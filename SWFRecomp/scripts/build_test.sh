@@ -49,22 +49,16 @@ if [ ! -d "$SWFMODERN_ROOT" ]; then
     exit 1
 fi
 
-# Copy or use main.c
-if [ "$TARGET" == "wasm" ]; then
-    # Use WASM wrapper main.c (has Emscripten exports)
-    cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${BUILD_DIR}/"
-    cp "${SWFRECOMP_ROOT}/wasm_wrappers/index_template.html" "${BUILD_DIR}/index.html"
+# Copy main.c
+# For NO_GRAPHICS mode, always use wasm_wrappers/main.c (works for both native and WASM)
+# This main.c properly initializes SWFAppContext for NO_GRAPHICS builds
+cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${BUILD_DIR}/"
 
+# For WASM builds, also copy HTML template
+if [ "$TARGET" == "wasm" ]; then
+    cp "${SWFRECOMP_ROOT}/wasm_wrappers/index_template.html" "${BUILD_DIR}/index.html"
     # Customize HTML with test name
     sed -i "s/{{TEST_NAME}}/${TEST_NAME}/g" "${BUILD_DIR}/index.html"
-else
-    # Use test's own main.c for native builds
-    if [ -f "${TEST_DIR}/main.c" ]; then
-        cp "${TEST_DIR}/main.c" "${BUILD_DIR}/"
-    else
-        # Fallback to wrapper main.c
-        cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${BUILD_DIR}/"
-    fi
 fi
 
 # Copy SWFModernRuntime source files
@@ -73,18 +67,11 @@ cp "${SWFMODERN_SRC}/actionmodern/action.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/variables.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
 
-# For WASM builds, use NO_GRAPHICS mode (console-only)
-# For native builds, use full graphics mode
-if [ "$TARGET" == "wasm" ]; then
-    echo "Using NO_GRAPHICS mode for WASM build..."
-    cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
-    cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
-else
-    echo "Using full graphics mode for native build..."
-    cp "${SWFMODERN_SRC}/libswf/swf.c" "${BUILD_DIR}/"
-    cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
-    cp "${SWFMODERN_SRC}/flashbang/flashbang.c" "${BUILD_DIR}/"
-fi
+# Use NO_GRAPHICS mode for both WASM and native builds (console-only)
+# This avoids SDL3/Vulkan/flashbang dependencies
+echo "Using NO_GRAPHICS mode (console-only)..."
+cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
+cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
 
 # Copy hashmap library (required for variable storage)
 cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${BUILD_DIR}/"
@@ -140,6 +127,8 @@ else
     # Compile SWFModernRuntime from source
     gcc \
         *.c \
+        -DNO_GRAPHICS \
+        -D_GNU_SOURCE \
         -I. \
         -I"${SWFMODERN_INC}" \
         -I"${SWFMODERN_INC}/actionmodern" \
