@@ -82,3 +82,4 @@ void actionSetVariable(char* stack, u32* sp);
 
 void actionTrace(char* stack, u32* sp);
 void actionGetTime(char* stack, u32* sp);
+void actionIncrement(char* stack, u32* sp);
