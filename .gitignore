@@ -1,3 +1,6 @@
+# Disabled git directories (for submodules converted to regular directories)
+.git.disabled
+
 # Visual Studio
 .vs/
 

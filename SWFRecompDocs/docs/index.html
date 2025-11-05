@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWFRecomp - Static Flash Recompiler</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #e0e0e0;
+            background: #1a1a1a;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        header {
+            background: #222;
+            color: #e0e0e0;
+            padding: 60px 40px;
+            text-align: center;
+            border-bottom: 3px solid #4CAF50;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 15px;
+            font-weight: 700;
+            color: #4CAF50;
+        }
+
+        .tagline {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            color: #b0b0b0;
+        }
+
+        .subtitle {
+            font-size: 1em;
+            color: #888;
+        }
+
+        main {
+            padding: 40px;
+        }
+
+        h2 {
+            color: #4CAF50;
+            margin: 30px 0 20px 0;
+            font-size: 1.8em;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+
+        p {
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            color: #d0d0d0;
+        }
+
+        .demo-section {
+            background: #1f1f1f;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .demo-card {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 1px solid #333;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-2px);
+            border-color: #4CAF50;
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.2);
+        }
+
+        .demo-card h3 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-size: 1.4em;
+        }
+
+        .demo-card p {
+            color: #b0b0b0;
+            margin-bottom: 15px;
+        }
+
+        .demo-link {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 12px 25px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .demo-link:hover {
+            background: #45a049;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature {
+            padding: 20px;
+            background: #1f1f1f;
+            border-radius: 8px;
+            border-top: 3px solid #4CAF50;
+            border: 1px solid #333;
+        }
+
+        .feature h3 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        .feature p {
+            color: #b0b0b0;
+        }
+
+        .links {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #333;
+        }
+
+        .links a {
+            color: #4CAF50;
+            text-decoration: none;
+            font-weight: 600;
+            margin-right: 20px;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            background: #1f1f1f;
+            color: #888;
+            border-top: 1px solid #333;
+        }
+
+        footer a {
+            color: #4CAF50;
+        }
+
+        code {
+            background: #000;
+            color: #4CAF50;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            border: 1px solid #333;
+        }
+
+        strong {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SWFRecomp</h1>
+            <p class="tagline">Static Flash Recompiler</p>
+            <p class="subtitle">Preserving Flash content forever through static recompilation to WebAssembly</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>What is SWFRecomp?</h2>
+                <p>
+                    SWFRecomp is a <strong>static recompiler</strong> that translates Flash SWF files into portable C code,
+                    which can then be compiled to native executables or WebAssembly for modern web browsers.
+                </p>
+                <p>
+                    Unlike emulators that interpret Flash bytecode at runtime, SWFRecomp performs a one-time
+                    translation, enabling Flash content to run natively without the Flash Player plugin.
+                </p>
+            </section>
+
+            <section class="features">
+                <div class="feature">
+                    <h3>Static Recompilation</h3>
+                    <p>Translates ActionScript bytecode to C code at build time, not runtime</p>
+                </div>
+                <div class="feature">
+                    <h3>WebAssembly Output</h3>
+                    <p>Compile to WASM for native browser execution with near-native performance</p>
+                </div>
+                <div class="feature">
+                    <h3>Native Builds</h3>
+                    <p>Also compiles to native executables</p>
+                </div>
+            </section>
+
+            <section class="demo-section">
+                <h2>Live Demos</h2>
+
+                <div class="demo-card">
+                    <h3>add_floats_consecutive_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic addition operations.</p>
+                    <a href="examples/add_floats_consecutive_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>add_floats_imprecise_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic addition operations.</p>
+                    <a href="examples/add_floats_imprecise_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>add_floats_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic addition operations.</p>
+                    <a href="examples/add_floats_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>add_strings_imprecise_swf_4</h3>
+                    <p>Flash SWF test demonstrating string concatenation with the <code>add</code> operator.</p>
+                    <a href="examples/add_strings_imprecise_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>add_strings_swf_4</h3>
+                    <p>Flash SWF test demonstrating string concatenation with the <code>add</code> operator.</p>
+                    <a href="examples/add_strings_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>and_floats_both_0_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/and_floats_both_0_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>and_floats_first_1_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/and_floats_first_1_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>and_floats_nonzero_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/and_floats_nonzero_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>and_floats_second_1_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/and_floats_second_1_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>and_floats_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/and_floats_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>divide_floats_error_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/divide_floats_error_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>dyna_string_triple_vars_optimized_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/dyna_string_triple_vars_optimized_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>dyna_string_triple_vars_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/dyna_string_triple_vars_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>dyna_string_vars_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/dyna_string_vars_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>equals_floats_0_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/equals_floats_0_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>equals_floats_1_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/equals_floats_1_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>equals_not_floats_false_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/equals_not_floats_false_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>equals_not_floats_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/equals_not_floats_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>float_vars_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/float_vars_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>jump_swf_4</h3>
+                    <p>Flash SWF test demonstrating ActionScript bytecode recompilation to WebAssembly.</p>
+                    <a href="examples/jump_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>less_floats_false_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/less_floats_false_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>less_floats_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/less_floats_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>multi_push_vars_swf_4</h3>
+                    <p>Flash SWF test demonstrating variable storage and retrieval with ActionScript.</p>
+                    <a href="examples/multi_push_vars_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>multiply_floats_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/multiply_floats_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>not_floats_nonzero_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/not_floats_nonzero_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>or_floats_false_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/or_floats_false_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>or_floats_first_true_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/or_floats_first_true_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>or_floats_nonzero_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/or_floats_nonzero_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>or_floats_second_true_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/or_floats_second_true_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>or_floats_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/or_floats_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_a_list_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_a_list_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_b_list_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_b_list_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_both_lists_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_both_lists_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_equals_a_not_list_false_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_equals_a_not_list_false_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_equals_a_not_list_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_equals_a_not_list_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_equals_b_not_list_false_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_equals_b_not_list_false_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_equals_b_not_list_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_equals_b_not_list_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_equals_false_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_equals_false_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_equals_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_equals_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_length_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_length_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_add_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_add_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_equals_0_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_equals_0_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_equals_1_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_equals_1_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>string_length_swf_4</h3>
+                    <p>Flash SWF test demonstrating string manipulation and operations.</p>
+                    <a href="examples/string_length_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>subtract_floats_swf_4</h3>
+                    <p>Flash SWF test demonstrating floating-point arithmetic operations.</p>
+                    <a href="examples/subtract_floats_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>trace_float_swf_4</h3>
+                    <p>Flash SWF test demonstrating console output with the <code>trace()</code> function.</p>
+                    <a href="examples/trace_float_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>trace_swf_4</h3>
+                    <p>Flash SWF test demonstrating console output with the <code>trace()</code> function.</p>
+                    <a href="examples/trace_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>vars_between_frames_swf_4</h3>
+                    <p>Flash SWF test demonstrating variable storage and retrieval with ActionScript.</p>
+                    <a href="examples/vars_between_frames_swf_4/" class="demo-link">View Demo →</a>
+                </div>
+
+                <p style="margin-top: 20px; color: #666;">
+                    More complex demos with graphics rendering coming soon!
+                </p>
+            </section>
+
+            <section>
+                <h2>Excluded Tests</h2>
+                <p>The following tests are currently excluded from the live demos due to known issues:</p>
+
+                <div style="margin: 20px 0;">
+
+                    <div style="background: #1f1f1f; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ff9800;">
+                        <h3 style="color: #ff9800; margin: 0 0 8px 0; font-size: 1.1em;">if_swf_4</h3>
+                        <p style="color: #b0b0b0; margin: 0; font-size: 0.95em;">Missing evaluateCondition() function in runtime</p>
+                    </div>
+
+                    <div style="background: #1f1f1f; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ff9800;">
+                        <h3 style="color: #ff9800; margin: 0 0 8px 0; font-size: 1.1em;">if_false_swf_4</h3>
+                        <p style="color: #b0b0b0; margin: 0; font-size: 0.95em;">Missing evaluateCondition() function in runtime</p>
+                    </div>
+
+                    <div style="background: #1f1f1f; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ff9800;">
+                        <h3 style="color: #ff9800; margin: 0 0 8px 0; font-size: 1.1em;">speed_test_swf_4</h3>
+                        <p style="color: #b0b0b0; margin: 0; font-size: 0.95em;">Build timeout - generates 811KB of code (stress test)</p>
+                    </div>
+
+                </div>
+            </section>
+
+            <section>
+                <h2>How It Works</h2>
+                <p><strong>1. SWF Parsing:</strong> Reads and decompresses the Flash SWF file</p>
+                <p><strong>2. Code Generation:</strong> Translates ActionScript bytecode to portable C17 code</p>
+                <p><strong>3. Compilation:</strong> Compiles C code to native executables or WebAssembly</p>
+                <p><strong>4. Execution:</strong> Runs in browsers or as standalone applications</p>
+            </section>
+
+            <section class="links">
+                <h2>Links</h2>
+                <a href="https://github.com/SWFRecomp/SWFRecomp" target="_blank">GitHub Repository</a>
+                <a href="https://github.com/SWFRecomp/SWFRecomp/blob/master/README.md" target="_blank">Documentation</a>
+                <a href="https://github.com/SWFRecomp/SWFModernRuntime" target="_blank">SWFModernRuntime</a>
+            </section>
+        </main>
+
+        <footer>
+            <p>SWFRecomp - Preserving Flash History Through Modern Technology</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,9 @@
+.vs/
+build/
+out/
+RecompiledTags/
+RecompiledScripts/
+sup*.swf
+
+# Test executables
+test_vars
