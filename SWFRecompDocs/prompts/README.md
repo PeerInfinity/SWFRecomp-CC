@@ -17,16 +17,28 @@ prompts/
 
 ## Current Prompts
 
-### Batch 1: Simple Opcodes (1-2 hours each)
+### Batch 1: Simple Opcodes (1-2 hours each) - COMPLETE ✅
 
-#### Comparison Operations
-- **opcode-greater-0x48.md** - GREATER comparison operator
+#### Comparison Operations (4 prompts)
+- **opcode-greater-0x67.md** - GREATER comparison operator (>)
+- **opcode-string-greater-0x68.md** - STRING_GREATER lexicographic comparison
+- **opcode-strict-equals-0x66.md** - STRICT_EQUALS (===) comparison
+- **opcode-less2-0x48.md** - LESS2 comparison using ECMA-262 rules
 
-#### Bitwise Operations
-- **opcode-bit-and-0x60.md** - Bitwise AND operation
+#### Bitwise Operations (6 prompts)
+- **opcode-bit-and-0x60.md** - Bitwise AND operation (&)
+- **opcode-bit-or-0x61.md** - Bitwise OR operation (|)
+- **opcode-bit-xor-0x62.md** - Bitwise XOR operation (^)
+- **opcode-bit-lshift-0x63.md** - Bitwise left shift (<<)
+- **opcode-bit-rshift-0x64.md** - Bitwise arithmetic right shift (>>)
+- **opcode-bit-urshift-0x65.md** - Bitwise unsigned right shift (>>>)
 
-#### Type Conversion
-- **opcode-to-integer-0x18.md** - Convert value to 32-bit integer
+#### Type Conversion (3 prompts)
+- **opcode-to-integer-0x18.md** - Convert value to 32-bit integer (truncate)
+- **opcode-to-number-0x4a.md** - Convert value to number
+- **opcode-to-string-0x4b.md** - Convert value to string
+
+**Total Batch 1 Prompts**: 13 prompts created ✅
 
 ## How to Use These Prompts
 
@@ -73,11 +85,11 @@ Each prompt contains:
 Prompts are organized by implementation priority:
 
 ### Batch 1: Simple (13 opcodes, 15-25 hours total)
-- **Comparison**: GREATER, GREATER_EQUALS, LESS_EQUALS, STRICT_EQUALS
-- **Bitwise**: BIT_AND, BIT_OR, BIT_XOR, BIT_LSHIFT, BIT_RSHIFT, BIT_URSHIFT
-- **Type Conversion**: TO_INTEGER, TO_NUMBER, TO_STRING
+- **Comparison**: GREATER (0x67), STRING_GREATER (0x68), STRICT_EQUALS (0x66), LESS2 (0x48)
+- **Bitwise**: BIT_AND (0x60), BIT_OR (0x61), BIT_XOR (0x62), BIT_LSHIFT (0x63), BIT_RSHIFT (0x64), BIT_URSHIFT (0x65)
+- **Type Conversion**: TO_INTEGER (0x18), TO_NUMBER (0x4A), TO_STRING (0x4B)
 
-**Status**: 3 prompts created (samples), 10 more to create
+**Status**: ✅ COMPLETE - All 13 prompts created (2025-11-05)
 
 ### Batch 2: Medium (14 opcodes, 30-55 hours total)
 - **String Operations**: 7 opcodes
@@ -128,10 +140,10 @@ Each implemented opcode should:
 
 ## Next Steps
 
-1. **Complete Batch 1 prompts** - Create remaining 10 prompts for simple opcodes
+1. ~~**Complete Batch 1 prompts**~~ ✅ DONE - All 13 prompts created
 2. **Begin parallel implementation** - Assign prompts to multiple Claude Code instances
 3. **Monitor and merge** - Sequential merge as implementations complete
-4. **Create Batch 2 prompts** - After Batch 1 success
+4. **Create Batch 2 prompts** - String operations, stack operations, utility opcodes
 5. **Continue expansion** - Iterative batches until all opcodes implemented
 
 ## Resources
@@ -151,6 +163,7 @@ Each implemented opcode should:
 
 ---
 
-**Status**: Ready for parallel opcode implementation
+**Status**: Batch 1 complete (13 prompts), ready for parallel implementation
 **Created**: 2025-11-05
 **Last Updated**: 2025-11-05
+**Batch 1 Completed**: 2025-11-05
