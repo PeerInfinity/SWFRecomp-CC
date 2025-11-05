@@ -309,7 +309,6 @@ namespace SWFRecomp
 					break;
 				}
 
-<<<<<<< HEAD
 				case SWF_ACTION_BIT_OR:
 				{
 					out_script << "\t" << "// Bit Or" << endl

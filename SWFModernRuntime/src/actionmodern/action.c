@@ -54,8 +54,6 @@ ActionStackValueType convertDouble(char* stack, u32* sp)
 
 void pushVar(char* stack, u32* sp, ActionVar* var)
 {
-	u32 oldSP;
-
 	switch (var->type)
 	{
 		case ACTION_STACK_VALUE_F32:
@@ -499,7 +497,6 @@ void actionNot(char* stack, u32* sp)
 
 void actionToInteger(char* stack, u32* sp)
 {
-	u32 oldSP;
 	ActionVar v;
 	convertFloat(stack, sp);
 	popVar(stack, sp, &v);
@@ -871,7 +868,6 @@ void actionTrace(char* stack, u32* sp)
 
 void actionGetVariable(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Read variable name info from stack
 	u32 string_id = VAL(u32, &stack[*sp + 4]);
@@ -995,7 +991,6 @@ void actionDecrement(char* stack, u32* sp)
 
 void actionBitAnd(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Convert and pop second operand (a)
 	convertFloat(stack, sp);
@@ -1019,10 +1014,8 @@ void actionBitAnd(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
 
-<<<<<<< HEAD
 void actionBitOr(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Convert and pop second operand (a)
 	convertFloat(stack, sp);
@@ -1048,7 +1041,6 @@ void actionBitOr(char* stack, u32* sp)
 
 void actionBitXor(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Convert and pop second operand (a)
 	convertFloat(stack, sp);
@@ -1074,7 +1066,6 @@ void actionBitXor(char* stack, u32* sp)
 
 void actionBitLShift(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Pop shift count (first argument)
 	convertFloat(stack, sp);
@@ -1103,7 +1094,6 @@ void actionBitLShift(char* stack, u32* sp)
 
 void actionBitRShift(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Pop shift count (first argument)
 	convertFloat(stack, sp);
@@ -1135,7 +1125,6 @@ void actionBitRShift(char* stack, u32* sp)
 
 void actionBitURShift(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Pop shift count (first argument)
 	convertFloat(stack, sp);
@@ -1170,8 +1159,6 @@ void actionBitURShift(char* stack, u32* sp)
 
 void actionStrictEquals(char* stack, u32* sp)
 {
-	u32 oldSP;  // Required by PUSH macro
-
 	// Pop first argument (no type conversion - strict equality!)
 	ActionVar a;
 	popVar(stack, sp, &a);
@@ -1239,7 +1226,6 @@ void actionStrictEquals(char* stack, u32* sp)
 }
 void actionStringGreater(char* stack, u32* sp)
 {
-	u32 oldSP;
 
 	// Get first string (arg1)
 	ActionVar a;
