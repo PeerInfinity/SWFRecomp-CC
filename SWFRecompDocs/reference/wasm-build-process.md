@@ -594,6 +594,23 @@ rm -rf tests/<test_name>/build/wasm
 ./scripts/build_test.sh <test_name> wasm
 ```
 
+#### 3a. Math function errors (Native only)
+
+**Error:** (Native builds only)
+```
+undefined reference to 'fmod'
+undefined reference to 'fmodf'
+```
+
+**Cause:** Math library not linked
+
+**Solution:** ✅ Already fixed in `build_test.sh` (2025-11-05)
+- Native builds now include `-lm` flag automatically
+- WASM builds (Emscripten) handle math library automatically
+- No action needed for new implementations
+
+**Note:** If you see this error, update to the latest version of `scripts/build_test.sh`.
+
 #### 4. WASM doesn't load in browser
 
 **Error:** "Failed to fetch" or CORS error

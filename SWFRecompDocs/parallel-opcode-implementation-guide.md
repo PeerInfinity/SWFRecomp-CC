@@ -238,6 +238,24 @@ trace(5 OPERATION 3);  // Replace OPERATION with your opcode's operator
 
 Compile to SWF using Flex SDK or MTASC compiler. Verify the expected output manually.
 
+**IMPORTANT - Stack Operation Order**:
+
+When creating test SWFs manually (using Python scripts), remember that SWF uses a **stack-based execution model**:
+
+For binary operations `(a OP b)`:
+- **Push b first** (becomes second operand after two pops)
+- **Push a second** (becomes first operand after first pop)
+- **Result**: `b OP a`
+
+**Example for 7 % 3**:
+```python
+action_push_7 = ...  # Push 7 first (second operand 'b')
+action_push_3 = ...  # Push 3 second (first operand 'a')
+action_modulo = bytes([0x3F])  # Computes: 7 % 3 = 1
+```
+
+If you push in the wrong order, you'll compute `3 % 7 = 3` instead of `7 % 3 = 1`!
+
 #### Step 6: Setup Test Directory
 
 ```bash
@@ -418,7 +436,7 @@ your_opcode_swf_4/
 - Iterator patterns
 - **IMPORTANT**: See "Object Allocation Model" section below
 
-## Currently Implemented Opcodes (24 total)
+## Currently Implemented Opcodes (25 total)
 
 | Opcode | Hex  | Name | Category |
 |--------|------|------|----------|
@@ -441,6 +459,7 @@ your_opcode_swf_4/
 | 0x21 | 0x21 | STRING_ADD | String |
 | 0x26 | 0x26 | TRACE | Debug |
 | 0x34 | 0x34 | GET_TIME | Special |
+| 0x3F | 0x3F | MODULO | Arithmetic |
 | 0x88 | 0x88 | CONSTANT_POOL | Special |
 | 0x96 | 0x96 | PUSH | Stack |
 | 0x99 | 0x99 | JUMP | Control |
@@ -748,6 +767,13 @@ Expected output:
 - Fixed by adding `-D_GNU_SOURCE` flag in build script
 - Build script now includes this automatically
 
+**"undefined reference to fmod/fmodf/sin/cos/etc."** ✅ FIXED
+- Math library not linked (needed for math.h functions)
+- Fixed by adding `-lm` flag in build_test.sh (2025-11-05)
+- Applies to all native builds automatically
+- Emscripten (WASM builds) handles this automatically
+- If implementing opcodes using `<math.h>`, this is already handled
+
 **"Type mismatch" errors**
 - Incorrect stack macro usage
 - Check PUSH/POP types match
@@ -930,7 +956,19 @@ An opcode implementation is complete when:
 - Automated build script handles all complexity
 - trace_swf_4 test passes with expected output
 
-🟢 **Status**: PRODUCTION READY for console-only opcode implementation
+✅ **7-Step Workflow Validated** (2025-11-05 - Experiment #2)
+- Implemented Modulo opcode (0x3F) following all 7 steps
+- Actual time: 45 minutes (well within 1-2 hour estimate for simple opcodes)
+- Documentation sufficient for autonomous implementation
+- Pattern-based development highly effective
+- Math library linking fixed for all future builds
+- Test: `7 % 3 = 1` passes correctly
+
+🟢 **Status**: PRODUCTION READY for parallel opcode implementation
+- Build system: ✅ Validated
+- Workflow: ✅ Validated
+- Documentation: ✅ Sufficient
+- Time estimates: ✅ Accurate
 
 ### Summary
 
@@ -954,4 +992,9 @@ After validating your environment with the Quick Start:
 4. Verify output matches expected behavior
 5. Document any edge cases encountered
 
-**Ready to begin?** Start with a simple opcode like Modulo (0x3F) to familiarize yourself with the workflow!
+**Ready to begin?** Start with a simple arithmetic opcode (like Increment, Decrement, or comparison operators) to familiarize yourself with the workflow. See the "Opcode Categories and Complexity" section for suggestions.
+
+**Reference implementations:**
+- Simple arithmetic: See Modulo (0x3F) in `tests/modulo_swf_4/`
+- String operations: See trace_swf_4, string_equals_swf_4
+- Variables: See get_variable, set_variable tests
