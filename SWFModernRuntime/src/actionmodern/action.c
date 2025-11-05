@@ -1050,3 +1050,32 @@ void actionBitXor(char* stack, u32* sp)
 	float result_f = (float)result;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
+
+void actionBitLShift(char* stack, u32* sp)
+{
+	u32 oldSP;
+
+	// Pop shift count (first argument)
+	convertFloat(stack, sp);
+	ActionVar shift_count_var;
+	popVar(stack, sp, &shift_count_var);
+
+	// Pop value to shift (second argument)
+	convertFloat(stack, sp);
+	ActionVar value_var;
+	popVar(stack, sp, &value_var);
+
+	// Convert to 32-bit signed integers (truncate, don't round)
+	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
+	int32_t value = (int32_t)VAL(float, &value_var.data.numeric_value);
+
+	// Mask shift count to 5 bits (0-31 range)
+	shift_count = shift_count & 0x1F;
+
+	// Perform left shift
+	int32_t result = value << shift_count;
+
+	// Push result as float (ActionScript stores all numbers as float)
+	float result_f = (float)result;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
+}
