@@ -290,6 +290,7 @@ namespace SWFRecomp
 					break;
 				}
 
+<<<<<<< HEAD
 				case SWF_ACTION_BIT_OR:
 				{
 					out_script << "\t" << "// Bit Or" << endl
@@ -310,6 +311,14 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// BitLShift" << endl
 							   << "\t" << "actionBitLShift(stack, sp);" << endl;
+
+					break;
+				}
+
+				case SWF_ACTION_BIT_RSHIFT:
+				{
+					out_script << "\t" << "// BitRShift" << endl
+							   << "\t" << "actionBitRShift(stack, sp);" << endl;
 
 					break;
 				}
