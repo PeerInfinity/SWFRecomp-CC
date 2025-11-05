@@ -998,3 +998,29 @@ void actionBitAnd(char* stack, u32* sp)
 	float result_f = (float)result;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
+
+void actionBitOr(char* stack, u32* sp)
+{
+	u32 oldSP;
+
+	// Convert and pop second operand (a)
+	convertFloat(stack, sp);
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	// Convert and pop first operand (b)
+	convertFloat(stack, sp);
+	ActionVar b;
+	popVar(stack, sp, &b);
+
+	// Convert to 32-bit signed integers (truncate, don't round)
+	int32_t a_int = (int32_t)VAL(float, &a.data.numeric_value);
+	int32_t b_int = (int32_t)VAL(float, &b.data.numeric_value);
+
+	// Perform bitwise OR
+	int32_t result = b_int | a_int;
+
+	// Push result as float (ActionScript stores all numbers as float)
+	float result_f = (float)result;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
+}

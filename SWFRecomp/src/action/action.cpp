@@ -290,6 +290,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_BIT_OR:
+				{
+					out_script << "\t" << "// Bit Or" << endl
+							   << "\t" << "actionBitOr(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;
