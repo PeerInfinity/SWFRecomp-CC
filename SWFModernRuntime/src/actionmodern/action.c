@@ -531,6 +531,14 @@ void actionToNumber(char* stack, u32* sp)
 	// Value is already converted on stack in-place
 }
 
+void actionToString(char* stack, u32* sp, char* str_buffer)
+{
+	// Convert top of stack to string
+	// If already string, this does nothing
+	// If float, converts using snprintf with %.15g format
+	convertString(stack, sp, str_buffer);
+}
+
 int evaluateCondition(char* stack, u32* sp)
 {
 	ActionVar v;
