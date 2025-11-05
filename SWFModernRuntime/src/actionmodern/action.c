@@ -268,6 +268,50 @@ void actionDivide(char* stack, u32* sp)
 	}
 }
 
+void actionModulo(char* stack, u32* sp)
+{
+	convertFloat(stack, sp);
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	convertFloat(stack, sp);
+	ActionVar b;
+	popVar(stack, sp, &b);
+
+	if (VAL(float, &a.data.numeric_value) == 0.0f)
+	{
+		// SWF 4: Division by zero returns error string
+		PUSH_STR("#ERROR#", 8);
+	}
+
+	else
+	{
+		if (a.type == ACTION_STACK_VALUE_F64)
+		{
+			double a_val = VAL(double, &a.data.numeric_value);
+			double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
+
+			double c = fmod(b_val, a_val);
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+		}
+
+		else if (b.type == ACTION_STACK_VALUE_F64)
+		{
+			double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
+			double b_val = VAL(double, &b.data.numeric_value);
+
+			double c = fmod(b_val, a_val);
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+		}
+
+		else
+		{
+			float c = fmodf(VAL(float, &b.data.numeric_value), VAL(float, &a.data.numeric_value));
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
+		}
+	}
+}
+
 void actionEquals(char* stack, u32* sp)
 {
 	convertFloat(stack, sp);

@@ -67,6 +67,7 @@ void actionAdd(char* stack, u32* sp);
 void actionSubtract(char* stack, u32* sp);
 void actionMultiply(char* stack, u32* sp);
 void actionDivide(char* stack, u32* sp);
+void actionModulo(char* stack, u32* sp);
 void actionEquals(char* stack, u32* sp);
 void actionLess(char* stack, u32* sp);
 void actionAnd(char* stack, u32* sp);

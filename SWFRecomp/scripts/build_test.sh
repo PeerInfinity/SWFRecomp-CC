@@ -137,7 +137,8 @@ else
         -Wall \
         -Wno-unused-variable \
         -std=c17 \
-        -o "${TEST_NAME}"
+        -o "${TEST_NAME}" \
+        -lm
 
     echo ""
     echo "✅ Native build complete!"

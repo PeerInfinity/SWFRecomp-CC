@@ -238,10 +238,18 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// GetTime" << endl
 							   << "\t" << "actionGetTime(stack, sp);" << endl;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_MODULO:
+				{
+					out_script << "\t" << "// Modulo" << endl
+							   << "\t" << "actionModulo(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;
