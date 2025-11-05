@@ -24,6 +24,35 @@ if [ ! -d "$TEST_DIR" ]; then
     exit 1
 fi
 
+# Generate test.swf if it doesn't exist
+if [ ! -f "${TEST_DIR}/test.swf" ]; then
+    echo "test.swf not found, checking for generation script..."
+
+    # Look for common SWF generation script names
+    for script in create_test_swf.py generate_swf.py make_test.py create_swf.py; do
+        if [ -f "${TEST_DIR}/${script}" ]; then
+            echo "Found ${script}, generating test.swf..."
+            cd "${TEST_DIR}"
+            python3 "${script}"
+            if [ -f "test.swf" ]; then
+                echo "✅ test.swf generated successfully"
+                break
+            else
+                echo "⚠️  Warning: ${script} ran but test.swf was not created"
+            fi
+        fi
+    done
+
+    # Final check
+    if [ ! -f "${TEST_DIR}/test.swf" ]; then
+        echo "Error: test.swf not found and no generation script available"
+        echo "Expected either:"
+        echo "  - ${TEST_DIR}/test.swf (SWF file)"
+        echo "  - ${TEST_DIR}/create_test_swf.py (generation script)"
+        exit 1
+    fi
+fi
+
 # Run SWFRecomp if needed
 if [ ! -d "${TEST_DIR}/RecompiledScripts" ]; then
     echo "Running SWFRecomp..."
