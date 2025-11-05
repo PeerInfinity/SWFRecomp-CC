@@ -1,0 +1,51 @@
+# Visual Studio
+.vs/
+
+# Build directories
+build/
+build-*/
+build_*/
+out/
+
+# Recompiled output
+RecompiledTags/
+RecompiledScripts/
+
+# Flash files
+*.swf
+sup*.swf
+
+# Libraries
+zlib.dll
+*.lib
+*.a
+
+# Compiled files
+*.spv
+*.o
+
+# WASM build artifacts (but keep source)
+wasm/examples/*/*.wasm
+wasm/examples/*/*.js
+!wasm/examples/*/build.sh
+!wasm/examples/*/*.c
+!wasm/examples/*/*.h
+!wasm/examples/*/*.html
+
+# Emscripten
+.emscripten_cache/
+.emscripten_ports/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test executables
+test_vars

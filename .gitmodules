@@ -1,0 +1,12 @@
+[submodule "SWFModernRuntime"]
+	path = SWFModernRuntime
+	url = https://github.com/PeerInfinity/SWFModernRuntime.git
+	branch = wasm-support-cc
+[submodule "SWFRecomp"]
+	path = SWFRecomp
+	url = https://github.com/PeerInfinity/SWFRecomp.git
+	branch = wasm-support-cc
+[submodule "SWFRecompDocs"]
+	path = SWFRecompDocs
+	url = https://github.com/SWFRecomp/SWFRecompDocs.git
+	branch = wasm-support-cc
