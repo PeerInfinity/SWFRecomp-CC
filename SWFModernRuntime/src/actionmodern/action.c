@@ -998,3 +998,36 @@ void actionBitAnd(char* stack, u32* sp)
 	float result_f = (float)result;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
+
+void actionBitURShift(char* stack, u32* sp)
+{
+	// Pop shift count (first argument)
+	convertFloat(stack, sp);
+	ActionVar shift_count_var;
+	popVar(stack, sp, &shift_count_var);
+
+	// Pop value to shift (second argument)
+	convertFloat(stack, sp);
+	ActionVar value_var;
+	popVar(stack, sp, &value_var);
+
+	// Convert to integers
+	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
+
+	// IMPORTANT: Use UNSIGNED for logical shift
+	uint32_t value = (uint32_t)((int32_t)VAL(float, &value_var.data.numeric_value));
+
+	// Mask shift count to 5 bits (0-31 range)
+	shift_count = shift_count & 0x1F;
+
+	// Perform logical (unsigned) right shift
+	// In C, >> on unsigned int is logical shift (zero-fill)
+	uint32_t result = value >> shift_count;
+
+	// Convert result back to float for stack
+	// Cast through double to preserve full 32-bit unsigned value
+	float result_float = (float)((double)result);
+
+	// Push result
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_float));
+}

@@ -290,6 +290,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_BIT_URSHIFT:
+				{
+					out_script << "\t" << "// BitURShift" << endl
+							   << "\t" << "actionBitURShift(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;
