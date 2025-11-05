@@ -290,6 +290,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_STRICT_EQUALS:
+				{
+					out_script << "\t" << "// StrictEquals" << endl
+							   << "\t" << "actionStrictEquals(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;

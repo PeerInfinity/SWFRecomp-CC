@@ -998,3 +998,73 @@ void actionBitAnd(char* stack, u32* sp)
 	float result_f = (float)result;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
+
+void actionStrictEquals(char* stack, u32* sp)
+{
+	u32 oldSP;  // Required by PUSH macro
+
+	// Pop first argument (no type conversion - strict equality!)
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	// Pop second argument (no type conversion - strict equality!)
+	ActionVar b;
+	popVar(stack, sp, &b);
+
+	float result = 0.0f;
+
+	// First check: types must match
+	if (a.type == b.type)
+	{
+		// Second check: values must match
+		switch (a.type)
+		{
+			case ACTION_STACK_VALUE_F32:
+			{
+				float a_val = VAL(float, &a.data.numeric_value);
+				float b_val = VAL(float, &b.data.numeric_value);
+				result = (a_val == b_val) ? 1.0f : 0.0f;
+				break;
+			}
+
+			case ACTION_STACK_VALUE_F64:
+			{
+				double a_val = VAL(double, &a.data.numeric_value);
+				double b_val = VAL(double, &b.data.numeric_value);
+				result = (a_val == b_val) ? 1.0f : 0.0f;
+				break;
+			}
+
+			case ACTION_STACK_VALUE_STRING:
+			{
+				const char* str_a = (const char*) a.data.numeric_value;
+				const char* str_b = (const char*) b.data.numeric_value;
+				// Check for NULL pointers first
+				if (str_a != NULL && str_b != NULL) {
+					result = (strcmp(str_a, str_b) == 0) ? 1.0f : 0.0f;
+				} else {
+					// If either is NULL, they're only equal if both are NULL
+					result = (str_a == str_b) ? 1.0f : 0.0f;
+				}
+				break;
+			}
+
+			case ACTION_STACK_VALUE_STR_LIST:
+			{
+				// For string lists, use strcmp_list_a_list_b
+				int cmp_result = strcmp_list_a_list_b(a.data.numeric_value, b.data.numeric_value);
+				result = (cmp_result == 0) ? 1.0f : 0.0f;
+				break;
+			}
+
+			// For other types (OBJECT, etc.), compare raw values
+			default:
+				result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
+				break;
+		}
+	}
+	// else: different types, result remains 0.0f (false)
+
+	// Push boolean result
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
