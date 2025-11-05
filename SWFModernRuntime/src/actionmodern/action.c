@@ -851,3 +851,23 @@ void actionIncrement(char* stack, u32* sp)
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 	}
 }
+
+void actionDecrement(char* stack, u32* sp)
+{
+	convertFloat(stack, sp);
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	if (a.type == ACTION_STACK_VALUE_F64)
+	{
+		double val = VAL(double, &a.data.numeric_value);
+		double result = val - 1.0;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+	}
+	else
+	{
+		float val = VAL(float, &a.data.numeric_value);
+		float result = val - 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+	}
+}

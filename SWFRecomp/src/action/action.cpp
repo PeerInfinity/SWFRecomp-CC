@@ -250,6 +250,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_DECREMENT:
+				{
+					out_script << "\t" << "// Decrement" << endl
+							   << "\t" << "actionDecrement(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;
