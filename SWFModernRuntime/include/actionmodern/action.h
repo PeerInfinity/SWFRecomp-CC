@@ -89,3 +89,4 @@ void actionIncrement(char* stack, u32* sp);
 void actionDecrement(char* stack, u32* sp);
 void actionBitAnd(char* stack, u32* sp);
 void actionBitOr(char* stack, u32* sp);
+void actionBitXor(char* stack, u32* sp);
