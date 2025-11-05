@@ -266,8 +266,16 @@ mkdir your_opcode_swf_4
 # Copy config template
 cp trace_swf_4/config.toml your_opcode_swf_4/
 
-# Place your test.swf in the directory
+# Option A: Place your test.swf in the directory
 cp /path/to/your/test.swf your_opcode_swf_4/test.swf
+
+# Option B: Create a Python script to generate test.swf (recommended)
+# The build script will automatically run it if test.swf is missing
+cat > your_opcode_swf_4/create_test_swf.py << 'EOF'
+#!/usr/bin/env python3
+# Script to generate test.swf
+# (See trace_swf_4/create_test_swf.py for examples)
+EOF
 ```
 
 **config.toml structure**:
@@ -282,6 +290,8 @@ do_recompile = true
 ```
 
 **Note**: You do NOT need to copy runtime files, Makefiles, or build scripts. The automated build script (`scripts/build_test.sh`) handles all of this for you.
+
+**Auto-generation feature** (added 2025-11-05): The build script now automatically detects when `test.swf` is missing and looks for generation scripts (`create_test_swf.py`, `generate_swf.py`, `make_test.py`, `create_swf.py`). If found, it runs the script automatically before compilation. This eliminates the manual step of generating test files.
 
 #### Step 7: Build and Verify
 
@@ -299,11 +309,12 @@ cd SWFRecomp
 ```
 
 **What the build script does automatically:**
-1. Runs SWFRecomp if RecompiledScripts/ doesn't exist
-2. Copies SWFModernRuntime sources (action.c, variables.c, etc.)
-3. Copies generated files (script_*.c, tagMain.c, etc.)
-4. Compiles with NO_GRAPHICS mode (console-only)
-5. Links everything into a single executable
+1. Generates test.swf if missing (runs create_test_swf.py or similar)
+2. Runs SWFRecomp if RecompiledScripts/ doesn't exist
+3. Copies SWFModernRuntime sources (action.c, variables.c, etc.)
+4. Copies generated files (script_*.c, tagMain.c, etc.)
+5. Compiles with NO_GRAPHICS mode (console-only)
+6. Links everything into a single executable
 
 **Build output location:**
 - Native: `tests/your_opcode_swf_4/build/native/your_opcode_swf_4`
