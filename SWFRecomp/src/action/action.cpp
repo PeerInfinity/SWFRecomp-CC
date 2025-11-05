@@ -206,10 +206,18 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Pop" << endl
 							   << "\t" << "POP();" << endl;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_TO_INTEGER:
+				{
+					out_script << "\t" << "// ToInteger" << endl
+							   << "\t" << "actionToInteger(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_GET_VARIABLE:
 				{
 					out_script << "\t" << "// GetVariable" << endl

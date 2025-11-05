@@ -457,9 +457,31 @@ void actionNot(char* stack, u32* sp)
 	ActionVar v;
 	convertFloat(stack, sp);
 	popVar(stack, sp, &v);
-	
+
 	float result = v.data.numeric_value == 0.0f ? 1.0f : 0.0f;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u64, &result));
+}
+
+void actionToInteger(char* stack, u32* sp)
+{
+	u32 oldSP;
+	ActionVar v;
+	convertFloat(stack, sp);
+	popVar(stack, sp, &v);
+
+	float f = VAL(float, &v.data.numeric_value);
+
+	// Handle special values: NaN and Infinity -> 0
+	if (isnan(f) || isinf(f)) {
+		f = 0.0f;
+	} else {
+		// Convert to 32-bit signed integer (truncate toward zero)
+		int32_t int_value = (int32_t)f;
+		// Convert back to float for pushing
+		f = (float)int_value;
+	}
+
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &f));
 }
 
 int evaluateCondition(char* stack, u32* sp)
