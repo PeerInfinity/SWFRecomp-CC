@@ -519,12 +519,24 @@ void actionToInteger(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &f));
 }
 
+void actionToNumber(char* stack, u32* sp)
+{
+	// Convert top of stack to number
+	// convertFloat() handles all type conversions:
+	// - Number: return as-is
+	// - String: parse as number (empty→0, invalid→NaN)
+	// - Boolean: true→1, false→0
+	// - Null/undefined: NaN
+	convertFloat(stack, sp);
+	// Value is already converted on stack in-place
+}
+
 int evaluateCondition(char* stack, u32* sp)
 {
 	ActionVar v;
 	convertFloat(stack, sp);
 	popVar(stack, sp, &v);
-	
+
 	return v.data.numeric_value != 0.0f;
 }
 
