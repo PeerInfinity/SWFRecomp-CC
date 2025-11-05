@@ -1237,3 +1237,24 @@ void actionStrictEquals(char* stack, u32* sp)
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
+void actionStringGreater(char* stack, u32* sp)
+{
+	u32 oldSP;
+
+	// Get first string (arg1)
+	ActionVar a;
+	popVar(stack, sp, &a);
+	const char* str_a = (const char*) a.data.numeric_value;
+
+	// Get second string (arg2)
+	ActionVar b;
+	popVar(stack, sp, &b);
+	const char* str_b = (const char*) b.data.numeric_value;
+
+	// Compare: b > a (using strcmp)
+	// strcmp returns positive if str_b > str_a
+	float result = (strcmp(str_b, str_a) > 0) ? 1.0f : 0.0f;
+
+	// Push boolean result
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}

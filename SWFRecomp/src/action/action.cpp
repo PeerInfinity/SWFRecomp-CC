@@ -358,6 +358,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_STRING_GREATER:
+				{
+					out_script << "\t" << "// StringGreater" << endl
+							   << "\t" << "actionStringGreater(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;
