@@ -23,8 +23,8 @@ action_push_5 += struct.pack('<f', 5.0)  # Float value 5.0
 action_push_3 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH action, length=5, type=1 (float)
 action_push_3 += struct.pack('<f', 3.0)  # Float value 3.0
 
-# Greater operation (0x48)
-action_greater = bytes([0x48])
+# Greater operation (0x67)
+action_greater = bytes([0x67])
 
 # Trace action (0x26)
 action_trace = bytes([0x26])

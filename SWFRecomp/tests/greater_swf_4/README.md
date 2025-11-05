@@ -1,11 +1,11 @@
-# GREATER Opcode Test (0x48)
+# GREATER Opcode Test (0x67)
 
 This test verifies the implementation of the GREATER comparison opcode in ActionScript 2.
 
 ## Opcode Details
 
-- **Opcode**: 0x48
-- **Name**: GREATER
+- **Opcode**: 0x67
+- **Name**: GREATER (ActionGreater)
 - **Category**: Comparison
 - **SWF Version**: 5+
 
@@ -53,7 +53,7 @@ cd SWFRecomp
 
 ## Implementation Files
 
-- **Enum**: `SWFRecomp/include/action/action.hpp` - `SWF_ACTION_GREATER = 0x48`
+- **Enum**: `SWFRecomp/include/action/action.hpp` - `SWF_ACTION_GREATER = 0x67`
 - **Translation**: `SWFRecomp/src/action/action.cpp` - case `SWF_ACTION_GREATER`
 - **Declaration**: `SWFModernRuntime/include/actionmodern/action.h` - `void actionGreater(char* stack, u32* sp)`
 - **Implementation**: `SWFModernRuntime/src/actionmodern/action.c` - `actionGreater()` function
