@@ -75,6 +75,7 @@ void actionAnd(char* stack, u32* sp);
 void actionOr(char* stack, u32* sp);
 void actionNot(char* stack, u32* sp);
 void actionToInteger(char* stack, u32* sp);
+void actionToNumber(char* stack, u32* sp);
 
 void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLength(char* stack, u32* sp, char* v_str);

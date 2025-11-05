@@ -266,6 +266,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_TO_NUMBER:
+				{
+					out_script << "\t" << "// ToNumber" << endl
+							   << "\t" << "actionToNumber(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_INCREMENT:
 				{
 					out_script << "\t" << "// Increment" << endl
