@@ -58,6 +58,12 @@ extern char* str_0;
     stack[(*sp)++] = '\0'; \
 } while(0)
 
+#define PUSH_STR_ID(str_id, len, id) do { \
+    memcpy(stack + (*sp), str_id, len); \
+    (*sp) += len; \
+    stack[(*sp)++] = '\0'; \
+} while(0)
+
 #define PUSH_FLOAT(val) do { \
     *((float*)(stack + (*sp))) = val; \
     (*sp) += sizeof(float); \
