@@ -828,6 +828,26 @@ void actionGetTime(char* stack, u32* sp)
 {
 	u32 delta_ms = get_elapsed_ms() - start_time;
 	float delta_ms_f32 = (float) delta_ms;
-	
+
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &delta_ms_f32));
+}
+
+void actionDecrement(char* stack, u32* sp)
+{
+	convertFloat(stack, sp);
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	if (a.type == ACTION_STACK_VALUE_F64)
+	{
+		double val = VAL(double, &a.data.numeric_value);
+		double result = val - 1.0;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+	}
+	else
+	{
+		float val = VAL(float, &a.data.numeric_value);
+		float result = val - 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+	}
 }
