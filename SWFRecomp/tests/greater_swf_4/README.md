@@ -1,68 +1,76 @@
-# LESS2 Opcode Test (0x48) - Originally labeled "GREATER"
+# GREATER Opcode Test (0x67)
 
-**IMPORTANT NOTE**: This test was originally created to test the "GREATER" operation, but opcode 0x48 is actually **ActionLess2** according to the official SWF specification. The test has been updated to reflect the correct semantics.
+This test verifies the implementation of the GREATER comparison opcode in ActionScript 2.
 
 ## Opcode Details
 
-- **Opcode**: 0x48
-- **Official Name**: ActionLess2 (not ActionGreater!)
+- **Opcode**: 0x67
+- **Name**: GREATER (ActionGreater)
 - **Category**: Comparison
 - **SWF Version**: 5+
 
-## Background
+## Test Description
 
-There was confusion because:
-- Opcode 0x48 is officially called **ActionLess2** in the SWF spec
-- It computes `arg2 < arg1` which is semantically equivalent to `arg1 > arg2`
-- This led to it being informally called "GREATER" in some documentation
-- The real **ActionGreater** opcode is **0x67** (different opcode!)
+Tests the greater than comparison operation with the expression `5 > 3`.
 
-## Current Test Behavior
+### Expected Behavior
 
-This test uses opcode 0x48 (ActionLess2) with the values:
-- Push 5.0
-- Push 3.0
-- Execute 0x48 (ActionLess2)
+- Pop two numeric values from the stack
+- Compare: second popped value > first popped value
+- Push result as 1.0 (true) or 0.0 (false)
 
-### Execution:
-- Pop arg1 = 3.0 (top of stack)
-- Pop arg2 = 5.0 (second from top)
-- Compute: arg2 < arg1 = 5.0 < 3.0 = **false (0)**
+### Test Case
 
-**Expected Output**: `0` (false)
-
-## Recommended Action
-
-This test should be updated to test the correct semantics:
-
-### Option 1: Test as "Less Than"
-Rename to reflect that it tests `5 > 3` viewed as "NOT (5 < 3)":
-```python
-# Current bytecode tests: 5 < 3 = false
-# To test 5 > 3, we would need to use opcode 0x67 (ActionGreater)
+```actionscript
+trace(5 > 3);
 ```
 
-### Option 2: Use Correct Opcode
-Update the test to use opcode 0x67 (ActionGreater) instead of 0x48.
+**Expected Output**: `1` (true, because 5 is greater than 3)
 
-## For Correct "Greater Than" Testing
+## Stack Operation
 
-To properly test `5 > 3 = true`, the ActionScript compiler would generate:
-- Push 5.0 (left operand)
-- Push 3.0 (right operand)
-- Execute **0x67** (ActionGreater - not implemented yet)
-  - Pop arg1 = 3.0
-  - Pop arg2 = 5.0
-  - Compute: arg2 > arg1 = 5.0 > 3.0 = true (1)
+The test performs the following operations:
 
-## See Also
+1. Push 5.0 onto stack
+2. Push 3.0 onto stack
+3. Execute GREATER opcode:
+   - Pop 3.0 (operand `a`)
+   - Pop 5.0 (operand `b`)
+   - Compare: `b > a` = `5.0 > 3.0` = true
+   - Push 1.0 (result)
+4. Execute TRACE opcode to display result
 
-- `less2_swf_4/` - Proper test for ActionLess2 (0x48) demonstrating `3 < 5 = true`
-- SWF Spec Section on ActionLess2 (0x48) and ActionGreater (0x67)
+## Building and Running
+
+```bash
+# Build the test
+cd SWFRecomp
+./scripts/build_test.sh greater_swf_4 native
+
+# Run the test
+./tests/greater_swf_4/build/native/greater_swf_4
+```
 
 ## Implementation Files
 
-- **Enum**: `SWFRecomp/include/action/action.hpp` - `SWF_ACTION_LESS2 = 0x48`
-- **Translation**: `SWFRecomp/src/action/action.cpp` - case `SWF_ACTION_LESS2`
-- **Declaration**: `SWFModernRuntime/include/actionmodern/action.h` - `void actionLess2(char* stack, u32* sp)`
-- **Implementation**: `SWFModernRuntime/src/actionmodern/action.c` - `actionLess2()` function
+- **Enum**: `SWFRecomp/include/action/action.hpp` - `SWF_ACTION_GREATER = 0x67`
+- **Translation**: `SWFRecomp/src/action/action.cpp` - case `SWF_ACTION_GREATER`
+- **Declaration**: `SWFModernRuntime/include/actionmodern/action.h` - `void actionGreater(char* stack, u32* sp)`
+- **Implementation**: `SWFModernRuntime/src/actionmodern/action.c` - `actionGreater()` function
+
+## Additional Test Cases
+
+The implementation also handles:
+
+- Equal values: `5 > 5` = 0 (false)
+- Reverse comparison: `3 > 5` = 0 (false)
+- Floating point: `5.5 > 3.2` = 1 (true)
+- Zero comparison: `1 > 0` = 1 (true)
+- NaN handling: NaN comparisons return false
+
+## Notes
+
+- The comparison follows ActionScript 2 semantics
+- Operands are automatically converted to numbers if needed
+- Result is always a float (1.0 or 0.0)
+- Handles both F32 and F64 numeric types correctly
