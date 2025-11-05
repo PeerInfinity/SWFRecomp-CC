@@ -258,10 +258,10 @@ namespace SWFRecomp
 					break;
 				}
 
-				case SWF_ACTION_GREATER:
+				case SWF_ACTION_LESS2:
 				{
-					out_script << "\t" << "// Greater" << endl
-							   << "\t" << "actionGreater(stack, sp);" << endl;
+					out_script << "\t" << "// Less2" << endl
+							   << "\t" << "actionLess2(stack, sp);" << endl;
 
 					break;
 				}
