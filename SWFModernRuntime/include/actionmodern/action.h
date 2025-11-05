@@ -93,3 +93,4 @@ void actionBitXor(char* stack, u32* sp);
 void actionBitLShift(char* stack, u32* sp);
 void actionBitRShift(char* stack, u32* sp);
 void actionBitURShift(char* stack, u32* sp);
+void actionStrictEquals(char* stack, u32* sp);
