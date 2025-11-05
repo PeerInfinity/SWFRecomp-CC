@@ -18,11 +18,17 @@ ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
 	{
+		// Read the float value BEFORE overwriting it
+		float f = VAL(float, &STACK_TOP_VALUE);
+
+		// Format the float to string
+		snprintf(var_str, 17, "%.15g", f);
+
+		// Now update the stack entry to be a string
 		STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 		VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
-		snprintf(var_str, 17, "%.15g", VAL(float, &STACK_TOP_VALUE));
 	}
-	
+
 	return ACTION_STACK_VALUE_STRING;
 }
 
@@ -517,6 +523,14 @@ void actionToInteger(char* stack, u32* sp)
 	}
 
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &f));
+}
+
+void actionToString(char* stack, u32* sp, char* str_buffer)
+{
+	// Convert top of stack to string
+	// If already string, this does nothing
+	// If float, converts using snprintf with %.15g format
+	convertString(stack, sp, str_buffer);
 }
 
 int evaluateCondition(char* stack, u32* sp)

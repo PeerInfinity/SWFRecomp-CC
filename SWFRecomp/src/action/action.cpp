@@ -266,6 +266,17 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_TO_STRING:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// ToString" << endl
+							   << "\t" << "actionToString(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_INCREMENT:
 				{
 					out_script << "\t" << "// Increment" << endl
