@@ -242,6 +242,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_RANDOM_NUMBER:
+				{
+					out_script << "\t" << "// Random Number" << endl
+							   << "\t" << "actionRandomNumber(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CHAR_TO_ASCII:
 				{
 					out_script << "\t" << "// CharToAscii" << endl

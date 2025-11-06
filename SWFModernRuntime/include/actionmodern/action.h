@@ -96,6 +96,7 @@ void actionGetVariable(char* stack, u32* sp);
 void actionSetVariable(char* stack, u32* sp);
 
 void actionTrace(char* stack, u32* sp);
+void actionRandomNumber(char* stack, u32* sp);
 void actionAsciiToChar(char* stack, u32* sp, char* str_buffer);
 void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);
 void actionGetTime(char* stack, u32* sp);
