@@ -131,3 +131,8 @@ void actionInitObject(char* stack, u32* sp);
 void actionGetMember(char* stack, u32* sp);
 void actionSetMember(char* stack, u32* sp);
 void actionNewObject(char* stack, u32* sp);
+
+// Function pointer type for DefineFunction2
+typedef ActionVar (*Function2Ptr)(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+
+void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);

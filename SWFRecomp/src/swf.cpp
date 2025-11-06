@@ -361,10 +361,12 @@ namespace SWFRecomp
 		
 		context.out_script_defs = ofstream(context.output_scripts_folder + "script_defs.c", ios_base::out);
 		context.out_script_defs << "#include \"script_decls.h\"" << endl;
+		context.out_script_defs << "#include <string.h>" << endl;  // For memset
 		
 		context.out_script_decls = ofstream(context.output_scripts_folder + "script_decls.h", ios_base::out);
 		context.out_script_decls << "#pragma once" << endl << endl
-								 << "#include <stackvalue.h>" << endl;
+								 << "#include <stackvalue.h>" << endl
+								 << "#include <variables.h>" << endl;
 		
 		// output identity matrix at transform id 0
 		transform_data << "\t" << "1.0f," << endl

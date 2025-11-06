@@ -96,55 +96,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 }
 
 // ==================================================================
-// Array Object Model
-// ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
-}
 
 // ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
@@ -2497,5 +2448,62 @@ void actionSetProperty(char* stack, u32* sp)
 		default:
 			// Unknown property - ignore
 			break;
+	}
+}
+
+// DefineFunction2 support
+
+// Function storage structure
+typedef struct {
+	char name[64];
+	Function2Ptr func;
+	u32 param_count;
+	u8 register_count;
+	u16 flags;
+} ASFunction2;
+
+// Simple function table (max 256 functions)
+static ASFunction2 function_table[256];
+static int function_count = 0;
+
+void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags)
+{
+	// Store function in table
+	if (function_count < 256)
+	{
+		ASFunction2* as_func = &function_table[function_count++];
+
+		if (name && name[0] != '\0')
+		{
+			strncpy(as_func->name, name, 63);
+			as_func->name[63] = '\0';
+		}
+		else
+		{
+			snprintf(as_func->name, 64, "anonymous_%d", function_count);
+		}
+
+		as_func->func = func;
+		as_func->param_count = param_count;
+		as_func->register_count = register_count;
+		as_func->flags = flags;
+
+		// Create a function object and push to stack or set as variable
+		// For now, just create a placeholder value
+		ActionVar func_var;
+		func_var.type = ACTION_STACK_VALUE_F32;  // TODO: Use proper function type
+		func_var.data.numeric_value = (float)(function_count - 1);  // Store function index
+
+		// If named, set as variable
+		if (name && name[0] != '\0')
+		{
+			// TODO: Set as variable (not implemented yet)
+			PUSH_VAR(&func_var);
+		}
+		else
+		{
+			// Anonymous function - push to stack
+			PUSH_VAR(&func_var);
+		}
 	}
 }
