@@ -242,6 +242,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_CHAR_TO_ASCII:
+				{
+					out_script << "\t" << "// CharToAscii" << endl
+							   << "\t" << "actionCharToAscii(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_ASCII_TO_CHAR:
 				{
 					declareEmptyString(context, 17);

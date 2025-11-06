@@ -814,9 +814,38 @@ void actionStringLength(char* stack, u32* sp, char* v_str)
 	ActionVar v;
 	convertString(stack, sp, v_str);
 	popVar(stack, sp, &v);
-	
+
 	float str_size = (float) v.str_size;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &str_size));
+}
+
+void actionCharToAscii(char* stack, u32* sp)
+{
+	// Convert top of stack to string
+	char str_buffer[17];
+	convertString(stack, sp, str_buffer);
+
+	// Pop the string value
+	ActionVar v;
+	popVar(stack, sp, &v);
+
+	// Get pointer to the string
+	const char* str = (const char*) v.data.numeric_value;
+
+	// Handle empty string edge case
+	if (str == NULL || str[0] == '\0' || v.str_size == 0) {
+		// Push NaN for empty string (Flash behavior)
+		float result = 0.0f / 0.0f;  // NaN
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Get ASCII/Unicode code of first character
+	// Use unsigned char to ensure values 128-255 are handled correctly
+	float code = (float)(unsigned char)str[0];
+
+	// Push result
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &code));
 }
 
 void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
