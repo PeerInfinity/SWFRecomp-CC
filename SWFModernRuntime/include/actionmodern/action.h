@@ -87,6 +87,7 @@ void actionToString(char* stack, u32* sp, char* str_buffer);
 
 void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLength(char* stack, u32* sp, char* v_str);
+void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);
 
 void actionGetVariable(char* stack, u32* sp);

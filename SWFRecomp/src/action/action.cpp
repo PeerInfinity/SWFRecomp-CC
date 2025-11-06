@@ -189,6 +189,17 @@ namespace SWFRecomp
 					break;
 				}
 				
+
+			case SWF_ACTION_STRING_EXTRACT:
+			{
+				declareEmptyString(context, 17);
+
+				out_script << "\t" << "// StringExtract" << endl
+						   << "\t" << "actionStringExtract(stack, sp, str_"
+						   << to_string(next_str_i - 1) << ");" << endl;
+
+				break;
+			}
 				case SWF_ACTION_STRING_ADD:
 				{
 					declareEmptyString(context, 17);

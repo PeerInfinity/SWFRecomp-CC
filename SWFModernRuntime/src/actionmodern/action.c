@@ -748,6 +748,57 @@ void actionStringLength(char* stack, u32* sp, char* v_str)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &str_size));
 }
 
+void actionStringExtract(char* stack, u32* sp, char* str_buffer)
+{
+	// Pop length
+	convertFloat(stack, sp);
+	ActionVar length_var;
+	popVar(stack, sp, &length_var);
+	int length = (int)VAL(float, &length_var.data.numeric_value);
+
+	// Pop index
+	convertFloat(stack, sp);
+	ActionVar index_var;
+	popVar(stack, sp, &index_var);
+	int index = (int)VAL(float, &index_var.data.numeric_value);
+
+	// Pop string
+	char src_buffer[17];
+	convertString(stack, sp, src_buffer);
+	ActionVar src_var;
+	popVar(stack, sp, &src_var);
+	const char* src = src_var.data.string_data.owns_memory ?
+		src_var.data.string_data.heap_ptr :
+		(char*) src_var.data.numeric_value;
+
+	// Get source string length
+	int src_len = src_var.str_size;
+
+	// Handle out-of-bounds index
+	if (index < 0) index = 0;
+	if (index >= src_len) {
+		str_buffer[0] = '\0';
+		PUSH_STR(str_buffer, 0);
+		return;
+	}
+
+	// Handle out-of-bounds length
+	if (length < 0) length = 0;
+	if (index + length > src_len) {
+		length = src_len - index;
+	}
+
+	// Extract substring
+	int i;
+	for (i = 0; i < length && i < 16; i++) {  // Limit to buffer size
+		str_buffer[i] = src[index + i];
+	}
+	str_buffer[i] = '\0';
+
+	// Push result
+	PUSH_STR(str_buffer, i);
+}
+
 void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
 {
 	ActionVar a;
