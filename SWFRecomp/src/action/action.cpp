@@ -269,6 +269,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_DUPLICATE:
+				{
+					out_script << "\t" << "// Duplicate" << endl
+							   << "\t" << "actionDuplicate(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_MODULO:
 				{
 					out_script << "\t" << "// Modulo" << endl
