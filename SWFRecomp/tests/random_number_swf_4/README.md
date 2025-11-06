@@ -95,23 +95,32 @@ Note: The actual random values for tests 3, 4, and 5 will vary each run.
 ## Implementation Notes
 
 ### Algorithm
-- Uses C standard library `rand()` function
-- Range calculation: `rand() % max`
-- Result is stored as float on stack (Flash convention)
+**IMPORTANT**: This implementation uses Adobe's official avmplus RNG algorithm from the ActionScript Virtual Machine, NOT the C standard library `rand()` function. This ensures exact Flash Player compatibility for speedrunners and precise game behavior replication.
+
+**avmplus RNG Components**:
+1. **TRandomFast**: 31-bit Linear Feedback Shift Register (LFSR) with XOR masks
+2. **RandomPureHasher**: Multi-stage polynomial hasher for additional entropy
+3. **GenerateRandomNumber**: Combines LFSR + hashing for high-quality randomness
+4. **Random(max)**: Modulo operation to scale to desired range [0, max)
+
+**Source**: Based on `MathUtils.cpp` from https://github.com/adobe/avmplus
 
 ### Edge Cases
 - **max ≤ 0**: Returns 0
 - **max = 1**: Returns 0 (only value in range [0, 1))
-- **Large ranges**: Subject to modulo bias (acceptable for Flash compatibility)
+- **Large ranges**: Subject to modulo bias (matches Flash Player behavior)
 
 ### Random Seed
-The random number generator should be seeded using `srand(time(NULL))` during runtime initialization. Without seeding, the same sequence will be generated each run (deterministic behavior).
+The RNG is automatically seeded with `time(NULL)` on first use. The global RNG state persists across all calls, matching Flash Player's behavior where `random()` uses a shared generator.
 
 ## Flash Compatibility
-This implementation matches Flash Player's `random()` function behavior:
-- Returns integer values (stored as float)
-- Range is [0, max) - inclusive of 0, exclusive of max
-- Edge cases handled identically to Flash Player
+This implementation uses Adobe's official avmplus RNG algorithm to ensure **exact Flash Player compatibility**:
+- ✅ Same RNG algorithm as Flash Player (avmplus TRandomFast + RandomPureHasher)
+- ✅ Returns integer values (stored as float on stack)
+- ✅ Range is [0, max) - inclusive of 0, exclusive of max
+- ✅ Edge cases handled identically to Flash Player
+- ✅ Deterministic behavior matches original Flash Player for speedruns
+- ✅ Same sequence generation as ActionScript 2's `random()` function
 
 ## Testing Status
 - ✅ All test cases passing

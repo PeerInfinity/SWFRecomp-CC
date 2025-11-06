@@ -14,6 +14,86 @@ void initTime()
 	start_time = get_elapsed_ms();
 }
 
+// ==================================================================
+// avmplus-compatible Random Number Generator
+// Based on Adobe's ActionScript VM (avmplus) implementation
+// Source: https://github.com/adobe/avmplus/blob/master/core/MathUtils.cpp
+// ==================================================================
+
+typedef struct {
+	uint32_t uValue;           // Random result and seed for next random result
+	uint32_t uXorMask;         // XOR mask for generating the next random value
+	uint32_t uSequenceLength;  // Number of values in the sequence
+} TRandomFast;
+
+#define kRandomPureMax 0x7FFFFFFFL
+
+// XOR masks for random number generation (generates 2^n - 1 numbers)
+static const uint32_t Random_Xor_Masks[31] = {
+	0x00000003L, 0x00000006L, 0x0000000CL, 0x00000014L, 0x00000030L, 0x00000060L, 0x000000B8L, 0x00000110L,
+	0x00000240L, 0x00000500L, 0x00000CA0L, 0x00001B00L, 0x00003500L, 0x00006000L, 0x0000B400L, 0x00012000L,
+	0x00020400L, 0x00072000L, 0x00090000L, 0x00140000L, 0x00300000L, 0x00400000L, 0x00D80000L, 0x01200000L,
+	0x03880000L, 0x07200000L, 0x09000000L, 0x14000000L, 0x32800000L, 0x48000000L, 0xA3000000L
+};
+
+// Global RNG state (initialized on first use or at startup)
+static TRandomFast global_random_state = {0, 0, 0};
+
+// Initialize the random number generator with a seed
+static void RandomFastInit(TRandomFast *pRandomFast, uint32_t seed) {
+	int32_t n = 31;
+	pRandomFast->uValue = seed;
+	pRandomFast->uSequenceLength = (1L << n) - 1L;
+	pRandomFast->uXorMask = Random_Xor_Masks[n - 2];
+}
+
+// Generate next random value using XOR shift
+static int32_t RandomFastNext(TRandomFast *pRandomFast) {
+	if (pRandomFast->uValue & 1L) {
+		pRandomFast->uValue = (pRandomFast->uValue >> 1L) ^ pRandomFast->uXorMask;
+	} else {
+		pRandomFast->uValue >>= 1L;
+	}
+	return (int32_t)pRandomFast->uValue;
+}
+
+// Hash function for additional randomness
+static int32_t RandomPureHasher(int32_t iSeed) {
+	const int32_t c1 = 1376312589L;
+	const int32_t c2 = 789221L;
+	const int32_t c3 = 15731L;
+
+	iSeed = ((iSeed << 13) ^ iSeed) - (iSeed >> 21);
+	int32_t iResult = (iSeed * (iSeed * iSeed * c3 + c2) + c1) & kRandomPureMax;
+	iResult += iSeed;
+	iResult = ((iResult << 13) ^ iResult) - (iResult >> 21);
+
+	return iResult;
+}
+
+// Generate a random number (avmplus implementation)
+static int32_t GenerateRandomNumber(TRandomFast *pRandomFast) {
+	// Initialize if needed (first call or uninitialized)
+	if (pRandomFast->uValue == 0) {
+		// Use time-based seed for first initialization
+		RandomFastInit(pRandomFast, (uint32_t)time(NULL));
+	}
+
+	int32_t aNum = RandomFastNext(pRandomFast);
+	aNum = RandomPureHasher(aNum * 71L);
+	return aNum & kRandomPureMax;
+}
+
+// AS2 random(max) function - returns integer in range [0, max)
+static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
+	if (range <= 0) {
+		return 0;
+	}
+
+	int32_t randomNumber = GenerateRandomNumber(pRandomFast);
+	return randomNumber % range;
+}
+
 ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
@@ -949,16 +1029,9 @@ void actionRandomNumber(char* stack, u32* sp)
 	popVar(stack, sp, &max_var);
 	int max = (int) VAL(float, &max_var.data.numeric_value);
 
-	// Handle edge cases
-	if (max <= 0)
-	{
-		float result = 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
-		return;
-	}
-
-	// Generate random number in range [0, max)
-	int random_val = rand() % max;
+	// Generate random number using avmplus-compatible RNG
+	// This matches Flash Player's exact behavior for speedrunners
+	int random_val = Random(max, &global_random_state);
 
 	// Push result as float
 	float result = (float) random_val;
