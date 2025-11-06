@@ -238,10 +238,18 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Trace" << endl
 							   << "\t" << "actionTrace(stack, sp);" << endl;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_CHAR_TO_ASCII:
+				{
+					out_script << "\t" << "// CharToAscii" << endl
+							   << "\t" << "actionCharToAscii(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_GET_TIME:
 				{
 					out_script << "\t" << "// GetTime" << endl
