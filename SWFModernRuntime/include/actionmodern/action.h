@@ -69,6 +69,8 @@ extern ActionVar* temp_val;
 void initTime();
 
 void pushVar(char* stack, u32* sp, ActionVar* p);
+void popVar(char* stack, u32* sp, ActionVar* var);
+void setVariableByName(const char* var_name, ActionVar* value);
 
 void actionAdd(char* stack, u32* sp);
 void actionAdd2(char* stack, u32* sp, char* str_buffer);
@@ -131,6 +133,7 @@ void actionGreater(char* stack, u32* sp);
 void actionStringGreater(char* stack, u32* sp);
 void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 void actionPushRegister(char* stack, u32* sp, u8 register_num);
+void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(char*, u32*), u32 param_count);
 void actionCall(char* stack, u32* sp);
 void actionCallMethod(char* stack, u32* sp, char* str_buffer);
 void actionInitObject(char* stack, u32* sp);
