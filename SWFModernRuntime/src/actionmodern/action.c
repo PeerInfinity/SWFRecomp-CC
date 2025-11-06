@@ -1459,6 +1459,15 @@ void actionDuplicate(char* stack, u32* sp)
 	}
 }
 
+void actionReturn(char* stack, u32* sp)
+{
+	// The return value is already at the top of the stack.
+	// The generated C code includes a "return;" statement that exits
+	// the function, leaving the value on the stack for the caller.
+	// No operation needed here - the translation layer handles
+	// the actual return via C return statement.
+}
+
 void actionIncrement(char* stack, u32* sp)
 {
 	convertFloat(stack, sp);

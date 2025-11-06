@@ -348,6 +348,15 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_RETURN:
+				{
+					out_script << "\t" << "// Return" << endl
+							   << "\t" << "actionReturn(stack, sp);" << endl
+							   << "\t" << "return;" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_MODULO:
 				{
 					out_script << "\t" << "// Modulo" << endl
