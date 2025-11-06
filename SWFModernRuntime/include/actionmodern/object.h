@@ -69,6 +69,41 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length);
 void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* value);
 
 /**
+ * ASArray - ActionScript Array with Reference Counting
+ *
+ * Arrays store elements in a dynamic array with automatic growth.
+ * Like objects, arrays use reference counting for memory management.
+ */
+
+typedef struct ASArray
+{
+	u32 refcount;           // Reference count (starts at 1 on allocation)
+	u32 length;             // Number of elements in the array
+	u32 capacity;           // Allocated capacity
+	ActionVar* elements;    // Dynamic array of elements
+} ASArray;
+
+/**
+ * Array Lifecycle Primitives
+ */
+
+// Allocate new array with initial capacity
+// Returns array with refcount = 1
+ASArray* allocArray(u32 initial_capacity);
+
+// Increment reference count for array
+void retainArray(ASArray* arr);
+
+// Decrement reference count for array, free if zero
+void releaseArray(ASArray* arr);
+
+// Get element at index (returns NULL if out of bounds)
+ActionVar* getArrayElement(ASArray* arr, u32 index);
+
+// Set element at index (grows array if needed)
+void setArrayElement(ASArray* arr, u32 index, ActionVar* value);
+
+/**
  * Debug/Testing Functions
  */
 
@@ -78,4 +113,7 @@ void assertRefcount(ASObject* obj, u32 expected);
 
 // Print object state for debugging
 void printObject(ASObject* obj);
+
+// Print array state for debugging
+void printArray(ASArray* arr);
 #endif

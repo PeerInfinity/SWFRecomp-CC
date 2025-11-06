@@ -118,3 +118,4 @@ void actionBitURShift(char* stack, u32* sp);
 void actionStrictEquals(char* stack, u32* sp);
 void actionGreater(char* stack, u32* sp);
 void actionStringGreater(char* stack, u32* sp);
+void actionNewObject(char* stack, u32* sp);
