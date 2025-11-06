@@ -3,14 +3,10 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
-#include <ctype.h>
 
 #include <recomp.h>
 #include <utils.h>
 #include <actionmodern/object.h>
-
-// Forward declarations
-static void pushUndefined(char* stack, u32* sp);
 
 u32 start_time;
 
@@ -108,17 +104,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 }
 
 // ==================================================================
-// Array Object Model - implementations in object.c
-// ==================================================================
-
-<<<<<<< HEAD
-// ASArray implementation moved to object.c
-// ASArray is now defined in object.h and implemented in object.c
-// Array implementation is in object.h/object.c
-
->>>>>>> origin/claude/setup-and-run-tests-011CUqva5BzbiTWj4DcYnhfi
-// ==================================================================
-=======
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
 
@@ -159,100 +144,6 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		return &root_movieclip;
 	}
 	return NULL;  // Other paths not supported yet
-}
-
-// ==================================================================
-// Local Scope Infrastructure (for DECLARE_LOCAL opcode)
-// ==================================================================
-
-#define MAX_LOCAL_VARS 64
-#define MAX_CALL_DEPTH 32
-
-typedef struct {
-	char name[64];
-	ActionVar value;
-} LocalVar;
-
-typedef struct {
-	LocalVar vars[MAX_LOCAL_VARS];
-	u32 var_count;
-} LocalScope;
-
-// Call stack with local scopes
-static LocalScope call_stack[MAX_CALL_DEPTH];
-static u32 call_depth = 0;
-
-// Function entry - initialize new local scope
-void functionEnter()
-{
-	if (call_depth < MAX_CALL_DEPTH) {
-		call_stack[call_depth].var_count = 0;  // Clear local vars
-		call_depth++;
-	}
-}
-
-// Function exit - cleanup local scope
-void functionExit()
-{
-	if (call_depth > 0) {
-		// Free any heap-allocated strings in local variables
-		LocalScope* scope = &call_stack[call_depth - 1];
-		for (u32 i = 0; i < scope->var_count; i++) {
-			if (scope->vars[i].value.type == ACTION_STACK_VALUE_STRING &&
-			    scope->vars[i].value.data.string_data.owns_memory) {
-				free(scope->vars[i].value.data.string_data.heap_ptr);
-			}
-		}
-		call_depth--;
-	}
-}
-
-// Get local variable by name (returns NULL if not found)
-static ActionVar* getLocalVariable(const char* name)
-{
-	if (call_depth == 0) {
-		return NULL;  // Not in a function
-	}
-
-	LocalScope* scope = &call_stack[call_depth - 1];
-	for (u32 i = 0; i < scope->var_count; i++) {
-		if (strcmp(scope->vars[i].name, name) == 0) {
-			return &scope->vars[i].value;
-		}
-	}
-
-	return NULL;  // Not found in local scope
-}
-
-// Declare local variable (adds to local scope)
-static bool declareLocalVariable(const char* name)
-{
-	if (call_depth == 0) {
-		// Not in a function - should not happen
-		return false;
-	}
-
-	LocalScope* scope = &call_stack[call_depth - 1];
-
-	// Check if already declared
-	for (u32 i = 0; i < scope->var_count; i++) {
-		if (strcmp(scope->vars[i].name, name) == 0) {
-			// Already declared, do nothing
-			return true;
-		}
-	}
-
-	// Add to local scope
-	if (scope->var_count < MAX_LOCAL_VARS) {
-		strncpy(scope->vars[scope->var_count].name, name, 63);
-		scope->vars[scope->var_count].name[63] = '\0';
-		scope->vars[scope->var_count].value.type = ACTION_STACK_VALUE_UNDEFINED;
-		scope->var_count++;
-		return true;
-	}
-
-	// Too many local variables
-	return false;
 }
 
 ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
@@ -341,19 +232,8 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 void popVar(char* stack, u32* sp, ActionVar* var)
 {
 	peekVar(stack, sp, var);
-
+	
 	POP();
-}
-
-// Helper function to set a variable by name from an ActionVar value
-void setVariableByName(const char* var_name, ActionVar* value)
-{
-	size_t key_size = strlen(var_name);
-	ActionVar* var = getVariable((char*)var_name, key_size);
-	if (var) {
-		// Copy value
-		*var = *value;
-	}
 }
 
 void actionAdd(char* stack, u32* sp)
@@ -904,52 +784,6 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
-void actionEnumerate(char* stack, u32* sp, char* str_buffer)
-{
-	// Read variable name info from stack
-	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
-	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
-
-	// Pop variable name
-	POP();
-
-	// Get variable using hashmap lookup
-	ActionVar* var = getVariable(var_name, var_name_len);
-
-	// Check if variable exists and is an object
-	if (var == NULL || var->type != ACTION_STACK_VALUE_OBJECT)
-	{
-		// Not an object - push only null terminator
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-		return;
-	}
-
-	// Get the object
-	ASObject* obj = (ASObject*) var->data.numeric_value;
-
-	// Check if object pointer is valid
-	if (obj == NULL)
-	{
-		// Null object - push only null terminator
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-		return;
-	}
-
-	// Push null as terminator first
-	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-
-	// Enumerate and push property names in reverse order
-	// This allows them to be popped in forward order during iteration
-	for (int i = (int)obj->num_used - 1; i >= 0; i--)
-	{
-		const char* prop_name = obj->properties[i].name;
-		u32 prop_name_len = obj->properties[i].name_length;
-
-		// Push property name as string
-		PUSH_STR(prop_name, prop_name_len);
-	}
-}
-
 int evaluateCondition(char* stack, u32* sp)
 {
 	ActionVar v;
@@ -1416,22 +1250,6 @@ void actionGetVariable(char* stack, u32* sp)
 	// Pop variable name
 	POP();
 
-	// Check local scope first (if in function)
-	ActionVar* var = getLocalVariable(var_name);
-
-	if (!var) {
-		// Not in local scope, check global variables
-		// Get variable (fast path for constant strings)
-		if (string_id != 0)
-		{
-			// Constant string - use array (O(1))
-			var = getVariableById(string_id);
-		}
-		else
-		{
-			// Dynamic string - use hashmap (O(n))
-			var = getVariable(var_name, var_name_len);
-		}
 	// First check scope chain (innermost to outermost)
 	printf("[DEBUG GET_VAR] scope_depth=%u, looking for '%.*s'\n", scope_depth, var_name_len, var_name);
 	for (int i = scope_depth - 1; i >= 0; i--)
@@ -1472,11 +1290,8 @@ void actionGetVariable(char* stack, u32* sp)
 	{
 		// Variable not found - push empty string
 		PUSH_STR("", 0);
-		fprintf(stderr, "[DEBUG] actionGetVariable: var not found\n");
 		return;
 	}
-
-	fprintf(stderr, "[DEBUG] actionGetVariable: var->type=%d\n", var->type);
 
 	// Push variable value to stack
 	PUSH_VAR(var);
@@ -1484,13 +1299,11 @@ void actionGetVariable(char* stack, u32* sp)
 
 void actionSetVariable(char* stack, u32* sp)
 {
-	// Stack layout: [...] [value] [name] <- sp
-	// Name is on top, value is second
+	// Stack layout: [value] [name] <- sp
+	// We need value at top, name at second
 
-	u32 var_name_sp = *sp;        // Name is on top
-	u32 value_sp = SP_SECOND_TOP;  // Value is second
-
-	fprintf(stderr, "[DEBUG] actionSetVariable: value_type=%d\n", stack[value_sp]);
+	u32 value_sp = *sp;
+	u32 var_name_sp = SP_SECOND_TOP;
 
 	// Debug: check what's on stack
 	ActionStackValueType value_type = stack[value_sp];
@@ -1501,8 +1314,6 @@ void actionSetVariable(char* stack, u32* sp)
 	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
 	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
 
-	// Check local scope first (if in function)
-	ActionVar* var = getLocalVariable(var_name);
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
@@ -1538,26 +1349,11 @@ void actionSetVariable(char* stack, u32* sp)
 		var = getVariable(var_name, var_name_len);
 	}
 
-	if (!var) {
-		// Not in local scope, get/create global variable
-		// Get variable (fast path for constant strings)
-		if (string_id != 0)
-		{
-			// Constant string - use array (O(1))
-			var = getVariableById(string_id);
-		}
-		else
-		{
-			// Dynamic string - use hashmap (O(n))
-			var = getVariable(var_name, var_name_len);
-		}
-
-		if (!var)
-		{
-			// Failed to get/create variable
-			POP_2();
-			return;
-		}
+	if (!var)
+	{
+		// Failed to get/create variable
+		POP_2();
+		return;
 	}
 
 	// Set variable value (uses existing string materialization!)
@@ -1565,24 +1361,6 @@ void actionSetVariable(char* stack, u32* sp)
 
 	// Pop both value and name
 	POP_2();
-}
-
-void actionDeclareLocal(char* stack, u32* sp)
-{
-	// Pop variable name from stack
-	const char* var_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
-	POP();
-
-	if (call_depth == 0) {
-		// Not in a function: treat as warning
-		printf("Warning: DECLARE_LOCAL outside function for variable '%s'\n", var_name);
-		return;
-	}
-
-	// Declare variable in local scope
-	if (!declareLocalVariable(var_name)) {
-		printf("Error: Failed to declare local variable '%s'\n", var_name);
-	}
 }
 
 void actionGetProperty(char* stack, u32* sp)
@@ -1843,221 +1621,27 @@ void actionTypeof(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, len);
 }
 
-// Built-in function implementations
-static void builtin_parseInt(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
+void actionDuplicate(char* stack, u32* sp)
 {
-	if (arg_count < 1)
+	// Get the type of the top stack entry
+	u8 type = STACK_TOP_TYPE;
+
+	// Handle different types appropriately
+	if (type == ACTION_STACK_VALUE_STRING)
 	{
-		result->type = ACTION_STACK_VALUE_F32;
-		float nan_val = 0.0f / 0.0f;  // NaN
-		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
-		return;
-	}
+		// For strings, we need to copy both the pointer and the length
+		const char* str = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		u32 len = STACK_TOP_N;  // Length is stored at offset +8
+		u32 id = VAL(u32, &stack[*sp + 12]);  // String ID is at offset +12
 
-	// Convert first argument to string
-	const char* str = NULL;
-	if (args[0].type == ACTION_STACK_VALUE_STRING)
-	{
-		str = args[0].data.string_data.owns_memory ?
-			args[0].data.string_data.heap_ptr :
-			(char*)args[0].data.numeric_value;
-	}
-	else if (args[0].type == ACTION_STACK_VALUE_F32)
-	{
-		// Convert number to string first
-		float num_val = VAL(float, &args[0].data.numeric_value);
-		snprintf(str_buffer, 17, "%.0f", num_val);
-		str = str_buffer;
-	}
-
-	if (!str || str[0] == '\0')
-	{
-		result->type = ACTION_STACK_VALUE_F32;
-		float nan_val = 0.0f / 0.0f;
-		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
-		return;
-	}
-
-	// Parse integer
-	char* endptr;
-	long val = strtol(str, &endptr, 10);
-	float result_val = (float)val;
-
-	result->type = ACTION_STACK_VALUE_F32;
-	VAL(u32, &result->data.numeric_value) = VAL(u32, &result_val);
-}
-
-static void builtin_parseFloat(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
-{
-	if (arg_count < 1)
-	{
-		result->type = ACTION_STACK_VALUE_F32;
-		float nan_val = 0.0f / 0.0f;
-		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
-		return;
-	}
-
-	// Convert first argument to string
-	const char* str = NULL;
-	if (args[0].type == ACTION_STACK_VALUE_STRING)
-	{
-		str = args[0].data.string_data.owns_memory ?
-			args[0].data.string_data.heap_ptr :
-			(char*)args[0].data.numeric_value;
-	}
-	else if (args[0].type == ACTION_STACK_VALUE_F32)
-	{
-		result->type = ACTION_STACK_VALUE_F32;
-		result->data.numeric_value = args[0].data.numeric_value;
-		return;
-	}
-
-	if (!str || str[0] == '\0')
-	{
-		result->type = ACTION_STACK_VALUE_F32;
-		float nan_val = 0.0f / 0.0f;
-		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
-		return;
-	}
-
-	// Parse float
-	float val = strtof(str, NULL);
-	result->type = ACTION_STACK_VALUE_F32;
-	VAL(u32, &result->data.numeric_value) = VAL(u32, &val);
-}
-
-static void builtin_isNaN(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
-{
-	if (arg_count < 1)
-	{
-		result->type = ACTION_STACK_VALUE_F32;
-		float one = 1.0f;
-		VAL(u32, &result->data.numeric_value) = VAL(u32, &one);
-		return;
-	}
-
-	// Convert to float and check if NaN
-	float val = 0.0f;
-	if (args[0].type == ACTION_STACK_VALUE_F32)
-	{
-		val = VAL(float, &args[0].data.numeric_value);
-	}
-	else if (args[0].type == ACTION_STACK_VALUE_STRING)
-	{
-		const char* str = args[0].data.string_data.owns_memory ?
-			args[0].data.string_data.heap_ptr :
-			(char*)args[0].data.numeric_value;
-		val = strtof(str, NULL);
-	}
-
-	result->type = ACTION_STACK_VALUE_F32;
-	float result_val = (val != val) ? 1.0f : 0.0f;  // NaN != NaN is true
-	VAL(u32, &result->data.numeric_value) = VAL(u32, &result_val);
-}
-
-static void builtin_isFinite(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
-{
-	if (arg_count < 1)
-	{
-		result->type = ACTION_STACK_VALUE_F32;
-		float zero = 0.0f;
-		VAL(u32, &result->data.numeric_value) = VAL(u32, &zero);
-		return;
-	}
-
-	float val = 0.0f;
-	if (args[0].type == ACTION_STACK_VALUE_F32)
-	{
-		val = VAL(float, &args[0].data.numeric_value);
-	}
-
-	// Check if finite (not NaN and not infinite)
-	int is_finite = (val == val) && (val != 1.0f/0.0f) && (val != -1.0f/0.0f);
-	result->type = ACTION_STACK_VALUE_F32;
-	float result_val = is_finite ? 1.0f : 0.0f;
-	VAL(u32, &result->data.numeric_value) = VAL(u32, &result_val);
-}
-
-// Function registry
-typedef void (*BuiltinFunc)(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer);
-
-typedef struct {
-	const char* name;
-	BuiltinFunc func;
-} FunctionEntry;
-
-static FunctionEntry builtin_functions[] = {
-	{"parseInt", builtin_parseInt},
-	{"parseFloat", builtin_parseFloat},
-	{"isNaN", builtin_isNaN},
-	{"isFinite", builtin_isFinite},
-	{NULL, NULL}  // Sentinel
-};
-
-void actionCallFunction(char* stack, u32* sp, char* str_buffer)
-{
-	// 1. Pop function name (string)
-	const char* func_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
-	u32 func_name_len = STACK_TOP_N;
-	POP();
-
-	// 2. Pop argument count (number)
-	ActionVar count_var;
-	popVar(stack, sp, &count_var);
-
-	// Convert to number if needed
-	u32 arg_count = 0;
-	if (count_var.type == ACTION_STACK_VALUE_F32)
-	{
-		float count_f = VAL(float, &count_var.data.numeric_value);
-		arg_count = (u32)count_f;
-	}
-	else if (count_var.type == ACTION_STACK_VALUE_F64)
-	{
-		double count_d = VAL(double, &count_var.data.numeric_value);
-		arg_count = (u32)count_d;
-	}
-
-	// 3. Pop arguments from stack (in reverse order, so last arg is on top)
-	ActionVar* args = NULL;
-	if (arg_count > 0)
-	{
-		args = (ActionVar*)malloc(sizeof(ActionVar) * arg_count);
-		for (int i = arg_count - 1; i >= 0; i--)
-		{
-			popVar(stack, sp, &args[i]);
-		}
-	}
-
-	// 4. Look up and call function
-	BuiltinFunc func = NULL;
-	for (int i = 0; builtin_functions[i].name != NULL; i++)
-	{
-		if (strcmp(builtin_functions[i].name, func_name) == 0)
-		{
-			func = builtin_functions[i].func;
-			break;
-		}
-	}
-
-	// 5. Execute function and push result
-	ActionVar result;
-	if (func != NULL)
-	{
-		// Call the built-in function
-		func(args, arg_count, &result, str_buffer);
-		pushVar(stack, sp, &result);
+		// Push a copy of the string (shallow copy - same pointer)
+		PUSH_STR_ID(str, len, id);
 	}
 	else
 	{
-		// Function not found - push undefined
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-	}
-
-	// Clean up
-	if (args != NULL)
-	{
-		free(args);
+		// For other types (numeric, etc.), just copy the value
+		u64 value = STACK_TOP_VALUE;
+		PUSH(type, value);
 	}
 }
 
@@ -2108,175 +1692,6 @@ void actionDecrement(char* stack, u32* sp)
 		float result = val - 1.0f;
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 	}
-}
-
-void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
-{
-	// Pop object reference from stack
-	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
-
-	// Handle objects
-void actionDelete2(char* stack, u32* sp, char* str_buffer)
-{
-	// Stack layout (from top to bottom):
-	// 1. property_name (the name of the property to delete)
-	// 2. object (the object reference)
-
-	// 1. Pop property name from stack
-	convertString(stack, sp, str_buffer);
-	const char* prop_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
-	u32 prop_name_len = STACK_TOP_N;
-	POP();
-
-	// 2. Pop object reference from stack
-	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
-
-	// 3. Delete the property and determine result
-	float result = 1.0f;  // Default to success
-
-	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
-	{
-		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
-
-		if (obj == NULL)
-		{
-			// Push null terminator for NULL object
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			return;
-		}
-
-		// Push null as terminator
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-
-		// Enumerate and push property names (in reverse order)
-		for (int i = (int)obj->num_used - 1; i >= 0; i--)
-		{
-			const char* prop_name = obj->properties[i].name;
-			u32 prop_name_len = obj->properties[i].name_length;
-			PUSH_STR(prop_name, prop_name_len);
-		}
-
-		return;
-	}
-
-	// Handle arrays - enumerate indices as strings
-	if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
-	{
-		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
-
-		if (arr == NULL)
-		{
-			// Push null terminator for NULL array
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			return;
-		}
-
-		// Push null as terminator
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-
-		// Enumerate and push indices as strings (in reverse order)
-		for (int i = (int)arr->length - 1; i >= 0; i--)
-		{
-			// Convert index to string using str_buffer
-			int len = snprintf(str_buffer, 17, "%d", i);
-			PUSH_STR(str_buffer, len);
-		}
-
-		return;
-	}
-
-	// For non-object/non-array types, just push null terminator
-	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-}
-
-void actionDelete(char* stack, u32* sp)
-{
-	// Stack layout (from top to bottom):
-	// 1. property_name (string - name of property to delete)
-	// 2. object_name (string - name of variable holding the object)
-
-	// Pop property name (string)
-	ActionVar prop_name_var;
-	popVar(stack, sp, &prop_name_var);
-
-	const char* prop_name = NULL;
-	u32 prop_name_len = 0;
-
-	if (prop_name_var.type == ACTION_STACK_VALUE_STRING)
-	{
-		prop_name = prop_name_var.data.string_data.owns_memory ?
-			prop_name_var.data.string_data.heap_ptr :
-			(const char*) prop_name_var.data.numeric_value;
-		prop_name_len = prop_name_var.str_size;
-	}
-
-	// Pop object name (string)
-	u32 obj_name_sp = *sp;
-	u32 string_id = VAL(u32, &stack[obj_name_sp + 4]);
-	const char* obj_name = (const char*) VAL(u64, &stack[obj_name_sp + 16]);
-	u32 obj_name_len = VAL(u32, &stack[obj_name_sp + 8]);
-	POP();
-
-	// Default result: success (1.0)
-	float result = 1.0f;
-
-	// Look up the object by name
-	ActionVar* obj_var = NULL;
-	if (string_id != 0)
-	{
-		// Constant string - use array (O(1))
-		obj_var = getVariableById(string_id);
-	}
-	else
-	{
-		// Dynamic string - use hashmap (O(n))
-		obj_var = getVariable(obj_name, obj_name_len);
-	}
-
-	// If object variable exists and is an object, delete the property
-	if (obj_var != NULL && obj_var->type == ACTION_STACK_VALUE_OBJECT)
-	{
-		ASObject* obj = (ASObject*) obj_var->data.numeric_value;
-
-		if (obj != NULL && prop_name != NULL)
-		{
-			// Delete the property
-			int deleted = deleteProperty(obj, prop_name, prop_name_len);
-			result = deleted ? 1.0f : 0.0f;
-		}
-	}
-	// For arrays, also handle deletion
-	else if (obj_var != NULL && obj_var->type == ACTION_STACK_VALUE_ARRAY)
-	{
-		// For arrays, deletion leaves undefined but returns true
-		// This is handled by AS2 spec - we just return success
-		result = 1.0f;
-	}
-
-	// Push result
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
-}
-		if (obj != NULL)
-		{
-			// Delete the property (returns true for success)
-			bool deleted = deleteProperty(obj, prop_name, prop_name_len);
-			result = deleted ? 1.0f : 0.0f;
-		}
-	}
-	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
-	{
-		// For arrays, we can delete elements by index if prop_name is numeric
-		// For simplicity, we'll just return true (success) for now
-		// A more complete implementation would parse prop_name as an integer
-		// and call a deleteArrayElement function
-		result = 1.0f;
-	}
-	// For other types (undefined, null, primitives), return true
-
-	// 4. Push success result (1.0 = true, 0.0 = false)
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
 void actionBitAnd(char* stack, u32* sp)
@@ -2605,265 +2020,41 @@ void actionStringLess(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-// ==================================================================
-// Function Storage for ActionScript Functions
-// ==================================================================
-
-typedef void (*FunctionPtr)(char* stack, u32* sp);
-
-typedef struct {
-	char name[256];
-	FunctionPtr func;
-	u32 param_count;
-} ASFunction;
-
-// Function registry (simple array, could be hash map for better performance)
-#define MAX_FUNCTIONS 256
-static ASFunction* function_registry[MAX_FUNCTIONS];
-static u32 function_count = 0;
-
-void actionDefineFunction(char* stack, u32* sp, const char* name, FunctionPtr func, u32 param_count)
-{
-	// Allocate and store function in registry
-	if (function_count >= MAX_FUNCTIONS) {
-		printf("ERROR: Function registry full (max %d functions)\n", MAX_FUNCTIONS);
-		return;
-	}
-
-	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
-	if (!as_func) {
-		printf("ERROR: Failed to allocate memory for function\n");
-		return;
-	}
-
-	strncpy(as_func->name, name, 255);
-	as_func->name[255] = '\0';
-	as_func->func = func;
-	as_func->param_count = param_count;
-
-	function_registry[function_count++] = as_func;
-
-	// If named, store in variable
-	if (strlen(name) > 0) {
-		ActionVar func_var;
-		func_var.type = ACTION_STACK_VALUE_FUNCTION;
-		func_var.data.numeric_value = (u64) as_func;
-		setVariableByName(name, &func_var);
-	} else {
-		// Anonymous function: push to stack
-		PUSH(ACTION_STACK_VALUE_FUNCTION, VAL(u64, as_func));
-	}
-
-	printf("// Defined function: %s (params: %u)\n",
-		   strlen(name) > 0 ? name : "(anonymous)", param_count);
-}
-
-// Lookup function by name
-static ASFunction* lookupFunction(const char* name)
-{
-	for (u32 i = 0; i < function_count; i++) {
-		if (strcmp(function_registry[i]->name, name) == 0) {
-			return function_registry[i];
-		}
-	}
-	return NULL;
-}
-
 void actionCall(char* stack, u32* sp)
 {
-	// Pop function name or frame identifier
-	ActionVar func_var;
-	popVar(stack, sp, &func_var);
+	// Pop frame identifier (string or number)
+	ActionVar frame_var;
+	popVar(stack, sp, &frame_var);
 
-	// Check if it's a function call
-	if (func_var.type == ACTION_STACK_VALUE_STRING) {
-		const char* func_name = (const char*) func_var.data.numeric_value;
+	// Simplified implementation: log the call
+	// TODO: Actually execute frame actions when frame infrastructure is ready
 
-		// Try to find user-defined function
-		ASFunction* func = lookupFunction(func_name);
-		if (func != NULL) {
-			// Call the user-defined function
-			printf("// Calling function: %s\n", func_name);
-			func->func(stack, sp);
-			return;
-		}
+	int frame_num = -1;
+	const char* frame_id = NULL;
 
-		// Fall through to frame call
-		printf("// Call frame label: %s\n", func_name);
-	} else if (func_var.type == ACTION_STACK_VALUE_FUNCTION) {
-		// Direct function object call
-		ASFunction* func = (ASFunction*) func_var.data.numeric_value;
-		if (func != NULL) {
-			printf("// Calling function: %s\n", func->name);
-			func->func(stack, sp);
-			return;
-		}
-	} else if (func_var.type == ACTION_STACK_VALUE_F32) {
-		// Frame number call
-		int frame_num = (int) func_var.data.numeric_value;
+	// Try to interpret as frame number or string
+	if (frame_var.type == ACTION_STACK_VALUE_F32) {
+		frame_num = (int) frame_var.data.numeric_value;
 		printf("// Call frame %d\n", frame_num);
+	} else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
+		frame_id = (const char*) frame_var.data.numeric_value;
+		// Try to parse as number
+		char* endptr;
+		long num = strtol(frame_id, &endptr, 10);
+		if (*endptr == '\0') {
+			// It's a numeric string
+			frame_num = (int) num;
+			printf("// Call frame %d\n", frame_num);
+		} else {
+			// It's a frame label
+			printf("// Call frame label: %s\n", frame_id);
+		}
 	}
 
-	// In a full implementation for frame calls, this would:
+	// In a full implementation, this would:
 	// 1. Look up the frame by number or label
 	// 2. Execute the frame's actions
 	// 3. Return to the current frame when done
-}
-
-void actionCallMethod(char* stack, u32* sp, char* str_buffer)
-{
-	// 1. Pop method name (can be empty string for anonymous calls)
-	convertString(stack, sp, str_buffer);
-	const char* method_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
-	POP();
-
-	// 2. Pop object reference
-	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
-
-	// 3. Pop argument count
-	convertFloat(stack, sp);
-	ActionVar count_var;
-	popVar(stack, sp, &count_var);
-	u32 arg_count = (u32) count_var.data.numeric_value;
-
-	// 4. Pop arguments into array (in reverse order)
-	ActionVar* args = NULL;
-	if (arg_count > 0) {
-		args = (ActionVar*) malloc(sizeof(ActionVar) * arg_count);
-		for (int i = arg_count - 1; i >= 0; i--) {
-			popVar(stack, sp, &args[i]);
-		}
-	}
-
-	// 5. Handle method calls based on object type
-	bool method_found = false;
-
-	// Handle String methods
-	if (obj_var.type == ACTION_STACK_VALUE_STRING)
-	{
-		const char* str = (const char*) obj_var.data.numeric_value;
-
-		if (strcmp(method_name, "toUpperCase") == 0)
-		{
-			// Convert to uppercase
-			int len = strlen(str);
-			if (len > 16) len = 16;
-			for (int i = 0; i < len; i++) {
-				str_buffer[i] = toupper(str[i]);
-			}
-			str_buffer[len] = '\0';
-			PUSH_STR(str_buffer, len);
-			method_found = true;
-		}
-		else if (strcmp(method_name, "toLowerCase") == 0)
-		{
-			// Convert to lowercase
-			int len = strlen(str);
-			if (len > 16) len = 16;
-			for (int i = 0; i < len; i++) {
-				str_buffer[i] = tolower(str[i]);
-			}
-			str_buffer[len] = '\0';
-			PUSH_STR(str_buffer, len);
-			method_found = true;
-		}
-		else if (strcmp(method_name, "substring") == 0)
-		{
-			// substring(start, end)
-			int start = 0, end = strlen(str);
-			if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_F32) {
-				start = (int) args[0].data.numeric_value;
-			}
-			if (arg_count > 1 && args[1].type == ACTION_STACK_VALUE_F32) {
-				end = (int) args[1].data.numeric_value;
-			}
-
-			// Clamp values
-			if (start < 0) start = 0;
-			if (end > (int)strlen(str)) end = strlen(str);
-			if (start > end) { int tmp = start; start = end; end = tmp; }
-
-			int len = end - start;
-			if (len > 16) len = 16;
-			for (int i = 0; i < len; i++) {
-				str_buffer[i] = str[start + i];
-			}
-			str_buffer[len] = '\0';
-			PUSH_STR(str_buffer, len);
-			method_found = true;
-		}
-		else if (strcmp(method_name, "charAt") == 0)
-		{
-			// charAt(index)
-			int index = 0;
-			if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_F32) {
-				index = (int) args[0].data.numeric_value;
-			}
-
-			if (index >= 0 && index < (int)strlen(str)) {
-				str_buffer[0] = str[index];
-				str_buffer[1] = '\0';
-				PUSH_STR(str_buffer, 1);
-			} else {
-				PUSH_STR("", 0);
-			}
-			method_found = true;
-		}
-	}
-	// Handle Array methods
-	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
-	{
-		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
-
-		if (strcmp(method_name, "push") == 0)
-		{
-			// Push elements to array
-			if (arr != NULL && arg_count > 0) {
-				// Ensure capacity
-				if (arr->length + arg_count > arr->capacity) {
-					u32 new_capacity = arr->length + arg_count;
-					ActionVar* new_elements = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_capacity);
-					if (new_elements) {
-						arr->elements = new_elements;
-						arr->capacity = new_capacity;
-					}
-				}
-
-				// Add elements
-				for (u32 i = 0; i < arg_count; i++) {
-					arr->elements[arr->length++] = args[i];
-				}
-			}
-
-			// Return new length
-			float new_length = arr ? (float)arr->length : 0.0f;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &new_length));
-			method_found = true;
-		}
-		else if (strcmp(method_name, "pop") == 0)
-		{
-			// Pop last element
-			if (arr != NULL && arr->length > 0) {
-				ActionVar elem = arr->elements[arr->length - 1];
-				arr->length--;
-				pushVar(stack, sp, &elem);
-			} else {
-				pushUndefined(stack, sp);
-			}
-			method_found = true;
-		}
-	}
-
-	// If method not found or empty method name (anonymous call), push undefined
-	if (!method_found) {
-		pushUndefined(stack, sp);
-	}
-
-	// Free arguments array
-	if (args != NULL) {
-		free(args);
-	}
 }
 
 void actionInitArray(char* stack, u32* sp)
@@ -2980,8 +2171,6 @@ void actionInitObject(char* stack, u32* sp)
 	popVar(stack, sp, &count_var);
 	u32 num_props = (u32) VAL(float, &count_var.data.numeric_value);
 
-	fprintf(stderr, "[DEBUG] actionInitObject: creating object with %u properties\n", num_props);
-
 #ifdef DEBUG
 	printf("[DEBUG] actionInitObject: creating object with %u properties\n", num_props);
 #endif
@@ -3039,8 +2228,6 @@ void actionInitObject(char* stack, u32* sp)
 	// Step 4: Push object reference to stack
 	// The object has refcount = 1 from allocation
 	PUSH(ACTION_STACK_VALUE_OBJECT, (u64) obj);
-	fprintf(stderr, "[DEBUG] actionInitObject: pushed object %p (type=%d) to stack\n",
-		(void*)obj, ACTION_STACK_VALUE_OBJECT);
 
 #ifdef DEBUG
 	printf("[DEBUG] actionInitObject: pushed object %p to stack\n", (void*)obj);
@@ -3232,162 +2419,6 @@ void actionNewObject(char* stack, u32* sp)
 	}
 }
 
-void actionNewMethod(char* stack, u32* sp)
-{
-	// Stack layout: [object] [method_name] [arg_count] [arg1] [arg2] ... [argN] <- sp
-	// NEW_METHOD pops: method_name, object, arg_count, then arguments
-
-	// 1. Pop method name (string)
-	ActionVar method_name_var;
-	popVar(stack, sp, &method_name_var);
-	const char* method_name;
-	if (method_name_var.type == ACTION_STACK_VALUE_STRING)
-	{
-		method_name = method_name_var.data.string_data.owns_memory ?
-			method_name_var.data.string_data.heap_ptr :
-			(const char*) method_name_var.data.numeric_value;
-	}
-	else
-	{
-		// Fallback if not a string (shouldn't happen)
-		method_name = "";
-	}
-
-	// 2. Pop object reference
-	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
-
-	// 3. Pop argument count
-	convertFloat(stack, sp);
-	ActionVar num_args_var;
-	popVar(stack, sp, &num_args_var);
-	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
-
-	// 4. Pop arguments from stack (store them temporarily)
-	// Limit to 16 arguments for simplicity
-	ActionVar args[16];
-	if (num_args > 16)
-	{
-		num_args = 16;
-	}
-
-	// Pop arguments in reverse order (first arg is deepest on stack)
-	for (int i = (int)num_args - 1; i >= 0; i--)
-	{
-		popVar(stack, sp, &args[i]);
-	}
-
-	// 5. Get the constructor method from the object
-	// The method should be a property of the object
-	void* new_obj = NULL;
-	const char* ctor_name = NULL;
-
-	fprintf(stderr, "[DEBUG] actionNewMethod: method_name='%s', obj_type=%d, num_args=%u\n",
-		method_name, obj_var.type, num_args);
-
-	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
-	{
-		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
-		fprintf(stderr, "[DEBUG] actionNewMethod: obj=%p\n", (void*)obj);
-		if (obj != NULL)
-		{
-			// Try to get the method property
-			ActionVar* method_prop = getProperty(obj, method_name, strlen(method_name));
-			fprintf(stderr, "[DEBUG] actionNewMethod: method_prop=%p\n", (void*)method_prop);
-
-			// If the property is a string, use it as constructor name
-			if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_STRING)
-			{
-				ctor_name = method_prop->data.string_data.owns_memory ?
-					method_prop->data.string_data.heap_ptr :
-					(const char*) method_prop->data.numeric_value;
-				fprintf(stderr, "[DEBUG] actionNewMethod: ctor_name='%s'\n", ctor_name);
-			}
-			else if (method_prop != NULL)
-			{
-				fprintf(stderr, "[DEBUG] actionNewMethod: method_prop type=%d (expected STRING)\n", method_prop->type);
-			}
-		}
-	}
-
-	// 6. Create new object using the constructor
-	// For now, handle built-in constructors similar to NEW_OBJECT
-	if (ctor_name != NULL)
-	{
-		if (strcmp(ctor_name, "Array") == 0)
-		{
-			// Handle Array constructor
-			if (num_args == 0)
-			{
-				// new Array() - empty array
-				ASArray* arr = allocArray(4);
-				arr->length = 0;
-				new_obj = arr;
-			}
-			else if (num_args == 1 &&
-			         (args[0].type == ACTION_STACK_VALUE_F32 ||
-			          args[0].type == ACTION_STACK_VALUE_F64))
-			{
-				// new Array(length) - array with specified length
-				float length_f = (args[0].type == ACTION_STACK_VALUE_F32) ?
-					VAL(float, &args[0].data.numeric_value) :
-					(float) VAL(double, &args[0].data.numeric_value);
-				u32 length = (u32) length_f;
-				ASArray* arr = allocArray(length > 0 ? length : 4);
-				arr->length = length;
-				new_obj = arr;
-			}
-			else
-			{
-				// new Array(elem1, elem2, ...) - array with elements
-				ASArray* arr = allocArray(num_args);
-				arr->length = num_args;
-				for (u32 i = 0; i < num_args; i++)
-				{
-					arr->elements[i] = args[i];
-					// Retain if object/array
-					if (args[i].type == ACTION_STACK_VALUE_OBJECT)
-					{
-						retainObject((ASObject*) args[i].data.numeric_value);
-					}
-					else if (args[i].type == ACTION_STACK_VALUE_ARRAY)
-					{
-						retainArray((ASArray*) args[i].data.numeric_value);
-					}
-				}
-				new_obj = arr;
-			}
-			PUSH(ACTION_STACK_VALUE_ARRAY, VAL(u64, new_obj));
-		}
-		else if (strcmp(ctor_name, "Object") == 0)
-		{
-			// Handle Object constructor
-			ASObject* obj = allocObject(8);
-			new_obj = obj;
-			PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
-		}
-		else if (strcmp(ctor_name, "Date") == 0)
-		{
-			// Handle Date constructor (simplified)
-			ASObject* date = allocObject(4);
-			new_obj = date;
-			PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
-		}
-		else
-		{
-			// Unknown constructor - create generic object
-			ASObject* obj = allocObject(8);
-			new_obj = obj;
-			PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
-		}
-	}
-	else
-	{
-		// Method not found or invalid - push undefined
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-	}
-}
-
 void actionSetProperty(char* stack, u32* sp)
 {
 	// Stack layout: [target_path] [property_index] [value] <- sp
@@ -3475,62 +2506,6 @@ void actionSetProperty(char* stack, u32* sp)
 	}
 }
 
-// DefineFunction2 support
-
-// Function storage structure
-typedef struct {
-	char name[64];
-	Function2Ptr func;
-	u32 param_count;
-	u8 register_count;
-	u16 flags;
-} ASFunction2;
-
-// Simple function table (max 256 functions)
-static ASFunction2 function_table[256];
-static int function_count = 0;
-
-void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags)
-{
-	// Store function in table
-	if (function_count < 256)
-	{
-		ASFunction2* as_func = &function_table[function_count++];
-
-		if (name && name[0] != '\0')
-		{
-			strncpy(as_func->name, name, 63);
-			as_func->name[63] = '\0';
-		}
-		else
-		{
-			snprintf(as_func->name, 64, "anonymous_%d", function_count);
-		}
-
-		as_func->func = func;
-		as_func->param_count = param_count;
-		as_func->register_count = register_count;
-		as_func->flags = flags;
-
-		// Create a function object and push to stack or set as variable
-		// For now, just create a placeholder value
-		ActionVar func_var;
-		func_var.type = ACTION_STACK_VALUE_F32;  // TODO: Use proper function type
-		func_var.data.numeric_value = (float)(function_count - 1);  // Store function index
-
-		// If named, set as variable
-		if (name && name[0] != '\0')
-		{
-			// TODO: Set as variable (not implemented yet)
-			PUSH_VAR(&func_var);
-		}
-		else
-		{
-			// Anonymous function - push to stack
-			PUSH_VAR(&func_var);
-		}
-	}
-}
 // ==================================================================
 // WITH Statement Implementation
 // ==================================================================

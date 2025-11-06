@@ -24,8 +24,8 @@ action_push_2 += struct.pack('<f', 2.0)  # Float value 2.0
 action_push_10 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH action, length=5, type=1 (float)
 action_push_10 += struct.pack('<f', 10.0)  # Float value 10.0
 
-# Stack Swap operation (0x4C)
-action_stack_swap = bytes([0x4C])
+# Stack Swap operation (0x4D)
+action_stack_swap = bytes([0x4D])
 
 # Divide operation (0x0D)
 action_divide = bytes([0x0D])

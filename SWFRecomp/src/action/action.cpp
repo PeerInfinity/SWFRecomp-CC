@@ -14,9 +14,9 @@ using std::endl;
 
 namespace SWFRecomp
 {
-	SWFAction::SWFAction() : next_str_i(0), func_counter(0)
+	SWFAction::SWFAction() : next_str_i(0)
 	{
-
+		
 	}
 	
 	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
@@ -72,7 +72,7 @@ namespace SWFRecomp
 			action_buffer += 1;
 			length = 0;
 			
-			if ((code & 0b10000000) != 0 && code != SWF_ACTION_CALL && code != SWF_ACTION_CALL_METHOD)
+			if ((code & 0b10000000) != 0)
 			{
 				length = VAL(u16, action_buffer);
 				action_buffer += 2;
@@ -356,13 +356,10 @@ namespace SWFRecomp
 					break;
 				}
 
-				case SWF_ACTION_CALL_FUNCTION:
+				case SWF_ACTION_DUPLICATE:
 				{
-					declareEmptyString(context, 17);
-
-					out_script << "\t" << "// Call Function" << endl
-							   << "\t" << "actionCallFunction(stack, sp, str_"
-							   << to_string(next_str_i - 1) << ");" << endl;
+					out_script << "\t" << "// Duplicate" << endl
+							   << "\t" << "actionDuplicate(stack, sp);" << endl;
 
 					break;
 				}
@@ -392,14 +389,6 @@ namespace SWFRecomp
 				break;
 			}
 
-			case SWF_ACTION_DECLARE_LOCAL:
-			{
-				out_script << "\t" << "// DeclareLocal" << endl
-						   << "\t" << "actionDeclareLocal(stack, sp);" << endl;
-
-				break;
-			}
-
 			case SWF_ACTION_INIT_ARRAY:
 			{
 				out_script << "\t" << "// InitArray" << endl
@@ -422,17 +411,6 @@ namespace SWFRecomp
 
 					out_script << "\t" << "// TargetPath" << endl
 							   << "\t" << "actionTargetPath(stack, sp, str_"
-							   << to_string(next_str_i - 1) << ");" << endl;
-
-					break;
-				}
-
-				case SWF_ACTION_ENUMERATE:
-				{
-					declareEmptyString(context, 17);
-
-					out_script << "\t" << "// Enumerate" << endl
-							   << "\t" << "actionEnumerate(stack, sp, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -516,38 +494,6 @@ namespace SWFRecomp
 					break;
 				}
 
-				break;
-			}
-
-				case SWF_ACTION_ENUMERATE2:
-				{
-					out_script << "\t" << "// Enumerate2" << endl
-							   << "\t" << "actionEnumerate2(stack, sp, str_buffer);" << endl;
-				case SWF_ACTION_DELETE2:
-				{
-					declareEmptyString(context, 17);
-
-					out_script << "\t" << "// Delete2" << endl
-							   << "\t" << "actionDelete2(stack, sp, str_"
-							   << to_string(next_str_i - 1) << ");" << endl;
-				case SWF_ACTION_NEW_METHOD:
-				{
-					out_script << "\t" << "// NewMethod" << endl
-							   << "\t" << "actionNewMethod(stack, sp);" << endl;
-
-					break;
-				}
-
-			case SWF_ACTION_DELETE:
-			{
-				out_script << "\t" << "// Delete" << endl
-						   << "\t" << "actionDelete(stack, sp);" << endl;
-
-				break;
-			}
-
-
->>>>>>> origin/claude/opcode-delete2-0x5b-011CUquufkHrk6Pt1ggisyZL
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl
@@ -631,7 +577,6 @@ namespace SWFRecomp
 					break;
 				}
 
-<<<<<<< HEAD
 			case SWF_ACTION_DEFINE_FUNCTION2:
 			{
 				// Parse function metadata
@@ -760,7 +705,6 @@ namespace SWFRecomp
 				break;
 			}
 				
-=======
 				case SWF_ACTION_WITH:
 				{
 					// Read block size from bytecode
@@ -861,91 +805,15 @@ namespace SWFRecomp
 				case SWF_ACTION_JUMP:
 				{
 					s16 offset = VAL(s16, action_buffer);
-
+					
 					out_script << "\t" << "// Jump" << endl
 							   << "\t" << "goto label_" << to_string((s16) (action_buffer + length - action_buffer_start + offset)) << ";" << endl;
-
+					
 					action_buffer += length;
-
+					
 					break;
 				}
-
-				case SWF_ACTION_DEFINE_FUNCTION:
-				{
-					// Read function metadata from bytecode
-					char* func_name = action_buffer;
-					size_t func_name_len = strlen(func_name);
-					action_buffer += func_name_len + 1;
-
-					u16 num_params = VAL(u16, action_buffer);
-					action_buffer += 2;
-
-					std::vector<string> params;
-					for (u16 i = 0; i < num_params; i++)
-					{
-						char* param_name = action_buffer;
-						size_t param_len = strlen(param_name);
-						params.push_back(string(param_name));
-						action_buffer += param_len + 1;
-					}
-
-					u16 code_size = VAL(u16, action_buffer);
-					action_buffer += 2;
-
-					// Generate unique function identifier
-					string func_id;
-					if (func_name_len > 0)
-					{
-						func_id = "func_" + string(func_name) + "_" + to_string(func_counter);
-					}
-					else
-					{
-						func_id = "func_anon_" + to_string(func_counter);
-					}
-					func_counter++;
-
-					out_script << "\t" << "// DefineFunction: " << (func_name_len > 0 ? func_name : "(anonymous)") << endl;
-
-					// Generate function declaration in header
-					context.out_script_decls << "void " << func_id
-											 << "(char* stack, u32* sp);" << endl;
-
-					// Generate function definition
-					context.out_script_defs << "void " << func_id
-											<< "(char* stack, u32* sp)" << endl
-											<< "{" << endl;
-
-					// Bind parameters from stack
-					// Parameters are on the stack in reverse order (last param on top)
-					for (int i = (int)params.size() - 1; i >= 0; i--)
-					{
-						context.out_script_defs << "\t" << "// Bind parameter: " << params[i] << endl
-												<< "\t" << "ActionVar param_" << i << ";" << endl
-												<< "\t" << "popVar(stack, sp, &param_" << i << ");" << endl
-												<< "\t" << "setVariableByName(\"" << params[i] << "\", &param_" << i << ");" << endl;
-					}
-
-					// Parse function body bytecode
-					char* func_body = action_buffer;
-					action_buffer += code_size;
-
-					// Recursively parse the function body
-					parseActions(context, func_body, context.out_script_defs);
-
-					// Add default return for functions without explicit return
-					context.out_script_defs << "\t" << "// Default return undefined" << endl
-											<< "\t" << "ActionVar ret;" << endl
-											<< "\t" << "ret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl
-											<< "\t" << "PUSH_VAR(&ret);" << endl
-											<< "}" << endl << endl;
-
-					// Store function in runtime registry
-					out_script << "\t" << "actionDefineFunction(stack, sp, \"" << func_name
-							   << "\", " << func_id << ", " << num_params << ");" << endl;
-
-					break;
-				}
-
+				
 				case SWF_ACTION_IF:
 				{
 					s16 offset = VAL(s16, action_buffer);
@@ -965,18 +833,6 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Call" << endl
 							   << "\t" << "actionCall(stack, sp);" << endl;
-
-					break;
-				}
-
-				case SWF_ACTION_CALL_METHOD:
-				{
-					declareEmptyString(context, 17);
-
-					out_script << "\t" << "// CallMethod" << endl
-							   << "\t" << "actionCallMethod(stack, sp, str_"
-							   << to_string(next_str_i - 1) << ");" << endl;
-
 
 					break;
 				}
