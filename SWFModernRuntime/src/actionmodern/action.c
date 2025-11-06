@@ -18,11 +18,12 @@ ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
 	{
+		float temp_val = VAL(float, &STACK_TOP_VALUE);  // Save the float value first!
 		STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 		VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
-		snprintf(var_str, 17, "%.15g", VAL(float, &STACK_TOP_VALUE));
+		snprintf(var_str, 17, "%.15g", temp_val);  // Use the saved value
 	}
-	
+
 	return ACTION_STACK_VALUE_STRING;
 }
 
@@ -133,6 +134,76 @@ void actionAdd(char* stack, u32* sp)
 	{
 		float c = VAL(float, &b.data.numeric_value) + VAL(float, &a.data.numeric_value);
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
+	}
+}
+
+void actionAdd2(char* stack, u32* sp, char* str_buffer)
+{
+	// Peek at types without popping
+	u8 type_a = STACK_TOP_TYPE;
+
+	// Move to second value
+	u32 sp_second = VAL(u32, &(stack[*sp + 4]));  // Get previous_sp
+	u8 type_b = stack[sp_second];  // Type of second value
+
+	// Check if either operand is a string
+	if (type_a == ACTION_STACK_VALUE_STRING || type_b == ACTION_STACK_VALUE_STRING) {
+		// String concatenation path
+
+		// Convert first operand to string (top of stack - right operand)
+		char str_a[17];
+		convertString(stack, sp, str_a);
+		// Get the string pointer (either str_a if converted, or original if already string)
+		const char* str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		POP();
+
+		// Convert second operand to string (second on stack - left operand)
+		char str_b[17];
+		convertString(stack, sp, str_b);
+		// Get the string pointer
+		const char* str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		POP();
+
+		// Concatenate (left + right = b + a)
+		snprintf(str_buffer, 17, "%s%s", str_b_ptr, str_a_ptr);
+
+		// Push result
+		PUSH_STR(str_buffer, strlen(str_buffer));
+	} else {
+		// Numeric addition path
+
+		// Convert and pop first operand
+		convertFloat(stack, sp);
+		ActionVar a;
+		popVar(stack, sp, &a);
+
+		// Convert and pop second operand
+		convertFloat(stack, sp);
+		ActionVar b;
+		popVar(stack, sp, &b);
+
+		// Perform addition (same logic as actionAdd)
+		if (a.type == ACTION_STACK_VALUE_F64)
+		{
+			double a_val = VAL(double, &a.data.numeric_value);
+			double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
+
+			double c = b_val + a_val;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+		}
+		else if (b.type == ACTION_STACK_VALUE_F64)
+		{
+			double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
+			double b_val = VAL(double, &b.data.numeric_value);
+
+			double c = b_val + a_val;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+		}
+		else
+		{
+			float c = VAL(float, &b.data.numeric_value) + VAL(float, &a.data.numeric_value);
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
+		}
 	}
 }
 
