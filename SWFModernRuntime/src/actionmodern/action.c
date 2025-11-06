@@ -6,6 +6,7 @@
 
 #include <recomp.h>
 #include <utils.h>
+#include <actionmodern/object.h>
 
 u32 start_time;
 
@@ -1773,4 +1774,75 @@ void actionStringLess(char* stack, u32* sp)
 
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
+void actionInitObject(char* stack, u32* sp)
+{
+	// Step 1: Pop property count from stack
+	convertFloat(stack, sp);
+	ActionVar count_var;
+	popVar(stack, sp, &count_var);
+	u32 num_props = (u32) VAL(float, &count_var.data.numeric_value);
+
+#ifdef DEBUG
+	printf("[DEBUG] actionInitObject: creating object with %u properties\n", num_props);
+#endif
+
+	// Step 2: Allocate object with the specified number of properties
+	ASObject* obj = allocObject(num_props);
+	if (obj == NULL)
+	{
+		fprintf(stderr, "ERROR: Failed to allocate object in actionInitObject\n");
+		// Push null/undefined object on error
+		PUSH(ACTION_STACK_VALUE_OBJECT, 0);
+		return;
+	}
+
+	// Step 3: Pop property name/value pairs from stack
+	// Properties are in reverse order: rightmost property is on top of stack
+	// Stack order is: [..., value1, name1, ..., valueN, nameN, count]
+	// So after popping count, top of stack is nameN
+	for (u32 i = 0; i < num_props; i++)
+	{
+		// Pop property name first (it's on top)
+		ActionVar name_var;
+		popVar(stack, sp, &name_var);
+
+		// Pop property value (it's below the name)
+		ActionVar value;
+		popVar(stack, sp, &value);
+		const char* name = NULL;
+		u32 name_length = 0;
+
+		// Handle string name
+		if (name_var.type == ACTION_STACK_VALUE_STRING)
+		{
+			name = name_var.data.string_data.owns_memory ?
+				name_var.data.string_data.heap_ptr :
+				(const char*) name_var.data.numeric_value;
+			name_length = name_var.str_size;
+		}
+		else
+		{
+			// If name is not a string, skip this property
+			fprintf(stderr, "WARNING: Property name is not a string (type=%d), skipping\n", name_var.type);
+			continue;
+		}
+
+#ifdef DEBUG
+		printf("[DEBUG] actionInitObject: setting property '%.*s'\n", name_length, name);
+#endif
+
+		// Store property using the object API
+		// This handles refcount management if value is an object
+		setProperty(obj, name, name_length, &value);
+	}
+
+	// Step 4: Push object reference to stack
+	// The object has refcount = 1 from allocation
+	PUSH(ACTION_STACK_VALUE_OBJECT, (u64) obj);
+
+#ifdef DEBUG
+	printf("[DEBUG] actionInitObject: pushed object %p to stack\n", (void*)obj);
+#endif
 }

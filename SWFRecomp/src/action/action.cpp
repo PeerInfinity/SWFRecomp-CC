@@ -356,6 +356,14 @@ namespace SWFRecomp
 					break;
 				}
 
+			case SWF_ACTION_INIT_OBJECT:
+			{
+				out_script << "\t" << "// InitObject" << endl
+						   << "\t" << "actionInitObject(stack, sp);" << endl;
+
+				break;
+			}
+
 				case SWF_ACTION_TARGET_PATH:
 				{
 					declareEmptyString(context, 17);
