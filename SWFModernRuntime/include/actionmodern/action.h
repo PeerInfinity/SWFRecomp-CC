@@ -136,3 +136,4 @@ void actionInitObject(char* stack, u32* sp);
 void actionGetMember(char* stack, u32* sp);
 void actionSetMember(char* stack, u32* sp);
 void actionNewObject(char* stack, u32* sp);
+void actionNewMethod(char* stack, u32* sp);

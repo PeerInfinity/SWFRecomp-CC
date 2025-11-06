@@ -181,6 +181,7 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 	}
 
 	ActionStackValueType type = stack[sp];
+	fprintf(stderr, "[DEBUG] setVariableWithValue: type=%d\n", type);
 
 	if (type == ACTION_STACK_VALUE_STRING || type == ACTION_STACK_VALUE_STR_LIST)
 	{

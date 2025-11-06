@@ -96,11 +96,12 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 }
 
 // ==================================================================
-<<<<<<< HEAD
 // Array Object Model
 // ==================================================================
+<<<<<<< HEAD
 
 // ASArray implementation moved to object.c
+// ASArray is now defined in object.h and implemented in object.c
 // ==================================================================
 >>>>>>> origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4
 =======
@@ -1412,8 +1413,11 @@ void actionGetVariable(char* stack, u32* sp)
 	{
 		// Variable not found - push empty string
 		PUSH_STR("", 0);
+		fprintf(stderr, "[DEBUG] actionGetVariable: var not found\n");
 		return;
 	}
+
+	fprintf(stderr, "[DEBUG] actionGetVariable: var->type=%d\n", var->type);
 
 	// Push variable value to stack
 	PUSH_VAR(var);
@@ -1426,6 +1430,8 @@ void actionSetVariable(char* stack, u32* sp)
 
 	u32 var_name_sp = *sp;        // Name is on top
 	u32 value_sp = SP_SECOND_TOP;  // Value is second
+
+	fprintf(stderr, "[DEBUG] actionSetVariable: value_type=%d\n", stack[value_sp]);
 
 	// Read variable name info
 	u32 string_id = VAL(u32, &stack[var_name_sp + 4]);
@@ -2653,6 +2659,8 @@ void actionInitObject(char* stack, u32* sp)
 	popVar(stack, sp, &count_var);
 	u32 num_props = (u32) VAL(float, &count_var.data.numeric_value);
 
+	fprintf(stderr, "[DEBUG] actionInitObject: creating object with %u properties\n", num_props);
+
 #ifdef DEBUG
 	printf("[DEBUG] actionInitObject: creating object with %u properties\n", num_props);
 #endif
@@ -2710,6 +2718,8 @@ void actionInitObject(char* stack, u32* sp)
 	// Step 4: Push object reference to stack
 	// The object has refcount = 1 from allocation
 	PUSH(ACTION_STACK_VALUE_OBJECT, (u64) obj);
+	fprintf(stderr, "[DEBUG] actionInitObject: pushed object %p (type=%d) to stack\n",
+		(void*)obj, ACTION_STACK_VALUE_OBJECT);
 
 #ifdef DEBUG
 	printf("[DEBUG] actionInitObject: pushed object %p to stack\n", (void*)obj);
@@ -2898,6 +2908,162 @@ void actionNewObject(char* stack, u32* sp)
 		ASObject* obj = allocObject(8);
 		new_obj = obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+}
+
+void actionNewMethod(char* stack, u32* sp)
+{
+	// Stack layout: [object] [method_name] [arg_count] [arg1] [arg2] ... [argN] <- sp
+	// NEW_METHOD pops: method_name, object, arg_count, then arguments
+
+	// 1. Pop method name (string)
+	ActionVar method_name_var;
+	popVar(stack, sp, &method_name_var);
+	const char* method_name;
+	if (method_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		method_name = method_name_var.data.string_data.owns_memory ?
+			method_name_var.data.string_data.heap_ptr :
+			(const char*) method_name_var.data.numeric_value;
+	}
+	else
+	{
+		// Fallback if not a string (shouldn't happen)
+		method_name = "";
+	}
+
+	// 2. Pop object reference
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// 3. Pop argument count
+	convertFloat(stack, sp);
+	ActionVar num_args_var;
+	popVar(stack, sp, &num_args_var);
+	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
+
+	// 4. Pop arguments from stack (store them temporarily)
+	// Limit to 16 arguments for simplicity
+	ActionVar args[16];
+	if (num_args > 16)
+	{
+		num_args = 16;
+	}
+
+	// Pop arguments in reverse order (first arg is deepest on stack)
+	for (int i = (int)num_args - 1; i >= 0; i--)
+	{
+		popVar(stack, sp, &args[i]);
+	}
+
+	// 5. Get the constructor method from the object
+	// The method should be a property of the object
+	void* new_obj = NULL;
+	const char* ctor_name = NULL;
+
+	fprintf(stderr, "[DEBUG] actionNewMethod: method_name='%s', obj_type=%d, num_args=%u\n",
+		method_name, obj_var.type, num_args);
+
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+		fprintf(stderr, "[DEBUG] actionNewMethod: obj=%p\n", (void*)obj);
+		if (obj != NULL)
+		{
+			// Try to get the method property
+			ActionVar* method_prop = getProperty(obj, method_name, strlen(method_name));
+			fprintf(stderr, "[DEBUG] actionNewMethod: method_prop=%p\n", (void*)method_prop);
+
+			// If the property is a string, use it as constructor name
+			if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_STRING)
+			{
+				ctor_name = method_prop->data.string_data.owns_memory ?
+					method_prop->data.string_data.heap_ptr :
+					(const char*) method_prop->data.numeric_value;
+				fprintf(stderr, "[DEBUG] actionNewMethod: ctor_name='%s'\n", ctor_name);
+			}
+			else if (method_prop != NULL)
+			{
+				fprintf(stderr, "[DEBUG] actionNewMethod: method_prop type=%d (expected STRING)\n", method_prop->type);
+			}
+		}
+	}
+
+	// 6. Create new object using the constructor
+	// For now, handle built-in constructors similar to NEW_OBJECT
+	if (ctor_name != NULL)
+	{
+		if (strcmp(ctor_name, "Array") == 0)
+		{
+			// Handle Array constructor
+			if (num_args == 0)
+			{
+				// new Array() - empty array
+				ASArray* arr = allocArray(4);
+				arr->length = 0;
+				new_obj = arr;
+			}
+			else if (num_args == 1 &&
+			         (args[0].type == ACTION_STACK_VALUE_F32 ||
+			          args[0].type == ACTION_STACK_VALUE_F64))
+			{
+				// new Array(length) - array with specified length
+				float length_f = (args[0].type == ACTION_STACK_VALUE_F32) ?
+					VAL(float, &args[0].data.numeric_value) :
+					(float) VAL(double, &args[0].data.numeric_value);
+				u32 length = (u32) length_f;
+				ASArray* arr = allocArray(length > 0 ? length : 4);
+				arr->length = length;
+				new_obj = arr;
+			}
+			else
+			{
+				// new Array(elem1, elem2, ...) - array with elements
+				ASArray* arr = allocArray(num_args);
+				arr->length = num_args;
+				for (u32 i = 0; i < num_args; i++)
+				{
+					arr->elements[i] = args[i];
+					// Retain if object/array
+					if (args[i].type == ACTION_STACK_VALUE_OBJECT)
+					{
+						retainObject((ASObject*) args[i].data.numeric_value);
+					}
+					else if (args[i].type == ACTION_STACK_VALUE_ARRAY)
+					{
+						retainArray((ASArray*) args[i].data.numeric_value);
+					}
+				}
+				new_obj = arr;
+			}
+			PUSH(ACTION_STACK_VALUE_ARRAY, VAL(u64, new_obj));
+		}
+		else if (strcmp(ctor_name, "Object") == 0)
+		{
+			// Handle Object constructor
+			ASObject* obj = allocObject(8);
+			new_obj = obj;
+			PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		}
+		else if (strcmp(ctor_name, "Date") == 0)
+		{
+			// Handle Date constructor (simplified)
+			ASObject* date = allocObject(4);
+			new_obj = date;
+			PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		}
+		else
+		{
+			// Unknown constructor - create generic object
+			ASObject* obj = allocObject(8);
+			new_obj = obj;
+			PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		}
+	}
+	else
+	{
+		// Method not found or invalid - push undefined
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 	}
 }
 

@@ -530,6 +530,10 @@ namespace SWFRecomp
 					out_script << "\t" << "// Delete2" << endl
 							   << "\t" << "actionDelete2(stack, sp, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
+				case SWF_ACTION_NEW_METHOD:
+				{
+					out_script << "\t" << "// NewMethod" << endl
+							   << "\t" << "actionNewMethod(stack, sp);" << endl;
 
 					break;
 				}
@@ -544,8 +548,8 @@ namespace SWFRecomp
 			}
 
 
-=======
 >>>>>>> origin/claude/opcode-delete2-0x5b-011CUquufkHrk6Pt1ggisyZL
+=======
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl
