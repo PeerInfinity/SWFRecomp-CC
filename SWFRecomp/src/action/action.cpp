@@ -356,10 +356,13 @@ namespace SWFRecomp
 					break;
 				}
 
-				case SWF_ACTION_DUPLICATE:
+				case SWF_ACTION_CALL_FUNCTION:
 				{
-					out_script << "\t" << "// Duplicate" << endl
-							   << "\t" << "actionDuplicate(stack, sp);" << endl;
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// Call Function" << endl
+							   << "\t" << "actionCallFunction(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
 				}

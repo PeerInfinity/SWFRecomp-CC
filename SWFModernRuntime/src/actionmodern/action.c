@@ -96,57 +96,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 }
 
 // ==================================================================
-// Array Object Model
-// ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
-}
-
-// ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
 
@@ -1615,27 +1564,221 @@ void actionTypeof(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, len);
 }
 
-void actionDuplicate(char* stack, u32* sp)
+// Built-in function implementations
+static void builtin_parseInt(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
 {
-	// Get the type of the top stack entry
-	u8 type = STACK_TOP_TYPE;
-
-	// Handle different types appropriately
-	if (type == ACTION_STACK_VALUE_STRING)
+	if (arg_count < 1)
 	{
-		// For strings, we need to copy both the pointer and the length
-		const char* str = (const char*) VAL(u64, &STACK_TOP_VALUE);
-		u32 len = STACK_TOP_N;  // Length is stored at offset +8
-		u32 id = VAL(u32, &stack[*sp + 12]);  // String ID is at offset +12
+		result->type = ACTION_STACK_VALUE_F32;
+		float nan_val = 0.0f / 0.0f;  // NaN
+		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
+		return;
+	}
 
-		// Push a copy of the string (shallow copy - same pointer)
-		PUSH_STR_ID(str, len, id);
+	// Convert first argument to string
+	const char* str = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_STRING)
+	{
+		str = args[0].data.string_data.owns_memory ?
+			args[0].data.string_data.heap_ptr :
+			(char*)args[0].data.numeric_value;
+	}
+	else if (args[0].type == ACTION_STACK_VALUE_F32)
+	{
+		// Convert number to string first
+		float num_val = VAL(float, &args[0].data.numeric_value);
+		snprintf(str_buffer, 17, "%.0f", num_val);
+		str = str_buffer;
+	}
+
+	if (!str || str[0] == '\0')
+	{
+		result->type = ACTION_STACK_VALUE_F32;
+		float nan_val = 0.0f / 0.0f;
+		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
+		return;
+	}
+
+	// Parse integer
+	char* endptr;
+	long val = strtol(str, &endptr, 10);
+	float result_val = (float)val;
+
+	result->type = ACTION_STACK_VALUE_F32;
+	VAL(u32, &result->data.numeric_value) = VAL(u32, &result_val);
+}
+
+static void builtin_parseFloat(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
+{
+	if (arg_count < 1)
+	{
+		result->type = ACTION_STACK_VALUE_F32;
+		float nan_val = 0.0f / 0.0f;
+		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
+		return;
+	}
+
+	// Convert first argument to string
+	const char* str = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_STRING)
+	{
+		str = args[0].data.string_data.owns_memory ?
+			args[0].data.string_data.heap_ptr :
+			(char*)args[0].data.numeric_value;
+	}
+	else if (args[0].type == ACTION_STACK_VALUE_F32)
+	{
+		result->type = ACTION_STACK_VALUE_F32;
+		result->data.numeric_value = args[0].data.numeric_value;
+		return;
+	}
+
+	if (!str || str[0] == '\0')
+	{
+		result->type = ACTION_STACK_VALUE_F32;
+		float nan_val = 0.0f / 0.0f;
+		VAL(u32, &result->data.numeric_value) = VAL(u32, &nan_val);
+		return;
+	}
+
+	// Parse float
+	float val = strtof(str, NULL);
+	result->type = ACTION_STACK_VALUE_F32;
+	VAL(u32, &result->data.numeric_value) = VAL(u32, &val);
+}
+
+static void builtin_isNaN(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
+{
+	if (arg_count < 1)
+	{
+		result->type = ACTION_STACK_VALUE_F32;
+		float one = 1.0f;
+		VAL(u32, &result->data.numeric_value) = VAL(u32, &one);
+		return;
+	}
+
+	// Convert to float and check if NaN
+	float val = 0.0f;
+	if (args[0].type == ACTION_STACK_VALUE_F32)
+	{
+		val = VAL(float, &args[0].data.numeric_value);
+	}
+	else if (args[0].type == ACTION_STACK_VALUE_STRING)
+	{
+		const char* str = args[0].data.string_data.owns_memory ?
+			args[0].data.string_data.heap_ptr :
+			(char*)args[0].data.numeric_value;
+		val = strtof(str, NULL);
+	}
+
+	result->type = ACTION_STACK_VALUE_F32;
+	float result_val = (val != val) ? 1.0f : 0.0f;  // NaN != NaN is true
+	VAL(u32, &result->data.numeric_value) = VAL(u32, &result_val);
+}
+
+static void builtin_isFinite(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer)
+{
+	if (arg_count < 1)
+	{
+		result->type = ACTION_STACK_VALUE_F32;
+		float zero = 0.0f;
+		VAL(u32, &result->data.numeric_value) = VAL(u32, &zero);
+		return;
+	}
+
+	float val = 0.0f;
+	if (args[0].type == ACTION_STACK_VALUE_F32)
+	{
+		val = VAL(float, &args[0].data.numeric_value);
+	}
+
+	// Check if finite (not NaN and not infinite)
+	int is_finite = (val == val) && (val != 1.0f/0.0f) && (val != -1.0f/0.0f);
+	result->type = ACTION_STACK_VALUE_F32;
+	float result_val = is_finite ? 1.0f : 0.0f;
+	VAL(u32, &result->data.numeric_value) = VAL(u32, &result_val);
+}
+
+// Function registry
+typedef void (*BuiltinFunc)(ActionVar* args, u32 arg_count, ActionVar* result, char* str_buffer);
+
+typedef struct {
+	const char* name;
+	BuiltinFunc func;
+} FunctionEntry;
+
+static FunctionEntry builtin_functions[] = {
+	{"parseInt", builtin_parseInt},
+	{"parseFloat", builtin_parseFloat},
+	{"isNaN", builtin_isNaN},
+	{"isFinite", builtin_isFinite},
+	{NULL, NULL}  // Sentinel
+};
+
+void actionCallFunction(char* stack, u32* sp, char* str_buffer)
+{
+	// 1. Pop function name (string)
+	const char* func_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	u32 func_name_len = STACK_TOP_N;
+	POP();
+
+	// 2. Pop argument count (number)
+	ActionVar count_var;
+	popVar(stack, sp, &count_var);
+
+	// Convert to number if needed
+	u32 arg_count = 0;
+	if (count_var.type == ACTION_STACK_VALUE_F32)
+	{
+		float count_f = VAL(float, &count_var.data.numeric_value);
+		arg_count = (u32)count_f;
+	}
+	else if (count_var.type == ACTION_STACK_VALUE_F64)
+	{
+		double count_d = VAL(double, &count_var.data.numeric_value);
+		arg_count = (u32)count_d;
+	}
+
+	// 3. Pop arguments from stack (in reverse order, so last arg is on top)
+	ActionVar* args = NULL;
+	if (arg_count > 0)
+	{
+		args = (ActionVar*)malloc(sizeof(ActionVar) * arg_count);
+		for (int i = arg_count - 1; i >= 0; i--)
+		{
+			popVar(stack, sp, &args[i]);
+		}
+	}
+
+	// 4. Look up and call function
+	BuiltinFunc func = NULL;
+	for (int i = 0; builtin_functions[i].name != NULL; i++)
+	{
+		if (strcmp(builtin_functions[i].name, func_name) == 0)
+		{
+			func = builtin_functions[i].func;
+			break;
+		}
+	}
+
+	// 5. Execute function and push result
+	ActionVar result;
+	if (func != NULL)
+	{
+		// Call the built-in function
+		func(args, arg_count, &result, str_buffer);
+		pushVar(stack, sp, &result);
 	}
 	else
 	{
-		// For other types (numeric, etc.), just copy the value
-		u64 value = STACK_TOP_VALUE;
-		PUSH(type, value);
+		// Function not found - push undefined
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+	}
+
+	// Clean up
+	if (args != NULL)
+	{
+		free(args);
 	}
 }
 
