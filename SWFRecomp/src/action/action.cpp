@@ -238,10 +238,18 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Trace" << endl
 							   << "\t" << "actionTrace(stack, sp);" << endl;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_RANDOM_NUMBER:
+				{
+					out_script << "\t" << "// Random Number" << endl
+							   << "\t" << "actionRandomNumber(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_GET_TIME:
 				{
 					out_script << "\t" << "// GetTime" << endl

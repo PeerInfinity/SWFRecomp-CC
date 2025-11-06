@@ -941,6 +941,30 @@ void actionSetVariable(char* stack, u32* sp)
 	POP_2();
 }
 
+void actionRandomNumber(char* stack, u32* sp)
+{
+	// Pop maximum value
+	convertFloat(stack, sp);
+	ActionVar max_var;
+	popVar(stack, sp, &max_var);
+	int max = (int) VAL(float, &max_var.data.numeric_value);
+
+	// Handle edge cases
+	if (max <= 0)
+	{
+		float result = 0.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Generate random number in range [0, max)
+	int random_val = rand() % max;
+
+	// Push result as float
+	float result = (float) random_val;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
 void actionGetTime(char* stack, u32* sp)
 {
 	u32 delta_ms = get_elapsed_ms() - start_time;
