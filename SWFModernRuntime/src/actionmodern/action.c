@@ -1835,7 +1835,6 @@ void actionStringLess(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-<<<<<<< HEAD
 void actionInitArray(char* stack, u32* sp)
 {
 	// 1. Pop array element count
@@ -1870,6 +1869,76 @@ void actionInitArray(char* stack, u32* sp)
 
 	// 4. Push array reference to stack
 	PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+}
+
+void actionSetMember(char* stack, u32* sp)
+{
+	// Stack layout (from top to bottom):
+	// 1. value (the value to assign)
+	// 2. property_name (the name of the property)
+	// 3. object (the object to set the property on)
+
+	// Pop the value to assign
+	ActionVar value_var;
+	popVar(stack, sp, &value_var);
+
+	// Pop the property name
+	// The property name should be a string on the stack
+	ActionVar prop_name_var;
+	popVar(stack, sp, &prop_name_var);
+
+	// Get the property name as string
+	const char* prop_name = NULL;
+	u32 prop_name_len = 0;
+
+	if (prop_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		// If it's a string, use it directly
+		prop_name = (const char*) prop_name_var.data.numeric_value;
+		prop_name_len = prop_name_var.str_size;
+	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_F32 || prop_name_var.type == ACTION_STACK_VALUE_F64)
+	{
+		// If it's a number, convert it to string (for array indices)
+		// Use a static buffer for conversion
+		static char index_buffer[32];
+		if (prop_name_var.type == ACTION_STACK_VALUE_F32)
+		{
+			float f = VAL(float, &prop_name_var.data.numeric_value);
+			snprintf(index_buffer, sizeof(index_buffer), "%.15g", f);
+		}
+		else
+		{
+			double d = VAL(double, &prop_name_var.data.numeric_value);
+			snprintf(index_buffer, sizeof(index_buffer), "%.15g", d);
+		}
+		prop_name = index_buffer;
+		prop_name_len = strlen(index_buffer);
+	}
+	else
+	{
+		// Unknown type for property name - error case
+		// Just pop the object and return
+		POP();
+		return;
+	}
+
+	// Pop the object
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// Check if the object is actually an object type
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+		if (obj != NULL)
+		{
+			// Set the property on the object
+			setProperty(obj, prop_name, prop_name_len, &value_var);
+		}
+	}
+	// If it's not an object type, we silently ignore the operation
+	// (Flash behavior for setting properties on non-objects)
 }
 
 void actionInitObject(char* stack, u32* sp)

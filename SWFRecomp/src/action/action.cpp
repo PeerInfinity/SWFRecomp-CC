@@ -437,6 +437,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_SET_MEMBER:
+				{
+					out_script << "\t" << "// SetMember" << endl
+							   << "\t" << "actionSetMember(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_INCREMENT:
 				{
 					out_script << "\t" << "// Increment" << endl
