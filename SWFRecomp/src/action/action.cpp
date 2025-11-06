@@ -280,6 +280,17 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_MB_STRING_LENGTH:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// MbStringLength" << endl
+							   << "\t" << "actionMbStringLength(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_MB_ASCII_TO_CHAR:
 				{
 					declareEmptyString(context, 5);  // Max 4 bytes for UTF-8 + null terminator
