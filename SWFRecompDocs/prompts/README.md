@@ -134,13 +134,46 @@ Prompts are organized by implementation priority:
 **Total Batch 3 Prompts**: 10 prompts created ✅
 **Status**: ✅ COMPLETE - All 10 prompts created (2025-11-05), ready for parallel implementation
 
-### Batch 4: Advanced (20+ opcodes, 80-160+ hours total)
-- **Remaining Object Operations**: ENUMERATE (0x55), DELETE (0x5A), etc.
-- **Function Operations**: CALL_FUNCTION (0x3D), CALL_METHOD (0x9F), DEFINE_FUNCTION (0x9B), etc.
-- **Advanced Control Flow**: WITH (0x94), TRY (0x8F), THROW (0x2A), etc.
-- **Frame & MovieClip Operations**: NEXT_FRAME, PLAY, STOP_SOUNDS, etc.
+### Batch 4: Advanced/Complex (11 opcodes, 70-120 hours total) - READY FOR IMPLEMENTATION ✅
 
-**Status**: To be created (after Batch 3)
+#### Remaining Object Operations (4 prompts)
+- **opcode-enumerate-0x46.md** - ENUMERATE - Enumerate object properties (for..in, variable name)
+- **opcode-enumerate2-0x55.md** - ENUMERATE2 - Enumerate properties (direct object reference)
+- **opcode-delete-0x5a.md** - DELETE - Delete property by name (old version)
+- **opcode-delete2-0x5b.md** - DELETE2 - Delete property (direct reference)
+
+#### Function Operations (3 prompts)
+- **opcode-call-function-0x3d.md** - CALL_FUNCTION - Call function by name with arguments
+- **opcode-call-method-0x9f.md** - CALL_METHOD - Call method on object with 'this' binding
+- **opcode-new-method-0x53.md** - NEW_METHOD - Create object using method as constructor
+
+#### Advanced Control Flow (4 prompts)
+- **opcode-define-function-0x9b.md** - DEFINE_FUNCTION - Define function with parameters and body
+- **opcode-define-function2-0x8e.md** - DEFINE_FUNCTION2 - Enhanced function with registers
+- **opcode-with-0x94.md** - WITH - Execute block with modified scope chain
+- **opcode-declare-local-0x41.md** - DECLARE_LOCAL - Declare local variable in function scope
+
+**Total Batch 4 Prompts**: 11 prompts created ✅
+**Status**: ✅ COMPLETE - All 11 prompts created (2025-11-05), ready for parallel implementation
+
+**Complexity Note**: These are the most complex opcodes yet. Many require significant infrastructure:
+- Function definition and invocation system
+- Call stack management
+- Local scope and variable shadowing
+- Register allocation (DEFINE_FUNCTION2)
+- Scope chain manipulation (WITH)
+
+**Recommended Implementation Order**:
+1. **First Wave** (foundational): ENUMERATE, ENUMERATE2, DELETE, DELETE2, DECLARE_LOCAL
+2. **Second Wave** (function basics): CALL_FUNCTION, NEW_METHOD, DEFINE_FUNCTION
+3. **Third Wave** (advanced): CALL_METHOD, WITH, DEFINE_FUNCTION2
+
+### Batch 5: MovieClip & Exception Handling (20+ opcodes, 80-160+ hours total)
+- **Exception Handling**: TRY (0x8F), THROW (0x2A), etc.
+- **Frame & MovieClip Operations**: NEXT_FRAME, PLAY, STOP_SOUNDS, etc.
+- **Advanced Operations**: CAST_OP, IMPLEMENTS_OP, EXTENDS, etc.
+
+**Status**: To be created (after Batch 4)
 
 ## Validation Status
 
@@ -178,11 +211,12 @@ Each implemented opcode should:
 
 1. ~~**Complete Batch 1 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
 2. ~~**Create Batch 2 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
-3. ~~**Create Batch 3 prompts**~~ ✅ DONE - All 10 prompts created (2025-11-05)
-4. **Begin parallel implementation of Batch 3** - Assign prompts to multiple Claude Code instances
-5. **Monitor and merge** - Sequential merge as implementations complete
-6. **Create Batch 4 prompts** - Advanced opcodes, function definitions, exception handling
-7. **Continue expansion** - Iterative batches until all opcodes implemented
+3. ~~**Create Batch 3 prompts**~~ ✅ DONE - All 10 prompts created and moved to completed/
+4. ~~**Create Batch 4 prompts**~~ ✅ DONE - All 11 prompts created (2025-11-05)
+5. **Begin parallel implementation of Batch 4** - Assign prompts to multiple Claude Code instances
+6. **Monitor and merge** - Sequential merge as implementations complete
+7. **Create Batch 5 prompts** - MovieClip operations, exception handling, inheritance
+8. **Continue expansion** - Iterative batches until all opcodes implemented
 
 ## Resources
 
@@ -201,9 +235,14 @@ Each implemented opcode should:
 
 ---
 
-**Status**: Batch 3 complete (10 prompts), ready for parallel implementation
+**Status**: Batch 4 complete (11 prompts), ready for parallel implementation
 **Created**: 2025-11-05
 **Last Updated**: 2025-11-05
 **Batch 1 Completed**: 2025-11-05 (moved to completed/)
 **Batch 2 Completed**: 2025-11-05 (moved to completed/)
-**Batch 3 Completed**: 2025-11-05
+**Batch 3 Completed**: 2025-11-05 (moved to completed/)
+**Batch 4 Completed**: 2025-11-05
+
+**Total Prompts Created**: 47 prompts (13 + 13 + 10 + 11)
+**Prompts in Active Directory**: 11 (Batch 4)
+**Prompts in Completed Directory**: 36 (Batches 1-3)

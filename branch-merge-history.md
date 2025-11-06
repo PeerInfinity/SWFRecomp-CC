@@ -172,8 +172,8 @@ This document tracks all branches created by Claude Code web interface and their
 
 ## Summary
 
-**Total Branches Reviewed:** 34
-**Merged:** 33
+**Total Branches Reviewed:** 44
+**Merged:** 43
 **Rejected:** 1
 
 **Validation Phase Complete:** ✅ GREEN LIGHT
@@ -181,10 +181,11 @@ This document tracks all branches created by Claude Code web interface and their
 - All 4 critical experiments completed successfully
 - Ready for production parallel implementation
 
-**Production Phase:** ✅ BATCH 1 COMPLETE!
+**Production Phase:** ✅ BATCH 1 COMPLETE! ✅ OBJECT/PROPERTY BATCH COMPLETE!
 - 13 opcodes implemented from Batch 1 (100%)
+- 10 additional opcodes for object/property operations (100%)
 - Parallel implementation highly successful
-- Most merges auto-resolved, complex conflicts manually resolved
+- Complex merge conflicts successfully resolved
 
 **Experiments Completed:**
 - Experiment #1: Hello World Smoke Test ✅ (45 min)
@@ -192,7 +193,7 @@ This document tracks all branches created by Claude Code web interface and their
 - Experiment #4: Reference Counting PoC ✅ (2 hours, 0 leaks)
 - Experiment #5: Parallel Merge Test ✅ (2 min conflict resolution)
 
-**Opcodes Implemented (Total: 16):**
+**Opcodes Implemented (Total: 37):**
 
 *Validation Phase (3 opcodes):*
 - 0x3F: Modulo
@@ -213,6 +214,33 @@ This document tracks all branches created by Claude Code web interface and their
 - 0x66: STRICT_EQUALS (Comparison)
 - 0x67: GREATER (Comparison - moved to correct opcode value)
 - 0x68: STRING_GREATER (String comparison)
+
+*Production Phase - Additional Opcodes (13 opcodes):*
+- 0x15: STRING_EXTRACT (String operation)
+- 0x29: STRING_LESS (String comparison)
+- 0x30: RANDOM_NUMBER (Utility - avmplus RNG)
+- 0x31: CHAR_TO_ASCII (String conversion)
+- 0x32: ASCII_TO_CHAR (String conversion)
+- 0x33: MB_CHAR_TO_ASCII (Multibyte string - UTF-8)
+- 0x35: MB_STRING_LENGTH (Multibyte string - UTF-8)
+- 0x36: MB_ASCII_TO_CHAR (Multibyte string - UTF-8)
+- 0x3C: TYPEOF (Type introspection)
+- 0x3D: DUPLICATE (Stack operation)
+- 0x45: TARGET_PATH (Movie clip - placeholder)
+- 0x47: ADD2 (Type-aware arithmetic)
+- 0x4C: STACK_SWAP (Stack operation)
+
+*Production Phase - Object/Property Operations (10 opcodes - NEW):*
+- 0x22: GET_PROPERTY (MovieClip property access)
+- 0x23: SET_PROPERTY (MovieClip property mutation)
+- 0x3E: RETURN (Function return)
+- 0x40: NEW_OBJECT (Constructor call)
+- 0x42: INIT_ARRAY (Array literal creation)
+- 0x43: INIT_OBJECT (Object literal creation)
+- 0x4E: GET_MEMBER (Object property access)
+- 0x4F: SET_MEMBER (Object property mutation)
+- 0x87: STORE_REGISTER (Register storage)
+- 0x9E: CALL (Function call - placeholder)
 
 **Infrastructure Added:**
 - Reference counting system for memory management
@@ -490,3 +518,134 @@ This document tracks all branches created by Claude Code web interface and their
 - Returns "number", "string", "object", or "undefined"
 - New: `SWFRecomp/tests/typeof_swf_4/` test suite
 - Resolved complex merge conflicts with multiple existing opcodes
+
+### 34. `claude/run-all-tests-011CUqoyGxjxwnG7eQcS1Cth`
+**Status:** ✅ Merged (fast-forward)
+**Commits:** 2 commits
+**Description:** Added comprehensive test vectors for all 27 newly implemented opcodes
+
+**Key Changes:**
+- Updated: `SWFRecomp/tests/test_vecs.txt` with expected outputs for 27 new opcodes
+- Includes test vectors for: modulo, increment, decrement, duplicate, less2, strict_equals, to_integer, to_number, to_string, ascii_to_char, char_to_ascii, bit_and, bit_or, bit_xor, bit_lshift, bit_rshift, bit_urshift, stack_swap, string_extract, string_less, string_greater, add2, typeof, mb_ascii_to_char, mb_char_to_ascii, mb_string_length, target_path
+- Enables automated regression testing for all newly implemented opcodes
+- Total: 28 lines added to test_vecs.txt
+
+### 35. `claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe`
+**Status:** ✅ Merged (fast-forward)
+**Commits:** 1 commit
+**Description:** Implemented INIT_ARRAY opcode (0x42) - Creates array from stack values
+
+**Key Changes:**
+- New: INIT_ARRAY opcode (0x42) implementation in action.c and action.cpp
+- Pops count, then count elements from stack to create array
+- Proper refcount management for array elements
+- New: `SWFRecomp/tests/init_array_swf_4/` test suite
+- Total: 275 lines added
+
+### 36. `claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented INIT_OBJECT opcode (0x43) - Creates object with properties
+
+**Key Changes:**
+- New: INIT_OBJECT opcode (0x43) implementation in action.c and action.cpp
+- Creates object from property name/value pairs on stack
+- Full integration with object API and refcount management
+- New: `SWFRecomp/tests/init_object_swf_4/` test suite
+- Resolved merge conflicts with INIT_ARRAY in action.h, action.c, action.hpp, action.cpp
+
+### 37. `claude/opcode-get-member-0x4e-011CUqqnqRJSNy4EshrhTBUY`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented GET_MEMBER opcode (0x4E) - Gets object property value
+
+**Key Changes:**
+- New: GET_MEMBER opcode (0x4E) implementation in action.c and action.cpp
+- Supports object properties and string.length
+- Added helper function pushUndefined()
+- Proper handling of null objects and missing properties
+- New: `SWFRecomp/tests/get_member_swf_4/` test suite
+- Resolved merge conflicts in action.c
+
+### 38. `claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented SET_MEMBER opcode (0x4F) - Sets object property value
+
+**Key Changes:**
+- New: SET_MEMBER opcode (0x4F) implementation in action.c and action.cpp
+- Handles string and numeric property names (for arrays)
+- Proper integration with object API
+- New: `SWFRecomp/tests/set_member_swf_4/` test suite
+- Resolved merge conflicts preserving all existing implementations
+
+### 39. `claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented NEW_OBJECT opcode (0x40) - Creates object instance (constructor call)
+
+**Key Changes:**
+- New: NEW_OBJECT opcode (0x40) implementation in action.c and action.cpp
+- Creates new object instance and calls constructor with arguments
+- Proper argument passing and stack management
+- New: `SWFRecomp/tests/new_object_swf_4/` test suite
+- Resolved merge conflicts in action.h, action.c, action.hpp, action.cpp
+
+### 40. `claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs`
+**Status:** ✅ Merged (clean merge)
+**Commits:** 1 commit
+**Description:** Implemented GET_PROPERTY opcode (0x22) - Gets MovieClip property by index
+
+**Key Changes:**
+- New: GET_PROPERTY opcode (0x22) implementation in action.c and action.cpp
+- Supports MovieClip properties (_x, _y, _xscale, _yscale, _currentframe, etc.)
+- Added MovieClip structure and property enumeration
+- New: `SWFRecomp/tests/get_property_swf_4/` test suite
+- Clean merge with no conflicts
+
+### 41. `claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented SET_PROPERTY opcode (0x23) - Sets MovieClip property by index
+
+**Key Changes:**
+- New: SET_PROPERTY opcode (0x23) implementation in action.c and action.cpp
+- Supports setting MovieClip properties (_x, _y, _xscale, etc.)
+- New: `SWFRecomp/tests/set_property_swf_4/` test suite
+- Resolved merge conflicts, unified duplicate MovieClip definitions
+- Added actionSetProperty function
+
+### 42. `claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented RETURN opcode (0x3E) - Returns value from function
+
+**Key Changes:**
+- New: RETURN opcode (0x3E) implementation in action.c and action.cpp
+- Returns value from current function execution
+- Proper stack management for function returns
+- New: `SWFRecomp/tests/return_swf_4/` test suite
+- Resolved merge conflicts in action.h
+
+### 43. `claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented CALL opcode (0x9E) - Calls function by name
+
+**Key Changes:**
+- New: CALL opcode (0x9E) implementation in action.c and action.cpp
+- Placeholder implementation for function calls
+- New: `SWFRecomp/tests/call_swf_4/` test suite
+- Resolved merge conflicts, removed duplicate actionCall definition
+
+### 44. `claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented STORE_REGISTER opcode (0x87) - Stores value in register
+
+**Key Changes:**
+- New: STORE_REGISTER opcode (0x87) implementation in action.c and action.cpp
+- Added register storage support (4 or 256 registers depending on SWF version)
+- Added helper functions for register management
+- New: `SWFRecomp/tests/store_register_swf_4/` test suite
+- Resolved merge conflicts in action.h
