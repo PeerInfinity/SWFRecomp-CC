@@ -494,6 +494,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_NEW_METHOD:
+				{
+					out_script << "\t" << "// NewMethod" << endl
+							   << "\t" << "actionNewMethod(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl
