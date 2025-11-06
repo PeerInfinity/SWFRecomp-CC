@@ -241,7 +241,15 @@ namespace SWFRecomp
 					
 					break;
 				}
-				
+
+				case SWF_ACTION_STRING_LESS:
+				{
+					out_script << "\t" << "// StringLess" << endl
+							   << "\t" << "actionStringLess(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_GET_TIME:
 				{
 					out_script << "\t" << "// GetTime" << endl
