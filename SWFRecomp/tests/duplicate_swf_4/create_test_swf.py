@@ -19,8 +19,8 @@ frame_count = struct.pack('<H', 1)  # 1 frame
 action_push_42 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH action, length=5, type=1 (float)
 action_push_42 += struct.pack('<f', 42.0)  # Float value 42.0
 
-# Duplicate (0x3D) - duplicates the top stack value
-action_duplicate = bytes([0x3D])
+# Duplicate (0x4C) - duplicates the top stack value
+action_duplicate = bytes([0x4C])
 
 # Add operation (0x0A)
 action_add = bytes([0x0A])
