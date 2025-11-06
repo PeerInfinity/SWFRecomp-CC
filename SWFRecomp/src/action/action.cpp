@@ -632,6 +632,134 @@ namespace SWFRecomp
 					
 					break;
 				}
+
+			case SWF_ACTION_DEFINE_FUNCTION2:
+			{
+				// Parse function metadata
+				char* func_name = action_buffer;
+				size_t name_len = strlen(func_name);
+				action_buffer += name_len + 1;
+
+				u16 num_params = VAL(u16, action_buffer);
+				action_buffer += 2;
+
+				u8 register_count = VAL(u8, action_buffer);
+				action_buffer += 1;
+
+				u16 flags = VAL(u16, action_buffer);
+				action_buffer += 2;
+
+				// Parse parameters
+				std::vector<std::pair<u8, std::string>> params;
+				for (u16 i = 0; i < num_params; i++)
+				{
+					u8 reg = VAL(u8, action_buffer);
+					action_buffer += 1;
+
+					char* param_name = action_buffer;
+					size_t param_len = strlen(param_name);
+					action_buffer += param_len + 1;
+
+					params.push_back(std::make_pair(reg, std::string(param_name)));
+				}
+
+				u16 code_size = VAL(u16, action_buffer);
+				action_buffer += 2;
+
+				// Generate unique function ID
+				static int func2_counter = 0;
+				std::string func_id = std::string("func2_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func2_counter++);
+
+			// Add function declaration to header
+			context.out_script_decls << endl << "ActionVar " << func_id << "(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);" << endl;
+				// Generate function definition in out_script_defs
+				context.out_script_defs << endl << endl
+					<< "// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl
+					<< "ActionVar " << func_id << "(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)" << endl
+					<< "{" << endl;
+
+				// Initialize local registers
+				if (register_count > 0)
+				{
+					context.out_script_defs << "\tActionVar regs[" << (int)register_count << "];" << endl;
+					context.out_script_defs << "\tmemset(regs, 0, sizeof(regs));" << endl;
+				}
+
+				// Parse flags
+				bool preload_this = (flags & 0x0001);
+				bool preload_arguments = (flags & 0x0002);
+				bool preload_super = (flags & 0x0004);
+				bool preload_root = (flags & 0x0008);
+				bool preload_parent = (flags & 0x0010);
+				bool preload_global = (flags & 0x0020);
+				bool suppress_this = (flags & 0x0080);
+				bool suppress_arguments = (flags & 0x0100);
+				bool suppress_super = (flags & 0x0200);
+
+				// Preload special variables into registers
+				int next_reg = 1; // Register 0 is reserved
+
+				if (preload_this && !suppress_this)
+				{
+					context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].value.u64 = (u64)this_obj;" << endl;
+					next_reg++;
+				}
+
+				if (preload_arguments && !suppress_arguments)
+				{
+					context.out_script_defs << "\t// Preload 'arguments' into register " << next_reg << endl;
+					context.out_script_defs << "\t// TODO: Create arguments object" << endl;
+					next_reg++;
+				}
+
+				if (preload_super && !suppress_super)
+				{
+					context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
+					context.out_script_defs << "\t// TODO: Create super reference" << endl;
+					next_reg++;
+				}
+
+				// Bind parameters to registers or variables
+				for (size_t i = 0; i < params.size(); i++)
+				{
+					if (params[i].first == 0)
+					{
+						// Variable parameter
+						context.out_script_defs << "\tif (" << i << " < arg_count) {" << endl;
+						context.out_script_defs << "\t\t// TODO: Set variable parameter '" << params[i].second << "' to args[" << i << "]" << endl;
+						context.out_script_defs << "\t}" << endl;
+					}
+					else
+					{
+						// Register parameter
+						context.out_script_defs << "\tif (" << i << " < arg_count) {" << endl;
+						context.out_script_defs << "\t\tregs[" << (int)params[i].first << "] = args[" << i << "];" << endl;
+						context.out_script_defs << "\t}" << endl;
+					}
+				}
+
+				// For now, skip the function body and just return undefined
+				// TODO: Parse function body recursively
+				context.out_script_defs << "\t// Function body (" << code_size << " bytes)" << endl;
+				context.out_script_defs << "\t// TODO: Parse function body" << endl;
+
+				context.out_script_defs << "\tActionVar ret;" << endl;
+				context.out_script_defs << "\tret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+				context.out_script_defs << "\treturn ret;" << endl;
+				context.out_script_defs << "}" << endl;
+
+				// Generate runtime call to register function
+				out_script << "\t// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl;
+				out_script << "\tactionDefineFunction2(stack, sp, \"" << (name_len > 0 ? func_name : "") << "\", "
+						   << func_id << ", " << num_params << ", " << (int)register_count << ", " << flags << ");" << endl;
+
+				// Skip function body in bytecode
+				action_buffer += code_size;
+
+				break;
+			}
 				
 				case SWF_ACTION_PUSH:
 				{
