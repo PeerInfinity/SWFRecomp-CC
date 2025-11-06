@@ -115,13 +115,32 @@ Prompts are organized by implementation priority:
 **Total Batch 2 Prompts**: 13 prompts created ✅
 **Status**: ✅ COMPLETE - All 13 prompts created (2025-11-05), ready for parallel implementation
 
-### Batch 3: Complex (25+ opcodes, 100-200 hours total)
-- **Object Operations**: 10 opcodes (requires object model)
-- **Function Operations**: 6 opcodes
-- **Control Flow**: 5 opcodes
-- **Advanced**: 25+ opcodes
+### Batch 3: Complex (10 opcodes, 30-60 hours total) - READY FOR IMPLEMENTATION ✅
 
-**Status**: To be created (after Batch 1 and 2)
+#### Object Operations (6 prompts)
+- **opcode-init-array-0x42.md** - INIT_ARRAY - Create new array with elements
+- **opcode-init-object-0x43.md** - INIT_OBJECT - Create new object with properties
+- **opcode-get-member-0x4e.md** - GET_MEMBER - Get object/array property or element
+- **opcode-set-member-0x4f.md** - SET_MEMBER - Set object/array property or element
+- **opcode-get-property-0x22.md** - GET_PROPERTY - Get MovieClip property by index
+- **opcode-set-property-0x23.md** - SET_PROPERTY - Set MovieClip property by index
+
+#### Function & Control Flow Operations (4 prompts)
+- **opcode-new-object-0x40.md** - NEW_OBJECT - Create object via constructor
+- **opcode-return-0x3e.md** - RETURN - Return value from function
+- **opcode-call-0x9e.md** - CALL - Call frame actions
+- **opcode-store-register-0x87.md** - STORE_REGISTER - Store value in register
+
+**Total Batch 3 Prompts**: 10 prompts created ✅
+**Status**: ✅ COMPLETE - All 10 prompts created (2025-11-05), ready for parallel implementation
+
+### Batch 4: Advanced (20+ opcodes, 80-160+ hours total)
+- **Remaining Object Operations**: ENUMERATE (0x55), DELETE (0x5A), etc.
+- **Function Operations**: CALL_FUNCTION (0x3D), CALL_METHOD (0x9F), DEFINE_FUNCTION (0x9B), etc.
+- **Advanced Control Flow**: WITH (0x94), TRY (0x8F), THROW (0x2A), etc.
+- **Frame & MovieClip Operations**: NEXT_FRAME, PLAY, STOP_SOUNDS, etc.
+
+**Status**: To be created (after Batch 3)
 
 ## Validation Status
 
@@ -158,11 +177,12 @@ Each implemented opcode should:
 ## Next Steps
 
 1. ~~**Complete Batch 1 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
-2. ~~**Create Batch 2 prompts**~~ ✅ DONE - All 13 prompts created (2025-11-05)
-3. **Begin parallel implementation of Batch 2** - Assign prompts to multiple Claude Code instances
-4. **Monitor and merge** - Sequential merge as implementations complete
-5. **Create Batch 3 prompts** - Object operations, function operations, control flow
-6. **Continue expansion** - Iterative batches until all opcodes implemented
+2. ~~**Create Batch 2 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
+3. ~~**Create Batch 3 prompts**~~ ✅ DONE - All 10 prompts created (2025-11-05)
+4. **Begin parallel implementation of Batch 3** - Assign prompts to multiple Claude Code instances
+5. **Monitor and merge** - Sequential merge as implementations complete
+6. **Create Batch 4 prompts** - Advanced opcodes, function definitions, exception handling
+7. **Continue expansion** - Iterative batches until all opcodes implemented
 
 ## Resources
 
@@ -181,8 +201,9 @@ Each implemented opcode should:
 
 ---
 
-**Status**: Batch 2 complete (13 prompts), ready for parallel implementation
+**Status**: Batch 3 complete (10 prompts), ready for parallel implementation
 **Created**: 2025-11-05
 **Last Updated**: 2025-11-05
 **Batch 1 Completed**: 2025-11-05 (moved to completed/)
-**Batch 2 Completed**: 2025-11-05
+**Batch 2 Completed**: 2025-11-05 (moved to completed/)
+**Batch 3 Completed**: 2025-11-05
