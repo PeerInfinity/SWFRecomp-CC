@@ -2083,3 +2083,116 @@ void actionGetMember(char* stack, u32* sp)
 		pushUndefined(stack, sp);
 	}
 }
+
+void actionNewObject(char* stack, u32* sp)
+{
+	// 1. Pop constructor name (string)
+	ActionVar ctor_name_var;
+	popVar(stack, sp, &ctor_name_var);
+	const char* ctor_name;
+	if (ctor_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		ctor_name = ctor_name_var.data.string_data.owns_memory ?
+			ctor_name_var.data.string_data.heap_ptr :
+			(const char*) ctor_name_var.data.numeric_value;
+	}
+	else
+	{
+		// Fallback if not a string (shouldn't happen in normal cases)
+		ctor_name = "Object";
+	}
+
+	// 2. Pop number of arguments
+	convertFloat(stack, sp);
+	ActionVar num_args_var;
+	popVar(stack, sp, &num_args_var);
+	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
+
+	// 3. Pop arguments from stack (store them temporarily)
+	// Limit to 16 arguments for simplicity
+	ActionVar args[16];
+	if (num_args > 16)
+	{
+		num_args = 16;
+	}
+
+	// Pop arguments in reverse order (first arg is deepest on stack)
+	for (int i = (int)num_args - 1; i >= 0; i--)
+	{
+		popVar(stack, sp, &args[i]);
+	}
+
+	// 4. Create new object based on constructor name
+	void* new_obj = NULL;
+
+	if (strcmp(ctor_name, "Array") == 0)
+	{
+		// Handle Array constructor
+		if (num_args == 0)
+		{
+			// new Array() - empty array
+			ASArray* arr = allocArray(4);
+			arr->length = 0;
+			new_obj = arr;
+		}
+		else if (num_args == 1 &&
+		         (args[0].type == ACTION_STACK_VALUE_F32 ||
+		          args[0].type == ACTION_STACK_VALUE_F64))
+		{
+			// new Array(length) - array with specified length
+			float length_f = (args[0].type == ACTION_STACK_VALUE_F32) ?
+				VAL(float, &args[0].data.numeric_value) :
+				(float) VAL(double, &args[0].data.numeric_value);
+			u32 length = (u32) length_f;
+			ASArray* arr = allocArray(length > 0 ? length : 4);
+			arr->length = length;
+			new_obj = arr;
+		}
+		else
+		{
+			// new Array(elem1, elem2, ...) - array with elements
+			ASArray* arr = allocArray(num_args);
+			arr->length = num_args;
+			for (u32 i = 0; i < num_args; i++)
+			{
+				arr->elements[i] = args[i];
+				// Retain if object/array
+				if (args[i].type == ACTION_STACK_VALUE_OBJECT)
+				{
+					retainObject((ASObject*) args[i].data.numeric_value);
+				}
+				else if (args[i].type == ACTION_STACK_VALUE_ARRAY)
+				{
+					retainArray((ASArray*) args[i].data.numeric_value);
+				}
+			}
+			new_obj = arr;
+		}
+		PUSH(ACTION_STACK_VALUE_ARRAY, VAL(u64, new_obj));
+	}
+	else if (strcmp(ctor_name, "Object") == 0)
+	{
+		// Handle Object constructor
+		// Create empty object with initial capacity
+		ASObject* obj = allocObject(8);
+		new_obj = obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else if (strcmp(ctor_name, "Date") == 0)
+	{
+		// Handle Date constructor (simplified)
+		// In a full implementation, this would parse date arguments
+		// For now, just create an empty object
+		ASObject* date = allocObject(4);
+		new_obj = date;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else
+	{
+		// Unknown constructor - create generic object
+		// In a full implementation, this would try to call user-defined constructor
+		ASObject* obj = allocObject(8);
+		new_obj = obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+}

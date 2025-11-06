@@ -356,6 +356,14 @@ namespace SWFRecomp
 					break;
 				}
 
+			case SWF_ACTION_NEW_OBJECT:
+			{
+				out_script << "\t" << "// NewObject" << endl
+						   << "\t" << "actionNewObject(stack, sp);" << endl;
+
+				break;
+			}
+
 			case SWF_ACTION_INIT_ARRAY:
 			{
 				out_script << "\t" << "// InitArray" << endl
