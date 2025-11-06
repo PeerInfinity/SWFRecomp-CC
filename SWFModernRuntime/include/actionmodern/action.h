@@ -89,6 +89,7 @@ void actionStackSwap(char* stack, u32* sp);
 
 void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLength(char* stack, u32* sp, char* v_str);
+void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 void actionMbStringLength(char* stack, u32* sp, char* v_str);
 void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);
 void actionCharToAscii(char* stack, u32* sp);
