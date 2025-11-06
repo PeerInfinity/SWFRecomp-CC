@@ -10,6 +10,14 @@
 
 u32 start_time;
 
+// ==================================================================
+// Scope Chain for WITH statement
+// ==================================================================
+
+#define MAX_SCOPE_DEPTH 32
+static ASObject* scope_chain[MAX_SCOPE_DEPTH];
+static u32 scope_depth = 0;
+
 void initTime()
 {
 	start_time = get_elapsed_ms();
@@ -93,57 +101,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 
 	int32_t randomNumber = GenerateRandomNumber(pRandomFast);
 	return randomNumber % range;
-}
-
-// ==================================================================
-// Array Object Model
-// ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
 }
 
 // ==================================================================
@@ -1293,7 +1250,30 @@ void actionGetVariable(char* stack, u32* sp)
 	// Pop variable name
 	POP();
 
-	// Get variable (fast path for constant strings)
+	// First check scope chain (innermost to outermost)
+	printf("[DEBUG GET_VAR] scope_depth=%u, looking for '%.*s'\n", scope_depth, var_name_len, var_name);
+	for (int i = scope_depth - 1; i >= 0; i--)
+	{
+		if (scope_chain[i] != NULL)
+		{
+			printf("[DEBUG GET_VAR] Checking scope object %p\n", (void*)scope_chain[i]);
+			// Try to find property in this scope object
+			ActionVar* prop = getProperty(scope_chain[i], var_name, var_name_len);
+			if (prop != NULL)
+			{
+				// Found in scope chain - push its value
+				printf("[DEBUG GET_VAR] Found! type=%d\n", prop->type);
+				PUSH_VAR(prop);
+				return;
+			}
+			else
+			{
+				printf("[DEBUG GET_VAR] Not found in this object\n");
+			}
+		}
+	}
+
+	// Not found in scope chain - check global variables
 	ActionVar* var;
 	if (string_id != 0)
 	{
@@ -1325,12 +1305,38 @@ void actionSetVariable(char* stack, u32* sp)
 	u32 value_sp = *sp;
 	u32 var_name_sp = SP_SECOND_TOP;
 
+	// Debug: check what's on stack
+	ActionStackValueType value_type = stack[value_sp];
+	printf("[DEBUG SET_VAR] Setting variable, value type=%d\n", value_type);
+
 	// Read variable name info
 	u32 string_id = VAL(u32, &stack[var_name_sp + 4]);
 	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
 	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
 
-	// Get variable (fast path for constant strings)
+	// First check scope chain (innermost to outermost)
+	for (int i = scope_depth - 1; i >= 0; i--)
+	{
+		if (scope_chain[i] != NULL)
+		{
+			// Try to find property in this scope object
+			ActionVar* prop = getProperty(scope_chain[i], var_name, var_name_len);
+			if (prop != NULL)
+			{
+				// Found in scope chain - set it there
+				// We need to convert the value at value_sp to an ActionVar
+				ActionVar value_var;
+				peekVar(stack, sp, &value_var);
+				setProperty(scope_chain[i], var_name, var_name_len, &value_var);
+
+				// Pop both value and name
+				POP_2();
+				return;
+			}
+		}
+	}
+
+	// Not found in scope chain - set as global variable
 	ActionVar* var;
 	if (string_id != 0)
 	{
@@ -2497,5 +2503,75 @@ void actionSetProperty(char* stack, u32* sp)
 		default:
 			// Unknown property - ignore
 			break;
+	}
+}
+
+// ==================================================================
+// WITH Statement Implementation
+// ==================================================================
+
+void actionWithStart(char* stack, u32* sp)
+{
+	// Pop object from stack
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	printf("[DEBUG] actionWithStart: popped type=%d\n", obj_var.type);
+
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		// Get the object pointer
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+
+		// Push onto scope chain (if valid and space available)
+		if (obj != NULL && scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_chain[scope_depth++] = obj;
+#ifdef DEBUG
+			printf("[DEBUG] actionWithStart: pushed object %p onto scope chain (depth=%u)\n", (void*)obj, scope_depth);
+#endif
+		}
+		else
+		{
+			if (obj == NULL)
+			{
+				// Push null marker to maintain balance
+				scope_chain[scope_depth++] = NULL;
+#ifdef DEBUG
+				printf("[DEBUG] actionWithStart: object is null, pushed null marker (depth=%u)\n", scope_depth);
+#endif
+			}
+			else
+			{
+				fprintf(stderr, "ERROR: Scope chain overflow (depth=%u, max=%u)\n", scope_depth, MAX_SCOPE_DEPTH);
+			}
+		}
+	}
+	else
+	{
+		// Non-object type - push null marker to maintain balance
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_chain[scope_depth++] = NULL;
+#ifdef DEBUG
+			printf("[DEBUG] actionWithStart: non-object type %d, pushed null marker (depth=%u)\n", obj_var.type, scope_depth);
+#endif
+		}
+	}
+}
+
+void actionWithEnd(char* stack, u32* sp)
+{
+	// Pop from scope chain
+	if (scope_depth > 0)
+	{
+		scope_depth--;
+#ifdef DEBUG
+		printf("[DEBUG] actionWithEnd: popped from scope chain (depth=%u)\n", scope_depth);
+#endif
+	}
+	else
+	{
+		fprintf(stderr, "ERROR: actionWithEnd called with empty scope chain\n");
 	}
 }

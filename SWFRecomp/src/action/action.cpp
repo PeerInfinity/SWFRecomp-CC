@@ -573,10 +573,37 @@ namespace SWFRecomp
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_WITH:
+				{
+					// Read block size from bytecode
+					u16 block_size = VAL(u16, action_buffer);
+					action_buffer += 2;
+
+					// Store the end position of the with block
+					char* block_end = action_buffer + block_size;
+
+					// Emit actionWithStart to push object onto scope chain
+					out_script << "\t" << "// WITH block (size=" << block_size << ")" << endl;
+					out_script << "\t" << "actionWithStart(stack, sp);" << endl;
+					out_script << "\t" << "{" << endl; // C scope for clarity
+
+					// Recursively parse the actions within the with block
+					parseActions(context, action_buffer, out_script);
+
+					// Emit actionWithEnd to pop object from scope chain
+					out_script << "\t" << "}" << endl;
+					out_script << "\t" << "actionWithEnd(stack, sp);" << endl;
+
+					// Move action_buffer to the end of the block
+					action_buffer = block_end;
+
+					break;
+				}
+
 				case SWF_ACTION_PUSH:
 				{
 					u64 push_value;
