@@ -204,15 +204,23 @@ namespace SWFRecomp
 				{
 					declareEmptyString(context, 17);
 					declareEmptyString(context, 17);
-					
+
 					out_script << "\t" << "// StringAdd" << endl
 							   << "\t" << "actionStringAdd(stack, sp, "
 							   << "str_" << to_string(next_str_i - 2) << ", "
 							   << "str_" << to_string(next_str_i - 1) << ");" << endl;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_GET_PROPERTY:
+				{
+					out_script << "\t" << "// GetProperty" << endl
+							   << "\t" << "actionGetProperty(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_POP:
 				{
 					out_script << "\t" << "// Pop" << endl

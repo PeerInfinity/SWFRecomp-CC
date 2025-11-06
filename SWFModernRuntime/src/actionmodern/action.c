@@ -1254,6 +1254,122 @@ void actionSetVariable(char* stack, u32* sp)
 	POP_2();
 }
 
+// MovieClip structure for GET_PROPERTY opcode
+typedef struct {
+	float x, y;
+	float xscale, yscale;
+	float rotation;
+	float alpha;
+	float width, height;
+	int visible;
+	int currentframe;
+	int totalframes;
+	const char* name;
+	const char* target;
+} MovieClip;
+
+// Get MovieClip by target path (simplified implementation)
+static MovieClip* getMovieClipByTarget(const char* target) {
+	// For initial implementation, return a default _root MovieClip
+	static MovieClip root = {
+		.x = 0.0f,
+		.y = 0.0f,
+		.xscale = 100.0f,
+		.yscale = 100.0f,
+		.rotation = 0.0f,
+		.alpha = 100.0f,
+		.width = 550.0f,
+		.height = 400.0f,
+		.visible = 1,
+		.currentframe = 1,
+		.totalframes = 1,
+		.name = "",
+		.target = ""
+	};
+
+	if (strcmp(target, "") == 0 || strcmp(target, "_root") == 0 || strcmp(target, "/") == 0) {
+		return &root;
+	}
+	return NULL;
+}
+
+void actionGetProperty(char* stack, u32* sp)
+{
+	// Pop property index
+	convertFloat(stack, sp);
+	ActionVar index_var;
+	popVar(stack, sp, &index_var);
+	int prop_index = (int) VAL(float, &index_var.data.numeric_value);
+
+	// Pop target path
+	convertString(stack, sp, NULL);
+	const char* target = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	POP();
+
+	// Get the MovieClip object
+	MovieClip* mc = getMovieClipByTarget(target);
+
+	// Get property value based on index
+	float value = 0.0f;
+	const char* str_value = NULL;
+	int is_string = 0;
+
+	switch (prop_index) {
+		case 0:  // _x
+			value = mc ? mc->x : 0.0f;
+			break;
+		case 1:  // _y
+			value = mc ? mc->y : 0.0f;
+			break;
+		case 2:  // _xscale
+			value = mc ? mc->xscale : 100.0f;
+			break;
+		case 3:  // _yscale
+			value = mc ? mc->yscale : 100.0f;
+			break;
+		case 4:  // _currentframe
+			value = mc ? (float)mc->currentframe : 1.0f;
+			break;
+		case 5:  // _totalframes
+			value = mc ? (float)mc->totalframes : 1.0f;
+			break;
+		case 6:  // _alpha
+			value = mc ? mc->alpha : 100.0f;
+			break;
+		case 7:  // _visible
+			value = mc ? (mc->visible ? 1.0f : 0.0f) : 1.0f;
+			break;
+		case 8:  // _width
+			value = mc ? mc->width : 0.0f;
+			break;
+		case 9:  // _height
+			value = mc ? mc->height : 0.0f;
+			break;
+		case 10: // _rotation
+			value = mc ? mc->rotation : 0.0f;
+			break;
+		case 11: // _target
+			str_value = mc ? mc->target : "";
+			is_string = 1;
+			break;
+		case 13: // _name
+			str_value = mc ? mc->name : "";
+			is_string = 1;
+			break;
+		default:
+			// Unknown property - push 0
+			value = 0.0f;
+			break;
+	}
+
+	// Push result
+	if (is_string) {
+		PUSH_STR(str_value, strlen(str_value));
+	} else {
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &value));
+	}
+}
+
 void actionRandomNumber(char* stack, u32* sp)
 {
 	// Pop maximum value
