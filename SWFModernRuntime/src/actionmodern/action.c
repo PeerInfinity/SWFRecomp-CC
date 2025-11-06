@@ -3,10 +3,14 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
 
 #include <recomp.h>
 #include <utils.h>
 #include <actionmodern/object.h>
+
+// Forward declarations
+static void pushUndefined(char* stack, u32* sp);
 
 u32 start_time;
 
@@ -93,57 +97,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 
 	int32_t randomNumber = GenerateRandomNumber(pRandomFast);
 	return randomNumber % range;
-}
-
-// ==================================================================
-// Array Object Model
-// ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
 }
 
 // ==================================================================
@@ -2049,6 +2002,162 @@ void actionCall(char* stack, u32* sp)
 	// 1. Look up the frame by number or label
 	// 2. Execute the frame's actions
 	// 3. Return to the current frame when done
+}
+
+void actionCallMethod(char* stack, u32* sp, char* str_buffer)
+{
+	// 1. Pop method name (can be empty string for anonymous calls)
+	convertString(stack, sp, str_buffer);
+	const char* method_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	POP();
+
+	// 2. Pop object reference
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// 3. Pop argument count
+	convertFloat(stack, sp);
+	ActionVar count_var;
+	popVar(stack, sp, &count_var);
+	u32 arg_count = (u32) count_var.data.numeric_value;
+
+	// 4. Pop arguments into array (in reverse order)
+	ActionVar* args = NULL;
+	if (arg_count > 0) {
+		args = (ActionVar*) malloc(sizeof(ActionVar) * arg_count);
+		for (int i = arg_count - 1; i >= 0; i--) {
+			popVar(stack, sp, &args[i]);
+		}
+	}
+
+	// 5. Handle method calls based on object type
+	bool method_found = false;
+
+	// Handle String methods
+	if (obj_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		const char* str = (const char*) obj_var.data.numeric_value;
+
+		if (strcmp(method_name, "toUpperCase") == 0)
+		{
+			// Convert to uppercase
+			int len = strlen(str);
+			if (len > 16) len = 16;
+			for (int i = 0; i < len; i++) {
+				str_buffer[i] = toupper(str[i]);
+			}
+			str_buffer[len] = '\0';
+			PUSH_STR(str_buffer, len);
+			method_found = true;
+		}
+		else if (strcmp(method_name, "toLowerCase") == 0)
+		{
+			// Convert to lowercase
+			int len = strlen(str);
+			if (len > 16) len = 16;
+			for (int i = 0; i < len; i++) {
+				str_buffer[i] = tolower(str[i]);
+			}
+			str_buffer[len] = '\0';
+			PUSH_STR(str_buffer, len);
+			method_found = true;
+		}
+		else if (strcmp(method_name, "substring") == 0)
+		{
+			// substring(start, end)
+			int start = 0, end = strlen(str);
+			if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_F32) {
+				start = (int) args[0].data.numeric_value;
+			}
+			if (arg_count > 1 && args[1].type == ACTION_STACK_VALUE_F32) {
+				end = (int) args[1].data.numeric_value;
+			}
+
+			// Clamp values
+			if (start < 0) start = 0;
+			if (end > (int)strlen(str)) end = strlen(str);
+			if (start > end) { int tmp = start; start = end; end = tmp; }
+
+			int len = end - start;
+			if (len > 16) len = 16;
+			for (int i = 0; i < len; i++) {
+				str_buffer[i] = str[start + i];
+			}
+			str_buffer[len] = '\0';
+			PUSH_STR(str_buffer, len);
+			method_found = true;
+		}
+		else if (strcmp(method_name, "charAt") == 0)
+		{
+			// charAt(index)
+			int index = 0;
+			if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_F32) {
+				index = (int) args[0].data.numeric_value;
+			}
+
+			if (index >= 0 && index < (int)strlen(str)) {
+				str_buffer[0] = str[index];
+				str_buffer[1] = '\0';
+				PUSH_STR(str_buffer, 1);
+			} else {
+				PUSH_STR("", 0);
+			}
+			method_found = true;
+		}
+	}
+	// Handle Array methods
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+
+		if (strcmp(method_name, "push") == 0)
+		{
+			// Push elements to array
+			if (arr != NULL && arg_count > 0) {
+				// Ensure capacity
+				if (arr->length + arg_count > arr->capacity) {
+					u32 new_capacity = arr->length + arg_count;
+					ActionVar* new_elements = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_capacity);
+					if (new_elements) {
+						arr->elements = new_elements;
+						arr->capacity = new_capacity;
+					}
+				}
+
+				// Add elements
+				for (u32 i = 0; i < arg_count; i++) {
+					arr->elements[arr->length++] = args[i];
+				}
+			}
+
+			// Return new length
+			float new_length = arr ? (float)arr->length : 0.0f;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &new_length));
+			method_found = true;
+		}
+		else if (strcmp(method_name, "pop") == 0)
+		{
+			// Pop last element
+			if (arr != NULL && arr->length > 0) {
+				ActionVar elem = arr->elements[arr->length - 1];
+				arr->length--;
+				pushVar(stack, sp, &elem);
+			} else {
+				pushUndefined(stack, sp);
+			}
+			method_found = true;
+		}
+	}
+
+	// If method not found or empty method name (anonymous call), push undefined
+	if (!method_found) {
+		pushUndefined(stack, sp);
+	}
+
+	// Free arguments array
+	if (args != NULL) {
+		free(args);
+	}
 }
 
 void actionInitArray(char* stack, u32* sp)
