@@ -493,6 +493,18 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_STORE_REGISTER:
+				{
+					// Read register number from bytecode
+					u8 register_num = (u8) action_buffer[0];
+
+					out_script << "\t" << "// StoreRegister " << (int)register_num << endl
+							   << "\t" << "actionStoreRegister(stack, sp, " << (int)register_num << ");" << endl;
+
+					action_buffer += length;
+					break;
+				}
+
 				case SWF_ACTION_CONSTANT_POOL:
 				{
 					action_buffer += length;
@@ -547,6 +559,17 @@ namespace SWFRecomp
 								break;
 							}
 							
+
+						case ACTION_STACK_VALUE_REGISTER:
+						{
+							u8 register_num = (u8) action_buffer[push_length];
+							push_length += 1;
+
+							out_script << "(Register " << (int)register_num << ")" << endl;
+							out_script << "\t" << "actionPushRegister(stack, sp, " << (int)register_num << ");" << endl;
+
+							break;
+						}
 							default:
 							{
 								EXC_ARG("Undefined push type: %d\n", push_type);
