@@ -134,7 +134,7 @@ Prompts are organized by implementation priority:
 **Total Batch 3 Prompts**: 10 prompts created ✅
 **Status**: ✅ COMPLETE - All 10 prompts created (2025-11-05), ready for parallel implementation
 
-### Batch 4: Advanced/Complex (11 opcodes, 70-120 hours total) - READY FOR IMPLEMENTATION ✅
+### Batch 4: Advanced/Complex (11 opcodes, 70-120 hours total) - MOVED TO COMPLETED ✅
 
 #### Remaining Object Operations (4 prompts)
 - **opcode-enumerate-0x46.md** - ENUMERATE - Enumerate object properties (for..in, variable name)
@@ -154,7 +154,7 @@ Prompts are organized by implementation priority:
 - **opcode-declare-local-0x41.md** - DECLARE_LOCAL - Declare local variable in function scope
 
 **Total Batch 4 Prompts**: 11 prompts created ✅
-**Status**: ✅ COMPLETE - All 11 prompts created (2025-11-05), ready for parallel implementation
+**Status**: ✅ COMPLETE - All 11 prompts created and moved to completed/ directory (2025-11-05)
 
 **Complexity Note**: These are the most complex opcodes yet. Many require significant infrastructure:
 - Function definition and invocation system
@@ -168,12 +168,51 @@ Prompts are organized by implementation priority:
 2. **Second Wave** (function basics): CALL_FUNCTION, NEW_METHOD, DEFINE_FUNCTION
 3. **Third Wave** (advanced): CALL_METHOD, WITH, DEFINE_FUNCTION2
 
-### Batch 5: MovieClip & Exception Handling (20+ opcodes, 80-160+ hours total)
-- **Exception Handling**: TRY (0x8F), THROW (0x2A), etc.
-- **Frame & MovieClip Operations**: NEXT_FRAME, PLAY, STOP_SOUNDS, etc.
-- **Advanced Operations**: CAST_OP, IMPLEMENTS_OP, EXTENDS, etc.
+### Batch 5: MovieClip, Exception Handling & Type System (14 opcodes, 56-112 hours total) - READY FOR IMPLEMENTATION ✅
 
-**Status**: To be created (after Batch 4)
+#### Frame & MovieClip Control Operations (6 prompts)
+- **opcode-next-frame-0x04.md** - NEXT_FRAME - Advance to next frame
+- **opcode-prev-frame-0x05.md** - PREV_FRAME - Go to previous frame
+- **opcode-play-0x06.md** - PLAY - Start playing timeline
+- **opcode-stop-0x07.md** - STOP - Stop playing (already implemented, reference doc)
+- **opcode-toggle-quality-0x08.md** - TOGGLE_QUALITY - Toggle rendering quality
+- **opcode-stop-sounds-0x09.md** - STOP_SOUNDS - Stop all audio
+
+#### Sprite Manipulation Operations (4 prompts)
+- **opcode-clone-sprite-0x24.md** - CLONE_SPRITE - Duplicate a sprite/MovieClip
+- **opcode-remove-sprite-0x25.md** - REMOVE_SPRITE - Remove sprite from display list
+- **opcode-start-drag-0x27.md** - START_DRAG - Make sprite draggable
+- **opcode-end-drag-0x28.md** - END_DRAG - Stop dragging sprite
+
+#### Exception Handling (1 prompt)
+- **opcode-throw-0x2a.md** - THROW - Throw exception (works with TRY)
+
+#### Type System & Inheritance (3 prompts)
+- **opcode-cast-op-0x2b.md** - CAST_OP - Cast object to type (returns object or null)
+- **opcode-implements-op-0x2c.md** - IMPLEMENTS_OP - Declare interface implementation
+- **opcode-extends-0x69.md** - EXTENDS - Set up class inheritance
+
+**Total Batch 5 Prompts**: 14 prompts created ✅
+**Status**: ✅ COMPLETE - All 14 prompts created (2025-11-05), ready for parallel implementation
+
+**Complexity Distribution**:
+- **Simple** (4 opcodes, 4-8 hours): STOP_SOUNDS, TOGGLE_QUALITY, END_DRAG, REMOVE_SPRITE
+- **Medium** (4 opcodes, 8-16 hours): NEXT_FRAME, PREV_FRAME, PLAY, CLONE_SPRITE
+- **Complex** (6 opcodes, 44-88 hours): START_DRAG, THROW, CAST_OP, IMPLEMENTS_OP, EXTENDS
+
+**Implementation Notes**:
+- Frame control opcodes require timeline management
+- Sprite operations are stubs in NO_GRAPHICS mode
+- Exception handling requires TRY opcode (0x8F) for full functionality
+- Type system opcodes require prototype chain support
+- Coordinate EXTENDS, CAST_OP, IMPLEMENTS_OP together (shared infrastructure)
+
+**Recommended Implementation Order**:
+1. **First Wave** (simple control): STOP_SOUNDS, TOGGLE_QUALITY, END_DRAG
+2. **Second Wave** (frame control): NEXT_FRAME, PREV_FRAME, PLAY
+3. **Third Wave** (sprite ops): REMOVE_SPRITE, CLONE_SPRITE
+4. **Fourth Wave** (type system foundation): EXTENDS, IMPLEMENTS_OP
+5. **Fifth Wave** (advanced): CAST_OP, START_DRAG, THROW
 
 ## Validation Status
 
@@ -212,11 +251,12 @@ Each implemented opcode should:
 1. ~~**Complete Batch 1 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
 2. ~~**Create Batch 2 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
 3. ~~**Create Batch 3 prompts**~~ ✅ DONE - All 10 prompts created and moved to completed/
-4. ~~**Create Batch 4 prompts**~~ ✅ DONE - All 11 prompts created (2025-11-05)
-5. **Begin parallel implementation of Batch 4** - Assign prompts to multiple Claude Code instances
-6. **Monitor and merge** - Sequential merge as implementations complete
-7. **Create Batch 5 prompts** - MovieClip operations, exception handling, inheritance
-8. **Continue expansion** - Iterative batches until all opcodes implemented
+4. ~~**Create Batch 4 prompts**~~ ✅ DONE - All 11 prompts created and moved to completed/
+5. ~~**Create Batch 5 prompts**~~ ✅ DONE - All 14 prompts created (2025-11-05)
+6. **Begin parallel implementation of Batch 5** - Assign prompts to multiple Claude Code instances
+7. **Monitor and merge** - Sequential merge as implementations complete
+8. **Create Batch 6 prompts** - Remaining MovieClip operations, ActionTry, etc.
+9. **Continue expansion** - Iterative batches until all opcodes implemented
 
 ## Resources
 
@@ -235,14 +275,15 @@ Each implemented opcode should:
 
 ---
 
-**Status**: Batch 4 complete (11 prompts), ready for parallel implementation
+**Status**: Batch 5 complete (14 prompts), ready for parallel implementation
 **Created**: 2025-11-05
 **Last Updated**: 2025-11-05
 **Batch 1 Completed**: 2025-11-05 (moved to completed/)
 **Batch 2 Completed**: 2025-11-05 (moved to completed/)
 **Batch 3 Completed**: 2025-11-05 (moved to completed/)
-**Batch 4 Completed**: 2025-11-05
+**Batch 4 Completed**: 2025-11-05 (moved to completed/)
+**Batch 5 Completed**: 2025-11-05
 
-**Total Prompts Created**: 47 prompts (13 + 13 + 10 + 11)
-**Prompts in Active Directory**: 11 (Batch 4)
-**Prompts in Completed Directory**: 36 (Batches 1-3)
+**Total Prompts Created**: 61 prompts (13 + 13 + 10 + 11 + 14)
+**Prompts in Active Directory**: 14 (Batch 5)
+**Prompts in Completed Directory**: 47 (Batches 1-4)
