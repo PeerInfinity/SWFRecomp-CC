@@ -146,3 +146,5 @@ void actionNewMethod(char* stack, u32* sp);
 typedef ActionVar (*Function2Ptr)(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 
 void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);
+void actionWithStart(char* stack, u32* sp);
+void actionWithEnd(char* stack, u32* sp);

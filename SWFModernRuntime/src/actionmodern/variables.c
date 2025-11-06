@@ -207,5 +207,6 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 		var->type = type;
 		var->str_size = VAL(u32, &stack[sp + 8]);
 		var->data.numeric_value = VAL(u64, &stack[sp + 16]);
+		printf("[DEBUG setVar] Stored type=%d, value=%lx\n", type, var->data.numeric_value);
 	}
 }
