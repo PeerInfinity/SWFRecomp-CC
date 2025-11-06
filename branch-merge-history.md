@@ -172,8 +172,8 @@ This document tracks all branches created by Claude Code web interface and their
 
 ## Summary
 
-**Total Branches Reviewed:** 21
-**Merged:** 20
+**Total Branches Reviewed:** 34
+**Merged:** 33
 **Rejected:** 1
 
 **Validation Phase Complete:** ✅ GREEN LIGHT
@@ -344,3 +344,149 @@ This document tracks all branches created by Claude Code web interface and their
 - Runtime segfaults when pushing multiple strings in sequence
 - Not specific to STRING_GREATER implementation
 - Underlying issue in SWFModernRuntime's string handling needs investigation
+
+### 21. `claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Implemented ADD2 opcode (0x47) - Type-aware addition operation
+
+**Key Changes:**
+- New: ADD2 opcode (0x47) implementation in action.c and action.cpp
+- Handles both numeric addition and string concatenation
+- New: `SWFRecomp/tests/add2_swf_5/` test suite
+- Total: 326 lines added
+
+### 22. `claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Implemented ASCII_TO_CHAR opcode (0x32) - Converts ASCII code to character
+
+**Key Changes:**
+- New: ASCII_TO_CHAR opcode (0x32) implementation
+- Converts numeric ASCII code to single-character string
+- New: `SWFRecomp/tests/ascii_to_char_swf_4/` test suite
+- Total: 209 lines added
+
+### 23. `claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented CHAR_TO_ASCII opcode (0x31) - Converts character to ASCII code
+
+**Key Changes:**
+- New: CHAR_TO_ASCII opcode (0x31) implementation
+- Returns ASCII/Unicode code of first character
+- New: `SWFRecomp/tests/char_to_ascii_swf_4/` test suite
+- Resolved merge conflicts with ASCII_TO_CHAR branch
+
+### 24. `claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Implemented DUPLICATE opcode (0x3D) - Duplicates top stack value
+
+**Key Changes:**
+- New: DUPLICATE opcode (0x3D) implementation
+- Handles both string and numeric types with shallow copy for strings
+- New: `SWFRecomp/tests/duplicate_swf_4/` test suite
+- Total: 165 lines added
+
+### 25. `claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented MB_ASCII_TO_CHAR opcode (0x36) - Multi-byte ASCII to character (UTF-8)
+
+**Key Changes:**
+- New: MB_ASCII_TO_CHAR opcode (0x36) with full UTF-8 encoding support
+- Handles 1-4 byte UTF-8 sequences (Unicode up to 0x10FFFF)
+- New: `SWFRecomp/tests/mb_ascii_to_char_swf_4/` test suite
+- Resolved merge conflicts in action files
+
+### 26. `claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented MB_CHAR_TO_ASCII opcode (0x33) - Multi-byte character to ASCII (UTF-8)
+
+**Key Changes:**
+- New: MB_CHAR_TO_ASCII opcode (0x33) with full UTF-8 decoding support
+- Decodes 1-4 byte UTF-8 sequences to Unicode codepoints
+- New: `SWFRecomp/tests/mb_char_to_ascii_swf_4/` test suite
+- Resolved merge conflicts with previous opcode implementations
+
+### 27. `claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented MB_STRING_LENGTH opcode (0x35) - Multi-byte string length (UTF-8)
+
+**Key Changes:**
+- New: MB_STRING_LENGTH opcode (0x35) counting UTF-8 characters
+- Properly handles multi-byte UTF-8 sequences (1-4 bytes)
+- New: `SWFRecomp/tests/mb_string_length_swf_4/` test suite
+- Resolved merge conflicts in C files
+
+### 28. `claude/opcode-random-number-0x30-011CUqjQQSpPiu7TsdDaxd5P`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented RANDOM_NUMBER opcode (0x30) - Random number generation
+
+**Key Changes:**
+- New: RANDOM_NUMBER opcode (0x30) using avmplus-compatible RNG
+- Implements Adobe's Flash Player RNG for deterministic speedrun behavior
+- New: `SWFRecomp/tests/random_number_swf_4/` test suite
+- Added complete avmplus RNG implementation to action.c
+- Resolved merge conflicts
+
+### 29. `claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Implemented STACK_SWAP opcode (0x4C) - Swaps top two stack values
+
+**Key Changes:**
+- New: STACK_SWAP opcode (0x4C) implementation
+- Pops two values and pushes them back in reverse order
+- New: `SWFRecomp/tests/stack_swap_swf_4/` test suite
+- Total: 141 lines added
+
+### 30. `claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented STRING_EXTRACT opcode (0x15) - Extracts substring
+
+**Key Changes:**
+- New: STRING_EXTRACT opcode (0x15) for substring extraction
+- Takes string, index, and length from stack
+- Handles out-of-bounds cases gracefully
+- New: `SWFRecomp/tests/string_extract_swf_4/` test suite
+- Resolved merge conflicts
+
+### 31. `claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented STRING_LESS opcode (0x29) - Lexicographic string comparison
+
+**Key Changes:**
+- New: STRING_LESS opcode (0x29) using strcmp
+- Performs case-sensitive lexicographic comparison
+- New: `SWFRecomp/tests/string_less_swf_4/` test suite
+- Resolved merge conflicts
+
+### 32. `claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented TARGET_PATH opcode (0x45) - Get target path (placeholder)
+
+**Key Changes:**
+- New: TARGET_PATH opcode (0x45) with simplified implementation
+- Returns "_root" placeholder for Object types (MovieClip infrastructure not yet available)
+- New: `SWFRecomp/tests/target_path_swf_5/` test suite
+- Documented limitations in README
+- Resolved merge conflicts
+
+### 33. `claude/opcode-typeof-0x3c-011CUqjRkgkmLYw99RCTrX2N`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented TYPEOF opcode (0x3C) - Returns type of value as string
+
+**Key Changes:**
+- New: TYPEOF opcode (0x3C) implementation
+- Returns "number", "string", "object", or "undefined"
+- New: `SWFRecomp/tests/typeof_swf_4/` test suite
+- Resolved complex merge conflicts with multiple existing opcodes
