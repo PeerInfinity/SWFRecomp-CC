@@ -132,6 +132,7 @@ void actionStringGreater(char* stack, u32* sp);
 void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 void actionPushRegister(char* stack, u32* sp, u8 register_num);
 void actionCall(char* stack, u32* sp);
+void actionCallMethod(char* stack, u32* sp, char* str_buffer);
 void actionInitObject(char* stack, u32* sp);
 void actionGetMember(char* stack, u32* sp);
 void actionSetMember(char* stack, u32* sp);

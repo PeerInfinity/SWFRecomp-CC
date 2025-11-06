@@ -72,7 +72,7 @@ namespace SWFRecomp
 			action_buffer += 1;
 			length = 0;
 			
-			if ((code & 0b10000000) != 0)
+			if ((code & 0b10000000) != 0 && code != SWF_ACTION_CALL && code != SWF_ACTION_CALL_METHOD)
 			{
 				length = VAL(u16, action_buffer);
 				action_buffer += 2;
@@ -734,6 +734,18 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Call" << endl
 							   << "\t" << "actionCall(stack, sp);" << endl;
+
+					break;
+				}
+
+				case SWF_ACTION_CALL_METHOD:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// CallMethod" << endl
+							   << "\t" << "actionCallMethod(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
+
 
 					break;
 				}
