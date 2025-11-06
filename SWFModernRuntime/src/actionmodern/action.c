@@ -1944,6 +1944,56 @@ void actionStringGreater(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
+// ==================================================================
+// Register Storage (up to 256 registers for SWF 5+)
+// ==================================================================
+
+#define MAX_REGISTERS 256
+static ActionVar g_registers[MAX_REGISTERS];
+
+void actionStoreRegister(char* stack, u32* sp, u8 register_num)
+{
+	// Validate register number
+	if (register_num >= MAX_REGISTERS) {
+		return;
+	}
+
+	// Peek the top of stack (don't pop!)
+	ActionVar value;
+	peekVar(stack, sp, &value);
+
+	// Store value in register
+	g_registers[register_num] = value;
+}
+
+void actionPushRegister(char* stack, u32* sp, u8 register_num)
+{
+	// Validate register number
+	if (register_num >= MAX_REGISTERS) {
+		// Push undefined for invalid register
+		float undef = 0.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
+		return;
+	}
+
+	ActionVar* reg = &g_registers[register_num];
+
+	// Push register value to stack
+	if (reg->type == ACTION_STACK_VALUE_F32 || reg->type == ACTION_STACK_VALUE_F64) {
+		PUSH(reg->type, reg->data.numeric_value);
+	} else if (reg->type == ACTION_STACK_VALUE_STRING) {
+		const char* str = (const char*) reg->data.numeric_value;
+		PUSH_STR(str, reg->str_size);
+	} else if (reg->type == ACTION_STACK_VALUE_STR_LIST) {
+		// String list - push reference
+		PUSH_STR_LIST(reg->str_size, 0);
+	} else {
+		// Undefined or unknown type - push 0
+		float undef = 0.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
+	}
+}
+
 void actionStringLess(char* stack, u32* sp)
 {
 	// Get first string (arg1)
