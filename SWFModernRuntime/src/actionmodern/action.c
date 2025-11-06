@@ -1012,6 +1012,30 @@ void actionSetVariable(char* stack, u32* sp)
 	POP_2();
 }
 
+void actionAsciiToChar(char* stack, u32* sp, char* str_buffer)
+{
+	// Convert top of stack to number
+	convertFloat(stack, sp);
+
+	// Pop the numeric value
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	// Get integer code (truncate decimal)
+	float val = VAL(float, &a.data.numeric_value);
+	int code = (int)val;
+
+	// Handle out-of-range values (wrap to 0-255)
+	code = code & 0xFF;
+
+	// Create single-character string
+	str_buffer[0] = (char)code;
+	str_buffer[1] = '\0';
+
+	// Push result string
+	PUSH_STR(str_buffer, 1);
+}
+
 void actionGetTime(char* stack, u32* sp)
 {
 	u32 delta_ms = get_elapsed_ms() - start_time;
