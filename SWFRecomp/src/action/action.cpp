@@ -494,6 +494,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_ENUMERATE2:
+				{
+					out_script << "\t" << "// Enumerate2" << endl
+							   << "\t" << "actionEnumerate2(stack, sp, str_buffer);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl

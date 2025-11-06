@@ -97,56 +97,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 
 // ==================================================================
 // Array Object Model
-// ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
-}
-
-// ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
 
@@ -1686,6 +1636,68 @@ void actionDecrement(char* stack, u32* sp)
 		float result = val - 1.0f;
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 	}
+}
+
+void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
+{
+	// Pop object reference from stack
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// Handle objects
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+
+		if (obj == NULL)
+		{
+			// Push null terminator for NULL object
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+
+		// Push null as terminator
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+
+		// Enumerate and push property names (in reverse order)
+		for (int i = (int)obj->num_used - 1; i >= 0; i--)
+		{
+			const char* prop_name = obj->properties[i].name;
+			u32 prop_name_len = obj->properties[i].name_length;
+			PUSH_STR(prop_name, prop_name_len);
+		}
+
+		return;
+	}
+
+	// Handle arrays - enumerate indices as strings
+	if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+
+		if (arr == NULL)
+		{
+			// Push null terminator for NULL array
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+
+		// Push null as terminator
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+
+		// Enumerate and push indices as strings (in reverse order)
+		for (int i = (int)arr->length - 1; i >= 0; i--)
+		{
+			// Convert index to string using str_buffer
+			int len = snprintf(str_buffer, 17, "%d", i);
+			PUSH_STR(str_buffer, len);
+		}
+
+		return;
+	}
+
+	// For non-object/non-array types, just push null terminator
+	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 }
 
 void actionBitAnd(char* stack, u32* sp)
