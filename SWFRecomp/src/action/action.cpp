@@ -505,6 +505,9 @@ namespace SWFRecomp
 					break;
 				}
 
+				break;
+			}
+
 				case SWF_ACTION_ENUMERATE2:
 				{
 					out_script << "\t" << "// Enumerate2" << endl
@@ -512,6 +515,15 @@ namespace SWFRecomp
 
 					break;
 				}
+
+			case SWF_ACTION_DELETE:
+			{
+				out_script << "\t" << "// Delete" << endl
+						   << "\t" << "actionDelete(stack, sp);" << endl;
+
+				break;
+			}
+
 
 				case SWF_ACTION_BIT_AND:
 				{
