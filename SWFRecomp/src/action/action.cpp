@@ -329,6 +329,17 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_TYPEOF:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// Typeof" << endl
+							   << "\t" << "actionTypeof(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_DUPLICATE:
 				{
 					out_script << "\t" << "// Duplicate" << endl

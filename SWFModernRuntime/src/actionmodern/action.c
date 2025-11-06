@@ -1397,6 +1397,44 @@ void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, len);
 }
 
+void actionTypeof(char* stack, u32* sp, char* str_buffer)
+{
+	// Peek at the type without modifying value
+	u8 type = STACK_TOP_TYPE;
+
+	// Pop the value
+	POP();
+
+	// Determine type string based on stack type
+	const char* type_str;
+	switch (type)
+	{
+		case ACTION_STACK_VALUE_F32:
+		case ACTION_STACK_VALUE_F64:
+			type_str = "number";
+			break;
+
+		case ACTION_STACK_VALUE_STRING:
+		case ACTION_STACK_VALUE_STR_LIST:
+			type_str = "string";
+			break;
+
+		case ACTION_STACK_VALUE_OBJECT:
+			type_str = "object";
+			break;
+
+		default:
+			type_str = "undefined";
+			break;
+	}
+
+	// Copy to str_buffer and push
+	int len = strlen(type_str);
+	strncpy(str_buffer, type_str, 16);
+	str_buffer[len] = '\0';
+	PUSH_STR(str_buffer, len);
+}
+
 void actionDuplicate(char* stack, u32* sp)
 {
 	// Get the type of the top stack entry
