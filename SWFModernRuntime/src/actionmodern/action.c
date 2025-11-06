@@ -536,6 +536,32 @@ void actionToString(char* stack, u32* sp, char* str_buffer)
 	convertString(stack, sp, str_buffer);
 }
 
+void actionTargetPath(char* stack, u32* sp, char* str_buffer)
+{
+	// Get type of value on stack
+	u8 type = STACK_TOP_TYPE;
+
+	// Pop value from stack
+	ActionVar val;
+	popVar(stack, sp, &val);
+
+	// Check if value is an Object (treating as MovieClip placeholder)
+	// NOTE: This is a simplified implementation since full MovieClip
+	// infrastructure is not yet available. See SWFRecompDocs/prompts/opcode-target-path-0x45.md
+	if (type == ACTION_STACK_VALUE_OBJECT) {
+		// For Object type, return "_root" as placeholder
+		const char* path = "_root";
+		int len = 5; // length of "_root"
+		strncpy(str_buffer, path, 16);
+		str_buffer[len] = '\0';
+		PUSH_STR(str_buffer, len);
+	} else {
+		// Not a valid target, return empty string
+		str_buffer[0] = '\0';
+		PUSH_STR(str_buffer, 0);
+	}
+}
+
 int evaluateCondition(char* stack, u32* sp)
 {
 	ActionVar v;
