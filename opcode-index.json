@@ -1,0 +1,3322 @@
+{
+  "metadata": {
+    "generated_date": "2025-11-06",
+    "total_opcodes": 102,
+    "implemented_opcodes": 21,
+    "total_entries": 230
+  },
+  "entries": [
+    {
+      "hex": "0X00",
+      "name": "SWF_ACTION_END_OF_ACTIONS",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_END_OF_ACTIONS)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X04",
+      "name": "ActionNextFrame",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-next-frame-0x04.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4310)"
+    },
+    {
+      "hex": "0X05",
+      "name": "ActionPreviousFrame",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-prev-frame-0x05.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4324)"
+    },
+    {
+      "hex": "0X06",
+      "name": "ActionPlay",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-play-0x06.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4338)"
+    },
+    {
+      "hex": "0X07",
+      "name": "ActionStop",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-stop-0x07.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4354)"
+    },
+    {
+      "hex": "0X07",
+      "name": "SWF_ACTION_STOP",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STOP)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-stop-0x07.md",
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X08",
+      "name": "ActionToggleQuality",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-toggle-quality-0x08.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4368)"
+    },
+    {
+      "hex": "0X09",
+      "name": "ActionStopSounds",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-stop-sounds-0x09.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4379)"
+    },
+    {
+      "hex": "0X0A",
+      "name": "ActionAdd",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4670)"
+    },
+    {
+      "hex": "0X0A",
+      "name": "SWF_ACTION_ADD",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_ADD)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X0A",
+      "name": "actionAdd",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionAdd(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 75)"
+    },
+    {
+      "hex": "0X0B",
+      "name": "ActionSubtract",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4693)"
+    },
+    {
+      "hex": "0X0B",
+      "name": "SWF_ACTION_SUBTRACT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_SUBTRACT)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X0B",
+      "name": "actionSubtract",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionSubtract(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 77)"
+    },
+    {
+      "hex": "0X0C",
+      "name": "ActionMultiply",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4714)"
+    },
+    {
+      "hex": "0X0C",
+      "name": "SWF_ACTION_MULTIPLY",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_MULTIPLY)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X0C",
+      "name": "actionMultiply",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionMultiply(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 78)"
+    },
+    {
+      "hex": "0X0D",
+      "name": "ActionDivide",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4737)"
+    },
+    {
+      "hex": "0X0D",
+      "name": "SWF_ACTION_DIVIDE",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DIVIDE)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X0D",
+      "name": "actionDivide",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionDivide(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 79)"
+    },
+    {
+      "hex": "0X0E",
+      "name": "ActionEquals",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4761)"
+    },
+    {
+      "hex": "0X0E",
+      "name": "SWF_ACTION_EQUALS",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_EQUALS)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X0E",
+      "name": "actionEquals",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionEquals(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 81)"
+    },
+    {
+      "hex": "0X0F",
+      "name": "ActionLess",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4786)"
+    },
+    {
+      "hex": "0X0F",
+      "name": "SWF_ACTION_LESS",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_LESS)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X0F",
+      "name": "actionLess",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionLess(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 82)"
+    },
+    {
+      "hex": "0X10",
+      "name": "ActionAnd",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4808)"
+    },
+    {
+      "hex": "0X10",
+      "name": "SWF_ACTION_AND",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_AND)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X10",
+      "name": "actionAnd",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionAnd(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 84)"
+    },
+    {
+      "hex": "0X11",
+      "name": "ActionOr",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4829)"
+    },
+    {
+      "hex": "0X11",
+      "name": "SWF_ACTION_OR",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_OR)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X11",
+      "name": "actionOr",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionOr(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 85)"
+    },
+    {
+      "hex": "0X12",
+      "name": "ActionNot",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4853)"
+    },
+    {
+      "hex": "0X12",
+      "name": "SWF_ACTION_NOT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_NOT)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X12",
+      "name": "actionNot",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionNot(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 86)"
+    },
+    {
+      "hex": "0X13",
+      "name": "ActionStringEquals",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4882)"
+    },
+    {
+      "hex": "0X13",
+      "name": "SWF_ACTION_STRING_EQUALS",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STRING_EQUALS)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X13",
+      "name": "actionStringEquals",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 95)"
+    },
+    {
+      "hex": "0X14",
+      "name": "ActionStringLength",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4903)"
+    },
+    {
+      "hex": "0X14",
+      "name": "SWF_ACTION_STRING_LENGTH",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STRING_LENGTH)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X14",
+      "name": "actionStringLength",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStringLength(char* stack, u32* sp, char* v_str);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 96)"
+    },
+    {
+      "hex": "0X15",
+      "name": "ActionStringExtract",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
+        "head_commit": "d117464f127c23c3b5e1c3453987d49332b71ff3",
+        "subject": "Implement STRING_EXTRACT opcode (0x15) for AS2 substring operation"
+      },
+      "notes": "Official SWF specification name (spec line 4942)"
+    },
+    {
+      "hex": "0X15",
+      "name": "SWF_ACTION_STRING_EXTRACT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STRING_EXTRACT)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
+        "head_commit": "d117464f127c23c3b5e1c3453987d49332b71ff3",
+        "subject": "Implement STRING_EXTRACT opcode (0x15) for AS2 substring operation"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X15",
+      "name": "actionStringExtract",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStringExtract(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
+        "head_commit": "d117464f127c23c3b5e1c3453987d49332b71ff3",
+        "subject": "Implement STRING_EXTRACT opcode (0x15) for AS2 substring operation"
+      },
+      "notes": "Runtime function (action.h line 97)"
+    },
+    {
+      "hex": "0X17",
+      "name": "ActionPop",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4651)"
+    },
+    {
+      "hex": "0X17",
+      "name": "SWF_ACTION_POP",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_POP)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X18",
+      "name": "ActionToInteger",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5031)"
+    },
+    {
+      "hex": "0X18",
+      "name": "SWF_ACTION_TO_INTEGER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_TO_INTEGER)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X18",
+      "name": "actionToInteger",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionToInteger(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 87)"
+    },
+    {
+      "hex": "0X1C",
+      "name": "ActionGetVariable",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5218)"
+    },
+    {
+      "hex": "0X1C",
+      "name": "SWF_ACTION_GET_VARIABLE",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_GET_VARIABLE)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X1C",
+      "name": "actionGetVariable",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionGetVariable(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 103)"
+    },
+    {
+      "hex": "0X1D",
+      "name": "ActionSetVariable",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5240)"
+    },
+    {
+      "hex": "0X1D",
+      "name": "SWF_ACTION_SET_VARIABLE",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_SET_VARIABLE)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X1D",
+      "name": "actionSetVariable",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionSetVariable(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 104)"
+    },
+    {
+      "hex": "0X20",
+      "name": "ActionSetTarget2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5405)"
+    },
+    {
+      "hex": "0X21",
+      "name": "ActionStringAdd",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4921)"
+    },
+    {
+      "hex": "0X21",
+      "name": "SWF_ACTION_STRING_ADD",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STRING_ADD)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X21",
+      "name": "actionStringAdd",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 99)"
+    },
+    {
+      "hex": "0X22",
+      "name": "ActionGetProperty",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
+        "head_commit": "2dc128a80b3e23b988853623bd7cad44765f2bed",
+        "subject": "Implement GET_PROPERTY opcode (0x22) for MovieClip property access"
+      },
+      "notes": "Official SWF specification name (spec line 5423)"
+    },
+    {
+      "hex": "0X22",
+      "name": "SWF_ACTION_GET_PROPERTY",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_GET_PROPERTY)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
+        "head_commit": "2dc128a80b3e23b988853623bd7cad44765f2bed",
+        "subject": "Implement GET_PROPERTY opcode (0x22) for MovieClip property access"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X22",
+      "name": "actionGetProperty",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionGetProperty(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
+        "head_commit": "2dc128a80b3e23b988853623bd7cad44765f2bed",
+        "subject": "Implement GET_PROPERTY opcode (0x22) for MovieClip property access"
+      },
+      "notes": "Runtime function (action.h line 106)"
+    },
+    {
+      "hex": "0X23",
+      "name": "ActionSetProperty",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
+        "head_commit": "6a591e68a1ea81556b338f3a61e96e8d12772c39",
+        "subject": "Implement SET_PROPERTY opcode (0x23) for MovieClip properties"
+      },
+      "notes": "Official SWF specification name (spec line 5541)"
+    },
+    {
+      "hex": "0X23",
+      "name": "SWF_ACTION_SET_PROPERTY",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_SET_PROPERTY)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
+        "head_commit": "6a591e68a1ea81556b338f3a61e96e8d12772c39",
+        "subject": "Implement SET_PROPERTY opcode (0x23) for MovieClip properties"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X23",
+      "name": "actionSetProperty",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionSetProperty(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
+        "head_commit": "6a591e68a1ea81556b338f3a61e96e8d12772c39",
+        "subject": "Implement SET_PROPERTY opcode (0x23) for MovieClip properties"
+      },
+      "notes": "Runtime function (action.h line 107)"
+    },
+    {
+      "hex": "0X24",
+      "name": "ActionCloneSprite",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-clone-sprite-0x24.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5561)"
+    },
+    {
+      "hex": "0X25",
+      "name": "ActionRemoveSprite",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-remove-sprite-0x25.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5583)"
+    },
+    {
+      "hex": "0X26",
+      "name": "ActionTrace",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/trace_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5682)"
+    },
+    {
+      "hex": "0X26",
+      "name": "SWF_ACTION_TRACE",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_TRACE)",
+      "test_directories": [
+        "SWFRecomp/tests/trace_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X26",
+      "name": "actionTrace",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionTrace(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/trace_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 109)"
+    },
+    {
+      "hex": "0X27",
+      "name": "ActionStartDrag",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-start-drag-0x27.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5601)"
+    },
+    {
+      "hex": "0X28",
+      "name": "ActionEndDrag",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-end-drag-0x28.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5641)"
+    },
+    {
+      "hex": "0X29",
+      "name": "ActionStringLess",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
+        "head_commit": "705d3e4952efe1d4cae824e22fbcc916cb6b7edd",
+        "subject": "Implement STRING_LESS opcode (0x29) for lexicographic string comparison"
+      },
+      "notes": "Official SWF specification name (spec line 4964)"
+    },
+    {
+      "hex": "0X29",
+      "name": "SWF_ACTION_STRING_LESS",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STRING_LESS)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
+        "head_commit": "705d3e4952efe1d4cae824e22fbcc916cb6b7edd",
+        "subject": "Implement STRING_LESS opcode (0x29) for lexicographic string comparison"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X29",
+      "name": "actionStringLess",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStringLess(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
+        "head_commit": "705d3e4952efe1d4cae824e22fbcc916cb6b7edd",
+        "subject": "Implement STRING_LESS opcode (0x29) for lexicographic string comparison"
+      },
+      "notes": "Runtime function (action.h line 100)"
+    },
+    {
+      "hex": "0X2A",
+      "name": "ActionThrow",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-throw-0x2a.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 7289)"
+    },
+    {
+      "hex": "0X2B",
+      "name": "ActionCastOp",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-cast-op-0x2b.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 7141)"
+    },
+    {
+      "hex": "0X2C",
+      "name": "ActionImplementsOp",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-implements-op-0x2c.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 7164)"
+    },
+    {
+      "hex": "0X30",
+      "name": "ActionRandomNumber",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5721)"
+    },
+    {
+      "hex": "0X30",
+      "name": "SWF_ACTION_RANDOM_NUMBER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_RANDOM_NUMBER)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X30",
+      "name": "actionRandomNumber",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionRandomNumber(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 110)"
+    },
+    {
+      "hex": "0X31",
+      "name": "ActionMBStringLength",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE",
+        "head_commit": "bfbc54b8dc9cf5cbd7a08c3a832457452fedf8bc",
+        "subject": "Implement CharToAscii (0x31) opcode for AS2"
+      },
+      "notes": "Official SWF specification name (spec line 4986)"
+    },
+    {
+      "hex": "0X31",
+      "name": "SWF_ACTION_CHAR_TO_ASCII",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_CHAR_TO_ASCII)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE",
+        "head_commit": "bfbc54b8dc9cf5cbd7a08c3a832457452fedf8bc",
+        "subject": "Implement CharToAscii (0x31) opcode for AS2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X32",
+      "name": "ActionCharToAscii",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
+        "head_commit": "f919257999bd3620b400f2bcef828e6e8fc2090a",
+        "subject": "Implement ASCII_TO_CHAR opcode (0x32)"
+      },
+      "notes": "Official SWF specification name (spec line 5053)"
+    },
+    {
+      "hex": "0X32",
+      "name": "SWF_ACTION_ASCII_TO_CHAR",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_ASCII_TO_CHAR)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
+        "head_commit": "f919257999bd3620b400f2bcef828e6e8fc2090a",
+        "subject": "Implement ASCII_TO_CHAR opcode (0x32)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X32",
+      "name": "actionCharToAscii",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionCharToAscii(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
+        "head_commit": "f919257999bd3620b400f2bcef828e6e8fc2090a",
+        "subject": "Implement ASCII_TO_CHAR opcode (0x32)"
+      },
+      "notes": "Runtime function (action.h line 101)"
+    },
+    {
+      "hex": "0X33",
+      "name": "ActionAsciiToChar",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
+        "head_commit": "420ee39dcc4c0e3b8e2cd899d30eebb9e824d697",
+        "subject": "Implement MB_CHAR_TO_ASCII opcode (0x33) for multibyte UTF-8 string support"
+      },
+      "notes": "Official SWF specification name (spec line 5072)"
+    },
+    {
+      "hex": "0X33",
+      "name": "SWF_ACTION_MB_CHAR_TO_ASCII",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_MB_CHAR_TO_ASCII)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
+        "head_commit": "420ee39dcc4c0e3b8e2cd899d30eebb9e824d697",
+        "subject": "Implement MB_CHAR_TO_ASCII opcode (0x33) for multibyte UTF-8 string support"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X33",
+      "name": "actionAsciiToChar",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionAsciiToChar(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
+        "head_commit": "420ee39dcc4c0e3b8e2cd899d30eebb9e824d697",
+        "subject": "Implement MB_CHAR_TO_ASCII opcode (0x33) for multibyte UTF-8 string support"
+      },
+      "notes": "Runtime function (action.h line 111)"
+    },
+    {
+      "hex": "0X34",
+      "name": "ActionGetTime",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5703)"
+    },
+    {
+      "hex": "0X34",
+      "name": "SWF_ACTION_GET_TIME",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_GET_TIME)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X34",
+      "name": "actionGetTime",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionGetTime(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 113)"
+    },
+    {
+      "hex": "0X35",
+      "name": "ActionMBStringExtract",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK",
+        "head_commit": "5a7d71fd71cc468bba9df66f0143402e2048f193",
+        "subject": "Implement MB_STRING_LENGTH opcode (0x35)"
+      },
+      "notes": "Official SWF specification name (spec line 5006)"
+    },
+    {
+      "hex": "0X35",
+      "name": "SWF_ACTION_MB_STRING_LENGTH",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_MB_STRING_LENGTH)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK",
+        "head_commit": "5a7d71fd71cc468bba9df66f0143402e2048f193",
+        "subject": "Implement MB_STRING_LENGTH opcode (0x35)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X36",
+      "name": "ActionMBCharToAscii",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-ascii-to-char-0x36.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
+        "head_commit": "5012878afbe100af027f2bc377a93fccb7d128d8",
+        "subject": "Implement MB_ASCII_TO_CHAR opcode (0x36)"
+      },
+      "notes": "Official SWF specification name (spec line 5094)"
+    },
+    {
+      "hex": "0X36",
+      "name": "SWF_ACTION_MB_ASCII_TO_CHAR",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-ascii-to-char-0x36.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
+        "head_commit": "5012878afbe100af027f2bc377a93fccb7d128d8",
+        "subject": "Implement MB_ASCII_TO_CHAR opcode (0x36)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X37",
+      "name": "ActionMBAsciiToChar",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5115)"
+    },
+    {
+      "hex": "0X3A",
+      "name": "ActionDelete",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/delete_swf_5"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6007)"
+    },
+    {
+      "hex": "0X3A",
+      "name": "actionDelete",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionDelete(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/delete_swf_5"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 123)"
+    },
+    {
+      "hex": "0X3B",
+      "name": "ActionDelete2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/delete2_swf_5"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6025)"
+    },
+    {
+      "hex": "0X3B",
+      "name": "actionDelete2",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionDelete2(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/delete2_swf_5"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 124)"
+    },
+    {
+      "hex": "0X3C",
+      "name": "ActionDefineLocal",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/typeof_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-typeof-0x3c-011CUqjRkgkmLYw99RCTrX2N",
+        "head_commit": "e8c6149a895d55c12ff64fc38abfb422e1847755",
+        "subject": "Implement TYPEOF opcode (0x3C)"
+      },
+      "notes": "Official SWF specification name (spec line 5969)"
+    },
+    {
+      "hex": "0X3C",
+      "name": "SWF_ACTION_TYPEOF",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_TYPEOF)",
+      "test_directories": [
+        "SWFRecomp/tests/typeof_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-typeof-0x3c-011CUqjRkgkmLYw99RCTrX2N",
+        "head_commit": "e8c6149a895d55c12ff64fc38abfb422e1847755",
+        "subject": "Implement TYPEOF opcode (0x3C)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X3D",
+      "name": "ActionStackSwap",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
+        "head_commit": "16cd31e229e5f910b61a45737df165f3fa2fc5bf",
+        "subject": "Implement DUPLICATE opcode (0x3D)"
+      },
+      "notes": "Official SWF specification name (spec line 5796)"
+    },
+    {
+      "hex": "0X3D",
+      "name": "SWF_ACTION_CALL_FUNCTION",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_CALL_FUNCTION)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
+        "head_commit": "16cd31e229e5f910b61a45737df165f3fa2fc5bf",
+        "subject": "Implement DUPLICATE opcode (0x3D)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X3D",
+      "name": "actionStackSwap",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStackSwap(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
+        "head_commit": "16cd31e229e5f910b61a45737df165f3fa2fc5bf",
+        "subject": "Implement DUPLICATE opcode (0x3D)"
+      },
+      "notes": "Runtime function (action.h line 90)"
+    },
+    {
+      "hex": "0X3E",
+      "name": "ActionReturn",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/return_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
+        "head_commit": "2722c1226bc29b04becb65e51d805661065bbe34",
+        "subject": "Implement RETURN opcode (0x3E) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6643)"
+    },
+    {
+      "hex": "0X3E",
+      "name": "SWF_ACTION_RETURN",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_RETURN)",
+      "test_directories": [
+        "SWFRecomp/tests/return_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
+        "head_commit": "2722c1226bc29b04becb65e51d805661065bbe34",
+        "subject": "Implement RETURN opcode (0x3E) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X3E",
+      "name": "actionReturn",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionReturn(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/return_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
+        "head_commit": "2722c1226bc29b04becb65e51d805661065bbe34",
+        "subject": "Implement RETURN opcode (0x3E) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 117)"
+    },
+    {
+      "hex": "0X3F",
+      "name": "ActionModulo",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/modulo_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6438)"
+    },
+    {
+      "hex": "0X3F",
+      "name": "SWF_ACTION_MODULO",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_MODULO)",
+      "test_directories": [
+        "SWFRecomp/tests/modulo_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X3F",
+      "name": "actionModulo",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionModulo(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/modulo_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 80)"
+    },
+    {
+      "hex": "0X40",
+      "name": "ActionNewObject",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
+        "head_commit": "73a5174c63a74faf1b955c38831ea2d93cea9ba3",
+        "subject": "Implement NEW_OBJECT opcode (0x40) with Array/Object support"
+      },
+      "notes": "Official SWF specification name (spec line 6216)"
+    },
+    {
+      "hex": "0X40",
+      "name": "SWF_ACTION_NEW_OBJECT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_NEW_OBJECT)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
+        "head_commit": "73a5174c63a74faf1b955c38831ea2d93cea9ba3",
+        "subject": "Implement NEW_OBJECT opcode (0x40) with Array/Object support"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X40",
+      "name": "actionNewObject",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionNewObject(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
+        "head_commit": "73a5174c63a74faf1b955c38831ea2d93cea9ba3",
+        "subject": "Implement NEW_OBJECT opcode (0x40) with Array/Object support"
+      },
+      "notes": "Runtime function (action.h line 142)"
+    },
+    {
+      "hex": "0X41",
+      "name": "ActionDefineLocal2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4",
+        "head_commit": "97cec4084ea511e3d08ceba8008e6c6222eaa45f",
+        "subject": "Implement DECLARE_LOCAL opcode (0x41) with local scope infrastructure"
+      },
+      "notes": "Official SWF specification name (spec line 5990)"
+    },
+    {
+      "hex": "0X41",
+      "name": "SWF_ACTION_DECLARE_LOCAL",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DECLARE_LOCAL)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4",
+        "head_commit": "97cec4084ea511e3d08ceba8008e6c6222eaa45f",
+        "subject": "Implement DECLARE_LOCAL opcode (0x41) with local scope infrastructure"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X42",
+      "name": "ActionInitArray",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
+        "head_commit": "b11c784685c0700a097478b45e701c19e13d76c9",
+        "subject": "Implement INIT_ARRAY opcode (0x42)"
+      },
+      "notes": "Official SWF specification name (spec line 6124)"
+    },
+    {
+      "hex": "0X42",
+      "name": "SWF_ACTION_INIT_ARRAY",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_INIT_ARRAY)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
+        "head_commit": "b11c784685c0700a097478b45e701c19e13d76c9",
+        "subject": "Implement INIT_ARRAY opcode (0x42)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X42",
+      "name": "actionInitArray",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionInitArray(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
+        "head_commit": "b11c784685c0700a097478b45e701c19e13d76c9",
+        "subject": "Implement INIT_ARRAY opcode (0x42)"
+      },
+      "notes": "Runtime function (action.h line 118)"
+    },
+    {
+      "hex": "0X43",
+      "name": "ActionInitObject",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
+        "head_commit": "ac7e661289f093413930f20754bbfa827cf562ac",
+        "subject": "Implement INIT_OBJECT opcode (0x43) for ActionScript object creation"
+      },
+      "notes": "Official SWF specification name (spec line 6153)"
+    },
+    {
+      "hex": "0X43",
+      "name": "SWF_ACTION_INIT_OBJECT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_INIT_OBJECT)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
+        "head_commit": "ac7e661289f093413930f20754bbfa827cf562ac",
+        "subject": "Implement INIT_OBJECT opcode (0x43) for ActionScript object creation"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X43",
+      "name": "actionInitObject",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionInitObject(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
+        "head_commit": "ac7e661289f093413930f20754bbfa827cf562ac",
+        "subject": "Implement INIT_OBJECT opcode (0x43) for ActionScript object creation"
+      },
+      "notes": "Runtime function (action.h line 139)"
+    },
+    {
+      "hex": "0X44",
+      "name": "ActionTypeOf",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/typeof_swf_5"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6380)"
+    },
+    {
+      "hex": "0X45",
+      "name": "ActionTargetPath",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
+        "head_commit": "f7dbad28eac27324c6117bb3c301e6d2d109df24",
+        "subject": "Implement TARGET_PATH opcode (0x45)"
+      },
+      "notes": "Official SWF specification name (spec line 6268)"
+    },
+    {
+      "hex": "0X45",
+      "name": "SWF_ACTION_TARGET_PATH",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_TARGET_PATH)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
+        "head_commit": "f7dbad28eac27324c6117bb3c301e6d2d109df24",
+        "subject": "Implement TARGET_PATH opcode (0x45)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X45",
+      "name": "actionTargetPath",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionTargetPath(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
+        "head_commit": "f7dbad28eac27324c6117bb3c301e6d2d109df24",
+        "subject": "Implement TARGET_PATH opcode (0x45)"
+      },
+      "notes": "Runtime function (action.h line 92)"
+    },
+    {
+      "hex": "0X46",
+      "name": "ActionEnumerate",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/enumerate_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
+        "head_commit": "ebe63532930ce7dac71c8af8dae63d7ac387834e",
+        "subject": "Implement ENUMERATE opcode (0x46) for object property enumeration"
+      },
+      "notes": "Official SWF specification name (spec line 6044)"
+    },
+    {
+      "hex": "0X46",
+      "name": "SWF_ACTION_ENUMERATE",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_ENUMERATE)",
+      "test_directories": [
+        "SWFRecomp/tests/enumerate_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
+        "head_commit": "ebe63532930ce7dac71c8af8dae63d7ac387834e",
+        "subject": "Implement ENUMERATE opcode (0x46) for object property enumeration"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X46",
+      "name": "actionEnumerate",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionEnumerate(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/enumerate_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
+        "head_commit": "ebe63532930ce7dac71c8af8dae63d7ac387834e",
+        "subject": "Implement ENUMERATE opcode (0x46) for object property enumeration"
+      },
+      "notes": "Runtime function (action.h line 93)"
+    },
+    {
+      "hex": "0X47",
+      "name": "ActionAdd2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/add2_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
+        "head_commit": "10b0923c538e8829e12185167e6f1f66d4c21d1b",
+        "subject": "Implement ADD2 opcode (0x47) - Type-aware addition"
+      },
+      "notes": "Official SWF specification name (spec line 6393)"
+    },
+    {
+      "hex": "0X47",
+      "name": "SWF_ACTION_ADD2",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_ADD2)",
+      "test_directories": [
+        "SWFRecomp/tests/add2_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
+        "head_commit": "10b0923c538e8829e12185167e6f1f66d4c21d1b",
+        "subject": "Implement ADD2 opcode (0x47) - Type-aware addition"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X47",
+      "name": "actionAdd2",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionAdd2(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/add2_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
+        "head_commit": "10b0923c538e8829e12185167e6f1f66d4c21d1b",
+        "subject": "Implement ADD2 opcode (0x47) - Type-aware addition"
+      },
+      "notes": "Runtime function (action.h line 76)"
+    },
+    {
+      "hex": "0X48",
+      "name": "ActionLess2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/less2_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
+        "head_commit": "38abf422447f760d57ac32be92b3ad8427a48d86",
+        "subject": "Implement ActionLess2 opcode (0x48) and fix opcode naming"
+      },
+      "notes": "Official SWF specification name (spec line 6414)"
+    },
+    {
+      "hex": "0X48",
+      "name": "SWF_ACTION_LESS2",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_LESS2)",
+      "test_directories": [
+        "SWFRecomp/tests/less2_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
+        "head_commit": "38abf422447f760d57ac32be92b3ad8427a48d86",
+        "subject": "Implement ActionLess2 opcode (0x48) and fix opcode naming"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X48",
+      "name": "actionLess2",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionLess2(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/less2_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
+        "head_commit": "38abf422447f760d57ac32be92b3ad8427a48d86",
+        "subject": "Implement ActionLess2 opcode (0x48) and fix opcode naming"
+      },
+      "notes": "Runtime function (action.h line 83)"
+    },
+    {
+      "hex": "0X49",
+      "name": "ActionEquals2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6068)"
+    },
+    {
+      "hex": "0X4A",
+      "name": "ActionToNumber",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
+        "head_commit": "5a01940750da3549c0c5b47f539667c4153ca24d",
+        "subject": "Implement TO_NUMBER opcode (0x4A) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6320)"
+    },
+    {
+      "hex": "0X4A",
+      "name": "SWF_ACTION_TO_NUMBER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_TO_NUMBER)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
+        "head_commit": "5a01940750da3549c0c5b47f539667c4153ca24d",
+        "subject": "Implement TO_NUMBER opcode (0x4A) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X4A",
+      "name": "actionToNumber",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionToNumber(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
+        "head_commit": "5a01940750da3549c0c5b47f539667c4153ca24d",
+        "subject": "Implement TO_NUMBER opcode (0x4A) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 88)"
+    },
+    {
+      "hex": "0X4B",
+      "name": "ActionToString",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
+        "head_commit": "2fde36278e8f75217529a706b8d71989dbc37216",
+        "subject": "Implement TO_STRING opcode (0x4B) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6342)"
+    },
+    {
+      "hex": "0X4B",
+      "name": "SWF_ACTION_TO_STRING",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_TO_STRING)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
+        "head_commit": "2fde36278e8f75217529a706b8d71989dbc37216",
+        "subject": "Implement TO_STRING opcode (0x4B) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X4B",
+      "name": "actionToString",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionToString(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
+        "head_commit": "2fde36278e8f75217529a706b8d71989dbc37216",
+        "subject": "Implement TO_STRING opcode (0x4B) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 89)"
+    },
+    {
+      "hex": "0X4C",
+      "name": "ActionPushDuplicate",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/duplicate_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc",
+        "head_commit": "9509728d78349fa6c71676e6d9f85c1c44c6fc88",
+        "subject": "Implement STACK_SWAP opcode (0x4C)"
+      },
+      "notes": "Official SWF specification name (spec line 6627)"
+    },
+    {
+      "hex": "0X4C",
+      "name": "SWF_ACTION_DUPLICATE",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DUPLICATE)",
+      "test_directories": [
+        "SWFRecomp/tests/duplicate_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc",
+        "head_commit": "9509728d78349fa6c71676e6d9f85c1c44c6fc88",
+        "subject": "Implement STACK_SWAP opcode (0x4C)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X4D",
+      "name": "ActionStackSwap",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6660)"
+    },
+    {
+      "hex": "0X4D",
+      "name": "SWF_ACTION_STACK_SWAP",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STACK_SWAP)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X4D",
+      "name": "actionStackSwap",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStackSwap(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 90)"
+    },
+    {
+      "hex": "0X4E",
+      "name": "ActionGetMember",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6090)"
+    },
+    {
+      "hex": "0X4E",
+      "name": "SWF_ACTION_GET_MEMBER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_GET_MEMBER)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X4E",
+      "name": "actionGetMember",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionGetMember(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 140)"
+    },
+    {
+      "hex": "0X4F",
+      "name": "ActionSetMember",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
+        "head_commit": "65f2d22b52936b06419c0a9c6df9b3ed37d765d5",
+        "subject": "Implement SET_MEMBER opcode (0x4F) and dependencies"
+      },
+      "notes": "Official SWF specification name (spec line 6248)"
+    },
+    {
+      "hex": "0X4F",
+      "name": "SWF_ACTION_SET_MEMBER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_SET_MEMBER)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
+        "head_commit": "65f2d22b52936b06419c0a9c6df9b3ed37d765d5",
+        "subject": "Implement SET_MEMBER opcode (0x4F) and dependencies"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X4F",
+      "name": "actionSetMember",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionSetMember(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
+        "head_commit": "65f2d22b52936b06419c0a9c6df9b3ed37d765d5",
+        "subject": "Implement SET_MEMBER opcode (0x4F) and dependencies"
+      },
+      "notes": "Runtime function (action.h line 141)"
+    },
+    {
+      "hex": "0X50",
+      "name": "ActionIncrement",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/increment_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6605)"
+    },
+    {
+      "hex": "0X50",
+      "name": "SWF_ACTION_INCREMENT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_INCREMENT)",
+      "test_directories": [
+        "SWFRecomp/tests/increment_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X50",
+      "name": "actionIncrement",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionIncrement(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/increment_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 120)"
+    },
+    {
+      "hex": "0X51",
+      "name": "ActionDecrement",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/decrement_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6586)"
+    },
+    {
+      "hex": "0X51",
+      "name": "SWF_ACTION_DECREMENT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DECREMENT)",
+      "test_directories": [
+        "SWFRecomp/tests/decrement_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X51",
+      "name": "actionDecrement",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionDecrement(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/decrement_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 121)"
+    },
+    {
+      "hex": "0X52",
+      "name": "ActionCallMethod",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5831)"
+    },
+    {
+      "hex": "0X52",
+      "name": "actionCallMethod",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionCallMethod(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 138)"
+    },
+    {
+      "hex": "0X53",
+      "name": "ActionNewMethod",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
+        "head_commit": "80136be832c77e5b7e0371987cbe6cae912fb729",
+        "subject": "Implement NEW_METHOD opcode (0x53)"
+      },
+      "notes": "Official SWF specification name (spec line 6184)"
+    },
+    {
+      "hex": "0X53",
+      "name": "SWF_ACTION_NEW_METHOD",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_NEW_METHOD)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
+        "head_commit": "80136be832c77e5b7e0371987cbe6cae912fb729",
+        "subject": "Implement NEW_METHOD opcode (0x53)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X53",
+      "name": "actionNewMethod",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionNewMethod(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
+      "implementation_branch": {
+        "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
+        "head_commit": "80136be832c77e5b7e0371987cbe6cae912fb729",
+        "subject": "Implement NEW_METHOD opcode (0x53)"
+      },
+      "notes": "Runtime function (action.h line 143)"
+    },
+    {
+      "hex": "0X54",
+      "name": "ActionInstanceOf",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6782)"
+    },
+    {
+      "hex": "0X55",
+      "name": "ActionEnumerate2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/enumerate2_swf_6"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
+        "head_commit": "5ee877d6d80387875c1f269ee3bc09d37adb1092",
+        "subject": "Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration"
+      },
+      "notes": "Official SWF specification name (spec line 6806)"
+    },
+    {
+      "hex": "0X55",
+      "name": "SWF_ACTION_ENUMERATE2",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_ENUMERATE2)",
+      "test_directories": [
+        "SWFRecomp/tests/enumerate2_swf_6"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
+        "head_commit": "5ee877d6d80387875c1f269ee3bc09d37adb1092",
+        "subject": "Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X55",
+      "name": "actionEnumerate2",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionEnumerate2(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/enumerate2_swf_6"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
+        "head_commit": "5ee877d6d80387875c1f269ee3bc09d37adb1092",
+        "subject": "Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration"
+      },
+      "notes": "Runtime function (action.h line 122)"
+    },
+    {
+      "hex": "0X5A",
+      "name": "SWF_ACTION_DELETE",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DELETE)",
+      "test_directories": [
+        "SWFRecomp/tests/delete_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete-0x5a.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-delete-0x5a-011CUqutNyCjGYCvA8jEoP4y",
+        "head_commit": "d985ca6b7d54546eccd19ee6068a8d9d2bbf7531",
+        "subject": "Implement DELETE opcode (0x5A) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X5B",
+      "name": "SWF_ACTION_DELETE2",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DELETE2)",
+      "test_directories": [
+        "SWFRecomp/tests/delete2_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete2-0x5b.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-delete2-0x5b-011CUquufkHrk6Pt1ggisyZL",
+        "head_commit": "2bb7cfff8754f73d7eb1fd14ba91e99817be3bf4",
+        "subject": "Implement DELETE2 opcode (0x5B) - Object property deletion"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X60",
+      "name": "ActionBitAnd",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
+        "head_commit": "24c5cdffc24f6cc602a8283f78a870ffa8a3a9d9",
+        "subject": "Implement BIT_AND opcode (0x60) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6457)"
+    },
+    {
+      "hex": "0X60",
+      "name": "SWF_ACTION_BIT_AND",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_BIT_AND)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
+        "head_commit": "24c5cdffc24f6cc602a8283f78a870ffa8a3a9d9",
+        "subject": "Implement BIT_AND opcode (0x60) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X60",
+      "name": "actionBitAnd",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionBitAnd(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
+        "head_commit": "24c5cdffc24f6cc602a8283f78a870ffa8a3a9d9",
+        "subject": "Implement BIT_AND opcode (0x60) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 125)"
+    },
+    {
+      "hex": "0X61",
+      "name": "ActionBitOr",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
+        "head_commit": "c84503abf6326e8bdb04fd6d948695b4569d4801",
+        "subject": "Implement BIT_OR opcode (0x61) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6497)"
+    },
+    {
+      "hex": "0X61",
+      "name": "SWF_ACTION_BIT_OR",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_BIT_OR)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
+        "head_commit": "c84503abf6326e8bdb04fd6d948695b4569d4801",
+        "subject": "Implement BIT_OR opcode (0x61) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X61",
+      "name": "actionBitOr",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionBitOr(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
+        "head_commit": "c84503abf6326e8bdb04fd6d948695b4569d4801",
+        "subject": "Implement BIT_OR opcode (0x61) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 126)"
+    },
+    {
+      "hex": "0X62",
+      "name": "ActionBitXor",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
+        "head_commit": "0cb58244e28e4f3c842d5c1ae8d07ca6b9b0ad18",
+        "subject": "Implement BIT_XOR opcode (0x62) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6563)"
+    },
+    {
+      "hex": "0X62",
+      "name": "SWF_ACTION_BIT_XOR",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_BIT_XOR)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
+        "head_commit": "0cb58244e28e4f3c842d5c1ae8d07ca6b9b0ad18",
+        "subject": "Implement BIT_XOR opcode (0x62) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X62",
+      "name": "actionBitXor",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionBitXor(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
+        "head_commit": "0cb58244e28e4f3c842d5c1ae8d07ca6b9b0ad18",
+        "subject": "Implement BIT_XOR opcode (0x62) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 127)"
+    },
+    {
+      "hex": "0X63",
+      "name": "ActionBitLShift",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
+        "head_commit": "6adec98bba782efd8516f67af512f4460ef80867",
+        "subject": "Implement BIT_LSHIFT opcode (0x63) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6476)"
+    },
+    {
+      "hex": "0X63",
+      "name": "SWF_ACTION_BIT_LSHIFT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_BIT_LSHIFT)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
+        "head_commit": "6adec98bba782efd8516f67af512f4460ef80867",
+        "subject": "Implement BIT_LSHIFT opcode (0x63) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X63",
+      "name": "actionBitLShift",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionBitLShift(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
+        "head_commit": "6adec98bba782efd8516f67af512f4460ef80867",
+        "subject": "Implement BIT_LSHIFT opcode (0x63) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 128)"
+    },
+    {
+      "hex": "0X64",
+      "name": "ActionBitRShift",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
+        "head_commit": "ac378945d5e4372147e701c69aa8f37510a67e0a",
+        "subject": "Implement BIT_RSHIFT opcode (0x64) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6517)"
+    },
+    {
+      "hex": "0X64",
+      "name": "SWF_ACTION_BIT_RSHIFT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_BIT_RSHIFT)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
+        "head_commit": "ac378945d5e4372147e701c69aa8f37510a67e0a",
+        "subject": "Implement BIT_RSHIFT opcode (0x64) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X64",
+      "name": "actionBitRShift",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionBitRShift(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
+        "head_commit": "ac378945d5e4372147e701c69aa8f37510a67e0a",
+        "subject": "Implement BIT_RSHIFT opcode (0x64) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 129)"
+    },
+    {
+      "hex": "0X65",
+      "name": "ActionBitURShift",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
+        "head_commit": "f6cc4cdbc522c20f7df48d85870caa95a934b148",
+        "subject": "Implement BIT_URSHIFT opcode (0x65) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6541)"
+    },
+    {
+      "hex": "0X65",
+      "name": "SWF_ACTION_BIT_URSHIFT",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_BIT_URSHIFT)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
+        "head_commit": "f6cc4cdbc522c20f7df48d85870caa95a934b148",
+        "subject": "Implement BIT_URSHIFT opcode (0x65) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X65",
+      "name": "actionBitURShift",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionBitURShift(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
+        "head_commit": "f6cc4cdbc522c20f7df48d85870caa95a934b148",
+        "subject": "Implement BIT_URSHIFT opcode (0x65) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 130)"
+    },
+    {
+      "hex": "0X66",
+      "name": "ActionStrictEquals",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
+        "head_commit": "5367dc91ade751214ce4f9b1c0959bab15bf3f6a",
+        "subject": "Implement STRICT_EQUALS opcode (0x66) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6829)"
+    },
+    {
+      "hex": "0X66",
+      "name": "SWF_ACTION_STRICT_EQUALS",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STRICT_EQUALS)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
+        "head_commit": "5367dc91ade751214ce4f9b1c0959bab15bf3f6a",
+        "subject": "Implement STRICT_EQUALS opcode (0x66) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X66",
+      "name": "actionStrictEquals",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStrictEquals(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
+        "head_commit": "5367dc91ade751214ce4f9b1c0959bab15bf3f6a",
+        "subject": "Implement STRICT_EQUALS opcode (0x66) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 131)"
+    },
+    {
+      "hex": "0X67",
+      "name": "ActionGreater",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/greater_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
+        "head_commit": "ecbbd2b83213ce340b24df5b748e99b505fb5ba1",
+        "subject": "Fix GREATER opcode hex value from 0x48 to 0x67"
+      },
+      "notes": "Official SWF specification name (spec line 6848)"
+    },
+    {
+      "hex": "0X67",
+      "name": "SWF_ACTION_GREATER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_GREATER)",
+      "test_directories": [
+        "SWFRecomp/tests/greater_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
+        "head_commit": "ecbbd2b83213ce340b24df5b748e99b505fb5ba1",
+        "subject": "Fix GREATER opcode hex value from 0x48 to 0x67"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X67",
+      "name": "actionGreater",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionGreater(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/greater_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
+        "head_commit": "ecbbd2b83213ce340b24df5b748e99b505fb5ba1",
+        "subject": "Fix GREATER opcode hex value from 0x48 to 0x67"
+      },
+      "notes": "Runtime function (action.h line 132)"
+    },
+    {
+      "hex": "0X68",
+      "name": "ActionStringGreater",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
+        "head_commit": "874e6ecce97598d896b7b2f05d4c47a7e986e970",
+        "subject": "Implement STRING_GREATER opcode (0x68) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 6870)"
+    },
+    {
+      "hex": "0X68",
+      "name": "SWF_ACTION_STRING_GREATER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STRING_GREATER)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
+        "head_commit": "874e6ecce97598d896b7b2f05d4c47a7e986e970",
+        "subject": "Implement STRING_GREATER opcode (0x68) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X68",
+      "name": "actionStringGreater",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStringGreater(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
+        "head_commit": "874e6ecce97598d896b7b2f05d4c47a7e986e970",
+        "subject": "Implement STRING_GREATER opcode (0x68) for ActionScript 2"
+      },
+      "notes": "Runtime function (action.h line 133)"
+    },
+    {
+      "hex": "0X69",
+      "name": "ActionExtends",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/opcode-extends-0x69.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 7120)"
+    },
+    {
+      "hex": "0X81",
+      "name": "ActionGotoFrame",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4258)"
+    },
+    {
+      "hex": "0X83",
+      "name": "ActionGetURL",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4281)"
+    },
+    {
+      "hex": "0X87",
+      "name": "ActionStoreRegister",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
+        "head_commit": "f308ca4dfe0eb38426e54c168da941f732fab719",
+        "subject": "Implement StoreRegister opcode (0x87)"
+      },
+      "notes": "Official SWF specification name (spec line 6678)"
+    },
+    {
+      "hex": "0X87",
+      "name": "SWF_ACTION_STORE_REGISTER",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_STORE_REGISTER)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
+        "head_commit": "f308ca4dfe0eb38426e54c168da941f732fab719",
+        "subject": "Implement StoreRegister opcode (0x87)"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X87",
+      "name": "actionStoreRegister",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStoreRegister(char* stack, u32* sp, u8 register_num);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
+        "head_commit": "f308ca4dfe0eb38426e54c168da941f732fab719",
+        "subject": "Implement StoreRegister opcode (0x87)"
+      },
+      "notes": "Runtime function (action.h line 134)"
+    },
+    {
+      "hex": "0X88",
+      "name": "ActionConstantPool",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5868)"
+    },
+    {
+      "hex": "0X88",
+      "name": "SWF_ACTION_CONSTANT_POOL",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_CONSTANT_POOL)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X8A",
+      "name": "ActionWaitForFrame",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4393)"
+    },
+    {
+      "hex": "0X8B",
+      "name": "ActionSetTarget",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4437)"
+    },
+    {
+      "hex": "0X8C",
+      "name": "ActionGoToLabel",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4449)"
+    },
+    {
+      "hex": "0X8D",
+      "name": "ActionWaitForFrame2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5655)"
+    },
+    {
+      "hex": "0X8E",
+      "name": "ActionDefineFunction2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 6949)"
+    },
+    {
+      "hex": "0X8E",
+      "name": "SWF_ACTION_DEFINE_FUNCTION2",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DEFINE_FUNCTION2)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X8E",
+      "name": "actionDefineFunction2",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
+      "implementation_branch": null,
+      "notes": "Runtime function (action.h line 148)"
+    },
+    {
+      "hex": "0X8F",
+      "name": "ActionTry",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 7191)"
+    },
+    {
+      "hex": "0X94",
+      "name": "ActionWith",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/with_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
+      "implementation_branch": {
+        "name": "origin/claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF",
+        "head_commit": "eac8864411b07eeb460edcd4848938b78184821c",
+        "subject": "Implement WITH statement (opcode 0x94) with scope chain"
+      },
+      "notes": "Official SWF specification name (spec line 6289)"
+    },
+    {
+      "hex": "0X94",
+      "name": "SWF_ACTION_WITH",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_WITH)",
+      "test_directories": [
+        "SWFRecomp/tests/with_swf_5"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
+      "implementation_branch": {
+        "name": "origin/claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF",
+        "head_commit": "eac8864411b07eeb460edcd4848938b78184821c",
+        "subject": "Implement WITH statement (opcode 0x94) with scope chain"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X96",
+      "name": "ActionPush",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 4556)"
+    },
+    {
+      "hex": "0X96",
+      "name": "SWF_ACTION_PUSH",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_PUSH)",
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X99",
+      "name": "ActionJump",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/jump_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5139)"
+    },
+    {
+      "hex": "0X99",
+      "name": "SWF_ACTION_JUMP",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_JUMP)",
+      "test_directories": [
+        "SWFRecomp/tests/jump_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X9A",
+      "name": "ActionGetURL2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5262)"
+    },
+    {
+      "hex": "0X9B",
+      "name": "ActionDefineFunction",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
+      "implementation_branch": {
+        "name": "origin/claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq",
+        "head_commit": "c955e9b6fe8054a3b7896510f0803c4dace174ca",
+        "subject": "Implement DEFINE_FUNCTION opcode (0x9B) for AS2 function definitions"
+      },
+      "notes": "Official SWF specification name (spec line 5894)"
+    },
+    {
+      "hex": "0X9B",
+      "name": "SWF_ACTION_DEFINE_FUNCTION",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_DEFINE_FUNCTION)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
+      "implementation_branch": {
+        "name": "origin/claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq",
+        "head_commit": "c955e9b6fe8054a3b7896510f0803c4dace174ca",
+        "subject": "Implement DEFINE_FUNCTION opcode (0x9B) for AS2 function definitions"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X9D",
+      "name": "ActionIf",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/if_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "Official SWF specification name (spec line 5163)"
+    },
+    {
+      "hex": "0X9D",
+      "name": "SWF_ACTION_IF",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_IF)",
+      "test_directories": [
+        "SWFRecomp/tests/if_swf_4"
+      ],
+      "documentation_prompt": null,
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X9E",
+      "name": "ActionCall",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [
+        "SWFRecomp/tests/call_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
+        "head_commit": "68f22c53ace3c0e60aa3bc446c252c9f92c23e59",
+        "subject": "Implement CALL opcode (0x9E) - ActionScript 2 frame subroutine calls"
+      },
+      "notes": "Official SWF specification name (spec line 5195)"
+    },
+    {
+      "hex": "0X9E",
+      "name": "SWF_ACTION_CALL",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_CALL)",
+      "test_directories": [
+        "SWFRecomp/tests/call_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
+        "head_commit": "68f22c53ace3c0e60aa3bc446c252c9f92c23e59",
+        "subject": "Implement CALL opcode (0x9E) - ActionScript 2 frame subroutine calls"
+      },
+      "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X9E",
+      "name": "actionCall",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionCall(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "test_directories": [
+        "SWFRecomp/tests/call_swf_4"
+      ],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
+        "head_commit": "68f22c53ace3c0e60aa3bc446c252c9f92c23e59",
+        "subject": "Implement CALL opcode (0x9E) - ActionScript 2 frame subroutine calls"
+      },
+      "notes": "Runtime function (action.h line 137)"
+    },
+    {
+      "hex": "0X9F",
+      "name": "ActionGotoFrame2",
+      "source": "SWF Specification v19",
+      "type": "spec",
+      "function_declaration": null,
+      "function_implementation": null,
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ",
+        "head_commit": "1489c3ee1455923b589789b67f4cf947ccd26547",
+        "subject": "Implement CALL_METHOD opcode (0x9F) for ActionScript 2"
+      },
+      "notes": "Official SWF specification name (spec line 5344)"
+    },
+    {
+      "hex": "0X9F",
+      "name": "SWF_ACTION_CALL_METHOD",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_CALL_METHOD)",
+      "test_directories": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md",
+      "implementation_branch": {
+        "name": "origin/claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ",
+        "head_commit": "1489c3ee1455923b589789b67f4cf947ccd26547",
+        "subject": "Implement CALL_METHOD opcode (0x9F) for ActionScript 2"
+      },
+      "notes": "C++ enum value for opcode"
+    }
+  ]
+}
