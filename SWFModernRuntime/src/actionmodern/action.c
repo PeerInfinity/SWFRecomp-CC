@@ -743,9 +743,48 @@ void actionStringLength(char* stack, u32* sp, char* v_str)
 	ActionVar v;
 	convertString(stack, sp, v_str);
 	popVar(stack, sp, &v);
-	
+
 	float str_size = (float) v.str_size;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &str_size));
+}
+
+void actionMbStringLength(char* stack, u32* sp, char* v_str)
+{
+	// Convert top of stack to string (if it's a number, converts it to string in v_str)
+	convertString(stack, sp, v_str);
+
+	// Get the string pointer from stack
+	const unsigned char* str = (const unsigned char*) VAL(u64, &STACK_TOP_VALUE);
+
+	// Pop the string value
+	POP();
+
+	// Count UTF-8 characters
+	int count = 0;
+	while (*str != '\0') {
+		// Check UTF-8 sequence length
+		if ((*str & 0x80) == 0) {
+			// 1-byte sequence (0xxxxxxx)
+			str += 1;
+		} else if ((*str & 0xE0) == 0xC0) {
+			// 2-byte sequence (110xxxxx)
+			str += 2;
+		} else if ((*str & 0xF0) == 0xE0) {
+			// 3-byte sequence (1110xxxx)
+			str += 3;
+		} else if ((*str & 0xF8) == 0xF0) {
+			// 4-byte sequence (11110xxx)
+			str += 4;
+		} else {
+			// Invalid UTF-8, skip one byte
+			str += 1;
+		}
+		count++;
+	}
+
+	// Push result
+	float result = (float)count;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
 void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
