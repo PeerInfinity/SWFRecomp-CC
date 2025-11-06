@@ -356,14 +356,21 @@ namespace SWFRecomp
 					break;
 				}
 
+			case SWF_ACTION_INIT_ARRAY:
+			{
+				out_script << "\t" << "// InitArray" << endl
+						   << "\t" << "actionInitArray(stack, sp);" << endl;
 
-				case SWF_ACTION_INIT_ARRAY:
-				{
-					out_script << "\t" << "// InitArray" << endl
-							   << "\t" << "actionInitArray(stack, sp);" << endl;
+				break;
+			}
 
-					break;
-				}
+			case SWF_ACTION_INIT_OBJECT:
+			{
+				out_script << "\t" << "// InitObject" << endl
+						   << "\t" << "actionInitObject(stack, sp);" << endl;
+
+				break;
+			}
 
 				case SWF_ACTION_TARGET_PATH:
 				{
