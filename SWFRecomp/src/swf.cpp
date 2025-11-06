@@ -743,6 +743,7 @@ namespace SWFRecomp
 						   << "#include \"script_decls.h\"" << endl << endl
 						   << "void script_" << next_script_i << "(char* stack, u32* sp)" << endl
 						   << "{" << endl;
+				out_script << "\t" << "char str_buffer[17];" << endl << endl;
 				
 				next_script_i += 1;
 				
