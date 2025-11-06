@@ -356,6 +356,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_INIT_OBJECT:
+				{
+					out_script << "\t" << "// InitObject" << endl
+							   << "\t" << "actionInitObject(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TARGET_PATH:
 				{
 					declareEmptyString(context, 17);
@@ -409,6 +417,22 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Stack Swap" << endl
 							   << "\t" << "actionStackSwap(stack, sp);" << endl;
+
+					break;
+				}
+
+				case SWF_ACTION_GET_MEMBER:
+				{
+					out_script << "\t" << "// GetMember" << endl
+							   << "\t" << "actionGetMember(stack, sp);" << endl;
+
+					break;
+				}
+
+				case SWF_ACTION_SET_MEMBER:
+				{
+					out_script << "\t" << "// SetMember" << endl
+							   << "\t" << "actionSetMember(stack, sp);" << endl;
 
 					break;
 				}

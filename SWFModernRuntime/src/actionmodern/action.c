@@ -6,6 +6,7 @@
 
 #include <recomp.h>
 #include <utils.h>
+#include <object.h>
 
 u32 start_time;
 
@@ -1773,4 +1774,224 @@ void actionStringLess(char* stack, u32* sp)
 
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
+void actionSetMember(char* stack, u32* sp)
+{
+	// Stack layout (from top to bottom):
+	// 1. value (the value to assign)
+	// 2. property_name (the name of the property)
+	// 3. object (the object to set the property on)
+
+	// Pop the value to assign
+	ActionVar value_var;
+	popVar(stack, sp, &value_var);
+
+	// Pop the property name
+	// The property name should be a string on the stack
+	ActionVar prop_name_var;
+	popVar(stack, sp, &prop_name_var);
+
+	// Get the property name as string
+	const char* prop_name = NULL;
+	u32 prop_name_len = 0;
+
+	if (prop_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		// If it's a string, use it directly
+		prop_name = (const char*) prop_name_var.data.numeric_value;
+		prop_name_len = prop_name_var.str_size;
+	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_F32 || prop_name_var.type == ACTION_STACK_VALUE_F64)
+	{
+		// If it's a number, convert it to string (for array indices)
+		// Use a static buffer for conversion
+		static char index_buffer[32];
+		if (prop_name_var.type == ACTION_STACK_VALUE_F32)
+		{
+			float f = VAL(float, &prop_name_var.data.numeric_value);
+			snprintf(index_buffer, sizeof(index_buffer), "%.15g", f);
+		}
+		else
+		{
+			double d = VAL(double, &prop_name_var.data.numeric_value);
+			snprintf(index_buffer, sizeof(index_buffer), "%.15g", d);
+		}
+		prop_name = index_buffer;
+		prop_name_len = strlen(index_buffer);
+	}
+	else
+	{
+		// Unknown type for property name - error case
+		// Just pop the object and return
+		POP();
+		return;
+	}
+
+	// Pop the object
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// Check if the object is actually an object type
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+		if (obj != NULL)
+		{
+			// Set the property on the object
+			setProperty(obj, prop_name, prop_name_len, &value_var);
+		}
+	}
+	// If it's not an object type, we silently ignore the operation
+	// (Flash behavior for setting properties on non-objects)
+}
+
+void actionInitObject(char* stack, u32* sp)
+{
+	// Pop the number of properties
+	// Stack has: num_properties
+	ActionVar num_props_var;
+	popVar(stack, sp, &num_props_var);
+
+	u32 num_properties = 0;
+	if (num_props_var.type == ACTION_STACK_VALUE_F32)
+	{
+		num_properties = (u32) VAL(float, &num_props_var.data.numeric_value);
+	}
+	else if (num_props_var.type == ACTION_STACK_VALUE_F64)
+	{
+		num_properties = (u32) VAL(double, &num_props_var.data.numeric_value);
+	}
+
+	// Allocate object with capacity for properties
+	ASObject* obj = allocObject(num_properties);
+	if (obj == NULL)
+	{
+		// Allocation failed - pop property pairs from stack and push null
+		for (u32 i = 0; i < num_properties * 2; i++)
+		{
+			POP();
+		}
+		float null_val = 0.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &null_val));
+		return;
+	}
+
+	// Pop property name/value pairs and initialize object
+	// Stack has pairs like: [value1, name1, value2, name2, ...]
+	// We need to pop them in reverse order (name1, value1, name2, value2, ...)
+	for (u32 i = 0; i < num_properties; i++)
+	{
+		// Pop value
+		ActionVar value_var;
+		popVar(stack, sp, &value_var);
+
+		// Pop name
+		ActionVar name_var;
+		popVar(stack, sp, &name_var);
+
+		const char* prop_name = NULL;
+		u32 prop_name_len = 0;
+
+		if (name_var.type == ACTION_STACK_VALUE_STRING)
+		{
+			prop_name = (const char*) name_var.data.numeric_value;
+			prop_name_len = name_var.str_size;
+		}
+		else
+		{
+			// Skip non-string property names
+			continue;
+		}
+
+		// Set the property
+		setProperty(obj, prop_name, prop_name_len, &value_var);
+	}
+
+	// Push object onto stack
+	PUSH(ACTION_STACK_VALUE_OBJECT, (u64) obj);
+}
+
+void actionGetMember(char* stack, u32* sp)
+{
+	// Stack layout (from top to bottom):
+	// 1. property_name (the name of the property to get)
+	// 2. object (the object to get the property from)
+
+	// Pop the property name
+	ActionVar prop_name_var;
+	popVar(stack, sp, &prop_name_var);
+
+	// Get the property name as string
+	const char* prop_name = NULL;
+	u32 prop_name_len = 0;
+
+	if (prop_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		prop_name = (const char*) prop_name_var.data.numeric_value;
+		prop_name_len = prop_name_var.str_size;
+	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_F32 || prop_name_var.type == ACTION_STACK_VALUE_F64)
+	{
+		// Convert number to string for array indices
+		static char index_buffer[32];
+		if (prop_name_var.type == ACTION_STACK_VALUE_F32)
+		{
+			float f = VAL(float, &prop_name_var.data.numeric_value);
+			snprintf(index_buffer, sizeof(index_buffer), "%.15g", f);
+		}
+		else
+		{
+			double d = VAL(double, &prop_name_var.data.numeric_value);
+			snprintf(index_buffer, sizeof(index_buffer), "%.15g", d);
+		}
+		prop_name = index_buffer;
+		prop_name_len = strlen(index_buffer);
+	}
+	else
+	{
+		// Unknown type for property name - pop object and push undefined
+		POP();
+		float undef = 0.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
+		return;
+	}
+
+	// Pop the object
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// Check if the object is actually an object type
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+		if (obj != NULL)
+		{
+			// Get the property from the object
+			ActionVar* prop_value = getProperty(obj, prop_name, prop_name_len);
+			if (prop_value != NULL)
+			{
+				// Push the property value onto the stack
+				pushVar(stack, sp, prop_value);
+			}
+			else
+			{
+				// Property not found - push undefined (0.0)
+				float undef = 0.0f;
+				PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
+			}
+		}
+		else
+		{
+			// Null object - push undefined
+			float undef = 0.0f;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
+		}
+	}
+	else
+	{
+		// Not an object type - push undefined
+		float undef = 0.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
+	}
 }
