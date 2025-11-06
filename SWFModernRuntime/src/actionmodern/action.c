@@ -108,16 +108,16 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 }
 
 // ==================================================================
-// Array Object Model
+// Array Object Model - implementations in object.c
 // ==================================================================
-<<<<<<< HEAD
 
+<<<<<<< HEAD
 // ASArray implementation moved to object.c
 // ASArray is now defined in object.h and implemented in object.c
 // Array implementation is in object.h/object.c
 
+>>>>>>> origin/claude/setup-and-run-tests-011CUqva5BzbiTWj4DcYnhfi
 // ==================================================================
->>>>>>> origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4
 =======
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
