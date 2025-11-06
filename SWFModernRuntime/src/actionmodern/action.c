@@ -96,57 +96,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 }
 
 // ==================================================================
-// Array Object Model
-// ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
-}
-
-// ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
 
@@ -827,6 +776,52 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
+void actionEnumerate(char* stack, u32* sp, char* str_buffer)
+{
+	// Read variable name info from stack
+	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
+	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
+
+	// Pop variable name
+	POP();
+
+	// Get variable using hashmap lookup
+	ActionVar* var = getVariable(var_name, var_name_len);
+
+	// Check if variable exists and is an object
+	if (var == NULL || var->type != ACTION_STACK_VALUE_OBJECT)
+	{
+		// Not an object - push only null terminator
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		return;
+	}
+
+	// Get the object
+	ASObject* obj = (ASObject*) var->data.numeric_value;
+
+	// Check if object pointer is valid
+	if (obj == NULL)
+	{
+		// Null object - push only null terminator
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		return;
+	}
+
+	// Push null as terminator first
+	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+
+	// Enumerate and push property names in reverse order
+	// This allows them to be popped in forward order during iteration
+	for (int i = (int)obj->num_used - 1; i >= 0; i--)
+	{
+		const char* prop_name = obj->properties[i].name;
+		u32 prop_name_len = obj->properties[i].name_length;
+
+		// Push property name as string
+		PUSH_STR(prop_name, prop_name_len);
+	}
+}
+
 int evaluateCondition(char* stack, u32* sp)
 {
 	ActionVar v;
@@ -1319,11 +1314,11 @@ void actionGetVariable(char* stack, u32* sp)
 
 void actionSetVariable(char* stack, u32* sp)
 {
-	// Stack layout: [value] [name] <- sp
-	// We need value at top, name at second
+	// Stack layout: [...] [value] [name] <- sp
+	// Name is on top, value is second
 
-	u32 value_sp = *sp;
-	u32 var_name_sp = SP_SECOND_TOP;
+	u32 var_name_sp = *sp;        // Name is on top
+	u32 value_sp = SP_SECOND_TOP;  // Value is second
 
 	// Read variable name info
 	u32 string_id = VAL(u32, &stack[var_name_sp + 4]);
