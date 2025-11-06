@@ -512,10 +512,18 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Enumerate2" << endl
 							   << "\t" << "actionEnumerate2(stack, sp, str_buffer);" << endl;
+				case SWF_ACTION_DELETE2:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// Delete2" << endl
+							   << "\t" << "actionDelete2(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
 				}
 
+<<<<<<< HEAD
 			case SWF_ACTION_DELETE:
 			{
 				out_script << "\t" << "// Delete" << endl
@@ -525,6 +533,8 @@ namespace SWFRecomp
 			}
 
 
+=======
+>>>>>>> origin/claude/opcode-delete2-0x5b-011CUquufkHrk6Pt1ggisyZL
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl

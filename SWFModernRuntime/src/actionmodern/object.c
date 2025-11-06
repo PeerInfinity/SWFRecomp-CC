@@ -283,6 +283,17 @@ int deleteProperty(ASObject* obj, const char* name, u32 name_length)
 	}
 
 	// Search for the property
+ * Deletes a property by name. Returns true if deleted or not found (Flash behavior).
+ * Handles reference counting if value is an object/array.
+ */
+bool deleteProperty(ASObject* obj, const char* name, u32 name_length)
+{
+	if (obj == NULL || name == NULL)
+	{
+		return true;  // Flash behavior: delete on null returns true
+	}
+
+	// Find property by name
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
 		if (obj->properties[i].name_length == name_length &&
@@ -301,6 +312,18 @@ int deleteProperty(ASObject* obj, const char* name, u32 name_length)
 			{
 				ASObject* old_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
 				releaseObject(old_obj);
+			// Property found - delete it
+
+			// 1. Release the property value if it's an object/array
+			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
+			{
+				ASObject* child_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
+				releaseObject(child_obj);
+			}
+			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ASArray* child_arr = (ASArray*) obj->properties[i].value.data.numeric_value;
+				releaseArray(child_arr);
 			}
 			// Free string if it owns memory
 			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
@@ -320,6 +343,22 @@ int deleteProperty(ASObject* obj, const char* name, u32 name_length)
 			obj->num_used--;
 
 			// Zero out the last slot (for cleanliness)
+			// 2. Free the property name
+			if (obj->properties[i].name != NULL)
+			{
+				free(obj->properties[i].name);
+			}
+
+			// 3. Shift remaining properties down to fill the gap
+			for (u32 j = i; j < obj->num_used - 1; j++)
+			{
+				obj->properties[j] = obj->properties[j + 1];
+			}
+
+			// 4. Decrement the number of used slots
+			obj->num_used--;
+
+			// 5. Zero out the last slot
 			memset(&obj->properties[obj->num_used], 0, sizeof(ASProperty));
 
 #ifdef DEBUG
@@ -338,6 +377,17 @@ int deleteProperty(ASObject* obj, const char* name, u32 name_length)
 #endif
 
 	return 1;
+			return true;
+		}
+	}
+
+	// Property not found - Flash behavior is to return true anyway
+#ifdef DEBUG
+	printf("[DEBUG] deleteProperty: obj=%p, property '%.*s' not found (returning true)\n",
+		(void*)obj, name_length, name);
+#endif
+
+	return true;
 }
 
 /**

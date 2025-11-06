@@ -99,6 +99,7 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 // Array Object Model
 // ==================================================================
 
+// ASArray implementation moved to object.c
 // ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
@@ -1694,6 +1695,25 @@ void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
 	popVar(stack, sp, &obj_var);
 
 	// Handle objects
+void actionDelete2(char* stack, u32* sp, char* str_buffer)
+{
+	// Stack layout (from top to bottom):
+	// 1. property_name (the name of the property to delete)
+	// 2. object (the object reference)
+
+	// 1. Pop property name from stack
+	convertString(stack, sp, str_buffer);
+	const char* prop_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	u32 prop_name_len = STACK_TOP_N;
+	POP();
+
+	// 2. Pop object reference from stack
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// 3. Delete the property and determine result
+	float result = 1.0f;  // Default to success
+
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
@@ -1816,6 +1836,27 @@ void actionDelete(char* stack, u32* sp)
 	// Push result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
+		if (obj != NULL)
+		{
+			// Delete the property (returns true for success)
+			bool deleted = deleteProperty(obj, prop_name, prop_name_len);
+			result = deleted ? 1.0f : 0.0f;
+		}
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// For arrays, we can delete elements by index if prop_name is numeric
+		// For simplicity, we'll just return true (success) for now
+		// A more complete implementation would parse prop_name as an integer
+		// and call a deleteArrayElement function
+		result = 1.0f;
+	}
+	// For other types (undefined, null, primitives), return true
+
+	// 4. Push success result (1.0 = true, 0.0 = false)
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
 void actionBitAnd(char* stack, u32* sp)
 {
 

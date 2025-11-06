@@ -72,6 +72,9 @@ void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* va
 // Returns true (1) if property was deleted, false (0) if not found
 // Handles refcount management if value is an object
 int deleteProperty(ASObject* obj, const char* name, u32 name_length);
+// Delete property by name (returns true if deleted or not found, false if protected)
+// Handles refcount management if value is an object
+bool deleteProperty(ASObject* obj, const char* name, u32 name_length);
 
 /**
  * ASArray - ActionScript Array with Reference Counting
