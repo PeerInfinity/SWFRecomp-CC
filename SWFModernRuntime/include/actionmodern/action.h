@@ -115,6 +115,7 @@ void actionInitArray(char* stack, u32* sp);
 void actionInitObject(char* stack, u32* sp);
 void actionIncrement(char* stack, u32* sp);
 void actionDecrement(char* stack, u32* sp);
+void actionDelete2(char* stack, u32* sp, char* str_buffer);
 void actionBitAnd(char* stack, u32* sp);
 void actionBitOr(char* stack, u32* sp);
 void actionBitXor(char* stack, u32* sp);

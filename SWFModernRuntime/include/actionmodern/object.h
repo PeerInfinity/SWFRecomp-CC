@@ -68,6 +68,10 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length);
 // Handles refcount management if value is an object
 void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* value);
 
+// Delete property by name (returns true if deleted or not found, false if protected)
+// Handles refcount management if value is an object
+bool deleteProperty(ASObject* obj, const char* name, u32 name_length);
+
 /**
  * ASArray - ActionScript Array with Reference Counting
  *

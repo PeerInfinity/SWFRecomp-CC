@@ -494,6 +494,17 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_DELETE2:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// Delete2" << endl
+							   << "\t" << "actionDelete2(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl
