@@ -111,7 +111,7 @@ void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);
 void actionGetTime(char* stack, u32* sp);
 void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);
 void actionTypeof(char* stack, u32* sp, char* str_buffer);
-void actionDuplicate(char* stack, u32* sp);
+void actionCallFunction(char* stack, u32* sp, char* str_buffer);
 void actionReturn(char* stack, u32* sp);
 void actionInitArray(char* stack, u32* sp);
 void actionInitObject(char* stack, u32* sp);
