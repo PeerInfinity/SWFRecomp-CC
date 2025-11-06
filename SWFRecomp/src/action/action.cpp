@@ -345,6 +345,17 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_TARGET_PATH:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// TargetPath" << endl
+							   << "\t" << "actionTargetPath(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_ADD2:
 				{
 					declareEmptyString(context, 17);
