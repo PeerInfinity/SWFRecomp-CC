@@ -285,6 +285,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_STACK_SWAP:
+				{
+					out_script << "\t" << "// Stack Swap" << endl
+							   << "\t" << "actionStackSwap(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_INCREMENT:
 				{
 					out_script << "\t" << "// Increment" << endl
