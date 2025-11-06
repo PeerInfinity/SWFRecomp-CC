@@ -1774,3 +1774,44 @@ void actionStringLess(char* stack, u32* sp)
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
+
+void actionCall(char* stack, u32* sp)
+{
+	// Pop frame identifier (string or number)
+	ActionVar frame_var;
+	popVar(stack, sp, &frame_var);
+
+	// Simplified implementation: log the call
+	// TODO: Actually execute frame actions when frame infrastructure is ready
+
+	int frame_num = -1;
+	const char* frame_id = NULL;
+
+	// Try to interpret as frame number or string
+	if (frame_var.type == ACTION_STACK_VALUE_F32) {
+		frame_num = (int) frame_var.data.numeric_value;
+		printf("// Call frame %d\n", frame_num);
+	} else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
+		frame_id = (const char*) frame_var.data.numeric_value;
+		// Try to parse as number
+		char* endptr;
+		long num = strtol(frame_id, &endptr, 10);
+		if (*endptr == '\0') {
+			// It's a numeric string
+			frame_num = (int) num;
+			printf("// Call frame %d\n", frame_num);
+		} else {
+			// It's a frame label
+			printf("// Call frame label '%s'\n", frame_id);
+		}
+	} else {
+		printf("// Call frame (unknown type)\n");
+	}
+
+	// Note: Full implementation would:
+	// 1. Parse target path if present (format: "/path:frame")
+	// 2. Locate the target MovieClip
+	// 3. Find the frame by number or label
+	// 4. Execute the frame's actions
+	// 5. Return to continue execution here
+}

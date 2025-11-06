@@ -65,7 +65,8 @@ namespace SWFRecomp
 		SWF_ACTION_CONSTANT_POOL = 0x88,
 		SWF_ACTION_PUSH = 0x96,
 		SWF_ACTION_JUMP = 0x99,
-		SWF_ACTION_IF = 0x9D
+		SWF_ACTION_IF = 0x9D,
+		SWF_ACTION_CALL = 0x9E
 	};
 	
 	class SWFAction
