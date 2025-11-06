@@ -94,6 +94,57 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 	return randomNumber % range;
 }
 
+// ==================================================================
+// Array Object Model
+// ==================================================================
+
+typedef struct {
+	u32 refcount;       // Reference count
+	u32 length;         // Number of elements
+	u32 capacity;       // Allocated capacity
+	ActionVar elements[];  // Flexible array member
+} ASArray;
+
+// Allocate a new array with specified capacity
+ASArray* allocArray(u32 initial_capacity)
+{
+	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
+	if (!arr) {
+		// Handle allocation failure
+		return NULL;
+	}
+	arr->refcount = 1;  // Initial reference
+	arr->length = 0;
+	arr->capacity = initial_capacity;
+	return arr;
+}
+
+// Increment reference count
+void retainArray(ASArray* arr)
+{
+	if (arr) {
+		arr->refcount++;
+	}
+}
+
+// Decrement reference count and free if zero
+void releaseArray(ASArray* arr)
+{
+	if (!arr) return;
+
+	arr->refcount--;
+	if (arr->refcount == 0) {
+		// Release all element objects (if they are arrays or objects)
+		for (u32 i = 0; i < arr->length; i++) {
+			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
+				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
+			}
+			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
+		}
+		free(arr);
+	}
+}
+
 ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
@@ -1773,4 +1824,40 @@ void actionStringLess(char* stack, u32* sp)
 
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
+void actionInitArray(char* stack, u32* sp)
+{
+	// 1. Pop array element count
+	convertFloat(stack, sp);
+	ActionVar count_var;
+	popVar(stack, sp, &count_var);
+	u32 num_elements = (u32) VAL(float, &count_var.data.numeric_value);
+
+	// 2. Allocate array
+	ASArray* arr = allocArray(num_elements);
+	if (!arr) {
+		// Handle allocation failure - push empty array or null
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &(float){0.0f}));
+		return;
+	}
+	arr->length = num_elements;
+
+	// 3. Pop elements in reverse order and populate array
+	// Elements are on stack in reverse order: [..., elem_N, elem_N-1, ..., elem_1]
+	// We need to pop them and store in array as: [elem_1, elem_2, ..., elem_N]
+	for (int i = (int)num_elements - 1; i >= 0; i--) {
+		ActionVar elem;
+		popVar(stack, sp, &elem);
+		arr->elements[i] = elem;
+
+		// If element is array, increment refcount
+		if (elem.type == ACTION_STACK_VALUE_ARRAY) {
+			retainArray((ASArray*) elem.data.numeric_value);
+		}
+		// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
+	}
+
+	// 4. Push array reference to stack
+	PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 }
