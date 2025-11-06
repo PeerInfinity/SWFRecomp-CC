@@ -949,6 +949,54 @@ void actionGetTime(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &delta_ms_f32));
 }
 
+void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer)
+{
+	// Convert top of stack to number
+	convertFloat(stack, sp);
+
+	// Pop the numeric value
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	// Get integer code point
+	float value = a.type == ACTION_STACK_VALUE_F32 ? VAL(float, &a.data.numeric_value) : (float)VAL(double, &a.data.numeric_value);
+	unsigned int codepoint = (unsigned int)value;
+
+	// Validate code point range (0 to 0x10FFFF for valid Unicode)
+	if (codepoint > 0x10FFFF) {
+		// Push empty string for invalid code points
+		str_buffer[0] = '\0';
+		PUSH_STR(str_buffer, 0);
+		return;
+	}
+
+	// Encode as UTF-8
+	int len = 0;
+	if (codepoint <= 0x7F) {
+		// 1-byte sequence
+		str_buffer[len++] = (char)codepoint;
+	} else if (codepoint <= 0x7FF) {
+		// 2-byte sequence
+		str_buffer[len++] = (char)(0xC0 | (codepoint >> 6));
+		str_buffer[len++] = (char)(0x80 | (codepoint & 0x3F));
+	} else if (codepoint <= 0xFFFF) {
+		// 3-byte sequence
+		str_buffer[len++] = (char)(0xE0 | (codepoint >> 12));
+		str_buffer[len++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+		str_buffer[len++] = (char)(0x80 | (codepoint & 0x3F));
+	} else {
+		// 4-byte sequence
+		str_buffer[len++] = (char)(0xF0 | (codepoint >> 18));
+		str_buffer[len++] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+		str_buffer[len++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+		str_buffer[len++] = (char)(0x80 | (codepoint & 0x3F));
+	}
+	str_buffer[len] = '\0';
+
+	// Push result string
+	PUSH_STR(str_buffer, len);
+}
+
 void actionIncrement(char* stack, u32* sp)
 {
 	convertFloat(stack, sp);
