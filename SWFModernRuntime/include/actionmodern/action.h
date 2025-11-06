@@ -97,6 +97,7 @@ void actionSetVariable(char* stack, u32* sp);
 void actionTrace(char* stack, u32* sp);
 void actionAsciiToChar(char* stack, u32* sp, char* str_buffer);
 void actionGetTime(char* stack, u32* sp);
+void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);
 void actionDuplicate(char* stack, u32* sp);
 void actionIncrement(char* stack, u32* sp);
 void actionDecrement(char* stack, u32* sp);
