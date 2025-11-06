@@ -941,6 +941,52 @@ void actionSetVariable(char* stack, u32* sp)
 	POP_2();
 }
 
+void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer)
+{
+	// Convert top of stack to string
+	convertString(stack, sp, str_buffer);
+
+	// Get string pointer from stack
+	const char* str = (const char*) VAL(u64, &STACK_TOP_VALUE);
+
+	// Pop the string value
+	POP();
+
+	// Handle empty string edge case
+	if (str == NULL || str[0] == '\0') {
+		float result = 0.0f;  // Return 0 for empty string
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Decode UTF-8 first character
+	unsigned int codepoint = 0;
+	unsigned char c = (unsigned char)str[0];
+
+	if ((c & 0x80) == 0) {
+		// 1-byte sequence (0xxxxxxx)
+		codepoint = c;
+	} else if ((c & 0xE0) == 0xC0) {
+		// 2-byte sequence (110xxxxx 10xxxxxx)
+		codepoint = ((c & 0x1F) << 6) | ((unsigned char)str[1] & 0x3F);
+	} else if ((c & 0xF0) == 0xE0) {
+		// 3-byte sequence (1110xxxx 10xxxxxx 10xxxxxx)
+		codepoint = ((c & 0x0F) << 12) |
+		            (((unsigned char)str[1] & 0x3F) << 6) |
+		            ((unsigned char)str[2] & 0x3F);
+	} else if ((c & 0xF8) == 0xF0) {
+		// 4-byte sequence (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+		codepoint = ((c & 0x07) << 18) |
+		            (((unsigned char)str[1] & 0x3F) << 12) |
+		            (((unsigned char)str[2] & 0x3F) << 6) |
+		            ((unsigned char)str[3] & 0x3F);
+	}
+
+	// Push result as float
+	float result = (float)codepoint;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
 void actionGetTime(char* stack, u32* sp)
 {
 	u32 delta_ms = get_elapsed_ms() - start_time;
