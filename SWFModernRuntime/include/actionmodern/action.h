@@ -71,6 +71,7 @@ void initTime();
 void pushVar(char* stack, u32* sp, ActionVar* p);
 
 void actionAdd(char* stack, u32* sp);
+void actionAdd2(char* stack, u32* sp, char* str_buffer);
 void actionSubtract(char* stack, u32* sp);
 void actionMultiply(char* stack, u32* sp);
 void actionDivide(char* stack, u32* sp);
