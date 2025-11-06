@@ -94,6 +94,7 @@ void actionSetVariable(char* stack, u32* sp);
 
 void actionTrace(char* stack, u32* sp);
 void actionGetTime(char* stack, u32* sp);
+void actionTypeof(char* stack, u32* sp, char* str_buffer);
 void actionIncrement(char* stack, u32* sp);
 void actionDecrement(char* stack, u32* sp);
 void actionBitAnd(char* stack, u32* sp);
