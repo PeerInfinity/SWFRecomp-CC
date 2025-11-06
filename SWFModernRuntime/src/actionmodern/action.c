@@ -687,6 +687,23 @@ void actionToString(char* stack, u32* sp, char* str_buffer)
 	convertString(stack, sp, str_buffer);
 }
 
+void actionStackSwap(char* stack, u32* sp)
+{
+	// Pop top value (value1)
+	ActionVar val1;
+	popVar(stack, sp, &val1);
+
+	// Pop second value (value2)
+	ActionVar val2;
+	popVar(stack, sp, &val2);
+
+	// Push value1 (was on top, now goes to second position)
+	pushVar(stack, sp, &val1);
+
+	// Push value2 (was second, now goes to top)
+	pushVar(stack, sp, &val2);
+}
+
 int evaluateCondition(char* stack, u32* sp)
 {
 	ActionVar v;
