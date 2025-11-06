@@ -94,6 +94,49 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 	return randomNumber % range;
 }
 
+// ==================================================================
+// MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
+// ==================================================================
+
+typedef struct {
+	float x, y;
+	float xscale, yscale;
+	float rotation;
+	float alpha;
+	float width, height;
+	int visible;
+	int currentframe;
+	int totalframes;
+	char name[256];
+	char target[256];
+} MovieClip;
+
+// Static _root MovieClip for simplified implementation
+static MovieClip root_movieclip = {
+	.x = 0.0f,
+	.y = 0.0f,
+	.xscale = 100.0f,
+	.yscale = 100.0f,
+	.rotation = 0.0f,
+	.alpha = 100.0f,
+	.width = 550.0f,
+	.height = 400.0f,
+	.visible = 1,
+	.currentframe = 1,
+	.totalframes = 1,
+	.name = "_root",
+	.target = "_root"
+};
+
+// Helper function to get MovieClip by target path
+// Simplified: only supports "_root" or empty string
+static MovieClip* getMovieClipByTarget(const char* target) {
+	if (!target || strlen(target) == 0 || strcmp(target, "_root") == 0 || strcmp(target, "/") == 0) {
+		return &root_movieclip;
+	}
+	return NULL;  // Other paths not supported yet
+}
+
 ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
@@ -1773,4 +1816,91 @@ void actionStringLess(char* stack, u32* sp)
 
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
+void actionSetProperty(char* stack, u32* sp)
+{
+	// Stack layout: [target_path] [property_index] [value] <- sp
+	// Pop in reverse order: value, index, target
+
+	// 1. Pop value
+	ActionVar value_var;
+	popVar(stack, sp, &value_var);
+
+	// 2. Pop property index
+	convertFloat(stack, sp);
+	ActionVar index_var;
+	popVar(stack, sp, &index_var);
+	int prop_index = (int) VAL(float, &index_var.data.numeric_value);
+
+	// 3. Pop target path
+	convertString(stack, sp, NULL);
+	const char* target = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	POP();
+
+	// 4. Get the MovieClip object
+	MovieClip* mc = getMovieClipByTarget(target);
+	if (!mc) return; // Invalid target
+
+	// 5. Set property value based on index
+	// Convert value to float for numeric properties
+	float num_value = 0.0f;
+	const char* str_value = NULL;
+
+	if (value_var.type == ACTION_STACK_VALUE_F32 || value_var.type == ACTION_STACK_VALUE_F64) {
+		num_value = (float) VAL(float, &value_var.data.numeric_value);
+	} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+		str_value = (const char*) value_var.data.numeric_value;
+		num_value = (float) atof(str_value);
+	}
+
+	switch (prop_index) {
+		case 0:  // _x
+			mc->x = num_value;
+			break;
+		case 1:  // _y
+			mc->y = num_value;
+			break;
+		case 2:  // _xscale
+			mc->xscale = num_value;
+			break;
+		case 3:  // _yscale
+			mc->yscale = num_value;
+			break;
+		case 6:  // _alpha
+			mc->alpha = num_value;
+			break;
+		case 7:  // _visible
+			mc->visible = (num_value != 0.0f);
+			break;
+		case 8:  // _width
+			mc->width = num_value;
+			break;
+		case 9:  // _height
+			mc->height = num_value;
+			break;
+		case 10: // _rotation
+			mc->rotation = num_value;
+			break;
+		case 13: // _name
+			if (str_value) {
+				strncpy(mc->name, str_value, sizeof(mc->name) - 1);
+				mc->name[sizeof(mc->name) - 1] = '\0';
+			}
+			break;
+		// Read-only properties - ignore silently
+		case 4:  // _currentframe
+		case 5:  // _totalframes
+		case 11: // _target
+		case 12: // _framesloaded
+		case 14: // _droptarget
+		case 15: // _url
+		case 20: // _xmouse
+		case 21: // _ymouse
+			// Do nothing - these are read-only
+			break;
+		default:
+			// Unknown property - ignore
+			break;
+	}
 }

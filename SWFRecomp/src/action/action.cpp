@@ -244,7 +244,15 @@ namespace SWFRecomp
 
 					break;
 				}
-				
+
+				case SWF_ACTION_SET_PROPERTY:
+				{
+					out_script << "\t" << "// SetProperty" << endl
+							   << "\t" << "actionSetProperty(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TRACE:
 				{
 					out_script << "\t" << "// Trace" << endl
