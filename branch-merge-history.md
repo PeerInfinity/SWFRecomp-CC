@@ -172,8 +172,8 @@ This document tracks all branches created by Claude Code web interface and their
 
 ## Summary
 
-**Total Branches Reviewed:** 10
-**Merged:** 9
+**Total Branches Reviewed:** 21
+**Merged:** 20
 **Rejected:** 1
 
 **Validation Phase Complete:** ✅ GREEN LIGHT
@@ -181,10 +181,10 @@ This document tracks all branches created by Claude Code web interface and their
 - All 4 critical experiments completed successfully
 - Ready for production parallel implementation
 
-**Production Phase Started:** ✅ IN PROGRESS
-- 3 opcodes implemented from Batch 1
-- Parallel implementation working successfully
-- All merges auto-resolved without manual intervention
+**Production Phase:** ✅ BATCH 1 COMPLETE!
+- 13 opcodes implemented from Batch 1 (100%)
+- Parallel implementation highly successful
+- Most merges auto-resolved, complex conflicts manually resolved
 
 **Experiments Completed:**
 - Experiment #1: Hello World Smoke Test ✅ (45 min)
@@ -192,17 +192,27 @@ This document tracks all branches created by Claude Code web interface and their
 - Experiment #4: Reference Counting PoC ✅ (2 hours, 0 leaks)
 - Experiment #5: Parallel Merge Test ✅ (2 min conflict resolution)
 
-**Opcodes Implemented (Total: 6):**
+**Opcodes Implemented (Total: 16):**
 
 *Validation Phase (3 opcodes):*
 - 0x3F: Modulo
 - 0x50: Increment
 - 0x51: Decrement
 
-*Production Phase - Batch 1 (3 opcodes):*
+*Production Phase - Batch 1 (13 opcodes - COMPLETE):*
 - 0x18: TO_INTEGER (Type conversion)
-- 0x48: GREATER (Comparison)
+- 0x48: LESS2 (Comparison - fixed from incorrect GREATER label)
+- 0x4A: TO_NUMBER (Type conversion)
+- 0x4B: TO_STRING (Type conversion)
 - 0x60: BIT_AND (Bitwise)
+- 0x61: BIT_OR (Bitwise)
+- 0x62: BIT_XOR (Bitwise)
+- 0x63: BIT_LSHIFT (Bitwise)
+- 0x64: BIT_RSHIFT (Bitwise)
+- 0x65: BIT_URSHIFT (Bitwise)
+- 0x66: STRICT_EQUALS (Comparison)
+- 0x67: GREATER (Comparison - moved to correct opcode value)
+- 0x68: STRING_GREATER (String comparison)
 
 **Infrastructure Added:**
 - Reference counting system for memory management
@@ -214,6 +224,123 @@ This document tracks all branches created by Claude Code web interface and their
 
 **Batch 1 Progress:**
 - Target: 13 simple opcodes
-- Completed: 3 opcodes (23%)
-- Remaining: 10 opcodes
-- Status: Parallel implementation working well, auto-merge successful
+- Completed: 13 opcodes (100% complete!)
+- Status: Parallel implementation highly successful
+
+### 10. `claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Implemented BIT_OR opcode (0x61) - Bitwise OR operation
+
+**Key Changes:**
+- New: BIT_OR opcode (0x61) implementation in action.c and action.cpp
+- New: `SWFRecomp/tests/bit_or_swf_4/` test suite with README, config, and test generation script
+- Total: 238 lines added
+
+### 11. `claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented BIT_XOR opcode (0x62) - Bitwise XOR operation
+
+**Key Changes:**
+- New: BIT_XOR opcode (0x62) implementation in action.c and action.cpp
+- New: `SWFRecomp/tests/bit_xor_swf_4/` test suite
+- Resolved merge conflicts with BIT_OR branch
+
+### 12. `claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented BIT_LSHIFT opcode (0x63) - Bitwise left shift operation
+
+**Key Changes:**
+- New: BIT_LSHIFT opcode (0x63) implementation with 5-bit mask for shift count
+- New: `SWFRecomp/tests/bit_lshift_swf_4/` test suite
+- Resolved merge conflicts with previous bitwise operations
+
+### 13. `claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented BIT_RSHIFT opcode (0x64) - Arithmetic right shift operation
+
+**Key Changes:**
+- New: BIT_RSHIFT opcode (0x64) with sign-extending arithmetic shift
+- New: `SWFRecomp/tests/bit_rshift_swf_4/` test suite
+- Uses signed integer for proper sign extension
+
+### 14. `claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ`
+**Status:** ✅ Merged (resolved complex nested conflicts)
+**Commits:** 1 commit
+**Description:** Implemented BIT_URSHIFT opcode (0x65) - Logical (unsigned) right shift operation
+
+**Key Changes:**
+- New: BIT_URSHIFT opcode (0x65) with zero-fill logical shift
+- Uses unsigned integer for proper zero-fill behavior
+- New: `SWFRecomp/tests/bit_urshift_swf_4/` test suite
+- Resolved complex nested merge conflicts in action.c
+
+### 15. `claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented STRICT_EQUALS opcode (0x66) - Type-strict equality comparison
+
+**Key Changes:**
+- New: STRICT_EQUALS opcode (0x66) with type checking before value comparison
+- Handles F32, F64, STRING, STR_LIST, and OBJECT types
+- NULL-safe string comparison
+- New: `SWFRecomp/tests/strict_equals_swf_4/` test suite
+
+### 16. `claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Fixed opcode naming - GREATER (0x48) renamed to LESS2 (0x48)
+
+**Key Changes:**
+- Corrected: Renamed SWF_ACTION_GREATER from 0x48 to LESS2 (ActionLess2)
+- Updated: `greater_swf_4/README.md` to document the correction
+- New: `SWFRecomp/tests/less2_swf_4/` test suite for the correct opcode
+- This fixed a naming error where 0x48 was incorrectly labeled as GREATER
+
+### 17. `claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Moved GREATER opcode to correct value 0x67
+
+**Key Changes:**
+- New: SWF_ACTION_GREATER = 0x67 (correct opcode value per SWF spec)
+- Updated: `greater_swf_4/README.md` and test files to use 0x67
+- This completes the fix started by the LESS2 branch
+
+### 18. `claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented TO_NUMBER opcode (0x4A) - Type conversion to number
+
+**Key Changes:**
+- New: TO_NUMBER opcode (0x4A) using convertFloat for type conversion
+- New: `SWFRecomp/tests/to_number_swf_4/` test suite
+- Handles string parsing, boolean conversion, null/undefined → NaN
+
+### 19. `claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented TO_STRING opcode (0x4B) - Type conversion to string
+
+**Key Changes:**
+- New: TO_STRING opcode (0x4B) using convertString with string buffer parameter
+- New: `SWFRecomp/tests/to_string_swf_4/` test suite
+- Uses %.15g format for float→string conversion
+
+### 20. `claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE`
+**Status:** ✅ Merged (resolved conflicts, known runtime issue)
+**Commits:** 1 commit
+**Description:** Implemented STRING_GREATER opcode (0x68) - Lexicographic string comparison
+
+**Key Changes:**
+- New: STRING_GREATER opcode (0x68) for case-sensitive string comparison
+- Uses strcmp() for lexicographic byte-by-byte comparison
+- New: `SWFRecomp/tests/string_greater_swf_4/` test suite
+
+**Known Issue:**
+- Runtime segfaults when pushing multiple strings in sequence
+- Not specific to STRING_GREATER implementation
+- Underlying issue in SWFModernRuntime's string handling needs investigation

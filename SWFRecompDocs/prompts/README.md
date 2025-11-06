@@ -17,28 +17,28 @@ prompts/
 
 ## Current Prompts
 
-### Batch 1: Simple Opcodes (1-2 hours each) - COMPLETE ✅
+### Batch 2: Medium Opcodes (2-4 hours each) - READY ✅
 
-#### Comparison Operations (4 prompts)
-- **opcode-greater-0x67.md** - GREATER comparison operator (>)
-- **opcode-string-greater-0x68.md** - STRING_GREATER lexicographic comparison
-- **opcode-strict-equals-0x66.md** - STRICT_EQUALS (===) comparison
-- **opcode-less2-0x48.md** - LESS2 comparison using ECMA-262 rules
+#### String Operations (7 prompts)
+- **opcode-char-to-ascii-0x31.md** - CHAR_TO_ASCII - Convert first character to ASCII code
+- **opcode-ascii-to-char-0x32.md** - ASCII_TO_CHAR - Convert ASCII code to character
+- **opcode-mb-char-to-ascii-0x33.md** - MB_CHAR_TO_ASCII - Multibyte character to Unicode code point
+- **opcode-mb-ascii-to-char-0x36.md** - MB_ASCII_TO_CHAR - Unicode code point to UTF-8 character
+- **opcode-mb-string-length-0x35.md** - MB_STRING_LENGTH - Character count (not byte count)
+- **opcode-string-extract-0x15.md** - STRING_EXTRACT - Extract substring
+- **opcode-string-less-0x29.md** - STRING_LESS - Lexicographic string comparison
 
-#### Bitwise Operations (6 prompts)
-- **opcode-bit-and-0x60.md** - Bitwise AND operation (&)
-- **opcode-bit-or-0x61.md** - Bitwise OR operation (|)
-- **opcode-bit-xor-0x62.md** - Bitwise XOR operation (^)
-- **opcode-bit-lshift-0x63.md** - Bitwise left shift (<<)
-- **opcode-bit-rshift-0x64.md** - Bitwise arithmetic right shift (>>)
-- **opcode-bit-urshift-0x65.md** - Bitwise unsigned right shift (>>>)
+#### Stack Operations (3 prompts)
+- **opcode-duplicate-0x3d.md** - DUPLICATE - Duplicate top stack value
+- **opcode-stack-swap-0x4c.md** - STACK_SWAP - Swap top two stack values
+- **opcode-random-number-0x30.md** - RANDOM_NUMBER - Generate random integer in range
 
-#### Type Conversion (3 prompts)
-- **opcode-to-integer-0x18.md** - Convert value to 32-bit integer (truncate)
-- **opcode-to-number-0x4a.md** - Convert value to number
-- **opcode-to-string-0x4b.md** - Convert value to string
+#### Utility Operations (3 prompts)
+- **opcode-typeof-0x3c.md** - TYPEOF - Return type of value as string
+- **opcode-target-path-0x45.md** - TARGET_PATH - Get MovieClip target path
+- **opcode-add2-0x47.md** - ADD2 - Type-aware addition (ECMA-262)
 
-**Total Batch 1 Prompts**: 13 prompts created ✅
+**Total Batch 2 Prompts**: 13 prompts created ✅
 
 ## How to Use These Prompts
 
@@ -84,19 +84,36 @@ Each prompt contains:
 
 Prompts are organized by implementation priority:
 
-### Batch 1: Simple (13 opcodes, 15-25 hours total)
+### Batch 1: Simple (13 opcodes, 15-25 hours total) - MOVED TO COMPLETED ✅
 - **Comparison**: GREATER (0x67), STRING_GREATER (0x68), STRICT_EQUALS (0x66), LESS2 (0x48)
 - **Bitwise**: BIT_AND (0x60), BIT_OR (0x61), BIT_XOR (0x62), BIT_LSHIFT (0x63), BIT_RSHIFT (0x64), BIT_URSHIFT (0x65)
 - **Type Conversion**: TO_INTEGER (0x18), TO_NUMBER (0x4A), TO_STRING (0x4B)
 
-**Status**: ✅ COMPLETE - All 13 prompts created (2025-11-05)
+**Status**: ✅ COMPLETE - All 13 prompts created and moved to completed/ directory (2025-11-05)
 
-### Batch 2: Medium (14 opcodes, 30-55 hours total)
-- **String Operations**: 7 opcodes
-- **Stack Operations**: 3 opcodes
-- **Utility**: 3 opcodes
+### Batch 2: Medium (13 opcodes, 28-52 hours total) - READY FOR IMPLEMENTATION ✅
 
-**Status**: To be created
+#### String Operations (7 prompts)
+- **opcode-char-to-ascii-0x31.md** - CHAR_TO_ASCII - Convert first character to ASCII code
+- **opcode-ascii-to-char-0x32.md** - ASCII_TO_CHAR - Convert ASCII code to character
+- **opcode-mb-char-to-ascii-0x33.md** - MB_CHAR_TO_ASCII - Multibyte character to Unicode code point
+- **opcode-mb-ascii-to-char-0x36.md** - MB_ASCII_TO_CHAR - Unicode code point to UTF-8 character
+- **opcode-mb-string-length-0x35.md** - MB_STRING_LENGTH - Character count (not byte count)
+- **opcode-string-extract-0x15.md** - STRING_EXTRACT - Extract substring
+- **opcode-string-less-0x29.md** - STRING_LESS - Lexicographic string comparison
+
+#### Stack Operations (3 prompts)
+- **opcode-duplicate-0x3d.md** - DUPLICATE - Duplicate top stack value
+- **opcode-stack-swap-0x4c.md** - STACK_SWAP - Swap top two stack values
+- **opcode-random-number-0x30.md** - RANDOM_NUMBER - Generate random integer in range
+
+#### Utility Operations (3 prompts)
+- **opcode-typeof-0x3c.md** - TYPEOF - Return type of value as string
+- **opcode-target-path-0x45.md** - TARGET_PATH - Get MovieClip target path
+- **opcode-add2-0x47.md** - ADD2 - Type-aware addition (ECMA-262)
+
+**Total Batch 2 Prompts**: 13 prompts created ✅
+**Status**: ✅ COMPLETE - All 13 prompts created (2025-11-05), ready for parallel implementation
 
 ### Batch 3: Complex (25+ opcodes, 100-200 hours total)
 - **Object Operations**: 10 opcodes (requires object model)
@@ -140,11 +157,12 @@ Each implemented opcode should:
 
 ## Next Steps
 
-1. ~~**Complete Batch 1 prompts**~~ ✅ DONE - All 13 prompts created
-2. **Begin parallel implementation** - Assign prompts to multiple Claude Code instances
-3. **Monitor and merge** - Sequential merge as implementations complete
-4. **Create Batch 2 prompts** - String operations, stack operations, utility opcodes
-5. **Continue expansion** - Iterative batches until all opcodes implemented
+1. ~~**Complete Batch 1 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
+2. ~~**Create Batch 2 prompts**~~ ✅ DONE - All 13 prompts created (2025-11-05)
+3. **Begin parallel implementation of Batch 2** - Assign prompts to multiple Claude Code instances
+4. **Monitor and merge** - Sequential merge as implementations complete
+5. **Create Batch 3 prompts** - Object operations, function operations, control flow
+6. **Continue expansion** - Iterative batches until all opcodes implemented
 
 ## Resources
 
@@ -163,7 +181,8 @@ Each implemented opcode should:
 
 ---
 
-**Status**: Batch 1 complete (13 prompts), ready for parallel implementation
+**Status**: Batch 2 complete (13 prompts), ready for parallel implementation
 **Created**: 2025-11-05
 **Last Updated**: 2025-11-05
-**Batch 1 Completed**: 2025-11-05
+**Batch 1 Completed**: 2025-11-05 (moved to completed/)
+**Batch 2 Completed**: 2025-11-05
