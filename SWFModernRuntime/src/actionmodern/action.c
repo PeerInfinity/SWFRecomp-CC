@@ -1964,6 +1964,43 @@ void actionStringLess(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
+void actionCall(char* stack, u32* sp)
+{
+	// Pop frame identifier (string or number)
+	ActionVar frame_var;
+	popVar(stack, sp, &frame_var);
+
+	// Simplified implementation: log the call
+	// TODO: Actually execute frame actions when frame infrastructure is ready
+
+	int frame_num = -1;
+	const char* frame_id = NULL;
+
+	// Try to interpret as frame number or string
+	if (frame_var.type == ACTION_STACK_VALUE_F32) {
+		frame_num = (int) frame_var.data.numeric_value;
+		printf("// Call frame %d\n", frame_num);
+	} else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
+		frame_id = (const char*) frame_var.data.numeric_value;
+		// Try to parse as number
+		char* endptr;
+		long num = strtol(frame_id, &endptr, 10);
+		if (*endptr == '\0') {
+			// It's a numeric string
+			frame_num = (int) num;
+			printf("// Call frame %d\n", frame_num);
+		} else {
+			// It's a frame label
+			printf("// Call frame label: %s\n", frame_id);
+		}
+	}
+
+	// In a full implementation, this would:
+	// 1. Look up the frame by number or label
+	// 2. Execute the frame's actions
+	// 3. Return to the current frame when done
+}
+
 void actionInitArray(char* stack, u32* sp)
 {
 	// 1. Pop array element count

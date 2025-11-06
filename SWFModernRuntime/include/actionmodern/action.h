@@ -124,6 +124,7 @@ void actionBitURShift(char* stack, u32* sp);
 void actionStrictEquals(char* stack, u32* sp);
 void actionGreater(char* stack, u32* sp);
 void actionStringGreater(char* stack, u32* sp);
+void actionCall(char* stack, u32* sp);
 void actionInitObject(char* stack, u32* sp);
 void actionGetMember(char* stack, u32* sp);
 void actionSetMember(char* stack, u32* sp);

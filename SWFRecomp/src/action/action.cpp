@@ -639,18 +639,26 @@ namespace SWFRecomp
 				case SWF_ACTION_IF:
 				{
 					s16 offset = VAL(s16, action_buffer);
-					
+
 					out_script << "\t" << "// If" << endl
 							   << "\t" << "if (evaluateCondition(stack, sp))" << endl
 							   << "\t" << "{" << endl
 							   << "\t" << "\t" << "goto label_" << to_string((s16) (action_buffer + length - action_buffer_start + offset)) << ";" << endl
 							   << "\t" << "}" << endl;
-					
+
 					action_buffer += length;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_CALL:
+				{
+					out_script << "\t" << "// Call" << endl
+							   << "\t" << "actionCall(stack, sp);" << endl;
+
+					break;
+				}
+
 				default:
 				{
 					EXC_ARG("Unimplemented action 0x%02X\n", code);
