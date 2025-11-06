@@ -261,6 +261,17 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_MB_CHAR_TO_ASCII:
+				{
+					declareEmptyString(context, 17);
+
+					out_script << "\t" << "// MbCharToAscii" << endl
+							   << "\t" << "actionMbCharToAscii(stack, sp, str_"
+							   << to_string(next_str_i - 1) << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_GET_TIME:
 				{
 					out_script << "\t" << "// GetTime" << endl
