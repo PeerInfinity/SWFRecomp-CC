@@ -96,57 +96,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 }
 
 // ==================================================================
-// Array Object Model
-// ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
-}
-
-// ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
 
@@ -187,6 +136,100 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		return &root_movieclip;
 	}
 	return NULL;  // Other paths not supported yet
+}
+
+// ==================================================================
+// Local Scope Infrastructure (for DECLARE_LOCAL opcode)
+// ==================================================================
+
+#define MAX_LOCAL_VARS 64
+#define MAX_CALL_DEPTH 32
+
+typedef struct {
+	char name[64];
+	ActionVar value;
+} LocalVar;
+
+typedef struct {
+	LocalVar vars[MAX_LOCAL_VARS];
+	u32 var_count;
+} LocalScope;
+
+// Call stack with local scopes
+static LocalScope call_stack[MAX_CALL_DEPTH];
+static u32 call_depth = 0;
+
+// Function entry - initialize new local scope
+void functionEnter()
+{
+	if (call_depth < MAX_CALL_DEPTH) {
+		call_stack[call_depth].var_count = 0;  // Clear local vars
+		call_depth++;
+	}
+}
+
+// Function exit - cleanup local scope
+void functionExit()
+{
+	if (call_depth > 0) {
+		// Free any heap-allocated strings in local variables
+		LocalScope* scope = &call_stack[call_depth - 1];
+		for (u32 i = 0; i < scope->var_count; i++) {
+			if (scope->vars[i].value.type == ACTION_STACK_VALUE_STRING &&
+			    scope->vars[i].value.data.string_data.owns_memory) {
+				free(scope->vars[i].value.data.string_data.heap_ptr);
+			}
+		}
+		call_depth--;
+	}
+}
+
+// Get local variable by name (returns NULL if not found)
+static ActionVar* getLocalVariable(const char* name)
+{
+	if (call_depth == 0) {
+		return NULL;  // Not in a function
+	}
+
+	LocalScope* scope = &call_stack[call_depth - 1];
+	for (u32 i = 0; i < scope->var_count; i++) {
+		if (strcmp(scope->vars[i].name, name) == 0) {
+			return &scope->vars[i].value;
+		}
+	}
+
+	return NULL;  // Not found in local scope
+}
+
+// Declare local variable (adds to local scope)
+static bool declareLocalVariable(const char* name)
+{
+	if (call_depth == 0) {
+		// Not in a function - should not happen
+		return false;
+	}
+
+	LocalScope* scope = &call_stack[call_depth - 1];
+
+	// Check if already declared
+	for (u32 i = 0; i < scope->var_count; i++) {
+		if (strcmp(scope->vars[i].name, name) == 0) {
+			// Already declared, do nothing
+			return true;
+		}
+	}
+
+	// Add to local scope
+	if (scope->var_count < MAX_LOCAL_VARS) {
+		strncpy(scope->vars[scope->var_count].name, name, 63);
+		scope->vars[scope->var_count].name[63] = '\0';
+		scope->vars[scope->var_count].value.type = ACTION_STACK_VALUE_UNDEFINED;
+		scope->var_count++;
+		return true;
+	}
+
+	// Too many local variables
+	return false;
 }
 
 ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
@@ -1293,17 +1336,22 @@ void actionGetVariable(char* stack, u32* sp)
 	// Pop variable name
 	POP();
 
-	// Get variable (fast path for constant strings)
-	ActionVar* var;
-	if (string_id != 0)
-	{
-		// Constant string - use array (O(1))
-		var = getVariableById(string_id);
-	}
-	else
-	{
-		// Dynamic string - use hashmap (O(n))
-		var = getVariable(var_name, var_name_len);
+	// Check local scope first (if in function)
+	ActionVar* var = getLocalVariable(var_name);
+
+	if (!var) {
+		// Not in local scope, check global variables
+		// Get variable (fast path for constant strings)
+		if (string_id != 0)
+		{
+			// Constant string - use array (O(1))
+			var = getVariableById(string_id);
+		}
+		else
+		{
+			// Dynamic string - use hashmap (O(n))
+			var = getVariable(var_name, var_name_len);
+		}
 	}
 
 	if (!var)
@@ -1330,24 +1378,29 @@ void actionSetVariable(char* stack, u32* sp)
 	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
 	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
 
-	// Get variable (fast path for constant strings)
-	ActionVar* var;
-	if (string_id != 0)
-	{
-		// Constant string - use array (O(1))
-		var = getVariableById(string_id);
-	}
-	else
-	{
-		// Dynamic string - use hashmap (O(n))
-		var = getVariable(var_name, var_name_len);
-	}
+	// Check local scope first (if in function)
+	ActionVar* var = getLocalVariable(var_name);
 
-	if (!var)
-	{
-		// Failed to get/create variable
-		POP_2();
-		return;
+	if (!var) {
+		// Not in local scope, get/create global variable
+		// Get variable (fast path for constant strings)
+		if (string_id != 0)
+		{
+			// Constant string - use array (O(1))
+			var = getVariableById(string_id);
+		}
+		else
+		{
+			// Dynamic string - use hashmap (O(n))
+			var = getVariable(var_name, var_name_len);
+		}
+
+		if (!var)
+		{
+			// Failed to get/create variable
+			POP_2();
+			return;
+		}
 	}
 
 	// Set variable value (uses existing string materialization!)
@@ -1355,6 +1408,24 @@ void actionSetVariable(char* stack, u32* sp)
 
 	// Pop both value and name
 	POP_2();
+}
+
+void actionDeclareLocal(char* stack, u32* sp)
+{
+	// Pop variable name from stack
+	const char* var_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	POP();
+
+	if (call_depth == 0) {
+		// Not in a function: treat as warning
+		printf("Warning: DECLARE_LOCAL outside function for variable '%s'\n", var_name);
+		return;
+	}
+
+	// Declare variable in local scope
+	if (!declareLocalVariable(var_name)) {
+		printf("Error: Failed to declare local variable '%s'\n", var_name);
+	}
 }
 
 void actionGetProperty(char* stack, u32* sp)
