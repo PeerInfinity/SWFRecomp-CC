@@ -100,6 +100,7 @@ void actionCharToAscii(char* stack, u32* sp);
 
 void actionGetVariable(char* stack, u32* sp);
 void actionSetVariable(char* stack, u32* sp);
+void actionDeclareLocal(char* stack, u32* sp);
 void actionGetProperty(char* stack, u32* sp);
 void actionSetProperty(char* stack, u32* sp);
 

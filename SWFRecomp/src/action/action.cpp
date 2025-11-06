@@ -389,6 +389,14 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_ACTION_DECLARE_LOCAL:
+			{
+				out_script << "\t" << "// DeclareLocal" << endl
+						   << "\t" << "actionDeclareLocal(stack, sp);" << endl;
+
+				break;
+			}
+
 			case SWF_ACTION_INIT_ARRAY:
 			{
 				out_script << "\t" << "// InitArray" << endl
