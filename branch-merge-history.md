@@ -172,8 +172,8 @@ This document tracks all branches created by Claude Code web interface and their
 
 ## Summary
 
-**Total Branches Reviewed:** 44
-**Merged:** 43
+**Total Branches Reviewed:** 56
+**Merged:** 55
 **Rejected:** 1
 
 **Validation Phase Complete:** ✅ GREEN LIGHT
@@ -193,7 +193,7 @@ This document tracks all branches created by Claude Code web interface and their
 - Experiment #4: Reference Counting PoC ✅ (2 hours, 0 leaks)
 - Experiment #5: Parallel Merge Test ✅ (2 min conflict resolution)
 
-**Opcodes Implemented (Total: 37):**
+**Opcodes Implemented (Total: 49):**
 
 *Validation Phase (3 opcodes):*
 - 0x3F: Modulo
@@ -241,6 +241,20 @@ This document tracks all branches created by Claude Code web interface and their
 - 0x4F: SET_MEMBER (Object property mutation)
 - 0x87: STORE_REGISTER (Register storage)
 - 0x9E: CALL (Function call - placeholder)
+
+*Production Phase - Advanced Opcodes Batch (12 opcodes - NEW):*
+- 0x3D: CALL_FUNCTION (Function call with arguments)
+- 0x41: DECLARE_LOCAL (Local variable declaration)
+- 0x46: ENUMERATE (Object property enumeration by variable name)
+- 0x53: NEW_METHOD (Constructor method call)
+- 0x55: ENUMERATE2 (Modern object/array enumeration)
+- 0x5A: DELETE (Delete object property by variable name)
+- 0x5B: DELETE2 (Modern delete - direct object reference)
+- 0x8E: DEFINE_FUNCTION2 (Advanced function definition with registers - parsing only)
+- 0x94: WITH (Scope chain management)
+- 0x9B: DEFINE_FUNCTION (Function definition - parsing only)
+- 0x9F: CALL_METHOD (Method call on object - placeholder)
+- Bug Fix: ASArray duplicate definitions resolved
 
 **Infrastructure Added:**
 - Reference counting system for memory management
@@ -649,3 +663,151 @@ This document tracks all branches created by Claude Code web interface and their
 - Added helper functions for register management
 - New: `SWFRecomp/tests/store_register_swf_4/` test suite
 - Resolved merge conflicts in action.h
+
+### 45. `claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Implemented ENUMERATE opcode (0x46) - Enumerates object properties by variable name
+
+**Key Changes:**
+- New: ENUMERATE opcode (0x46) implementation in action.c and action.cpp
+- Takes variable name from stack, enumerates properties
+- Pushes null terminator followed by property names
+- New: `SWFRecomp/tests/enumerate_swf_4/` test suite
+- Total: ~280 lines added
+
+### 46. `claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented ENUMERATE2 opcode (0x55) - Modern property enumeration (SWF 6+)
+
+**Key Changes:**
+- New: ENUMERATE2 opcode (0x55) implementation in action.c and action.cpp
+- Pops object reference directly from stack (unlike ENUMERATE which uses variable name)
+- Handles both objects and arrays
+- Array enumeration pushes indices as strings
+- New: `SWFRecomp/tests/enumerate2_swf_6/` test suite with detailed README
+- Resolved comment conflict in action.c
+
+### 47. `claude/opcode-delete-0x5a-011CUqutNyCjGYCvA8jEoP4y`
+**Status:** ✅ Merged (resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented DELETE opcode (0x5A) - Deletes object property by variable name
+
+**Key Changes:**
+- New: DELETE opcode (0x5A) implementation in action.c and action.cpp
+- New: `deleteProperty` function in object.c with proper memory management
+- Works with variable names (not direct object references)
+- Returns 1.0 for success, 0.0 for failure (AS2 spec: usually returns 1.0)
+- Proper refcount management for deleted properties
+- New: `SWFRecomp/tests/delete_swf_5/` test suite with comprehensive README
+- Resolved merge conflicts in multiple files
+
+### 48. `claude/opcode-delete2-0x5b-011CUquufkHrk6Pt1ggisyZL`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented DELETE2 opcode (0x5B) - Modern delete (pops object reference)
+
+**Key Changes:**
+- New: DELETE2 opcode (0x5B) implementation in action.c and action.cpp
+- Pops object reference and property name directly from stack
+- Modern variant of DELETE (0x5A)
+- New: `SWFRecomp/tests/delete2_swf_5/` test suite
+- Auto-resolved conflicts using conflict resolution script
+
+### 49. `claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented DECLARE_LOCAL opcode (0x41) - Declares local variable
+
+**Key Changes:**
+- New: DECLARE_LOCAL opcode (0x41) implementation
+- Declares local variable in current scope
+- Pops variable name and initial value from stack
+- New: `SWFRecomp/tests/declare_local_swf_5/` test suite
+- Auto-resolved conflicts
+
+### 50. `claude/opcode-call-function-0x3d-011CUquwYS4X8C2RVTAq2p7T`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented CALL_FUNCTION opcode (0x3D) - Calls function with arguments
+
+**Key Changes:**
+- New: CALL_FUNCTION opcode (0x3D) implementation in action.c and action.cpp
+- Function registry with built-in functions: parseInt, parseFloat, isNaN, isFinite
+- Pops function name, argument count, and arguments from stack
+- Pushes return value onto stack
+- New: `SWFRecomp/tests/call_function_swf_5/` test suite
+- Auto-resolved conflicts
+
+### 51. `claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented NEW_METHOD opcode (0x53) - Calls constructor method on object
+
+**Key Changes:**
+- New: NEW_METHOD opcode (0x53) implementation in action.c and action.cpp
+- Creates new object instance by calling method as constructor
+- Pops method name, object, argument count, and arguments
+- New: `SWFRecomp/tests/new_method_swf_5/` test suite
+- Auto-resolved conflicts in multiple files
+
+### 52. `claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented CALL_METHOD opcode (0x9F) - Calls method on object
+
+**Key Changes:**
+- New: CALL_METHOD opcode (0x9F) implementation in action.c and action.cpp
+- Calls method on object with arguments
+- Pops method name, object, argument count, and arguments from stack
+- Placeholder implementation (full method dispatch not yet implemented)
+- Auto-resolved conflicts
+
+### 53. `claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Added DEFINE_FUNCTION opcode (0x9B) documentation and parsing
+
+**Key Changes:**
+- Added DEFINE_FUNCTION opcode (0x9B) reading/parsing in swf.cpp
+- Reads function name, parameter names, and body code length
+- Skips function body bytes (implementation deferred)
+- Documentation added for future implementation
+- Auto-resolved conflicts
+
+### 54. `claude/read-opcode-define-function2-011CUqv2tCqApewbVGDbCPav`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Added DEFINE_FUNCTION2 opcode (0x8E) documentation and parsing
+
+**Key Changes:**
+- Added DEFINE_FUNCTION2 opcode (0x8E) reading/parsing in swf.cpp
+- Reads function name, register count, flags, parameters, and body
+- More advanced than DEFINE_FUNCTION with register allocation
+- Skips function body bytes (implementation deferred)
+- Auto-resolved conflicts in multiple files
+
+### 55. `claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Implemented WITH statement opcode (0x94) with scope chain
+
+**Key Changes:**
+- New: WITH opcode (0x94) implementation with scope chain management
+- Adds object to scope chain for property lookups
+- Modified variable lookup to check scope chain
+- Added scope chain operations: pushScope, popScope, searchScopeChain
+- Updated `SWFModernRuntime/src/actionmodern/variables.c` with scope support
+- Auto-resolved conflicts
+
+### 56. `claude/setup-and-run-tests-011CUqva5BzbiTWj4DcYnhfi`
+**Status:** ✅ Merged (auto-resolved conflicts)
+**Commits:** 1 commit
+**Description:** Fixed duplicate ASArray definitions in action.c
+
+**Key Changes:**
+- Fixed duplicate typedef for ASArray structure
+- Resolved compilation errors from multiple array definitions
+- Cleanup commit to fix merge conflicts from parallel development
+- Auto-resolved conflicts
