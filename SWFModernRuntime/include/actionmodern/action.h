@@ -99,6 +99,7 @@ void actionCharToAscii(char* stack, u32* sp);
 
 void actionGetVariable(char* stack, u32* sp);
 void actionSetVariable(char* stack, u32* sp);
+void actionGetProperty(char* stack, u32* sp);
 
 void actionTrace(char* stack, u32* sp);
 void actionRandomNumber(char* stack, u32* sp);
