@@ -74,6 +74,7 @@ namespace SWFRecomp
 		SWF_ACTION_CONSTANT_POOL = 0x88,
 		SWF_ACTION_PUSH = 0x96,
 		SWF_ACTION_JUMP = 0x99,
+		SWF_ACTION_DEFINE_FUNCTION = 0x9B,
 		SWF_ACTION_IF = 0x9D,
 		SWF_ACTION_CALL = 0x9E
 	};
@@ -82,6 +83,7 @@ namespace SWFRecomp
 	{
 	public:
 		size_t next_str_i;
+		size_t func_counter;
 		std::map<std::string, size_t> string_to_id;  // Track declared strings for deduplication
 
 		SWFAction();

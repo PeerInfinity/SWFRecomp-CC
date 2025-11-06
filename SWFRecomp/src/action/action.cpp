@@ -14,9 +14,9 @@ using std::endl;
 
 namespace SWFRecomp
 {
-	SWFAction::SWFAction() : next_str_i(0)
+	SWFAction::SWFAction() : next_str_i(0), func_counter(0)
 	{
-		
+
 	}
 	
 	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
@@ -650,15 +650,91 @@ namespace SWFRecomp
 				case SWF_ACTION_JUMP:
 				{
 					s16 offset = VAL(s16, action_buffer);
-					
+
 					out_script << "\t" << "// Jump" << endl
 							   << "\t" << "goto label_" << to_string((s16) (action_buffer + length - action_buffer_start + offset)) << ";" << endl;
-					
+
 					action_buffer += length;
-					
+
 					break;
 				}
-				
+
+				case SWF_ACTION_DEFINE_FUNCTION:
+				{
+					// Read function metadata from bytecode
+					char* func_name = action_buffer;
+					size_t func_name_len = strlen(func_name);
+					action_buffer += func_name_len + 1;
+
+					u16 num_params = VAL(u16, action_buffer);
+					action_buffer += 2;
+
+					std::vector<string> params;
+					for (u16 i = 0; i < num_params; i++)
+					{
+						char* param_name = action_buffer;
+						size_t param_len = strlen(param_name);
+						params.push_back(string(param_name));
+						action_buffer += param_len + 1;
+					}
+
+					u16 code_size = VAL(u16, action_buffer);
+					action_buffer += 2;
+
+					// Generate unique function identifier
+					string func_id;
+					if (func_name_len > 0)
+					{
+						func_id = "func_" + string(func_name) + "_" + to_string(func_counter);
+					}
+					else
+					{
+						func_id = "func_anon_" + to_string(func_counter);
+					}
+					func_counter++;
+
+					out_script << "\t" << "// DefineFunction: " << (func_name_len > 0 ? func_name : "(anonymous)") << endl;
+
+					// Generate function declaration in header
+					context.out_script_decls << "void " << func_id
+											 << "(char* stack, u32* sp);" << endl;
+
+					// Generate function definition
+					context.out_script_defs << "void " << func_id
+											<< "(char* stack, u32* sp)" << endl
+											<< "{" << endl;
+
+					// Bind parameters from stack
+					// Parameters are on the stack in reverse order (last param on top)
+					for (int i = (int)params.size() - 1; i >= 0; i--)
+					{
+						context.out_script_defs << "\t" << "// Bind parameter: " << params[i] << endl
+												<< "\t" << "ActionVar param_" << i << ";" << endl
+												<< "\t" << "popVar(stack, sp, &param_" << i << ");" << endl
+												<< "\t" << "setVariableByName(\"" << params[i] << "\", &param_" << i << ");" << endl;
+					}
+
+					// Parse function body bytecode
+					char* func_body = action_buffer;
+					action_buffer += code_size;
+
+					// Recursively parse the function body
+					parseActions(context, func_body, context.out_script_defs);
+
+					// Add default return for functions without explicit return
+					context.out_script_defs << "\t" << "// Default return undefined" << endl
+											<< "\t" << "ActionVar ret;" << endl
+											<< "\t" << "ret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl
+											<< "\t" << "PUSH_VAR(&ret);" << endl
+											<< "}" << endl << endl;
+
+					// Store function in runtime registry
+					out_script << "\t" << "actionDefineFunction(stack, sp, \"" << func_name
+							   << "\", " << func_id << ", " << num_params << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_IF:
 				{
 					s16 offset = VAL(s16, action_buffer);

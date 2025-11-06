@@ -98,54 +98,7 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 // ==================================================================
 // Array Object Model
 // ==================================================================
-
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
-}
-
+// Array implementation is in object.h/object.c
 // ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
@@ -275,8 +228,19 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 void popVar(char* stack, u32* sp, ActionVar* var)
 {
 	peekVar(stack, sp, var);
-	
+
 	POP();
+}
+
+// Helper function to set a variable by name from an ActionVar value
+void setVariableByName(const char* var_name, ActionVar* value)
+{
+	size_t key_size = strlen(var_name);
+	ActionVar* var = getVariable((char*)var_name, key_size);
+	if (var) {
+		// Copy value
+		*var = *value;
+	}
 }
 
 void actionAdd(char* stack, u32* sp)
@@ -2014,38 +1978,106 @@ void actionStringLess(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionCall(char* stack, u32* sp)
+// ==================================================================
+// Function Storage for ActionScript Functions
+// ==================================================================
+
+typedef void (*FunctionPtr)(char* stack, u32* sp);
+
+typedef struct {
+	char name[256];
+	FunctionPtr func;
+	u32 param_count;
+} ASFunction;
+
+// Function registry (simple array, could be hash map for better performance)
+#define MAX_FUNCTIONS 256
+static ASFunction* function_registry[MAX_FUNCTIONS];
+static u32 function_count = 0;
+
+void actionDefineFunction(char* stack, u32* sp, const char* name, FunctionPtr func, u32 param_count)
 {
-	// Pop frame identifier (string or number)
-	ActionVar frame_var;
-	popVar(stack, sp, &frame_var);
-
-	// Simplified implementation: log the call
-	// TODO: Actually execute frame actions when frame infrastructure is ready
-
-	int frame_num = -1;
-	const char* frame_id = NULL;
-
-	// Try to interpret as frame number or string
-	if (frame_var.type == ACTION_STACK_VALUE_F32) {
-		frame_num = (int) frame_var.data.numeric_value;
-		printf("// Call frame %d\n", frame_num);
-	} else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
-		frame_id = (const char*) frame_var.data.numeric_value;
-		// Try to parse as number
-		char* endptr;
-		long num = strtol(frame_id, &endptr, 10);
-		if (*endptr == '\0') {
-			// It's a numeric string
-			frame_num = (int) num;
-			printf("// Call frame %d\n", frame_num);
-		} else {
-			// It's a frame label
-			printf("// Call frame label: %s\n", frame_id);
-		}
+	// Allocate and store function in registry
+	if (function_count >= MAX_FUNCTIONS) {
+		printf("ERROR: Function registry full (max %d functions)\n", MAX_FUNCTIONS);
+		return;
 	}
 
-	// In a full implementation, this would:
+	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
+	if (!as_func) {
+		printf("ERROR: Failed to allocate memory for function\n");
+		return;
+	}
+
+	strncpy(as_func->name, name, 255);
+	as_func->name[255] = '\0';
+	as_func->func = func;
+	as_func->param_count = param_count;
+
+	function_registry[function_count++] = as_func;
+
+	// If named, store in variable
+	if (strlen(name) > 0) {
+		ActionVar func_var;
+		func_var.type = ACTION_STACK_VALUE_FUNCTION;
+		func_var.data.numeric_value = (u64) as_func;
+		setVariableByName(name, &func_var);
+	} else {
+		// Anonymous function: push to stack
+		PUSH(ACTION_STACK_VALUE_FUNCTION, VAL(u64, as_func));
+	}
+
+	printf("// Defined function: %s (params: %u)\n",
+		   strlen(name) > 0 ? name : "(anonymous)", param_count);
+}
+
+// Lookup function by name
+static ASFunction* lookupFunction(const char* name)
+{
+	for (u32 i = 0; i < function_count; i++) {
+		if (strcmp(function_registry[i]->name, name) == 0) {
+			return function_registry[i];
+		}
+	}
+	return NULL;
+}
+
+void actionCall(char* stack, u32* sp)
+{
+	// Pop function name or frame identifier
+	ActionVar func_var;
+	popVar(stack, sp, &func_var);
+
+	// Check if it's a function call
+	if (func_var.type == ACTION_STACK_VALUE_STRING) {
+		const char* func_name = (const char*) func_var.data.numeric_value;
+
+		// Try to find user-defined function
+		ASFunction* func = lookupFunction(func_name);
+		if (func != NULL) {
+			// Call the user-defined function
+			printf("// Calling function: %s\n", func_name);
+			func->func(stack, sp);
+			return;
+		}
+
+		// Fall through to frame call
+		printf("// Call frame label: %s\n", func_name);
+	} else if (func_var.type == ACTION_STACK_VALUE_FUNCTION) {
+		// Direct function object call
+		ASFunction* func = (ASFunction*) func_var.data.numeric_value;
+		if (func != NULL) {
+			printf("// Calling function: %s\n", func->name);
+			func->func(stack, sp);
+			return;
+		}
+	} else if (func_var.type == ACTION_STACK_VALUE_F32) {
+		// Frame number call
+		int frame_num = (int) func_var.data.numeric_value;
+		printf("// Call frame %d\n", frame_num);
+	}
+
+	// In a full implementation for frame calls, this would:
 	// 1. Look up the frame by number or label
 	// 2. Execute the frame's actions
 	// 3. Return to the current frame when done
