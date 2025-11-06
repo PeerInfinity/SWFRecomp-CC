@@ -6,6 +6,7 @@
 
 #include <recomp.h>
 #include <utils.h>
+#include <actionmodern/object.h>
 
 u32 start_time;
 
@@ -139,6 +140,8 @@ void pushVar(char* stack, u32* sp, ActionVar* var)
 	{
 		case ACTION_STACK_VALUE_F32:
 		case ACTION_STACK_VALUE_F64:
+		case ACTION_STACK_VALUE_UNDEFINED:
+		case ACTION_STACK_VALUE_OBJECT:
 		{
 			PUSH(var->type, var->data.numeric_value);
 
@@ -1138,7 +1141,7 @@ void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
 void actionTrace(char* stack, u32* sp)
 {
 	ActionStackValueType type = STACK_TOP_TYPE;
-	
+
 	switch (type)
 	{
 		case ACTION_STACK_VALUE_STRING:
@@ -1146,34 +1149,40 @@ void actionTrace(char* stack, u32* sp)
 			printf("%s\n", (char*) STACK_TOP_VALUE);
 			break;
 		}
-		
+
 		case ACTION_STACK_VALUE_STR_LIST:
 		{
 			u64* str_list = (u64*) &STACK_TOP_VALUE;
-			
+
 			for (u64 i = 0; i < str_list[0]; ++i)
 			{
 				printf("%s", (char*) str_list[i + 1]);
 			}
-			
+
 			printf("\n");
-			
+
 			break;
 		}
-		
+
 		case ACTION_STACK_VALUE_F32:
 		{
 			printf("%.15g\n", VAL(float, &STACK_TOP_VALUE));
 			break;
 		}
-		
+
 		case ACTION_STACK_VALUE_F64:
 		{
 			printf("%.15g\n", VAL(double, &STACK_TOP_VALUE));
 			break;
 		}
+
+		case ACTION_STACK_VALUE_UNDEFINED:
+		{
+			printf("undefined\n");
+			break;
+		}
 	}
-	
+
 	fflush(stdout);
 
 	POP();
@@ -1773,4 +1782,76 @@ void actionStringLess(char* stack, u32* sp)
 
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
+// Helper function to push undefined value
+static void pushUndefined(char* stack, u32* sp)
+{
+	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+}
+
+void actionGetMember(char* stack, u32* sp)
+{
+	// 1. Convert and pop property name (top of stack)
+	char str_buffer[17];
+	convertString(stack, sp, str_buffer);
+	const char* prop_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	u32 prop_name_len = STACK_TOP_N;
+	POP();
+
+	// 2. Pop object (second on stack)
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// 3. Handle different object types
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		// Handle AS object
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+
+		if (obj == NULL)
+		{
+			pushUndefined(stack, sp);
+			return;
+		}
+
+		// Look up property
+		ActionVar* prop = getProperty(obj, prop_name, prop_name_len);
+
+		if (prop != NULL)
+		{
+			// Property found - push its value
+			pushVar(stack, sp, prop);
+		}
+		else
+		{
+			// Property not found - push undefined
+			pushUndefined(stack, sp);
+		}
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		// Handle string properties
+		if (strcmp(prop_name, "length") == 0)
+		{
+			// Get string pointer
+			const char* str = obj_var.data.string_data.owns_memory ?
+				obj_var.data.string_data.heap_ptr :
+				(const char*) obj_var.data.numeric_value;
+
+			// Push length as float
+			float len = (float) strlen(str);
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
+		}
+		else
+		{
+			// Other properties don't exist on strings
+			pushUndefined(stack, sp);
+		}
+	}
+	else
+	{
+		// Other primitive types (number, undefined, etc.) - push undefined
+		pushUndefined(stack, sp);
+	}
 }
