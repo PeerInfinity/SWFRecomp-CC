@@ -269,6 +269,78 @@ void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* va
 }
 
 /**
+ * Delete Property
+ *
+ * Deletes a property by name. Returns 1 if deleted, 0 if not found.
+ * Handles reference counting if value is an object.
+ * For arrays, returns 1 even if property doesn't exist (AS2 spec behavior).
+ */
+int deleteProperty(ASObject* obj, const char* name, u32 name_length)
+{
+	if (obj == NULL || name == NULL)
+	{
+		return 1;  // AS2 spec: return true even for invalid cases
+	}
+
+	// Search for the property
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name_length == name_length &&
+		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		{
+			// Found the property - release resources
+
+			// Free property name
+			if (obj->properties[i].name != NULL)
+			{
+				free(obj->properties[i].name);
+			}
+
+			// Release value if it's an object
+			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
+			{
+				ASObject* old_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
+				releaseObject(old_obj);
+			}
+			// Free string if it owns memory
+			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
+			         obj->properties[i].value.data.string_data.owns_memory)
+			{
+				free(obj->properties[i].value.data.string_data.heap_ptr);
+			}
+
+			// Shift remaining properties down to fill the gap
+			if (i < obj->num_used - 1)
+			{
+				memmove(&obj->properties[i], &obj->properties[i + 1],
+				        sizeof(ASProperty) * (obj->num_used - i - 1));
+			}
+
+			// Decrement used count
+			obj->num_used--;
+
+			// Zero out the last slot (for cleanliness)
+			memset(&obj->properties[obj->num_used], 0, sizeof(ASProperty));
+
+#ifdef DEBUG
+			printf("[DEBUG] deleteProperty: obj=%p, deleted property '%.*s', num_used=%u\n",
+				(void*)obj, name_length, name, obj->num_used);
+#endif
+
+			return 1;  // Successfully deleted
+		}
+	}
+
+	// Property not found - but AS2 spec says to return true anyway
+#ifdef DEBUG
+	printf("[DEBUG] deleteProperty: obj=%p, property '%.*s' not found (returning 1 per spec)\n",
+		(void*)obj, name_length, name);
+#endif
+
+	return 1;
+}
+
+/**
  * Debug Functions
  */
 

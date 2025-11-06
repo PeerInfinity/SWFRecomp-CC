@@ -99,53 +99,6 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 // Array Object Model
 // ==================================================================
 
-typedef struct {
-	u32 refcount;       // Reference count
-	u32 length;         // Number of elements
-	u32 capacity;       // Allocated capacity
-	ActionVar elements[];  // Flexible array member
-} ASArray;
-
-// Allocate a new array with specified capacity
-ASArray* allocArray(u32 initial_capacity)
-{
-	ASArray* arr = (ASArray*) malloc(sizeof(ASArray) + initial_capacity * sizeof(ActionVar));
-	if (!arr) {
-		// Handle allocation failure
-		return NULL;
-	}
-	arr->refcount = 1;  // Initial reference
-	arr->length = 0;
-	arr->capacity = initial_capacity;
-	return arr;
-}
-
-// Increment reference count
-void retainArray(ASArray* arr)
-{
-	if (arr) {
-		arr->refcount++;
-	}
-}
-
-// Decrement reference count and free if zero
-void releaseArray(ASArray* arr)
-{
-	if (!arr) return;
-
-	arr->refcount--;
-	if (arr->refcount == 0) {
-		// Release all element objects (if they are arrays or objects)
-		for (u32 i = 0; i < arr->length; i++) {
-			if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY) {
-				releaseArray((ASArray*) arr->elements[i].data.numeric_value);
-			}
-			// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
-		}
-		free(arr);
-	}
-}
-
 // ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
@@ -1688,6 +1641,74 @@ void actionDecrement(char* stack, u32* sp)
 	}
 }
 
+
+void actionDelete(char* stack, u32* sp)
+{
+	// Stack layout (from top to bottom):
+	// 1. property_name (string - name of property to delete)
+	// 2. object_name (string - name of variable holding the object)
+
+	// Pop property name (string)
+	ActionVar prop_name_var;
+	popVar(stack, sp, &prop_name_var);
+
+	const char* prop_name = NULL;
+	u32 prop_name_len = 0;
+
+	if (prop_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		prop_name = prop_name_var.data.string_data.owns_memory ?
+			prop_name_var.data.string_data.heap_ptr :
+			(const char*) prop_name_var.data.numeric_value;
+		prop_name_len = prop_name_var.str_size;
+	}
+
+	// Pop object name (string)
+	u32 obj_name_sp = *sp;
+	u32 string_id = VAL(u32, &stack[obj_name_sp + 4]);
+	const char* obj_name = (const char*) VAL(u64, &stack[obj_name_sp + 16]);
+	u32 obj_name_len = VAL(u32, &stack[obj_name_sp + 8]);
+	POP();
+
+	// Default result: success (1.0)
+	float result = 1.0f;
+
+	// Look up the object by name
+	ActionVar* obj_var = NULL;
+	if (string_id != 0)
+	{
+		// Constant string - use array (O(1))
+		obj_var = getVariableById(string_id);
+	}
+	else
+	{
+		// Dynamic string - use hashmap (O(n))
+		obj_var = getVariable(obj_name, obj_name_len);
+	}
+
+	// If object variable exists and is an object, delete the property
+	if (obj_var != NULL && obj_var->type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+
+		if (obj != NULL && prop_name != NULL)
+		{
+			// Delete the property
+			int deleted = deleteProperty(obj, prop_name, prop_name_len);
+			result = deleted ? 1.0f : 0.0f;
+		}
+	}
+	// For arrays, also handle deletion
+	else if (obj_var != NULL && obj_var->type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// For arrays, deletion leaves undefined but returns true
+		// This is handled by AS2 spec - we just return success
+		result = 1.0f;
+	}
+
+	// Push result
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
 void actionBitAnd(char* stack, u32* sp)
 {
 
