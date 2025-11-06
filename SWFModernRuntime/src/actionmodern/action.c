@@ -949,6 +949,30 @@ void actionGetTime(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &delta_ms_f32));
 }
 
+void actionDuplicate(char* stack, u32* sp)
+{
+	// Get the type of the top stack entry
+	u8 type = STACK_TOP_TYPE;
+
+	// Handle different types appropriately
+	if (type == ACTION_STACK_VALUE_STRING)
+	{
+		// For strings, we need to copy both the pointer and the length
+		const char* str = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		u32 len = STACK_TOP_N;  // Length is stored at offset +8
+		u32 id = VAL(u32, &stack[*sp + 12]);  // String ID is at offset +12
+
+		// Push a copy of the string (shallow copy - same pointer)
+		PUSH_STR_ID(str, len, id);
+	}
+	else
+	{
+		// For other types (numeric, etc.), just copy the value
+		u64 value = STACK_TOP_VALUE;
+		PUSH(type, value);
+	}
+}
+
 void actionIncrement(char* stack, u32* sp)
 {
 	convertFloat(stack, sp);
