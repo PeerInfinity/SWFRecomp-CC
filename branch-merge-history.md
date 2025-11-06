@@ -170,10 +170,21 @@ This document tracks all branches created by Claude Code web interface and their
 
 **Reason for Rejection:** Conflicts with the decision to flatten submodules into the main repository for easier Claude Code web interface access.
 
+### 57. `claude/setup-and-run-tests-011CUqyF6uVdoqSrnYKWezXa`
+**Status:** ✅ Merged
+**Commits:** 1 commit
+**Description:** Fixed opcode confusion in duplicate and stack_swap test files
+
+**Key Changes:**
+- Fixed: `duplicate_swf_4/create_test_swf.py` - Changed from 0x3D (CALL_FUNCTION) to 0x4C (DUPLICATE)
+- Fixed: `stack_swap_swf_4/create_test_swf.py` - Changed from 0x4C (DUPLICATE) to 0x4D (STACK_SWAP)
+- Test suite results: 28/28 tests now passing (100%)
+- Critical bug fix for test validation
+
 ## Summary
 
-**Total Branches Reviewed:** 56
-**Merged:** 55
+**Total Branches Reviewed:** 57
+**Merged:** 56
 **Rejected:** 1
 
 **Validation Phase Complete:** ✅ GREEN LIGHT
