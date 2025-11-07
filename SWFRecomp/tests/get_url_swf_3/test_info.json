@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "get_url_swf_3",
+    "description": "Tests ActionGetURL opcode (0x83) - Load URLs into browser frames or Flash levels",
+    "swf_version": 3
+  },
+  "opcodes": {
+    "tested": ["GET_URL"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

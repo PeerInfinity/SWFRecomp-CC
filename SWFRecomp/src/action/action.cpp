@@ -617,6 +617,27 @@ namespace SWFRecomp
 					break;
 				}
 
+			case SWF_ACTION_GET_URL:
+			{
+				// Read UrlString (null-terminated)
+				char* url_string = action_buffer;
+				size_t url_len = strlen(url_string);
+				action_buffer += url_len + 1;
+
+				// Read TargetString (null-terminated)
+				char* target_string = action_buffer;
+				size_t target_len = strlen(target_string);
+				action_buffer += target_len + 1;
+
+				out_script << "\t" << "// GetURL: \"" << url_string
+						   << "\" -> \"" << target_string << "\"" << endl
+						   << "\t" << "actionGetURL(stack, sp, "
+						   << "\"" << url_string << "\", "
+						   << "\"" << target_string << "\");" << endl;
+
+				break;
+			}
+
 				case SWF_ACTION_STORE_REGISTER:
 				{
 					// Read register number from bytecode

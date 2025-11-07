@@ -1322,6 +1322,20 @@ void actionEndDrag(char* stack, u32* sp)
 	(void)sp;     // Suppress unused parameter warning
 }
 
+void actionGetURL(char* stack, u32* sp, const char* url, const char* target)
+{
+	// Simplified implementation: just log the URL request
+	printf("// GetURL: %s -> %s\n",
+		   url ? url : "(null)",
+		   target ? target : "(null)");
+
+	// TODO: Implement actual URL loading
+	// This requires:
+	// - Browser integration or HTTP client
+	// - SWF loader (for _level targets)
+	// - Frame/window management
+}
+
 void actionGetVariable(char* stack, u32* sp)
 {
 
