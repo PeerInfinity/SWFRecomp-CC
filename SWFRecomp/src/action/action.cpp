@@ -116,7 +116,15 @@ namespace SWFRecomp
 
 					break;
 				}
-				
+
+				case SWF_ACTION_STOP_SOUNDS:
+				{
+					out_script << "\t" << "// Stop Sounds" << endl
+							   << "\t" << "actionStopSounds(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_ADD:
 				{
 					out_script << "\t" << "// Add" << endl
