@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "wait_for_frame2_swf_4",
+    "description": "Tests WAIT_FOR_FRAME2 opcode (0x8D) - stack-based frame loading check",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["WAIT_FOR_FRAME2"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

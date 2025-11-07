@@ -2623,6 +2623,34 @@ void actionWithEnd(char* stack, u32* sp)
 	}
 }
 
+bool actionWaitForFrame2(char* stack, u32* sp)
+{
+	// Pop frame identifier from stack
+	ActionVar frame_var;
+	popVar(stack, sp, &frame_var);
+
+	// For simplified implementation: assume all frames are loaded
+	// In a full implementation, this would check if the frame is actually loaded
+	// by examining the MovieClip's frames_loaded count
+
+	// Debug output to show what frame was checked
+#ifdef DEBUG
+	if (frame_var.type == ACTION_STACK_VALUE_F32)
+	{
+		printf("[DEBUG] WaitForFrame2: checking frame %d (assuming loaded)\n", (int)frame_var.value.f32);
+	}
+	else if (frame_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		const char* frame_str = (const char*)frame_var.value.u64;
+		printf("[DEBUG] WaitForFrame2: checking frame '%s' (assuming loaded)\n", frame_str);
+	}
+#endif
+
+	// Simplified: always return true (frame loaded)
+	// This is appropriate for non-streaming SWF files where all content loads instantly
+	return true;
+}
+
 void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(char*, u32*), u32 param_count)
 {
 	// Create function object

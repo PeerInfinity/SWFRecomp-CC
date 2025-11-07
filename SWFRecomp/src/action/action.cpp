@@ -50,6 +50,33 @@ namespace SWFRecomp
 					labels.push_back(action_buffer + length + ((s64) offset));
 					break;
 				}
+
+				case SWF_ACTION_WAIT_FOR_FRAME2:
+				{
+					// Calculate skip target by parsing ahead skip_count actions
+					u8 skip_count = (u8) action_buffer[0];
+
+					// Parse ahead to find where we'd land after skipping
+					char* skip_ptr = action_buffer + length;
+					for (u8 i = 0; i < skip_count && skip_ptr < action_buffer_start + 65536; i++)
+					{
+						SWFActionType skip_code = (SWFActionType) (u8) skip_ptr[0];
+						skip_ptr += 1;
+
+						u16 skip_length = 0;
+						if ((skip_code & 0b10000000) != 0)
+						{
+							skip_length = VAL(u16, skip_ptr);
+							skip_ptr += 2;
+						}
+
+						skip_ptr += skip_length;
+					}
+
+					// Mark the skip target as a label
+					labels.push_back(skip_ptr);
+					break;
+				}
 			}
 			
 			action_buffer += length;
@@ -577,6 +604,38 @@ namespace SWFRecomp
 				{
 					action_buffer += length;
 
+					break;
+				}
+
+				case SWF_ACTION_WAIT_FOR_FRAME2:
+				{
+					// Read skip count parameter
+					u8 skip_count = (u8) action_buffer[0];
+
+					// Calculate skip target by parsing ahead skip_count actions
+					char* skip_ptr = action_buffer + length;
+					for (u8 i = 0; i < skip_count && skip_ptr < action_buffer_start + 65536; i++)
+					{
+						SWFActionType skip_code = (SWFActionType) (u8) skip_ptr[0];
+						skip_ptr += 1;
+
+						u16 skip_length = 0;
+						if ((skip_code & 0b10000000) != 0)
+						{
+							skip_length = VAL(u16, skip_ptr);
+							skip_ptr += 2;
+						}
+
+						skip_ptr += skip_length;
+					}
+
+					out_script << "\t" << "// WaitForFrame2: skip=" << (int)skip_count << endl
+							   << "\t" << "if (!actionWaitForFrame2(stack, sp)) {" << endl
+							   << "\t\t" << "// Frame not loaded, skip next " << (int)skip_count << " action(s)" << endl
+							   << "\t\t" << "goto label_" << to_string((s16) (skip_ptr - action_buffer_start)) << ";" << endl
+							   << "\t" << "}" << endl;
+
+					action_buffer += length;
 					break;
 				}
 
