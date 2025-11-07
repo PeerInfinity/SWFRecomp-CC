@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "prev_frame_swf_4",
+    "description": "Tests PREV_FRAME opcode (0x05) - moves playhead to previous frame",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["PREV_FRAME"],
+    "supporting": ["PUSH", "TRACE", "GET_VARIABLE", "SET_VARIABLE", "ADD", "LESS", "IF", "STOP"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

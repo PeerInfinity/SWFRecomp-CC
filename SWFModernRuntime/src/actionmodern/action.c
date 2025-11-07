@@ -6,6 +6,7 @@
 
 #include <recomp.h>
 #include <utils.h>
+#include <swf.h>
 #include <actionmodern/object.h>
 
 u32 start_time;
@@ -279,8 +280,19 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 void popVar(char* stack, u32* sp, ActionVar* var)
 {
 	peekVar(stack, sp, var);
-	
+
 	POP();
+}
+
+void actionPrevFrame(char* stack, u32* sp)
+{
+	// Move to previous frame if not already at first frame
+	if (current_frame > 0)
+	{
+		next_frame = current_frame - 1;
+		manual_next_frame = 1;
+	}
+	// If already at frame 0, do nothing (stay on current frame)
 }
 
 void actionAdd(char* stack, u32* sp)
