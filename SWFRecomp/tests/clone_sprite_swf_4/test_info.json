@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "clone_sprite_swf_4",
+    "description": "Tests CLONE_SPRITE opcode (duplicateMovieClip operation)",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["CLONE_SPRITE"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
