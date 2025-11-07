@@ -1,11 +1,11 @@
-# TYPEOF Opcode Test (0x3C)
+# TYPEOF Opcode Test (0x44)
 
-This test validates the implementation of the TYPEOF opcode (0x3C) in SWF version 5+.
+This test validates the implementation of the TYPEOF opcode (0x44) in SWF version 5+.
 
 ## Opcode Specification
 
-- **Opcode**: 0x3C
-- **Name**: TYPEOF
+- **Opcode**: 0x44
+- **Name**: ActionTypeOf
 - **Operation**: Pop value from stack, determine its type, push type name as string
 - **SWF Version**: 5+
 
@@ -52,7 +52,9 @@ The `actionTypeof` function:
 3. Determines the type string based on the stack value type:
    - `ACTION_STACK_VALUE_F32` or `ACTION_STACK_VALUE_F64` → "number"
    - `ACTION_STACK_VALUE_STRING` or `ACTION_STACK_VALUE_STR_LIST` → "string"
-   - `ACTION_STACK_VALUE_OBJECT` → "object"
+   - `ACTION_STACK_VALUE_FUNCTION` → "function"
+   - `ACTION_STACK_VALUE_OBJECT` or `ACTION_STACK_VALUE_ARRAY` → "object"
+   - `ACTION_STACK_VALUE_UNDEFINED` → "undefined"
    - Default → "undefined"
 4. Copies the type string to the string buffer
 5. Pushes the result string onto the stack
@@ -63,7 +65,9 @@ The `actionTypeof` function:
 |------------------|---------------|
 | F32 / F64        | "number"      |
 | STRING / STR_LIST| "string"      |
-| OBJECT           | "object"      |
+| FUNCTION         | "function"    |
+| OBJECT / ARRAY   | "object"      |
+| UNDEFINED        | "undefined"   |
 | Unknown          | "undefined"   |
 
 ## Building and Running
@@ -78,7 +82,7 @@ The `actionTypeof` function:
 
 ## Files Modified
 
-- `SWFRecomp/include/action/action.hpp` - Added `SWF_ACTION_TYPEOF = 0x3C` enum
+- `SWFRecomp/include/action/action.hpp` - Added `SWF_ACTION_TYPEOF = 0x44` enum
 - `SWFRecomp/src/action/action.cpp` - Added translation case for TYPEOF
 - `SWFModernRuntime/include/actionmodern/action.h` - Added `actionTypeof` declaration
 - `SWFModernRuntime/src/actionmodern/action.c` - Implemented `actionTypeof` function
@@ -86,6 +90,7 @@ The `actionTypeof` function:
 ## Notes
 
 - The typeof operator in ActionScript 2.0 is similar to JavaScript's typeof operator
-- Unlike JavaScript, ActionScript 2.0's `typeof null` returns "null" (not "object")
-- The implementation currently supports the basic types available in the stack value type system
-- Future extensions may include support for additional types like "function", "movieclip", "boolean", "null" when those stack types are implemented
+- Like JavaScript, ActionScript 2.0's `typeof null` returns "object" (JavaScript quirk)
+- The implementation supports number, string, function, object, array, and undefined types
+- Arrays return "object" (as in JavaScript, arrays are objects)
+- Future extensions may include support for additional types like "boolean", "movieclip", and explicit "null" when those stack types are implemented
