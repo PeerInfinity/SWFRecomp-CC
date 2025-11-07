@@ -266,6 +266,14 @@ namespace SWFRecomp
 					out_script << "\t" << "// Trace" << endl
 							   << "\t" << "actionTrace(stack, sp);" << endl;
 
+				break;
+				}
+
+				case SWF_ACTION_START_DRAG:
+				{
+					out_script << "\t" << "// StartDrag" << endl
+							   << "\t" << "actionStartDrag(stack, sp);" << endl;
+
 					break;
 				}
 
