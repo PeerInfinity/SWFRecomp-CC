@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "toggle_quality_swf_4",
+    "description": "Tests TOGGLE_QUALITY opcode (0x08) - toggles display quality",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["TOGGLE_QUALITY"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

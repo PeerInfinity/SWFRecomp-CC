@@ -73,6 +73,7 @@ void popVar(char* stack, u32* sp, ActionVar* var);
 void setVariableByName(const char* var_name, ActionVar* value);
 
 void actionPrevFrame(char* stack, u32* sp);
+void actionToggleQuality(char* stack, u32* sp);
 
 void actionAdd(char* stack, u32* sp);
 void actionAdd2(char* stack, u32* sp, char* str_buffer);

@@ -117,6 +117,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_TOGGLE_QUALITY:
+				{
+					out_script << "\t" << "// Toggle Quality" << endl
+							   << "\t" << "actionToggleQuality(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_STOP_SOUNDS:
 				{
 					out_script << "\t" << "// Stop Sounds" << endl

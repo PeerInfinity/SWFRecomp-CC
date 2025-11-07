@@ -72,6 +72,21 @@ void initTime()
 }
 
 // ==================================================================
+// Display Control Operations
+// ==================================================================
+
+void actionToggleQuality(char* stack, u32* sp)
+{
+	// In NO_GRAPHICS mode, this is a no-op
+	// In full graphics mode, this would toggle between high and low quality rendering
+	// affecting anti-aliasing, smoothing, etc.
+
+	#ifdef DEBUG
+	printf("[ActionToggleQuality] Toggled render quality\n");
+	#endif
+}
+
+// ==================================================================
 // avmplus-compatible Random Number Generator
 // Based on Adobe's ActionScript VM (avmplus) implementation
 // Source: https://github.com/adobe/avmplus/blob/master/core/MathUtils.cpp
