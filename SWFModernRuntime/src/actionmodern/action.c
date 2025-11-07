@@ -2158,6 +2158,94 @@ void actionStringGreater(char* stack, u32* sp)
 }
 
 // ==================================================================
+// Inheritance (EXTENDS opcode)
+// ==================================================================
+
+void actionExtends(char* stack, u32* sp)
+{
+	// Pop superclass constructor from stack
+	ActionVar superclass;
+	popVar(stack, sp, &superclass);
+
+	// Pop subclass constructor from stack
+	ActionVar subclass;
+	popVar(stack, sp, &subclass);
+
+	// Verify both are objects/functions
+	if (superclass.type != ACTION_STACK_VALUE_OBJECT &&
+	    superclass.type != ACTION_STACK_VALUE_FUNCTION)
+	{
+#ifdef DEBUG
+		printf("[DEBUG] actionExtends: superclass is not an object/function (type=%d)\n",
+		       superclass.type);
+#endif
+		return;
+	}
+
+	if (subclass.type != ACTION_STACK_VALUE_OBJECT &&
+	    subclass.type != ACTION_STACK_VALUE_FUNCTION)
+	{
+#ifdef DEBUG
+		printf("[DEBUG] actionExtends: subclass is not an object/function (type=%d)\n",
+		       subclass.type);
+#endif
+		return;
+	}
+
+	// Get constructor objects
+	ASObject* super_func = (ASObject*) superclass.data.numeric_value;
+	ASObject* sub_func = (ASObject*) subclass.data.numeric_value;
+
+	if (super_func == NULL || sub_func == NULL)
+	{
+#ifdef DEBUG
+		printf("[DEBUG] actionExtends: NULL constructor object\n");
+#endif
+		return;
+	}
+
+	// Create new prototype object
+	ASObject* new_proto = allocObject(0);
+	if (new_proto == NULL)
+	{
+#ifdef DEBUG
+		printf("[DEBUG] actionExtends: Failed to allocate new prototype\n");
+#endif
+		return;
+	}
+
+	// Get superclass prototype property
+	ActionVar* super_proto_var = getProperty(super_func, "prototype", 9);
+
+	// Set __proto__ of new prototype to superclass prototype
+	if (super_proto_var != NULL)
+	{
+		setProperty(new_proto, "__proto__", 9, super_proto_var);
+	}
+
+	// Set constructor property to superclass
+	setProperty(new_proto, "constructor", 11, &superclass);
+
+	// Set subclass prototype to new object
+	ActionVar new_proto_var;
+	new_proto_var.type = ACTION_STACK_VALUE_OBJECT;
+	new_proto_var.data.numeric_value = (u64) new_proto;
+	new_proto_var.str_size = 0;
+
+	setProperty(sub_func, "prototype", 9, &new_proto_var);
+
+	// Release our reference to new_proto
+	// (setProperty retained it when setting as prototype)
+	releaseObject(new_proto);
+
+#ifdef DEBUG
+	printf("[DEBUG] actionExtends: Prototype chain established\n");
+#endif
+
+	// Note: No values pushed back on stack
+}
+
+// ==================================================================
 // Register Storage (up to 256 registers for SWF 5+)
 // ==================================================================
 
