@@ -2451,6 +2451,64 @@ void actionCall(char* stack, u32* sp)
 	// 3. Return to the current frame when done
 }
 
+void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag)
+{
+	// Pop target from stack
+	char target_str[17];
+	ActionVar target_var;
+	convertString(stack, sp, target_str);
+	popVar(stack, sp, &target_var);
+	const char* target = (target_var.type == ACTION_STACK_VALUE_STRING) ?
+						 (const char*)target_var.data.numeric_value : "";
+
+	// Pop URL from stack
+	char url_str[17];
+	ActionVar url_var;
+	convertString(stack, sp, url_str);
+	popVar(stack, sp, &url_var);
+	const char* url = (url_var.type == ACTION_STACK_VALUE_STRING) ?
+					  (const char*)url_var.data.numeric_value : "";
+
+	// Determine HTTP method
+	const char* method = "NONE";
+	if (send_vars_method == 1) method = "GET";
+	else if (send_vars_method == 2) method = "POST";
+
+	// Determine operation type
+	bool is_sprite = (load_target_flag == 1);
+	bool load_vars = (load_variables_flag == 1);
+
+	// Log the operation (simplified implementation)
+	if (is_sprite) {
+		// Load into sprite/movieclip
+		if (load_vars) {
+			// Load variables into sprite
+			printf("// LoadVariables: %s -> %s (method: %s)\n", url, target, method);
+		} else {
+			// Load SWF into sprite
+			printf("// LoadMovie: %s -> %s\n", url, target);
+		}
+	} else {
+		// Load into browser window
+		if (load_vars) {
+			// Load variables into timeline
+			printf("// LoadVariables: %s (method: %s)\n", url, method);
+		} else {
+			// Open URL in browser
+			printf("// OpenURL: %s (target: %s", url, target);
+			if (send_vars_method != 0) {
+				printf(", method: %s", method);
+			}
+			printf(")\n");
+		}
+	}
+
+	// TODO: Implement actual URL loading functionality
+	// - For browser windows: platform-specific browser launch
+	// - For variables: HTTP request + parse response
+	// - For movies: download and load SWF file
+}
+
 void actionInitArray(char* stack, u32* sp)
 {
 	// 1. Pop array element count

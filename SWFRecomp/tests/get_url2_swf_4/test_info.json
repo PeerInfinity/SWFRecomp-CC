@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "get_url2_swf_4",
+    "description": "Tests GET_URL2 opcode (0x9A) - Stack-based URL loading with HTTP method support",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["GET_URL2"],
+    "supporting": ["PUSH", "TRACE", "STRING_ADD"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

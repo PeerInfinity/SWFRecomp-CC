@@ -932,6 +932,32 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_GET_URL2:
+				{
+					// Read flags byte
+					u8 flags = VAL(u8, action_buffer);
+
+					u8 send_vars_method = (flags & 0xC0) >> 6;  // Top 2 bits (6-7)
+					u8 load_target_flag = (flags & 0x02) >> 1;   // Bit 1
+					u8 load_variables_flag = (flags & 0x01);     // Bit 0
+
+					const char* method_str = "NONE";
+					if (send_vars_method == 1) method_str = "GET";
+					else if (send_vars_method == 2) method_str = "POST";
+
+					out_script << "\t" << "// GetURL2: method=" << method_str
+							   << ", loadTarget=" << (int)load_target_flag
+							   << ", loadVars=" << (int)load_variables_flag << endl
+							   << "\t" << "actionGetURL2(stack, sp, "
+							   << (int)send_vars_method << ", "
+							   << (int)load_target_flag << ", "
+							   << (int)load_variables_flag << ");" << endl;
+
+					action_buffer += length;
+
+					break;
+				}
+
 			case SWF_ACTION_DEFINE_FUNCTION:
 			{
 				// Parse function metadata
