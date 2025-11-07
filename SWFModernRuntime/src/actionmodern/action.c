@@ -3099,6 +3099,30 @@ void actionRemoveSprite(char* stack, u32* sp)
 	#endif
 }
 
+void actionSetTarget(char* stack, u32* sp, const char* target_name)
+{
+	// Simplified implementation: just log the target change
+	// TODO: Actually change execution context when MovieClip infrastructure is complete
+
+	if (!target_name || strlen(target_name) == 0) {
+		printf("// SetTarget: (main)\n");
+	} else {
+		printf("// SetTarget: %s\n", target_name);
+	}
+
+	// Future implementation will need:
+	// - Global variable to track current context (g_current_context)
+	// - setCurrentContext(MovieClip* mc) function
+	// - getCurrentContext() function
+	// - resolveTargetPath(const char* path) function
+	//
+	// For empty string, return to main timeline:
+	//   setCurrentContext(getRootMovieClip());
+	// For non-empty string, resolve target path:
+	//   MovieClip* target_mc = resolveTargetPath(target_name);
+	//   if (target_mc) setCurrentContext(target_mc);
+}
+
 // ==================================================================
 // WITH Statement Implementation
 // ==================================================================

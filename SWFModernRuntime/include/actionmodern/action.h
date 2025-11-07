@@ -114,6 +114,7 @@ void actionGetProperty(char* stack, u32* sp);
 void actionSetProperty(char* stack, u32* sp);
 void actionCloneSprite(char* stack, u32* sp);
 void actionRemoveSprite(char* stack, u32* sp);
+void actionSetTarget(char* stack, u32* sp, const char* target_name);
 
 void actionNextFrame();
 void actionPlay();

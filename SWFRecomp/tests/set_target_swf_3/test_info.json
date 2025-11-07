@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "set_target_swf_3",
+    "description": "Tests ActionSetTarget opcode (0x8B) - Changes execution context to a named movie clip",
+    "swf_version": 3
+  },
+  "opcodes": {
+    "tested": ["SET_TARGET"],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
