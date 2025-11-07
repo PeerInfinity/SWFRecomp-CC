@@ -1410,6 +1410,32 @@ void actionSetVariable(char* stack, u32* sp)
 	POP_2();
 }
 
+void actionSetTarget2(char* stack, u32* sp)
+{
+	// Convert top of stack to string if needed
+	convertString(stack, sp, NULL);
+
+	// Get target path from stack
+	const char* target_path = (const char*) VAL(u64, &STACK_TOP_VALUE);
+
+	// Pop the target path
+	POP();
+
+	// For simplified implementation: just log the target change
+	// Empty string or NULL means return to main timeline
+	if (target_path == NULL || strlen(target_path) == 0)
+	{
+		printf("// SetTarget2: (main)\n");
+	}
+	else
+	{
+		printf("// SetTarget2: %s\n", target_path);
+	}
+
+	// TODO: Actually change execution context
+	// This requires MovieClip infrastructure
+}
+
 void actionGetProperty(char* stack, u32* sp)
 {
 	// Pop property index

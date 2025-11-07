@@ -253,6 +253,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_SET_TARGET2:
+				{
+					out_script << "\t" << "// SetTarget2" << endl
+							   << "\t" << "actionSetTarget2(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_SET_PROPERTY:
 				{
 					out_script << "\t" << "// SetProperty" << endl

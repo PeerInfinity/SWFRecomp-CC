@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "set_target2_swf_4",
+    "description": "Tests SET_TARGET2 opcode (0x20) - stack-based context switching for movie clips",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["SET_TARGET2"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
