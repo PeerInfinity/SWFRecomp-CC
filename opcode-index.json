@@ -1,9 +1,9 @@
 {
   "metadata": {
     "generated_date": "2025-11-06",
-    "total_opcodes": 102,
-    "implemented_opcodes": 21,
-    "total_entries": 230
+    "total_opcodes": 100,
+    "implemented_opcodes": 19,
+    "total_entries": 228
   },
   "entries": [
     {
@@ -26,7 +26,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-next-frame-0x04.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4310)"
     },
@@ -38,7 +38,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-prev-frame-0x05.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4324)"
     },
@@ -50,7 +50,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-play-0x06.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4338)"
     },
@@ -62,7 +62,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-stop-0x07.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4354)"
     },
@@ -74,7 +74,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STOP)",
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-stop-0x07.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -86,7 +86,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-toggle-quality-0x08.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4368)"
     },
@@ -98,7 +98,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-stop-sounds-0x09.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4379)"
     },
@@ -110,7 +110,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4670)"
     },
@@ -122,7 +122,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_ADD)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -134,7 +134,7 @@
       "function_declaration": "void actionAdd(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 75)"
     },
@@ -146,7 +146,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4693)"
     },
@@ -158,7 +158,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_SUBTRACT)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -170,7 +170,7 @@
       "function_declaration": "void actionSubtract(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 77)"
     },
@@ -182,7 +182,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4714)"
     },
@@ -194,7 +194,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_MULTIPLY)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -206,7 +206,7 @@
       "function_declaration": "void actionMultiply(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 78)"
     },
@@ -218,7 +218,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4737)"
     },
@@ -230,7 +230,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DIVIDE)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -242,7 +242,7 @@
       "function_declaration": "void actionDivide(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 79)"
     },
@@ -254,7 +254,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4761)"
     },
@@ -266,7 +266,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_EQUALS)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -278,7 +278,7 @@
       "function_declaration": "void actionEquals(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 81)"
     },
@@ -290,7 +290,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4786)"
     },
@@ -302,7 +302,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_LESS)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -314,7 +314,7 @@
       "function_declaration": "void actionLess(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 82)"
     },
@@ -326,7 +326,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4808)"
     },
@@ -338,7 +338,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_AND)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -350,7 +350,7 @@
       "function_declaration": "void actionAnd(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 84)"
     },
@@ -362,7 +362,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4829)"
     },
@@ -374,7 +374,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_OR)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -386,7 +386,7 @@
       "function_declaration": "void actionOr(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 85)"
     },
@@ -398,7 +398,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4853)"
     },
@@ -410,7 +410,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_NOT)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -422,7 +422,7 @@
       "function_declaration": "void actionNot(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 86)"
     },
@@ -434,7 +434,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4882)"
     },
@@ -446,7 +446,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_EQUALS)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -458,7 +458,7 @@
       "function_declaration": "void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 95)"
     },
@@ -470,7 +470,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4903)"
     },
@@ -482,7 +482,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_LENGTH)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -494,7 +494,7 @@
       "function_declaration": "void actionStringLength(char* stack, u32* sp, char* v_str);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 96)"
     },
@@ -554,7 +554,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4651)"
     },
@@ -566,7 +566,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_POP)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -614,7 +614,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5218)"
     },
@@ -626,7 +626,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GET_VARIABLE)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -638,7 +638,7 @@
       "function_declaration": "void actionGetVariable(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 103)"
     },
@@ -650,7 +650,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5240)"
     },
@@ -662,7 +662,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_SET_VARIABLE)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -674,7 +674,7 @@
       "function_declaration": "void actionSetVariable(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 104)"
     },
@@ -686,7 +686,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5405)"
     },
@@ -698,7 +698,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4921)"
     },
@@ -710,7 +710,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_ADD)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -722,7 +722,7 @@
       "function_declaration": "void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 99)"
     },
@@ -830,7 +830,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-clone-sprite-0x24.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5561)"
     },
@@ -842,7 +842,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-remove-sprite-0x25.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5583)"
     },
@@ -856,7 +856,7 @@
       "test_directories": [
         "SWFRecomp/tests/trace_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5682)"
     },
@@ -870,7 +870,7 @@
       "test_directories": [
         "SWFRecomp/tests/trace_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -884,7 +884,7 @@
       "test_directories": [
         "SWFRecomp/tests/trace_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 109)"
     },
@@ -896,7 +896,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-start-drag-0x27.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5601)"
     },
@@ -908,7 +908,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-end-drag-0x28.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5641)"
     },
@@ -968,7 +968,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-throw-0x2a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7289)"
     },
@@ -980,7 +980,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-cast-op-0x2b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7141)"
     },
@@ -992,7 +992,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-implements-op-0x2c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7164)"
     },
@@ -1168,7 +1168,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5703)"
     },
@@ -1180,7 +1180,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GET_TIME)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -1192,7 +1192,7 @@
       "function_declaration": "void actionGetTime(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 113)"
     },
@@ -1236,7 +1236,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-ascii-to-char-0x36.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
         "head_commit": "5012878afbe100af027f2bc377a93fccb7d128d8",
@@ -1252,7 +1252,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)",
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-ascii-to-char-0x36.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
         "head_commit": "5012878afbe100af027f2bc377a93fccb7d128d8",
@@ -1268,7 +1268,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5115)"
     },
@@ -1282,7 +1282,7 @@
       "test_directories": [
         "SWFRecomp/tests/delete_swf_5"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6007)"
     },
@@ -1296,7 +1296,7 @@
       "test_directories": [
         "SWFRecomp/tests/delete_swf_5"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 123)"
     },
@@ -1310,7 +1310,7 @@
       "test_directories": [
         "SWFRecomp/tests/delete2_swf_5"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6025)"
     },
@@ -1324,7 +1324,7 @@
       "test_directories": [
         "SWFRecomp/tests/delete2_swf_5"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 124)"
     },
@@ -1476,7 +1476,7 @@
       "test_directories": [
         "SWFRecomp/tests/modulo_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6438)"
     },
@@ -1490,7 +1490,7 @@
       "test_directories": [
         "SWFRecomp/tests/modulo_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -1504,7 +1504,7 @@
       "test_directories": [
         "SWFRecomp/tests/modulo_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 80)"
     },
@@ -1694,7 +1694,7 @@
       "test_directories": [
         "SWFRecomp/tests/typeof_swf_5"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6380)"
     },
@@ -1916,7 +1916,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6068)"
     },
@@ -2060,7 +2060,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6660)"
     },
@@ -2072,7 +2072,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STACK_SWAP)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -2084,7 +2084,7 @@
       "function_declaration": "void actionStackSwap(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 90)"
     },
@@ -2182,7 +2182,7 @@
       "test_directories": [
         "SWFRecomp/tests/increment_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6605)"
     },
@@ -2196,7 +2196,7 @@
       "test_directories": [
         "SWFRecomp/tests/increment_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -2210,7 +2210,7 @@
       "test_directories": [
         "SWFRecomp/tests/increment_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 120)"
     },
@@ -2224,7 +2224,7 @@
       "test_directories": [
         "SWFRecomp/tests/decrement_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6586)"
     },
@@ -2238,7 +2238,7 @@
       "test_directories": [
         "SWFRecomp/tests/decrement_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -2252,7 +2252,7 @@
       "test_directories": [
         "SWFRecomp/tests/decrement_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 121)"
     },
@@ -2264,7 +2264,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5831)"
     },
@@ -2276,7 +2276,7 @@
       "function_declaration": "void actionCallMethod(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 138)"
     },
@@ -2336,7 +2336,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6782)"
     },
@@ -2393,42 +2393,6 @@
         "subject": "Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration"
       },
       "notes": "Runtime function (action.h line 122)"
-    },
-    {
-      "hex": "0X5A",
-      "name": "SWF_ACTION_DELETE",
-      "source": "action.hpp",
-      "type": "enum",
-      "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_DELETE)",
-      "test_directories": [
-        "SWFRecomp/tests/delete_swf_5"
-      ],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete-0x5a.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-delete-0x5a-011CUqutNyCjGYCvA8jEoP4y",
-        "head_commit": "d985ca6b7d54546eccd19ee6068a8d9d2bbf7531",
-        "subject": "Implement DELETE opcode (0x5A) for ActionScript 2"
-      },
-      "notes": "C++ enum value for opcode"
-    },
-    {
-      "hex": "0X5B",
-      "name": "SWF_ACTION_DELETE2",
-      "source": "action.hpp",
-      "type": "enum",
-      "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_DELETE2)",
-      "test_directories": [
-        "SWFRecomp/tests/delete2_swf_5"
-      ],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete2-0x5b.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-delete2-0x5b-011CUquufkHrk6Pt1ggisyZL",
-        "head_commit": "2bb7cfff8754f73d7eb1fd14ba91e99817be3bf4",
-        "subject": "Implement DELETE2 opcode (0x5B) - Object property deletion"
-      },
-      "notes": "C++ enum value for opcode"
     },
     {
       "hex": "0X60",
@@ -2876,7 +2840,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/opcode-extends-0x69.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7120)"
     },
@@ -2888,7 +2852,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4258)"
     },
@@ -2900,7 +2864,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4281)"
     },
@@ -2960,7 +2924,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5868)"
     },
@@ -2972,7 +2936,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_CONSTANT_POOL)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -2984,7 +2948,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4393)"
     },
@@ -2996,7 +2960,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4437)"
     },
@@ -3008,7 +2972,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4449)"
     },
@@ -3020,7 +2984,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe2-0x8d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5655)"
     },
@@ -3068,7 +3032,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7191)"
     },
@@ -3116,7 +3080,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4556)"
     },
@@ -3128,7 +3092,7 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_PUSH)",
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -3142,7 +3106,7 @@
       "test_directories": [
         "SWFRecomp/tests/jump_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5139)"
     },
@@ -3156,7 +3120,7 @@
       "test_directories": [
         "SWFRecomp/tests/jump_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },
@@ -3168,7 +3132,7 @@
       "function_declaration": null,
       "function_implementation": null,
       "test_directories": [],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5262)"
     },
@@ -3214,7 +3178,7 @@
       "test_directories": [
         "SWFRecomp/tests/if_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5163)"
     },
@@ -3228,7 +3192,7 @@
       "test_directories": [
         "SWFRecomp/tests/if_swf_4"
       ],
-      "documentation_prompt": null,
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
     },

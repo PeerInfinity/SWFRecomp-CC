@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "random_example_swf_4",
+    "description": "Tests RANDOM_OPCODE with range validation for non-deterministic outputs",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["RANDOM_OPCODE"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "range_validation"
+  }
+}

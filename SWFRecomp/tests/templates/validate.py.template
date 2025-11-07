@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""
+Validation script for <TEST_NAME>
+
+This script receives test output via stdin and determines pass/fail status.
+It returns JSON with structured results for each sub-test.
+
+Usage:
+    ./test_executable 2>&1 | ./validate.py
+
+The script filters test output and validates expected results.
+"""
+import sys
+import json
+import os
+
+# Import common validation utilities (optional)
+# script_dir = os.path.dirname(os.path.abspath(__file__))
+# sys.path.insert(0, os.path.join(script_dir, '..'))
+# from test_utils import *
+
+
+def validate_output(output):
+    """
+    Validate test output and return structured results.
+
+    Args:
+        output: String containing the complete stdout from the test
+
+    Returns:
+        dict with structure:
+        {
+            "passed": bool,           # Overall test pass/fail
+            "sub_tests": [            # List of individual test results
+                {
+                    "name": str,      # Sub-test identifier
+                    "passed": bool,   # Sub-test pass/fail
+                    "expected": str,  # Expected value/description
+                    "actual": str,    # Actual value observed
+                    "message": str    # Optional: Additional context (only on failure)
+                }
+            ]
+        }
+    """
+    # Split output into lines and clean up
+    lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
+
+    # TODO: Implement your validation logic here
+
+    # Example 1: Simple single-output test
+    # expected = "42"
+    # actual = lines[0] if lines else ""
+    #
+    # return {
+    #     "passed": actual == expected,
+    #     "sub_tests": [
+    #         {
+    #             "name": "main_output",
+    #             "passed": actual == expected,
+    #             "expected": expected,
+    #             "actual": actual
+    #         }
+    #     ]
+    # }
+
+    # Example 2: Multi-output test with multiple validations
+    # results = []
+    #
+    # # Validation 1: Check first output
+    # if len(lines) > 0:
+    #     expected = "42"
+    #     actual = lines[0]
+    #     results.append({
+    #         "name": "first_output",
+    #         "passed": actual == expected,
+    #         "expected": expected,
+    #         "actual": actual
+    #     })
+    #
+    # # Validation 2: Check second output
+    # if len(lines) > 1:
+    #     expected = "100"
+    #     actual = lines[1]
+    #     results.append({
+    #         "name": "second_output",
+    #         "passed": actual == expected,
+    #         "expected": expected,
+    #         "actual": actual
+    #     })
+    #
+    # # Overall pass = all sub-tests passed
+    # overall_passed = all(r["passed"] for r in results)
+    #
+    # return {
+    #     "passed": overall_passed,
+    #     "sub_tests": results
+    # }
+
+    # Example 3: Range validation (for non-deterministic tests)
+    # results = []
+    #
+    # # Test that output is within expected range
+    # if len(lines) > 0:
+    #     try:
+    #         actual_val = int(lines[0])
+    #         passed = 0 <= actual_val < 10
+    #         results.append({
+    #             "name": "range_check",
+    #             "passed": passed,
+    #             "expected": "[0, 10)",
+    #             "actual": str(actual_val)
+    #         })
+    #     except ValueError:
+    #         results.append({
+    #             "name": "range_check",
+    #             "passed": False,
+    #             "expected": "[0, 10)",
+    #             "actual": lines[0],
+    #             "message": "Could not parse as integer"
+    #         })
+    #
+    # return {
+    #     "passed": all(r["passed"] for r in results),
+    #     "sub_tests": results
+    # }
+
+    # Default placeholder - replace with actual validation
+    return {
+        "passed": False,
+        "sub_tests": [
+            {
+                "name": "not_implemented",
+                "passed": False,
+                "expected": "validation logic",
+                "actual": "placeholder",
+                "message": "TODO: Implement validation logic in validate_output()"
+            }
+        ]
+    }
+
+
+if __name__ == "__main__":
+    # Read test output from stdin
+    output = sys.stdin.read()
+
+    # Validate and get results
+    result = validate_output(output)
+
+    # Output JSON results
+    print(json.dumps(result, indent=2))

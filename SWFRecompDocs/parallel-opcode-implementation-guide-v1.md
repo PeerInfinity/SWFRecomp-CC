@@ -123,16 +123,7 @@ Each stack entry (24 bytes):
 - `convertFloat(stack, sp)` - Convert top entry to float
 - `convertString(stack, sp, buffer)` - Convert top entry to string
 
-### The 8-Step Implementation Workflow
-
-**Note**: Many opcodes may already be partially or fully implemented. Before starting, check:
-- `SWFRecomp/include/action/action.hpp` - Check if enum exists
-- `SWFRecomp/src/action/action.cpp` - Check if translation case exists
-- `SWFModernRuntime/include/actionmodern/action.h` - Check if API is declared
-- `SWFModernRuntime/src/actionmodern/action.c` - Check if runtime is implemented
-- `SWFRecomp/tests/<opcode>_swf_N/` - Check if test directory exists
-
-If the opcode is fully implemented but missing validation files, **skip to Step 6** to add test validation.
+### The 7-Step Implementation Workflow
 
 #### Step 1: Define Enum (SWFRecomp)
 
@@ -265,24 +256,12 @@ action_modulo = bytes([0x3F])  # Computes: 7 % 3 = 1
 
 If you push in the wrong order, you'll compute `3 % 7 = 3` instead of `7 % 3 = 1`!
 
-#### Step 6: Setup Test Directory and Validation
-
-**If test directory already exists** (many opcodes are already implemented):
-- Check if `test_info.json` and `validate.py` exist
-- If missing, create them following the templates below
-- Skip to Step 8 to verify
-
-**If creating new test directory**:
+#### Step 6: Setup Test Directory
 
 ```bash
 # Create test directory
 cd SWFRecomp/tests
 mkdir your_opcode_swf_4
-
-# Copy templates
-cp templates/test_info_deterministic.json your_opcode_swf_4/test_info.json
-cp templates/validate.py.template your_opcode_swf_4/validate.py
-chmod +x your_opcode_swf_4/validate.py
 
 # Copy config template
 cp trace_swf_4/config.toml your_opcode_swf_4/
@@ -295,7 +274,7 @@ cp /path/to/your/test.swf your_opcode_swf_4/test.swf
 cat > your_opcode_swf_4/create_test_swf.py << 'EOF'
 #!/usr/bin/env python3
 # Script to generate test.swf
-# (See existing tests for examples: random_number_swf_4/create_test_swf.py)
+# (See trace_swf_4/create_test_swf.py for examples)
 EOF
 ```
 
@@ -310,125 +289,11 @@ output_scripts_folder = "RecompiledScripts"
 do_recompile = true
 ```
 
-**test_info.json** - Update with your opcode details:
-```json
-{
-  "metadata": {
-    "name": "your_opcode_swf_4",
-    "description": "Tests YOUR_OPCODE opcode (operation description)",
-    "swf_version": 4
-  },
-  "opcodes": {
-    "tested": ["YOUR_OPCODE"],
-    "supporting": ["PUSH", "TRACE"]
-  },
-  "execution": {
-    "type": "deterministic"
-  }
-}
-```
-
-For non-deterministic tests (like random number generation), use `"type": "range_validation"` instead.
-
-**validate.py** - Implement validation logic:
-
-```python
-#!/usr/bin/env python3
-"""
-Validation script for your_opcode_swf_4
-
-Tests the YOUR_OPCODE opcode.
-Expected output: (describe expected behavior)
-"""
-import sys
-import json
-import os
-
-# Import common utilities
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(script_dir, '..'))
-from test_utils import parse_output, make_result, make_validation_result
-
-
-def validate_output(output):
-    """
-    Validate test output.
-
-    Expected: (describe what the test should output)
-    """
-    lines = parse_output(output)
-
-    # Simple single-output validation
-    expected = "42"  # Replace with your expected output
-    actual = lines[0] if lines else ""
-
-    return make_validation_result([
-        make_result(
-            "test_name",  # Descriptive name for this test case
-            actual == expected,
-            expected,
-            actual
-        )
-    ])
-
-
-if __name__ == "__main__":
-    output = sys.stdin.read()
-    result = validate_output(output)
-    print(json.dumps(result, indent=2))
-```
-
-**Validation patterns**:
-
-For **simple single output**:
-```python
-expected = "42"
-actual = lines[0] if lines else ""
-return make_validation_result([
-    make_result("test_case", actual == expected, expected, actual)
-])
-```
-
-For **multiple outputs**:
-```python
-results = []
-results.append(make_result("output_1", lines[0] == "42", "42", lines[0]))
-results.append(make_result("output_2", lines[1] == "100", "100", lines[1]))
-return make_validation_result(results)
-```
-
-For **range validation** (non-deterministic):
-```python
-try:
-    value = int(lines[0])
-    passed = 0 <= value < 10
-    return make_validation_result([
-        make_result("range_check", passed, "[0, 10)", str(value))
-    ])
-except ValueError:
-    return make_validation_result([
-        make_result("range_check", False, "[0, 10)", lines[0],
-                   "Could not parse as integer")
-    ])
-```
-
-**Helper utilities** (`test_utils.py` provides):
-- `parse_output(output)` - Clean and split output lines
-- `make_result(name, passed, expected, actual, message=None)` - Create test result
-- `make_validation_result(sub_tests)` - Create complete validation output
-- `validate_single_output(output, expected, test_name)` - Quick single-value check
-- `validate_multiple_outputs(output, expected_values, test_names)` - Quick multi-value check
-- `validate_integer_range(output, min_val, max_val, test_name)` - Range validation
-
-See `tests/templates/README.md` for detailed validation patterns and examples.
-
 **Note**: You do NOT need to copy runtime files, Makefiles, or build scripts. The automated build script (`scripts/build_test.sh`) handles all of this for you.
 
 **Auto-generation feature** (added 2025-11-05): The build script now automatically detects when `test.swf` is missing and looks for generation scripts (`create_test_swf.py`, `generate_swf.py`, `make_test.py`, `create_swf.py`). If found, it runs the script automatically before compilation. This eliminates the manual step of generating test files.
 
-#### Step 7: Build Test
-
-Build your test to verify the implementation works:
+#### Step 7: Build and Verify
 
 ```bash
 # From SWFRecomp directory
@@ -437,7 +302,7 @@ cd SWFRecomp
 # Build test using automated script (~2 seconds)
 ./scripts/build_test.sh your_opcode_swf_4 native
 
-# Run test manually (to see raw output)
+# Run test
 ./tests/your_opcode_swf_4/build/native/your_opcode_swf_4
 
 # Verify output matches expected result
@@ -454,48 +319,6 @@ cd SWFRecomp
 **Build output location:**
 - Native: `tests/your_opcode_swf_4/build/native/your_opcode_swf_4`
 - WASM: `tests/your_opcode_swf_4/build/wasm/your_opcode_swf_4.wasm` (if you have Emscripten)
-
-#### Step 8: Verify with Test Runner
-
-Run the automated test suite to verify your implementation:
-
-```bash
-# Run all tests (from SWFRecomp/tests directory)
-cd tests
-./all_tests.sh
-
-# Or run manually for your specific test
-cd your_opcode_swf_4
-./build/native/your_opcode_swf_4 2>&1 | grep -v "SWF Runtime" | grep -v "===" | grep -v "\[Frame" | grep -v "\[Tag\]" | grep -v "^$" | ./validate.py
-```
-
-**Expected validation output** (JSON):
-```json
-{
-  "passed": true,
-  "sub_tests": [
-    {
-      "name": "test_case",
-      "passed": true,
-      "expected": "42",
-      "actual": "42"
-    }
-  ]
-}
-```
-
-**If validation fails**:
-- Check that expected values in validate.py match test specification
-- Verify test output matches what you expect
-- Add debug output to validate.py to see what's being compared
-- Check test_utils.py is being imported correctly (path issue)
-
-**Test suite output**:
-When running `./all_tests.sh`, you'll see:
-- Colored pass/fail indicators for each test
-- Summary with total passed/failed counts
-- Detailed failure messages for any failures
-- JSON results saved to `tests/test_results.json`
 
 ## Build System Details
 
@@ -849,50 +672,6 @@ void assertRefcount(ASObject* obj, u32 expected) {
 
 **IMPORTANT**: Before implementing any object/array opcodes, coordinate with the team to establish the base object model (ASObject structure, property storage, refcount primitives). These are shared infrastructure that multiple opcodes will use.
 
-## Re-implementing Existing Opcodes (Adding Validation)
-
-**Many opcodes are already implemented** but lack validation files. To add validation to an existing test:
-
-1. **Check test directory** - Navigate to `SWFRecomp/tests/<opcode>_swf_N/`
-2. **Verify test works** - Run `../../scripts/build_test.sh <opcode>_swf_N native` and verify output
-3. **Create test_info.json** - Copy from `templates/test_info_deterministic.json` and update
-4. **Create validate.py** - Copy from `templates/validate.py.template` and implement validation
-5. **Test validation** - Run `cd .. && ./all_tests.sh` to verify
-
-**Prompt-based approach**: For each prompt in `SWFRecompDocs/prompts/completed/`:
-- The prompt contains test cases and expected outputs
-- Create `test_info.json` based on opcode metadata in prompt
-- Create `validate.py` based on expected outputs in prompt
-- Test can be verified immediately with `./all_tests.sh`
-
-This is ideal for parallel work - each AI instance can work on a different existing test.
-
-### Example: Adding Validation to bit_and_swf_4
-
-```bash
-# 1. Navigate to test directory
-cd SWFRecomp/tests/bit_and_swf_4
-
-# 2. Verify test works
-../../scripts/build_test.sh bit_and_swf_4 native
-./build/native/bit_and_swf_4
-# Output: 8
-
-# 3. Create test_info.json
-cp ../templates/test_info_deterministic.json test_info.json
-# Edit to add: "tested": ["BIT_AND"], "description": "Tests BIT_AND opcode..."
-
-# 4. Create validate.py
-cp ../templates/validate.py.template validate.py
-chmod +x validate.py
-# Edit to check: expected = "8", actual = lines[0]
-
-# 5. Test validation
-cd ..
-./all_tests.sh
-# Should show: [PASS] bit_and_swf_4
-```
-
 ## Common Implementation Patterns
 
 ### Type Conversions
@@ -1063,18 +842,15 @@ As you implement each opcode, document:
 
 **Implementation Checklist**:
 - [ ] Opcode hex value confirmed from specification
-- [ ] Enum added to action.hpp (or verified if exists)
-- [ ] Translation case added to action.cpp (or verified if exists)
-- [ ] Function declared in action.h (or verified if exists)
-- [ ] Function implemented in action.c (or verified if exists)
-- [ ] Test SWF created with known expected output (or verified if exists)
-- [ ] Test directory created with all required files (or verified if exists)
-- [ ] **test_info.json created with opcode metadata**
-- [ ] **validate.py created with test validation logic**
+- [ ] Enum added to action.hpp
+- [ ] Translation case added to action.cpp
+- [ ] Function declared in action.h
+- [ ] Function implemented in action.c
+- [ ] Test SWF created with known expected output
+- [ ] Test directory created with all required files
 - [ ] SWFRecomp builds successfully
 - [ ] Test compiles successfully
 - [ ] Test produces correct output
-- [ ] **Validation script passes (./all_tests.sh)**
 - [ ] Edge cases tested
 - [ ] Integration with other opcodes verified
 
@@ -1134,13 +910,11 @@ An opcode implementation is complete when:
 
 1. ✅ Builds without errors or warnings
 2. ✅ Test produces correct output for basic cases
-3. ✅ **Validation files created (test_info.json, validate.py)**
-4. ✅ **Test passes in ./all_tests.sh**
-5. ✅ Edge cases handled correctly
-6. ✅ No crashes or undefined behavior
-7. ✅ All tests in test suite still pass
-8. ✅ Code follows existing patterns and style
-9. ✅ Documentation updated
+3. ✅ Edge cases handled correctly
+4. ✅ No crashes or undefined behavior
+5. ✅ All tests in test suite still pass
+6. ✅ Code follows existing patterns and style
+7. ✅ Documentation updated
 
 ## Working in Parallel
 
@@ -1209,9 +983,7 @@ An opcode implementation is complete when:
 
 ### Summary
 
-This systematic approach enables autonomous, parallel implementation of AS2 opcodes. Follow the 8-step workflow, test incrementally, and document thoroughly. Each opcode implementation should take 1-8 hours depending on complexity, with most simple operations completing in 1-3 hours.
-
-**For existing opcodes**: Adding validation files (test_info.json and validate.py) takes 15-30 minutes per test and can be done in parallel across multiple AI instances.
+This systematic approach enables autonomous, parallel implementation of AS2 opcodes. Follow the 7-step workflow, test incrementally, and document thoroughly. Each opcode implementation should take 1-8 hours depending on complexity, with most simple operations completing in 1-3 hours.
 
 **Key Advantages:**
 1. **Fast iteration**: ~2 second build times enable rapid testing
@@ -1224,21 +996,12 @@ The combined repository structure eliminates integration complexity, and the wel
 
 ### Next Steps
 
-**For new opcode implementations**:
+After validating your environment with the Quick Start:
 1. Choose an unimplemented opcode from the specification
-2. Follow the 8-step workflow
+2. Follow the 7-step workflow
 3. Use `./scripts/build_test.sh` for all builds
-4. Create validation files (test_info.json, validate.py)
-5. Run `./all_tests.sh` to verify
-6. Document any edge cases encountered
-
-**For adding validation to existing tests**:
-1. Check `SWFRecompDocs/prompts/completed/` for test specifications
-2. Navigate to existing test directory
-3. Create test_info.json from template
-4. Create validate.py based on expected outputs in prompt
-5. Run `./all_tests.sh` to verify
-6. Repeat for next test (ideal for parallel work)
+4. Verify output matches expected behavior
+5. Document any edge cases encountered
 
 **Ready to begin?** Start with a simple arithmetic opcode (like Increment, Decrement, or comparison operators) to familiarize yourself with the workflow. See the "Opcode Categories and Complexity" section for suggestions.
 

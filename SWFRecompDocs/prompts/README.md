@@ -246,6 +246,78 @@ Each implemented opcode should:
 - ✅ Include complete documentation
 - ✅ Pass full test suite
 
+### Batch 6: Control Flow, External Communication & Advanced (25 opcodes total, 56-120 hours total) - READY FOR IMPLEMENTATION ✅
+
+**NOTE**: Batch 6 includes the existing 14 prompts from Batch 5 plus 11 newly created prompts for a total of 25 opcodes in the pending directory.
+
+#### Frame & MovieClip Control Operations (6 prompts) - From Batch 5
+- **opcode-next-frame-0x04.md** - NEXT_FRAME - Advance to next frame
+- **opcode-prev-frame-0x05.md** - PREV_FRAME - Go to previous frame
+- **opcode-play-0x06.md** - PLAY - Start playing timeline
+- **opcode-stop-0x07.md** - STOP - Stop playing (reference doc, already implemented)
+- **opcode-toggle-quality-0x08.md** - TOGGLE_QUALITY - Toggle rendering quality
+- **opcode-stop-sounds-0x09.md** - STOP_SOUNDS - Stop all audio
+
+#### Sprite Manipulation Operations (4 prompts) - From Batch 5
+- **opcode-clone-sprite-0x24.md** - CLONE_SPRITE - Duplicate a sprite/MovieClip
+- **opcode-remove-sprite-0x25.md** - REMOVE_SPRITE - Remove sprite from display list
+- **opcode-start-drag-0x27.md** - START_DRAG - Make sprite draggable
+- **opcode-end-drag-0x28.md** - END_DRAG - Stop dragging sprite
+
+#### Exception Handling (2 prompts)
+- **opcode-throw-0x2a.md** - THROW - Throw exception (works with TRY) - From Batch 5
+- **opcode-try-0x8f.md** - TRY - Try-catch-finally exception handling - NEW ✨
+
+#### Type System & Inheritance (3 prompts) - From Batch 5
+- **opcode-cast-op-0x2b.md** - CAST_OP - Cast object to type (returns object or null)
+- **opcode-implements-op-0x2c.md** - IMPLEMENTS_OP - Declare interface implementation
+- **opcode-extends-0x69.md** - EXTENDS - Set up class inheritance
+
+#### External Communication & URL Loading (2 prompts) - NEW ✨
+- **opcode-geturl-0x83.md** - GET_URL - Load URL (HTML, images, SWF files)
+- **opcode-geturl2-0x9a.md** - GET_URL2 - Enhanced URL loading with HTTP methods
+
+#### Advanced Frame Control (7 prompts) - NEW ✨
+- **opcode-gotoframe-0x81.md** - GOTO_FRAME - Jump to specific frame by index
+- **opcode-gotolabel-0x8c.md** - GOTO_LABEL - Jump to frame by label name
+- **opcode-waitforframe-0x8a.md** - WAIT_FOR_FRAME - Wait for frame to load (streaming)
+- **opcode-waitforframe2-0x8d.md** - WAIT_FOR_FRAME2 - Stack-based frame waiting
+- **opcode-settarget-0x8b.md** - SET_TARGET - Set action target (string-based)
+- **opcode-settarget2-0x20.md** - SET_TARGET2 - Set action target (stack-based)
+
+#### Type Operations & Comparison (4 prompts) - NEW ✨
+- **opcode-equals2-0x49.md** - EQUALS2 - Type-aware equality (ECMA-262)
+- **opcode-instanceof-0x54.md** - INSTANCEOF - Check if object is instance of class
+- **opcode-mbasciitochar-0x37.md** - MB_ASCII_TO_CHAR - Convert code point to UTF-8 character
+- **opcode-typeof-0x44.md** - TYPEOF - Get type of value as string
+
+**Total Batch 6 Prompts**: 27 prompts (14 from Batch 5 + 13 new)
+**Status**: ✅ COMPLETE - All 27 prompts created (2025-11-06), ready for parallel implementation
+
+**Complexity Distribution**:
+- **Simple** (4 opcodes, 4-8 hours): STOP_SOUNDS, TOGGLE_QUALITY, END_DRAG, REMOVE_SPRITE
+- **Medium** (13 opcodes, 26-52 hours): NEXT_FRAME, PREV_FRAME, PLAY, CLONE_SPRITE, GOTO_FRAME, GOTO_LABEL, WAIT_FOR_FRAME, WAIT_FOR_FRAME2, SET_TARGET, SET_TARGET2, EQUALS2, MB_ASCII_TO_CHAR, TYPEOF
+- **Complex** (10 opcodes, 40-80 hours): START_DRAG, THROW, TRY, CAST_OP, IMPLEMENTS_OP, EXTENDS, GET_URL, GET_URL2, INSTANCEOF
+
+**Implementation Notes**:
+- Frame control opcodes require timeline management infrastructure
+- Sprite operations are stubs in NO_GRAPHICS mode (return success)
+- Exception handling (TRY/THROW) requires exception state and stack unwinding
+- Type system opcodes (EXTENDS, CAST_OP, IMPLEMENTS_OP, INSTANCEOF) share prototype chain infrastructure
+- URL loading opcodes (GET_URL, GET_URL2) require external communication infrastructure
+- Coordinate implementation of related opcodes for shared infrastructure efficiency
+
+**Recommended Implementation Order**:
+1. **First Wave** (simple control, 4 opcodes): STOP_SOUNDS, TOGGLE_QUALITY, END_DRAG, REMOVE_SPRITE
+2. **Second Wave** (frame navigation, 4 opcodes): NEXT_FRAME, PREV_FRAME, PLAY, GOTO_FRAME
+3. **Third Wave** (frame control, 3 opcodes): GOTO_LABEL, SET_TARGET, SET_TARGET2
+4. **Fourth Wave** (comparison & types, 2 opcodes): EQUALS2, INSTANCEOF
+5. **Fifth Wave** (streaming, 2 opcodes): WAIT_FOR_FRAME, WAIT_FOR_FRAME2
+6. **Sixth Wave** (sprite manipulation, 2 opcodes): CLONE_SPRITE, START_DRAG
+7. **Seventh Wave** (type system, 3 opcodes): EXTENDS, IMPLEMENTS_OP, CAST_OP
+8. **Eighth Wave** (external I/O, 2 opcodes): GET_URL, GET_URL2
+9. **Ninth Wave** (exception handling, 2 opcodes): THROW, TRY
+
 ## Next Steps
 
 1. ~~**Complete Batch 1 prompts**~~ ✅ DONE - All 13 prompts created and moved to completed/
@@ -253,9 +325,9 @@ Each implemented opcode should:
 3. ~~**Create Batch 3 prompts**~~ ✅ DONE - All 10 prompts created and moved to completed/
 4. ~~**Create Batch 4 prompts**~~ ✅ DONE - All 11 prompts created and moved to completed/
 5. ~~**Create Batch 5 prompts**~~ ✅ DONE - All 14 prompts created (2025-11-05)
-6. **Begin parallel implementation of Batch 5** - Assign prompts to multiple Claude Code instances
-7. **Monitor and merge** - Sequential merge as implementations complete
-8. **Create Batch 6 prompts** - Remaining MovieClip operations, ActionTry, etc.
+6. ~~**Create Batch 6 prompts**~~ ✅ DONE - All 13 new prompts created (2025-11-06), combined with Batch 5 for 27 total
+7. **Begin parallel implementation of Batch 6** - Assign prompts to multiple Claude Code instances
+8. **Monitor and merge** - Sequential merge as implementations complete
 9. **Continue expansion** - Iterative batches until all opcodes implemented
 
 ## Resources
@@ -275,15 +347,16 @@ Each implemented opcode should:
 
 ---
 
-**Status**: Batch 5 complete (14 prompts), ready for parallel implementation
+**Status**: Batch 6 complete (25 prompts), ready for parallel implementation
 **Created**: 2025-11-05
-**Last Updated**: 2025-11-05
+**Last Updated**: 2025-11-06
 **Batch 1 Completed**: 2025-11-05 (moved to completed/)
 **Batch 2 Completed**: 2025-11-05 (moved to completed/)
 **Batch 3 Completed**: 2025-11-05 (moved to completed/)
 **Batch 4 Completed**: 2025-11-05 (moved to completed/)
-**Batch 5 Completed**: 2025-11-05
+**Batch 5 Completed**: 2025-11-05 (14 prompts, merged into Batch 6)
+**Batch 6 Completed**: 2025-11-06 (27 prompts total: 14 from Batch 5 + 13 new)
 
-**Total Prompts Created**: 61 prompts (13 + 13 + 10 + 11 + 14)
-**Prompts in Active Directory**: 14 (Batch 5)
+**Total Prompts Created**: 74 prompts (13 + 13 + 10 + 11 + 14 + 13)
+**Prompts in Pending Directory**: 27 (Batch 6)
 **Prompts in Completed Directory**: 47 (Batches 1-4)

@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "<TEST_NAME>",
+    "description": "<Brief description of what this test validates>",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["<PRIMARY_OPCODE>"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

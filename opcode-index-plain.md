@@ -2,11 +2,11 @@
 
 **Generated**: 2025-11-06
 
-**Total Opcodes**: 102
+**Total Opcodes**: 100
 
-**Implemented Opcodes**: 21
+**Implemented Opcodes**: 19
 
-**Total Entries**: 230
+**Total Entries**: 228
 
 ## Summary Table
 
@@ -19,29 +19,29 @@
 | 0X07 | ActionStop | SWF_ACTION_STOP |  |  | ✓ |  |
 | 0X08 | ActionToggleQuality |  |  |  | ✓ |  |
 | 0X09 | ActionStopSounds |  |  |  | ✓ |  |
-| 0X0A | ActionAdd | SWF_ACTION_ADD | actionAdd |  |  |  |
-| 0X0B | ActionSubtract | SWF_ACTION_SUBTRACT | actionSubtract |  |  |  |
-| 0X0C | ActionMultiply | SWF_ACTION_MULTIPLY | actionMultiply |  |  |  |
-| 0X0D | ActionDivide | SWF_ACTION_DIVIDE | actionDivide |  |  |  |
-| 0X0E | ActionEquals | SWF_ACTION_EQUALS | actionEquals |  |  |  |
-| 0X0F | ActionLess | SWF_ACTION_LESS | actionLess |  |  |  |
-| 0X10 | ActionAnd | SWF_ACTION_AND | actionAnd |  |  |  |
-| 0X11 | ActionOr | SWF_ACTION_OR | actionOr |  |  |  |
-| 0X12 | ActionNot | SWF_ACTION_NOT | actionNot |  |  |  |
-| 0X13 | ActionStringEquals | SWF_ACTION_STRING_EQUALS | actionStringEquals |  |  |  |
-| 0X14 | ActionStringLength | SWF_ACTION_STRING_LENGTH | actionStringLength |  |  |  |
+| 0X0A | ActionAdd | SWF_ACTION_ADD | actionAdd |  | ✓ |  |
+| 0X0B | ActionSubtract | SWF_ACTION_SUBTRACT | actionSubtract |  | ✓ |  |
+| 0X0C | ActionMultiply | SWF_ACTION_MULTIPLY | actionMultiply |  | ✓ |  |
+| 0X0D | ActionDivide | SWF_ACTION_DIVIDE | actionDivide |  | ✓ |  |
+| 0X0E | ActionEquals | SWF_ACTION_EQUALS | actionEquals |  | ✓ |  |
+| 0X0F | ActionLess | SWF_ACTION_LESS | actionLess |  | ✓ |  |
+| 0X10 | ActionAnd | SWF_ACTION_AND | actionAnd |  | ✓ |  |
+| 0X11 | ActionOr | SWF_ACTION_OR | actionOr |  | ✓ |  |
+| 0X12 | ActionNot | SWF_ACTION_NOT | actionNot |  | ✓ |  |
+| 0X13 | ActionStringEquals | SWF_ACTION_STRING_EQUALS | actionStringEquals |  | ✓ |  |
+| 0X14 | ActionStringLength | SWF_ACTION_STRING_LENGTH | actionStringLength |  | ✓ |  |
 | 0X15 | ActionStringExtract | SWF_ACTION_STRING_EXTRACT | actionStringExtract |  | ✓ | ✓ |
-| 0X17 | ActionPop | SWF_ACTION_POP |  |  |  |  |
+| 0X17 | ActionPop | SWF_ACTION_POP |  |  | ✓ |  |
 | 0X18 | ActionToInteger | SWF_ACTION_TO_INTEGER | actionToInteger |  | ✓ |  |
-| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable |  |  |  |
-| 0X1D | ActionSetVariable | SWF_ACTION_SET_VARIABLE | actionSetVariable |  |  |  |
-| 0X20 | ActionSetTarget2 |  |  |  |  |  |
-| 0X21 | ActionStringAdd | SWF_ACTION_STRING_ADD | actionStringAdd |  |  |  |
+| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable |  | ✓ |  |
+| 0X1D | ActionSetVariable | SWF_ACTION_SET_VARIABLE | actionSetVariable |  | ✓ |  |
+| 0X20 | ActionSetTarget2 |  |  |  | ✓ |  |
+| 0X21 | ActionStringAdd | SWF_ACTION_STRING_ADD | actionStringAdd |  | ✓ |  |
 | 0X22 | ActionGetProperty | SWF_ACTION_GET_PROPERTY | actionGetProperty |  | ✓ | ✓ |
 | 0X23 | ActionSetProperty | SWF_ACTION_SET_PROPERTY | actionSetProperty |  | ✓ | ✓ |
 | 0X24 | ActionCloneSprite |  |  |  | ✓ |  |
 | 0X25 | ActionRemoveSprite |  |  |  | ✓ |  |
-| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1 |  |  |
+| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1 | ✓ |  |
 | 0X27 | ActionStartDrag |  |  |  | ✓ |  |
 | 0X28 | ActionEndDrag |  |  |  | ✓ |  |
 | 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess |  | ✓ | ✓ |
@@ -52,40 +52,38 @@
 | 0X31 | ActionMBStringLength | SWF_ACTION_CHAR_TO_ASCII |  |  | ✓ | ✓ |
 | 0X32 | ActionCharToAscii | SWF_ACTION_ASCII_TO_CHAR | actionCharToAscii |  | ✓ | ✓ |
 | 0X33 | ActionAsciiToChar | SWF_ACTION_MB_CHAR_TO_ASCII | actionAsciiToChar |  | ✓ | ✓ |
-| 0X34 | ActionGetTime | SWF_ACTION_GET_TIME | actionGetTime |  |  |  |
+| 0X34 | ActionGetTime | SWF_ACTION_GET_TIME | actionGetTime |  | ✓ |  |
 | 0X35 | ActionMBStringExtract | SWF_ACTION_MB_STRING_LENGTH |  |  | ✓ | ✓ |
 | 0X36 | ActionMBCharToAscii | SWF_ACTION_MB_ASCII_TO_CHAR |  |  | ✓ | ✓ |
-| 0X37 | ActionMBAsciiToChar |  |  |  |  |  |
-| 0X3A | ActionDelete |  | actionDelete | 1 |  |  |
-| 0X3B | ActionDelete2 |  | actionDelete2 | 1 |  |  |
+| 0X37 | ActionMBAsciiToChar |  |  |  | ✓ |  |
+| 0X3A | ActionDelete |  | actionDelete | 1 | ✓ |  |
+| 0X3B | ActionDelete2 |  | actionDelete2 | 1 | ✓ |  |
 | 0X3C | ActionDefineLocal | SWF_ACTION_TYPEOF |  | 1 | ✓ | ✓ |
 | 0X3D | ActionStackSwap | SWF_ACTION_CALL_FUNCTION | actionStackSwap |  | ✓ | ✓ |
 | 0X3E | ActionReturn | SWF_ACTION_RETURN | actionReturn | 1 | ✓ | ✓ |
-| 0X3F | ActionModulo | SWF_ACTION_MODULO | actionModulo | 1 |  |  |
+| 0X3F | ActionModulo | SWF_ACTION_MODULO | actionModulo | 1 | ✓ |  |
 | 0X40 | ActionNewObject | SWF_ACTION_NEW_OBJECT | actionNewObject |  | ✓ | ✓ |
 | 0X41 | ActionDefineLocal2 | SWF_ACTION_DECLARE_LOCAL |  |  | ✓ | ✓ |
 | 0X42 | ActionInitArray | SWF_ACTION_INIT_ARRAY | actionInitArray |  | ✓ | ✓ |
 | 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject |  | ✓ | ✓ |
-| 0X44 | ActionTypeOf |  |  | 1 |  |  |
+| 0X44 | ActionTypeOf |  |  | 1 | ✓ |  |
 | 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath |  | ✓ | ✓ |
 | 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate | 1 | ✓ | ✓ |
 | 0X47 | ActionAdd2 | SWF_ACTION_ADD2 | actionAdd2 | 1 | ✓ | ✓ |
 | 0X48 | ActionLess2 | SWF_ACTION_LESS2 | actionLess2 | 1 | ✓ | ✓ |
-| 0X49 | ActionEquals2 |  |  |  |  |  |
+| 0X49 | ActionEquals2 |  |  |  | ✓ |  |
 | 0X4A | ActionToNumber | SWF_ACTION_TO_NUMBER | actionToNumber |  | ✓ | ✓ |
 | 0X4B | ActionToString | SWF_ACTION_TO_STRING | actionToString |  | ✓ | ✓ |
 | 0X4C | ActionPushDuplicate | SWF_ACTION_DUPLICATE |  | 1 | ✓ | ✓ |
-| 0X4D | ActionStackSwap | SWF_ACTION_STACK_SWAP | actionStackSwap |  |  |  |
+| 0X4D | ActionStackSwap | SWF_ACTION_STACK_SWAP | actionStackSwap |  | ✓ |  |
 | 0X4E | ActionGetMember | SWF_ACTION_GET_MEMBER | actionGetMember |  | ✓ |  |
 | 0X4F | ActionSetMember | SWF_ACTION_SET_MEMBER | actionSetMember |  | ✓ | ✓ |
-| 0X50 | ActionIncrement | SWF_ACTION_INCREMENT | actionIncrement | 1 |  |  |
-| 0X51 | ActionDecrement | SWF_ACTION_DECREMENT | actionDecrement | 1 |  |  |
-| 0X52 | ActionCallMethod |  | actionCallMethod |  |  |  |
+| 0X50 | ActionIncrement | SWF_ACTION_INCREMENT | actionIncrement | 1 | ✓ |  |
+| 0X51 | ActionDecrement | SWF_ACTION_DECREMENT | actionDecrement | 1 | ✓ |  |
+| 0X52 | ActionCallMethod |  | actionCallMethod |  | ✓ |  |
 | 0X53 | ActionNewMethod | SWF_ACTION_NEW_METHOD | actionNewMethod |  | ✓ | ✓ |
-| 0X54 | ActionInstanceOf |  |  |  |  |  |
+| 0X54 | ActionInstanceOf |  |  |  | ✓ |  |
 | 0X55 | ActionEnumerate2 | SWF_ACTION_ENUMERATE2 | actionEnumerate2 | 1 | ✓ | ✓ |
-| 0X5A |  | SWF_ACTION_DELETE |  |  |  |  |
-| 0X5B |  | SWF_ACTION_DELETE2 |  |  |  |  |
 | 0X60 | ActionBitAnd | SWF_ACTION_BIT_AND | actionBitAnd |  | ✓ | ✓ |
 | 0X61 | ActionBitOr | SWF_ACTION_BIT_OR | actionBitOr |  | ✓ | ✓ |
 | 0X62 | ActionBitXor | SWF_ACTION_BIT_XOR | actionBitXor |  | ✓ | ✓ |
@@ -96,22 +94,22 @@
 | 0X67 | ActionGreater | SWF_ACTION_GREATER | actionGreater | 1 | ✓ | ✓ |
 | 0X68 | ActionStringGreater | SWF_ACTION_STRING_GREATER | actionStringGreater |  | ✓ | ✓ |
 | 0X69 | ActionExtends |  |  |  | ✓ |  |
-| 0X81 | ActionGotoFrame |  |  |  |  |  |
-| 0X83 | ActionGetURL |  |  |  |  |  |
+| 0X81 | ActionGotoFrame |  |  |  | ✓ |  |
+| 0X83 | ActionGetURL |  |  |  | ✓ |  |
 | 0X87 | ActionStoreRegister | SWF_ACTION_STORE_REGISTER | actionStoreRegister |  | ✓ | ✓ |
-| 0X88 | ActionConstantPool | SWF_ACTION_CONSTANT_POOL |  |  |  |  |
-| 0X8A | ActionWaitForFrame |  |  |  |  |  |
-| 0X8B | ActionSetTarget |  |  |  |  |  |
-| 0X8C | ActionGoToLabel |  |  |  |  |  |
-| 0X8D | ActionWaitForFrame2 |  |  |  |  |  |
+| 0X88 | ActionConstantPool | SWF_ACTION_CONSTANT_POOL |  |  | ✓ |  |
+| 0X8A | ActionWaitForFrame |  |  |  | ✓ |  |
+| 0X8B | ActionSetTarget |  |  |  | ✓ |  |
+| 0X8C | ActionGoToLabel |  |  |  | ✓ |  |
+| 0X8D | ActionWaitForFrame2 |  |  |  | ✓ |  |
 | 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 |  | ✓ |  |
-| 0X8F | ActionTry |  |  |  |  |  |
+| 0X8F | ActionTry |  |  |  | ✓ |  |
 | 0X94 | ActionWith | SWF_ACTION_WITH |  | 1 | ✓ | ✓ |
-| 0X96 | ActionPush | SWF_ACTION_PUSH |  |  |  |  |
-| 0X99 | ActionJump | SWF_ACTION_JUMP |  | 1 |  |  |
-| 0X9A | ActionGetURL2 |  |  |  |  |  |
+| 0X96 | ActionPush | SWF_ACTION_PUSH |  |  | ✓ |  |
+| 0X99 | ActionJump | SWF_ACTION_JUMP |  | 1 | ✓ |  |
+| 0X9A | ActionGetURL2 |  |  |  | ✓ |  |
 | 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  |  | ✓ | ✓ |
-| 0X9D | ActionIf | SWF_ACTION_IF |  | 1 |  |  |
+| 0X9D | ActionIf | SWF_ACTION_IF |  | 1 | ✓ |  |
 | 0X9E | ActionCall | SWF_ACTION_CALL | actionCall | 1 | ✓ | ✓ |
 | 0X9F | ActionGotoFrame2 | SWF_ACTION_CALL_METHOD |  |  | ✓ | ✓ |
 
@@ -122,14 +120,14 @@
 
 | Hex | Spec Name | Enum | Function | Tests | Docs | Branch |
 |-----|-----------|------|----------|-------|------|--------|
-| 0X26 | ActionTrace | ✓ | ✓ | ✓ |  |  |
+| 0X26 | ActionTrace | ✓ | ✓ | ✓ | ✓ |  |
 | 0X3E | ActionReturn | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 0X3F | ActionModulo | ✓ | ✓ | ✓ |  |  |
+| 0X3F | ActionModulo | ✓ | ✓ | ✓ | ✓ |  |
 | 0X46 | ActionEnumerate | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 0X47 | ActionAdd2 | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 0X48 | ActionLess2 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 0X50 | ActionIncrement | ✓ | ✓ | ✓ |  |  |
-| 0X51 | ActionDecrement | ✓ | ✓ | ✓ |  |  |
+| 0X50 | ActionIncrement | ✓ | ✓ | ✓ | ✓ |  |
+| 0X51 | ActionDecrement | ✓ | ✓ | ✓ | ✓ |  |
 | 0X55 | ActionEnumerate2 | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 0X67 | ActionGreater | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 0X9E | ActionCall | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -141,23 +139,23 @@
 |-----|-----------|------|----------|-------|------|--------|
 | 0X00 |  | ✓ |  | |  |  |
 | 0X07 | ActionStop | ✓ |  | | ✓ |  |
-| 0X0A | ActionAdd | ✓ | ✓ | |  |  |
-| 0X0B | ActionSubtract | ✓ | ✓ | |  |  |
-| 0X0C | ActionMultiply | ✓ | ✓ | |  |  |
-| 0X0D | ActionDivide | ✓ | ✓ | |  |  |
-| 0X0E | ActionEquals | ✓ | ✓ | |  |  |
-| 0X0F | ActionLess | ✓ | ✓ | |  |  |
-| 0X10 | ActionAnd | ✓ | ✓ | |  |  |
-| 0X11 | ActionOr | ✓ | ✓ | |  |  |
-| 0X12 | ActionNot | ✓ | ✓ | |  |  |
-| 0X13 | ActionStringEquals | ✓ | ✓ | |  |  |
-| 0X14 | ActionStringLength | ✓ | ✓ | |  |  |
+| 0X0A | ActionAdd | ✓ | ✓ | | ✓ |  |
+| 0X0B | ActionSubtract | ✓ | ✓ | | ✓ |  |
+| 0X0C | ActionMultiply | ✓ | ✓ | | ✓ |  |
+| 0X0D | ActionDivide | ✓ | ✓ | | ✓ |  |
+| 0X0E | ActionEquals | ✓ | ✓ | | ✓ |  |
+| 0X0F | ActionLess | ✓ | ✓ | | ✓ |  |
+| 0X10 | ActionAnd | ✓ | ✓ | | ✓ |  |
+| 0X11 | ActionOr | ✓ | ✓ | | ✓ |  |
+| 0X12 | ActionNot | ✓ | ✓ | | ✓ |  |
+| 0X13 | ActionStringEquals | ✓ | ✓ | | ✓ |  |
+| 0X14 | ActionStringLength | ✓ | ✓ | | ✓ |  |
 | 0X15 | ActionStringExtract | ✓ | ✓ | | ✓ | ✓ |
-| 0X17 | ActionPop | ✓ |  | |  |  |
+| 0X17 | ActionPop | ✓ |  | | ✓ |  |
 | 0X18 | ActionToInteger | ✓ | ✓ | | ✓ |  |
-| 0X1C | ActionGetVariable | ✓ | ✓ | |  |  |
-| 0X1D | ActionSetVariable | ✓ | ✓ | |  |  |
-| 0X21 | ActionStringAdd | ✓ | ✓ | |  |  |
+| 0X1C | ActionGetVariable | ✓ | ✓ | | ✓ |  |
+| 0X1D | ActionSetVariable | ✓ | ✓ | | ✓ |  |
+| 0X21 | ActionStringAdd | ✓ | ✓ | | ✓ |  |
 | 0X22 | ActionGetProperty | ✓ | ✓ | | ✓ | ✓ |
 | 0X23 | ActionSetProperty | ✓ | ✓ | | ✓ | ✓ |
 | 0X29 | ActionStringLess | ✓ | ✓ | | ✓ | ✓ |
@@ -165,7 +163,7 @@
 | 0X31 | ActionMBStringLength | ✓ |  | | ✓ | ✓ |
 | 0X32 | ActionCharToAscii | ✓ | ✓ | | ✓ | ✓ |
 | 0X33 | ActionAsciiToChar | ✓ | ✓ | | ✓ | ✓ |
-| 0X34 | ActionGetTime | ✓ | ✓ | |  |  |
+| 0X34 | ActionGetTime | ✓ | ✓ | | ✓ |  |
 | 0X35 | ActionMBStringExtract | ✓ |  | | ✓ | ✓ |
 | 0X36 | ActionMBCharToAscii | ✓ |  | | ✓ | ✓ |
 | 0X3D | ActionStackSwap | ✓ | ✓ | | ✓ | ✓ |
@@ -176,13 +174,11 @@
 | 0X45 | ActionTargetPath | ✓ | ✓ | | ✓ | ✓ |
 | 0X4A | ActionToNumber | ✓ | ✓ | | ✓ | ✓ |
 | 0X4B | ActionToString | ✓ | ✓ | | ✓ | ✓ |
-| 0X4D | ActionStackSwap | ✓ | ✓ | |  |  |
+| 0X4D | ActionStackSwap | ✓ | ✓ | | ✓ |  |
 | 0X4E | ActionGetMember | ✓ | ✓ | | ✓ |  |
 | 0X4F | ActionSetMember | ✓ | ✓ | | ✓ | ✓ |
-| 0X52 | ActionCallMethod |  | ✓ | |  |  |
+| 0X52 | ActionCallMethod |  | ✓ | | ✓ |  |
 | 0X53 | ActionNewMethod | ✓ | ✓ | | ✓ | ✓ |
-| 0X5A |  | ✓ |  | |  |  |
-| 0X5B |  | ✓ |  | |  |  |
 | 0X60 | ActionBitAnd | ✓ | ✓ | | ✓ | ✓ |
 | 0X61 | ActionBitOr | ✓ | ✓ | | ✓ | ✓ |
 | 0X62 | ActionBitXor | ✓ | ✓ | | ✓ | ✓ |
@@ -192,9 +188,9 @@
 | 0X66 | ActionStrictEquals | ✓ | ✓ | | ✓ | ✓ |
 | 0X68 | ActionStringGreater | ✓ | ✓ | | ✓ | ✓ |
 | 0X87 | ActionStoreRegister | ✓ | ✓ | | ✓ | ✓ |
-| 0X88 | ActionConstantPool | ✓ |  | |  |  |
+| 0X88 | ActionConstantPool | ✓ |  | | ✓ |  |
 | 0X8E | ActionDefineFunction2 | ✓ | ✓ | | ✓ |  |
-| 0X96 | ActionPush | ✓ |  | |  |  |
+| 0X96 | ActionPush | ✓ |  | | ✓ |  |
 | 0X9B | ActionDefineFunction | ✓ |  | | ✓ | ✓ |
 | 0X9F | ActionGotoFrame2 | ✓ |  | | ✓ | ✓ |
 
@@ -251,7 +247,7 @@
 - `ActionNextFrame` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-next-frame-0x04.md](SWFRecompDocs/prompts/opcode-next-frame-0x04.md)
+- [SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md](SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4310)
@@ -264,7 +260,7 @@
 - `ActionPreviousFrame` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-prev-frame-0x05.md](SWFRecompDocs/prompts/opcode-prev-frame-0x05.md)
+- [SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md](SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4324)
@@ -277,7 +273,7 @@
 - `ActionPlay` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-play-0x06.md](SWFRecompDocs/prompts/opcode-play-0x06.md)
+- [SWFRecompDocs/prompts/pending/opcode-play-0x06.md](SWFRecompDocs/prompts/pending/opcode-play-0x06.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4338)
@@ -294,7 +290,7 @@
 - parseActions (case SWF_ACTION_STOP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-stop-0x07.md](SWFRecompDocs/prompts/opcode-stop-0x07.md)
+- [SWFRecompDocs/prompts/pending/opcode-stop-0x07.md](SWFRecompDocs/prompts/pending/opcode-stop-0x07.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4354)
@@ -307,7 +303,7 @@
 - `ActionToggleQuality` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-toggle-quality-0x08.md](SWFRecompDocs/prompts/opcode-toggle-quality-0x08.md)
+- [SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md](SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4368)
@@ -320,7 +316,7 @@
 - `ActionStopSounds` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-stop-sounds-0x09.md](SWFRecompDocs/prompts/opcode-stop-sounds-0x09.md)
+- [SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md](SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4379)
@@ -342,6 +338,9 @@ void actionAdd(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_ADD)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md](SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4670)
 
@@ -361,6 +360,9 @@ void actionSubtract(char* stack, u32* sp);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_SUBTRACT)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md](SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4693)
@@ -382,6 +384,9 @@ void actionMultiply(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_MULTIPLY)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md](SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4714)
 
@@ -401,6 +406,9 @@ void actionDivide(char* stack, u32* sp);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_DIVIDE)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md](SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4737)
@@ -422,6 +430,9 @@ void actionEquals(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_EQUALS)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md](SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4761)
 
@@ -441,6 +452,9 @@ void actionLess(char* stack, u32* sp);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_LESS)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md](SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4786)
@@ -462,6 +476,9 @@ void actionAnd(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_AND)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-and-0x10.md](SWFRecompDocs/prompts/batch7/opcode-and-0x10.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4808)
 
@@ -481,6 +498,9 @@ void actionOr(char* stack, u32* sp);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_OR)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-or-0x11.md](SWFRecompDocs/prompts/batch7/opcode-or-0x11.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4829)
@@ -502,6 +522,9 @@ void actionNot(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_NOT)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-not-0x12.md](SWFRecompDocs/prompts/batch7/opcode-not-0x12.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4853)
 
@@ -522,6 +545,9 @@ void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 **Implementation:**
 - parseActions (case SWF_ACTION_STRING_EQUALS)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md](SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4882)
 
@@ -541,6 +567,9 @@ void actionStringLength(char* stack, u32* sp, char* v_str);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_STRING_LENGTH)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md](SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4903)
@@ -583,6 +612,9 @@ void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_POP)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md](SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4651)
@@ -627,6 +659,9 @@ void actionGetVariable(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_GET_VARIABLE)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md](SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md)
+
 **Notes:**
 - Official SWF specification name (spec line 5218)
 
@@ -647,6 +682,9 @@ void actionSetVariable(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_SET_VARIABLE)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md](SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md)
+
 **Notes:**
 - Official SWF specification name (spec line 5240)
 
@@ -656,6 +694,9 @@ void actionSetVariable(char* stack, u32* sp);
 
 **Name Variations:**
 - `ActionSetTarget2` (spec, source: SWF Specification v19)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md](SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5405)
@@ -676,6 +717,9 @@ void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_STRING_ADD)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md](SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4921)
@@ -744,7 +788,7 @@ void actionSetProperty(char* stack, u32* sp);
 - `ActionCloneSprite` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-clone-sprite-0x24.md](SWFRecompDocs/prompts/opcode-clone-sprite-0x24.md)
+- [SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md](SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5561)
@@ -757,7 +801,7 @@ void actionSetProperty(char* stack, u32* sp);
 - `ActionRemoveSprite` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-remove-sprite-0x25.md](SWFRecompDocs/prompts/opcode-remove-sprite-0x25.md)
+- [SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md](SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5583)
@@ -782,6 +826,9 @@ void actionTrace(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_TRACE)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md](SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md)
+
 **Notes:**
 - Official SWF specification name (spec line 5682)
 
@@ -793,7 +840,7 @@ void actionTrace(char* stack, u32* sp);
 - `ActionStartDrag` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-start-drag-0x27.md](SWFRecompDocs/prompts/opcode-start-drag-0x27.md)
+- [SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md](SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5601)
@@ -806,7 +853,7 @@ void actionTrace(char* stack, u32* sp);
 - `ActionEndDrag` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-end-drag-0x28.md](SWFRecompDocs/prompts/opcode-end-drag-0x28.md)
+- [SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md](SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5641)
@@ -847,7 +894,7 @@ void actionStringLess(char* stack, u32* sp);
 - `ActionThrow` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-throw-0x2a.md](SWFRecompDocs/prompts/opcode-throw-0x2a.md)
+- [SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md](SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7289)
@@ -860,7 +907,7 @@ void actionStringLess(char* stack, u32* sp);
 - `ActionCastOp` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-cast-op-0x2b.md](SWFRecompDocs/prompts/opcode-cast-op-0x2b.md)
+- [SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md](SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7141)
@@ -873,7 +920,7 @@ void actionStringLess(char* stack, u32* sp);
 - `ActionImplementsOp` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-implements-op-0x2c.md](SWFRecompDocs/prompts/opcode-implements-op-0x2c.md)
+- [SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md](SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7164)
@@ -996,6 +1043,9 @@ void actionGetTime(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_GET_TIME)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md](SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md)
+
 **Notes:**
 - Official SWF specification name (spec line 5703)
 
@@ -1033,7 +1083,7 @@ void actionGetTime(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mb-ascii-to-char-0x36.md](SWFRecompDocs/prompts/completed/opcode-mb-ascii-to-char-0x36.md)
+- [SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md](SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md)
 
 **Implementation Branch:**
 - **Branch**: `origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB`
@@ -1049,6 +1099,9 @@ void actionGetTime(char* stack, u32* sp);
 
 **Name Variations:**
 - `ActionMBAsciiToChar` (spec, source: SWF Specification v19)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md](SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5115)
@@ -1072,6 +1125,9 @@ void actionDelete(char* stack, u32* sp);
 **Implementation:**
 - SWFModernRuntime/src/actionmodern/action.c
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md](SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md)
+
 **Notes:**
 - Official SWF specification name (spec line 6007)
 
@@ -1093,6 +1149,9 @@ void actionDelete2(char* stack, u32* sp, char* str_buffer);
 
 **Implementation:**
 - SWFModernRuntime/src/actionmodern/action.c
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md](SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6025)
@@ -1200,6 +1259,9 @@ void actionModulo(char* stack, u32* sp);
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MODULO)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md](SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6438)
@@ -1319,6 +1381,9 @@ void actionInitObject(char* stack, u32* sp);
 
 **Test Directories:**
 - `SWFRecomp/tests/typeof_swf_5`
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md](SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6380)
@@ -1451,6 +1516,9 @@ void actionLess2(char* stack, u32* sp);
 **Name Variations:**
 - `ActionEquals2` (spec, source: SWF Specification v19)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md](SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md)
+
 **Notes:**
 - Official SWF specification name (spec line 6068)
 
@@ -1552,6 +1620,9 @@ void actionStackSwap(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_STACK_SWAP)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md](SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md)
+
 **Notes:**
 - Official SWF specification name (spec line 6660)
 
@@ -1626,6 +1697,9 @@ void actionIncrement(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_INCREMENT)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md](SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md)
+
 **Notes:**
 - Official SWF specification name (spec line 6605)
 
@@ -1649,6 +1723,9 @@ void actionDecrement(char* stack, u32* sp);
 **Implementation:**
 - parseActions (case SWF_ACTION_DECREMENT)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md](SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md)
+
 **Notes:**
 - Official SWF specification name (spec line 6586)
 
@@ -1667,6 +1744,9 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer);
 
 **Implementation:**
 - SWFModernRuntime/src/actionmodern/action.c
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md](SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5831)
@@ -1706,6 +1786,9 @@ void actionNewMethod(char* stack, u32* sp);
 **Name Variations:**
 - `ActionInstanceOf` (spec, source: SWF Specification v19)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md](SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md)
+
 **Notes:**
 - Official SWF specification name (spec line 6782)
 
@@ -1739,54 +1822,6 @@ void actionEnumerate2(char* stack, u32* sp, char* str_buffer);
 
 **Notes:**
 - Official SWF specification name (spec line 6806)
-
----
-
-### 0X5A: Unknown
-
-**Name Variations:**
-- `SWF_ACTION_DELETE` (enum, source: action.hpp)
-
-**Test Directories:**
-- `SWFRecomp/tests/delete_swf_5`
-
-**Implementation:**
-- parseActions (case SWF_ACTION_DELETE)
-
-**Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-delete-0x5a.md](SWFRecompDocs/prompts/completed/opcode-delete-0x5a.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-delete-0x5a-011CUqutNyCjGYCvA8jEoP4y`
-- **Commit**: `d985ca6b7d54546eccd19ee6068a8d9d2bbf7531`
-- **Subject**: Implement DELETE opcode (0x5A) for ActionScript 2
-
-**Notes:**
-- C++ enum value for opcode
-
----
-
-### 0X5B: Unknown
-
-**Name Variations:**
-- `SWF_ACTION_DELETE2` (enum, source: action.hpp)
-
-**Test Directories:**
-- `SWFRecomp/tests/delete2_swf_5`
-
-**Implementation:**
-- parseActions (case SWF_ACTION_DELETE2)
-
-**Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-delete2-0x5b.md](SWFRecompDocs/prompts/completed/opcode-delete2-0x5b.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-delete2-0x5b-011CUquufkHrk6Pt1ggisyZL`
-- **Commit**: `2bb7cfff8754f73d7eb1fd14ba91e99817be3bf4`
-- **Subject**: Implement DELETE2 opcode (0x5B) - Object property deletion
-
-**Notes:**
-- C++ enum value for opcode
 
 ---
 
@@ -2051,7 +2086,7 @@ void actionStringGreater(char* stack, u32* sp);
 - `ActionExtends` (spec, source: SWF Specification v19)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/opcode-extends-0x69.md](SWFRecompDocs/prompts/opcode-extends-0x69.md)
+- [SWFRecompDocs/prompts/pending/opcode-extends-0x69.md](SWFRecompDocs/prompts/pending/opcode-extends-0x69.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7120)
@@ -2063,6 +2098,9 @@ void actionStringGreater(char* stack, u32* sp);
 **Name Variations:**
 - `ActionGotoFrame` (spec, source: SWF Specification v19)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md](SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4258)
 
@@ -2072,6 +2110,9 @@ void actionStringGreater(char* stack, u32* sp);
 
 **Name Variations:**
 - `ActionGetURL` (spec, source: SWF Specification v19)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md](SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4281)
@@ -2115,6 +2156,9 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 **Implementation:**
 - parseActions (case SWF_ACTION_CONSTANT_POOL)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md](SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md)
+
 **Notes:**
 - Official SWF specification name (spec line 5868)
 
@@ -2124,6 +2168,9 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 
 **Name Variations:**
 - `ActionWaitForFrame` (spec, source: SWF Specification v19)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md](SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4393)
@@ -2135,6 +2182,9 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 **Name Variations:**
 - `ActionSetTarget` (spec, source: SWF Specification v19)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md](SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4437)
 
@@ -2145,6 +2195,9 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 **Name Variations:**
 - `ActionGoToLabel` (spec, source: SWF Specification v19)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md](SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4449)
 
@@ -2154,6 +2207,9 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 
 **Name Variations:**
 - `ActionWaitForFrame2` (spec, source: SWF Specification v19)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-waitforframe2-0x8d.md](SWFRecompDocs/prompts/pending/opcode-waitforframe2-0x8d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5655)
@@ -2187,6 +2243,9 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 
 **Name Variations:**
 - `ActionTry` (spec, source: SWF Specification v19)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-try-0x8f.md](SWFRecompDocs/prompts/pending/opcode-try-0x8f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7191)
@@ -2227,6 +2286,9 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 **Implementation:**
 - parseActions (case SWF_ACTION_PUSH)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-push-0x96.md](SWFRecompDocs/prompts/batch7/opcode-push-0x96.md)
+
 **Notes:**
 - Official SWF specification name (spec line 4556)
 
@@ -2244,6 +2306,9 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 **Implementation:**
 - parseActions (case SWF_ACTION_JUMP)
 
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md](SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md)
+
 **Notes:**
 - Official SWF specification name (spec line 5139)
 
@@ -2253,6 +2318,9 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 
 **Name Variations:**
 - `ActionGetURL2` (spec, source: SWF Specification v19)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md](SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5262)
@@ -2292,6 +2360,9 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 
 **Implementation:**
 - parseActions (case SWF_ACTION_IF)
+
+**Documentation:**
+- [SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md](SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5163)

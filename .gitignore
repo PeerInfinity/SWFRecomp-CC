@@ -52,3 +52,9 @@ Thumbs.db
 
 # Test executables
 test_vars
+
+# Test results
+test_results.json
+
+# Other
+__pycache__/

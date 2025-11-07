@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "example_test_swf_4",
+    "description": "Tests EXAMPLE_OPCODE with deterministic outputs",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["EXAMPLE_OPCODE"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
