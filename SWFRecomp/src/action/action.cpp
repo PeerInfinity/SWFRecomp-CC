@@ -617,6 +617,18 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_GOTO_FRAME:
+				{
+					// Read the frame index from the action record
+					u16 frame_index = VAL(u16, action_buffer);
+
+					out_script << "	" << "// GotoFrame: " << frame_index << endl
+							   << "	" << "actionGotoFrame(stack, sp, " << frame_index << ");" << endl;
+
+					action_buffer += length;
+					break;
+				}
+
 			case SWF_ACTION_GET_URL:
 			{
 				// Read UrlString (null-terminated)
