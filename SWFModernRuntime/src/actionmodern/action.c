@@ -3468,3 +3468,68 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		return;
 	}
 }
+void actionStartDrag(char* stack, u32* sp)
+{
+	// Pop target sprite name
+	ActionVar target;
+	popVar(stack, sp, &target);
+	const char* target_name = (const char*) target.data.string_data.heap_ptr;
+
+	// Pop lock center flag
+	ActionVar lock_center;
+	popVar(stack, sp, &lock_center);
+
+	// Pop constrain flag
+	ActionVar constrain;
+	popVar(stack, sp, &constrain);
+
+	float x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+	int has_constraint = 0;
+	
+	// Check if we need to pop constraint rectangle
+	// Convert to integer to check if non-zero
+	if (constrain.type == ACTION_STACK_VALUE_F32) {
+		has_constraint = ((int)VAL(float, &constrain.data.numeric_value) != 0);
+	} else if (constrain.type == ACTION_STACK_VALUE_F64) {
+		has_constraint = ((int)VAL(double, &constrain.data.numeric_value) != 0);
+	}
+
+	if (has_constraint) {
+		// Pop constraint rectangle (y2, x2, y1, x1 order)
+		ActionVar y2_var, x2_var, y1_var, x1_var;
+		popVar(stack, sp, &y2_var);
+		popVar(stack, sp, &x2_var);
+		popVar(stack, sp, &y1_var);
+		popVar(stack, sp, &x1_var);
+
+		x1 = (x1_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &x1_var.data.numeric_value) : (float)VAL(double, &x1_var.data.numeric_value);
+		y1 = (y1_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &y1_var.data.numeric_value) : (float)VAL(double, &y1_var.data.numeric_value);
+		x2 = (x2_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &x2_var.data.numeric_value) : (float)VAL(double, &x2_var.data.numeric_value);
+		y2 = (y2_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &y2_var.data.numeric_value) : (float)VAL(double, &y2_var.data.numeric_value);
+	}
+
+	int lock_flag = 0;
+	if (lock_center.type == ACTION_STACK_VALUE_F32) {
+		lock_flag = ((int)VAL(float, &lock_center.data.numeric_value) != 0);
+	} else if (lock_center.type == ACTION_STACK_VALUE_F64) {
+		lock_flag = ((int)VAL(double, &lock_center.data.numeric_value) != 0);
+	}
+
+	#ifndef NO_GRAPHICS
+	// Full implementation would:
+	// 1. Find target MovieClip
+	// 2. Set dragging state
+	// 3. Store drag parameters
+	// 4. Update position each frame based on mouse
+	// startDragMovieClip(target_name, lock_flag, has_constraint, x1, y1, x2, y2);
+	#else
+	// NO_GRAPHICS mode: just log
+	#ifdef DEBUG
+	printf("[StartDrag] %s (lock:%d, constrain:%d)\n",
+		   target_name, lock_flag, has_constraint);
+	if (has_constraint) {
+		printf("  Bounds: (%.1f,%.1f)-(%.1f,%.1f)\n", x1, y1, x2, y2);
+	}
+	#endif
+	#endif
+}

@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "start_drag_swf_4",
+    "description": "Tests START_DRAG opcode (0x27) - Makes a sprite/MovieClip draggable",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["START_DRAG"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
