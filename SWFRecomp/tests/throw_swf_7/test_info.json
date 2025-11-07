@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "throw_swf_7",
+    "description": "Tests THROW opcode (exception handling)",
+    "swf_version": 7
+  },
+  "opcodes": {
+    "tested": ["THROW"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

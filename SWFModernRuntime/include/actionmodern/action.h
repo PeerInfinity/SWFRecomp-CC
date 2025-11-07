@@ -98,6 +98,7 @@ void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 void actionMbStringLength(char* stack, u32* sp, char* v_str);
 void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLess(char* stack, u32* sp);
+void actionThrow(char* stack, u32* sp);
 void actionCharToAscii(char* stack, u32* sp);
 
 void actionGetVariable(char* stack, u32* sp);

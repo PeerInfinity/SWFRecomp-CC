@@ -2067,6 +2067,63 @@ void actionStringLess(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
+void actionThrow(char* stack, u32* sp)
+{
+	// Pop exception value from stack
+	ActionVar exception;
+	popVar(stack, sp, &exception);
+
+	// Print uncaught exception message
+	printf("[Uncaught exception: ");
+
+	switch (exception.type)
+	{
+		case ACTION_STACK_VALUE_STRING:
+		{
+			printf("%s", (const char*) exception.data.numeric_value);
+			break;
+		}
+
+		case ACTION_STACK_VALUE_F32:
+		{
+			printf("%.15g", VAL(float, &exception.data.numeric_value));
+			break;
+		}
+
+		case ACTION_STACK_VALUE_F64:
+		{
+			printf("%.15g", VAL(double, &exception.data.numeric_value));
+			break;
+		}
+
+		case ACTION_STACK_VALUE_OBJECT:
+		{
+			// For objects, just print [Object]
+			printf("[Object]");
+			break;
+		}
+
+		case ACTION_STACK_VALUE_UNDEFINED:
+		{
+			printf("undefined");
+			break;
+		}
+
+		default:
+		{
+			printf("(unknown type)");
+			break;
+		}
+	}
+
+	printf("]\n");
+
+	// Terminate execution
+	// For now, we exit with error code
+	// In a full implementation, this would unwind to a catch block
+	exit(1);
+}
+
 void actionCall(char* stack, u32* sp)
 {
 	// Pop frame identifier (string or number)

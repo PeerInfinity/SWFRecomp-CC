@@ -277,6 +277,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_THROW:
+				{
+					out_script << "\t" << "// Throw" << endl
+							   << "\t" << "actionThrow(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_RANDOM_NUMBER:
 				{
 					out_script << "\t" << "// Random Number" << endl
