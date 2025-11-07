@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "stop_swf_4",
+    "description": "Tests STOP opcode (0x07) - halts execution cleanly at current position",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["STOP"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
