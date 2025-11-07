@@ -1286,6 +1286,27 @@ void actionTrace(char* stack, u32* sp)
 	POP();
 }
 
+void actionEndDrag(char* stack, u32* sp)
+{
+	#ifndef NO_GRAPHICS
+	// Full implementation would:
+	// 1. Clear dragging state
+	// 2. Stop updating sprite position with mouse
+	// if (ctx->dragged_sprite) {
+	//     ctx->dragged_sprite = NULL;
+	// }
+	#else
+	// NO_GRAPHICS mode: just log
+	#ifdef DEBUG
+	printf("[EndDrag]\n");
+	#endif
+	#endif
+
+	// No stack operations - END_DRAG has no parameters
+	(void)stack;  // Suppress unused parameter warning
+	(void)sp;     // Suppress unused parameter warning
+}
+
 void actionGetVariable(char* stack, u32* sp)
 {
 

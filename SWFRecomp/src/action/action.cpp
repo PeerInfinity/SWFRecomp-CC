@@ -269,6 +269,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_END_DRAG:
+				{
+					out_script << "\t" << "// End Drag" << endl
+							   << "\t" << "actionEndDrag(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_STRING_LESS:
 				{
 					out_script << "\t" << "// StringLess" << endl
