@@ -1652,8 +1652,18 @@ void actionTypeof(char* stack, u32* sp, char* str_buffer)
 			type_str = "string";
 			break;
 
+		case ACTION_STACK_VALUE_FUNCTION:
+			type_str = "function";
+			break;
+
 		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_ARRAY:
+			// Arrays are objects in ActionScript (typeof [] returns "object")
 			type_str = "object";
+			break;
+
+		case ACTION_STACK_VALUE_UNDEFINED:
+			type_str = "undefined";
 			break;
 
 		default:

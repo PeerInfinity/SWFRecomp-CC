@@ -2,7 +2,7 @@
 import struct
 
 # Create a minimal SWF5 file with Typeof actions
-# Test typeof operator to verify TYPEOF opcode (0x3C)
+# Test typeof operator to verify TYPEOF opcode (0x44)
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -19,28 +19,28 @@ frame_count = struct.pack('<H', 1)  # 1 frame
 # Expected output: "number"
 float_42 = struct.pack('<f', 42.0)
 action_push_42 = struct.pack('<BHB', 0x96, 5, 1) + float_42  # PUSH 42.0
-action_typeof_1 = bytes([0x3C])  # Typeof (0x3C)
+action_typeof_1 = bytes([0x44])  # Typeof (0x44)
 action_trace_1 = bytes([0x26])  # Trace
 
 # Test Case 2: trace(typeof("hello"))
 # Expected output: "string"
 string_hello = b'hello\x00'
 action_push_hello = struct.pack('<BHB', 0x96, 7, 0) + string_hello  # PUSH "hello"
-action_typeof_2 = bytes([0x3C])  # Typeof (0x3C)
+action_typeof_2 = bytes([0x44])  # Typeof (0x44)
 action_trace_2 = bytes([0x26])  # Trace
 
 # Test Case 3: trace(typeof(3.14))
 # Expected output: "number"
 float_314 = struct.pack('<f', 3.14)
 action_push_314 = struct.pack('<BHB', 0x96, 5, 1) + float_314  # PUSH 3.14
-action_typeof_3 = bytes([0x3C])  # Typeof (0x3C)
+action_typeof_3 = bytes([0x44])  # Typeof (0x44)
 action_trace_3 = bytes([0x26])  # Trace
 
 # Test Case 4: trace(typeof(""))
 # Expected output: "string"
 string_empty = b'\x00'
 action_push_empty = struct.pack('<BHB', 0x96, 1, 0) + string_empty  # PUSH ""
-action_typeof_4 = bytes([0x3C])  # Typeof (0x3C)
+action_typeof_4 = bytes([0x44])  # Typeof (0x44)
 action_trace_4 = bytes([0x26])  # Trace
 
 # END action
