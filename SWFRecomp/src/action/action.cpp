@@ -269,6 +269,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_CLONE_SPRITE:
+				{
+					out_script << "\t" << "// CloneSprite" << endl
+							   << "\t" << "actionCloneSprite(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TRACE:
 				{
 					out_script << "\t" << "// Trace" << endl

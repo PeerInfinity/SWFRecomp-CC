@@ -2689,6 +2689,42 @@ void actionSetProperty(char* stack, u32* sp)
 	}
 }
 
+void actionCloneSprite(char* stack, u32* sp)
+{
+	// Stack layout: [target_name] [source_name] [depth] <- sp
+	// Pop in reverse order: depth, source, target
+
+	// Pop depth
+	convertFloat(stack, sp);
+	ActionVar depth;
+	popVar(stack, sp, &depth);
+
+	// Pop source sprite name
+	ActionVar source;
+	popVar(stack, sp, &source);
+	const char* source_name = (const char*) source.data.numeric_value;
+
+	// Pop target sprite name
+	ActionVar target;
+	popVar(stack, sp, &target);
+	const char* target_name = (const char*) target.data.numeric_value;
+
+	#ifndef NO_GRAPHICS
+	// Full implementation would:
+	// 1. Find source MovieClip in display list
+	// 2. Create deep copy of sprite and its children
+	// 3. Add to display list at specified depth
+	// 4. Assign new name
+	cloneMovieClip(source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
+	#else
+	// NO_GRAPHICS mode: just log the operation
+	#ifdef DEBUG
+	printf("[CloneSprite] %s -> %s (depth %d)\n",
+	       source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
+	#endif
+	#endif
+}
+
 // ==================================================================
 // WITH Statement Implementation
 // ==================================================================
