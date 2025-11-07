@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a SWF5 file to test MB_STRING_LENGTH opcode (0x35)
+# Create a SWF5 file to test MB_STRING_LENGTH opcode (0x31)
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 5  # SWF 5 for multibyte support
@@ -33,8 +33,8 @@ for test_string, description in test_cases:
     action_push = struct.pack('<BHB', 0x96, len(string_bytes) + 1, 0)  # PUSH action, length, type=0 (string)
     action_push += string_bytes
 
-    # MB_STRING_LENGTH opcode (0x35)
-    action_mb_string_length = bytes([0x35])
+    # MB_STRING_LENGTH opcode (0x31)
+    action_mb_string_length = bytes([0x31])
 
     # TRACE the result
     action_trace = bytes([0x26])  # TRACE action (0x26)

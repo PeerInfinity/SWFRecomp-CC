@@ -18,6 +18,53 @@ u32 start_time;
 static ASObject* scope_chain[MAX_SCOPE_DEPTH];
 static u32 scope_depth = 0;
 
+// ==================================================================
+// Function Storage and Management
+// ==================================================================
+
+// Function pointer types
+typedef void (*SimpleFunctionPtr)(char* stack, u32* sp);
+typedef ActionVar (*Function2Ptr)(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+
+// Function object structure
+typedef struct ASFunction {
+	char name[256];           // Function name (can be empty for anonymous)
+	u8 function_type;         // 1 = simple (DefineFunction), 2 = advanced (DefineFunction2)
+	u32 param_count;          // Number of parameters
+
+	// For DefineFunction (type 1)
+	SimpleFunctionPtr simple_func;
+
+	// For DefineFunction2 (type 2)
+	Function2Ptr advanced_func;
+	u8 register_count;
+	u16 flags;
+} ASFunction;
+
+// Function registry
+#define MAX_FUNCTIONS 256
+static ASFunction* function_registry[MAX_FUNCTIONS];
+static u32 function_count = 0;
+
+// Helper to look up function by name
+static ASFunction* lookupFunctionByName(const char* name, u32 name_len) {
+	for (u32 i = 0; i < function_count; i++) {
+		if (strlen(function_registry[i]->name) == name_len &&
+		    strncmp(function_registry[i]->name, name, name_len) == 0) {
+			return function_registry[i];
+		}
+	}
+	return NULL;
+}
+
+// Helper to look up function from ActionVar
+static ASFunction* lookupFunctionFromVar(ActionVar* var) {
+	if (var->type != ACTION_STACK_VALUE_FUNCTION) {
+		return NULL;
+	}
+	return (ASFunction*) var->data.numeric_value;
+}
+
 void initTime()
 {
 	start_time = get_elapsed_ms();
@@ -2573,5 +2620,255 @@ void actionWithEnd(char* stack, u32* sp)
 	else
 	{
 		fprintf(stderr, "ERROR: actionWithEnd called with empty scope chain\n");
+	}
+}
+
+void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(char*, u32*), u32 param_count)
+{
+	// Create function object
+	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
+	if (as_func == NULL) {
+		fprintf(stderr, "ERROR: Failed to allocate memory for function\n");
+		return;
+	}
+
+	// Initialize function object
+	strncpy(as_func->name, name, 255);
+	as_func->name[255] = '\0';
+	as_func->function_type = 1;  // Simple function
+	as_func->param_count = param_count;
+	as_func->simple_func = (SimpleFunctionPtr) func;
+	as_func->advanced_func = NULL;
+	as_func->register_count = 0;
+	as_func->flags = 0;
+
+	// Register function
+	if (function_count < MAX_FUNCTIONS) {
+		function_registry[function_count++] = as_func;
+	} else {
+		fprintf(stderr, "ERROR: Function registry full\n");
+		free(as_func);
+		return;
+	}
+
+	// If named, store in variable
+	if (strlen(name) > 0) {
+		ActionVar func_var;
+		func_var.type = ACTION_STACK_VALUE_FUNCTION;
+		func_var.str_size = 0;
+		func_var.data.numeric_value = (u64) as_func;
+		setVariableByName(name, &func_var);
+	} else {
+		// Anonymous function: push to stack
+		PUSH(ACTION_STACK_VALUE_FUNCTION, (u64) as_func);
+	}
+}
+
+void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags)
+{
+	// Create function object
+	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
+	if (as_func == NULL) {
+		fprintf(stderr, "ERROR: Failed to allocate memory for function\n");
+		return;
+	}
+
+	// Initialize function object
+	strncpy(as_func->name, name, 255);
+	as_func->name[255] = '\0';
+	as_func->function_type = 2;  // Advanced function
+	as_func->param_count = param_count;
+	as_func->simple_func = NULL;
+	as_func->advanced_func = func;
+	as_func->register_count = register_count;
+	as_func->flags = flags;
+
+	// Register function
+	if (function_count < MAX_FUNCTIONS) {
+		function_registry[function_count++] = as_func;
+	} else {
+		fprintf(stderr, "ERROR: Function registry full\n");
+		free(as_func);
+		return;
+	}
+
+	// If named, store in variable
+	if (strlen(name) > 0) {
+		ActionVar func_var;
+		func_var.type = ACTION_STACK_VALUE_FUNCTION;
+		func_var.str_size = 0;
+		func_var.data.numeric_value = (u64) as_func;
+		setVariableByName(name, &func_var);
+	} else {
+		// Anonymous function: push to stack
+		PUSH(ACTION_STACK_VALUE_FUNCTION, (u64) as_func);
+	}
+}
+
+void actionCallFunction(char* stack, u32* sp, char* str_buffer)
+{
+	// 1. Pop function name (string) from stack
+	char func_name_buffer[17];
+	convertString(stack, sp, func_name_buffer);
+	const char* func_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	u32 func_name_len = STACK_TOP_N;
+	POP();
+
+	// 2. Pop number of arguments
+	ActionVar num_args_var;
+	popVar(stack, sp, &num_args_var);
+	u32 num_args = 0;
+
+	if (num_args_var.type == ACTION_STACK_VALUE_F32)
+	{
+		num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
+	}
+	else if (num_args_var.type == ACTION_STACK_VALUE_F64)
+	{
+		num_args = (u32) VAL(double, &num_args_var.data.numeric_value);
+	}
+
+	// 3. Pop arguments from stack (in reverse order)
+	ActionVar* args = NULL;
+	if (num_args > 0)
+	{
+		args = (ActionVar*) malloc(sizeof(ActionVar) * num_args);
+		for (u32 i = 0; i < num_args; i++)
+		{
+			popVar(stack, sp, &args[num_args - 1 - i]);
+		}
+	}
+
+	// 4. Look up and invoke the function
+	ASFunction* func = lookupFunctionByName(func_name, func_name_len);
+
+	if (func != NULL)
+	{
+		if (func->function_type == 2)
+		{
+			// DefineFunction2 with registers and this context
+			ActionVar* registers = NULL;
+			if (func->register_count > 0) {
+				registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+			}
+
+			ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
+
+			if (registers != NULL) free(registers);
+			if (args != NULL) free(args);
+
+			pushVar(stack, sp, &result);
+		}
+		else
+		{
+			// Simple DefineFunction - not yet supported for invocation
+			// Would need to handle differently since simple_func doesn't return a value
+			if (args != NULL) free(args);
+			pushUndefined(stack, sp);
+		}
+	}
+	else
+	{
+		// Function not found - push undefined
+		if (args != NULL) free(args);
+		pushUndefined(stack, sp);
+	}
+}
+
+void actionCallMethod(char* stack, u32* sp, char* str_buffer)
+{
+	// 1. Pop method name (string) from stack
+	char method_name_buffer[17];
+	convertString(stack, sp, method_name_buffer);
+	const char* method_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	u32 method_name_len = STACK_TOP_N;
+	POP();
+
+	// 2. Pop object (receiver/this) from stack
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// 3. Pop number of arguments
+	ActionVar num_args_var;
+	popVar(stack, sp, &num_args_var);
+	u32 num_args = 0;
+
+	if (num_args_var.type == ACTION_STACK_VALUE_F32)
+	{
+		num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
+	}
+	else if (num_args_var.type == ACTION_STACK_VALUE_F64)
+	{
+		num_args = (u32) VAL(double, &num_args_var.data.numeric_value);
+	}
+
+	// 4. Pop arguments from stack (in reverse order)
+	ActionVar* args = NULL;
+	if (num_args > 0)
+	{
+		args = (ActionVar*) malloc(sizeof(ActionVar) * num_args);
+		for (u32 i = 0; i < num_args; i++)
+		{
+			popVar(stack, sp, &args[num_args - 1 - i]);
+		}
+	}
+
+	// 5. Look up the method on the object and invoke it
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+
+		if (obj == NULL)
+		{
+			// Null object - push undefined
+			if (args != NULL) free(args);
+			pushUndefined(stack, sp);
+			return;
+		}
+
+		// Look up the method property
+		ActionVar* method_prop = getProperty(obj, method_name, method_name_len);
+
+		if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			// Get function object
+			ASFunction* func = lookupFunctionFromVar(method_prop);
+
+			if (func != NULL && func->function_type == 2)
+			{
+				// Invoke DefineFunction2 with 'this' binding
+				ActionVar* registers = NULL;
+				if (func->register_count > 0) {
+					registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+				}
+
+				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, (void*) obj);
+
+				if (registers != NULL) free(registers);
+				if (args != NULL) free(args);
+
+				pushVar(stack, sp, &result);
+			}
+			else
+			{
+				// Simple function or invalid - push undefined
+				if (args != NULL) free(args);
+				pushUndefined(stack, sp);
+			}
+		}
+		else
+		{
+			// Method not found or not a function - push undefined
+			if (args != NULL) free(args);
+			pushUndefined(stack, sp);
+			return;
+		}
+	}
+	else
+	{
+		// Not an object - push undefined
+		if (args != NULL) free(args);
+		pushUndefined(stack, sp);
+		return;
 	}
 }

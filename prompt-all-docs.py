@@ -150,6 +150,9 @@ def process_files(md_files, start_index=0, count=None, text_mode=False, prompt_m
             if result.returncode != 0:
                 print(f"Warning: prompt.py returned non-zero exit code {result.returncode}", file=sys.stderr)
 
+            # Save the index after successful processing
+            save_last_index(i)
+
         except KeyboardInterrupt:
             print("\nInterrupted by user", file=sys.stderr)
             print(f"Stopped at index {i}")
@@ -204,7 +207,19 @@ def main():
         process_next_file(md_files, args.text, args.prompt)
     else:
         # Batch mode
-        start = args.start if args.start is not None else 0
+        # If no start index provided, use the state file index (starting from next file)
+        if args.start is not None:
+            start = args.start
+        else:
+            # Get the last processed index from state file and start from the next one
+            last_index = get_last_index()
+            start = last_index + 1
+
+            # If we've already processed all files, reset to 0
+            if start >= len(md_files):
+                print(f"All files already processed (state file shows index {last_index}).", file=sys.stderr)
+                print(f"Starting from beginning (index 0).", file=sys.stderr)
+                start = 0
 
         # Validate batch mode arguments
         if start < 0:

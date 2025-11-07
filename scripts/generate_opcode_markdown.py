@@ -62,8 +62,8 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     # Generate summary table
     md.append("## Summary Table")
     md.append("")
-    md.append("| Hex | Spec Name | Enum Name | Function Name | Tests | Docs | Branch |")
-    md.append("|-----|-----------|-----------|---------------|-------|------|--------|")
+    md.append("| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Branch |")
+    md.append("|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|--------|")
 
     for hex_val in sorted(opcodes.keys()):
         entries = opcodes[hex_val]
@@ -72,14 +72,20 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
         spec_name = ""
         enum_name = ""
         func_name = ""
-        test_count = 0
+        primary_count = 0
+        secondary_count = 0
+        passing_primary_count = 0
+        passing_secondary_count = 0
         has_docs = ""
         has_branch = ""
 
         for entry in entries:
             if entry['type'] == 'spec':
                 spec_name = entry['name']
-                test_count = len(entry.get('test_directories', []))
+                primary_count = len(entry.get('tests_primary', []))
+                secondary_count = len(entry.get('tests_secondary', []))
+                passing_primary_count = len(entry.get('tests_primary_passing', []))
+                passing_secondary_count = len(entry.get('tests_secondary_passing', []))
                 has_docs = "✓" if entry.get('documentation_prompt') else ""
                 has_branch = "✓" if entry.get('implementation_branch') else ""
             elif entry['type'] == 'enum':
@@ -87,8 +93,13 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
             elif entry['type'] == 'function':
                 func_name = entry['name']
 
-        # Format test count
-        test_str = str(test_count) if test_count > 0 else ""
+        # Format test counts as "passing/total"
+        primary_str = f"{passing_primary_count}/{primary_count}" if primary_count > 0 else ""
+        secondary_str = f"{passing_secondary_count}/{secondary_count}" if secondary_count > 0 else ""
+
+        # Calculate failing tests
+        failing_primary_count = primary_count - passing_primary_count
+        failing_str = str(failing_primary_count) if failing_primary_count > 0 else ""
 
         if with_links:
             # Create links to detailed section
@@ -103,7 +114,7 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
             enum_link = enum_name
             func_link = func_name
 
-        md.append(f"| {hex_link} | {spec_link} | {enum_link} | {func_link} | {test_str} | {has_docs} | {has_branch} |")
+        md.append(f"| {hex_link} | {spec_link} | {enum_link} | {func_link} | {primary_str} | {secondary_str} | {failing_str} | {has_docs} | {has_branch} |")
 
     md.append("")
     return "\n".join(md)
@@ -146,11 +157,22 @@ def generate_detailed_sections(index: Dict) -> str:
         # Get common data from first entry
         first_entry = entries[0]
 
-        # Test directories
-        if first_entry.get('test_directories'):
-            md.append("**Test Directories:**")
-            for test_dir in first_entry['test_directories']:
-                md.append(f"- `{test_dir}`")
+        # Primary Tests
+        if first_entry.get('tests_primary'):
+            md.append("**Primary Tests:**")
+            tests_primary_passing = set(first_entry.get('tests_primary_passing', []))
+            for test_dir in first_entry['tests_primary']:
+                status = "✓" if test_dir in tests_primary_passing else "✗"
+                md.append(f"- [{status}] `{test_dir}`")
+            md.append("")
+
+        # Secondary Tests
+        if first_entry.get('tests_secondary'):
+            md.append("**Secondary Tests:**")
+            tests_secondary_passing = set(first_entry.get('tests_secondary_passing', []))
+            for test_dir in first_entry['tests_secondary']:
+                status = "✓" if test_dir in tests_secondary_passing else "✗"
+                md.append(f"- [{status}] `{test_dir}`")
             md.append("")
 
         # Function declarations
@@ -220,14 +242,18 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
                 'spec_name': '',
                 'has_enum': False,
                 'has_function': False,
-                'has_tests': False,
+                'has_primary_tests': False,
+                'primary_count': 0,
+                'passing_primary_count': 0,
                 'has_docs': False,
                 'has_branch': False
             }
 
         if entry['type'] == 'spec':
             opcodes[hex_val]['spec_name'] = entry['name']
-            opcodes[hex_val]['has_tests'] = len(entry.get('test_directories', [])) > 0
+            opcodes[hex_val]['has_primary_tests'] = len(entry.get('tests_primary', [])) > 0
+            opcodes[hex_val]['primary_count'] = len(entry.get('tests_primary', []))
+            opcodes[hex_val]['passing_primary_count'] = len(entry.get('tests_primary_passing', []))
             opcodes[hex_val]['has_docs'] = bool(entry.get('documentation_prompt'))
             opcodes[hex_val]['has_branch'] = bool(entry.get('implementation_branch'))
         elif entry['type'] == 'enum':
@@ -242,19 +268,23 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     md.append("### ✅ Fully Implemented")
     md.append("(Has enum, function, and tests)")
     md.append("")
-    md.append("| Hex | Spec Name | Enum | Function | Tests | Docs | Branch |")
-    md.append("|-----|-----------|------|----------|-------|------|--------|")
+    md.append("| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs | Branch |")
+    md.append("|-----|-----------|------|----------|---------------|-----------------|------|--------|")
 
     for hex_val in sorted(opcodes.keys()):
         opc = opcodes[hex_val]
-        if opc['has_enum'] and opc['has_function'] and opc['has_tests']:
+        if opc['has_enum'] and opc['has_function'] and opc['has_primary_tests']:
             if with_links:
                 hex_link = make_link(opc['hex'], opc['hex'], opc['spec_name']) if opc['spec_name'] else opc['hex']
                 spec_link = make_link(opc['spec_name'], opc['hex'], opc['spec_name']) if opc['spec_name'] else ""
             else:
                 hex_link = opc['hex']
                 spec_link = opc['spec_name']
-            md.append(f"| {hex_link} | {spec_link} | ✓ | ✓ | ✓ | {'✓' if opc['has_docs'] else ''} | {'✓' if opc['has_branch'] else ''} |")
+
+            test_status = f"{opc['passing_primary_count']}/{opc['primary_count']}"
+            failing_count = opc['primary_count'] - opc['passing_primary_count']
+            failing_str = str(failing_count) if failing_count > 0 else ""
+            md.append(f"| {hex_link} | {spec_link} | ✓ | ✓ | {test_status} | {failing_str} | {'✓' if opc['has_docs'] else ''} | {'✓' if opc['has_branch'] else ''} |")
 
     md.append("")
 
@@ -262,19 +292,19 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     md.append("### 🔄 Partially Implemented")
     md.append("(Has enum or function, but missing tests)")
     md.append("")
-    md.append("| Hex | Spec Name | Enum | Function | Tests | Docs | Branch |")
-    md.append("|-----|-----------|------|----------|-------|------|--------|")
+    md.append("| Hex | Spec Name | Enum | Function | Docs | Branch |")
+    md.append("|-----|-----------|------|----------|------|--------|")
 
     for hex_val in sorted(opcodes.keys()):
         opc = opcodes[hex_val]
-        if (opc['has_enum'] or opc['has_function']) and not opc['has_tests']:
+        if (opc['has_enum'] or opc['has_function']) and not opc['has_primary_tests']:
             if with_links:
                 hex_link = make_link(opc['hex'], opc['hex'], opc['spec_name']) if opc['spec_name'] else opc['hex']
                 spec_link = make_link(opc['spec_name'], opc['hex'], opc['spec_name']) if opc['spec_name'] else ""
             else:
                 hex_link = opc['hex']
                 spec_link = opc['spec_name']
-            md.append(f"| {hex_link} | {spec_link} | {'✓' if opc['has_enum'] else ''} | {'✓' if opc['has_function'] else ''} | | {'✓' if opc['has_docs'] else ''} | {'✓' if opc['has_branch'] else ''} |")
+            md.append(f"| {hex_link} | {spec_link} | {'✓' if opc['has_enum'] else ''} | {'✓' if opc['has_function'] else ''} | {'✓' if opc['has_docs'] else ''} | {'✓' if opc['has_branch'] else ''} |")
 
     md.append("")
 

@@ -367,8 +367,11 @@ namespace SWFRecomp
 				case SWF_ACTION_RETURN:
 				{
 					out_script << "\t" << "// Return" << endl
-							   << "\t" << "actionReturn(stack, sp);" << endl
-							   << "\t" << "return;" << endl;
+							   << "\t" << "{" << endl
+							   << "\t\t" << "ActionVar ret_val;" << endl
+							   << "\t\t" << "popVar(stack, sp, &ret_val);" << endl
+							   << "\t\t" << "return ret_val;" << endl
+							   << "\t" << "}" << endl;
 
 					break;
 				}
@@ -647,7 +650,7 @@ namespace SWFRecomp
 				{
 					context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].value.u64 = (u64)this_obj;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
 					next_reg++;
 				}
 
@@ -672,7 +675,7 @@ namespace SWFRecomp
 					{
 						// Variable parameter
 						context.out_script_defs << "\tif (" << i << " < arg_count) {" << endl;
-						context.out_script_defs << "\t\t// TODO: Set variable parameter '" << params[i].second << "' to args[" << i << "]" << endl;
+						context.out_script_defs << "\t\tsetVariableByName(\"" << params[i].second << "\", &args[" << i << "]);" << endl;
 						context.out_script_defs << "\t}" << endl;
 					}
 					else
@@ -684,13 +687,30 @@ namespace SWFRecomp
 					}
 				}
 
-				// For now, skip the function body and just return undefined
-				// TODO: Parse function body recursively
-				context.out_script_defs << "\t// Function body (" << code_size << " bytes)" << endl;
-				context.out_script_defs << "\t// TODO: Parse function body" << endl;
+				// Parse function body recursively
+				context.out_script_defs << endl << "\t// Function body (" << code_size << " bytes)" << endl;
 
+				// Save the function body boundaries
+				char* func_body_start = action_buffer;
+				char* func_body_end = action_buffer + code_size;
+
+				// Create a temporary buffer for the function body that ends with END_OF_ACTIONS
+				// This ensures parseActions stops at the right place
+				char* temp_buffer = (char*)malloc(code_size + 1);
+				memcpy(temp_buffer, func_body_start, code_size);
+				temp_buffer[code_size] = 0x00; // Add END_OF_ACTIONS marker
+
+				char* temp_ptr = temp_buffer;
+				parseActions(context, temp_ptr, context.out_script_defs);
+				free(temp_buffer);
+
+				// Advance the actual buffer past the function body
+				action_buffer = func_body_end;
+
+				context.out_script_defs << endl << "\t// Return undefined if no explicit return" << endl;
 				context.out_script_defs << "\tActionVar ret;" << endl;
 				context.out_script_defs << "\tret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+				context.out_script_defs << "\tret.data.numeric_value = 0;" << endl;
 				context.out_script_defs << "\treturn ret;" << endl;
 				context.out_script_defs << "}" << endl;
 
@@ -699,9 +719,7 @@ namespace SWFRecomp
 				out_script << "\tactionDefineFunction2(stack, sp, \"" << (name_len > 0 ? func_name : "") << "\", "
 						   << func_id << ", " << num_params << ", " << (int)register_count << ", " << flags << ");" << endl;
 
-				// Skip function body in bytecode
-				action_buffer += code_size;
-
+				// action_buffer has already been advanced by parseActions
 				break;
 			}
 				
@@ -836,6 +854,91 @@ namespace SWFRecomp
 
 					break;
 				}
+
+			case SWF_ACTION_DEFINE_FUNCTION:
+			{
+				// Parse function metadata
+				char* func_name = action_buffer;
+				size_t name_len = strlen(func_name);
+				action_buffer += name_len + 1;
+
+				u16 num_params = VAL(u16, action_buffer);
+				action_buffer += 2;
+
+				// Parse parameter names
+				std::vector<std::string> params;
+				for (u16 i = 0; i < num_params; i++)
+				{
+					char* param_name = action_buffer;
+					size_t param_len = strlen(param_name);
+					action_buffer += param_len + 1;
+					params.push_back(std::string(param_name));
+				}
+
+				u16 code_size = VAL(u16, action_buffer);
+				action_buffer += 2;
+
+				// Generate unique function ID
+				static int func_counter = 0;
+				std::string func_id = std::string("func_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func_counter++);
+
+				// Add function declaration to header
+				context.out_script_decls << endl << "void " << func_id << "(char* stack, u32* sp);" << endl;
+
+				// Generate function definition
+				context.out_script_defs << endl << endl
+					<< "// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl
+					<< "void " << func_id << "(char* stack, u32* sp)" << endl
+					<< "{" << endl;
+
+				// Bind parameters (simple DefineFunction uses variables, not registers)
+				for (size_t i = 0; i < params.size(); i++)
+				{
+					context.out_script_defs << "\t// TODO: Bind parameter '" << params[i] << "' from arguments" << endl;
+				}
+
+				// Parse function body recursively
+				context.out_script_defs << endl << "\t// Function body (" << code_size << " bytes)" << endl;
+
+				char* func_body_start = action_buffer;
+				char* func_body_end = action_buffer + code_size;
+
+				// Create temporary buffer with END_OF_ACTIONS marker
+				char* temp_buffer = (char*)malloc(code_size + 1);
+				memcpy(temp_buffer, func_body_start, code_size);
+				temp_buffer[code_size] = 0x00;
+
+				char* temp_ptr = temp_buffer;
+				parseActions(context, temp_ptr, context.out_script_defs);
+				free(temp_buffer);
+
+				action_buffer = func_body_end;
+
+				context.out_script_defs << "}" << endl;
+
+				// Generate runtime call to register function
+				out_script << "\t// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl;
+				out_script << "\tactionDefineFunction(stack, sp, \"" << (name_len > 0 ? func_name : "") << "\", "
+						   << func_id << ", " << num_params << ");" << endl;
+
+				break;
+			}
+
+			case SWF_ACTION_CALL_FUNCTION:
+			{
+				out_script << "\t" << "// CallFunction" << endl
+						   << "\t" << "actionCallFunction(stack, sp, str_buffer);" << endl;
+
+				break;
+			}
+
+			case SWF_ACTION_CALL_METHOD:
+			{
+				out_script << "\t" << "// CallMethod" << endl
+						   << "\t" << "actionCallMethod(stack, sp, str_buffer);" << endl;
+
+				break;
+			}
 
 				default:
 				{

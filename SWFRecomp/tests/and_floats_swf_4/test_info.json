@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "and_floats_swf_4",
+    "description": "Tests ActionAnd opcode with both operands true (1 && 1)",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["AND"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

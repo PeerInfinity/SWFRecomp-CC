@@ -2,7 +2,7 @@
 import struct
 
 # Create a minimal SWF4 file with AsciiToChar actions
-# Test ASCII code to character conversion using ASCII_TO_CHAR opcode (0x32)
+# Test ASCII code to character conversion using ASCII_TO_CHAR opcode (0x33)
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -19,35 +19,35 @@ frame_count = struct.pack('<H', 1)  # 1 frame
 # Expected output: "A"
 float_65 = struct.pack('<f', 65.0)
 action_push_65 = struct.pack('<BHB', 0x96, 5, 1) + float_65  # PUSH 65.0
-action_ascii_to_char_1 = bytes([0x32])  # AsciiToChar (0x32)
+action_ascii_to_char_1 = bytes([0x33])  # AsciiToChar (0x33)
 action_trace_1 = bytes([0x26])  # Trace
 
 # Test Case 2: trace(chr(97))
 # Expected output: "a"
 float_97 = struct.pack('<f', 97.0)
 action_push_97 = struct.pack('<BHB', 0x96, 5, 1) + float_97  # PUSH 97.0
-action_ascii_to_char_2 = bytes([0x32])  # AsciiToChar (0x32)
+action_ascii_to_char_2 = bytes([0x33])  # AsciiToChar (0x33)
 action_trace_2 = bytes([0x26])  # Trace
 
 # Test Case 3: trace(chr(33))
 # Expected output: "!"
 float_33 = struct.pack('<f', 33.0)
 action_push_33 = struct.pack('<BHB', 0x96, 5, 1) + float_33  # PUSH 33.0
-action_ascii_to_char_3 = bytes([0x32])  # AsciiToChar (0x32)
+action_ascii_to_char_3 = bytes([0x33])  # AsciiToChar (0x33)
 action_trace_3 = bytes([0x26])  # Trace
 
 # Test Case 4: trace(chr(32))
 # Expected output: " " (space character)
 float_32 = struct.pack('<f', 32.0)
 action_push_32 = struct.pack('<BHB', 0x96, 5, 1) + float_32  # PUSH 32.0
-action_ascii_to_char_4 = bytes([0x32])  # AsciiToChar (0x32)
+action_ascii_to_char_4 = bytes([0x33])  # AsciiToChar (0x33)
 action_trace_4 = bytes([0x26])  # Trace
 
 # Test Case 5: trace(chr(233))
 # Expected output: "é"
 float_233 = struct.pack('<f', 233.0)
 action_push_233 = struct.pack('<BHB', 0x96, 5, 1) + float_233  # PUSH 233.0
-action_ascii_to_char_5 = bytes([0x32])  # AsciiToChar (0x32)
+action_ascii_to_char_5 = bytes([0x33])  # AsciiToChar (0x33)
 action_trace_5 = bytes([0x26])  # Trace
 
 # END action

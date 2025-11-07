@@ -125,8 +125,18 @@ def parse_action_h() -> Dict[str, Dict]:
     return functions
 
 
-def scan_test_directories() -> Dict[str, List[str]]:
-    """Scan test directories and map them to opcodes."""
+def scan_test_directories() -> Dict[str, Dict[str, List[str]]]:
+    """
+    Scan test directories and map them to opcodes by reading test_info.json files.
+
+    Returns a dict mapping hex values to test information:
+    {
+        "0x0A": {
+            "tested": ["SWFRecomp/tests/add_swf_4"],
+            "supporting": ["SWFRecomp/tests/other_test_swf_4"]
+        }
+    }
+    """
     test_dir = BASE_DIR / "SWFRecomp/tests"
     test_map = {}
 
@@ -136,26 +146,65 @@ def scan_test_directories() -> Dict[str, List[str]]:
         print("  ERROR: Test directory not found")
         return test_map
 
-    # Find all test directories matching pattern *_swf_*
+    # Parse action.hpp to get mapping from opcode names to hex values
+    hpp_path = BASE_DIR / "SWFRecomp/include/action/action.hpp"
+    opcode_name_to_hex = {}
+
+    with open(hpp_path, 'r') as f:
+        content = f.read()
+
+    # Find the SWFActionType enum
+    enum_match = re.search(r'enum\s+SWFActionType\s*\{([^}]+)\}', content, re.DOTALL)
+    if enum_match:
+        enum_body = enum_match.group(1)
+        pattern = r'(SWF_ACTION_\w+)\s*=\s*(0x[0-9A-Fa-f]+)'
+        for match in re.finditer(pattern, enum_body):
+            enum_name = match.group(1)
+            hex_value = match.group(2).upper()
+            # Store mapping from short name to hex
+            # e.g., SWF_ACTION_ADD -> ADD
+            short_name = enum_name.replace('SWF_ACTION_', '')
+            opcode_name_to_hex[short_name] = hex_value
+
+    # Find all test directories with test_info.json
     for item in sorted(test_dir.iterdir()):
         if item.is_dir() and '_swf_' in item.name:
-            test_name = item.name
-            relative_path = f"SWFRecomp/tests/{test_name}"
+            test_info_path = item / "test_info.json"
 
-            # Extract opcode name from directory name (e.g., "add2_swf_5" -> "add2")
-            opcode_part = test_name.split('_swf_')[0]
+            if not test_info_path.exists():
+                continue
 
-            # Convert to various formats to match against
-            # e.g., "add2" -> ["add2", "ADD2", "Add2"]
-            key = opcode_part.lower()
+            try:
+                with open(test_info_path, 'r') as f:
+                    test_info = json.load(f)
 
-            if key not in test_map:
-                test_map[key] = []
+                test_name = item.name
+                relative_path = f"SWFRecomp/tests/{test_name}"
 
-            test_map[key].append(relative_path)
-            print(f"  Found: {relative_path}")
+                # Get the opcodes from test_info.json
+                opcodes_tested = test_info.get('opcodes', {}).get('tested', [])
+                opcodes_supporting = test_info.get('opcodes', {}).get('supporting', [])
 
-    print(f"Total test directory groups: {len(test_map)}")
+                # Map opcode names to hex values
+                for opcode_name in opcodes_tested:
+                    hex_value = opcode_name_to_hex.get(opcode_name)
+                    if hex_value:
+                        if hex_value not in test_map:
+                            test_map[hex_value] = {"tested": [], "supporting": []}
+                        test_map[hex_value]["tested"].append(relative_path)
+                        print(f"  Found: {relative_path} tests {opcode_name} ({hex_value})")
+
+                for opcode_name in opcodes_supporting:
+                    hex_value = opcode_name_to_hex.get(opcode_name)
+                    if hex_value:
+                        if hex_value not in test_map:
+                            test_map[hex_value] = {"tested": [], "supporting": []}
+                        test_map[hex_value]["supporting"].append(relative_path)
+
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"  WARNING: Could not parse {test_info_path}: {e}")
+
+    print(f"Total opcodes with tests: {len(test_map)}")
     return test_map
 
 
@@ -237,6 +286,40 @@ def parse_repository_data() -> Dict[str, Dict]:
     return branch_map
 
 
+def load_test_results() -> Dict[str, bool]:
+    """
+    Load test_results.json and return a mapping of test names to pass/fail status.
+
+    Returns:
+        Dict mapping test name to whether it passed (True/False)
+    """
+    test_results_path = BASE_DIR / "SWFRecomp/tests/test_results.json"
+    test_status = {}
+
+    print(f"\nLoading test results: {test_results_path}")
+
+    if not test_results_path.exists():
+        print("  WARNING: test_results.json not found")
+        return test_status
+
+    try:
+        with open(test_results_path, 'r') as f:
+            data = json.load(f)
+
+        for test in data.get('tests', []):
+            test_name = test.get('name')
+            passed = test.get('passed', False)
+            if test_name:
+                test_status[test_name] = passed
+                print(f"  {test_name}: {'PASS' if passed else 'FAIL'}")
+
+        print(f"Total test results loaded: {len(test_status)}")
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"  WARNING: Could not parse test_results.json: {e}")
+
+    return test_status
+
+
 def normalize_name_for_matching(name: str) -> str:
     """Normalize a name for matching purposes."""
     # Remove common prefixes/suffixes
@@ -248,31 +331,9 @@ def normalize_name_for_matching(name: str) -> str:
     return name.lower().replace('_', '')
 
 
-def match_test_directories(opcode_info: Dict, test_map: Dict[str, List[str]]) -> List[str]:
-    """Match test directories to an opcode based on various name formats."""
-    tests = []
-
-    # Try matching with spec name
-    if 'spec_name' in opcode_info:
-        key = normalize_name_for_matching(opcode_info['spec_name'])
-        if key in test_map:
-            tests.extend(test_map[key])
-
-    # Try matching with enum name
-    if 'enum_name' in opcode_info:
-        key = normalize_name_for_matching(opcode_info['enum_name'])
-        if key in test_map:
-            tests.extend(test_map[key])
-
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_tests = []
-    for test in tests:
-        if test not in seen:
-            seen.add(test)
-            unique_tests.append(test)
-
-    return unique_tests
+def get_test_directories_for_opcode(hex_value: str, test_map: Dict[str, Dict[str, List[str]]]) -> Dict[str, List[str]]:
+    """Get test directories for an opcode by hex value."""
+    return test_map.get(hex_value, {"tested": [], "supporting": []})
 
 
 def match_function_name(opcode_info: Dict, functions: Dict[str, Dict]) -> Optional[Dict]:
@@ -305,6 +366,7 @@ def build_opcode_index():
     test_map = scan_test_directories()
     prompt_map = scan_documentation_prompts()
     branch_map = parse_repository_data()
+    test_results = load_test_results()
 
     # Merge all data
     print("\n" + "=" * 80)
@@ -323,11 +385,27 @@ def build_opcode_index():
         spec_info = spec_opcodes.get(hex_value, {})
         enum_info = enum_opcodes.get(hex_value, {})
 
-        # Find matching test directories
-        combined_info = {**spec_info, **enum_info}
-        test_dirs = match_test_directories(combined_info, test_map)
+        # Get test directories for this opcode
+        test_info = get_test_directories_for_opcode(hex_value, test_map)
+        tests_tested = test_info["tested"]
+        tests_supporting = test_info["supporting"]
+
+        # Determine passing tests
+        tests_tested_passing = []
+        tests_supporting_passing = []
+
+        for test_path in tests_tested:
+            test_name = test_path.split('/')[-1]  # Extract test name from path
+            if test_results.get(test_name, False):
+                tests_tested_passing.append(test_path)
+
+        for test_path in tests_supporting:
+            test_name = test_path.split('/')[-1]
+            if test_results.get(test_name, False):
+                tests_supporting_passing.append(test_path)
 
         # Find matching function
+        combined_info = {**spec_info, **enum_info}
         func_info = match_function_name(combined_info, functions)
 
         # Get documentation prompt
@@ -345,7 +423,10 @@ def build_opcode_index():
                 'type': 'spec',
                 'function_declaration': None,
                 'function_implementation': None,
-                'test_directories': test_dirs,
+                'tests_primary': tests_tested,
+                'tests_secondary': tests_supporting,
+                'tests_primary_passing': tests_tested_passing,
+                'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
                 'implementation_branch': branch,
                 'notes': f"Official SWF specification name (spec line {spec_info.get('line_number', 'unknown')})"
@@ -360,7 +441,10 @@ def build_opcode_index():
                 'type': 'enum',
                 'function_declaration': None,
                 'function_implementation': f"parseActions (case {enum_info['enum_name']})",
-                'test_directories': test_dirs,
+                'tests_primary': tests_tested,
+                'tests_secondary': tests_supporting,
+                'tests_primary_passing': tests_tested_passing,
+                'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
                 'implementation_branch': branch,
                 'notes': 'C++ enum value for opcode'
@@ -375,16 +459,19 @@ def build_opcode_index():
                 'type': 'function',
                 'function_declaration': func_info['declaration'],
                 'function_implementation': 'SWFModernRuntime/src/actionmodern/action.c',
-                'test_directories': test_dirs,
+                'tests_primary': tests_tested,
+                'tests_secondary': tests_supporting,
+                'tests_primary_passing': tests_tested_passing,
+                'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
                 'implementation_branch': branch,
                 'notes': f"Runtime function (action.h line {func_info.get('line_number', 'unknown')})"
             })
 
-    # Count implemented opcodes (those with test directories)
+    # Count implemented opcodes (those with primary tests)
     implemented_hex_values = set()
     for entry in entries:
-        if entry['test_directories']:
+        if entry.get('tests_primary'):
             implemented_hex_values.add(entry['hex'])
 
     # Build final index

@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "and_floats_nonzero_swf_4",
+    "description": "Tests ActionAnd opcode with non-zero numbers (5 && 3)",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["AND"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

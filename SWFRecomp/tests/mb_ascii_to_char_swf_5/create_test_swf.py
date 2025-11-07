@@ -14,7 +14,7 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# Test cases for mbchr (MB_ASCII_TO_CHAR opcode 0x36)
+# Test cases for mbchr (MB_ASCII_TO_CHAR opcode 0x37)
 test_cases = [
     (65, "A"),          # Test 1: Basic ASCII
     (233, "é"),         # Test 2: 2-byte UTF-8 (U+00E9)
@@ -32,8 +32,8 @@ for codepoint, expected in test_cases:
     action_push += struct.pack('<f', float(codepoint))
     actions += action_push
 
-    # MB_ASCII_TO_CHAR operation (0x36)
-    action_mb_ascii_to_char = bytes([0x36])
+    # MB_ASCII_TO_CHAR operation (0x37)
+    action_mb_ascii_to_char = bytes([0x37])
     actions += action_mb_ascii_to_char
 
     # Trace action (0x26)

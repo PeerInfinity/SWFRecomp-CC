@@ -128,6 +128,28 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 	return var;
 }
 
+void setVariableByName(const char* var_name, ActionVar* value)
+{
+	size_t key_size = strlen(var_name);
+	ActionVar* var = getVariable((char*)var_name, key_size);
+
+	if (var == NULL) {
+		return;
+	}
+
+	// Free old data if it was a heap-allocated string
+	if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory) {
+		free(var->data.string_data.heap_ptr);
+		var->data.string_data.heap_ptr = NULL;
+		var->data.string_data.owns_memory = false;
+	}
+
+	// Copy the new value
+	var->type = value->type;
+	var->str_size = value->str_size;
+	var->data = value->data;
+}
+
 char* materializeStringList(char* stack, u32 sp)
 {
 	ActionStackValueType type = stack[sp];

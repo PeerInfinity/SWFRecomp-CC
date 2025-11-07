@@ -23,23 +23,27 @@ cmake ..
 make
 cd ../..
 
-# 2. Test the build system works
+# 2. Build and run a test
 cd SWFRecomp
 ./scripts/build_test.sh trace_swf_4 native
-
-# 3. Run the test
 ./tests/trace_swf_4/build/native/trace_swf_4
 ```
 
 **Expected output:**
 ```
-WASM SWF Runtime Loaded!
+SWF Runtime Loaded (Native Build)
+
 === SWF Execution Started (NO_GRAPHICS mode) ===
+
 [Frame 0]
+[Tag] SetBackgroundColor(255, 255, 255)
 sup from SWF 4
 [Tag] ShowFrame()
+
 === SWF Execution Completed ===
 ```
+
+**Note**: When tests are run through the test suite (`all_tests.sh`), the runtime messages (lines starting with "SWF Runtime", "===", "[Frame", "[Tag]", and empty lines) are automatically filtered out, leaving only the actual test output (in this case, "sup from SWF 4").
 
 If this works, your environment is ready for opcode implementation!
 
@@ -426,7 +430,7 @@ See `tests/templates/README.md` for detailed validation patterns and examples.
 
 **Auto-generation feature** (added 2025-11-05): The build script now automatically detects when `test.swf` is missing and looks for generation scripts (`create_test_swf.py`, `generate_swf.py`, `make_test.py`, `create_swf.py`). If found, it runs the script automatically before compilation. This eliminates the manual step of generating test files.
 
-#### Step 7: Build Test
+#### Step 7: Build and Test
 
 Build your test to verify the implementation works:
 
@@ -455,18 +459,50 @@ cd SWFRecomp
 - Native: `tests/your_opcode_swf_4/build/native/your_opcode_swf_4`
 - WASM: `tests/your_opcode_swf_4/build/wasm/your_opcode_swf_4.wasm` (if you have Emscripten)
 
+**Understanding test output:**
+
+When you run a test directly, you'll see runtime messages along with the actual output:
+```
+SWF Runtime Loaded (Native Build)
+
+=== SWF Execution Started (NO_GRAPHICS mode) ===
+
+[Frame 0]
+[Tag] SetBackgroundColor(255, 255, 255)
+42
+[Tag] ShowFrame()
+
+=== SWF Execution Completed ===
+```
+
+In this example, the actual test output is just `42`. The test validation system automatically filters out:
+- Lines starting with "SWF Runtime"
+- Lines starting with "==="
+- Lines starting with "[Frame"
+- Lines starting with "[Tag]"
+- Empty lines
+
+So your `validate.py` script will receive only the clean output: `42`
+
 #### Step 8: Verify with Test Runner
 
 Run the automated test suite to verify your implementation:
 
 ```bash
-# Run all tests (from SWFRecomp/tests directory)
-cd tests
+# Run all tests
+cd SWFRecomp/tests
 ./all_tests.sh
 
-# Or run manually for your specific test
-cd your_opcode_swf_4
-./build/native/your_opcode_swf_4 2>&1 | grep -v "SWF Runtime" | grep -v "===" | grep -v "\[Frame" | grep -v "\[Tag\]" | grep -v "^$" | ./validate.py
+# Or run just your test
+cd SWFRecomp/tests
+./all_tests.sh your_opcode_swf_4
+
+# Or manually test validation script (for debugging)
+cd SWFRecomp/tests/your_opcode_swf_4
+../../scripts/build_test.sh your_opcode_swf_4 native
+./build/native/your_opcode_swf_4 2>&1 | \
+  grep -v "SWF Runtime" | grep -v "===" | grep -v "\[Frame" | grep -v "\[Tag\]" | grep -v "^$" | \
+  ./validate.py
 ```
 
 **Expected validation output** (JSON):
@@ -484,18 +520,34 @@ cd your_opcode_swf_4
 }
 ```
 
+**Test suite output:**
+
+When running `./all_tests.sh`, you'll see a summary like:
+```
+========================================
+SWFRecomp Test Suite Results
+========================================
+Timestamp: 2025-11-06 12:34:56
+
+Tests:     95 / 95 passed (0 failed, 0 skipped)
+Sub-tests: 150 / 150 passed
+Time:      45.2s total (build: 32.1s, run: 13.1s)
+
+Results saved to: tests/test_results.json
+========================================
+```
+
 **If validation fails**:
 - Check that expected values in validate.py match test specification
-- Verify test output matches what you expect
+- Verify test output matches what you expect (run test manually first)
 - Add debug output to validate.py to see what's being compared
-- Check test_utils.py is being imported correctly (path issue)
+- Check test_utils.py is being imported correctly (use `sys.path.insert(0, '..')`)
+- Verify the output filtering is working correctly
 
-**Test suite output**:
-When running `./all_tests.sh`, you'll see:
-- Colored pass/fail indicators for each test
-- Summary with total passed/failed counts
-- Detailed failure messages for any failures
-- JSON results saved to `tests/test_results.json`
+**Detailed results:**
+- JSON results are saved to `tests/test_results.json`
+- Contains build times, execution times, and detailed failure messages
+- Includes all sub-test results for debugging
 
 ## Build System Details
 
@@ -520,7 +572,8 @@ The `scripts/build_test.sh` script automates the entire build process:
 # Build native executable
 ./scripts/build_test.sh <test_name> native
 
-# Build WASM (requires Emscripten)
+# Build WASM (requires Emscripten and emsdk activation)
+source ~/tools/emsdk/emsdk_env.sh  # Activate Emscripten first
 ./scripts/build_test.sh <test_name> wasm
 ```
 
@@ -532,7 +585,9 @@ The `scripts/build_test.sh` script automates the entire build process:
 - Links with c-hashmap for variable storage
 - Creates clean build directory structure
 
-**Build time**: ~2 seconds per test
+**Build time**: ~2 seconds per test (native), ~4 seconds per test (WASM)
+
+**For detailed WASM build instructions**, see `SWFRecompDocs/reference/wasm-build-process.md`
 
 ### Test Directory Structure
 
@@ -573,6 +628,78 @@ your_opcode_swf_4/
 ```
 
 **Note**: You do NOT need to manually create runtime/, Makefile, or other build files. The build script handles everything.
+
+### Test Validation System
+
+The test system uses Python validation scripts to determine pass/fail status for each test.
+
+**How it works:**
+
+1. **Build**: Test is compiled using `build_test.sh`
+2. **Execute**: Test binary runs and produces output to stdout
+3. **Filter**: Runtime messages are filtered out (see "Understanding test output" in Step 7)
+4. **Validate**: Filtered output is piped to `validate.py` for evaluation
+5. **Report**: Results are saved to JSON and summarized
+
+**Output filtering:**
+
+The test runner automatically removes these lines from test output before validation:
+- Lines starting with "SWF Runtime"
+- Lines starting with "==="
+- Lines starting with "[Frame"
+- Lines starting with "[Tag]"
+- Empty lines
+
+This is done using the `filter_output()` function in `all_tests.sh`:
+```bash
+filter_output() {
+    grep -v "SWF Runtime Loaded" | \
+    grep -v "=== SWF" | \
+    grep -v "\[Frame" | \
+    grep -v "\[Tag\]" | \
+    grep -v "^$" || true
+}
+```
+
+**Example:**
+
+Raw test output:
+```
+SWF Runtime Loaded (Native Build)
+
+=== SWF Execution Started (NO_GRAPHICS mode) ===
+
+[Frame 0]
+42
+[Tag] ShowFrame()
+
+=== SWF Execution Completed ===
+```
+
+Filtered output (what `validate.py` receives):
+```
+42
+```
+
+**Running tests:**
+
+```bash
+# Run all tests
+cd SWFRecomp/tests
+./all_tests.sh
+
+# Run specific test
+cd SWFRecomp/tests
+./all_tests.sh trace_swf_4
+
+# Manual validation (for debugging)
+cd SWFRecomp/tests/trace_swf_4
+./build/native/trace_swf_4 2>&1 | \
+  grep -v "SWF Runtime" | grep -v "===" | grep -v "\[Frame" | grep -v "\[Tag\]" | grep -v "^$" | \
+  ./validate.py
+```
+
+**For detailed information about the test system design**, see `SWFRecompDocs/plans/test-system-redesign-plan.md`
 
 ## Opcode Categories and Complexity
 

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generated_date": "2025-11-06",
+    "generated_date": "2025-11-07",
     "total_opcodes": 100,
-    "implemented_opcodes": 19,
-    "total_entries": 228
+    "implemented_opcodes": 4,
+    "total_entries": 229
   },
   "entries": [
     {
@@ -13,7 +13,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_END_OF_ACTIONS)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": null,
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -25,7 +28,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4310)"
@@ -37,7 +43,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4324)"
@@ -49,7 +58,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4338)"
@@ -61,7 +73,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4354)"
@@ -73,7 +88,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STOP)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -85,7 +103,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4368)"
@@ -97,7 +118,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4379)"
@@ -109,7 +133,16 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4670)"
@@ -121,7 +154,16 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_ADD)",
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -133,7 +175,16 @@
       "type": "function",
       "function_declaration": "void actionAdd(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 75)"
@@ -145,7 +196,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4693)"
@@ -157,7 +211,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_SUBTRACT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -169,7 +226,10 @@
       "type": "function",
       "function_declaration": "void actionSubtract(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 77)"
@@ -181,7 +241,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4714)"
@@ -193,7 +256,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_MULTIPLY)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -205,7 +271,10 @@
       "type": "function",
       "function_declaration": "void actionMultiply(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 78)"
@@ -217,7 +286,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4737)"
@@ -229,7 +301,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DIVIDE)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -241,7 +316,10 @@
       "type": "function",
       "function_declaration": "void actionDivide(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 79)"
@@ -253,7 +331,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4761)"
@@ -265,7 +346,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_EQUALS)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -277,7 +361,10 @@
       "type": "function",
       "function_declaration": "void actionEquals(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 81)"
@@ -289,7 +376,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4786)"
@@ -301,7 +391,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_LESS)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -313,7 +406,10 @@
       "type": "function",
       "function_declaration": "void actionLess(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 82)"
@@ -325,7 +421,22 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4808)"
@@ -337,7 +448,22 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_AND)",
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -349,7 +475,22 @@
       "type": "function",
       "function_declaration": "void actionAnd(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 84)"
@@ -361,7 +502,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4829)"
@@ -373,7 +517,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_OR)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -385,7 +532,10 @@
       "type": "function",
       "function_declaration": "void actionOr(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 85)"
@@ -397,7 +547,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4853)"
@@ -409,7 +562,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_NOT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -421,7 +577,10 @@
       "type": "function",
       "function_declaration": "void actionNot(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 86)"
@@ -433,7 +592,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4882)"
@@ -445,7 +607,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_EQUALS)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -457,7 +622,10 @@
       "type": "function",
       "function_declaration": "void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 95)"
@@ -469,7 +637,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4903)"
@@ -481,7 +652,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_LENGTH)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -493,7 +667,10 @@
       "type": "function",
       "function_declaration": "void actionStringLength(char* stack, u32* sp, char* v_str);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 96)"
@@ -505,7 +682,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
@@ -521,7 +701,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_EXTRACT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
@@ -537,7 +720,10 @@
       "type": "function",
       "function_declaration": "void actionStringExtract(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
@@ -553,7 +739,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4651)"
@@ -565,7 +754,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_POP)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -577,7 +769,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5031)"
@@ -589,7 +784,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_TO_INTEGER)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -601,7 +799,10 @@
       "type": "function",
       "function_declaration": "void actionToInteger(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 87)"
@@ -613,7 +814,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5218)"
@@ -625,7 +829,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GET_VARIABLE)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -637,7 +844,10 @@
       "type": "function",
       "function_declaration": "void actionGetVariable(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 103)"
@@ -649,7 +859,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5240)"
@@ -661,7 +874,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_SET_VARIABLE)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -673,7 +889,10 @@
       "type": "function",
       "function_declaration": "void actionSetVariable(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 104)"
@@ -685,7 +904,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5405)"
@@ -697,7 +919,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4921)"
@@ -709,7 +934,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_ADD)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -721,7 +949,10 @@
       "type": "function",
       "function_declaration": "void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 99)"
@@ -733,7 +964,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
@@ -749,7 +983,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GET_PROPERTY)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
@@ -765,7 +1002,10 @@
       "type": "function",
       "function_declaration": "void actionGetProperty(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
@@ -781,7 +1021,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
@@ -797,7 +1040,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_SET_PROPERTY)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
@@ -813,7 +1059,10 @@
       "type": "function",
       "function_declaration": "void actionSetProperty(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
@@ -829,7 +1078,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5561)"
@@ -841,7 +1093,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5583)"
@@ -853,8 +1108,29 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/trace_swf_4"
+      "tests_primary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "implementation_branch": null,
@@ -867,8 +1143,29 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_TRACE)",
-      "test_directories": [
-        "SWFRecomp/tests/trace_swf_4"
+      "tests_primary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "implementation_branch": null,
@@ -881,8 +1178,29 @@
       "type": "function",
       "function_declaration": "void actionTrace(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/trace_swf_4"
+      "tests_primary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "implementation_branch": null,
@@ -895,7 +1213,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5601)"
@@ -907,7 +1228,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5641)"
@@ -919,7 +1243,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
@@ -935,7 +1262,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_LESS)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
@@ -951,7 +1281,10 @@
       "type": "function",
       "function_declaration": "void actionStringLess(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
@@ -967,7 +1300,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7289)"
@@ -979,7 +1315,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7141)"
@@ -991,7 +1330,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7164)"
@@ -1003,7 +1345,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5721)"
@@ -1015,7 +1360,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_RANDOM_NUMBER)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -1027,7 +1375,10 @@
       "type": "function",
       "function_declaration": "void actionRandomNumber(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 110)"
@@ -1039,7 +1390,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE",
@@ -1050,12 +1404,15 @@
     },
     {
       "hex": "0X31",
-      "name": "SWF_ACTION_CHAR_TO_ASCII",
+      "name": "SWF_ACTION_MB_STRING_LENGTH",
       "source": "action.hpp",
       "type": "enum",
       "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_CHAR_TO_ASCII)",
-      "test_directories": [],
+      "function_implementation": "parseActions (case SWF_ACTION_MB_STRING_LENGTH)",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE",
@@ -1071,7 +1428,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
@@ -1082,12 +1442,15 @@
     },
     {
       "hex": "0X32",
-      "name": "SWF_ACTION_ASCII_TO_CHAR",
+      "name": "SWF_ACTION_CHAR_TO_ASCII",
       "source": "action.hpp",
       "type": "enum",
       "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_ASCII_TO_CHAR)",
-      "test_directories": [],
+      "function_implementation": "parseActions (case SWF_ACTION_CHAR_TO_ASCII)",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
@@ -1103,7 +1466,10 @@
       "type": "function",
       "function_declaration": "void actionCharToAscii(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
@@ -1119,7 +1485,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
@@ -1130,12 +1499,15 @@
     },
     {
       "hex": "0X33",
-      "name": "SWF_ACTION_MB_CHAR_TO_ASCII",
+      "name": "SWF_ACTION_ASCII_TO_CHAR",
       "source": "action.hpp",
       "type": "enum",
       "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_MB_CHAR_TO_ASCII)",
-      "test_directories": [],
+      "function_implementation": "parseActions (case SWF_ACTION_ASCII_TO_CHAR)",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
@@ -1151,7 +1523,10 @@
       "type": "function",
       "function_declaration": "void actionAsciiToChar(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
@@ -1167,7 +1542,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5703)"
@@ -1179,7 +1557,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GET_TIME)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -1191,7 +1572,10 @@
       "type": "function",
       "function_declaration": "void actionGetTime(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 113)"
@@ -1203,7 +1587,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK",
@@ -1214,12 +1601,15 @@
     },
     {
       "hex": "0X35",
-      "name": "SWF_ACTION_MB_STRING_LENGTH",
+      "name": "SWF_ACTION_MB_STRING_EXTRACT",
       "source": "action.hpp",
       "type": "enum",
       "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_MB_STRING_LENGTH)",
-      "test_directories": [],
+      "function_implementation": "parseActions (case SWF_ACTION_MB_STRING_EXTRACT)",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK",
@@ -1235,7 +1625,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
@@ -1246,12 +1639,15 @@
     },
     {
       "hex": "0X36",
-      "name": "SWF_ACTION_MB_ASCII_TO_CHAR",
+      "name": "SWF_ACTION_MB_CHAR_TO_ASCII",
       "source": "action.hpp",
       "type": "enum",
       "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)",
-      "test_directories": [],
+      "function_implementation": "parseActions (case SWF_ACTION_MB_CHAR_TO_ASCII)",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
@@ -1267,10 +1663,28 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5115)"
+    },
+    {
+      "hex": "0X37",
+      "name": "SWF_ACTION_MB_ASCII_TO_CHAR",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
+      "implementation_branch": null,
+      "notes": "C++ enum value for opcode"
     },
     {
       "hex": "0X3A",
@@ -1279,9 +1693,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/delete_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6007)"
@@ -1293,9 +1708,10 @@
       "type": "function",
       "function_declaration": "void actionDelete(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/delete_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 123)"
@@ -1307,9 +1723,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/delete2_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6025)"
@@ -1321,9 +1738,10 @@
       "type": "function",
       "function_declaration": "void actionDelete2(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/delete2_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 124)"
@@ -1335,9 +1753,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/typeof_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-typeof-0x3c-011CUqjRkgkmLYw99RCTrX2N",
@@ -1353,9 +1772,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_TYPEOF)",
-      "test_directories": [
-        "SWFRecomp/tests/typeof_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-typeof-0x3c-011CUqjRkgkmLYw99RCTrX2N",
@@ -1371,7 +1791,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
@@ -1387,7 +1810,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_CALL_FUNCTION)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
@@ -1403,7 +1829,10 @@
       "type": "function",
       "function_declaration": "void actionStackSwap(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
@@ -1419,9 +1848,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/return_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
@@ -1437,9 +1867,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_RETURN)",
-      "test_directories": [
-        "SWFRecomp/tests/return_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
@@ -1455,9 +1886,10 @@
       "type": "function",
       "function_declaration": "void actionReturn(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/return_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
@@ -1473,9 +1905,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/modulo_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6438)"
@@ -1487,9 +1920,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_MODULO)",
-      "test_directories": [
-        "SWFRecomp/tests/modulo_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -1501,9 +1935,10 @@
       "type": "function",
       "function_declaration": "void actionModulo(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/modulo_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 80)"
@@ -1515,7 +1950,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
@@ -1531,7 +1969,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_NEW_OBJECT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
@@ -1547,7 +1988,10 @@
       "type": "function",
       "function_declaration": "void actionNewObject(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
@@ -1563,7 +2007,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4",
@@ -1579,7 +2026,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DECLARE_LOCAL)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4",
@@ -1595,7 +2045,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
@@ -1611,7 +2064,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_INIT_ARRAY)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
@@ -1627,7 +2083,10 @@
       "type": "function",
       "function_declaration": "void actionInitArray(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
@@ -1643,7 +2102,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
@@ -1659,7 +2121,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_INIT_OBJECT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
@@ -1675,7 +2140,10 @@
       "type": "function",
       "function_declaration": "void actionInitObject(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
@@ -1691,9 +2159,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/typeof_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6380)"
@@ -1705,7 +2174,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
@@ -1721,7 +2193,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_TARGET_PATH)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
@@ -1737,7 +2212,10 @@
       "type": "function",
       "function_declaration": "void actionTargetPath(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
@@ -1753,9 +2231,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/enumerate_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
@@ -1771,9 +2250,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_ENUMERATE)",
-      "test_directories": [
-        "SWFRecomp/tests/enumerate_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
@@ -1789,9 +2269,10 @@
       "type": "function",
       "function_declaration": "void actionEnumerate(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/enumerate_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
@@ -1807,9 +2288,14 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
+      "tests_primary": [
         "SWFRecomp/tests/add2_swf_5"
       ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/add2_swf_5"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
@@ -1825,9 +2311,14 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_ADD2)",
-      "test_directories": [
+      "tests_primary": [
         "SWFRecomp/tests/add2_swf_5"
       ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/add2_swf_5"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
@@ -1843,9 +2334,14 @@
       "type": "function",
       "function_declaration": "void actionAdd2(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
+      "tests_primary": [
         "SWFRecomp/tests/add2_swf_5"
       ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/add2_swf_5"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
@@ -1861,9 +2357,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
@@ -1879,9 +2376,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_LESS2)",
-      "test_directories": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
@@ -1897,9 +2395,10 @@
       "type": "function",
       "function_declaration": "void actionLess2(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
@@ -1915,7 +2414,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6068)"
@@ -1927,7 +2429,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
@@ -1943,7 +2448,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_TO_NUMBER)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
@@ -1959,7 +2467,10 @@
       "type": "function",
       "function_declaration": "void actionToNumber(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
@@ -1975,7 +2486,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
@@ -1991,7 +2505,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_TO_STRING)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
@@ -2007,7 +2524,10 @@
       "type": "function",
       "function_declaration": "void actionToString(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
@@ -2023,9 +2543,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/duplicate_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc",
@@ -2041,9 +2562,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DUPLICATE)",
-      "test_directories": [
-        "SWFRecomp/tests/duplicate_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc",
@@ -2059,7 +2581,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6660)"
@@ -2071,7 +2596,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STACK_SWAP)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -2083,7 +2611,10 @@
       "type": "function",
       "function_declaration": "void actionStackSwap(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 90)"
@@ -2095,7 +2626,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6090)"
@@ -2107,7 +2641,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GET_MEMBER)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -2119,7 +2656,10 @@
       "type": "function",
       "function_declaration": "void actionGetMember(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 140)"
@@ -2131,7 +2671,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
@@ -2147,7 +2690,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_SET_MEMBER)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
@@ -2163,7 +2709,10 @@
       "type": "function",
       "function_declaration": "void actionSetMember(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
@@ -2179,9 +2728,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/increment_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6605)"
@@ -2193,9 +2743,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_INCREMENT)",
-      "test_directories": [
-        "SWFRecomp/tests/increment_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -2207,9 +2758,10 @@
       "type": "function",
       "function_declaration": "void actionIncrement(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/increment_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 120)"
@@ -2221,9 +2773,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/decrement_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6586)"
@@ -2235,9 +2788,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DECREMENT)",
-      "test_directories": [
-        "SWFRecomp/tests/decrement_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -2249,9 +2803,10 @@
       "type": "function",
       "function_declaration": "void actionDecrement(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/decrement_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 121)"
@@ -2263,7 +2818,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5831)"
@@ -2275,7 +2833,10 @@
       "type": "function",
       "function_declaration": "void actionCallMethod(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 138)"
@@ -2287,7 +2848,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
@@ -2303,7 +2867,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_NEW_METHOD)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
@@ -2319,7 +2886,10 @@
       "type": "function",
       "function_declaration": "void actionNewMethod(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
       "implementation_branch": {
         "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
@@ -2335,7 +2905,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6782)"
@@ -2347,9 +2920,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/enumerate2_swf_6"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
@@ -2365,9 +2939,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_ENUMERATE2)",
-      "test_directories": [
-        "SWFRecomp/tests/enumerate2_swf_6"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
@@ -2383,9 +2958,10 @@
       "type": "function",
       "function_declaration": "void actionEnumerate2(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/enumerate2_swf_6"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
@@ -2401,7 +2977,14 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
@@ -2417,7 +3000,14 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_BIT_AND)",
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
@@ -2433,7 +3023,14 @@
       "type": "function",
       "function_declaration": "void actionBitAnd(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
@@ -2449,7 +3046,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
@@ -2465,7 +3065,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_BIT_OR)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
@@ -2481,7 +3084,10 @@
       "type": "function",
       "function_declaration": "void actionBitOr(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
@@ -2497,7 +3103,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
@@ -2513,7 +3122,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_BIT_XOR)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
@@ -2529,7 +3141,10 @@
       "type": "function",
       "function_declaration": "void actionBitXor(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
@@ -2545,7 +3160,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
@@ -2561,7 +3179,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_BIT_LSHIFT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
@@ -2577,7 +3198,10 @@
       "type": "function",
       "function_declaration": "void actionBitLShift(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
@@ -2593,7 +3217,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
@@ -2609,7 +3236,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_BIT_RSHIFT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
@@ -2625,7 +3255,10 @@
       "type": "function",
       "function_declaration": "void actionBitRShift(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
@@ -2641,7 +3274,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
@@ -2657,7 +3293,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_BIT_URSHIFT)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
@@ -2673,7 +3312,10 @@
       "type": "function",
       "function_declaration": "void actionBitURShift(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
@@ -2689,7 +3331,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
@@ -2705,7 +3350,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRICT_EQUALS)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
@@ -2721,7 +3369,10 @@
       "type": "function",
       "function_declaration": "void actionStrictEquals(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
@@ -2737,9 +3388,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/greater_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
@@ -2755,9 +3407,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GREATER)",
-      "test_directories": [
-        "SWFRecomp/tests/greater_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
@@ -2773,9 +3426,10 @@
       "type": "function",
       "function_declaration": "void actionGreater(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/greater_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
@@ -2791,7 +3445,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
@@ -2807,7 +3464,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STRING_GREATER)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
@@ -2823,7 +3483,10 @@
       "type": "function",
       "function_declaration": "void actionStringGreater(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
@@ -2839,7 +3502,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7120)"
@@ -2851,7 +3517,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4258)"
@@ -2863,7 +3532,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4281)"
@@ -2875,7 +3547,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
@@ -2891,7 +3566,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_STORE_REGISTER)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
@@ -2907,7 +3585,10 @@
       "type": "function",
       "function_declaration": "void actionStoreRegister(char* stack, u32* sp, u8 register_num);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
@@ -2923,7 +3604,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5868)"
@@ -2935,7 +3619,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_CONSTANT_POOL)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -2947,7 +3634,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4393)"
@@ -2959,7 +3649,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4437)"
@@ -2971,7 +3664,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4449)"
@@ -2983,7 +3679,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe2-0x8d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5655)"
@@ -2995,7 +3694,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 6949)"
@@ -3007,7 +3709,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DEFINE_FUNCTION2)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -3019,7 +3724,10 @@
       "type": "function",
       "function_declaration": "void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
       "implementation_branch": null,
       "notes": "Runtime function (action.h line 148)"
@@ -3031,7 +3739,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 7191)"
@@ -3043,9 +3754,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/with_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
       "implementation_branch": {
         "name": "origin/claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF",
@@ -3061,9 +3773,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_WITH)",
-      "test_directories": [
-        "SWFRecomp/tests/with_swf_5"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
       "implementation_branch": {
         "name": "origin/claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF",
@@ -3079,7 +3792,30 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 4556)"
@@ -3091,7 +3827,30 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_PUSH)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
+        "SWFRecomp/tests/add_swf_4",
+        "SWFRecomp/tests/and_floats_both_0_swf_4",
+        "SWFRecomp/tests/and_floats_first_1_swf_4",
+        "SWFRecomp/tests/and_floats_nonzero_swf_4",
+        "SWFRecomp/tests/and_floats_second_1_swf_4",
+        "SWFRecomp/tests/and_floats_swf_4",
+        "SWFRecomp/tests/bit_and_swf_4"
+      ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -3103,9 +3862,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/jump_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5139)"
@@ -3117,9 +3877,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_JUMP)",
-      "test_directories": [
-        "SWFRecomp/tests/jump_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -3131,7 +3892,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5262)"
@@ -3143,7 +3907,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
       "implementation_branch": {
         "name": "origin/claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq",
@@ -3159,7 +3926,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DEFINE_FUNCTION)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
       "implementation_branch": {
         "name": "origin/claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq",
@@ -3175,9 +3945,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/if_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
       "implementation_branch": null,
       "notes": "Official SWF specification name (spec line 5163)"
@@ -3189,9 +3960,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_IF)",
-      "test_directories": [
-        "SWFRecomp/tests/if_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
       "implementation_branch": null,
       "notes": "C++ enum value for opcode"
@@ -3203,9 +3975,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [
-        "SWFRecomp/tests/call_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
@@ -3221,9 +3994,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_CALL)",
-      "test_directories": [
-        "SWFRecomp/tests/call_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
@@ -3239,9 +4013,10 @@
       "type": "function",
       "function_declaration": "void actionCall(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "test_directories": [
-        "SWFRecomp/tests/call_swf_4"
-      ],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
@@ -3257,7 +4032,10 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ",
@@ -3273,7 +4051,10 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_CALL_METHOD)",
-      "test_directories": [],
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md",
       "implementation_branch": {
         "name": "origin/claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ",

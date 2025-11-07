@@ -1,0 +1,6 @@
+# SWFRecomp Configuration for ActionCallMethod Test
+# This test requires SWF version 5+ for method calls
+
+[output]
+# Generate optimized C code for ActionCallMethod opcode testing
+optimization_level = 2

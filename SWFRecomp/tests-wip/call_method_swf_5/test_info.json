@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "call_method_swf_5",
+    "description": "Tests for ActionCallMethod opcode (0x52) - calls methods on objects with this binding",
+    "swf_version": 5
+  },
+  "opcodes": {
+    "tested": ["CALL_METHOD"],
+    "supporting": ["PUSH", "TRACE", "INIT_OBJECT", "SET_MEMBER", "DEFINE_FUNCTION"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": [
+    "ActionCallMethod (0x52) is a COMPLEX opcode requiring:",
+    "- Object support (INIT_OBJECT)",
+    "- Function definitions (DEFINE_FUNCTION)",
+    "- Method lookup and invocation",
+    "- 'this' context binding",
+    "This test currently validates basic structure only.",
+    "Full functionality requires complete function/object system implementation."
+  ]
+}

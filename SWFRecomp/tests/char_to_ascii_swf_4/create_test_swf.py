@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF4 file with CharToAscii (0x31) tests
+# Create a minimal SWF4 file with CharToAscii (0x32) tests
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 4
@@ -16,31 +16,31 @@ frame_count = struct.pack('<H', 1)  # 1 frame
 # Test 1: Single character "A" - should output 65
 string1 = b'A\x00'
 action_push1 = struct.pack('<BHB', 0x96, len(string1) + 1, 0) + string1
-action_char_to_ascii1 = bytes([0x31])  # CharToAscii opcode
+action_char_to_ascii1 = bytes([0x32])  # CharToAscii opcode
 action_trace1 = bytes([0x26])  # Trace
 
 # Test 2: Multiple characters "Hello" - should output 72 (ASCII of 'H')
 string2 = b'Hello\x00'
 action_push2 = struct.pack('<BHB', 0x96, len(string2) + 1, 0) + string2
-action_char_to_ascii2 = bytes([0x31])
+action_char_to_ascii2 = bytes([0x32])
 action_trace2 = bytes([0x26])
 
 # Test 3: Special character "!" - should output 33
 string3 = b'!\x00'
 action_push3 = struct.pack('<BHB', 0x96, len(string3) + 1, 0) + string3
-action_char_to_ascii3 = bytes([0x31])
+action_char_to_ascii3 = bytes([0x32])
 action_trace3 = bytes([0x26])
 
 # Test 4: Empty string - should output NaN
 string4 = b'\x00'
 action_push4 = struct.pack('<BHB', 0x96, len(string4) + 1, 0) + string4
-action_char_to_ascii4 = bytes([0x31])
+action_char_to_ascii4 = bytes([0x32])
 action_trace4 = bytes([0x26])
 
 # Test 5: Unicode character "é" (0xE9 in Latin-1) - should output 233
 string5 = b'\xe9\x00'
 action_push5 = struct.pack('<BHB', 0x96, len(string5) + 1, 0) + string5
-action_char_to_ascii5 = bytes([0x31])
+action_char_to_ascii5 = bytes([0x32])
 action_trace5 = bytes([0x26])
 
 # Combine all actions
