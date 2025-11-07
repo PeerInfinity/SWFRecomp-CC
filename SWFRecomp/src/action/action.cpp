@@ -285,6 +285,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_END_DRAG:
+				{
+					out_script << "\t" << "// End Drag" << endl
+							   << "\t" << "actionEndDrag(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_CAST_OP:
 				{
 					out_script << "\t" << "// CastOp" << endl

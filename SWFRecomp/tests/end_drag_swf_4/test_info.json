@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "end_drag_swf_4",
+    "description": "Tests END_DRAG opcode (0x28) - stops dragging sprite/MovieClip",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["END_DRAG"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

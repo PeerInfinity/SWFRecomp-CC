@@ -110,6 +110,7 @@ void actionCloneSprite(char* stack, u32* sp);
 
 void actionNextFrame();
 void actionTrace(char* stack, u32* sp);
+void actionEndDrag(char* stack, u32* sp);
 void actionRandomNumber(char* stack, u32* sp);
 void actionAsciiToChar(char* stack, u32* sp, char* str_buffer);
 void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);
