@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "mb_ascii_to_char_swf_4",
+    "description": "Tests MB_ASCII_TO_CHAR opcode (0x37) - converts code points to UTF-8 characters",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["MB_ASCII_TO_CHAR"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
