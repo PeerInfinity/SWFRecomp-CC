@@ -357,6 +357,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_THROW:
+				{
+					out_script << "\t" << "// Throw" << endl
+							   << "\t" << "actionThrow(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_IMPLEMENTS_OP:
 				{
 					out_script << "\t" << "// ImplementsOp" << endl
