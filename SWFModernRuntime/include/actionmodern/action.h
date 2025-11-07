@@ -148,3 +148,11 @@ typedef ActionVar (*Function2Ptr)(char* stack, u32* sp, ActionVar* args, u32 arg
 void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);
 void actionWithStart(char* stack, u32* sp);
 void actionWithEnd(char* stack, u32* sp);
+
+// Exception handling (try-catch-finally)
+void actionThrow(char* stack, u32* sp);
+void actionTryBegin(char* stack, u32* sp);
+bool actionTryExecute(char* stack, u32* sp);
+void actionCatchToVariable(char* stack, u32* sp, const char* var_name);
+void actionCatchToRegister(char* stack, u32* sp, u8 reg_num);
+void actionTryEnd(char* stack, u32* sp);

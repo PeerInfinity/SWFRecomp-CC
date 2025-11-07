@@ -277,6 +277,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_THROW:
+				{
+					out_script << "\t" << "// Throw" << endl
+							   << "\t" << "actionThrow(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_RANDOM_NUMBER:
 				{
 					out_script << "\t" << "// Random Number" << endl
@@ -722,7 +730,120 @@ namespace SWFRecomp
 				// action_buffer has already been advanced by parseActions
 				break;
 			}
-				
+
+			case SWF_ACTION_TRY:
+			{
+				// Read flags byte
+				u8 flags = VAL(u8, action_buffer);
+				action_buffer += 1;
+
+				bool catch_in_register = (flags & 0x04) != 0;
+				bool has_finally = (flags & 0x02) != 0;
+				bool has_catch = (flags & 0x01) != 0;
+
+				// Read block sizes
+				u16 try_size = VAL(u16, action_buffer);
+				action_buffer += 2;
+				u16 catch_size = VAL(u16, action_buffer);
+				action_buffer += 2;
+				u16 finally_size = VAL(u16, action_buffer);
+				action_buffer += 2;
+
+				// Read catch name or register
+				std::string catch_name;
+				u8 catch_register = 0;
+				if (has_catch)
+				{
+					if (catch_in_register)
+					{
+						catch_register = VAL(u8, action_buffer);
+						action_buffer += 1;
+					}
+					else
+					{
+						catch_name = std::string(action_buffer);
+						action_buffer += catch_name.length() + 1; // +1 for null terminator
+					}
+				}
+
+				// Store positions for each block
+				char* try_body = action_buffer;
+				char* catch_body = try_body + try_size;
+				char* finally_body = catch_body + catch_size;
+				char* after_try = finally_body + finally_size;
+
+				// Generate try-catch-finally structure
+				out_script << "\t" << "// Try-Catch-Finally" << endl;
+				out_script << "\t" << "actionTryBegin(stack, sp);" << endl;
+				out_script << "\t" << "if (actionTryExecute(stack, sp)) {" << endl;
+
+				// Translate try block
+				out_script << "\t\t" << "// Try block" << endl;
+				if (try_size > 0)
+				{
+					char* temp_buffer = (char*)malloc(try_size + 1);
+					memcpy(temp_buffer, try_body, try_size);
+					temp_buffer[try_size] = 0x00; // Add END_OF_ACTIONS marker
+					char* temp_ptr = temp_buffer;
+
+					// Temporarily increase indentation for nested block
+					std::string indent_backup = "\t";
+					parseActions(context, temp_ptr, out_script);
+					free(temp_buffer);
+				}
+
+				if (has_catch)
+				{
+					out_script << "\t" << "} else {" << endl;
+					out_script << "\t\t" << "// Catch block" << endl;
+
+					if (catch_in_register)
+					{
+						out_script << "\t\t" << "actionCatchToRegister(stack, sp, " << (int)catch_register << ");" << endl;
+					}
+					else
+					{
+						out_script << "\t\t" << "actionCatchToVariable(stack, sp, \"" << catch_name << "\");" << endl;
+					}
+
+					// Translate catch block
+					if (catch_size > 0)
+					{
+						char* temp_buffer = (char*)malloc(catch_size + 1);
+						memcpy(temp_buffer, catch_body, catch_size);
+						temp_buffer[catch_size] = 0x00; // Add END_OF_ACTIONS marker
+						char* temp_ptr = temp_buffer;
+						parseActions(context, temp_ptr, out_script);
+						free(temp_buffer);
+					}
+				}
+
+				out_script << "\t" << "}" << endl;
+
+				if (has_finally)
+				{
+					out_script << "\t" << "// Finally block" << endl;
+
+					// Translate finally block
+					if (finally_size > 0)
+					{
+						char* temp_buffer = (char*)malloc(finally_size + 1);
+						memcpy(temp_buffer, finally_body, finally_size);
+						temp_buffer[finally_size] = 0x00; // Add END_OF_ACTIONS marker
+						char* temp_ptr = temp_buffer;
+						parseActions(context, temp_ptr, out_script);
+						free(temp_buffer);
+					}
+				}
+
+				out_script << "\t" << "actionTryEnd(stack, sp);" << endl;
+
+				// Advance action_buffer past all try-catch-finally blocks
+				action_buffer = after_try;
+
+				break;
+			}
+
 				case SWF_ACTION_WITH:
 				{
 					// Read block size from bytecode
