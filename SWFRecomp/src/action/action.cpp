@@ -50,6 +50,32 @@ namespace SWFRecomp
 					labels.push_back(action_buffer + length + ((s64) offset));
 					break;
 				}
+
+				case SWF_ACTION_WAIT_FOR_FRAME:
+				{
+					// Skip past frame (u16) and skip_count (u8)
+					u16 frame = VAL(u16, action_buffer);
+					u8 skip_count = VAL(u8, action_buffer + 2);
+
+					// Calculate skip target by parsing ahead through skip_count actions
+					char* skip_ptr = action_buffer + length;
+					for (u8 i = 0; i < skip_count && *skip_ptr != SWF_ACTION_END_OF_ACTIONS; i++)
+					{
+						u8 next_code = *skip_ptr;
+						skip_ptr += 1;
+
+						if ((next_code & 0b10000000) != 0)
+						{
+							u16 next_length = VAL(u16, skip_ptr);
+							skip_ptr += 2;
+							skip_ptr += next_length;
+						}
+					}
+
+					// Add skip target as a label
+					labels.push_back(skip_ptr);
+					break;
+				}
 			}
 			
 			action_buffer += length;
@@ -736,6 +762,41 @@ namespace SWFRecomp
 
 				case SWF_ACTION_CONSTANT_POOL:
 				{
+					action_buffer += length;
+
+					break;
+				}
+
+				case SWF_ACTION_WAIT_FOR_FRAME:
+				{
+					// Read frame number (u16) and skip count (u8)
+					u16 frame = VAL(u16, action_buffer);
+					u8 skip_count = VAL(u8, action_buffer + 2);
+
+					// Calculate skip target (same logic as first pass)
+					char* skip_ptr = action_buffer + length;
+					for (u8 i = 0; i < skip_count && *skip_ptr != SWF_ACTION_END_OF_ACTIONS; i++)
+					{
+						u8 next_code = *skip_ptr;
+						skip_ptr += 1;
+
+						if ((next_code & 0b10000000) != 0)
+						{
+							u16 next_length = VAL(u16, skip_ptr);
+							skip_ptr += 2;
+							skip_ptr += next_length;
+						}
+					}
+
+					s16 skip_label = (s16)(skip_ptr - action_buffer_start);
+
+					out_script << "\t" << "// WaitForFrame: frame=" << frame
+							   << ", skip=" << (int)skip_count << " actions" << endl
+							   << "\t" << "if (!actionWaitForFrame(stack, sp, " << frame << "))" << endl
+							   << "\t" << "{" << endl
+							   << "\t" << "\t" << "goto label_" << skip_label << ";" << endl
+							   << "\t" << "}" << endl;
+
 					action_buffer += length;
 
 					break;

@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "wait_for_frame_swf_3",
+    "description": "Tests WAIT_FOR_FRAME opcode (0x8A) - checks if a frame is loaded and conditionally skips actions",
+    "swf_version": 3
+  },
+  "opcodes": {
+    "tested": ["WAIT_FOR_FRAME"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

@@ -3663,6 +3663,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		return;
 	}
 }
+<<<<<<< HEAD
 void actionStartDrag(char* stack, u32* sp)
 {
 	// Pop target sprite name
@@ -3727,4 +3728,47 @@ void actionStartDrag(char* stack, u32* sp)
 	}
 	#endif
 	#endif
+}
+
+// ==================================================================
+// Control Flow - WaitForFrame
+// ==================================================================
+
+/**
+ * actionWaitForFrame - Check if a frame is loaded
+ *
+ * @param stack - The execution stack
+ * @param sp - Stack pointer
+ * @param frame - Frame number to check (0-based in bytecode, 1-based in MovieClip)
+ * @return true if frame is loaded, false otherwise
+ *
+ * This opcode was designed for streaming SWF files where frames load progressively.
+ * For modern usage with instantly-loaded SWFs, we simplify by assuming all frames
+ * that exist are loaded.
+ */
+bool actionWaitForFrame(char* stack, u32* sp, u16 frame)
+{
+	// Get the current MovieClip (simplified: always use root)
+	MovieClip* mc = &root_movieclip;
+
+	if (!mc) {
+		// No MovieClip available - frame not loaded
+		return false;
+	}
+
+	// Check if frame exists
+	// Note: Frame numbers in WaitForFrame are 0-based in the bytecode,
+	// but MovieClip properties are 1-based. Convert for comparison.
+	u16 frame_1based = frame + 1;
+
+	if (frame_1based > mc->totalframes) {
+		// Frame doesn't exist
+		return false;
+	}
+
+	// For non-streaming SWF files, all frames that exist are loaded
+	// In a full streaming implementation, we would check:
+	// if (frame_1based <= mc->frames_loaded) return true;
+	// For now, assume all frames are loaded
+	return true;
 }
