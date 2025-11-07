@@ -136,6 +136,7 @@ void actionPushRegister(char* stack, u32* sp, u8 register_num);
 void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(char*, u32*), u32 param_count);
 void actionCall(char* stack, u32* sp);
 void actionCallMethod(char* stack, u32* sp, char* str_buffer);
+void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag);
 void actionInitObject(char* stack, u32* sp);
 void actionGetMember(char* stack, u32* sp);
 void actionSetMember(char* stack, u32* sp);
