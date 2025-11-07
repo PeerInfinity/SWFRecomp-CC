@@ -3306,6 +3306,104 @@ void actionWithEnd(char* stack, u32* sp)
 	}
 }
 
+// ============================================================================
+// Exception Handling (Try-Catch-Finally)
+// ============================================================================
+
+// Exception state structure
+typedef struct {
+	bool exception_thrown;
+	ActionVar exception_value;
+	int handler_depth;
+} ExceptionState;
+
+static ExceptionState g_exception_state = {false, {0}, 0};
+
+void actionThrow(char* stack, u32* sp)
+{
+	// Pop value to throw
+	ActionVar throw_value;
+	popVar(stack, sp, &throw_value);
+
+	// Set exception state
+	g_exception_state.exception_thrown = true;
+	g_exception_state.exception_value = throw_value;
+
+#ifdef DEBUG
+	printf("[DEBUG] actionThrow: exception thrown (type=%d)\n", throw_value.type);
+#endif
+
+	// Control flow will jump to catch or finally block
+	// (handled by actionTryExecute returning false)
+}
+
+void actionTryBegin(char* stack, u32* sp)
+{
+	// Push exception handler onto handler stack
+	g_exception_state.handler_depth++;
+#ifdef DEBUG
+	printf("[DEBUG] actionTryBegin: handler_depth=%d\n", g_exception_state.handler_depth);
+#endif
+}
+
+bool actionTryExecute(char* stack, u32* sp)
+{
+	// Returns true if try block should execute normally
+	// Returns false if exception was thrown (jump to catch)
+	bool should_execute_try = !g_exception_state.exception_thrown;
+#ifdef DEBUG
+	printf("[DEBUG] actionTryExecute: exception_thrown=%d, returning %d\n",
+		   g_exception_state.exception_thrown, should_execute_try);
+#endif
+	return should_execute_try;
+}
+
+void actionCatchToVariable(char* stack, u32* sp, const char* var_name)
+{
+	// Store caught exception in named variable
+	if (g_exception_state.exception_thrown)
+	{
+#ifdef DEBUG
+		printf("[DEBUG] actionCatchToVariable: storing exception in variable '%s'\n", var_name);
+#endif
+		setVariableByName(var_name, &g_exception_state.exception_value);
+		g_exception_state.exception_thrown = false;
+	}
+}
+
+void actionCatchToRegister(char* stack, u32* sp, u8 reg_num)
+{
+	// Store caught exception in register
+	if (g_exception_state.exception_thrown)
+	{
+#ifdef DEBUG
+		printf("[DEBUG] actionCatchToRegister: storing exception in register %d\n", reg_num);
+#endif
+		// Note: Register handling would require access to register array
+		// For now, we'll just clear the exception flag
+		// TODO: Implement register storage when register infrastructure is available
+		g_exception_state.exception_thrown = false;
+	}
+}
+
+void actionTryEnd(char* stack, u32* sp)
+{
+	// Pop exception handler from handler stack
+	g_exception_state.handler_depth--;
+
+	if (g_exception_state.handler_depth == 0)
+	{
+		// Clear exception if at top level
+		g_exception_state.exception_thrown = false;
+	}
+
+#ifdef DEBUG
+	printf("[DEBUG] actionTryEnd: handler_depth=%d\n", g_exception_state.handler_depth);
+#endif
+}
+
+// ============================================================================
+
 void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(char*, u32*), u32 param_count)
 {
 	// Create function object

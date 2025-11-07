@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "try_swf_7",
+    "description": "Tests ActionTry (0x8F) and ActionThrow (0x2A) opcodes for exception handling with try-catch blocks",
+    "swf_version": 7
+  },
+  "opcodes": {
+    "tested": ["TRY", "THROW"],
+    "supporting": ["PUSH", "TRACE", "GET_VARIABLE", "STRING_ADD"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
