@@ -68,7 +68,11 @@ bit_urshift_swf_4 "2"
 stack_swap_swf_4 "5"
 string_extract_swf_4 "Hello"
 string_less_swf_4 "1"
-string_greater_swf_4 "0"
+string_greater_swf_4 "0
+1
+0
+1
+0"
 add2_swf_5 "8"
 typeof_swf_5 "number"
 mb_ascii_to_char_swf_5 "A"

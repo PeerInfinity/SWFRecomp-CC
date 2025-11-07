@@ -19,35 +19,36 @@ def push_string(s):
     action += string_data
     return action
 
-# Test Case 1: "zebra" > "apple" => 1 (true)
-# Stack order: push "apple" (b), push "zebra" (a), then STRING_GREATER computes b > a
-test1 = push_string("apple")     # Push second operand (b)
-test1 += push_string("zebra")    # Push first operand (a)
-test1 += bytes([0x68])           # STRING_GREATER (0x68)
+# Test Case 1: "apple" > "zebra" => 0 (false)
+# Stack order: push "apple" (arg2), push "zebra" (arg1)
+# STRING_GREATER pops arg1 ("zebra"), then arg2 ("apple"), computes arg2 > arg1
+test1 = push_string("apple")     # Push arg2 (popped second)
+test1 += push_string("zebra")    # Push arg1 (popped first)
+test1 += bytes([0x68])           # STRING_GREATER (0x68): computes "apple" > "zebra" = 0
 test1 += bytes([0x26])           # TRACE
 
-# Test Case 2: "apple" > "zebra" => 0 (false)
-test2 = push_string("zebra")     # Push second operand (b)
-test2 += push_string("apple")    # Push first operand (a)
-test2 += bytes([0x68])           # STRING_GREATER
+# Test Case 2: "zebra" > "apple" => 1 (true)
+test2 = push_string("zebra")     # Push arg2 (popped second)
+test2 += push_string("apple")    # Push arg1 (popped first)
+test2 += bytes([0x68])           # STRING_GREATER: computes "zebra" > "apple" = 1
 test2 += bytes([0x26])           # TRACE
 
 # Test Case 3: "hello" > "hello" => 0 (equal strings, not greater)
-test3 = push_string("hello")     # Push second operand (b)
-test3 += push_string("hello")    # Push first operand (a)
-test3 += bytes([0x68])           # STRING_GREATER
+test3 = push_string("hello")     # Push arg2 (popped second)
+test3 += push_string("hello")    # Push arg1 (popped first)
+test3 += bytes([0x68])           # STRING_GREATER: computes "hello" > "hello" = 0
 test3 += bytes([0x26])           # TRACE
 
-# Test Case 4: "Z" > "a" => 0 (false, uppercase 'Z'=90, lowercase 'a'=97)
-test4 = push_string("a")         # Push second operand (b)
-test4 += push_string("Z")        # Push first operand (a)
-test4 += bytes([0x68])           # STRING_GREATER
+# Test Case 4: "a" > "Z" => 1 (true, lowercase 'a'=97 > uppercase 'Z'=90)
+test4 = push_string("a")         # Push arg2 (popped second)
+test4 += push_string("Z")        # Push arg1 (popped first)
+test4 += bytes([0x68])           # STRING_GREATER: computes "a" > "Z" = 1
 test4 += bytes([0x26])           # TRACE
 
-# Test Case 5: "hello world" > "hello" => 1 (true, longer string is greater)
-test5 = push_string("hello")            # Push second operand (b)
-test5 += push_string("hello world")     # Push first operand (a)
-test5 += bytes([0x68])                  # STRING_GREATER
+# Test Case 5: "hello" > "hello world" => 0 (false, shorter when prefix matches)
+test5 = push_string("hello")            # Push arg2 (popped second)
+test5 += push_string("hello world")     # Push arg1 (popped first)
+test5 += bytes([0x68])                  # STRING_GREATER: computes "hello" > "hello world" = 0
 test5 += bytes([0x26])                  # TRACE
 
 # Combine all tests
@@ -79,8 +80,8 @@ with open('test.swf', 'wb') as f:
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
 print("Expected output:")
-print("1  (zebra > apple)")
-print("0  (apple > zebra)")
-print("0  (hello > hello)")
-print("0  (Z > a)")
-print("1  (hello world > hello)")
+print("0  (apple > zebra = false)")
+print("1  (zebra > apple = true)")
+print("0  (hello > hello = false)")
+print("1  (a > Z = true, 97 > 90)")
+print("0  (hello > hello world = false)")

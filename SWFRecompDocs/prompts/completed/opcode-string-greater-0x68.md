@@ -38,35 +38,51 @@ Implement this opcode following the 7-step workflow:
 
 ## Test Cases
 
-### Test Case 1: Basic string comparison (true)
-```actionscript
-trace("zebra" > "apple");
+**Note**: The stack-based implementation means that for `trace("zebra" > "apple")`, you must push in the order that results in the correct operands after popping. The opcode pops arg1 first (top of stack), then arg2, and computes `arg2 > arg1`.
+
+### Test Case 1: Basic string comparison (false)
+To compute `"apple" > "zebra"`, push in this order:
+```python
+push_string("apple")   # This becomes arg2 (popped second)
+push_string("zebra")   # This becomes arg1 (popped first)
+# Result: arg2 > arg1 = "apple" > "zebra" = 0 (false)
+```
+Expected output: `0` (false, 'a' < 'z')
+
+### Test Case 2: Basic string comparison (true)
+To compute `"zebra" > "apple"`:
+```python
+push_string("zebra")   # This becomes arg2 (popped second)
+push_string("apple")   # This becomes arg1 (popped first)
+# Result: arg2 > arg1 = "zebra" > "apple" = 1 (true)
 ```
 Expected output: `1` (true, "zebra" comes after "apple")
 
-### Test Case 2: Basic string comparison (false)
-```actionscript
-trace("apple" > "zebra");
-```
-Expected output: `0` (false)
-
 ### Test Case 3: Equal strings
-```actionscript
-trace("hello" > "hello");
+```python
+push_string("hello")   # arg2
+push_string("hello")   # arg1
+# Result: "hello" > "hello" = 0
 ```
-Expected output: `0` (false, not greater)
+Expected output: `0` (false, equal strings are not greater)
 
 ### Test Case 4: Case sensitivity
-```actionscript
-trace("Z" > "a");
+To compute `"a" > "Z"`:
+```python
+push_string("a")       # arg2
+push_string("Z")       # arg1
+# Result: "a" > "Z" = 1 (97 > 90)
 ```
-Expected output: `0` (false, uppercase 'Z' = 90, lowercase 'a' = 97)
+Expected output: `1` (true, lowercase 'a' = 97 > uppercase 'Z' = 90)
 
 ### Test Case 5: Prefix comparison
-```actionscript
-trace("hello world" > "hello");
+To compute `"hello" > "hello world"`:
+```python
+push_string("hello")        # arg2
+push_string("hello world")  # arg1
+# Result: "hello" > "hello world" = 0
 ```
-Expected output: `1` (true, longer string is greater when prefix matches)
+Expected output: `0` (false, shorter string when prefix matches)
 
 ## Implementation Hints
 

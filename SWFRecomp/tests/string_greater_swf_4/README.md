@@ -52,43 +52,49 @@ Comparison is:
 
 ## Test Cases
 
-### Test 1: Basic comparison (true)
+### Test 1: Basic comparison (false)
+**Stack**: `[apple, zebra]` → pop arg1=zebra, pop arg2=apple → compare `apple > zebra`
 ```actionscript
-trace("zebra" > "apple");  // Expected: 1
+// Equivalent to: trace("apple" > "zebra");
 ```
-'z' (122) > 'a' (97), so result is true
+Expected: `0` (false, 'a' < 'z')
 
-### Test 2: Basic comparison (false)
+### Test 2: Basic comparison (true)
+**Stack**: `[zebra, apple]` → pop arg1=apple, pop arg2=zebra → compare `zebra > apple`
 ```actionscript
-trace("apple" > "zebra");  // Expected: 0
+// Equivalent to: trace("zebra" > "apple");
 ```
-'a' (97) < 'z' (122), so result is false
+Expected: `1` (true, 'z' > 'a')
 
 ### Test 3: Equal strings
+**Stack**: `[hello, hello]` → pop arg1=hello, pop arg2=hello → compare `hello > hello`
 ```actionscript
-trace("hello" > "hello");  // Expected: 0
+// Equivalent to: trace("hello" > "hello");
 ```
-Equal strings are not greater, result is false
+Expected: `0` (false, equal strings are not greater)
 
 ### Test 4: Case sensitivity
+**Stack**: `[a, Z]` → pop arg1=Z, pop arg2=a → compare `a > Z`
 ```actionscript
-trace("Z" > "a");  // Expected: 0
+// Equivalent to: trace("a" > "Z");
 ```
-Uppercase 'Z' (90) < lowercase 'a' (97), result is false
+Expected: `1` (true, lowercase 'a'=97 > uppercase 'Z'=90)
 
 ### Test 5: Prefix comparison
+**Stack**: `[hello, hello world]` → pop arg1="hello world", pop arg2=hello → compare `hello > hello world`
 ```actionscript
-trace("hello world" > "hello");  // Expected: 1
+// Equivalent to: trace("hello" > "hello world");
 ```
-When prefix matches, longer string is greater, result is true
+Expected: `0` (false, shorter string when prefix matches)
 
 ## Expected Output
 
 ```
-1
-0
 0
 1
+0
+1
+0
 ```
 
 ## Building and Running
@@ -103,9 +109,9 @@ When prefix matches, longer string is greater, result is true
 
 ## Known Issues
 
-There is currently a runtime issue with pushing multiple strings in sequence that causes segmentation faults. This is not related to the STRING_GREATER implementation itself, but affects the test execution. The implementation is correct and follows the established patterns for binary comparison operations.
+~~There is currently a runtime issue with pushing multiple strings in sequence that causes segmentation faults.~~
 
-The issue appears to be in the SWFModernRuntime's handling of consecutive string push operations. Once this underlying issue is resolved, the STRING_GREATER opcode should work correctly.
+**RESOLVED** (commit 3c3ea22): The segmentation fault issue was caused by `oldSP` variable reuse in PUSH macros. This has been fixed by declaring `oldSP` as a local variable within each macro scope. The test now runs successfully without segfaults.
 
 ## Implementation Status
 
@@ -116,7 +122,8 @@ The issue appears to be in the SWFModernRuntime's handling of consecutive string
 - [x] Test SWF created with comprehensive test cases
 - [x] Test directory setup complete
 - [x] Builds without errors
-- [ ] Test execution blocked by runtime string handling issue
+- [x] Test execution working correctly
+- [x] Runtime string handling issue resolved (commit 3c3ea22)
 
 ## References
 

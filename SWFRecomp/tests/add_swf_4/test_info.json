@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "add_swf_4",
+    "description": "Comprehensive tests for ADD opcode (0x0A) including basic arithmetic, type conversion, and edge cases",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["ADD"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
