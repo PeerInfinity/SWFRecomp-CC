@@ -1,11 +1,27 @@
 #!/bin/bash
-# Usage: ./scripts/build_test.sh <test_name> [native|wasm]
+# Usage: ./scripts/build_test.sh <test_name> [native|wasm] [--clean]
 # Example: ./scripts/build_test.sh trace_swf_4 wasm
+# Example: ./scripts/build_test.sh trace_swf_4 native --clean
 
 set -e
 
+# Parse arguments
 TEST_NAME=$1
 TARGET=${2:-wasm}              # Default: wasm
+CLEAN_FLAG=false
+
+# Check for --clean flag in any position
+for arg in "$@"; do
+    if [ "$arg" = "--clean" ]; then
+        CLEAN_FLAG=true
+    fi
+done
+
+# If TARGET is --clean, set it to default and enable clean
+if [ "$TARGET" = "--clean" ]; then
+    TARGET="wasm"
+    CLEAN_FLAG=true
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -15,7 +31,7 @@ BUILD_DIR="${TEST_DIR}/build/${TARGET}"
 # Validate inputs
 if [ -z "$TEST_NAME" ]; then
     echo "Error: Test name required"
-    echo "Usage: $0 <test_name> [native|wasm]"
+    echo "Usage: $0 <test_name> [native|wasm] [--clean]"
     exit 1
 fi
 
@@ -51,6 +67,13 @@ if [ ! -f "${TEST_DIR}/test.swf" ]; then
         echo "  - ${TEST_DIR}/create_test_swf.py (generation script)"
         exit 1
     fi
+fi
+
+# Clean generated files if --clean flag is set
+if [ "$CLEAN_FLAG" = true ]; then
+    echo "Cleaning generated files..."
+    rm -rf "${TEST_DIR}/RecompiledScripts"
+    rm -rf "${TEST_DIR}/RecompiledTags"
 fi
 
 # Run SWFRecomp if needed
