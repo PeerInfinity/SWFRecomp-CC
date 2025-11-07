@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "remove_sprite_swf_4",
+    "description": "Tests REMOVE_SPRITE opcode (0x25) - removes a sprite/MovieClip from the display list",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["REMOVE_SPRITE"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

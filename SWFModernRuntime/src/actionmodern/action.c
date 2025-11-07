@@ -2553,6 +2553,29 @@ void actionSetProperty(char* stack, u32* sp)
 	}
 }
 
+void actionRemoveSprite(char* stack, u32* sp)
+{
+	// Pop target sprite name from stack
+	ActionVar target;
+	popVar(stack, sp, &target);
+	const char* target_name = (const char*) target.data.numeric_value;
+
+	#ifndef NO_GRAPHICS
+	// Full implementation: Remove MovieClip from display list
+	// TODO: Implement actual sprite removal when display list is implemented
+	// This would involve:
+	// 1. Find MovieClip in display list
+	// 2. Remove from display list
+	// 3. Release resources (with reference counting)
+	removeMovieClip(target_name);
+	#else
+	// NO_GRAPHICS mode: just log the operation
+	#ifdef DEBUG
+	printf("[RemoveSprite] %s\n", target_name);
+	#endif
+	#endif
+}
+
 // ==================================================================
 // WITH Statement Implementation
 // ==================================================================
