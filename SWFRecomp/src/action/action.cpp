@@ -561,6 +561,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_EXTENDS:
+				{
+					out_script << "\t" << "// Extends - Set up prototype chain for inheritance" << endl
+							   << "\t" << "actionExtends(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_STORE_REGISTER:
 				{
 					// Read register number from bytecode

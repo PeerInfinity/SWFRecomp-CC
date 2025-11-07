@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "extends_swf_7",
+    "description": "Tests EXTENDS opcode (0x69) for prototype-based inheritance",
+    "swf_version": 7
+  },
+  "opcodes": {
+    "tested": ["EXTENDS"],
+    "supporting": ["PUSH", "TRACE", "INIT_OBJECT", "GET_VARIABLE", "SET_VARIABLE", "SET_MEMBER", "DUPLICATE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
