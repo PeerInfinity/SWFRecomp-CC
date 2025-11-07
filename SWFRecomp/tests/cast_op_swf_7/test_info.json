@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "cast_op_swf_7",
+    "description": "Tests CAST_OP opcode (0x2B) - ActionScript 2.0 cast operator for type conversion",
+    "swf_version": 7
+  },
+  "opcodes": {
+    "tested": ["CAST_OP"],
+    "supporting": ["PUSH", "POP", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

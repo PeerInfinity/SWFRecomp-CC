@@ -1683,6 +1683,42 @@ void actionTypeof(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, len);
 }
 
+void actionCastOp(char* stack, u32* sp)
+{
+	// CastOp implementation (ActionScript 2.0 cast operator)
+	// Pops object to cast, pops constructor, checks if object is instance of constructor
+	// Returns object if cast succeeds, undefined/null if it fails
+
+	// Pop object to cast
+	u8 obj_type = STACK_TOP_TYPE;
+	u64 obj_value = STACK_TOP_VALUE;
+	POP();
+
+	// Pop constructor function
+	u8 ctor_type = STACK_TOP_TYPE;
+	u64 ctor_value = STACK_TOP_VALUE;
+	POP();
+
+	// SIMPLIFIED IMPLEMENTATION:
+	// Since prototype chain and instanceof infrastructure is not yet implemented,
+	// this is a basic version that only checks if the object is an object type.
+	// TODO: Implement full instanceof checking with prototype chain walking
+	//       and interface implementation checking when that infrastructure is available.
+
+	// For now: if object is an OBJECT type and non-null, assume cast succeeds
+	// This will need to be enhanced with actual instanceof logic later
+	if (obj_type == ACTION_STACK_VALUE_OBJECT && obj_value != 0)
+	{
+		// Cast succeeds - push the object back
+		PUSH(ACTION_STACK_VALUE_OBJECT, obj_value);
+	}
+	else
+	{
+		// Cast fails - push undefined (represents null in ActionScript)
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+	}
+}
+
 void actionDuplicate(char* stack, u32* sp)
 {
 	// Get the type of the top stack entry

@@ -277,6 +277,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_CAST_OP:
+				{
+					out_script << "\t" << "// CastOp" << endl
+							   << "\t" << "actionCastOp(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_STRING_LESS:
 				{
 					out_script << "\t" << "// StringLess" << endl
