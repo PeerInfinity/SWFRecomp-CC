@@ -1286,6 +1286,19 @@ void actionTrace(char* stack, u32* sp)
 	POP();
 }
 
+void actionGotoFrame(char* stack, u32* sp, u16 frame)
+{
+	// Simplified: just log the frame change
+	printf("// GotoFrame: %d\n", frame);
+	fflush(stdout);
+
+	// TODO: Implement actual frame navigation
+	// This requires:
+	// - MovieClip structure
+	// - Frame management
+	// - Timeline playback control
+}
+
 void actionGetVariable(char* stack, u32* sp)
 {
 
