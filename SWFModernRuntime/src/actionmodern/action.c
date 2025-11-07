@@ -1976,6 +1976,94 @@ void actionStrictEquals(char* stack, u32* sp)
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
+
+void actionEquals2(char* stack, u32* sp)
+{
+	// Pop first argument (arg1)
+	ActionVar a;
+	popVar(stack, sp, &a);
+
+	// Pop second argument (arg2)
+	ActionVar b;
+	popVar(stack, sp, &b);
+
+	float result = 0.0f;
+
+	// ECMA-262 equality algorithm
+	// 1. If types are the same, use strict equality
+	if (a.type == b.type)
+	{
+		switch (a.type)
+		{
+			case ACTION_STACK_VALUE_F32:
+			{
+				float a_val = VAL(float, &a.data.numeric_value);
+				float b_val = VAL(float, &b.data.numeric_value);
+				result = (a_val == b_val) ? 1.0f : 0.0f;
+				break;
+			}
+
+			case ACTION_STACK_VALUE_F64:
+			{
+				double a_val = VAL(double, &a.data.numeric_value);
+				double b_val = VAL(double, &b.data.numeric_value);
+				result = (a_val == b_val) ? 1.0f : 0.0f;
+				break;
+			}
+
+			case ACTION_STACK_VALUE_STRING:
+			{
+				const char* str_a = (const char*) a.data.numeric_value;
+				const char* str_b = (const char*) b.data.numeric_value;
+				if (str_a != NULL && str_b != NULL) {
+					result = (strcmp(str_a, str_b) == 0) ? 1.0f : 0.0f;
+				} else {
+					result = (str_a == str_b) ? 1.0f : 0.0f;
+				}
+				break;
+			}
+
+			case ACTION_STACK_VALUE_UNDEFINED:
+			{
+				// undefined == undefined is true
+				result = 1.0f;
+				break;
+			}
+
+			default:
+				// For other types (OBJECT, etc.), compare raw values
+				result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
+				break;
+		}
+	}
+	// 2. Number vs String: convert string to number
+	else if ((a.type == ACTION_STACK_VALUE_F32 || a.type == ACTION_STACK_VALUE_F64) &&
+	         b.type == ACTION_STACK_VALUE_STRING)
+	{
+		const char* str_b = (const char*) b.data.numeric_value;
+		float b_num = (str_b != NULL) ? (float)atof(str_b) : 0.0f;
+		float a_val = (a.type == ACTION_STACK_VALUE_F32) ?
+		              VAL(float, &a.data.numeric_value) :
+		              (float)VAL(double, &a.data.numeric_value);
+		result = (a_val == b_num) ? 1.0f : 0.0f;
+	}
+	else if (a.type == ACTION_STACK_VALUE_STRING &&
+	         (b.type == ACTION_STACK_VALUE_F32 || b.type == ACTION_STACK_VALUE_F64))
+	{
+		const char* str_a = (const char*) a.data.numeric_value;
+		float a_num = (str_a != NULL) ? (float)atof(str_a) : 0.0f;
+		float b_val = (b.type == ACTION_STACK_VALUE_F32) ?
+		              VAL(float, &b.data.numeric_value) :
+		              (float)VAL(double, &b.data.numeric_value);
+		result = (a_num == b_val) ? 1.0f : 0.0f;
+	}
+	// 3. Different types not covered above: false
+	// (This handles cases like object vs number, etc.)
+
+	// Push boolean result (1.0 = true, 0.0 = false)
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
 void actionStringGreater(char* stack, u32* sp)
 {
 

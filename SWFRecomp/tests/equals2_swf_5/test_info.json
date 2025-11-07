@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "equals2_swf_5",
+    "description": "Tests ActionEquals2 opcode (0x49) - Type-aware equality comparison following ECMA-262 specification",
+    "swf_version": 5
+  },
+  "opcodes": {
+    "tested": ["EQUALS2"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

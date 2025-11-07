@@ -81,6 +81,7 @@ void actionModulo(char* stack, u32* sp);
 void actionEquals(char* stack, u32* sp);
 void actionLess(char* stack, u32* sp);
 void actionLess2(char* stack, u32* sp);
+void actionEquals2(char* stack, u32* sp);
 void actionAnd(char* stack, u32* sp);
 void actionOr(char* stack, u32* sp);
 void actionNot(char* stack, u32* sp);
