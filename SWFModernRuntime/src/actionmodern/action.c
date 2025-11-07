@@ -2082,6 +2082,91 @@ void actionStringLess(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
+void actionImplementsOp(char* stack, u32* sp)
+{
+	// ActionImplementsOp implements the ActionScript "implements" keyword
+	// It specifies the interfaces that a class implements, for use by instanceof and CastOp
+
+	// Step 1: Pop constructor function (the class) from stack
+	ActionVar constructor_var;
+	popVar(stack, sp, &constructor_var);
+
+	// Validate that it's an object
+	if (constructor_var.type != ACTION_STACK_VALUE_OBJECT)
+	{
+		fprintf(stderr, "ERROR: actionImplementsOp - constructor is not an object\n");
+		return;
+	}
+
+	ASObject* constructor = (ASObject*) constructor_var.data.numeric_value;
+
+	// Step 2: Pop count of interfaces from stack
+	ActionVar count_var;
+	popVar(stack, sp, &count_var);
+
+	// Convert to number if needed
+	u32 interface_count = 0;
+	if (count_var.type == ACTION_STACK_VALUE_F32)
+	{
+		interface_count = (u32) *((float*)&count_var.data.numeric_value);
+	}
+	else if (count_var.type == ACTION_STACK_VALUE_F64)
+	{
+		interface_count = (u32) *((double*)&count_var.data.numeric_value);
+	}
+	else
+	{
+		fprintf(stderr, "ERROR: actionImplementsOp - interface count is not a number\n");
+		return;
+	}
+
+	// Step 3: Allocate array for interface constructors
+	ASObject** interfaces = NULL;
+	if (interface_count > 0)
+	{
+		interfaces = (ASObject**) malloc(sizeof(ASObject*) * interface_count);
+		if (interfaces == NULL)
+		{
+			fprintf(stderr, "ERROR: actionImplementsOp - failed to allocate interfaces array\n");
+			return;
+		}
+
+		// Pop each interface constructor from stack
+		// Note: Interfaces are pushed in order, so we pop them in reverse
+		for (u32 i = 0; i < interface_count; i++)
+		{
+			ActionVar iface_var;
+			popVar(stack, sp, &iface_var);
+
+			if (iface_var.type != ACTION_STACK_VALUE_OBJECT)
+			{
+				fprintf(stderr, "ERROR: actionImplementsOp - interface %u is not an object\n", i);
+				// Clean up allocated interfaces
+				for (u32 j = 0; j < i; j++)
+				{
+					releaseObject(interfaces[j]);
+				}
+				free(interfaces);
+				return;
+			}
+
+			// Store in reverse order (last popped goes first)
+			interfaces[interface_count - 1 - i] = (ASObject*) iface_var.data.numeric_value;
+		}
+	}
+
+	// Step 4: Set the interface list on the constructor
+	// This transfers ownership of the interfaces array
+	setInterfaceList(constructor, interfaces, interface_count);
+
+#ifdef DEBUG
+	printf("[DEBUG] actionImplementsOp: constructor=%p, interface_count=%u\n",
+		(void*)constructor, interface_count);
+#endif
+
+	// Note: No values pushed back on stack (ImplementsOp has no return value)
+}
+
 void actionCall(char* stack, u32* sp)
 {
 	// Pop frame identifier (string or number)

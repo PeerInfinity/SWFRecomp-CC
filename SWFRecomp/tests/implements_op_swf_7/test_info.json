@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "implements_op_swf_7",
+    "description": "Tests IMPLEMENTS_OP opcode (0x2C) - ActionScript implements keyword for interface support",
+    "swf_version": 7
+  },
+  "opcodes": {
+    "tested": ["IMPLEMENTS_OP"],
+    "supporting": ["PUSH", "INIT_OBJECT", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": "This is a smoke test to verify ImplementsOp doesn't crash. Full interface testing (with instanceof) will be added when instanceof is implemented."
+}
