@@ -36,6 +36,7 @@ void swfStart(SWFAppContext* app_context)
 	quit_swf = 0;
 	is_playing = 1;
 	bad_poll = 0;
+	current_frame = 0;
 	next_frame = 0;
 	manual_next_frame = 0;
 

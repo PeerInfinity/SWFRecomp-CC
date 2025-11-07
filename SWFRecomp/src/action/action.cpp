@@ -93,6 +93,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_PREV_FRAME:
+				{
+					out_script << "\t" << "// Prev Frame" << endl
+							   << "\t" << "actionPrevFrame(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_PLAY:
 				{
 					out_script << "\t" << "// Play" << endl
