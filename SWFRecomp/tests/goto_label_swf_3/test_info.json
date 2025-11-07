@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "goto_label_swf_3",
+    "description": "Tests GOTO_LABEL opcode (0x8C) - jumps to frame by label",
+    "swf_version": 3
+  },
+  "opcodes": {
+    "tested": ["GOTO_LABEL"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

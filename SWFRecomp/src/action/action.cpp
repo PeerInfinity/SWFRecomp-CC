@@ -669,6 +669,23 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_GOTO_LABEL:
+				{
+					// Read Label (null-terminated string)
+					std::string label;
+					char ch;
+					char* label_ptr = action_buffer;
+					while ((ch = *label_ptr++) != '\0') {
+						label += ch;
+					}
+
+					out_script << "\t" << "// GoToLabel: \"" << label << "\"" << endl
+							   << "\t" << "actionGoToLabel(stack, sp, \"" << label << "\");" << endl;
+
+					action_buffer += length;
+					break;
+				}
+
 			case SWF_ACTION_DEFINE_FUNCTION2:
 			{
 				// Parse function metadata

@@ -1314,6 +1314,18 @@ void actionGotoFrame(char* stack, u32* sp, u16 frame)
 	// - Timeline playback control
 }
 
+void actionGoToLabel(char* stack, u32* sp, const char* label)
+{
+	// Simplified implementation: Log the label
+	// TODO: Implement actual frame label lookup and navigation
+	// This requires:
+	// - MovieClip structure with labeled frames
+	// - Frame label mapping
+	// - Timeline navigation
+	printf("// GoToLabel: %s\n", label ? label : "(null)");
+	fflush(stdout);
+}
+
 void actionEndDrag(char* stack, u32* sp)
 {
 	#ifndef NO_GRAPHICS

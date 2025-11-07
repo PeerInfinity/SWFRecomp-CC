@@ -93,6 +93,9 @@ void actionGetMember(char* stack, u32* sp);
 void actionTargetPath(char* stack, u32* sp, char* str_buffer);
 void actionEnumerate(char* stack, u32* sp, char* str_buffer);
 
+// Movie control
+void actionGoToLabel(char* stack, u32* sp, const char* label);
+
 void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLength(char* stack, u32* sp, char* v_str);
 void actionStringExtract(char* stack, u32* sp, char* str_buffer);
