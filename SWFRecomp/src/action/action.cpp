@@ -293,6 +293,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_REMOVE_SPRITE:
+				{
+					out_script << "\t" << "// RemoveSprite" << endl
+						   << "\t" << "actionRemoveSprite(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TRACE:
 				{
 					out_script << "\t" << "// Trace" << endl
