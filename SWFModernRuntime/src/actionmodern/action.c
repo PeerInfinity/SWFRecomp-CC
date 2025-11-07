@@ -1286,6 +1286,21 @@ void actionTrace(char* stack, u32* sp)
 	POP();
 }
 
+void actionStopSounds(char* stack, u32* sp)
+{
+	// In NO_GRAPHICS mode, this is a no-op
+	// No stack operations required
+	#ifndef NO_GRAPHICS
+	// In full graphics mode, would stop all audio channels
+	// if (audio_context) {
+	//     stopAllAudioChannels(audio_context);
+	// }
+	#endif
+
+	// For testing purposes, no action needed
+	// This opcode has global effect and does not modify the stack
+}
+
 void actionGetVariable(char* stack, u32* sp)
 {
 

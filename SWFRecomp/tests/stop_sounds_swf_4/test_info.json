@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "stop_sounds_swf_4",
+    "description": "Tests STOP_SOUNDS opcode (0x09) - stops all currently playing sounds",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["STOP_SOUNDS"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
