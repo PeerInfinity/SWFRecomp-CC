@@ -84,12 +84,20 @@ namespace SWFRecomp
 				{
 					break;
 				}
-				
+
+				case SWF_ACTION_PLAY:
+				{
+					out_script << "\t" << "// Play" << endl
+							   << "\t" << "actionPlay();" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_STOP:
 				{
 					out_script << "\t" << "// Stop" << endl
-							   << "\t" << "quit_swf = 1;" << endl;
-					
+							   << "\t" << "is_playing = 0;" << endl;
+
 					break;
 				}
 				

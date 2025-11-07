@@ -6,6 +6,7 @@
 
 #include <recomp.h>
 #include <utils.h>
+#include <swf.h>
 #include <actionmodern/object.h>
 
 u32 start_time;
@@ -1234,6 +1235,13 @@ void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
 	{
 		str_list[1 + num_b_strings] = a.data.numeric_value;
 	}
+}
+
+void actionPlay()
+{
+	// Set playing state to true
+	// This allows the timeline to advance to the next frame
+	is_playing = 1;
 }
 
 void actionTrace(char* stack, u32* sp)

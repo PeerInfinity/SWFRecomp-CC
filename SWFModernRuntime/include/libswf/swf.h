@@ -57,6 +57,7 @@ extern u32 sp;
 extern u32 oldSP;
 
 extern int quit_swf;
+extern int is_playing;
 extern size_t next_frame;
 extern int manual_next_frame;
 
