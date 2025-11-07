@@ -105,6 +105,7 @@ void actionSetVariable(char* stack, u32* sp);
 void actionDeclareLocal(char* stack, u32* sp);
 void actionGetProperty(char* stack, u32* sp);
 void actionSetProperty(char* stack, u32* sp);
+void actionSetTarget(char* stack, u32* sp, const char* target_name);
 
 void actionTrace(char* stack, u32* sp);
 void actionRandomNumber(char* stack, u32* sp);

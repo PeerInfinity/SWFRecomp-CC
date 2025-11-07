@@ -580,6 +580,30 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_SET_TARGET:
+				{
+					// Read TargetName (null-terminated string)
+					std::string target_name;
+					char ch;
+					while ((ch = *action_buffer++) != '\0') {
+						target_name += ch;
+					}
+
+					// Escape quotes in target name for C string
+					std::string escaped_target = "";
+					for (char c : target_name) {
+						if (c == '"' || c == '\\') {
+							escaped_target += '\\';
+						}
+						escaped_target += c;
+					}
+
+					out_script << "\t" << "// SetTarget: \"" << escaped_target << "\"" << endl
+							   << "\t" << "actionSetTarget(stack, sp, \"" << escaped_target << "\");" << endl;
+
+					break;
+				}
+
 			case SWF_ACTION_DEFINE_FUNCTION2:
 			{
 				// Parse function metadata
