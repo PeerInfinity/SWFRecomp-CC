@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "next_frame_swf_4",
+    "description": "Tests NEXT_FRAME opcode (0x04) - advances playhead to next frame",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["NEXT_FRAME"],
+    "supporting": ["TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

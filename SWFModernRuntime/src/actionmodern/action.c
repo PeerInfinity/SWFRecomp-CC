@@ -1236,6 +1236,21 @@ void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
 	}
 }
 
+// ==================================================================
+// MovieClip Control Actions
+// ==================================================================
+
+void actionNextFrame()
+{
+	// Advance to the next frame
+	extern size_t current_frame;
+	extern size_t next_frame;
+	extern int manual_next_frame;
+
+	next_frame = current_frame + 1;
+	manual_next_frame = 1;
+}
+
 void actionTrace(char* stack, u32* sp)
 {
 	ActionStackValueType type = STACK_TOP_TYPE;

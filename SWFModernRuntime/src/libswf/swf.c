@@ -13,6 +13,7 @@ u32 oldSP;
 
 int quit_swf;
 int bad_poll;
+size_t current_frame;
 size_t next_frame;
 int manual_next_frame;
 ActionVar* temp_val;
@@ -28,6 +29,7 @@ void tagMain(frame_func* frame_funcs)
 {
 	while (!quit_swf)
 	{
+		current_frame = next_frame;
 		frame_funcs[next_frame]();
 		if (!manual_next_frame)
 		{

@@ -13,6 +13,7 @@ u32 oldSP = 0;
 
 int quit_swf = 0;
 int bad_poll = 0;
+size_t current_frame = 0;
 size_t next_frame = 0;
 int manual_next_frame = 0;
 ActionVar* temp_val = NULL;
@@ -42,7 +43,7 @@ void swfStart(SWFAppContext* app_context)
 
 	// Run frames in console mode
 	frame_func* funcs = app_context->frame_funcs;
-	size_t current_frame = 0;
+	current_frame = 0;
 	const size_t max_frames = 10000;
 
 	while (!quit_swf && current_frame < max_frames)

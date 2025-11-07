@@ -84,7 +84,15 @@ namespace SWFRecomp
 				{
 					break;
 				}
-				
+
+				case SWF_ACTION_NEXT_FRAME:
+				{
+					out_script << "\t" << "// NextFrame" << endl
+							   << "\t" << "actionNextFrame();" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_STOP:
 				{
 					out_script << "\t" << "// Stop" << endl
