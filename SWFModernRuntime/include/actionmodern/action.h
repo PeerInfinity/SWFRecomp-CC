@@ -183,3 +183,4 @@ void actionTryEnd(char* stack, u32* sp);
 
 // Control flow
 bool actionWaitForFrame(char* stack, u32* sp, u16 frame);
+bool actionWaitForFrame2(char* stack, u32* sp);
