@@ -12,6 +12,7 @@ u32 sp = 0;
 u32 oldSP = 0;
 
 int quit_swf = 0;
+int is_playing = 1;
 int bad_poll = 0;
 size_t current_frame = 0;
 size_t next_frame = 0;
@@ -33,6 +34,7 @@ void swfStart(SWFAppContext* app_context)
 
 	// Initialize subsystems
 	quit_swf = 0;
+	is_playing = 1;
 	bad_poll = 0;
 	next_frame = 0;
 	manual_next_frame = 0;
@@ -60,6 +62,14 @@ void swfStart(SWFAppContext* app_context)
 			break;
 		}
 
+		// Check if we should continue playing
+		if (!is_playing)
+		{
+			// Stopped - exit loop
+			break;
+		}
+
+		// Advance to next frame
 		if (manual_next_frame)
 		{
 			current_frame = next_frame;

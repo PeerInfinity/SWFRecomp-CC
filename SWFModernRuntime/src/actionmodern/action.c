@@ -6,6 +6,7 @@
 
 #include <recomp.h>
 #include <utils.h>
+#include <swf.h>
 #include <actionmodern/object.h>
 
 u32 start_time;
@@ -1249,6 +1250,13 @@ void actionNextFrame()
 
 	next_frame = current_frame + 1;
 	manual_next_frame = 1;
+}
+
+void actionPlay()
+{
+	// Set playing state to true
+	// This allows the timeline to advance to the next frame
+	is_playing = 1;
 }
 
 void actionTrace(char* stack, u32* sp)

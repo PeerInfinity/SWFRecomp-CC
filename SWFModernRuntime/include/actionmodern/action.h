@@ -112,8 +112,9 @@ void actionGetProperty(char* stack, u32* sp);
 void actionSetProperty(char* stack, u32* sp);
 void actionCloneSprite(char* stack, u32* sp);
 
-void actionGotoFrame(char* stack, u32* sp, u16 frame);
 void actionNextFrame();
+void actionPlay();
+void actionGotoFrame(char* stack, u32* sp, u16 frame);
 void actionTrace(char* stack, u32* sp);
 void actionEndDrag(char* stack, u32* sp);
 void actionGetURL(char* stack, u32* sp, const char* url, const char* target);

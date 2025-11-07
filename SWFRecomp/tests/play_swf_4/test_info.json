@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "play_swf_4",
+    "description": "Tests PLAY opcode (0x06) - starts playback from current frame",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["PLAY"],
+    "supporting": ["PUSH", "TRACE", "STOP"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
