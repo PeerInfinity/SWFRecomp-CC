@@ -277,6 +277,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_IMPLEMENTS_OP:
+				{
+					out_script << "\t" << "// ImplementsOp" << endl
+							   << "\t" << "actionImplementsOp(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_RANDOM_NUMBER:
 				{
 					out_script << "\t" << "// Random Number" << endl
