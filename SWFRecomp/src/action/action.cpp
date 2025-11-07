@@ -478,6 +478,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_EQUALS2:
+				{
+					out_script << "\t" << "// Equals2" << endl
+							   << "\t" << "actionEquals2(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TO_NUMBER:
 				{
 					out_script << "\t" << "// ToNumber" << endl
