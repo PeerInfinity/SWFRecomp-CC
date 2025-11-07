@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "instanceof_swf_6",
+    "description": "Tests INSTANCEOF opcode (0x54) - ActionScript instanceof operator",
+    "swf_version": 6
+  },
+  "opcodes": {
+    "tested": ["INSTANCEOF"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": "Current implementation is simplified and always returns false. Requires prototype chain support for full functionality."
+}

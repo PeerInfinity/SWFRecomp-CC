@@ -1741,6 +1741,44 @@ void actionDecrement(char* stack, u32* sp)
 	}
 }
 
+void actionInstanceOf(char* stack, u32* sp)
+{
+	// Pop constructor function
+	ActionVar constr_var;
+	popVar(stack, sp, &constr_var);
+
+	// Pop object
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// TODO: Implement proper prototype chain traversal
+	// This requires adding prototype field to ASObject structure
+	// For now, simplified implementation returns false
+
+	bool result = false;
+
+	// Primitives (number, string, boolean) are never instances
+	if (obj_var.type == ACTION_STACK_VALUE_F32 ||
+		obj_var.type == ACTION_STACK_VALUE_F64 ||
+		obj_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		result = false;
+	}
+	// TODO: When prototype support is added, implement:
+	// 1. Get constructor's prototype property
+	// 2. Walk up object's prototype chain
+	// 3. If any prototype matches constructor's prototype, return true
+	// 4. If chain ends without match, return false
+
+	// Push result as float (1.0 for true, 0.0 for false)
+	float result_val = result ? 1.0f : 0.0f;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_val));
+
+	#ifdef DEBUG
+	printf("// InstanceOf check (simplified - always returns false)\n");
+	#endif
+}
+
 void actionBitAnd(char* stack, u32* sp)
 {
 

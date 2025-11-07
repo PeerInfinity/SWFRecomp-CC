@@ -497,6 +497,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_INSTANCEOF:
+				{
+					out_script << "\t" << "// InstanceOf" << endl
+							   << "\t" << "actionInstanceOf(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl
