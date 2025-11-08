@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "increment_swf_4",
+    "description": "Tests INCREMENT opcode (0x50) - increments a value by 1",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["INCREMENT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
