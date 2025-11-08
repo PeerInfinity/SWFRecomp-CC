@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "ascii_to_char_swf_4",
+    "description": "Tests ASCII_TO_CHAR opcode (0x33) - converts numeric code to character string",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["ASCII_TO_CHAR"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
