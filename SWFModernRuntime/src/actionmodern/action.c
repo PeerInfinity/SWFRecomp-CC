@@ -1414,7 +1414,8 @@ void actionGetVariable(char* stack, u32* sp)
 {
 
 	// Read variable name info from stack
-	u32 string_id = VAL(u32, &stack[*sp + 4]);
+	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
+	u32 string_id = VAL(u32, &stack[*sp + 12]);
 	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
 	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
 
@@ -1470,18 +1471,19 @@ void actionGetVariable(char* stack, u32* sp)
 
 void actionSetVariable(char* stack, u32* sp)
 {
-	// Stack layout: [value] [name] <- sp
-	// We need value at top, name at second
+	// Stack layout: [value, name] <- sp
+	// NAME is at top (*sp), VALUE is at second (SP_SECOND_TOP)
 
-	u32 value_sp = *sp;
-	u32 var_name_sp = SP_SECOND_TOP;
+	u32 var_name_sp = *sp;
+	u32 value_sp = SP_SECOND_TOP;
 
 	// Debug: check what's on stack
 	ActionStackValueType value_type = stack[value_sp];
 	printf("[DEBUG SET_VAR] Setting variable, value type=%d\n", value_type);
 
 	// Read variable name info
-	u32 string_id = VAL(u32, &stack[var_name_sp + 4]);
+	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
+	u32 string_id = VAL(u32, &stack[var_name_sp + 12]);
 	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
 	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
 
