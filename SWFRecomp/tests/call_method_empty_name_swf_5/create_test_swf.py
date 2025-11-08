@@ -81,8 +81,7 @@ action_trace = bytes([0x26])
 action_end = bytes([0x00])
 
 # Combine all actions
-# IMPORTANT: For SetVariable, we need NAME then VALUE on stack
-# So: Push "obj" (name), DefineFunction2 (pushes value), SetVariable
+# Note: SetVariable pops value first, then name, so stack order is [name, value]
 actions = (action_push_var_name + define_func2 + action_set_variable +
            action_push_zero + action_push_obj_name + action_get_variable +
            action_push_empty + action_call_method + action_trace + action_end)
