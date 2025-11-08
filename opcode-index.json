@@ -1531,10 +1531,10 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/divide_floats_error_swf_4",
         "SWFRecomp/tests/end_drag_swf_4",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/equals_swf_4",
         "SWFRecomp/tests/extends_swf_7",
+        "SWFRecomp/tests/get_member_swf_4",
         "SWFRecomp/tests/get_time_swf_5",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
@@ -1579,10 +1579,10 @@
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/trace_swf_4"
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/get_member_swf_4"
       ],
-      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 5682)"
@@ -1621,10 +1621,10 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/divide_floats_error_swf_4",
         "SWFRecomp/tests/end_drag_swf_4",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/equals_swf_4",
         "SWFRecomp/tests/extends_swf_7",
+        "SWFRecomp/tests/get_member_swf_4",
         "SWFRecomp/tests/get_time_swf_5",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
@@ -1669,10 +1669,10 @@
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/trace_swf_4"
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/get_member_swf_4"
       ],
-      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
       "notes": "C++ enum value for opcode"
@@ -1711,10 +1711,10 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/divide_floats_error_swf_4",
         "SWFRecomp/tests/end_drag_swf_4",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/equals_swf_4",
         "SWFRecomp/tests/extends_swf_7",
+        "SWFRecomp/tests/get_member_swf_4",
         "SWFRecomp/tests/get_time_swf_5",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
@@ -1759,10 +1759,10 @@
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/trace_swf_4"
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/get_member_swf_4"
       ],
-      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
       "notes": "Runtime function (action.h line 125)"
@@ -2858,7 +2858,6 @@
       "tests_secondary": [
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7"
       ],
@@ -2879,7 +2878,6 @@
       "tests_secondary": [
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7"
       ],
@@ -2900,7 +2898,6 @@
       "tests_secondary": [
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7"
       ],
@@ -3382,14 +3379,18 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/get_member_swf_4"
+      ],
       "tests_secondary": [
         "SWFRecomp/tests/delete2_swf_5"
       ],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/get_member_swf_4"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 6090)"
     },
     {
@@ -3399,14 +3400,18 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_GET_MEMBER)",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/get_member_swf_4"
+      ],
       "tests_secondary": [
         "SWFRecomp/tests/delete2_swf_5"
       ],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/get_member_swf_4"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3416,14 +3421,18 @@
       "type": "function",
       "function_declaration": "void actionGetMember(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/get_member_swf_4"
+      ],
       "tests_secondary": [
         "SWFRecomp/tests/delete2_swf_5"
       ],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/get_member_swf_4"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "Runtime function (action.h line 164)"
     },
     {
@@ -3736,14 +3745,12 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [
-        "SWFRecomp/tests/enumerate2_swf_6"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
-      "fully_implemented": true,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6806)"
     },
     {
@@ -3753,14 +3760,12 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_ENUMERATE2)",
-      "tests_primary": [
-        "SWFRecomp/tests/enumerate2_swf_6"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
-      "fully_implemented": true,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3770,14 +3775,12 @@
       "type": "function",
       "function_declaration": "void actionEnumerate2(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [
-        "SWFRecomp/tests/enumerate2_swf_6"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
-      "fully_implemented": true,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 144)"
     },
     {
@@ -4748,10 +4751,10 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/divide_floats_error_swf_4",
         "SWFRecomp/tests/end_drag_swf_4",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/equals_swf_4",
         "SWFRecomp/tests/extends_swf_7",
+        "SWFRecomp/tests/get_member_swf_4",
         "SWFRecomp/tests/get_time_swf_5",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
@@ -4797,7 +4800,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/trace_swf_4"
+        "SWFRecomp/tests/get_member_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
@@ -4837,10 +4840,10 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/divide_floats_error_swf_4",
         "SWFRecomp/tests/end_drag_swf_4",
-        "SWFRecomp/tests/enumerate2_swf_6",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/equals_swf_4",
         "SWFRecomp/tests/extends_swf_7",
+        "SWFRecomp/tests/get_member_swf_4",
         "SWFRecomp/tests/get_time_swf_5",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
@@ -4886,7 +4889,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/trace_swf_4"
+        "SWFRecomp/tests/get_member_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
