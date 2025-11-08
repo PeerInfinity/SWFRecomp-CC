@@ -190,11 +190,6 @@ SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md
 
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md
 
 
@@ -246,6 +241,11 @@ SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/parallel-opcode-implementation-guide.md
+SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md
 
 
 Please read these files and follow their instructions:
@@ -365,7 +365,7 @@ SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md
 
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md
+SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md
 
 
 Please read these files and follow their instructions:
@@ -375,7 +375,17 @@ SWFRecompDocs/prompts/completed/opcode-with-0x94.md
 
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
+SWFRecompDocs/prompts/corrections/opcode-call-method-0x52.md
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/parallel-opcode-implementation-guide.md
+SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md
 
 
 Please read these files and follow their instructions:
@@ -386,6 +396,11 @@ SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/parallel-opcode-implementation-guide.md
+SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md
 
 
 Please read these files and follow their instructions:
@@ -416,6 +431,11 @@ SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/parallel-opcode-implementation-guide.md
+SWFRecompDocs/prompts/pending/opcode-gotoframe2-0x9f.md
 
 
 Please read these files and follow their instructions:

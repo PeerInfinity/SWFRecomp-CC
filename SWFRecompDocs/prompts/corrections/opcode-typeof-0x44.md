@@ -7,7 +7,7 @@ Your task is to implement support for the AS2 opcode: **TYPEOF**
 ## Opcode Specification
 
 **Opcode Name**: TYPEOF
-**Hex Value**: 0x3C
+**Hex Value**: 0x44
 **Category**: Utility Operations
 **Estimated Complexity**: MEDIUM (2-4 hours)
 

@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "definelocal_swf_5",
+    "description": "Tests DEFINE_LOCAL opcode (0x3C) - defines local variable with value",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["DEFINE_LOCAL"],
+    "supporting": ["PUSH", "GET_VARIABLE", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": [
+    "DefineLocal (0x3C) defines a local variable in the current scope",
+    "Without full function infrastructure, it behaves like SetVariable in global scope",
+    "This test verifies basic functionality: var x = 42; trace(x);"
+  ]
+}

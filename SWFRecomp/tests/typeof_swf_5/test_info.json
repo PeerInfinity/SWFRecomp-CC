@@ -2,7 +2,8 @@
   "metadata": {
     "name": "typeof_swf_5",
     "description": "Tests ActionTypeOf opcode (0x44) - returns type of value as string",
-    "swf_version": 5
+    "swf_version": 5,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["TYPEOF"],

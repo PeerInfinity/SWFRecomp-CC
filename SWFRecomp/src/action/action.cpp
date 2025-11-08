@@ -524,6 +524,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_DEFINE_LOCAL:
+				{
+					out_script << "\t" << "// DefineLocal" << endl
+							   << "\t" << "actionDefineLocal(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TYPEOF:
 				{
 					declareEmptyString(context, 17);
@@ -1372,6 +1380,29 @@ namespace SWFRecomp
 				{
 					out_script << "\t" << "// Call" << endl
 							   << "\t" << "actionCall(stack, sp);" << endl;
+
+					break;
+				}
+
+				case SWF_ACTION_GOTO_FRAME2:
+				{
+					// Parse opcode data byte
+					u8 flags = VAL(u8, action_buffer);
+
+					u8 play_flag = flags & 0x01;
+					u8 scene_bias_flag = (flags >> 1) & 0x01;
+
+					u16 scene_bias = 0;
+					if (scene_bias_flag) {
+						scene_bias = VAL(u16, action_buffer + 1);
+					}
+
+					out_script << "\t" << "// GotoFrame2 (play=" << (int)play_flag
+							   << ", sceneBias=" << scene_bias << ")" << endl
+							   << "\t" << "actionGotoFrame2(stack, sp, "
+							   << (int)play_flag << ", " << scene_bias << ");" << endl;
+
+					action_buffer += length;
 
 					break;
 				}

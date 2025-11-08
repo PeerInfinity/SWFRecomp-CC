@@ -4,9 +4,9 @@
 
 **Total Opcodes**: 100
 
-**Implemented Opcodes**: 58
+**Implemented Opcodes**: 60
 
-**Total Entries**: 275
+**Total Entries**: 279
 
 ## Summary Table
 
@@ -33,7 +33,7 @@
 | 0X15 | ActionStringExtract | SWF_ACTION_STRING_EXTRACT | actionStringExtract |  |  |  | ✓ |  |
 | 0X17 | ActionPop | SWF_ACTION_POP |  | 1/1 | 1/1 |  | ✓ | ✓ |
 | 0X18 | ActionToInteger | SWF_ACTION_TO_INTEGER | actionToInteger |  |  |  | ✓ |  |
-| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable | 0/1 | 3/6 | 1 | ✓ |  |
+| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable | 0/1 | 4/7 | 1 | ✓ |  |
 | 0X1D | ActionSetVariable | SWF_ACTION_SET_VARIABLE | actionSetVariable | 1/1 | 2/6 |  | ✓ | ✓ |
 | 0X20 | ActionSetTarget2 | SWF_ACTION_SET_TARGET2 | actionSetTarget2 | 1/1 |  |  | ✓ |  |
 | 0X21 | ActionStringAdd | SWF_ACTION_STRING_ADD | actionStringAdd | 0/1 | 1/2 | 1 | ✓ | ✓ |
@@ -41,7 +41,7 @@
 | 0X23 | ActionSetProperty | SWF_ACTION_SET_PROPERTY | actionSetProperty |  |  |  | ✓ |  |
 | 0X24 | ActionCloneSprite | SWF_ACTION_CLONE_SPRITE | actionCloneSprite | 1/1 |  |  | ✓ |  |
 | 0X25 | ActionRemoveSprite | SWF_ACTION_REMOVE_SPRITE | actionRemoveSprite | 1/1 |  |  | ✓ |  |
-| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 55/67 |  | ✓ | ✓ |
+| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 57/69 |  | ✓ | ✓ |
 | 0X27 | ActionStartDrag | SWF_ACTION_START_DRAG | actionStartDrag | 1/1 |  |  | ✓ |  |
 | 0X28 | ActionEndDrag | SWF_ACTION_END_DRAG | actionEndDrag | 1/1 |  |  | ✓ |  |
 | 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess |  |  |  | ✓ |  |
@@ -58,7 +58,7 @@
 | 0X37 | ActionMBAsciiToChar | SWF_ACTION_MB_ASCII_TO_CHAR |  | 1/1 |  |  | ✓ |  |
 | 0X3A | ActionDelete | SWF_ACTION_DELETE | actionDelete | 0/1 |  | 1 | ✓ | ✓ |
 | 0X3B | ActionDelete2 | SWF_ACTION_DELETE2 | actionDelete2 | 0/1 |  | 1 | ✓ |  |
-| 0X3C | ActionDefineLocal |  |  |  |  |  | ✓ |  |
+| 0X3C | ActionDefineLocal | SWF_ACTION_DEFINE_LOCAL | actionDefineLocal | 1/1 |  |  | ✓ |  |
 | 0X3D | ActionStackSwap | SWF_ACTION_CALL_FUNCTION | actionStackSwap |  |  |  | ✓ |  |
 | 0X3E | ActionReturn | SWF_ACTION_RETURN | actionReturn |  | 0/1 |  | ✓ |  |
 | 0X3F | ActionModulo | SWF_ACTION_MODULO | actionModulo | 1/1 |  |  | ✓ | ✓ |
@@ -66,7 +66,7 @@
 | 0X41 | ActionDefineLocal2 | SWF_ACTION_DECLARE_LOCAL |  |  |  |  | ✓ |  |
 | 0X42 | ActionInitArray | SWF_ACTION_INIT_ARRAY | actionInitArray |  |  |  | ✓ |  |
 | 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject |  | 2/4 |  | ✓ |  |
-| 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF |  | 1/1 |  |  | ✓ |  |
+| 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF |  | 1/1 |  |  | ✓ | ✓ |
 | 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath |  |  |  | ✓ |  |
 | 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate |  |  |  | ✓ |  |
 | 0X47 | ActionAdd2 | SWF_ACTION_ADD2 | actionAdd2 | 1/1 |  |  | ✓ |  |
@@ -105,13 +105,13 @@
 | 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 0/1 |  | 1 | ✓ |  |
 | 0X8F | ActionTry | SWF_ACTION_TRY |  | 0/1 |  | 1 | ✓ |  |
 | 0X94 | ActionWith | SWF_ACTION_WITH |  |  |  |  | ✓ |  |
-| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 54/66 |  | ✓ | ✓ |
+| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 56/68 |  | ✓ | ✓ |
 | 0X99 | ActionJump | SWF_ACTION_JUMP |  | 0/1 |  | 1 | ✓ | ✓ |
 | 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  |
 | 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  |  |  |  | ✓ |  |
 | 0X9D | ActionIf | SWF_ACTION_IF |  | 0/2 | 1/1 | 2 | ✓ | ✓ |
 | 0X9E | ActionCall | SWF_ACTION_CALL | actionCall |  |  |  | ✓ |  |
-| 0X9F | ActionGotoFrame2 |  |  |  |  |  | ✓ |  |
+| 0X9F | ActionGotoFrame2 | SWF_ACTION_GOTO_FRAME2 | actionGotoFrame2 | 1/1 |  |  | ✓ |  |
 
 ## Implementation Status
 
@@ -138,6 +138,7 @@
 | 0X34 | ActionGetTime | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X3A | ActionDelete | ✓ | ✓ | 0/1 | 1 | ✓ |
 | 0X3F | ActionModulo | ✓ | ✓ | 1/1 |  | ✓ |
+| 0X44 | ActionTypeOf | ✓ |  | 1/1 |  | ✓ |
 | 0X4D | ActionStackSwap | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X50 | ActionIncrement | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X51 | ActionDecrement | ✓ | ✓ | 1/1 |  | ✓ |
@@ -198,8 +199,6 @@
 
 | Hex | Spec Name |
 |-----|-----------|
-| 0X3C | ActionDefineLocal |
-| 0X9F | ActionGotoFrame2 |
 
 ## Detailed Information
 
@@ -305,7 +304,7 @@ void actionPlay();
 - parseActions (case SWF_ACTION_STOP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-stop-0x07.md](SWFRecompDocs/prompts/completed/opcode-stop-0x07.md)
+- [SWFRecompDocs/prompts/pending/opcode-stop-0x07.md](SWFRecompDocs/prompts/pending/opcode-stop-0x07.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4354)
@@ -748,6 +747,7 @@ void actionToInteger(char* stack, u32* sp);
 
 **Secondary Tests:**
 - [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/definelocal_swf_5`
 - [✗] `SWFRecomp/tests/delete2_swf_5`
 - [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
@@ -987,6 +987,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/constant_pool_repeated_swf_5`
 - [✓] `SWFRecomp/tests/constant_pool_swf_5`
 - [✓] `SWFRecomp/tests/decrement_swf_4`
+- [✓] `SWFRecomp/tests/definelocal_swf_5`
 - [✗] `SWFRecomp/tests/delete2_swf_5`
 - [✗] `SWFRecomp/tests/delete_swf_5`
 - [✗] `SWFRecomp/tests/divide_floats_error_swf_4`
@@ -1000,6 +1001,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✗] `SWFRecomp/tests/get_variable_swf_4`
 - [✓] `SWFRecomp/tests/goto_frame_swf_3`
 - [✓] `SWFRecomp/tests/goto_label_swf_3`
+- [✓] `SWFRecomp/tests/gotoframe2_swf_5`
 - [✗] `SWFRecomp/tests/if_false_swf_4`
 - [✗] `SWFRecomp/tests/if_swf_4`
 - [✓] `SWFRecomp/tests/implements_op_swf_7`
@@ -1429,9 +1431,22 @@ void actionDelete2(char* stack, u32* sp, char* str_buffer);
 
 **Name Variations:**
 - `ActionDefineLocal` (spec, source: SWF Specification v19)
+- `SWF_ACTION_DEFINE_LOCAL` (enum, source: action.hpp)
+- `actionDefineLocal` (function, source: action.h)
+
+**Primary Tests:**
+- [✓] `SWFRecomp/tests/definelocal_swf_5`
+
+**Function Declaration:**
+```c
+void actionDefineLocal(char* stack, u32* sp);
+```
+
+**Implementation:**
+- parseActions (case SWF_ACTION_DEFINE_LOCAL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md](SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md)
+- [SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md](SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5969)
@@ -1618,7 +1633,7 @@ void actionInitObject(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_TYPEOF)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md](SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md)
+- [SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md](SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6380)
@@ -2271,7 +2286,7 @@ void actionExtends(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_EXTENDS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-extends-0x69-original-prompt.md](SWFRecompDocs/prompts/completed/opcode-extends-0x69-original-prompt.md)
+- [SWFRecompDocs/prompts/pending/opcode-extends-0x69.md](SWFRecompDocs/prompts/pending/opcode-extends-0x69.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7120)
@@ -2559,6 +2574,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/constant_pool_repeated_swf_5`
 - [✓] `SWFRecomp/tests/constant_pool_swf_5`
 - [✓] `SWFRecomp/tests/decrement_swf_4`
+- [✓] `SWFRecomp/tests/definelocal_swf_5`
 - [✗] `SWFRecomp/tests/delete2_swf_5`
 - [✗] `SWFRecomp/tests/delete_swf_5`
 - [✗] `SWFRecomp/tests/divide_floats_error_swf_4`
@@ -2572,6 +2588,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✗] `SWFRecomp/tests/get_variable_swf_4`
 - [✓] `SWFRecomp/tests/goto_frame_swf_3`
 - [✓] `SWFRecomp/tests/goto_label_swf_3`
+- [✓] `SWFRecomp/tests/gotoframe2_swf_5`
 - [✗] `SWFRecomp/tests/if_false_swf_4`
 - [✗] `SWFRecomp/tests/if_swf_4`
 - [✓] `SWFRecomp/tests/implements_op_swf_7`
@@ -2733,9 +2750,22 @@ void actionCall(char* stack, u32* sp);
 
 **Name Variations:**
 - `ActionGotoFrame2` (spec, source: SWF Specification v19)
+- `SWF_ACTION_GOTO_FRAME2` (enum, source: action.hpp)
+- `actionGotoFrame2` (function, source: action.h)
+
+**Primary Tests:**
+- [✓] `SWFRecomp/tests/gotoframe2_swf_5`
+
+**Function Declaration:**
+```c
+void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias);
+```
+
+**Implementation:**
+- parseActions (case SWF_ACTION_GOTO_FRAME2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md](SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md)
+- [SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md](SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5344)

@@ -98,6 +98,7 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer);
 
 // Movie control
 void actionGoToLabel(char* stack, u32* sp, const char* label);
+void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias);
 
 void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLength(char* stack, u32* sp, char* v_str);
@@ -111,7 +112,7 @@ void actionCharToAscii(char* stack, u32* sp);
 void actionGetVariable(char* stack, u32* sp);
 void actionSetVariable(char* stack, u32* sp);
 void actionSetTarget2(char* stack, u32* sp);
-void actionDeclareLocal(char* stack, u32* sp);
+void actionDefineLocal(char* stack, u32* sp);
 void actionGetProperty(char* stack, u32* sp);
 void actionSetProperty(char* stack, u32* sp);
 void actionCloneSprite(char* stack, u32* sp);

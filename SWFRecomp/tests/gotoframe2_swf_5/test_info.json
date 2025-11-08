@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "gotoframe2_swf_5",
+    "description": "Tests GOTO_FRAME2 opcode - stack-based frame navigation with numeric and string frames",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["GOTO_FRAME2"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

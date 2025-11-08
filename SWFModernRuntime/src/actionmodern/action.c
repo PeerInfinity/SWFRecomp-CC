@@ -1360,6 +1360,50 @@ void actionGoToLabel(char* stack, u32* sp, const char* label)
 	fflush(stdout);
 }
 
+void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias)
+{
+	// Pop frame identifier from stack
+	ActionVar frame_var;
+	popVar(stack, sp, &frame_var);
+
+	if (frame_var.type == ACTION_STACK_VALUE_F32) {
+		// Numeric frame
+		float frame_float;
+		memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
+		u32 frame_num = (u32)frame_float;
+		frame_num += scene_bias;  // Apply bias if present
+
+		printf("GotoFrame2: frame %u (play=%d)\n", frame_num, play_flag);
+		fflush(stdout);
+
+		// TODO: Implement actual frame navigation
+		// This requires:
+		// - MovieClip structure
+		// - Frame management
+		// - Set current frame to frame_num
+		// - Set play state based on play_flag
+	}
+	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
+		// Frame label
+		const char* label = (const char*)frame_var.data.numeric_value;
+
+		printf("GotoFrame2: label '%s' (play=%d)\n", label ? label : "(null)", play_flag);
+		fflush(stdout);
+
+		// TODO: Implement frame label lookup and navigation
+		// This requires:
+		// - Parse target path if present (format: "path:label")
+		// - Look up frame by label
+		// - If found, jump to that frame with play_flag
+		// - If not found, ignore action
+	}
+	else {
+		// Invalid type
+		printf("GotoFrame2: invalid frame type %d\n", frame_var.type);
+		fflush(stdout);
+	}
+}
+
 void actionEndDrag(char* stack, u32* sp)
 {
 	#ifndef NO_GRAPHICS
@@ -1519,6 +1563,71 @@ void actionSetVariable(char* stack, u32* sp)
 	}
 
 	// Set variable value (uses existing string materialization!)
+	setVariableWithValue(var, stack, value_sp);
+
+	// Pop both value and name
+	POP_2();
+}
+
+void actionDefineLocal(char* stack, u32* sp)
+{
+	// Stack layout: [name, value] <- sp
+	// According to AS2 spec for DefineLocal:
+	// Pop value first, then name
+	// So VALUE is at top (*sp), NAME is at second (SP_SECOND_TOP)
+
+	u32 value_sp = *sp;
+	u32 var_name_sp = SP_SECOND_TOP;
+
+	// Read variable name info
+	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
+	u32 string_id = VAL(u32, &stack[var_name_sp + 12]);
+	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
+	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
+
+	// DefineLocal ALWAYS creates/updates in the local scope
+	// If there's a scope object (function context), define it there
+	// Otherwise, fall back to global scope (for testing without full function support)
+
+	if (scope_depth > 0 && scope_chain[scope_depth - 1] != NULL)
+	{
+		// We have a local scope object - define variable as a property
+		ASObject* local_scope = scope_chain[scope_depth - 1];
+
+		ActionVar value_var;
+		peekVar(stack, sp, &value_var);
+
+		// Set property on the local scope object
+		// This will create the property if it doesn't exist, or update if it does
+		setProperty(local_scope, var_name, var_name_len, &value_var);
+
+		// Pop both value and name
+		POP_2();
+		return;
+	}
+
+	// No local scope - fall back to global variable
+	// This allows testing DefineLocal without full function infrastructure
+	ActionVar* var;
+	if (string_id != 0)
+	{
+		// Constant string - use array (O(1))
+		var = getVariableById(string_id);
+	}
+	else
+	{
+		// Dynamic string - use hashmap (O(n))
+		var = getVariable(var_name, var_name_len);
+	}
+
+	if (!var)
+	{
+		// Failed to get/create variable
+		POP_2();
+		return;
+	}
+
+	// Set variable value
 	setVariableWithValue(var, stack, value_sp);
 
 	// Pop both value and name

@@ -1,4 +1,4 @@
-# Opcode Implementation Task: CALL_METHOD (0x9F)
+# Opcode Implementation Task: CALL_METHOD (0x52)
 
 Please read the implementation guide at SWFRecompDocs/parallel-opcode-implementation-guide.md.
 
@@ -7,7 +7,7 @@ Your task is to implement support for the AS2 opcode: **CALL_METHOD**
 ## Opcode Specification
 
 **Opcode Name**: CALL_METHOD
-**Hex Value**: 0x9F
+**Hex Value**: 0x52
 **Category**: Function Operations
 **Estimated Complexity**: COMPLEX (6-10 hours)
 
@@ -44,7 +44,7 @@ Stack behavior (example for `obj.foo(arg1, arg2)`):
 
 Implement this opcode following the 7-step workflow:
 
-1. **Define Enum** - Add `SWF_ACTION_CALL_METHOD = 0x9F` to `SWFRecomp/include/action/action.hpp`
+1. **Define Enum** - Add `SWF_ACTION_CALL_METHOD = 0x52` to `SWFRecomp/include/action/action.hpp`
 2. **Add Translation** - Add case to `SWFRecomp/src/action/action.cpp`
 3. **Declare API** - Add declaration to `SWFModernRuntime/include/actionmodern/action.h`
 4. **Implement Runtime** - Implement in `SWFModernRuntime/src/actionmodern/action.c`
