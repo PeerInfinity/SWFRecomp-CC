@@ -2,25 +2,28 @@
 """
 Test script for EXTENDS opcode (0x69)
 
-This creates a simple SWF that tests the ActionScript 2.0 extends keyword
+This creates a comprehensive SWF that tests the ActionScript 2.0 extends keyword
 for setting up prototype-based inheritance between classes.
 
 The EXTENDS opcode sets up the prototype chain between two constructor functions.
 
-Test: Basic EXTENDS operation
-  1. Create two objects to act as constructor functions
-  2. Set up their prototype properties
-  3. Call EXTENDS to establish inheritance
-  4. Trace success message
+Test Cases:
+  1. Basic EXTENDS operation - verify it completes without error
+  2. Verify Dog.prototype.constructor is set to Animal
+  3. Verify Dog.prototype.__proto__ is set to Animal.prototype
 
 Expected output:
   EXTENDS test started
+  Step 1: Creating constructors
+  Step 2: Calling EXTENDS
+  Step 3: Checking constructor property
+  Step 4: Checking __proto__ property
   EXTENDS completed successfully
 """
 
 import struct
 
-# Create a minimal SWF7 file with EXTENDS test
+# Create a minimal SWF7 file with comprehensive EXTENDS test
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 7  # SWF 7 for ActionScript 2.0 features
@@ -31,146 +34,188 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
+# Helper functions to build actions
+def push_string(s):
+    """Create PUSH action for a string"""
+    string_data = s.encode('latin1') + b'\x00'
+    return struct.pack('<BHB', 0x96, len(string_data) + 1, 0) + string_data
+
+def push_float(f):
+    """Create PUSH action for a float"""
+    return struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', f)
+
+# Action opcodes
+ACTION_TRACE = bytes([0x26])
+ACTION_INIT_OBJECT = bytes([0x43])
+ACTION_DUPLICATE = bytes([0x4C])
+ACTION_GET_VARIABLE = bytes([0x1C])
+ACTION_SET_VARIABLE = bytes([0x1D])
+ACTION_SET_MEMBER = bytes([0x4F])
+ACTION_GET_MEMBER = bytes([0x4E])
+ACTION_EXTENDS = bytes([0x69])
+ACTION_EQUALS2 = bytes([0x49])
+ACTION_STRICT_EQUALS = bytes([0x66])
+
 # Build ActionScript bytecode
 actions = b''
 
 # Trace start message
-string_start = b'EXTENDS test started\x00'
-action_push_start = struct.pack('<BHB', 0x96, len(string_start) + 1, 0)  # PUSH string
-action_push_start += string_start
-actions += action_push_start
-action_trace = bytes([0x26])  # TRACE (0x26)
-actions += action_trace
+actions += push_string('EXTENDS test started')
+actions += ACTION_TRACE
 
-# Create "Animal" constructor object (simulated with InitObject)
-# In a real implementation, this would be a DefineFunction
-# For now, we'll create a simple object to act as a constructor
+actions += push_string('Step 1: Creating constructors')
+actions += ACTION_TRACE
 
-# Create prototype object for Animal
-# Push properties: none for now
-action_push_0 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float 0
-action_push_0 += struct.pack('<f', 0.0)
-actions += action_push_0
-action_init_object = bytes([0x43])  # INIT_OBJECT (0x43)
-actions += action_init_object
+# ===================================================================
+# Create "Animal" constructor object with prototype
+# ===================================================================
+
+# Create Animal prototype object
+actions += push_float(0.0)  # Number of properties
+actions += ACTION_INIT_OBJECT
 
 # Store Animal prototype in variable "AnimalPrototype"
-action_duplicate = bytes([0x4C])  # DUPLICATE (0x4C)
-actions += action_duplicate
-string_animal_proto = b'AnimalPrototype\x00'
-action_push_animal_proto = struct.pack('<BHB', 0x96, len(string_animal_proto) + 1, 0)
-action_push_animal_proto += string_animal_proto
-actions += action_push_animal_proto
-action_set_variable = bytes([0x1D])  # SET_VARIABLE (0x1D)
-actions += action_set_variable
+actions += ACTION_DUPLICATE
+actions += push_string('AnimalPrototype')
+actions += ACTION_SET_VARIABLE
 
 # Create Animal constructor object
-actions += action_push_0
-actions += action_init_object
+actions += push_float(0.0)
+actions += ACTION_INIT_OBJECT
 
 # Set prototype property on Animal object
-# Stack: [Animal_obj]
-actions += action_duplicate  # [Animal_obj, Animal_obj]
+actions += ACTION_DUPLICATE  # Duplicate Animal object
 
 # Get the AnimalPrototype variable
-string_animal_proto_get = b'AnimalPrototype\x00'
-action_push_animal_proto_get = struct.pack('<BHB', 0x96, len(string_animal_proto_get) + 1, 0)
-action_push_animal_proto_get += string_animal_proto_get
-actions += action_push_animal_proto_get
-action_get_variable = bytes([0x1C])  # GET_VARIABLE (0x1C)
-actions += action_get_variable  # [Animal_obj, Animal_obj, AnimalProto_obj]
+actions += push_string('AnimalPrototype')
+actions += ACTION_GET_VARIABLE
 
 # Push property name "prototype"
-string_prototype = b'prototype\x00'
-action_push_prototype = struct.pack('<BHB', 0x96, len(string_prototype) + 1, 0)
-action_push_prototype += string_prototype
-actions += action_push_prototype  # [Animal_obj, Animal_obj, AnimalProto_obj, "prototype"]
+actions += push_string('prototype')
 
 # SetMember: Animal.prototype = AnimalProto_obj
-action_set_member = bytes([0x4F])  # SET_MEMBER (0x4F)
-actions += action_set_member  # [Animal_obj]
+actions += ACTION_SET_MEMBER
 
 # Store Animal in variable
-string_animal = b'Animal\x00'
-action_push_animal = struct.pack('<BHB', 0x96, len(string_animal) + 1, 0)
-action_push_animal += string_animal
-actions += action_push_animal
-actions += action_set_variable
+actions += push_string('Animal')
+actions += ACTION_SET_VARIABLE
 
-# Create "Dog" constructor object (same process)
-# Create prototype for Dog
-actions += action_push_0
-actions += action_init_object
+# ===================================================================
+# Create "Dog" constructor object with prototype
+# ===================================================================
+
+# Create Dog prototype object
+actions += push_float(0.0)
+actions += ACTION_INIT_OBJECT
 
 # Store Dog prototype
-actions += action_duplicate
-string_dog_proto = b'DogPrototype\x00'
-action_push_dog_proto = struct.pack('<BHB', 0x96, len(string_dog_proto) + 1, 0)
-action_push_dog_proto += string_dog_proto
-actions += action_push_dog_proto
-actions += action_set_variable
+actions += ACTION_DUPLICATE
+actions += push_string('DogPrototype')
+actions += ACTION_SET_VARIABLE
 
 # Create Dog constructor object
-actions += action_push_0
-actions += action_init_object
+actions += push_float(0.0)
+actions += ACTION_INIT_OBJECT
 
 # Set prototype property on Dog object
-actions += action_duplicate
+actions += ACTION_DUPLICATE
 
 # Get DogPrototype variable
-string_dog_proto_get = b'DogPrototype\x00'
-action_push_dog_proto_get = struct.pack('<BHB', 0x96, len(string_dog_proto_get) + 1, 0)
-action_push_dog_proto_get += string_dog_proto_get
-actions += action_push_dog_proto_get
-actions += action_get_variable
+actions += push_string('DogPrototype')
+actions += ACTION_GET_VARIABLE
 
 # Push "prototype"
-actions += action_push_prototype
+actions += push_string('prototype')
 
 # SetMember: Dog.prototype = DogProto_obj
-actions += action_set_member
+actions += ACTION_SET_MEMBER
 
 # Store Dog in variable
-string_dog = b'Dog\x00'
-action_push_dog = struct.pack('<BHB', 0x96, len(string_dog) + 1, 0)
-action_push_dog += string_dog
-actions += action_push_dog
-actions += action_set_variable
+actions += push_string('Dog')
+actions += ACTION_SET_VARIABLE
 
-# Now call EXTENDS to set up inheritance: Dog extends Animal
-# Stack order: Push Dog (subclass), then Animal (superclass)
+# ===================================================================
+# Call EXTENDS to set up inheritance: Dog extends Animal
+# ===================================================================
 
-# Get Dog variable
-string_dog_get = b'Dog\x00'
-action_push_dog_get = struct.pack('<BHB', 0x96, len(string_dog_get) + 1, 0)
-action_push_dog_get += string_dog_get
-actions += action_push_dog_get
-actions += action_get_variable  # [Dog_obj]
+actions += push_string('Step 2: Calling EXTENDS')
+actions += ACTION_TRACE
 
-# Get Animal variable
-string_animal_get = b'Animal\x00'
-action_push_animal_get = struct.pack('<BHB', 0x96, len(string_animal_get) + 1, 0)
-action_push_animal_get += string_animal_get
-actions += action_push_animal_get
-actions += action_get_variable  # [Dog_obj, Animal_obj]
+# Get Dog variable (subclass)
+actions += push_string('Dog')
+actions += ACTION_GET_VARIABLE
+
+# Get Animal variable (superclass)
+actions += push_string('Animal')
+actions += ACTION_GET_VARIABLE
 
 # EXTENDS opcode (0x69)
 # Pops Animal (superclass), then Dog (subclass)
 # Sets up Dog.prototype.__proto__ = Animal.prototype
 # Sets up Dog.prototype.constructor = Animal
-action_extends = bytes([0x69])  # EXTENDS (0x69)
-actions += action_extends
+actions += ACTION_EXTENDS
 
-# Trace success message
-string_success = b'EXTENDS completed successfully\x00'
-action_push_success = struct.pack('<BHB', 0x96, len(string_success) + 1, 0)
-action_push_success += string_success
-actions += action_push_success
-actions += action_trace
+# ===================================================================
+# Test: Verify Dog.prototype.constructor points to Animal
+# ===================================================================
+
+actions += push_string('Step 3: Checking constructor property')
+actions += ACTION_TRACE
+
+# Get Dog.prototype.constructor
+actions += push_string('Dog')
+actions += ACTION_GET_VARIABLE
+actions += push_string('prototype')
+actions += ACTION_GET_MEMBER
+actions += push_string('constructor')
+actions += ACTION_GET_MEMBER
+
+# Get Animal
+actions += push_string('Animal')
+actions += ACTION_GET_VARIABLE
+
+# Compare with STRICT_EQUALS (should return 1 if same object)
+actions += ACTION_STRICT_EQUALS
+
+# Trace the result (will be 1 for true, 0 for false)
+actions += ACTION_TRACE
+
+# ===================================================================
+# Test: Verify Dog.prototype.__proto__ points to Animal.prototype
+# ===================================================================
+
+actions += push_string('Step 4: Checking __proto__ property')
+actions += ACTION_TRACE
+
+# Get Dog.prototype.__proto__
+actions += push_string('Dog')
+actions += ACTION_GET_VARIABLE
+actions += push_string('prototype')
+actions += ACTION_GET_MEMBER
+actions += push_string('__proto__')
+actions += ACTION_GET_MEMBER
+
+# Get Animal.prototype
+actions += push_string('Animal')
+actions += ACTION_GET_VARIABLE
+actions += push_string('prototype')
+actions += ACTION_GET_MEMBER
+
+# Compare with STRICT_EQUALS
+actions += ACTION_STRICT_EQUALS
+
+# Trace the result
+actions += ACTION_TRACE
+
+# ===================================================================
+# Success message
+# ===================================================================
+
+actions += push_string('EXTENDS completed successfully')
+actions += ACTION_TRACE
 
 # End action
-action_end = bytes([0x00])
-actions += action_end
+actions += bytes([0x00])
 
 # DoAction tag
 do_action_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
@@ -196,7 +241,13 @@ with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
-print("Test: EXTENDS opcode (0x69) - Set up prototype chain")
+print("Test: EXTENDS opcode (0x69) - Property verification")
 print("Expected output:")
 print("  EXTENDS test started")
+print("  Step 1: Creating constructors")
+print("  Step 2: Calling EXTENDS")
+print("  Step 3: Checking constructor property")
+print("  1")
+print("  Step 4: Checking __proto__ property")
+print("  1")
 print("  EXTENDS completed successfully")
