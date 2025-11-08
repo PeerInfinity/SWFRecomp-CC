@@ -27,108 +27,108 @@
 
 ## Summary Table
 
-| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Fully Implemented |
-|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|-------------------|
-| 0X00 |  | SWF_ACTION_END_OF_ACTIONS |  |  |  |  |  |  |
-| [0X04](#0x04-actionnextframe) | [ActionNextFrame](#0x04-actionnextframe) | [SWF_ACTION_NEXT_FRAME](#0x04-actionnextframe) | [actionNextFrame](#0x04-actionnextframe) | 1/1 |  |  | ✓ |  |
-| [0X05](#0x05-actionpreviousframe) | [ActionPreviousFrame](#0x05-actionpreviousframe) | [SWF_ACTION_PREV_FRAME](#0x05-actionpreviousframe) | [actionPrevFrame](#0x05-actionpreviousframe) | 1/1 |  |  | ✓ |  |
-| [0X06](#0x06-actionplay) | [ActionPlay](#0x06-actionplay) | [SWF_ACTION_PLAY](#0x06-actionplay) | [actionPlay](#0x06-actionplay) | 1/1 |  |  | ✓ |  |
-| [0X07](#0x07-actionstop) | [ActionStop](#0x07-actionstop) | [SWF_ACTION_STOP](#0x07-actionstop) |  | 1/1 | 2/2 |  | ✓ |  |
-| [0X08](#0x08-actiontogglequality) | [ActionToggleQuality](#0x08-actiontogglequality) | [SWF_ACTION_TOGGLE_QUALITY](#0x08-actiontogglequality) | [actionToggleQuality](#0x08-actiontogglequality) | 1/1 |  |  | ✓ |  |
-| [0X09](#0x09-actionstopsounds) | [ActionStopSounds](#0x09-actionstopsounds) | [SWF_ACTION_STOP_SOUNDS](#0x09-actionstopsounds) | [actionStopSounds](#0x09-actionstopsounds) | 1/1 |  |  | ✓ |  |
-| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | [SWF_ACTION_ADD](#0x0a-actionadd) | [actionAdd](#0x0a-actionadd) | 2/2 | 3/3 |  | ✓ | ✓ |
-| [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | [SWF_ACTION_SUBTRACT](#0x0b-actionsubtract) | [actionSubtract](#0x0b-actionsubtract) | 1/1 |  |  | ✓ | ✓ |
-| [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | [SWF_ACTION_MULTIPLY](#0x0c-actionmultiply) | [actionMultiply](#0x0c-actionmultiply) | 1/1 |  |  | ✓ | ✓ |
-| [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | [SWF_ACTION_DIVIDE](#0x0d-actiondivide) | [actionDivide](#0x0d-actiondivide) | 1/1 | 1/1 |  | ✓ | ✓ |
-| [0X0E](#0x0e-actionequals) | [ActionEquals](#0x0e-actionequals) | [SWF_ACTION_EQUALS](#0x0e-actionequals) | [actionEquals](#0x0e-actionequals) | 1/1 |  |  | ✓ | ✓ |
-| [0X0F](#0x0f-actionless) | [ActionLess](#0x0f-actionless) | [SWF_ACTION_LESS](#0x0f-actionless) | [actionLess](#0x0f-actionless) | 2/2 | 1/1 |  | ✓ | ✓ |
-| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | [SWF_ACTION_AND](#0x10-actionand) | [actionAnd](#0x10-actionand) | 5/5 |  |  | ✓ | ✓ |
-| [0X11](#0x11-actionor) | [ActionOr](#0x11-actionor) | [SWF_ACTION_OR](#0x11-actionor) | [actionOr](#0x11-actionor) | 1/1 |  |  | ✓ | ✓ |
-| [0X12](#0x12-actionnot) | [ActionNot](#0x12-actionnot) | [SWF_ACTION_NOT](#0x12-actionnot) | [actionNot](#0x12-actionnot) | 1/1 |  |  | ✓ | ✓ |
-| [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | [SWF_ACTION_STRING_EQUALS](#0x13-actionstringequals) | [actionStringEquals](#0x13-actionstringequals) | 2/2 |  |  | ✓ | ✓ |
-| [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | [SWF_ACTION_STRING_LENGTH](#0x14-actionstringlength) | [actionStringLength](#0x14-actionstringlength) | 1/1 |  |  | ✓ | ✓ |
-| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | [SWF_ACTION_STRING_EXTRACT](#0x15-actionstringextract) | [actionStringExtract](#0x15-actionstringextract) | 1/1 |  |  | ✓ | ✓ |
-| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | [SWF_ACTION_POP](#0x17-actionpop) |  | 1/1 | 4/4 |  | ✓ | ✓ |
-| [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | [SWF_ACTION_TO_INTEGER](#0x18-actiontointeger) | [actionToInteger](#0x18-actiontointeger) | 1/1 |  |  | ✓ | ✓ |
-| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | [SWF_ACTION_GET_VARIABLE](#0x1c-actiongetvariable) | [actionGetVariable](#0x1c-actiongetvariable) | 1/1 | 10/10 |  | ✓ |  |
-| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | [SWF_ACTION_SET_VARIABLE](#0x1d-actionsetvariable) | [actionSetVariable](#0x1d-actionsetvariable) | 1/1 | 10/10 |  | ✓ | ✓ |
-| [0X20](#0x20-actionsettarget2) | [ActionSetTarget2](#0x20-actionsettarget2) | [SWF_ACTION_SET_TARGET2](#0x20-actionsettarget2) | [actionSetTarget2](#0x20-actionsettarget2) | 1/1 |  |  | ✓ |  |
-| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | [SWF_ACTION_STRING_ADD](#0x21-actionstringadd) | [actionStringAdd](#0x21-actionstringadd) | 1/1 | 2/2 |  | ✓ | ✓ |
-| [0X22](#0x22-actiongetproperty) | [ActionGetProperty](#0x22-actiongetproperty) | [SWF_ACTION_GET_PROPERTY](#0x22-actiongetproperty) | [actionGetProperty](#0x22-actiongetproperty) | 1/1 |  |  | ✓ |  |
-| [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | [SWF_ACTION_SET_PROPERTY](#0x23-actionsetproperty) | [actionSetProperty](#0x23-actionsetproperty) | 1/1 |  |  | ✓ |  |
-| [0X24](#0x24-actionclonesprite) | [ActionCloneSprite](#0x24-actionclonesprite) | [SWF_ACTION_CLONE_SPRITE](#0x24-actionclonesprite) | [actionCloneSprite](#0x24-actionclonesprite) | 1/1 |  |  | ✓ |  |
-| [0X25](#0x25-actionremovesprite) | [ActionRemoveSprite](#0x25-actionremovesprite) | [SWF_ACTION_REMOVE_SPRITE](#0x25-actionremovesprite) | [actionRemoveSprite](#0x25-actionremovesprite) | 1/1 |  |  | ✓ |  |
-| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 108/108 |  | ✓ | ✓ |
-| [0X27](#0x27-actionstartdrag) | [ActionStartDrag](#0x27-actionstartdrag) | [SWF_ACTION_START_DRAG](#0x27-actionstartdrag) | [actionStartDrag](#0x27-actionstartdrag) | 1/1 |  |  | ✓ |  |
-| [0X28](#0x28-actionenddrag) | [ActionEndDrag](#0x28-actionenddrag) | [SWF_ACTION_END_DRAG](#0x28-actionenddrag) | [actionEndDrag](#0x28-actionenddrag) | 1/1 |  |  | ✓ |  |
-| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | [SWF_ACTION_STRING_LESS](#0x29-actionstringless) | [actionStringLess](#0x29-actionstringless) | 1/1 |  |  | ✓ | ✓ |
-| [0X2A](#0x2a-actionthrow) | [ActionThrow](#0x2a-actionthrow) | [SWF_ACTION_THROW](#0x2a-actionthrow) | [actionThrow](#0x2a-actionthrow) | 2/2 |  |  | ✓ |  |
-| [0X2B](#0x2b-actioncastop) | [ActionCastOp](#0x2b-actioncastop) | [SWF_ACTION_CAST_OP](#0x2b-actioncastop) | [actionCastOp](#0x2b-actioncastop) | 1/1 |  |  | ✓ |  |
-| [0X2C](#0x2c-actionimplementsop) | [ActionImplementsOp](#0x2c-actionimplementsop) | [SWF_ACTION_IMPLEMENTS_OP](#0x2c-actionimplementsop) | [actionImplementsOp](#0x2c-actionimplementsop) | 1/1 |  |  | ✓ |  |
-| [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | [SWF_ACTION_RANDOM_NUMBER](#0x30-actionrandomnumber) | [actionRandomNumber](#0x30-actionrandomnumber) | 1/1 |  |  | ✓ | ✓ |
-| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | [SWF_ACTION_MB_STRING_LENGTH](#0x31-actionmbstringlength) | [actionMbStringLength](#0x31-actionmbstringlength) | 1/1 |  |  | ✓ | ✓ |
-| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | [SWF_ACTION_CHAR_TO_ASCII](#0x32-actionchartoascii) | [actionCharToAscii](#0x32-actionchartoascii) | 1/1 |  |  | ✓ | ✓ |
-| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) | 1/1 |  |  | ✓ | ✓ |
-| [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | [SWF_ACTION_GET_TIME](#0x34-actiongettime) | [actionGetTime](#0x34-actiongettime) | 1/1 |  |  | ✓ | ✓ |
-| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) | [actionMbStringExtract](#0x35-actionmbstringextract) | 1/1 |  |  | ✓ | ✓ |
-| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) | [actionMbCharToAscii](#0x36-actionmbchartoascii) | 1/1 |  |  | ✓ | ✓ |
-| [0X37](#0x37-actionmbasciitochar) | [ActionMBAsciiToChar](#0x37-actionmbasciitochar) | [SWF_ACTION_MB_ASCII_TO_CHAR](#0x37-actionmbasciitochar) | [actionMbAsciiToChar](#0x37-actionmbasciitochar) | 1/1 |  |  | ✓ |  |
-| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | [SWF_ACTION_DELETE](#0x3a-actiondelete) | [actionDelete](#0x3a-actiondelete) | 1/1 |  |  | ✓ | ✓ |
-| [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) | [SWF_ACTION_DELETE2](#0x3b-actiondelete2) | [actionDelete2](#0x3b-actiondelete2) | 1/1 |  |  | ✓ |  |
-| [0X3C](#0x3c-actiondefinelocal) | [ActionDefineLocal](#0x3c-actiondefinelocal) | [SWF_ACTION_DEFINE_LOCAL](#0x3c-actiondefinelocal) | [actionDefineLocal](#0x3c-actiondefinelocal) | 1/1 |  |  | ✓ |  |
-| [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | [SWF_ACTION_CALL_FUNCTION](#0x3d-actionstackswap) | [actionStackSwap](#0x3d-actionstackswap) | 1/1 |  |  | ✓ |  |
-| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | [SWF_ACTION_RETURN](#0x3e-actionreturn) | [actionReturn](#0x3e-actionreturn) | 1/1 | 2/2 |  | ✓ | ✓ |
-| [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | [SWF_ACTION_MODULO](#0x3f-actionmodulo) | [actionModulo](#0x3f-actionmodulo) | 1/1 |  |  | ✓ | ✓ |
-| [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | [SWF_ACTION_NEW_OBJECT](#0x40-actionnewobject) | [actionNewObject](#0x40-actionnewobject) | 1/1 |  |  | ✓ |  |
-| [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | [SWF_ACTION_DECLARE_LOCAL](#0x41-actiondefinelocal2) | [actionDeclareLocal](#0x41-actiondefinelocal2) | 1/1 |  |  | ✓ |  |
-| [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | [SWF_ACTION_INIT_ARRAY](#0x42-actioninitarray) | [actionInitArray](#0x42-actioninitarray) | 1/1 |  |  | ✓ |  |
-| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | [SWF_ACTION_INIT_OBJECT](#0x43-actioninitobject) | [actionInitObject](#0x43-actioninitobject) | 1/1 | 8/8 |  | ✓ | ✓ |
-| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | [SWF_ACTION_TYPEOF](#0x44-actiontypeof) | [actionTypeof](#0x44-actiontypeof) | 1/1 | 1/1 |  | ✓ | ✓ |
-| [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | [SWF_ACTION_TARGET_PATH](#0x45-actiontargetpath) | [actionTargetPath](#0x45-actiontargetpath) | 1/1 |  |  | ✓ |  |
-| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | [SWF_ACTION_ENUMERATE](#0x46-actionenumerate) | [actionEnumerate](#0x46-actionenumerate) | 1/1 |  |  | ✓ |  |
-| [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | [SWF_ACTION_ADD2](#0x47-actionadd2) | [actionAdd2](#0x47-actionadd2) | 1/1 |  |  | ✓ | ✓ |
-| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | [SWF_ACTION_LESS2](#0x48-actionless2) | [actionLess2](#0x48-actionless2) | 1/1 |  |  | ✓ | ✓ |
-| [0X49](#0x49-actionequals2) | [ActionEquals2](#0x49-actionequals2) | [SWF_ACTION_EQUALS2](#0x49-actionequals2) | [actionEquals2](#0x49-actionequals2) | 1/1 |  |  | ✓ |  |
-| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | [SWF_ACTION_TO_NUMBER](#0x4a-actiontonumber) | [actionToNumber](#0x4a-actiontonumber) | 1/1 |  |  | ✓ | ✓ |
-| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | [SWF_ACTION_TO_STRING](#0x4b-actiontostring) | [actionToString](#0x4b-actiontostring) | 1/1 |  |  | ✓ | ✓ |
-| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | [SWF_ACTION_DUPLICATE](#0x4c-actionpushduplicate) | [actionDuplicate](#0x4c-actionpushduplicate) | 1/1 | 5/5 |  | ✓ | ✓ |
-| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | [SWF_ACTION_STACK_SWAP](#0x4d-actionstackswap) | [actionStackSwap](#0x4d-actionstackswap) | 1/1 | 1/1 |  | ✓ | ✓ |
-| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | [SWF_ACTION_GET_MEMBER](#0x4e-actiongetmember) | [actionGetMember](#0x4e-actiongetmember) | 1/1 | 3/3 |  | ✓ | ✓ |
-| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | [SWF_ACTION_SET_MEMBER](#0x4f-actionsetmember) | [actionSetMember](#0x4f-actionsetmember) | 1/1 | 1/1 |  | ✓ | ✓ |
-| [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | [SWF_ACTION_INCREMENT](#0x50-actionincrement) | [actionIncrement](#0x50-actionincrement) | 1/1 |  |  | ✓ | ✓ |
-| [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | [SWF_ACTION_DECREMENT](#0x51-actiondecrement) | [actionDecrement](#0x51-actiondecrement) | 1/1 |  |  | ✓ | ✓ |
-| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) | [SWF_ACTION_CALL_METHOD](#0x52-actioncallmethod) | [actionCallMethod](#0x52-actioncallmethod) | 2/2 |  |  | ✓ | ✓ |
-| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | [SWF_ACTION_NEW_METHOD](#0x53-actionnewmethod) | [actionNewMethod](#0x53-actionnewmethod) | 1/1 |  |  | ✓ |  |
-| [0X54](#0x54-actioninstanceof) | [ActionInstanceOf](#0x54-actioninstanceof) | [SWF_ACTION_INSTANCEOF](#0x54-actioninstanceof) | [actionInstanceOf](#0x54-actioninstanceof) | 1/1 |  |  | ✓ |  |
-| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | [SWF_ACTION_ENUMERATE2](#0x55-actionenumerate2) | [actionEnumerate2](#0x55-actionenumerate2) | 1/1 |  |  | ✓ | ✓ |
-| [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | [SWF_ACTION_BIT_AND](#0x60-actionbitand) | [actionBitAnd](#0x60-actionbitand) | 1/1 |  |  | ✓ | ✓ |
-| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | [SWF_ACTION_BIT_OR](#0x61-actionbitor) | [actionBitOr](#0x61-actionbitor) | 1/1 |  |  | ✓ | ✓ |
-| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | [SWF_ACTION_BIT_XOR](#0x62-actionbitxor) | [actionBitXor](#0x62-actionbitxor) | 1/1 |  |  | ✓ | ✓ |
-| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | [SWF_ACTION_BIT_LSHIFT](#0x63-actionbitlshift) | [actionBitLShift](#0x63-actionbitlshift) | 1/1 |  |  | ✓ | ✓ |
-| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | [SWF_ACTION_BIT_RSHIFT](#0x64-actionbitrshift) | [actionBitRShift](#0x64-actionbitrshift) | 1/1 |  |  | ✓ | ✓ |
-| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | [SWF_ACTION_BIT_URSHIFT](#0x65-actionbiturshift) | [actionBitURShift](#0x65-actionbiturshift) | 1/1 |  |  | ✓ | ✓ |
-| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | [SWF_ACTION_STRICT_EQUALS](#0x66-actionstrictequals) | [actionStrictEquals](#0x66-actionstrictequals) | 1/1 |  |  | ✓ | ✓ |
-| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | [SWF_ACTION_GREATER](#0x67-actiongreater) | [actionGreater](#0x67-actiongreater) | 1/1 |  |  | ✓ | ✓ |
-| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | [SWF_ACTION_STRING_GREATER](#0x68-actionstringgreater) | [actionStringGreater](#0x68-actionstringgreater) | 1/1 |  |  | ✓ | ✓ |
-| [0X69](#0x69-actionextends) | [ActionExtends](#0x69-actionextends) | [SWF_ACTION_EXTENDS](#0x69-actionextends) | [actionExtends](#0x69-actionextends) | 1/1 |  |  | ✓ |  |
-| [0X81](#0x81-actiongotoframe) | [ActionGotoFrame](#0x81-actiongotoframe) | [SWF_ACTION_GOTO_FRAME](#0x81-actiongotoframe) | [actionGotoFrame](#0x81-actiongotoframe) | 1/1 |  |  | ✓ |  |
-| [0X83](#0x83-actiongeturl) | [ActionGetURL](#0x83-actiongeturl) | [SWF_ACTION_GET_URL](#0x83-actiongeturl) | [actionGetURL](#0x83-actiongeturl) | 1/1 |  |  | ✓ |  |
-| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | [SWF_ACTION_STORE_REGISTER](#0x87-actionstoreregister) | [actionStoreRegister](#0x87-actionstoreregister) | 1/1 |  |  | ✓ | ✓ |
-| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | [SWF_ACTION_CONSTANT_POOL](#0x88-actionconstantpool) |  | 4/4 |  |  | ✓ | ✓ |
-| [0X8A](#0x8a-actionwaitforframe) | [ActionWaitForFrame](#0x8a-actionwaitforframe) | [SWF_ACTION_WAIT_FOR_FRAME](#0x8a-actionwaitforframe) |  | 1/1 |  |  | ✓ |  |
-| [0X8B](#0x8b-actionsettarget) | [ActionSetTarget](#0x8b-actionsettarget) | [SWF_ACTION_SET_TARGET](#0x8b-actionsettarget) | [actionSetTarget](#0x8b-actionsettarget) | 1/1 |  |  | ✓ |  |
-| [0X8C](#0x8c-actiongotolabel) | [ActionGoToLabel](#0x8c-actiongotolabel) | [SWF_ACTION_GOTO_LABEL](#0x8c-actiongotolabel) | [actionGoToLabel](#0x8c-actiongotolabel) | 1/1 |  |  | ✓ |  |
-| [0X8D](#0x8d-actionwaitforframe2) | [ActionWaitForFrame2](#0x8d-actionwaitforframe2) | [SWF_ACTION_WAIT_FOR_FRAME2](#0x8d-actionwaitforframe2) |  | 1/1 |  |  | ✓ | ✓ |
-| [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | [SWF_ACTION_DEFINE_FUNCTION2](#0x8e-actiondefinefunction2) | [actionDefineFunction2](#0x8e-actiondefinefunction2) | 2/2 |  |  | ✓ |  |
-| [0X8F](#0x8f-actiontry) | [ActionTry](#0x8f-actiontry) | [SWF_ACTION_TRY](#0x8f-actiontry) |  | 1/1 |  |  | ✓ |  |
-| [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | [SWF_ACTION_WITH](#0x94-actionwith) |  | 1/1 |  |  | ✓ |  |
-| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 108/108 |  | ✓ | ✓ |
-| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | [SWF_ACTION_JUMP](#0x99-actionjump) |  | 1/1 |  |  | ✓ | ✓ |
-| [0X9A](#0x9a-actiongeturl2) | [ActionGetURL2](#0x9a-actiongeturl2) | [SWF_ACTION_GET_URL2](#0x9a-actiongeturl2) | [actionGetURL2](#0x9a-actiongeturl2) | 1/1 |  |  | ✓ |  |
-| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | [SWF_ACTION_DEFINE_FUNCTION](#0x9b-actiondefinefunction) |  | 1/1 |  |  | ✓ | ✓ |
-| [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | [SWF_ACTION_IF](#0x9d-actionif) |  | 2/2 | 1/1 |  | ✓ | ✓ |
-| [0X9E](#0x9e-actioncall) | [ActionCall](#0x9e-actioncall) | [SWF_ACTION_CALL](#0x9e-actioncall) | [actionCall](#0x9e-actioncall) | 1/1 |  |  | ✓ |  |
-| [0X9F](#0x9f-actiongotoframe2) | [ActionGotoFrame2](#0x9f-actiongotoframe2) | [SWF_ACTION_GOTO_FRAME2](#0x9f-actiongotoframe2) | [actionGotoFrame2](#0x9f-actiongotoframe2) | 1/1 |  |  | ✓ |  |
+| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Fully Impl | Fully Impl (No Graphics) |
+|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|------------|--------------------------|
+| 0X00 |  | SWF_ACTION_END_OF_ACTIONS |  |  |  |  |  |  |  |
+| [0X04](#0x04-actionnextframe) | [ActionNextFrame](#0x04-actionnextframe) | [SWF_ACTION_NEXT_FRAME](#0x04-actionnextframe) | [actionNextFrame](#0x04-actionnextframe) | 1/1 |  |  | ✓ |  |  |
+| [0X05](#0x05-actionpreviousframe) | [ActionPreviousFrame](#0x05-actionpreviousframe) | [SWF_ACTION_PREV_FRAME](#0x05-actionpreviousframe) | [actionPrevFrame](#0x05-actionpreviousframe) | 1/1 |  |  | ✓ |  |  |
+| [0X06](#0x06-actionplay) | [ActionPlay](#0x06-actionplay) | [SWF_ACTION_PLAY](#0x06-actionplay) | [actionPlay](#0x06-actionplay) | 1/1 |  |  | ✓ |  |  |
+| [0X07](#0x07-actionstop) | [ActionStop](#0x07-actionstop) | [SWF_ACTION_STOP](#0x07-actionstop) |  | 1/1 | 2/2 |  | ✓ |  |  |
+| [0X08](#0x08-actiontogglequality) | [ActionToggleQuality](#0x08-actiontogglequality) | [SWF_ACTION_TOGGLE_QUALITY](#0x08-actiontogglequality) | [actionToggleQuality](#0x08-actiontogglequality) | 1/1 |  |  | ✓ |  |  |
+| [0X09](#0x09-actionstopsounds) | [ActionStopSounds](#0x09-actionstopsounds) | [SWF_ACTION_STOP_SOUNDS](#0x09-actionstopsounds) | [actionStopSounds](#0x09-actionstopsounds) | 1/1 |  |  | ✓ |  |  |
+| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | [SWF_ACTION_ADD](#0x0a-actionadd) | [actionAdd](#0x0a-actionadd) | 2/2 | 3/3 |  | ✓ | ✓ |  |
+| [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | [SWF_ACTION_SUBTRACT](#0x0b-actionsubtract) | [actionSubtract](#0x0b-actionsubtract) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | [SWF_ACTION_MULTIPLY](#0x0c-actionmultiply) | [actionMultiply](#0x0c-actionmultiply) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | [SWF_ACTION_DIVIDE](#0x0d-actiondivide) | [actionDivide](#0x0d-actiondivide) | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| [0X0E](#0x0e-actionequals) | [ActionEquals](#0x0e-actionequals) | [SWF_ACTION_EQUALS](#0x0e-actionequals) | [actionEquals](#0x0e-actionequals) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X0F](#0x0f-actionless) | [ActionLess](#0x0f-actionless) | [SWF_ACTION_LESS](#0x0f-actionless) | [actionLess](#0x0f-actionless) | 2/2 | 1/1 |  | ✓ | ✓ |  |
+| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | [SWF_ACTION_AND](#0x10-actionand) | [actionAnd](#0x10-actionand) | 5/5 |  |  | ✓ | ✓ |  |
+| [0X11](#0x11-actionor) | [ActionOr](#0x11-actionor) | [SWF_ACTION_OR](#0x11-actionor) | [actionOr](#0x11-actionor) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X12](#0x12-actionnot) | [ActionNot](#0x12-actionnot) | [SWF_ACTION_NOT](#0x12-actionnot) | [actionNot](#0x12-actionnot) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | [SWF_ACTION_STRING_EQUALS](#0x13-actionstringequals) | [actionStringEquals](#0x13-actionstringequals) | 2/2 |  |  | ✓ | ✓ |  |
+| [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | [SWF_ACTION_STRING_LENGTH](#0x14-actionstringlength) | [actionStringLength](#0x14-actionstringlength) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | [SWF_ACTION_STRING_EXTRACT](#0x15-actionstringextract) | [actionStringExtract](#0x15-actionstringextract) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | [SWF_ACTION_POP](#0x17-actionpop) |  | 1/1 | 4/4 |  | ✓ | ✓ |  |
+| [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | [SWF_ACTION_TO_INTEGER](#0x18-actiontointeger) | [actionToInteger](#0x18-actiontointeger) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | [SWF_ACTION_GET_VARIABLE](#0x1c-actiongetvariable) | [actionGetVariable](#0x1c-actiongetvariable) | 1/1 | 10/10 |  | ✓ |  |  |
+| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | [SWF_ACTION_SET_VARIABLE](#0x1d-actionsetvariable) | [actionSetVariable](#0x1d-actionsetvariable) | 1/1 | 10/10 |  | ✓ | ✓ |  |
+| [0X20](#0x20-actionsettarget2) | [ActionSetTarget2](#0x20-actionsettarget2) | [SWF_ACTION_SET_TARGET2](#0x20-actionsettarget2) | [actionSetTarget2](#0x20-actionsettarget2) | 1/1 |  |  | ✓ |  |  |
+| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | [SWF_ACTION_STRING_ADD](#0x21-actionstringadd) | [actionStringAdd](#0x21-actionstringadd) | 1/1 | 2/2 |  | ✓ | ✓ |  |
+| [0X22](#0x22-actiongetproperty) | [ActionGetProperty](#0x22-actiongetproperty) | [SWF_ACTION_GET_PROPERTY](#0x22-actiongetproperty) | [actionGetProperty](#0x22-actiongetproperty) | 1/1 |  |  | ✓ |  |  |
+| [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | [SWF_ACTION_SET_PROPERTY](#0x23-actionsetproperty) | [actionSetProperty](#0x23-actionsetproperty) | 1/1 |  |  | ✓ |  |  |
+| [0X24](#0x24-actionclonesprite) | [ActionCloneSprite](#0x24-actionclonesprite) | [SWF_ACTION_CLONE_SPRITE](#0x24-actionclonesprite) | [actionCloneSprite](#0x24-actionclonesprite) | 1/1 |  |  | ✓ |  |  |
+| [0X25](#0x25-actionremovesprite) | [ActionRemoveSprite](#0x25-actionremovesprite) | [SWF_ACTION_REMOVE_SPRITE](#0x25-actionremovesprite) | [actionRemoveSprite](#0x25-actionremovesprite) | 1/1 |  |  | ✓ |  |  |
+| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 108/108 |  | ✓ | ✓ |  |
+| [0X27](#0x27-actionstartdrag) | [ActionStartDrag](#0x27-actionstartdrag) | [SWF_ACTION_START_DRAG](#0x27-actionstartdrag) | [actionStartDrag](#0x27-actionstartdrag) | 1/1 |  |  | ✓ |  |  |
+| [0X28](#0x28-actionenddrag) | [ActionEndDrag](#0x28-actionenddrag) | [SWF_ACTION_END_DRAG](#0x28-actionenddrag) | [actionEndDrag](#0x28-actionenddrag) | 1/1 |  |  | ✓ |  |  |
+| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | [SWF_ACTION_STRING_LESS](#0x29-actionstringless) | [actionStringLess](#0x29-actionstringless) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X2A](#0x2a-actionthrow) | [ActionThrow](#0x2a-actionthrow) | [SWF_ACTION_THROW](#0x2a-actionthrow) | [actionThrow](#0x2a-actionthrow) | 2/2 |  |  | ✓ |  |  |
+| [0X2B](#0x2b-actioncastop) | [ActionCastOp](#0x2b-actioncastop) | [SWF_ACTION_CAST_OP](#0x2b-actioncastop) | [actionCastOp](#0x2b-actioncastop) | 1/1 |  |  | ✓ |  |  |
+| [0X2C](#0x2c-actionimplementsop) | [ActionImplementsOp](#0x2c-actionimplementsop) | [SWF_ACTION_IMPLEMENTS_OP](#0x2c-actionimplementsop) | [actionImplementsOp](#0x2c-actionimplementsop) | 1/1 |  |  | ✓ |  |  |
+| [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | [SWF_ACTION_RANDOM_NUMBER](#0x30-actionrandomnumber) | [actionRandomNumber](#0x30-actionrandomnumber) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | [SWF_ACTION_MB_STRING_LENGTH](#0x31-actionmbstringlength) | [actionMbStringLength](#0x31-actionmbstringlength) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | [SWF_ACTION_CHAR_TO_ASCII](#0x32-actionchartoascii) | [actionCharToAscii](#0x32-actionchartoascii) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | [SWF_ACTION_GET_TIME](#0x34-actiongettime) | [actionGetTime](#0x34-actiongettime) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) | [actionMbStringExtract](#0x35-actionmbstringextract) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) | [actionMbCharToAscii](#0x36-actionmbchartoascii) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X37](#0x37-actionmbasciitochar) | [ActionMBAsciiToChar](#0x37-actionmbasciitochar) | [SWF_ACTION_MB_ASCII_TO_CHAR](#0x37-actionmbasciitochar) | [actionMbAsciiToChar](#0x37-actionmbasciitochar) | 1/1 |  |  | ✓ |  |  |
+| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | [SWF_ACTION_DELETE](#0x3a-actiondelete) | [actionDelete](#0x3a-actiondelete) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) | [SWF_ACTION_DELETE2](#0x3b-actiondelete2) | [actionDelete2](#0x3b-actiondelete2) | 1/1 |  |  | ✓ |  |  |
+| [0X3C](#0x3c-actiondefinelocal) | [ActionDefineLocal](#0x3c-actiondefinelocal) | [SWF_ACTION_DEFINE_LOCAL](#0x3c-actiondefinelocal) | [actionDefineLocal](#0x3c-actiondefinelocal) | 1/1 |  |  | ✓ |  |  |
+| [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | [SWF_ACTION_CALL_FUNCTION](#0x3d-actionstackswap) | [actionStackSwap](#0x3d-actionstackswap) | 1/1 |  |  | ✓ |  |  |
+| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | [SWF_ACTION_RETURN](#0x3e-actionreturn) | [actionReturn](#0x3e-actionreturn) | 1/1 | 2/2 |  | ✓ | ✓ |  |
+| [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | [SWF_ACTION_MODULO](#0x3f-actionmodulo) | [actionModulo](#0x3f-actionmodulo) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | [SWF_ACTION_NEW_OBJECT](#0x40-actionnewobject) | [actionNewObject](#0x40-actionnewobject) | 1/1 |  |  | ✓ |  |  |
+| [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | [SWF_ACTION_DECLARE_LOCAL](#0x41-actiondefinelocal2) | [actionDeclareLocal](#0x41-actiondefinelocal2) | 1/1 |  |  | ✓ |  |  |
+| [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | [SWF_ACTION_INIT_ARRAY](#0x42-actioninitarray) | [actionInitArray](#0x42-actioninitarray) | 1/1 |  |  | ✓ |  |  |
+| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | [SWF_ACTION_INIT_OBJECT](#0x43-actioninitobject) | [actionInitObject](#0x43-actioninitobject) | 1/1 | 8/8 |  | ✓ | ✓ |  |
+| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | [SWF_ACTION_TYPEOF](#0x44-actiontypeof) | [actionTypeof](#0x44-actiontypeof) | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | [SWF_ACTION_TARGET_PATH](#0x45-actiontargetpath) | [actionTargetPath](#0x45-actiontargetpath) | 1/1 |  |  | ✓ |  |  |
+| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | [SWF_ACTION_ENUMERATE](#0x46-actionenumerate) | [actionEnumerate](#0x46-actionenumerate) | 1/1 |  |  | ✓ |  |  |
+| [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | [SWF_ACTION_ADD2](#0x47-actionadd2) | [actionAdd2](#0x47-actionadd2) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | [SWF_ACTION_LESS2](#0x48-actionless2) | [actionLess2](#0x48-actionless2) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X49](#0x49-actionequals2) | [ActionEquals2](#0x49-actionequals2) | [SWF_ACTION_EQUALS2](#0x49-actionequals2) | [actionEquals2](#0x49-actionequals2) | 1/1 |  |  | ✓ |  |  |
+| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | [SWF_ACTION_TO_NUMBER](#0x4a-actiontonumber) | [actionToNumber](#0x4a-actiontonumber) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | [SWF_ACTION_TO_STRING](#0x4b-actiontostring) | [actionToString](#0x4b-actiontostring) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | [SWF_ACTION_DUPLICATE](#0x4c-actionpushduplicate) | [actionDuplicate](#0x4c-actionpushduplicate) | 1/1 | 5/5 |  | ✓ | ✓ |  |
+| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | [SWF_ACTION_STACK_SWAP](#0x4d-actionstackswap) | [actionStackSwap](#0x4d-actionstackswap) | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | [SWF_ACTION_GET_MEMBER](#0x4e-actiongetmember) | [actionGetMember](#0x4e-actiongetmember) | 1/1 | 3/3 |  | ✓ | ✓ |  |
+| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | [SWF_ACTION_SET_MEMBER](#0x4f-actionsetmember) | [actionSetMember](#0x4f-actionsetmember) | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | [SWF_ACTION_INCREMENT](#0x50-actionincrement) | [actionIncrement](#0x50-actionincrement) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | [SWF_ACTION_DECREMENT](#0x51-actiondecrement) | [actionDecrement](#0x51-actiondecrement) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) | [SWF_ACTION_CALL_METHOD](#0x52-actioncallmethod) | [actionCallMethod](#0x52-actioncallmethod) | 2/2 |  |  | ✓ | ✓ |  |
+| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | [SWF_ACTION_NEW_METHOD](#0x53-actionnewmethod) | [actionNewMethod](#0x53-actionnewmethod) | 1/1 |  |  | ✓ |  |  |
+| [0X54](#0x54-actioninstanceof) | [ActionInstanceOf](#0x54-actioninstanceof) | [SWF_ACTION_INSTANCEOF](#0x54-actioninstanceof) | [actionInstanceOf](#0x54-actioninstanceof) | 1/1 |  |  | ✓ |  |  |
+| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | [SWF_ACTION_ENUMERATE2](#0x55-actionenumerate2) | [actionEnumerate2](#0x55-actionenumerate2) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | [SWF_ACTION_BIT_AND](#0x60-actionbitand) | [actionBitAnd](#0x60-actionbitand) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | [SWF_ACTION_BIT_OR](#0x61-actionbitor) | [actionBitOr](#0x61-actionbitor) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | [SWF_ACTION_BIT_XOR](#0x62-actionbitxor) | [actionBitXor](#0x62-actionbitxor) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | [SWF_ACTION_BIT_LSHIFT](#0x63-actionbitlshift) | [actionBitLShift](#0x63-actionbitlshift) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | [SWF_ACTION_BIT_RSHIFT](#0x64-actionbitrshift) | [actionBitRShift](#0x64-actionbitrshift) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | [SWF_ACTION_BIT_URSHIFT](#0x65-actionbiturshift) | [actionBitURShift](#0x65-actionbiturshift) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | [SWF_ACTION_STRICT_EQUALS](#0x66-actionstrictequals) | [actionStrictEquals](#0x66-actionstrictequals) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | [SWF_ACTION_GREATER](#0x67-actiongreater) | [actionGreater](#0x67-actiongreater) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | [SWF_ACTION_STRING_GREATER](#0x68-actionstringgreater) | [actionStringGreater](#0x68-actionstringgreater) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X69](#0x69-actionextends) | [ActionExtends](#0x69-actionextends) | [SWF_ACTION_EXTENDS](#0x69-actionextends) | [actionExtends](#0x69-actionextends) | 1/1 |  |  | ✓ |  |  |
+| [0X81](#0x81-actiongotoframe) | [ActionGotoFrame](#0x81-actiongotoframe) | [SWF_ACTION_GOTO_FRAME](#0x81-actiongotoframe) | [actionGotoFrame](#0x81-actiongotoframe) | 1/1 |  |  | ✓ |  |  |
+| [0X83](#0x83-actiongeturl) | [ActionGetURL](#0x83-actiongeturl) | [SWF_ACTION_GET_URL](#0x83-actiongeturl) | [actionGetURL](#0x83-actiongeturl) | 1/1 |  |  | ✓ |  |  |
+| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | [SWF_ACTION_STORE_REGISTER](#0x87-actionstoreregister) | [actionStoreRegister](#0x87-actionstoreregister) | 1/1 |  |  | ✓ | ✓ |  |
+| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | [SWF_ACTION_CONSTANT_POOL](#0x88-actionconstantpool) |  | 4/4 |  |  | ✓ | ✓ |  |
+| [0X8A](#0x8a-actionwaitforframe) | [ActionWaitForFrame](#0x8a-actionwaitforframe) | [SWF_ACTION_WAIT_FOR_FRAME](#0x8a-actionwaitforframe) |  | 1/1 |  |  | ✓ |  |  |
+| [0X8B](#0x8b-actionsettarget) | [ActionSetTarget](#0x8b-actionsettarget) | [SWF_ACTION_SET_TARGET](#0x8b-actionsettarget) | [actionSetTarget](#0x8b-actionsettarget) | 1/1 |  |  | ✓ |  |  |
+| [0X8C](#0x8c-actiongotolabel) | [ActionGoToLabel](#0x8c-actiongotolabel) | [SWF_ACTION_GOTO_LABEL](#0x8c-actiongotolabel) | [actionGoToLabel](#0x8c-actiongotolabel) | 1/1 |  |  | ✓ |  |  |
+| [0X8D](#0x8d-actionwaitforframe2) | [ActionWaitForFrame2](#0x8d-actionwaitforframe2) | [SWF_ACTION_WAIT_FOR_FRAME2](#0x8d-actionwaitforframe2) |  | 1/1 |  |  | ✓ | ✓ |  |
+| [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | [SWF_ACTION_DEFINE_FUNCTION2](#0x8e-actiondefinefunction2) | [actionDefineFunction2](#0x8e-actiondefinefunction2) | 2/2 |  |  | ✓ |  |  |
+| [0X8F](#0x8f-actiontry) | [ActionTry](#0x8f-actiontry) | [SWF_ACTION_TRY](#0x8f-actiontry) |  | 1/1 |  |  | ✓ |  |  |
+| [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | [SWF_ACTION_WITH](#0x94-actionwith) |  | 1/1 |  |  | ✓ |  |  |
+| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 108/108 |  | ✓ | ✓ |  |
+| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | [SWF_ACTION_JUMP](#0x99-actionjump) |  | 1/1 |  |  | ✓ | ✓ |  |
+| [0X9A](#0x9a-actiongeturl2) | [ActionGetURL2](#0x9a-actiongeturl2) | [SWF_ACTION_GET_URL2](#0x9a-actiongeturl2) | [actionGetURL2](#0x9a-actiongeturl2) | 1/1 |  |  | ✓ |  |  |
+| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | [SWF_ACTION_DEFINE_FUNCTION](#0x9b-actiondefinefunction) |  | 1/1 |  |  | ✓ | ✓ |  |
+| [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | [SWF_ACTION_IF](#0x9d-actionif) |  | 2/2 | 1/1 |  | ✓ | ✓ |  |
+| [0X9E](#0x9e-actioncall) | [ActionCall](#0x9e-actioncall) | [SWF_ACTION_CALL](#0x9e-actioncall) | [actionCall](#0x9e-actioncall) | 1/1 |  |  | ✓ |  |  |
+| [0X9F](#0x9f-actiongotoframe2) | [ActionGotoFrame2](#0x9f-actiongotoframe2) | [SWF_ACTION_GOTO_FRAME2](#0x9f-actiongotoframe2) | [actionGotoFrame2](#0x9f-actiongotoframe2) | 1/1 |  |  | ✓ |  |  |
 
 ## Failing Primary Tests
 
@@ -139,66 +139,66 @@
 ### ✅ Fully Implemented
 (Opcodes marked as fully_implemented in test_info.json)
 
-| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs |
-|-----|-----------|------|----------|---------------|-----------------|------|
-| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | ✓ | ✓ | 2/2 |  | ✓ |
-| [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X0E](#0x0e-actionequals) | [ActionEquals](#0x0e-actionequals) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X0F](#0x0f-actionless) | [ActionLess](#0x0f-actionless) | ✓ | ✓ | 2/2 |  | ✓ |
-| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | ✓ | ✓ | 5/5 |  | ✓ |
-| [0X11](#0x11-actionor) | [ActionOr](#0x11-actionor) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X12](#0x12-actionnot) | [ActionNot](#0x12-actionnot) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | ✓ | ✓ | 2/2 |  | ✓ |
-| [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | ✓ |  | 1/1 |  | ✓ |
-| [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) | ✓ | ✓ | 2/2 |  | ✓ |
-| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | ✓ |  | 4/4 |  | ✓ |
-| [0X8D](#0x8d-actionwaitforframe2) | [ActionWaitForFrame2](#0x8d-actionwaitforframe2) | ✓ |  | 1/1 |  | ✓ |
-| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | ✓ |  | 1/1 |  | ✓ |
-| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | ✓ |  | 1/1 |  | ✓ |
-| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | ✓ |  | 1/1 |  | ✓ |
-| [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | ✓ |  | 2/2 |  | ✓ |
+| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs | No Graphics |
+|-----|-----------|------|----------|---------------|-----------------|------|-------------|
+| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | ✓ | ✓ | 2/2 |  | ✓ |  |
+| [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X0E](#0x0e-actionequals) | [ActionEquals](#0x0e-actionequals) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X0F](#0x0f-actionless) | [ActionLess](#0x0f-actionless) | ✓ | ✓ | 2/2 |  | ✓ |  |
+| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | ✓ | ✓ | 5/5 |  | ✓ |  |
+| [0X11](#0x11-actionor) | [ActionOr](#0x11-actionor) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X12](#0x12-actionnot) | [ActionNot](#0x12-actionnot) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | ✓ | ✓ | 2/2 |  | ✓ |  |
+| [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | ✓ |  | 1/1 |  | ✓ |  |
+| [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) | ✓ | ✓ | 2/2 |  | ✓ |  |
+| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | ✓ |  | 4/4 |  | ✓ |  |
+| [0X8D](#0x8d-actionwaitforframe2) | [ActionWaitForFrame2](#0x8d-actionwaitforframe2) | ✓ |  | 1/1 |  | ✓ |  |
+| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | ✓ |  | 1/1 |  | ✓ |  |
+| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | ✓ |  | 1/1 |  | ✓ |  |
+| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | ✓ |  | 1/1 |  | ✓ |  |
+| [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | ✓ |  | 2/2 |  | ✓ |  |
 
 ### 🔄 Partially Implemented
 (Has enum or function, but not marked as fully implemented)
@@ -253,6 +253,12 @@
 
 | Hex | Spec Name |
 |-----|-----------|
+
+## Missing Features
+
+This section lists all missing features for opcodes that are not fully implemented.
+
+**No opcodes with documented missing features! 🎉**
 
 ## Detailed Information
 

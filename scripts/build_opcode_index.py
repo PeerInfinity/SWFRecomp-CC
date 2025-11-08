@@ -134,7 +134,9 @@ def scan_test_directories() -> Dict[str, Dict]:
         "0x0A": {
             "tested": ["SWFRecomp/tests/add_swf_4"],
             "supporting": ["SWFRecomp/tests/other_test_swf_4"],
-            "fully_implemented": True
+            "fully_implemented": True,
+            "fully_implemented_no_graphics": False,
+            "missing_features": {"test_name": ["feature1", "feature2"]}
         }
     }
     """
@@ -186,24 +188,43 @@ def scan_test_directories() -> Dict[str, Dict]:
                 opcodes_tested = test_info.get('opcodes', {}).get('tested', [])
                 opcodes_supporting = test_info.get('opcodes', {}).get('supporting', [])
                 fully_implemented = test_info.get('metadata', {}).get('fully_implemented', False)
+                fully_implemented_no_graphics = test_info.get('metadata', {}).get('fully_implemented_no_graphics', False)
+                missing_features = test_info.get('metadata', {}).get('missing_features', [])
 
                 # Map opcode names to hex values
                 for opcode_name in opcodes_tested:
                     hex_value = opcode_name_to_hex.get(opcode_name)
                     if hex_value:
                         if hex_value not in test_map:
-                            test_map[hex_value] = {"tested": [], "supporting": [], "fully_implemented": False}
+                            test_map[hex_value] = {
+                                "tested": [],
+                                "supporting": [],
+                                "fully_implemented": False,
+                                "fully_implemented_no_graphics": False,
+                                "missing_features": {}
+                            }
                         test_map[hex_value]["tested"].append(relative_path)
                         # If any test for this opcode marks it as fully implemented, mark it as such
                         if fully_implemented:
                             test_map[hex_value]["fully_implemented"] = True
+                        if fully_implemented_no_graphics:
+                            test_map[hex_value]["fully_implemented_no_graphics"] = True
+                        # Store missing features per test
+                        if missing_features:
+                            test_map[hex_value]["missing_features"][test_name] = missing_features
                         print(f"  Found: {relative_path} tests {opcode_name} ({hex_value})")
 
                 for opcode_name in opcodes_supporting:
                     hex_value = opcode_name_to_hex.get(opcode_name)
                     if hex_value:
                         if hex_value not in test_map:
-                            test_map[hex_value] = {"tested": [], "supporting": [], "fully_implemented": False}
+                            test_map[hex_value] = {
+                                "tested": [],
+                                "supporting": [],
+                                "fully_implemented": False,
+                                "fully_implemented_no_graphics": False,
+                                "missing_features": {}
+                            }
                         test_map[hex_value]["supporting"].append(relative_path)
 
             except (json.JSONDecodeError, KeyError) as e:
@@ -289,7 +310,13 @@ def normalize_name_for_matching(name: str) -> str:
 
 def get_test_directories_for_opcode(hex_value: str, test_map: Dict[str, Dict]) -> Dict:
     """Get test directories for an opcode by hex value."""
-    return test_map.get(hex_value, {"tested": [], "supporting": [], "fully_implemented": False})
+    return test_map.get(hex_value, {
+        "tested": [],
+        "supporting": [],
+        "fully_implemented": False,
+        "fully_implemented_no_graphics": False,
+        "missing_features": {}
+    })
 
 
 def match_function_name(opcode_info: Dict, functions: Dict[str, Dict]) -> Optional[Dict]:
@@ -357,6 +384,8 @@ def build_opcode_index():
         tests_tested = test_info["tested"]
         tests_supporting = test_info["supporting"]
         fully_implemented = test_info["fully_implemented"]
+        fully_implemented_no_graphics = test_info["fully_implemented_no_graphics"]
+        missing_features = test_info["missing_features"]
 
         # Determine passing tests
         tests_tested_passing = []
@@ -394,6 +423,8 @@ def build_opcode_index():
                 'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
                 'fully_implemented': fully_implemented,
+                'fully_implemented_no_graphics': fully_implemented_no_graphics,
+                'missing_features': missing_features,
                 'notes': f"Official SWF specification name (spec line {spec_info.get('line_number', 'unknown')})"
             })
 
@@ -412,6 +443,8 @@ def build_opcode_index():
                 'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
                 'fully_implemented': fully_implemented,
+                'fully_implemented_no_graphics': fully_implemented_no_graphics,
+                'missing_features': missing_features,
                 'notes': 'C++ enum value for opcode'
             })
 
@@ -430,6 +463,8 @@ def build_opcode_index():
                 'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
                 'fully_implemented': fully_implemented,
+                'fully_implemented_no_graphics': fully_implemented_no_graphics,
+                'missing_features': missing_features,
                 'notes': f"Runtime function (action.h line {func_info.get('line_number', 'unknown')})"
             })
 

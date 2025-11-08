@@ -17,7 +17,7 @@ The `fully_implemented` field in `test_info.json` indicates whether an opcode is
 
 ### Criteria for `fully_implemented: true`
 
-Set `fully_implemented` to **`true`** only when ALL of the following conditions are met:
+Set `fully_implemented` to **`true`** only when ALL of the following conditions are met AND **all features of the opcode are fully functional**:
 
 1. **Complete implementation**: The opcode itself is fully implemented with all required functionality
 2. **All dependencies working**: All supporting functionality required by the opcode is fully implemented
@@ -26,6 +26,40 @@ Set `fully_implemented` to **`true`** only when ALL of the following conditions 
 5. **All tests passing**: All primary tests for the opcode pass validation
 6. **Edge cases handled**: Common edge cases are tested and handled correctly
 7. **Documentation complete**: The opcode's behavior is properly documented
+8. **All features functional**: Every feature of the opcode works correctly, including graphics-related features if applicable
+
+### Criteria for `fully_implemented_no_graphics: true`
+
+Set `fully_implemented_no_graphics` to **`true`** when the opcode is as fully functional as it can be specifically in NO_GRAPHICS mode, but would require graphics support to be fully functional:
+
+1. **All non-graphics features working**: All features that don't require graphics are fully implemented
+2. **NO_GRAPHICS mode complete**: The opcode works correctly in console-only mode
+3. **Graphics-only limitations**: The only missing functionality requires graphics rendering (SDL3/Vulkan)
+4. **Would be fully_implemented with graphics**: If graphics support were added, the opcode would meet all `fully_implemented` criteria
+
+**Note**: If an opcode doesn't require graphics at all, only set `fully_implemented` (not `fully_implemented_no_graphics`).
+
+### Tracking Missing Features with `missing_features`
+
+For opcodes that don't qualify as `fully_implemented`, add a `missing_features` field to `test_info.json` with a point-form list of what features are still missing:
+
+```json
+{
+  "metadata": {
+    "name": "opcode_name_swf_N",
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": false,
+    "missing_features": [
+      "Prototype chain support not implemented",
+      "Property enumeration incomplete",
+      "Edge case: NaN handling in string conversion",
+      "Test coverage: missing boundary value tests"
+    ]
+  }
+}
+```
+
+This list should include **all** missing features, even trivial ones like missing edge cases in tests. Be comprehensive and specific.
 
 ### Why an Opcode Might Be Incomplete
 
@@ -759,6 +793,19 @@ Once everything is complete:
 {
   "metadata": {
     "fully_implemented": true
+  }
+}
+```
+
+   If the opcode is complete in NO_GRAPHICS mode but would need graphics for full functionality:
+```json
+{
+  "metadata": {
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Graphics rendering not implemented (requires SDL3/Vulkan)"
+    ]
   }
 }
 ```

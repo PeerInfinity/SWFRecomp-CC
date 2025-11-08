@@ -27,108 +27,108 @@
 
 ## Summary Table
 
-| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Fully Implemented |
-|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|-------------------|
-| 0X00 |  | SWF_ACTION_END_OF_ACTIONS |  |  |  |  |  |  |
-| 0X04 | ActionNextFrame | SWF_ACTION_NEXT_FRAME | actionNextFrame | 1/1 |  |  | ✓ |  |
-| 0X05 | ActionPreviousFrame | SWF_ACTION_PREV_FRAME | actionPrevFrame | 1/1 |  |  | ✓ |  |
-| 0X06 | ActionPlay | SWF_ACTION_PLAY | actionPlay | 1/1 |  |  | ✓ |  |
-| 0X07 | ActionStop | SWF_ACTION_STOP |  | 1/1 | 2/2 |  | ✓ |  |
-| 0X08 | ActionToggleQuality | SWF_ACTION_TOGGLE_QUALITY | actionToggleQuality | 1/1 |  |  | ✓ |  |
-| 0X09 | ActionStopSounds | SWF_ACTION_STOP_SOUNDS | actionStopSounds | 1/1 |  |  | ✓ |  |
-| 0X0A | ActionAdd | SWF_ACTION_ADD | actionAdd | 2/2 | 3/3 |  | ✓ | ✓ |
-| 0X0B | ActionSubtract | SWF_ACTION_SUBTRACT | actionSubtract | 1/1 |  |  | ✓ | ✓ |
-| 0X0C | ActionMultiply | SWF_ACTION_MULTIPLY | actionMultiply | 1/1 |  |  | ✓ | ✓ |
-| 0X0D | ActionDivide | SWF_ACTION_DIVIDE | actionDivide | 1/1 | 1/1 |  | ✓ | ✓ |
-| 0X0E | ActionEquals | SWF_ACTION_EQUALS | actionEquals | 1/1 |  |  | ✓ | ✓ |
-| 0X0F | ActionLess | SWF_ACTION_LESS | actionLess | 2/2 | 1/1 |  | ✓ | ✓ |
-| 0X10 | ActionAnd | SWF_ACTION_AND | actionAnd | 5/5 |  |  | ✓ | ✓ |
-| 0X11 | ActionOr | SWF_ACTION_OR | actionOr | 1/1 |  |  | ✓ | ✓ |
-| 0X12 | ActionNot | SWF_ACTION_NOT | actionNot | 1/1 |  |  | ✓ | ✓ |
-| 0X13 | ActionStringEquals | SWF_ACTION_STRING_EQUALS | actionStringEquals | 2/2 |  |  | ✓ | ✓ |
-| 0X14 | ActionStringLength | SWF_ACTION_STRING_LENGTH | actionStringLength | 1/1 |  |  | ✓ | ✓ |
-| 0X15 | ActionStringExtract | SWF_ACTION_STRING_EXTRACT | actionStringExtract | 1/1 |  |  | ✓ | ✓ |
-| 0X17 | ActionPop | SWF_ACTION_POP |  | 1/1 | 4/4 |  | ✓ | ✓ |
-| 0X18 | ActionToInteger | SWF_ACTION_TO_INTEGER | actionToInteger | 1/1 |  |  | ✓ | ✓ |
-| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable | 1/1 | 10/10 |  | ✓ |  |
-| 0X1D | ActionSetVariable | SWF_ACTION_SET_VARIABLE | actionSetVariable | 1/1 | 10/10 |  | ✓ | ✓ |
-| 0X20 | ActionSetTarget2 | SWF_ACTION_SET_TARGET2 | actionSetTarget2 | 1/1 |  |  | ✓ |  |
-| 0X21 | ActionStringAdd | SWF_ACTION_STRING_ADD | actionStringAdd | 1/1 | 2/2 |  | ✓ | ✓ |
-| 0X22 | ActionGetProperty | SWF_ACTION_GET_PROPERTY | actionGetProperty | 1/1 |  |  | ✓ |  |
-| 0X23 | ActionSetProperty | SWF_ACTION_SET_PROPERTY | actionSetProperty | 1/1 |  |  | ✓ |  |
-| 0X24 | ActionCloneSprite | SWF_ACTION_CLONE_SPRITE | actionCloneSprite | 1/1 |  |  | ✓ |  |
-| 0X25 | ActionRemoveSprite | SWF_ACTION_REMOVE_SPRITE | actionRemoveSprite | 1/1 |  |  | ✓ |  |
-| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 108/108 |  | ✓ | ✓ |
-| 0X27 | ActionStartDrag | SWF_ACTION_START_DRAG | actionStartDrag | 1/1 |  |  | ✓ |  |
-| 0X28 | ActionEndDrag | SWF_ACTION_END_DRAG | actionEndDrag | 1/1 |  |  | ✓ |  |
-| 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess | 1/1 |  |  | ✓ | ✓ |
-| 0X2A | ActionThrow | SWF_ACTION_THROW | actionThrow | 2/2 |  |  | ✓ |  |
-| 0X2B | ActionCastOp | SWF_ACTION_CAST_OP | actionCastOp | 1/1 |  |  | ✓ |  |
-| 0X2C | ActionImplementsOp | SWF_ACTION_IMPLEMENTS_OP | actionImplementsOp | 1/1 |  |  | ✓ |  |
-| 0X30 | ActionRandomNumber | SWF_ACTION_RANDOM_NUMBER | actionRandomNumber | 1/1 |  |  | ✓ | ✓ |
-| 0X31 | ActionMBStringLength | SWF_ACTION_MB_STRING_LENGTH | actionMbStringLength | 1/1 |  |  | ✓ | ✓ |
-| 0X32 | ActionCharToAscii | SWF_ACTION_CHAR_TO_ASCII | actionCharToAscii | 1/1 |  |  | ✓ | ✓ |
-| 0X33 | ActionAsciiToChar | SWF_ACTION_ASCII_TO_CHAR | actionAsciiToChar | 1/1 |  |  | ✓ | ✓ |
-| 0X34 | ActionGetTime | SWF_ACTION_GET_TIME | actionGetTime | 1/1 |  |  | ✓ | ✓ |
-| 0X35 | ActionMBStringExtract | SWF_ACTION_MB_STRING_EXTRACT | actionMbStringExtract | 1/1 |  |  | ✓ | ✓ |
-| 0X36 | ActionMBCharToAscii | SWF_ACTION_MB_CHAR_TO_ASCII | actionMbCharToAscii | 1/1 |  |  | ✓ | ✓ |
-| 0X37 | ActionMBAsciiToChar | SWF_ACTION_MB_ASCII_TO_CHAR | actionMbAsciiToChar | 1/1 |  |  | ✓ |  |
-| 0X3A | ActionDelete | SWF_ACTION_DELETE | actionDelete | 1/1 |  |  | ✓ | ✓ |
-| 0X3B | ActionDelete2 | SWF_ACTION_DELETE2 | actionDelete2 | 1/1 |  |  | ✓ |  |
-| 0X3C | ActionDefineLocal | SWF_ACTION_DEFINE_LOCAL | actionDefineLocal | 1/1 |  |  | ✓ |  |
-| 0X3D | ActionStackSwap | SWF_ACTION_CALL_FUNCTION | actionStackSwap | 1/1 |  |  | ✓ |  |
-| 0X3E | ActionReturn | SWF_ACTION_RETURN | actionReturn | 1/1 | 2/2 |  | ✓ | ✓ |
-| 0X3F | ActionModulo | SWF_ACTION_MODULO | actionModulo | 1/1 |  |  | ✓ | ✓ |
-| 0X40 | ActionNewObject | SWF_ACTION_NEW_OBJECT | actionNewObject | 1/1 |  |  | ✓ |  |
-| 0X41 | ActionDefineLocal2 | SWF_ACTION_DECLARE_LOCAL | actionDeclareLocal | 1/1 |  |  | ✓ |  |
-| 0X42 | ActionInitArray | SWF_ACTION_INIT_ARRAY | actionInitArray | 1/1 |  |  | ✓ |  |
-| 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject | 1/1 | 8/8 |  | ✓ | ✓ |
-| 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF | actionTypeof | 1/1 | 1/1 |  | ✓ | ✓ |
-| 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath | 1/1 |  |  | ✓ |  |
-| 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate | 1/1 |  |  | ✓ |  |
-| 0X47 | ActionAdd2 | SWF_ACTION_ADD2 | actionAdd2 | 1/1 |  |  | ✓ | ✓ |
-| 0X48 | ActionLess2 | SWF_ACTION_LESS2 | actionLess2 | 1/1 |  |  | ✓ | ✓ |
-| 0X49 | ActionEquals2 | SWF_ACTION_EQUALS2 | actionEquals2 | 1/1 |  |  | ✓ |  |
-| 0X4A | ActionToNumber | SWF_ACTION_TO_NUMBER | actionToNumber | 1/1 |  |  | ✓ | ✓ |
-| 0X4B | ActionToString | SWF_ACTION_TO_STRING | actionToString | 1/1 |  |  | ✓ | ✓ |
-| 0X4C | ActionPushDuplicate | SWF_ACTION_DUPLICATE | actionDuplicate | 1/1 | 5/5 |  | ✓ | ✓ |
-| 0X4D | ActionStackSwap | SWF_ACTION_STACK_SWAP | actionStackSwap | 1/1 | 1/1 |  | ✓ | ✓ |
-| 0X4E | ActionGetMember | SWF_ACTION_GET_MEMBER | actionGetMember | 1/1 | 3/3 |  | ✓ | ✓ |
-| 0X4F | ActionSetMember | SWF_ACTION_SET_MEMBER | actionSetMember | 1/1 | 1/1 |  | ✓ | ✓ |
-| 0X50 | ActionIncrement | SWF_ACTION_INCREMENT | actionIncrement | 1/1 |  |  | ✓ | ✓ |
-| 0X51 | ActionDecrement | SWF_ACTION_DECREMENT | actionDecrement | 1/1 |  |  | ✓ | ✓ |
-| 0X52 | ActionCallMethod | SWF_ACTION_CALL_METHOD | actionCallMethod | 2/2 |  |  | ✓ | ✓ |
-| 0X53 | ActionNewMethod | SWF_ACTION_NEW_METHOD | actionNewMethod | 1/1 |  |  | ✓ |  |
-| 0X54 | ActionInstanceOf | SWF_ACTION_INSTANCEOF | actionInstanceOf | 1/1 |  |  | ✓ |  |
-| 0X55 | ActionEnumerate2 | SWF_ACTION_ENUMERATE2 | actionEnumerate2 | 1/1 |  |  | ✓ | ✓ |
-| 0X60 | ActionBitAnd | SWF_ACTION_BIT_AND | actionBitAnd | 1/1 |  |  | ✓ | ✓ |
-| 0X61 | ActionBitOr | SWF_ACTION_BIT_OR | actionBitOr | 1/1 |  |  | ✓ | ✓ |
-| 0X62 | ActionBitXor | SWF_ACTION_BIT_XOR | actionBitXor | 1/1 |  |  | ✓ | ✓ |
-| 0X63 | ActionBitLShift | SWF_ACTION_BIT_LSHIFT | actionBitLShift | 1/1 |  |  | ✓ | ✓ |
-| 0X64 | ActionBitRShift | SWF_ACTION_BIT_RSHIFT | actionBitRShift | 1/1 |  |  | ✓ | ✓ |
-| 0X65 | ActionBitURShift | SWF_ACTION_BIT_URSHIFT | actionBitURShift | 1/1 |  |  | ✓ | ✓ |
-| 0X66 | ActionStrictEquals | SWF_ACTION_STRICT_EQUALS | actionStrictEquals | 1/1 |  |  | ✓ | ✓ |
-| 0X67 | ActionGreater | SWF_ACTION_GREATER | actionGreater | 1/1 |  |  | ✓ | ✓ |
-| 0X68 | ActionStringGreater | SWF_ACTION_STRING_GREATER | actionStringGreater | 1/1 |  |  | ✓ | ✓ |
-| 0X69 | ActionExtends | SWF_ACTION_EXTENDS | actionExtends | 1/1 |  |  | ✓ |  |
-| 0X81 | ActionGotoFrame | SWF_ACTION_GOTO_FRAME | actionGotoFrame | 1/1 |  |  | ✓ |  |
-| 0X83 | ActionGetURL | SWF_ACTION_GET_URL | actionGetURL | 1/1 |  |  | ✓ |  |
-| 0X87 | ActionStoreRegister | SWF_ACTION_STORE_REGISTER | actionStoreRegister | 1/1 |  |  | ✓ | ✓ |
-| 0X88 | ActionConstantPool | SWF_ACTION_CONSTANT_POOL |  | 4/4 |  |  | ✓ | ✓ |
-| 0X8A | ActionWaitForFrame | SWF_ACTION_WAIT_FOR_FRAME |  | 1/1 |  |  | ✓ |  |
-| 0X8B | ActionSetTarget | SWF_ACTION_SET_TARGET | actionSetTarget | 1/1 |  |  | ✓ |  |
-| 0X8C | ActionGoToLabel | SWF_ACTION_GOTO_LABEL | actionGoToLabel | 1/1 |  |  | ✓ |  |
-| 0X8D | ActionWaitForFrame2 | SWF_ACTION_WAIT_FOR_FRAME2 |  | 1/1 |  |  | ✓ | ✓ |
-| 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 2/2 |  |  | ✓ |  |
-| 0X8F | ActionTry | SWF_ACTION_TRY |  | 1/1 |  |  | ✓ |  |
-| 0X94 | ActionWith | SWF_ACTION_WITH |  | 1/1 |  |  | ✓ |  |
-| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 108/108 |  | ✓ | ✓ |
-| 0X99 | ActionJump | SWF_ACTION_JUMP |  | 1/1 |  |  | ✓ | ✓ |
-| 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  |
-| 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  | 1/1 |  |  | ✓ | ✓ |
-| 0X9D | ActionIf | SWF_ACTION_IF |  | 2/2 | 1/1 |  | ✓ | ✓ |
-| 0X9E | ActionCall | SWF_ACTION_CALL | actionCall | 1/1 |  |  | ✓ |  |
-| 0X9F | ActionGotoFrame2 | SWF_ACTION_GOTO_FRAME2 | actionGotoFrame2 | 1/1 |  |  | ✓ |  |
+| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Fully Impl | Fully Impl (No Graphics) |
+|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|------------|--------------------------|
+| 0X00 |  | SWF_ACTION_END_OF_ACTIONS |  |  |  |  |  |  |  |
+| 0X04 | ActionNextFrame | SWF_ACTION_NEXT_FRAME | actionNextFrame | 1/1 |  |  | ✓ |  |  |
+| 0X05 | ActionPreviousFrame | SWF_ACTION_PREV_FRAME | actionPrevFrame | 1/1 |  |  | ✓ |  |  |
+| 0X06 | ActionPlay | SWF_ACTION_PLAY | actionPlay | 1/1 |  |  | ✓ |  |  |
+| 0X07 | ActionStop | SWF_ACTION_STOP |  | 1/1 | 2/2 |  | ✓ |  |  |
+| 0X08 | ActionToggleQuality | SWF_ACTION_TOGGLE_QUALITY | actionToggleQuality | 1/1 |  |  | ✓ |  |  |
+| 0X09 | ActionStopSounds | SWF_ACTION_STOP_SOUNDS | actionStopSounds | 1/1 |  |  | ✓ |  |  |
+| 0X0A | ActionAdd | SWF_ACTION_ADD | actionAdd | 2/2 | 3/3 |  | ✓ | ✓ |  |
+| 0X0B | ActionSubtract | SWF_ACTION_SUBTRACT | actionSubtract | 1/1 |  |  | ✓ | ✓ |  |
+| 0X0C | ActionMultiply | SWF_ACTION_MULTIPLY | actionMultiply | 1/1 |  |  | ✓ | ✓ |  |
+| 0X0D | ActionDivide | SWF_ACTION_DIVIDE | actionDivide | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| 0X0E | ActionEquals | SWF_ACTION_EQUALS | actionEquals | 1/1 |  |  | ✓ | ✓ |  |
+| 0X0F | ActionLess | SWF_ACTION_LESS | actionLess | 2/2 | 1/1 |  | ✓ | ✓ |  |
+| 0X10 | ActionAnd | SWF_ACTION_AND | actionAnd | 5/5 |  |  | ✓ | ✓ |  |
+| 0X11 | ActionOr | SWF_ACTION_OR | actionOr | 1/1 |  |  | ✓ | ✓ |  |
+| 0X12 | ActionNot | SWF_ACTION_NOT | actionNot | 1/1 |  |  | ✓ | ✓ |  |
+| 0X13 | ActionStringEquals | SWF_ACTION_STRING_EQUALS | actionStringEquals | 2/2 |  |  | ✓ | ✓ |  |
+| 0X14 | ActionStringLength | SWF_ACTION_STRING_LENGTH | actionStringLength | 1/1 |  |  | ✓ | ✓ |  |
+| 0X15 | ActionStringExtract | SWF_ACTION_STRING_EXTRACT | actionStringExtract | 1/1 |  |  | ✓ | ✓ |  |
+| 0X17 | ActionPop | SWF_ACTION_POP |  | 1/1 | 4/4 |  | ✓ | ✓ |  |
+| 0X18 | ActionToInteger | SWF_ACTION_TO_INTEGER | actionToInteger | 1/1 |  |  | ✓ | ✓ |  |
+| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable | 1/1 | 10/10 |  | ✓ |  |  |
+| 0X1D | ActionSetVariable | SWF_ACTION_SET_VARIABLE | actionSetVariable | 1/1 | 10/10 |  | ✓ | ✓ |  |
+| 0X20 | ActionSetTarget2 | SWF_ACTION_SET_TARGET2 | actionSetTarget2 | 1/1 |  |  | ✓ |  |  |
+| 0X21 | ActionStringAdd | SWF_ACTION_STRING_ADD | actionStringAdd | 1/1 | 2/2 |  | ✓ | ✓ |  |
+| 0X22 | ActionGetProperty | SWF_ACTION_GET_PROPERTY | actionGetProperty | 1/1 |  |  | ✓ |  |  |
+| 0X23 | ActionSetProperty | SWF_ACTION_SET_PROPERTY | actionSetProperty | 1/1 |  |  | ✓ |  |  |
+| 0X24 | ActionCloneSprite | SWF_ACTION_CLONE_SPRITE | actionCloneSprite | 1/1 |  |  | ✓ |  |  |
+| 0X25 | ActionRemoveSprite | SWF_ACTION_REMOVE_SPRITE | actionRemoveSprite | 1/1 |  |  | ✓ |  |  |
+| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 108/108 |  | ✓ | ✓ |  |
+| 0X27 | ActionStartDrag | SWF_ACTION_START_DRAG | actionStartDrag | 1/1 |  |  | ✓ |  |  |
+| 0X28 | ActionEndDrag | SWF_ACTION_END_DRAG | actionEndDrag | 1/1 |  |  | ✓ |  |  |
+| 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess | 1/1 |  |  | ✓ | ✓ |  |
+| 0X2A | ActionThrow | SWF_ACTION_THROW | actionThrow | 2/2 |  |  | ✓ |  |  |
+| 0X2B | ActionCastOp | SWF_ACTION_CAST_OP | actionCastOp | 1/1 |  |  | ✓ |  |  |
+| 0X2C | ActionImplementsOp | SWF_ACTION_IMPLEMENTS_OP | actionImplementsOp | 1/1 |  |  | ✓ |  |  |
+| 0X30 | ActionRandomNumber | SWF_ACTION_RANDOM_NUMBER | actionRandomNumber | 1/1 |  |  | ✓ | ✓ |  |
+| 0X31 | ActionMBStringLength | SWF_ACTION_MB_STRING_LENGTH | actionMbStringLength | 1/1 |  |  | ✓ | ✓ |  |
+| 0X32 | ActionCharToAscii | SWF_ACTION_CHAR_TO_ASCII | actionCharToAscii | 1/1 |  |  | ✓ | ✓ |  |
+| 0X33 | ActionAsciiToChar | SWF_ACTION_ASCII_TO_CHAR | actionAsciiToChar | 1/1 |  |  | ✓ | ✓ |  |
+| 0X34 | ActionGetTime | SWF_ACTION_GET_TIME | actionGetTime | 1/1 |  |  | ✓ | ✓ |  |
+| 0X35 | ActionMBStringExtract | SWF_ACTION_MB_STRING_EXTRACT | actionMbStringExtract | 1/1 |  |  | ✓ | ✓ |  |
+| 0X36 | ActionMBCharToAscii | SWF_ACTION_MB_CHAR_TO_ASCII | actionMbCharToAscii | 1/1 |  |  | ✓ | ✓ |  |
+| 0X37 | ActionMBAsciiToChar | SWF_ACTION_MB_ASCII_TO_CHAR | actionMbAsciiToChar | 1/1 |  |  | ✓ |  |  |
+| 0X3A | ActionDelete | SWF_ACTION_DELETE | actionDelete | 1/1 |  |  | ✓ | ✓ |  |
+| 0X3B | ActionDelete2 | SWF_ACTION_DELETE2 | actionDelete2 | 1/1 |  |  | ✓ |  |  |
+| 0X3C | ActionDefineLocal | SWF_ACTION_DEFINE_LOCAL | actionDefineLocal | 1/1 |  |  | ✓ |  |  |
+| 0X3D | ActionStackSwap | SWF_ACTION_CALL_FUNCTION | actionStackSwap | 1/1 |  |  | ✓ |  |  |
+| 0X3E | ActionReturn | SWF_ACTION_RETURN | actionReturn | 1/1 | 2/2 |  | ✓ | ✓ |  |
+| 0X3F | ActionModulo | SWF_ACTION_MODULO | actionModulo | 1/1 |  |  | ✓ | ✓ |  |
+| 0X40 | ActionNewObject | SWF_ACTION_NEW_OBJECT | actionNewObject | 1/1 |  |  | ✓ |  |  |
+| 0X41 | ActionDefineLocal2 | SWF_ACTION_DECLARE_LOCAL | actionDeclareLocal | 1/1 |  |  | ✓ |  |  |
+| 0X42 | ActionInitArray | SWF_ACTION_INIT_ARRAY | actionInitArray | 1/1 |  |  | ✓ |  |  |
+| 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject | 1/1 | 8/8 |  | ✓ | ✓ |  |
+| 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF | actionTypeof | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath | 1/1 |  |  | ✓ |  |  |
+| 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate | 1/1 |  |  | ✓ |  |  |
+| 0X47 | ActionAdd2 | SWF_ACTION_ADD2 | actionAdd2 | 1/1 |  |  | ✓ | ✓ |  |
+| 0X48 | ActionLess2 | SWF_ACTION_LESS2 | actionLess2 | 1/1 |  |  | ✓ | ✓ |  |
+| 0X49 | ActionEquals2 | SWF_ACTION_EQUALS2 | actionEquals2 | 1/1 |  |  | ✓ |  |  |
+| 0X4A | ActionToNumber | SWF_ACTION_TO_NUMBER | actionToNumber | 1/1 |  |  | ✓ | ✓ |  |
+| 0X4B | ActionToString | SWF_ACTION_TO_STRING | actionToString | 1/1 |  |  | ✓ | ✓ |  |
+| 0X4C | ActionPushDuplicate | SWF_ACTION_DUPLICATE | actionDuplicate | 1/1 | 5/5 |  | ✓ | ✓ |  |
+| 0X4D | ActionStackSwap | SWF_ACTION_STACK_SWAP | actionStackSwap | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| 0X4E | ActionGetMember | SWF_ACTION_GET_MEMBER | actionGetMember | 1/1 | 3/3 |  | ✓ | ✓ |  |
+| 0X4F | ActionSetMember | SWF_ACTION_SET_MEMBER | actionSetMember | 1/1 | 1/1 |  | ✓ | ✓ |  |
+| 0X50 | ActionIncrement | SWF_ACTION_INCREMENT | actionIncrement | 1/1 |  |  | ✓ | ✓ |  |
+| 0X51 | ActionDecrement | SWF_ACTION_DECREMENT | actionDecrement | 1/1 |  |  | ✓ | ✓ |  |
+| 0X52 | ActionCallMethod | SWF_ACTION_CALL_METHOD | actionCallMethod | 2/2 |  |  | ✓ | ✓ |  |
+| 0X53 | ActionNewMethod | SWF_ACTION_NEW_METHOD | actionNewMethod | 1/1 |  |  | ✓ |  |  |
+| 0X54 | ActionInstanceOf | SWF_ACTION_INSTANCEOF | actionInstanceOf | 1/1 |  |  | ✓ |  |  |
+| 0X55 | ActionEnumerate2 | SWF_ACTION_ENUMERATE2 | actionEnumerate2 | 1/1 |  |  | ✓ | ✓ |  |
+| 0X60 | ActionBitAnd | SWF_ACTION_BIT_AND | actionBitAnd | 1/1 |  |  | ✓ | ✓ |  |
+| 0X61 | ActionBitOr | SWF_ACTION_BIT_OR | actionBitOr | 1/1 |  |  | ✓ | ✓ |  |
+| 0X62 | ActionBitXor | SWF_ACTION_BIT_XOR | actionBitXor | 1/1 |  |  | ✓ | ✓ |  |
+| 0X63 | ActionBitLShift | SWF_ACTION_BIT_LSHIFT | actionBitLShift | 1/1 |  |  | ✓ | ✓ |  |
+| 0X64 | ActionBitRShift | SWF_ACTION_BIT_RSHIFT | actionBitRShift | 1/1 |  |  | ✓ | ✓ |  |
+| 0X65 | ActionBitURShift | SWF_ACTION_BIT_URSHIFT | actionBitURShift | 1/1 |  |  | ✓ | ✓ |  |
+| 0X66 | ActionStrictEquals | SWF_ACTION_STRICT_EQUALS | actionStrictEquals | 1/1 |  |  | ✓ | ✓ |  |
+| 0X67 | ActionGreater | SWF_ACTION_GREATER | actionGreater | 1/1 |  |  | ✓ | ✓ |  |
+| 0X68 | ActionStringGreater | SWF_ACTION_STRING_GREATER | actionStringGreater | 1/1 |  |  | ✓ | ✓ |  |
+| 0X69 | ActionExtends | SWF_ACTION_EXTENDS | actionExtends | 1/1 |  |  | ✓ |  |  |
+| 0X81 | ActionGotoFrame | SWF_ACTION_GOTO_FRAME | actionGotoFrame | 1/1 |  |  | ✓ |  |  |
+| 0X83 | ActionGetURL | SWF_ACTION_GET_URL | actionGetURL | 1/1 |  |  | ✓ |  |  |
+| 0X87 | ActionStoreRegister | SWF_ACTION_STORE_REGISTER | actionStoreRegister | 1/1 |  |  | ✓ | ✓ |  |
+| 0X88 | ActionConstantPool | SWF_ACTION_CONSTANT_POOL |  | 4/4 |  |  | ✓ | ✓ |  |
+| 0X8A | ActionWaitForFrame | SWF_ACTION_WAIT_FOR_FRAME |  | 1/1 |  |  | ✓ |  |  |
+| 0X8B | ActionSetTarget | SWF_ACTION_SET_TARGET | actionSetTarget | 1/1 |  |  | ✓ |  |  |
+| 0X8C | ActionGoToLabel | SWF_ACTION_GOTO_LABEL | actionGoToLabel | 1/1 |  |  | ✓ |  |  |
+| 0X8D | ActionWaitForFrame2 | SWF_ACTION_WAIT_FOR_FRAME2 |  | 1/1 |  |  | ✓ | ✓ |  |
+| 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 2/2 |  |  | ✓ |  |  |
+| 0X8F | ActionTry | SWF_ACTION_TRY |  | 1/1 |  |  | ✓ |  |  |
+| 0X94 | ActionWith | SWF_ACTION_WITH |  | 1/1 |  |  | ✓ |  |  |
+| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 108/108 |  | ✓ | ✓ |  |
+| 0X99 | ActionJump | SWF_ACTION_JUMP |  | 1/1 |  |  | ✓ | ✓ |  |
+| 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  |  |
+| 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  | 1/1 |  |  | ✓ | ✓ |  |
+| 0X9D | ActionIf | SWF_ACTION_IF |  | 2/2 | 1/1 |  | ✓ | ✓ |  |
+| 0X9E | ActionCall | SWF_ACTION_CALL | actionCall | 1/1 |  |  | ✓ |  |  |
+| 0X9F | ActionGotoFrame2 | SWF_ACTION_GOTO_FRAME2 | actionGotoFrame2 | 1/1 |  |  | ✓ |  |  |
 
 ## Failing Primary Tests
 
@@ -139,66 +139,66 @@
 ### ✅ Fully Implemented
 (Opcodes marked as fully_implemented in test_info.json)
 
-| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs |
-|-----|-----------|------|----------|---------------|-----------------|------|
-| 0X0A | ActionAdd | ✓ | ✓ | 2/2 |  | ✓ |
-| 0X0B | ActionSubtract | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X0C | ActionMultiply | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X0D | ActionDivide | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X0E | ActionEquals | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X0F | ActionLess | ✓ | ✓ | 2/2 |  | ✓ |
-| 0X10 | ActionAnd | ✓ | ✓ | 5/5 |  | ✓ |
-| 0X11 | ActionOr | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X12 | ActionNot | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X13 | ActionStringEquals | ✓ | ✓ | 2/2 |  | ✓ |
-| 0X14 | ActionStringLength | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X15 | ActionStringExtract | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X17 | ActionPop | ✓ |  | 1/1 |  | ✓ |
-| 0X18 | ActionToInteger | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X1D | ActionSetVariable | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X21 | ActionStringAdd | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X26 | ActionTrace | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X29 | ActionStringLess | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X30 | ActionRandomNumber | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X31 | ActionMBStringLength | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X32 | ActionCharToAscii | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X33 | ActionAsciiToChar | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X34 | ActionGetTime | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X35 | ActionMBStringExtract | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X36 | ActionMBCharToAscii | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X3A | ActionDelete | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X3E | ActionReturn | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X3F | ActionModulo | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X43 | ActionInitObject | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X44 | ActionTypeOf | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X47 | ActionAdd2 | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X48 | ActionLess2 | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X4A | ActionToNumber | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X4B | ActionToString | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X4C | ActionPushDuplicate | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X4D | ActionStackSwap | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X4E | ActionGetMember | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X4F | ActionSetMember | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X50 | ActionIncrement | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X51 | ActionDecrement | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X52 | ActionCallMethod | ✓ | ✓ | 2/2 |  | ✓ |
-| 0X55 | ActionEnumerate2 | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X60 | ActionBitAnd | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X61 | ActionBitOr | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X62 | ActionBitXor | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X63 | ActionBitLShift | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X64 | ActionBitRShift | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X65 | ActionBitURShift | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X66 | ActionStrictEquals | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X67 | ActionGreater | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X68 | ActionStringGreater | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X87 | ActionStoreRegister | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X88 | ActionConstantPool | ✓ |  | 4/4 |  | ✓ |
-| 0X8D | ActionWaitForFrame2 | ✓ |  | 1/1 |  | ✓ |
-| 0X96 | ActionPush | ✓ |  | 1/1 |  | ✓ |
-| 0X99 | ActionJump | ✓ |  | 1/1 |  | ✓ |
-| 0X9B | ActionDefineFunction | ✓ |  | 1/1 |  | ✓ |
-| 0X9D | ActionIf | ✓ |  | 2/2 |  | ✓ |
+| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs | No Graphics |
+|-----|-----------|------|----------|---------------|-----------------|------|-------------|
+| 0X0A | ActionAdd | ✓ | ✓ | 2/2 |  | ✓ |  |
+| 0X0B | ActionSubtract | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X0C | ActionMultiply | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X0D | ActionDivide | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X0E | ActionEquals | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X0F | ActionLess | ✓ | ✓ | 2/2 |  | ✓ |  |
+| 0X10 | ActionAnd | ✓ | ✓ | 5/5 |  | ✓ |  |
+| 0X11 | ActionOr | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X12 | ActionNot | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X13 | ActionStringEquals | ✓ | ✓ | 2/2 |  | ✓ |  |
+| 0X14 | ActionStringLength | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X15 | ActionStringExtract | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X17 | ActionPop | ✓ |  | 1/1 |  | ✓ |  |
+| 0X18 | ActionToInteger | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X1D | ActionSetVariable | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X21 | ActionStringAdd | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X26 | ActionTrace | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X29 | ActionStringLess | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X30 | ActionRandomNumber | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X31 | ActionMBStringLength | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X32 | ActionCharToAscii | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X33 | ActionAsciiToChar | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X34 | ActionGetTime | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X35 | ActionMBStringExtract | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X36 | ActionMBCharToAscii | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X3A | ActionDelete | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X3E | ActionReturn | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X3F | ActionModulo | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X43 | ActionInitObject | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X44 | ActionTypeOf | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X47 | ActionAdd2 | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X48 | ActionLess2 | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X4A | ActionToNumber | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X4B | ActionToString | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X4C | ActionPushDuplicate | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X4D | ActionStackSwap | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X4E | ActionGetMember | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X4F | ActionSetMember | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X50 | ActionIncrement | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X51 | ActionDecrement | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X52 | ActionCallMethod | ✓ | ✓ | 2/2 |  | ✓ |  |
+| 0X55 | ActionEnumerate2 | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X60 | ActionBitAnd | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X61 | ActionBitOr | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X62 | ActionBitXor | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X63 | ActionBitLShift | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X64 | ActionBitRShift | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X65 | ActionBitURShift | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X66 | ActionStrictEquals | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X67 | ActionGreater | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X68 | ActionStringGreater | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X87 | ActionStoreRegister | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X88 | ActionConstantPool | ✓ |  | 4/4 |  | ✓ |  |
+| 0X8D | ActionWaitForFrame2 | ✓ |  | 1/1 |  | ✓ |  |
+| 0X96 | ActionPush | ✓ |  | 1/1 |  | ✓ |  |
+| 0X99 | ActionJump | ✓ |  | 1/1 |  | ✓ |  |
+| 0X9B | ActionDefineFunction | ✓ |  | 1/1 |  | ✓ |  |
+| 0X9D | ActionIf | ✓ |  | 2/2 |  | ✓ |  |
 
 ### 🔄 Partially Implemented
 (Has enum or function, but not marked as fully implemented)
@@ -253,6 +253,12 @@
 
 | Hex | Spec Name |
 |-----|-----------|
+
+## Missing Features
+
+This section lists all missing features for opcodes that are not fully implemented.
+
+**No opcodes with documented missing features! 🎉**
 
 ## Detailed Information
 

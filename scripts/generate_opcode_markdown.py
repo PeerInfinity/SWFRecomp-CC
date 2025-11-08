@@ -167,8 +167,8 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     # Generate summary table
     md.append("## Summary Table")
     md.append("")
-    md.append("| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Fully Implemented |")
-    md.append("|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|-------------------|")
+    md.append("| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Fully Impl | Fully Impl (No Graphics) |")
+    md.append("|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|------------|--------------------------|")
 
     for hex_val in sorted(opcodes.keys()):
         entries = opcodes[hex_val]
@@ -183,6 +183,7 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
         passing_secondary_count = 0
         has_docs = ""
         fully_implemented = False
+        fully_implemented_no_graphics = False
 
         for entry in entries:
             if entry['type'] == 'spec':
@@ -193,6 +194,7 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
                 passing_secondary_count = len(entry.get('tests_secondary_passing', []))
                 has_docs = "✓" if entry.get('documentation_prompt') else ""
                 fully_implemented = entry.get('fully_implemented', False)
+                fully_implemented_no_graphics = entry.get('fully_implemented_no_graphics', False)
             elif entry['type'] == 'enum':
                 enum_name = entry['name']
             elif entry['type'] == 'function':
@@ -208,6 +210,7 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
 
         # Format fully_implemented as checkbox
         fully_impl_str = "✓" if fully_implemented else ""
+        fully_impl_no_graphics_str = "✓" if fully_implemented_no_graphics else ""
 
         if with_links:
             # Create links to detailed section
@@ -222,9 +225,64 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
             enum_link = enum_name
             func_link = func_name
 
-        md.append(f"| {hex_link} | {spec_link} | {enum_link} | {func_link} | {primary_str} | {secondary_str} | {failing_str} | {has_docs} | {fully_impl_str} |")
+        md.append(f"| {hex_link} | {spec_link} | {enum_link} | {func_link} | {primary_str} | {secondary_str} | {failing_str} | {has_docs} | {fully_impl_str} | {fully_impl_no_graphics_str} |")
 
     md.append("")
+    return "\n".join(md)
+
+
+def generate_missing_features_section(index: Dict, with_links: bool = True) -> str:
+    """Generate a section listing all missing features for each opcode."""
+    md = []
+
+    md.append("## Missing Features")
+    md.append("")
+    md.append("This section lists all missing features for opcodes that are not fully implemented.")
+    md.append("")
+
+    # Group entries by hex value
+    opcodes_with_missing_features = []
+
+    for entry in index['entries']:
+        if entry['type'] == 'spec':
+            hex_val = entry['hex']
+            spec_name = entry['name']
+            missing_features = entry.get('missing_features', {})
+
+            if missing_features:
+                opcodes_with_missing_features.append({
+                    'hex': hex_val,
+                    'spec_name': spec_name,
+                    'missing_features': missing_features
+                })
+
+    if not opcodes_with_missing_features:
+        md.append("**No opcodes with documented missing features! 🎉**")
+        md.append("")
+        return "\n".join(md)
+
+    # Sort by hex value
+    opcodes_with_missing_features.sort(key=lambda x: x['hex'])
+
+    for opc in opcodes_with_missing_features:
+        if with_links:
+            header = f"### [{opc['hex']}: {opc['spec_name']}](#{make_anchor(opc['hex'], opc['spec_name'])})"
+        else:
+            header = f"### {opc['hex']}: {opc['spec_name']}"
+
+        md.append(header)
+        md.append("")
+
+        # Group features by test
+        for test_name, features in opc['missing_features'].items():
+            if features:
+                md.append(f"**From test `{test_name}`:**")
+                for feature in features:
+                    md.append(f"- {feature}")
+                md.append("")
+
+        md.append("")
+
     return "\n".join(md)
 
 
@@ -410,7 +468,8 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
                 'primary_count': 0,
                 'passing_primary_count': 0,
                 'has_docs': False,
-                'fully_implemented': False
+                'fully_implemented': False,
+                'fully_implemented_no_graphics': False
             }
 
         if entry['type'] == 'spec':
@@ -420,6 +479,7 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
             opcodes[hex_val]['passing_primary_count'] = len(entry.get('tests_primary_passing', []))
             opcodes[hex_val]['has_docs'] = bool(entry.get('documentation_prompt'))
             opcodes[hex_val]['fully_implemented'] = entry.get('fully_implemented', False)
+            opcodes[hex_val]['fully_implemented_no_graphics'] = entry.get('fully_implemented_no_graphics', False)
         elif entry['type'] == 'enum':
             opcodes[hex_val]['has_enum'] = True
         elif entry['type'] == 'function':
@@ -432,8 +492,8 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     md.append("### ✅ Fully Implemented")
     md.append("(Opcodes marked as fully_implemented in test_info.json)")
     md.append("")
-    md.append("| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs |")
-    md.append("|-----|-----------|------|----------|---------------|-----------------|------|")
+    md.append("| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs | No Graphics |")
+    md.append("|-----|-----------|------|----------|---------------|-----------------|------|-------------|")
 
     for hex_val in sorted(opcodes.keys()):
         opc = opcodes[hex_val]
@@ -448,7 +508,8 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
             test_status = f"{opc['passing_primary_count']}/{opc['primary_count']}"
             failing_count = opc['primary_count'] - opc['passing_primary_count']
             failing_str = str(failing_count) if failing_count > 0 else ""
-            md.append(f"| {hex_link} | {spec_link} | {'✓' if opc['has_enum'] else ''} | {'✓' if opc['has_function'] else ''} | {test_status} | {failing_str} | {'✓' if opc['has_docs'] else ''} |")
+            no_graphics_str = "✓" if opc['fully_implemented_no_graphics'] else ""
+            md.append(f"| {hex_link} | {spec_link} | {'✓' if opc['has_enum'] else ''} | {'✓' if opc['has_function'] else ''} | {test_status} | {failing_str} | {'✓' if opc['has_docs'] else ''} | {no_graphics_str} |")
 
     md.append("")
 
@@ -508,11 +569,13 @@ def generate_markdown():
     summary_with_links = generate_summary_table(index, with_links=True)
     failing_tests_with_links = generate_failing_tests_chart(index, with_links=True)
     status_with_links = generate_implementation_status(index, with_links=True)
+    missing_features_with_links = generate_missing_features_section(index, with_links=True)
 
     markdown_with_links = "\n".join([
         summary_with_links,
         failing_tests_with_links,
         status_with_links,
+        missing_features_with_links,
         detailed
     ])
 
@@ -527,11 +590,13 @@ def generate_markdown():
     summary_no_links = generate_summary_table(index, with_links=False)
     failing_tests_no_links = generate_failing_tests_chart(index, with_links=False)
     status_no_links = generate_implementation_status(index, with_links=False)
+    missing_features_no_links = generate_missing_features_section(index, with_links=False)
 
     markdown_no_links = "\n".join([
         summary_no_links,
         failing_tests_no_links,
         status_no_links,
+        missing_features_no_links,
         detailed
     ])
 

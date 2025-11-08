@@ -19,6 +19,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": null,
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -38,6 +40,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4310)"
     },
     {
@@ -57,6 +61,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -76,6 +82,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 126)"
     },
     {
@@ -95,6 +103,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4324)"
     },
     {
@@ -114,6 +124,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -133,6 +145,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 76)"
     },
     {
@@ -152,6 +166,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4338)"
     },
     {
@@ -171,6 +187,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -190,6 +208,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 127)"
     },
     {
@@ -215,6 +235,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4354)"
     },
     {
@@ -240,6 +262,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -259,6 +283,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4368)"
     },
     {
@@ -278,6 +304,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -297,6 +325,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 77)"
     },
     {
@@ -316,6 +346,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4379)"
     },
     {
@@ -335,6 +367,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -354,6 +388,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 132)"
     },
     {
@@ -383,6 +419,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4670)"
     },
     {
@@ -412,6 +450,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -441,6 +481,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 79)"
     },
     {
@@ -460,6 +502,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4693)"
     },
     {
@@ -479,6 +523,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -498,6 +544,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 81)"
     },
     {
@@ -517,6 +565,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4714)"
     },
     {
@@ -536,6 +586,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -555,6 +607,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 82)"
     },
     {
@@ -578,6 +632,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4737)"
     },
     {
@@ -601,6 +657,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -624,6 +682,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 83)"
     },
     {
@@ -643,6 +703,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4761)"
     },
     {
@@ -662,6 +724,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -681,6 +745,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 85)"
     },
     {
@@ -706,6 +772,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4786)"
     },
     {
@@ -731,6 +799,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -756,6 +826,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 86)"
     },
     {
@@ -783,6 +855,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4808)"
     },
     {
@@ -810,6 +884,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -837,6 +913,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 89)"
     },
     {
@@ -856,6 +934,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4829)"
     },
     {
@@ -875,6 +955,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -894,6 +976,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 90)"
     },
     {
@@ -913,6 +997,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4853)"
     },
     {
@@ -932,6 +1018,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -951,6 +1039,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 91)"
     },
     {
@@ -972,6 +1062,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4882)"
     },
     {
@@ -993,6 +1085,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1014,6 +1108,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 105)"
     },
     {
@@ -1033,6 +1129,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4903)"
     },
     {
@@ -1052,6 +1150,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1071,6 +1171,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 106)"
     },
     {
@@ -1090,6 +1192,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4942)"
     },
     {
@@ -1109,6 +1213,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1128,6 +1234,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 107)"
     },
     {
@@ -1157,6 +1265,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4651)"
     },
     {
@@ -1186,6 +1296,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1205,6 +1317,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5031)"
     },
     {
@@ -1224,6 +1338,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1243,6 +1359,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 92)"
     },
     {
@@ -1284,6 +1402,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5218)"
     },
     {
@@ -1325,6 +1445,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1366,6 +1488,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 115)"
     },
     {
@@ -1407,6 +1531,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5240)"
     },
     {
@@ -1448,6 +1574,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1489,6 +1617,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 116)"
     },
     {
@@ -1508,6 +1638,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5405)"
     },
     {
@@ -1527,6 +1659,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1546,6 +1680,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 117)"
     },
     {
@@ -1571,6 +1707,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4921)"
     },
     {
@@ -1596,6 +1734,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1621,6 +1761,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 110)"
     },
     {
@@ -1640,6 +1782,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5423)"
     },
     {
@@ -1659,6 +1803,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1678,6 +1824,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 120)"
     },
     {
@@ -1697,6 +1845,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5541)"
     },
     {
@@ -1716,6 +1866,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1735,6 +1887,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 121)"
     },
     {
@@ -1754,6 +1908,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5561)"
     },
     {
@@ -1773,6 +1929,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1792,6 +1950,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 122)"
     },
     {
@@ -1811,6 +1971,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5583)"
     },
     {
@@ -1830,6 +1992,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1849,6 +2013,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 123)"
     },
     {
@@ -2086,6 +2252,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5682)"
     },
     {
@@ -2323,6 +2491,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2560,6 +2730,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 129)"
     },
     {
@@ -2579,6 +2751,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5601)"
     },
     {
@@ -2598,6 +2772,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2617,6 +2793,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 130)"
     },
     {
@@ -2636,6 +2814,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5641)"
     },
     {
@@ -2655,6 +2835,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2674,6 +2856,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 131)"
     },
     {
@@ -2693,6 +2877,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4964)"
     },
     {
@@ -2712,6 +2898,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2731,6 +2919,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 111)"
     },
     {
@@ -2752,6 +2942,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 7289)"
     },
     {
@@ -2773,6 +2965,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2794,6 +2988,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 183)"
     },
     {
@@ -2813,6 +3009,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 7141)"
     },
     {
@@ -2832,6 +3030,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2851,6 +3051,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 140)"
     },
     {
@@ -2870,6 +3072,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 7164)"
     },
     {
@@ -2889,6 +3093,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2908,6 +3114,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 112)"
     },
     {
@@ -2927,6 +3135,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5721)"
     },
     {
@@ -2946,6 +3156,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2965,6 +3177,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 134)"
     },
     {
@@ -2984,6 +3198,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4986)"
     },
     {
@@ -3003,6 +3219,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3022,6 +3240,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 108)"
     },
     {
@@ -3041,6 +3261,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5053)"
     },
     {
@@ -3060,6 +3282,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3079,6 +3303,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 113)"
     },
     {
@@ -3098,6 +3324,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5072)"
     },
     {
@@ -3117,6 +3345,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3136,6 +3366,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 135)"
     },
     {
@@ -3155,6 +3387,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5703)"
     },
     {
@@ -3174,6 +3408,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3193,6 +3429,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 137)"
     },
     {
@@ -3212,6 +3450,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5006)"
     },
     {
@@ -3231,6 +3471,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3250,6 +3492,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 109)"
     },
     {
@@ -3269,6 +3513,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5094)"
     },
     {
@@ -3288,6 +3534,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3307,6 +3555,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 136)"
     },
     {
@@ -3326,6 +3576,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5115)"
     },
     {
@@ -3345,6 +3597,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3364,6 +3618,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 138)"
     },
     {
@@ -3383,6 +3639,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6007)"
     },
     {
@@ -3402,6 +3660,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3421,6 +3681,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 150)"
     },
     {
@@ -3440,6 +3702,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6025)"
     },
     {
@@ -3459,6 +3723,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3478,6 +3744,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 151)"
     },
     {
@@ -3497,6 +3765,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5969)"
     },
     {
@@ -3516,6 +3786,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3535,6 +3807,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 118)"
     },
     {
@@ -3554,6 +3828,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5796)"
     },
     {
@@ -3573,6 +3849,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3592,6 +3870,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 95)"
     },
     {
@@ -3617,6 +3897,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6643)"
     },
     {
@@ -3642,6 +3924,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3667,6 +3951,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 142)"
     },
     {
@@ -3686,6 +3972,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6438)"
     },
     {
@@ -3705,6 +3993,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3724,6 +4014,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 84)"
     },
     {
@@ -3743,6 +4035,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6216)"
     },
     {
@@ -3762,6 +4056,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3781,6 +4077,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 172)"
     },
     {
@@ -3800,6 +4098,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5990)"
     },
     {
@@ -3819,6 +4119,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3838,6 +4140,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 119)"
     },
     {
@@ -3857,6 +4161,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6124)"
     },
     {
@@ -3876,6 +4182,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3895,6 +4203,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 143)"
     },
     {
@@ -3932,6 +4242,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6153)"
     },
     {
@@ -3969,6 +4281,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4006,6 +4320,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 169)"
     },
     {
@@ -4029,6 +4345,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6380)"
     },
     {
@@ -4052,6 +4370,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4075,6 +4395,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 139)"
     },
     {
@@ -4094,6 +4416,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6268)"
     },
     {
@@ -4113,6 +4437,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4132,6 +4458,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 98)"
     },
     {
@@ -4151,6 +4479,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6044)"
     },
     {
@@ -4170,6 +4500,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4189,6 +4521,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 99)"
     },
     {
@@ -4208,6 +4542,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6393)"
     },
     {
@@ -4227,6 +4563,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4246,6 +4584,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 80)"
     },
     {
@@ -4265,6 +4605,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6414)"
     },
     {
@@ -4284,6 +4626,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4303,6 +4647,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 87)"
     },
     {
@@ -4322,6 +4668,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6068)"
     },
     {
@@ -4341,6 +4689,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4360,6 +4710,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 88)"
     },
     {
@@ -4379,6 +4731,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6320)"
     },
     {
@@ -4398,6 +4752,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4417,6 +4773,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 93)"
     },
     {
@@ -4436,6 +4794,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6342)"
     },
     {
@@ -4455,6 +4815,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4474,6 +4836,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 94)"
     },
     {
@@ -4505,6 +4869,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6627)"
     },
     {
@@ -4536,6 +4902,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4567,6 +4935,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 152)"
     },
     {
@@ -4590,6 +4960,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6660)"
     },
     {
@@ -4613,6 +4985,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4636,6 +5010,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 95)"
     },
     {
@@ -4663,6 +5039,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6090)"
     },
     {
@@ -4690,6 +5068,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4717,6 +5097,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 170)"
     },
     {
@@ -4740,6 +5122,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6248)"
     },
     {
@@ -4763,6 +5147,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4786,6 +5172,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 171)"
     },
     {
@@ -4805,6 +5193,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6605)"
     },
     {
@@ -4824,6 +5214,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4843,6 +5235,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 145)"
     },
     {
@@ -4862,6 +5256,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6586)"
     },
     {
@@ -4881,6 +5277,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4900,6 +5298,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 146)"
     },
     {
@@ -4921,6 +5321,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5831)"
     },
     {
@@ -4942,6 +5344,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4963,6 +5367,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 167)"
     },
     {
@@ -4982,6 +5388,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6184)"
     },
     {
@@ -5001,6 +5409,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5020,6 +5430,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 173)"
     },
     {
@@ -5039,6 +5451,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6782)"
     },
     {
@@ -5058,6 +5472,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5077,6 +5493,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 148)"
     },
     {
@@ -5096,6 +5514,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6806)"
     },
     {
@@ -5115,6 +5535,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5134,6 +5556,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 149)"
     },
     {
@@ -5153,6 +5577,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6457)"
     },
     {
@@ -5172,6 +5598,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5191,6 +5619,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 153)"
     },
     {
@@ -5210,6 +5640,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6497)"
     },
     {
@@ -5229,6 +5661,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5248,6 +5682,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 154)"
     },
     {
@@ -5267,6 +5703,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6563)"
     },
     {
@@ -5286,6 +5724,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5305,6 +5745,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 155)"
     },
     {
@@ -5324,6 +5766,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6476)"
     },
     {
@@ -5343,6 +5787,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5362,6 +5808,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 156)"
     },
     {
@@ -5381,6 +5829,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6517)"
     },
     {
@@ -5400,6 +5850,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5419,6 +5871,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 157)"
     },
     {
@@ -5438,6 +5892,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6541)"
     },
     {
@@ -5457,6 +5913,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5476,6 +5934,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 158)"
     },
     {
@@ -5495,6 +5955,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6829)"
     },
     {
@@ -5514,6 +5976,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5533,6 +5997,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 159)"
     },
     {
@@ -5552,6 +6018,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6848)"
     },
     {
@@ -5571,6 +6039,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5590,6 +6060,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 160)"
     },
     {
@@ -5609,6 +6081,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6870)"
     },
     {
@@ -5628,6 +6102,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5647,6 +6123,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 161)"
     },
     {
@@ -5666,6 +6144,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 7120)"
     },
     {
@@ -5685,6 +6165,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5704,6 +6186,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 162)"
     },
     {
@@ -5723,6 +6207,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4258)"
     },
     {
@@ -5742,6 +6228,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5761,6 +6249,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 128)"
     },
     {
@@ -5780,6 +6270,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4281)"
     },
     {
@@ -5799,6 +6291,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5818,6 +6312,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 133)"
     },
     {
@@ -5837,6 +6333,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6678)"
     },
     {
@@ -5856,6 +6354,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5875,6 +6375,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 163)"
     },
     {
@@ -5900,6 +6402,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5868)"
     },
     {
@@ -5925,6 +6429,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5944,6 +6450,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4393)"
     },
     {
@@ -5963,6 +6471,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5982,6 +6492,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4437)"
     },
     {
@@ -6001,6 +6513,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6020,6 +6534,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 124)"
     },
     {
@@ -6039,6 +6555,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4449)"
     },
     {
@@ -6058,6 +6576,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6077,6 +6597,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 102)"
     },
     {
@@ -6096,6 +6618,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5655)"
     },
     {
@@ -6115,6 +6639,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6136,6 +6662,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6949)"
     },
     {
@@ -6157,6 +6685,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6178,6 +6708,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 178)"
     },
     {
@@ -6197,6 +6729,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 7191)"
     },
     {
@@ -6216,6 +6750,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6235,6 +6771,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6289)"
     },
     {
@@ -6254,6 +6792,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6491,6 +7031,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4556)"
     },
     {
@@ -6728,6 +7270,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6747,6 +7291,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5139)"
     },
     {
@@ -6766,6 +7312,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6785,6 +7333,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5262)"
     },
     {
@@ -6804,6 +7354,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6823,6 +7375,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 168)"
     },
     {
@@ -6842,6 +7396,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5894)"
     },
     {
@@ -6861,6 +7417,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6886,6 +7444,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5163)"
     },
     {
@@ -6911,6 +7471,8 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
       "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6930,6 +7492,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5195)"
     },
     {
@@ -6949,6 +7513,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6968,6 +7534,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 166)"
     },
     {
@@ -6987,6 +7555,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 5344)"
     },
     {
@@ -7006,6 +7576,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -7025,6 +7597,8 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
       "notes": "Runtime function (action.h line 103)"
     }
   ]
