@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "to_string_swf_4",
+    "description": "Tests TO_STRING opcode (0x4B) - converts values to string representation",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["TO_STRING"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
