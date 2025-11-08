@@ -2,7 +2,8 @@
   "metadata": {
     "name": "bit_and_swf_4",
     "description": "Tests BIT_AND opcode (0x60) - performs bitwise AND on two 32-bit integers",
-    "swf_version": 4
+    "swf_version": 4,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["BIT_AND"],
