@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF3 file with a GoToLabel action
+# Create a comprehensive SWF3 file testing GoToLabel with various labels
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 3
@@ -13,39 +13,66 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# ActionScript bytecode for:
-# trace("Testing GoToLabel");
-# gotoAndStop("testlabel");
-# trace("After GoToLabel");
+# ActionScript bytecode for comprehensive label testing
 
-# First trace: "Testing GoToLabel"
-string1 = b'Testing GoToLabel\x00'
-action_push1 = struct.pack('<BHB', 0x96, len(string1) + 1, 0)  # PUSH action, length, type=0 (string)
-action_push1 += string1
-action_trace1 = bytes([0x26])  # TRACE action (0x26)
+def create_trace(msg):
+    """Create PUSH + TRACE actions for a message"""
+    string_data = (msg + '\x00').encode('utf-8')
+    action_push = struct.pack('<BHB', 0x96, len(string_data) + 1, 0)  # PUSH action, length, type=0 (string)
+    action_push += string_data
+    action_trace = bytes([0x26])  # TRACE action (0x26)
+    return action_push + action_trace
 
-# GoToLabel with label "testlabel"
-label = b'testlabel\x00'  # Null-terminated label string
-action_goto_label_length = len(label)
-action_goto_label = struct.pack('<BH', 0x8C, action_goto_label_length)  # GoToLabel action (0x8C), length
-action_goto_label += label
+def create_goto_label(label):
+    """Create GoToLabel action with given label"""
+    label_data = (label + '\x00').encode('utf-8')  # Null-terminated label string
+    action_goto_label_length = len(label_data)
+    action_goto_label = struct.pack('<BH', 0x8C, action_goto_label_length)  # GoToLabel action (0x8C), length
+    action_goto_label += label_data
+    return action_goto_label
 
-# Second trace: "After GoToLabel"
-string2 = b'After GoToLabel\x00'
-action_push2 = struct.pack('<BHB', 0x96, len(string2) + 1, 0)  # PUSH action, length, type=0 (string)
-action_push2 += string2
-action_trace2 = bytes([0x26])  # TRACE action (0x26)
+# Build comprehensive test
+actions = b''
 
-action_end = bytes([0x00])  # END action
+# Test 1: Basic label
+actions += create_trace("Test 1: Basic label")
+actions += create_goto_label("scene1")
 
-# Combine all actions
-all_actions = action_push1 + action_trace1 + action_goto_label + action_push2 + action_trace2 + action_end
+# Test 2: Label with underscores and numbers
+actions += create_trace("Test 2: Label with underscores")
+actions += create_goto_label("frame_2_start")
+
+# Test 3: Label with mixed case
+actions += create_trace("Test 3: Mixed case label")
+actions += create_goto_label("MyScene")
+
+# Test 4: Empty label (edge case)
+actions += create_trace("Test 4: Empty label")
+actions += create_goto_label("")
+
+# Test 5: Single character label
+actions += create_trace("Test 5: Single char label")
+actions += create_goto_label("A")
+
+# Test 6: Long label
+actions += create_trace("Test 6: Long label")
+actions += create_goto_label("this_is_a_very_long_frame_label_name")
+
+# Test 7: Label with special characters
+actions += create_trace("Test 7: Special chars label")
+actions += create_goto_label("label-with-dash")
+
+# Final trace
+actions += create_trace("All tests complete")
+
+# END action
+actions += bytes([0x00])
 
 # DoAction tag
 do_action_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
-do_action_length = len(all_actions)
+do_action_length = len(actions)
 do_action_header += struct.pack('<I', do_action_length)
-do_action_tag = do_action_header + all_actions
+do_action_tag = do_action_header + actions
 
 # ShowFrame tag
 show_frame_tag = struct.pack('<H', 1 << 6)  # Tag type 1, short form (length 0)

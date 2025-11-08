@@ -2,11 +2,15 @@
 """
 Validation script for goto_label_swf_3
 
-Tests the GOTO_LABEL opcode (0x8C).
-Expected output:
-- Testing GoToLabel
-- // GoToLabel: testlabel
-- After GoToLabel
+Tests the GOTO_LABEL opcode (0x8C) with comprehensive label variations.
+Tests label parsing for:
+- Basic labels
+- Labels with underscores and numbers
+- Mixed case labels
+- Empty labels (edge case)
+- Single character labels
+- Long labels
+- Labels with special characters
 """
 import sys
 import json
@@ -22,47 +26,66 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected: Three lines showing trace before, GoToLabel call, and trace after
+    Expected: Alternating trace messages and GoToLabel calls for 7 test cases
     """
     lines = parse_output(output)
 
     results = []
 
-    # Check we have 3 lines
-    if len(lines) < 3:
+    # Expected output pattern:
+    # Test N: <description>
+    # // GoToLabel: <label>
+    # ... (repeated for each test)
+    # All tests complete
+
+    expected_tests = [
+        ("test1_trace", "Test 1: Basic label"),
+        ("test1_goto", "// GoToLabel: scene1"),
+        ("test2_trace", "Test 2: Label with underscores"),
+        ("test2_goto", "// GoToLabel: frame_2_start"),
+        ("test3_trace", "Test 3: Mixed case label"),
+        ("test3_goto", "// GoToLabel: MyScene"),
+        ("test4_trace", "Test 4: Empty label"),
+        ("test4_goto", "// GoToLabel:"),  # Empty label - no space after colon
+        ("test5_trace", "Test 5: Single char label"),
+        ("test5_goto", "// GoToLabel: A"),
+        ("test6_trace", "Test 6: Long label"),
+        ("test6_goto", "// GoToLabel: this_is_a_very_long_frame_label_name"),
+        ("test7_trace", "Test 7: Special chars label"),
+        ("test7_goto", "// GoToLabel: label-with-dash"),
+        ("final_trace", "All tests complete"),
+    ]
+
+    # Check we have the expected number of lines
+    expected_count = len(expected_tests)
+    if len(lines) < expected_count:
         return make_validation_result([
             make_result(
                 "output_line_count",
                 False,
-                "3",
+                str(expected_count),
                 str(len(lines)),
-                f"Expected 3 lines of output, got {len(lines)}"
+                f"Expected {expected_count} lines of output, got {len(lines)}"
             )
         ])
 
-    # Check first trace output
-    results.append(make_result(
-        "trace_before_goto",
-        lines[0] == "Testing GoToLabel",
-        "Testing GoToLabel",
-        lines[0]
-    ))
-
-    # Check GoToLabel call output
-    results.append(make_result(
-        "goto_label_call",
-        lines[1] == "// GoToLabel: testlabel",
-        "// GoToLabel: testlabel",
-        lines[1]
-    ))
-
-    # Check trace after goto
-    results.append(make_result(
-        "trace_after_goto",
-        lines[2] == "After GoToLabel",
-        "After GoToLabel",
-        lines[2]
-    ))
+    # Validate each line
+    for i, (test_name, expected_line) in enumerate(expected_tests):
+        if i < len(lines):
+            results.append(make_result(
+                test_name,
+                lines[i] == expected_line,
+                expected_line,
+                lines[i]
+            ))
+        else:
+            results.append(make_result(
+                test_name,
+                False,
+                expected_line,
+                "(missing)",
+                f"Line {i} is missing from output"
+            ))
 
     return make_validation_result(results)
 
