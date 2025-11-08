@@ -27,5 +27,6 @@ void initVarArray(size_t max_string_id);
 ActionVar* getVariableById(u32 string_id);
 
 ActionVar* getVariable(char* var_name, size_t key_size);
+bool hasVariable(char* var_name, size_t key_size);
 char* materializeStringList(char* stack, u32 sp);
 void setVariableWithValue(ActionVar* var, char* stack, u32 sp);

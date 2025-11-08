@@ -1981,8 +1981,7 @@ void actionDelete2(char* stack, u32* sp, char* str_buffer)
 	// Not found in scope chain - check global variables
 	// Note: In Flash, you cannot delete variables declared with 'var', so we return false
 	// However, if the variable doesn't exist at all, we return true (Flash behavior)
-	ActionVar* global_var = getVariable(var_name, var_name_len);
-	if (global_var != NULL)
+	if (hasVariable(var_name, var_name_len))
 	{
 		// Variable exists but is a 'var' declaration - cannot delete
 		success = false;
