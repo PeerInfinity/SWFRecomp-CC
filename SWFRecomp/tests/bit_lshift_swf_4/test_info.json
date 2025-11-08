@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "bit_lshift_swf_4",
+    "description": "Tests BIT_LSHIFT opcode (0x63) - bitwise left shift operation",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["BIT_LSHIFT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

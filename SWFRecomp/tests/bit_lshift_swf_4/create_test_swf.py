@@ -1,8 +1,13 @@
-#!/usr/bin/env python3
+#\!/usr/bin/env python3
 import struct
 
 # Create a minimal SWF4 file with bitwise left shift operations
-# Tests multiple cases of the << operator (0x63)
+# Test cases:
+# 1. 1 << 3 = 8 (0001 << 3 = 1000)
+# 2. 5 << 2 = 20 (5 * 2^2 = 5 * 4 = 20)
+# 3. 1 << 33 = 2 (33 & 0x1F = 1, so 1 << 1 = 2, tests 5-bit masking)
+# 4. 42 << 0 = 42 (no shift)
+# 5. 1 << 31 = -2147483648 (shifts into sign bit)
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -14,44 +19,54 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# Helper function to create PUSH action
+# Helper function to create PUSH action for a float
 def push_float(value):
-    """Create a PUSH action for a float value"""
-    return struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', value)
+    return struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', float(value))
 
-# ActionScript bytecode for multiple left shift tests
+# Helper function to create bit left shift action
+def bit_lshift():
+    return bytes([0x63])  # BIT_LSHIFT opcode
+
+# Helper function to create trace action
+def trace():
+    return bytes([0x26])  # TRACE opcode
+
+# Build action sequence for all test cases
 actions = b''
 
-# Test 1: trace(1 << 3) = 8
-# Stack order: push value (1), push shift_count (3), lshift
-actions += push_float(1.0)    # Push value first
-actions += push_float(3.0)    # Push shift count second
-actions += bytes([0x63])      # BIT_LSHIFT operation
-actions += bytes([0x26])      # TRACE
+# IMPORTANT: Stack order for bit shift operations:
+# The implementation pops shift_count first, then value
+# So we push: value first (bottom), shift_count second (top)
 
-# Test 2: trace(5 << 2) = 20
-actions += push_float(5.0)    # Push value
-actions += push_float(2.0)    # Push shift count
-actions += bytes([0x63])      # BIT_LSHIFT
-actions += bytes([0x26])      # TRACE
+# Test 1: 1 << 3 = 8
+actions += push_float(1.0)   # Push value (bottom of stack)
+actions += push_float(3.0)   # Push shift count (top of stack)
+actions += bit_lshift()
+actions += trace()
 
-# Test 3: trace(1 << 33) = 2 (33 & 0x1F = 1)
-actions += push_float(1.0)    # Push value
-actions += push_float(33.0)   # Push shift count (will be masked to 1)
-actions += bytes([0x63])      # BIT_LSHIFT
-actions += bytes([0x26])      # TRACE
+# Test 2: 5 << 2 = 20
+actions += push_float(5.0)
+actions += push_float(2.0)
+actions += bit_lshift()
+actions += trace()
 
-# Test 4: trace(42 << 0) = 42
-actions += push_float(42.0)   # Push value
-actions += push_float(0.0)    # Push shift count
-actions += bytes([0x63])      # BIT_LSHIFT
-actions += bytes([0x26])      # TRACE
+# Test 3: 1 << 33 = 2 (33 & 0x1F = 1, so 1 << 1 = 2)
+actions += push_float(1.0)
+actions += push_float(33.0)
+actions += bit_lshift()
+actions += trace()
 
-# Test 5: trace(1 << 31) = -2147483648 (shift into sign bit)
-actions += push_float(1.0)    # Push value
-actions += push_float(31.0)   # Push shift count
-actions += bytes([0x63])      # BIT_LSHIFT
-actions += bytes([0x26])      # TRACE
+# Test 4: 42 << 0 = 42
+actions += push_float(42.0)
+actions += push_float(0.0)
+actions += bit_lshift()
+actions += trace()
+
+# Test 5: 1 << 31 = -2147483648 (shifts into sign bit)
+actions += push_float(1.0)
+actions += push_float(31.0)
+actions += bit_lshift()
+actions += trace()
 
 # End action
 actions += bytes([0x00])
@@ -80,9 +95,9 @@ with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
-print("Expected output:")
-print("8")
-print("20")
-print("2")
-print("42")
-print("-2147483648")
+print("Test cases:")
+print("  1. 1 << 3 = 8 (basic left shift)")
+print("  2. 5 << 2 = 20 (multiply by power of 2)")
+print("  3. 1 << 33 = 2 (shift count wrapping with 5-bit mask)")
+print("  4. 42 << 0 = 42 (zero shift)")
+print("  5. 1 << 31 = -2147483648 (shift into sign bit)")
