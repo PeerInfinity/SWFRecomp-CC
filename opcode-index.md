@@ -6,7 +6,7 @@
 
 **Implemented Opcodes**: 60
 
-**Total Entries**: 279
+**Total Entries**: 284
 
 ## Summary Table
 
@@ -14,7 +14,7 @@
 |-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|-------------------|
 | 0X00 |  | SWF_ACTION_END_OF_ACTIONS |  |  |  |  |  |  |
 | [0X04](#0x04-actionnextframe) | [ActionNextFrame](#0x04-actionnextframe) | [SWF_ACTION_NEXT_FRAME](#0x04-actionnextframe) | [actionNextFrame](#0x04-actionnextframe) | 1/1 |  |  | ✓ |  |
-| [0X05](#0x05-actionpreviousframe) | [ActionPreviousFrame](#0x05-actionpreviousframe) | [SWF_ACTION_PREV_FRAME](#0x05-actionpreviousframe) |  | 1/1 |  |  | ✓ |  |
+| [0X05](#0x05-actionpreviousframe) | [ActionPreviousFrame](#0x05-actionpreviousframe) | [SWF_ACTION_PREV_FRAME](#0x05-actionpreviousframe) | [actionPrevFrame](#0x05-actionpreviousframe) | 1/1 |  |  | ✓ |  |
 | [0X06](#0x06-actionplay) | [ActionPlay](#0x06-actionplay) | [SWF_ACTION_PLAY](#0x06-actionplay) | [actionPlay](#0x06-actionplay) | 1/1 |  |  | ✓ |  |
 | [0X07](#0x07-actionstop) | [ActionStop](#0x07-actionstop) | [SWF_ACTION_STOP](#0x07-actionstop) |  | 1/1 | 2/2 |  | ✓ |  |
 | [0X08](#0x08-actiontogglequality) | [ActionToggleQuality](#0x08-actiontogglequality) | [SWF_ACTION_TOGGLE_QUALITY](#0x08-actiontogglequality) | [actionToggleQuality](#0x08-actiontogglequality) | 1/1 |  |  | ✓ |  |
@@ -49,13 +49,13 @@
 | [0X2B](#0x2b-actioncastop) | [ActionCastOp](#0x2b-actioncastop) | [SWF_ACTION_CAST_OP](#0x2b-actioncastop) | [actionCastOp](#0x2b-actioncastop) | 1/1 |  |  | ✓ |  |
 | [0X2C](#0x2c-actionimplementsop) | [ActionImplementsOp](#0x2c-actionimplementsop) | [SWF_ACTION_IMPLEMENTS_OP](#0x2c-actionimplementsop) | [actionImplementsOp](#0x2c-actionimplementsop) | 1/1 |  |  | ✓ |  |
 | [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | [SWF_ACTION_RANDOM_NUMBER](#0x30-actionrandomnumber) | [actionRandomNumber](#0x30-actionrandomnumber) |  |  |  | ✓ |  |
-| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | [SWF_ACTION_MB_STRING_LENGTH](#0x31-actionmbstringlength) |  |  |  |  | ✓ |  |
+| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | [SWF_ACTION_MB_STRING_LENGTH](#0x31-actionmbstringlength) | [actionMbStringLength](#0x31-actionmbstringlength) |  |  |  | ✓ |  |
 | [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | [SWF_ACTION_CHAR_TO_ASCII](#0x32-actionchartoascii) | [actionCharToAscii](#0x32-actionchartoascii) |  |  |  | ✓ |  |
 | [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) |  |  |  | ✓ |  |
 | [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | [SWF_ACTION_GET_TIME](#0x34-actiongettime) | [actionGetTime](#0x34-actiongettime) | 1/1 |  |  | ✓ | ✓ |
 | [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) |  |  |  |  | ✓ |  |
-| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) |  |  |  |  | ✓ |  |
-| [0X37](#0x37-actionmbasciitochar) | [ActionMBAsciiToChar](#0x37-actionmbasciitochar) | [SWF_ACTION_MB_ASCII_TO_CHAR](#0x37-actionmbasciitochar) |  | 1/1 |  |  | ✓ |  |
+| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) | [actionMbCharToAscii](#0x36-actionmbchartoascii) |  |  |  | ✓ |  |
+| [0X37](#0x37-actionmbasciitochar) | [ActionMBAsciiToChar](#0x37-actionmbasciitochar) | [SWF_ACTION_MB_ASCII_TO_CHAR](#0x37-actionmbasciitochar) | [actionMbAsciiToChar](#0x37-actionmbasciitochar) | 1/1 |  |  | ✓ |  |
 | [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | [SWF_ACTION_DELETE](#0x3a-actiondelete) | [actionDelete](#0x3a-actiondelete) | 0/1 |  | 1 | ✓ | ✓ |
 | [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) | [SWF_ACTION_DELETE2](#0x3b-actiondelete2) | [actionDelete2](#0x3b-actiondelete2) | 0/1 |  | 1 | ✓ |  |
 | [0X3C](#0x3c-actiondefinelocal) | [ActionDefineLocal](#0x3c-actiondefinelocal) | [SWF_ACTION_DEFINE_LOCAL](#0x3c-actiondefinelocal) | [actionDefineLocal](#0x3c-actiondefinelocal) | 1/1 |  |  | ✓ |  |
@@ -66,7 +66,7 @@
 | [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | [SWF_ACTION_DECLARE_LOCAL](#0x41-actiondefinelocal2) |  |  |  |  | ✓ |  |
 | [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | [SWF_ACTION_INIT_ARRAY](#0x42-actioninitarray) | [actionInitArray](#0x42-actioninitarray) |  |  |  | ✓ |  |
 | [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | [SWF_ACTION_INIT_OBJECT](#0x43-actioninitobject) | [actionInitObject](#0x43-actioninitobject) |  | 2/4 |  | ✓ |  |
-| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | [SWF_ACTION_TYPEOF](#0x44-actiontypeof) |  | 1/1 |  |  | ✓ | ✓ |
+| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | [SWF_ACTION_TYPEOF](#0x44-actiontypeof) | [actionTypeof](#0x44-actiontypeof) | 1/1 |  |  | ✓ | ✓ |
 | [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | [SWF_ACTION_TARGET_PATH](#0x45-actiontargetpath) | [actionTargetPath](#0x45-actiontargetpath) |  |  |  | ✓ |  |
 | [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | [SWF_ACTION_ENUMERATE](#0x46-actionenumerate) | [actionEnumerate](#0x46-actionenumerate) |  |  |  | ✓ |  |
 | [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | [SWF_ACTION_ADD2](#0x47-actionadd2) | [actionAdd2](#0x47-actionadd2) | 1/1 |  |  | ✓ |  |
@@ -138,7 +138,7 @@
 | [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | ✓ | ✓ | 0/1 | 1 | ✓ |
 | [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | ✓ |  | 1/1 |  | ✓ |
+| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | ✓ | ✓ | 1/1 |  | ✓ |
@@ -160,11 +160,11 @@
 | [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | ✓ | ✓ | ✓ |
 | [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | ✓ | ✓ | ✓ |
 | [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | ✓ | ✓ | ✓ |
-| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | ✓ |  | ✓ |
+| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | ✓ | ✓ | ✓ |
 | [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | ✓ | ✓ | ✓ |
 | [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | ✓ |
 | [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ |  | ✓ |
-| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ |  | ✓ |
+| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ | ✓ | ✓ |
 | [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | ✓ | ✓ | ✓ |
 | [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | ✓ | ✓ | ✓ |
 | [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | ✓ | ✓ | ✓ |
@@ -246,9 +246,15 @@ void actionNextFrame();
 **Name Variations:**
 - `ActionPreviousFrame` (spec, source: SWF Specification v19)
 - `SWF_ACTION_PREV_FRAME` (enum, source: action.hpp)
+- `actionPrevFrame` (function, source: action.h)
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
+
+**Function Declaration:**
+```c
+void actionPrevFrame(char* stack, u32* sp);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_PREV_FRAME)
@@ -1237,6 +1243,12 @@ void actionRandomNumber(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBStringLength` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_STRING_LENGTH` (enum, source: action.hpp)
+- `actionMbStringLength` (function, source: action.h)
+
+**Function Declaration:**
+```c
+void actionMbStringLength(char* stack, u32* sp, char* v_str);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_STRING_LENGTH)
@@ -1343,6 +1355,12 @@ void actionGetTime(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBCharToAscii` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_CHAR_TO_ASCII` (enum, source: action.hpp)
+- `actionMbCharToAscii` (function, source: action.h)
+
+**Function Declaration:**
+```c
+void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_CHAR_TO_ASCII)
@@ -1360,9 +1378,15 @@ void actionGetTime(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBAsciiToChar` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_ASCII_TO_CHAR` (enum, source: action.hpp)
+- `actionMbAsciiToChar` (function, source: action.h)
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/mb_ascii_to_char_swf_4`
+
+**Function Declaration:**
+```c
+void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)
@@ -1625,9 +1649,15 @@ void actionInitObject(char* stack, u32* sp);
 **Name Variations:**
 - `ActionTypeOf` (spec, source: SWF Specification v19)
 - `SWF_ACTION_TYPEOF` (enum, source: action.hpp)
+- `actionTypeof` (function, source: action.h)
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/typeof_swf_5`
+
+**Function Declaration:**
+```c
+void actionTypeof(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_TYPEOF)

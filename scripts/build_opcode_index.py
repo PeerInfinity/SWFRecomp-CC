@@ -293,20 +293,32 @@ def get_test_directories_for_opcode(hex_value: str, test_map: Dict[str, Dict]) -
 
 
 def match_function_name(opcode_info: Dict, functions: Dict[str, Dict]) -> Optional[Dict]:
-    """Match a function declaration to an opcode."""
-    if 'spec_name' not in opcode_info:
+    """Match a function declaration to an opcode using normalized name matching."""
+    if 'spec_name' not in opcode_info and 'enum_name' not in opcode_info:
         return None
 
-    # Convert spec name to function name format
-    # e.g., "ActionAdd" -> "actionAdd"
-    spec_name = opcode_info['spec_name']
-    if spec_name.startswith('Action'):
-        func_name = 'action' + spec_name[6:]  # Remove "Action" and lowercase first letter
+    # Strategy 1: Try exact match with spec name
+    if 'spec_name' in opcode_info:
+        spec_name = opcode_info['spec_name']
+        if spec_name.startswith('Action'):
+            # Try direct transformation: "ActionAdd" -> "actionAdd"
+            func_name = 'action' + spec_name[6:]
+            if func_name in functions:
+                return functions[func_name]
 
-        if func_name in functions:
-            return functions[func_name]
+    # Strategy 2: Normalize and fuzzy match based on enum name or spec name
+    search_name = opcode_info.get('enum_name', opcode_info.get('spec_name', ''))
+    normalized_search = normalize_name_for_matching(search_name)
 
-    return None
+    # Find the best matching function by normalized name
+    best_match = None
+    for func_name, func_info in functions.items():
+        normalized_func = normalize_name_for_matching(func_name)
+        if normalized_func == normalized_search:
+            best_match = func_info
+            break
+
+    return best_match
 
 
 def build_opcode_index():

@@ -6,7 +6,7 @@
 
 **Implemented Opcodes**: 60
 
-**Total Entries**: 279
+**Total Entries**: 284
 
 ## Summary Table
 
@@ -14,7 +14,7 @@
 |-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|-------------------|
 | 0X00 |  | SWF_ACTION_END_OF_ACTIONS |  |  |  |  |  |  |
 | 0X04 | ActionNextFrame | SWF_ACTION_NEXT_FRAME | actionNextFrame | 1/1 |  |  | ✓ |  |
-| 0X05 | ActionPreviousFrame | SWF_ACTION_PREV_FRAME |  | 1/1 |  |  | ✓ |  |
+| 0X05 | ActionPreviousFrame | SWF_ACTION_PREV_FRAME | actionPrevFrame | 1/1 |  |  | ✓ |  |
 | 0X06 | ActionPlay | SWF_ACTION_PLAY | actionPlay | 1/1 |  |  | ✓ |  |
 | 0X07 | ActionStop | SWF_ACTION_STOP |  | 1/1 | 2/2 |  | ✓ |  |
 | 0X08 | ActionToggleQuality | SWF_ACTION_TOGGLE_QUALITY | actionToggleQuality | 1/1 |  |  | ✓ |  |
@@ -49,13 +49,13 @@
 | 0X2B | ActionCastOp | SWF_ACTION_CAST_OP | actionCastOp | 1/1 |  |  | ✓ |  |
 | 0X2C | ActionImplementsOp | SWF_ACTION_IMPLEMENTS_OP | actionImplementsOp | 1/1 |  |  | ✓ |  |
 | 0X30 | ActionRandomNumber | SWF_ACTION_RANDOM_NUMBER | actionRandomNumber |  |  |  | ✓ |  |
-| 0X31 | ActionMBStringLength | SWF_ACTION_MB_STRING_LENGTH |  |  |  |  | ✓ |  |
+| 0X31 | ActionMBStringLength | SWF_ACTION_MB_STRING_LENGTH | actionMbStringLength |  |  |  | ✓ |  |
 | 0X32 | ActionCharToAscii | SWF_ACTION_CHAR_TO_ASCII | actionCharToAscii |  |  |  | ✓ |  |
 | 0X33 | ActionAsciiToChar | SWF_ACTION_ASCII_TO_CHAR | actionAsciiToChar |  |  |  | ✓ |  |
 | 0X34 | ActionGetTime | SWF_ACTION_GET_TIME | actionGetTime | 1/1 |  |  | ✓ | ✓ |
 | 0X35 | ActionMBStringExtract | SWF_ACTION_MB_STRING_EXTRACT |  |  |  |  | ✓ |  |
-| 0X36 | ActionMBCharToAscii | SWF_ACTION_MB_CHAR_TO_ASCII |  |  |  |  | ✓ |  |
-| 0X37 | ActionMBAsciiToChar | SWF_ACTION_MB_ASCII_TO_CHAR |  | 1/1 |  |  | ✓ |  |
+| 0X36 | ActionMBCharToAscii | SWF_ACTION_MB_CHAR_TO_ASCII | actionMbCharToAscii |  |  |  | ✓ |  |
+| 0X37 | ActionMBAsciiToChar | SWF_ACTION_MB_ASCII_TO_CHAR | actionMbAsciiToChar | 1/1 |  |  | ✓ |  |
 | 0X3A | ActionDelete | SWF_ACTION_DELETE | actionDelete | 0/1 |  | 1 | ✓ | ✓ |
 | 0X3B | ActionDelete2 | SWF_ACTION_DELETE2 | actionDelete2 | 0/1 |  | 1 | ✓ |  |
 | 0X3C | ActionDefineLocal | SWF_ACTION_DEFINE_LOCAL | actionDefineLocal | 1/1 |  |  | ✓ |  |
@@ -66,7 +66,7 @@
 | 0X41 | ActionDefineLocal2 | SWF_ACTION_DECLARE_LOCAL |  |  |  |  | ✓ |  |
 | 0X42 | ActionInitArray | SWF_ACTION_INIT_ARRAY | actionInitArray |  |  |  | ✓ |  |
 | 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject |  | 2/4 |  | ✓ |  |
-| 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF |  | 1/1 |  |  | ✓ | ✓ |
+| 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF | actionTypeof | 1/1 |  |  | ✓ | ✓ |
 | 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath |  |  |  | ✓ |  |
 | 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate |  |  |  | ✓ |  |
 | 0X47 | ActionAdd2 | SWF_ACTION_ADD2 | actionAdd2 | 1/1 |  |  | ✓ |  |
@@ -138,7 +138,7 @@
 | 0X34 | ActionGetTime | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X3A | ActionDelete | ✓ | ✓ | 0/1 | 1 | ✓ |
 | 0X3F | ActionModulo | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X44 | ActionTypeOf | ✓ |  | 1/1 |  | ✓ |
+| 0X44 | ActionTypeOf | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X4D | ActionStackSwap | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X50 | ActionIncrement | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X51 | ActionDecrement | ✓ | ✓ | 1/1 |  | ✓ |
@@ -160,11 +160,11 @@
 | 0X23 | ActionSetProperty | ✓ | ✓ | ✓ |
 | 0X29 | ActionStringLess | ✓ | ✓ | ✓ |
 | 0X30 | ActionRandomNumber | ✓ | ✓ | ✓ |
-| 0X31 | ActionMBStringLength | ✓ |  | ✓ |
+| 0X31 | ActionMBStringLength | ✓ | ✓ | ✓ |
 | 0X32 | ActionCharToAscii | ✓ | ✓ | ✓ |
 | 0X33 | ActionAsciiToChar | ✓ | ✓ | ✓ |
 | 0X35 | ActionMBStringExtract | ✓ |  | ✓ |
-| 0X36 | ActionMBCharToAscii | ✓ |  | ✓ |
+| 0X36 | ActionMBCharToAscii | ✓ | ✓ | ✓ |
 | 0X3D | ActionStackSwap | ✓ | ✓ | ✓ |
 | 0X3E | ActionReturn | ✓ | ✓ | ✓ |
 | 0X40 | ActionNewObject | ✓ | ✓ | ✓ |
@@ -246,9 +246,15 @@ void actionNextFrame();
 **Name Variations:**
 - `ActionPreviousFrame` (spec, source: SWF Specification v19)
 - `SWF_ACTION_PREV_FRAME` (enum, source: action.hpp)
+- `actionPrevFrame` (function, source: action.h)
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
+
+**Function Declaration:**
+```c
+void actionPrevFrame(char* stack, u32* sp);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_PREV_FRAME)
@@ -1237,6 +1243,12 @@ void actionRandomNumber(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBStringLength` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_STRING_LENGTH` (enum, source: action.hpp)
+- `actionMbStringLength` (function, source: action.h)
+
+**Function Declaration:**
+```c
+void actionMbStringLength(char* stack, u32* sp, char* v_str);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_STRING_LENGTH)
@@ -1343,6 +1355,12 @@ void actionGetTime(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBCharToAscii` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_CHAR_TO_ASCII` (enum, source: action.hpp)
+- `actionMbCharToAscii` (function, source: action.h)
+
+**Function Declaration:**
+```c
+void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_CHAR_TO_ASCII)
@@ -1360,9 +1378,15 @@ void actionGetTime(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBAsciiToChar` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_ASCII_TO_CHAR` (enum, source: action.hpp)
+- `actionMbAsciiToChar` (function, source: action.h)
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/mb_ascii_to_char_swf_4`
+
+**Function Declaration:**
+```c
+void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)
@@ -1625,9 +1649,15 @@ void actionInitObject(char* stack, u32* sp);
 **Name Variations:**
 - `ActionTypeOf` (spec, source: SWF Specification v19)
 - `SWF_ACTION_TYPEOF` (enum, source: action.hpp)
+- `actionTypeof` (function, source: action.h)
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/typeof_swf_5`
+
+**Function Declaration:**
+```c
+void actionTypeof(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_TYPEOF)

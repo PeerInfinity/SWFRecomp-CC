@@ -3,7 +3,7 @@
     "generated_date": "2025-11-07",
     "total_opcodes": 100,
     "implemented_opcodes": 60,
-    "total_entries": 279
+    "total_entries": 284
   },
   "entries": [
     {
@@ -115,6 +115,25 @@
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
       "fully_implemented": false,
       "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X05",
+      "name": "actionPrevFrame",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionPrevFrame(char* stack, u32* sp);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "tests_primary": [
+        "SWFRecomp/tests/prev_frame_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/prev_frame_swf_4"
+      ],
+      "tests_secondary_passing": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
+      "fully_implemented": false,
+      "notes": "Runtime function (action.h line 75)"
     },
     {
       "hex": "0X06",
@@ -2520,6 +2539,21 @@
       "notes": "C++ enum value for opcode"
     },
     {
+      "hex": "0X31",
+      "name": "actionMbStringLength",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionMbStringLength(char* stack, u32* sp, char* v_str);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "fully_implemented": false,
+      "notes": "Runtime function (action.h line 106)"
+    },
+    {
       "hex": "0X32",
       "name": "ActionCharToAscii",
       "source": "SWF Specification v19",
@@ -2727,6 +2761,21 @@
       "notes": "C++ enum value for opcode"
     },
     {
+      "hex": "0X36",
+      "name": "actionMbCharToAscii",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "tests_primary": [],
+      "tests_secondary": [],
+      "tests_primary_passing": [],
+      "tests_secondary_passing": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
+      "fully_implemented": false,
+      "notes": "Runtime function (action.h line 132)"
+    },
+    {
       "hex": "0X37",
       "name": "ActionMBAsciiToChar",
       "source": "SWF Specification v19",
@@ -2763,6 +2812,25 @@
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
       "fully_implemented": false,
       "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X37",
+      "name": "actionMbAsciiToChar",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "tests_primary": [
+        "SWFRecomp/tests/mb_ascii_to_char_swf_4"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/mb_ascii_to_char_swf_4"
+      ],
+      "tests_secondary_passing": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
+      "fully_implemented": false,
+      "notes": "Runtime function (action.h line 134)"
     },
     {
       "hex": "0X3A",
@@ -3302,6 +3370,25 @@
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "notes": "C++ enum value for opcode"
+    },
+    {
+      "hex": "0X44",
+      "name": "actionTypeof",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionTypeof(char* stack, u32* sp, char* str_buffer);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "tests_primary": [
+        "SWFRecomp/tests/typeof_swf_5"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/typeof_swf_5"
+      ],
+      "tests_secondary_passing": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
+      "fully_implemented": true,
+      "notes": "Runtime function (action.h line 135)"
     },
     {
       "hex": "0X45",
