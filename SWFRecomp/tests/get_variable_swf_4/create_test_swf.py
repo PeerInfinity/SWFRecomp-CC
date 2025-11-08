@@ -6,6 +6,11 @@ import struct
 # 1. Get existing numeric variable: var x = 42; trace(x); -> 42
 # 2. Get existing string variable: var name = "hello"; trace(name); -> hello
 # 3. Get after assignment: var x = 10; var y = x; trace(y); -> 10
+# 4. Get undefined variable: trace(undefinedVar); -> "" (empty string in SWF 4)
+# 5. Get zero value: var zero = 0; trace(zero); -> 0
+# 6. Get boolean true (1): var isTrue = 1; trace(isTrue); -> 1
+# 7. Get boolean false (0): var isFalse = 0; trace(isFalse); -> 0
+# 8. Get negative number: var neg = -99.5; trace(neg); -> -99.5
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -77,6 +82,52 @@ actions += push_string("y")         # Push variable name
 actions += get_variable()           # Get variable value
 actions += trace()                  # Trace the result
 
+# Test 4: Get undefined variable
+# trace(undefinedVar);
+actions += push_string("undefinedVar")  # Push variable name that doesn't exist
+actions += get_variable()           # Get undefined variable (should return empty string)
+actions += trace()                  # Trace the result
+
+# Test 5: Get zero value
+# var zero = 0;
+# trace(zero);
+actions += push_string("zero")      # Push variable name FIRST
+actions += push_float(0.0)          # Push value SECOND
+actions += set_variable()           # Set variable zero = 0
+actions += push_string("zero")      # Push variable name
+actions += get_variable()           # Get variable value
+actions += trace()                  # Trace the result
+
+# Test 6: Get boolean true (represented as 1 in SWF 4)
+# var isTrue = 1;
+# trace(isTrue);
+actions += push_string("isTrue")    # Push variable name FIRST
+actions += push_float(1.0)          # Push value SECOND
+actions += set_variable()           # Set variable isTrue = 1
+actions += push_string("isTrue")    # Push variable name
+actions += get_variable()           # Get variable value
+actions += trace()                  # Trace the result
+
+# Test 7: Get boolean false (represented as 0 in SWF 4)
+# var isFalse = 0;
+# trace(isFalse);
+actions += push_string("isFalse")   # Push variable name FIRST
+actions += push_float(0.0)          # Push value SECOND
+actions += set_variable()           # Set variable isFalse = 0
+actions += push_string("isFalse")   # Push variable name
+actions += get_variable()           # Get variable value
+actions += trace()                  # Trace the result
+
+# Test 8: Get negative number
+# var neg = -99.5;
+# trace(neg);
+actions += push_string("neg")       # Push variable name FIRST
+actions += push_float(-99.5)        # Push value SECOND
+actions += set_variable()           # Set variable neg = -99.5
+actions += push_string("neg")       # Push variable name
+actions += get_variable()           # Get variable value
+actions += trace()                  # Trace the result
+
 # End of actions
 actions += bytes([0x00])  # END action
 
@@ -112,3 +163,8 @@ print("Test cases:")
 print("  1. var x = 42; trace(x) -> expected: 42")
 print("  2. var name = 'hello'; trace(name) -> expected: hello")
 print("  3. var x = 10; var y = x; trace(y) -> expected: 10")
+print("  4. trace(undefinedVar) -> expected: (empty string)")
+print("  5. var zero = 0; trace(zero) -> expected: 0")
+print("  6. var isTrue = 1; trace(isTrue) -> expected: 1")
+print("  7. var isFalse = 0; trace(isFalse) -> expected: 0")
+print("  8. var neg = -99.5; trace(neg) -> expected: -99.5")

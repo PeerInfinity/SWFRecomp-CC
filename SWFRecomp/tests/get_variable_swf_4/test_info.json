@@ -1,10 +1,9 @@
 {
   "metadata": {
     "name": "get_variable_swf_4",
-    "description": "Tests GET_VARIABLE opcode (0x1C) - gets value of a variable by name",
+    "description": "Tests GET_VARIABLE opcode (0x1C) - gets value of a variable by name with comprehensive edge case coverage including undefined variables, numeric values (positive, negative, zero), string values, and boolean representations",
     "swf_version": 4,
-    "fully_implemented": false,
-    "notes": "Implementation exists but currently not producing expected output - requires debugging"
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["GET_VARIABLE"],
@@ -12,5 +11,15 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "get_existing_numeric_variable",
+    "get_existing_string_variable",
+    "get_after_variable_assignment",
+    "get_undefined_variable_returns_empty_string",
+    "get_zero_value",
+    "get_boolean_true_as_1",
+    "get_boolean_false_as_0",
+    "get_negative_number"
+  ]
 }
