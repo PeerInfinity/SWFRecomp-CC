@@ -1547,10 +1547,10 @@
         "SWFRecomp/tests/increment_swf_4",
         "SWFRecomp/tests/instanceof_swf_6",
         "SWFRecomp/tests/jump_swf_4",
-        "SWFRecomp/tests/less2_swf_4",
         "SWFRecomp/tests/less_floats_false_swf_4",
         "SWFRecomp/tests/less_floats_swf_4",
         "SWFRecomp/tests/mb_ascii_to_char_swf_4",
+        "SWFRecomp/tests/mb_string_length_swf_5",
         "SWFRecomp/tests/modulo_swf_4",
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/next_frame_swf_4",
@@ -1581,7 +1581,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
+        "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -1637,10 +1637,10 @@
         "SWFRecomp/tests/increment_swf_4",
         "SWFRecomp/tests/instanceof_swf_6",
         "SWFRecomp/tests/jump_swf_4",
-        "SWFRecomp/tests/less2_swf_4",
         "SWFRecomp/tests/less_floats_false_swf_4",
         "SWFRecomp/tests/less_floats_swf_4",
         "SWFRecomp/tests/mb_ascii_to_char_swf_4",
+        "SWFRecomp/tests/mb_string_length_swf_5",
         "SWFRecomp/tests/modulo_swf_4",
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/next_frame_swf_4",
@@ -1671,7 +1671,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
+        "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -1727,10 +1727,10 @@
         "SWFRecomp/tests/increment_swf_4",
         "SWFRecomp/tests/instanceof_swf_6",
         "SWFRecomp/tests/jump_swf_4",
-        "SWFRecomp/tests/less2_swf_4",
         "SWFRecomp/tests/less_floats_false_swf_4",
         "SWFRecomp/tests/less_floats_swf_4",
         "SWFRecomp/tests/mb_ascii_to_char_swf_4",
+        "SWFRecomp/tests/mb_string_length_swf_5",
         "SWFRecomp/tests/modulo_swf_4",
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/next_frame_swf_4",
@@ -1761,7 +1761,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
+        "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -2122,12 +2122,16 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/mb_string_length_swf_5"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/mb_string_length_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 4986)"
     },
     {
@@ -2137,12 +2141,16 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_MB_STRING_LENGTH)",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/mb_string_length_swf_5"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/mb_string_length_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2152,12 +2160,16 @@
       "type": "function",
       "function_declaration": "void actionMbStringLength(char* stack, u32* sp, char* v_str);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/mb_string_length_swf_5"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/mb_string_length_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "Runtime function (action.h line 106)"
     },
     {
@@ -3106,16 +3118,12 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
-      "fully_implemented": true,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6414)"
     },
     {
@@ -3125,16 +3133,12 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_LESS2)",
-      "tests_primary": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
-      "fully_implemented": true,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3144,16 +3148,12 @@
       "type": "function",
       "function_declaration": "void actionLess2(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
-      "fully_implemented": true,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 86)"
     },
     {
@@ -4767,10 +4767,10 @@
         "SWFRecomp/tests/increment_swf_4",
         "SWFRecomp/tests/instanceof_swf_6",
         "SWFRecomp/tests/jump_swf_4",
-        "SWFRecomp/tests/less2_swf_4",
         "SWFRecomp/tests/less_floats_false_swf_4",
         "SWFRecomp/tests/less_floats_swf_4",
         "SWFRecomp/tests/mb_ascii_to_char_swf_4",
+        "SWFRecomp/tests/mb_string_length_swf_5",
         "SWFRecomp/tests/modulo_swf_4",
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/not_floats_nonzero_swf_4",
@@ -4800,7 +4800,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
+        "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
@@ -4856,10 +4856,10 @@
         "SWFRecomp/tests/increment_swf_4",
         "SWFRecomp/tests/instanceof_swf_6",
         "SWFRecomp/tests/jump_swf_4",
-        "SWFRecomp/tests/less2_swf_4",
         "SWFRecomp/tests/less_floats_false_swf_4",
         "SWFRecomp/tests/less_floats_swf_4",
         "SWFRecomp/tests/mb_ascii_to_char_swf_4",
+        "SWFRecomp/tests/mb_string_length_swf_5",
         "SWFRecomp/tests/modulo_swf_4",
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/not_floats_nonzero_swf_4",
@@ -4889,7 +4889,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/less2_swf_4"
+        "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
