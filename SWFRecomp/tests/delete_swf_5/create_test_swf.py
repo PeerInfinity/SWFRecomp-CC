@@ -90,15 +90,17 @@ action_push_obj_name += string_obj
 actions += action_push_obj_name
 
 action_set_variable = bytes([0x1D])  # SET_VARIABLE (0x1D)
+action_get_variable = bytes([0x1C])  # GET_VARIABLE (0x1C)
 actions += action_set_variable
 
 # Now delete property "b" from "obj"
 # DELETE opcode (0x3A) expects:
 # - Top of stack: property name (string)
-# - Second: object name (string - variable name)
+# - Second: object reference (not object name!)
 
-# Push object name "obj"
-actions += action_push_obj_name  # Reuse the same push
+# Get the object reference first
+actions += action_push_obj_name  # Push "obj" variable name
+actions += action_get_variable   # GET_VARIABLE to get the actual object reference
 
 # Push property name "b"
 actions += action_push_b  # Reuse the same push
@@ -114,8 +116,7 @@ actions += action_trace
 # Now try to access obj.b (should be undefined)
 # GET_VARIABLE to get the object
 actions += action_push_obj_name  # Push "obj"
-action_get_variable = bytes([0x1C])  # GET_VARIABLE (0x1C)
-actions += action_get_variable
+actions += action_get_variable   # GET_VARIABLE (0x1C)
 
 # Push property name "b"
 actions += action_push_b
@@ -157,7 +158,9 @@ actions += action_push_obj2_name
 actions += action_set_variable
 
 # Delete non-existent property "xyz"
-actions += action_push_obj2_name  # Push "obj2"
+# Get the object reference first
+actions += action_push_obj2_name  # Push "obj2" variable name
+actions += action_get_variable     # GET_VARIABLE to get the object reference
 
 string_xyz = b'xyz\x00'
 action_push_xyz = struct.pack('<BHB', 0x96, len(string_xyz) + 1, 0)
