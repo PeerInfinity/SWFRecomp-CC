@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "jump_swf_4",
+    "description": "Tests JUMP opcode (0x99) - unconditional forward jump to skip code",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["JUMP"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
