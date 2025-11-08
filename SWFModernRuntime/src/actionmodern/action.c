@@ -3862,6 +3862,26 @@ void actionCloneSprite(char* stack, u32* sp)
 	#endif
 }
 
+/**
+ * ActionRemoveSprite (0x25) - Removes a clone sprite from the display list
+ *
+ * Stack: [ target ] -> [ ]
+ *
+ * Pops a target path (string) from the stack and removes the corresponding
+ * clone movie clip from the display list. Only sprites created with
+ * ActionCloneSprite can be removed (not sprites from the original SWF).
+ *
+ * Edge cases handled:
+ * - Non-existent sprite: No error, silently ignored
+ * - Empty string: No-op
+ * - Null target: Handled gracefully (no crash)
+ *
+ * NO_GRAPHICS mode: This is a no-op as there's no display list
+ * Graphics mode: Would remove sprite from display list and release resources
+ *
+ * SWF version: 4+
+ * Opcode: 0x25
+ */
 void actionRemoveSprite(char* stack, u32* sp)
 {
 	// Pop target sprite name from stack
@@ -3869,16 +3889,34 @@ void actionRemoveSprite(char* stack, u32* sp)
 	popVar(stack, sp, &target);
 	const char* target_name = (const char*) target.data.numeric_value;
 
+	// Handle null/empty gracefully
+	if (target_name == NULL || target_name[0] == '\0') {
+		#ifdef DEBUG
+		printf("[RemoveSprite] Empty or null target, skipping\n");
+		#endif
+		return;
+	}
+
 	#ifndef NO_GRAPHICS
-	// Full implementation: Remove MovieClip from display list
-	// TODO: Implement actual sprite removal when display list is implemented
-	// This would involve:
-	// 1. Find MovieClip in display list
-	// 2. Remove from display list
-	// 3. Release resources (with reference counting)
-	removeMovieClip(target_name);
+	// TODO: Full graphics implementation requires:
+	// 1. Display list management system
+	// 2. MovieClip reference counting
+	// 3. Proper resource cleanup
+	//
+	// When implemented, this should:
+	// - Look up the target sprite in the display list
+	// - Verify it's a clone (created by ActionCloneSprite)
+	// - Remove it from the display list
+	// - Decrement reference count and free if needed
+	// - Update any parent/child relationships
+	//
+	// For now, log in debug mode
+	#ifdef DEBUG
+	printf("[RemoveSprite] Graphics mode stub: would remove %s\n", target_name);
+	#endif
 	#else
-	// NO_GRAPHICS mode: just log the operation
+	// NO_GRAPHICS mode: This is a complete no-op
+	// There's no display list to remove from
 	#ifdef DEBUG
 	printf("[RemoveSprite] %s\n", target_name);
 	#endif
