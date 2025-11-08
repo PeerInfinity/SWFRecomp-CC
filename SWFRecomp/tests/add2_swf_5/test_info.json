@@ -2,7 +2,8 @@
   "metadata": {
     "name": "add2_swf_5",
     "description": "Tests ADD2 (Type-Aware Addition) opcode with numeric addition and string concatenation",
-    "swf_version": 5
+    "swf_version": 5,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["ADD2"],
