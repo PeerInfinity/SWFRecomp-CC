@@ -86,7 +86,7 @@ action_init_object = bytes([0x43])
 actions += action_init_object
 
 # Duplicate object reference for later use
-action_duplicate = bytes([0x3D])
+action_duplicate = bytes([0x4C])
 actions += action_duplicate
 
 # Store in variable "obj" (need to dup again)
@@ -104,8 +104,8 @@ actions += action_set_variable
 # Push property name "y"
 actions += action_push_y
 
-# DELETE2 (0x5B) - pops property name and object, pushes result (1.0 or 0.0)
-action_delete2 = bytes([0x5B])
+# DELETE2 (0x3B) - pops property name, deletes from scope, pushes result (1.0 or 0.0)
+action_delete2 = bytes([0x3B])
 actions += action_delete2
 
 # Trace result (should be 1)

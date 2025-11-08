@@ -1,10 +1,10 @@
-# DELETE2 Opcode Test (0x5B)
+# DELETE2 Opcode Test (0x3B)
 
 ## Description
-Tests the DELETE2 opcode which deletes a property from an object using a direct object reference.
+Tests the DELETE2 opcode which deletes a named property by searching the scope chain.
 
 ## Opcode Details
-- **Hex**: 0x5B
+- **Hex**: 0x3B
 - **Name**: DELETE2
 - **SWF Version**: 5+
 - **Operation**: Pops property name and object reference from stack, deletes the property, pushes success boolean
