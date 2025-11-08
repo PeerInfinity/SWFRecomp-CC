@@ -905,7 +905,7 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 	POP();
 
 #ifdef DEBUG
-	printf("[DEBUG] actionEnumerate: looking up variable '%.*s' (len=%u, id=%u)\n", 
+	printf("[DEBUG] actionEnumerate: looking up variable '%.*s' (len=%u, id=%u)\n",
 	       var_name_len, var_name, var_name_len, string_id);
 #endif
 

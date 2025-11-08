@@ -29,6 +29,13 @@ actions = b''
 # Create object with three properties {a: 1, b: 2, c: 3}
 # Stack order for InitObject: [value1, name1, value2, name2, value3, name3, count]
 
+# First, push the variable name for SetVariable (this will stay at bottom of stack)
+string_obj = b'obj\x00'
+action_push_obj_name = struct.pack('<BHB', 0x96, len(string_obj) + 1, 0)  # PUSH string
+action_push_obj_name += string_obj
+actions += action_push_obj_name
+
+# Now push all the properties
 # Push property "a": value
 action_push_1 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
 action_push_1 += struct.pack('<f', 1.0)
@@ -67,16 +74,15 @@ action_push_count = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
 action_push_count += struct.pack('<f', 3.0)
 actions += action_push_count
 
-# InitObject - creates object with properties
+# InitObject - pops all properties and count, creates object, pushes it to stack
+# Stack before: ["obj", 1.0, "a", 2.0, "b", 3.0, "c", 3.0]
+# Stack after:  ["obj", object]
 action_init_object = bytes([0x43])  # INIT_OBJECT (0x43)
 actions += action_init_object
 
-# Store object in variable "obj"
-string_obj = b'obj\x00'
-action_push_obj_name = struct.pack('<BHB', 0x96, len(string_obj) + 1, 0)  # PUSH string
-action_push_obj_name += string_obj
-actions += action_push_obj_name
-
+# SetVariable - pops value (object) from top, then name ("obj") from second
+# Stack before: ["obj", object]
+# This matches the spec: [name, value] with value on top
 action_set_variable = bytes([0x1D])  # SET_VARIABLE (0x1D)
 actions += action_set_variable
 
