@@ -43,7 +43,11 @@ define_func2_data = (function_name + num_params + register_count + flags +
 define_func2 = struct.pack('<BH', 0x8E, len(define_func2_data)) + define_func2_data
 
 # Store function in variable "obj"
-# Push string "obj"
+# IMPORTANT: SetVariable pops VALUE first, then NAME
+# So we need: Push NAME first, then DefineFunction2 (pushes VALUE)
+# But DefineFunction2 is already created above, so we need to reorder
+
+# Push string "obj" (this will be the NAME)
 var_name = b'obj\x00'
 action_push_var_name = struct.pack('<BHB', 0x96, len(var_name) + 1, 0)
 action_push_var_name += var_name
@@ -77,7 +81,9 @@ action_trace = bytes([0x26])
 action_end = bytes([0x00])
 
 # Combine all actions
-actions = (define_func2 + action_push_var_name + action_set_variable +
+# IMPORTANT: For SetVariable, we need NAME then VALUE on stack
+# So: Push "obj" (name), DefineFunction2 (pushes value), SetVariable
+actions = (action_push_var_name + define_func2 + action_set_variable +
            action_push_zero + action_push_obj_name + action_get_variable +
            action_push_empty + action_call_method + action_trace + action_end)
 
