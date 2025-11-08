@@ -2,7 +2,7 @@
   "metadata": {
     "generated_date": "2025-11-08",
     "total_opcodes": 100,
-    "implemented_opcodes": 60,
+    "implemented_opcodes": 61,
     "total_entries": 284
   },
   "entries": [
@@ -1572,6 +1572,7 @@
         "SWFRecomp/tests/string_length_swf_4",
         "SWFRecomp/tests/subtract_swf_4",
         "SWFRecomp/tests/throw_swf_7",
+        "SWFRecomp/tests/to_string_swf_4",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
@@ -1580,7 +1581,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
+        "SWFRecomp/tests/to_string_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -1661,6 +1662,7 @@
         "SWFRecomp/tests/string_length_swf_4",
         "SWFRecomp/tests/subtract_swf_4",
         "SWFRecomp/tests/throw_swf_7",
+        "SWFRecomp/tests/to_string_swf_4",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
@@ -1669,7 +1671,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
+        "SWFRecomp/tests/to_string_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -1750,6 +1752,7 @@
         "SWFRecomp/tests/string_length_swf_4",
         "SWFRecomp/tests/subtract_swf_4",
         "SWFRecomp/tests/throw_swf_7",
+        "SWFRecomp/tests/to_string_swf_4",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
@@ -1758,7 +1761,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
+        "SWFRecomp/tests/to_string_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -2588,7 +2591,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
       "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5796)"
     },
@@ -2603,7 +2606,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
       "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
@@ -2618,7 +2621,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
       "fully_implemented": false,
       "notes": "Runtime function (action.h line 94)"
     },
@@ -2917,7 +2920,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 6380)"
     },
@@ -2934,7 +2937,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
@@ -2951,7 +2954,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "notes": "Runtime function (action.h line 135)"
     },
@@ -3107,7 +3110,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6414)"
     },
@@ -3122,7 +3125,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
@@ -3137,7 +3140,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": false,
       "notes": "Runtime function (action.h line 86)"
     },
@@ -3244,12 +3247,16 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/to_string_swf_4"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/to_string_swf_4"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 6342)"
     },
     {
@@ -3259,12 +3266,16 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_TO_STRING)",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/to_string_swf_4"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/to_string_swf_4"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3274,12 +3285,16 @@
       "type": "function",
       "function_declaration": "void actionToString(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/to_string_swf_4"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/to_string_swf_4"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "notes": "Runtime function (action.h line 93)"
     },
     {
@@ -4775,6 +4790,7 @@
         "SWFRecomp/tests/string_length_swf_4",
         "SWFRecomp/tests/subtract_swf_4",
         "SWFRecomp/tests/throw_swf_7",
+        "SWFRecomp/tests/to_string_swf_4",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/trace_swf_4",
         "SWFRecomp/tests/try_swf_7",
@@ -4784,7 +4800,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
+        "SWFRecomp/tests/to_string_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
@@ -4863,6 +4879,7 @@
         "SWFRecomp/tests/string_length_swf_4",
         "SWFRecomp/tests/subtract_swf_4",
         "SWFRecomp/tests/throw_swf_7",
+        "SWFRecomp/tests/to_string_swf_4",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/trace_swf_4",
         "SWFRecomp/tests/try_swf_7",
@@ -4872,7 +4889,7 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
+        "SWFRecomp/tests/to_string_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
@@ -5089,9 +5106,7 @@
         "SWFRecomp/tests/gotoframe2_swf_5"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
@@ -5108,9 +5123,7 @@
         "SWFRecomp/tests/gotoframe2_swf_5"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
@@ -5127,9 +5140,7 @@
         "SWFRecomp/tests/gotoframe2_swf_5"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/gotoframe2_swf_5"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
