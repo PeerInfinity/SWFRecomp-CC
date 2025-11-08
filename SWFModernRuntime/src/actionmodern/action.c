@@ -2145,6 +2145,73 @@ void actionInstanceOf(char* stack, u32* sp)
 	#endif
 }
 
+void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
+{
+	// Pop object reference from stack
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// Push undefined as terminator
+	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+
+	// Handle different types
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		// Object enumeration - push property names in reverse order
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+
+		if (obj != NULL && obj->num_used > 0)
+		{
+			// Enumerate properties in reverse order (last to first)
+			// This way when they're popped, they'll come out in the correct order
+			for (int i = obj->num_used - 1; i >= 0; i--)
+			{
+				const char* prop_name = obj->properties[i].name;
+				u32 prop_name_len = obj->properties[i].name_length;
+
+				// Push property name as string
+				PUSH_STR(prop_name, prop_name_len);
+			}
+		}
+
+		#ifdef DEBUG
+		printf("// Enumerate2: enumerated %u properties from object\n",
+			obj ? obj->num_used : 0);
+		#endif
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Array enumeration - push indices as strings
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+
+		if (arr != NULL && arr->length > 0)
+		{
+			// Enumerate indices in reverse order
+			for (int i = arr->length - 1; i >= 0; i--)
+			{
+				// Convert index to string
+				snprintf(str_buffer, 17, "%d", i);
+				u32 len = strlen(str_buffer);
+
+				// Push index as string
+				PUSH_STR(str_buffer, len);
+			}
+		}
+
+		#ifdef DEBUG
+		printf("// Enumerate2: enumerated %u indices from array\n",
+			arr ? arr->length : 0);
+		#endif
+	}
+	else
+	{
+		// Non-object/non-array: just the undefined terminator
+		#ifdef DEBUG
+		printf("// Enumerate2: non-enumerable type, only undefined pushed\n");
+		#endif
+	}
+}
+
 void actionBitAnd(char* stack, u32* sp)
 {
 
