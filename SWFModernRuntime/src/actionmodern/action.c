@@ -4442,7 +4442,25 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 					registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
 				}
 
+				// Create local scope object for function-local variables
+				// Start with capacity for a few local variables
+				ASObject* local_scope = allocObject(8);
+
+				// Push local scope onto scope chain
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_chain[scope_depth++] = local_scope;
+				}
+
 				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
+
+				// Pop local scope from scope chain
+				if (scope_depth > 0) {
+					scope_depth--;
+				}
+
+				// Clean up local scope object
+				// Release decrements refcount and frees if refcount reaches 0
+				releaseObject(local_scope);
 
 				if (registers != NULL) free(registers);
 				if (args != NULL) free(args);

@@ -1,15 +1,28 @@
 {
   "metadata": {
     "name": "declare_local_swf_5",
-    "description": "Tests DECLARE_LOCAL opcode (0x41) - declares local variables in function scope",
+    "description": "Tests DECLARE_LOCAL opcode (0x41 / ActionDefineLocal2) - declares local variables in function scope without setting a value",
     "swf_version": 5,
-    "fully_implemented": false
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["DECLARE_LOCAL"],
-    "supporting": ["PUSH", "TRACE"]
+    "supporting": ["PUSH", "TRACE", "DEFINE_FUNCTION2", "CALL_FUNCTION", "GET_VARIABLE", "TYPE_OF"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "implementation_notes": [
+    "ActionDefineLocal2 (0x41) correctly declares local variables initialized to undefined",
+    "DefineFunction2 now creates a local scope object and pushes it onto scope_chain",
+    "Local variables properly shadow global variables of the same name",
+    "GET_VARIABLE correctly retrieves local variables from the scope chain",
+    "The basic functionality is fully implemented and working"
+  ],
+  "test_coverage": [
+    "Basic DECLARE_LOCAL outside function (warning expected)",
+    "DECLARE_LOCAL inside DefineFunction2 creates local variable",
+    "typeof(local_var) correctly returns 'undefined' after declaration",
+    "Local scope is properly created and managed during function execution"
+  ]
 }
