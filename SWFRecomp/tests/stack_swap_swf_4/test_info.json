@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "stack_swap_swf_4",
+    "description": "Tests STACK_SWAP opcode (0x4D) - swaps the top two values on the stack",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STACK_SWAP"],
+    "supporting": ["PUSH", "DIVIDE", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
