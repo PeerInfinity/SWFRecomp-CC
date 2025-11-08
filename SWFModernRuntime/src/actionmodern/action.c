@@ -1830,6 +1830,76 @@ void actionTypeof(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, len);
 }
 
+void actionDelete2(char* stack, u32* sp, char* str_buffer)
+{
+	// Delete2 deletes a named property/variable
+	// Pops the name from the stack, deletes it, pushes success boolean
+
+	// Read variable name from stack
+	u32 var_name_sp = *sp;
+	u8 name_type = stack[var_name_sp];
+	char* var_name = NULL;
+	u32 var_name_len = 0;
+
+	// Get the variable name string
+	if (name_type == ACTION_STACK_VALUE_STRING)
+	{
+		var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
+		var_name_len = VAL(u32, &stack[var_name_sp + 8]);
+	}
+	else if (name_type == ACTION_STACK_VALUE_STR_LIST)
+	{
+		// Materialize string list
+		var_name = materializeStringList(stack, var_name_sp);
+		var_name_len = strlen(var_name);
+	}
+
+	// Pop the variable name
+	POP();
+
+	// Default: assume deletion succeeds (Flash behavior)
+	bool success = true;
+
+	// Try to delete from scope chain (innermost to outermost)
+	for (int i = scope_depth - 1; i >= 0; i--)
+	{
+		if (scope_chain[i] != NULL)
+		{
+			// Check if property exists in this scope object
+			ActionVar* prop = getProperty(scope_chain[i], var_name, var_name_len);
+			if (prop != NULL)
+			{
+				// Found in scope chain - delete it
+				success = deleteProperty(scope_chain[i], var_name, var_name_len);
+
+				// Push result and return
+				float result = success ? 1.0f : 0.0f;
+				PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+				return;
+			}
+		}
+	}
+
+	// Not found in scope chain - check global variables
+	// Note: In Flash, you cannot delete variables declared with 'var', so we return false
+	// However, if the variable doesn't exist at all, we return true (Flash behavior)
+	ActionVar* global_var = getVariable(var_name, var_name_len);
+	if (global_var != NULL)
+	{
+		// Variable exists but is a 'var' declaration - cannot delete
+		success = false;
+	}
+	else
+	{
+		// Variable doesn't exist - Flash returns true
+		success = true;
+	}
+
+	// Push result
+	float result = success ? 1.0f : 0.0f;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
 void actionCastOp(char* stack, u32* sp)
 {
 	// CastOp implementation (ActionScript 2.0 cast operator)

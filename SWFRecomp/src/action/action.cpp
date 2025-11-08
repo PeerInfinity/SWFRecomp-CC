@@ -513,6 +513,17 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_DELETE2:
+				{
+					declareEmptyString(context, 256);  // Buffer for variable name operations
+
+					out_script << "\t" << "// Delete2" << endl
+							   << "\t" << "actionDelete2(stack, sp, "
+							   << "str_" << to_string(next_str_i - 1) << ");" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TYPEOF:
 				{
 					declareEmptyString(context, 17);

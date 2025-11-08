@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "name": "delete2_swf_5",
+    "description": "Tests DELETE2 opcode (0x3B) - deletes named properties from scope",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["DELETE2"],
+    "supporting": ["PUSH", "TRACE", "INIT_OBJECT", "DUPLICATE", "SET_VARIABLE", "GET_VARIABLE", "GET_MEMBER"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": "DELETE2 is implemented but test needs updating. Current test was designed for DELETE (0x3A) behavior (object + property on stack). DELETE2 (0x3B) only pops property name and searches scope chain. Test should be updated to use property paths like 'obj.y' or WITH scopes."
+}
