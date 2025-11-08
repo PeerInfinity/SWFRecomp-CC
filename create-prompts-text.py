@@ -63,27 +63,36 @@ def get_failing_opcodes():
 
 
 def get_incomplete_opcodes():
-    """Get set of documentation prompts for opcodes that are not fully implemented."""
+    """Get mapping of documentation prompts to incomplete opcode info."""
     opcode_data = load_opcode_index()
-    incomplete_prompts = set()
+    incomplete_info = {}  # Map prompt to dict with opcode info and missing features
 
     for entry in opcode_data['entries']:
         if entry.get('documentation_prompt'):
             # Check if fully_implemented is False or missing
             if not entry.get('fully_implemented', False):
-                incomplete_prompts.add(entry['documentation_prompt'])
+                prompt = entry['documentation_prompt']
 
-    return incomplete_prompts
+                # Store info for this prompt (take first entry with this prompt)
+                if prompt not in incomplete_info:
+                    incomplete_info[prompt] = {
+                        'opcode_name': entry.get('name', 'Unknown'),
+                        'hex': entry.get('hex', 'Unknown'),
+                        'fully_implemented_no_graphics': entry.get('fully_implemented_no_graphics', False),
+                        'missing_features': entry.get('missing_features', {})
+                    }
+
+    return incomplete_info
 
 
-def create_prompts_text(md_files, output_file, failing_info=None, incomplete_mode=False):
+def create_prompts_text(md_files, output_file, failing_info=None, incomplete_info=None):
     """Create a text file with all prompts.
 
     Args:
         md_files: List of markdown file paths
         output_file: Path to output file
         failing_info: Optional dict mapping prompts to failing test info
-        incomplete_mode: If True, use the complete-implementation-guide.md
+        incomplete_info: Optional dict mapping prompts to incomplete opcode info
     """
     script_dir = Path(__file__).parent
 
@@ -92,7 +101,7 @@ def create_prompts_text(md_files, output_file, failing_info=None, incomplete_mod
             # Choose guide based on mode
             if failing_info is not None:
                 guide = "SWFRecompDocs/failing-test-fix-guide.md"
-            elif incomplete_mode:
+            elif incomplete_info is not None:
                 guide = "SWFRecompDocs/complete-implementation-guide.md"
             else:
                 guide = "SWFRecompDocs/parallel-opcode-implementation-guide.md"
@@ -106,9 +115,29 @@ def create_prompts_text(md_files, output_file, failing_info=None, incomplete_mod
                 test_list = '\n'.join(f"  - {test}" for test in sorted(info['failing_tests']))
                 prompt += f"\n\nNOTE: The following test(s) for opcode {info['opcode_name']} ({info['hex']}) are currently FAILING:\n{test_list}\n\nPlease debug and fix these failing tests."
 
-            # Add incomplete mode note
-            if incomplete_mode:
-                prompt += f"\n\nNOTE: This opcode is marked as NOT fully implemented. Please complete the implementation to meet all criteria for the fully_implemented tag. Review the specification, implement missing features, add comprehensive tests, and update test_info.json when complete."
+            # Add incomplete opcode info if available
+            if incomplete_info and md_file in incomplete_info:
+                info = incomplete_info[md_file]
+                prompt += f"\n\nNOTE: Opcode {info['opcode_name']} ({info['hex']}) is marked as NOT fully implemented."
+
+                # Add NO_GRAPHICS status if applicable
+                if info['fully_implemented_no_graphics']:
+                    prompt += f"\n- Status: Fully implemented in NO_GRAPHICS mode, but requires graphics support for full implementation."
+
+                # Add missing features if documented
+                missing_features = info.get('missing_features', {})
+                if missing_features:
+                    prompt += f"\n\nDocumented missing features:"
+                    for test_name, features in missing_features.items():
+                        if features:
+                            prompt += f"\n  From test '{test_name}':"
+                            for feature in features:
+                                prompt += f"\n    - {feature}"
+                    prompt += f"\n\nPlease address these missing features to complete the implementation."
+                else:
+                    prompt += f"\n\nNo specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field."
+
+                prompt += f"\n\nWhen the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece)."
 
             # Write the prompt
             f.write(prompt)
@@ -179,16 +208,15 @@ def main():
 
     # Filter for failing opcodes if requested
     failing_info = None
-    incomplete_mode = False
+    incomplete_info = None
 
     if args.fail:
         failing_info = get_failing_opcodes()
         md_files = [f for f in md_files if f in failing_info]
         print(f"Filtering for opcodes with failing tests: {len(md_files)} prompts")
     elif args.incomplete:
-        incomplete_prompts = get_incomplete_opcodes()
-        md_files = [f for f in md_files if f in incomplete_prompts]
-        incomplete_mode = True
+        incomplete_info = get_incomplete_opcodes()
+        md_files = [f for f in md_files if f in incomplete_info]
         print(f"Filtering for opcodes not fully implemented: {len(md_files)} prompts")
 
     # Create the output file with appropriate name based on parameters
@@ -200,7 +228,7 @@ def main():
         output_filename = 'prompts.txt'
 
     output_file = Path(__file__).parent / output_filename
-    create_prompts_text(md_files, output_file, failing_info, incomplete_mode)
+    create_prompts_text(md_files, output_file, failing_info, incomplete_info)
 
 
 if __name__ == '__main__':
