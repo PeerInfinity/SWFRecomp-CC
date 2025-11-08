@@ -83,7 +83,7 @@ void actionToggleQuality(char* stack, u32* sp)
 
 	#ifdef DEBUG
 	printf("[ActionToggleQuality] Toggled render quality\n");
-	#endif
+#endif
 }
 
 // ==================================================================
@@ -256,7 +256,6 @@ void pushVar(char* stack, u32* sp, ActionVar* var)
 		case ACTION_STACK_VALUE_F64:
 		case ACTION_STACK_VALUE_UNDEFINED:
 		case ACTION_STACK_VALUE_OBJECT:
-		case ACTION_STACK_VALUE_FUNCTION:
 		{
 			PUSH(var->type, var->data.numeric_value);
 
@@ -270,7 +269,7 @@ void pushVar(char* stack, u32* sp, ActionVar* var)
 				var->data.string_data.heap_ptr :
 				(char*) var->data.numeric_value;
 
-			PUSH_STR_ID(str_ptr, var->str_size, var->string_id);
+					PUSH_STR(str_ptr, var->str_size);
 
 			break;
 		}
@@ -281,7 +280,6 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 {
 	var->type = STACK_TOP_TYPE;
 	var->str_size = STACK_TOP_N;
-	var->string_id = VAL(u32, &stack[*sp + 12]);
 
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STR_LIST)
 	{
@@ -904,11 +902,6 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
 	POP();
 
-#ifdef DEBUG
-	printf("[DEBUG] actionEnumerate: looking up variable '%.*s' (len=%u, id=%u)\n",
-	       var_name_len, var_name, var_name_len, string_id);
-#endif
-
 	// Step 2: Look up the variable
 	ActionVar* var = NULL;
 	if (string_id > 0)
@@ -925,12 +918,6 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 	// Step 3: Check if variable exists and is an object
 	if (!var || var->type != ACTION_STACK_VALUE_OBJECT)
 	{
-#ifdef DEBUG
-		if (!var)
-			printf("[DEBUG] actionEnumerate: variable not found\n");
-		else
-			printf("[DEBUG] actionEnumerate: variable is not an object (type=%d)\n", var->type);
-#endif
 		// Variable not found or not an object - push null terminator only
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
@@ -940,17 +927,10 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 	ASObject* obj = (ASObject*) VAL(u64, &var->data.numeric_value);
 	if (obj == NULL)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionEnumerate: object pointer is NULL\n");
-#endif
 		// Null object - push null terminator only
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}
-
-#ifdef DEBUG
-	printf("[DEBUG] actionEnumerate: enumerating %u properties\n", obj->num_used);
-#endif
 
 	// Step 5: Push null terminator first
 	// This marks the end of the enumeration for for..in loops
@@ -963,9 +943,6 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 		const char* prop_name = obj->properties[i].name;
 		u32 prop_name_len = obj->properties[i].name_length;
 		
-#ifdef DEBUG
-		printf("[DEBUG] actionEnumerate: pushing property '%.*s'\n", prop_name_len, prop_name);
-#endif
 		
 		PUSH_STR((char*)prop_name, prop_name_len);
 	}
@@ -1619,7 +1596,7 @@ void actionEndDrag(char* stack, u32* sp)
 	// NO_GRAPHICS mode: just log
 	#ifdef DEBUG
 	printf("[EndDrag]\n");
-	#endif
+#endif
 	#endif
 
 	// No stack operations - END_DRAG has no parameters
@@ -1665,6 +1642,7 @@ void actionGetVariable(char* stack, u32* sp)
 	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
 	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
 
+
 	// Pop variable name
 	POP();
 
@@ -1685,19 +1663,18 @@ void actionGetVariable(char* stack, u32* sp)
 	}
 
 	// Not found in scope chain - check global variables
-	ActionVar* var;
-	if (string_id != 0)
-	{
-		// Constant string - use array (O(1))
-		var = getVariableById(string_id);
-	}
-	else
-	{
-		// Dynamic string - use hashmap (O(n))
-		var = getVariable(var_name, var_name_len);
-	}
+	// Try hashmap first (handles catch variables and dynamic vars)
+	ActionVar* var = getVariable(var_name, var_name_len);
 
-	if (!var)
+	// Check if variable has actual data, if not and we have an ID, try array
+	if (var != NULL && var->str_size == 0 && var->data.string_data.heap_ptr == NULL && string_id != 0)
+	{
+		ActionVar* array_var = getVariableById(string_id);
+		if (array_var != NULL && (array_var->str_size != 0 || array_var->data.string_data.heap_ptr != NULL))
+		{
+			var = array_var;
+		}
+	}	if (!var)
 	{
 		// Variable not found - push empty string
 		PUSH_STR("", 0);
@@ -2176,12 +2153,24 @@ void actionDelete2(char* stack, u32* sp, char* str_buffer)
 	// Delete2 deletes a named property/variable
 	// Pops the name from the stack, deletes it, pushes success boolean
 
-	// Convert top of stack to string (in case it's a number or other type)
-	convertString(stack, sp, str_buffer);
-
 	// Read variable name from stack
-	const char* var_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
-	u32 var_name_len = STACK_TOP_N;
+	u32 var_name_sp = *sp;
+	u8 name_type = stack[var_name_sp];
+	char* var_name = NULL;
+	u32 var_name_len = 0;
+
+	// Get the variable name string
+	if (name_type == ACTION_STACK_VALUE_STRING)
+	{
+		var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
+		var_name_len = VAL(u32, &stack[var_name_sp + 8]);
+	}
+	else if (name_type == ACTION_STACK_VALUE_STR_LIST)
+	{
+		// Materialize string list
+		var_name = materializeStringList(stack, var_name_sp);
+		var_name_len = strlen(var_name);
+	}
 
 	// Pop the variable name
 	POP();
@@ -2372,7 +2361,7 @@ void actionInstanceOf(char* stack, u32* sp)
 
 	#ifdef DEBUG
 	printf("// InstanceOf check (simplified - always returns false)\n");
-	#endif
+#endif
 }
 
 void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
@@ -2407,7 +2396,7 @@ void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
 		#ifdef DEBUG
 		printf("// Enumerate2: enumerated %u properties from object\n",
 			obj ? obj->num_used : 0);
-		#endif
+#endif
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
 	{
@@ -2431,14 +2420,14 @@ void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
 		#ifdef DEBUG
 		printf("// Enumerate2: enumerated %u indices from array\n",
 			arr ? arr->length : 0);
-		#endif
+#endif
 	}
 	else
 	{
 		// Non-object/non-array: just the undefined terminator
 		#ifdef DEBUG
 		printf("// Enumerate2: non-enumerable type, only undefined pushed\n");
-		#endif
+#endif
 	}
 }
 
@@ -2804,20 +2793,12 @@ void actionExtends(char* stack, u32* sp)
 	if (superclass.type != ACTION_STACK_VALUE_OBJECT &&
 	    superclass.type != ACTION_STACK_VALUE_FUNCTION)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionExtends: superclass is not an object/function (type=%d)\n",
-		       superclass.type);
-#endif
 		return;
 	}
 
 	if (subclass.type != ACTION_STACK_VALUE_OBJECT &&
 	    subclass.type != ACTION_STACK_VALUE_FUNCTION)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionExtends: subclass is not an object/function (type=%d)\n",
-		       subclass.type);
-#endif
 		return;
 	}
 
@@ -2827,9 +2808,6 @@ void actionExtends(char* stack, u32* sp)
 
 	if (super_func == NULL || sub_func == NULL)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionExtends: NULL constructor object\n");
-#endif
 		return;
 	}
 
@@ -2837,9 +2815,6 @@ void actionExtends(char* stack, u32* sp)
 	ASObject* new_proto = allocObject(0);
 	if (new_proto == NULL)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionExtends: Failed to allocate new prototype\n");
-#endif
 		return;
 	}
 
@@ -2867,9 +2842,6 @@ void actionExtends(char* stack, u32* sp)
 	// (setProperty retained it when setting as prototype)
 	releaseObject(new_proto);
 
-#ifdef DEBUG
-	printf("[DEBUG] actionExtends: Prototype chain established\n");
-#endif
 
 	// Note: No values pushed back on stack
 }
@@ -3021,10 +2993,6 @@ void actionImplementsOp(char* stack, u32* sp)
 	// This transfers ownership of the interfaces array
 	setInterfaceList(constructor, interfaces, interface_count);
 
-#ifdef DEBUG
-	printf("[DEBUG] actionImplementsOp: constructor=%p, interface_count=%u\n",
-		(void*)constructor, interface_count);
-#endif
 
 	// Note: No values pushed back on stack (ImplementsOp has no return value)
 }
@@ -3238,9 +3206,6 @@ void actionInitObject(char* stack, u32* sp)
 	popVar(stack, sp, &count_var);
 	u32 num_props = (u32) VAL(float, &count_var.data.numeric_value);
 
-#ifdef DEBUG
-	printf("[DEBUG] actionInitObject: creating object with %u properties\n", num_props);
-#endif
 
 	// Step 2: Allocate object with the specified number of properties
 	ASObject* obj = allocObject(num_props);
@@ -3283,9 +3248,6 @@ void actionInitObject(char* stack, u32* sp)
 			continue;
 		}
 
-#ifdef DEBUG
-		printf("[DEBUG] actionInitObject: setting property '%.*s'\n", name_length, name);
-#endif
 
 		// Store property using the object API
 		// This handles refcount management if value is an object
@@ -3296,9 +3258,6 @@ void actionInitObject(char* stack, u32* sp)
 	// The object has refcount = 1 from allocation
 	PUSH(ACTION_STACK_VALUE_OBJECT, (u64) obj);
 
-#ifdef DEBUG
-	printf("[DEBUG] actionInitObject: pushed object %p to stack\n", (void*)obj);
-#endif
 }
 
 // Helper function to push undefined value
@@ -3309,53 +3268,92 @@ static void pushUndefined(char* stack, u32* sp)
 
 void actionDelete(char* stack, u32* sp)
 {
-	// ActionDelete (0x3A) - SWF5+
 	// Stack layout (from top to bottom):
 	// 1. property_name (string) - name of property to delete
-	// 2. object (reference) - the actual object reference (not object name!)
-	//
-	// Per SWF spec: "Pops the name of the property to delete off the stack.
-	// Pops the object to delete the property from."
+	// 2. object_name (string) - name of variable containing the object
 
-	// 1. Pop property name (top of stack)
-	char str_buffer[17];
-	convertString(stack, sp, str_buffer);
-	const char* prop_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
-	u32 prop_name_len = STACK_TOP_N;
-	POP();
+	// Pop property name
+	ActionVar prop_name_var;
+	popVar(stack, sp, &prop_name_var);
 
-	// 2. Pop object (second on stack)
-	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	const char* prop_name = NULL;
+	u32 prop_name_len = 0;
 
-	// 3. Handle different object types
-	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	if (prop_name_var.type == ACTION_STACK_VALUE_STRING)
 	{
-		// Handle AS object
-		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
-
-		if (obj == NULL)
-		{
-			// NULL object - return true (AS2 spec: returns true for invalid operations)
-			float result = 1.0f;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
-			return;
-		}
-
-		// Delete the property
-		bool success = deleteProperty(obj, prop_name, prop_name_len);
-
-		// Push result (1.0 for success, 0.0 for failure)
-		float result = success ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		prop_name = prop_name_var.data.string_data.owns_memory ?
+			prop_name_var.data.string_data.heap_ptr :
+			(const char*) prop_name_var.data.numeric_value;
+		prop_name_len = prop_name_var.str_size;
 	}
 	else
 	{
-		// Not an object - return true (AS2 spec: returns true for invalid operations)
-		// This matches Flash Player behavior for deleting properties from primitives
+		// Property name must be a string
+		// Return true (AS2 spec: returns true for invalid operations)
 		float result = 1.0f;
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
 	}
+
+	// Pop object name (variable name)
+	ActionVar obj_name_var;
+	popVar(stack, sp, &obj_name_var);
+
+	const char* obj_name = NULL;
+	u32 obj_name_len = 0;
+
+	if (obj_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		obj_name = obj_name_var.data.string_data.owns_memory ?
+			obj_name_var.data.string_data.heap_ptr :
+			(const char*) obj_name_var.data.numeric_value;
+		obj_name_len = obj_name_var.str_size;
+	}
+	else
+	{
+		// Object name must be a string
+		// Return true (AS2 spec: returns true for invalid operations)
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Look up the variable to get the object
+	ActionVar* obj_var = getVariable((char*)obj_name, obj_name_len);
+
+	// If variable doesn't exist, return true (AS2 spec)
+	if (obj_var == NULL)
+	{
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// If variable is not an object, return true (AS2 spec)
+	if (obj_var->type != ACTION_STACK_VALUE_OBJECT)
+	{
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Get the object
+	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+
+	// If object is NULL, return true
+	if (obj == NULL)
+	{
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Delete the property
+	bool success = deleteProperty(obj, prop_name, prop_name_len);
+
+	// Push result (1.0 for success, 0.0 for failure)
+	float result = success ? 1.0f : 0.0f;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
 void actionGetMember(char* stack, u32* sp)
@@ -3394,29 +3392,6 @@ void actionGetMember(char* stack, u32* sp)
 		else
 		{
 			// Property not found - push undefined
-			pushUndefined(stack, sp);
-		}
-	}
-	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
-	{
-		// Handle array properties
-		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
-
-		if (arr == NULL)
-		{
-			pushUndefined(stack, sp);
-			return;
-		}
-
-		if (strcmp(prop_name, "length") == 0)
-		{
-			// Push array length as float
-			float len = (float) arr->length;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
-		}
-		else
-		{
-			// For now, push undefined for other properties
 			pushUndefined(stack, sp);
 		}
 	}
@@ -3806,7 +3781,7 @@ void actionCloneSprite(char* stack, u32* sp)
 	#ifdef DEBUG
 	printf("[CloneSprite] %s -> %s (depth %d)\n",
 	       source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
-	#endif
+#endif
 	#endif
 }
 
@@ -3829,7 +3804,7 @@ void actionRemoveSprite(char* stack, u32* sp)
 	// NO_GRAPHICS mode: just log the operation
 	#ifdef DEBUG
 	printf("[RemoveSprite] %s\n", target_name);
-	#endif
+#endif
 	#endif
 }
 
@@ -3867,6 +3842,7 @@ void actionWithStart(char* stack, u32* sp)
 	ActionVar obj_var;
 	popVar(stack, sp, &obj_var);
 
+
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		// Get the object pointer
@@ -3876,9 +3852,6 @@ void actionWithStart(char* stack, u32* sp)
 		if (obj != NULL && scope_depth < MAX_SCOPE_DEPTH)
 		{
 			scope_chain[scope_depth++] = obj;
-#ifdef DEBUG
-			printf("[DEBUG] actionWithStart: pushed object %p onto scope chain (depth=%u)\n", (void*)obj, scope_depth);
-#endif
 		}
 		else
 		{
@@ -3886,9 +3859,6 @@ void actionWithStart(char* stack, u32* sp)
 			{
 				// Push null marker to maintain balance
 				scope_chain[scope_depth++] = NULL;
-#ifdef DEBUG
-				printf("[DEBUG] actionWithStart: object is null, pushed null marker (depth=%u)\n", scope_depth);
-#endif
 			}
 			else
 			{
@@ -3902,9 +3872,6 @@ void actionWithStart(char* stack, u32* sp)
 		if (scope_depth < MAX_SCOPE_DEPTH)
 		{
 			scope_chain[scope_depth++] = NULL;
-#ifdef DEBUG
-			printf("[DEBUG] actionWithStart: non-object type %d, pushed null marker (depth=%u)\n", obj_var.type, scope_depth);
-#endif
 		}
 	}
 }
@@ -3915,9 +3882,6 @@ void actionWithEnd(char* stack, u32* sp)
 	if (scope_depth > 0)
 	{
 		scope_depth--;
-#ifdef DEBUG
-		printf("[DEBUG] actionWithEnd: popped from scope chain (depth=%u)\n", scope_depth);
-#endif
 	}
 	else
 	{
@@ -3955,11 +3919,10 @@ typedef struct {
 	bool exception_thrown;
 	ActionVar exception_value;
 	int handler_depth;
-	jmp_buf exception_handler;
-	int has_jmp_buf;
+	jmp_buf* exception_handler;  // Pointer to jmp_buf in script function
 } ExceptionState;
 
-static ExceptionState g_exception_state = {false, {0}, 0, {0}, 0};
+static ExceptionState g_exception_state = {false, {0}, 0, NULL};
 
 void actionThrow(char* stack, u32* sp)
 {
@@ -3969,7 +3932,42 @@ void actionThrow(char* stack, u32* sp)
 
 	// Set exception state
 	g_exception_state.exception_thrown = true;
-	g_exception_state.exception_value = throw_value;
+
+	// Deep copy the exception value (especially important for strings)
+	g_exception_state.exception_value.type = throw_value.type;
+	g_exception_state.exception_value.str_size = throw_value.str_size;
+
+	if (throw_value.type == ACTION_STACK_VALUE_STRING)
+	{
+		// Make a heap copy of the string since the stack will be unwound
+		const char* str_ptr = (const char*)throw_value.data.numeric_value;
+		if (str_ptr != NULL)
+		{
+			size_t str_len = strlen(str_ptr) + 1;
+			char* heap_copy = (char*)malloc(str_len);
+			if (heap_copy != NULL)
+			{
+				memcpy(heap_copy, str_ptr, str_len);
+				g_exception_state.exception_value.data.string_data.heap_ptr = heap_copy;
+				g_exception_state.exception_value.data.string_data.owns_memory = true;
+			}
+			else
+			{
+				g_exception_state.exception_value.data.string_data.heap_ptr = NULL;
+				g_exception_state.exception_value.data.string_data.owns_memory = false;
+			}
+		}
+		else
+		{
+			g_exception_state.exception_value.data.string_data.heap_ptr = NULL;
+			g_exception_state.exception_value.data.string_data.owns_memory = false;
+		}
+	}
+	else
+	{
+		// For numeric types, just copy the value
+		g_exception_state.exception_value.data.numeric_value = throw_value.data.numeric_value;
+	}
 
 	// Check if we're in a try block
 	if (g_exception_state.handler_depth == 0) {
@@ -3996,39 +3994,22 @@ void actionThrow(char* stack, u32* sp)
 	}
 
 	// Inside a try block - jump to catch handler using longjmp
-	// NOTE: Due to current implementation flaw (see TODO above), this doesn't
-	// properly skip remaining try block code. Fix requires inline setjmp in generated code.
-	if (g_exception_state.has_jmp_buf) {
-		longjmp(g_exception_state.exception_handler, 1);
+	// The jmp_buf is now stored as a pointer from the script function
+	if (g_exception_state.exception_handler != NULL) {
+		longjmp(*g_exception_state.exception_handler, 1);
 	}
 }
 
-void actionTryBegin(char* stack, u32* sp)
+void actionTryBegin(char* stack, u32* sp, void* jmp_buf_ptr)
 {
 	// Push exception handler onto handler stack
 	g_exception_state.handler_depth++;
 
+	// Store pointer to jmp_buf from script function
+	g_exception_state.exception_handler = (jmp_buf*)jmp_buf_ptr;
+
 	// Clear exception flag for new try block
 	g_exception_state.exception_thrown = false;
-	g_exception_state.has_jmp_buf = 0;
-}
-
-bool actionTryExecute(char* stack, u32* sp)
-{
-	// Set up exception handler using setjmp
-	// This will be called again when longjmp is triggered
-	// WARNING: This function-based approach has a control flow flaw (see TODO above)
-	int exception_occurred = setjmp(g_exception_state.exception_handler);
-	g_exception_state.has_jmp_buf = 1;
-
-	// If exception occurred (longjmp was called), return false to execute catch block
-	if (exception_occurred != 0) {
-		g_exception_state.exception_thrown = true;
-		return false;
-	}
-
-	// No exception yet, execute try block
-	return true;
 }
 
 void actionCatchToVariable(char* stack, u32* sp, const char* var_name)
@@ -4036,10 +4017,16 @@ void actionCatchToVariable(char* stack, u32* sp, const char* var_name)
 	// Store caught exception in named variable
 	if (g_exception_state.exception_thrown)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionCatchToVariable: storing exception in variable '%s'\n", var_name);
-#endif
 		setVariableByName(var_name, &g_exception_state.exception_value);
+
+		// Transfer ownership of heap string to variable (prevent double-free)
+		if (g_exception_state.exception_value.type == ACTION_STACK_VALUE_STRING &&
+		    g_exception_state.exception_value.data.string_data.owns_memory)
+		{
+			g_exception_state.exception_value.data.string_data.owns_memory = false;
+			g_exception_state.exception_value.data.string_data.heap_ptr = NULL;
+		}
+
 		g_exception_state.exception_thrown = false;
 	}
 }
@@ -4049,9 +4036,6 @@ void actionCatchToRegister(char* stack, u32* sp, u8 reg_num)
 	// Store caught exception in register
 	if (g_exception_state.exception_thrown)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionCatchToRegister: storing exception in register %d\n", reg_num);
-#endif
 		// Note: Register handling would require access to register array
 		// For now, we'll just clear the exception flag
 		// TODO: Implement register storage when register infrastructure is available
@@ -4064,18 +4048,25 @@ void actionTryEnd(char* stack, u32* sp)
 	// Pop exception handler from handler stack
 	g_exception_state.handler_depth--;
 
-	// Clear jmp_buf flag
-	g_exception_state.has_jmp_buf = 0;
+	// Clear jmp_buf pointer
+	g_exception_state.exception_handler = NULL;
 
 	if (g_exception_state.handler_depth == 0)
 	{
+		// Free heap-allocated exception string if it exists
+		if (g_exception_state.exception_value.type == ACTION_STACK_VALUE_STRING &&
+		    g_exception_state.exception_value.data.string_data.owns_memory &&
+		    g_exception_state.exception_value.data.string_data.heap_ptr != NULL)
+		{
+			free(g_exception_state.exception_value.data.string_data.heap_ptr);
+			g_exception_state.exception_value.data.string_data.heap_ptr = NULL;
+			g_exception_state.exception_value.data.string_data.owns_memory = false;
+		}
+
 		// Clear exception if at top level
 		g_exception_state.exception_thrown = false;
 	}
 
-#ifdef DEBUG
-	printf("[DEBUG] actionTryEnd: handler_depth=%d\n", g_exception_state.handler_depth);
-#endif
 }
 
 // ============================================================================
@@ -4856,7 +4847,7 @@ void actionStartDrag(char* stack, u32* sp)
 	if (has_constraint) {
 		printf("  Bounds: (%.1f,%.1f)-(%.1f,%.1f)\n", x1, y1, x2, y2);
 	}
-	#endif
+#endif
 	#endif
 }
 
@@ -4914,17 +4905,6 @@ bool actionWaitForFrame2(char* stack, u32* sp)
 	// by examining the MovieClip's frames_loaded count
 
 	// Debug output to show what frame was checked
-#ifdef DEBUG
-	if (frame_var.type == ACTION_STACK_VALUE_F32)
-	{
-		printf("[DEBUG] WaitForFrame2: checking frame %d (assuming loaded)\n", (int)frame_var.value.f32);
-	}
-	else if (frame_var.type == ACTION_STACK_VALUE_STRING)
-	{
-		const char* frame_str = (const char*)frame_var.value.u64;
-		printf("[DEBUG] WaitForFrame2: checking frame '%s' (assuming loaded)\n", frame_str);
-	}
-#endif
 
 	// Simplified: always return true (frame loaded)
 	// This is appropriate for non-streaming SWF files where all content loads instantly

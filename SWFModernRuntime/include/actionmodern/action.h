@@ -180,8 +180,7 @@ void actionWithEnd(char* stack, u32* sp);
 
 // Exception handling (try-catch-finally)
 void actionThrow(char* stack, u32* sp);
-void actionTryBegin(char* stack, u32* sp);
-bool actionTryExecute(char* stack, u32* sp);
+void actionTryBegin(char* stack, u32* sp, void* jmp_buf_ptr);
 void actionCatchToVariable(char* stack, u32* sp, const char* var_name);
 void actionCatchToRegister(char* stack, u32* sp, u8 reg_num);
 void actionTryEnd(char* stack, u32* sp);
