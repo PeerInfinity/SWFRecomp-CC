@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "string_add_swf_4",
+    "description": "Tests STRING_ADD opcode (0x21) - concatenates two strings",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STRING_ADD"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
