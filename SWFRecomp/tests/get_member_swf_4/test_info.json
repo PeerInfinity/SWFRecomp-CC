@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "get_member_swf_4",
+    "description": "Tests GET_MEMBER opcode (0x4E) - retrieves property values from objects and primitives",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["GET_MEMBER"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
