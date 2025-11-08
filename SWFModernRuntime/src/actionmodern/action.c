@@ -209,6 +209,24 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 	return NULL;  // Other paths not supported yet
 }
 
+// ==================================================================
+// Execution Context Tracking (for SET_TARGET / SET_TARGET2)
+// ==================================================================
+
+// Global variable to track current execution context
+// When NULL, defaults to root_movieclip
+static MovieClip* g_current_context = NULL;
+
+// Set the current execution context
+static void setCurrentContext(MovieClip* mc) {
+	g_current_context = mc;
+}
+
+// Get the current execution context
+static MovieClip* getCurrentContext(void) {
+	return g_current_context ? g_current_context : &root_movieclip;
+}
+
 ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
@@ -1912,19 +1930,28 @@ void actionSetTarget2(char* stack, u32* sp)
 	// Pop the target path
 	POP();
 
-	// For simplified implementation: just log the target change
 	// Empty string or NULL means return to main timeline
 	if (target_path == NULL || strlen(target_path) == 0)
 	{
+		setCurrentContext(&root_movieclip);
 		printf("// SetTarget2: (main)\n");
-	}
-	else
-	{
-		printf("// SetTarget2: %s\n", target_path);
+		return;
 	}
 
-	// TODO: Actually change execution context
-	// This requires MovieClip infrastructure
+	// Try to resolve the target path
+	MovieClip* target_mc = getMovieClipByTarget(target_path);
+
+	if (target_mc) {
+		// Valid target found - change context
+		setCurrentContext(target_mc);
+		printf("// SetTarget2: %s\n", target_path);
+	} else {
+		// Invalid target - context remains unchanged
+		printf("// SetTarget2: %s (not found, context unchanged)\n", target_path);
+	}
+
+	// Note: In NO_GRAPHICS mode, only _root is available as a target.
+	// Full MovieClip hierarchy requires display list infrastructure.
 }
 
 void actionGetProperty(char* stack, u32* sp)
@@ -3887,26 +3914,29 @@ void actionRemoveSprite(char* stack, u32* sp)
 
 void actionSetTarget(char* stack, u32* sp, const char* target_name)
 {
-	// Simplified implementation: just log the target change
-	// TODO: Actually change execution context when MovieClip infrastructure is complete
-
+	// Empty string or NULL means return to main timeline
 	if (!target_name || strlen(target_name) == 0) {
+		setCurrentContext(&root_movieclip);
 		printf("// SetTarget: (main)\n");
-	} else {
-		printf("// SetTarget: %s\n", target_name);
+		return;
 	}
 
-	// Future implementation will need:
-	// - Global variable to track current context (g_current_context)
-	// - setCurrentContext(MovieClip* mc) function
-	// - getCurrentContext() function
-	// - resolveTargetPath(const char* path) function
-	//
-	// For empty string, return to main timeline:
-	//   setCurrentContext(getRootMovieClip());
-	// For non-empty string, resolve target path:
-	//   MovieClip* target_mc = resolveTargetPath(target_name);
-	//   if (target_mc) setCurrentContext(target_mc);
+	// Try to resolve the target path
+	MovieClip* target_mc = getMovieClipByTarget(target_name);
+
+	if (target_mc) {
+		// Valid target found - change context
+		setCurrentContext(target_mc);
+		printf("// SetTarget: %s\n", target_name);
+	} else {
+		// Invalid target - context remains unchanged
+		// In Flash, if target is not found, the context doesn't change
+		printf("// SetTarget: %s (not found, context unchanged)\n", target_name);
+	}
+
+	// Note: In NO_GRAPHICS mode, only _root is available as a target.
+	// Full MovieClip hierarchy (named sprites, nested clips) requires
+	// display list infrastructure which is only available in graphics mode.
 }
 
 // ==================================================================
