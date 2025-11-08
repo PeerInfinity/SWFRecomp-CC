@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "call_swf_4",
+    "description": "Tests CALL opcode (0x9E) - calls frame actions (simplified implementation)",
+    "swf_version": 4,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["CALL"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": [
+    "Current implementation is simplified - logs the call instead of executing frame actions",
+    "Full implementation would require MovieClip structure and frame action infrastructure",
+    "CALL is a legacy opcode from SWF 4; modern ActionScript uses CALL_FUNCTION instead"
+  ]
+}
