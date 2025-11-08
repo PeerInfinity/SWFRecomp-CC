@@ -121,6 +121,8 @@ namespace SWFRecomp
 	public:
 		size_t next_str_i;
 		size_t func_counter;
+		size_t try_counter;  // Counter for jmp_buf variables in try-catch blocks
+		bool needs_setjmp;  // Flag to track if script uses try-catch
 		std::map<std::string, size_t> string_to_id;  // Track declared strings for deduplication
 		std::vector<size_t> constant_pool;  // Maps constant pool index to string ID
 

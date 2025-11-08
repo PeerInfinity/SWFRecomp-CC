@@ -747,9 +747,10 @@ namespace SWFRecomp
 			case SWF_TAG_DO_ACTION:
 			{
 				context.out_script_header << endl << "void script_" << to_string(next_script_i) << "(char* stack, u32* sp);";
-				
+
 				ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
 				out_script << "#include <recomp.h>" << endl
+						   << "#include <setjmp.h>" << endl
 						   << "#include \"script_decls.h\"" << endl << endl
 						   << "void script_" << next_script_i << "(char* stack, u32* sp)" << endl
 						   << "{" << endl;
