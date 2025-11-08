@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "string_equals_0_swf_4",
+    "description": "Tests STRING_EQUALS opcode (0x13) - compares unequal strings",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STRING_EQUALS"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
