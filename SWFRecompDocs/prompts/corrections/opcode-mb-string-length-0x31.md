@@ -7,7 +7,7 @@ Your task is to implement support for the AS2 opcode: **MB_STRING_LENGTH**
 ## Opcode Specification
 
 **Opcode Name**: MB_STRING_LENGTH (Multibyte String Length)
-**Hex Value**: 0x35
+**Hex Value**: 0x31
 **Category**: String Operations
 **Estimated Complexity**: MEDIUM (2-4 hours)
 

@@ -280,11 +280,6 @@ SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md
 
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md
 
 
@@ -385,6 +380,11 @@ SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md
 
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
+SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md
 
 
@@ -451,6 +451,11 @@ SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md
 Please read these files and follow their instructions:
 SWFRecompDocs/parallel-opcode-implementation-guide.md
 SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/parallel-opcode-implementation-guide.md
+SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md
 
 
 Please read these files and follow their instructions:

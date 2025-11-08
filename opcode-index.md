@@ -4,26 +4,26 @@
 
 **Total Opcodes**: 100
 
-**Implemented Opcodes**: 98
+**Implemented Opcodes**: 99
 
-**Total Entries**: 286
+**Total Entries**: 287
 
 ## Test Statistics
 
-**Overall Test Results**: 319/381 passing (83.7%)
+**Overall Test Results**: 322/384 passing (83.9%)
 
-**Primary Tests**: 99/112 passing (88.4%)
+**Primary Tests**: 100/113 passing (88.5%)
   - 13 failing primary tests
   - 13 opcodes with failing primary tests
 
-**Secondary Tests**: 220/269 passing (81.8%)
+**Secondary Tests**: 222/271 passing (81.9%)
   - 49 failing secondary tests
 
 ## Implementation Progress
 
-**Fully Implemented Opcodes**: 56/100
+**Fully Implemented Opcodes**: 57/100
 
-**Opcodes with Primary Tests**: 98
+**Opcodes with Primary Tests**: 99
 
 **Opcodes with Documentation**: 99
 
@@ -31,7 +31,7 @@
 
 - **13 failing primary tests** across 13 opcodes (see 'Failing Primary' column)
 - **49 failing secondary tests**
-- **44 opcodes** not yet marked as fully implemented
+- **43 opcodes** not yet marked as fully implemented
 
 
 ## Summary Table
@@ -67,7 +67,7 @@
 | [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | [SWF_ACTION_SET_PROPERTY](#0x23-actionsetproperty) | [actionSetProperty](#0x23-actionsetproperty) | 1/1 |  |  | ✓ |  |
 | [0X24](#0x24-actionclonesprite) | [ActionCloneSprite](#0x24-actionclonesprite) | [SWF_ACTION_CLONE_SPRITE](#0x24-actionclonesprite) | [actionCloneSprite](#0x24-actionclonesprite) | 1/1 |  |  | ✓ |  |
 | [0X25](#0x25-actionremovesprite) | [ActionRemoveSprite](#0x25-actionremovesprite) | [SWF_ACTION_REMOVE_SPRITE](#0x25-actionremovesprite) | [actionRemoveSprite](#0x25-actionremovesprite) | 1/1 |  |  | ✓ |  |
-| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 96/107 |  | ✓ | ✓ |
+| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 97/108 |  | ✓ | ✓ |
 | [0X27](#0x27-actionstartdrag) | [ActionStartDrag](#0x27-actionstartdrag) | [SWF_ACTION_START_DRAG](#0x27-actionstartdrag) | [actionStartDrag](#0x27-actionstartdrag) | 1/1 |  |  | ✓ |  |
 | [0X28](#0x28-actionenddrag) | [ActionEndDrag](#0x28-actionenddrag) | [SWF_ACTION_END_DRAG](#0x28-actionenddrag) | [actionEndDrag](#0x28-actionenddrag) | 1/1 |  |  | ✓ |  |
 | [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | [SWF_ACTION_STRING_LESS](#0x29-actionstringless) | [actionStringLess](#0x29-actionstringless) | 1/1 |  |  | ✓ | ✓ |
@@ -79,7 +79,7 @@
 | [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | [SWF_ACTION_CHAR_TO_ASCII](#0x32-actionchartoascii) | [actionCharToAscii](#0x32-actionchartoascii) | 1/1 |  |  | ✓ | ✓ |
 | [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) | 0/1 |  | 1 | ✓ | ✓ |
 | [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | [SWF_ACTION_GET_TIME](#0x34-actiongettime) | [actionGetTime](#0x34-actiongettime) | 1/1 |  |  | ✓ | ✓ |
-| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) |  |  |  |  | ✓ |  |
+| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) | [actionMbStringExtract](#0x35-actionmbstringextract) | 1/1 |  |  | ✓ | ✓ |
 | [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) | [actionMbCharToAscii](#0x36-actionmbchartoascii) | 1/1 |  |  | ✓ | ✓ |
 | [0X37](#0x37-actionmbasciitochar) | [ActionMBAsciiToChar](#0x37-actionmbasciitochar) | [SWF_ACTION_MB_ASCII_TO_CHAR](#0x37-actionmbasciitochar) | [actionMbAsciiToChar](#0x37-actionmbasciitochar) | 1/1 |  |  | ✓ |  |
 | [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | [SWF_ACTION_DELETE](#0x3a-actiondelete) | [actionDelete](#0x3a-actiondelete) | 0/1 |  | 1 | ✓ | ✓ |
@@ -131,7 +131,7 @@
 | [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | [SWF_ACTION_DEFINE_FUNCTION2](#0x8e-actiondefinefunction2) | [actionDefineFunction2](#0x8e-actiondefinefunction2) | 1/2 |  | 1 | ✓ |  |
 | [0X8F](#0x8f-actiontry) | [ActionTry](#0x8f-actiontry) | [SWF_ACTION_TRY](#0x8f-actiontry) |  | 0/1 |  | 1 | ✓ |  |
 | [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | [SWF_ACTION_WITH](#0x94-actionwith) |  | 0/1 |  | 1 | ✓ |  |
-| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 96/107 |  | ✓ | ✓ |
+| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 97/108 |  | ✓ | ✓ |
 | [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | [SWF_ACTION_JUMP](#0x99-actionjump) |  | 0/1 |  | 1 | ✓ | ✓ |
 | [0X9A](#0x9a-actiongeturl2) | [ActionGetURL2](#0x9a-actiongeturl2) | [SWF_ACTION_GET_URL2](#0x9a-actiongeturl2) | [actionGetURL2](#0x9a-actiongeturl2) | 1/1 |  |  | ✓ |  |
 | [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | [SWF_ACTION_DEFINE_FUNCTION](#0x9b-actiondefinefunction) |  | 1/1 |  |  | ✓ | ✓ |
@@ -169,6 +169,7 @@
 | [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | 0/1 | 1 | ✓ |
 | [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | ✓ | ✓ | 1/1 |  | ✓ |
+| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | ✓ | ✓ | 0/1 | 1 | ✓ |
 | [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | ✓ | ✓ | 1/1 |  | ✓ |
@@ -209,7 +210,6 @@
 | Hex | Spec Name | Enum | Function | Docs |
 |-----|-----------|------|----------|------|
 | 0X00 |  | ✓ |  |  |
-| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ |  | ✓ |
 
 ### ❌ Not Implemented
 (Only in spec, no implementation yet)
@@ -1079,6 +1079,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/less_floats_swf_4`
 - [✓] `SWFRecomp/tests/mb_ascii_to_char_swf_4`
 - [✓] `SWFRecomp/tests/mb_char_to_ascii_swf_5`
+- [✓] `SWFRecomp/tests/mb_string_extract_swf_5`
 - [✓] `SWFRecomp/tests/mb_string_length_swf_5`
 - [✓] `SWFRecomp/tests/modulo_swf_4`
 - [✓] `SWFRecomp/tests/multiply_floats_swf_4`
@@ -1341,7 +1342,7 @@ void actionMbStringLength(char* stack, u32* sp, char* v_str);
 - parseActions (case SWF_ACTION_MB_STRING_LENGTH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md](SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md)
+- [SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md](SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4986)
@@ -1431,12 +1432,21 @@ void actionGetTime(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBStringExtract` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_STRING_EXTRACT` (enum, source: action.hpp)
+- `actionMbStringExtract` (function, source: action.h)
+
+**Primary Tests:**
+- [✓] `SWFRecomp/tests/mb_string_extract_swf_5`
+
+**Function Declaration:**
+```c
+void actionMbStringExtract(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_STRING_EXTRACT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md](SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md)
+- [SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md](SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5006)
@@ -2853,6 +2863,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/less_floats_swf_4`
 - [✓] `SWFRecomp/tests/mb_ascii_to_char_swf_4`
 - [✓] `SWFRecomp/tests/mb_char_to_ascii_swf_5`
+- [✓] `SWFRecomp/tests/mb_string_extract_swf_5`
 - [✓] `SWFRecomp/tests/mb_string_length_swf_5`
 - [✓] `SWFRecomp/tests/modulo_swf_4`
 - [✓] `SWFRecomp/tests/multiply_floats_swf_4`

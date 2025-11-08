@@ -105,6 +105,7 @@ void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLength(char* stack, u32* sp, char* v_str);
 void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 void actionMbStringLength(char* stack, u32* sp, char* v_str);
+void actionMbStringExtract(char* stack, u32* sp, char* str_buffer);
 void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLess(char* stack, u32* sp);
 void actionImplementsOp(char* stack, u32* sp);

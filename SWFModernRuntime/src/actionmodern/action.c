@@ -1272,6 +1272,94 @@ void actionMbStringLength(char* stack, u32* sp, char* v_str)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
+void actionMbStringExtract(char* stack, u32* sp, char* str_buffer)
+{
+	// Pop count (number of characters to extract)
+	convertFloat(stack, sp);
+	ActionVar count_var;
+	popVar(stack, sp, &count_var);
+	int count = (int)VAL(float, &count_var.data.numeric_value);
+
+	// Pop index (starting character position)
+	convertFloat(stack, sp);
+	ActionVar index_var;
+	popVar(stack, sp, &index_var);
+	int index = (int)VAL(float, &index_var.data.numeric_value);
+
+	// Pop string
+	char input_buffer[17];
+	convertString(stack, sp, input_buffer);
+	ActionVar src_var;
+	popVar(stack, sp, &src_var);
+	const char* src = src_var.data.string_data.owns_memory ?
+		src_var.data.string_data.heap_ptr :
+		(char*) src_var.data.numeric_value;
+
+	// If index or count are invalid, return empty string
+	if (index < 0 || count < 0) {
+		str_buffer[0] = '\0';
+		PUSH_STR(str_buffer, 0);
+		return;
+	}
+
+	// Navigate to starting character position (UTF-8 aware)
+	const unsigned char* str = (const unsigned char*)src;
+	int current_char = 0;
+
+	// Skip to index'th character
+	while (*str != '\0' && current_char < index) {
+		// Advance by one UTF-8 character
+		if ((*str & 0x80) == 0) {
+			str += 1;  // 1-byte character
+		} else if ((*str & 0xE0) == 0xC0) {
+			str += 2;  // 2-byte character
+		} else if ((*str & 0xF0) == 0xE0) {
+			str += 3;  // 3-byte character
+		} else if ((*str & 0xF8) == 0xF0) {
+			str += 4;  // 4-byte character
+		} else {
+			str += 1;  // Invalid, skip one byte
+		}
+		current_char++;
+	}
+
+	// If we reached end of string before index, return empty
+	if (*str == '\0') {
+		str_buffer[0] = '\0';
+		PUSH_STR(str_buffer, 0);
+		return;
+	}
+
+	// Extract count characters
+	const unsigned char* start = str;
+	current_char = 0;
+
+	while (*str != '\0' && current_char < count) {
+		// Advance by one UTF-8 character
+		if ((*str & 0x80) == 0) {
+			str += 1;
+		} else if ((*str & 0xE0) == 0xC0) {
+			str += 2;
+		} else if ((*str & 0xF0) == 0xE0) {
+			str += 3;
+		} else if ((*str & 0xF8) == 0xF0) {
+			str += 4;
+		} else {
+			str += 1;
+		}
+		current_char++;
+	}
+
+	// Copy substring to buffer
+	int length = str - start;
+	if (length > 16) length = 16;  // Buffer size limit
+	memcpy(str_buffer, start, length);
+	str_buffer[length] = '\0';
+
+	// Push result
+	PUSH_STR(str_buffer, length);
+}
+
 void actionCharToAscii(char* stack, u32* sp)
 {
 	// Convert top of stack to string

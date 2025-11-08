@@ -6,6 +6,7 @@ with three newlines between each prompt.
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -119,6 +120,32 @@ def create_prompts_text(md_files, output_file, failing_info=None, incomplete_mod
     print(f"Created {output_file} with {len(md_files)} prompts")
 
 
+def regenerate_md_files_json():
+    """Run create-md-files-json.py to regenerate md-files.json."""
+    script_path = Path(__file__).parent / 'create-md-files-json.py'
+
+    if not script_path.exists():
+        print(f"Error: {script_path} does not exist", file=sys.stderr)
+        sys.exit(1)
+
+    print("Regenerating md-files.json...")
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script_path)],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        # Print the output from create-md-files-json.py
+        if result.stdout:
+            print(result.stdout.rstrip())
+    except subprocess.CalledProcessError as e:
+        print(f"Error running create-md-files-json.py: {e}", file=sys.stderr)
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Create a text file containing all prompts from md-files.json'
@@ -139,6 +166,9 @@ def main():
     if args.fail and args.incomplete:
         print("Error: --fail and --incomplete are mutually exclusive")
         sys.exit(1)
+
+    # Regenerate md-files.json before loading it
+    regenerate_md_files_json()
 
     # Load the file list
     md_files = load_md_files()

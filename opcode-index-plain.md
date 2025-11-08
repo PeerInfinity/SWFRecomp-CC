@@ -4,26 +4,26 @@
 
 **Total Opcodes**: 100
 
-**Implemented Opcodes**: 98
+**Implemented Opcodes**: 99
 
-**Total Entries**: 286
+**Total Entries**: 287
 
 ## Test Statistics
 
-**Overall Test Results**: 319/381 passing (83.7%)
+**Overall Test Results**: 322/384 passing (83.9%)
 
-**Primary Tests**: 99/112 passing (88.4%)
+**Primary Tests**: 100/113 passing (88.5%)
   - 13 failing primary tests
   - 13 opcodes with failing primary tests
 
-**Secondary Tests**: 220/269 passing (81.8%)
+**Secondary Tests**: 222/271 passing (81.9%)
   - 49 failing secondary tests
 
 ## Implementation Progress
 
-**Fully Implemented Opcodes**: 56/100
+**Fully Implemented Opcodes**: 57/100
 
-**Opcodes with Primary Tests**: 98
+**Opcodes with Primary Tests**: 99
 
 **Opcodes with Documentation**: 99
 
@@ -31,7 +31,7 @@
 
 - **13 failing primary tests** across 13 opcodes (see 'Failing Primary' column)
 - **49 failing secondary tests**
-- **44 opcodes** not yet marked as fully implemented
+- **43 opcodes** not yet marked as fully implemented
 
 
 ## Summary Table
@@ -67,7 +67,7 @@
 | 0X23 | ActionSetProperty | SWF_ACTION_SET_PROPERTY | actionSetProperty | 1/1 |  |  | ✓ |  |
 | 0X24 | ActionCloneSprite | SWF_ACTION_CLONE_SPRITE | actionCloneSprite | 1/1 |  |  | ✓ |  |
 | 0X25 | ActionRemoveSprite | SWF_ACTION_REMOVE_SPRITE | actionRemoveSprite | 1/1 |  |  | ✓ |  |
-| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 96/107 |  | ✓ | ✓ |
+| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 97/108 |  | ✓ | ✓ |
 | 0X27 | ActionStartDrag | SWF_ACTION_START_DRAG | actionStartDrag | 1/1 |  |  | ✓ |  |
 | 0X28 | ActionEndDrag | SWF_ACTION_END_DRAG | actionEndDrag | 1/1 |  |  | ✓ |  |
 | 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess | 1/1 |  |  | ✓ | ✓ |
@@ -79,7 +79,7 @@
 | 0X32 | ActionCharToAscii | SWF_ACTION_CHAR_TO_ASCII | actionCharToAscii | 1/1 |  |  | ✓ | ✓ |
 | 0X33 | ActionAsciiToChar | SWF_ACTION_ASCII_TO_CHAR | actionAsciiToChar | 0/1 |  | 1 | ✓ | ✓ |
 | 0X34 | ActionGetTime | SWF_ACTION_GET_TIME | actionGetTime | 1/1 |  |  | ✓ | ✓ |
-| 0X35 | ActionMBStringExtract | SWF_ACTION_MB_STRING_EXTRACT |  |  |  |  | ✓ |  |
+| 0X35 | ActionMBStringExtract | SWF_ACTION_MB_STRING_EXTRACT | actionMbStringExtract | 1/1 |  |  | ✓ | ✓ |
 | 0X36 | ActionMBCharToAscii | SWF_ACTION_MB_CHAR_TO_ASCII | actionMbCharToAscii | 1/1 |  |  | ✓ | ✓ |
 | 0X37 | ActionMBAsciiToChar | SWF_ACTION_MB_ASCII_TO_CHAR | actionMbAsciiToChar | 1/1 |  |  | ✓ |  |
 | 0X3A | ActionDelete | SWF_ACTION_DELETE | actionDelete | 0/1 |  | 1 | ✓ | ✓ |
@@ -131,7 +131,7 @@
 | 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 1/2 |  | 1 | ✓ |  |
 | 0X8F | ActionTry | SWF_ACTION_TRY |  | 0/1 |  | 1 | ✓ |  |
 | 0X94 | ActionWith | SWF_ACTION_WITH |  | 0/1 |  | 1 | ✓ |  |
-| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 96/107 |  | ✓ | ✓ |
+| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 97/108 |  | ✓ | ✓ |
 | 0X99 | ActionJump | SWF_ACTION_JUMP |  | 0/1 |  | 1 | ✓ | ✓ |
 | 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  |
 | 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  | 1/1 |  |  | ✓ | ✓ |
@@ -169,6 +169,7 @@
 | 0X32 | ActionCharToAscii | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X33 | ActionAsciiToChar | ✓ | ✓ | 0/1 | 1 | ✓ |
 | 0X34 | ActionGetTime | ✓ | ✓ | 1/1 |  | ✓ |
+| 0X35 | ActionMBStringExtract | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X36 | ActionMBCharToAscii | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X3A | ActionDelete | ✓ | ✓ | 0/1 | 1 | ✓ |
 | 0X3E | ActionReturn | ✓ | ✓ | 1/1 |  | ✓ |
@@ -209,7 +210,6 @@
 | Hex | Spec Name | Enum | Function | Docs |
 |-----|-----------|------|----------|------|
 | 0X00 |  | ✓ |  |  |
-| 0X35 | ActionMBStringExtract | ✓ |  | ✓ |
 
 ### ❌ Not Implemented
 (Only in spec, no implementation yet)
@@ -1079,6 +1079,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/less_floats_swf_4`
 - [✓] `SWFRecomp/tests/mb_ascii_to_char_swf_4`
 - [✓] `SWFRecomp/tests/mb_char_to_ascii_swf_5`
+- [✓] `SWFRecomp/tests/mb_string_extract_swf_5`
 - [✓] `SWFRecomp/tests/mb_string_length_swf_5`
 - [✓] `SWFRecomp/tests/modulo_swf_4`
 - [✓] `SWFRecomp/tests/multiply_floats_swf_4`
@@ -1341,7 +1342,7 @@ void actionMbStringLength(char* stack, u32* sp, char* v_str);
 - parseActions (case SWF_ACTION_MB_STRING_LENGTH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md](SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md)
+- [SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md](SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4986)
@@ -1431,12 +1432,21 @@ void actionGetTime(char* stack, u32* sp);
 **Name Variations:**
 - `ActionMBStringExtract` (spec, source: SWF Specification v19)
 - `SWF_ACTION_MB_STRING_EXTRACT` (enum, source: action.hpp)
+- `actionMbStringExtract` (function, source: action.h)
+
+**Primary Tests:**
+- [✓] `SWFRecomp/tests/mb_string_extract_swf_5`
+
+**Function Declaration:**
+```c
+void actionMbStringExtract(char* stack, u32* sp, char* str_buffer);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_MB_STRING_EXTRACT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md](SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md)
+- [SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md](SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5006)
@@ -2853,6 +2863,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/less_floats_swf_4`
 - [✓] `SWFRecomp/tests/mb_ascii_to_char_swf_4`
 - [✓] `SWFRecomp/tests/mb_char_to_ascii_swf_5`
+- [✓] `SWFRecomp/tests/mb_string_extract_swf_5`
 - [✓] `SWFRecomp/tests/mb_string_length_swf_5`
 - [✓] `SWFRecomp/tests/modulo_swf_4`
 - [✓] `SWFRecomp/tests/multiply_floats_swf_4`
