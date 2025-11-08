@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "modulo_swf_4",
+    "description": "Tests MODULO opcode (0x3F) - computes remainder of division",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["MODULO"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
