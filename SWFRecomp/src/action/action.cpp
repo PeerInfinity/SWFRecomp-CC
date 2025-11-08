@@ -787,6 +787,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_GREATER:
+				{
+					out_script << "\t" << "// Greater" << endl
+							   << "\t" << "actionGreater(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_STRING_GREATER:
 				{
 					out_script << "\t" << "// StringGreater" << endl
