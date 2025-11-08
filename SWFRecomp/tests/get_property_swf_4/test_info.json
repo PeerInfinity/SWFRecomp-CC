@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "get_property_swf_4",
+    "description": "Tests GET_PROPERTY opcode (0x22) - gets MovieClip properties by numeric index",
+    "swf_version": 4,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["GET_PROPERTY"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
