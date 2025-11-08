@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "strict_equals_swf_4",
+    "description": "Tests STRICT_EQUALS opcode (0x66) - compares values with strict equality (no type coercion)",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STRICT_EQUALS"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
