@@ -1,0 +1,128 @@
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md
+
+NOTE: The following test(s) for opcode ActionCallMethod (0X52) are currently FAILING:
+  - SWFRecomp/tests/call_method_empty_name_swf_5
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md
+
+NOTE: The following test(s) for opcode ActionDelete (0X3A) are currently FAILING:
+  - SWFRecomp/tests/delete_swf_5
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md
+
+NOTE: The following test(s) for opcode ActionDelete2 (0X3B) are currently FAILING:
+  - SWFRecomp/tests/delete2_swf_5
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md
+
+NOTE: The following test(s) for opcode ActionGetVariable (0X1C) are currently FAILING:
+  - SWFRecomp/tests/get_variable_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md
+
+NOTE: The following test(s) for opcode ActionJump (0X99) are currently FAILING:
+  - SWFRecomp/tests/jump_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md
+
+NOTE: The following test(s) for opcode ActionDefineFunction2 (0X8E) are currently FAILING:
+  - SWFRecomp/tests/call_method_empty_name_swf_5
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md
+
+NOTE: The following test(s) for opcode ActionEnumerate (0X46) are currently FAILING:
+  - SWFRecomp/tests/enumerate_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md
+
+NOTE: The following test(s) for opcode ActionInitObject (0X43) are currently FAILING:
+  - SWFRecomp/tests/init_object_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md
+
+NOTE: The following test(s) for opcode ActionAsciiToChar (0X33) are currently FAILING:
+  - SWFRecomp/tests/ascii_to_char_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md
+
+NOTE: The following test(s) for opcode ActionNewMethod (0X53) are currently FAILING:
+  - SWFRecomp/tests/new_method_swf_5
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-with-0x94.md
+
+NOTE: The following test(s) for opcode ActionWith (0X94) are currently FAILING:
+  - SWFRecomp/tests/with_swf_5
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md
+
+NOTE: The following test(s) for opcode ActionThrow (0X2A) are currently FAILING:
+  - SWFRecomp/tests/try_swf_7
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/pending/opcode-try-0x8f.md
+
+NOTE: The following test(s) for opcode ActionTry (0X8F) are currently FAILING:
+  - SWFRecomp/tests/try_swf_7
+
+Please debug and fix these failing tests.

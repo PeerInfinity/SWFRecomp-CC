@@ -51,6 +51,11 @@ def main():
         action='store_true',
         help='Clean generated files before building tests'
     )
+    parser.add_argument(
+        '--retest',
+        action='store_true',
+        help='Only run tests that failed in the previous run'
+    )
     args = parser.parse_args()
 
     print("=" * 80)
@@ -66,10 +71,12 @@ def main():
         print(f"✗ ERROR: Test script not found: {all_tests_script}")
         sys.exit(1)
 
-    # Build command with optional --clean flag
+    # Build command with optional --clean and --retest flags
     test_cmd = [str(all_tests_script)]
     if args.clean:
         test_cmd.append('--clean')
+    if args.retest:
+        test_cmd.append('--retest')
 
     success = run_command(
         test_cmd,

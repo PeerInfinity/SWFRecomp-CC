@@ -24,11 +24,14 @@ RESULTS_FILE="test_results.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_SCRIPT="../scripts/build_test.sh"
 CLEAN_FLAG=""
+RETEST_FLAG=""
 
-# Check for --clean flag
+# Check for --clean and --retest flags
 for arg in "$@"; do
     if [ "$arg" = "--clean" ]; then
         CLEAN_FLAG="--clean"
+    elif [ "$arg" = "--retest" ]; then
+        RETEST_FLAG="--retest"
     fi
 done
 
@@ -96,7 +99,11 @@ filter_output() {
 
 # Initialize results JSON file
 init_results_file() {
-    cat > "$RESULTS_FILE" <<EOF
+    local tests_to_run=("$@")
+
+    # If no previous results exist, create fresh file
+    if [[ ! -f "$RESULTS_FILE" ]]; then
+        cat > "$RESULTS_FILE" <<EOF
 {
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "summary": {
@@ -110,6 +117,52 @@ init_results_file() {
   },
   "tests": []
 }
+EOF
+        return
+    fi
+
+    # Preserve previous results, removing only tests we're about to run
+    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    python3 - "$RESULTS_FILE" "$timestamp" "${tests_to_run[@]}" <<'EOF'
+import json
+import sys
+
+results_file = sys.argv[1]
+timestamp = sys.argv[2]
+tests_to_run = sys.argv[3:]  # All remaining args are test names
+
+# Read existing results
+try:
+    with open(results_file, 'r') as f:
+        data = json.load(f)
+except:
+    # If file is corrupted, start fresh
+    data = {"tests": []}
+
+# Keep only tests that are NOT being run this time
+preserved_tests = []
+for test in data.get('tests', []):
+    if test['name'] not in tests_to_run:
+        preserved_tests.append(test)
+
+# Create new structure with preserved tests
+new_data = {
+    "timestamp": timestamp,
+    "summary": {
+        "total_tests": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "total_sub_tests": 0,
+        "passed_sub_tests": 0,
+        "failed_sub_tests": 0
+    },
+    "tests": preserved_tests
+}
+
+# Write back
+with open(results_file, 'w') as f:
+    json.dump(new_data, f, indent=2)
 EOF
 }
 
@@ -159,14 +212,34 @@ import json
 with open('$RESULTS_FILE', 'r') as f:
     data = json.load(f)
 
+# Calculate totals from ALL tests in the file (preserved + newly run)
+all_tests = data.get('tests', [])
+total_tests = len(all_tests)
+passed_tests = sum(1 for t in all_tests if t.get('passed', False))
+failed_tests = sum(1 for t in all_tests if not t.get('passed', True))
+skipped_tests = 0  # We don't preserve skipped status
+
+# Calculate sub-test totals
+total_sub_tests = 0
+passed_sub_tests = 0
+failed_sub_tests = 0
+
+for test in all_tests:
+    for sub_test in test.get('sub_tests', []):
+        total_sub_tests += 1
+        if sub_test.get('passed', False):
+            passed_sub_tests += 1
+        else:
+            failed_sub_tests += 1
+
 data['summary'] = {
-    "total_tests": $total_tests,
-    "passed": $passed_tests,
-    "failed": $failed_tests,
-    "skipped": $skipped_tests,
-    "total_sub_tests": $total_sub_tests,
-    "passed_sub_tests": $passed_sub_tests,
-    "failed_sub_tests": $failed_sub_tests
+    "total_tests": total_tests,
+    "passed": passed_tests,
+    "failed": failed_tests,
+    "skipped": skipped_tests,
+    "total_sub_tests": total_sub_tests,
+    "passed_sub_tests": passed_sub_tests,
+    "failed_sub_tests": failed_sub_tests
 }
 
 with open('$RESULTS_FILE', 'w') as f:
@@ -178,21 +251,58 @@ EOF
 # Test Discovery
 # ==============================================================================
 
+get_failed_tests_from_previous_run() {
+    # Get list of failed tests from previous test_results.json
+    if [[ ! -f "$RESULTS_FILE" ]]; then
+        echo ""
+        return
+    fi
+
+    python3 -c '
+import json
+import sys
+
+try:
+    with open("'"$RESULTS_FILE"'", "r") as f:
+        data = json.load(f)
+
+    failed_tests = []
+    for test in data.get("tests", []):
+        if not test.get("passed", False):
+            failed_tests.append(test["name"])
+
+    print(" ".join(failed_tests))
+except Exception:
+    # If we cant read the file, return empty
+    pass
+' 2>/dev/null || echo ""
+}
+
 discover_tests() {
     local specified_tests=("$@")
 
     local test_dirs=()
 
-    # Filter out --clean flag from specified tests
+    # Filter out --clean and --retest flags from specified tests
     local filtered_tests=()
     for test in "${specified_tests[@]}"; do
-        if [[ "$test" != "--clean" ]]; then
+        if [[ "$test" != "--clean" && "$test" != "--retest" ]]; then
             filtered_tests+=("$test")
         fi
     done
 
+    # If --retest flag is set, only run previously failed tests
+    if [[ -n "$RETEST_FLAG" ]]; then
+        local failed_tests_str=$(get_failed_tests_from_previous_run)
+        local failed_tests=($failed_tests_str)
+        if [[ ${#failed_tests[@]} -eq 0 ]]; then
+            # Return empty - this will be handled in run_all_tests
+            echo ""
+            return
+        fi
+        test_dirs=("${failed_tests[@]}")
     # If tests were specified, use those
-    if [[ ${#filtered_tests[@]} -gt 0 ]]; then
+    elif [[ ${#filtered_tests[@]} -gt 0 ]]; then
         test_dirs=("${filtered_tests[@]}")
     else
         # Otherwise, discover all tests
@@ -410,19 +520,27 @@ EOF
 run_all_tests() {
     local specified_tests=("$@")
 
-    log_info "Initializing test results..."
-    init_results_file
-
-    # Discover tests (pass specified tests if any)
+    # Discover tests BEFORE initializing results (so we can read previous failures)
+    # Pass specified tests if any
     local test_dirs=($(discover_tests "${specified_tests[@]}"))
 
+    # Now initialize the results file (preserving results for tests not being run)
+    log_info "Initializing test results..."
+    init_results_file "${test_dirs[@]}"
+
     if [[ ${#test_dirs[@]} -eq 0 ]]; then
-        log_warning "No tests found with test_info.json"
+        if [[ -n "$RETEST_FLAG" ]]; then
+            log_info "No failed tests found in previous run"
+        else
+            log_warning "No tests found with test_info.json"
+        fi
         return
     fi
 
     # Log appropriate message
-    if [[ ${#specified_tests[@]} -gt 0 ]]; then
+    if [[ -n "$RETEST_FLAG" ]]; then
+        log_info "Retest mode: Running ${#test_dirs[@]} previously failed test(s)"
+    elif [[ ${#specified_tests[@]} -gt 0 ]]; then
         log_info "Running ${#test_dirs[@]} specified test(s)"
     else
         log_info "Discovered ${#test_dirs[@]} tests"

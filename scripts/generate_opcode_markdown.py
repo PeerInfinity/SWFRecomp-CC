@@ -44,11 +44,116 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     md.append("")
     md.append(f"**Generated**: {index['metadata']['generated_date']}")
     md.append("")
+
+    # Calculate comprehensive statistics
+    total_primary_tests = 0
+    passing_primary_tests = 0
+    total_secondary_tests = 0
+    passing_secondary_tests = 0
+    opcodes_with_primary = 0
+    opcodes_with_failing_primary = 0
+    opcodes_fully_implemented = 0
+    opcodes_with_docs = 0
+    opcodes_with_function = 0
+    opcodes_with_enum = 0
+
+    # Group entries by hex value for analysis
+    opcodes = {}
+    for entry in index['entries']:
+        hex_val = entry['hex']
+        if hex_val not in opcodes:
+            opcodes[hex_val] = []
+        opcodes[hex_val].append(entry)
+
+    # Analyze each opcode
+    for hex_val, entries in opcodes.items():
+        for entry in entries:
+            if entry['type'] == 'spec':
+                primary_tests = entry.get('tests_primary', [])
+                passing_primary = entry.get('tests_primary_passing', [])
+                secondary_tests = entry.get('tests_secondary', [])
+                passing_secondary = entry.get('tests_secondary_passing', [])
+
+                total_primary_tests += len(primary_tests)
+                passing_primary_tests += len(passing_primary)
+                total_secondary_tests += len(secondary_tests)
+                passing_secondary_tests += len(passing_secondary)
+
+                if len(primary_tests) > 0:
+                    opcodes_with_primary += 1
+                    if len(passing_primary) < len(primary_tests):
+                        opcodes_with_failing_primary += 1
+
+                if entry.get('fully_implemented'):
+                    opcodes_fully_implemented += 1
+
+                if entry.get('documentation_prompt'):
+                    opcodes_with_docs += 1
+
+            elif entry['type'] == 'function':
+                opcodes_with_function += 1
+            elif entry['type'] == 'enum':
+                opcodes_with_enum += 1
+
+    # Calculate percentages
+    primary_pass_rate = (passing_primary_tests / total_primary_tests * 100) if total_primary_tests > 0 else 0
+    secondary_pass_rate = (passing_secondary_tests / total_secondary_tests * 100) if total_secondary_tests > 0 else 0
+    total_tests = total_primary_tests + total_secondary_tests
+    total_passing = passing_primary_tests + passing_secondary_tests
+    overall_pass_rate = (total_passing / total_tests * 100) if total_tests > 0 else 0
+
+    # Display basic metadata
     md.append(f"**Total Opcodes**: {index['metadata']['total_opcodes']}")
     md.append("")
     md.append(f"**Implemented Opcodes**: {index['metadata']['implemented_opcodes']}")
     md.append("")
     md.append(f"**Total Entries**: {index['metadata']['total_entries']}")
+    md.append("")
+
+    # Test Statistics Section
+    md.append("## Test Statistics")
+    md.append("")
+    md.append(f"**Overall Test Results**: {total_passing}/{total_tests} passing ({overall_pass_rate:.1f}%)")
+    md.append("")
+
+    # Primary Tests
+    failing_primary = total_primary_tests - passing_primary_tests
+    md.append(f"**Primary Tests**: {passing_primary_tests}/{total_primary_tests} passing ({primary_pass_rate:.1f}%)")
+    if failing_primary > 0:
+        md.append(f"  - {failing_primary} failing primary tests")
+        md.append(f"  - {opcodes_with_failing_primary} opcodes with failing primary tests")
+    md.append("")
+
+    # Secondary Tests
+    failing_secondary = total_secondary_tests - passing_secondary_tests
+    md.append(f"**Secondary Tests**: {passing_secondary_tests}/{total_secondary_tests} passing ({secondary_pass_rate:.1f}%)")
+    if failing_secondary > 0:
+        md.append(f"  - {failing_secondary} failing secondary tests")
+    md.append("")
+
+    # Implementation Progress
+    md.append("## Implementation Progress")
+    md.append("")
+    md.append(f"**Fully Implemented Opcodes**: {opcodes_fully_implemented}/{index['metadata']['total_opcodes']}")
+    md.append("")
+    md.append(f"**Opcodes with Primary Tests**: {opcodes_with_primary}")
+    md.append("")
+    md.append(f"**Opcodes with Documentation**: {opcodes_with_docs}")
+    md.append("")
+
+    # What Needs Attention
+    if failing_primary > 0 or failing_secondary > 0:
+        md.append("## What Needs Attention")
+        md.append("")
+        if failing_primary > 0:
+            md.append(f"- **{failing_primary} failing primary tests** across {opcodes_with_failing_primary} opcodes (see 'Failing Primary' column)")
+        if failing_secondary > 0:
+            md.append(f"- **{failing_secondary} failing secondary tests**")
+        opcodes_not_fully_implemented = index['metadata']['total_opcodes'] - opcodes_fully_implemented
+        if opcodes_not_fully_implemented > 0:
+            md.append(f"- **{opcodes_not_fully_implemented} opcodes** not yet marked as fully implemented")
+        md.append("")
+
     md.append("")
 
     # Group entries by hex value

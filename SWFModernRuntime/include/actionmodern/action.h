@@ -186,5 +186,6 @@ void actionCatchToRegister(char* stack, u32* sp, u8 reg_num);
 void actionTryEnd(char* stack, u32* sp);
 
 // Control flow
+int evaluateCondition(char* stack, u32* sp);
 bool actionWaitForFrame(char* stack, u32* sp, u16 frame);
 bool actionWaitForFrame2(char* stack, u32* sp);
