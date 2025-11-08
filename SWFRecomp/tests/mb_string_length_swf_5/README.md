@@ -1,10 +1,10 @@
-# MB_STRING_LENGTH Opcode Test (0x35)
+# MB_STRING_LENGTH Opcode Test (0x31)
 
 ## Overview
 
 This test validates the implementation of the `MB_STRING_LENGTH` (Multibyte String Length) opcode for ActionScript 2.
 
-**Opcode**: 0x35
+**Opcode**: 0x31
 **Category**: String Operations
 **SWF Version**: 5+ (requires multibyte support)
 
@@ -93,7 +93,7 @@ mblength("Hello世界")
 ### Files Modified
 
 1. **SWFRecomp/include/action/action.hpp**
-   - Added `SWF_ACTION_MB_STRING_LENGTH = 0x35` to enum
+   - Added `SWF_ACTION_MB_STRING_LENGTH = 0x31` to enum
 
 2. **SWFRecomp/src/action/action.cpp**
    - Added translation case for MB_STRING_LENGTH opcode
@@ -143,7 +143,7 @@ void actionMbStringLength(char* stack, u32* sp, char* v_str)
 
 ### Key Differences from STRING_LENGTH (0x14)
 
-| Aspect | STRING_LENGTH (0x14) | MB_STRING_LENGTH (0x35) |
+| Aspect | STRING_LENGTH (0x14) | MB_STRING_LENGTH (0x31) |
 |--------|---------------------|------------------------|
 | **Counts** | Bytes | Characters |
 | **UTF-8 Aware** | No | Yes |
