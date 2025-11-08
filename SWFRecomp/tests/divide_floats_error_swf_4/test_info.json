@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "divide_floats_error_swf_4",
+    "description": "Tests DIVIDE opcode (0x0D) with various cases including division by zero, negative division by zero, and NaN",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["DIVIDE"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
