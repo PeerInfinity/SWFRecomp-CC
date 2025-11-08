@@ -3,7 +3,7 @@
 Validation script for greater_swf_4
 
 Tests the GREATER opcode (0x67).
-Expected output: 1 (since 5 > 3 is true)
+Expected output: 1 (because 5 > 3 is true)
 """
 import sys
 import json
@@ -19,12 +19,12 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected: 1 (since 5 > 3 is true)
+    Expected: "1" (5 > 3 is true)
     """
     lines = parse_output(output)
 
-    # Simple single-output validation
-    expected = "1"  # 5 > 3 = true = 1
+    # Test: trace(5 > 3) should output 1
+    expected = "1"
     actual = lines[0] if lines else ""
 
     return make_validation_result([
