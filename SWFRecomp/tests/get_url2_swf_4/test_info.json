@@ -1,8 +1,20 @@
 {
   "metadata": {
     "name": "get_url2_swf_4",
-    "description": "Tests GET_URL2 opcode (0x9A) - Stack-based URL loading with HTTP method support",
-    "swf_version": 4
+    "description": "Tests GET_URL2 opcode (0x9A) - Stack-based URL loading with HTTP method support. Comprehensive test coverage including all flag combinations, edge cases (empty strings, concatenated URLs), and multiple HTTP methods (GET/POST) for both browser windows and sprite targets.",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": false,
+    "missing_features": [
+      "HTTP client functionality - no actual GET/POST requests made",
+      "Variable encoding (x-www-form-urlencoded) - movie clip variables not sent with requests",
+      "Variable parsing from HTTP response - response not parsed into ActionScript variables",
+      "Setting variables in target scope - variables from response not set in timeline or sprite",
+      "SWF file downloading and loading - external SWF files not actually loaded",
+      "MovieClip/sprite management - sprite paths not resolved, no actual sprite loading",
+      "Browser window integration - URLs not opened in actual browser windows",
+      "Security sandbox enforcement - no cross-domain restrictions implemented"
+    ]
   },
   "opcodes": {
     "tested": ["GET_URL2"],
@@ -10,5 +22,24 @@
   },
   "execution": {
     "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "basic_url_window_target_no_method",
+    "get_request_with_variables_window",
+    "post_request_window",
+    "load_movie_into_sprite",
+    "dynamic_url_from_concatenation_str_list",
+    "empty_url_string",
+    "empty_target_string",
+    "sprite_target_with_get_method",
+    "sprite_target_with_post_method",
+    "multiple_string_concatenation_3_parts"
+  ],
+  "implementation_notes": {
+    "stack_operations": "Correctly pops URL and target from stack",
+    "flag_parsing": "All flags correctly parsed: SendVarsMethod (bits 7-6), LoadTargetFlag (bit 1), LoadVariablesFlag (bit 0)",
+    "string_handling": "Handles both regular strings and STR_LIST (concatenated strings)",
+    "logging": "Outputs debug messages showing what operation would be performed",
+    "current_behavior": "Logs the intended operation but does not perform actual HTTP requests, variable loading, or SWF loading"
   }
 }

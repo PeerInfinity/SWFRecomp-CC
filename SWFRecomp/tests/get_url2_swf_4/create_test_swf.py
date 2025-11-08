@@ -136,6 +136,134 @@ actions += struct.pack('<BHB', 0x96, len(string_trace5) + 1, 0)  # PUSH string
 actions += string_trace5
 actions += bytes([0x26])  # TRACE
 
+# Test Case 6: Empty URL string
+# Expected output: "Empty URL test"
+string_url6 = b'\x00'  # Empty string
+string_target6 = b'_self\x00'
+string_trace6 = b'Empty URL test\x00'
+
+# Push empty URL
+actions += struct.pack('<BHB', 0x96, len(string_url6) + 1, 0)  # PUSH string
+actions += string_url6
+
+# Push target
+actions += struct.pack('<BHB', 0x96, len(string_target6) + 1, 0)  # PUSH string
+actions += string_target6
+
+# GetURL2 with flags = 0x00
+actions += struct.pack('<BHB', 0x9A, 1, 0x00)
+
+# Trace confirmation
+actions += struct.pack('<BHB', 0x96, len(string_trace6) + 1, 0)  # PUSH string
+actions += string_trace6
+actions += bytes([0x26])  # TRACE
+
+# Test Case 7: Empty target string
+# Expected output: "Empty target test"
+string_url7 = b'test.html\x00'
+string_target7 = b'\x00'  # Empty string
+string_trace7 = b'Empty target test\x00'
+
+# Push URL
+actions += struct.pack('<BHB', 0x96, len(string_url7) + 1, 0)  # PUSH string
+actions += string_url7
+
+# Push empty target
+actions += struct.pack('<BHB', 0x96, len(string_target7) + 1, 0)  # PUSH string
+actions += string_target7
+
+# GetURL2 with flags = 0x00
+actions += struct.pack('<BHB', 0x9A, 1, 0x00)
+
+# Trace confirmation
+actions += struct.pack('<BHB', 0x96, len(string_trace7) + 1, 0)  # PUSH string
+actions += string_trace7
+actions += bytes([0x26])  # TRACE
+
+# Test Case 8: Sprite target with GET
+# Expected output: "Sprite GET test"
+string_url8 = b'data.txt\x00'
+string_target8 = b'_root.myClip\x00'
+string_trace8 = b'Sprite GET test\x00'
+
+# Push URL
+actions += struct.pack('<BHB', 0x96, len(string_url8) + 1, 0)  # PUSH string
+actions += string_url8
+
+# Push target
+actions += struct.pack('<BHB', 0x96, len(string_target8) + 1, 0)  # PUSH string
+actions += string_target8
+
+# GetURL2 with flags = 0x43 (GET method, sprite target, load variables)
+# Flags: 01 (GET) in bits 7-6, 1 in bit 1 (sprite), 1 in bit 0 (load vars)
+actions += struct.pack('<BHB', 0x9A, 1, 0x43)
+
+# Trace confirmation
+actions += struct.pack('<BHB', 0x96, len(string_trace8) + 1, 0)  # PUSH string
+actions += string_trace8
+actions += bytes([0x26])  # TRACE
+
+# Test Case 9: Sprite target with POST
+# Expected output: "Sprite POST test"
+string_url9 = b'upload.php\x00'
+string_target9 = b'/level0/clip\x00'
+string_trace9 = b'Sprite POST test\x00'
+
+# Push URL
+actions += struct.pack('<BHB', 0x96, len(string_url9) + 1, 0)  # PUSH string
+actions += string_url9
+
+# Push target
+actions += struct.pack('<BHB', 0x96, len(string_target9) + 1, 0)  # PUSH string
+actions += string_target9
+
+# GetURL2 with flags = 0x83 (POST method, sprite target, load variables)
+# Flags: 10 (POST) in bits 7-6, 1 in bit 1 (sprite), 1 in bit 0 (load vars)
+actions += struct.pack('<BHB', 0x9A, 1, 0x83)
+
+# Trace confirmation
+actions += struct.pack('<BHB', 0x96, len(string_trace9) + 1, 0)  # PUSH string
+actions += string_trace9
+actions += bytes([0x26])  # TRACE
+
+# Test Case 10: Multiple concatenations (STR_LIST with 3+ strings)
+# Expected output: "Multi-concat test"
+string_proto = b'https://\x00'
+string_domain = b'api.example.com\x00'
+string_path = b'/v1/data\x00'
+string_target10 = b'_blank\x00'
+string_trace10 = b'Multi-concat test\x00'
+
+# Push protocol
+actions += struct.pack('<BHB', 0x96, len(string_proto) + 1, 0)  # PUSH string
+actions += string_proto
+
+# Push domain
+actions += struct.pack('<BHB', 0x96, len(string_domain) + 1, 0)  # PUSH string
+actions += string_domain
+
+# Concatenate
+actions += bytes([0x21])  # STRING_ADD
+
+# Push path
+actions += struct.pack('<BHB', 0x96, len(string_path) + 1, 0)  # PUSH string
+actions += string_path
+
+# Concatenate again
+actions += bytes([0x21])  # STRING_ADD
+
+# Push target
+actions += struct.pack('<BHB', 0x96, len(string_target10) + 1, 0)  # PUSH string
+actions += string_target10
+
+# GetURL2 with flags = 0x00
+actions += struct.pack('<BHB', 0x9A, 1, 0x00)
+
+# Trace confirmation
+actions += struct.pack('<BHB', 0x96, len(string_trace10) + 1, 0)  # PUSH string
+actions += string_trace10
+actions += bytes([0x26])  # TRACE
+
 actions += bytes([0x00])  # END action
 
 # DoAction tag
