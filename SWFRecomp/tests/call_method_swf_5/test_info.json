@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "call_method_swf_5",
+    "description": "Tests CALL_METHOD opcode (0x52) - calls a method on an object with this binding",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["CALL_METHOD"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

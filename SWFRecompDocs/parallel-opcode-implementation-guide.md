@@ -320,7 +320,8 @@ do_recompile = true
   "metadata": {
     "name": "your_opcode_swf_4",
     "description": "Tests YOUR_OPCODE opcode (operation description)",
-    "swf_version": 4
+    "swf_version": 4,
+    "fully_implemented": false
   },
   "opcodes": {
     "tested": ["YOUR_OPCODE"],
@@ -333,6 +334,55 @@ do_recompile = true
 ```
 
 For non-deterministic tests (like random number generation), use `"type": "range_validation"` instead.
+
+**Important: `fully_implemented` field**
+
+The `fully_implemented` field in the metadata section indicates whether the opcode is **completely implemented** and **thoroughly tested**. This field is used to track implementation progress and appears in the opcode index.
+
+Set `fully_implemented` to **`true`** only when ALL of the following conditions are met:
+
+1. **Complete implementation**: The opcode itself is fully implemented with all required functionality
+2. **All dependencies working**: All supporting functionality required by the opcode is fully implemented
+3. **Comprehensive testing**: The test covers all relevant cases for the opcode
+4. **No known issues**: There are no TODO comments, FIXME notes, or documentation indicating missing/incomplete functionality
+
+Set `fully_implemented` to **`false`** (or omit it) if ANY of the following apply:
+
+- The opcode implementation is missing any functionality
+- Any required supporting functionality is incomplete or missing
+- The test doesn't cover all relevant edge cases
+- There are comments or documentation indicating something is incomplete
+- There are known bugs or issues with the implementation
+
+**Examples:**
+
+✅ **Set to `true`**:
+```json
+{
+  "metadata": {
+    "name": "add_swf_4",
+    "description": "Tests ADD opcode - adds two numbers",
+    "swf_version": 4,
+    "fully_implemented": true
+  }
+}
+```
+The ADD opcode is simple, fully implemented, and the test covers basic cases and edge cases.
+
+❌ **Set to `false`**:
+```json
+{
+  "metadata": {
+    "name": "init_object_swf_5",
+    "description": "Tests INIT_OBJECT opcode - creates objects",
+    "swf_version": 5,
+    "fully_implemented": false
+  }
+}
+```
+The INIT_OBJECT opcode requires object property support which may not be fully implemented yet.
+
+**When in doubt, set to `false`**. It's better to be conservative - you can always update it to `true` later once everything is confirmed working.
 
 **validate.py** - Implement validation logic:
 
@@ -1197,6 +1247,7 @@ As you implement each opcode, document:
 - [ ] Test SWF created with known expected output (or verified if exists)
 - [ ] Test directory created with all required files (or verified if exists)
 - [ ] **test_info.json created with opcode metadata**
+- [ ] **fully_implemented field set appropriately (true only if fully complete)**
 - [ ] **validate.py created with test validation logic**
 - [ ] SWFRecomp builds successfully
 - [ ] Test compiles successfully

@@ -13,6 +13,7 @@ import struct
 # 8. Small decimals: 0.001 + 0.002 = 0.003
 # 9. Negative result: -10 + 3 = -7
 # 10. Double negative: -5 + -5 = -10
+# 11. Non-numeric string: "hello" + 5 = 5 (atof("hello") = 0)
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -105,6 +106,12 @@ actions += push_float(-5.0)
 actions += add()
 actions += trace()
 
+# Test 11: NaN case "hello" + 5 = NaN
+actions += push_float(5.0)
+actions += push_string("hello")
+actions += add()
+actions += trace()
+
 # End action
 actions += bytes([0x00])
 
@@ -143,3 +150,4 @@ print("  7. 1000000 + 500000 = 1500000 (large numbers)")
 print("  8. 0.001 + 0.002 = 0.003 (small decimals)")
 print("  9. -10 + 3 = -7 (negative result)")
 print(" 10. -5 + -5 = -10 (double negative)")
+print(" 11. \"hello\" + 5 = 5 (non-numeric string becomes 0)")

@@ -82,6 +82,7 @@ filter_output() {
     grep -v "=== SWF" | \
     grep -v "\[Frame" | \
     grep -v "\[Tag\]" | \
+    grep -v "\[DEBUG" | \
     grep -v "^$" || true
 }
 
@@ -157,19 +158,25 @@ EOF
 # ==============================================================================
 
 discover_tests() {
-    log_info "Discovering tests..."
+    local specified_tests=("$@")
 
     local test_dirs=()
 
-    # Find all directories with test_info.json
-    for dir in "$SCRIPT_DIR"/*/; do
-        if [[ -d "$dir" && "$dir" != */templates/ && "$dir" != */build/ ]]; then
-            local test_name=$(basename "$dir")
-            if [[ -f "$dir/test_info.json" ]]; then
-                test_dirs+=("$test_name")
+    # If tests were specified, use those
+    if [[ ${#specified_tests[@]} -gt 0 ]]; then
+        test_dirs=("${specified_tests[@]}")
+    else
+        # Otherwise, discover all tests
+        # Find all directories with test_info.json
+        for dir in "$SCRIPT_DIR"/*/; do
+            if [[ -d "$dir" && "$dir" != */templates/ && "$dir" != */build/ ]]; then
+                local test_name=$(basename "$dir")
+                if [[ -f "$dir/test_info.json" ]]; then
+                    test_dirs+=("$test_name")
+                fi
             fi
-        fi
-    done
+        done
+    fi
 
     echo "${test_dirs[@]}"
 }
@@ -335,18 +342,25 @@ EOF
 # ==============================================================================
 
 run_all_tests() {
+    local specified_tests=("$@")
+
     log_info "Initializing test results..."
     init_results_file
 
-    # Discover tests
-    local test_dirs=($(discover_tests))
+    # Discover tests (pass specified tests if any)
+    local test_dirs=($(discover_tests "${specified_tests[@]}"))
 
     if [[ ${#test_dirs[@]} -eq 0 ]]; then
         log_warning "No tests found with test_info.json"
         return
     fi
 
-    log_info "Found ${#test_dirs[@]} tests"
+    # Log appropriate message
+    if [[ ${#specified_tests[@]} -gt 0 ]]; then
+        log_info "Running ${#test_dirs[@]} specified test(s)"
+    else
+        log_info "Discovered ${#test_dirs[@]} tests"
+    fi
     echo ""
 
     # Run each test
@@ -488,7 +502,7 @@ main() {
     echo "========================================"
     echo ""
 
-    run_all_tests
+    run_all_tests "$@"
     print_summary
 
     # Exit with error if any tests failed

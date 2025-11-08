@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "constant_pool_nonseq_swf_5",
+    "description": "Tests CONSTANT_POOL with non-sequential index access - verifies random access to pool",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["CONSTANT_POOL"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

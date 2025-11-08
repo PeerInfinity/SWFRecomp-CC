@@ -2,7 +2,8 @@
   "metadata": {
     "name": "and_floats_second_1_swf_4",
     "description": "Tests ActionAnd opcode with second operand false (1 && 0)",
-    "swf_version": 4
+    "swf_version": 4,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["AND"],

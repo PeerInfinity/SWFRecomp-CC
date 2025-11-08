@@ -2,7 +2,7 @@
   "metadata": {
     "generated_date": "2025-11-07",
     "total_opcodes": 100,
-    "implemented_opcodes": 31,
+    "implemented_opcodes": 34,
     "total_entries": 273
   },
   "entries": [
@@ -18,7 +18,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": null,
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -37,7 +37,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4310)"
     },
     {
@@ -56,7 +56,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -75,7 +75,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 121)"
     },
     {
@@ -94,7 +94,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4324)"
     },
     {
@@ -113,7 +113,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -132,7 +132,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4338)"
     },
     {
@@ -151,7 +151,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -170,7 +170,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 122)"
     },
     {
@@ -195,7 +195,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-0x07.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4354)"
     },
     {
@@ -220,7 +220,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-0x07.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -239,7 +239,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4368)"
     },
     {
@@ -258,7 +258,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -277,7 +277,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 76)"
     },
     {
@@ -296,7 +296,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4379)"
     },
     {
@@ -315,7 +315,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -334,7 +334,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 127)"
     },
     {
@@ -359,7 +359,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 4670)"
     },
     {
@@ -384,7 +384,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -409,7 +409,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "Runtime function (action.h line 78)"
     },
     {
@@ -424,7 +424,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4693)"
     },
     {
@@ -439,7 +439,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -454,7 +454,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 80)"
     },
     {
@@ -469,7 +469,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4714)"
     },
     {
@@ -484,7 +484,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -499,7 +499,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 81)"
     },
     {
@@ -514,7 +514,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4737)"
     },
     {
@@ -529,7 +529,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -544,7 +544,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 82)"
     },
     {
@@ -559,7 +559,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4761)"
     },
     {
@@ -574,7 +574,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -589,7 +589,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 84)"
     },
     {
@@ -608,7 +608,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4786)"
     },
     {
@@ -627,7 +627,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -646,7 +646,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 85)"
     },
     {
@@ -673,7 +673,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 4808)"
     },
     {
@@ -700,7 +700,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -727,7 +727,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "Runtime function (action.h line 88)"
     },
     {
@@ -742,7 +742,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4829)"
     },
     {
@@ -757,7 +757,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -772,7 +772,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 89)"
     },
     {
@@ -787,7 +787,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4853)"
     },
     {
@@ -802,7 +802,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -817,7 +817,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 90)"
     },
     {
@@ -832,7 +832,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4882)"
     },
     {
@@ -847,7 +847,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -862,7 +862,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 102)"
     },
     {
@@ -877,7 +877,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4903)"
     },
     {
@@ -892,7 +892,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -907,7 +907,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 103)"
     },
     {
@@ -922,11 +922,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
-        "head_commit": "d117464f127c23c3b5e1c3453987d49332b71ff3",
-        "subject": "Implement STRING_EXTRACT opcode (0x15) for AS2 substring operation"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4942)"
     },
     {
@@ -941,11 +937,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
-        "head_commit": "d117464f127c23c3b5e1c3453987d49332b71ff3",
-        "subject": "Implement STRING_EXTRACT opcode (0x15) for AS2 substring operation"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -960,11 +952,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja",
-        "head_commit": "d117464f127c23c3b5e1c3453987d49332b71ff3",
-        "subject": "Implement STRING_EXTRACT opcode (0x15) for AS2 substring operation"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 104)"
     },
     {
@@ -983,7 +971,7 @@
         "SWFRecomp/tests/cast_op_swf_7"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4651)"
     },
     {
@@ -1002,7 +990,7 @@
         "SWFRecomp/tests/cast_op_swf_7"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1017,7 +1005,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5031)"
     },
     {
@@ -1032,7 +1020,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1047,7 +1035,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 91)"
     },
     {
@@ -1059,16 +1047,18 @@
       "function_implementation": null,
       "tests_primary": [],
       "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5218)"
     },
     {
@@ -1080,16 +1070,18 @@
       "function_implementation": "parseActions (case SWF_ACTION_GET_VARIABLE)",
       "tests_primary": [],
       "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1101,16 +1093,18 @@
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "tests_primary": [],
       "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 111)"
     },
     {
@@ -1122,15 +1116,17 @@
       "function_implementation": null,
       "tests_primary": [],
       "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5240)"
     },
     {
@@ -1142,15 +1138,17 @@
       "function_implementation": "parseActions (case SWF_ACTION_SET_VARIABLE)",
       "tests_primary": [],
       "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1162,15 +1160,17 @@
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "tests_primary": [],
       "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 112)"
     },
     {
@@ -1189,7 +1189,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5405)"
     },
     {
@@ -1208,7 +1208,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1227,7 +1227,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 113)"
     },
     {
@@ -1247,7 +1247,7 @@
         "SWFRecomp/tests/get_url2_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4921)"
     },
     {
@@ -1267,7 +1267,7 @@
         "SWFRecomp/tests/get_url2_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1287,7 +1287,7 @@
         "SWFRecomp/tests/get_url2_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 106)"
     },
     {
@@ -1302,11 +1302,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
-        "head_commit": "2dc128a80b3e23b988853623bd7cad44765f2bed",
-        "subject": "Implement GET_PROPERTY opcode (0x22) for MovieClip property access"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5423)"
     },
     {
@@ -1321,11 +1317,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
-        "head_commit": "2dc128a80b3e23b988853623bd7cad44765f2bed",
-        "subject": "Implement GET_PROPERTY opcode (0x22) for MovieClip property access"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1340,11 +1332,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs",
-        "head_commit": "2dc128a80b3e23b988853623bd7cad44765f2bed",
-        "subject": "Implement GET_PROPERTY opcode (0x22) for MovieClip property access"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 115)"
     },
     {
@@ -1359,11 +1347,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
-        "head_commit": "6a591e68a1ea81556b338f3a61e96e8d12772c39",
-        "subject": "Implement SET_PROPERTY opcode (0x23) for MovieClip properties"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5541)"
     },
     {
@@ -1378,11 +1362,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
-        "head_commit": "6a591e68a1ea81556b338f3a61e96e8d12772c39",
-        "subject": "Implement SET_PROPERTY opcode (0x23) for MovieClip properties"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1397,11 +1377,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB",
-        "head_commit": "6a591e68a1ea81556b338f3a61e96e8d12772c39",
-        "subject": "Implement SET_PROPERTY opcode (0x23) for MovieClip properties"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 116)"
     },
     {
@@ -1420,7 +1396,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5561)"
     },
     {
@@ -1439,7 +1415,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1458,7 +1434,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 117)"
     },
     {
@@ -1477,7 +1453,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5583)"
     },
     {
@@ -1496,7 +1472,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1515,7 +1491,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 118)"
     },
     {
@@ -1536,8 +1512,14 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -1574,9 +1556,15 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
         "SWFRecomp/tests/goto_frame_swf_3",
@@ -1592,13 +1580,14 @@
         "SWFRecomp/tests/start_drag_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4",
         "SWFRecomp/tests/stop_swf_4",
+        "SWFRecomp/tests/throw_swf_7",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5682)"
     },
     {
@@ -1619,8 +1608,14 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -1657,9 +1652,15 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
         "SWFRecomp/tests/goto_frame_swf_3",
@@ -1675,13 +1676,14 @@
         "SWFRecomp/tests/start_drag_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4",
         "SWFRecomp/tests/stop_swf_4",
+        "SWFRecomp/tests/throw_swf_7",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1702,8 +1704,14 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -1740,9 +1748,15 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
         "SWFRecomp/tests/goto_frame_swf_3",
@@ -1758,13 +1772,14 @@
         "SWFRecomp/tests/start_drag_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4",
         "SWFRecomp/tests/stop_swf_4",
+        "SWFRecomp/tests/throw_swf_7",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 124)"
     },
     {
@@ -1783,7 +1798,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5601)"
     },
     {
@@ -1802,7 +1817,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1821,7 +1836,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 125)"
     },
     {
@@ -1840,7 +1855,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5641)"
     },
     {
@@ -1859,7 +1874,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1878,7 +1893,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 126)"
     },
     {
@@ -1893,11 +1908,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
-        "head_commit": "705d3e4952efe1d4cae824e22fbcc916cb6b7edd",
-        "subject": "Implement STRING_LESS opcode (0x29) for lexicographic string comparison"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4964)"
     },
     {
@@ -1912,11 +1923,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
-        "head_commit": "705d3e4952efe1d4cae824e22fbcc916cb6b7edd",
-        "subject": "Implement STRING_LESS opcode (0x29) for lexicographic string comparison"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1931,11 +1938,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L",
-        "head_commit": "705d3e4952efe1d4cae824e22fbcc916cb6b7edd",
-        "subject": "Implement STRING_LESS opcode (0x29) for lexicographic string comparison"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 107)"
     },
     {
@@ -1950,10 +1953,12 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/throw_swf_7"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 7289)"
     },
     {
@@ -1968,10 +1973,12 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/throw_swf_7"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -1986,10 +1993,12 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/throw_swf_7"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 176)"
     },
     {
@@ -2008,7 +2017,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 7141)"
     },
     {
@@ -2027,7 +2036,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2046,7 +2055,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 135)"
     },
     {
@@ -2065,7 +2074,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 7164)"
     },
     {
@@ -2084,7 +2093,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2103,7 +2112,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 108)"
     },
     {
@@ -2118,7 +2127,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5721)"
     },
     {
@@ -2133,7 +2142,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2148,7 +2157,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 129)"
     },
     {
@@ -2163,11 +2172,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE",
-        "head_commit": "bfbc54b8dc9cf5cbd7a08c3a832457452fedf8bc",
-        "subject": "Implement CharToAscii (0x31) opcode for AS2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4986)"
     },
     {
@@ -2182,11 +2187,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE",
-        "head_commit": "bfbc54b8dc9cf5cbd7a08c3a832457452fedf8bc",
-        "subject": "Implement CharToAscii (0x31) opcode for AS2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2201,11 +2202,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
-        "head_commit": "f919257999bd3620b400f2bcef828e6e8fc2090a",
-        "subject": "Implement ASCII_TO_CHAR opcode (0x32)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5053)"
     },
     {
@@ -2220,11 +2217,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
-        "head_commit": "f919257999bd3620b400f2bcef828e6e8fc2090a",
-        "subject": "Implement ASCII_TO_CHAR opcode (0x32)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2239,11 +2232,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6",
-        "head_commit": "f919257999bd3620b400f2bcef828e6e8fc2090a",
-        "subject": "Implement ASCII_TO_CHAR opcode (0x32)"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 109)"
     },
     {
@@ -2258,11 +2247,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
-        "head_commit": "420ee39dcc4c0e3b8e2cd899d30eebb9e824d697",
-        "subject": "Implement MB_CHAR_TO_ASCII opcode (0x33) for multibyte UTF-8 string support"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5072)"
     },
     {
@@ -2277,11 +2262,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
-        "head_commit": "420ee39dcc4c0e3b8e2cd899d30eebb9e824d697",
-        "subject": "Implement MB_CHAR_TO_ASCII opcode (0x33) for multibyte UTF-8 string support"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2296,11 +2277,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx",
-        "head_commit": "420ee39dcc4c0e3b8e2cd899d30eebb9e824d697",
-        "subject": "Implement MB_CHAR_TO_ASCII opcode (0x33) for multibyte UTF-8 string support"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 130)"
     },
     {
@@ -2315,7 +2292,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5703)"
     },
     {
@@ -2330,7 +2307,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2345,7 +2322,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 132)"
     },
     {
@@ -2360,11 +2337,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK",
-        "head_commit": "5a7d71fd71cc468bba9df66f0143402e2048f193",
-        "subject": "Implement MB_STRING_LENGTH opcode (0x35)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5006)"
     },
     {
@@ -2379,11 +2352,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK",
-        "head_commit": "5a7d71fd71cc468bba9df66f0143402e2048f193",
-        "subject": "Implement MB_STRING_LENGTH opcode (0x35)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2398,11 +2367,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
-        "head_commit": "5012878afbe100af027f2bc377a93fccb7d128d8",
-        "subject": "Implement MB_ASCII_TO_CHAR opcode (0x36)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5094)"
     },
     {
@@ -2417,11 +2382,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB",
-        "head_commit": "5012878afbe100af027f2bc377a93fccb7d128d8",
-        "subject": "Implement MB_ASCII_TO_CHAR opcode (0x36)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2440,7 +2401,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5115)"
     },
     {
@@ -2459,7 +2420,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2474,7 +2435,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6007)"
     },
     {
@@ -2489,7 +2450,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 144)"
     },
     {
@@ -2504,7 +2465,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6025)"
     },
     {
@@ -2519,7 +2480,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 145)"
     },
     {
@@ -2534,11 +2495,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-typeof-0x3c-011CUqjRkgkmLYw99RCTrX2N",
-        "head_commit": "e8c6149a895d55c12ff64fc38abfb422e1847755",
-        "subject": "Implement TYPEOF opcode (0x3C)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5969)"
     },
     {
@@ -2553,11 +2510,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
-        "head_commit": "16cd31e229e5f910b61a45737df165f3fa2fc5bf",
-        "subject": "Implement DUPLICATE opcode (0x3D)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5796)"
     },
     {
@@ -2572,11 +2525,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
-        "head_commit": "16cd31e229e5f910b61a45737df165f3fa2fc5bf",
-        "subject": "Implement DUPLICATE opcode (0x3D)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2591,11 +2540,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy",
-        "head_commit": "16cd31e229e5f910b61a45737df165f3fa2fc5bf",
-        "subject": "Implement DUPLICATE opcode (0x3D)"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 94)"
     },
     {
@@ -2606,15 +2551,13 @@
       "function_declaration": null,
       "function_implementation": null,
       "tests_primary": [],
-      "tests_secondary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5"
+      ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
-        "head_commit": "2722c1226bc29b04becb65e51d805661065bbe34",
-        "subject": "Implement RETURN opcode (0x3E) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6643)"
     },
     {
@@ -2625,15 +2568,13 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_RETURN)",
       "tests_primary": [],
-      "tests_secondary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5"
+      ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
-        "head_commit": "2722c1226bc29b04becb65e51d805661065bbe34",
-        "subject": "Implement RETURN opcode (0x3E) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2644,15 +2585,13 @@
       "function_declaration": "void actionReturn(char* stack, u32* sp);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "tests_primary": [],
-      "tests_secondary": [],
+      "tests_secondary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5"
+      ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz",
-        "head_commit": "2722c1226bc29b04becb65e51d805661065bbe34",
-        "subject": "Implement RETURN opcode (0x3E) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 137)"
     },
     {
@@ -2667,7 +2606,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6438)"
     },
     {
@@ -2682,7 +2621,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2697,7 +2636,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 83)"
     },
     {
@@ -2712,11 +2651,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
-        "head_commit": "73a5174c63a74faf1b955c38831ea2d93cea9ba3",
-        "subject": "Implement NEW_OBJECT opcode (0x40) with Array/Object support"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6216)"
     },
     {
@@ -2731,11 +2666,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
-        "head_commit": "73a5174c63a74faf1b955c38831ea2d93cea9ba3",
-        "subject": "Implement NEW_OBJECT opcode (0x40) with Array/Object support"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2750,11 +2681,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS",
-        "head_commit": "73a5174c63a74faf1b955c38831ea2d93cea9ba3",
-        "subject": "Implement NEW_OBJECT opcode (0x40) with Array/Object support"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 165)"
     },
     {
@@ -2769,11 +2696,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4",
-        "head_commit": "97cec4084ea511e3d08ceba8008e6c6222eaa45f",
-        "subject": "Implement DECLARE_LOCAL opcode (0x41) with local scope infrastructure"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5990)"
     },
     {
@@ -2788,11 +2711,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4",
-        "head_commit": "97cec4084ea511e3d08ceba8008e6c6222eaa45f",
-        "subject": "Implement DECLARE_LOCAL opcode (0x41) with local scope infrastructure"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2807,11 +2726,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
-        "head_commit": "b11c784685c0700a097478b45e701c19e13d76c9",
-        "subject": "Implement INIT_ARRAY opcode (0x42)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6124)"
     },
     {
@@ -2826,11 +2741,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
-        "head_commit": "b11c784685c0700a097478b45e701c19e13d76c9",
-        "subject": "Implement INIT_ARRAY opcode (0x42)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2845,11 +2756,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe",
-        "head_commit": "b11c784685c0700a097478b45e701c19e13d76c9",
-        "subject": "Implement INIT_ARRAY opcode (0x42)"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 138)"
     },
     {
@@ -2866,14 +2773,11 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
-        "head_commit": "ac7e661289f093413930f20754bbfa827cf562ac",
-        "subject": "Implement INIT_OBJECT opcode (0x43) for ActionScript object creation"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6153)"
     },
     {
@@ -2890,14 +2794,11 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
-        "head_commit": "ac7e661289f093413930f20754bbfa827cf562ac",
-        "subject": "Implement INIT_OBJECT opcode (0x43) for ActionScript object creation"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2914,14 +2815,11 @@
       ],
       "tests_primary_passing": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v",
-        "head_commit": "ac7e661289f093413930f20754bbfa827cf562ac",
-        "subject": "Implement INIT_OBJECT opcode (0x43) for ActionScript object creation"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 162)"
     },
     {
@@ -2940,7 +2838,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6380)"
     },
     {
@@ -2959,7 +2857,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -2974,11 +2872,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
-        "head_commit": "f7dbad28eac27324c6117bb3c301e6d2d109df24",
-        "subject": "Implement TARGET_PATH opcode (0x45)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6268)"
     },
     {
@@ -2993,11 +2887,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
-        "head_commit": "f7dbad28eac27324c6117bb3c301e6d2d109df24",
-        "subject": "Implement TARGET_PATH opcode (0x45)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3012,11 +2902,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD",
-        "head_commit": "f7dbad28eac27324c6117bb3c301e6d2d109df24",
-        "subject": "Implement TARGET_PATH opcode (0x45)"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 96)"
     },
     {
@@ -3031,11 +2917,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
-        "head_commit": "ebe63532930ce7dac71c8af8dae63d7ac387834e",
-        "subject": "Implement ENUMERATE opcode (0x46) for object property enumeration"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6044)"
     },
     {
@@ -3050,11 +2932,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
-        "head_commit": "ebe63532930ce7dac71c8af8dae63d7ac387834e",
-        "subject": "Implement ENUMERATE opcode (0x46) for object property enumeration"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3069,11 +2947,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ",
-        "head_commit": "ebe63532930ce7dac71c8af8dae63d7ac387834e",
-        "subject": "Implement ENUMERATE opcode (0x46) for object property enumeration"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 97)"
     },
     {
@@ -3092,11 +2966,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
-        "head_commit": "10b0923c538e8829e12185167e6f1f66d4c21d1b",
-        "subject": "Implement ADD2 opcode (0x47) - Type-aware addition"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6393)"
     },
     {
@@ -3115,11 +2985,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
-        "head_commit": "10b0923c538e8829e12185167e6f1f66d4c21d1b",
-        "subject": "Implement ADD2 opcode (0x47) - Type-aware addition"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3138,11 +3004,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add2-0x47.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb",
-        "head_commit": "10b0923c538e8829e12185167e6f1f66d4c21d1b",
-        "subject": "Implement ADD2 opcode (0x47) - Type-aware addition"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 79)"
     },
     {
@@ -3157,11 +3019,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
-        "head_commit": "38abf422447f760d57ac32be92b3ad8427a48d86",
-        "subject": "Implement ActionLess2 opcode (0x48) and fix opcode naming"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6414)"
     },
     {
@@ -3176,11 +3034,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
-        "head_commit": "38abf422447f760d57ac32be92b3ad8427a48d86",
-        "subject": "Implement ActionLess2 opcode (0x48) and fix opcode naming"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3195,11 +3049,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd",
-        "head_commit": "38abf422447f760d57ac32be92b3ad8427a48d86",
-        "subject": "Implement ActionLess2 opcode (0x48) and fix opcode naming"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 86)"
     },
     {
@@ -3216,7 +3066,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6068)"
     },
     {
@@ -3233,7 +3083,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3250,7 +3100,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 87)"
     },
     {
@@ -3265,11 +3115,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
-        "head_commit": "5a01940750da3549c0c5b47f539667c4153ca24d",
-        "subject": "Implement TO_NUMBER opcode (0x4A) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6320)"
     },
     {
@@ -3284,11 +3130,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
-        "head_commit": "5a01940750da3549c0c5b47f539667c4153ca24d",
-        "subject": "Implement TO_NUMBER opcode (0x4A) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3303,11 +3145,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo",
-        "head_commit": "5a01940750da3549c0c5b47f539667c4153ca24d",
-        "subject": "Implement TO_NUMBER opcode (0x4A) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 92)"
     },
     {
@@ -3322,11 +3160,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
-        "head_commit": "2fde36278e8f75217529a706b8d71989dbc37216",
-        "subject": "Implement TO_STRING opcode (0x4B) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6342)"
     },
     {
@@ -3341,11 +3175,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
-        "head_commit": "2fde36278e8f75217529a706b8d71989dbc37216",
-        "subject": "Implement TO_STRING opcode (0x4B) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3360,11 +3190,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE",
-        "head_commit": "2fde36278e8f75217529a706b8d71989dbc37216",
-        "subject": "Implement TO_STRING opcode (0x4B) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 93)"
     },
     {
@@ -3379,13 +3205,11 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc",
-        "head_commit": "9509728d78349fa6c71676e6d9f85c1c44c6fc88",
-        "subject": "Implement STACK_SWAP opcode (0x4C)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6627)"
     },
     {
@@ -3400,13 +3224,11 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc",
-        "head_commit": "9509728d78349fa6c71676e6d9f85c1c44c6fc88",
-        "subject": "Implement STACK_SWAP opcode (0x4C)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3421,7 +3243,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6660)"
     },
     {
@@ -3436,7 +3258,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3451,7 +3273,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 94)"
     },
     {
@@ -3466,7 +3288,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6090)"
     },
     {
@@ -3481,7 +3303,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3496,7 +3318,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 163)"
     },
     {
@@ -3511,13 +3333,11 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
-        "head_commit": "65f2d22b52936b06419c0a9c6df9b3ed37d765d5",
-        "subject": "Implement SET_MEMBER opcode (0x4F) and dependencies"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6248)"
     },
     {
@@ -3532,13 +3352,11 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
-        "head_commit": "65f2d22b52936b06419c0a9c6df9b3ed37d765d5",
-        "subject": "Implement SET_MEMBER opcode (0x4F) and dependencies"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3553,13 +3371,11 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E",
-        "head_commit": "65f2d22b52936b06419c0a9c6df9b3ed37d765d5",
-        "subject": "Implement SET_MEMBER opcode (0x4F) and dependencies"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 164)"
     },
     {
@@ -3574,7 +3390,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6605)"
     },
     {
@@ -3589,7 +3405,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3604,7 +3420,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 140)"
     },
     {
@@ -3619,7 +3435,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6586)"
     },
     {
@@ -3634,7 +3450,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3649,7 +3465,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 141)"
     },
     {
@@ -3659,13 +3475,38 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5831)"
+    },
+    {
+      "hex": "0X52",
+      "name": "SWF_ACTION_CALL_METHOD",
+      "source": "action.hpp",
+      "type": "enum",
+      "function_declaration": null,
+      "function_implementation": "parseActions (case SWF_ACTION_CALL_METHOD)",
+      "tests_primary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5"
+      ],
+      "tests_secondary": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_swf_5"
+      ],
+      "tests_secondary_passing": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
+      "fully_implemented": false,
+      "notes": "C++ enum value for opcode"
     },
     {
       "hex": "0X52",
@@ -3674,12 +3515,17 @@
       "type": "function",
       "function_declaration": "void actionCallMethod(char* stack, u32* sp, char* str_buffer);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 160)"
     },
     {
@@ -3694,11 +3540,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
-        "head_commit": "80136be832c77e5b7e0371987cbe6cae912fb729",
-        "subject": "Implement NEW_METHOD opcode (0x53)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6184)"
     },
     {
@@ -3713,11 +3555,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
-        "head_commit": "80136be832c77e5b7e0371987cbe6cae912fb729",
-        "subject": "Implement NEW_METHOD opcode (0x53)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3732,11 +3570,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
-      "implementation_branch": {
-        "name": "origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x",
-        "head_commit": "80136be832c77e5b7e0371987cbe6cae912fb729",
-        "subject": "Implement NEW_METHOD opcode (0x53)"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 166)"
     },
     {
@@ -3755,7 +3589,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6782)"
     },
     {
@@ -3774,7 +3608,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3793,7 +3627,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 142)"
     },
     {
@@ -3808,11 +3642,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
-        "head_commit": "5ee877d6d80387875c1f269ee3bc09d37adb1092",
-        "subject": "Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6806)"
     },
     {
@@ -3827,11 +3657,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
-        "head_commit": "5ee877d6d80387875c1f269ee3bc09d37adb1092",
-        "subject": "Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3846,11 +3672,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW",
-        "head_commit": "5ee877d6d80387875c1f269ee3bc09d37adb1092",
-        "subject": "Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 143)"
     },
     {
@@ -3869,11 +3691,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
-        "head_commit": "24c5cdffc24f6cc602a8283f78a870ffa8a3a9d9",
-        "subject": "Implement BIT_AND opcode (0x60) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6457)"
     },
     {
@@ -3892,11 +3710,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
-        "head_commit": "24c5cdffc24f6cc602a8283f78a870ffa8a3a9d9",
-        "subject": "Implement BIT_AND opcode (0x60) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3915,11 +3729,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN",
-        "head_commit": "24c5cdffc24f6cc602a8283f78a870ffa8a3a9d9",
-        "subject": "Implement BIT_AND opcode (0x60) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 146)"
     },
     {
@@ -3934,11 +3744,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
-        "head_commit": "c84503abf6326e8bdb04fd6d948695b4569d4801",
-        "subject": "Implement BIT_OR opcode (0x61) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6497)"
     },
     {
@@ -3953,11 +3759,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
-        "head_commit": "c84503abf6326e8bdb04fd6d948695b4569d4801",
-        "subject": "Implement BIT_OR opcode (0x61) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3972,11 +3774,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw",
-        "head_commit": "c84503abf6326e8bdb04fd6d948695b4569d4801",
-        "subject": "Implement BIT_OR opcode (0x61) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 147)"
     },
     {
@@ -3991,11 +3789,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
-        "head_commit": "0cb58244e28e4f3c842d5c1ae8d07ca6b9b0ad18",
-        "subject": "Implement BIT_XOR opcode (0x62) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6563)"
     },
     {
@@ -4010,11 +3804,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
-        "head_commit": "0cb58244e28e4f3c842d5c1ae8d07ca6b9b0ad18",
-        "subject": "Implement BIT_XOR opcode (0x62) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4029,11 +3819,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA",
-        "head_commit": "0cb58244e28e4f3c842d5c1ae8d07ca6b9b0ad18",
-        "subject": "Implement BIT_XOR opcode (0x62) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 148)"
     },
     {
@@ -4048,11 +3834,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
-        "head_commit": "6adec98bba782efd8516f67af512f4460ef80867",
-        "subject": "Implement BIT_LSHIFT opcode (0x63) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6476)"
     },
     {
@@ -4067,11 +3849,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
-        "head_commit": "6adec98bba782efd8516f67af512f4460ef80867",
-        "subject": "Implement BIT_LSHIFT opcode (0x63) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4086,11 +3864,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ",
-        "head_commit": "6adec98bba782efd8516f67af512f4460ef80867",
-        "subject": "Implement BIT_LSHIFT opcode (0x63) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 149)"
     },
     {
@@ -4105,11 +3879,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
-        "head_commit": "ac378945d5e4372147e701c69aa8f37510a67e0a",
-        "subject": "Implement BIT_RSHIFT opcode (0x64) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6517)"
     },
     {
@@ -4124,11 +3894,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
-        "head_commit": "ac378945d5e4372147e701c69aa8f37510a67e0a",
-        "subject": "Implement BIT_RSHIFT opcode (0x64) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4143,11 +3909,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt",
-        "head_commit": "ac378945d5e4372147e701c69aa8f37510a67e0a",
-        "subject": "Implement BIT_RSHIFT opcode (0x64) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 150)"
     },
     {
@@ -4162,11 +3924,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
-        "head_commit": "f6cc4cdbc522c20f7df48d85870caa95a934b148",
-        "subject": "Implement BIT_URSHIFT opcode (0x65) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6541)"
     },
     {
@@ -4181,11 +3939,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
-        "head_commit": "f6cc4cdbc522c20f7df48d85870caa95a934b148",
-        "subject": "Implement BIT_URSHIFT opcode (0x65) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4200,11 +3954,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ",
-        "head_commit": "f6cc4cdbc522c20f7df48d85870caa95a934b148",
-        "subject": "Implement BIT_URSHIFT opcode (0x65) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 151)"
     },
     {
@@ -4219,11 +3969,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
-        "head_commit": "5367dc91ade751214ce4f9b1c0959bab15bf3f6a",
-        "subject": "Implement STRICT_EQUALS opcode (0x66) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6829)"
     },
     {
@@ -4238,11 +3984,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
-        "head_commit": "5367dc91ade751214ce4f9b1c0959bab15bf3f6a",
-        "subject": "Implement STRICT_EQUALS opcode (0x66) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4257,11 +3999,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB",
-        "head_commit": "5367dc91ade751214ce4f9b1c0959bab15bf3f6a",
-        "subject": "Implement STRICT_EQUALS opcode (0x66) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 152)"
     },
     {
@@ -4276,11 +4014,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
-        "head_commit": "ecbbd2b83213ce340b24df5b748e99b505fb5ba1",
-        "subject": "Fix GREATER opcode hex value from 0x48 to 0x67"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6848)"
     },
     {
@@ -4295,11 +4029,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
-        "head_commit": "ecbbd2b83213ce340b24df5b748e99b505fb5ba1",
-        "subject": "Fix GREATER opcode hex value from 0x48 to 0x67"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4314,11 +4044,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr",
-        "head_commit": "ecbbd2b83213ce340b24df5b748e99b505fb5ba1",
-        "subject": "Fix GREATER opcode hex value from 0x48 to 0x67"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 153)"
     },
     {
@@ -4333,11 +4059,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
-        "head_commit": "874e6ecce97598d896b7b2f05d4c47a7e986e970",
-        "subject": "Implement STRING_GREATER opcode (0x68) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6870)"
     },
     {
@@ -4352,11 +4074,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
-        "head_commit": "874e6ecce97598d896b7b2f05d4c47a7e986e970",
-        "subject": "Implement STRING_GREATER opcode (0x68) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4371,11 +4089,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE",
-        "head_commit": "874e6ecce97598d896b7b2f05d4c47a7e986e970",
-        "subject": "Implement STRING_GREATER opcode (0x68) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 154)"
     },
     {
@@ -4389,10 +4103,12 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-extends-0x69-original-prompt.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 7120)"
     },
     {
@@ -4406,10 +4122,12 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-extends-0x69-original-prompt.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4423,10 +4141,12 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/extends_swf_7"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-extends-0x69-original-prompt.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 155)"
     },
     {
@@ -4445,7 +4165,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4258)"
     },
     {
@@ -4464,7 +4184,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4483,7 +4203,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 123)"
     },
     {
@@ -4502,7 +4222,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4281)"
     },
     {
@@ -4521,7 +4241,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4540,7 +4260,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 128)"
     },
     {
@@ -4555,11 +4275,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
-        "head_commit": "f308ca4dfe0eb38426e54c168da941f732fab719",
-        "subject": "Implement StoreRegister opcode (0x87)"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6678)"
     },
     {
@@ -4574,11 +4290,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
-        "head_commit": "f308ca4dfe0eb38426e54c168da941f732fab719",
-        "subject": "Implement StoreRegister opcode (0x87)"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4593,11 +4305,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT",
-        "head_commit": "f308ca4dfe0eb38426e54c168da941f732fab719",
-        "subject": "Implement StoreRegister opcode (0x87)"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 156)"
     },
     {
@@ -4607,12 +4315,22 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 5868)"
     },
     {
@@ -4622,12 +4340,22 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_CONSTANT_POOL)",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5"
+      ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
-      "implementation_branch": null,
+      "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4646,7 +4374,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4393)"
     },
     {
@@ -4665,7 +4393,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4684,7 +4412,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4437)"
     },
     {
@@ -4703,7 +4431,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4722,7 +4450,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 119)"
     },
     {
@@ -4741,7 +4469,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4449)"
     },
     {
@@ -4760,7 +4488,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4779,7 +4507,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 100)"
     },
     {
@@ -4798,7 +4526,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5655)"
     },
     {
@@ -4817,7 +4545,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4827,12 +4555,14 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5"
+      ],
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6949)"
     },
     {
@@ -4842,12 +4572,14 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DEFINE_FUNCTION2)",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5"
+      ],
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4857,12 +4589,14 @@
       "type": "function",
       "function_declaration": "void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [],
+      "tests_primary": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5"
+      ],
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 171)"
     },
     {
@@ -4879,7 +4613,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 7191)"
     },
     {
@@ -4896,7 +4630,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4911,11 +4645,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
-      "implementation_branch": {
-        "name": "origin/claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF",
-        "head_commit": "eac8864411b07eeb460edcd4848938b78184821c",
-        "subject": "Implement WITH statement (opcode 0x94) with scope chain"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 6289)"
     },
     {
@@ -4930,11 +4660,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
-      "implementation_branch": {
-        "name": "origin/claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF",
-        "head_commit": "eac8864411b07eeb460edcd4848938b78184821c",
-        "subject": "Implement WITH statement (opcode 0x94) with scope chain"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4955,8 +4681,14 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -4992,9 +4724,15 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
         "SWFRecomp/tests/goto_frame_swf_3",
@@ -5009,13 +4747,14 @@
         "SWFRecomp/tests/start_drag_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4",
         "SWFRecomp/tests/stop_swf_4",
+        "SWFRecomp/tests/throw_swf_7",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 4556)"
     },
     {
@@ -5036,8 +4775,14 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
         "SWFRecomp/tests/equals2_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -5073,9 +4818,15 @@
         "SWFRecomp/tests/and_floats_second_1_swf_4",
         "SWFRecomp/tests/and_floats_swf_4",
         "SWFRecomp/tests/bit_and_swf_4",
+        "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/cast_op_swf_7",
         "SWFRecomp/tests/clone_sprite_swf_4",
+        "SWFRecomp/tests/constant_pool_large_swf_5",
+        "SWFRecomp/tests/constant_pool_nonseq_swf_5",
+        "SWFRecomp/tests/constant_pool_repeated_swf_5",
+        "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/end_drag_swf_4",
+        "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/get_url2_swf_4",
         "SWFRecomp/tests/get_url_swf_3",
         "SWFRecomp/tests/goto_frame_swf_3",
@@ -5090,13 +4841,14 @@
         "SWFRecomp/tests/start_drag_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4",
         "SWFRecomp/tests/stop_swf_4",
+        "SWFRecomp/tests/throw_swf_7",
         "SWFRecomp/tests/toggle_quality_swf_4",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5111,7 +4863,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5139)"
     },
     {
@@ -5126,7 +4878,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5145,7 +4897,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5262)"
     },
     {
@@ -5164,7 +4916,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5183,7 +4935,7 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 161)"
     },
     {
@@ -5198,11 +4950,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
-      "implementation_branch": {
-        "name": "origin/claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq",
-        "head_commit": "c955e9b6fe8054a3b7896510f0803c4dace174ca",
-        "subject": "Implement DEFINE_FUNCTION opcode (0x9B) for AS2 function definitions"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5894)"
     },
     {
@@ -5217,11 +4965,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md",
-      "implementation_branch": {
-        "name": "origin/claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq",
-        "head_commit": "c955e9b6fe8054a3b7896510f0803c4dace174ca",
-        "subject": "Implement DEFINE_FUNCTION opcode (0x9B) for AS2 function definitions"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5240,7 +4984,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5163)"
     },
     {
@@ -5259,7 +5003,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
-      "implementation_branch": null,
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5274,11 +5018,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
-        "head_commit": "68f22c53ace3c0e60aa3bc446c252c9f92c23e59",
-        "subject": "Implement CALL opcode (0x9E) - ActionScript 2 frame subroutine calls"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5195)"
     },
     {
@@ -5293,11 +5033,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
-        "head_commit": "68f22c53ace3c0e60aa3bc446c252c9f92c23e59",
-        "subject": "Implement CALL opcode (0x9E) - ActionScript 2 frame subroutine calls"
-      },
+      "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5312,11 +5048,7 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq",
-        "head_commit": "68f22c53ace3c0e60aa3bc446c252c9f92c23e59",
-        "subject": "Implement CALL opcode (0x9E) - ActionScript 2 frame subroutine calls"
-      },
+      "fully_implemented": false,
       "notes": "Runtime function (action.h line 159)"
     },
     {
@@ -5331,31 +5063,8 @@
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ",
-        "head_commit": "1489c3ee1455923b589789b67f4cf947ccd26547",
-        "subject": "Implement CALL_METHOD opcode (0x9F) for ActionScript 2"
-      },
+      "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5344)"
-    },
-    {
-      "hex": "0X9F",
-      "name": "SWF_ACTION_CALL_METHOD",
-      "source": "action.hpp",
-      "type": "enum",
-      "function_declaration": null,
-      "function_implementation": "parseActions (case SWF_ACTION_CALL_METHOD)",
-      "tests_primary": [],
-      "tests_secondary": [],
-      "tests_primary_passing": [],
-      "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md",
-      "implementation_branch": {
-        "name": "origin/claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ",
-        "head_commit": "1489c3ee1455923b589789b67f4cf947ccd26547",
-        "subject": "Implement CALL_METHOD opcode (0x9F) for ActionScript 2"
-      },
-      "notes": "C++ enum value for opcode"
     }
   ]
 }

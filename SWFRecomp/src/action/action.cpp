@@ -21,13 +21,16 @@ namespace SWFRecomp
 	
 	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
 	{
+		// Clear constant pool at script boundary (per SWF spec)
+		constant_pool.clear();
+
 		SWFActionType code = SWF_ACTION_CONSTANT_POOL;
 		u16 length;
-		
+
 		char* action_buffer_start = action_buffer;
-		
+
 		std::vector<char*> labels;
-		
+
 		// Parse action bytes once to mark labels
 		while (code != SWF_ACTION_END_OF_ACTIONS)
 		{
@@ -789,7 +792,28 @@ namespace SWFRecomp
 
 				case SWF_ACTION_CONSTANT_POOL:
 				{
-					action_buffer += length;
+					// Read count of strings (16-bit)
+					u16 count = VAL(u16, action_buffer);
+					action_buffer += 2;
+
+					out_script << "\t" << "// ConstantPool (" << count << " strings)" << endl;
+
+					// Read each null-terminated string
+					for (u16 i = 0; i < count; i++)
+					{
+						char* str = action_buffer;
+						size_t str_len = strlen(str);
+
+						// Declare the string
+						declareString(context, str);
+						size_t str_id = getStringId(str);
+
+						// Add to constant pool
+						constant_pool.push_back(str_id);
+
+						// Advance past string and null terminator
+						action_buffer += str_len + 1;
+					}
 
 					break;
 				}
@@ -1243,6 +1267,49 @@ namespace SWFRecomp
 
 							break;
 						}
+
+						case 8:  // Constant pool index (8-bit)
+						{
+							u8 pool_index = (u8) action_buffer[push_length];
+							push_length += 1;
+
+							if (pool_index >= constant_pool.size())
+							{
+								fprintf(stderr, "Constant pool index %d out of range (pool size: %zu)\n",
+									pool_index, constant_pool.size());
+								throw std::exception();
+							}
+
+							size_t str_id = constant_pool[pool_index];
+
+							out_script << "(ConstantPool8[" << (int)pool_index << "])" << endl;
+							out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
+									   << "strlen(str_" << to_string(str_id) << "), " << str_id << ");" << endl;
+
+							break;
+						}
+
+						case 9:  // Constant pool index (16-bit)
+						{
+							u16 pool_index = VAL(u16, &action_buffer[push_length]);
+							push_length += 2;
+
+							if (pool_index >= constant_pool.size())
+							{
+								fprintf(stderr, "Constant pool index %d out of range (pool size: %zu)\n",
+									pool_index, constant_pool.size());
+								throw std::exception();
+							}
+
+							size_t str_id = constant_pool[pool_index];
+
+							out_script << "(ConstantPool16[" << (int)pool_index << "])" << endl;
+							out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
+									   << "strlen(str_" << to_string(str_id) << "), " << str_id << ");" << endl;
+
+							break;
+						}
+
 							default:
 							{
 								EXC_ARG("Undefined push type: %d\n", push_type);

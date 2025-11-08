@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "constant_pool_large_swf_5",
+    "description": "Tests CONSTANT_POOL with push type 9 (16-bit indices) and large pool (300 strings)",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["CONSTANT_POOL"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

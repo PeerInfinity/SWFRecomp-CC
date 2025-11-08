@@ -125,7 +125,7 @@ def parse_action_h() -> Dict[str, Dict]:
     return functions
 
 
-def scan_test_directories() -> Dict[str, Dict[str, List[str]]]:
+def scan_test_directories() -> Dict[str, Dict]:
     """
     Scan test directories and map them to opcodes by reading test_info.json files.
 
@@ -133,7 +133,8 @@ def scan_test_directories() -> Dict[str, Dict[str, List[str]]]:
     {
         "0x0A": {
             "tested": ["SWFRecomp/tests/add_swf_4"],
-            "supporting": ["SWFRecomp/tests/other_test_swf_4"]
+            "supporting": ["SWFRecomp/tests/other_test_swf_4"],
+            "fully_implemented": True
         }
     }
     """
@@ -184,21 +185,25 @@ def scan_test_directories() -> Dict[str, Dict[str, List[str]]]:
                 # Get the opcodes from test_info.json
                 opcodes_tested = test_info.get('opcodes', {}).get('tested', [])
                 opcodes_supporting = test_info.get('opcodes', {}).get('supporting', [])
+                fully_implemented = test_info.get('metadata', {}).get('fully_implemented', False)
 
                 # Map opcode names to hex values
                 for opcode_name in opcodes_tested:
                     hex_value = opcode_name_to_hex.get(opcode_name)
                     if hex_value:
                         if hex_value not in test_map:
-                            test_map[hex_value] = {"tested": [], "supporting": []}
+                            test_map[hex_value] = {"tested": [], "supporting": [], "fully_implemented": False}
                         test_map[hex_value]["tested"].append(relative_path)
+                        # If any test for this opcode marks it as fully implemented, mark it as such
+                        if fully_implemented:
+                            test_map[hex_value]["fully_implemented"] = True
                         print(f"  Found: {relative_path} tests {opcode_name} ({hex_value})")
 
                 for opcode_name in opcodes_supporting:
                     hex_value = opcode_name_to_hex.get(opcode_name)
                     if hex_value:
                         if hex_value not in test_map:
-                            test_map[hex_value] = {"tested": [], "supporting": []}
+                            test_map[hex_value] = {"tested": [], "supporting": [], "fully_implemented": False}
                         test_map[hex_value]["supporting"].append(relative_path)
 
             except (json.JSONDecodeError, KeyError) as e:
@@ -235,55 +240,6 @@ def scan_documentation_prompts() -> Dict[str, str]:
     return prompt_map
 
 
-def parse_repository_data() -> Dict[str, Dict]:
-    """Parse repository-data.json to extract branch information."""
-    repo_data_path = BASE_DIR / "repository-data.json"
-    branch_map = {}
-
-    print(f"\nParsing repository data: {repo_data_path}")
-
-    if not repo_data_path.exists():
-        print("  ERROR: repository-data.json not found")
-        return branch_map
-
-    with open(repo_data_path, 'r') as f:
-        data = json.load(f)
-
-    # Extract branches with opcode information
-    for branch in data.get('branches', []):
-        branch_name = branch.get('name', '')
-        subject = branch.get('subject', '')
-        head_commit = branch.get('head_commit', '')
-
-        hex_value = None
-
-        # Look for hex value in branch name: opcode-<name>-0x<hex>
-        match = re.search(r'opcode-[^-]+-0x([0-9A-Fa-f]+)', branch_name)
-        if match:
-            hex_value = f"0X{match.group(1).upper()}"
-        else:
-            # Look for hex value in subject: "Implement ... (0xHH)" or "... opcode (0xHH)"
-            match = re.search(r'\(0x([0-9A-Fa-f]+)\)', subject)
-            if match:
-                hex_value = f"0X{match.group(1).upper()}"
-            else:
-                # Look for hex value anywhere in subject
-                match = re.search(r'0x([0-9A-Fa-f]+)', subject)
-                if match:
-                    hex_value = f"0X{match.group(1).upper()}"
-
-        if hex_value:
-            # Store full branch details
-            branch_info = {
-                'name': branch_name,
-                'head_commit': head_commit,
-                'subject': subject
-            }
-            branch_map[hex_value] = branch_info
-            print(f"  Found: {branch_name} -> {hex_value}")
-
-    print(f"Total opcode branches found: {len(branch_map)}")
-    return branch_map
 
 
 def load_test_results() -> Dict[str, bool]:
@@ -331,9 +287,9 @@ def normalize_name_for_matching(name: str) -> str:
     return name.lower().replace('_', '')
 
 
-def get_test_directories_for_opcode(hex_value: str, test_map: Dict[str, Dict[str, List[str]]]) -> Dict[str, List[str]]:
+def get_test_directories_for_opcode(hex_value: str, test_map: Dict[str, Dict]) -> Dict:
     """Get test directories for an opcode by hex value."""
-    return test_map.get(hex_value, {"tested": [], "supporting": []})
+    return test_map.get(hex_value, {"tested": [], "supporting": [], "fully_implemented": False})
 
 
 def match_function_name(opcode_info: Dict, functions: Dict[str, Dict]) -> Optional[Dict]:
@@ -365,7 +321,6 @@ def build_opcode_index():
     functions = parse_action_h()
     test_map = scan_test_directories()
     prompt_map = scan_documentation_prompts()
-    branch_map = parse_repository_data()
     test_results = load_test_results()
 
     # Merge all data
@@ -389,6 +344,7 @@ def build_opcode_index():
         test_info = get_test_directories_for_opcode(hex_value, test_map)
         tests_tested = test_info["tested"]
         tests_supporting = test_info["supporting"]
+        fully_implemented = test_info["fully_implemented"]
 
         # Determine passing tests
         tests_tested_passing = []
@@ -411,9 +367,6 @@ def build_opcode_index():
         # Get documentation prompt
         doc_prompt = prompt_map.get(hex_value)
 
-        # Get branch info
-        branch = branch_map.get(hex_value)
-
         # Create entry for spec name
         if 'spec_name' in spec_info:
             entries.append({
@@ -428,7 +381,7 @@ def build_opcode_index():
                 'tests_primary_passing': tests_tested_passing,
                 'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
-                'implementation_branch': branch,
+                'fully_implemented': fully_implemented,
                 'notes': f"Official SWF specification name (spec line {spec_info.get('line_number', 'unknown')})"
             })
 
@@ -446,7 +399,7 @@ def build_opcode_index():
                 'tests_primary_passing': tests_tested_passing,
                 'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
-                'implementation_branch': branch,
+                'fully_implemented': fully_implemented,
                 'notes': 'C++ enum value for opcode'
             })
 
@@ -464,7 +417,7 @@ def build_opcode_index():
                 'tests_primary_passing': tests_tested_passing,
                 'tests_secondary_passing': tests_supporting_passing,
                 'documentation_prompt': doc_prompt,
-                'implementation_branch': branch,
+                'fully_implemented': fully_implemented,
                 'notes': f"Runtime function (action.h line {func_info.get('line_number', 'unknown')})"
             })
 

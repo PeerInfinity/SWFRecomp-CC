@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "constant_pool_swf_5",
+    "description": "Tests CONSTANT_POOL opcode (0x88) - defines constant strings for Push references",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["CONSTANT_POOL"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

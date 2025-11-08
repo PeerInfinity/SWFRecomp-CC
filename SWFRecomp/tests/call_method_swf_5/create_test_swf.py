@@ -30,8 +30,8 @@ method_name = b'toUpperCase\x00'
 action_push_method = struct.pack('<BHB', 0x96, len(method_name) + 1, 0)
 action_push_method += method_name
 
-# CallMethod action (0x9F)
-action_call_method = bytes([0x9F])
+# CallMethod action (0x52)
+action_call_method = bytes([0x52])
 
 # Trace the result
 action_trace = bytes([0x26])

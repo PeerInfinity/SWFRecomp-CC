@@ -2,7 +2,8 @@
   "metadata": {
     "name": "add_swf_4",
     "description": "Comprehensive tests for ADD opcode (0x0A) including basic arithmetic, type conversion, and edge cases",
-    "swf_version": 4
+    "swf_version": 4,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["ADD"],

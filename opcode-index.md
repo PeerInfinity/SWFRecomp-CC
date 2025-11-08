@@ -4,14 +4,14 @@
 
 **Total Opcodes**: 100
 
-**Implemented Opcodes**: 31
+**Implemented Opcodes**: 34
 
 **Total Entries**: 273
 
 ## Summary Table
 
-| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Branch |
-|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|--------|
+| Hex | Spec Name | Enum Name | Function Name | Primary Tests | Secondary Tests | Failing Primary | Docs | Fully Implemented |
+|-----|-----------|-----------|---------------|---------------|-----------------|-----------------|------|-------------------|
 | 0X00 |  | SWF_ACTION_END_OF_ACTIONS |  |  |  |  |  |  |
 | [0X04](#0x04-actionnextframe) | [ActionNextFrame](#0x04-actionnextframe) | [SWF_ACTION_NEXT_FRAME](#0x04-actionnextframe) | [actionNextFrame](#0x04-actionnextframe) | 1/1 |  |  | ✓ |  |
 | [0X05](#0x05-actionpreviousframe) | [ActionPreviousFrame](#0x05-actionpreviousframe) | [SWF_ACTION_PREV_FRAME](#0x05-actionpreviousframe) |  | 1/1 |  |  | ✓ |  |
@@ -19,205 +19,180 @@
 | [0X07](#0x07-actionstop) | [ActionStop](#0x07-actionstop) | [SWF_ACTION_STOP](#0x07-actionstop) |  | 1/1 | 2/2 |  | ✓ |  |
 | [0X08](#0x08-actiontogglequality) | [ActionToggleQuality](#0x08-actiontogglequality) | [SWF_ACTION_TOGGLE_QUALITY](#0x08-actiontogglequality) | [actionToggleQuality](#0x08-actiontogglequality) | 1/1 |  |  | ✓ |  |
 | [0X09](#0x09-actionstopsounds) | [ActionStopSounds](#0x09-actionstopsounds) | [SWF_ACTION_STOP_SOUNDS](#0x09-actionstopsounds) | [actionStopSounds](#0x09-actionstopsounds) | 1/1 |  |  | ✓ |  |
-| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | [SWF_ACTION_ADD](#0x0a-actionadd) | [actionAdd](#0x0a-actionadd) | 2/2 | 1/1 |  | ✓ |  |
+| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | [SWF_ACTION_ADD](#0x0a-actionadd) | [actionAdd](#0x0a-actionadd) | 2/2 | 1/1 |  | ✓ | ✓ |
 | [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | [SWF_ACTION_SUBTRACT](#0x0b-actionsubtract) | [actionSubtract](#0x0b-actionsubtract) |  |  |  | ✓ |  |
 | [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | [SWF_ACTION_MULTIPLY](#0x0c-actionmultiply) | [actionMultiply](#0x0c-actionmultiply) |  |  |  | ✓ |  |
 | [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | [SWF_ACTION_DIVIDE](#0x0d-actiondivide) | [actionDivide](#0x0d-actiondivide) |  |  |  | ✓ |  |
 | [0X0E](#0x0e-actionequals) | [ActionEquals](#0x0e-actionequals) | [SWF_ACTION_EQUALS](#0x0e-actionequals) | [actionEquals](#0x0e-actionequals) |  |  |  | ✓ |  |
 | [0X0F](#0x0f-actionless) | [ActionLess](#0x0f-actionless) | [SWF_ACTION_LESS](#0x0f-actionless) | [actionLess](#0x0f-actionless) |  | 1/1 |  | ✓ |  |
-| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | [SWF_ACTION_AND](#0x10-actionand) | [actionAnd](#0x10-actionand) | 5/5 |  |  | ✓ |  |
+| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | [SWF_ACTION_AND](#0x10-actionand) | [actionAnd](#0x10-actionand) | 5/5 |  |  | ✓ | ✓ |
 | [0X11](#0x11-actionor) | [ActionOr](#0x11-actionor) | [SWF_ACTION_OR](#0x11-actionor) | [actionOr](#0x11-actionor) |  |  |  | ✓ |  |
 | [0X12](#0x12-actionnot) | [ActionNot](#0x12-actionnot) | [SWF_ACTION_NOT](#0x12-actionnot) | [actionNot](#0x12-actionnot) |  |  |  | ✓ |  |
 | [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | [SWF_ACTION_STRING_EQUALS](#0x13-actionstringequals) | [actionStringEquals](#0x13-actionstringequals) |  |  |  | ✓ |  |
 | [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | [SWF_ACTION_STRING_LENGTH](#0x14-actionstringlength) | [actionStringLength](#0x14-actionstringlength) |  |  |  | ✓ |  |
-| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | [SWF_ACTION_STRING_EXTRACT](#0x15-actionstringextract) | [actionStringExtract](#0x15-actionstringextract) |  |  |  | ✓ | ✓ |
+| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | [SWF_ACTION_STRING_EXTRACT](#0x15-actionstringextract) | [actionStringExtract](#0x15-actionstringextract) |  |  |  | ✓ |  |
 | [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | [SWF_ACTION_POP](#0x17-actionpop) |  |  | 1/1 |  | ✓ |  |
 | [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | [SWF_ACTION_TO_INTEGER](#0x18-actiontointeger) | [actionToInteger](#0x18-actiontointeger) |  |  |  | ✓ |  |
-| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | [SWF_ACTION_GET_VARIABLE](#0x1c-actiongetvariable) | [actionGetVariable](#0x1c-actiongetvariable) |  | 1/3 |  | ✓ |  |
-| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | [SWF_ACTION_SET_VARIABLE](#0x1d-actionsetvariable) | [actionSetVariable](#0x1d-actionsetvariable) |  | 1/2 |  | ✓ |  |
+| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | [SWF_ACTION_GET_VARIABLE](#0x1c-actiongetvariable) | [actionGetVariable](#0x1c-actiongetvariable) |  | 2/4 |  | ✓ |  |
+| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | [SWF_ACTION_SET_VARIABLE](#0x1d-actionsetvariable) | [actionSetVariable](#0x1d-actionsetvariable) |  | 2/3 |  | ✓ |  |
 | [0X20](#0x20-actionsettarget2) | [ActionSetTarget2](#0x20-actionsettarget2) | [SWF_ACTION_SET_TARGET2](#0x20-actionsettarget2) | [actionSetTarget2](#0x20-actionsettarget2) | 1/1 |  |  | ✓ |  |
 | [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | [SWF_ACTION_STRING_ADD](#0x21-actionstringadd) | [actionStringAdd](#0x21-actionstringadd) |  | 1/2 |  | ✓ |  |
-| [0X22](#0x22-actiongetproperty) | [ActionGetProperty](#0x22-actiongetproperty) | [SWF_ACTION_GET_PROPERTY](#0x22-actiongetproperty) | [actionGetProperty](#0x22-actiongetproperty) |  |  |  | ✓ | ✓ |
-| [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | [SWF_ACTION_SET_PROPERTY](#0x23-actionsetproperty) | [actionSetProperty](#0x23-actionsetproperty) |  |  |  | ✓ | ✓ |
+| [0X22](#0x22-actiongetproperty) | [ActionGetProperty](#0x22-actiongetproperty) | [SWF_ACTION_GET_PROPERTY](#0x22-actiongetproperty) | [actionGetProperty](#0x22-actiongetproperty) |  |  |  | ✓ |  |
+| [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | [SWF_ACTION_SET_PROPERTY](#0x23-actionsetproperty) | [actionSetProperty](#0x23-actionsetproperty) |  |  |  | ✓ |  |
 | [0X24](#0x24-actionclonesprite) | [ActionCloneSprite](#0x24-actionclonesprite) | [SWF_ACTION_CLONE_SPRITE](#0x24-actionclonesprite) | [actionCloneSprite](#0x24-actionclonesprite) | 1/1 |  |  | ✓ |  |
 | [0X25](#0x25-actionremovesprite) | [ActionRemoveSprite](#0x25-actionremovesprite) | [SWF_ACTION_REMOVE_SPRITE](#0x25-actionremovesprite) | [actionRemoveSprite](#0x25-actionremovesprite) | 1/1 |  |  | ✓ |  |
-| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) |  | 31/35 |  | ✓ |  |
+| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) |  | 38/41 |  | ✓ |  |
 | [0X27](#0x27-actionstartdrag) | [ActionStartDrag](#0x27-actionstartdrag) | [SWF_ACTION_START_DRAG](#0x27-actionstartdrag) | [actionStartDrag](#0x27-actionstartdrag) | 1/1 |  |  | ✓ |  |
 | [0X28](#0x28-actionenddrag) | [ActionEndDrag](#0x28-actionenddrag) | [SWF_ACTION_END_DRAG](#0x28-actionenddrag) | [actionEndDrag](#0x28-actionenddrag) | 1/1 |  |  | ✓ |  |
-| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | [SWF_ACTION_STRING_LESS](#0x29-actionstringless) | [actionStringLess](#0x29-actionstringless) |  |  |  | ✓ | ✓ |
-| [0X2A](#0x2a-actionthrow) | [ActionThrow](#0x2a-actionthrow) | [SWF_ACTION_THROW](#0x2a-actionthrow) | [actionThrow](#0x2a-actionthrow) | 0/2 |  | 2 | ✓ |  |
+| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | [SWF_ACTION_STRING_LESS](#0x29-actionstringless) | [actionStringLess](#0x29-actionstringless) |  |  |  | ✓ |  |
+| [0X2A](#0x2a-actionthrow) | [ActionThrow](#0x2a-actionthrow) | [SWF_ACTION_THROW](#0x2a-actionthrow) | [actionThrow](#0x2a-actionthrow) | 1/2 |  | 1 | ✓ |  |
 | [0X2B](#0x2b-actioncastop) | [ActionCastOp](#0x2b-actioncastop) | [SWF_ACTION_CAST_OP](#0x2b-actioncastop) | [actionCastOp](#0x2b-actioncastop) | 1/1 |  |  | ✓ |  |
 | [0X2C](#0x2c-actionimplementsop) | [ActionImplementsOp](#0x2c-actionimplementsop) | [SWF_ACTION_IMPLEMENTS_OP](#0x2c-actionimplementsop) | [actionImplementsOp](#0x2c-actionimplementsop) | 1/1 |  |  | ✓ |  |
 | [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | [SWF_ACTION_RANDOM_NUMBER](#0x30-actionrandomnumber) | [actionRandomNumber](#0x30-actionrandomnumber) |  |  |  | ✓ |  |
-| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | [SWF_ACTION_MB_STRING_LENGTH](#0x31-actionmbstringlength) |  |  |  |  | ✓ | ✓ |
-| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | [SWF_ACTION_CHAR_TO_ASCII](#0x32-actionchartoascii) | [actionCharToAscii](#0x32-actionchartoascii) |  |  |  | ✓ | ✓ |
-| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) |  |  |  | ✓ | ✓ |
+| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | [SWF_ACTION_MB_STRING_LENGTH](#0x31-actionmbstringlength) |  |  |  |  | ✓ |  |
+| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | [SWF_ACTION_CHAR_TO_ASCII](#0x32-actionchartoascii) | [actionCharToAscii](#0x32-actionchartoascii) |  |  |  | ✓ |  |
+| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) |  |  |  | ✓ |  |
 | [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | [SWF_ACTION_GET_TIME](#0x34-actiongettime) | [actionGetTime](#0x34-actiongettime) |  |  |  | ✓ |  |
-| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) |  |  |  |  | ✓ | ✓ |
-| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) |  |  |  |  | ✓ | ✓ |
+| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) |  |  |  |  | ✓ |  |
+| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) |  |  |  |  | ✓ |  |
 | [0X37](#0x37-actionmbasciitochar) | [ActionMBAsciiToChar](#0x37-actionmbasciitochar) | [SWF_ACTION_MB_ASCII_TO_CHAR](#0x37-actionmbasciitochar) |  | 1/1 |  |  | ✓ |  |
 | [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) |  | [actionDelete](#0x3a-actiondelete) |  |  |  | ✓ |  |
 | [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) |  | [actionDelete2](#0x3b-actiondelete2) |  |  |  | ✓ |  |
-| [0X3C](#0x3c-actiondefinelocal) | [ActionDefineLocal](#0x3c-actiondefinelocal) |  |  |  |  |  | ✓ | ✓ |
-| [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | [SWF_ACTION_CALL_FUNCTION](#0x3d-actionstackswap) | [actionStackSwap](#0x3d-actionstackswap) |  |  |  | ✓ | ✓ |
-| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | [SWF_ACTION_RETURN](#0x3e-actionreturn) | [actionReturn](#0x3e-actionreturn) |  |  |  | ✓ | ✓ |
+| [0X3C](#0x3c-actiondefinelocal) | [ActionDefineLocal](#0x3c-actiondefinelocal) |  |  |  |  |  | ✓ |  |
+| [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | [SWF_ACTION_CALL_FUNCTION](#0x3d-actionstackswap) | [actionStackSwap](#0x3d-actionstackswap) |  |  |  | ✓ |  |
+| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | [SWF_ACTION_RETURN](#0x3e-actionreturn) | [actionReturn](#0x3e-actionreturn) |  | 0/1 |  | ✓ |  |
 | [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | [SWF_ACTION_MODULO](#0x3f-actionmodulo) | [actionModulo](#0x3f-actionmodulo) |  |  |  | ✓ |  |
-| [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | [SWF_ACTION_NEW_OBJECT](#0x40-actionnewobject) | [actionNewObject](#0x40-actionnewobject) |  |  |  | ✓ | ✓ |
-| [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | [SWF_ACTION_DECLARE_LOCAL](#0x41-actiondefinelocal2) |  |  |  |  | ✓ | ✓ |
-| [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | [SWF_ACTION_INIT_ARRAY](#0x42-actioninitarray) | [actionInitArray](#0x42-actioninitarray) |  |  |  | ✓ | ✓ |
-| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | [SWF_ACTION_INIT_OBJECT](#0x43-actioninitobject) | [actionInitObject](#0x43-actioninitobject) |  | 1/2 |  | ✓ | ✓ |
+| [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | [SWF_ACTION_NEW_OBJECT](#0x40-actionnewobject) | [actionNewObject](#0x40-actionnewobject) |  |  |  | ✓ |  |
+| [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | [SWF_ACTION_DECLARE_LOCAL](#0x41-actiondefinelocal2) |  |  |  |  | ✓ |  |
+| [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | [SWF_ACTION_INIT_ARRAY](#0x42-actioninitarray) | [actionInitArray](#0x42-actioninitarray) |  |  |  | ✓ |  |
+| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | [SWF_ACTION_INIT_OBJECT](#0x43-actioninitobject) | [actionInitObject](#0x43-actioninitobject) |  | 2/2 |  | ✓ |  |
 | [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | [SWF_ACTION_TYPEOF](#0x44-actiontypeof) |  | 1/1 |  |  | ✓ |  |
-| [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | [SWF_ACTION_TARGET_PATH](#0x45-actiontargetpath) | [actionTargetPath](#0x45-actiontargetpath) |  |  |  | ✓ | ✓ |
-| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | [SWF_ACTION_ENUMERATE](#0x46-actionenumerate) | [actionEnumerate](#0x46-actionenumerate) |  |  |  | ✓ | ✓ |
-| [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | [SWF_ACTION_ADD2](#0x47-actionadd2) | [actionAdd2](#0x47-actionadd2) | 1/1 |  |  | ✓ | ✓ |
-| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | [SWF_ACTION_LESS2](#0x48-actionless2) | [actionLess2](#0x48-actionless2) |  |  |  | ✓ | ✓ |
+| [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | [SWF_ACTION_TARGET_PATH](#0x45-actiontargetpath) | [actionTargetPath](#0x45-actiontargetpath) |  |  |  | ✓ |  |
+| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | [SWF_ACTION_ENUMERATE](#0x46-actionenumerate) | [actionEnumerate](#0x46-actionenumerate) |  |  |  | ✓ |  |
+| [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | [SWF_ACTION_ADD2](#0x47-actionadd2) | [actionAdd2](#0x47-actionadd2) | 1/1 |  |  | ✓ |  |
+| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | [SWF_ACTION_LESS2](#0x48-actionless2) | [actionLess2](#0x48-actionless2) |  |  |  | ✓ |  |
 | [0X49](#0x49-actionequals2) | [ActionEquals2](#0x49-actionequals2) | [SWF_ACTION_EQUALS2](#0x49-actionequals2) | [actionEquals2](#0x49-actionequals2) | 0/1 |  | 1 | ✓ |  |
-| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | [SWF_ACTION_TO_NUMBER](#0x4a-actiontonumber) | [actionToNumber](#0x4a-actiontonumber) |  |  |  | ✓ | ✓ |
-| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | [SWF_ACTION_TO_STRING](#0x4b-actiontostring) | [actionToString](#0x4b-actiontostring) |  |  |  | ✓ | ✓ |
-| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | [SWF_ACTION_DUPLICATE](#0x4c-actionpushduplicate) |  |  | 0/1 |  | ✓ | ✓ |
+| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | [SWF_ACTION_TO_NUMBER](#0x4a-actiontonumber) | [actionToNumber](#0x4a-actiontonumber) |  |  |  | ✓ |  |
+| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | [SWF_ACTION_TO_STRING](#0x4b-actiontostring) | [actionToString](#0x4b-actiontostring) |  |  |  | ✓ |  |
+| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | [SWF_ACTION_DUPLICATE](#0x4c-actionpushduplicate) |  |  | 1/1 |  | ✓ |  |
 | [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | [SWF_ACTION_STACK_SWAP](#0x4d-actionstackswap) | [actionStackSwap](#0x4d-actionstackswap) |  |  |  | ✓ |  |
 | [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | [SWF_ACTION_GET_MEMBER](#0x4e-actiongetmember) | [actionGetMember](#0x4e-actiongetmember) |  |  |  | ✓ |  |
-| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | [SWF_ACTION_SET_MEMBER](#0x4f-actionsetmember) | [actionSetMember](#0x4f-actionsetmember) |  | 0/1 |  | ✓ | ✓ |
+| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | [SWF_ACTION_SET_MEMBER](#0x4f-actionsetmember) | [actionSetMember](#0x4f-actionsetmember) |  | 1/1 |  | ✓ |  |
 | [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | [SWF_ACTION_INCREMENT](#0x50-actionincrement) | [actionIncrement](#0x50-actionincrement) |  |  |  | ✓ |  |
 | [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | [SWF_ACTION_DECREMENT](#0x51-actiondecrement) | [actionDecrement](#0x51-actiondecrement) |  |  |  | ✓ |  |
-| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) |  | [actionCallMethod](#0x52-actioncallmethod) |  |  |  | ✓ |  |
-| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | [SWF_ACTION_NEW_METHOD](#0x53-actionnewmethod) | [actionNewMethod](#0x53-actionnewmethod) |  |  |  | ✓ | ✓ |
+| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) | [SWF_ACTION_CALL_METHOD](#0x52-actioncallmethod) | [actionCallMethod](#0x52-actioncallmethod) | 1/2 |  | 1 | ✓ |  |
+| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | [SWF_ACTION_NEW_METHOD](#0x53-actionnewmethod) | [actionNewMethod](#0x53-actionnewmethod) |  |  |  | ✓ |  |
 | [0X54](#0x54-actioninstanceof) | [ActionInstanceOf](#0x54-actioninstanceof) | [SWF_ACTION_INSTANCEOF](#0x54-actioninstanceof) | [actionInstanceOf](#0x54-actioninstanceof) | 1/1 |  |  | ✓ |  |
-| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | [SWF_ACTION_ENUMERATE2](#0x55-actionenumerate2) | [actionEnumerate2](#0x55-actionenumerate2) |  |  |  | ✓ | ✓ |
-| [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | [SWF_ACTION_BIT_AND](#0x60-actionbitand) | [actionBitAnd](#0x60-actionbitand) | 1/1 |  |  | ✓ | ✓ |
-| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | [SWF_ACTION_BIT_OR](#0x61-actionbitor) | [actionBitOr](#0x61-actionbitor) |  |  |  | ✓ | ✓ |
-| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | [SWF_ACTION_BIT_XOR](#0x62-actionbitxor) | [actionBitXor](#0x62-actionbitxor) |  |  |  | ✓ | ✓ |
-| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | [SWF_ACTION_BIT_LSHIFT](#0x63-actionbitlshift) | [actionBitLShift](#0x63-actionbitlshift) |  |  |  | ✓ | ✓ |
-| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | [SWF_ACTION_BIT_RSHIFT](#0x64-actionbitrshift) | [actionBitRShift](#0x64-actionbitrshift) |  |  |  | ✓ | ✓ |
-| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | [SWF_ACTION_BIT_URSHIFT](#0x65-actionbiturshift) | [actionBitURShift](#0x65-actionbiturshift) |  |  |  | ✓ | ✓ |
-| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | [SWF_ACTION_STRICT_EQUALS](#0x66-actionstrictequals) | [actionStrictEquals](#0x66-actionstrictequals) |  |  |  | ✓ | ✓ |
-| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | [SWF_ACTION_GREATER](#0x67-actiongreater) | [actionGreater](#0x67-actiongreater) |  |  |  | ✓ | ✓ |
-| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | [SWF_ACTION_STRING_GREATER](#0x68-actionstringgreater) | [actionStringGreater](#0x68-actionstringgreater) |  |  |  | ✓ | ✓ |
-| [0X69](#0x69-actionextends) | [ActionExtends](#0x69-actionextends) | [SWF_ACTION_EXTENDS](#0x69-actionextends) | [actionExtends](#0x69-actionextends) | 0/1 |  | 1 | ✓ |  |
+| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | [SWF_ACTION_ENUMERATE2](#0x55-actionenumerate2) | [actionEnumerate2](#0x55-actionenumerate2) |  |  |  | ✓ |  |
+| [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | [SWF_ACTION_BIT_AND](#0x60-actionbitand) | [actionBitAnd](#0x60-actionbitand) | 1/1 |  |  | ✓ |  |
+| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | [SWF_ACTION_BIT_OR](#0x61-actionbitor) | [actionBitOr](#0x61-actionbitor) |  |  |  | ✓ |  |
+| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | [SWF_ACTION_BIT_XOR](#0x62-actionbitxor) | [actionBitXor](#0x62-actionbitxor) |  |  |  | ✓ |  |
+| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | [SWF_ACTION_BIT_LSHIFT](#0x63-actionbitlshift) | [actionBitLShift](#0x63-actionbitlshift) |  |  |  | ✓ |  |
+| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | [SWF_ACTION_BIT_RSHIFT](#0x64-actionbitrshift) | [actionBitRShift](#0x64-actionbitrshift) |  |  |  | ✓ |  |
+| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | [SWF_ACTION_BIT_URSHIFT](#0x65-actionbiturshift) | [actionBitURShift](#0x65-actionbiturshift) |  |  |  | ✓ |  |
+| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | [SWF_ACTION_STRICT_EQUALS](#0x66-actionstrictequals) | [actionStrictEquals](#0x66-actionstrictequals) |  |  |  | ✓ |  |
+| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | [SWF_ACTION_GREATER](#0x67-actiongreater) | [actionGreater](#0x67-actiongreater) |  |  |  | ✓ |  |
+| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | [SWF_ACTION_STRING_GREATER](#0x68-actionstringgreater) | [actionStringGreater](#0x68-actionstringgreater) |  |  |  | ✓ |  |
+| [0X69](#0x69-actionextends) | [ActionExtends](#0x69-actionextends) | [SWF_ACTION_EXTENDS](#0x69-actionextends) | [actionExtends](#0x69-actionextends) | 1/1 |  |  | ✓ |  |
 | [0X81](#0x81-actiongotoframe) | [ActionGotoFrame](#0x81-actiongotoframe) | [SWF_ACTION_GOTO_FRAME](#0x81-actiongotoframe) | [actionGotoFrame](#0x81-actiongotoframe) | 1/1 |  |  | ✓ |  |
 | [0X83](#0x83-actiongeturl) | [ActionGetURL](#0x83-actiongeturl) | [SWF_ACTION_GET_URL](#0x83-actiongeturl) | [actionGetURL](#0x83-actiongeturl) | 1/1 |  |  | ✓ |  |
-| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | [SWF_ACTION_STORE_REGISTER](#0x87-actionstoreregister) | [actionStoreRegister](#0x87-actionstoreregister) |  |  |  | ✓ | ✓ |
-| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | [SWF_ACTION_CONSTANT_POOL](#0x88-actionconstantpool) |  |  |  |  | ✓ |  |
+| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | [SWF_ACTION_STORE_REGISTER](#0x87-actionstoreregister) | [actionStoreRegister](#0x87-actionstoreregister) |  |  |  | ✓ |  |
+| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | [SWF_ACTION_CONSTANT_POOL](#0x88-actionconstantpool) |  | 4/4 |  |  | ✓ | ✓ |
 | [0X8A](#0x8a-actionwaitforframe) | [ActionWaitForFrame](#0x8a-actionwaitforframe) | [SWF_ACTION_WAIT_FOR_FRAME](#0x8a-actionwaitforframe) |  | 1/1 |  |  | ✓ |  |
 | [0X8B](#0x8b-actionsettarget) | [ActionSetTarget](#0x8b-actionsettarget) | [SWF_ACTION_SET_TARGET](#0x8b-actionsettarget) | [actionSetTarget](#0x8b-actionsettarget) | 1/1 |  |  | ✓ |  |
 | [0X8C](#0x8c-actiongotolabel) | [ActionGoToLabel](#0x8c-actiongotolabel) | [SWF_ACTION_GOTO_LABEL](#0x8c-actiongotolabel) | [actionGoToLabel](#0x8c-actiongotolabel) | 1/1 |  |  | ✓ |  |
 | [0X8D](#0x8d-actionwaitforframe2) | [ActionWaitForFrame2](#0x8d-actionwaitforframe2) | [SWF_ACTION_WAIT_FOR_FRAME2](#0x8d-actionwaitforframe2) |  | 1/1 |  |  | ✓ |  |
-| [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | [SWF_ACTION_DEFINE_FUNCTION2](#0x8e-actiondefinefunction2) | [actionDefineFunction2](#0x8e-actiondefinefunction2) |  |  |  | ✓ |  |
+| [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | [SWF_ACTION_DEFINE_FUNCTION2](#0x8e-actiondefinefunction2) | [actionDefineFunction2](#0x8e-actiondefinefunction2) | 0/1 |  | 1 | ✓ |  |
 | [0X8F](#0x8f-actiontry) | [ActionTry](#0x8f-actiontry) | [SWF_ACTION_TRY](#0x8f-actiontry) |  | 0/1 |  | 1 | ✓ |  |
-| [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | [SWF_ACTION_WITH](#0x94-actionwith) |  |  |  |  | ✓ | ✓ |
-| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  |  | 30/34 |  | ✓ |  |
+| [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | [SWF_ACTION_WITH](#0x94-actionwith) |  |  |  |  | ✓ |  |
+| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  |  | 37/40 |  | ✓ |  |
 | [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | [SWF_ACTION_JUMP](#0x99-actionjump) |  |  |  |  | ✓ |  |
 | [0X9A](#0x9a-actiongeturl2) | [ActionGetURL2](#0x9a-actiongeturl2) | [SWF_ACTION_GET_URL2](#0x9a-actiongeturl2) | [actionGetURL2](#0x9a-actiongeturl2) | 1/1 |  |  | ✓ |  |
-| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | [SWF_ACTION_DEFINE_FUNCTION](#0x9b-actiondefinefunction) |  |  |  |  | ✓ | ✓ |
+| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | [SWF_ACTION_DEFINE_FUNCTION](#0x9b-actiondefinefunction) |  |  |  |  | ✓ |  |
 | [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | [SWF_ACTION_IF](#0x9d-actionif) |  |  | 1/1 |  | ✓ |  |
-| [0X9E](#0x9e-actioncall) | [ActionCall](#0x9e-actioncall) | [SWF_ACTION_CALL](#0x9e-actioncall) | [actionCall](#0x9e-actioncall) |  |  |  | ✓ | ✓ |
-| [0X9F](#0x9f-actiongotoframe2) | [ActionGotoFrame2](#0x9f-actiongotoframe2) | [SWF_ACTION_CALL_METHOD](#0x9f-actiongotoframe2) |  |  |  |  | ✓ | ✓ |
+| [0X9E](#0x9e-actioncall) | [ActionCall](#0x9e-actioncall) | [SWF_ACTION_CALL](#0x9e-actioncall) | [actionCall](#0x9e-actioncall) |  |  |  | ✓ |  |
+| [0X9F](#0x9f-actiongotoframe2) | [ActionGotoFrame2](#0x9f-actiongotoframe2) |  |  |  |  |  | ✓ |  |
 
 ## Implementation Status
 
 ### ✅ Fully Implemented
-(Has enum, function, and tests)
+(Opcodes marked as fully_implemented in test_info.json)
 
-| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs | Branch |
-|-----|-----------|------|----------|---------------|-----------------|------|--------|
-| [0X04](#0x04-actionnextframe) | [ActionNextFrame](#0x04-actionnextframe) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X06](#0x06-actionplay) | [ActionPlay](#0x06-actionplay) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X08](#0x08-actiontogglequality) | [ActionToggleQuality](#0x08-actiontogglequality) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X09](#0x09-actionstopsounds) | [ActionStopSounds](#0x09-actionstopsounds) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | ✓ | ✓ | 2/2 |  | ✓ |  |
-| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | ✓ | ✓ | 5/5 |  | ✓ |  |
-| [0X20](#0x20-actionsettarget2) | [ActionSetTarget2](#0x20-actionsettarget2) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X24](#0x24-actionclonesprite) | [ActionCloneSprite](#0x24-actionclonesprite) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X25](#0x25-actionremovesprite) | [ActionRemoveSprite](#0x25-actionremovesprite) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X27](#0x27-actionstartdrag) | [ActionStartDrag](#0x27-actionstartdrag) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X28](#0x28-actionenddrag) | [ActionEndDrag](#0x28-actionenddrag) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X2A](#0x2a-actionthrow) | [ActionThrow](#0x2a-actionthrow) | ✓ | ✓ | 0/2 | 2 | ✓ |  |
-| [0X2B](#0x2b-actioncastop) | [ActionCastOp](#0x2b-actioncastop) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X2C](#0x2c-actionimplementsop) | [ActionImplementsOp](#0x2c-actionimplementsop) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | ✓ | ✓ | 1/1 |  | ✓ | ✓ |
-| [0X49](#0x49-actionequals2) | [ActionEquals2](#0x49-actionequals2) | ✓ | ✓ | 0/1 | 1 | ✓ |  |
-| [0X54](#0x54-actioninstanceof) | [ActionInstanceOf](#0x54-actioninstanceof) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | ✓ | ✓ | 1/1 |  | ✓ | ✓ |
-| [0X69](#0x69-actionextends) | [ActionExtends](#0x69-actionextends) | ✓ | ✓ | 0/1 | 1 | ✓ |  |
-| [0X81](#0x81-actiongotoframe) | [ActionGotoFrame](#0x81-actiongotoframe) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X83](#0x83-actiongeturl) | [ActionGetURL](#0x83-actiongeturl) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X8B](#0x8b-actionsettarget) | [ActionSetTarget](#0x8b-actionsettarget) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X8C](#0x8c-actiongotolabel) | [ActionGoToLabel](#0x8c-actiongotolabel) | ✓ | ✓ | 1/1 |  | ✓ |  |
-| [0X9A](#0x9a-actiongeturl2) | [ActionGetURL2](#0x9a-actiongeturl2) | ✓ | ✓ | 1/1 |  | ✓ |  |
+| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs |
+|-----|-----------|------|----------|---------------|-----------------|------|
+| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | ✓ | ✓ | 2/2 |  | ✓ |
+| [0X10](#0x10-actionand) | [ActionAnd](#0x10-actionand) | ✓ | ✓ | 5/5 |  | ✓ |
+| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | ✓ |  | 4/4 |  | ✓ |
 
 ### 🔄 Partially Implemented
 (Has enum or function, but missing tests)
 
-| Hex | Spec Name | Enum | Function | Docs | Branch |
-|-----|-----------|------|----------|------|--------|
-| 0X00 |  | ✓ |  |  |  |
-| [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | ✓ | ✓ | ✓ |  |
-| [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | ✓ | ✓ | ✓ |  |
-| [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | ✓ | ✓ | ✓ |  |
-| [0X0E](#0x0e-actionequals) | [ActionEquals](#0x0e-actionequals) | ✓ | ✓ | ✓ |  |
-| [0X0F](#0x0f-actionless) | [ActionLess](#0x0f-actionless) | ✓ | ✓ | ✓ |  |
-| [0X11](#0x11-actionor) | [ActionOr](#0x11-actionor) | ✓ | ✓ | ✓ |  |
-| [0X12](#0x12-actionnot) | [ActionNot](#0x12-actionnot) | ✓ | ✓ | ✓ |  |
-| [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | ✓ | ✓ | ✓ |  |
-| [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | ✓ | ✓ | ✓ |  |
-| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | ✓ | ✓ | ✓ | ✓ |
-| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | ✓ |  | ✓ |  |
-| [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | ✓ | ✓ | ✓ |  |
-| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | ✓ | ✓ | ✓ |  |
-| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | ✓ | ✓ | ✓ |  |
-| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | ✓ | ✓ | ✓ |  |
-| [0X22](#0x22-actiongetproperty) | [ActionGetProperty](#0x22-actiongetproperty) | ✓ | ✓ | ✓ | ✓ |
-| [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | ✓ | ✓ | ✓ | ✓ |
-| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | ✓ | ✓ | ✓ |  |
-| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | ✓ | ✓ | ✓ | ✓ |
-| [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | ✓ | ✓ | ✓ |  |
-| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | ✓ |  | ✓ | ✓ |
-| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | ✓ | ✓ | ✓ | ✓ |
-| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | ✓ | ✓ |
-| [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | ✓ | ✓ | ✓ |  |
-| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ |  | ✓ | ✓ |
-| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ |  | ✓ | ✓ |
-| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) |  | ✓ | ✓ |  |
-| [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) |  | ✓ | ✓ |  |
-| [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | ✓ | ✓ | ✓ | ✓ |
-| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | ✓ | ✓ | ✓ | ✓ |
-| [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | ✓ | ✓ | ✓ |  |
-| [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | ✓ | ✓ | ✓ | ✓ |
-| [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | ✓ |  | ✓ | ✓ |
-| [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | ✓ | ✓ | ✓ | ✓ |
-| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | ✓ | ✓ | ✓ | ✓ |
-| [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | ✓ | ✓ | ✓ | ✓ |
-| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | ✓ | ✓ | ✓ | ✓ |
-| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | ✓ | ✓ | ✓ | ✓ |
-| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | ✓ | ✓ | ✓ | ✓ |
-| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | ✓ | ✓ | ✓ | ✓ |
-| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | ✓ |  | ✓ | ✓ |
-| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | ✓ | ✓ | ✓ |  |
-| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | ✓ | ✓ | ✓ |  |
-| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | ✓ | ✓ | ✓ | ✓ |
-| [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | ✓ | ✓ | ✓ |  |
-| [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | ✓ | ✓ | ✓ |  |
-| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) |  | ✓ | ✓ |  |
-| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | ✓ | ✓ | ✓ | ✓ |
-| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | ✓ | ✓ | ✓ | ✓ |
-| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | ✓ | ✓ | ✓ | ✓ |
-| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | ✓ | ✓ | ✓ | ✓ |
-| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | ✓ | ✓ | ✓ | ✓ |
-| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | ✓ | ✓ | ✓ | ✓ |
-| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | ✓ | ✓ | ✓ | ✓ |
-| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | ✓ | ✓ | ✓ | ✓ |
-| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | ✓ | ✓ | ✓ | ✓ |
-| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | ✓ | ✓ | ✓ | ✓ |
-| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | ✓ | ✓ | ✓ | ✓ |
-| [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | ✓ |  | ✓ |  |
-| [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | ✓ | ✓ | ✓ |  |
-| [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | ✓ |  | ✓ | ✓ |
-| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | ✓ |  | ✓ |  |
-| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | ✓ |  | ✓ |  |
-| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | ✓ |  | ✓ | ✓ |
-| [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | ✓ |  | ✓ |  |
-| [0X9E](#0x9e-actioncall) | [ActionCall](#0x9e-actioncall) | ✓ | ✓ | ✓ | ✓ |
-| [0X9F](#0x9f-actiongotoframe2) | [ActionGotoFrame2](#0x9f-actiongotoframe2) | ✓ |  | ✓ | ✓ |
+| Hex | Spec Name | Enum | Function | Docs |
+|-----|-----------|------|----------|------|
+| 0X00 |  | ✓ |  |  |
+| [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | ✓ | ✓ | ✓ |
+| [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | ✓ | ✓ | ✓ |
+| [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | ✓ | ✓ | ✓ |
+| [0X0E](#0x0e-actionequals) | [ActionEquals](#0x0e-actionequals) | ✓ | ✓ | ✓ |
+| [0X0F](#0x0f-actionless) | [ActionLess](#0x0f-actionless) | ✓ | ✓ | ✓ |
+| [0X11](#0x11-actionor) | [ActionOr](#0x11-actionor) | ✓ | ✓ | ✓ |
+| [0X12](#0x12-actionnot) | [ActionNot](#0x12-actionnot) | ✓ | ✓ | ✓ |
+| [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | ✓ | ✓ | ✓ |
+| [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | ✓ | ✓ | ✓ |
+| [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | ✓ | ✓ | ✓ |
+| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | ✓ |  | ✓ |
+| [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | ✓ | ✓ | ✓ |
+| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | ✓ | ✓ | ✓ |
+| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | ✓ | ✓ | ✓ |
+| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | ✓ | ✓ | ✓ |
+| [0X22](#0x22-actiongetproperty) | [ActionGetProperty](#0x22-actiongetproperty) | ✓ | ✓ | ✓ |
+| [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | ✓ | ✓ | ✓ |
+| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | ✓ | ✓ | ✓ |
+| [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | ✓ | ✓ | ✓ |
+| [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | ✓ | ✓ | ✓ |
+| [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | ✓ |  | ✓ |
+| [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | ✓ | ✓ | ✓ |
+| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | ✓ |
+| [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | ✓ | ✓ | ✓ |
+| [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ |  | ✓ |
+| [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ |  | ✓ |
+| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) |  | ✓ | ✓ |
+| [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) |  | ✓ | ✓ |
+| [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | ✓ | ✓ | ✓ |
+| [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | ✓ | ✓ | ✓ |
+| [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | ✓ | ✓ | ✓ |
+| [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | ✓ | ✓ | ✓ |
+| [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | ✓ |  | ✓ |
+| [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | ✓ | ✓ | ✓ |
+| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | ✓ | ✓ | ✓ |
+| [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | ✓ | ✓ | ✓ |
+| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | ✓ | ✓ | ✓ |
+| [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | ✓ | ✓ | ✓ |
+| [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | ✓ | ✓ | ✓ |
+| [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | ✓ | ✓ | ✓ |
+| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | ✓ |  | ✓ |
+| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | ✓ | ✓ | ✓ |
+| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | ✓ | ✓ | ✓ |
+| [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | ✓ | ✓ | ✓ |
+| [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | ✓ | ✓ | ✓ |
+| [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | ✓ | ✓ | ✓ |
+| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | ✓ | ✓ | ✓ |
+| [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | ✓ | ✓ | ✓ |
+| [0X61](#0x61-actionbitor) | [ActionBitOr](#0x61-actionbitor) | ✓ | ✓ | ✓ |
+| [0X62](#0x62-actionbitxor) | [ActionBitXor](#0x62-actionbitxor) | ✓ | ✓ | ✓ |
+| [0X63](#0x63-actionbitlshift) | [ActionBitLShift](#0x63-actionbitlshift) | ✓ | ✓ | ✓ |
+| [0X64](#0x64-actionbitrshift) | [ActionBitRShift](#0x64-actionbitrshift) | ✓ | ✓ | ✓ |
+| [0X65](#0x65-actionbiturshift) | [ActionBitURShift](#0x65-actionbiturshift) | ✓ | ✓ | ✓ |
+| [0X66](#0x66-actionstrictequals) | [ActionStrictEquals](#0x66-actionstrictequals) | ✓ | ✓ | ✓ |
+| [0X67](#0x67-actiongreater) | [ActionGreater](#0x67-actiongreater) | ✓ | ✓ | ✓ |
+| [0X68](#0x68-actionstringgreater) | [ActionStringGreater](#0x68-actionstringgreater) | ✓ | ✓ | ✓ |
+| [0X87](#0x87-actionstoreregister) | [ActionStoreRegister](#0x87-actionstoreregister) | ✓ | ✓ | ✓ |
+| [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | ✓ |  | ✓ |
+| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | ✓ |  | ✓ |
+| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | ✓ |  | ✓ |
+| [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | ✓ |  | ✓ |
+| [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | ✓ |  | ✓ |
+| [0X9E](#0x9e-actioncall) | [ActionCall](#0x9e-actioncall) | ✓ | ✓ | ✓ |
 
 ### ❌ Not Implemented
 (Only in spec, no implementation yet)
@@ -225,6 +200,7 @@
 | Hex | Spec Name |
 |-----|-----------|
 | [0X3C](#0x3c-actiondefinelocal) | [ActionDefineLocal](#0x3c-actiondefinelocal) |
+| [0X9F](#0x9f-actiongotoframe2) | [ActionGotoFrame2](#0x9f-actiongotoframe2) |
 
 ## Detailed Information
 
@@ -677,11 +653,6 @@ void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md](SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-string-extract-0x15-011CUqjJxEarFz94kS6esXja`
-- **Commit**: `d117464f127c23c3b5e1c3453987d49332b71ff3`
-- **Subject**: Implement STRING_EXTRACT opcode (0x15) for AS2 substring operation
-
 **Notes:**
 - Official SWF specification name (spec line 4942)
 
@@ -738,7 +709,8 @@ void actionToInteger(char* stack, u32* sp);
 - `actionGetVariable` (function, source: action.h)
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
 - [✗] `SWFRecomp/tests/try_swf_7`
 
@@ -766,7 +738,8 @@ void actionGetVariable(char* stack, u32* sp);
 - `actionSetVariable` (function, source: action.h)
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
 
 **Function Declaration:**
@@ -856,11 +829,6 @@ void actionGetProperty(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md](SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-get-property-0x22-011CUqqqTnsyJjtfQywgWLjs`
-- **Commit**: `2dc128a80b3e23b988853623bd7cad44765f2bed`
-- **Subject**: Implement GET_PROPERTY opcode (0x22) for MovieClip property access
-
 **Notes:**
 - Official SWF specification name (spec line 5423)
 
@@ -883,11 +851,6 @@ void actionSetProperty(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md](SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/implement-opcode-set-property-011CUqqrbs54vXgh5PYu8tPB`
-- **Commit**: `6a591e68a1ea81556b338f3a61e96e8d12772c39`
-- **Subject**: Implement SET_PROPERTY opcode (0x23) for MovieClip properties
 
 **Notes:**
 - Official SWF specification name (spec line 5541)
@@ -963,11 +926,17 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/and_floats_second_1_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_swf_4`
 - [✓] `SWFRecomp/tests/bit_and_swf_4`
+- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_swf_5`
 - [✓] `SWFRecomp/tests/cast_op_swf_7`
 - [✓] `SWFRecomp/tests/clone_sprite_swf_4`
+- [✓] `SWFRecomp/tests/constant_pool_large_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_nonseq_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_repeated_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_swf_5`
 - [✓] `SWFRecomp/tests/end_drag_swf_4`
 - [✗] `SWFRecomp/tests/equals2_swf_5`
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/get_url2_swf_4`
 - [✓] `SWFRecomp/tests/get_url_swf_3`
 - [✓] `SWFRecomp/tests/goto_frame_swf_3`
@@ -983,7 +952,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/start_drag_swf_4`
 - [✓] `SWFRecomp/tests/stop_sounds_swf_4`
 - [✓] `SWFRecomp/tests/stop_swf_4`
-- [✗] `SWFRecomp/tests/throw_swf_7`
+- [✓] `SWFRecomp/tests/throw_swf_7`
 - [✓] `SWFRecomp/tests/toggle_quality_swf_4`
 - [✗] `SWFRecomp/tests/try_swf_7`
 - [✓] `SWFRecomp/tests/typeof_swf_5`
@@ -1076,11 +1045,6 @@ void actionStringLess(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md](SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-string-less-0x29-011CUqjLBvt11NbE5qovg15L`
-- **Commit**: `705d3e4952efe1d4cae824e22fbcc916cb6b7edd`
-- **Subject**: Implement STRING_LESS opcode (0x29) for lexicographic string comparison
-
 **Notes:**
 - Official SWF specification name (spec line 4964)
 
@@ -1094,7 +1058,7 @@ void actionStringLess(char* stack, u32* sp);
 - `actionThrow` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/throw_swf_7`
+- [✓] `SWFRecomp/tests/throw_swf_7`
 - [✗] `SWFRecomp/tests/try_swf_7`
 
 **Function Declaration:**
@@ -1200,11 +1164,6 @@ void actionRandomNumber(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md](SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-char-to-ascii-011CUqj9iRdh36YUoc2qi2cE`
-- **Commit**: `bfbc54b8dc9cf5cbd7a08c3a832457452fedf8bc`
-- **Subject**: Implement CharToAscii (0x31) opcode for AS2
-
 **Notes:**
 - Official SWF specification name (spec line 4986)
 
@@ -1228,11 +1187,6 @@ void actionCharToAscii(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md](SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-ascii-to-char-011CUqjDTN85jHrPQw6TcwG6`
-- **Commit**: `f919257999bd3620b400f2bcef828e6e8fc2090a`
-- **Subject**: Implement ASCII_TO_CHAR opcode (0x32)
-
 **Notes:**
 - Official SWF specification name (spec line 5053)
 
@@ -1255,11 +1209,6 @@ void actionAsciiToChar(char* stack, u32* sp, char* str_buffer);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md](SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-mb-char-to-ascii-011CUqjErLGMw5t3U7fW8Ptx`
-- **Commit**: `420ee39dcc4c0e3b8e2cd899d30eebb9e824d697`
-- **Subject**: Implement MB_CHAR_TO_ASCII opcode (0x33) for multibyte UTF-8 string support
 
 **Notes:**
 - Official SWF specification name (spec line 5072)
@@ -1301,11 +1250,6 @@ void actionGetTime(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md](SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x35.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-mb-string-length-011CUqjHZGBt4RPFnmqHZUmK`
-- **Commit**: `5a7d71fd71cc468bba9df66f0143402e2048f193`
-- **Subject**: Implement MB_STRING_LENGTH opcode (0x35)
-
 **Notes:**
 - Official SWF specification name (spec line 5006)
 
@@ -1322,11 +1266,6 @@ void actionGetTime(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md](SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-mb-ascii-to-char-011CUqjGDDuJtLXjWDS2jnrB`
-- **Commit**: `5012878afbe100af027f2bc377a93fccb7d128d8`
-- **Subject**: Implement MB_ASCII_TO_CHAR opcode (0x36)
 
 **Notes:**
 - Official SWF specification name (spec line 5094)
@@ -1405,11 +1344,6 @@ void actionDelete2(char* stack, u32* sp, char* str_buffer);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md](SWFRecompDocs/prompts/completed/opcode-typeof-0x3c.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-typeof-0x3c-011CUqjRkgkmLYw99RCTrX2N`
-- **Commit**: `e8c6149a895d55c12ff64fc38abfb422e1847755`
-- **Subject**: Implement TYPEOF opcode (0x3C)
-
 **Notes:**
 - Official SWF specification name (spec line 5969)
 
@@ -1433,11 +1367,6 @@ void actionStackSwap(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md](SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-duplicate-0x3d-011CUqjMorPan5wAhTnAR7Xy`
-- **Commit**: `16cd31e229e5f910b61a45737df165f3fa2fc5bf`
-- **Subject**: Implement DUPLICATE opcode (0x3D)
-
 **Notes:**
 - Official SWF specification name (spec line 5796)
 
@@ -1450,6 +1379,9 @@ void actionStackSwap(char* stack, u32* sp);
 - `SWF_ACTION_RETURN` (enum, source: action.hpp)
 - `actionReturn` (function, source: action.h)
 
+**Secondary Tests:**
+- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+
 **Function Declaration:**
 ```c
 void actionReturn(char* stack, u32* sp);
@@ -1460,11 +1392,6 @@ void actionReturn(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-return-0x3e.md](SWFRecompDocs/prompts/completed/opcode-return-0x3e.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-return-0x3e-011CUqqvqpagz6dnfYaZnpQz`
-- **Commit**: `2722c1226bc29b04becb65e51d805661065bbe34`
-- **Subject**: Implement RETURN opcode (0x3E) for ActionScript 2
 
 **Notes:**
 - Official SWF specification name (spec line 6643)
@@ -1512,11 +1439,6 @@ void actionNewObject(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md](SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/implement-opcode-new-object-011CUqqtdjVWnbspsyb3PyNS`
-- **Commit**: `73a5174c63a74faf1b955c38831ea2d93cea9ba3`
-- **Subject**: Implement NEW_OBJECT opcode (0x40) with Array/Object support
-
 **Notes:**
 - Official SWF specification name (spec line 6216)
 
@@ -1533,11 +1455,6 @@ void actionNewObject(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md](SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-declare-local-0x41-011CUqv6JpWVXE8iy8PwqaP4`
-- **Commit**: `97cec4084ea511e3d08ceba8008e6c6222eaa45f`
-- **Subject**: Implement DECLARE_LOCAL opcode (0x41) with local scope infrastructure
 
 **Notes:**
 - Official SWF specification name (spec line 5990)
@@ -1562,11 +1479,6 @@ void actionInitArray(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md](SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-init-array-0x42-011CUqqkAxTY8viyYWbxeESe`
-- **Commit**: `b11c784685c0700a097478b45e701c19e13d76c9`
-- **Subject**: Implement INIT_ARRAY opcode (0x42)
-
 **Notes:**
 - Official SWF specification name (spec line 6124)
 
@@ -1580,7 +1492,7 @@ void actionInitArray(char* stack, u32* sp);
 - `actionInitObject` (function, source: action.h)
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/implements_op_swf_7`
 
 **Function Declaration:**
@@ -1593,11 +1505,6 @@ void actionInitObject(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md](SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-init-object-0x43-011CUqqmNYk4A15HTAzbUq5v`
-- **Commit**: `ac7e661289f093413930f20754bbfa827cf562ac`
-- **Subject**: Implement INIT_OBJECT opcode (0x43) for ActionScript object creation
 
 **Notes:**
 - Official SWF specification name (spec line 6153)
@@ -1642,11 +1549,6 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md](SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-target-path-0x45-011CUqjSvUtwuKs7YmLXRRcD`
-- **Commit**: `f7dbad28eac27324c6117bb3c301e6d2d109df24`
-- **Subject**: Implement TARGET_PATH opcode (0x45)
-
 **Notes:**
 - Official SWF specification name (spec line 6268)
 
@@ -1669,11 +1571,6 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md](SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-enumerate-0x46-011CUquqm9cxfLVykjjXYtZZ`
-- **Commit**: `ebe63532930ce7dac71c8af8dae63d7ac387834e`
-- **Subject**: Implement ENUMERATE opcode (0x46) for object property enumeration
 
 **Notes:**
 - Official SWF specification name (spec line 6044)
@@ -1701,11 +1598,6 @@ void actionAdd2(char* stack, u32* sp, char* str_buffer);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-add2-0x47.md](SWFRecompDocs/prompts/completed/opcode-add2-0x47.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-add2-0x47-011CUqjUFFXqojvHMPRuv3Bb`
-- **Commit**: `10b0923c538e8829e12185167e6f1f66d4c21d1b`
-- **Subject**: Implement ADD2 opcode (0x47) - Type-aware addition
-
 **Notes:**
 - Official SWF specification name (spec line 6393)
 
@@ -1728,11 +1620,6 @@ void actionLess2(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-less2-0x48.md](SWFRecompDocs/prompts/completed/opcode-less2-0x48.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-less2-0x48-011CUqVhjEkp43uiNZP73mVd`
-- **Commit**: `38abf422447f760d57ac32be92b3ad8427a48d86`
-- **Subject**: Implement ActionLess2 opcode (0x48) and fix opcode naming
 
 **Notes:**
 - Official SWF specification name (spec line 6414)
@@ -1783,11 +1670,6 @@ void actionToNumber(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md](SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-to-number-0x4a-011CUqVrcGZ3S8hpgvoNmZFo`
-- **Commit**: `5a01940750da3549c0c5b47f539667c4153ca24d`
-- **Subject**: Implement TO_NUMBER opcode (0x4A) for ActionScript 2
-
 **Notes:**
 - Official SWF specification name (spec line 6320)
 
@@ -1811,11 +1693,6 @@ void actionToString(char* stack, u32* sp, char* str_buffer);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md](SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-to-string-0x4b-011CUqVt3dKcYBkDFdbzzoiE`
-- **Commit**: `2fde36278e8f75217529a706b8d71989dbc37216`
-- **Subject**: Implement TO_STRING opcode (0x4B) for ActionScript 2
-
 **Notes:**
 - Official SWF specification name (spec line 6342)
 
@@ -1828,18 +1705,13 @@ void actionToString(char* stack, u32* sp, char* str_buffer);
 - `SWF_ACTION_DUPLICATE` (enum, source: action.hpp)
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 
 **Implementation:**
 - parseActions (case SWF_ACTION_DUPLICATE)
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md](SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-stack-swap-0x4c-011CUqjPCoZCMmajEqhdp9Wc`
-- **Commit**: `9509728d78349fa6c71676e6d9f85c1c44c6fc88`
-- **Subject**: Implement STACK_SWAP opcode (0x4C)
 
 **Notes:**
 - Official SWF specification name (spec line 6627)
@@ -1900,7 +1772,7 @@ void actionGetMember(char* stack, u32* sp);
 - `actionSetMember` (function, source: action.h)
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 
 **Function Declaration:**
 ```c
@@ -1912,11 +1784,6 @@ void actionSetMember(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md](SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/implement-opcode-set-member-011CUqqpFbcbnzZ8QFBxdF1E`
-- **Commit**: `65f2d22b52936b06419c0a9c6df9b3ed37d765d5`
-- **Subject**: Implement SET_MEMBER opcode (0x4F) and dependencies
 
 **Notes:**
 - Official SWF specification name (spec line 6248)
@@ -1973,7 +1840,12 @@ void actionDecrement(char* stack, u32* sp);
 
 **Name Variations:**
 - `ActionCallMethod` (spec, source: SWF Specification v19)
+- `SWF_ACTION_CALL_METHOD` (enum, source: action.hpp)
 - `actionCallMethod` (function, source: action.h)
+
+**Primary Tests:**
+- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_swf_5`
 
 **Function Declaration:**
 ```c
@@ -1981,7 +1853,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer);
 ```
 
 **Implementation:**
-- SWFModernRuntime/src/actionmodern/action.c
+- parseActions (case SWF_ACTION_CALL_METHOD)
 
 **Documentation:**
 - [SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md](SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md)
@@ -2008,11 +1880,6 @@ void actionNewMethod(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md](SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/implement-opcode-0x53-method-011CUquz2wcCAhXKTfy6ug9x`
-- **Commit**: `80136be832c77e5b7e0371987cbe6cae912fb729`
-- **Subject**: Implement NEW_METHOD opcode (0x53)
 
 **Notes:**
 - Official SWF specification name (spec line 6184)
@@ -2063,11 +1930,6 @@ void actionEnumerate2(char* stack, u32* sp, char* str_buffer);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md](SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-enumerate2-0x55-011CUqus5xEVytTKvwVar7WW`
-- **Commit**: `5ee877d6d80387875c1f269ee3bc09d37adb1092`
-- **Subject**: Implement ENUMERATE2 opcode (0x55) for SWF 6+ property enumeration
-
 **Notes:**
 - Official SWF specification name (spec line 6806)
 
@@ -2094,11 +1956,6 @@ void actionBitAnd(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md](SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-bit-and-0x60-011CUqSTKKr3twXcRVWnFhfN`
-- **Commit**: `24c5cdffc24f6cc602a8283f78a870ffa8a3a9d9`
-- **Subject**: Implement BIT_AND opcode (0x60) for ActionScript 2
-
 **Notes:**
 - Official SWF specification name (spec line 6457)
 
@@ -2121,11 +1978,6 @@ void actionBitOr(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md](SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-bit-or-0x61-011CUqVjXPv9HusHiVtc6TGw`
-- **Commit**: `c84503abf6326e8bdb04fd6d948695b4569d4801`
-- **Subject**: Implement BIT_OR opcode (0x61) for ActionScript 2
 
 **Notes:**
 - Official SWF specification name (spec line 6497)
@@ -2150,11 +2002,6 @@ void actionBitXor(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md](SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-bit-xor-0x62-011CUqVkkQnMQwzLk76tgFdA`
-- **Commit**: `0cb58244e28e4f3c842d5c1ae8d07ca6b9b0ad18`
-- **Subject**: Implement BIT_XOR opcode (0x62) for ActionScript 2
-
 **Notes:**
 - Official SWF specification name (spec line 6563)
 
@@ -2177,11 +2024,6 @@ void actionBitLShift(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md](SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-bit-lshift-0x63-011CUqVnDyW9hL8bDRoCyrSZ`
-- **Commit**: `6adec98bba782efd8516f67af512f4460ef80867`
-- **Subject**: Implement BIT_LSHIFT opcode (0x63) for ActionScript 2
 
 **Notes:**
 - Official SWF specification name (spec line 6476)
@@ -2206,11 +2048,6 @@ void actionBitRShift(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md](SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-bit-rshift-0x64-011CUqVp4jS5TmGv6wrUvggt`
-- **Commit**: `ac378945d5e4372147e701c69aa8f37510a67e0a`
-- **Subject**: Implement BIT_RSHIFT opcode (0x64) for ActionScript 2
-
 **Notes:**
 - Official SWF specification name (spec line 6517)
 
@@ -2233,11 +2070,6 @@ void actionBitURShift(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md](SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-bit-urshift-0x65-011CUqVqFVcxjU7FyuaVQmaJ`
-- **Commit**: `f6cc4cdbc522c20f7df48d85870caa95a934b148`
-- **Subject**: Implement BIT_URSHIFT opcode (0x65) for ActionScript 2
 
 **Notes:**
 - Official SWF specification name (spec line 6541)
@@ -2262,11 +2094,6 @@ void actionStrictEquals(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md](SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-strict-equals-0x66-011CUqVg8PjXUUbRMxgc4YVB`
-- **Commit**: `5367dc91ade751214ce4f9b1c0959bab15bf3f6a`
-- **Subject**: Implement STRICT_EQUALS opcode (0x66) for ActionScript 2
-
 **Notes:**
 - Official SWF specification name (spec line 6829)
 
@@ -2289,11 +2116,6 @@ void actionGreater(char* stack, u32* sp);
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-greater-0x67.md](SWFRecompDocs/prompts/completed/opcode-greater-0x67.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-greater-0x67-011CUqVaJqcbH4RtE6aUYjdr`
-- **Commit**: `ecbbd2b83213ce340b24df5b748e99b505fb5ba1`
-- **Subject**: Fix GREATER opcode hex value from 0x48 to 0x67
 
 **Notes:**
 - Official SWF specification name (spec line 6848)
@@ -2318,11 +2140,6 @@ void actionStringGreater(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md](SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-string-greater-0x68-011CUqVejVoGZ9nRiJM9nwVE`
-- **Commit**: `874e6ecce97598d896b7b2f05d4c47a7e986e970`
-- **Subject**: Implement STRING_GREATER opcode (0x68) for ActionScript 2
-
 **Notes:**
 - Official SWF specification name (spec line 6870)
 
@@ -2336,7 +2153,7 @@ void actionStringGreater(char* stack, u32* sp);
 - `actionExtends` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 
 **Function Declaration:**
 ```c
@@ -2424,11 +2241,6 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md](SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-store-register-0x87-011CUqqydram99y3sZsbqWkT`
-- **Commit**: `f308ca4dfe0eb38426e54c168da941f732fab719`
-- **Subject**: Implement StoreRegister opcode (0x87)
-
 **Notes:**
 - Official SWF specification name (spec line 6678)
 
@@ -2439,6 +2251,12 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 **Name Variations:**
 - `ActionConstantPool` (spec, source: SWF Specification v19)
 - `SWF_ACTION_CONSTANT_POOL` (enum, source: action.hpp)
+
+**Primary Tests:**
+- [✓] `SWFRecomp/tests/constant_pool_large_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_nonseq_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_repeated_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_swf_5`
 
 **Implementation:**
 - parseActions (case SWF_ACTION_CONSTANT_POOL)
@@ -2550,6 +2368,9 @@ void actionGoToLabel(char* stack, u32* sp, const char* label);
 - `SWF_ACTION_DEFINE_FUNCTION2` (enum, source: action.hpp)
 - `actionDefineFunction2` (function, source: action.h)
 
+**Primary Tests:**
+- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+
 **Function Declaration:**
 ```c
 void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);
@@ -2598,11 +2419,6 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-with-0x94.md](SWFRecompDocs/prompts/completed/opcode-with-0x94.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/review-opcode-0x94-docs-011CUqv4hzUhu2AxFawLjQRF`
-- **Commit**: `eac8864411b07eeb460edcd4848938b78184821c`
-- **Subject**: Implement WITH statement (opcode 0x94) with scope chain
-
 **Notes:**
 - Official SWF specification name (spec line 6289)
 
@@ -2624,11 +2440,17 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/and_floats_second_1_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_swf_4`
 - [✓] `SWFRecomp/tests/bit_and_swf_4`
+- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_swf_5`
 - [✓] `SWFRecomp/tests/cast_op_swf_7`
 - [✓] `SWFRecomp/tests/clone_sprite_swf_4`
+- [✓] `SWFRecomp/tests/constant_pool_large_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_nonseq_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_repeated_swf_5`
+- [✓] `SWFRecomp/tests/constant_pool_swf_5`
 - [✓] `SWFRecomp/tests/end_drag_swf_4`
 - [✗] `SWFRecomp/tests/equals2_swf_5`
-- [✗] `SWFRecomp/tests/extends_swf_7`
+- [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/get_url2_swf_4`
 - [✓] `SWFRecomp/tests/get_url_swf_3`
 - [✓] `SWFRecomp/tests/goto_frame_swf_3`
@@ -2643,7 +2465,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/start_drag_swf_4`
 - [✓] `SWFRecomp/tests/stop_sounds_swf_4`
 - [✓] `SWFRecomp/tests/stop_swf_4`
-- [✗] `SWFRecomp/tests/throw_swf_7`
+- [✓] `SWFRecomp/tests/throw_swf_7`
 - [✓] `SWFRecomp/tests/toggle_quality_swf_4`
 - [✗] `SWFRecomp/tests/try_swf_7`
 - [✓] `SWFRecomp/tests/typeof_swf_5`
@@ -2716,11 +2538,6 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md](SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/read-opcode-define-function-011CUqv1Yar8czBGx2TBLEKq`
-- **Commit**: `c955e9b6fe8054a3b7896510f0803c4dace174ca`
-- **Subject**: Implement DEFINE_FUNCTION opcode (0x9B) for AS2 function definitions
-
 **Notes:**
 - Official SWF specification name (spec line 5894)
 
@@ -2764,11 +2581,6 @@ void actionCall(char* stack, u32* sp);
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-call-0x9e.md](SWFRecompDocs/prompts/completed/opcode-call-0x9e.md)
 
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-call-0x9e-011CUqqxAw4Cd4VdGoYqDDVq`
-- **Commit**: `68f22c53ace3c0e60aa3bc446c252c9f92c23e59`
-- **Subject**: Implement CALL opcode (0x9E) - ActionScript 2 frame subroutine calls
-
 **Notes:**
 - Official SWF specification name (spec line 5195)
 
@@ -2778,18 +2590,9 @@ void actionCall(char* stack, u32* sp);
 
 **Name Variations:**
 - `ActionGotoFrame2` (spec, source: SWF Specification v19)
-- `SWF_ACTION_CALL_METHOD` (enum, source: action.hpp)
-
-**Implementation:**
-- parseActions (case SWF_ACTION_CALL_METHOD)
 
 **Documentation:**
 - [SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md](SWFRecompDocs/prompts/completed/opcode-call-method-0x9f.md)
-
-**Implementation Branch:**
-- **Branch**: `origin/claude/opcode-call-method-0x9f-011CUquxpiNPgc5MXYU71YCQ`
-- **Commit**: `1489c3ee1455923b589789b67f4cf947ccd26547`
-- **Subject**: Implement CALL_METHOD opcode (0x9F) for ActionScript 2
 
 **Notes:**
 - Official SWF specification name (spec line 5344)

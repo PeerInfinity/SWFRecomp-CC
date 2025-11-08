@@ -2,7 +2,8 @@
   "metadata": {
     "name": "try_swf_7",
     "description": "Tests ActionTry (0x8F) and ActionThrow (0x2A) opcodes for exception handling with try-catch blocks",
-    "swf_version": 7
+    "swf_version": 7,
+    "fully_implemented": false
   },
   "opcodes": {
     "tested": ["TRY", "THROW"],
@@ -10,5 +11,10 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "known_issues": [
+    "setjmp/longjmp control flow issue: longjmp from within try block doesn't properly skip to catch block",
+    "Exception is thrown but remaining try block code still executes",
+    "Needs restructuring - setjmp must be at script level, not in function call"
+  ]
 }

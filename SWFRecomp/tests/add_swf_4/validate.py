@@ -22,7 +22,7 @@ from test_utils import parse_output, make_result, make_validation_result
 def validate_output(output):
     """
     Validate test output for comprehensive ADD opcode tests.
-    
+
     Tests:
     1. Basic integer addition: 5 + 3 = 8
     2. Floating point: 2.5 + 1.5 = 4
@@ -34,12 +34,13 @@ def validate_output(output):
     8. Small decimals: 0.001 + 0.002 = 0.003
     9. Negative result: -10 + 3 = -7
     10. Double negative: -5 + -5 = -10
+    11. Non-numeric string: "hello" + 5 = 5 (atof converts to 0)
     """
     lines = parse_output(output)
-    
-    # We expect 10 output lines
-    if len(lines) < 10:
-        lines.extend([''] * (10 - len(lines)))  # Pad with empty strings
+
+    # We expect 11 output lines
+    if len(lines) < 11:
+        lines.extend([''] * (11 - len(lines)))  # Pad with empty strings
     
     results = []
     
@@ -134,7 +135,16 @@ def validate_output(output):
         "-10",
         lines[9]
     ))
-    
+
+    # Test 11: Non-numeric string case
+    # atof("hello") returns 0, so "hello" + 5 = 0 + 5 = 5
+    results.append(make_result(
+        "non_numeric_string_hello_plus_5",
+        lines[10] == "5",
+        "5",
+        lines[10]
+    ))
+
     return make_validation_result(results)
 
 

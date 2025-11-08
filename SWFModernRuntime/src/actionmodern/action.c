@@ -3264,13 +3264,36 @@ void actionWithEnd(char* stack, u32* sp)
 // ============================================================================
 
 // Exception state structure
+#include <setjmp.h>
+
+// TODO: Current setjmp/longjmp implementation has a critical flaw!
+// The problem: setjmp is called inside actionTryExecute(), which is called from within
+// the if statement. When longjmp is triggered, it returns to setjmp inside actionTryExecute,
+// which then returns false. However, the C runtime is still executing inside the try block's
+// code body, so execution continues from where longjmp was called rather than jumping to
+// the catch block.
+//
+// Solution needed: Generate code that places setjmp at the script function level, not inside
+// a helper function. The generated code should look like:
+//
+//   if (setjmp(exception_handler) == 0) {
+//       // try block
+//   } else {
+//       // catch block
+//   }
+//
+// This requires modifying the SWFRecomp translator to emit setjmp inline rather than
+// calling actionTryExecute().
+
 typedef struct {
 	bool exception_thrown;
 	ActionVar exception_value;
 	int handler_depth;
+	jmp_buf exception_handler;
+	int has_jmp_buf;
 } ExceptionState;
 
-static ExceptionState g_exception_state = {false, {0}, 0};
+static ExceptionState g_exception_state = {false, {0}, 0, {0}, 0};
 
 void actionThrow(char* stack, u32* sp)
 {
@@ -3282,33 +3305,64 @@ void actionThrow(char* stack, u32* sp)
 	g_exception_state.exception_thrown = true;
 	g_exception_state.exception_value = throw_value;
 
-#ifdef DEBUG
-	printf("[DEBUG] actionThrow: exception thrown (type=%d)\n", throw_value.type);
-#endif
+	// Check if we're in a try block
+	if (g_exception_state.handler_depth == 0) {
+		// Uncaught exception - print error message and exit
+		printf("[Uncaught exception: ");
 
-	// Control flow will jump to catch or finally block
-	// (handled by actionTryExecute returning false)
+		if (throw_value.type == ACTION_STACK_VALUE_STRING) {
+			const char* str = (const char*) VAL(u64, &throw_value.data.numeric_value);
+			printf("%s", str);
+		} else if (throw_value.type == ACTION_STACK_VALUE_F32) {
+			float val = VAL(float, &throw_value.data.numeric_value);
+			printf("%g", val);
+		} else if (throw_value.type == ACTION_STACK_VALUE_F64) {
+			double val = VAL(double, &throw_value.data.numeric_value);
+			printf("%g", val);
+		} else {
+			printf("(type %d)", throw_value.type);
+		}
+
+		printf("]\n");
+
+		// Exit to stop script execution
+		exit(1);
+	}
+
+	// Inside a try block - jump to catch handler using longjmp
+	// NOTE: Due to current implementation flaw (see TODO above), this doesn't
+	// properly skip remaining try block code. Fix requires inline setjmp in generated code.
+	if (g_exception_state.has_jmp_buf) {
+		longjmp(g_exception_state.exception_handler, 1);
+	}
 }
 
 void actionTryBegin(char* stack, u32* sp)
 {
 	// Push exception handler onto handler stack
 	g_exception_state.handler_depth++;
-#ifdef DEBUG
-	printf("[DEBUG] actionTryBegin: handler_depth=%d\n", g_exception_state.handler_depth);
-#endif
+
+	// Clear exception flag for new try block
+	g_exception_state.exception_thrown = false;
+	g_exception_state.has_jmp_buf = 0;
 }
 
 bool actionTryExecute(char* stack, u32* sp)
 {
-	// Returns true if try block should execute normally
-	// Returns false if exception was thrown (jump to catch)
-	bool should_execute_try = !g_exception_state.exception_thrown;
-#ifdef DEBUG
-	printf("[DEBUG] actionTryExecute: exception_thrown=%d, returning %d\n",
-		   g_exception_state.exception_thrown, should_execute_try);
-#endif
-	return should_execute_try;
+	// Set up exception handler using setjmp
+	// This will be called again when longjmp is triggered
+	// WARNING: This function-based approach has a control flow flaw (see TODO above)
+	int exception_occurred = setjmp(g_exception_state.exception_handler);
+	g_exception_state.has_jmp_buf = 1;
+
+	// If exception occurred (longjmp was called), return false to execute catch block
+	if (exception_occurred != 0) {
+		g_exception_state.exception_thrown = true;
+		return false;
+	}
+
+	// No exception yet, execute try block
+	return true;
 }
 
 void actionCatchToVariable(char* stack, u32* sp, const char* var_name)
@@ -3343,6 +3397,9 @@ void actionTryEnd(char* stack, u32* sp)
 {
 	// Pop exception handler from handler stack
 	g_exception_state.handler_depth--;
+
+	// Clear jmp_buf flag
+	g_exception_state.has_jmp_buf = 0;
 
 	if (g_exception_state.handler_depth == 0)
 	{
@@ -3509,6 +3566,232 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
+// Helper function to call built-in string methods
+// Returns 1 if method was handled, 0 if not found
+static int callStringPrimitiveMethod(char* stack, u32* sp, char* str_buffer,
+                                      const char* str_value, u32 str_len,
+                                      const char* method_name, u32 method_name_len,
+                                      ActionVar* args, u32 num_args)
+{
+	// toUpperCase() - no arguments
+	if (method_name_len == 11 && strncmp(method_name, "toUpperCase", 11) == 0)
+	{
+		// Convert string to uppercase
+		int i;
+		for (i = 0; i < str_len && i < 16; i++)
+		{
+			char c = str_value[i];
+			if (c >= 'a' && c <= 'z')
+			{
+				str_buffer[i] = c - ('a' - 'A');
+			}
+			else
+			{
+				str_buffer[i] = c;
+			}
+		}
+		str_buffer[i] = '\0';
+		PUSH_STR(str_buffer, i);
+		return 1;
+	}
+
+	// toLowerCase() - no arguments
+	if (method_name_len == 11 && strncmp(method_name, "toLowerCase", 11) == 0)
+	{
+		// Convert string to lowercase
+		int i;
+		for (i = 0; i < str_len && i < 16; i++)
+		{
+			char c = str_value[i];
+			if (c >= 'A' && c <= 'Z')
+			{
+				str_buffer[i] = c + ('a' - 'A');
+			}
+			else
+			{
+				str_buffer[i] = c;
+			}
+		}
+		str_buffer[i] = '\0';
+		PUSH_STR(str_buffer, i);
+		return 1;
+	}
+
+	// charAt(index) - 1 argument
+	if (method_name_len == 6 && strncmp(method_name, "charAt", 6) == 0)
+	{
+		int index = 0;
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_F32)
+		{
+			index = (int)VAL(float, &args[0].data.numeric_value);
+		}
+
+		// Bounds check
+		if (index < 0 || index >= str_len)
+		{
+			str_buffer[0] = '\0';
+			PUSH_STR(str_buffer, 0);
+		}
+		else
+		{
+			str_buffer[0] = str_value[index];
+			str_buffer[1] = '\0';
+			PUSH_STR(str_buffer, 1);
+		}
+		return 1;
+	}
+
+	// substr(start, length) - 2 arguments
+	if (method_name_len == 6 && strncmp(method_name, "substr", 6) == 0)
+	{
+		int start = 0;
+		int length = str_len;
+
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_F32)
+		{
+			start = (int)VAL(float, &args[0].data.numeric_value);
+		}
+		if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_F32)
+		{
+			length = (int)VAL(float, &args[1].data.numeric_value);
+		}
+
+		// Handle negative start (count from end)
+		if (start < 0)
+		{
+			start = str_len + start;
+			if (start < 0) start = 0;
+		}
+
+		// Bounds check
+		if (start >= str_len || length <= 0)
+		{
+			str_buffer[0] = '\0';
+			PUSH_STR(str_buffer, 0);
+		}
+		else
+		{
+			if (start + length > str_len)
+			{
+				length = str_len - start;
+			}
+
+			int i;
+			for (i = 0; i < length && i < 16; i++)
+			{
+				str_buffer[i] = str_value[start + i];
+			}
+			str_buffer[i] = '\0';
+			PUSH_STR(str_buffer, i);
+		}
+		return 1;
+	}
+
+	// substring(start, end) - 2 arguments (different from substr!)
+	if (method_name_len == 9 && strncmp(method_name, "substring", 9) == 0)
+	{
+		int start = 0;
+		int end = str_len;
+
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_F32)
+		{
+			start = (int)VAL(float, &args[0].data.numeric_value);
+		}
+		if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_F32)
+		{
+			end = (int)VAL(float, &args[1].data.numeric_value);
+		}
+
+		// Clamp to valid range
+		if (start < 0) start = 0;
+		if (end < 0) end = 0;
+		if (start > str_len) start = str_len;
+		if (end > str_len) end = str_len;
+
+		// Swap if start > end
+		if (start > end)
+		{
+			int temp = start;
+			start = end;
+			end = temp;
+		}
+
+		int length = end - start;
+		if (length <= 0)
+		{
+			str_buffer[0] = '\0';
+			PUSH_STR(str_buffer, 0);
+		}
+		else
+		{
+			int i;
+			for (i = 0; i < length && i < 16; i++)
+			{
+				str_buffer[i] = str_value[start + i];
+			}
+			str_buffer[i] = '\0';
+			PUSH_STR(str_buffer, i);
+		}
+		return 1;
+	}
+
+	// indexOf(searchString, startIndex) - 1-2 arguments
+	if (method_name_len == 7 && strncmp(method_name, "indexOf", 7) == 0)
+	{
+		const char* search_str = "";
+		int search_len = 0;
+		int start_index = 0;
+
+		if (num_args > 0)
+		{
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				search_str = (const char*)args[0].data.numeric_value;
+				search_len = args[0].str_size;
+			}
+		}
+		if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_F32)
+		{
+			start_index = (int)VAL(float, &args[1].data.numeric_value);
+			if (start_index < 0) start_index = 0;
+		}
+
+		// Search for substring
+		int found_index = -1;
+		if (search_len == 0)
+		{
+			found_index = start_index <= str_len ? start_index : -1;
+		}
+		else
+		{
+			for (int i = start_index; i <= str_len - search_len; i++)
+			{
+				int match = 1;
+				for (int j = 0; j < search_len; j++)
+				{
+					if (str_value[i + j] != search_str[j])
+					{
+						match = 0;
+						break;
+					}
+				}
+				if (match)
+				{
+					found_index = i;
+					break;
+				}
+			}
+		}
+
+		float result = (float)found_index;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return 1;
+	}
+
+	// Method not found
+	return 0;
+}
+
 void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 {
 	// 1. Pop method name (string) from stack
@@ -3547,7 +3830,50 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		}
 	}
 
-	// 5. Look up the method on the object and invoke it
+	// 5. Check for empty/blank method name - invoke object as function
+	if (method_name_len == 0 || (method_name_len == 1 && method_name[0] == '\0'))
+	{
+		// Empty method name - invoke the object itself as a function
+		if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			// Object is a function - invoke it
+			ASFunction* func = lookupFunctionFromVar(&obj_var);
+
+			if (func != NULL && func->function_type == 2)
+			{
+				// Invoke DefineFunction2
+				ActionVar* registers = NULL;
+				if (func->register_count > 0) {
+					registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+				}
+
+				// No 'this' binding for direct function call (pass NULL)
+				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
+
+				if (registers != NULL) free(registers);
+				if (args != NULL) free(args);
+
+				pushVar(stack, sp, &result);
+				return;
+			}
+			else
+			{
+				// Simple function or invalid - push undefined
+				if (args != NULL) free(args);
+				pushUndefined(stack, sp);
+				return;
+			}
+		}
+		else
+		{
+			// Object is not a function - cannot invoke, push undefined
+			if (args != NULL) free(args);
+			pushUndefined(stack, sp);
+			return;
+		}
+	}
+
+	// 6. Look up the method on the object and invoke it
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
@@ -3598,9 +3924,29 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 			return;
 		}
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		// String primitive - call built-in string methods
+		const char* str_value = (const char*) obj_var.data.numeric_value;
+		u32 str_len = obj_var.str_size;
+
+		int handled = callStringPrimitiveMethod(stack, sp, str_buffer,
+		                                         str_value, str_len,
+		                                         method_name, method_name_len,
+		                                         args, num_args);
+
+		if (args != NULL) free(args);
+
+		if (!handled)
+		{
+			// Method not found - push undefined
+			pushUndefined(stack, sp);
+		}
+		return;
+	}
 	else
 	{
-		// Not an object - push undefined
+		// Not an object or string - push undefined
 		if (args != NULL) free(args);
 		pushUndefined(stack, sp);
 		return;

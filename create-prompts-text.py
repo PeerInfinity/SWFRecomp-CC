@@ -29,7 +29,7 @@ def create_prompts_text(md_files, output_file):
     with open(output_file, 'w') as f:
         for i, md_file in enumerate(md_files):
             # Build the prompt
-            prompt = f"Please read this file and follow its instructions:\n{md_file}"
+            prompt = f"Please read these files and follow their instructions:\nSWFRecompDocs/parallel-opcode-implementation-guide.md\n{md_file}"
 
             # Write the prompt
             f.write(prompt)

@@ -109,7 +109,7 @@ namespace SWFRecomp
 		SWF_ACTION_DEFINE_FUNCTION = 0x9B,
 		SWF_ACTION_IF = 0x9D,
 		SWF_ACTION_CALL = 0x9E,
-		SWF_ACTION_CALL_METHOD = 0x9F
+		SWF_ACTION_CALL_METHOD = 0x52
 	};
 	
 	class SWFAction
@@ -118,6 +118,7 @@ namespace SWFRecomp
 		size_t next_str_i;
 		size_t func_counter;
 		std::map<std::string, size_t> string_to_id;  // Track declared strings for deduplication
+		std::vector<size_t> constant_pool;  // Maps constant pool index to string ID
 
 		SWFAction();
 
