@@ -2,8 +2,8 @@
   "metadata": {
     "generated_date": "2025-11-08",
     "total_opcodes": 100,
-    "implemented_opcodes": 61,
-    "total_entries": 285
+    "implemented_opcodes": 60,
+    "total_entries": 284
   },
   "entries": [
     {
@@ -70,7 +70,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 123)"
+      "notes": "Runtime function (action.h line 122)"
     },
     {
       "hex": "0X05",
@@ -172,7 +172,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 124)"
+      "notes": "Runtime function (action.h line 123)"
     },
     {
       "hex": "0X07",
@@ -314,7 +314,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 129)"
+      "notes": "Runtime function (action.h line 128)"
     },
     {
       "hex": "0X0A",
@@ -1348,7 +1348,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 117)"
+      "notes": "Runtime function (action.h line 116)"
     },
     {
       "hex": "0X23",
@@ -1393,7 +1393,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 118)"
+      "notes": "Runtime function (action.h line 117)"
     },
     {
       "hex": "0X24",
@@ -1444,7 +1444,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 119)"
+      "notes": "Runtime function (action.h line 118)"
     },
     {
       "hex": "0X25",
@@ -1495,7 +1495,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 120)"
+      "notes": "Runtime function (action.h line 119)"
     },
     {
       "hex": "0X26",
@@ -1525,8 +1525,8 @@
         "SWFRecomp/tests/constant_pool_nonseq_swf_5",
         "SWFRecomp/tests/constant_pool_repeated_swf_5",
         "SWFRecomp/tests/constant_pool_swf_5",
-        "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -1580,9 +1580,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 5682)"
@@ -1615,8 +1613,8 @@
         "SWFRecomp/tests/constant_pool_nonseq_swf_5",
         "SWFRecomp/tests/constant_pool_repeated_swf_5",
         "SWFRecomp/tests/constant_pool_swf_5",
-        "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -1670,9 +1668,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
       "notes": "C++ enum value for opcode"
@@ -1705,8 +1701,8 @@
         "SWFRecomp/tests/constant_pool_nonseq_swf_5",
         "SWFRecomp/tests/constant_pool_repeated_swf_5",
         "SWFRecomp/tests/constant_pool_swf_5",
-        "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -1760,12 +1756,10 @@
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
-      "notes": "Runtime function (action.h line 126)"
+      "notes": "Runtime function (action.h line 125)"
     },
     {
       "hex": "0X27",
@@ -1816,7 +1810,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 127)"
+      "notes": "Runtime function (action.h line 126)"
     },
     {
       "hex": "0X28",
@@ -1867,7 +1861,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 128)"
+      "notes": "Runtime function (action.h line 127)"
     },
     {
       "hex": "0X29",
@@ -1966,7 +1960,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 178)"
+      "notes": "Runtime function (action.h line 177)"
     },
     {
       "hex": "0X2B",
@@ -2017,7 +2011,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 137)"
+      "notes": "Runtime function (action.h line 136)"
     },
     {
       "hex": "0X2C",
@@ -2113,7 +2107,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 131)"
+      "notes": "Runtime function (action.h line 130)"
     },
     {
       "hex": "0X31",
@@ -2248,7 +2242,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 132)"
+      "notes": "Runtime function (action.h line 131)"
     },
     {
       "hex": "0X34",
@@ -2299,7 +2293,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
       "fully_implemented": true,
-      "notes": "Runtime function (action.h line 134)"
+      "notes": "Runtime function (action.h line 133)"
     },
     {
       "hex": "0X35",
@@ -2374,7 +2368,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 133)"
+      "notes": "Runtime function (action.h line 132)"
     },
     {
       "hex": "0X37",
@@ -2425,7 +2419,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 135)"
+      "notes": "Runtime function (action.h line 134)"
     },
     {
       "hex": "0X3A",
@@ -2476,7 +2470,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
       "fully_implemented": true,
-      "notes": "Runtime function (action.h line 146)"
+      "notes": "Runtime function (action.h line 145)"
     },
     {
       "hex": "0X3B",
@@ -2527,7 +2521,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 147)"
+      "notes": "Runtime function (action.h line 146)"
     },
     {
       "hex": "0X3C",
@@ -2674,7 +2668,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 139)"
+      "notes": "Runtime function (action.h line 138)"
     },
     {
       "hex": "0X3F",
@@ -2770,7 +2764,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 167)"
+      "notes": "Runtime function (action.h line 166)"
     },
     {
       "hex": "0X41",
@@ -2779,13 +2773,9 @@
       "type": "spec",
       "function_declaration": null,
       "function_implementation": null,
-      "tests_primary": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
       "fully_implemented": false,
@@ -2798,36 +2788,13 @@
       "type": "enum",
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DECLARE_LOCAL)",
-      "tests_primary": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_primary": [],
       "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
       "fully_implemented": false,
       "notes": "C++ enum value for opcode"
-    },
-    {
-      "hex": "0X41",
-      "name": "actionDeclareLocal",
-      "source": "action.h",
-      "type": "function",
-      "function_declaration": "void actionDeclareLocal(char* stack, u32* sp);",
-      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
-      "tests_primary": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
-      "tests_secondary": [],
-      "tests_primary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
-      "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md",
-      "fully_implemented": false,
-      "notes": "Runtime function (action.h line 116)"
     },
     {
       "hex": "0X42",
@@ -2872,7 +2839,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 140)"
+      "notes": "Runtime function (action.h line 139)"
     },
     {
       "hex": "0X43",
@@ -2932,7 +2899,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 164)"
+      "notes": "Runtime function (action.h line 163)"
     },
     {
       "hex": "0X44",
@@ -2947,7 +2914,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 6380)"
     },
@@ -2964,7 +2931,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
@@ -2981,9 +2948,9 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
       "fully_implemented": true,
-      "notes": "Runtime function (action.h line 136)"
+      "notes": "Runtime function (action.h line 135)"
     },
     {
       "hex": "0X45",
@@ -3448,7 +3415,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 165)"
+      "notes": "Runtime function (action.h line 164)"
     },
     {
       "hex": "0X4F",
@@ -3499,7 +3466,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 166)"
+      "notes": "Runtime function (action.h line 165)"
     },
     {
       "hex": "0X50",
@@ -3550,7 +3517,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
       "fully_implemented": true,
-      "notes": "Runtime function (action.h line 142)"
+      "notes": "Runtime function (action.h line 141)"
     },
     {
       "hex": "0X51",
@@ -3601,7 +3568,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
       "fully_implemented": true,
-      "notes": "Runtime function (action.h line 143)"
+      "notes": "Runtime function (action.h line 142)"
     },
     {
       "hex": "0X52",
@@ -3617,7 +3584,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-call-method-0x52.md",
       "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 5831)"
     },
@@ -3635,7 +3602,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-call-method-0x52.md",
       "fully_implemented": true,
       "notes": "C++ enum value for opcode"
     },
@@ -3653,9 +3620,9 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-call-method-0x52.md",
       "fully_implemented": true,
-      "notes": "Runtime function (action.h line 162)"
+      "notes": "Runtime function (action.h line 161)"
     },
     {
       "hex": "0X53",
@@ -3700,7 +3667,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 168)"
+      "notes": "Runtime function (action.h line 167)"
     },
     {
       "hex": "0X54",
@@ -3751,7 +3718,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 144)"
+      "notes": "Runtime function (action.h line 143)"
     },
     {
       "hex": "0X55",
@@ -3796,7 +3763,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 145)"
+      "notes": "Runtime function (action.h line 144)"
     },
     {
       "hex": "0X60",
@@ -3847,7 +3814,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 148)"
+      "notes": "Runtime function (action.h line 147)"
     },
     {
       "hex": "0X61",
@@ -3892,7 +3859,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 149)"
+      "notes": "Runtime function (action.h line 148)"
     },
     {
       "hex": "0X62",
@@ -3937,7 +3904,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 150)"
+      "notes": "Runtime function (action.h line 149)"
     },
     {
       "hex": "0X63",
@@ -3982,7 +3949,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 151)"
+      "notes": "Runtime function (action.h line 150)"
     },
     {
       "hex": "0X64",
@@ -4027,7 +3994,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 152)"
+      "notes": "Runtime function (action.h line 151)"
     },
     {
       "hex": "0X65",
@@ -4072,7 +4039,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 153)"
+      "notes": "Runtime function (action.h line 152)"
     },
     {
       "hex": "0X66",
@@ -4117,7 +4084,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 154)"
+      "notes": "Runtime function (action.h line 153)"
     },
     {
       "hex": "0X67",
@@ -4162,7 +4129,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x67.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 155)"
+      "notes": "Runtime function (action.h line 154)"
     },
     {
       "hex": "0X68",
@@ -4207,7 +4174,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 156)"
+      "notes": "Runtime function (action.h line 155)"
     },
     {
       "hex": "0X69",
@@ -4258,7 +4225,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 157)"
+      "notes": "Runtime function (action.h line 156)"
     },
     {
       "hex": "0X81",
@@ -4309,7 +4276,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 125)"
+      "notes": "Runtime function (action.h line 124)"
     },
     {
       "hex": "0X83",
@@ -4360,7 +4327,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 130)"
+      "notes": "Runtime function (action.h line 129)"
     },
     {
       "hex": "0X87",
@@ -4405,7 +4372,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 158)"
+      "notes": "Runtime function (action.h line 157)"
     },
     {
       "hex": "0X88",
@@ -4530,7 +4497,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 121)"
+      "notes": "Runtime function (action.h line 120)"
     },
     {
       "hex": "0X8C",
@@ -4596,7 +4563,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe2-0x8d.md",
       "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5655)"
     },
@@ -4613,7 +4580,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe2-0x8d.md",
       "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
@@ -4625,7 +4592,8 @@
       "function_declaration": null,
       "function_implementation": null,
       "tests_primary": [
-        "SWFRecomp/tests/call_method_empty_name_swf_5"
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary": [],
       "tests_primary_passing": [],
@@ -4642,7 +4610,8 @@
       "function_declaration": null,
       "function_implementation": "parseActions (case SWF_ACTION_DEFINE_FUNCTION2)",
       "tests_primary": [
-        "SWFRecomp/tests/call_method_empty_name_swf_5"
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary": [],
       "tests_primary_passing": [],
@@ -4659,14 +4628,15 @@
       "function_declaration": "void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);",
       "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
       "tests_primary": [
-        "SWFRecomp/tests/call_method_empty_name_swf_5"
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 173)"
+      "notes": "Runtime function (action.h line 172)"
     },
     {
       "hex": "0X8F",
@@ -4760,8 +4730,8 @@
         "SWFRecomp/tests/constant_pool_nonseq_swf_5",
         "SWFRecomp/tests/constant_pool_repeated_swf_5",
         "SWFRecomp/tests/constant_pool_swf_5",
-        "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -4814,9 +4784,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
       "notes": "Official SWF specification name (spec line 4556)"
@@ -4849,8 +4817,8 @@
         "SWFRecomp/tests/constant_pool_nonseq_swf_5",
         "SWFRecomp/tests/constant_pool_repeated_swf_5",
         "SWFRecomp/tests/constant_pool_swf_5",
-        "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -4903,9 +4871,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "tests_primary_passing": [],
-      "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
-      ],
+      "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
       "notes": "C++ enum value for opcode"
@@ -4993,7 +4959,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 163)"
+      "notes": "Runtime function (action.h line 162)"
     },
     {
       "hex": "0X9B",
@@ -5108,7 +5074,7 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "fully_implemented": false,
-      "notes": "Runtime function (action.h line 161)"
+      "notes": "Runtime function (action.h line 160)"
     },
     {
       "hex": "0X9F",
@@ -5123,7 +5089,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
       "notes": "Official SWF specification name (spec line 5344)"
     },
@@ -5140,7 +5106,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
       "notes": "C++ enum value for opcode"
     },
@@ -5157,7 +5123,7 @@
       "tests_secondary": [],
       "tests_primary_passing": [],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe2-0x9f.md",
       "fully_implemented": false,
       "notes": "Runtime function (action.h line 101)"
     }

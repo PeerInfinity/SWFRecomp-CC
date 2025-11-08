@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "define_function2_swf_7",
+    "description": "Tests DEFINE_FUNCTION2 opcode (0x8E) - enhanced function definition with register support",
+    "swf_version": 7,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["DEFINE_FUNCTION2"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": [
+    "This is a PARTIAL implementation",
+    "Function definition works but function body parsing is not yet complete",
+    "Function calling (CALL_FUNCTION) is not yet implemented",
+    "Test validates that functions can be defined without errors",
+    "Future enhancements needed: function body parsing, calling, preloading, arguments object"
+  ]
+}
