@@ -6,6 +6,7 @@ This script runs the test suite and then regenerates the opcode documentation
 with the latest test results.
 """
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -41,6 +42,17 @@ def run_command(cmd, description, cwd=None):
 
 def main():
     """Main execution flow."""
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Run tests and update documentation"
+    )
+    parser.add_argument(
+        '--clean',
+        action='store_true',
+        help='Clean generated files before building tests'
+    )
+    args = parser.parse_args()
+
     print("=" * 80)
     print("SWFRecomp Test and Documentation Generator")
     print("=" * 80)
@@ -54,8 +66,13 @@ def main():
         print(f"✗ ERROR: Test script not found: {all_tests_script}")
         sys.exit(1)
 
+    # Build command with optional --clean flag
+    test_cmd = [str(all_tests_script)]
+    if args.clean:
+        test_cmd.append('--clean')
+
     success = run_command(
-        [str(all_tests_script)],
+        test_cmd,
         "Running test suite",
         cwd=tests_dir
     )

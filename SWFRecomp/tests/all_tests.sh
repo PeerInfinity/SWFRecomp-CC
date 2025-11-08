@@ -23,6 +23,14 @@ fi
 RESULTS_FILE="test_results.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_SCRIPT="../scripts/build_test.sh"
+CLEAN_FLAG=""
+
+# Check for --clean flag
+for arg in "$@"; do
+    if [ "$arg" = "--clean" ]; then
+        CLEAN_FLAG="--clean"
+    fi
+done
 
 # Counters
 total_tests=0
@@ -162,9 +170,17 @@ discover_tests() {
 
     local test_dirs=()
 
+    # Filter out --clean flag from specified tests
+    local filtered_tests=()
+    for test in "${specified_tests[@]}"; do
+        if [[ "$test" != "--clean" ]]; then
+            filtered_tests+=("$test")
+        fi
+    done
+
     # If tests were specified, use those
-    if [[ ${#specified_tests[@]} -gt 0 ]]; then
-        test_dirs=("${specified_tests[@]}")
+    if [[ ${#filtered_tests[@]} -gt 0 ]]; then
+        test_dirs=("${filtered_tests[@]}")
     else
         # Otherwise, discover all tests
         # Find all directories with test_info.json
@@ -216,7 +232,7 @@ build_test() {
     local build_start=$(date +%s%3N)
 
     cd "$SCRIPT_DIR/.."
-    ./scripts/build_test.sh "$test_name" native > /dev/null 2>&1
+    ./scripts/build_test.sh "$test_name" native $CLEAN_FLAG > /dev/null 2>&1
     local build_status=$?
 
     local build_end=$(date +%s%3N)
@@ -360,6 +376,11 @@ run_all_tests() {
         log_info "Running ${#test_dirs[@]} specified test(s)"
     else
         log_info "Discovered ${#test_dirs[@]} tests"
+    fi
+
+    # Report clean mode if enabled
+    if [[ -n "$CLEAN_FLAG" ]]; then
+        log_info "Clean mode enabled - will regenerate all files from SWF sources"
     fi
     echo ""
 
