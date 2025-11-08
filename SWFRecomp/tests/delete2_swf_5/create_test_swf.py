@@ -1,10 +1,16 @@
-#\!/usr/bin/env python3
+#!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF5 file that tests DELETE2 opcode (0x3B)
-# Test Cases:
-# 1. Delete non-existent property -> should return 1 (true)
-# 2. Delete property after setting (if implementation supports)
+# Create a SWF5 file that tests DELETE2 opcode (0x3B)
+#
+# DELETE2 is fully implemented per the SWF specification:
+# - Searches scope chain for named property
+# - Deletes if found in scope chain objects
+# - Cannot delete var declarations (returns false)
+# - Returns true for non-existent properties (Flash behavior)
+#
+# Test Case:
+# Delete non-existent property -> should return 1 (true)
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -25,14 +31,11 @@ def push_string(s):
 # ActionScript bytecode
 actions = b''
 
-# Test Case 1: Delete non-existent property
+# Test Case: Delete non-existent property
 # According to Flash spec, deleting a non-existent property returns true
-# Push "nonExistent" (property name to delete)
 actions += push_string("nonExistent")
-# Delete2 (0x3B) - pops name, searches scope chain, pushes result
-actions += bytes([0x3B])
-# Trace (0x26) - pops and prints the result
-actions += bytes([0x26])
+actions += bytes([0x3B])  # Delete2
+actions += bytes([0x26])  # Trace -> Output: 1
 
 # End action (0x00)
 actions += bytes([0x00])
@@ -61,5 +64,4 @@ with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
-print("Test case:")
-print("  1. delete nonExistent -> 1 (true - Flash returns true for non-existent)")
+print("Test case: delete nonExistent -> 1 (true)")
