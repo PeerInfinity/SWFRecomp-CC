@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "bit_rshift_swf_4",
+    "description": "Tests BIT_RSHIFT opcode (0x64) - arithmetic right shift with sign extension",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["BIT_RSHIFT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
