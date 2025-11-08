@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "greater_swf_4",
+    "description": "Tests GREATER opcode (0x67) - compares if b > a",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["GREATER"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
