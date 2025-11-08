@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "define_function_swf_5",
+    "description": "Tests DEFINE_FUNCTION opcode (0x9B) - creates user-defined functions",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["DEFINE_FUNCTION"],
+    "supporting": ["PUSH", "TRACE", "RETURN"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
