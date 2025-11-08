@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "string_less_swf_4",
+    "description": "Tests STRING_LESS opcode (0x29) - lexicographic string comparison",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STRING_LESS"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
