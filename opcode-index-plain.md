@@ -10,14 +10,11 @@
 
 ## Test Statistics
 
-**Overall Test Results**: 370/384 passing (96.4%)
+**Overall Test Results**: 384/384 passing (100.0%)
 
-**Primary Tests**: 110/113 passing (97.3%)
-  - 3 failing primary tests
-  - 3 opcodes with failing primary tests
+**Primary Tests**: 113/113 passing (100.0%)
 
-**Secondary Tests**: 260/271 passing (95.9%)
-  - 11 failing secondary tests
+**Secondary Tests**: 271/271 passing (100.0%)
 
 ## Implementation Progress
 
@@ -26,12 +23,6 @@
 **Opcodes with Primary Tests**: 99
 
 **Opcodes with Documentation**: 99
-
-## What Needs Attention
-
-- **3 failing primary tests** across 3 opcodes (see 'Failing Primary' column)
-- **11 failing secondary tests**
-- **42 opcodes** not yet marked as fully implemented
 
 
 ## Summary Table
@@ -59,15 +50,15 @@
 | 0X15 | ActionStringExtract | SWF_ACTION_STRING_EXTRACT | actionStringExtract | 1/1 |  |  | ✓ | ✓ |
 | 0X17 | ActionPop | SWF_ACTION_POP |  | 1/1 | 4/4 |  | ✓ | ✓ |
 | 0X18 | ActionToInteger | SWF_ACTION_TO_INTEGER | actionToInteger | 1/1 |  |  | ✓ | ✓ |
-| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable | 1/1 | 8/10 |  | ✓ |  |
-| 0X1D | ActionSetVariable | SWF_ACTION_SET_VARIABLE | actionSetVariable | 1/1 | 8/10 |  | ✓ | ✓ |
+| 0X1C | ActionGetVariable | SWF_ACTION_GET_VARIABLE | actionGetVariable | 1/1 | 10/10 |  | ✓ |  |
+| 0X1D | ActionSetVariable | SWF_ACTION_SET_VARIABLE | actionSetVariable | 1/1 | 10/10 |  | ✓ | ✓ |
 | 0X20 | ActionSetTarget2 | SWF_ACTION_SET_TARGET2 | actionSetTarget2 | 1/1 |  |  | ✓ |  |
 | 0X21 | ActionStringAdd | SWF_ACTION_STRING_ADD | actionStringAdd | 1/1 | 2/2 |  | ✓ | ✓ |
 | 0X22 | ActionGetProperty | SWF_ACTION_GET_PROPERTY | actionGetProperty | 1/1 |  |  | ✓ |  |
 | 0X23 | ActionSetProperty | SWF_ACTION_SET_PROPERTY | actionSetProperty | 1/1 |  |  | ✓ |  |
 | 0X24 | ActionCloneSprite | SWF_ACTION_CLONE_SPRITE | actionCloneSprite | 1/1 |  |  | ✓ |  |
 | 0X25 | ActionRemoveSprite | SWF_ACTION_REMOVE_SPRITE | actionRemoveSprite | 1/1 |  |  | ✓ |  |
-| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 106/108 |  | ✓ | ✓ |
+| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 108/108 |  | ✓ | ✓ |
 | 0X27 | ActionStartDrag | SWF_ACTION_START_DRAG | actionStartDrag | 1/1 |  |  | ✓ |  |
 | 0X28 | ActionEndDrag | SWF_ACTION_END_DRAG | actionEndDrag | 1/1 |  |  | ✓ |  |
 | 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess | 1/1 |  |  | ✓ | ✓ |
@@ -86,12 +77,12 @@
 | 0X3B | ActionDelete2 | SWF_ACTION_DELETE2 | actionDelete2 | 1/1 |  |  | ✓ |  |
 | 0X3C | ActionDefineLocal | SWF_ACTION_DEFINE_LOCAL | actionDefineLocal | 1/1 |  |  | ✓ |  |
 | 0X3D | ActionStackSwap | SWF_ACTION_CALL_FUNCTION | actionStackSwap | 1/1 |  |  | ✓ |  |
-| 0X3E | ActionReturn | SWF_ACTION_RETURN | actionReturn | 1/1 | 1/2 |  | ✓ | ✓ |
+| 0X3E | ActionReturn | SWF_ACTION_RETURN | actionReturn | 1/1 | 2/2 |  | ✓ | ✓ |
 | 0X3F | ActionModulo | SWF_ACTION_MODULO | actionModulo | 1/1 |  |  | ✓ | ✓ |
 | 0X40 | ActionNewObject | SWF_ACTION_NEW_OBJECT | actionNewObject | 1/1 |  |  | ✓ |  |
 | 0X41 | ActionDefineLocal2 | SWF_ACTION_DECLARE_LOCAL | actionDeclareLocal | 1/1 |  |  | ✓ |  |
 | 0X42 | ActionInitArray | SWF_ACTION_INIT_ARRAY | actionInitArray | 1/1 |  |  | ✓ |  |
-| 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject | 1/1 | 7/8 |  | ✓ | ✓ |
+| 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject | 1/1 | 8/8 |  | ✓ | ✓ |
 | 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF | actionTypeof | 1/1 | 1/1 |  | ✓ | ✓ |
 | 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath | 1/1 |  |  | ✓ |  |
 | 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate | 1/1 |  |  | ✓ |  |
@@ -100,13 +91,13 @@
 | 0X49 | ActionEquals2 | SWF_ACTION_EQUALS2 | actionEquals2 | 1/1 |  |  | ✓ |  |
 | 0X4A | ActionToNumber | SWF_ACTION_TO_NUMBER | actionToNumber | 1/1 |  |  | ✓ | ✓ |
 | 0X4B | ActionToString | SWF_ACTION_TO_STRING | actionToString | 1/1 |  |  | ✓ | ✓ |
-| 0X4C | ActionPushDuplicate | SWF_ACTION_DUPLICATE | actionDuplicate | 1/1 | 4/5 |  | ✓ | ✓ |
+| 0X4C | ActionPushDuplicate | SWF_ACTION_DUPLICATE | actionDuplicate | 1/1 | 5/5 |  | ✓ | ✓ |
 | 0X4D | ActionStackSwap | SWF_ACTION_STACK_SWAP | actionStackSwap | 1/1 | 1/1 |  | ✓ | ✓ |
 | 0X4E | ActionGetMember | SWF_ACTION_GET_MEMBER | actionGetMember | 1/1 | 3/3 |  | ✓ | ✓ |
 | 0X4F | ActionSetMember | SWF_ACTION_SET_MEMBER | actionSetMember | 1/1 | 1/1 |  | ✓ | ✓ |
 | 0X50 | ActionIncrement | SWF_ACTION_INCREMENT | actionIncrement | 1/1 |  |  | ✓ | ✓ |
 | 0X51 | ActionDecrement | SWF_ACTION_DECREMENT | actionDecrement | 1/1 |  |  | ✓ | ✓ |
-| 0X52 | ActionCallMethod | SWF_ACTION_CALL_METHOD | actionCallMethod | 1/2 |  | 1 | ✓ | ✓ |
+| 0X52 | ActionCallMethod | SWF_ACTION_CALL_METHOD | actionCallMethod | 2/2 |  |  | ✓ | ✓ |
 | 0X53 | ActionNewMethod | SWF_ACTION_NEW_METHOD | actionNewMethod | 1/1 |  |  | ✓ |  |
 | 0X54 | ActionInstanceOf | SWF_ACTION_INSTANCEOF | actionInstanceOf | 1/1 |  |  | ✓ |  |
 | 0X55 | ActionEnumerate2 | SWF_ACTION_ENUMERATE2 | actionEnumerate2 | 1/1 |  |  | ✓ | ✓ |
@@ -128,10 +119,10 @@
 | 0X8B | ActionSetTarget | SWF_ACTION_SET_TARGET | actionSetTarget | 1/1 |  |  | ✓ |  |
 | 0X8C | ActionGoToLabel | SWF_ACTION_GOTO_LABEL | actionGoToLabel | 1/1 |  |  | ✓ |  |
 | 0X8D | ActionWaitForFrame2 | SWF_ACTION_WAIT_FOR_FRAME2 |  | 1/1 |  |  | ✓ | ✓ |
-| 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 1/2 |  | 1 | ✓ |  |
+| 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 2/2 |  |  | ✓ |  |
 | 0X8F | ActionTry | SWF_ACTION_TRY |  | 1/1 |  |  | ✓ |  |
-| 0X94 | ActionWith | SWF_ACTION_WITH |  | 0/1 |  | 1 | ✓ |  |
-| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 106/108 |  | ✓ | ✓ |
+| 0X94 | ActionWith | SWF_ACTION_WITH |  | 1/1 |  |  | ✓ |  |
+| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 108/108 |  | ✓ | ✓ |
 | 0X99 | ActionJump | SWF_ACTION_JUMP |  | 1/1 |  |  | ✓ | ✓ |
 | 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  |
 | 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  | 1/1 |  |  | ✓ | ✓ |
@@ -141,13 +132,7 @@
 
 ## Failing Primary Tests
 
-**Total Failing Primary Tests**: 3
-
-| Hex | Opcode | Test Path | Enum | Function | Docs |
-|-----|--------|-----------|------|----------|------|
-| 0X52 | ActionCallMethod | `call_method_empty_name_swf_5` | ✓ | ✓ | ✓ |
-| 0X8E | ActionDefineFunction2 | `call_method_empty_name_swf_5` | ✓ | ✓ | ✓ |
-| 0X94 | ActionWith | `with_swf_5` | ✓ |  | ✓ |
+**No failing primary tests! 🎉**
 
 ## Implementation Status
 
@@ -196,7 +181,7 @@
 | 0X4F | ActionSetMember | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X50 | ActionIncrement | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X51 | ActionDecrement | ✓ | ✓ | 1/1 |  | ✓ |
-| 0X52 | ActionCallMethod | ✓ | ✓ | 1/2 | 1 | ✓ |
+| 0X52 | ActionCallMethod | ✓ | ✓ | 2/2 |  | ✓ |
 | 0X55 | ActionEnumerate2 | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X60 | ActionBitAnd | ✓ | ✓ | 1/1 |  | ✓ |
 | 0X61 | ActionBitOr | ✓ | ✓ | 1/1 |  | ✓ |
@@ -216,11 +201,52 @@
 | 0X9D | ActionIf | ✓ |  | 2/2 |  | ✓ |
 
 ### 🔄 Partially Implemented
-(Has enum or function, but missing tests)
+(Has enum or function, but not marked as fully implemented)
 
 | Hex | Spec Name | Enum | Function | Docs |
 |-----|-----------|------|----------|------|
 | 0X00 |  | ✓ |  |  |
+| 0X04 | ActionNextFrame | ✓ | ✓ | ✓ |
+| 0X05 | ActionPreviousFrame | ✓ | ✓ | ✓ |
+| 0X06 | ActionPlay | ✓ | ✓ | ✓ |
+| 0X07 | ActionStop | ✓ |  | ✓ |
+| 0X08 | ActionToggleQuality | ✓ | ✓ | ✓ |
+| 0X09 | ActionStopSounds | ✓ | ✓ | ✓ |
+| 0X1C | ActionGetVariable | ✓ | ✓ | ✓ |
+| 0X20 | ActionSetTarget2 | ✓ | ✓ | ✓ |
+| 0X22 | ActionGetProperty | ✓ | ✓ | ✓ |
+| 0X23 | ActionSetProperty | ✓ | ✓ | ✓ |
+| 0X24 | ActionCloneSprite | ✓ | ✓ | ✓ |
+| 0X25 | ActionRemoveSprite | ✓ | ✓ | ✓ |
+| 0X27 | ActionStartDrag | ✓ | ✓ | ✓ |
+| 0X28 | ActionEndDrag | ✓ | ✓ | ✓ |
+| 0X2A | ActionThrow | ✓ | ✓ | ✓ |
+| 0X2B | ActionCastOp | ✓ | ✓ | ✓ |
+| 0X2C | ActionImplementsOp | ✓ | ✓ | ✓ |
+| 0X37 | ActionMBAsciiToChar | ✓ | ✓ | ✓ |
+| 0X3B | ActionDelete2 | ✓ | ✓ | ✓ |
+| 0X3C | ActionDefineLocal | ✓ | ✓ | ✓ |
+| 0X3D | ActionStackSwap | ✓ | ✓ | ✓ |
+| 0X40 | ActionNewObject | ✓ | ✓ | ✓ |
+| 0X41 | ActionDefineLocal2 | ✓ | ✓ | ✓ |
+| 0X42 | ActionInitArray | ✓ | ✓ | ✓ |
+| 0X45 | ActionTargetPath | ✓ | ✓ | ✓ |
+| 0X46 | ActionEnumerate | ✓ | ✓ | ✓ |
+| 0X49 | ActionEquals2 | ✓ | ✓ | ✓ |
+| 0X53 | ActionNewMethod | ✓ | ✓ | ✓ |
+| 0X54 | ActionInstanceOf | ✓ | ✓ | ✓ |
+| 0X69 | ActionExtends | ✓ | ✓ | ✓ |
+| 0X81 | ActionGotoFrame | ✓ | ✓ | ✓ |
+| 0X83 | ActionGetURL | ✓ | ✓ | ✓ |
+| 0X8A | ActionWaitForFrame | ✓ |  | ✓ |
+| 0X8B | ActionSetTarget | ✓ | ✓ | ✓ |
+| 0X8C | ActionGoToLabel | ✓ | ✓ | ✓ |
+| 0X8E | ActionDefineFunction2 | ✓ | ✓ | ✓ |
+| 0X8F | ActionTry | ✓ |  | ✓ |
+| 0X94 | ActionWith | ✓ |  | ✓ |
+| 0X9A | ActionGetURL2 | ✓ | ✓ | ✓ |
+| 0X9E | ActionCall | ✓ | ✓ | ✓ |
+| 0X9F | ActionGotoFrame2 | ✓ | ✓ | ✓ |
 
 ### ❌ Not Implemented
 (Only in spec, no implementation yet)
@@ -790,7 +816,7 @@ void actionToInteger(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/get_variable_swf_4`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/definelocal_swf_5`
 - [✓] `SWFRecomp/tests/delete_swf_5`
 - [✓] `SWFRecomp/tests/extends_swf_7`
@@ -799,7 +825,7 @@ void actionToInteger(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/set_member_swf_5`
 - [✓] `SWFRecomp/tests/set_variable_swf_4`
 - [✓] `SWFRecomp/tests/try_swf_7`
-- [✗] `SWFRecomp/tests/with_swf_5`
+- [✓] `SWFRecomp/tests/with_swf_5`
 
 **Function Declaration:**
 ```c
@@ -828,7 +854,7 @@ void actionGetVariable(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/set_variable_swf_4`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/delete_swf_5`
 - [✓] `SWFRecomp/tests/enumerate_swf_4`
 - [✓] `SWFRecomp/tests/extends_swf_7`
@@ -837,7 +863,7 @@ void actionGetVariable(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
 - [✓] `SWFRecomp/tests/set_member_swf_5`
-- [✗] `SWFRecomp/tests/with_swf_5`
+- [✓] `SWFRecomp/tests/with_swf_5`
 
 **Function Declaration:**
 ```c
@@ -1042,7 +1068,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/bit_urshift_swf_4`
 - [✓] `SWFRecomp/tests/bit_xor_swf_4`
 - [✓] `SWFRecomp/tests/call_function_swf_5`
-- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/call_method_swf_5`
 - [✓] `SWFRecomp/tests/call_swf_4`
 - [✓] `SWFRecomp/tests/cast_op_swf_7`
@@ -1133,7 +1159,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/typeof_swf_5`
 - [✓] `SWFRecomp/tests/wait_for_frame2_swf_4`
 - [✓] `SWFRecomp/tests/wait_for_frame_swf_3`
-- [✗] `SWFRecomp/tests/with_swf_5`
+- [✓] `SWFRecomp/tests/with_swf_5`
 
 **Function Declaration:**
 ```c
@@ -1631,7 +1657,7 @@ void actionStackSwap(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/return_swf_4`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/define_function_swf_5`
 
 **Function Declaration:**
@@ -1772,7 +1798,7 @@ void actionInitArray(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/implements_op_swf_7`
 - [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/set_member_swf_5`
-- [✗] `SWFRecomp/tests/with_swf_5`
+- [✓] `SWFRecomp/tests/with_swf_5`
 
 **Function Declaration:**
 ```c
@@ -2016,7 +2042,7 @@ void actionToString(char* stack, u32* sp, char* str_buffer);
 - [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/init_object_swf_4`
 - [✓] `SWFRecomp/tests/new_method_swf_5`
-- [✗] `SWFRecomp/tests/with_swf_5`
+- [✓] `SWFRecomp/tests/with_swf_5`
 
 **Function Declaration:**
 ```c
@@ -2183,7 +2209,7 @@ void actionDecrement(char* stack, u32* sp);
 - `actionCallMethod` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/call_method_swf_5`
 
 **Function Declaration:**
@@ -2741,7 +2767,7 @@ void actionGoToLabel(char* stack, u32* sp, const char* label);
 - `actionDefineFunction2` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/define_function2_swf_7`
 
 **Function Declaration:**
@@ -2787,7 +2813,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - `SWF_ACTION_WITH` (enum, source: action.hpp)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/with_swf_5`
+- [✓] `SWFRecomp/tests/with_swf_5`
 
 **Implementation:**
 - parseActions (case SWF_ACTION_WITH)
@@ -2826,7 +2852,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/bit_urshift_swf_4`
 - [✓] `SWFRecomp/tests/bit_xor_swf_4`
 - [✓] `SWFRecomp/tests/call_function_swf_5`
-- [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
+- [✓] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/call_method_swf_5`
 - [✓] `SWFRecomp/tests/call_swf_4`
 - [✓] `SWFRecomp/tests/cast_op_swf_7`
@@ -2917,7 +2943,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/typeof_swf_5`
 - [✓] `SWFRecomp/tests/wait_for_frame2_swf_4`
 - [✓] `SWFRecomp/tests/wait_for_frame_swf_3`
-- [✗] `SWFRecomp/tests/with_swf_5`
+- [✓] `SWFRecomp/tests/with_swf_5`
 
 **Implementation:**
 - parseActions (case SWF_ACTION_PUSH)

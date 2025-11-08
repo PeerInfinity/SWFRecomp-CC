@@ -191,10 +191,6 @@ def main():
         incomplete_mode = True
         print(f"Filtering for opcodes not fully implemented: {len(md_files)} prompts")
 
-    if not md_files:
-        print("Warning: No matching .md files found")
-        sys.exit(0)
-
     # Create the output file with appropriate name based on parameters
     if args.fail:
         output_filename = 'prompts-fail.txt'

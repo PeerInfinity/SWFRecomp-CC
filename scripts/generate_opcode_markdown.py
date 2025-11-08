@@ -454,14 +454,14 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
 
     # Partially implemented
     md.append("### 🔄 Partially Implemented")
-    md.append("(Has enum or function, but missing tests)")
+    md.append("(Has enum or function, but not marked as fully implemented)")
     md.append("")
     md.append("| Hex | Spec Name | Enum | Function | Docs |")
     md.append("|-----|-----------|------|----------|------|")
 
     for hex_val in sorted(opcodes.keys()):
         opc = opcodes[hex_val]
-        if (opc['has_enum'] or opc['has_function']) and not opc['has_primary_tests']:
+        if (opc['has_enum'] or opc['has_function']) and not opc['fully_implemented']:
             if with_links:
                 hex_link = make_link(opc['hex'], opc['hex'], opc['spec_name']) if opc['spec_name'] else opc['hex']
                 spec_link = make_link(opc['spec_name'], opc['hex'], opc['spec_name']) if opc['spec_name'] else ""
@@ -481,7 +481,7 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
 
     for hex_val in sorted(opcodes.keys()):
         opc = opcodes[hex_val]
-        if not opc['has_enum'] and not opc['has_function']:
+        if not opc['has_enum'] and not opc['has_function'] and not opc['fully_implemented']:
             if with_links:
                 hex_link = make_link(opc['hex'], opc['hex'], opc['spec_name']) if opc['spec_name'] else opc['hex']
                 spec_link = make_link(opc['spec_name'], opc['hex'], opc['spec_name']) if opc['spec_name'] else ""

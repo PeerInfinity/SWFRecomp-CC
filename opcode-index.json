@@ -1271,6 +1271,7 @@
         "SWFRecomp/tests/get_variable_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -1278,7 +1279,8 @@
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/set_member_swf_5",
         "SWFRecomp/tests/set_variable_swf_4",
-        "SWFRecomp/tests/try_swf_7"
+        "SWFRecomp/tests/try_swf_7",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "fully_implemented": false,
@@ -1310,6 +1312,7 @@
         "SWFRecomp/tests/get_variable_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -1317,7 +1320,8 @@
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/set_member_swf_5",
         "SWFRecomp/tests/set_variable_swf_4",
-        "SWFRecomp/tests/try_swf_7"
+        "SWFRecomp/tests/try_swf_7",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "fully_implemented": false,
@@ -1349,6 +1353,7 @@
         "SWFRecomp/tests/get_variable_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/extends_swf_7",
@@ -1356,7 +1361,8 @@
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/set_member_swf_5",
         "SWFRecomp/tests/set_variable_swf_4",
-        "SWFRecomp/tests/try_swf_7"
+        "SWFRecomp/tests/try_swf_7",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
       "fully_implemented": false,
@@ -1388,6 +1394,7 @@
         "SWFRecomp/tests/set_variable_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/enumerate_swf_4",
         "SWFRecomp/tests/extends_swf_7",
@@ -1395,7 +1402,8 @@
         "SWFRecomp/tests/init_object_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/prev_frame_swf_4",
-        "SWFRecomp/tests/set_member_swf_5"
+        "SWFRecomp/tests/set_member_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
@@ -1427,6 +1435,7 @@
         "SWFRecomp/tests/set_variable_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/enumerate_swf_4",
         "SWFRecomp/tests/extends_swf_7",
@@ -1434,7 +1443,8 @@
         "SWFRecomp/tests/init_object_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/prev_frame_swf_4",
-        "SWFRecomp/tests/set_member_swf_5"
+        "SWFRecomp/tests/set_member_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
@@ -1466,6 +1476,7 @@
         "SWFRecomp/tests/set_variable_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/enumerate_swf_4",
         "SWFRecomp/tests/extends_swf_7",
@@ -1473,7 +1484,8 @@
         "SWFRecomp/tests/init_object_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/prev_frame_swf_4",
-        "SWFRecomp/tests/set_member_swf_5"
+        "SWFRecomp/tests/set_member_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
@@ -1979,6 +1991,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -2068,7 +2081,8 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
-        "SWFRecomp/tests/wait_for_frame_swf_3"
+        "SWFRecomp/tests/wait_for_frame_swf_3",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -2214,6 +2228,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -2303,7 +2318,8 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
-        "SWFRecomp/tests/wait_for_frame_swf_3"
+        "SWFRecomp/tests/wait_for_frame_swf_3",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -2449,6 +2465,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -2538,7 +2555,8 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
-        "SWFRecomp/tests/wait_for_frame_swf_3"
+        "SWFRecomp/tests/wait_for_frame_swf_3",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
       "fully_implemented": true,
@@ -3594,6 +3612,7 @@
         "SWFRecomp/tests/return_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/define_function_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
@@ -3618,6 +3637,7 @@
         "SWFRecomp/tests/return_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/define_function_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
@@ -3642,6 +3662,7 @@
         "SWFRecomp/tests/return_swf_4"
       ],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/define_function_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
@@ -3906,7 +3927,8 @@
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7",
         "SWFRecomp/tests/new_method_swf_5",
-        "SWFRecomp/tests/set_member_swf_5"
+        "SWFRecomp/tests/set_member_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "fully_implemented": true,
@@ -3942,7 +3964,8 @@
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7",
         "SWFRecomp/tests/new_method_swf_5",
-        "SWFRecomp/tests/set_member_swf_5"
+        "SWFRecomp/tests/set_member_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "fully_implemented": true,
@@ -3978,7 +4001,8 @@
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/implements_op_swf_7",
         "SWFRecomp/tests/new_method_swf_5",
-        "SWFRecomp/tests/set_member_swf_5"
+        "SWFRecomp/tests/set_member_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md",
       "fully_implemented": true,
@@ -4476,7 +4500,8 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/init_object_swf_4",
-        "SWFRecomp/tests/new_method_swf_5"
+        "SWFRecomp/tests/new_method_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "fully_implemented": true,
@@ -4506,7 +4531,8 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/init_object_swf_4",
-        "SWFRecomp/tests/new_method_swf_5"
+        "SWFRecomp/tests/new_method_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "fully_implemented": true,
@@ -4536,7 +4562,8 @@
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/init_object_swf_4",
-        "SWFRecomp/tests/new_method_swf_5"
+        "SWFRecomp/tests/new_method_swf_5",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md",
       "fully_implemented": true,
@@ -4888,6 +4915,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_secondary_passing": [],
@@ -4908,6 +4936,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_secondary_passing": [],
@@ -4928,6 +4957,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_secondary_passing": [],
@@ -6100,6 +6130,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_passing": [],
@@ -6120,6 +6151,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_passing": [],
@@ -6140,6 +6172,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_passing": [],
@@ -6196,7 +6229,9 @@
         "SWFRecomp/tests/with_swf_5"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/with_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
       "fully_implemented": false,
@@ -6213,7 +6248,9 @@
         "SWFRecomp/tests/with_swf_5"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/with_swf_5"
+      ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-with-0x94.md",
       "fully_implemented": false,
@@ -6359,6 +6396,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -6448,7 +6486,8 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
-        "SWFRecomp/tests/wait_for_frame_swf_3"
+        "SWFRecomp/tests/wait_for_frame_swf_3",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,
@@ -6594,6 +6633,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -6683,7 +6723,8 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/typeof_swf_5",
         "SWFRecomp/tests/wait_for_frame2_swf_4",
-        "SWFRecomp/tests/wait_for_frame_swf_3"
+        "SWFRecomp/tests/wait_for_frame_swf_3",
+        "SWFRecomp/tests/with_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
       "fully_implemented": true,

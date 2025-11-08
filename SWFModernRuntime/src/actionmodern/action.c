@@ -256,6 +256,7 @@ void pushVar(char* stack, u32* sp, ActionVar* var)
 		case ACTION_STACK_VALUE_F64:
 		case ACTION_STACK_VALUE_UNDEFINED:
 		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_FUNCTION:
 		{
 			PUSH(var->type, var->data.numeric_value);
 
