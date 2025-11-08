@@ -269,7 +269,7 @@ void pushVar(char* stack, u32* sp, ActionVar* var)
 				var->data.string_data.heap_ptr :
 				(char*) var->data.numeric_value;
 
-			PUSH_STR(str_ptr, var->str_size);
+			PUSH_STR_ID(str_ptr, var->str_size, var->string_id);
 
 			break;
 		}
@@ -280,6 +280,7 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 {
 	var->type = STACK_TOP_TYPE;
 	var->str_size = STACK_TOP_N;
+	var->string_id = VAL(u32, &stack[*sp + 12]);
 
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STR_LIST)
 	{
@@ -3431,6 +3432,29 @@ void actionGetMember(char* stack, u32* sp)
 		else
 		{
 			// Property not found - push undefined
+			pushUndefined(stack, sp);
+		}
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Handle array properties
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+
+		if (arr == NULL)
+		{
+			pushUndefined(stack, sp);
+			return;
+		}
+
+		if (strcmp(prop_name, "length") == 0)
+		{
+			// Push array length as float
+			float len = (float) arr->length;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
+		}
+		else
+		{
+			// For now, push undefined for other properties
 			pushUndefined(stack, sp);
 		}
 	}

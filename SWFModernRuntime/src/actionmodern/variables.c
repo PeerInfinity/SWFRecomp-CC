@@ -98,6 +98,7 @@ ActionVar* getVariableById(u32 string_id)
 		// Initialize with unset type
 		var->type = ACTION_STACK_VALUE_STRING;
 		var->str_size = 0;
+		var->string_id = 0;  // Initialize string_id
 		var->data.string_data.heap_ptr = NULL;
 		var->data.string_data.owns_memory = false;
 
@@ -124,6 +125,7 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 	// Initialize with unset type
 	var->type = ACTION_STACK_VALUE_STRING;
 	var->str_size = 0;
+	var->string_id = 0;  // Initialize string_id (dynamic variables use 0)
 	var->data.string_data.heap_ptr = NULL;
 	var->data.string_data.owns_memory = false;
 
@@ -157,6 +159,7 @@ void setVariableByName(const char* var_name, ActionVar* value)
 	// Copy the new value
 	var->type = value->type;
 	var->str_size = value->str_size;
+	var->string_id = value->string_id;
 	var->data = value->data;
 }
 
