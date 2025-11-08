@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "less2_swf_4",
+    "description": "Tests LESS2 opcode (0x48) - less-than comparison using ECMA-262 rules",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["LESS2"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
