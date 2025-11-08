@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "decrement_swf_4",
+    "description": "Tests DECREMENT opcode (0x51) - decrements a value by 1",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["DECREMENT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
