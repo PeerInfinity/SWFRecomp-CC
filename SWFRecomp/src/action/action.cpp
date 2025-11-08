@@ -868,8 +868,18 @@ namespace SWFRecomp
 					// Read register number from bytecode
 					u8 register_num = (u8) action_buffer[0];
 
-					out_script << "\t" << "// StoreRegister " << (int)register_num << endl
-							   << "\t" << "actionStoreRegister(stack, sp, " << (int)register_num << ");" << endl;
+					out_script << "\t" << "// StoreRegister " << (int)register_num << endl;
+
+					if (context.inside_function2)
+					{
+						// Inside DefineFunction2: store to local registers array
+						out_script << "\t" << "peekVar(stack, sp, &regs[" << (int)register_num << "]);" << endl;
+					}
+					else
+					{
+						// Outside functions: store to global registers
+						out_script << "\t" << "actionStoreRegister(stack, sp, " << (int)register_num << ");" << endl;
+					}
 
 					action_buffer += length;
 					break;
@@ -1131,9 +1141,16 @@ namespace SWFRecomp
 				memcpy(temp_buffer, func_body_start, code_size);
 				temp_buffer[code_size] = 0x00; // Add END_OF_ACTIONS marker
 
+				// Set flag to indicate we're inside a DefineFunction2 (for local register handling)
+				bool prev_inside_function2 = context.inside_function2;
+				context.inside_function2 = true;
+
 				char* temp_ptr = temp_buffer;
 				parseActions(context, temp_ptr, context.out_script_defs);
 				free(temp_buffer);
+
+				// Restore previous state
+				context.inside_function2 = prev_inside_function2;
 
 				// Advance the actual buffer past the function body
 				action_buffer = func_body_end;
@@ -1348,7 +1365,17 @@ namespace SWFRecomp
 							push_length += 1;
 
 							out_script << "(Register " << (int)register_num << ")" << endl;
-							out_script << "\t" << "actionPushRegister(stack, sp, " << (int)register_num << ");" << endl;
+
+							if (context.inside_function2)
+							{
+								// Inside DefineFunction2: use local registers array
+								out_script << "\t" << "pushVar(stack, sp, &regs[" << (int)register_num << "]);" << endl;
+							}
+							else
+							{
+								// Outside functions: use global registers
+								out_script << "\t" << "actionPushRegister(stack, sp, " << (int)register_num << ");" << endl;
+							}
 
 							break;
 						}
