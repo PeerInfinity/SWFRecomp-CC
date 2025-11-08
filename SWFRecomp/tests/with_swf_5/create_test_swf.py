@@ -73,100 +73,24 @@ action_init_object = bytes([0x43])  # INIT_OBJECT (0x43)
 actions += action_init_object
 
 # Step 2: Store object in variable "obj"
-# SetVariable expects: push name, push value, then set
-# So we push "obj" (name), then duplicate object for value
+# SetVariable expects stack: [name, value] with value on top
+# After InitObject, stack is: [object]
+# We need: ["obj", object]
+# Solution: Push name, then use StackSwap (0x4D) to swap top two items
 
 string_obj = b'obj\x00'
 action_push_obj_name = struct.pack('<BHB', 0x96, len(string_obj) + 1, 0)  # PUSH string "obj"
 action_push_obj_name += string_obj
 actions += action_push_obj_name
+# Stack is now: [object, "obj"]
 
-# Duplicate the object (which is below "obj" on stack)
-# Stack is [object, "obj"], we need ["obj", object]
-# Since we can't easily duplicate from below, use StoreRegister approach
+# Use StackSwap to get ["obj", object]
+action_stack_swap = bytes([0x4D])  # StackSwap (0x4D)
+actions += action_stack_swap
+# Stack is now: ["obj", object]
 
-# SIMPLEST APPROACH: Just store and retrieve
-# After InitObject: stack = [object]
-# Store it: push name, duplicate object, swap if needed, setvar
-
-# Actually simpler: after InitObject, just push name then duplicate
-# Stack after InitObject: [object]
-# Push "obj": [object, "obj"]
-# Use DUPLICATE: [object, "obj", "obj"] - no, duplicates top!
-
-# FINAL SIMPLE FIX: push name, duplicate object value that's below
-# Can't do that either!
-
-# REAL FIX: Remove name push above, do this order:
-actions = actions[:-len(action_push_obj_name)]  # Remove name push
-
-# After InitObject: [object]
-# Duplicate object: [object, object]
-action_duplicate = bytes([0x4C])
-actions += action_duplicate
-
-# Push name: [object, object, "obj"]
-actions += action_push_obj_name
-
-# SetVariable pops value ("obj"???) NO - we still have wrong order!
-
-# GIVE UP on complex stack manipulation. Use simple approach:
-# After InitObject: [object] - that's all we need!
-# Push NAME first (as required by SetVariable)
-# Then push VALUE (the object)
-
-# Clear and restart:
-# After InitObject, stack has [object]
-# For SetVariable to work with format [name, value] where value on top:
-# We need to have name pushed first, value second
-
-# So: [object] -> need to add name below it!
-# Can't insert, only push on top
-
-# Alternative: POP object, push name, push object again
-# But we can't "push object again" without duplicating/storing first!
-
-# ACTUALLY CORRECT SOLUTION:
-# 1. Store object in temp variable
-# 2. Push name
-# 3. Get temp variable (pushes object)
-# 4. SetVariable
-
-# OR just retrieve the object when needed for WITH, don't keep it on stack!
-# After SetVariable, we can GetVariable to retrieve it!
-
-# So simply:
-actions += action_push_obj_name  # Re-add name: [object, "obj"]
-# Now duplicate to get [object, "obj", "obj"]? No, need object!
-
-# I give up trying to be clever. Let me check if this even works:
-# Stack is [object, "obj"]
-# SetVariable will pop value (top = "obj") and name (second = object)
-# That's backwards!
-
-# So we DO need swap. Let me check if StackSwap is implemented...
-# If not, simple fix: just remove keeping object on stack entirely!
-
-# After InitObject: [object]
-# SetVariable needs to consume it, so:
-# Push name: [object, "obj"]
-# ... we're stuck in same problem
-
-# FINAL ANSWER: duplicate FIRST, then everything else
-actions = actions[:-len(action_push_obj_name)]  # Remove the name push
-action_duplicate = bytes([0x4C])
-actions += action_duplicate  # [object, object]
-actions += action_push_obj_name  # [object, object, "obj"]
-
-# Now we need [object, "obj", object]
-# Still stuck! No way to do this in SWF4/5 without swap or registers!
-
-# ACTUAL FINAL FIX: Check real ActionScript compiler output
-# or just use simplest approach: don't keep object, retrieve it later
-
-# Remove all the above and use clean approach:
-# Store normally (even if it fails), then retrieve for WITH
-action_set_variable = bytes([0x1D])
+# SetVariable consumes the stack correctly
+action_set_variable = bytes([0x1D])  # SET_VARIABLE (0x1D)
 actions += action_set_variable
 
 # Step 3: Build the WITH block

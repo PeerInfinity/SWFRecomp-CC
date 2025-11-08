@@ -269,7 +269,7 @@ void pushVar(char* stack, u32* sp, ActionVar* var)
 				var->data.string_data.heap_ptr :
 				(char*) var->data.numeric_value;
 
-			PUSH_STR(str_ptr, var->str_size);
+			PUSH_STR_ID(str_ptr, var->str_size, var->string_id);
 
 			break;
 		}
@@ -284,11 +284,20 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STR_LIST)
 	{
 		var->data.numeric_value = (u64) &STACK_TOP_VALUE;
+		var->string_id = 0;  // String lists don't have IDs
 	}
-
+	else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STRING)
+	{
+		// For strings, store pointer and mark as not owning memory (it's on the stack)
+		var->data.numeric_value = VAL(u64, &STACK_TOP_VALUE);
+		var->data.string_data.heap_ptr = (char*) var->data.numeric_value;
+		var->data.string_data.owns_memory = false;
+		var->string_id = VAL(u32, &stack[*sp + 12]);  // Read string_id from stack
+	}
 	else
 	{
 		var->data.numeric_value = VAL(u64, &STACK_TOP_VALUE);
+		var->string_id = 0;  // Non-string types don't have IDs
 	}
 
 	// Initialize owns_memory to false for non-heap strings
@@ -1663,7 +1672,6 @@ void actionGetURL(char* stack, u32* sp, const char* url, const char* target)
 
 void actionGetVariable(char* stack, u32* sp)
 {
-
 	// Read variable name info from stack
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
 	u32 string_id = VAL(u32, &stack[*sp + 12]);
@@ -1732,7 +1740,9 @@ void actionSetVariable(char* stack, u32* sp)
 	// Read variable name info
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
 	u32 string_id = VAL(u32, &stack[var_name_sp + 12]);
+
 	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
+
 	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
 
 	// First check scope chain (innermost to outermost)
@@ -1757,6 +1767,7 @@ void actionSetVariable(char* stack, u32* sp)
 	}
 
 	// Not found in scope chain - set as global variable
+
 	ActionVar* var;
 	if (string_id != 0)
 	{
