@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "set_property_swf_4",
+    "description": "Tests SET_PROPERTY opcode (0x23) - sets MovieClip properties by numeric index",
+    "swf_version": 4,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["SET_PROPERTY"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
