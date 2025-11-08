@@ -22,18 +22,26 @@ def validate_output(output):
     Expected:
     Frame 1
     Frame 2
+    Frame 3
+    Frame 4
+
+    Tests:
+    - Basic nextFrame advancement
+    - Multiple consecutive nextFrame calls
+    - nextFrame behavior through multiple frames
+    - Proper termination with stop()
     """
     lines = parse_output(output)
 
-    # Check that we got exactly 2 lines of output
-    if len(lines) < 2:
+    # Check that we got exactly 4 lines of output
+    if len(lines) < 4:
         return make_validation_result([
             make_result(
                 "frame_count",
                 False,
-                "2 frames",
+                "4 frames",
                 f"{len(lines)} frames",
-                "Expected 2 trace outputs"
+                "Expected 4 trace outputs"
             )
         ])
 
@@ -44,7 +52,8 @@ def validate_output(output):
         "frame_1_output",
         lines[0] == "Frame 1",
         "Frame 1",
-        lines[0]
+        lines[0],
+        "First frame with nextFrame() call"
     ))
 
     # Check Frame 2
@@ -52,7 +61,26 @@ def validate_output(output):
         "frame_2_output",
         lines[1] == "Frame 2",
         "Frame 2",
-        lines[1]
+        lines[1],
+        "Second frame with nextFrame() call"
+    ))
+
+    # Check Frame 3
+    results.append(make_result(
+        "frame_3_output",
+        lines[2] == "Frame 3",
+        "Frame 3",
+        lines[2],
+        "Third frame with nextFrame() call"
+    ))
+
+    # Check Frame 4
+    results.append(make_result(
+        "frame_4_output",
+        lines[3] == "Frame 4",
+        "Frame 4",
+        lines[3],
+        "Fourth frame with stop() call"
     ))
 
     return make_validation_result(results)
