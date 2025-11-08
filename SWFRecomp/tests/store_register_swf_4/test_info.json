@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "store_register_swf_4",
+    "description": "Tests STORE_REGISTER opcode (0x87) - stores value in register without popping",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STORE_REGISTER"],
+    "supporting": ["PUSH"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
