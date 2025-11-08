@@ -3498,6 +3498,133 @@ void actionNewObject(char* stack, u32* sp)
 	}
 }
 
+void actionNewMethod(char* stack, u32* sp)
+{
+	// Stack layout: [method_name] [object] [num_args] [arg1] [arg2] ... <- sp
+	// Pop in order: method_name, object, num_args, then args
+
+	// 1. Pop method name (string)
+	char str_buffer[17];
+	convertString(stack, sp, str_buffer);
+	const char* method_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
+	u32 method_name_len = STACK_TOP_N;
+	POP();
+
+	// 2. Pop object reference
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
+
+	// 3. Pop number of arguments
+	convertFloat(stack, sp);
+	ActionVar num_args_var;
+	popVar(stack, sp, &num_args_var);
+	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
+
+	// 4. Pop arguments from stack (store them temporarily)
+	// Limit to 16 arguments for simplicity
+	ActionVar args[16];
+	if (num_args > 16)
+	{
+		num_args = 16;
+	}
+
+	// Pop arguments in reverse order (first arg is deepest on stack)
+	for (int i = (int)num_args - 1; i >= 0; i--)
+	{
+		popVar(stack, sp, &args[i]);
+	}
+
+	// 5. Get the method property from the object
+	const char* ctor_name = NULL;
+
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
+
+		if (obj != NULL)
+		{
+			// Look up the method property
+			ActionVar* method_prop = getProperty(obj, method_name, method_name_len);
+
+			if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_STRING)
+			{
+				// Get constructor name from the property
+				ctor_name = method_prop->data.string_data.owns_memory ?
+					method_prop->data.string_data.heap_ptr :
+					(const char*) method_prop->data.numeric_value;
+			}
+		}
+	}
+
+	// 6. Create new object based on constructor name
+	void* new_obj = NULL;
+
+	if (ctor_name != NULL && strcmp(ctor_name, "Array") == 0)
+	{
+		// Handle Array constructor
+		if (num_args == 0)
+		{
+			// new Array() - empty array
+			ASArray* arr = allocArray(4);
+			arr->length = 0;
+			new_obj = arr;
+		}
+		else if (num_args == 1 &&
+		         (args[0].type == ACTION_STACK_VALUE_F32 ||
+		          args[0].type == ACTION_STACK_VALUE_F64))
+		{
+			// new Array(length) - array with specified length
+			float length_f = (args[0].type == ACTION_STACK_VALUE_F32) ?
+				VAL(float, &args[0].data.numeric_value) :
+				(float) VAL(double, &args[0].data.numeric_value);
+			u32 length = (u32) length_f;
+			ASArray* arr = allocArray(length > 0 ? length : 4);
+			arr->length = length;
+			new_obj = arr;
+		}
+		else
+		{
+			// new Array(elem1, elem2, ...) - array with elements
+			ASArray* arr = allocArray(num_args);
+			arr->length = num_args;
+			for (u32 i = 0; i < num_args; i++)
+			{
+				arr->elements[i] = args[i];
+				// Retain if object/array
+				if (args[i].type == ACTION_STACK_VALUE_OBJECT)
+				{
+					retainObject((ASObject*) args[i].data.numeric_value);
+				}
+				else if (args[i].type == ACTION_STACK_VALUE_ARRAY)
+				{
+					retainArray((ASArray*) args[i].data.numeric_value);
+				}
+			}
+			new_obj = arr;
+		}
+		PUSH(ACTION_STACK_VALUE_ARRAY, VAL(u64, new_obj));
+	}
+	else if (ctor_name != NULL && strcmp(ctor_name, "Object") == 0)
+	{
+		// Handle Object constructor
+		ASObject* obj = allocObject(8);
+		new_obj = obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else if (ctor_name != NULL && strcmp(ctor_name, "Date") == 0)
+	{
+		// Handle Date constructor (simplified)
+		ASObject* date = allocObject(4);
+		new_obj = date;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else
+	{
+		// Method not found or not a valid constructor - push undefined
+		pushUndefined(stack, sp);
+	}
+}
+
 void actionSetProperty(char* stack, u32* sp)
 {
 	// Stack layout: [target_path] [property_index] [value] <- sp

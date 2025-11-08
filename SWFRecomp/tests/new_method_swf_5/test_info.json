@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "new_method_swf_5",
+    "description": "Tests NEW_METHOD opcode (0x53) - creates new object by calling method on object as constructor",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["NEW_METHOD"],
+    "supporting": ["PUSH", "INIT_OBJECT", "DUPLICATE", "STACK_SWAP", "SET_VARIABLE", "GET_VARIABLE", "GET_MEMBER", "TRACE", "POP"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": [
+    "Test creates object with constructor property ArrayCtor='Array'",
+    "Uses NEW_METHOD to call obj.ArrayCtor(5) to create array with length 5",
+    "Currently has known issue with variable persistence during initialization",
+    "Expected output: 5, NEW_METHOD test completed",
+    "Actual output may show 'undefined' due to variable system limitations"
+  ]
+}
