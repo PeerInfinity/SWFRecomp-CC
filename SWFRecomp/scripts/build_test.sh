@@ -40,6 +40,26 @@ if [ ! -d "$TEST_DIR" ]; then
     exit 1
 fi
 
+# Regenerate test.swf if --clean is set and generation script exists
+if [ "$CLEAN_FLAG" = true ]; then
+    echo "Clean mode: checking for SWF generation script..."
+
+    # Look for common SWF generation script names
+    for script in create_test_swf.py generate_swf.py make_test.py create_swf.py; do
+        if [ -f "${TEST_DIR}/${script}" ]; then
+            echo "Found ${script}, regenerating test.swf..."
+            cd "${TEST_DIR}"
+            python3 "${script}"
+            if [ -f "test.swf" ]; then
+                echo "✅ test.swf regenerated successfully"
+                break
+            else
+                echo "⚠️  Warning: ${script} ran but test.swf was not created"
+            fi
+        fi
+    done
+fi
+
 # Generate test.swf if it doesn't exist
 if [ ! -f "${TEST_DIR}/test.swf" ]; then
     echo "test.swf not found, checking for generation script..."

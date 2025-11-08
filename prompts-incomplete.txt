@@ -70,13 +70,6 @@ NOTE: This opcode is marked as NOT fully implemented. Please complete the implem
 
 Please read these files and follow their instructions:
 SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md
-
-NOTE: This opcode is marked as NOT fully implemented. Please complete the implementation to meet all criteria for the fully_implemented tag. Review the specification, implement missing features, add comprehensive tests, and update test_info.json when complete.
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
 SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md
 
 NOTE: This opcode is marked as NOT fully implemented. Please complete the implementation to meet all criteria for the fully_implemented tag. Review the specification, implement missing features, add comprehensive tests, and update test_info.json when complete.

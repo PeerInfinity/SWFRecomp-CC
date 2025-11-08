@@ -319,6 +319,79 @@ def generate_detailed_sections(index: Dict) -> str:
     return "\n".join(md)
 
 
+def generate_failing_tests_chart(index: Dict, with_links: bool = True) -> str:
+    """Generate a chart showing all failing primary tests."""
+    md = []
+
+    md.append("## Failing Primary Tests")
+    md.append("")
+
+    # Collect all failing primary tests
+    failing_tests = []
+
+    for entry in index['entries']:
+        if entry['type'] == 'spec':
+            hex_val = entry['hex']
+            spec_name = entry['name']
+
+            # Get test lists
+            primary_tests = entry.get('tests_primary', [])
+            passing_primary = set(entry.get('tests_primary_passing', []))
+
+            # Find failing primary tests
+            for test in primary_tests:
+                if test not in passing_primary:
+                    failing_tests.append({
+                        'hex': hex_val,
+                        'spec_name': spec_name,
+                        'test_path': test,
+                        'has_function': False,
+                        'has_enum': False,
+                        'has_docs': bool(entry.get('documentation_prompt'))
+                    })
+
+    # Add implementation info to failing tests
+    for entry in index['entries']:
+        if entry['type'] == 'enum':
+            for test in failing_tests:
+                if test['hex'] == entry['hex']:
+                    test['has_enum'] = True
+        elif entry['type'] == 'function':
+            for test in failing_tests:
+                if test['hex'] == entry['hex']:
+                    test['has_function'] = True
+
+    if not failing_tests:
+        md.append("**No failing primary tests! 🎉**")
+        md.append("")
+        return "\n".join(md)
+
+    # Sort by hex value, then by test path
+    failing_tests.sort(key=lambda x: (x['hex'], x['test_path']))
+
+    md.append(f"**Total Failing Primary Tests**: {len(failing_tests)}")
+    md.append("")
+    md.append("| Hex | Opcode | Test Path | Enum | Function | Docs |")
+    md.append("|-----|--------|-----------|------|----------|------|")
+
+    for test in failing_tests:
+        if with_links:
+            hex_link = make_link(test['hex'], test['hex'], test['spec_name'])
+            spec_link = make_link(test['spec_name'], test['hex'], test['spec_name'])
+        else:
+            hex_link = test['hex']
+            spec_link = test['spec_name']
+
+        test_path = test['test_path']
+        # Shorten test path for readability - keep just the test directory name
+        test_name = test_path.split('/')[-1] if '/' in test_path else test_path
+
+        md.append(f"| {hex_link} | {spec_link} | `{test_name}` | {'✓' if test['has_enum'] else ''} | {'✓' if test['has_function'] else ''} | {'✓' if test['has_docs'] else ''} |")
+
+    md.append("")
+    return "\n".join(md)
+
+
 def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     """Generate implementation status section."""
     md = []
@@ -433,10 +506,12 @@ def generate_markdown():
     # Generate version WITH links
     print("\nGenerating version WITH links...")
     summary_with_links = generate_summary_table(index, with_links=True)
+    failing_tests_with_links = generate_failing_tests_chart(index, with_links=True)
     status_with_links = generate_implementation_status(index, with_links=True)
 
     markdown_with_links = "\n".join([
         summary_with_links,
+        failing_tests_with_links,
         status_with_links,
         detailed
     ])
@@ -450,10 +525,12 @@ def generate_markdown():
     # Generate version WITHOUT links
     print("\nGenerating version WITHOUT links...")
     summary_no_links = generate_summary_table(index, with_links=False)
+    failing_tests_no_links = generate_failing_tests_chart(index, with_links=False)
     status_no_links = generate_implementation_status(index, with_links=False)
 
     markdown_no_links = "\n".join([
         summary_no_links,
+        failing_tests_no_links,
         status_no_links,
         detailed
     ])

@@ -89,12 +89,12 @@ parse_json_array() {
 
 # Filter test output to remove runtime messages
 filter_output() {
-    grep -v "SWF Runtime Loaded" | \
-    grep -v "=== SWF" | \
-    grep -v "\[Frame" | \
-    grep -v "\[Tag\]" | \
-    grep -v "\[DEBUG" | \
-    grep -v "^$" || true
+    grep -a -v "SWF Runtime Loaded" | \
+    grep -a -v "=== SWF" | \
+    grep -a -v "\[Frame" | \
+    grep -a -v "\[Tag\]" | \
+    grep -a -v "\[DEBUG" | \
+    grep -a -v "^$" || true
 }
 
 # Initialize results JSON file
@@ -549,6 +549,28 @@ run_all_tests() {
     # Report clean mode if enabled
     if [[ -n "$CLEAN_FLAG" ]]; then
         log_info "Clean mode enabled - will regenerate all files from SWF sources"
+        log_info "Rebuilding SWFRecomp..."
+
+        # Get the SWFRecomp root directory (parent of tests directory)
+        SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+        SWFRECOMP_BUILD="${SWFRECOMP_ROOT}/build"
+
+        if [[ ! -d "$SWFRECOMP_BUILD" ]]; then
+            log_error "SWFRecomp build directory not found: $SWFRECOMP_BUILD"
+            exit 1
+        fi
+
+        cd "$SWFRECOMP_BUILD"
+        make clean > /dev/null 2>&1
+        make -j > /dev/null 2>&1
+
+        if [[ $? -ne 0 ]]; then
+            log_error "Failed to rebuild SWFRecomp"
+            exit 1
+        fi
+
+        log_info "✅ SWFRecomp rebuilt successfully"
+        cd "$SCRIPT_DIR"
     fi
     echo ""
 

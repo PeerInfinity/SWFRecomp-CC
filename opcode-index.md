@@ -10,18 +10,18 @@
 
 ## Test Statistics
 
-**Overall Test Results**: 322/384 passing (83.9%)
+**Overall Test Results**: 370/384 passing (96.4%)
 
-**Primary Tests**: 100/113 passing (88.5%)
-  - 13 failing primary tests
-  - 13 opcodes with failing primary tests
+**Primary Tests**: 110/113 passing (97.3%)
+  - 3 failing primary tests
+  - 3 opcodes with failing primary tests
 
-**Secondary Tests**: 222/271 passing (81.9%)
-  - 49 failing secondary tests
+**Secondary Tests**: 260/271 passing (95.9%)
+  - 11 failing secondary tests
 
 ## Implementation Progress
 
-**Fully Implemented Opcodes**: 57/100
+**Fully Implemented Opcodes**: 58/100
 
 **Opcodes with Primary Tests**: 99
 
@@ -29,9 +29,9 @@
 
 ## What Needs Attention
 
-- **13 failing primary tests** across 13 opcodes (see 'Failing Primary' column)
-- **49 failing secondary tests**
-- **43 opcodes** not yet marked as fully implemented
+- **3 failing primary tests** across 3 opcodes (see 'Failing Primary' column)
+- **11 failing secondary tests**
+- **42 opcodes** not yet marked as fully implemented
 
 
 ## Summary Table
@@ -57,33 +57,33 @@
 | [0X13](#0x13-actionstringequals) | [ActionStringEquals](#0x13-actionstringequals) | [SWF_ACTION_STRING_EQUALS](#0x13-actionstringequals) | [actionStringEquals](#0x13-actionstringequals) | 2/2 |  |  | ✓ | ✓ |
 | [0X14](#0x14-actionstringlength) | [ActionStringLength](#0x14-actionstringlength) | [SWF_ACTION_STRING_LENGTH](#0x14-actionstringlength) | [actionStringLength](#0x14-actionstringlength) | 1/1 |  |  | ✓ | ✓ |
 | [0X15](#0x15-actionstringextract) | [ActionStringExtract](#0x15-actionstringextract) | [SWF_ACTION_STRING_EXTRACT](#0x15-actionstringextract) | [actionStringExtract](#0x15-actionstringextract) | 1/1 |  |  | ✓ | ✓ |
-| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | [SWF_ACTION_POP](#0x17-actionpop) |  | 1/1 | 3/4 |  | ✓ | ✓ |
+| [0X17](#0x17-actionpop) | [ActionPop](#0x17-actionpop) | [SWF_ACTION_POP](#0x17-actionpop) |  | 1/1 | 4/4 |  | ✓ | ✓ |
 | [0X18](#0x18-actiontointeger) | [ActionToInteger](#0x18-actiontointeger) | [SWF_ACTION_TO_INTEGER](#0x18-actiontointeger) | [actionToInteger](#0x18-actiontointeger) | 1/1 |  |  | ✓ | ✓ |
-| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | [SWF_ACTION_GET_VARIABLE](#0x1c-actiongetvariable) | [actionGetVariable](#0x1c-actiongetvariable) | 0/1 | 5/10 | 1 | ✓ |  |
-| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | [SWF_ACTION_SET_VARIABLE](#0x1d-actionsetvariable) | [actionSetVariable](#0x1d-actionsetvariable) | 1/1 | 3/10 |  | ✓ | ✓ |
+| [0X1C](#0x1c-actiongetvariable) | [ActionGetVariable](#0x1c-actiongetvariable) | [SWF_ACTION_GET_VARIABLE](#0x1c-actiongetvariable) | [actionGetVariable](#0x1c-actiongetvariable) | 1/1 | 8/10 |  | ✓ |  |
+| [0X1D](#0x1d-actionsetvariable) | [ActionSetVariable](#0x1d-actionsetvariable) | [SWF_ACTION_SET_VARIABLE](#0x1d-actionsetvariable) | [actionSetVariable](#0x1d-actionsetvariable) | 1/1 | 8/10 |  | ✓ | ✓ |
 | [0X20](#0x20-actionsettarget2) | [ActionSetTarget2](#0x20-actionsettarget2) | [SWF_ACTION_SET_TARGET2](#0x20-actionsettarget2) | [actionSetTarget2](#0x20-actionsettarget2) | 1/1 |  |  | ✓ |  |
-| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | [SWF_ACTION_STRING_ADD](#0x21-actionstringadd) | [actionStringAdd](#0x21-actionstringadd) | 1/1 | 1/2 |  | ✓ | ✓ |
+| [0X21](#0x21-actionstringadd) | [ActionStringAdd](#0x21-actionstringadd) | [SWF_ACTION_STRING_ADD](#0x21-actionstringadd) | [actionStringAdd](#0x21-actionstringadd) | 1/1 | 2/2 |  | ✓ | ✓ |
 | [0X22](#0x22-actiongetproperty) | [ActionGetProperty](#0x22-actiongetproperty) | [SWF_ACTION_GET_PROPERTY](#0x22-actiongetproperty) | [actionGetProperty](#0x22-actiongetproperty) | 1/1 |  |  | ✓ |  |
 | [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | [SWF_ACTION_SET_PROPERTY](#0x23-actionsetproperty) | [actionSetProperty](#0x23-actionsetproperty) | 1/1 |  |  | ✓ |  |
 | [0X24](#0x24-actionclonesprite) | [ActionCloneSprite](#0x24-actionclonesprite) | [SWF_ACTION_CLONE_SPRITE](#0x24-actionclonesprite) | [actionCloneSprite](#0x24-actionclonesprite) | 1/1 |  |  | ✓ |  |
 | [0X25](#0x25-actionremovesprite) | [ActionRemoveSprite](#0x25-actionremovesprite) | [SWF_ACTION_REMOVE_SPRITE](#0x25-actionremovesprite) | [actionRemoveSprite](#0x25-actionremovesprite) | 1/1 |  |  | ✓ |  |
-| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 97/108 |  | ✓ | ✓ |
+| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 106/108 |  | ✓ | ✓ |
 | [0X27](#0x27-actionstartdrag) | [ActionStartDrag](#0x27-actionstartdrag) | [SWF_ACTION_START_DRAG](#0x27-actionstartdrag) | [actionStartDrag](#0x27-actionstartdrag) | 1/1 |  |  | ✓ |  |
 | [0X28](#0x28-actionenddrag) | [ActionEndDrag](#0x28-actionenddrag) | [SWF_ACTION_END_DRAG](#0x28-actionenddrag) | [actionEndDrag](#0x28-actionenddrag) | 1/1 |  |  | ✓ |  |
 | [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | [SWF_ACTION_STRING_LESS](#0x29-actionstringless) | [actionStringLess](#0x29-actionstringless) | 1/1 |  |  | ✓ | ✓ |
-| [0X2A](#0x2a-actionthrow) | [ActionThrow](#0x2a-actionthrow) | [SWF_ACTION_THROW](#0x2a-actionthrow) | [actionThrow](#0x2a-actionthrow) | 1/2 |  | 1 | ✓ |  |
+| [0X2A](#0x2a-actionthrow) | [ActionThrow](#0x2a-actionthrow) | [SWF_ACTION_THROW](#0x2a-actionthrow) | [actionThrow](#0x2a-actionthrow) | 2/2 |  |  | ✓ |  |
 | [0X2B](#0x2b-actioncastop) | [ActionCastOp](#0x2b-actioncastop) | [SWF_ACTION_CAST_OP](#0x2b-actioncastop) | [actionCastOp](#0x2b-actioncastop) | 1/1 |  |  | ✓ |  |
 | [0X2C](#0x2c-actionimplementsop) | [ActionImplementsOp](#0x2c-actionimplementsop) | [SWF_ACTION_IMPLEMENTS_OP](#0x2c-actionimplementsop) | [actionImplementsOp](#0x2c-actionimplementsop) | 1/1 |  |  | ✓ |  |
 | [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | [SWF_ACTION_RANDOM_NUMBER](#0x30-actionrandomnumber) | [actionRandomNumber](#0x30-actionrandomnumber) | 1/1 |  |  | ✓ | ✓ |
 | [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | [SWF_ACTION_MB_STRING_LENGTH](#0x31-actionmbstringlength) | [actionMbStringLength](#0x31-actionmbstringlength) | 1/1 |  |  | ✓ | ✓ |
 | [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | [SWF_ACTION_CHAR_TO_ASCII](#0x32-actionchartoascii) | [actionCharToAscii](#0x32-actionchartoascii) | 1/1 |  |  | ✓ | ✓ |
-| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) | 0/1 |  | 1 | ✓ | ✓ |
+| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | [SWF_ACTION_ASCII_TO_CHAR](#0x33-actionasciitochar) | [actionAsciiToChar](#0x33-actionasciitochar) | 1/1 |  |  | ✓ | ✓ |
 | [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | [SWF_ACTION_GET_TIME](#0x34-actiongettime) | [actionGetTime](#0x34-actiongettime) | 1/1 |  |  | ✓ | ✓ |
 | [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | [SWF_ACTION_MB_STRING_EXTRACT](#0x35-actionmbstringextract) | [actionMbStringExtract](#0x35-actionmbstringextract) | 1/1 |  |  | ✓ | ✓ |
 | [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | [SWF_ACTION_MB_CHAR_TO_ASCII](#0x36-actionmbchartoascii) | [actionMbCharToAscii](#0x36-actionmbchartoascii) | 1/1 |  |  | ✓ | ✓ |
 | [0X37](#0x37-actionmbasciitochar) | [ActionMBAsciiToChar](#0x37-actionmbasciitochar) | [SWF_ACTION_MB_ASCII_TO_CHAR](#0x37-actionmbasciitochar) | [actionMbAsciiToChar](#0x37-actionmbasciitochar) | 1/1 |  |  | ✓ |  |
-| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | [SWF_ACTION_DELETE](#0x3a-actiondelete) | [actionDelete](#0x3a-actiondelete) | 0/1 |  | 1 | ✓ | ✓ |
-| [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) | [SWF_ACTION_DELETE2](#0x3b-actiondelete2) | [actionDelete2](#0x3b-actiondelete2) | 0/1 |  | 1 | ✓ |  |
+| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | [SWF_ACTION_DELETE](#0x3a-actiondelete) | [actionDelete](#0x3a-actiondelete) | 1/1 |  |  | ✓ | ✓ |
+| [0X3B](#0x3b-actiondelete2) | [ActionDelete2](#0x3b-actiondelete2) | [SWF_ACTION_DELETE2](#0x3b-actiondelete2) | [actionDelete2](#0x3b-actiondelete2) | 1/1 |  |  | ✓ |  |
 | [0X3C](#0x3c-actiondefinelocal) | [ActionDefineLocal](#0x3c-actiondefinelocal) | [SWF_ACTION_DEFINE_LOCAL](#0x3c-actiondefinelocal) | [actionDefineLocal](#0x3c-actiondefinelocal) | 1/1 |  |  | ✓ |  |
 | [0X3D](#0x3d-actionstackswap) | [ActionStackSwap](#0x3d-actionstackswap) | [SWF_ACTION_CALL_FUNCTION](#0x3d-actionstackswap) | [actionStackSwap](#0x3d-actionstackswap) | 1/1 |  |  | ✓ |  |
 | [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | [SWF_ACTION_RETURN](#0x3e-actionreturn) | [actionReturn](#0x3e-actionreturn) | 1/1 | 1/2 |  | ✓ | ✓ |
@@ -91,23 +91,23 @@
 | [0X40](#0x40-actionnewobject) | [ActionNewObject](#0x40-actionnewobject) | [SWF_ACTION_NEW_OBJECT](#0x40-actionnewobject) | [actionNewObject](#0x40-actionnewobject) | 1/1 |  |  | ✓ |  |
 | [0X41](#0x41-actiondefinelocal2) | [ActionDefineLocal2](#0x41-actiondefinelocal2) | [SWF_ACTION_DECLARE_LOCAL](#0x41-actiondefinelocal2) | [actionDeclareLocal](#0x41-actiondefinelocal2) | 1/1 |  |  | ✓ |  |
 | [0X42](#0x42-actioninitarray) | [ActionInitArray](#0x42-actioninitarray) | [SWF_ACTION_INIT_ARRAY](#0x42-actioninitarray) | [actionInitArray](#0x42-actioninitarray) | 1/1 |  |  | ✓ |  |
-| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | [SWF_ACTION_INIT_OBJECT](#0x43-actioninitobject) | [actionInitObject](#0x43-actioninitobject) | 0/1 | 4/8 | 1 | ✓ |  |
-| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | [SWF_ACTION_TYPEOF](#0x44-actiontypeof) | [actionTypeof](#0x44-actiontypeof) | 1/1 | 0/1 |  | ✓ | ✓ |
+| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | [SWF_ACTION_INIT_OBJECT](#0x43-actioninitobject) | [actionInitObject](#0x43-actioninitobject) | 1/1 | 7/8 |  | ✓ | ✓ |
+| [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | [SWF_ACTION_TYPEOF](#0x44-actiontypeof) | [actionTypeof](#0x44-actiontypeof) | 1/1 | 1/1 |  | ✓ | ✓ |
 | [0X45](#0x45-actiontargetpath) | [ActionTargetPath](#0x45-actiontargetpath) | [SWF_ACTION_TARGET_PATH](#0x45-actiontargetpath) | [actionTargetPath](#0x45-actiontargetpath) | 1/1 |  |  | ✓ |  |
-| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | [SWF_ACTION_ENUMERATE](#0x46-actionenumerate) | [actionEnumerate](#0x46-actionenumerate) | 0/1 |  | 1 | ✓ |  |
+| [0X46](#0x46-actionenumerate) | [ActionEnumerate](#0x46-actionenumerate) | [SWF_ACTION_ENUMERATE](#0x46-actionenumerate) | [actionEnumerate](#0x46-actionenumerate) | 1/1 |  |  | ✓ |  |
 | [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | [SWF_ACTION_ADD2](#0x47-actionadd2) | [actionAdd2](#0x47-actionadd2) | 1/1 |  |  | ✓ | ✓ |
 | [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | [SWF_ACTION_LESS2](#0x48-actionless2) | [actionLess2](#0x48-actionless2) | 1/1 |  |  | ✓ | ✓ |
 | [0X49](#0x49-actionequals2) | [ActionEquals2](#0x49-actionequals2) | [SWF_ACTION_EQUALS2](#0x49-actionequals2) | [actionEquals2](#0x49-actionequals2) | 1/1 |  |  | ✓ |  |
 | [0X4A](#0x4a-actiontonumber) | [ActionToNumber](#0x4a-actiontonumber) | [SWF_ACTION_TO_NUMBER](#0x4a-actiontonumber) | [actionToNumber](#0x4a-actiontonumber) | 1/1 |  |  | ✓ | ✓ |
 | [0X4B](#0x4b-actiontostring) | [ActionToString](#0x4b-actiontostring) | [SWF_ACTION_TO_STRING](#0x4b-actiontostring) | [actionToString](#0x4b-actiontostring) | 1/1 |  |  | ✓ | ✓ |
-| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | [SWF_ACTION_DUPLICATE](#0x4c-actionpushduplicate) | [actionDuplicate](#0x4c-actionpushduplicate) | 1/1 | 1/5 |  | ✓ | ✓ |
-| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | [SWF_ACTION_STACK_SWAP](#0x4d-actionstackswap) | [actionStackSwap](#0x4d-actionstackswap) | 1/1 | 0/1 |  | ✓ | ✓ |
-| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | [SWF_ACTION_GET_MEMBER](#0x4e-actiongetmember) | [actionGetMember](#0x4e-actiongetmember) | 1/1 | 1/3 |  | ✓ | ✓ |
+| [0X4C](#0x4c-actionpushduplicate) | [ActionPushDuplicate](#0x4c-actionpushduplicate) | [SWF_ACTION_DUPLICATE](#0x4c-actionpushduplicate) | [actionDuplicate](#0x4c-actionpushduplicate) | 1/1 | 4/5 |  | ✓ | ✓ |
+| [0X4D](#0x4d-actionstackswap) | [ActionStackSwap](#0x4d-actionstackswap) | [SWF_ACTION_STACK_SWAP](#0x4d-actionstackswap) | [actionStackSwap](#0x4d-actionstackswap) | 1/1 | 1/1 |  | ✓ | ✓ |
+| [0X4E](#0x4e-actiongetmember) | [ActionGetMember](#0x4e-actiongetmember) | [SWF_ACTION_GET_MEMBER](#0x4e-actiongetmember) | [actionGetMember](#0x4e-actiongetmember) | 1/1 | 3/3 |  | ✓ | ✓ |
 | [0X4F](#0x4f-actionsetmember) | [ActionSetMember](#0x4f-actionsetmember) | [SWF_ACTION_SET_MEMBER](#0x4f-actionsetmember) | [actionSetMember](#0x4f-actionsetmember) | 1/1 | 1/1 |  | ✓ | ✓ |
 | [0X50](#0x50-actionincrement) | [ActionIncrement](#0x50-actionincrement) | [SWF_ACTION_INCREMENT](#0x50-actionincrement) | [actionIncrement](#0x50-actionincrement) | 1/1 |  |  | ✓ | ✓ |
 | [0X51](#0x51-actiondecrement) | [ActionDecrement](#0x51-actiondecrement) | [SWF_ACTION_DECREMENT](#0x51-actiondecrement) | [actionDecrement](#0x51-actiondecrement) | 1/1 |  |  | ✓ | ✓ |
 | [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) | [SWF_ACTION_CALL_METHOD](#0x52-actioncallmethod) | [actionCallMethod](#0x52-actioncallmethod) | 1/2 |  | 1 | ✓ | ✓ |
-| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | [SWF_ACTION_NEW_METHOD](#0x53-actionnewmethod) | [actionNewMethod](#0x53-actionnewmethod) | 0/1 |  | 1 | ✓ |  |
+| [0X53](#0x53-actionnewmethod) | [ActionNewMethod](#0x53-actionnewmethod) | [SWF_ACTION_NEW_METHOD](#0x53-actionnewmethod) | [actionNewMethod](#0x53-actionnewmethod) | 1/1 |  |  | ✓ |  |
 | [0X54](#0x54-actioninstanceof) | [ActionInstanceOf](#0x54-actioninstanceof) | [SWF_ACTION_INSTANCEOF](#0x54-actioninstanceof) | [actionInstanceOf](#0x54-actioninstanceof) | 1/1 |  |  | ✓ |  |
 | [0X55](#0x55-actionenumerate2) | [ActionEnumerate2](#0x55-actionenumerate2) | [SWF_ACTION_ENUMERATE2](#0x55-actionenumerate2) | [actionEnumerate2](#0x55-actionenumerate2) | 1/1 |  |  | ✓ | ✓ |
 | [0X60](#0x60-actionbitand) | [ActionBitAnd](#0x60-actionbitand) | [SWF_ACTION_BIT_AND](#0x60-actionbitand) | [actionBitAnd](#0x60-actionbitand) | 1/1 |  |  | ✓ | ✓ |
@@ -129,15 +129,25 @@
 | [0X8C](#0x8c-actiongotolabel) | [ActionGoToLabel](#0x8c-actiongotolabel) | [SWF_ACTION_GOTO_LABEL](#0x8c-actiongotolabel) | [actionGoToLabel](#0x8c-actiongotolabel) | 1/1 |  |  | ✓ |  |
 | [0X8D](#0x8d-actionwaitforframe2) | [ActionWaitForFrame2](#0x8d-actionwaitforframe2) | [SWF_ACTION_WAIT_FOR_FRAME2](#0x8d-actionwaitforframe2) |  | 1/1 |  |  | ✓ | ✓ |
 | [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | [SWF_ACTION_DEFINE_FUNCTION2](#0x8e-actiondefinefunction2) | [actionDefineFunction2](#0x8e-actiondefinefunction2) | 1/2 |  | 1 | ✓ |  |
-| [0X8F](#0x8f-actiontry) | [ActionTry](#0x8f-actiontry) | [SWF_ACTION_TRY](#0x8f-actiontry) |  | 0/1 |  | 1 | ✓ |  |
+| [0X8F](#0x8f-actiontry) | [ActionTry](#0x8f-actiontry) | [SWF_ACTION_TRY](#0x8f-actiontry) |  | 1/1 |  |  | ✓ |  |
 | [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | [SWF_ACTION_WITH](#0x94-actionwith) |  | 0/1 |  | 1 | ✓ |  |
-| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 97/108 |  | ✓ | ✓ |
-| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | [SWF_ACTION_JUMP](#0x99-actionjump) |  | 0/1 |  | 1 | ✓ | ✓ |
+| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 106/108 |  | ✓ | ✓ |
+| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | [SWF_ACTION_JUMP](#0x99-actionjump) |  | 1/1 |  |  | ✓ | ✓ |
 | [0X9A](#0x9a-actiongeturl2) | [ActionGetURL2](#0x9a-actiongeturl2) | [SWF_ACTION_GET_URL2](#0x9a-actiongeturl2) | [actionGetURL2](#0x9a-actiongeturl2) | 1/1 |  |  | ✓ |  |
 | [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | [SWF_ACTION_DEFINE_FUNCTION](#0x9b-actiondefinefunction) |  | 1/1 |  |  | ✓ | ✓ |
 | [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | [SWF_ACTION_IF](#0x9d-actionif) |  | 2/2 | 1/1 |  | ✓ | ✓ |
 | [0X9E](#0x9e-actioncall) | [ActionCall](#0x9e-actioncall) | [SWF_ACTION_CALL](#0x9e-actioncall) | [actionCall](#0x9e-actioncall) | 1/1 |  |  | ✓ |  |
 | [0X9F](#0x9f-actiongotoframe2) | [ActionGotoFrame2](#0x9f-actiongotoframe2) | [SWF_ACTION_GOTO_FRAME2](#0x9f-actiongotoframe2) | [actionGotoFrame2](#0x9f-actiongotoframe2) | 1/1 |  |  | ✓ |  |
+
+## Failing Primary Tests
+
+**Total Failing Primary Tests**: 3
+
+| Hex | Opcode | Test Path | Enum | Function | Docs |
+|-----|--------|-----------|------|----------|------|
+| [0X52](#0x52-actioncallmethod) | [ActionCallMethod](#0x52-actioncallmethod) | `call_method_empty_name_swf_5` | ✓ | ✓ | ✓ |
+| [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | `call_method_empty_name_swf_5` | ✓ | ✓ | ✓ |
+| [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | `with_swf_5` | ✓ |  | ✓ |
 
 ## Implementation Status
 
@@ -167,13 +177,14 @@
 | [0X30](#0x30-actionrandomnumber) | [ActionRandomNumber](#0x30-actionrandomnumber) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X31](#0x31-actionmbstringlength) | [ActionMBStringLength](#0x31-actionmbstringlength) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X32](#0x32-actionchartoascii) | [ActionCharToAscii](#0x32-actionchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | 0/1 | 1 | ✓ |
+| [0X33](#0x33-actionasciitochar) | [ActionAsciiToChar](#0x33-actionasciitochar) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X34](#0x34-actiongettime) | [ActionGetTime](#0x34-actiongettime) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X35](#0x35-actionmbstringextract) | [ActionMBStringExtract](#0x35-actionmbstringextract) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X36](#0x36-actionmbchartoascii) | [ActionMBCharToAscii](#0x36-actionmbchartoascii) | ✓ | ✓ | 1/1 |  | ✓ |
-| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | ✓ | ✓ | 0/1 | 1 | ✓ |
+| [0X3A](#0x3a-actiondelete) | [ActionDelete](#0x3a-actiondelete) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X3E](#0x3e-actionreturn) | [ActionReturn](#0x3e-actionreturn) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X3F](#0x3f-actionmodulo) | [ActionModulo](#0x3f-actionmodulo) | ✓ | ✓ | 1/1 |  | ✓ |
+| [0X43](#0x43-actioninitobject) | [ActionInitObject](#0x43-actioninitobject) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X44](#0x44-actiontypeof) | [ActionTypeOf](#0x44-actiontypeof) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X47](#0x47-actionadd2) | [ActionAdd2](#0x47-actionadd2) | ✓ | ✓ | 1/1 |  | ✓ |
 | [0X48](#0x48-actionless2) | [ActionLess2](#0x48-actionless2) | ✓ | ✓ | 1/1 |  | ✓ |
@@ -200,7 +211,7 @@
 | [0X88](#0x88-actionconstantpool) | [ActionConstantPool](#0x88-actionconstantpool) | ✓ |  | 4/4 |  | ✓ |
 | [0X8D](#0x8d-actionwaitforframe2) | [ActionWaitForFrame2](#0x8d-actionwaitforframe2) | ✓ |  | 1/1 |  | ✓ |
 | [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | ✓ |  | 1/1 |  | ✓ |
-| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | ✓ |  | 0/1 | 1 | ✓ |
+| [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | ✓ |  | 1/1 |  | ✓ |
 | [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | ✓ |  | 1/1 |  | ✓ |
 | [0X9D](#0x9d-actionif) | [ActionIf](#0x9d-actionif) | ✓ |  | 2/2 |  | ✓ |
 
@@ -728,7 +739,7 @@ void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 **Secondary Tests:**
 - [✓] `SWFRecomp/tests/cast_op_swf_7`
 - [✓] `SWFRecomp/tests/init_array_swf_4`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/new_object_swf_4`
 
 **Implementation:**
@@ -776,18 +787,18 @@ void actionToInteger(char* stack, u32* sp);
 - `actionGetVariable` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/get_variable_swf_4`
+- [✓] `SWFRecomp/tests/get_variable_swf_4`
 
 **Secondary Tests:**
 - [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
 - [✓] `SWFRecomp/tests/definelocal_swf_5`
-- [✗] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/delete_swf_5`
 - [✓] `SWFRecomp/tests/extends_swf_7`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
 - [✓] `SWFRecomp/tests/set_member_swf_5`
 - [✓] `SWFRecomp/tests/set_variable_swf_4`
-- [✗] `SWFRecomp/tests/try_swf_7`
+- [✓] `SWFRecomp/tests/try_swf_7`
 - [✗] `SWFRecomp/tests/with_swf_5`
 
 **Function Declaration:**
@@ -818,12 +829,12 @@ void actionGetVariable(char* stack, u32* sp);
 
 **Secondary Tests:**
 - [✗] `SWFRecomp/tests/call_method_empty_name_swf_5`
-- [✗] `SWFRecomp/tests/delete_swf_5`
-- [✗] `SWFRecomp/tests/enumerate_swf_4`
+- [✓] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/enumerate_swf_4`
 - [✓] `SWFRecomp/tests/extends_swf_7`
-- [✗] `SWFRecomp/tests/get_variable_swf_4`
-- [✗] `SWFRecomp/tests/init_object_swf_4`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/get_variable_swf_4`
+- [✓] `SWFRecomp/tests/init_object_swf_4`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
 - [✓] `SWFRecomp/tests/set_member_swf_5`
 - [✗] `SWFRecomp/tests/with_swf_5`
@@ -882,7 +893,7 @@ void actionSetTarget2(char* stack, u32* sp);
 
 **Secondary Tests:**
 - [✓] `SWFRecomp/tests/get_url2_swf_4`
-- [✗] `SWFRecomp/tests/try_swf_7`
+- [✓] `SWFRecomp/tests/try_swf_7`
 
 **Function Declaration:**
 ```c
@@ -1023,7 +1034,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/and_floats_nonzero_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_second_1_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_swf_4`
-- [✗] `SWFRecomp/tests/ascii_to_char_swf_4`
+- [✓] `SWFRecomp/tests/ascii_to_char_swf_4`
 - [✓] `SWFRecomp/tests/bit_and_swf_4`
 - [✓] `SWFRecomp/tests/bit_lshift_swf_4`
 - [✓] `SWFRecomp/tests/bit_or_swf_4`
@@ -1046,13 +1057,13 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/define_function2_swf_7`
 - [✓] `SWFRecomp/tests/define_function_swf_5`
 - [✓] `SWFRecomp/tests/definelocal_swf_5`
-- [✗] `SWFRecomp/tests/delete2_swf_5`
-- [✗] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/delete2_swf_5`
+- [✓] `SWFRecomp/tests/delete_swf_5`
 - [✓] `SWFRecomp/tests/divide_floats_error_swf_4`
 - [✓] `SWFRecomp/tests/duplicate_swf_4`
 - [✓] `SWFRecomp/tests/end_drag_swf_4`
 - [✓] `SWFRecomp/tests/enumerate2_swf_6`
-- [✗] `SWFRecomp/tests/enumerate_swf_4`
+- [✓] `SWFRecomp/tests/enumerate_swf_4`
 - [✓] `SWFRecomp/tests/equals2_swf_5`
 - [✓] `SWFRecomp/tests/equals_swf_4`
 - [✓] `SWFRecomp/tests/extends_swf_7`
@@ -1061,7 +1072,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/get_time_swf_5`
 - [✓] `SWFRecomp/tests/get_url2_swf_4`
 - [✓] `SWFRecomp/tests/get_url_swf_3`
-- [✗] `SWFRecomp/tests/get_variable_swf_4`
+- [✓] `SWFRecomp/tests/get_variable_swf_4`
 - [✓] `SWFRecomp/tests/goto_frame_swf_3`
 - [✓] `SWFRecomp/tests/goto_label_swf_3`
 - [✓] `SWFRecomp/tests/gotoframe2_swf_5`
@@ -1071,9 +1082,9 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/implements_op_swf_7`
 - [✓] `SWFRecomp/tests/increment_swf_4`
 - [✓] `SWFRecomp/tests/init_array_swf_4`
-- [✗] `SWFRecomp/tests/init_object_swf_4`
+- [✓] `SWFRecomp/tests/init_object_swf_4`
 - [✓] `SWFRecomp/tests/instanceof_swf_6`
-- [✗] `SWFRecomp/tests/jump_swf_4`
+- [✓] `SWFRecomp/tests/jump_swf_4`
 - [✓] `SWFRecomp/tests/less2_swf_4`
 - [✓] `SWFRecomp/tests/less_floats_false_swf_4`
 - [✓] `SWFRecomp/tests/less_floats_swf_4`
@@ -1083,7 +1094,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/mb_string_length_swf_5`
 - [✓] `SWFRecomp/tests/modulo_swf_4`
 - [✓] `SWFRecomp/tests/multiply_floats_swf_4`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/new_object_swf_4`
 - [✓] `SWFRecomp/tests/next_frame_swf_4`
 - [✓] `SWFRecomp/tests/not_floats_nonzero_swf_4`
@@ -1118,7 +1129,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/to_number_swf_4`
 - [✓] `SWFRecomp/tests/to_string_swf_4`
 - [✓] `SWFRecomp/tests/toggle_quality_swf_4`
-- [✗] `SWFRecomp/tests/try_swf_7`
+- [✓] `SWFRecomp/tests/try_swf_7`
 - [✓] `SWFRecomp/tests/typeof_swf_5`
 - [✓] `SWFRecomp/tests/wait_for_frame2_swf_4`
 - [✓] `SWFRecomp/tests/wait_for_frame_swf_3`
@@ -1227,7 +1238,7 @@ void actionStringLess(char* stack, u32* sp);
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/throw_swf_7`
-- [✗] `SWFRecomp/tests/try_swf_7`
+- [✓] `SWFRecomp/tests/try_swf_7`
 
 **Function Declaration:**
 ```c
@@ -1383,7 +1394,7 @@ void actionCharToAscii(char* stack, u32* sp);
 - `actionAsciiToChar` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/ascii_to_char_swf_4`
+- [✓] `SWFRecomp/tests/ascii_to_char_swf_4`
 
 **Function Declaration:**
 ```c
@@ -1513,7 +1524,7 @@ void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);
 - `actionDelete` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/delete_swf_5`
 
 **Function Declaration:**
 ```c
@@ -1539,7 +1550,7 @@ void actionDelete(char* stack, u32* sp);
 - `actionDelete2` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/delete2_swf_5`
+- [✓] `SWFRecomp/tests/delete2_swf_5`
 
 **Function Declaration:**
 ```c
@@ -1751,15 +1762,15 @@ void actionInitArray(char* stack, u32* sp);
 - `actionInitObject` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/init_object_swf_4`
+- [✓] `SWFRecomp/tests/init_object_swf_4`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/delete_swf_5`
 - [✓] `SWFRecomp/tests/enumerate2_swf_6`
-- [✗] `SWFRecomp/tests/enumerate_swf_4`
+- [✓] `SWFRecomp/tests/enumerate_swf_4`
 - [✓] `SWFRecomp/tests/extends_swf_7`
 - [✓] `SWFRecomp/tests/implements_op_swf_7`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/set_member_swf_5`
 - [✗] `SWFRecomp/tests/with_swf_5`
 
@@ -1790,7 +1801,7 @@ void actionInitObject(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/typeof_swf_5`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/init_object_swf_4`
+- [✓] `SWFRecomp/tests/init_object_swf_4`
 
 **Function Declaration:**
 ```c
@@ -1842,7 +1853,7 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer);
 - `actionEnumerate` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/enumerate_swf_4`
+- [✓] `SWFRecomp/tests/enumerate_swf_4`
 
 **Function Declaration:**
 ```c
@@ -2001,10 +2012,10 @@ void actionToString(char* stack, u32* sp, char* str_buffer);
 - [✓] `SWFRecomp/tests/duplicate_swf_4`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/delete_swf_5`
 - [✓] `SWFRecomp/tests/extends_swf_7`
-- [✗] `SWFRecomp/tests/init_object_swf_4`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/init_object_swf_4`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✗] `SWFRecomp/tests/with_swf_5`
 
 **Function Declaration:**
@@ -2034,7 +2045,7 @@ void actionDuplicate(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/stack_swap_swf_4`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 
 **Function Declaration:**
 ```c
@@ -2063,8 +2074,8 @@ void actionStackSwap(char* stack, u32* sp);
 - [✓] `SWFRecomp/tests/get_member_swf_4`
 
 **Secondary Tests:**
-- [✗] `SWFRecomp/tests/delete_swf_5`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/set_member_swf_5`
 
 **Function Declaration:**
@@ -2199,7 +2210,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer);
 - `actionNewMethod` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 
 **Function Declaration:**
 ```c
@@ -2756,7 +2767,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - `SWF_ACTION_TRY` (enum, source: action.hpp)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/try_swf_7`
+- [✓] `SWFRecomp/tests/try_swf_7`
 
 **Implementation:**
 - parseActions (case SWF_ACTION_TRY)
@@ -2807,7 +2818,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/and_floats_nonzero_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_second_1_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_swf_4`
-- [✗] `SWFRecomp/tests/ascii_to_char_swf_4`
+- [✓] `SWFRecomp/tests/ascii_to_char_swf_4`
 - [✓] `SWFRecomp/tests/bit_and_swf_4`
 - [✓] `SWFRecomp/tests/bit_lshift_swf_4`
 - [✓] `SWFRecomp/tests/bit_or_swf_4`
@@ -2830,13 +2841,13 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/define_function2_swf_7`
 - [✓] `SWFRecomp/tests/define_function_swf_5`
 - [✓] `SWFRecomp/tests/definelocal_swf_5`
-- [✗] `SWFRecomp/tests/delete2_swf_5`
-- [✗] `SWFRecomp/tests/delete_swf_5`
+- [✓] `SWFRecomp/tests/delete2_swf_5`
+- [✓] `SWFRecomp/tests/delete_swf_5`
 - [✓] `SWFRecomp/tests/divide_floats_error_swf_4`
 - [✓] `SWFRecomp/tests/duplicate_swf_4`
 - [✓] `SWFRecomp/tests/end_drag_swf_4`
 - [✓] `SWFRecomp/tests/enumerate2_swf_6`
-- [✗] `SWFRecomp/tests/enumerate_swf_4`
+- [✓] `SWFRecomp/tests/enumerate_swf_4`
 - [✓] `SWFRecomp/tests/equals2_swf_5`
 - [✓] `SWFRecomp/tests/equals_swf_4`
 - [✓] `SWFRecomp/tests/extends_swf_7`
@@ -2845,7 +2856,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/get_time_swf_5`
 - [✓] `SWFRecomp/tests/get_url2_swf_4`
 - [✓] `SWFRecomp/tests/get_url_swf_3`
-- [✗] `SWFRecomp/tests/get_variable_swf_4`
+- [✓] `SWFRecomp/tests/get_variable_swf_4`
 - [✓] `SWFRecomp/tests/goto_frame_swf_3`
 - [✓] `SWFRecomp/tests/goto_label_swf_3`
 - [✓] `SWFRecomp/tests/gotoframe2_swf_5`
@@ -2855,9 +2866,9 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/implements_op_swf_7`
 - [✓] `SWFRecomp/tests/increment_swf_4`
 - [✓] `SWFRecomp/tests/init_array_swf_4`
-- [✗] `SWFRecomp/tests/init_object_swf_4`
+- [✓] `SWFRecomp/tests/init_object_swf_4`
 - [✓] `SWFRecomp/tests/instanceof_swf_6`
-- [✗] `SWFRecomp/tests/jump_swf_4`
+- [✓] `SWFRecomp/tests/jump_swf_4`
 - [✓] `SWFRecomp/tests/less2_swf_4`
 - [✓] `SWFRecomp/tests/less_floats_false_swf_4`
 - [✓] `SWFRecomp/tests/less_floats_swf_4`
@@ -2867,7 +2878,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/mb_string_length_swf_5`
 - [✓] `SWFRecomp/tests/modulo_swf_4`
 - [✓] `SWFRecomp/tests/multiply_floats_swf_4`
-- [✗] `SWFRecomp/tests/new_method_swf_5`
+- [✓] `SWFRecomp/tests/new_method_swf_5`
 - [✓] `SWFRecomp/tests/new_object_swf_4`
 - [✓] `SWFRecomp/tests/not_floats_nonzero_swf_4`
 - [✓] `SWFRecomp/tests/or_swf_4`
@@ -2902,7 +2913,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - [✓] `SWFRecomp/tests/to_string_swf_4`
 - [✓] `SWFRecomp/tests/toggle_quality_swf_4`
 - [✓] `SWFRecomp/tests/trace_swf_4`
-- [✗] `SWFRecomp/tests/try_swf_7`
+- [✓] `SWFRecomp/tests/try_swf_7`
 - [✓] `SWFRecomp/tests/typeof_swf_5`
 - [✓] `SWFRecomp/tests/wait_for_frame2_swf_4`
 - [✓] `SWFRecomp/tests/wait_for_frame_swf_3`
@@ -2926,7 +2937,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - `SWF_ACTION_JUMP` (enum, source: action.hpp)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/jump_swf_4`
+- [✓] `SWFRecomp/tests/jump_swf_4`
 
 **Implementation:**
 - parseActions (case SWF_ACTION_JUMP)
