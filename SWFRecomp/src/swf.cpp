@@ -351,7 +351,8 @@ namespace SWFRecomp
 		
 		context.tag_main << "#include <recomp.h>" << endl << endl
 				 << "#include <out.h>" << endl
-				 << "#include \"draws.h\"" << endl << endl
+				 << "#include \"draws.h\"" << endl
+				 << "#include \"script_decls.h\"" << endl << endl
 				 << "void frame_" << to_string(next_frame_i) << "()" << endl
 				 << "{" << endl;
 		next_frame_i += 1;
@@ -416,7 +417,13 @@ namespace SWFRecomp
 		{
 			tag_init << endl << "\tfinalizeBitmaps();";
 		}
-		
+
+		// Initialize variable array if string constants were used
+		if (action.next_str_i > 0)
+		{
+			tag_init << endl << "\tinitVarArray(MAX_STRING_ID);";
+		}
+
 		context.tag_main << "};" << endl
 						 << endl
 						 << "void tagInit()" << endl

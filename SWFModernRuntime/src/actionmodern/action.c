@@ -1423,24 +1423,17 @@ void actionGetVariable(char* stack, u32* sp)
 	POP();
 
 	// First check scope chain (innermost to outermost)
-	printf("[DEBUG GET_VAR] scope_depth=%u, looking for '%.*s'\n", scope_depth, var_name_len, var_name);
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
 		if (scope_chain[i] != NULL)
 		{
-			printf("[DEBUG GET_VAR] Checking scope object %p\n", (void*)scope_chain[i]);
 			// Try to find property in this scope object
 			ActionVar* prop = getProperty(scope_chain[i], var_name, var_name_len);
 			if (prop != NULL)
 			{
 				// Found in scope chain - push its value
-				printf("[DEBUG GET_VAR] Found! type=%d\n", prop->type);
 				PUSH_VAR(prop);
 				return;
-			}
-			else
-			{
-				printf("[DEBUG GET_VAR] Not found in this object\n");
 			}
 		}
 	}
@@ -1471,15 +1464,12 @@ void actionGetVariable(char* stack, u32* sp)
 
 void actionSetVariable(char* stack, u32* sp)
 {
-	// Stack layout: [value, name] <- sp
-	// NAME is at top (*sp), VALUE is at second (SP_SECOND_TOP)
+	// Stack layout: [name, value] <- sp
+	// According to spec: Pop value first, then name
+	// So VALUE is at top (*sp), NAME is at second (SP_SECOND_TOP)
 
-	u32 var_name_sp = *sp;
-	u32 value_sp = SP_SECOND_TOP;
-
-	// Debug: check what's on stack
-	ActionStackValueType value_type = stack[value_sp];
-	printf("[DEBUG SET_VAR] Setting variable, value type=%d\n", value_type);
+	u32 value_sp = *sp;
+	u32 var_name_sp = SP_SECOND_TOP;
 
 	// Read variable name info
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
@@ -1497,7 +1487,6 @@ void actionSetVariable(char* stack, u32* sp)
 			if (prop != NULL)
 			{
 				// Found in scope chain - set it there
-				// We need to convert the value at value_sp to an ActionVar
 				ActionVar value_var;
 				peekVar(stack, sp, &value_var);
 				setProperty(scope_chain[i], var_name, var_name_len, &value_var);

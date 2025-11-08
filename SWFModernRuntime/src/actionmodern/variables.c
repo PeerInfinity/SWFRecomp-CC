@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <errno.h>
 #include <string.h>
 
@@ -203,7 +207,6 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 	}
 
 	ActionStackValueType type = stack[sp];
-	fprintf(stderr, "[DEBUG] setVariableWithValue: type=%d\n", type);
 
 	if (type == ACTION_STACK_VALUE_STRING || type == ACTION_STACK_VALUE_STR_LIST)
 	{
@@ -229,6 +232,5 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 		var->type = type;
 		var->str_size = VAL(u32, &stack[sp + 8]);
 		var->data.numeric_value = VAL(u64, &stack[sp + 16]);
-		printf("[DEBUG setVar] Stored type=%d, value=%lx\n", type, var->data.numeric_value);
 	}
 }

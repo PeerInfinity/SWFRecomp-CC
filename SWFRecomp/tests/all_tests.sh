@@ -116,26 +116,39 @@ EOF
 # Add test result to JSON file
 add_test_result() {
     local test_name="$1"
-    local test_result_json="$2"
+
+    # Read stdin into variable
+    local input_json=$(cat)
+
+    # Write to temp file to pass to Python
+    local temp_input=$(mktemp)
+    echo "$input_json" > "$temp_input"
 
     # Use Python to append test result to JSON array
-    python3 <<EOF
+    python3 - "$RESULTS_FILE" "$temp_input" <<'EOF'
 import json
+import sys
+
+results_file = sys.argv[1]
+input_file = sys.argv[2]
+
+# Read new test result from file
+with open(input_file, 'r') as f:
+    test_result = json.load(f)
 
 # Read existing results
-with open('$RESULTS_FILE', 'r') as f:
+with open(results_file, 'r') as f:
     data = json.load(f)
-
-# Parse new test result
-test_result = json.loads('''$test_result_json''')
 
 # Append to tests array
 data['tests'].append(test_result)
 
 # Write back
-with open('$RESULTS_FILE', 'w') as f:
+with open(results_file, 'w') as f:
     json.dump(data, f, indent=2)
 EOF
+
+    rm -f "$temp_input"
 }
 
 # Update summary in results file
@@ -331,23 +344,60 @@ process_test_result() {
         passed_py="False"
     fi
 
-    local test_result=$(python3 <<EOF
+    # Convert opcodes to JSON array safely
+    local opcodes_json=$(echo "$opcodes" | python3 -c "import sys, json; words=sys.stdin.read().strip().split(); print(json.dumps(words) if words else '[]')" 2>/dev/null || echo "[]")
+
+    # Build test result by merging validation JSON with metadata
+    # Use temporary files to safely pass JSON data
+    local temp_validation=$(mktemp)
+    local temp_opcodes=$(mktemp)
+    echo "$validation_json" > "$temp_validation"
+    echo "$opcodes_json" > "$temp_opcodes"
+
+    local test_result=$(python3 - "$test_name" "$passed_py" "$build_time" "$run_time" "$temp_validation" "$temp_opcodes" <<'EOF'
 import json
+import sys
+
+test_name = sys.argv[1]
+passed = sys.argv[2] == "True"
+build_time = int(sys.argv[3])
+run_time = int(sys.argv[4])
+temp_validation = sys.argv[5]
+temp_opcodes = sys.argv[6]
+
+# Read validation JSON from file
+with open(temp_validation, "r") as f:
+    validation_data = json.load(f)
+
+# Read opcodes JSON from file
+with open(temp_opcodes, "r") as f:
+    opcodes_tested = json.load(f)
+
+# Build complete test data
 test_data = {
-    "name": "$test_name",
-    "passed": $passed_py,
-    "build_time_ms": $build_time,
-    "execution_time_ms": $run_time,
-    "opcodes_tested": $(echo "$opcodes" | python3 -c "import sys; words=sys.stdin.read().strip().split(); print(json.dumps(words) if words else '[]')" 2>/dev/null || echo "[]")
+    "name": test_name,
+    "passed": passed,
+    "build_time_ms": build_time,
+    "execution_time_ms": run_time,
+    "opcodes_tested": opcodes_tested
 }
-validation_data = json.loads('''$validation_json''')
 test_data.update(validation_data)
+
 print(json.dumps(test_data))
 EOF
 )
+    local python_status=$?
+
+    rm -f "$temp_validation" "$temp_opcodes"
+
+    # Check if Python script failed
+    if [[ $python_status -ne 0 || -z "$test_result" ]]; then
+        echo "[ERROR] Failed to build test result JSON for $test_name" >&2
+        test_result='{"name":"'$test_name'","passed":false,"error":"Failed to build result JSON"}'
+    fi
 
     # Add to results file
-    add_test_result "$test_name" "$test_result"
+    echo "$test_result" | add_test_result "$test_name"
 
     total_build_time=$((total_build_time + build_time))
     total_run_time=$((total_run_time + run_time))
@@ -429,7 +479,7 @@ run_all_tests() {
                     "message": "Test failed to build"
                 }]
             }'
-            add_test_result "$test_name" "$test_result"
+            echo "$test_result" | add_test_result "$test_name"
             total_build_time=$((total_build_time + build_time))
             continue
         fi
