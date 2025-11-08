@@ -904,9 +904,9 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer)
 		str_buffer[len] = '\0';
 		PUSH_STR(str_buffer, len);
 	} else {
-		// Not a valid target, return empty string
-		str_buffer[0] = '\0';
-		PUSH_STR(str_buffer, 0);
+		// Not a MovieClip, return undefined per specification
+		// "If the object is not a MovieClip, the result is undefined"
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 	}
 }
 
