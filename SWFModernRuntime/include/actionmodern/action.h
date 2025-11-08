@@ -92,6 +92,7 @@ void actionToInteger(char* stack, u32* sp);
 void actionToNumber(char* stack, u32* sp);
 void actionToString(char* stack, u32* sp, char* str_buffer);
 void actionStackSwap(char* stack, u32* sp);
+void actionDuplicate(char* stack, u32* sp);
 void actionGetMember(char* stack, u32* sp);
 void actionTargetPath(char* stack, u32* sp, char* str_buffer);
 void actionEnumerate(char* stack, u32* sp, char* str_buffer);
