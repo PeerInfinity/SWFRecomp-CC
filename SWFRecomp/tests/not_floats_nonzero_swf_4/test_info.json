@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "not_floats_nonzero_swf_4",
+    "description": "Tests NOT opcode (0x12) - logical NOT of a nonzero float value",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["NOT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
