@@ -1,15 +1,51 @@
 {
   "metadata": {
     "name": "enumerate_swf_4",
-    "description": "Tests ENUMERATE opcode (0x46) - enumerates object property names",
+    "description": "Tests ENUMERATE opcode (0x46) - enumerates object property names. Basic enumeration works correctly but lacks prototype chain support and DontEnum filtering required for full ECMA-262 compliance.",
     "swf_version": 4,
-    "fully_implemented": false
+    "fully_implemented": false,
+    "missing_features": [
+      "Prototype chain enumeration - ASObject structure lacks prototype field, so inherited properties are not enumerated (required for full ActionScript compliance)",
+      "DontEnum property filtering - No mechanism to mark properties as non-enumerable per ECMA-262 standard (all properties are currently enumerated)",
+      "Slash-path/dot-path variable resolution - Spec mentions support for paths like '/path/to/obj' or 'obj.prop' but this is untested",
+      "Property enumeration metadata - No support for property attributes (enumerable, writable, configurable)"
+    ]
   },
   "opcodes": {
     "tested": ["ENUMERATE"],
-    "supporting": ["PUSH", "INIT_OBJECT", "SET_VARIABLE", "TRACE"]
+    "supporting": ["PUSH", "INIT_OBJECT", "SET_VARIABLE", "TRACE", "POP"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "implementation_notes": {
+    "what_works": [
+      "Basic object property enumeration",
+      "Null terminator handling (pushes undefined to mark end)",
+      "Empty object handling (returns only null terminator)",
+      "Non-object handling (returns only null terminator for strings, numbers, undefined variables)",
+      "Property name ordering (reverse order push for forward order pop)",
+      "Variable lookup via getVariable/getVariableById"
+    ],
+    "infrastructure_requirements": [
+      "Prototype support requires adding 'ASObject* prototype' field to ASObject structure",
+      "DontEnum support requires adding property attribute flags to ASProperty structure",
+      "Both changes would affect multiple opcodes (GetMember, SetMember, InitObject, etc.)"
+    ]
+  },
+  "edge_cases_tested": [
+    "basic_object_with_three_properties",
+    "property_names_in_any_order"
+  ],
+  "edge_cases_not_tested": [
+    "empty_object",
+    "single_property_object",
+    "non-existent_variable",
+    "non-object_variable_types",
+    "object_with_many_properties",
+    "dynamically_added_properties",
+    "properties_with_special_characters",
+    "prototype_chain_inheritance",
+    "array_enumeration_via_variable_name"
+  ]
 }
