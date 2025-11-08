@@ -30,6 +30,20 @@ def validate_output(output):
     8. JavaScript executed
     9. // GetURL: https://www.example.com -> _self
     10. Loading in current window
+    11. // GetURL:  -> _blank (empty URL edge case)
+    12. Empty URL test
+    13. // GetURL: https://www.example.com -> (empty target edge case)
+    14. Empty target test
+    15. // GetURL: file:///path/to/file.html -> _self
+    16. File protocol test
+    17. // GetURL: app.swf -> _level5
+    18. Level 5 test
+    19. // GetURL: https://example.com/page?foo=bar&baz=qux#anchor -> _top
+    20. Special chars test
+    21. // GetURL: ../parent/page.html -> contentFrame
+    22. Relative URL test
+    23. // GetURL: https://www.example.com/page -> _parent
+    24. Parent frame test
     """
     lines = parse_output(output)
 
@@ -128,6 +142,139 @@ def validate_output(output):
             lines[9] == expected10,
             expected10,
             lines[9]
+        ))
+
+    # Test Case 6: Empty URL
+    if len(lines) > 10:
+        expected11 = "// GetURL:  -> _blank"
+        results.append(make_result(
+            "geturl_empty_url",
+            lines[10] == expected11,
+            expected11,
+            lines[10]
+        ))
+
+    if len(lines) > 11:
+        expected12 = "Empty URL test"
+        results.append(make_result(
+            "trace_empty_url",
+            lines[11] == expected12,
+            expected12,
+            lines[11]
+        ))
+
+    # Test Case 7: Empty target
+    if len(lines) > 12:
+        expected13 = "// GetURL: https://www.example.com ->"
+        results.append(make_result(
+            "geturl_empty_target",
+            lines[12] == expected13,
+            expected13,
+            lines[12]
+        ))
+
+    if len(lines) > 13:
+        expected14 = "Empty target test"
+        results.append(make_result(
+            "trace_empty_target",
+            lines[13] == expected14,
+            expected14,
+            lines[13]
+        ))
+
+    # Test Case 8: File protocol
+    if len(lines) > 14:
+        expected15 = "// GetURL: file:///path/to/file.html -> _self"
+        results.append(make_result(
+            "geturl_file_protocol",
+            lines[14] == expected15,
+            expected15,
+            lines[14]
+        ))
+
+    if len(lines) > 15:
+        expected16 = "File protocol test"
+        results.append(make_result(
+            "trace_file_protocol",
+            lines[15] == expected16,
+            expected16,
+            lines[15]
+        ))
+
+    # Test Case 9: Level 5
+    if len(lines) > 16:
+        expected17 = "// GetURL: app.swf -> _level5"
+        results.append(make_result(
+            "geturl_level5",
+            lines[16] == expected17,
+            expected17,
+            lines[16]
+        ))
+
+    if len(lines) > 17:
+        expected18 = "Level 5 test"
+        results.append(make_result(
+            "trace_level5",
+            lines[17] == expected18,
+            expected18,
+            lines[17]
+        ))
+
+    # Test Case 10: Special characters in URL
+    if len(lines) > 18:
+        expected19 = "// GetURL: https://example.com/page?foo=bar&baz=qux#anchor -> _top"
+        results.append(make_result(
+            "geturl_special_chars",
+            lines[18] == expected19,
+            expected19,
+            lines[18]
+        ))
+
+    if len(lines) > 19:
+        expected20 = "Special chars test"
+        results.append(make_result(
+            "trace_special_chars",
+            lines[19] == expected20,
+            expected20,
+            lines[19]
+        ))
+
+    # Test Case 11: Relative URL
+    if len(lines) > 20:
+        expected21 = "// GetURL: ../parent/page.html -> contentFrame"
+        results.append(make_result(
+            "geturl_relative",
+            lines[20] == expected21,
+            expected21,
+            lines[20]
+        ))
+
+    if len(lines) > 21:
+        expected22 = "Relative URL test"
+        results.append(make_result(
+            "trace_relative",
+            lines[21] == expected22,
+            expected22,
+            lines[21]
+        ))
+
+    # Test Case 12: Parent frame
+    if len(lines) > 22:
+        expected23 = "// GetURL: https://www.example.com/page -> _parent"
+        results.append(make_result(
+            "geturl_parent",
+            lines[22] == expected23,
+            expected23,
+            lines[22]
+        ))
+
+    if len(lines) > 23:
+        expected24 = "Parent frame test"
+        results.append(make_result(
+            "trace_parent",
+            lines[23] == expected24,
+            expected24,
+            lines[23]
         ))
 
     return make_validation_result(results)

@@ -1,8 +1,18 @@
 {
   "metadata": {
     "name": "get_url_swf_3",
-    "description": "Tests ActionGetURL opcode (0x83) - Load URLs into browser frames or Flash levels",
-    "swf_version": 3
+    "description": "Tests ActionGetURL opcode (0x83) - Comprehensive test of URL loading functionality including edge cases for different URL schemes, targets, and special characters. In NO_GRAPHICS mode, verifies correct parsing and logging of URL requests.",
+    "swf_version": 3,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Actual URL loading (requires browser integration or HTTP client)",
+      "SWF file loading into _level targets (requires SWF loader and level management)",
+      "Browser frame/window management (requires browser API)",
+      "JavaScript URL execution (requires JavaScript bridge)",
+      "Cross-domain security policy enforcement",
+      "URL scheme validation and sanitization"
+    ]
   },
   "opcodes": {
     "tested": ["GET_URL"],
@@ -10,5 +20,21 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_url_with_blank_target",
+    "named_frame_target",
+    "swf_loading_to_level",
+    "javascript_url_scheme",
+    "self_target",
+    "empty_url_string",
+    "empty_target_string",
+    "file_protocol_url",
+    "high_level_number",
+    "special_characters_in_url",
+    "relative_url_path",
+    "parent_frame_target",
+    "top_frame_target",
+    "query_parameters_and_anchors"
+  ]
 }

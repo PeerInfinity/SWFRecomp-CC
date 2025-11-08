@@ -1657,18 +1657,56 @@ void actionStopSounds(char* stack, u32* sp)
 	// This opcode has global effect and does not modify the stack
 }
 
+/**
+ * ActionGetURL - Load a URL into browser frame or Flash level
+ *
+ * Opcode: 0x83
+ * SWF Version: 3+
+ *
+ * Instructs Flash Player to get the URL specified by the url parameter.
+ * The URL can be any type: HTML file, image, or another SWF file.
+ * If playing in a browser, the URL is displayed in the frame specified by target.
+ *
+ * Special targets:
+ * - "_blank": Open in new window
+ * - "_self": Open in current window/frame
+ * - "_parent": Open in parent frame
+ * - "_top": Open in top-level frame
+ * - "_level0", "_level1", etc.: Load SWF into Flash Player level
+ * - Named string: Open in named frame/window
+ *
+ * Current Implementation:
+ * This is a simplified implementation for NO_GRAPHICS mode that logs the URL
+ * request to stdout. Full implementation would require:
+ * - Browser integration or HTTP client for web URLs
+ * - SWF loader for _level targets
+ * - Frame/window management for browser targets
+ *
+ * Edge cases handled:
+ * - Null URL or target (logged as "(null)")
+ * - Empty strings (logged as-is)
+ *
+ * @param stack Pointer to the runtime stack (unused in current implementation)
+ * @param sp Pointer to stack pointer (unused in current implementation)
+ * @param url The URL to load (can be relative or absolute)
+ * @param target The target window/frame/level
+ */
 void actionGetURL(char* stack, u32* sp, const char* url, const char* target)
 {
-	// Simplified implementation: just log the URL request
-	printf("// GetURL: %s -> %s\n",
-		   url ? url : "(null)",
-		   target ? target : "(null)");
+	// Handle null pointers
+	const char* safe_url = url ? url : "(null)";
+	const char* safe_target = target ? target : "(null)";
 
-	// TODO: Implement actual URL loading
-	// This requires:
-	// - Browser integration or HTTP client
-	// - SWF loader (for _level targets)
-	// - Frame/window management
+	// Log the URL request for verification in NO_GRAPHICS mode
+	// Format: "// GetURL: <url> -> <target>"
+	printf("// GetURL: %s -> %s\n", safe_url, safe_target);
+
+	// Note: Full implementation would check target type and dispatch accordingly:
+	// - _level targets: Load SWF file into specified level
+	// - Browser targets (_blank, _self, etc.): Open in browser window/frame
+	// - Named targets: Open in named frame/window
+	// - JavaScript URLs: Execute JavaScript (if enabled)
+	// - Security: Check cross-domain policy, validate URL scheme
 }
 
 void actionGetVariable(char* stack, u32* sp)
