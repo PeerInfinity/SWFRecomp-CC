@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "bit_or_swf_4",
+    "description": "Tests BIT_OR opcode (0x61) - bitwise OR on 32-bit integers",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["BIT_OR"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
