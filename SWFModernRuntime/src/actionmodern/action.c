@@ -3826,12 +3826,32 @@ void actionSetProperty(char* stack, u32* sp)
 	}
 }
 
+/**
+ * ActionCloneSprite - Clones a sprite/MovieClip
+ *
+ * Stack: [ target_name, source_name, depth ] -> [ ]
+ *
+ * Pops three values from the stack:
+ * - depth (number): z-order depth for the clone
+ * - source (string): path to sprite to clone
+ * - target (string): name for the new clone
+ *
+ * Creates a duplicate of the source MovieClip with the specified name at the given depth.
+ *
+ * Edge cases:
+ * - Null/empty strings: Treated as empty string names
+ * - Negative depth: Accepted (some Flash versions allow this)
+ * - Non-existent source: No-op in NO_GRAPHICS mode; would fail silently in Flash
+ *
+ * SWF version: 4+
+ * Opcode: 0x24
+ */
 void actionCloneSprite(char* stack, u32* sp)
 {
 	// Stack layout: [target_name] [source_name] [depth] <- sp
 	// Pop in reverse order: depth, source, target
 
-	// Pop depth
+	// Pop depth (convert to float first)
 	convertFloat(stack, sp);
 	ActionVar depth;
 	popVar(stack, sp, &depth);
@@ -3841,10 +3861,20 @@ void actionCloneSprite(char* stack, u32* sp)
 	popVar(stack, sp, &source);
 	const char* source_name = (const char*) source.data.numeric_value;
 
+	// Handle null source name
+	if (source_name == NULL) {
+		source_name = "";
+	}
+
 	// Pop target sprite name
 	ActionVar target;
 	popVar(stack, sp, &target);
 	const char* target_name = (const char*) target.data.numeric_value;
+
+	// Handle null target name
+	if (target_name == NULL) {
+		target_name = "";
+	}
 
 	#ifndef NO_GRAPHICS
 	// Full implementation would:
@@ -3854,9 +3884,10 @@ void actionCloneSprite(char* stack, u32* sp)
 	// 4. Assign new name
 	cloneMovieClip(source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
 	#else
-	// NO_GRAPHICS mode: just log the operation
+	// NO_GRAPHICS mode: Parameters are validated and popped
+	// In full graphics mode, this would clone the MovieClip
 	#ifdef DEBUG
-	printf("[CloneSprite] %s -> %s (depth %d)\n",
+	printf("[CloneSprite] source='%s' -> target='%s' (depth=%d)\n",
 	       source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
 	#endif
 	#endif

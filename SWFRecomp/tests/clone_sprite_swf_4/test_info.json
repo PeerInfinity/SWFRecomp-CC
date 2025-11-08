@@ -1,8 +1,14 @@
 {
   "metadata": {
     "name": "clone_sprite_swf_4",
-    "description": "Tests CLONE_SPRITE opcode (duplicateMovieClip operation)",
-    "swf_version": 4
+    "description": "Tests CLONE_SPRITE opcode (0x24) - duplicateMovieClip operation with comprehensive edge case coverage including basic cloning, various depth values (positive, negative, zero), empty strings, and long sprite names",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Graphics rendering not implemented (requires display list and MovieClip infrastructure)",
+      "Actual sprite cloning only works with graphics support - NO_GRAPHICS mode validates parameters only"
+    ]
   },
   "opcodes": {
     "tested": ["CLONE_SPRITE"],
@@ -10,5 +16,14 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_clone_operation",
+    "different_depth_values",
+    "negative_depth",
+    "zero_depth",
+    "empty_string_names",
+    "long_sprite_names",
+    "null_pointer_handling"
+  ]
 }
