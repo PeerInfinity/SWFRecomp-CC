@@ -2383,31 +2383,91 @@ void actionInstanceOf(char* stack, u32* sp)
 	ActionVar obj_var;
 	popVar(stack, sp, &obj_var);
 
-	// TODO: Implement proper prototype chain traversal
-	// This requires adding prototype field to ASObject structure
-	// For now, simplified implementation returns false
-
 	bool result = false;
 
-	// Primitives (number, string, boolean) are never instances
+	// Primitives (number, string, undefined) are never instances
 	if (obj_var.type == ACTION_STACK_VALUE_F32 ||
 		obj_var.type == ACTION_STACK_VALUE_F64 ||
-		obj_var.type == ACTION_STACK_VALUE_STRING)
+		obj_var.type == ACTION_STACK_VALUE_STRING ||
+		obj_var.type == ACTION_STACK_VALUE_UNDEFINED)
 	{
 		result = false;
 	}
-	// TODO: When prototype support is added, implement:
-	// 1. Get constructor's prototype property
-	// 2. Walk up object's prototype chain
-	// 3. If any prototype matches constructor's prototype, return true
-	// 4. If chain ends without match, return false
+	// Check if constructor is an object/function
+	else if (constr_var.type != ACTION_STACK_VALUE_OBJECT &&
+	         constr_var.type != ACTION_STACK_VALUE_FUNCTION)
+	{
+		// Constructor must be an object/function
+		result = false;
+	}
+	// Both operands are objects - perform instanceof check
+	else if (obj_var.type == ACTION_STACK_VALUE_OBJECT ||
+	         obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		ASObject* obj = (obj_var.type == ACTION_STACK_VALUE_OBJECT) ?
+			(ASObject*) obj_var.data.numeric_value :
+			(ASObject*) obj_var.data.numeric_value;  // Arrays are also ASObjects for prototype purposes
+		ASObject* constr = (ASObject*) constr_var.data.numeric_value;
+
+		if (obj != NULL && constr != NULL)
+		{
+			// Step 1: Get constructor's "prototype" property
+			ActionVar* constr_proto_var = getProperty(constr, "prototype", 9);
+
+			if (constr_proto_var != NULL && constr_proto_var->type == ACTION_STACK_VALUE_OBJECT)
+			{
+				ASObject* constr_proto = (ASObject*) constr_proto_var->data.numeric_value;
+
+				// Step 2: Walk up the object's prototype chain via "__proto__" property
+				// Start with the object's __proto__
+				ActionVar* current_proto_var = getProperty(obj, "__proto__", 9);
+
+				// Prevent infinite loops with a maximum chain depth
+				int max_depth = 100;
+				int depth = 0;
+
+				while (current_proto_var != NULL && depth < max_depth)
+				{
+					depth++;
+
+					// Check if current_proto_var is an object
+					if (current_proto_var->type == ACTION_STACK_VALUE_OBJECT)
+					{
+						ASObject* current_proto = (ASObject*) current_proto_var->data.numeric_value;
+
+						// Step 3: Compare with constructor's prototype
+						if (current_proto == constr_proto)
+						{
+							result = true;
+							break;
+						}
+
+						// Move up the chain: get __proto__ of current prototype
+						current_proto_var = getProperty(current_proto, "__proto__", 9);
+					}
+					else
+					{
+						// Reached null or non-object, end of chain
+						break;
+					}
+				}
+			}
+
+			// Step 4: For SWF 7+, also check if object implements the interface
+			// If not found via prototype chain, check interface implementation
+			if (!result)
+			{
+				result = implementsInterface(obj, constr);
+			}
+		}
+	}
 
 	// Push result as float (1.0 for true, 0.0 for false)
 	float result_val = result ? 1.0f : 0.0f;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_val));
 
 	#ifdef DEBUG
-	printf("// InstanceOf check (simplified - always returns false)\n");
+	printf("// InstanceOf check: result = %s\n", result ? "true" : "false");
 	#endif
 }
 
