@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "init_object_swf_4",
+    "description": "Tests INIT_OBJECT opcode (0x43) - creates objects with properties",
+    "swf_version": 4,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["INIT_OBJECT"],
+    "supporting": ["PUSH", "TRACE", "DUPLICATE", "SET_VARIABLE", "TYPEOF"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

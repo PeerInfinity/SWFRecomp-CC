@@ -142,6 +142,7 @@ void actionInitArray(char* stack, u32* sp);
 void actionInitObject(char* stack, u32* sp);
 void actionIncrement(char* stack, u32* sp);
 void actionDecrement(char* stack, u32* sp);
+void actionDuplicate(char* stack, u32* sp);
 void actionInstanceOf(char* stack, u32* sp);
 void actionEnumerate2(char* stack, u32* sp, char* str_buffer);
 void actionDelete(char* stack, u32* sp);
