@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "string_length_swf_4",
+    "description": "Tests STRING_LENGTH opcode (0x14) - returns the byte length of a string",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STRING_LENGTH"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
