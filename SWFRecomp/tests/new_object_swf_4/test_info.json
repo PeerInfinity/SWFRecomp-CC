@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "new_object_swf_4",
+    "description": "Tests NEW_OBJECT opcode (0x40) - creates objects via constructor calls",
+    "swf_version": 4,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["NEW_OBJECT"],
+    "supporting": ["PUSH", "TRACE", "POP"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
