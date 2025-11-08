@@ -1,8 +1,13 @@
 {
   "metadata": {
     "name": "toggle_quality_swf_4",
-    "description": "Tests TOGGLE_QUALITY opcode (0x08) - toggles display quality",
-    "swf_version": 4
+    "description": "Tests TOGGLE_QUALITY opcode (0x08) - toggles display between high and low quality rendering. Comprehensive test covering basic toggle and multiple consecutive toggles. In NO_GRAPHICS mode, the opcode is a no-op (which is correct behavior).",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Graphics rendering not implemented (requires SDL3/Vulkan) - quality toggle has no visible effect in NO_GRAPHICS mode"
+    ]
   },
   "opcodes": {
     "tested": ["TOGGLE_QUALITY"],
@@ -10,5 +15,10 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_quality_toggle",
+    "multiple_consecutive_toggles",
+    "toggle_state_persistence"
+  ]
 }
