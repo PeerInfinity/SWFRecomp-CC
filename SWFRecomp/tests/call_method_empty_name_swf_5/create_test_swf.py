@@ -16,7 +16,7 @@ frame_rate = struct.pack('<H', 24 << 8)  # 24 fps
 frame_count = struct.pack('<H', 1)  # 1 frame
 
 # Define a simple function that returns 42
-# DefineFunction2: name="", numParams=0, registerCount=0, flags=0
+# DefineFunction2: name="" (ANONYMOUS), numParams=0, registerCount=0, flags=0
 # Body: Push 42, Return
 
 # Push 42.0
@@ -30,7 +30,7 @@ function_body = action_push_42 + action_return
 
 # DefineFunction2 header (0x8E)
 # Format: name (null-terminated), numParams(u16), registerCount(u8), flags(u16), params[], codeSize(u16), body
-function_name = b'testFunc\x00'  # Named function (we'll call it with empty method name)
+function_name = b'\x00'  # ANONYMOUS function (empty name)
 num_params = struct.pack('<H', 0)  # 0 parameters
 register_count = struct.pack('B', 0)  # 0 registers
 flags = struct.pack('<H', 0)  # No flags
