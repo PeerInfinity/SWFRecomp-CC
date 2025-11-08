@@ -42,7 +42,7 @@ action_init_object = bytes([0x43])  # INIT_OBJECT (0x43)
 actions += action_init_object
 
 # Duplicate the object reference so we can use it twice
-action_duplicate = bytes([0x3D])  # DUPLICATE (0x3D)
+action_duplicate = bytes([0x4C])  # DUPLICATE (0x4C)
 actions += action_duplicate
 
 # SetVariable - store in variable "obj"
@@ -54,7 +54,7 @@ action_set_variable = bytes([0x1D])  # SET_VARIABLE (0x1D)
 actions += action_set_variable
 
 # typeof(obj) - the object is still on stack from duplicate
-action_typeof = bytes([0x3C])  # TYPEOF (0x3C)
+action_typeof = bytes([0x44])  # TYPEOF (0x44)
 actions += action_typeof
 
 # trace(typeof result)

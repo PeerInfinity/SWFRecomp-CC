@@ -73,7 +73,7 @@ action_init_object = bytes([0x43])  # INIT_OBJECT (0x43)
 actions += action_init_object
 
 # Step 2: Duplicate and store in variable "obj"
-action_duplicate = bytes([0x3D])  # DUPLICATE (0x3D)
+action_duplicate = bytes([0x4C])  # DUPLICATE (0x4C)
 actions += action_duplicate
 
 string_obj = b'obj\x00'
