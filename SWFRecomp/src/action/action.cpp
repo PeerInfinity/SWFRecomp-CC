@@ -579,6 +579,14 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_ACTION_NEW_METHOD:
+			{
+				out_script << "\t" << "// NewMethod" << endl
+						   << "\t" << "actionNewMethod(stack, sp);" << endl;
+
+				break;
+			}
+
 			case SWF_ACTION_INIT_ARRAY:
 			{
 				out_script << "\t" << "// InitArray" << endl

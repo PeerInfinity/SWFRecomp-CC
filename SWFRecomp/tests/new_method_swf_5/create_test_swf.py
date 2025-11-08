@@ -38,14 +38,14 @@ action_init_object = bytes([0x43])
 
 # Step 2: Store object in a variable for reuse
 # Duplicate the object on stack
-action_duplicate = bytes([0x3D])
+action_duplicate = bytes([0x4C])  # DUPLICATE is 0x4C
 
 # Push variable name "testObj"
 action_push_var_name = struct.pack('<BHB', 0x96, 1 + len("testObj") + 1, 0)  # PUSH, length, type=0 (string)
 action_push_var_name += b"testObj\x00"
 
 # Swap stack so variable name is below object value
-action_stack_swap = bytes([0x4C])
+action_stack_swap = bytes([0x4D])  # STACK_SWAP is 0x4D
 
 # SET_VARIABLE (0x1D)
 action_set_variable = bytes([0x1D])
@@ -75,7 +75,7 @@ action_new_method = bytes([0x53])
 
 # Step 4: Get the length property of the created array
 # Duplicate the array
-action_duplicate_2 = bytes([0x3D])
+action_duplicate_2 = bytes([0x4C])  # DUPLICATE is 0x4C
 
 # Push property name "length"
 action_push_length_str = struct.pack('<BHB', 0x96, 1 + len("length") + 1, 0)  # PUSH, length, type=0 (string)
