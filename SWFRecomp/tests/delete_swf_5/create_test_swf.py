@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for DELETE opcode (0x5A)
+Test script for DELETE opcode (0x3A)
 
 This creates a simple SWF that tests property deletion from objects.
 
@@ -101,8 +101,8 @@ action_push_b2 = struct.pack('<BHB', 0x96, len(string_b) + 1, 0)  # PUSH string
 action_push_b2 += string_b
 actions += action_push_b2
 
-# DELETE opcode (0x5A)
-action_delete = bytes([0x5A])  # DELETE (0x5A)
+# DELETE opcode (0x3A)
+action_delete = bytes([0x3A])  # DELETE (0x3A)
 actions += action_delete
 
 # Trace the result (should be 1.0)

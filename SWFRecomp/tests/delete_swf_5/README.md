@@ -1,10 +1,10 @@
-# DELETE Opcode (0x5A) Test
+# DELETE Opcode (0x3A) Test
 
 This test validates the DELETE opcode implementation for ActionScript 2.
 
 ## Opcode Details
 
-- **Opcode**: 0x5A (DELETE)
+- **Opcode**: 0x3A (DELETE)
 - **Category**: Object Operations
 - **SWF Version**: 5+
 
@@ -106,8 +106,8 @@ cd SWFRecomp
 
 ## Comparison with Related Opcodes
 
-- **DELETE (0x5A)**: Deletes property by name, uses variable lookup
-- **DELETE2 (0x5B)**: Modern variant, pops object reference directly
+- **DELETE (0x3A)**: Deletes property by name, uses variable lookup
+- **DELETE2 (0x3B)**: Modern variant, pops object reference directly
 - **SET_MEMBER (0x4F)**: Sets property, pops object reference
 - **GET_MEMBER (0x4E)**: Gets property, pops object reference
 

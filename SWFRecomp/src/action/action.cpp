@@ -505,6 +505,14 @@ namespace SWFRecomp
 					break;
 				}
 
+				case SWF_ACTION_DELETE:
+				{
+					out_script << "\t" << "// Delete" << endl
+							   << "\t" << "actionDelete(stack, sp);" << endl;
+
+					break;
+				}
+
 				case SWF_ACTION_TYPEOF:
 				{
 					declareEmptyString(context, 17);

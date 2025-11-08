@@ -2840,6 +2840,96 @@ static void pushUndefined(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 }
 
+void actionDelete(char* stack, u32* sp)
+{
+	// Stack layout (from top to bottom):
+	// 1. property_name (string) - name of property to delete
+	// 2. object_name (string) - name of variable containing the object
+
+	// Pop property name
+	ActionVar prop_name_var;
+	popVar(stack, sp, &prop_name_var);
+
+	const char* prop_name = NULL;
+	u32 prop_name_len = 0;
+
+	if (prop_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		prop_name = prop_name_var.data.string_data.owns_memory ?
+			prop_name_var.data.string_data.heap_ptr :
+			(const char*) prop_name_var.data.numeric_value;
+		prop_name_len = prop_name_var.str_size;
+	}
+	else
+	{
+		// Property name must be a string
+		// Return true (AS2 spec: returns true for invalid operations)
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Pop object name (variable name)
+	ActionVar obj_name_var;
+	popVar(stack, sp, &obj_name_var);
+
+	const char* obj_name = NULL;
+	u32 obj_name_len = 0;
+
+	if (obj_name_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		obj_name = obj_name_var.data.string_data.owns_memory ?
+			obj_name_var.data.string_data.heap_ptr :
+			(const char*) obj_name_var.data.numeric_value;
+		obj_name_len = obj_name_var.str_size;
+	}
+	else
+	{
+		// Object name must be a string
+		// Return true (AS2 spec: returns true for invalid operations)
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Look up the variable to get the object
+	ActionVar* obj_var = getVariable((char*)obj_name, obj_name_len);
+
+	// If variable doesn't exist, return true (AS2 spec)
+	if (obj_var == NULL)
+	{
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// If variable is not an object, return true (AS2 spec)
+	if (obj_var->type != ACTION_STACK_VALUE_OBJECT)
+	{
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Get the object
+	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+
+	// If object is NULL, return true
+	if (obj == NULL)
+	{
+		float result = 1.0f;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return;
+	}
+
+	// Delete the property
+	bool success = deleteProperty(obj, prop_name, prop_name_len);
+
+	// Push result (1.0 for success, 0.0 for failure)
+	float result = success ? 1.0f : 0.0f;
+	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+}
+
 void actionGetMember(char* stack, u32* sp)
 {
 	// 1. Convert and pop property name (top of stack)

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "delete_swf_5",
+    "description": "Tests DELETE opcode (0x3A) - deletes properties from objects",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["DELETE"],
+    "supporting": ["PUSH", "INIT_OBJECT", "SET_VARIABLE", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
