@@ -2,53 +2,95 @@
 """
 Creates a SWF file to test the DefineLocal opcode (0x3C).
 
-This test creates a simple SWF that:
-1. Uses DefineLocal to create a local variable 'x' with value 42
-2. Uses GetVariable to retrieve 'x'
-3. Uses Trace to output the value
+This comprehensive test covers:
+1. Basic local variable definition with numeric value
+2. Local variable redefinition (updating existing variable)
+3. String value assignment
+4. Different numeric values (including 0, negative)
+5. Verification that variables retain their values
 
 Note: Without full function infrastructure, DefineLocal behaves like SetVariable
 in global scope, which is acceptable for basic testing.
 
-Expected output: 42
+Expected output:
+42
+100
+Hello
+0
+-5
+100
 """
 
 import struct
 import zlib
 
+def push_string(s):
+    """Helper to create a PUSH action for a string"""
+    s_bytes = (s + '\x00').encode('latin1')
+    return struct.pack('<BHB', 0x96, len(s_bytes) + 1, 0) + s_bytes
+
+def push_float(f):
+    """Helper to create a PUSH action for a float"""
+    return struct.pack('<BHBf', 0x96, 5, 1, f)
+
 def create_swf():
     # ===== ActionScript bytecode =====
-    # Test: var x = 42; trace(x);
+    # Test 1: Basic definition - var x = 42; trace(x);
+    actions = b''
 
-    # Push string "x" for variable name
-    var_name = b'x\x00'  # Null-terminated string
-    action_push_x = struct.pack('<BHB', 0x96, len(var_name) + 1, 0)  # PUSH, length, type=0 (string)
-    action_push_x += var_name
+    # DefineLocal: x = 42
+    actions += push_string('x')
+    actions += push_float(42.0)
+    actions += bytes([0x3C])  # DefineLocal
 
-    # Push value 42.0
-    action_push_42 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-    action_push_42 += struct.pack('<f', 42.0)  # Float value
+    # GetVariable and Trace x
+    actions += push_string('x')
+    actions += bytes([0x1C])  # GetVariable
+    actions += bytes([0x26])  # Trace
 
-    # DefineLocal (0x3C) - pops value, pops name, creates local variable
-    action_define_local = bytes([0x3C])
+    # Test 2: Redefinition - x = 100; trace(x);
+    actions += push_string('x')
+    actions += push_float(100.0)
+    actions += bytes([0x3C])  # DefineLocal (redefines x)
 
-    # Push string "x" again to get the variable
-    var_name_2 = b'x\x00'  # Null-terminated string
-    action_push_x_again = struct.pack('<BHB', 0x96, len(var_name_2) + 1, 0)  # PUSH, length, type=0 (string)
-    action_push_x_again += var_name_2
+    actions += push_string('x')
+    actions += bytes([0x1C])  # GetVariable
+    actions += bytes([0x26])  # Trace
 
-    # GetVariable (0x1C) - pops name, pushes value
-    action_get_variable = bytes([0x1C])
+    # Test 3: String variable - var name = "Hello"; trace(name);
+    actions += push_string('name')
+    actions += push_string('Hello')
+    actions += bytes([0x3C])  # DefineLocal
 
-    # Trace (0x26) - pops value and outputs it
-    action_trace = bytes([0x26])
+    actions += push_string('name')
+    actions += bytes([0x1C])  # GetVariable
+    actions += bytes([0x26])  # Trace
+
+    # Test 4: Zero value - var zero = 0; trace(zero);
+    actions += push_string('zero')
+    actions += push_float(0.0)
+    actions += bytes([0x3C])  # DefineLocal
+
+    actions += push_string('zero')
+    actions += bytes([0x1C])  # GetVariable
+    actions += bytes([0x26])  # Trace
+
+    # Test 5: Negative value - var neg = -5; trace(neg);
+    actions += push_string('neg')
+    actions += push_float(-5.0)
+    actions += bytes([0x3C])  # DefineLocal
+
+    actions += push_string('neg')
+    actions += bytes([0x1C])  # GetVariable
+    actions += bytes([0x26])  # Trace
+
+    # Test 6: Verify x is still 100 (persistence)
+    actions += push_string('x')
+    actions += bytes([0x1C])  # GetVariable
+    actions += bytes([0x26])  # Trace
 
     # End of actions
-    action_end = bytes([0x00])
-
-    # Combine all actions
-    actions = (action_push_x + action_push_42 + action_define_local +
-              action_push_x_again + action_get_variable + action_trace + action_end)
+    actions += bytes([0x00])
 
     # ===== DoAction tag =====
     action_length = len(actions)
@@ -124,7 +166,8 @@ def create_swf():
 
     print(f"Created test.swf ({len(swf)} bytes)")
     print(f"  - DefineLocal opcode: 0x3C")
-    print(f"  - Expected output: 42")
+    print(f"  - Tests: basic definition, redefinition, strings, zero, negative, persistence")
+    print(f"  - Expected output: 42, 100, Hello, 0, -5, 100")
 
 if __name__ == '__main__':
     create_swf()
