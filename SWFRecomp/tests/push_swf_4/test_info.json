@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "push_swf_4",
+    "description": "Tests PUSH opcode (0x96) with different data types: integer, string, float, and boolean",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["PUSH"],
+    "supporting": ["TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
