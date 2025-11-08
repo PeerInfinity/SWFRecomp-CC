@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "bit_xor_swf_4",
+    "description": "Tests BIT_XOR opcode (bitwise exclusive OR) with identity, self-cancellation, bit flipping, and self-inverse properties",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["BIT_XOR"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
