@@ -179,8 +179,17 @@ typedef struct {
 	int visible;
 	int currentframe;
 	int totalframes;
+	int framesloaded;
 	char name[256];
 	char target[256];
+	char droptarget[256];
+	char url[512];
+	int highquality;
+	int focusrect;
+	float soundbuftime;
+	int quality;
+	float xmouse;
+	float ymouse;
 } MovieClip;
 
 // Static _root MovieClip for simplified implementation
@@ -196,8 +205,17 @@ static MovieClip root_movieclip = {
 	.visible = 1,
 	.currentframe = 1,
 	.totalframes = 1,
+	.framesloaded = 1,  // All frames loaded in NO_GRAPHICS mode
 	.name = "_root",
-	.target = "_root"
+	.target = "_root",
+	.droptarget = "",  // No drag/drop in NO_GRAPHICS mode
+	.url = "",  // Could be set to actual SWF URL if known
+	.highquality = 1,  // 1 = high quality
+	.focusrect = 1,  // Focus rectangle enabled
+	.soundbuftime = 5.0f,  // Default 5 seconds
+	.quality = 2,  // 0=low, 1=high, 2=best
+	.xmouse = 0.0f,  // No mouse in NO_GRAPHICS mode
+	.ymouse = 0.0f  // No mouse in NO_GRAPHICS mode
 };
 
 // Helper function to get MovieClip by target path
@@ -1986,9 +2004,38 @@ void actionGetProperty(char* stack, u32* sp)
 			str_value = mc ? mc->target : "";
 			is_string = 1;
 			break;
+		case 12: // _framesloaded
+			value = mc ? (float)mc->framesloaded : 1.0f;
+			break;
 		case 13: // _name
 			str_value = mc ? mc->name : "";
 			is_string = 1;
+			break;
+		case 14: // _droptarget
+			str_value = mc ? mc->droptarget : "";
+			is_string = 1;
+			break;
+		case 15: // _url
+			str_value = mc ? mc->url : "";
+			is_string = 1;
+			break;
+		case 16: // _highquality
+			value = mc ? (float)mc->highquality : 1.0f;
+			break;
+		case 17: // _focusrect
+			value = mc ? (float)mc->focusrect : 1.0f;
+			break;
+		case 18: // _soundbuftime
+			value = mc ? mc->soundbuftime : 5.0f;
+			break;
+		case 19: // _quality (SWF 5+)
+			value = mc ? (float)mc->quality : 2.0f;
+			break;
+		case 20: // _xmouse (SWF 5+)
+			value = mc ? mc->xmouse : 0.0f;
+			break;
+		case 21: // _ymouse (SWF 5+)
+			value = mc ? mc->ymouse : 0.0f;
 			break;
 		default:
 			// Unknown property - push 0
