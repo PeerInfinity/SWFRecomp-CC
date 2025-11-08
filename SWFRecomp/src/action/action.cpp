@@ -14,9 +14,9 @@ using std::endl;
 
 namespace SWFRecomp
 {
-	SWFAction::SWFAction() : next_str_i(0), try_counter(0), needs_setjmp(false)
+	SWFAction::SWFAction() : next_str_i(0)
 	{
-
+		
 	}
 	
 	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
@@ -1156,9 +1156,6 @@ namespace SWFRecomp
 
 			case SWF_ACTION_TRY:
 			{
-				// Mark that this script needs setjmp.h
-				needs_setjmp = true;
-
 				// Read flags byte
 				u8 flags = VAL(u8, action_buffer);
 				action_buffer += 1;
@@ -1198,15 +1195,10 @@ namespace SWFRecomp
 				char* finally_body = catch_body + catch_size;
 				char* after_try = finally_body + finally_size;
 
-				// Generate unique jmp_buf variable name
-				std::string jmp_buf_name = "exception_handler_" + std::to_string(try_counter);
-				try_counter++;
-
-				// Generate try-catch-finally structure with inline setjmp
-				out_script << "\t" << "// Try-Catch-Finally (using inline setjmp)" << endl;
-				out_script << "\t" << "jmp_buf " << jmp_buf_name << ";" << endl;
-				out_script << "\t" << "actionTryBegin(stack, sp, &" << jmp_buf_name << ");" << endl;
-				out_script << "\t" << "if (setjmp(" << jmp_buf_name << ") == 0) {" << endl;
+				// Generate try-catch-finally structure
+				out_script << "\t" << "// Try-Catch-Finally" << endl;
+				out_script << "\t" << "actionTryBegin(stack, sp);" << endl;
+				out_script << "\t" << "if (ACTION_TRY_SETJMP(stack, sp) == 0) {" << endl;
 
 				// Translate try block
 				out_script << "\t\t" << "// Try block" << endl;
