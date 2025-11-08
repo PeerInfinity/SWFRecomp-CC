@@ -132,6 +132,12 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 	return var;
 }
 
+bool hasVariable(char* var_name, size_t key_size)
+{
+	ActionVar* var;
+	return hashmap_get(var_map, var_name, key_size, (uintptr_t*) &var);
+}
+
 void setVariableByName(const char* var_name, ActionVar* value)
 {
 	size_t key_size = strlen(var_name);
