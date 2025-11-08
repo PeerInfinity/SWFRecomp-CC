@@ -3867,39 +3867,214 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 		}
 	}
 
-	// 4. Look up and invoke the function
-	ASFunction* func = lookupFunctionByName(func_name, func_name_len);
+	// 4. Check for built-in global functions first
+	int builtin_handled = 0;
 
-	if (func != NULL)
+	// parseInt(string) - Parse string to integer
+	if (func_name_len == 8 && strncmp(func_name, "parseInt", 8) == 0)
 	{
-		if (func->function_type == 2)
+		if (num_args > 0)
 		{
-			// DefineFunction2 with registers and this context
-			ActionVar* registers = NULL;
-			if (func->register_count > 0) {
-				registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+			// Convert first argument to string
+			char arg_buffer[17];
+			const char* str_value = NULL;
+
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				str_value = (const char*) args[0].data.numeric_value;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				// Convert float to string
+				float fval = VAL(float, &args[0].data.numeric_value);
+				snprintf(arg_buffer, 17, "%.15g", fval);
+				str_value = arg_buffer;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				// Convert double to string
+				double dval = VAL(double, &args[0].data.numeric_value);
+				snprintf(arg_buffer, 17, "%.15g", dval);
+				str_value = arg_buffer;
+			}
+			else
+			{
+				// Undefined or other types -> NaN
+				str_value = "NaN";
 			}
 
-			ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
-
-			if (registers != NULL) free(registers);
+			// Parse integer from string
+			float result = (float) atoi(str_value);
 			if (args != NULL) free(args);
-
-			pushVar(stack, sp, &result);
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			builtin_handled = 1;
 		}
 		else
 		{
-			// Simple DefineFunction - not yet supported for invocation
-			// Would need to handle differently since simple_func doesn't return a value
+			// No arguments - return NaN
+			if (args != NULL) free(args);
+			float nan_val = 0.0f / 0.0f;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
+			builtin_handled = 1;
+		}
+	}
+	// parseFloat(string) - Parse string to float
+	else if (func_name_len == 10 && strncmp(func_name, "parseFloat", 10) == 0)
+	{
+		if (num_args > 0)
+		{
+			// Convert first argument to string
+			char arg_buffer[17];
+			const char* str_value = NULL;
+
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				str_value = (const char*) args[0].data.numeric_value;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				// Convert float to string
+				float fval = VAL(float, &args[0].data.numeric_value);
+				snprintf(arg_buffer, 17, "%.15g", fval);
+				str_value = arg_buffer;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				// Convert double to string
+				double dval = VAL(double, &args[0].data.numeric_value);
+				snprintf(arg_buffer, 17, "%.15g", dval);
+				str_value = arg_buffer;
+			}
+			else
+			{
+				// Undefined or other types -> NaN
+				str_value = "NaN";
+			}
+
+			// Parse float from string
+			float result = (float) atof(str_value);
+			if (args != NULL) free(args);
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			builtin_handled = 1;
+		}
+		else
+		{
+			// No arguments - return NaN
+			if (args != NULL) free(args);
+			float nan_val = 0.0f / 0.0f;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
+			builtin_handled = 1;
+		}
+	}
+	// isNaN(value) - Check if value is NaN
+	else if (func_name_len == 5 && strncmp(func_name, "isNaN", 5) == 0)
+	{
+		if (num_args > 0)
+		{
+			// Convert to number and check if NaN
+			float val = 0.0f;
+			if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				val = VAL(float, &args[0].data.numeric_value);
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				val = (float) VAL(double, &args[0].data.numeric_value);
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				// Try to parse as number
+				const char* str = (const char*) args[0].data.numeric_value;
+				val = (float) atof(str);
+			}
+
+			float result = (val != val) ? 1.0f : 0.0f;  // NaN != NaN is true
+			if (args != NULL) free(args);
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			builtin_handled = 1;
+		}
+		else
+		{
+			// No arguments - isNaN(undefined) = true
+			if (args != NULL) free(args);
+			float result = 1.0f;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			builtin_handled = 1;
+		}
+	}
+	// isFinite(value) - Check if value is finite
+	else if (func_name_len == 8 && strncmp(func_name, "isFinite", 8) == 0)
+	{
+		if (num_args > 0)
+		{
+			// Convert to number and check if finite
+			float val = 0.0f;
+			if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				val = VAL(float, &args[0].data.numeric_value);
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				val = (float) VAL(double, &args[0].data.numeric_value);
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				const char* str = (const char*) args[0].data.numeric_value;
+				val = (float) atof(str);
+			}
+
+			// Check if finite (not NaN and not infinity)
+			float result = (val == val && val != INFINITY && val != -INFINITY) ? 1.0f : 0.0f;
+			if (args != NULL) free(args);
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			builtin_handled = 1;
+		}
+		else
+		{
+			// No arguments - isFinite(undefined) = false
+			if (args != NULL) free(args);
+			float result = 0.0f;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			builtin_handled = 1;
+		}
+	}
+
+	// If not a built-in function, look up user-defined functions
+	if (!builtin_handled)
+	{
+		ASFunction* func = lookupFunctionByName(func_name, func_name_len);
+
+		if (func != NULL)
+		{
+			if (func->function_type == 2)
+			{
+				// DefineFunction2 with registers and this context
+				ActionVar* registers = NULL;
+				if (func->register_count > 0) {
+					registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+				}
+
+				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
+
+				if (registers != NULL) free(registers);
+				if (args != NULL) free(args);
+
+				pushVar(stack, sp, &result);
+			}
+			else
+			{
+				// Simple DefineFunction - not yet supported for invocation
+				// Would need to handle differently since simple_func doesn't return a value
+				if (args != NULL) free(args);
+				pushUndefined(stack, sp);
+			}
+		}
+		else
+		{
+			// Function not found - push undefined
 			if (args != NULL) free(args);
 			pushUndefined(stack, sp);
 		}
-	}
-	else
-	{
-		// Function not found - push undefined
-		if (args != NULL) free(args);
-		pushUndefined(stack, sp);
 	}
 }
 
