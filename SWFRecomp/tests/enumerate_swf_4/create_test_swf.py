@@ -72,10 +72,6 @@ action_init_object = bytes([0x43])  # INIT_OBJECT (0x43)
 actions += action_init_object
 
 # Store object in variable "obj"
-# Duplicate first so we keep one copy for enumeration
-action_duplicate = bytes([0x3D])  # DUPLICATE (0x3D)
-actions += action_duplicate
-
 string_obj = b'obj\x00'
 action_push_obj_name = struct.pack('<BHB', 0x96, len(string_obj) + 1, 0)  # PUSH string
 action_push_obj_name += string_obj
@@ -86,7 +82,7 @@ actions += action_set_variable
 
 # Now enumerate the object
 # Push variable name "obj" onto stack
-actions += action_push_obj_name  # Push "obj" again
+actions += action_push_obj_name  # Push "obj"
 
 # Call ENUMERATE - this will pop "obj" name, look up the variable,
 # and push null terminator + property names in reverse order

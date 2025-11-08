@@ -858,6 +858,83 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
+void actionEnumerate(char* stack, u32* sp, char* str_buffer)
+{
+	// Step 1: Pop variable name from stack
+	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
+	u32 string_id = VAL(u32, &stack[*sp + 12]);
+	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
+	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
+	POP();
+
+#ifdef DEBUG
+	printf("[DEBUG] actionEnumerate: looking up variable '%.*s' (len=%u, id=%u)\n", 
+	       var_name_len, var_name, var_name_len, string_id);
+#endif
+
+	// Step 2: Look up the variable
+	ActionVar* var = NULL;
+	if (string_id > 0)
+	{
+		// Constant string - use array lookup (O(1))
+		var = getVariableById(string_id);
+	}
+	else
+	{
+		// Dynamic string - use hashmap (O(n))
+		var = getVariable(var_name, var_name_len);
+	}
+
+	// Step 3: Check if variable exists and is an object
+	if (!var || var->type != ACTION_STACK_VALUE_OBJECT)
+	{
+#ifdef DEBUG
+		if (!var)
+			printf("[DEBUG] actionEnumerate: variable not found\n");
+		else
+			printf("[DEBUG] actionEnumerate: variable is not an object (type=%d)\n", var->type);
+#endif
+		// Variable not found or not an object - push null terminator only
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		return;
+	}
+
+	// Step 4: Get the object from the variable
+	ASObject* obj = (ASObject*) VAL(u64, &var->data.numeric_value);
+	if (obj == NULL)
+	{
+#ifdef DEBUG
+		printf("[DEBUG] actionEnumerate: object pointer is NULL\n");
+#endif
+		// Null object - push null terminator only
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		return;
+	}
+
+#ifdef DEBUG
+	printf("[DEBUG] actionEnumerate: enumerating %u properties\n", obj->num_used);
+#endif
+
+	// Step 5: Push null terminator first
+	// This marks the end of the enumeration for for..in loops
+	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+
+	// Step 6: Push property names in reverse order
+	// This allows them to be popped in forward order during enumeration
+	for (int i = obj->num_used - 1; i >= 0; i--)
+	{
+		const char* prop_name = obj->properties[i].name;
+		u32 prop_name_len = obj->properties[i].name_length;
+		
+#ifdef DEBUG
+		printf("[DEBUG] actionEnumerate: pushing property '%.*s'\n", prop_name_len, prop_name);
+#endif
+		
+		PUSH_STR((char*)prop_name, prop_name_len);
+	}
+}
+
+
 int evaluateCondition(char* stack, u32* sp)
 {
 	ActionVar v;

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "enumerate_swf_4",
+    "description": "Tests ENUMERATE opcode (0x46) - enumerates object property names",
+    "swf_version": 4,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["ENUMERATE"],
+    "supporting": ["PUSH", "INIT_OBJECT", "SET_VARIABLE", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
