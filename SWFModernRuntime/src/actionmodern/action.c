@@ -2687,41 +2687,6 @@ void actionEquals2(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionGreater(char* stack, u32* sp)
-{
-	ActionVar a;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &a);
-
-	ActionVar b;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &b);
-
-	if (a.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = VAL(double, &a.data.numeric_value);
-		double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-
-		float c = b_val > a_val ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-
-	else if (b.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
-		double b_val = VAL(double, &b.data.numeric_value);
-
-		float c = b_val > a_val ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-
-	else
-	{
-		float c = VAL(float, &b.data.numeric_value) > VAL(float, &a.data.numeric_value) ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-	}
-}
-
 void actionStringGreater(char* stack, u32* sp)
 {
 
