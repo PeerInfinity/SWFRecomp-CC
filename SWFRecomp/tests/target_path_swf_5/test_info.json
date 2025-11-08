@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "name": "target_path_swf_5",
+    "description": "Tests TARGET_PATH opcode (0x45) - returns target path for MovieClip/object",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["TARGET_PATH"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": "Simplified implementation - returns '_root' for OBJECT type, empty string for others. Full MovieClip infrastructure not yet available."
+}
