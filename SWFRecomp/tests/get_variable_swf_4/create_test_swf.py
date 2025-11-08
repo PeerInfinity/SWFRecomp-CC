@@ -69,10 +69,10 @@ actions += trace()                  # Trace the result
 actions += push_string("x")         # Push variable name FIRST
 actions += push_float(10.0)         # Push value SECOND (top of stack)
 actions += set_variable()           # Set variable x = 10
-actions += push_string("x")         # Push variable name
-actions += get_variable()           # Get x value
 actions += push_string("y")         # Push variable name for y FIRST
-actions += set_variable()           # Set variable y = x (x value is on stack)
+actions += push_string("x")         # Push variable name for x
+actions += get_variable()           # Get x value (pushes value on top of "y")
+actions += set_variable()           # Set variable y = x (pops value then "y")
 actions += push_string("y")         # Push variable name
 actions += get_variable()           # Get variable value
 actions += trace()                  # Trace the result
