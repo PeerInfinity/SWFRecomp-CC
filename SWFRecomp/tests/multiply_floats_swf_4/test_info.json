@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "multiply_floats_swf_4",
+    "description": "Tests MULTIPLY opcode (0x0C) with various numeric values",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["MULTIPLY"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
