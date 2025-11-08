@@ -1634,6 +1634,47 @@ void actionDefineLocal(char* stack, u32* sp)
 	POP_2();
 }
 
+void actionDeclareLocal(char* stack, u32* sp)
+{
+	// DECLARE_LOCAL pops only the variable name (no value)
+	// It declares a local variable initialized to undefined
+
+	// Stack layout: [name] <- sp
+
+	// Read variable name info
+	u32 string_id = VAL(u32, &stack[*sp + 12]);
+	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
+	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
+
+	// Check if we're in a local scope (function context)
+	if (scope_depth > 0 && scope_chain[scope_depth - 1] != NULL)
+	{
+		// We have a local scope object - declare variable as undefined property
+		ASObject* local_scope = scope_chain[scope_depth - 1];
+
+		// Create an undefined value
+		ActionVar undefined_var;
+		undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
+		undefined_var.str_size = 0;
+		undefined_var.data.numeric_value = 0;
+
+		// Set property on the local scope object
+		// This will create the property if it doesn't exist
+		setProperty(local_scope, var_name, var_name_len, &undefined_var);
+
+		// Pop the name
+		POP();
+		return;
+	}
+
+	// Not in a function - show warning and treat as no-op
+	// (In AS2, DECLARE_LOCAL outside a function is technically invalid)
+	printf("Warning: DECLARE_LOCAL outside function for variable '%s'\n", var_name);
+
+	// Pop the name
+	POP();
+}
+
 void actionSetTarget2(char* stack, u32* sp)
 {
 	// Convert top of stack to string if needed

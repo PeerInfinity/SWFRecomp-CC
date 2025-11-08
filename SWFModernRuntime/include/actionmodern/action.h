@@ -113,6 +113,7 @@ void actionGetVariable(char* stack, u32* sp);
 void actionSetVariable(char* stack, u32* sp);
 void actionSetTarget2(char* stack, u32* sp);
 void actionDefineLocal(char* stack, u32* sp);
+void actionDeclareLocal(char* stack, u32* sp);
 void actionGetProperty(char* stack, u32* sp);
 void actionSetProperty(char* stack, u32* sp);
 void actionCloneSprite(char* stack, u32* sp);
