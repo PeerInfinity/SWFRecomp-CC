@@ -1,10 +1,10 @@
-# ASCII_TO_CHAR Opcode Test (0x32)
+# ASCII_TO_CHAR Opcode Test (0x33)
 
-This test verifies the implementation of the `ASCII_TO_CHAR` opcode (0x32) which converts an ASCII/Unicode code value to its corresponding character string.
+This test verifies the implementation of the `ASCII_TO_CHAR` opcode (0x33) which converts an ASCII/Unicode code value to its corresponding character string.
 
 ## Opcode Details
 
-- **Opcode**: `0x32` (ASCII_TO_CHAR)
+- **Opcode**: `0x33` (ASCII_TO_CHAR)
 - **Category**: String Operations
 - **SWF Version**: 4+
 
@@ -69,5 +69,5 @@ a
 
 ## Related Opcodes
 
-- `CHAR_TO_ASCII` (0x33) - Inverse operation (character to ASCII code)
+- `CHAR_TO_ASCII` (0x32) - Inverse operation (character to ASCII code)
 - `TO_STRING` (0x4B) - Convert any value to string representation
