@@ -1,12 +1,12 @@
-# MB_CHAR_TO_ASCII Opcode Test (0x33)
+# MB_CHAR_TO_ASCII Opcode Test (0x36)
 
 ## Overview
 
-This test verifies the implementation of the `MB_CHAR_TO_ASCII` opcode (0x33), which converts the first character of a multibyte UTF-8 string to its Unicode code point value.
+This test verifies the implementation of the `MB_CHAR_TO_ASCII` opcode (0x36), which converts the first character of a multibyte UTF-8 string to its Unicode code point value.
 
 ## Opcode Details
 
-- **Opcode**: 0x33
+- **Opcode**: 0x36
 - **Name**: MB_CHAR_TO_ASCII
 - **Category**: String Operations
 - **SWF Version**: 5+ (multibyte support)
@@ -84,8 +84,8 @@ cd SWFRecomp
 
 ## Related Opcodes
 
-- `CHAR_TO_ASCII` (0x31) - Similar but for single-byte encoding (Latin-1)
-- `ASCII_TO_CHAR` (0x32) - Converts ASCII/Unicode code point to character
+- `CHAR_TO_ASCII` (0x32) - Similar but for single-byte encoding (Latin-1)
+- `ASCII_TO_CHAR` (0x33) - Converts ASCII code point to character
 - `MB_ASCII_TO_CHAR` (0x37) - Multibyte version of ASCII_TO_CHAR
 
 ## Notes

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "mb_char_to_ascii_swf_5",
+    "description": "Tests MB_CHAR_TO_ASCII opcode (0x36) - converts first character of multibyte UTF-8 string to Unicode code point",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["MB_CHAR_TO_ASCII"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
