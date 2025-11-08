@@ -98,6 +98,7 @@ ActionVar* getVariableById(u32 string_id)
 		// Initialize with unset type
 		var->type = ACTION_STACK_VALUE_STRING;
 		var->str_size = 0;
+		var->string_id = 0;
 		var->data.string_data.heap_ptr = NULL;
 		var->data.string_data.owns_memory = false;
 
@@ -124,6 +125,7 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 	// Initialize with unset type
 	var->type = ACTION_STACK_VALUE_STRING;
 	var->str_size = 0;
+	var->string_id = 0;
 	var->data.string_data.heap_ptr = NULL;
 	var->data.string_data.owns_memory = false;
 

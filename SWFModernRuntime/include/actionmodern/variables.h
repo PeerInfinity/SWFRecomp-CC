@@ -7,6 +7,7 @@ typedef struct
 {
 	ActionStackValueType type;
 	u32 str_size;
+	u32 string_id;  // String ID for constant strings (0 for dynamic strings)
 	union {
 		u64 numeric_value;
 		struct {
