@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "name": "get_variable_swf_4",
+    "description": "Tests GET_VARIABLE opcode (0x1C) - gets value of a variable by name",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "notes": "Implementation exists but currently not producing expected output - requires debugging"
+  },
+  "opcodes": {
+    "tested": ["GET_VARIABLE"],
+    "supporting": ["PUSH", "SET_VARIABLE", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
