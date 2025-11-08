@@ -3651,6 +3651,16 @@ void actionNewMethod(char* stack, u32* sp)
 	// 5. Get the method property from the object
 	const char* ctor_name = NULL;
 
+	// Check for blank/empty method name (SWF spec: treat object as function)
+	if (method_name == NULL || method_name_len == 0 || method_name[0] == '\0')
+	{
+		// Blank method name: object should be invoked as function/constructor
+		// Currently not supported (requires function object implementation)
+		// Push undefined and return
+		pushUndefined(stack, sp);
+		return;
+	}
+
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
@@ -3730,6 +3740,54 @@ void actionNewMethod(char* stack, u32* sp)
 		// Handle Date constructor (simplified)
 		ASObject* date = allocObject(4);
 		new_obj = date;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else if (ctor_name != NULL && strcmp(ctor_name, "String") == 0)
+	{
+		// Handle String constructor
+		// new String() or new String(value)
+		ASObject* str_obj = allocObject(4);
+
+		if (num_args > 0)
+		{
+			// Convert first argument to string and store as "value" property
+			// For now, just create empty String object
+			// Full implementation would store the string value
+		}
+
+		new_obj = str_obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else if (ctor_name != NULL && strcmp(ctor_name, "Number") == 0)
+	{
+		// Handle Number constructor
+		// new Number() or new Number(value)
+		ASObject* num_obj = allocObject(4);
+
+		if (num_args > 0)
+		{
+			// Convert first argument to number and store as "value" property
+			// For now, just create empty Number object
+			// Full implementation would store the numeric value
+		}
+
+		new_obj = num_obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else if (ctor_name != NULL && strcmp(ctor_name, "Boolean") == 0)
+	{
+		// Handle Boolean constructor
+		// new Boolean() or new Boolean(value)
+		ASObject* bool_obj = allocObject(4);
+
+		if (num_args > 0)
+		{
+			// Convert first argument to boolean and store as "value" property
+			// For now, just create empty Boolean object
+			// Full implementation would store the boolean value
+		}
+
+		new_obj = bool_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
 	}
 	else
