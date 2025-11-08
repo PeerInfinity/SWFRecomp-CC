@@ -7,7 +7,7 @@
   },
   "opcodes": {
     "tested": ["DELETE"],
-    "supporting": ["PUSH", "INIT_OBJECT", "SET_VARIABLE", "TRACE"]
+    "supporting": ["PUSH", "INIT_OBJECT", "DUPLICATE", "SET_VARIABLE", "GET_VARIABLE", "GET_MEMBER", "TRACE"]
   },
   "execution": {
     "type": "deterministic"
