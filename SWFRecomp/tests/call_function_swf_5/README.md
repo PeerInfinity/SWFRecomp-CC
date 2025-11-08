@@ -28,12 +28,20 @@ trace(parseInt("42"));
 
 ## Built-in Functions Implemented
 
-The CALL_FUNCTION implementation includes a function registry with these built-in functions:
+The CALL_FUNCTION implementation includes these built-in global functions:
 
 - `parseInt(string)` - Parses a string to an integer
+  - Returns NaN if the string cannot be parsed
+  - Returns NaN if no argument is provided
 - `parseFloat(string)` - Parses a string to a floating-point number
+  - Returns NaN if the string cannot be parsed
+  - Returns NaN if no argument is provided
 - `isNaN(value)` - Checks if a value is NaN
+  - Returns 1.0 (true) if value is NaN
+  - Returns 0.0 (false) otherwise
 - `isFinite(value)` - Checks if a value is finite
+  - Returns 1.0 (true) if value is not NaN and not Infinity
+  - Returns 0.0 (false) otherwise
 
 ## Opcode Details
 
@@ -51,9 +59,10 @@ After:   ... | 42 |
 ## Implementation Notes
 
 - Arguments are pushed onto the stack in order (first to last), but the opcode pops them in reverse order (last to first)
+- Built-in global functions (parseInt, parseFloat, isNaN, isFinite) are checked first
+- User-defined functions from DEFINE_FUNCTION2 are supported
+- User-defined functions from DEFINE_FUNCTION (simple version) are not yet fully supported for invocation
 - If a function is not found, `undefined` is pushed onto the stack
-- The function registry can be extended to support more built-in functions
-- User-defined functions (from DEFINE_FUNCTION opcode) are not yet supported
 
 ## Build and Run
 

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "call_function_swf_5",
+    "description": "Tests CALL_FUNCTION opcode (0x3D) - calls functions with arguments",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["CALL_FUNCTION"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
