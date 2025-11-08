@@ -2736,7 +2736,12 @@ void actionEquals2(char* stack, u32* sp)
 			{
 				float a_val = VAL(float, &a.data.numeric_value);
 				float b_val = VAL(float, &b.data.numeric_value);
-				result = (a_val == b_val) ? 1.0f : 0.0f;
+				// NaN is never equal to anything, including itself (ECMA-262)
+				if (isnan(a_val) || isnan(b_val)) {
+					result = 0.0f;
+				} else {
+					result = (a_val == b_val) ? 1.0f : 0.0f;
+				}
 				break;
 			}
 
@@ -2744,7 +2749,12 @@ void actionEquals2(char* stack, u32* sp)
 			{
 				double a_val = VAL(double, &a.data.numeric_value);
 				double b_val = VAL(double, &b.data.numeric_value);
-				result = (a_val == b_val) ? 1.0f : 0.0f;
+				// NaN is never equal to anything, including itself (ECMA-262)
+				if (isnan(a_val) || isnan(b_val)) {
+					result = 0.0f;
+				} else {
+					result = (a_val == b_val) ? 1.0f : 0.0f;
+				}
 				break;
 			}
 
@@ -2782,7 +2792,12 @@ void actionEquals2(char* stack, u32* sp)
 		float a_val = (a.type == ACTION_STACK_VALUE_F32) ?
 		              VAL(float, &a.data.numeric_value) :
 		              (float)VAL(double, &a.data.numeric_value);
-		result = (a_val == b_num) ? 1.0f : 0.0f;
+		// NaN is never equal to anything (ECMA-262)
+		if (isnan(a_val) || isnan(b_num)) {
+			result = 0.0f;
+		} else {
+			result = (a_val == b_num) ? 1.0f : 0.0f;
+		}
 	}
 	else if (a.type == ACTION_STACK_VALUE_STRING &&
 	         (b.type == ACTION_STACK_VALUE_F32 || b.type == ACTION_STACK_VALUE_F64))
@@ -2792,7 +2807,12 @@ void actionEquals2(char* stack, u32* sp)
 		float b_val = (b.type == ACTION_STACK_VALUE_F32) ?
 		              VAL(float, &b.data.numeric_value) :
 		              (float)VAL(double, &b.data.numeric_value);
-		result = (a_num == b_val) ? 1.0f : 0.0f;
+		// NaN is never equal to anything (ECMA-262)
+		if (isnan(a_num) || isnan(b_val)) {
+			result = 0.0f;
+		} else {
+			result = (a_num == b_val) ? 1.0f : 0.0f;
+		}
 	}
 	// 3. Different types not covered above: false
 	// (This handles cases like object vs number, etc.)
