@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "declare_local_swf_5",
+    "description": "Tests DECLARE_LOCAL opcode (0x41) - declares local variables in function scope",
+    "swf_version": 5,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["DECLARE_LOCAL"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
