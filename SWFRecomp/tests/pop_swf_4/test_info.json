@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "pop_swf_4",
+    "description": "Tests POP opcode (0x17) - removes top value from stack",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["POP"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
