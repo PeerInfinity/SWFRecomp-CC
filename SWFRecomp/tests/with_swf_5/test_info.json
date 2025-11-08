@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "name": "with_swf_5",
+    "description": "Tests WITH opcode (0x94) - scope chain manipulation for property access",
+    "swf_version": 5,
+    "fully_implemented": false,
+    "notes": "Implementation complete but test currently segfaults - needs debugging"
+  },
+  "opcodes": {
+    "tested": ["WITH"],
+    "supporting": ["PUSH", "TRACE", "INIT_OBJECT", "GET_VARIABLE", "SET_VARIABLE", "DUPLICATE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
