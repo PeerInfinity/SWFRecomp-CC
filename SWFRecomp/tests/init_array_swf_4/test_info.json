@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "name": "init_array_swf_4",
+    "description": "Tests INIT_ARRAY opcode (0x42) - creates array objects with specified elements",
+    "swf_version": 4,
+    "fully_implemented": false
+  },
+  "opcodes": {
+    "tested": ["INIT_ARRAY"],
+    "supporting": ["PUSH", "POP", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "notes": "Full array functionality testing requires GET_MEMBER (0x4E) for accessing array.length and array[index]. This test verifies arrays can be created without crashing."
+}
