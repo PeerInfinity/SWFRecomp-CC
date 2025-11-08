@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "if_false_swf_4",
+    "description": "Tests ActionIf opcode (0x9D) - conditional jump with false condition",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["IF"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
