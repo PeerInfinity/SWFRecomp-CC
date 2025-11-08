@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "return_swf_4",
+    "description": "Tests RETURN opcode (0x3E) - exits script early, proving control flow works",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["RETURN"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
