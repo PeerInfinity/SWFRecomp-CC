@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "trace_swf_4",
+    "description": "Tests TRACE opcode (0x26) - outputs debug messages to console",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["TRACE"],
+    "supporting": ["PUSH"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
