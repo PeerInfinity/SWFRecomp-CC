@@ -290,6 +290,13 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 	{
 		var->data.numeric_value = VAL(u64, &STACK_TOP_VALUE);
 	}
+
+	// Initialize owns_memory to false for non-heap strings
+	// (When the value is in numeric_value, not string_data.heap_ptr)
+	if (var->type == ACTION_STACK_VALUE_STRING)
+	{
+		var->data.string_data.owns_memory = false;
+	}
 }
 
 void popVar(char* stack, u32* sp, ActionVar* var)
@@ -1683,11 +1690,18 @@ void actionGetVariable(char* stack, u32* sp)
 	}
 
 	// Not found in scope chain - check global variables
-	ActionVar* var;
+	ActionVar* var = NULL;
 	if (string_id != 0)
 	{
 		// Constant string - use array (O(1))
 		var = getVariableById(string_id);
+
+		// Fall back to hashmap if array lookup doesn't find the variable
+		// (This can happen for catch variables that are set by name but have a string ID)
+		if (var == NULL || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
+		{
+			var = getVariable(var_name, var_name_len);
+		}
 	}
 	else
 	{
@@ -4059,14 +4073,19 @@ bool actionTryExecute(char* stack, u32* sp)
 	return true;
 }
 
+jmp_buf* actionGetExceptionJmpBuf(char* stack, u32* sp)
+{
+	// Return pointer to the exception handler jump buffer
+	// This allows setjmp to be called inline in generated code
+	g_exception_state.has_jmp_buf = 1;
+	return &g_exception_state.exception_handler;
+}
+
 void actionCatchToVariable(char* stack, u32* sp, const char* var_name)
 {
 	// Store caught exception in named variable
 	if (g_exception_state.exception_thrown)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionCatchToVariable: storing exception in variable '%s'\n", var_name);
-#endif
 		setVariableByName(var_name, &g_exception_state.exception_value);
 		g_exception_state.exception_thrown = false;
 	}

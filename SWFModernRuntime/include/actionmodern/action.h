@@ -2,6 +2,7 @@
 
 #include <variables.h>
 #include <stackvalue.h>
+#include <setjmp.h>
 
 #define PUSH(t, v) \
 	do { \
@@ -182,9 +183,13 @@ void actionWithEnd(char* stack, u32* sp);
 void actionThrow(char* stack, u32* sp);
 void actionTryBegin(char* stack, u32* sp);
 bool actionTryExecute(char* stack, u32* sp);
+jmp_buf* actionGetExceptionJmpBuf(char* stack, u32* sp);
 void actionCatchToVariable(char* stack, u32* sp, const char* var_name);
 void actionCatchToRegister(char* stack, u32* sp, u8 reg_num);
 void actionTryEnd(char* stack, u32* sp);
+
+// Macro for inline setjmp in generated code
+#define ACTION_TRY_SETJMP(stack, sp) setjmp(*actionGetExceptionJmpBuf(stack, sp))
 
 // Control flow
 int evaluateCondition(char* stack, u32* sp);

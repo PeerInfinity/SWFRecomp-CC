@@ -1198,7 +1198,7 @@ namespace SWFRecomp
 				// Generate try-catch-finally structure
 				out_script << "\t" << "// Try-Catch-Finally" << endl;
 				out_script << "\t" << "actionTryBegin(stack, sp);" << endl;
-				out_script << "\t" << "if (actionTryExecute(stack, sp)) {" << endl;
+				out_script << "\t" << "if (ACTION_TRY_SETJMP(stack, sp) == 0) {" << endl;
 
 				// Translate try block
 				out_script << "\t\t" << "// Try block" << endl;
