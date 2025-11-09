@@ -61,7 +61,7 @@ actions += set_property("_root", 4, 99)    # Try to set _currentframe (read-only
 actions += set_property("_root", 2, 500)   # _xscale = 500 (very large)
 
 # Trace completion message
-completion_msg = b'All SET_PROPERTY tests passed\x00'
+completion_msg = b'SET_PROPERTY tests completed\x00'
 actions += struct.pack('<BHB', 0x96, len(completion_msg) + 1, 0) + completion_msg
 actions += bytes([0x26])  # TRACE
 
