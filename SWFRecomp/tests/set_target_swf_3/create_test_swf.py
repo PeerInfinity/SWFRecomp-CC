@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF3 file with SetTarget actions
+# Create a comprehensive SWF3 file with SetTarget actions testing edge cases
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 3  # SetTarget is available in SWF 3+
@@ -13,29 +13,47 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# ActionScript bytecode for testing SetTarget
-# Test sequence:
-# 1. SetTarget "mySprite"
-# 2. SetTarget ""  (return to main)
+# Comprehensive test sequence for SetTarget:
+# 1. SetTarget "mySprite" (non-existent sprite)
+# 2. SetTarget "" (return to main)
+# 3. SetTarget "_root" (explicit root)
+# 4. SetTarget "/" (root via slash)
+# 5. SetTarget "invalidTarget" (another invalid target)
+# 6. SetTarget "" (return to main again)
 
-# ActionSetTarget with target "mySprite"
-target_name_1 = b'mySprite\x00'  # Null-terminated string
-action_set_target_1 = struct.pack('<BH', 0x8B, len(target_name_1))  # SetTarget (0x8B), length
-action_set_target_1 += target_name_1
+actions = b''
 
-# ActionSetTarget with empty target (return to main)
-target_name_2 = b'\x00'  # Empty null-terminated string
-action_set_target_2 = struct.pack('<BH', 0x8B, len(target_name_2))  # SetTarget (0x8B), length
-action_set_target_2 += target_name_2
+# Test 1: SetTarget to non-existent sprite
+target_1 = b'mySprite\x00'
+actions += struct.pack('<BH', 0x8B, len(target_1)) + target_1
+
+# Test 2: SetTarget to empty string (return to main)
+target_2 = b'\x00'
+actions += struct.pack('<BH', 0x8B, len(target_2)) + target_2
+
+# Test 3: SetTarget to "_root"
+target_3 = b'_root\x00'
+actions += struct.pack('<BH', 0x8B, len(target_3)) + target_3
+
+# Test 4: SetTarget to "/" (root via slash)
+target_4 = b'/\x00'
+actions += struct.pack('<BH', 0x8B, len(target_4)) + target_4
+
+# Test 5: SetTarget to invalid nested path
+target_5 = b'invalid/nested/path\x00'
+actions += struct.pack('<BH', 0x8B, len(target_5)) + target_5
+
+# Test 6: SetTarget to empty string (return to main)
+target_6 = b'\x00'
+actions += struct.pack('<BH', 0x8B, len(target_6)) + target_6
 
 # End action
-action_end = bytes([0x00])  # END action
+actions += bytes([0x00])  # END action
 
 # DoAction tag
 do_action_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
-do_action_length = len(action_set_target_1 + action_set_target_2 + action_end)
-do_action_header += struct.pack('<I', do_action_length)
-do_action_tag = do_action_header + action_set_target_1 + action_set_target_2 + action_end
+do_action_header += struct.pack('<I', len(actions))
+do_action_tag = do_action_header + actions
 
 # ShowFrame tag
 show_frame_tag = struct.pack('<H', 1 << 6)  # Tag type 1, short form (length 0)

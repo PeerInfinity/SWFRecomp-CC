@@ -1,8 +1,14 @@
 {
   "metadata": {
     "name": "set_target_swf_3",
-    "description": "Tests ActionSetTarget opcode (0x8B) - Changes execution context to a named movie clip",
-    "swf_version": 3
+    "description": "Tests ActionSetTarget opcode (0x8B) - Changes execution context to a named movie clip. Comprehensive edge case testing including invalid targets, _root, slash notation, and empty string returns to main timeline.",
+    "swf_version": 3,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "MovieClip hierarchy (named sprites, nested clips) requires display list infrastructure available only in graphics mode",
+      "In NO_GRAPHICS mode, only _root is available as a valid target - all other target names are treated as 'not found'"
+    ]
   },
   "opcodes": {
     "tested": ["SET_TARGET"],
@@ -10,5 +16,13 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "invalid_target_handling",
+    "empty_string_return_to_main",
+    "explicit_root_target",
+    "slash_notation_root",
+    "invalid_nested_path",
+    "multiple_context_switches"
+  ]
 }
