@@ -2,8 +2,8 @@
 """
 Validation script for start_drag_swf_4
 
-Tests the START_DRAG opcode (0x27).
-Expected output: Three test cases demonstrating basic drag, lock center, and constrained drag
+Tests the START_DRAG opcode (0x27) with comprehensive edge cases.
+Expected output: Test cases demonstrating basic drag, lock center, constrained drag, and type conversions
 """
 import sys
 import json
@@ -23,6 +23,10 @@ def validate_output(output):
     - Test Case 1: "Drag started"
     - Test Case 2: "Before drag", "After drag"
     - Test Case 3: "Constrained drag started"
+    - Test Case 4: "Numeric target" (type conversion: number to string)
+    - Test Case 5: "String flags" (type conversion: strings to numbers for booleans)
+    - Test Case 6: "String coordinates" (type conversion: strings to numbers for coordinates)
+    - Test Case 7: "Empty target" (edge case: empty string)
     """
     lines = parse_output(output)
 
@@ -94,6 +98,74 @@ def validate_output(output):
             "Constrained drag started",
             "",
             "Missing output line 4"
+        ))
+
+    # Test Case 4: Numeric target (type conversion)
+    if len(lines) >= 5:
+        results.append(make_result(
+            "type_conversion_numeric_target",
+            lines[4] == "Numeric target",
+            "Numeric target",
+            lines[4]
+        ))
+    else:
+        results.append(make_result(
+            "type_conversion_numeric_target",
+            False,
+            "Numeric target",
+            "",
+            "Missing output line 5"
+        ))
+
+    # Test Case 5: String boolean flags (type conversion)
+    if len(lines) >= 6:
+        results.append(make_result(
+            "type_conversion_string_flags",
+            lines[5] == "String flags",
+            "String flags",
+            lines[5]
+        ))
+    else:
+        results.append(make_result(
+            "type_conversion_string_flags",
+            False,
+            "String flags",
+            "",
+            "Missing output line 6"
+        ))
+
+    # Test Case 6: String coordinates (type conversion)
+    if len(lines) >= 7:
+        results.append(make_result(
+            "type_conversion_string_coords",
+            lines[6] == "String coordinates",
+            "String coordinates",
+            lines[6]
+        ))
+    else:
+        results.append(make_result(
+            "type_conversion_string_coords",
+            False,
+            "String coordinates",
+            "",
+            "Missing output line 7"
+        ))
+
+    # Test Case 7: Empty target (edge case)
+    if len(lines) >= 8:
+        results.append(make_result(
+            "edge_case_empty_target",
+            lines[7] == "Empty target",
+            "Empty target",
+            lines[7]
+        ))
+    else:
+        results.append(make_result(
+            "edge_case_empty_target",
+            False,
+            "Empty target",
+            "",
+            "Missing output line 8"
         ))
 
     return make_validation_result(results)

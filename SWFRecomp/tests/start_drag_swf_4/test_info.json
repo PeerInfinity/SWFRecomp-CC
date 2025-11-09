@@ -1,8 +1,10 @@
 {
   "metadata": {
     "name": "start_drag_swf_4",
-    "description": "Tests START_DRAG opcode (0x27) - Makes a sprite/MovieClip draggable",
-    "swf_version": 4
+    "description": "Tests START_DRAG opcode (0x27) - Makes a sprite/MovieClip draggable with comprehensive edge cases including type conversions for target (string conversion), boolean flags (number conversion), and constraint coordinates (number conversion)",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true
   },
   "opcodes": {
     "tested": ["START_DRAG"],
@@ -10,5 +12,20 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "missing_features": [
+    "Graphics rendering (requires SDL3/Vulkan for actual mouse dragging and sprite position updates)",
+    "MovieClip/sprite management (finding target by name)",
+    "Mouse position tracking and event handling",
+    "Visual drag feedback and constraint rectangle rendering"
+  ],
+  "edge_cases_tested": [
+    "basic_drag - Basic drag operation without constraints",
+    "lock_center - Drag with center locked to mouse position",
+    "constrained_drag - Drag with rectangular constraint bounds",
+    "type_conversion_numeric_target - Target as number converted to string",
+    "type_conversion_string_flags - Boolean flags as strings converted to numbers",
+    "type_conversion_string_coords - Constraint coordinates as strings converted to numbers",
+    "edge_case_empty_target - Empty string as target"
+  ]
 }

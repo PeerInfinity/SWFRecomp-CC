@@ -82,6 +82,80 @@ actions += struct.pack('<BHB', 0x96, len(trace_msg4) + 1, 0)
 actions += trace_msg4
 actions += bytes([0x26])  # TRACE
 
+# Test Case 4: Type conversions - numeric target (should convert to string)
+# startDrag(123, false);
+# trace("Numeric target");
+actions += struct.pack('<BHB', 0x96, 5, 1)  # PUSH float 0.0 (constrain=false)
+actions += struct.pack('<f', 0.0)
+actions += struct.pack('<BHB', 0x96, 5, 1)  # PUSH float 0.0 (lock_center=false)
+actions += struct.pack('<f', 0.0)
+actions += struct.pack('<BHB', 0x96, 5, 1)  # PUSH float 123.0 (target as number)
+actions += struct.pack('<f', 123.0)
+actions += bytes([0x27])  # START_DRAG (0x27)
+
+trace_msg5 = b'Numeric target\x00'
+actions += struct.pack('<BHB', 0x96, len(trace_msg5) + 1, 0)
+actions += trace_msg5
+actions += bytes([0x26])  # TRACE
+
+# Test Case 5: Type conversions - string boolean flags
+# startDrag("mySprite", "1", "0");
+# trace("String flags");
+# Note: "1" should convert to 1 (true), "0" should convert to 0 (false)
+actions += struct.pack('<BHB', 0x96, 2, 0)  # PUSH string "0"
+actions += b'0\x00'
+actions += struct.pack('<BHB', 0x96, 2, 0)  # PUSH string "1"
+actions += b'1\x00'
+actions += struct.pack('<BHB', 0x96, len(sprite_name) + 1, 0)  # PUSH string
+actions += sprite_name
+actions += bytes([0x27])  # START_DRAG (0x27)
+
+trace_msg6 = b'String flags\x00'
+actions += struct.pack('<BHB', 0x96, len(trace_msg6) + 1, 0)
+actions += trace_msg6
+actions += bytes([0x26])  # TRACE
+
+# Test Case 6: Type conversions - string coordinates
+# startDrag("mySprite", false, "10", "20", "30", "40");
+# trace("String coordinates");
+actions += struct.pack('<BHB', 0x96, 3, 0)  # PUSH string "10"
+actions += b'10\x00'
+actions += struct.pack('<BHB', 0x96, 3, 0)  # PUSH string "20"
+actions += b'20\x00'
+actions += struct.pack('<BHB', 0x96, 3, 0)  # PUSH string "30"
+actions += b'30\x00'
+actions += struct.pack('<BHB', 0x96, 3, 0)  # PUSH string "40"
+actions += b'40\x00'
+actions += struct.pack('<BHB', 0x96, 5, 1)  # PUSH float 1.0 (constrain=true)
+actions += struct.pack('<f', 1.0)
+actions += struct.pack('<BHB', 0x96, 5, 1)  # PUSH float 0.0 (lock_center=false)
+actions += struct.pack('<f', 0.0)
+actions += struct.pack('<BHB', 0x96, len(sprite_name) + 1, 0)  # PUSH string
+actions += sprite_name
+actions += bytes([0x27])  # START_DRAG (0x27)
+
+trace_msg7 = b'String coordinates\x00'
+actions += struct.pack('<BHB', 0x96, len(trace_msg7) + 1, 0)
+actions += trace_msg7
+actions += bytes([0x26])  # TRACE
+
+# Test Case 7: Empty string target
+# startDrag("", false);
+# trace("Empty target");
+empty_target = b'\x00'
+actions += struct.pack('<BHB', 0x96, 5, 1)  # PUSH float 0.0 (constrain=false)
+actions += struct.pack('<f', 0.0)
+actions += struct.pack('<BHB', 0x96, 5, 1)  # PUSH float 0.0 (lock_center=false)
+actions += struct.pack('<f', 0.0)
+actions += struct.pack('<BHB', 0x96, len(empty_target) + 1, 0)  # PUSH empty string
+actions += empty_target
+actions += bytes([0x27])  # START_DRAG (0x27)
+
+trace_msg8 = b'Empty target\x00'
+actions += struct.pack('<BHB', 0x96, len(trace_msg8) + 1, 0)
+actions += trace_msg8
+actions += bytes([0x26])  # TRACE
+
 actions += bytes([0x00])  # END action
 
 # DoAction tag

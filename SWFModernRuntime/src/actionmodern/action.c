@@ -4853,51 +4853,83 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
+/**
+ * actionStartDrag - Makes a sprite/MovieClip draggable with the mouse
+ *
+ * Stack: [ ..., target, lockcenter, constrain, [x1, y1, x2, y2] ] -> [ ... ]
+ *
+ * Pops values from stack:
+ * 1. target (string) - sprite to make draggable (converted to string if needed)
+ * 2. lockcenter (boolean) - lock to mouse center or drag from click point (converted to number)
+ * 3. constrain (boolean) - whether to constrain to rectangle (converted to number)
+ * 4. If constrain is nonzero: pops y2, x2, y1, x1 (constraint rectangle coordinates)
+ *
+ * Makes sprite follow mouse cursor. Only one sprite can be dragged at a time.
+ *
+ * SWF version: 4+
+ * Opcode: 0x27
+ */
 void actionStartDrag(char* stack, u32* sp)
 {
-	// Pop target sprite name
+	// Convert target to string and pop
+	char target_buffer[256];
+	convertString(stack, sp, target_buffer);
 	ActionVar target;
 	popVar(stack, sp, &target);
-	const char* target_name = (const char*) target.data.string_data.heap_ptr;
+	const char* target_name = (target.type == ACTION_STACK_VALUE_STRING && target.data.string_data.heap_ptr != NULL)
+		? target.data.string_data.heap_ptr
+		: "";
 
-	// Pop lock center flag
+	// Convert lock_center to number and pop
+	convertFloat(stack, sp);
 	ActionVar lock_center;
 	popVar(stack, sp, &lock_center);
 
-	// Pop constrain flag
+	// Convert constrain to number and pop
+	convertFloat(stack, sp);
 	ActionVar constrain;
 	popVar(stack, sp, &constrain);
 
-	float x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+	// Extract boolean values from converted numbers
+	int lock_flag = 0;
+	if (lock_center.type == ACTION_STACK_VALUE_F32) {
+		lock_flag = ((int)VAL(float, &lock_center.data.numeric_value) != 0);
+	} else if (lock_center.type == ACTION_STACK_VALUE_F64) {
+		lock_flag = ((int)VAL(double, &lock_center.data.numeric_value) != 0);
+	}
+
 	int has_constraint = 0;
-	
-	// Check if we need to pop constraint rectangle
-	// Convert to integer to check if non-zero
 	if (constrain.type == ACTION_STACK_VALUE_F32) {
 		has_constraint = ((int)VAL(float, &constrain.data.numeric_value) != 0);
 	} else if (constrain.type == ACTION_STACK_VALUE_F64) {
 		has_constraint = ((int)VAL(double, &constrain.data.numeric_value) != 0);
 	}
 
+	float x1 = 0, y1 = 0, x2 = 0, y2 = 0;
 	if (has_constraint) {
-		// Pop constraint rectangle (y2, x2, y1, x1 order)
-		ActionVar y2_var, x2_var, y1_var, x1_var;
+		// Pop constraint rectangle (y2, x2, y1, x1 order per SWF spec)
+		// Convert each coordinate to float before popping
+		convertFloat(stack, sp);
+		ActionVar y2_var;
 		popVar(stack, sp, &y2_var);
+
+		convertFloat(stack, sp);
+		ActionVar x2_var;
 		popVar(stack, sp, &x2_var);
+
+		convertFloat(stack, sp);
+		ActionVar y1_var;
 		popVar(stack, sp, &y1_var);
+
+		convertFloat(stack, sp);
+		ActionVar x1_var;
 		popVar(stack, sp, &x1_var);
 
+		// Extract float values (already converted, so should be F32 or F64)
 		x1 = (x1_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &x1_var.data.numeric_value) : (float)VAL(double, &x1_var.data.numeric_value);
 		y1 = (y1_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &y1_var.data.numeric_value) : (float)VAL(double, &y1_var.data.numeric_value);
 		x2 = (x2_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &x2_var.data.numeric_value) : (float)VAL(double, &x2_var.data.numeric_value);
 		y2 = (y2_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &y2_var.data.numeric_value) : (float)VAL(double, &y2_var.data.numeric_value);
-	}
-
-	int lock_flag = 0;
-	if (lock_center.type == ACTION_STACK_VALUE_F32) {
-		lock_flag = ((int)VAL(float, &lock_center.data.numeric_value) != 0);
-	} else if (lock_center.type == ACTION_STACK_VALUE_F64) {
-		lock_flag = ((int)VAL(double, &lock_center.data.numeric_value) != 0);
 	}
 
 	#ifndef NO_GRAPHICS
@@ -4907,6 +4939,10 @@ void actionStartDrag(char* stack, u32* sp)
 	// 3. Store drag parameters
 	// 4. Update position each frame based on mouse
 	// startDragMovieClip(target_name, lock_flag, has_constraint, x1, y1, x2, y2);
+	(void)target_name;  // Suppress unused warning
+	(void)lock_flag;
+	(void)has_constraint;
+	(void)x1; (void)y1; (void)x2; (void)y2;
 	#else
 	// NO_GRAPHICS mode: just log
 	#ifdef DEBUG
@@ -4915,6 +4951,12 @@ void actionStartDrag(char* stack, u32* sp)
 	if (has_constraint) {
 		printf("  Bounds: (%.1f,%.1f)-(%.1f,%.1f)\n", x1, y1, x2, y2);
 	}
+	#else
+	// Suppress unused variable warnings in non-DEBUG builds
+	(void)target_name;
+	(void)lock_flag;
+	(void)has_constraint;
+	(void)x1; (void)y1; (void)x2; (void)y2;
 	#endif
 	#endif
 }
