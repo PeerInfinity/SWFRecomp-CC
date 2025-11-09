@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF4 file with NEW_OBJECT operations
-# Test: new Array(3), new Object(), new Array(1, 2, 3)
+# Create a comprehensive SWF4 file with NEW_OBJECT operations
+# Tests: Array constructor with length, Array with elements, Object constructor, edge cases
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -14,103 +14,120 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# ActionScript bytecode for testing NEW_OBJECT
+def push_string(s):
+    """Helper to create PUSH string action"""
+    return struct.pack('<BHB', 0x96, 1 + len(s) + 1, 0) + s.encode('ascii') + b'\x00'
 
-# Test 1: new Array(3) - creates array with length 3
-# Push string "Array"
-action_push_array_str = struct.pack('<BHB', 0x96, 1 + len("Array") + 1, 0)  # PUSH, length, type=0 (string)
-action_push_array_str += b"Array\x00"
+def push_float(f):
+    """Helper to create PUSH float action"""
+    return struct.pack('<BHBf', 0x96, 5, 1, f)
 
-# Push 1 (number of arguments)
-action_push_1 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_1 += struct.pack('<f', 1.0)
+# Opcodes
+OP_PUSH = 0x96
+OP_POP = 0x17
+OP_TRACE = 0x26
+OP_NEW_OBJECT = 0x40
+OP_GET_MEMBER = 0x4E
+OP_SET_MEMBER = 0x4F
+OP_END = 0x00
 
-# Push 3.0 (the argument - array length)
-action_push_3 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_3 += struct.pack('<f', 3.0)
+# Test 1: new Array(5) - creates array with length 5, then check length property
+test1 = b''
+# Create: var arr1 = new Array(5);
+test1 += push_float(5.0)              # Push argument: 5.0 (array length)
+test1 += push_float(1.0)              # Push numArgs: 1
+test1 += push_string("Array")         # Push constructor name
+test1 += bytes([OP_NEW_OBJECT])       # Create array -> stack: [array]
+# Duplicate array for later use
+test1 += bytes([0x4C])                # PUSH_DUPLICATE -> stack: [array, array]
+# Get length: trace(arr1.length);
+test1 += push_string("length")        # Push property name -> stack: [array, array, "length"]
+test1 += bytes([OP_GET_MEMBER])       # Get arr1.length -> stack: [array, length_value]
+test1 += bytes([OP_TRACE])            # Trace the length -> stack: [array]
+test1 += bytes([OP_POP])              # Pop the array -> stack: []
 
-# NEW_OBJECT (0x40)
-action_new_object_1 = bytes([0x40])
+# Test 2: new Array(10, 20, 30) - creates array with elements [10, 20, 30]
+test2 = b''
+# Create array with 3 elements
+test2 += push_float(10.0)             # Push arg1 (first element)
+test2 += push_float(20.0)             # Push arg2 (second element)
+test2 += push_float(30.0)             # Push arg3 (third element)
+test2 += push_float(3.0)              # Push numArgs: 3
+test2 += push_string("Array")         # Push constructor name
+test2 += bytes([OP_NEW_OBJECT])       # Create array with elements -> stack: [array]
+# Duplicate array reference
+test2 += bytes([0x4C])                # PUSH_DUPLICATE -> stack: [array, array]
+# Check length
+test2 += push_string("length")        # Push property name -> stack: [array, array, "length"]
+test2 += bytes([OP_GET_MEMBER])       # Get arr2.length -> stack: [array, 3]
+test2 += bytes([OP_TRACE])            # Trace the length (should be 3) -> stack: [array]
+test2 += bytes([OP_POP])              # Pop the array -> stack: []
 
-# Pop the result (we can't trace objects directly without GET_MEMBER)
-action_pop = bytes([0x17])
+# Test 3: new Array(10, 20, 30) - verify first element
+test3 = b''
+# Create array with 3 elements
+test3 += push_float(10.0)             # Push arg1
+test3 += push_float(20.0)             # Push arg2
+test3 += push_float(30.0)             # Push arg3
+test3 += push_float(3.0)              # Push numArgs: 3
+test3 += push_string("Array")         # Push constructor name
+test3 += bytes([OP_NEW_OBJECT])       # Create array -> stack: [array]
+# Duplicate array reference
+test3 += bytes([0x4C])                # PUSH_DUPLICATE -> stack: [array, array]
+# Get element [0]
+test3 += push_string("0")             # Push index "0" -> stack: [array, array, "0"]
+test3 += bytes([OP_GET_MEMBER])       # Get arr[0] -> stack: [array, 10]
+test3 += bytes([OP_TRACE])            # Trace first element (should be 10) -> stack: [array]
+test3 += bytes([OP_POP])              # Pop the array -> stack: []
 
-# Test 2: new Object() - creates empty object
-# Push string "Object"
-action_push_object_str = struct.pack('<BHB', 0x96, 1 + len("Object") + 1, 0)  # PUSH, length, type=0 (string)
-action_push_object_str += b"Object\x00"
+# Test 4: new Object() - creates empty object, then set and get property
+test4 = b''
+# Create: var obj = new Object();
+test4 += push_float(0.0)              # Push numArgs: 0
+test4 += push_string("Object")        # Push constructor name
+test4 += bytes([OP_NEW_OBJECT])       # Create object -> stack: [object]
+# Duplicate for SET_MEMBER (which will consume it)
+test4 += bytes([0x4C])                # PUSH_DUPLICATE -> stack: [object, object]
+# Set property: obj.x = 42;
+test4 += push_float(42.0)             # Push value: 42 -> stack: [object, object, 42]
+test4 += push_string("x")             # Push property name -> stack: [object, object, 42, "x"]
+test4 += bytes([OP_SET_MEMBER])       # Set obj.x = 42 -> stack: [object]
+# Get property: trace(obj.x);
+test4 += push_string("x")             # Push property name -> stack: [object, "x"]
+test4 += bytes([OP_GET_MEMBER])       # Get obj.x -> stack: [42]
+test4 += bytes([OP_TRACE])            # Trace the value (should be 42) -> stack: []
 
-# Push 0 (number of arguments)
-action_push_0 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_0 += struct.pack('<f', 0.0)
+# Test 5: new Array() - creates empty array (no arguments)
+test5 = b''
+test5 += push_float(0.0)              # Push numArgs: 0
+test5 += push_string("Array")         # Push constructor name
+test5 += bytes([OP_NEW_OBJECT])       # Create empty array -> stack: [array]
+# Duplicate array reference
+test5 += bytes([0x4C])                # PUSH_DUPLICATE -> stack: [array, array]
+# Check length
+test5 += push_string("length")        # Push property name -> stack: [array, array, "length"]
+test5 += bytes([OP_GET_MEMBER])       # Get arr.length -> stack: [array, 0]
+test5 += bytes([OP_TRACE])            # Trace the length (should be 0) -> stack: [array]
+test5 += bytes([OP_POP])              # Pop the array -> stack: []
 
-# NEW_OBJECT (0x40)
-action_new_object_2 = bytes([0x40])
-
-# Pop the result
-action_pop_2 = bytes([0x17])
-
-# Test 3: new Array(1, 2, 3) - creates array with elements [1, 2, 3]
-# Push string "Array"
-action_push_array_str_2 = struct.pack('<BHB', 0x96, 1 + len("Array") + 1, 0)  # PUSH, length, type=0 (string)
-action_push_array_str_2 += b"Array\x00"
-
-# Push 3 (number of arguments)
-action_push_3_args = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_3_args += struct.pack('<f', 3.0)
-
-# Push arguments: 1.0, 2.0, 3.0
-action_push_arg_1 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_arg_1 += struct.pack('<f', 1.0)
-
-action_push_arg_2 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_arg_2 += struct.pack('<f', 2.0)
-
-action_push_arg_3 = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_arg_3 += struct.pack('<f', 3.0)
-
-# NEW_OBJECT (0x40)
-action_new_object_3 = bytes([0x40])
-
-# Pop the result
-action_pop_3 = bytes([0x17])
-
-# Trace success message
-# Push string "NEW_OBJECT tests completed"
-test_message = "NEW_OBJECT tests completed"
-action_push_message = struct.pack('<BHB', 0x96, 1 + len(test_message) + 1, 0)  # PUSH, length, type=0 (string)
-action_push_message += test_message.encode('ascii') + b'\x00'
-
-# Trace action (0x26)
-action_trace = bytes([0x26])
-
-# End action (0x00)
-action_end = bytes([0x00])
+# Test 6: new Array(0) - creates array with length 0
+test6 = b''
+test6 += push_float(0.0)              # Push argument: 0 (array length)
+test6 += push_float(1.0)              # Push numArgs: 1
+test6 += push_string("Array")         # Push constructor name
+test6 += bytes([OP_NEW_OBJECT])       # Create array with length 0 -> stack: [array]
+# Duplicate array reference
+test6 += bytes([0x4C])                # PUSH_DUPLICATE -> stack: [array, array]
+# Check length
+test6 += push_string("length")        # Push property name -> stack: [array, array, "length"]
+test6 += bytes([OP_GET_MEMBER])       # Get arr.length -> stack: [array, 0]
+test6 += bytes([OP_TRACE])            # Trace the length (should be 0) -> stack: [array]
+test6 += bytes([OP_POP])              # Pop the array -> stack: []
 
 # Build complete action sequence
 action_sequence = (
-    action_push_3 +           # Push argument 3.0 (deepest on stack)
-    action_push_1 +           # Push numArgs 1.0
-    action_push_array_str +   # Push "Array"
-    action_new_object_1 +     # new Array(3)
-    action_pop +              # Pop result
-
-    action_push_0 +           # Push numArgs 0.0
-    action_push_object_str +  # Push "Object"
-    action_new_object_2 +     # new Object()
-    action_pop_2 +            # Pop result
-
-    action_push_arg_1 +       # Push argument 1.0 (deepest on stack)
-    action_push_arg_2 +       # Push argument 2.0
-    action_push_arg_3 +       # Push argument 3.0 (topmost on stack)
-    action_push_3_args +      # Push numArgs 3.0
-    action_push_array_str_2 + # Push "Array"
-    action_new_object_3 +     # new Array(1, 2, 3)
-    action_pop_3 +            # Pop result
-
-    action_push_message +     # Push success message
-    action_trace +            # trace(message)
-    action_end
+    test1 + test2 + test3 + test4 + test5 + test6 +
+    bytes([OP_END])
 )
 
 # DoAction tag
@@ -138,7 +155,16 @@ with open('test.swf', 'wb') as f:
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
 print("Test cases:")
-print("  1. new Array(3) - creates array with length 3")
-print("  2. new Object() - creates empty object")
-print("  3. new Array(1, 2, 3) - creates array with elements")
-print("Expected output: 'NEW_OBJECT tests completed'")
+print("  1. new Array(5) - verify length is 5")
+print("  2. new Array(10, 20, 30) - verify length is 3")
+print("  3. new Array(10, 20, 30) - verify first element is 10")
+print("  4. new Object() - set and get property x=42")
+print("  5. new Array() - verify empty array has length 0")
+print("  6. new Array(0) - verify array with length 0")
+print("Expected output:")
+print("  5")
+print("  3")
+print("  10")
+print("  42")
+print("  0")
+print("  0")
