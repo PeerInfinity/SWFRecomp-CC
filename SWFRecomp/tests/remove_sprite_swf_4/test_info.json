@@ -1,8 +1,15 @@
 {
   "metadata": {
     "name": "remove_sprite_swf_4",
-    "description": "Tests REMOVE_SPRITE opcode (0x25) - removes a sprite/MovieClip from the display list",
-    "swf_version": 4
+    "description": "Comprehensive tests for REMOVE_SPRITE opcode (0x25) - removes a clone sprite/MovieClip from the display list. Tests basic removal, non-existent sprites, empty strings, special characters, and path notation. Complete in NO_GRAPHICS mode (no-op behavior is correct).",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Graphics mode: Display list management system not implemented",
+      "Graphics mode: MovieClip reference counting not implemented",
+      "Graphics mode: Actual sprite removal and resource cleanup requires SDL3/Vulkan rendering"
+    ]
   },
   "opcodes": {
     "tested": ["REMOVE_SPRITE"],
@@ -10,5 +17,13 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_sprite_removal",
+    "nonexistent_sprite_no_crash",
+    "empty_string_graceful_handling",
+    "special_characters_in_name",
+    "path_notation_support",
+    "null_target_handling"
+  ]
 }

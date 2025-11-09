@@ -2,10 +2,12 @@
 """
 Validation script for remove_sprite_swf_4
 
-Tests the REMOVE_SPRITE opcode (0x25).
-Expected output:
-1. Remove a sprite and trace confirmation
-2. Remove non-existent sprite (should not crash)
+Comprehensive tests for the REMOVE_SPRITE opcode (0x25):
+- Basic sprite removal
+- Non-existent sprite (should not crash)
+- Empty string (should handle gracefully)
+- Special characters in sprite name
+- Path notation (e.g., _root.sprite)
 """
 import sys
 import json
@@ -22,16 +24,19 @@ def validate_output(output):
     Validate test output.
 
     Expected output:
-    Line 1: "Sprite removed" - after removing mySprite
-    Line 2: "Before remove" - before attempting to remove non-existent sprite
-    Line 3: "After remove" - after attempting to remove non-existent sprite
+    Line 0: "Test 1: Basic remove"
+    Line 1: "Test 2: Non-existent"
+    Line 2: "Test 3: Empty string"
+    Line 3: "Test 4: Special chars"
+    Line 4: "Test 5: Path notation"
+    Line 5: "All tests completed"
     """
     lines = parse_output(output)
 
     results = []
 
     # Test 1: Basic sprite removal
-    expected_line1 = "Sprite removed"
+    expected_line1 = "Test 1: Basic remove"
     actual_line1 = lines[0] if len(lines) > 0 else ""
     results.append(make_result(
         "basic_remove",
@@ -40,24 +45,54 @@ def validate_output(output):
         actual_line1
     ))
 
-    # Test 2: Before removing non-existent sprite
-    expected_line2 = "Before remove"
+    # Test 2: Non-existent sprite (should not crash)
+    expected_line2 = "Test 2: Non-existent"
     actual_line2 = lines[1] if len(lines) > 1 else ""
     results.append(make_result(
-        "before_nonexistent",
+        "nonexistent_sprite",
         actual_line2 == expected_line2,
         expected_line2,
         actual_line2
     ))
 
-    # Test 3: After removing non-existent sprite (should not crash)
-    expected_line3 = "After remove"
+    # Test 3: Empty string (should handle gracefully)
+    expected_line3 = "Test 3: Empty string"
     actual_line3 = lines[2] if len(lines) > 2 else ""
     results.append(make_result(
-        "after_nonexistent",
+        "empty_string",
         actual_line3 == expected_line3,
         expected_line3,
         actual_line3
+    ))
+
+    # Test 4: Special characters
+    expected_line4 = "Test 4: Special chars"
+    actual_line4 = lines[3] if len(lines) > 3 else ""
+    results.append(make_result(
+        "special_chars",
+        actual_line4 == expected_line4,
+        expected_line4,
+        actual_line4
+    ))
+
+    # Test 5: Path notation
+    expected_line5 = "Test 5: Path notation"
+    actual_line5 = lines[4] if len(lines) > 4 else ""
+    results.append(make_result(
+        "path_notation",
+        actual_line5 == expected_line5,
+        expected_line5,
+        actual_line5
+    ))
+
+    # Final confirmation
+    expected_final = "All tests completed"
+    actual_final = lines[5] if len(lines) > 5 else ""
+    results.append(make_result(
+        "all_tests_completed",
+        actual_final == expected_final,
+        expected_final,
+        actual_final
     ))
 
     return make_validation_result(results)
