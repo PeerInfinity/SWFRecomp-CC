@@ -31,17 +31,19 @@ def validate_output(output):
 
     Note: ActionCall now actually executes frames. Since frame 2 doesn't exist
     in this single-frame SWF, ActionCall does nothing (per spec), and execution
-    continues directly to the TRACE statement.
+    continues directly to the TRACE statement. The implementation logs debug
+    messages about frame operations.
     """
     lines = parse_output(output)
 
-    # Filter out system/runtime messages to get actual trace output
+    # Filter out system/runtime messages and debug/comment lines to get actual trace output
     filtered_lines = [
         line for line in lines
         if not line.startswith('SWF Runtime') and
            not line.startswith('===') and
            not line.startswith('[Frame') and
-           not line.startswith('[Tag]')
+           not line.startswith('[Tag]') and
+           not line.startswith('// ')  # Skip debug/comment lines from ActionCall
     ]
 
     results = []

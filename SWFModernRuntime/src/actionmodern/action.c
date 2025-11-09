@@ -3942,6 +3942,35 @@ void actionImplementsOp(char* stack, u32* sp)
 	// Note: No values pushed back on stack (ImplementsOp has no return value)
 }
 
+/**
+ * ActionCall - Calls a subroutine (frame actions)
+ *
+ * Stack: [ frame_identifier ] -> [ ]
+ *
+ * Pops a frame identifier from the stack and executes the actions in that frame.
+ * After the frame actions complete, execution resumes at the instruction after
+ * the ActionCall instruction.
+ *
+ * Frame identifier can be:
+ * - A number: Frame index (0-based in g_frame_funcs array)
+ * - A string (numeric): Parsed as frame number
+ * - A string (label): Frame label (requires label registry - not implemented)
+ * - With target path: "/target:frame" or "/target:label" (requires MovieClip tree - not implemented)
+ *
+ * Edge cases:
+ * - Negative frame numbers: Ignored (no action)
+ * - Out of range frames: Ignored (no action)
+ * - Invalid frame types: Ignored with warning
+ * - Null/undefined: Ignored (no action)
+ * - Frame labels: Parsed and logged but not executed (requires label registry)
+ * - Target paths: Parsed and logged but not executed (requires MovieClip infrastructure)
+ *
+ * SWF version: 4+
+ * Opcode: 0x9E
+ *
+ * @param stack Pointer to the runtime stack
+ * @param sp Pointer to stack pointer
+ */
 void actionCall(char* stack, u32* sp)
 {
 	// Access global frame info (set by swfStart)
@@ -3949,49 +3978,138 @@ void actionCall(char* stack, u32* sp)
 	extern size_t g_frame_count;
 	extern int quit_swf;
 
-	// Pop frame identifier (string or number)
+	// Pop frame identifier from stack
 	ActionVar frame_var;
 	popVar(stack, sp, &frame_var);
 
-	int frame_num = -1;
-	const char* frame_id = NULL;
-
-	// Parse frame identifier (number or string)
 	if (frame_var.type == ACTION_STACK_VALUE_F32) {
-		frame_num = (int) frame_var.data.numeric_value;
-	} else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
-		frame_id = (const char*) frame_var.data.numeric_value;
+		// Numeric frame
+		float frame_float;
+		memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
 
-		// Try to parse as numeric string
-		if (frame_id) {
-			char* endptr;
-			long num = strtol(frame_id, &endptr, 10);
-			if (*endptr == '\0') {
-				// It's a numeric string
-				frame_num = (int) num;
-			}
-			// else: It's a frame label (not supported yet)
+		// Handle negative frames (ignore)
+		s32 frame_num = (s32)frame_float;
+		if (frame_num < 0) {
+			printf("// Call: negative frame %d (ignored)\n", frame_num);
+			fflush(stdout);
+			return;
+		}
+
+		// Validate frame is in range
+		if (g_frame_funcs && (size_t)frame_num < g_frame_count) {
+			printf("// Call: frame %d\n", frame_num);
+			fflush(stdout);
+
+			// Save quit_swf state to prevent frame from terminating execution
+			int saved_quit_swf = quit_swf;
+			quit_swf = 0;
+
+			// Call the frame function (executes frame actions)
+			// Note: This calls the full frame function including ShowFrame
+			g_frame_funcs[frame_num]();
+
+			// Restore quit_swf state (only quit if we were already quitting)
+			quit_swf = saved_quit_swf;
+		} else {
+			printf("// Call: frame %d out of range (ignored, total frames: %zu)\n", frame_num, g_frame_count);
+			fflush(stdout);
 		}
 	}
+	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
+		// Frame label or number as string - may include target path
+		const char* frame_str = (const char*)frame_var.data.numeric_value;
 
-	// Validate and call frame
-	if (frame_num >= 0 && g_frame_funcs && (size_t)frame_num < g_frame_count) {
-		// Save quit_swf state to prevent frame from terminating execution
-		int saved_quit_swf = quit_swf;
-		quit_swf = 0;
+		if (frame_str == NULL) {
+			printf("// Call: null frame identifier (ignored)\n");
+			fflush(stdout);
+			return;
+		}
 
-		// Call the frame function (executes frame actions)
-		// Note: This calls the full frame function including ShowFrame
-		g_frame_funcs[frame_num]();
+		// Parse target path if present (format: "target:frame" or "/target:frame")
+		const char* target = NULL;
+		const char* frame_part = frame_str;
+		const char* colon = strchr(frame_str, ':');
 
-		// Restore quit_swf state (only quit if we were already quitting)
-		quit_swf = saved_quit_swf;
-	} else if (frame_num < 0 && frame_id) {
-		// Frame label lookup not implemented yet
-		// Note: Full implementation would require a label->frame mapping
-		printf("// ActionCall: Frame labels not supported (requested: %s)\n", frame_id);
+		if (colon != NULL) {
+			// Target path present
+			size_t target_len = colon - frame_str;
+			static char target_buffer[256];
+
+			if (target_len < sizeof(target_buffer)) {
+				memcpy(target_buffer, frame_str, target_len);
+				target_buffer[target_len] = '\0';
+				target = target_buffer;
+				frame_part = colon + 1;  // Frame label/number after the colon
+			}
+		}
+
+		// Check if frame_part is numeric or a label
+		char* endptr;
+		long frame_num = strtol(frame_part, &endptr, 10);
+
+		if (endptr != frame_part && *endptr == '\0') {
+			// It's a numeric frame
+			if (frame_num < 0) {
+				if (target) {
+					printf("// Call: target '%s', negative frame %ld (ignored)\n", target, frame_num);
+				} else {
+					printf("// Call: negative frame %ld (ignored)\n", frame_num);
+				}
+				fflush(stdout);
+				return;
+			}
+
+			if (target) {
+				// Target path specified - requires MovieClip infrastructure
+				printf("// Call: target '%s', frame %ld (target paths not implemented)\n", target, frame_num);
+				fflush(stdout);
+				// Note: Full implementation would require MovieClip tree traversal
+			} else {
+				// Main timeline - can execute
+				if (g_frame_funcs && (size_t)frame_num < g_frame_count) {
+					printf("// Call: frame %ld\n", frame_num);
+					fflush(stdout);
+
+					// Save quit_swf state to prevent frame from terminating execution
+					int saved_quit_swf = quit_swf;
+					quit_swf = 0;
+
+					// Call the frame function (executes frame actions)
+					g_frame_funcs[frame_num]();
+
+					// Restore quit_swf state
+					quit_swf = saved_quit_swf;
+				} else {
+					printf("// Call: frame %ld out of range (ignored, total frames: %zu)\n", frame_num, g_frame_count);
+					fflush(stdout);
+				}
+			}
+		} else {
+			// It's a frame label
+			if (target) {
+				printf("// Call: target '%s', label '%s' (frame labels not implemented)\n", target, frame_part);
+			} else {
+				printf("// Call: label '%s' (frame labels not implemented)\n", frame_part);
+			}
+			fflush(stdout);
+
+			// Note: Frame label lookup requires:
+			// - Frame label registry (mapping labels to frame numbers)
+			// - SWFRecomp to parse FrameLabel tags (tag type 43) and generate the registry
+			// - MovieClip context switching for target paths
+		}
 	}
-	// If frame not found, do nothing (per spec)
+	else if (frame_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+		// Undefined - ignore
+		printf("// Call: undefined frame (ignored)\n");
+		fflush(stdout);
+	}
+	else {
+		// Invalid type - ignore with warning
+		printf("// Call: invalid frame type %d (ignored)\n", frame_var.type);
+		fflush(stdout);
+	}
+	// If frame not found or invalid, do nothing (per SWF spec)
 }
 
 // Helper function to print a string value that may be a regular string or STR_LIST
