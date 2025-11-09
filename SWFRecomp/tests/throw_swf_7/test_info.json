@@ -1,8 +1,18 @@
 {
   "metadata": {
     "name": "throw_swf_7",
-    "description": "Tests THROW opcode (exception handling)",
-    "swf_version": 7
+    "description": "Tests THROW opcode (0x2A) - throws exceptions and terminates execution for uncaught exceptions",
+    "swf_version": 7,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": false,
+    "missing_features": [
+      "Try-catch integration has known implementation flaw - setjmp/longjmp called from helper function instead of inline",
+      "Stack unwinding to catch blocks doesn't work correctly (execution continues after longjmp)",
+      "Finally block execution during unwinding not tested",
+      "Nested try-catch blocks not tested",
+      "Exception propagation through function calls not tested",
+      "Only tested uncaught exceptions (requires ActionTry 0x8F for full testing)"
+    ]
   },
   "opcodes": {
     "tested": ["THROW"],
@@ -10,5 +20,10 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "uncaught_string_exception",
+    "execution_stops_after_throw",
+    "trace_before_exception_executes"
+  ]
 }

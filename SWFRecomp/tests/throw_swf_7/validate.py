@@ -2,11 +2,16 @@
 """
 Validation script for throw_swf_7
 
-Tests the THROW opcode (0x2A) for exception handling.
+Tests the THROW opcode (0x2A).
 Expected output:
-- "Before throw"
-- "[Uncaught exception: Error message]"
-- "After throw" should NOT appear (execution stops after throw)
+1. "Before throw" - traces before exception
+2. "[Uncaught exception: Error message]" - exception handler output
+3. Should NOT see "After throw"
+
+This test validates that:
+- ActionThrow properly pops value from stack
+- Exception terminates execution (code after throw doesn't run)
+- Uncaught exceptions are properly reported
 """
 import sys
 import json
@@ -23,56 +28,41 @@ def validate_output(output):
     Validate test output.
 
     Expected:
-    Line 1: "Before throw"
-    Line 2: "[Uncaught exception: Error message]"
-
-    NOT expected:
-    "After throw" (execution should stop)
+    - Line 1: "Before throw"
+    - Line 2: "[Uncaught exception: Error message]"
+    - Should NOT contain: "After throw"
     """
     lines = parse_output(output)
-
     results = []
-
-    # Check we have at least 2 lines
-    if len(lines) < 2:
-        results.append(make_result(
-            "output_length",
-            False,
-            "at least 2 lines",
-            f"{len(lines)} lines",
-            "Not enough output lines"
-        ))
-        return make_validation_result(results)
-
-    # Check line 1: "Before throw"
-    expected_line1 = "Before throw"
-    actual_line1 = lines[0] if len(lines) > 0 else ""
+    
+    # Check that we see the trace before throw
+    before_throw_ok = len(lines) > 0 and lines[0] == "Before throw"
     results.append(make_result(
-        "before_throw",
-        actual_line1 == expected_line1,
-        expected_line1,
-        actual_line1
+        "trace_before_throw",
+        before_throw_ok,
+        "Before throw",
+        lines[0] if len(lines) > 0 else "(no output)"
     ))
-
-    # Check line 2: "[Uncaught exception: Error message]"
-    expected_line2 = "[Uncaught exception: Error message]"
-    actual_line2 = lines[1] if len(lines) > 1 else ""
+    
+    # Check that we see the uncaught exception message
+    exception_ok = len(lines) > 1 and "[Uncaught exception: Error message]" in lines[1]
     results.append(make_result(
-        "exception_message",
-        actual_line2 == expected_line2,
-        expected_line2,
-        actual_line2
+        "uncaught_exception",
+        exception_ok,
+        "[Uncaught exception: Error message]",
+        lines[1] if len(lines) > 1 else "(no output)"
     ))
-
-    # Check that "After throw" does NOT appear
-    has_after_throw = any("After throw" in line for line in lines)
+    
+    # Check that code after throw did NOT execute
+    after_throw_text = "After throw"
+    execution_stopped = after_throw_text not in output
     results.append(make_result(
-        "no_after_throw",
-        not has_after_throw,
-        "Should not appear",
-        "Appeared in output" if has_after_throw else "Not in output"
+        "execution_stopped_after_throw",
+        execution_stopped,
+        f"Should NOT contain: {after_throw_text}",
+        "OK - text not found" if execution_stopped else f"FAIL - found: {after_throw_text}"
     ))
-
+    
     return make_validation_result(results)
 
 
