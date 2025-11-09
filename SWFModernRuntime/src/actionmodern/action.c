@@ -3516,10 +3516,11 @@ void actionInitArray(char* stack, u32* sp)
 	}
 	arr->length = num_elements;
 
-	// 3. Pop elements in reverse order and populate array
-	// Elements are on stack in reverse order: [..., elem_N, elem_N-1, ..., elem_1]
-	// We need to pop them and store in array as: [elem_1, elem_2, ..., elem_N]
-	for (int i = (int)num_elements - 1; i >= 0; i--) {
+	// 3. Pop elements and populate array
+	// Per SWF spec: elements were pushed in reverse order (rightmost first, leftmost last)
+	// Stack has: [..., elem_N, elem_N-1, ..., elem_1] with elem_1 on top
+	// We pop and store sequentially: pop elem_1 -> arr[0], pop elem_2 -> arr[1], etc.
+	for (u32 i = 0; i < num_elements; i++) {
 		ActionVar elem;
 		popVar(stack, sp, &elem);
 		arr->elements[i] = elem;
@@ -3842,6 +3843,7 @@ void actionGetMember(char* stack, u32* sp)
 			return;
 		}
 
+		// Check if accessing the "length" property
 		if (strcmp(prop_name, "length") == 0)
 		{
 			// Push array length as float
@@ -3850,18 +3852,29 @@ void actionGetMember(char* stack, u32* sp)
 		}
 		else
 		{
-			// Try to parse property name as numeric index
+			// Try to parse property name as an array index
 			char* endptr;
 			long index = strtol(prop_name, &endptr, 10);
 
-			if (*endptr == '\0' && index >= 0 && (u32)index < arr->length)
+			// Check if conversion was successful and entire string was consumed
+			if (*endptr == '\0' && index >= 0)
 			{
-				// Valid numeric index - push element
-				pushVar(stack, sp, &arr->elements[index]);
+				// Valid numeric index
+				ActionVar* elem = getArrayElement(arr, (u32)index);
+				if (elem != NULL)
+				{
+					// Element exists - push its value
+					pushVar(stack, sp, elem);
+				}
+				else
+				{
+					// Index out of bounds - push undefined
+					pushUndefined(stack, sp);
+				}
 			}
 			else
 			{
-				// Not a valid index - push undefined
+				// Non-numeric property name - arrays don't have other properties
 				pushUndefined(stack, sp);
 			}
 		}
