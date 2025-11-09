@@ -1902,15 +1902,60 @@ void actionTrace(char* stack, u32* sp)
 	POP();
 }
 
+/**
+ * ActionGotoFrame - Go to specified frame and stop
+ *
+ * Opcode: 0x81
+ * SWF Version: 3+
+ *
+ * Jumps to the specified frame in the timeline and stops playback.
+ * This implements the "gotoAndStop" semantics - the timeline will
+ * jump to the target frame and halt there.
+ *
+ * Frame indexing: The frame parameter is 0-based (frame 0 is the first frame).
+ *
+ * Behavior:
+ * - Sets next_frame to the specified frame index
+ * - Sets manual_next_frame flag to trigger the jump
+ * - Sets is_playing = 0 to stop playback at the target frame
+ * - Validates frame boundaries (frame must be < g_frame_count)
+ * - If frame is out of bounds, ignores the jump (continues current frame)
+ *
+ * @param stack - Pointer to the runtime stack (unused but required for API consistency)
+ * @param sp - Pointer to stack pointer (unused but required for API consistency)
+ * @param frame - Target frame index (0-based)
+ */
 void actionGotoFrame(char* stack, u32* sp, u16 frame)
 {
-	// Set the next frame to the specified frame index
+	// Suppress unused parameter warnings
+	(void)stack;
+	(void)sp;
+
+	// Access global frame control variables
 	extern size_t current_frame;
 	extern size_t next_frame;
 	extern int manual_next_frame;
+	extern int is_playing;
+	extern size_t g_frame_count;
 
+	// Frame boundary validation
+	// If the target frame is out of bounds, ignore the jump
+	if (frame >= g_frame_count)
+	{
+		// Target frame doesn't exist - no-op
+		// Continue execution in current frame
+		return;
+	}
+
+	// Set the next frame to the specified frame index
 	next_frame = frame;
+
+	// Signal manual frame navigation (overrides automatic playback advancement)
 	manual_next_frame = 1;
+
+	// Stop playback at the target frame (gotoAndStop semantics)
+	// This is the key difference from just advancing the frame counter
+	is_playing = 0;
 }
 
 /**
