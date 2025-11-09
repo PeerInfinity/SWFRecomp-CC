@@ -209,6 +209,38 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 	return NULL;  // Other paths not supported yet
 }
 
+// ==================================================================
+// Execution Context Tracking (for SET_TARGET / SET_TARGET2)
+// ==================================================================
+
+// Global variable to track the current execution context
+static MovieClip* g_current_target_context = NULL;
+
+// Set the current execution context
+static void setCurrentTargetContext(MovieClip* mc) {
+	g_current_target_context = mc;
+}
+
+// Get the current execution context (returns root if not set)
+static MovieClip* getCurrentTargetContext() {
+	return g_current_target_context ? g_current_target_context : &root_movieclip;
+}
+
+// Resolve a target path string to a MovieClip and set as current context
+static void resolveAndSetTargetContext(const char* target_path) {
+	if (!target_path || strlen(target_path) == 0) {
+		// Empty string: return to main timeline (root)
+		setCurrentTargetContext(&root_movieclip);
+	} else {
+		// Resolve target path to MovieClip
+		MovieClip* target_mc = getMovieClipByTarget(target_path);
+		if (target_mc) {
+			setCurrentTargetContext(target_mc);
+		}
+		// If target not found, context remains unchanged
+	}
+}
+
 ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
@@ -1901,6 +1933,24 @@ void actionDeclareLocal(char* stack, u32* sp)
 	POP();
 }
 
+/**
+ * ActionSetTarget2 - Stack-based execution context switching
+ *
+ * Stack: [ target_path ] -> [ ]
+ *
+ * Pops the target path off the stack and makes it the current active context.
+ * All subsequent actions apply to this context until changed.
+ *
+ * - Empty string: Returns context to the main timeline (_root)
+ * - Non-empty string: Resolves target path and sets as current context
+ * - If target not found: Context remains unchanged
+ *
+ * This is the stack-based version of ActionSetTarget (0x8B), enabling
+ * the target path to be the result of expression evaluation.
+ *
+ * SWF version: 4+
+ * Opcode: 0x20
+ */
 void actionSetTarget2(char* stack, u32* sp)
 {
 	// Convert top of stack to string if needed
@@ -1912,7 +1962,7 @@ void actionSetTarget2(char* stack, u32* sp)
 	// Pop the target path
 	POP();
 
-	// For simplified implementation: just log the target change
+	// Log the target change
 	// Empty string or NULL means return to main timeline
 	if (target_path == NULL || strlen(target_path) == 0)
 	{
@@ -1923,8 +1973,8 @@ void actionSetTarget2(char* stack, u32* sp)
 		printf("// SetTarget2: %s\n", target_path);
 	}
 
-	// TODO: Actually change execution context
-	// This requires MovieClip infrastructure
+	// Actually change execution context
+	resolveAndSetTargetContext(target_path);
 }
 
 void actionGetProperty(char* stack, u32* sp)
@@ -3885,28 +3935,33 @@ void actionRemoveSprite(char* stack, u32* sp)
 	#endif
 }
 
+/**
+ * ActionSetTarget - String literal execution context switching
+ *
+ * Changes the current execution context to a named object (TargetName).
+ * All subsequent actions apply to this context until changed.
+ *
+ * - Empty string: Returns context to the main timeline (_root)
+ * - Non-empty string: Resolves target path and sets as current context
+ * - If target not found: Context remains unchanged
+ *
+ * This is the string literal version of ActionSetTarget2 (0x20).
+ * The target name is embedded in the action record rather than on the stack.
+ *
+ * SWF version: 3+
+ * Opcode: 0x8B
+ */
 void actionSetTarget(char* stack, u32* sp, const char* target_name)
 {
-	// Simplified implementation: just log the target change
-	// TODO: Actually change execution context when MovieClip infrastructure is complete
-
+	// Log the target change
 	if (!target_name || strlen(target_name) == 0) {
 		printf("// SetTarget: (main)\n");
 	} else {
 		printf("// SetTarget: %s\n", target_name);
 	}
 
-	// Future implementation will need:
-	// - Global variable to track current context (g_current_context)
-	// - setCurrentContext(MovieClip* mc) function
-	// - getCurrentContext() function
-	// - resolveTargetPath(const char* path) function
-	//
-	// For empty string, return to main timeline:
-	//   setCurrentContext(getRootMovieClip());
-	// For non-empty string, resolve target path:
-	//   MovieClip* target_mc = resolveTargetPath(target_name);
-	//   if (target_mc) setCurrentContext(target_mc);
+	// Actually change execution context
+	resolveAndSetTargetContext(target_name);
 }
 
 // ==================================================================

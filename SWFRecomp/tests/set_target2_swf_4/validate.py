@@ -24,87 +24,23 @@ def validate_output(output):
     """
     lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
 
+    # Define test cases
+    test_cases = [
+        ("set_target_mySprite", "// SetTarget2: mySprite", 0),
+        ("trace_in_mySprite", "In mySprite", 1),
+        ("set_target_main_1", "// SetTarget2: (main)", 2),
+        ("trace_back_to_main", "Back to main", 3),
+        ("set_target_nested", "// SetTarget2: nested/path", 4),
+        ("trace_in_nested", "In nested path", 5),
+        ("set_target_main_2", "// SetTarget2: (main)", 6),
+        ("trace_final_main", "Final main", 7),
+    ]
+
     results = []
-
-    # Test Case 1: Set target to mySprite
-    if len(lines) > 0:
-        expected = "// SetTarget2: mySprite"
-        actual = lines[0] if lines else ""
+    for name, expected, line_idx in test_cases:
+        actual = lines[line_idx] if line_idx < len(lines) else ""
         results.append({
-            "name": "set_target_mySprite",
-            "passed": actual == expected,
-            "expected": expected,
-            "actual": actual
-        })
-
-    if len(lines) > 1:
-        expected = "In mySprite"
-        actual = lines[1] if len(lines) > 1 else ""
-        results.append({
-            "name": "trace_in_mySprite",
-            "passed": actual == expected,
-            "expected": expected,
-            "actual": actual
-        })
-
-    # Test Case 2: Return to main
-    if len(lines) > 2:
-        expected = "// SetTarget2: (main)"
-        actual = lines[2] if len(lines) > 2 else ""
-        results.append({
-            "name": "set_target_main_1",
-            "passed": actual == expected,
-            "expected": expected,
-            "actual": actual
-        })
-
-    if len(lines) > 3:
-        expected = "Back to main"
-        actual = lines[3] if len(lines) > 3 else ""
-        results.append({
-            "name": "trace_back_to_main",
-            "passed": actual == expected,
-            "expected": expected,
-            "actual": actual
-        })
-
-    # Test Case 3: Set target to nested path
-    if len(lines) > 4:
-        expected = "// SetTarget2: nested/path"
-        actual = lines[4] if len(lines) > 4 else ""
-        results.append({
-            "name": "set_target_nested",
-            "passed": actual == expected,
-            "expected": expected,
-            "actual": actual
-        })
-
-    if len(lines) > 5:
-        expected = "In nested path"
-        actual = lines[5] if len(lines) > 5 else ""
-        results.append({
-            "name": "trace_in_nested",
-            "passed": actual == expected,
-            "expected": expected,
-            "actual": actual
-        })
-
-    # Test Case 4: Return to main again
-    if len(lines) > 6:
-        expected = "// SetTarget2: (main)"
-        actual = lines[6] if len(lines) > 6 else ""
-        results.append({
-            "name": "set_target_main_2",
-            "passed": actual == expected,
-            "expected": expected,
-            "actual": actual
-        })
-
-    if len(lines) > 7:
-        expected = "Final main"
-        actual = lines[7] if len(lines) > 7 else ""
-        results.append({
-            "name": "trace_final_main",
+            "name": name,
             "passed": actual == expected,
             "expected": expected,
             "actual": actual
