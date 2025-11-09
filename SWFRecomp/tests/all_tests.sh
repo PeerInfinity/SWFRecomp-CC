@@ -97,6 +97,15 @@ filter_output() {
     grep -a -v "^$" || true
 }
 
+# Filter test output but preserve empty lines (for tests that need them)
+filter_output_preserve_empty() {
+    grep -a -v "SWF Runtime Loaded" | \
+    grep -a -v "=== SWF" | \
+    grep -a -v "\[Frame" | \
+    grep -a -v "\[Tag\]" | \
+    grep -a -v "\[DEBUG" || true
+}
+
 # Initialize results JSON file
 init_results_file() {
     local tests_to_run=("$@")
@@ -381,8 +390,16 @@ run_test() {
 
     local run_start=$(date +%s%3N)
 
+    # Check if test needs to preserve empty lines
+    local preserve_empty=$(parse_json_field "$test_dir/test_info.json" "['execution']['preserve_empty_lines']" 2>/dev/null || echo "false")
+
     # Run test and capture output, filter runtime messages
-    local output=$("$executable" 2>&1 | filter_output)
+    local output
+    if [[ "$preserve_empty" == "True" || "$preserve_empty" == "true" ]]; then
+        output=$("$executable" 2>&1 | filter_output_preserve_empty)
+    else
+        output=$("$executable" 2>&1 | filter_output)
+    fi
 
     local run_end=$(date +%s%3N)
     local run_time=$((run_end - run_start))

@@ -10,7 +10,8 @@
     "supporting": ["PUSH", "SET_VARIABLE", "TRACE"]
   },
   "execution": {
-    "type": "deterministic"
+    "type": "deterministic",
+    "preserve_empty_lines": true
   },
   "edge_cases_tested": [
     "get_existing_numeric_variable",
