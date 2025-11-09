@@ -1,17 +1,22 @@
 {
   "metadata": {
     "name": "new_method_swf_5",
-    "description": "Tests NEW_METHOD opcode (0x53) - creates new object by calling method on object as constructor. Includes built-in constructors (Array, Object, Date, String, Number, Boolean) and blank method name handling.",
+    "description": "Tests NEW_METHOD opcode (0x53) - creates new object by calling method on object as constructor. Includes built-in constructors (Array, Object, Date, String, Number, Boolean) with proper primitive value storage. Blank method name returns undefined as fallback until function objects are implemented.",
     "swf_version": 5,
     "fully_implemented": false,
+    "fully_implemented_no_graphics": false,
     "missing_features": [
-      "Function objects as constructors - current implementation only supports string properties containing constructor names, not actual function objects",
-      "User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported",
-      "Constructor return value handling - spec says constructor return value should be discarded and new object returned, but this isn't fully tested",
-      "Proper 'this' binding for constructor calls - requires full function object implementation",
-      "Prototype chain for constructed objects - advanced feature not implemented",
-      "String/Number/Boolean wrapper objects - constructors create objects but don't properly store wrapped primitive values",
-      "Test relies on variable system which has persistence issues, causing test to output 'undefined' instead of expected value"
+      "Function objects as constructors - when method name is blank, spec requires object to be invoked as constructor function (requires DEFINE_FUNCTION/function object infrastructure)",
+      "User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported; user-defined constructors require function object implementation",
+      "Proper 'this' binding for constructor calls - requires function object implementation with 'this' context support",
+      "Prototype chain for constructed objects - prototypes not yet implemented in object system",
+      "Constructor return value handling - spec requires discarding constructor return value and returning new object; not tested without function object support"
+    ],
+    "fixed_features": [
+      "String/Number/Boolean wrapper objects now properly store primitive values in 'valueOf' property",
+      "Variable persistence issue resolved - test correctly outputs array length",
+      "Array constructor properly handles length argument and element initialization",
+      "Built-in constructors (Array, Object, Date, String, Number, Boolean) all functional"
     ]
   },
   "opcodes": {
@@ -22,17 +27,19 @@
     "type": "deterministic"
   },
   "edge_cases_tested": [
-    "Array constructor with length argument",
-    "Blank method name handling (returns undefined)",
-    "Built-in constructor lookup via object property"
+    "Array constructor with length argument (new Array(5))",
+    "Built-in constructor lookup via object property",
+    "Variable storage and retrieval of objects",
+    "GET_MEMBER access to array.length property"
   ],
   "notes": [
     "Test creates object with constructor property ArrayCtor='Array'",
     "Uses NEW_METHOD to call obj.ArrayCtor(5) to create array with length 5",
-    "Currently has known issue with variable persistence during initialization",
+    "Variable persistence issue has been resolved - test outputs correct value",
     "Expected output: 5, NEW_METHOD test completed",
-    "Actual output may show 'undefined' due to variable system limitations",
-    "Blank method name handling added - returns undefined (function objects not implemented)",
-    "String, Number, Boolean constructors added but don't store primitive values yet"
+    "String/Number/Boolean wrapper objects now store primitive values in 'valueOf' property",
+    "Blank method name case returns undefined until function objects are implemented",
+    "User-defined constructors not supported - requires function object infrastructure (DEFINE_FUNCTION opcode, etc.)",
+    "Prototype chains not implemented - requires broader object system enhancements"
   ]
 }
