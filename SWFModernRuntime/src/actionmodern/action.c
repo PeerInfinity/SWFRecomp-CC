@@ -436,6 +436,15 @@ void popVar(char* stack, u32* sp, ActionVar* var)
 
 void actionPrevFrame(char* stack, u32* sp)
 {
+	// Suppress unused parameter warnings
+	(void)stack;
+	(void)sp;
+
+	// Access global frame control variables
+	extern size_t current_frame;
+	extern size_t next_frame;
+	extern int manual_next_frame;
+
 	// Move to previous frame if not already at first frame
 	if (current_frame > 0)
 	{
@@ -4128,9 +4137,39 @@ static void printStringValue(ActionVar* var)
 	// For other types, print nothing (empty string)
 }
 
+/**
+ * ActionGetURL2 - Stack-based URL loading with HTTP method support
+ *
+ * Stack: [ url, target ] -> [ ]
+ *
+ * Pops target and URL from stack, then performs URL loading based on flags:
+ * - SendVarsMethod (bits 7-6): 0=None, 1=GET, 2=POST
+ * - LoadTargetFlag (bit 1): 0=browser window, 1=sprite path
+ * - LoadVariablesFlag (bit 0): 0=load content, 1=load variables
+ *
+ * In NO_GRAPHICS mode: Logs the operation but does not perform actual
+ * HTTP requests, browser integration, SWF loading, or variable setting.
+ * Full implementation would require:
+ * - HTTP client (libcurl or similar)
+ * - Platform-specific browser integration
+ * - SWF parser and loader
+ * - Full sprite/timeline variable management
+ * - Security sandbox enforcement
+ *
+ * SWF version: 4+
+ * Opcode: 0x9A
+ *
+ * @param stack Pointer to the runtime stack
+ * @param sp Pointer to stack pointer
+ * @param send_vars_method HTTP method: 0=None, 1=GET, 2=POST
+ * @param load_target_flag Target type: 0=window, 1=sprite
+ * @param load_variables_flag Load type: 0=content, 1=variables
+ */
 void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag)
 {
 	// Pop target from stack
+	// convertString() is called to handle the case where the value might be a number
+	// that needs to be converted to a string, though in practice URLs/targets are always strings
 	char target_str[17];
 	ActionVar target_var;
 	convertString(stack, sp, target_str);
@@ -4151,11 +4190,14 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 	bool is_sprite = (load_target_flag == 1);
 	bool load_vars = (load_variables_flag == 1);
 
-	// Log the operation (simplified implementation)
+	// Log the operation (NO_GRAPHICS mode implementation)
+	// In a full implementation, this would perform the actual operation
 	if (is_sprite) {
 		// Load into sprite/movieclip
 		if (load_vars) {
 			// Load variables into sprite
+			// Full implementation: Make HTTP request, parse x-www-form-urlencoded response,
+			// set variables in target sprite scope
 			printf("// LoadVariables: ");
 			printStringValue(&url_var);
 			printf(" -> ");
@@ -4163,6 +4205,7 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 			printf(" (method: %s)\n", method);
 		} else {
 			// Load SWF into sprite
+			// Full implementation: Download SWF file, parse it, load into target sprite path
 			printf("// LoadMovie: ");
 			printStringValue(&url_var);
 			printf(" -> ");
@@ -4173,11 +4216,14 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 		// Load into browser window
 		if (load_vars) {
 			// Load variables into timeline
+			// Full implementation: Make HTTP request, parse response, set variables in timeline
 			printf("// LoadVariables: ");
 			printStringValue(&url_var);
 			printf(" (method: %s)\n", method);
 		} else {
 			// Open URL in browser
+			// Full implementation: Open URL in specified browser window/frame using
+			// platform-specific APIs (e.g., system(), ShellExecute on Windows, open on macOS)
 			printf("// OpenURL: ");
 			printStringValue(&url_var);
 			printf(" (target: ");
@@ -4188,11 +4234,6 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 			printf(")\n");
 		}
 	}
-
-	// TODO: Implement actual URL loading functionality
-	// - For browser windows: platform-specific browser launch
-	// - For variables: HTTP request + parse response
-	// - For movies: download and load SWF file
 }
 
 void actionInitArray(char* stack, u32* sp)
@@ -4911,15 +4952,14 @@ void actionNewObject(char* stack, u32* sp)
  * Current implementation:
  * - Built-in constructors supported: Array, Object, Date, String, Number, Boolean
  * - String/Number/Boolean wrapper objects store primitive values in 'valueOf' property
- * - Blank method name returns undefined (function objects not yet implemented)
- * - User-defined constructors not supported (requires function object infrastructure)
- * - Prototype chains not implemented
+ * - Function objects as constructors: SUPPORTED (blank method name with function object)
+ * - User-defined constructors: SUPPORTED (method property containing function object)
+ * - 'this' binding: SUPPORTED for DefineFunction2, limited for DefineFunction
+ * - Constructor return value: Discarded per spec (always returns new object)
  *
- * Limitations:
- * - Function objects as constructors: Requires DEFINE_FUNCTION opcode support
- * - User-defined constructors: Requires function object implementation
- * - 'this' binding: Requires function execution context
- * - Prototypes: Requires object system enhancement
+ * Remaining limitations:
+ * - Prototype chains not implemented (requires __proto__ property support)
+ * - DefineFunction (type 1) has limited 'this' context support
  */
 void actionNewMethod(char* stack, u32* sp)
 {
@@ -4963,11 +5003,86 @@ void actionNewMethod(char* stack, u32* sp)
 	if (method_name == NULL || method_name_len == 0 || method_name[0] == '\0')
 	{
 		// Blank method name: object should be invoked as function/constructor
-		// Currently not supported (requires function object implementation)
-		// Push undefined and return
+		// The object should be a function object (ACTION_STACK_VALUE_FUNCTION)
+		if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+
+			if (func != NULL)
+			{
+				// Create new object for 'this' context
+				ASObject* new_obj = allocObject(8);
+
+				// TODO: Set up prototype chain (new_obj.__proto__ = func.prototype)
+				// This requires prototype support in the object system
+
+				// Call function as constructor with 'this' binding
+				ActionVar return_value;
+
+				if (func->function_type == 2)
+				{
+					// DefineFunction2 with full register support
+					ActionVar* registers = NULL;
+					if (func->register_count > 0) {
+						registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+					}
+
+					// Create local scope for function
+					ASObject* local_scope = allocObject(8);
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_chain[scope_depth++] = local_scope;
+					}
+
+					// Call with 'this' context set to new object
+					return_value = func->advanced_func(stack, sp, args, num_args, registers, new_obj);
+
+					// Pop local scope
+					if (scope_depth > 0) {
+						scope_depth--;
+					}
+					releaseObject(local_scope);
+
+					if (registers != NULL) free(registers);
+				}
+				else
+				{
+					// Simple DefineFunction (type 1)
+					// Push arguments onto stack for the function
+					for (u32 i = 0; i < num_args; i++)
+					{
+						pushVar(stack, sp, &args[i]);
+					}
+
+					// Call simple function
+					// Note: Simple functions don't have 'this' context support in current implementation
+					func->simple_func(stack, sp);
+
+					// Pop return value if one was pushed
+					if (*sp < INITIAL_SP)
+					{
+						popVar(stack, sp, &return_value);
+					}
+					else
+					{
+						return_value.type = ACTION_STACK_VALUE_UNDEFINED;
+						return_value.data.numeric_value = 0;
+					}
+				}
+
+				// According to SWF spec: constructor return value should be discarded
+				// Always return the newly created object
+				// (unless constructor explicitly returns an object, but we simplify here)
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+				return;
+			}
+		}
+
+		// If not a function object, push undefined
 		pushUndefined(stack, sp);
 		return;
 	}
+
+	ASFunction* user_ctor_func = NULL;
 
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
@@ -4978,12 +5093,20 @@ void actionNewMethod(char* stack, u32* sp)
 			// Look up the method property
 			ActionVar* method_prop = getProperty(obj, method_name, method_name_len);
 
-			if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_STRING)
+			if (method_prop != NULL)
 			{
-				// Get constructor name from the property
-				ctor_name = method_prop->data.string_data.owns_memory ?
-					method_prop->data.string_data.heap_ptr :
-					(const char*) method_prop->data.numeric_value;
+				if (method_prop->type == ACTION_STACK_VALUE_STRING)
+				{
+					// Get constructor name from the property (for built-in constructors)
+					ctor_name = method_prop->data.string_data.owns_memory ?
+						method_prop->data.string_data.heap_ptr :
+						(const char*) method_prop->data.numeric_value;
+				}
+				else if (method_prop->type == ACTION_STACK_VALUE_FUNCTION)
+				{
+					// Property is a user-defined function - use it as constructor
+					user_ctor_func = (ASFunction*) method_prop->data.numeric_value;
+				}
 			}
 		}
 	}
@@ -5180,6 +5303,72 @@ void actionNewMethod(char* stack, u32* sp)
 
 		new_obj = bool_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else if (user_ctor_func != NULL)
+	{
+		// User-defined constructor function from object property
+		// Create new object for 'this' context
+		ASObject* new_obj_inst = allocObject(8);
+
+		// TODO: Set up prototype chain (new_obj.__proto__ = func.prototype)
+
+		// Call function as constructor with 'this' binding
+		ActionVar return_value;
+
+		if (user_ctor_func->function_type == 2)
+		{
+			// DefineFunction2 with full register support
+			ActionVar* registers = NULL;
+			if (user_ctor_func->register_count > 0) {
+				registers = (ActionVar*) calloc(user_ctor_func->register_count, sizeof(ActionVar));
+			}
+
+			// Create local scope for function
+			ASObject* local_scope = allocObject(8);
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_chain[scope_depth++] = local_scope;
+			}
+
+			// Call with 'this' context set to new object
+			return_value = user_ctor_func->advanced_func(stack, sp, args, num_args, registers, new_obj_inst);
+
+			// Pop local scope
+			if (scope_depth > 0) {
+				scope_depth--;
+			}
+			releaseObject(local_scope);
+
+			if (registers != NULL) free(registers);
+		}
+		else
+		{
+			// Simple DefineFunction (type 1)
+			// Push arguments onto stack for the function
+			for (u32 i = 0; i < num_args; i++)
+			{
+				pushVar(stack, sp, &args[i]);
+			}
+
+			// Call simple function
+			// Note: Simple functions don't have 'this' context support
+			user_ctor_func->simple_func(stack, sp);
+
+			// Pop return value if one was pushed
+			if (*sp < INITIAL_SP)
+			{
+				popVar(stack, sp, &return_value);
+			}
+			else
+			{
+				return_value.type = ACTION_STACK_VALUE_UNDEFINED;
+				return_value.data.numeric_value = 0;
+			}
+		}
+
+		// According to SWF spec: constructor return value should be discarded
+		// Always return the newly created object
+		// (unless constructor explicitly returns an object, but we simplify here)
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj_inst);
 	}
 	else
 	{

@@ -1,6 +1,6 @@
 # AS2 Opcode Index
 
-**Generated**: 2025-11-08
+**Generated**: 2025-11-09
 
 **Total Opcodes**: 100
 
@@ -12,9 +12,9 @@
 
 ## Implementation Progress
 
-**Fully Implemented Opcodes**: 76/100
+**Fully Implemented Opcodes**: 85/100
 
-**Fully Implemented Opcodes - No Graphics Mode**: 87/100
+**Fully Implemented Opcodes - No Graphics Mode**: 99/100
 
 **Opcodes with Primary Tests**: 99
 
@@ -59,7 +59,7 @@
 | 0X28 | ActionEndDrag | SWF_ACTION_END_DRAG | actionEndDrag | 1/1 |  |  | ✓ |  | ✓ |
 | 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess | 1/1 |  |  | ✓ | ✓ |  |
 | 0X2A | ActionThrow | SWF_ACTION_THROW | actionThrow | 2/2 |  |  | ✓ | ✓ |  |
-| 0X2B | ActionCastOp | SWF_ACTION_CAST_OP | actionCastOp | 1/1 |  |  | ✓ |  |  |
+| 0X2B | ActionCastOp | SWF_ACTION_CAST_OP | actionCastOp | 1/1 |  |  | ✓ | ✓ |  |
 | 0X2C | ActionImplementsOp | SWF_ACTION_IMPLEMENTS_OP | actionImplementsOp | 1/1 |  |  | ✓ | ✓ |  |
 | 0X30 | ActionRandomNumber | SWF_ACTION_RANDOM_NUMBER | actionRandomNumber | 1/1 |  |  | ✓ | ✓ |  |
 | 0X31 | ActionMBStringLength | SWF_ACTION_MB_STRING_LENGTH | actionMbStringLength | 1/1 |  |  | ✓ | ✓ |  |
@@ -75,16 +75,16 @@
 | 0X3D | ActionStackSwap | SWF_ACTION_CALL_FUNCTION | actionStackSwap | 1/1 | 2/2 |  | ✓ | ✓ |  |
 | 0X3E | ActionReturn | SWF_ACTION_RETURN | actionReturn | 1/1 | 3/3 |  | ✓ | ✓ |  |
 | 0X3F | ActionModulo | SWF_ACTION_MODULO | actionModulo | 1/1 |  |  | ✓ | ✓ |  |
-| 0X40 | ActionNewObject | SWF_ACTION_NEW_OBJECT | actionNewObject | 1/1 |  |  | ✓ |  |  |
+| 0X40 | ActionNewObject | SWF_ACTION_NEW_OBJECT | actionNewObject | 1/1 |  |  | ✓ | ✓ |  |
 | 0X41 | ActionDefineLocal2 | SWF_ACTION_DECLARE_LOCAL | actionDeclareLocal | 1/1 |  |  | ✓ | ✓ |  |
 | 0X42 | ActionInitArray | SWF_ACTION_INIT_ARRAY | actionInitArray | 1/1 |  |  | ✓ | ✓ |  |
 | 0X43 | ActionInitObject | SWF_ACTION_INIT_OBJECT | actionInitObject | 1/1 | 9/9 |  | ✓ | ✓ |  |
 | 0X44 | ActionTypeOf | SWF_ACTION_TYPEOF | actionTypeof | 1/1 | 2/2 |  | ✓ | ✓ |  |
-| 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath | 1/1 |  |  | ✓ |  |  |
-| 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate | 1/1 |  |  | ✓ |  |  |
+| 0X45 | ActionTargetPath | SWF_ACTION_TARGET_PATH | actionTargetPath | 1/1 |  |  | ✓ | ✓ |  |
+| 0X46 | ActionEnumerate | SWF_ACTION_ENUMERATE | actionEnumerate | 1/1 |  |  | ✓ | ✓ |  |
 | 0X47 | ActionAdd2 | SWF_ACTION_ADD2 | actionAdd2 | 1/1 |  |  | ✓ | ✓ |  |
 | 0X48 | ActionLess2 | SWF_ACTION_LESS2 | actionLess2 | 1/1 |  |  | ✓ | ✓ |  |
-| 0X49 | ActionEquals2 | SWF_ACTION_EQUALS2 | actionEquals2 | 1/1 |  |  | ✓ |  |  |
+| 0X49 | ActionEquals2 | SWF_ACTION_EQUALS2 | actionEquals2 | 1/1 |  |  | ✓ | ✓ |  |
 | 0X4A | ActionToNumber | SWF_ACTION_TO_NUMBER | actionToNumber | 1/1 |  |  | ✓ | ✓ |  |
 | 0X4B | ActionToString | SWF_ACTION_TO_STRING | actionToString | 1/1 |  |  | ✓ | ✓ |  |
 | 0X4C | ActionPushDuplicate | SWF_ACTION_DUPLICATE | actionDuplicate | 1/1 | 5/5 |  | ✓ | ✓ |  |
@@ -94,7 +94,7 @@
 | 0X50 | ActionIncrement | SWF_ACTION_INCREMENT | actionIncrement | 1/1 |  |  | ✓ | ✓ |  |
 | 0X51 | ActionDecrement | SWF_ACTION_DECREMENT | actionDecrement | 1/1 |  |  | ✓ | ✓ |  |
 | 0X52 | ActionCallMethod | SWF_ACTION_CALL_METHOD | actionCallMethod | 2/2 |  |  | ✓ | ✓ |  |
-| 0X53 | ActionNewMethod | SWF_ACTION_NEW_METHOD | actionNewMethod | 1/1 |  |  | ✓ |  |  |
+| 0X53 | ActionNewMethod | SWF_ACTION_NEW_METHOD | actionNewMethod | 1/1 |  |  | ✓ | ✓ | ✓ |
 | 0X54 | ActionInstanceOf | SWF_ACTION_INSTANCEOF | actionInstanceOf | 1/1 |  |  | ✓ | ✓ |  |
 | 0X55 | ActionEnumerate2 | SWF_ACTION_ENUMERATE2 | actionEnumerate2 | 1/1 |  |  | ✓ | ✓ |  |
 | 0X60 | ActionBitAnd | SWF_ACTION_BIT_AND | actionBitAnd | 1/1 |  |  | ✓ | ✓ |  |
@@ -106,24 +106,24 @@
 | 0X66 | ActionStrictEquals | SWF_ACTION_STRICT_EQUALS | actionStrictEquals | 1/1 | 1/1 |  | ✓ | ✓ |  |
 | 0X67 | ActionGreater | SWF_ACTION_GREATER | actionGreater | 1/1 |  |  | ✓ | ✓ |  |
 | 0X68 | ActionStringGreater | SWF_ACTION_STRING_GREATER | actionStringGreater | 1/1 |  |  | ✓ | ✓ |  |
-| 0X69 | ActionExtends | SWF_ACTION_EXTENDS | actionExtends | 1/1 |  |  | ✓ |  |  |
-| 0X81 | ActionGotoFrame | SWF_ACTION_GOTO_FRAME | actionGotoFrame | 1/1 | 1/1 |  | ✓ |  |  |
+| 0X69 | ActionExtends | SWF_ACTION_EXTENDS | actionExtends | 1/1 |  |  | ✓ | ✓ |  |
+| 0X81 | ActionGotoFrame | SWF_ACTION_GOTO_FRAME | actionGotoFrame | 1/1 | 1/1 |  | ✓ |  | ✓ |
 | 0X83 | ActionGetURL | SWF_ACTION_GET_URL | actionGetURL | 1/1 |  |  | ✓ |  | ✓ |
 | 0X87 | ActionStoreRegister | SWF_ACTION_STORE_REGISTER | actionStoreRegister | 1/1 |  |  | ✓ | ✓ |  |
 | 0X88 | ActionConstantPool | SWF_ACTION_CONSTANT_POOL |  | 4/4 |  |  | ✓ | ✓ |  |
 | 0X8A | ActionWaitForFrame | SWF_ACTION_WAIT_FOR_FRAME |  | 1/1 |  |  | ✓ | ✓ |  |
 | 0X8B | ActionSetTarget | SWF_ACTION_SET_TARGET | actionSetTarget | 1/1 |  |  | ✓ |  | ✓ |
-| 0X8C | ActionGoToLabel | SWF_ACTION_GOTO_LABEL | actionGoToLabel | 1/1 |  |  | ✓ |  |  |
+| 0X8C | ActionGoToLabel | SWF_ACTION_GOTO_LABEL | actionGoToLabel | 1/1 |  |  | ✓ | ✓ |  |
 | 0X8D | ActionWaitForFrame2 | SWF_ACTION_WAIT_FOR_FRAME2 |  | 1/1 |  |  | ✓ | ✓ |  |
-| 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 2/2 | 1/1 |  | ✓ |  |  |
+| 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 2/2 | 1/1 |  | ✓ | ✓ |  |
 | 0X8F | ActionTry | SWF_ACTION_TRY |  | 1/1 |  |  | ✓ | ✓ |  |
 | 0X94 | ActionWith | SWF_ACTION_WITH |  | 1/1 |  |  | ✓ | ✓ |  |
 | 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 113/113 |  | ✓ | ✓ |  |
 | 0X99 | ActionJump | SWF_ACTION_JUMP |  | 1/1 |  |  | ✓ | ✓ |  |
-| 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  |  |
+| 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  | ✓ |
 | 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  | 1/1 |  |  | ✓ | ✓ |  |
 | 0X9D | ActionIf | SWF_ACTION_IF |  | 2/2 |  |  | ✓ | ✓ |  |
-| 0X9E | ActionCall | SWF_ACTION_CALL | actionCall | 1/1 |  |  | ✓ |  |  |
+| 0X9E | ActionCall | SWF_ACTION_CALL | actionCall | 1/1 |  |  | ✓ |  | ✓ |
 | 0X9F | ActionGotoFrame2 | SWF_ACTION_GOTO_FRAME2 | actionGotoFrame2 | 1/1 |  |  | ✓ |  | ✓ |
 
 ## Passing Primary Tests
@@ -287,6 +287,7 @@
 | 0X26 | ActionTrace | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X29 | ActionStringLess | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X2A | ActionThrow | ✓ | ✓ | 2/2 |  | ✓ |  |
+| 0X2B | ActionCastOp | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X2C | ActionImplementsOp | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X30 | ActionRandomNumber | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X31 | ActionMBStringLength | ✓ | ✓ | 1/1 |  | ✓ |  |
@@ -302,12 +303,16 @@
 | 0X3D | ActionStackSwap | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X3E | ActionReturn | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X3F | ActionModulo | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X40 | ActionNewObject | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X41 | ActionDefineLocal2 | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X42 | ActionInitArray | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X43 | ActionInitObject | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X44 | ActionTypeOf | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X45 | ActionTargetPath | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X46 | ActionEnumerate | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X47 | ActionAdd2 | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X48 | ActionLess2 | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X49 | ActionEquals2 | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X4A | ActionToNumber | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X4B | ActionToString | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X4C | ActionPushDuplicate | ✓ | ✓ | 1/1 |  | ✓ |  |
@@ -317,6 +322,7 @@
 | 0X50 | ActionIncrement | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X51 | ActionDecrement | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X52 | ActionCallMethod | ✓ | ✓ | 2/2 |  | ✓ |  |
+| 0X53 | ActionNewMethod | ✓ | ✓ | 1/1 |  | ✓ | ✓ |
 | 0X54 | ActionInstanceOf | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X55 | ActionEnumerate2 | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X60 | ActionBitAnd | ✓ | ✓ | 1/1 |  | ✓ |  |
@@ -328,10 +334,13 @@
 | 0X66 | ActionStrictEquals | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X67 | ActionGreater | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X68 | ActionStringGreater | ✓ | ✓ | 1/1 |  | ✓ |  |
+| 0X69 | ActionExtends | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X87 | ActionStoreRegister | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X88 | ActionConstantPool | ✓ |  | 4/4 |  | ✓ |  |
 | 0X8A | ActionWaitForFrame | ✓ |  | 1/1 |  | ✓ |  |
+| 0X8C | ActionGoToLabel | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X8D | ActionWaitForFrame2 | ✓ |  | 1/1 |  | ✓ |  |
+| 0X8E | ActionDefineFunction2 | ✓ | ✓ | 2/2 |  | ✓ |  |
 | 0X8F | ActionTry | ✓ |  | 1/1 |  | ✓ |  |
 | 0X94 | ActionWith | ✓ |  | 1/1 |  | ✓ |  |
 | 0X96 | ActionPush | ✓ |  | 1/1 |  | ✓ |  |
@@ -353,18 +362,9 @@
 | 0X25 | ActionRemoveSprite | ✓ | ✓ | ✓ |
 | 0X27 | ActionStartDrag | ✓ | ✓ | ✓ |
 | 0X28 | ActionEndDrag | ✓ | ✓ | ✓ |
-| 0X2B | ActionCastOp | ✓ | ✓ | ✓ |
-| 0X40 | ActionNewObject | ✓ | ✓ | ✓ |
-| 0X45 | ActionTargetPath | ✓ | ✓ | ✓ |
-| 0X46 | ActionEnumerate | ✓ | ✓ | ✓ |
-| 0X49 | ActionEquals2 | ✓ | ✓ | ✓ |
-| 0X53 | ActionNewMethod | ✓ | ✓ | ✓ |
-| 0X69 | ActionExtends | ✓ | ✓ | ✓ |
 | 0X81 | ActionGotoFrame | ✓ | ✓ | ✓ |
 | 0X83 | ActionGetURL | ✓ | ✓ | ✓ |
 | 0X8B | ActionSetTarget | ✓ | ✓ | ✓ |
-| 0X8C | ActionGoToLabel | ✓ | ✓ | ✓ |
-| 0X8E | ActionDefineFunction2 | ✓ | ✓ | ✓ |
 | 0X9A | ActionGetURL2 | ✓ | ✓ | ✓ |
 | 0X9E | ActionCall | ✓ | ✓ | ✓ |
 | 0X9F | ActionGotoFrame2 | ✓ | ✓ | ✓ |
@@ -435,86 +435,10 @@ This section lists all missing features for opcodes that are not fully implement
 - Only tested uncaught exceptions (requires ActionTry 0x8F for full testing)
 
 
-### 0X2B: ActionCastOp
-
-**From test `cast_op_swf_7`:**
-- Complete prototype chain testing requires DefineFunction for creating constructor functions
-- Interface implementation testing requires proper ImplementsOp setup
-- Successful cast test (matching prototype chain) not included due to test complexity
-- Test only validates failure cases and doesn't crash behavior, not successful cast scenarios
-
-
-### 0X40: ActionNewObject
-
-**From test `new_object_swf_4`:**
-- Object property setting/getting has a bug (SET_MEMBER or GET_MEMBER issue, not NEW_OBJECT)
-- User-defined constructor functions not supported
-- Constructor function invocation with 'this' binding not implemented
-- Built-in constructors beyond Array and Object not implemented (Date, String, Number, Boolean, etc.)
-- Constructor return value handling not implemented
-- Prototype chain initialization not implemented
-
-
-### 0X45: ActionTargetPath
-
-**From test `target_path_swf_5`:**
-- MovieClip infrastructure not implemented - cannot return actual target paths for MovieClips
-- Display list hierarchy not available - cannot navigate or represent nested MovieClips
-- Path construction not implemented - returns placeholder '_root' instead of actual paths like '_root.mc1.mc2'
-- Test coverage: missing Object type test (would require INIT_OBJECT opcode support)
-
-
-### 0X46: ActionEnumerate
-
-**From test `enumerate_swf_4`:**
-- Prototype chain enumeration - ASObject structure lacks prototype field, so inherited properties are not enumerated (required for full ActionScript compliance)
-- DontEnum property filtering - No mechanism to mark properties as non-enumerable per ECMA-262 standard (all properties are currently enumerated)
-- Slash-path/dot-path variable resolution - Spec mentions support for paths like '/path/to/obj' or 'obj.prop' but this is untested
-- Property enumeration metadata - No support for property attributes (enumerable, writable, configurable)
-
-
-### 0X49: ActionEquals2
-
-**From test `equals2_swf_5`:**
-- Boolean type support not available in recompiler (cannot test true == 1, false == 0)
-- Null type support not available in recompiler (cannot test null == undefined, null == 0)
-- Additional edge case testing limited by test framework (NaN, Infinity, empty string tests would benefit from dedicated test files)
-- Object reference equality not tested (requires object creation support)
-
-
-### 0X53: ActionNewMethod
-
-**From test `new_method_swf_5`:**
-- Function objects as constructors - current implementation only supports string properties containing constructor names, not actual function objects
-- User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported
-- Constructor return value handling - spec says constructor return value should be discarded and new object returned, but this isn't fully tested
-- Proper 'this' binding for constructor calls - requires full function object implementation
-- Prototype chain for constructed objects - advanced feature not implemented
-- String/Number/Boolean wrapper objects - constructors create objects but don't properly store wrapped primitive values
-- Test relies on variable system which has persistence issues, causing test to output 'undefined' instead of expected value
-
-
-### 0X69: ActionExtends
-
-**From test `extends_swf_7`:**
-- Constructor property not set correctly - Dog.prototype.constructor should equal Animal but comparison fails
-- Prototype chain traversal not implemented - GET_MEMBER only searches own properties, not __proto__ chain
-- instanceof opcode doesn't use prototype chain - always returns false (requires prototype chain support)
-- NEW_OBJECT not fully functional with inheritance
-- Method inheritance not working - child instances cannot call parent methods via prototype chain
-
-
 ### 0X81: ActionGotoFrame
 
 **From test `goto_frame_swf_3`:**
-- Actual frame navigation not implemented (only logs the frame index)
-- Timeline jump semantics not implemented (go to frame N and stop)
-- Frame execution order after jump not handled
-- Stop/play state management after frame jump
-- Display list updates on frame change
-- Frame boundary validation (checking if target frame exists)
-- Integration with MovieClip timeline system
-- Proper handling of frame cycling and loops
+- Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)
 
 
 ### 0X83: ActionGetURL
@@ -535,52 +459,25 @@ This section lists all missing features for opcodes that are not fully implement
 - In NO_GRAPHICS mode, only _root is available as a valid target - all other target names are treated as 'not found'
 
 
-### 0X8C: ActionGoToLabel
-
-**From test `goto_label_swf_3`:**
-- FrameLabel tag parsing and storage (tag type 43)
-- Frame structure does not have label field
-- Frame lookup by label functionality not implemented
-- MovieClip/Timeline infrastructure not implemented
-- Actual frame navigation not implemented
-- Playback control (play/stop) not implemented
-- Frame action execution on arrival not implemented
-- Current implementation only logs the label string
-
-
-### 0X8E: ActionDefineFunction2
-
-**From test `define_function2_swf_7`:**
-- PreloadArguments flag: arguments object creation not implemented
-- PreloadSuper flag: super reference not implemented
-- PreloadRoot flag: _root preloading not implemented
-- PreloadParent flag: _parent preloading not implemented
-- PreloadGlobal flag: _global preloading not implemented
-- Variable parameters (register=0) not tested (code generated but untested)
-- Nested DefineFunction2 functions not tested
-- Anonymous functions (empty name) not tested
-
-
 ### 0X9A: ActionGetURL2
 
 **From test `get_url2_swf_4`:**
-- HTTP client functionality - no actual GET/POST requests made
-- Variable encoding (x-www-form-urlencoded) - movie clip variables not sent with requests
-- Variable parsing from HTTP response - response not parsed into ActionScript variables
-- Setting variables in target scope - variables from response not set in timeline or sprite
-- SWF file downloading and loading - external SWF files not actually loaded
-- MovieClip/sprite management - sprite paths not resolved, no actual sprite loading
-- Browser window integration - URLs not opened in actual browser windows
-- Security sandbox enforcement - no cross-domain restrictions implemented
+- Actual HTTP client functionality (requires libcurl or similar HTTP library)
+- Variable encoding to x-www-form-urlencoded format (requires variable enumeration)
+- HTTP response parsing (requires HTTP client and response parser)
+- Setting variables in target scope from response (requires full variable/scope management)
+- SWF file downloading and loading (requires HTTP client and SWF parser/loader)
+- MovieClip/sprite path resolution and management (requires full sprite hierarchy)
+- Browser window integration (requires platform-specific OS APIs)
+- Cross-domain security policy enforcement (requires security sandbox infrastructure)
 
 
 ### 0X9E: ActionCall
 
 **From test `call_swf_4`:**
-- Frame labels not supported (would require SWFRecomp to generate label->frame mapping)
-- Target path parsing not implemented (e.g., '/movieclip:frame')
-- Multi-MovieClip support not implemented (only main timeline supported)
-- Test coverage: need multi-frame test to verify actual frame execution
+- Frame label registry (requires SWFRecomp to parse FrameLabel tag 43 and generate label->frame mapping - graphics-only)
+- MovieClip tree for target paths (requires full MovieClip infrastructure - graphics-only)
+- Multi-MovieClip support (requires MovieClip context switching - graphics-only)
 
 
 ### 0X9F: ActionGotoFrame2

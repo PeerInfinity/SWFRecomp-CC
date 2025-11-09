@@ -29,6 +29,7 @@ struct MovieClip {
 	char quality[16];      // Property 19: _quality ("LOW", "MEDIUM", "HIGH", "BEST")
 	float xmouse;
 	float ymouse;
+	MovieClip* parent;     // Parent MovieClip (_root has NULL parent)
 };
 
 // Global root MovieClip

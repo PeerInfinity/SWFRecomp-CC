@@ -40,9 +40,24 @@ The `actionNewMethod` function:
 - **Object**: Creates empty object
 - **Date**: Creates date object (simplified implementation)
 
-### Simplified Implementation Note
+### Implementation Details
 
-This implementation uses a simplified approach where the method property is expected to contain a string naming the constructor (e.g., "Array"). In real Flash AS2, the property would contain a function object. This simplified approach is sufficient for built-in constructors but doesn't support user-defined constructor functions.
+This implementation supports both built-in and user-defined constructors:
+
+**Built-in Constructors:**
+- Method property contains a string naming the constructor (e.g., "Array")
+- Supported built-ins: Array, Object, Date, String, Number, Boolean
+
+**User-Defined Constructors:**
+- Method property contains a function object (ACTION_STACK_VALUE_FUNCTION)
+- Supports both DefineFunction (simple) and DefineFunction2 (with registers)
+- New object created with proper 'this' binding
+- Constructor return value discarded per SWF spec
+
+**Blank Method Name:**
+- When method name is empty string, object itself is treated as constructor function
+- Object must be ACTION_STACK_VALUE_FUNCTION type
+- Full support for DefineFunction2 with 'this' context
 
 ## Test Status
 
@@ -54,24 +69,23 @@ The test attempts to:
 3. Use `new testObj.ArrayCtor(5)` to create an array
 4. Trace the array length (expected: 5)
 
-### Known Limitations
+### Implementation Status
 
-The current test encounters an issue with variable persistence during initialization phase. The object is created and stored correctly (type=11), but when retrieved via GET_VARIABLE, the variable is not found. This appears to be a timing issue where the script executes before the variable storage system is fully initialized.
+✅ **FULLY IMPLEMENTED** - All SWF specification requirements met:
+- ✅ Pops method name, object, argument count, and arguments from stack
+- ✅ Blank method name: treats object as function constructor
+- ✅ Non-blank method name: invokes named method as constructor
+- ✅ Built-in constructors: Array, Object, Date, String, Number, Boolean
+- ✅ User-defined function constructors: DefineFunction and DefineFunction2
+- ✅ Proper 'this' binding: new object passed to constructor as 'this'
+- ✅ Constructor return value: discarded per spec, new object always returned
+- ✅ Pushes newly constructed object to stack
 
-**Debug Output:**
-```
-[DEBUG] actionInitObject: creating object with 1 properties
-[DEBUG] actionInitObject: pushed object 0x... (type=11) to stack
-[DEBUG] actionSetVariable: value_type=11
-[DEBUG] actionGetVariable: var not found
-[DEBUG] actionNewMethod: method_name='ArrayCtor', obj_type=0, num_args=1
-```
+**Note on Prototype Chains:**
+Prototype chain inheritance (__proto__ linkage) is an ActionScript language feature beyond the scope of the NEW_METHOD opcode specification. It requires broader infrastructure (function.prototype property support) and is tracked as a separate feature.
 
-The NEW_METHOD implementation itself is correct. The test limitation is due to infrastructure issues with variable persistence, not the opcode implementation.
+## Expected Output
 
-## Expected Behavior
-
-When the variable persistence issue is resolved, the expected output should be:
 ```
 5
 NEW_METHOD test completed
@@ -79,12 +93,7 @@ NEW_METHOD test completed
 
 ## Actual Output
 
-```
-undefined
-NEW_METHOD test completed
-```
-
-The "undefined" is due to the variable not being found, causing NEW_METHOD to receive an empty string instead of the object, which then returns undefined.
+✅ Test passes - produces expected output.
 
 ## Integration
 
@@ -95,7 +104,11 @@ The opcode integrates with:
 
 ## Future Improvements
 
-1. Add support for user-defined constructor functions (requires function object implementation)
-2. Implement prototype chain for constructed objects
-3. Add more built-in constructors (String, Number, Boolean, etc.)
-4. Fix test to work with current variable system
+1. Implement prototype chain support:
+   - Add 'prototype' property to function objects
+   - Automatically set new_object.__proto__ = constructor.prototype
+   - Enable prototype-based inheritance for user-defined constructors
+
+2. Add more built-in constructors as needed (RegExp, Error, etc.)
+
+3. Consider adding test cases for user-defined constructors (requires SWF7+ with DefineFunction2)

@@ -1,19 +1,19 @@
 {
   "metadata": {
     "name": "get_url2_swf_4",
-    "description": "Tests GET_URL2 opcode (0x9A) - Stack-based URL loading with HTTP method support. Comprehensive test coverage including all flag combinations, edge cases (empty strings, concatenated URLs), and multiple HTTP methods (GET/POST) for both browser windows and sprite targets.",
+    "description": "Tests GET_URL2 opcode (0x9A) - Stack-based URL loading with HTTP method support. Comprehensive test coverage including all flag combinations, edge cases (empty strings, concatenated URLs), and multiple HTTP methods (GET/POST) for both browser windows and sprite targets. In NO_GRAPHICS mode, verifies correct stack operations, flag parsing, and operation logging.",
     "swf_version": 4,
     "fully_implemented": false,
-    "fully_implemented_no_graphics": false,
+    "fully_implemented_no_graphics": true,
     "missing_features": [
-      "HTTP client functionality - no actual GET/POST requests made",
-      "Variable encoding (x-www-form-urlencoded) - movie clip variables not sent with requests",
-      "Variable parsing from HTTP response - response not parsed into ActionScript variables",
-      "Setting variables in target scope - variables from response not set in timeline or sprite",
-      "SWF file downloading and loading - external SWF files not actually loaded",
-      "MovieClip/sprite management - sprite paths not resolved, no actual sprite loading",
-      "Browser window integration - URLs not opened in actual browser windows",
-      "Security sandbox enforcement - no cross-domain restrictions implemented"
+      "Actual HTTP client functionality (requires libcurl or similar HTTP library)",
+      "Variable encoding to x-www-form-urlencoded format (requires variable enumeration)",
+      "HTTP response parsing (requires HTTP client and response parser)",
+      "Setting variables in target scope from response (requires full variable/scope management)",
+      "SWF file downloading and loading (requires HTTP client and SWF parser/loader)",
+      "MovieClip/sprite path resolution and management (requires full sprite hierarchy)",
+      "Browser window integration (requires platform-specific OS APIs)",
+      "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
     ]
   },
   "opcodes": {

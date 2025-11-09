@@ -46,8 +46,8 @@ actions.append(bytes([0x45]))
 actions.append(bytes([0x26]))
 
 # Test 4: targetPath(undefined) - should return undefined
-# PUSH undefined (type 5)
-push_data = struct.pack('<B', 5)
+# PUSH undefined (type 3)
+push_data = struct.pack('<B', 3)
 actions.append(struct.pack('<BH', 0x96, len(push_data)) + push_data)
 # TARGET_PATH
 actions.append(bytes([0x45]))

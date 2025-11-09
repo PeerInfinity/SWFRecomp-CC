@@ -75,22 +75,24 @@ void swfStart(SWFAppContext* app_context)
 			break;
 		}
 
-		// Check if we should continue playing
-		if (!is_playing)
-		{
-			// Stopped - exit loop
-			break;
-		}
-
 		// Advance to next frame
+		// IMPORTANT: Process manual_next_frame BEFORE checking is_playing
+		// This ensures that gotoFrame/gotoAndStop commands execute the target frame
+		// even when they stop playback
 		if (manual_next_frame)
 		{
 			current_frame = next_frame;
 			manual_next_frame = 0;
 		}
+		else if (is_playing)
+		{
+			// Only advance naturally if we're still playing
+			current_frame++;
+		}
 		else
 		{
-			current_frame++;
+			// Stopped and no manual jump - exit loop
+			break;
 		}
 	}
 

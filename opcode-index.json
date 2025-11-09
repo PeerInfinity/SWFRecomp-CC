@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_date": "2025-11-08",
+    "generated_date": "2025-11-09",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287
@@ -84,7 +84,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 126)"
+      "notes": "Runtime function (action.h line 160)"
     },
     {
       "hex": "0X05",
@@ -147,7 +147,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 76)"
+      "notes": "Runtime function (action.h line 107)"
     },
     {
       "hex": "0X06",
@@ -228,7 +228,7 @@
           "SetTarget support: Cannot control individual sprite/MovieClip timelines (requires MovieClip architecture not available in NO_GRAPHICS mode)"
         ]
       },
-      "notes": "Runtime function (action.h line 127)"
+      "notes": "Runtime function (action.h line 161)"
     },
     {
       "hex": "0X07",
@@ -369,7 +369,7 @@
           "Graphics rendering not implemented (requires SDL3/Vulkan) - quality toggle has no visible effect in NO_GRAPHICS mode"
         ]
       },
-      "notes": "Runtime function (action.h line 77)"
+      "notes": "Runtime function (action.h line 108)"
     },
     {
       "hex": "0X09",
@@ -432,7 +432,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 132)"
+      "notes": "Runtime function (action.h line 166)"
     },
     {
       "hex": "0X0A",
@@ -531,7 +531,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 79)"
+      "notes": "Runtime function (action.h line 110)"
     },
     {
       "hex": "0X0B",
@@ -594,7 +594,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 81)"
+      "notes": "Runtime function (action.h line 112)"
     },
     {
       "hex": "0X0C",
@@ -657,7 +657,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 82)"
+      "notes": "Runtime function (action.h line 113)"
     },
     {
       "hex": "0X0D",
@@ -732,7 +732,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 83)"
+      "notes": "Runtime function (action.h line 114)"
     },
     {
       "hex": "0X0E",
@@ -795,7 +795,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 85)"
+      "notes": "Runtime function (action.h line 116)"
     },
     {
       "hex": "0X0F",
@@ -864,7 +864,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 86)"
+      "notes": "Runtime function (action.h line 117)"
     },
     {
       "hex": "0X10",
@@ -951,7 +951,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 89)"
+      "notes": "Runtime function (action.h line 120)"
     },
     {
       "hex": "0X11",
@@ -1014,7 +1014,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 90)"
+      "notes": "Runtime function (action.h line 121)"
     },
     {
       "hex": "0X12",
@@ -1077,7 +1077,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 91)"
+      "notes": "Runtime function (action.h line 122)"
     },
     {
       "hex": "0X13",
@@ -1146,7 +1146,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 105)"
+      "notes": "Runtime function (action.h line 139)"
     },
     {
       "hex": "0X14",
@@ -1209,7 +1209,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 106)"
+      "notes": "Runtime function (action.h line 140)"
     },
     {
       "hex": "0X15",
@@ -1272,7 +1272,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 107)"
+      "notes": "Runtime function (action.h line 141)"
     },
     {
       "hex": "0X17",
@@ -1401,7 +1401,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 92)"
+      "notes": "Runtime function (action.h line 123)"
     },
     {
       "hex": "0X1C",
@@ -1530,7 +1530,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 115)"
+      "notes": "Runtime function (action.h line 149)"
     },
     {
       "hex": "0X1D",
@@ -1653,7 +1653,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 116)"
+      "notes": "Runtime function (action.h line 150)"
     },
     {
       "hex": "0X20",
@@ -1740,7 +1740,7 @@
           "Advanced path syntax not supported: dot notation (sprite1.sprite2), relative paths (../sprite), special targets (_parent, this)"
         ]
       },
-      "notes": "Runtime function (action.h line 117)"
+      "notes": "Runtime function (action.h line 151)"
     },
     {
       "hex": "0X21",
@@ -1827,7 +1827,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 110)"
+      "notes": "Runtime function (action.h line 144)"
     },
     {
       "hex": "0X22",
@@ -1890,7 +1890,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 120)"
+      "notes": "Runtime function (action.h line 154)"
     },
     {
       "hex": "0X23",
@@ -1953,7 +1953,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 121)"
+      "notes": "Runtime function (action.h line 155)"
     },
     {
       "hex": "0X24",
@@ -2031,7 +2031,7 @@
           "Actual sprite cloning only works with graphics support - NO_GRAPHICS mode validates parameters only"
         ]
       },
-      "notes": "Runtime function (action.h line 122)"
+      "notes": "Runtime function (action.h line 156)"
     },
     {
       "hex": "0X25",
@@ -2112,7 +2112,7 @@
           "Graphics mode: Actual sprite removal and resource cleanup requires SDL3/Vulkan rendering"
         ]
       },
-      "notes": "Runtime function (action.h line 123)"
+      "notes": "Runtime function (action.h line 157)"
     },
     {
       "hex": "0X26",
@@ -2847,7 +2847,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 129)"
+      "notes": "Runtime function (action.h line 163)"
     },
     {
       "hex": "0X27",
@@ -2922,7 +2922,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 130)"
+      "notes": "Runtime function (action.h line 164)"
     },
     {
       "hex": "0X28",
@@ -3003,7 +3003,7 @@
           "Display list integration: finding and updating sprites in the display list"
         ]
       },
-      "notes": "Runtime function (action.h line 131)"
+      "notes": "Runtime function (action.h line 165)"
     },
     {
       "hex": "0X29",
@@ -3066,7 +3066,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 111)"
+      "notes": "Runtime function (action.h line 145)"
     },
     {
       "hex": "0X2A",
@@ -3162,7 +3162,7 @@
           "Only tested uncaught exceptions (requires ActionTry 0x8F for full testing)"
         ]
       },
-      "notes": "Runtime function (action.h line 183)"
+      "notes": "Runtime function (action.h line 217)"
     },
     {
       "hex": "0X2B",
@@ -3180,16 +3180,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "cast_op_swf_7": [
-          "Complete prototype chain testing requires DefineFunction for creating constructor functions",
-          "Interface implementation testing requires proper ImplementsOp setup",
-          "Successful cast test (matching prototype chain) not included due to test complexity",
-          "Test only validates failure cases and doesn't crash behavior, not successful cast scenarios"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 7141)"
     },
     {
@@ -3208,16 +3201,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "cast_op_swf_7": [
-          "Complete prototype chain testing requires DefineFunction for creating constructor functions",
-          "Interface implementation testing requires proper ImplementsOp setup",
-          "Successful cast test (matching prototype chain) not included due to test complexity",
-          "Test only validates failure cases and doesn't crash behavior, not successful cast scenarios"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -3236,17 +3222,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "cast_op_swf_7": [
-          "Complete prototype chain testing requires DefineFunction for creating constructor functions",
-          "Interface implementation testing requires proper ImplementsOp setup",
-          "Successful cast test (matching prototype chain) not included due to test complexity",
-          "Test only validates failure cases and doesn't crash behavior, not successful cast scenarios"
-        ]
-      },
-      "notes": "Runtime function (action.h line 140)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 174)"
     },
     {
       "hex": "0X2C",
@@ -3309,7 +3288,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 112)"
+      "notes": "Runtime function (action.h line 146)"
     },
     {
       "hex": "0X30",
@@ -3372,7 +3351,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 134)"
+      "notes": "Runtime function (action.h line 168)"
     },
     {
       "hex": "0X31",
@@ -3435,7 +3414,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 108)"
+      "notes": "Runtime function (action.h line 142)"
     },
     {
       "hex": "0X32",
@@ -3498,7 +3477,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 113)"
+      "notes": "Runtime function (action.h line 147)"
     },
     {
       "hex": "0X33",
@@ -3561,7 +3540,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 135)"
+      "notes": "Runtime function (action.h line 169)"
     },
     {
       "hex": "0X34",
@@ -3624,7 +3603,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 137)"
+      "notes": "Runtime function (action.h line 171)"
     },
     {
       "hex": "0X35",
@@ -3687,7 +3666,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 109)"
+      "notes": "Runtime function (action.h line 143)"
     },
     {
       "hex": "0X36",
@@ -3750,7 +3729,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 136)"
+      "notes": "Runtime function (action.h line 170)"
     },
     {
       "hex": "0X37",
@@ -3825,7 +3804,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 138)"
+      "notes": "Runtime function (action.h line 172)"
     },
     {
       "hex": "0X3A",
@@ -3888,7 +3867,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 150)"
+      "notes": "Runtime function (action.h line 184)"
     },
     {
       "hex": "0X3B",
@@ -3951,7 +3930,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 151)"
+      "notes": "Runtime function (action.h line 185)"
     },
     {
       "hex": "0X3C",
@@ -4014,7 +3993,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 118)"
+      "notes": "Runtime function (action.h line 152)"
     },
     {
       "hex": "0X3D",
@@ -4095,7 +4074,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 95)"
+      "notes": "Runtime function (action.h line 126)"
     },
     {
       "hex": "0X3E",
@@ -4182,7 +4161,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 142)"
+      "notes": "Runtime function (action.h line 176)"
     },
     {
       "hex": "0X3F",
@@ -4245,7 +4224,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 84)"
+      "notes": "Runtime function (action.h line 115)"
     },
     {
       "hex": "0X40",
@@ -4263,18 +4242,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "new_object_swf_4": [
-          "Object property setting/getting has a bug (SET_MEMBER or GET_MEMBER issue, not NEW_OBJECT)",
-          "User-defined constructor functions not supported",
-          "Constructor function invocation with 'this' binding not implemented",
-          "Built-in constructors beyond Array and Object not implemented (Date, String, Number, Boolean, etc.)",
-          "Constructor return value handling not implemented",
-          "Prototype chain initialization not implemented"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6216)"
     },
     {
@@ -4293,18 +4263,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "new_object_swf_4": [
-          "Object property setting/getting has a bug (SET_MEMBER or GET_MEMBER issue, not NEW_OBJECT)",
-          "User-defined constructor functions not supported",
-          "Constructor function invocation with 'this' binding not implemented",
-          "Built-in constructors beyond Array and Object not implemented (Date, String, Number, Boolean, etc.)",
-          "Constructor return value handling not implemented",
-          "Prototype chain initialization not implemented"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4323,19 +4284,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "new_object_swf_4": [
-          "Object property setting/getting has a bug (SET_MEMBER or GET_MEMBER issue, not NEW_OBJECT)",
-          "User-defined constructor functions not supported",
-          "Constructor function invocation with 'this' binding not implemented",
-          "Built-in constructors beyond Array and Object not implemented (Date, String, Number, Boolean, etc.)",
-          "Constructor return value handling not implemented",
-          "Prototype chain initialization not implemented"
-        ]
-      },
-      "notes": "Runtime function (action.h line 172)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 206)"
     },
     {
       "hex": "0X41",
@@ -4398,7 +4350,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 119)"
+      "notes": "Runtime function (action.h line 153)"
     },
     {
       "hex": "0X42",
@@ -4461,7 +4413,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 143)"
+      "notes": "Runtime function (action.h line 177)"
     },
     {
       "hex": "0X43",
@@ -4584,7 +4536,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 169)"
+      "notes": "Runtime function (action.h line 203)"
     },
     {
       "hex": "0X44",
@@ -4665,7 +4617,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 139)"
+      "notes": "Runtime function (action.h line 173)"
     },
     {
       "hex": "0X45",
@@ -4683,16 +4635,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "target_path_swf_5": [
-          "MovieClip infrastructure not implemented - cannot return actual target paths for MovieClips",
-          "Display list hierarchy not available - cannot navigate or represent nested MovieClips",
-          "Path construction not implemented - returns placeholder '_root' instead of actual paths like '_root.mc1.mc2'",
-          "Test coverage: missing Object type test (would require INIT_OBJECT opcode support)"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6268)"
     },
     {
@@ -4711,16 +4656,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "target_path_swf_5": [
-          "MovieClip infrastructure not implemented - cannot return actual target paths for MovieClips",
-          "Display list hierarchy not available - cannot navigate or represent nested MovieClips",
-          "Path construction not implemented - returns placeholder '_root' instead of actual paths like '_root.mc1.mc2'",
-          "Test coverage: missing Object type test (would require INIT_OBJECT opcode support)"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4739,17 +4677,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "target_path_swf_5": [
-          "MovieClip infrastructure not implemented - cannot return actual target paths for MovieClips",
-          "Display list hierarchy not available - cannot navigate or represent nested MovieClips",
-          "Path construction not implemented - returns placeholder '_root' instead of actual paths like '_root.mc1.mc2'",
-          "Test coverage: missing Object type test (would require INIT_OBJECT opcode support)"
-        ]
-      },
-      "notes": "Runtime function (action.h line 98)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 129)"
     },
     {
       "hex": "0X46",
@@ -4767,16 +4698,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "enumerate_swf_4": [
-          "Prototype chain enumeration - ASObject structure lacks prototype field, so inherited properties are not enumerated (required for full ActionScript compliance)",
-          "DontEnum property filtering - No mechanism to mark properties as non-enumerable per ECMA-262 standard (all properties are currently enumerated)",
-          "Slash-path/dot-path variable resolution - Spec mentions support for paths like '/path/to/obj' or 'obj.prop' but this is untested",
-          "Property enumeration metadata - No support for property attributes (enumerable, writable, configurable)"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6044)"
     },
     {
@@ -4795,16 +4719,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "enumerate_swf_4": [
-          "Prototype chain enumeration - ASObject structure lacks prototype field, so inherited properties are not enumerated (required for full ActionScript compliance)",
-          "DontEnum property filtering - No mechanism to mark properties as non-enumerable per ECMA-262 standard (all properties are currently enumerated)",
-          "Slash-path/dot-path variable resolution - Spec mentions support for paths like '/path/to/obj' or 'obj.prop' but this is untested",
-          "Property enumeration metadata - No support for property attributes (enumerable, writable, configurable)"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -4823,17 +4740,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "enumerate_swf_4": [
-          "Prototype chain enumeration - ASObject structure lacks prototype field, so inherited properties are not enumerated (required for full ActionScript compliance)",
-          "DontEnum property filtering - No mechanism to mark properties as non-enumerable per ECMA-262 standard (all properties are currently enumerated)",
-          "Slash-path/dot-path variable resolution - Spec mentions support for paths like '/path/to/obj' or 'obj.prop' but this is untested",
-          "Property enumeration metadata - No support for property attributes (enumerable, writable, configurable)"
-        ]
-      },
-      "notes": "Runtime function (action.h line 99)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 130)"
     },
     {
       "hex": "0X47",
@@ -4896,7 +4806,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 80)"
+      "notes": "Runtime function (action.h line 111)"
     },
     {
       "hex": "0X48",
@@ -4959,7 +4869,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 87)"
+      "notes": "Runtime function (action.h line 118)"
     },
     {
       "hex": "0X49",
@@ -4977,16 +4887,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "equals2_swf_5": [
-          "Boolean type support not available in recompiler (cannot test true == 1, false == 0)",
-          "Null type support not available in recompiler (cannot test null == undefined, null == 0)",
-          "Additional edge case testing limited by test framework (NaN, Infinity, empty string tests would benefit from dedicated test files)",
-          "Object reference equality not tested (requires object creation support)"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6068)"
     },
     {
@@ -5005,16 +4908,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "equals2_swf_5": [
-          "Boolean type support not available in recompiler (cannot test true == 1, false == 0)",
-          "Null type support not available in recompiler (cannot test null == undefined, null == 0)",
-          "Additional edge case testing limited by test framework (NaN, Infinity, empty string tests would benefit from dedicated test files)",
-          "Object reference equality not tested (requires object creation support)"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5033,17 +4929,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "equals2_swf_5": [
-          "Boolean type support not available in recompiler (cannot test true == 1, false == 0)",
-          "Null type support not available in recompiler (cannot test null == undefined, null == 0)",
-          "Additional edge case testing limited by test framework (NaN, Infinity, empty string tests would benefit from dedicated test files)",
-          "Object reference equality not tested (requires object creation support)"
-        ]
-      },
-      "notes": "Runtime function (action.h line 88)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 119)"
     },
     {
       "hex": "0X4A",
@@ -5106,7 +4995,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 93)"
+      "notes": "Runtime function (action.h line 124)"
     },
     {
       "hex": "0X4B",
@@ -5169,7 +5058,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 94)"
+      "notes": "Runtime function (action.h line 125)"
     },
     {
       "hex": "0X4C",
@@ -5268,7 +5157,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 152)"
+      "notes": "Runtime function (action.h line 186)"
     },
     {
       "hex": "0X4D",
@@ -5349,7 +5238,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 95)"
+      "notes": "Runtime function (action.h line 126)"
     },
     {
       "hex": "0X4E",
@@ -5454,7 +5343,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 170)"
+      "notes": "Runtime function (action.h line 204)"
     },
     {
       "hex": "0X4F",
@@ -5535,7 +5424,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 171)"
+      "notes": "Runtime function (action.h line 205)"
     },
     {
       "hex": "0X50",
@@ -5598,7 +5487,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 145)"
+      "notes": "Runtime function (action.h line 179)"
     },
     {
       "hex": "0X51",
@@ -5661,7 +5550,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 146)"
+      "notes": "Runtime function (action.h line 180)"
     },
     {
       "hex": "0X52",
@@ -5730,7 +5619,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 167)"
+      "notes": "Runtime function (action.h line 201)"
     },
     {
       "hex": "0X53",
@@ -5748,19 +5637,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
-      "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "new_method_swf_5": [
-          "Function objects as constructors - current implementation only supports string properties containing constructor names, not actual function objects",
-          "User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported",
-          "Constructor return value handling - spec says constructor return value should be discarded and new object returned, but this isn't fully tested",
-          "Proper 'this' binding for constructor calls - requires full function object implementation",
-          "Prototype chain for constructed objects - advanced feature not implemented",
-          "String/Number/Boolean wrapper objects - constructors create objects but don't properly store wrapped primitive values",
-          "Test relies on variable system which has persistence issues, causing test to output 'undefined' instead of expected value"
-        ]
-      },
+      "fully_implemented": true,
+      "fully_implemented_no_graphics": true,
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6184)"
     },
     {
@@ -5779,19 +5658,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
-      "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "new_method_swf_5": [
-          "Function objects as constructors - current implementation only supports string properties containing constructor names, not actual function objects",
-          "User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported",
-          "Constructor return value handling - spec says constructor return value should be discarded and new object returned, but this isn't fully tested",
-          "Proper 'this' binding for constructor calls - requires full function object implementation",
-          "Prototype chain for constructed objects - advanced feature not implemented",
-          "String/Number/Boolean wrapper objects - constructors create objects but don't properly store wrapped primitive values",
-          "Test relies on variable system which has persistence issues, causing test to output 'undefined' instead of expected value"
-        ]
-      },
+      "fully_implemented": true,
+      "fully_implemented_no_graphics": true,
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -5810,20 +5679,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md",
-      "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "new_method_swf_5": [
-          "Function objects as constructors - current implementation only supports string properties containing constructor names, not actual function objects",
-          "User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported",
-          "Constructor return value handling - spec says constructor return value should be discarded and new object returned, but this isn't fully tested",
-          "Proper 'this' binding for constructor calls - requires full function object implementation",
-          "Prototype chain for constructed objects - advanced feature not implemented",
-          "String/Number/Boolean wrapper objects - constructors create objects but don't properly store wrapped primitive values",
-          "Test relies on variable system which has persistence issues, causing test to output 'undefined' instead of expected value"
-        ]
-      },
-      "notes": "Runtime function (action.h line 173)"
+      "fully_implemented": true,
+      "fully_implemented_no_graphics": true,
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 207)"
     },
     {
       "hex": "0X54",
@@ -5886,7 +5745,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 148)"
+      "notes": "Runtime function (action.h line 182)"
     },
     {
       "hex": "0X55",
@@ -5949,7 +5808,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 149)"
+      "notes": "Runtime function (action.h line 183)"
     },
     {
       "hex": "0X60",
@@ -6012,7 +5871,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 153)"
+      "notes": "Runtime function (action.h line 187)"
     },
     {
       "hex": "0X61",
@@ -6075,7 +5934,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 154)"
+      "notes": "Runtime function (action.h line 188)"
     },
     {
       "hex": "0X62",
@@ -6138,7 +5997,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 155)"
+      "notes": "Runtime function (action.h line 189)"
     },
     {
       "hex": "0X63",
@@ -6201,7 +6060,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 156)"
+      "notes": "Runtime function (action.h line 190)"
     },
     {
       "hex": "0X64",
@@ -6264,7 +6123,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 157)"
+      "notes": "Runtime function (action.h line 191)"
     },
     {
       "hex": "0X65",
@@ -6327,7 +6186,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 158)"
+      "notes": "Runtime function (action.h line 192)"
     },
     {
       "hex": "0X66",
@@ -6402,7 +6261,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 159)"
+      "notes": "Runtime function (action.h line 193)"
     },
     {
       "hex": "0X67",
@@ -6465,7 +6324,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 160)"
+      "notes": "Runtime function (action.h line 194)"
     },
     {
       "hex": "0X68",
@@ -6528,7 +6387,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 161)"
+      "notes": "Runtime function (action.h line 195)"
     },
     {
       "hex": "0X69",
@@ -6546,17 +6405,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "extends_swf_7": [
-          "Constructor property not set correctly - Dog.prototype.constructor should equal Animal but comparison fails",
-          "Prototype chain traversal not implemented - GET_MEMBER only searches own properties, not __proto__ chain",
-          "instanceof opcode doesn't use prototype chain - always returns false (requires prototype chain support)",
-          "NEW_OBJECT not fully functional with inheritance",
-          "Method inheritance not working - child instances cannot call parent methods via prototype chain"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 7120)"
     },
     {
@@ -6575,17 +6426,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "extends_swf_7": [
-          "Constructor property not set correctly - Dog.prototype.constructor should equal Animal but comparison fails",
-          "Prototype chain traversal not implemented - GET_MEMBER only searches own properties, not __proto__ chain",
-          "instanceof opcode doesn't use prototype chain - always returns false (requires prototype chain support)",
-          "NEW_OBJECT not fully functional with inheritance",
-          "Method inheritance not working - child instances cannot call parent methods via prototype chain"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -6604,18 +6447,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "extends_swf_7": [
-          "Constructor property not set correctly - Dog.prototype.constructor should equal Animal but comparison fails",
-          "Prototype chain traversal not implemented - GET_MEMBER only searches own properties, not __proto__ chain",
-          "instanceof opcode doesn't use prototype chain - always returns false (requires prototype chain support)",
-          "NEW_OBJECT not fully functional with inheritance",
-          "Method inheritance not working - child instances cannot call parent methods via prototype chain"
-        ]
-      },
-      "notes": "Runtime function (action.h line 162)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 196)"
     },
     {
       "hex": "0X81",
@@ -6638,17 +6473,10 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "goto_frame_swf_3": [
-          "Actual frame navigation not implemented (only logs the frame index)",
-          "Timeline jump semantics not implemented (go to frame N and stop)",
-          "Frame execution order after jump not handled",
-          "Stop/play state management after frame jump",
-          "Display list updates on frame change",
-          "Frame boundary validation (checking if target frame exists)",
-          "Integration with MovieClip timeline system",
-          "Proper handling of frame cycling and loops"
+          "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
         ]
       },
       "notes": "Official SWF specification name (spec line 4258)"
@@ -6674,17 +6502,10 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "goto_frame_swf_3": [
-          "Actual frame navigation not implemented (only logs the frame index)",
-          "Timeline jump semantics not implemented (go to frame N and stop)",
-          "Frame execution order after jump not handled",
-          "Stop/play state management after frame jump",
-          "Display list updates on frame change",
-          "Frame boundary validation (checking if target frame exists)",
-          "Integration with MovieClip timeline system",
-          "Proper handling of frame cycling and loops"
+          "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
         ]
       },
       "notes": "C++ enum value for opcode"
@@ -6710,20 +6531,13 @@
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "goto_frame_swf_3": [
-          "Actual frame navigation not implemented (only logs the frame index)",
-          "Timeline jump semantics not implemented (go to frame N and stop)",
-          "Frame execution order after jump not handled",
-          "Stop/play state management after frame jump",
-          "Display list updates on frame change",
-          "Frame boundary validation (checking if target frame exists)",
-          "Integration with MovieClip timeline system",
-          "Proper handling of frame cycling and loops"
+          "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
         ]
       },
-      "notes": "Runtime function (action.h line 128)"
+      "notes": "Runtime function (action.h line 162)"
     },
     {
       "hex": "0X83",
@@ -6813,7 +6627,7 @@
           "URL scheme validation and sanitization"
         ]
       },
-      "notes": "Runtime function (action.h line 133)"
+      "notes": "Runtime function (action.h line 167)"
     },
     {
       "hex": "0X87",
@@ -6876,7 +6690,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 163)"
+      "notes": "Runtime function (action.h line 197)"
     },
     {
       "hex": "0X88",
@@ -7050,7 +6864,7 @@
           "In NO_GRAPHICS mode, only _root is available as a valid target - all other target names are treated as 'not found'"
         ]
       },
-      "notes": "Runtime function (action.h line 124)"
+      "notes": "Runtime function (action.h line 158)"
     },
     {
       "hex": "0X8C",
@@ -7068,20 +6882,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "goto_label_swf_3": [
-          "FrameLabel tag parsing and storage (tag type 43)",
-          "Frame structure does not have label field",
-          "Frame lookup by label functionality not implemented",
-          "MovieClip/Timeline infrastructure not implemented",
-          "Actual frame navigation not implemented",
-          "Playback control (play/stop) not implemented",
-          "Frame action execution on arrival not implemented",
-          "Current implementation only logs the label string"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 4449)"
     },
     {
@@ -7100,20 +6903,9 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "goto_label_swf_3": [
-          "FrameLabel tag parsing and storage (tag type 43)",
-          "Frame structure does not have label field",
-          "Frame lookup by label functionality not implemented",
-          "MovieClip/Timeline infrastructure not implemented",
-          "Actual frame navigation not implemented",
-          "Playback control (play/stop) not implemented",
-          "Frame action execution on arrival not implemented",
-          "Current implementation only logs the label string"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -7132,21 +6924,10 @@
       ],
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "goto_label_swf_3": [
-          "FrameLabel tag parsing and storage (tag type 43)",
-          "Frame structure does not have label field",
-          "Frame lookup by label functionality not implemented",
-          "MovieClip/Timeline infrastructure not implemented",
-          "Actual frame navigation not implemented",
-          "Playback control (play/stop) not implemented",
-          "Frame action execution on arrival not implemented",
-          "Current implementation only logs the label string"
-        ]
-      },
-      "notes": "Runtime function (action.h line 102)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 133)"
     },
     {
       "hex": "0X8D",
@@ -7212,20 +6993,9 @@
         "SWFRecomp/tests/declare_local_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "define_function2_swf_7": [
-          "PreloadArguments flag: arguments object creation not implemented",
-          "PreloadSuper flag: super reference not implemented",
-          "PreloadRoot flag: _root preloading not implemented",
-          "PreloadParent flag: _parent preloading not implemented",
-          "PreloadGlobal flag: _global preloading not implemented",
-          "Variable parameters (register=0) not tested (code generated but untested)",
-          "Nested DefineFunction2 functions not tested",
-          "Anonymous functions (empty name) not tested"
-        ]
-      },
+      "missing_features": {},
       "notes": "Official SWF specification name (spec line 6949)"
     },
     {
@@ -7250,20 +7020,9 @@
         "SWFRecomp/tests/declare_local_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "define_function2_swf_7": [
-          "PreloadArguments flag: arguments object creation not implemented",
-          "PreloadSuper flag: super reference not implemented",
-          "PreloadRoot flag: _root preloading not implemented",
-          "PreloadParent flag: _parent preloading not implemented",
-          "PreloadGlobal flag: _global preloading not implemented",
-          "Variable parameters (register=0) not tested (code generated but untested)",
-          "Nested DefineFunction2 functions not tested",
-          "Anonymous functions (empty name) not tested"
-        ]
-      },
+      "missing_features": {},
       "notes": "C++ enum value for opcode"
     },
     {
@@ -7288,21 +7047,10 @@
         "SWFRecomp/tests/declare_local_swf_5"
       ],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md",
-      "fully_implemented": false,
+      "fully_implemented": true,
       "fully_implemented_no_graphics": false,
-      "missing_features": {
-        "define_function2_swf_7": [
-          "PreloadArguments flag: arguments object creation not implemented",
-          "PreloadSuper flag: super reference not implemented",
-          "PreloadRoot flag: _root preloading not implemented",
-          "PreloadParent flag: _parent preloading not implemented",
-          "PreloadGlobal flag: _global preloading not implemented",
-          "Variable parameters (register=0) not tested (code generated but untested)",
-          "Nested DefineFunction2 functions not tested",
-          "Anonymous functions (empty name) not tested"
-        ]
-      },
-      "notes": "Runtime function (action.h line 178)"
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 212)"
     },
     {
       "hex": "0X8F",
@@ -7945,17 +7693,17 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "get_url2_swf_4": [
-          "HTTP client functionality - no actual GET/POST requests made",
-          "Variable encoding (x-www-form-urlencoded) - movie clip variables not sent with requests",
-          "Variable parsing from HTTP response - response not parsed into ActionScript variables",
-          "Setting variables in target scope - variables from response not set in timeline or sprite",
-          "SWF file downloading and loading - external SWF files not actually loaded",
-          "MovieClip/sprite management - sprite paths not resolved, no actual sprite loading",
-          "Browser window integration - URLs not opened in actual browser windows",
-          "Security sandbox enforcement - no cross-domain restrictions implemented"
+          "Actual HTTP client functionality (requires libcurl or similar HTTP library)",
+          "Variable encoding to x-www-form-urlencoded format (requires variable enumeration)",
+          "HTTP response parsing (requires HTTP client and response parser)",
+          "Setting variables in target scope from response (requires full variable/scope management)",
+          "SWF file downloading and loading (requires HTTP client and SWF parser/loader)",
+          "MovieClip/sprite path resolution and management (requires full sprite hierarchy)",
+          "Browser window integration (requires platform-specific OS APIs)",
+          "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
         ]
       },
       "notes": "Official SWF specification name (spec line 5262)"
@@ -7977,17 +7725,17 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "get_url2_swf_4": [
-          "HTTP client functionality - no actual GET/POST requests made",
-          "Variable encoding (x-www-form-urlencoded) - movie clip variables not sent with requests",
-          "Variable parsing from HTTP response - response not parsed into ActionScript variables",
-          "Setting variables in target scope - variables from response not set in timeline or sprite",
-          "SWF file downloading and loading - external SWF files not actually loaded",
-          "MovieClip/sprite management - sprite paths not resolved, no actual sprite loading",
-          "Browser window integration - URLs not opened in actual browser windows",
-          "Security sandbox enforcement - no cross-domain restrictions implemented"
+          "Actual HTTP client functionality (requires libcurl or similar HTTP library)",
+          "Variable encoding to x-www-form-urlencoded format (requires variable enumeration)",
+          "HTTP response parsing (requires HTTP client and response parser)",
+          "Setting variables in target scope from response (requires full variable/scope management)",
+          "SWF file downloading and loading (requires HTTP client and SWF parser/loader)",
+          "MovieClip/sprite path resolution and management (requires full sprite hierarchy)",
+          "Browser window integration (requires platform-specific OS APIs)",
+          "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
         ]
       },
       "notes": "C++ enum value for opcode"
@@ -8009,20 +7757,20 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "get_url2_swf_4": [
-          "HTTP client functionality - no actual GET/POST requests made",
-          "Variable encoding (x-www-form-urlencoded) - movie clip variables not sent with requests",
-          "Variable parsing from HTTP response - response not parsed into ActionScript variables",
-          "Setting variables in target scope - variables from response not set in timeline or sprite",
-          "SWF file downloading and loading - external SWF files not actually loaded",
-          "MovieClip/sprite management - sprite paths not resolved, no actual sprite loading",
-          "Browser window integration - URLs not opened in actual browser windows",
-          "Security sandbox enforcement - no cross-domain restrictions implemented"
+          "Actual HTTP client functionality (requires libcurl or similar HTTP library)",
+          "Variable encoding to x-www-form-urlencoded format (requires variable enumeration)",
+          "HTTP response parsing (requires HTTP client and response parser)",
+          "Setting variables in target scope from response (requires full variable/scope management)",
+          "SWF file downloading and loading (requires HTTP client and SWF parser/loader)",
+          "MovieClip/sprite path resolution and management (requires full sprite hierarchy)",
+          "Browser window integration (requires platform-specific OS APIs)",
+          "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
         ]
       },
-      "notes": "Runtime function (action.h line 168)"
+      "notes": "Runtime function (action.h line 202)"
     },
     {
       "hex": "0X9B",
@@ -8129,13 +7877,12 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "call_swf_4": [
-          "Frame labels not supported (would require SWFRecomp to generate label->frame mapping)",
-          "Target path parsing not implemented (e.g., '/movieclip:frame')",
-          "Multi-MovieClip support not implemented (only main timeline supported)",
-          "Test coverage: need multi-frame test to verify actual frame execution"
+          "Frame label registry (requires SWFRecomp to parse FrameLabel tag 43 and generate label->frame mapping - graphics-only)",
+          "MovieClip tree for target paths (requires full MovieClip infrastructure - graphics-only)",
+          "Multi-MovieClip support (requires MovieClip context switching - graphics-only)"
         ]
       },
       "notes": "Official SWF specification name (spec line 5195)"
@@ -8157,13 +7904,12 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "call_swf_4": [
-          "Frame labels not supported (would require SWFRecomp to generate label->frame mapping)",
-          "Target path parsing not implemented (e.g., '/movieclip:frame')",
-          "Multi-MovieClip support not implemented (only main timeline supported)",
-          "Test coverage: need multi-frame test to verify actual frame execution"
+          "Frame label registry (requires SWFRecomp to parse FrameLabel tag 43 and generate label->frame mapping - graphics-only)",
+          "MovieClip tree for target paths (requires full MovieClip infrastructure - graphics-only)",
+          "Multi-MovieClip support (requires MovieClip context switching - graphics-only)"
         ]
       },
       "notes": "C++ enum value for opcode"
@@ -8185,16 +7931,15 @@
       "tests_secondary_passing": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-0x9e.md",
       "fully_implemented": false,
-      "fully_implemented_no_graphics": false,
+      "fully_implemented_no_graphics": true,
       "missing_features": {
         "call_swf_4": [
-          "Frame labels not supported (would require SWFRecomp to generate label->frame mapping)",
-          "Target path parsing not implemented (e.g., '/movieclip:frame')",
-          "Multi-MovieClip support not implemented (only main timeline supported)",
-          "Test coverage: need multi-frame test to verify actual frame execution"
+          "Frame label registry (requires SWFRecomp to parse FrameLabel tag 43 and generate label->frame mapping - graphics-only)",
+          "MovieClip tree for target paths (requires full MovieClip infrastructure - graphics-only)",
+          "Multi-MovieClip support (requires MovieClip context switching - graphics-only)"
         ]
       },
-      "notes": "Runtime function (action.h line 166)"
+      "notes": "Runtime function (action.h line 200)"
     },
     {
       "hex": "0X9F",
@@ -8275,7 +8020,7 @@
           "MovieClip context switching for target paths (requires full MovieClip tree - graphics-only)"
         ]
       },
-      "notes": "Runtime function (action.h line 103)"
+      "notes": "Runtime function (action.h line 134)"
     }
   ]
 }
