@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "name": "mb_ascii_to_char_edge_cases_swf_4",
+    "description": "Edge case testing for MB_ASCII_TO_CHAR opcode (0x37) - tests boundary values, surrogate pairs, negative numbers, and out-of-range code points",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["MB_ASCII_TO_CHAR"],
+    "supporting": ["PUSH", "TRACE", "STRING_ADD"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "negative_number_handling",
+    "zero_null_character",
+    "utf8_1byte_boundary_127",
+    "utf8_2byte_boundaries_128_2047",
+    "utf8_3byte_boundaries_2048_65535",
+    "surrogate_pair_range_0xD800_0xDFFF",
+    "utf8_4byte_boundary_65536",
+    "max_unicode_0x10FFFF",
+    "beyond_unicode_range"
+  ]
+}
