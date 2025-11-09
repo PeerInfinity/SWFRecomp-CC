@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "play_stop_swf_4",
+    "description": "Tests PLAY (0x06) and STOP (0x07) opcodes interaction - verifies that PLAY resumes playback after STOP",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["PLAY", "STOP"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "stop_then_play_resumes",
+    "play_allows_frame_2_to_execute",
+    "stop_in_frame_2_prevents_frame_3"
+  ]
+}
