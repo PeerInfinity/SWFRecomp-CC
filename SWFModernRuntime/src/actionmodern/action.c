@@ -184,10 +184,11 @@ typedef struct {
 	char target[256];
 	char droptarget[256];
 	char url[512];
-	int highquality;
-	int focusrect;
-	float soundbuftime;
-	int quality;
+	// SWF 4+ properties
+	float highquality;     // Property 16: _highquality (0, 1, or 2)
+	float focusrect;       // Property 17: _focusrect (0 or 1)
+	float soundbuftime;    // Property 18: _soundbuftime (in seconds)
+	char quality[16];      // Property 19: _quality ("LOW", "MEDIUM", "HIGH", "BEST")
 	float xmouse;
 	float ymouse;
 } MovieClip;
@@ -210,10 +211,10 @@ static MovieClip root_movieclip = {
 	.target = "_root",
 	.droptarget = "",  // No drag/drop in NO_GRAPHICS mode
 	.url = "",  // Could be set to actual SWF URL if known
-	.highquality = 1,  // 1 = high quality
-	.focusrect = 1,  // Focus rectangle enabled
-	.soundbuftime = 5.0f,  // Default 5 seconds
-	.quality = 2,  // 0=low, 1=high, 2=best
+	.highquality = 1.0f,       // Default: high quality
+	.focusrect = 1.0f,         // Default: focus rect enabled
+	.soundbuftime = 5.0f,      // Default: 5 seconds
+	.quality = "HIGH",         // Default: HIGH quality
 	.xmouse = 0.0f,  // No mouse in NO_GRAPHICS mode
 	.ymouse = 0.0f  // No mouse in NO_GRAPHICS mode
 };
@@ -2206,8 +2207,9 @@ void actionGetProperty(char* stack, u32* sp)
 		case 18: // _soundbuftime
 			value = mc ? mc->soundbuftime : 5.0f;
 			break;
-		case 19: // _quality (SWF 5+)
-			value = mc ? (float)mc->quality : 2.0f;
+		case 19: // _quality
+			str_value = mc ? mc->quality : "HIGH";
+			is_string = 1;
 			break;
 		case 20: // _xmouse (SWF 5+)
 			value = mc ? mc->xmouse : 0.0f;
