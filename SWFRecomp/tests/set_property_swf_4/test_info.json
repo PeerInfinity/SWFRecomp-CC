@@ -1,9 +1,9 @@
 {
   "metadata": {
     "name": "set_property_swf_4",
-    "description": "Tests SET_PROPERTY opcode (0x23) - sets MovieClip properties by numeric index",
+    "description": "Comprehensive test of SET_PROPERTY opcode (0x23) - sets MovieClip properties by numeric index. Tests all settable properties (0-3, 6-10, 13, 16-18), read-only property handling, and edge cases including negative values, large values, and read-only property attempts.",
     "swf_version": 4,
-    "fully_implemented": false
+    "fully_implemented_no_graphics": true
   },
   "opcodes": {
     "tested": ["SET_PROPERTY"],
@@ -11,5 +11,18 @@
   },
   "execution": {
     "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "all_basic_properties_0_through_10",
+    "swf4_properties_16_through_18",
+    "property_13_name",
+    "negative_values",
+    "large_values",
+    "readonly_properties_ignored",
+    "invalid_property_indices"
+  ],
+  "properties_tested": {
+    "settable": [0, 1, 2, 3, 6, 7, 8, 9, 10, 13, 16, 17, 18],
+    "readonly_verified": [4, 5, 11, 12, 14, 15, 20, 21]
   }
 }

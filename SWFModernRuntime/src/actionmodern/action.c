@@ -181,6 +181,11 @@ typedef struct {
 	int totalframes;
 	char name[256];
 	char target[256];
+	// SWF 4+ properties
+	float highquality;     // Property 16: _highquality (0, 1, or 2)
+	float focusrect;       // Property 17: _focusrect (0 or 1)
+	float soundbuftime;    // Property 18: _soundbuftime (in seconds)
+	char quality[16];      // Property 19: _quality ("LOW", "MEDIUM", "HIGH", "BEST")
 } MovieClip;
 
 // Static _root MovieClip for simplified implementation
@@ -197,7 +202,11 @@ static MovieClip root_movieclip = {
 	.currentframe = 1,
 	.totalframes = 1,
 	.name = "_root",
-	.target = "_root"
+	.target = "_root",
+	.highquality = 1.0f,       // Default: high quality
+	.focusrect = 1.0f,         // Default: focus rect enabled
+	.soundbuftime = 5.0f,      // Default: 5 seconds
+	.quality = "HIGH"          // Default: HIGH quality
 };
 
 // Helper function to get MovieClip by target path
@@ -1988,6 +1997,19 @@ void actionGetProperty(char* stack, u32* sp)
 			break;
 		case 13: // _name
 			str_value = mc ? mc->name : "";
+			is_string = 1;
+			break;
+		case 16: // _highquality
+			value = mc ? mc->highquality : 1.0f;
+			break;
+		case 17: // _focusrect
+			value = mc ? mc->focusrect : 1.0f;
+			break;
+		case 18: // _soundbuftime
+			value = mc ? mc->soundbuftime : 5.0f;
+			break;
+		case 19: // _quality
+			str_value = mc ? mc->quality : "HIGH";
 			is_string = 1;
 			break;
 		default:
@@ -3807,6 +3829,21 @@ void actionSetProperty(char* stack, u32* sp)
 			if (str_value) {
 				strncpy(mc->name, str_value, sizeof(mc->name) - 1);
 				mc->name[sizeof(mc->name) - 1] = '\0';
+			}
+			break;
+		case 16: // _highquality
+			mc->highquality = num_value;
+			break;
+		case 17: // _focusrect
+			mc->focusrect = num_value;
+			break;
+		case 18: // _soundbuftime
+			mc->soundbuftime = num_value;
+			break;
+		case 19: // _quality
+			if (str_value) {
+				strncpy(mc->quality, str_value, sizeof(mc->quality) - 1);
+				mc->quality[sizeof(mc->quality) - 1] = '\0';
 			}
 			break;
 		// Read-only properties - ignore silently

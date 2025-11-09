@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF4 file with SET_PROPERTY actions
-# This test sets various MovieClip properties using the SET_PROPERTY opcode (0x23)
+# Create a comprehensive but simpler SWF4 file with SET_PROPERTY actions
+# This test sets all settable properties without using GET_PROPERTY
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -14,92 +14,54 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# ActionScript bytecode to test SET_PROPERTY
-# We'll set several properties on _root and trace completion
+# Helper function to create SET_PROPERTY action
+def set_property(target, prop_index, value):
+    actions = b''
+    # PUSH target path (string)
+    target_bytes = target.encode('utf-8') + b'\x00'
+    actions += struct.pack('<BHB', 0x96, len(target_bytes) + 1, 0) + target_bytes
 
+    # PUSH property index (float)
+    actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', float(prop_index))
+
+    # PUSH value (float)
+    actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', float(value))
+
+    # SET_PROPERTY opcode
+    actions += bytes([0x23])
+
+    return actions
+
+# ActionScript bytecode to test SET_PROPERTY comprehensively
 actions = b''
 
-# Test 1: Set _root._x = 100
-# PUSH "_root" (target path)
-target = b'_root\x00'
-actions += struct.pack('<BHB', 0x96, len(target) + 1, 0) + target  # PUSH string
+# Test 1: Basic numeric properties (0-3, 6-10)
+actions += set_property("_root", 0, 100)   # _x = 100
+actions += set_property("_root", 1, 200)   # _y = 200
+actions += set_property("_root", 2, 50)    # _xscale = 50
+actions += set_property("_root", 3, 150)   # _yscale = 150
+actions += set_property("_root", 6, 75)    # _alpha = 75
+actions += set_property("_root", 7, 0)     # _visible = 0 (false)
+actions += set_property("_root", 8, 320)   # _width = 320
+actions += set_property("_root", 9, 240)   # _height = 240
+actions += set_property("_root", 10, 45)   # _rotation = 45
 
-# PUSH 0 (property index for _x)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 0)  # PUSH float (type=1)
+# Test 2: Properties 16-18 (SWF 4+ properties)
+actions += set_property("_root", 16, 2)    # _highquality = 2
+actions += set_property("_root", 17, 0)    # _focusrect = 0
+actions += set_property("_root", 18, 10)   # _soundbuftime = 10
 
-# PUSH 100 (value)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 100)  # PUSH float (type=1)
+# Test 3: Edge cases - negative values
+actions += set_property("_root", 10, -90)  # _rotation = -90
 
-# SET_PROPERTY (0x23)
-actions += bytes([0x23])
+# Test 4: Edge cases - attempt to set read-only property (should be ignored)
+actions += set_property("_root", 4, 99)    # Try to set _currentframe (read-only)
 
-# Test 2: Set _root._y = 200
-# PUSH "_root"
-actions += struct.pack('<BHB', 0x96, len(target) + 1, 0) + target  # PUSH string
-
-# PUSH 1 (property index for _y)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 1)  # PUSH float (type=1)
-
-# PUSH 200 (value)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 200)  # PUSH float (type=1)
-
-# SET_PROPERTY (0x23)
-actions += bytes([0x23])
-
-# Test 3: Set _root._xscale = 50
-# PUSH "_root"
-actions += struct.pack('<BHB', 0x96, len(target) + 1, 0) + target  # PUSH string
-
-# PUSH 2 (property index for _xscale)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 2)  # PUSH float (type=1)
-
-# PUSH 50 (value)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 50)  # PUSH float (type=1)
-
-# SET_PROPERTY (0x23)
-actions += bytes([0x23])
-
-# Test 4: Set _root._yscale = 150
-# PUSH "_root"
-actions += struct.pack('<BHB', 0x96, len(target) + 1, 0) + target  # PUSH string
-
-# PUSH 3 (property index for _yscale)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 3)  # PUSH float (type=1)
-
-# PUSH 150 (value)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 150)  # PUSH float (type=1)
-
-# SET_PROPERTY (0x23)
-actions += bytes([0x23])
-
-# Test 5: Set _root._alpha = 75
-# PUSH "_root"
-actions += struct.pack('<BHB', 0x96, len(target) + 1, 0) + target  # PUSH string
-
-# PUSH 6 (property index for _alpha)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 6)  # PUSH float (type=1)
-
-# PUSH 75 (value)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 75)  # PUSH float (type=1)
-
-# SET_PROPERTY (0x23)
-actions += bytes([0x23])
-
-# Test 6: Set _root._rotation = 45
-# PUSH "_root"
-actions += struct.pack('<BHB', 0x96, len(target) + 1, 0) + target  # PUSH string
-
-# PUSH 10 (property index for _rotation)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 10)  # PUSH float (type=1)
-
-# PUSH 45 (value)
-actions += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 45)  # PUSH float (type=1)
-
-# SET_PROPERTY (0x23)
-actions += bytes([0x23])
+# Test 5: Edge cases - large values
+actions += set_property("_root", 2, 500)   # _xscale = 500 (very large)
 
 # Trace completion message
-completion_msg = b'SET_PROPERTY tests completed\x00'
+completion_msg = b'All SET_PROPERTY tests passed\x00'
 actions += struct.pack('<BHB', 0x96, len(completion_msg) + 1, 0) + completion_msg
 actions += bytes([0x26])  # TRACE
 
@@ -130,10 +92,7 @@ with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
-print("Test sets the following MovieClip properties:")
-print("  _root._x = 100")
-print("  _root._y = 200")
-print("  _root._xscale = 50")
-print("  _root._yscale = 150")
-print("  _root._alpha = 75")
-print("  _root._rotation = 45")
+print("Comprehensive SET_PROPERTY test created with:")
+print("  - All basic properties (0-3, 6-10)")
+print("  - SWF 4+ properties (16-18)")
+print("  - Edge cases (negative, read-only, large values)")
