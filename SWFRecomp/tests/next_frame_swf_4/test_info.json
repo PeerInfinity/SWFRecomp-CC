@@ -1,14 +1,23 @@
 {
   "metadata": {
     "name": "next_frame_swf_4",
-    "description": "Tests NEXT_FRAME opcode (0x04) - advances playhead to next frame",
-    "swf_version": 4
+    "description": "Tests NEXT_FRAME opcode (0x04) - advances playhead to next frame. Comprehensive test covering basic advancement, multiple consecutive nextFrame calls, and proper interaction with stop() command.",
+    "swf_version": 4,
+    "fully_implemented": true,
+    "fully_implemented_no_graphics": true
   },
   "opcodes": {
     "tested": ["NEXT_FRAME"],
-    "supporting": ["TRACE"]
+    "supporting": ["TRACE", "STOP", "PUSH"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_next_frame_advancement",
+    "multiple_consecutive_next_frame_calls",
+    "next_frame_through_multiple_frames",
+    "interaction_with_stop_command",
+    "proper_frame_sequence_0_1_2_3"
+  ]
 }
