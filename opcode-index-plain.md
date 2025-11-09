@@ -6,22 +6,17 @@
 
 **Implemented Opcodes**: 99
 
-**Total Entries**: 287
-
 ## Test Statistics
-
-**Overall Test Results**: 387/412 passing (93.9%)
 
 **Primary Tests**: 111/118 passing (94.1%)
   - 7 failing primary tests
   - 7 opcodes with failing primary tests
 
-**Secondary Tests**: 276/294 passing (93.9%)
-  - 18 failing secondary tests
-
 ## Implementation Progress
 
 **Fully Implemented Opcodes**: 76/100
+
+**Fully Implemented Opcodes - No Graphics Mode**: 87/100
 
 **Opcodes with Primary Tests**: 99
 
@@ -30,8 +25,8 @@
 ## What Needs Attention
 
 - **7 failing primary tests** across 7 opcodes (see 'Failing Primary' column)
-- **18 failing secondary tests**
 - **24 opcodes** not yet marked as fully implemented
+- **13 opcodes** not yet marked as fully implemented for NO_GRAPHICS mode
 
 
 ## Summary Table

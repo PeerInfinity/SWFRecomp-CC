@@ -53,6 +53,7 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     opcodes_with_primary = 0
     opcodes_with_failing_primary = 0
     opcodes_fully_implemented = 0
+    opcodes_fully_implemented_no_graphics = 0
     opcodes_with_docs = 0
     opcodes_with_function = 0
     opcodes_with_enum = 0
@@ -87,6 +88,9 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
                 if entry.get('fully_implemented'):
                     opcodes_fully_implemented += 1
 
+                if entry.get('fully_implemented') or entry.get('fully_implemented_no_graphics'):
+                    opcodes_fully_implemented_no_graphics += 1
+
                 if entry.get('documentation_prompt'):
                     opcodes_with_docs += 1
 
@@ -107,13 +111,9 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     md.append("")
     md.append(f"**Implemented Opcodes**: {index['metadata']['implemented_opcodes']}")
     md.append("")
-    md.append(f"**Total Entries**: {index['metadata']['total_entries']}")
-    md.append("")
 
     # Test Statistics Section
     md.append("## Test Statistics")
-    md.append("")
-    md.append(f"**Overall Test Results**: {total_passing}/{total_tests} passing ({overall_pass_rate:.1f}%)")
     md.append("")
 
     # Primary Tests
@@ -124,17 +124,12 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
         md.append(f"  - {opcodes_with_failing_primary} opcodes with failing primary tests")
     md.append("")
 
-    # Secondary Tests
-    failing_secondary = total_secondary_tests - passing_secondary_tests
-    md.append(f"**Secondary Tests**: {passing_secondary_tests}/{total_secondary_tests} passing ({secondary_pass_rate:.1f}%)")
-    if failing_secondary > 0:
-        md.append(f"  - {failing_secondary} failing secondary tests")
-    md.append("")
-
     # Implementation Progress
     md.append("## Implementation Progress")
     md.append("")
     md.append(f"**Fully Implemented Opcodes**: {opcodes_fully_implemented}/{index['metadata']['total_opcodes']}")
+    md.append("")
+    md.append(f"**Fully Implemented Opcodes - No Graphics Mode**: {opcodes_fully_implemented_no_graphics}/{index['metadata']['total_opcodes']}")
     md.append("")
     md.append(f"**Opcodes with Primary Tests**: {opcodes_with_primary}")
     md.append("")
@@ -142,16 +137,17 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     md.append("")
 
     # What Needs Attention
-    if failing_primary > 0 or failing_secondary > 0:
+    if failing_primary > 0:
         md.append("## What Needs Attention")
         md.append("")
         if failing_primary > 0:
             md.append(f"- **{failing_primary} failing primary tests** across {opcodes_with_failing_primary} opcodes (see 'Failing Primary' column)")
-        if failing_secondary > 0:
-            md.append(f"- **{failing_secondary} failing secondary tests**")
         opcodes_not_fully_implemented = index['metadata']['total_opcodes'] - opcodes_fully_implemented
         if opcodes_not_fully_implemented > 0:
             md.append(f"- **{opcodes_not_fully_implemented} opcodes** not yet marked as fully implemented")
+        opcodes_not_fully_implemented_no_graphics = index['metadata']['total_opcodes'] - opcodes_fully_implemented_no_graphics
+        if opcodes_not_fully_implemented_no_graphics > 0:
+            md.append(f"- **{opcodes_not_fully_implemented_no_graphics} opcodes** not yet marked as fully implemented for NO_GRAPHICS mode")
         md.append("")
 
     md.append("")
