@@ -1,0 +1,6 @@
+[Project]
+swf_path = "test_comprehensive.swf"
+output_dir = "test_comp"
+
+[Runtime]
+build_mode = "native"
