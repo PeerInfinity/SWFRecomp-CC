@@ -3492,6 +3492,41 @@ void actionGetMember(char* stack, u32* sp)
 			pushUndefined(stack, sp);
 		}
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Handle array properties
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+
+		if (arr == NULL)
+		{
+			pushUndefined(stack, sp);
+			return;
+		}
+
+		if (strcmp(prop_name, "length") == 0)
+		{
+			// Push array length as float
+			float len = (float) arr->length;
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
+		}
+		else
+		{
+			// Try to parse property name as numeric index
+			char* endptr;
+			long index = strtol(prop_name, &endptr, 10);
+
+			if (*endptr == '\0' && index >= 0 && (u32)index < arr->length)
+			{
+				// Valid numeric index - push element
+				pushVar(stack, sp, &arr->elements[index]);
+			}
+			else
+			{
+				// Not a valid index - push undefined
+				pushUndefined(stack, sp);
+			}
+		}
+	}
 	else
 	{
 		// Other primitive types (number, undefined, etc.) - push undefined
@@ -3583,7 +3618,7 @@ void actionNewObject(char* stack, u32* sp)
 			}
 			new_obj = arr;
 		}
-		PUSH(ACTION_STACK_VALUE_ARRAY, VAL(u64, new_obj));
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) new_obj);
 	}
 	else if (strcmp(ctor_name, "Object") == 0)
 	{
@@ -3591,7 +3626,7 @@ void actionNewObject(char* stack, u32* sp)
 		// Create empty object with initial capacity
 		ASObject* obj = allocObject(8);
 		new_obj = obj;
-		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
 	else if (strcmp(ctor_name, "Date") == 0)
 	{
@@ -3600,7 +3635,7 @@ void actionNewObject(char* stack, u32* sp)
 		// For now, just create an empty object
 		ASObject* date = allocObject(4);
 		new_obj = date;
-		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
 	else
 	{
@@ -3608,7 +3643,7 @@ void actionNewObject(char* stack, u32* sp)
 		// In a full implementation, this would try to call user-defined constructor
 		ASObject* obj = allocObject(8);
 		new_obj = obj;
-		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
 }
 
@@ -3716,21 +3751,21 @@ void actionNewMethod(char* stack, u32* sp)
 			}
 			new_obj = arr;
 		}
-		PUSH(ACTION_STACK_VALUE_ARRAY, VAL(u64, new_obj));
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) new_obj);
 	}
 	else if (ctor_name != NULL && strcmp(ctor_name, "Object") == 0)
 	{
 		// Handle Object constructor
 		ASObject* obj = allocObject(8);
 		new_obj = obj;
-		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
 	else if (ctor_name != NULL && strcmp(ctor_name, "Date") == 0)
 	{
 		// Handle Date constructor (simplified)
 		ASObject* date = allocObject(4);
 		new_obj = date;
-		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
 	else
 	{

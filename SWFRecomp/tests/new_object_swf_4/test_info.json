@@ -1,15 +1,42 @@
 {
   "metadata": {
     "name": "new_object_swf_4",
-    "description": "Tests NEW_OBJECT opcode (0x40) - creates objects via constructor calls",
+    "description": "Tests NEW_OBJECT opcode (0x40) - creates objects and arrays via constructor calls. Supports Array constructor with length parameter, multiple elements, and Object constructor. Tests array length property and element access.",
     "swf_version": 4,
-    "fully_implemented": false
+    "fully_implemented": false,
+    "missing_features": [
+      "Object property setting/getting has a bug (SET_MEMBER or GET_MEMBER issue, not NEW_OBJECT)",
+      "User-defined constructor functions not supported",
+      "Constructor function invocation with 'this' binding not implemented",
+      "Built-in constructors beyond Array and Object not implemented (Date, String, Number, Boolean, etc.)",
+      "Constructor return value handling not implemented",
+      "Prototype chain initialization not implemented"
+    ]
   },
   "opcodes": {
     "tested": ["NEW_OBJECT"],
-    "supporting": ["PUSH", "TRACE", "POP"]
+    "supporting": ["PUSH", "TRACE", "POP", "GET_MEMBER", "SET_MEMBER", "PUSH_DUPLICATE"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "test_results": {
+    "arrays": "fully_working",
+    "array_with_length": "passing",
+    "array_with_elements": "passing",
+    "array_element_access": "passing",
+    "empty_array": "passing",
+    "objects": "partial",
+    "object_creation": "passing",
+    "object_properties": "failing"
+  },
+  "edge_cases_tested": [
+    "new Array(n) with single numeric argument",
+    "new Array(e1, e2, ...) with multiple elements",
+    "new Array() with no arguments",
+    "new Array(0) with zero length",
+    "new Object() empty object creation",
+    "Array length property access",
+    "Array element access by index"
+  ]
 }
