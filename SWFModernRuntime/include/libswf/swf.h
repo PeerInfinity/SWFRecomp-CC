@@ -62,6 +62,10 @@ extern size_t current_frame;
 extern size_t next_frame;
 extern int manual_next_frame;
 
+// Drag state tracking (works in both graphics and NO_GRAPHICS modes)
+extern int is_dragging;         // 1 if a sprite is being dragged, 0 otherwise
+extern char* dragged_target;    // Name of the target being dragged (or NULL)
+
 #ifndef NO_GRAPHICS
 extern Character* dictionary;
 

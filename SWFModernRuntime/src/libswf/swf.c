@@ -18,6 +18,10 @@ size_t next_frame;
 int manual_next_frame;
 ActionVar* temp_val;
 
+// Drag state tracking
+int is_dragging = 0;
+char* dragged_target = NULL;
+
 Character* dictionary = NULL;
 
 DisplayObject* display_list = NULL;
