@@ -15,15 +15,15 @@ frame_count = struct.pack('<H', 1)  # 1 frame (simplified test)
 # ActionScript bytecode for testing ActionGotoFrame
 actions = b''
 
-# Test: Trace "Start", then GotoFrame(2), then Trace "After goto"
-# Expected: "Start" should print, then "// GotoFrame: 2" should print
+# Test: Trace "Before goto", then GotoFrame(2), then Trace "After goto"
+# Expected: "Before goto", then "// GotoFrame: 2", then "After goto"
 
-# Push string "Start"
-string_start = b'Start\x00'
+# Push string "Before goto"
+string_start = b'Before goto\x00'
 actions += struct.pack('<BHB', 0x96, len(string_start) + 1, 0)  # PUSH string
 actions += string_start
 
-# TRACE - prints "Start"
+# TRACE - prints "Before goto"
 actions += bytes([0x26])  # TRACE (0x26)
 
 # ActionGotoFrame with frame index 2
@@ -71,4 +71,4 @@ swf_data = signature + struct.pack('<BI', version, file_length) + body
 with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
-print("Created test.swf with ActionGotoFrame test")
+print("Created test.swf with ActionGotoFrame test (simplified - logging only)")

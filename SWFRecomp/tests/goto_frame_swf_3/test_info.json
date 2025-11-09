@@ -1,8 +1,21 @@
 {
   "metadata": {
     "name": "goto_frame_swf_3",
-    "description": "Tests ActionGotoFrame opcode (0x81) - jumps to specific frame in timeline",
-    "swf_version": 3
+    "description": "Tests ActionGotoFrame opcode (0x81) - parses frame index and logs navigation request. Verifies correct bytecode parsing and parameter extraction.",
+    "swf_version": 3,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": false,
+    "missing_features": [
+      "Actual frame navigation not implemented (only logs the frame index)",
+      "Timeline jump semantics not implemented (go to frame N and stop)",
+      "Frame execution order after jump not handled",
+      "Stop/play state management after frame jump",
+      "Display list updates on frame change",
+      "Frame boundary validation (checking if target frame exists)",
+      "Integration with MovieClip timeline system",
+      "Proper handling of frame cycling and loops"
+    ],
+    "implementation_notes": "The opcode is correctly parsed from the SWF bytecode and the frame parameter (UI16) is extracted. The runtime function logs the frame navigation request but does not actually perform the jump. Full implementation requires a complete timeline management system with proper frame control flow, which is a larger architectural feature beyond this single opcode."
   },
   "opcodes": {
     "tested": ["GOTO_FRAME"],
@@ -10,5 +23,11 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "test_coverage": [
+    "Opcode parsing (0x81 correctly identified)",
+    "Frame parameter extraction (UI16 frame index)",
+    "Runtime function invocation",
+    "Debug output format"
+  ]
 }
