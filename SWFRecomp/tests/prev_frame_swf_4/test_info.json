@@ -1,14 +1,30 @@
 {
   "metadata": {
     "name": "prev_frame_swf_4",
-    "description": "Tests PREV_FRAME opcode (0x05) - moves playhead to previous frame",
-    "swf_version": 4
+    "description": "Tests PREV_FRAME opcode (0x05) - moves playhead to previous frame. Test verifies prevFrame correctly navigates backwards in the timeline by using gotoFrame to jump forward, then prevFrame to go back.",
+    "swf_version": 4,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["PREV_FRAME"],
-    "supporting": ["PUSH", "TRACE", "GET_VARIABLE", "SET_VARIABLE", "ADD", "LESS", "IF", "STOP"]
+    "supporting": ["PUSH", "TRACE", "GOTO_FRAME", "STOP"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "test_details": {
+    "test_structure": "Frame 0: trace('Frame 1'), gotoFrame(2) -> Frame 2: trace('Frame 3'), prevFrame() -> Frame 1: trace('Frame 2'), stop()",
+    "expected_output": ["Frame 1", "Frame 3", "Frame 2"],
+    "validates": [
+      "prevFrame moves to previous frame correctly",
+      "Frame navigation works in combination with gotoFrame",
+      "prevFrame does not affect play/pause state"
+    ]
+  },
+  "edge_cases_tested": [
+    "basic_prev_frame_navigation",
+    "prev_frame_after_goto",
+    "frame_sequence_correctness"
+  ],
+  "notes": "Implementation correctly handles edge case of prevFrame at frame 0 (does nothing), though not explicitly tested"
 }

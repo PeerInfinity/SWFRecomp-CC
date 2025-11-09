@@ -1610,24 +1610,13 @@ void actionTrace(char* stack, u32* sp)
 
 void actionGotoFrame(char* stack, u32* sp, u16 frame)
 {
-	// ActionGotoFrame - simplified implementation
-	// Logs the frame navigation request
-	//
-	// Full implementation requires:
-	// - Complete MovieClip/timeline management system
-	// - Frame label mapping
-	// - Display list updates
-	// - Proper stop/play state handling after jump
-	//
-	// The current NO_GRAPHICS console mode has basic timeline support
-	// but ActionGotoFrame's "jump then stop" semantics require more
-	// sophisticated frame loop control to avoid issues with:
-	// - Stopping before the jump executes
-	// - Infinite loops when frames cycle
-	// - Proper execution order of jumped-to frame's actions
+	// Set the next frame to the specified frame index
+	extern size_t current_frame;
+	extern size_t next_frame;
+	extern int manual_next_frame;
 
-	printf("// GotoFrame: %d\n", frame);
-	fflush(stdout);
+	next_frame = frame;
+	manual_next_frame = 1;
 }
 
 void actionGoToLabel(char* stack, u32* sp, const char* label)
