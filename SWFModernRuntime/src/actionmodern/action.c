@@ -3919,8 +3919,6 @@ void actionWithStart(char* stack, u32* sp)
 	ActionVar obj_var;
 	popVar(stack, sp, &obj_var);
 
-	printf("[DEBUG] actionWithStart: popped type=%d\n", obj_var.type);
-
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		// Get the object pointer
