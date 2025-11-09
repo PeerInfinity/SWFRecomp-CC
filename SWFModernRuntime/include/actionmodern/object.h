@@ -84,6 +84,10 @@ void releaseObject(ASObject* obj);
 // Get property by name (returns NULL if not found)
 ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length);
 
+// Get property by name with prototype chain traversal (returns NULL if not found)
+// Walks up the __proto__ chain to find inherited properties
+ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_length);
+
 // Set property by name (creates if not exists)
 // Handles refcount management if value is an object
 void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* value);

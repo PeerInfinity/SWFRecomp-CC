@@ -175,6 +175,51 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 }
 
 /**
+ * Get Property With Prototype Chain
+ *
+ * Retrieves a property value by name, searching up the prototype chain via __proto__.
+ * Returns pointer to ActionVar, or NULL if property not found in entire chain.
+ *
+ * This implements proper prototype-based inheritance for ActionScript.
+ */
+ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_length)
+{
+	if (obj == NULL || name == NULL)
+	{
+		return NULL;
+	}
+
+	ASObject* current = obj;
+	int max_depth = 100;  // Prevent infinite loops in circular prototype chains
+	int depth = 0;
+
+	while (current != NULL && depth < max_depth)
+	{
+		depth++;
+
+		// Search own properties first
+		ActionVar* prop = getProperty(current, name, name_length);
+		if (prop != NULL)
+		{
+			return prop;
+		}
+
+		// Property not found on this object - walk up to __proto__
+		ActionVar* proto_var = getProperty(current, "__proto__", 9);
+		if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT)
+		{
+			// No __proto__ property or not an object - end of chain
+			break;
+		}
+
+		// Move to next object in prototype chain
+		current = (ASObject*) proto_var->data.numeric_value;
+	}
+
+	return NULL;  // Property not found in entire prototype chain
+}
+
+/**
  * Set Property
  *
  * Sets a property value by name. Creates property if it doesn't exist.

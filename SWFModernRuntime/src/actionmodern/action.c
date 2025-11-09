@@ -3469,11 +3469,22 @@ void actionStrictEquals(char* stack, u32* sp)
 
 			// For other types (OBJECT, etc.), compare raw values
 			default:
+				#ifdef DEBUG
+				printf("[DEBUG] STRICT_EQUALS: type=%d, a.ptr=%p, b.ptr=%p, equal=%d\n",
+					a.type, (void*)a.data.numeric_value, (void*)b.data.numeric_value,
+					a.data.numeric_value == b.data.numeric_value);
+				#endif
 				result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
 				break;
 		}
 	}
-	// else: different types, result remains 0.0f (false)
+	else
+	{
+		// different types, result remains 0.0f (false)
+		#ifdef DEBUG
+		printf("[DEBUG] STRICT_EQUALS: type mismatch - a.type=%d, b.type=%d\n", a.type, b.type);
+		#endif
+	}
 
 	// Push boolean result
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
@@ -3760,6 +3771,18 @@ void actionExtends(char* stack, u32* sp)
 
 	// Set constructor property to superclass
 	setProperty(new_proto, "constructor", 11, &superclass);
+
+#ifdef DEBUG
+	printf("[DEBUG] actionExtends: Set constructor property - type=%d, ptr=%p\n",
+		superclass.type, (void*)superclass.data.numeric_value);
+
+	// Verify it was set correctly
+	ActionVar* check = getProperty(new_proto, "constructor", 11);
+	if (check != NULL) {
+		printf("[DEBUG] actionExtends: Retrieved constructor - type=%d, ptr=%p\n",
+			check->type, (void*)check->data.numeric_value);
+	}
+#endif
 
 	// Set subclass prototype to new object
 	ActionVar new_proto_var;
@@ -4369,8 +4392,8 @@ void actionGetMember(char* stack, u32* sp)
 			return;
 		}
 
-		// Look up property
-		ActionVar* prop = getProperty(obj, prop_name, prop_name_len);
+		// Look up property with prototype chain support
+		ActionVar* prop = getPropertyWithPrototype(obj, prop_name, prop_name_len);
 
 		if (prop != NULL)
 		{
