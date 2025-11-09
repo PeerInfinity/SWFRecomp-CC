@@ -1,8 +1,16 @@
 {
   "metadata": {
     "name": "set_target2_swf_4",
-    "description": "Tests SET_TARGET2 opcode (0x20) - stack-based context switching for movie clips",
-    "swf_version": 4
+    "description": "Tests SET_TARGET2 opcode (0x20) - stack-based context switching for movie clips. Tests target setting, empty string return to main, nested paths, and multiple context switches.",
+    "swf_version": 4,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Timeline control opcodes (Play, Stop, GotoFrame) don't use the current context",
+      "Only root MovieClip is supported (no child sprites or nested clips)",
+      "Target path resolution only supports empty string, _root, and / (all resolve to root)",
+      "Non-existent targets are silently ignored (context unchanged)",
+      "Advanced path syntax not supported: dot notation (sprite1.sprite2), relative paths (../sprite), special targets (_parent, this)"
+    ]
   },
   "opcodes": {
     "tested": ["SET_TARGET2"],
@@ -10,5 +18,12 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_target_setting",
+    "empty_string_return_to_main",
+    "nested_path_syntax",
+    "multiple_context_switches",
+    "context_persistence_across_actions"
+  ]
 }
