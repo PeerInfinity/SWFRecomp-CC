@@ -4101,9 +4101,35 @@ void actionNewObject(char* stack, u32* sp)
 	}
 }
 
+/**
+ * ActionNewMethod (0x53) - Create new object by calling method on object as constructor
+ *
+ * Stack layout: [method_name] [object] [num_args] [arg1] [arg2] ... <- sp
+ *
+ * SWF Specification behavior:
+ * 1. Pops the name of the method from the stack
+ * 2. Pops the ScriptObject from the stack
+ *    - If method name is blank: object is treated as function object (constructor)
+ *    - If method name not blank: named method of object is invoked as constructor
+ * 3. Pops the number of arguments from the stack
+ * 4. Executes the method call as constructor
+ * 5. Pushes the newly constructed object to the stack
+ *
+ * Current implementation:
+ * - Built-in constructors supported: Array, Object, Date, String, Number, Boolean
+ * - String/Number/Boolean wrapper objects store primitive values in 'valueOf' property
+ * - Blank method name returns undefined (function objects not yet implemented)
+ * - User-defined constructors not supported (requires function object infrastructure)
+ * - Prototype chains not implemented
+ *
+ * Limitations:
+ * - Function objects as constructors: Requires DEFINE_FUNCTION opcode support
+ * - User-defined constructors: Requires function object implementation
+ * - 'this' binding: Requires function execution context
+ * - Prototypes: Requires object system enhancement
+ */
 void actionNewMethod(char* stack, u32* sp)
 {
-	// Stack layout: [method_name] [object] [num_args] [arg1] [arg2] ... <- sp
 	// Pop in order: method_name, object, num_args, then args
 
 	// 1. Pop method name (string)
@@ -4239,9 +4265,21 @@ void actionNewMethod(char* stack, u32* sp)
 
 		if (num_args > 0)
 		{
-			// Convert first argument to string and store as "value" property
-			// For now, just create empty String object
-			// Full implementation would store the string value
+			// Convert first argument to string and store it
+			// Store the string value so it can be retrieved with valueOf() or toString()
+			ActionVar string_value = args[0];
+
+			// If not already a string, we'd need to convert it
+			// For now, store the value as-is with property name "valueOf"
+			setProperty(str_obj, "valueOf", 7, &string_value);
+		}
+		else
+		{
+			// new String() with no arguments - store empty string
+			ActionVar empty_str;
+			empty_str.type = ACTION_STACK_VALUE_STRING;
+			empty_str.data.numeric_value = (u64) "";
+			setProperty(str_obj, "valueOf", 7, &empty_str);
 		}
 
 		new_obj = str_obj;
@@ -4255,9 +4293,42 @@ void actionNewMethod(char* stack, u32* sp)
 
 		if (num_args > 0)
 		{
-			// Convert first argument to number and store as "value" property
-			// For now, just create empty Number object
-			// Full implementation would store the numeric value
+			// Store the numeric value
+			ActionVar num_value = args[0];
+
+			// Convert to float if not already numeric
+			if (num_value.type != ACTION_STACK_VALUE_F32 &&
+			    num_value.type != ACTION_STACK_VALUE_F64)
+			{
+				// For strings, convert to number
+				if (num_value.type == ACTION_STACK_VALUE_STRING)
+				{
+					const char* str = num_value.data.string_data.owns_memory ?
+						num_value.data.string_data.heap_ptr :
+						(const char*) num_value.data.numeric_value;
+					float fval = (float) atof(str);
+					num_value.type = ACTION_STACK_VALUE_F32;
+					num_value.data.numeric_value = VAL(u64, &fval);
+				}
+				else
+				{
+					// Default to 0 for other types
+					float zero = 0.0f;
+					num_value.type = ACTION_STACK_VALUE_F32;
+					num_value.data.numeric_value = VAL(u64, &zero);
+				}
+			}
+
+			setProperty(num_obj, "valueOf", 7, &num_value);
+		}
+		else
+		{
+			// new Number() with no arguments - store 0
+			ActionVar zero_val;
+			float zero = 0.0f;
+			zero_val.type = ACTION_STACK_VALUE_F32;
+			zero_val.data.numeric_value = VAL(u64, &zero);
+			setProperty(num_obj, "valueOf", 7, &zero_val);
 		}
 
 		new_obj = num_obj;
@@ -4271,9 +4342,47 @@ void actionNewMethod(char* stack, u32* sp)
 
 		if (num_args > 0)
 		{
-			// Convert first argument to boolean and store as "value" property
-			// For now, just create empty Boolean object
-			// Full implementation would store the boolean value
+			// Convert first argument to boolean
+			// In ActionScript/JavaScript, false values are: false, 0, NaN, "", null, undefined
+			ActionVar bool_value;
+			bool truthy = true;  // Default to true
+
+			if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				float fval = VAL(float, &args[0].data.numeric_value);
+				truthy = (fval != 0.0f && !isnan(fval));
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				double dval = VAL(double, &args[0].data.numeric_value);
+				truthy = (dval != 0.0 && !isnan(dval));
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				const char* str = args[0].data.string_data.owns_memory ?
+					args[0].data.string_data.heap_ptr :
+					(const char*) args[0].data.numeric_value;
+				truthy = (str != NULL && str[0] != '\0');
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				truthy = false;
+			}
+
+			// Store as a number (1.0 for true, 0.0 for false)
+			float bool_as_float = truthy ? 1.0f : 0.0f;
+			bool_value.type = ACTION_STACK_VALUE_F32;
+			bool_value.data.numeric_value = VAL(u64, &bool_as_float);
+			setProperty(bool_obj, "valueOf", 7, &bool_value);
+		}
+		else
+		{
+			// new Boolean() with no arguments - store false (0)
+			ActionVar false_val;
+			float zero = 0.0f;
+			false_val.type = ACTION_STACK_VALUE_F32;
+			false_val.data.numeric_value = VAL(u64, &zero);
+			setProperty(bool_obj, "valueOf", 7, &false_val);
 		}
 
 		new_obj = bool_obj;
