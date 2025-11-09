@@ -50,6 +50,16 @@ struct ASProperty
 };
 
 /**
+ * Global Objects
+ *
+ * Global singleton objects available in ActionScript.
+ */
+
+// Global object (_global in ActionScript)
+// Initialized on first use via initTime()
+extern ASObject* global_object;
+
+/**
  * Object Lifecycle Primitives
  *
  * These functions are called by generated code to manage object lifetimes.
