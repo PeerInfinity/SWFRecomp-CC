@@ -1,8 +1,12 @@
 {
   "metadata": {
     "name": "play_swf_4",
-    "description": "Tests PLAY opcode (0x06) - starts playback from current frame",
-    "swf_version": 4
+    "description": "Comprehensive test of PLAY opcode (0x06) - starts playback from current frame with edge cases including play when already playing, multiple consecutive play calls, and play/stop/play sequences",
+    "swf_version": 4,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "SetTarget support: Cannot control individual sprite/MovieClip timelines (requires MovieClip architecture not available in NO_GRAPHICS mode)"
+    ]
   },
   "opcodes": {
     "tested": ["PLAY"],
@@ -10,5 +14,12 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "play_from_stopped_state",
+    "play_when_already_playing",
+    "multiple_consecutive_play_calls",
+    "play_stop_play_sequence",
+    "frame_progression_after_play"
+  ]
 }
