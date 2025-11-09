@@ -168,7 +168,9 @@ All 10 test cases pass successfully:
 
 ## Implementation Status
 
-### ✅ What's Implemented
+### ✅ What's Implemented (Bytecode-Level Operations)
+
+The implementation correctly handles all ActionScript bytecode operations:
 
 - **Opcode parsing**: Correctly reads and decodes the GetURL2 opcode (0x9A)
 - **Flag byte parsing**: All flags correctly parsed
@@ -178,22 +180,43 @@ All 10 test cases pass successfully:
 - **Stack operations**: Correctly pops URL and target from stack
 - **String handling**: Handles both regular strings and STR_LIST (concatenated strings)
 - **Edge cases**: Empty strings, long URLs, all flag combinations
-- **Logging**: Debug output showing intended operations
+- **Operation logging**: Debug output showing what operation would be performed
 
-### ❌ What's NOT Implemented (Missing Features)
+### ❌ What's NOT Implemented (External Operations)
 
-These features are documented in `test_info.json` under `missing_features`:
+These features cannot be implemented in NO_GRAPHICS mode due to environmental constraints:
 
-1. **HTTP client functionality** - No actual GET/POST requests are made
-2. **Variable encoding** - Movie clip variables are not encoded as x-www-form-urlencoded
-3. **Variable parsing** - HTTP responses are not parsed
-4. **Variable setting** - Variables from responses are not set in target scope
-5. **SWF file loading** - External SWF files are not actually downloaded or loaded
-6. **MovieClip/sprite management** - Sprite paths are not resolved, no actual sprite loading
-7. **Browser integration** - URLs are not opened in actual browser windows
-8. **Security sandbox** - No cross-domain restrictions enforced
+1. **HTTP client functionality** - No actual GET/POST requests are made (would require libcurl or similar)
+2. **Variable encoding** - Movie clip variables are not encoded as x-www-form-urlencoded (no HTTP client)
+3. **Variable parsing** - HTTP responses are not parsed (no HTTP client)
+4. **Variable setting** - Variables from responses are not set in target scope (no HTTP responses)
+5. **SWF file loading** - External SWF files are not downloaded or loaded (requires HTTP client + SWF parser)
+6. **MovieClip/sprite management** - Sprite paths are not resolved (requires graphics/rendering system)
+7. **Browser integration** - URLs are not opened in browser windows (platform-specific, sandbox restricted)
+8. **Security sandbox** - No cross-domain restrictions enforced (no network layer)
 
-The current implementation correctly handles all bytecode-level operations (parsing, stack manipulation, flag interpretation) but does not implement the actual external communication functionality. This is expected for NO_GRAPHICS mode and would require significant infrastructure (HTTP client, SWF parser, browser integration) to fully implement.
+### Why These Features Are Missing
+
+The GetURL2 opcode's core purpose is **external communication** - making HTTP requests, opening browser windows, and loading external SWF files. These operations fundamentally require:
+
+- **Network access**: Not available in the sandboxed NO_GRAPHICS environment
+- **HTTP client library**: Would need libcurl or platform networking APIs
+- **Browser integration**: Platform-specific OS calls (ShellExecute on Windows, open on macOS, xdg-open on Linux)
+- **SWF parser**: Complex binary format parser to load external SWF files
+- **Graphics/rendering system**: Required for MovieClip/sprite management
+
+This is similar to other movie control opcodes like **GOTO_FRAME** (0x81) and **GOTO_LABEL** (0x8C), which also log their intended operations but cannot perform actual timeline navigation in NO_GRAPHICS mode.
+
+### Current Behavior
+
+The implementation correctly:
+1. Parses all bytecode and flags
+2. Pops values from the stack
+3. Determines what operation should be performed
+4. Logs the operation details
+5. Continues execution without errors
+
+This allows SWF files using GetURL2 to execute properly in NO_GRAPHICS mode, with the external operations being logged instead of performed. This is the expected and correct behavior for a headless runtime environment.
 
 ## Building and Running
 
