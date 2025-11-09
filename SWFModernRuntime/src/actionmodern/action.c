@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "constants.h"  // For SWF_FRAME_COUNT
 #include <recomp.h>
 #include <utils.h>
 #include <swf.h>
@@ -194,6 +195,7 @@ typedef struct {
 } MovieClip;
 
 // Static _root MovieClip for simplified implementation
+// Note: totalframes is set from SWF_FRAME_COUNT if available, otherwise defaults to 1
 static MovieClip root_movieclip = {
 	.x = 0.0f,
 	.y = 0.0f,
@@ -205,7 +207,11 @@ static MovieClip root_movieclip = {
 	.height = 400.0f,
 	.visible = 1,
 	.currentframe = 1,
+#ifdef SWF_FRAME_COUNT
+	.totalframes = SWF_FRAME_COUNT,
+#else
 	.totalframes = 1,
+#endif
 	.framesloaded = 1,  // All frames loaded in NO_GRAPHICS mode
 	.name = "_root",
 	.target = "_root",

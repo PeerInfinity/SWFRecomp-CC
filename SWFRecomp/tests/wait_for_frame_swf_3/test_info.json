@@ -1,8 +1,9 @@
 {
   "metadata": {
     "name": "wait_for_frame_swf_3",
-    "description": "Tests WAIT_FOR_FRAME opcode (0x8A) - checks if a frame is loaded and conditionally skips actions",
-    "swf_version": 3
+    "description": "Tests WAIT_FOR_FRAME opcode (0x8A) with comprehensive edge cases including frame existence checks, skip count behavior, and boundary conditions",
+    "swf_version": 3,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["WAIT_FOR_FRAME"],
@@ -10,5 +11,12 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "frame_0_exists",
+    "frame_100_nonexistent_skip",
+    "skip_count_0_no_skip",
+    "frame_1_boundary_last_frame",
+    "skip_count_2_multiple_actions"
+  ]
 }
