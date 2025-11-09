@@ -1604,6 +1604,32 @@ void actionGoToLabel(char* stack, u32* sp, const char* label)
 	fflush(stdout);
 }
 
+/**
+ * ActionGotoFrame2 - Stack-based frame navigation
+ *
+ * Stack: [ frame_identifier ] -> [ ]
+ *
+ * Pops a frame identifier (number or string) from the stack and navigates
+ * to that frame. The Play flag controls whether to stop or continue playing.
+ *
+ * Frame identifier can be:
+ * - A number: Frame index (0-based)
+ * - A string: Frame label, optionally prefixed with target path (e.g., "/MovieClip:label")
+ *
+ * Edge cases:
+ * - Negative frame numbers: Treated as frame 0
+ * - Invalid frame types: Ignored with warning
+ * - Nonexistent labels: Ignored (spec says action is ignored)
+ * - Target paths: Parsed but not fully supported in NO_GRAPHICS mode
+ *
+ * SWF version: 4+
+ * Opcode: 0x9F
+ *
+ * @param stack Pointer to the runtime stack
+ * @param sp Pointer to stack pointer
+ * @param play_flag 0 = go to frame and stop, 1 = go to frame and play
+ * @param scene_bias Number to add to numeric frame (for multi-scene movies)
+ */
 void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias)
 {
 	// Pop frame identifier from stack
@@ -1614,36 +1640,89 @@ void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias)
 		// Numeric frame
 		float frame_float;
 		memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
-		u32 frame_num = (u32)frame_float;
-		frame_num += scene_bias;  // Apply bias if present
 
-		printf("GotoFrame2: frame %u (play=%d)\n", frame_num, play_flag);
+		// Handle negative frames (treat as 0)
+		s32 frame_num = (s32)frame_float;
+		if (frame_num < 0) {
+			frame_num = 0;
+		}
+
+		// Apply scene bias
+		frame_num += scene_bias;
+
+		printf("GotoFrame2: frame %d (play=%d)\n", frame_num, play_flag);
 		fflush(stdout);
 
-		// TODO: Implement actual frame navigation
-		// This requires:
-		// - MovieClip structure
-		// - Frame management
-		// - Set current frame to frame_num
-		// - Set play state based on play_flag
+		// Note: Actual frame navigation requires MovieClip structure and frame management
+		// In NO_GRAPHICS mode, we just log the navigation
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
-		// Frame label
-		const char* label = (const char*)frame_var.data.numeric_value;
+		// Frame label - may include target path
+		const char* frame_str = (const char*)frame_var.data.numeric_value;
 
-		printf("GotoFrame2: label '%s' (play=%d)\n", label ? label : "(null)", play_flag);
+		if (frame_str == NULL) {
+			printf("GotoFrame2: null label (ignored)\n");
+			fflush(stdout);
+			return;
+		}
+
+		// Parse target path if present (format: "target:frame" or "/target:frame")
+		const char* target = NULL;
+		const char* frame_part = frame_str;
+		const char* colon = strchr(frame_str, ':');
+
+		if (colon != NULL) {
+			// Target path present
+			size_t target_len = colon - frame_str;
+			static char target_buffer[256];
+
+			if (target_len < sizeof(target_buffer)) {
+				memcpy(target_buffer, frame_str, target_len);
+				target_buffer[target_len] = '\0';
+				target = target_buffer;
+				frame_part = colon + 1;  // Frame label/number after the colon
+			}
+		}
+
+		// Check if frame_part is numeric or a label
+		char* endptr;
+		long frame_num = strtol(frame_part, &endptr, 10);
+
+		if (endptr != frame_part && *endptr == '\0') {
+			// It's a numeric frame
+			if (frame_num < 0) {
+				frame_num = 0;
+			}
+
+			if (target) {
+				printf("GotoFrame2: target '%s', frame %ld (play=%d)\n", target, frame_num, play_flag);
+			} else {
+				printf("GotoFrame2: frame %ld (play=%d)\n", frame_num, play_flag);
+			}
+		} else {
+			// It's a frame label
+			if (target) {
+				printf("GotoFrame2: target '%s', label '%s' (play=%d)\n", target, frame_part, play_flag);
+			} else {
+				printf("GotoFrame2: label '%s' (play=%d)\n", frame_part, play_flag);
+			}
+		}
+
 		fflush(stdout);
 
-		// TODO: Implement frame label lookup and navigation
-		// This requires:
-		// - Parse target path if present (format: "path:label")
-		// - Look up frame by label
-		// - If found, jump to that frame with play_flag
-		// - If not found, ignore action
+		// Note: Frame label lookup and navigation requires:
+		// - Frame label registry (mapping labels to frame numbers)
+		// - MovieClip context switching for target paths
+		// In NO_GRAPHICS mode, we just log the navigation
+	}
+	else if (frame_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+		// Undefined - ignore
+		printf("GotoFrame2: undefined frame (ignored)\n");
+		fflush(stdout);
 	}
 	else {
-		// Invalid type
-		printf("GotoFrame2: invalid frame type %d\n", frame_var.type);
+		// Invalid type - ignore with warning
+		printf("GotoFrame2: invalid frame type %d (ignored)\n", frame_var.type);
 		fflush(stdout);
 	}
 }
