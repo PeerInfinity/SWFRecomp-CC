@@ -2266,9 +2266,23 @@ void actionGetProperty(char* stack, u32* sp)
 		case 18: // _soundbuftime
 			value = mc ? mc->soundbuftime : 5.0f;
 			break;
-		case 19: // _quality
-			str_value = mc ? mc->quality : "HIGH";
-			is_string = 1;
+		case 19: // _quality (returns numeric: 0=LOW, 1=MEDIUM, 2=HIGH, 3=BEST)
+			// Convert quality string to numeric value
+			if (mc) {
+				if (strcmp(mc->quality, "LOW") == 0) {
+					value = 0.0f;
+				} else if (strcmp(mc->quality, "MEDIUM") == 0) {
+					value = 1.0f;
+				} else if (strcmp(mc->quality, "HIGH") == 0) {
+					value = 2.0f;
+				} else if (strcmp(mc->quality, "BEST") == 0) {
+					value = 3.0f;
+				} else {
+					value = 2.0f;  // Default to HIGH
+				}
+			} else {
+				value = 2.0f;  // Default to HIGH
+			}
 			break;
 		case 20: // _xmouse (SWF 5+)
 			value = mc ? mc->xmouse : 0.0f;
