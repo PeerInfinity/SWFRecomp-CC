@@ -15,15 +15,15 @@ frame_count = struct.pack('<H', 1)  # 1 frame (simplified test)
 # ActionScript bytecode for testing ActionGotoFrame
 actions = b''
 
-# Test: Trace "Before goto", then GotoFrame(2), then Trace "After goto"
-# Expected: "Before goto", then "// GotoFrame: 2", then "After goto"
+# Test: Trace "Start", then GotoFrame(2), then Trace "After goto"
+# Expected: "Start", then "After goto" (goto doesn't print anything)
 
-# Push string "Before goto"
-string_start = b'Before goto\x00'
+# Push string "Start"
+string_start = b'Start\x00'
 actions += struct.pack('<BHB', 0x96, len(string_start) + 1, 0)  # PUSH string
 actions += string_start
 
-# TRACE - prints "Before goto"
+# TRACE - prints "Start"
 actions += bytes([0x26])  # TRACE (0x26)
 
 # ActionGotoFrame with frame index 2
