@@ -1,14 +1,35 @@
 {
   "metadata": {
     "name": "cast_op_swf_7",
-    "description": "Tests CAST_OP opcode (0x2B) - ActionScript 2.0 cast operator for type conversion",
-    "swf_version": 7
+    "description": "Tests CAST_OP opcode (0x2B) - ActionScript 2.0 cast operator with prototype chain traversal and interface checking. Tests primitive type rejection, object casting without prototypes, and mixed type handling.",
+    "swf_version": 7,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": false,
+    "missing_features": [
+      "Complete prototype chain testing requires DefineFunction for creating constructor functions",
+      "Interface implementation testing requires proper ImplementsOp setup",
+      "Successful cast test (matching prototype chain) not included due to test complexity",
+      "Test only validates failure cases and doesn't crash behavior, not successful cast scenarios"
+    ]
   },
   "opcodes": {
     "tested": ["CAST_OP"],
-    "supporting": ["PUSH", "POP", "TRACE"]
+    "supporting": ["PUSH", "POP", "TRACE", "INIT_OBJECT"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "primitive_type_cast_rejection",
+    "object_cast_without_prototype_chain",
+    "mixed_type_cast_with_primitive_constructor",
+    "null_undefined_handling"
+  ],
+  "implementation_notes": [
+    "CastOp now implements full prototype chain traversal via __proto__ properties",
+    "Interface checking integrated via implementsInterface() function",
+    "Maximum prototype chain depth of 100 to prevent infinite loops",
+    "Returns original object on successful cast, undefined/null on failure",
+    "Shared instanceof logic with actionInstanceOf via checkInstanceOf() helper"
+  ]
 }

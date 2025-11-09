@@ -2264,39 +2264,140 @@ void actionDelete2(char* stack, u32* sp, char* str_buffer)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
+/**
+ * Helper function to check if an object is an instance of a constructor
+ *
+ * Implements the same logic as ActionScript's instanceof operator:
+ * 1. Checks prototype chain - walks __proto__ looking for constructor's prototype
+ * 2. Checks interface implementation - for AS2 interfaces
+ *
+ * @param obj_var Pointer to the object to check
+ * @param ctor_var Pointer to the constructor function
+ * @return 1 if object is instance of constructor, 0 otherwise
+ */
+static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
+{
+	// Primitives (number, string, undefined) are never instances
+	if (obj_var->type == ACTION_STACK_VALUE_F32 ||
+		obj_var->type == ACTION_STACK_VALUE_F64 ||
+		obj_var->type == ACTION_STACK_VALUE_STRING ||
+		obj_var->type == ACTION_STACK_VALUE_UNDEFINED)
+	{
+		return 0;
+	}
+
+	// Object and constructor must be object types
+	if (obj_var->type != ACTION_STACK_VALUE_OBJECT &&
+		obj_var->type != ACTION_STACK_VALUE_ARRAY &&
+		obj_var->type != ACTION_STACK_VALUE_FUNCTION)
+	{
+		return 0;
+	}
+
+	if (ctor_var->type != ACTION_STACK_VALUE_OBJECT &&
+		ctor_var->type != ACTION_STACK_VALUE_FUNCTION)
+	{
+		return 0;
+	}
+
+	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+	ASObject* ctor = (ASObject*) ctor_var->data.numeric_value;
+
+	if (obj == NULL || ctor == NULL)
+	{
+		return 0;
+	}
+
+	// Get the constructor's "prototype" property
+	ActionVar* ctor_proto_var = getProperty(ctor, "prototype", 9);
+	if (ctor_proto_var == NULL)
+	{
+		return 0;
+	}
+
+	// Get the prototype object
+	if (ctor_proto_var->type != ACTION_STACK_VALUE_OBJECT)
+	{
+		return 0;
+	}
+
+	ASObject* ctor_proto = (ASObject*) ctor_proto_var->data.numeric_value;
+	if (ctor_proto == NULL)
+	{
+		return 0;
+	}
+
+	// Walk up the object's prototype chain via __proto__ property
+	// Start with the object's __proto__
+	ActionVar* current_proto_var = getProperty(obj, "__proto__", 9);
+
+	// Maximum chain depth to prevent infinite loops
+	int max_depth = 100;
+	int depth = 0;
+
+	while (current_proto_var != NULL && depth < max_depth)
+	{
+		depth++;
+
+		// Check if this prototype matches the constructor's prototype
+		if (current_proto_var->type == ACTION_STACK_VALUE_OBJECT)
+		{
+			ASObject* current_proto = (ASObject*) current_proto_var->data.numeric_value;
+
+			if (current_proto == ctor_proto)
+			{
+				// Found a match!
+				return 1;
+			}
+
+			// Continue up the chain
+			current_proto_var = getProperty(current_proto, "__proto__", 9);
+		}
+		else
+		{
+			// Non-object in prototype chain, stop
+			break;
+		}
+	}
+
+	// Check interface implementation (ActionScript 2.0 implements keyword)
+	if (implementsInterface(obj, ctor))
+	{
+		return 1;
+	}
+
+	// Not found in prototype chain or interfaces
+	return 0;
+}
+
 void actionCastOp(char* stack, u32* sp)
 {
 	// CastOp implementation (ActionScript 2.0 cast operator)
 	// Pops object to cast, pops constructor, checks if object is instance of constructor
-	// Returns object if cast succeeds, undefined/null if it fails
+	// Returns object if cast succeeds, null if it fails
 
 	// Pop object to cast
-	u8 obj_type = STACK_TOP_TYPE;
-	u64 obj_value = STACK_TOP_VALUE;
-	POP();
+	ActionVar obj_var;
+	popVar(stack, sp, &obj_var);
 
 	// Pop constructor function
-	u8 ctor_type = STACK_TOP_TYPE;
-	u64 ctor_value = STACK_TOP_VALUE;
-	POP();
+	ActionVar ctor_var;
+	popVar(stack, sp, &ctor_var);
 
-	// SIMPLIFIED IMPLEMENTATION:
-	// Since prototype chain and instanceof infrastructure is not yet implemented,
-	// this is a basic version that only checks if the object is an object type.
-	// TODO: Implement full instanceof checking with prototype chain walking
-	//       and interface implementation checking when that infrastructure is available.
-
-	// For now: if object is an OBJECT type and non-null, assume cast succeeds
-	// This will need to be enhanced with actual instanceof logic later
-	if (obj_type == ACTION_STACK_VALUE_OBJECT && obj_value != 0)
+	// Check if object is an instance of constructor using prototype chain + interfaces
+	if (checkInstanceOf(&obj_var, &ctor_var))
 	{
 		// Cast succeeds - push the object back
-		PUSH(ACTION_STACK_VALUE_OBJECT, obj_value);
+		pushVar(stack, sp, &obj_var);
 	}
 	else
 	{
-		// Cast fails - push undefined (represents null in ActionScript)
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		// Cast fails - push null
+		ActionVar null_var;
+		null_var.type = ACTION_STACK_VALUE_UNDEFINED;
+		null_var.data.numeric_value = 0;
+		null_var.str_size = 0;
+		pushVar(stack, sp, &null_var);
 	}
 }
 
@@ -2383,32 +2484,12 @@ void actionInstanceOf(char* stack, u32* sp)
 	ActionVar obj_var;
 	popVar(stack, sp, &obj_var);
 
-	// TODO: Implement proper prototype chain traversal
-	// This requires adding prototype field to ASObject structure
-	// For now, simplified implementation returns false
-
-	bool result = false;
-
-	// Primitives (number, string, boolean) are never instances
-	if (obj_var.type == ACTION_STACK_VALUE_F32 ||
-		obj_var.type == ACTION_STACK_VALUE_F64 ||
-		obj_var.type == ACTION_STACK_VALUE_STRING)
-	{
-		result = false;
-	}
-	// TODO: When prototype support is added, implement:
-	// 1. Get constructor's prototype property
-	// 2. Walk up object's prototype chain
-	// 3. If any prototype matches constructor's prototype, return true
-	// 4. If chain ends without match, return false
+	// Check if object is an instance of constructor using prototype chain + interfaces
+	int result = checkInstanceOf(&obj_var, &constr_var);
 
 	// Push result as float (1.0 for true, 0.0 for false)
 	float result_val = result ? 1.0f : 0.0f;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_val));
-
-	#ifdef DEBUG
-	printf("// InstanceOf check (simplified - always returns false)\n");
-	#endif
 }
 
 void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
