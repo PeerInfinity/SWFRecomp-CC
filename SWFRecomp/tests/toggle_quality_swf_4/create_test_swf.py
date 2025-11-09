@@ -21,7 +21,7 @@ action_push1 += string1
 action_trace1 = bytes([0x26])  # TRACE action (0x26)
 
 # toggleHighQuality(); - This is opcode 0x08
-action_toggle_quality = bytes([0x08])  # TOGGLE_QUALITY action (0x08)
+action_toggle_quality1 = bytes([0x08])  # TOGGLE_QUALITY action (0x08)
 
 # trace("After toggleHighQuality");
 string2 = b'After toggleHighQuality\x00'
@@ -29,11 +29,40 @@ action_push2 = struct.pack('<BHB', 0x96, len(string2) + 1, 0)  # PUSH action, le
 action_push2 += string2
 action_trace2 = bytes([0x26])  # TRACE action (0x26)
 
+# Test Case 2: Multiple quality toggles
+# trace("Start");
+string3 = b'Start\x00'
+action_push3 = struct.pack('<BHB', 0x96, len(string3) + 1, 0)
+action_push3 += string3
+action_trace3 = bytes([0x26])
+
+# toggleHighQuality();
+action_toggle_quality2 = bytes([0x08])
+
+# trace("Toggled once");
+string4 = b'Toggled once\x00'
+action_push4 = struct.pack('<BHB', 0x96, len(string4) + 1, 0)
+action_push4 += string4
+action_trace4 = bytes([0x26])
+
+# toggleHighQuality();
+action_toggle_quality3 = bytes([0x08])
+
+# trace("Toggled twice");
+string5 = b'Toggled twice\x00'
+action_push5 = struct.pack('<BHB', 0x96, len(string5) + 1, 0)
+action_push5 += string5
+action_trace5 = bytes([0x26])
+
 # End action
 action_end = bytes([0x00])  # END action
 
 # Combine all actions
-all_actions = action_push1 + action_trace1 + action_toggle_quality + action_push2 + action_trace2 + action_end
+all_actions = (action_push1 + action_trace1 + action_toggle_quality1 +
+               action_push2 + action_trace2 +
+               action_push3 + action_trace3 + action_toggle_quality2 +
+               action_push4 + action_trace4 + action_toggle_quality3 +
+               action_push5 + action_trace5 + action_end)
 
 # DoAction tag
 do_action_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
