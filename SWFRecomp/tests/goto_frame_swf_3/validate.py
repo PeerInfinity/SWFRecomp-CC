@@ -3,10 +3,13 @@
 Validation script for goto_frame_swf_3
 
 Tests the ActionGotoFrame opcode (0x81).
+Note: The test has a single frame and attempts to goto frame 2, which doesn't exist.
+With the improved implementation, gotoFrame now actually performs navigation instead of
+just printing. Since frame 2 doesn't exist, execution continues in the same frame.
+
 Expected output:
 - "Start" (from trace before goto)
-- "// GotoFrame: 2" (from the actionGotoFrame call)
-- "After goto" (from trace after goto)
+- "After goto" (from trace after goto - executes because goto to non-existent frame doesn't stop execution in same frame)
 """
 import sys
 import json
@@ -22,7 +25,8 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected: Three lines of output showing trace before goto, the goto action, and trace after.
+    Expected: Two lines of output - the trace before and after the goto.
+    The goto itself now actually performs navigation instead of printing.
     """
     lines = parse_output(output)
 
@@ -31,7 +35,6 @@ def validate_output(output):
     # Expected output lines
     expected_lines = [
         "Start",
-        "// GotoFrame: 2",
         "After goto"
     ]
 

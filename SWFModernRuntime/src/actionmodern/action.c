@@ -1554,15 +1554,13 @@ void actionTrace(char* stack, u32* sp)
 
 void actionGotoFrame(char* stack, u32* sp, u16 frame)
 {
-	// Simplified: just log the frame change
-	printf("// GotoFrame: %d\n", frame);
-	fflush(stdout);
+	// Set the next frame to the specified frame index
+	extern size_t current_frame;
+	extern size_t next_frame;
+	extern int manual_next_frame;
 
-	// TODO: Implement actual frame navigation
-	// This requires:
-	// - MovieClip structure
-	// - Frame management
-	// - Timeline playback control
+	next_frame = frame;
+	manual_next_frame = 1;
 }
 
 void actionGoToLabel(char* stack, u32* sp, const char* label)

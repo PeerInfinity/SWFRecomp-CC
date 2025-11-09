@@ -4,10 +4,12 @@ Validation script for prev_frame_swf_4
 
 Tests the PREV_FRAME opcode (0x05).
 
-Note: This is a simplified test that demonstrates prevFrame opcode is recognized and compiled.
-Full frame navigation testing requires more complex control flow.
+This test properly exercises the prevFrame functionality:
+- Frame 0: trace "Frame 1", gotoFrame(2) - jumps to Frame 2
+- Frame 1: trace "Frame 2", STOP - only executes when prevFrame() is called
+- Frame 2: trace "Frame 3", prevFrame() - goes back to Frame 1
 
-Expected output: Frame 1, Frame 2 (Frame 2 never executes due to STOP in Frame 1)
+Expected output: Frame 1, Frame 3, Frame 2
 """
 import sys
 import json
@@ -21,29 +23,54 @@ from test_utils import parse_output, make_result, make_validation_result
 def validate_output(output):
     """
     Validate test output.
-    
-    Currently validates that the opcode compiles and basic frame execution works.
+
+    Expected sequence:
+    1. Frame 1 - from Frame 0
+    2. Frame 3 - from Frame 2 (after gotoFrame)
+    3. Frame 2 - from Frame 1 (after prevFrame)
     """
     lines = parse_output(output)
 
-    # For now, just verify we get Frame 1 and Frame 2
-    # Full prevFrame testing requires removing STOP from intermediate frames
-    expected_min = ["Frame 1", "Frame 2"]
-    
-    if len(lines) < 2:
+    # Check we got exactly 3 lines
+    if len(lines) < 3:
         return make_validation_result([
             make_result(
-                "basic_execution",
+                "output_count",
                 False,
-                "At least 2 lines",
+                "3 lines",
                 f"{len(lines)} lines",
-                f"Expected at least 2 output lines"
+                "Expected exactly 3 trace outputs"
             )
         ])
 
     results = []
-    results.append(make_result("frame_1", lines[0] == "Frame 1", "Frame 1", lines[0]))
-    results.append(make_result("frame_2", lines[1] == "Frame 2", "Frame 2", lines[1]))
+
+    # First output should be "Frame 1" from Frame 0
+    results.append(make_result(
+        "first_frame",
+        lines[0] == "Frame 1",
+        "Frame 1",
+        lines[0],
+        "First frame should trace 'Frame 1'"
+    ))
+
+    # Second output should be "Frame 3" from Frame 2 (after goto)
+    results.append(make_result(
+        "goto_target",
+        lines[1] == "Frame 3",
+        "Frame 3",
+        lines[1],
+        "After gotoFrame(2), should trace 'Frame 3'"
+    ))
+
+    # Third output should be "Frame 2" from Frame 1 (after prevFrame)
+    results.append(make_result(
+        "prev_frame_works",
+        lines[2] == "Frame 2",
+        "Frame 2",
+        lines[2],
+        "After prevFrame(), should trace 'Frame 2'"
+    ))
 
     return make_validation_result(results)
 
