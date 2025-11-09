@@ -427,8 +427,41 @@ namespace SWFRecomp
 		}
 
 		context.tag_main << "};" << endl
-						 << endl
-						 << "void tagInit()" << endl
+						 << endl;
+
+		// Generate frame label data
+		context.tag_main << "// Frame labels (label -> frame number)" << endl
+						 << "typedef struct {" << endl
+						 << "\tconst char* label;" << endl
+						 << "\tsize_t frame;" << endl
+						 << "} FrameLabelEntry;" << endl
+						 << endl;
+
+		if (frame_labels.empty())
+		{
+			// No frame labels - create empty array
+			context.tag_main << "FrameLabelEntry frame_label_data[] = { { NULL, 0 } };" << endl
+							 << "size_t frame_label_count = 0;" << endl
+							 << endl;
+		}
+		else
+		{
+			context.tag_main << "FrameLabelEntry frame_label_data[] =" << endl
+							 << "{" << endl;
+
+			for (const auto& pair : frame_labels)
+			{
+				context.tag_main << "\t{ \"" << pair.first << "\", " << to_string(pair.second) << " }," << endl;
+			}
+
+			context.tag_main << "\t{ NULL, 0 }" << endl  // Sentinel
+							 << "};" << endl
+							 << endl
+							 << "size_t frame_label_count = " << to_string(frame_labels.size()) << ";" << endl
+							 << endl;
+		}
+
+		context.tag_main << "void tagInit()" << endl
 						 << "{"
 						 << tag_init.str() << endl
 						 << "}";
@@ -540,6 +573,14 @@ namespace SWFRecomp
 				break;
 			}
 			
+			case SWF_TAG_FRAME_LABEL:
+			{
+				// Skip FrameLabel tags for now (parse label string and advance cur_pos)
+				cur_pos += tag.length;
+
+				break;
+			}
+
 			case SWF_TAG_SHOW_FRAME:
 			{
 				while (last_queued_script < next_script_i)
@@ -547,11 +588,11 @@ namespace SWFRecomp
 					context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(stack, &sp);" << endl;
 					last_queued_script += 1;
 				}
-				
+
 				context.tag_main << "\t" << "tagShowFrame();" << endl;
-				
+
 				another_frame = true;
-				
+
 				break;
 			}
 			
