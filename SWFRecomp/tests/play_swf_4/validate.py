@@ -2,16 +2,20 @@
 """
 Validation script for play_swf_4
 
-Tests the PLAY opcode (0x06) along with STOP opcode.
-Expected output:
-- Frame 1: trace("Frame 1"), stop(), trace("Stopped"), play(), trace("Playing")
-- Frame 2: trace("Frame 2"), stop()
+Comprehensive test of PLAY opcode (0x06) with multiple edge cases:
+- Basic play from stopped state
+- Play when already playing (no-op)
+- Multiple consecutive play calls
+- Play/stop/play sequences
 
 Expected output:
 Frame 1
-Stopped
-Playing
+After stop
+After play
 Frame 2
+Double play
+Frame 3
+Stop after play
 """
 import sys
 import json
@@ -25,53 +29,77 @@ from test_utils import parse_output, make_result, make_validation_result
 
 def validate_output(output):
     """
-    Validate test output.
+    Validate comprehensive PLAY opcode test output.
 
-    Expected: Four lines of trace output demonstrating play/stop control
+    Expected: 7 lines of trace output demonstrating various play/stop scenarios
     """
     lines = parse_output(output)
 
     results = []
 
-    # Check we have 4 lines
-    if len(lines) < 4:
+    # Check we have the expected number of lines
+    expected_lines = 7
+    if len(lines) < expected_lines:
         return make_validation_result([
             make_result(
                 "output_count",
                 False,
-                "4 lines",
+                f"{expected_lines} lines",
                 f"{len(lines)} lines",
-                f"Expected 4 lines but got {len(lines)}"
+                f"Expected {expected_lines} lines but got {len(lines)}"
             )
         ])
 
-    # Validate each line
+    # Frame 1: Basic play from stopped state
     results.append(make_result(
-        "frame_1_trace",
+        "frame_1_start",
         lines[0] == "Frame 1",
         "Frame 1",
         lines[0]
     ))
 
     results.append(make_result(
-        "stopped_trace",
-        lines[1] == "Stopped",
-        "Stopped",
+        "after_stop",
+        lines[1] == "After stop",
+        "After stop",
         lines[1]
     ))
 
     results.append(make_result(
-        "playing_trace",
-        lines[2] == "Playing",
-        "Playing",
+        "after_play",
+        lines[2] == "After play",
+        "After play",
         lines[2]
     ))
 
+    # Frame 2: Play when already playing
     results.append(make_result(
-        "frame_2_trace",
+        "frame_2_start",
         lines[3] == "Frame 2",
         "Frame 2",
         lines[3]
+    ))
+
+    results.append(make_result(
+        "double_play",
+        lines[4] == "Double play",
+        "Double play",
+        lines[4]
+    ))
+
+    # Frame 3: Play/stop/play sequence
+    results.append(make_result(
+        "frame_3_start",
+        lines[5] == "Frame 3",
+        "Frame 3",
+        lines[5]
+    ))
+
+    results.append(make_result(
+        "stop_after_play",
+        lines[6] == "Stop after play",
+        "Stop after play",
+        lines[6]
     ))
 
     return make_validation_result(results)

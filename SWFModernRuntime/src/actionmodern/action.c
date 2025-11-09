@@ -1513,6 +1513,44 @@ void actionNextFrame()
 	manual_next_frame = 1;
 }
 
+/**
+ * ActionPlay - Start playing from the current frame
+ *
+ * Opcode: 0x06
+ * SWF version: 3+
+ * Stack: [] -> [] (no stack operations)
+ *
+ * Description:
+ *   Instructs the Flash Player to start playing at the current frame.
+ *   The timeline will advance automatically on each frame tick after
+ *   this action is executed.
+ *
+ * Behavior:
+ *   - Sets the global playing state to true (is_playing = 1)
+ *   - Timeline advances to next frame on next tick
+ *   - If already playing, this is a no-op (safe to call multiple times)
+ *   - Opposite of ActionStop (0x07)
+ *
+ * Implementation notes (NO_GRAPHICS mode):
+ *   - Only affects the main timeline in current implementation
+ *   - SetTarget support for controlling individual sprites/MovieClips
+ *     is not yet implemented (requires MovieClip architecture)
+ *   - Frame advancement is handled by the frame loop in swf_core.c
+ *   - The frame loop checks is_playing and breaks if it's 0
+ *
+ * Edge cases handled:
+ *   - Play when already playing: No-op, safe behavior
+ *   - Multiple consecutive play calls: All are no-ops, state stays 1
+ *   - Play after stop: Resumes playback from current frame
+ *
+ * Limitations:
+ *   - SetTarget not supported: Cannot control individual sprite timelines
+ *   - Only one global playing state: All timelines share the same state
+ *
+ * See also:
+ *   - actionStop() / ActionStop (0x07): Stop playback
+ *   - swf_core.c: Frame loop that checks is_playing
+ */
 void actionPlay()
 {
 	// Set playing state to true

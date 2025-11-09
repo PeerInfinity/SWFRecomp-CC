@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF4 file testing PLAY and STOP opcodes
-# Test Case: Basic play/stop functionality with multiple frames
-# Frame 1: trace("Frame 1"); stop(); trace("Stopped"); play(); trace("Playing");
-# Frame 2: trace("Frame 2"); stop();
-# Expected output: Frame 1, Stopped, Playing, Frame 2
+# Create a comprehensive SWF4 file testing PLAY opcode (0x06)
+# This test covers multiple edge cases:
+# - Basic play from stopped state
+# - Play when already playing (no-op)
+# - Multiple consecutive play calls
+# - Play/stop/play sequences
+# - Frame progression
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -15,7 +17,7 @@ version = 4
 rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
-frame_count = struct.pack('<H', 2)  # 2 frames
+frame_count = struct.pack('<H', 4)  # 4 frames for comprehensive testing
 
 # Helper function to push a string constant
 def push_string(s):
@@ -23,74 +25,79 @@ def push_string(s):
     length = 1 + len(s_bytes)  # Type byte + string
     return struct.pack('<BHB', 0x96, length, 0) + s_bytes
 
-# Frame 1 Actions
-# trace("Frame 1")
-trace_frame1 = push_string("Frame 1") + bytes([0x26])  # 0x26 = TRACE
-
-# stop()
+# Opcode constants
 action_stop = bytes([0x07])  # 0x07 = STOP
-
-# trace("Stopped")
-trace_stopped = push_string("Stopped") + bytes([0x26])
-
-# play()
 action_play = bytes([0x06])  # 0x06 = PLAY
+action_end = bytes([0x00])   # 0x00 = END
 
-# trace("Playing")
-trace_playing = push_string("Playing") + bytes([0x26])
+# Frame 1: Test basic play from stopped state
+# trace("Frame 1"); stop(); trace("After stop"); play(); trace("After play");
+frame1_actions = (
+    push_string("Frame 1") + bytes([0x26]) +      # trace("Frame 1")
+    action_stop +                                   # stop()
+    push_string("After stop") + bytes([0x26]) +   # trace("After stop")
+    action_play +                                   # play()
+    push_string("After play") + bytes([0x26]) +   # trace("After play")
+    action_end
+)
 
-# End of Frame 1 actions
-action_end = bytes([0x00])
+# Frame 2: Test play when already playing (should be no-op)
+# trace("Frame 2"); play(); play(); trace("Double play");
+frame2_actions = (
+    push_string("Frame 2") + bytes([0x26]) +      # trace("Frame 2")
+    action_play +                                   # play() - redundant, already playing
+    action_play +                                   # play() - redundant again
+    push_string("Double play") + bytes([0x26]) +  # trace("Double play")
+    action_end
+)
 
-frame1_actions = trace_frame1 + action_stop + trace_stopped + action_play + trace_playing + action_end
+# Frame 3: Test play/stop/play sequence
+# trace("Frame 3"); stop(); play(); stop(); trace("Stop after play");
+frame3_actions = (
+    push_string("Frame 3") + bytes([0x26]) +      # trace("Frame 3")
+    action_stop +                                   # stop()
+    action_play +                                   # play()
+    action_stop +                                   # stop() - should stop again
+    push_string("Stop after play") + bytes([0x26]) + # trace("Stop after play")
+    action_end
+)
 
-# DoAction tag for Frame 1
-do_action1_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
-do_action1_length = len(frame1_actions)
-do_action1_header += struct.pack('<I', do_action1_length)
-do_action1_tag = do_action1_header + frame1_actions
+# Build tags for all frames
+def build_do_action_tag(actions):
+    header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
+    header += struct.pack('<I', len(actions))
+    return header + actions
 
-# ShowFrame tag 1
-show_frame1_tag = struct.pack('<H', 1 << 6)  # Tag type 1, short form
+def build_show_frame_tag():
+    return struct.pack('<H', 1 << 6)  # Tag type 1, short form
 
-# Frame 2 Actions
-# trace("Frame 2")
-trace_frame2 = push_string("Frame 2") + bytes([0x26])
+tags = (
+    build_do_action_tag(frame1_actions) + build_show_frame_tag() +
+    build_do_action_tag(frame2_actions) + build_show_frame_tag() +
+    build_do_action_tag(frame3_actions) + build_show_frame_tag() +
+    bytes([0x00, 0x00])  # End tag
+)
 
-# stop()
-# (action_stop already defined)
-
-frame2_actions = trace_frame2 + action_stop + action_end
-
-# DoAction tag for Frame 2
-do_action2_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
-do_action2_length = len(frame2_actions)
-do_action2_header += struct.pack('<I', do_action2_length)
-do_action2_tag = do_action2_header + frame2_actions
-
-# ShowFrame tag 2
-show_frame2_tag = struct.pack('<H', 1 << 6)  # Tag type 1, short form
-
-# End tag
-end_tag = bytes([0x00, 0x00])
-
-# Build complete SWF
-tags = do_action1_tag + show_frame1_tag + do_action2_tag + show_frame2_tag + end_tag
 body = rect_data + frame_rate + frame_count + tags
-
 file_length = 8 + len(body)  # Header is 8 bytes
-
 swf_data = signature + struct.pack('<BI', version, file_length) + body
 
 with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
-print("Test case: PLAY and STOP opcodes")
-print("Frame 1: trace('Frame 1'); stop(); trace('Stopped'); play(); trace('Playing');")
-print("Frame 2: trace('Frame 2'); stop();")
-print("Expected output:")
+print("\nComprehensive PLAY opcode test cases:")
+print("Frame 1: Basic play from stopped state")
+print("  trace('Frame 1'); stop(); trace('After stop'); play(); trace('After play');")
+print("Frame 2: Play when already playing (no-op)")
+print("  trace('Frame 2'); play(); play(); trace('Double play');")
+print("Frame 3: Play/stop/play sequence")
+print("  trace('Frame 3'); stop(); play(); stop(); trace('Stop after play');")
+print("\nExpected output:")
 print("  Frame 1")
-print("  Stopped")
-print("  Playing")
+print("  After stop")
+print("  After play")
 print("  Frame 2")
+print("  Double play")
+print("  Frame 3")
+print("  Stop after play")
