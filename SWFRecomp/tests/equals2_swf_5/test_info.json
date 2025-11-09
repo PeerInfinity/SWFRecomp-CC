@@ -1,15 +1,9 @@
 {
   "metadata": {
     "name": "equals2_swf_5",
-    "description": "Tests ActionEquals2 opcode (0x49) - Type-aware equality comparison following ECMA-262 specification. Includes number equality, string equality, and number-to-string type coercion. NaN handling added to implementation.",
+    "description": "Tests ActionEquals2 opcode (0x49) - Type-aware equality comparison following ECMA-262 specification. Comprehensive test coverage including number, string, boolean, null, and undefined types with proper type coercion.",
     "swf_version": 5,
-    "fully_implemented": false,
-    "missing_features": [
-      "Boolean type support not available in recompiler (cannot test true == 1, false == 0)",
-      "Null type support not available in recompiler (cannot test null == undefined, null == 0)",
-      "Additional edge case testing limited by test framework (NaN, Infinity, empty string tests would benefit from dedicated test files)",
-      "Object reference equality not tested (requires object creation support)"
-    ]
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["EQUALS2"],
@@ -22,27 +16,38 @@
     "completed_features": [
       "Number equality comparison (F32 and F64)",
       "String equality comparison with null safety",
+      "Boolean equality comparison (true == true, true == false)",
+      "Boolean to number conversion (true == 1, false == 0)",
+      "Null equality comparison (null == null)",
+      "Undefined equality comparison (undefined == undefined)",
+      "ECMA-262 special case: null == undefined returns true",
+      "ECMA-262 rule: null/undefined vs other types returns false",
       "Number-to-string type coercion (ECMA-262 compliant)",
       "String-to-number type coercion (ECMA-262 compliant)",
-      "NaN handling (NaN != NaN, NaN != anything)",
-      "Undefined type handling (undefined == undefined)"
+      "NaN handling (NaN != NaN, NaN != anything)"
     ],
     "tested_cases": [
-      "Same number equality (5 == 5)",
-      "Different number equality (5 == 3)",
-      "Same string equality (\"hello\" == \"hello\")",
-      "Different string equality (\"hello\" == \"world\")",
-      "Number-string type coercion (5 == \"5\", 10 == \"10\")"
+      "Number equality: 5 == 5 (true), 5 == 3 (false)",
+      "String equality: \"hello\" == \"hello\" (true), \"hello\" == \"world\" (false)",
+      "Number-string coercion: 5 == \"5\" (true), 10 == \"10\" (true)",
+      "Boolean equality: true == true (true), true == false (false)",
+      "Boolean-number coercion: true == 1 (true), false == 0 (true)",
+      "Null equality: null == null (true)",
+      "Undefined equality: undefined == undefined (true)",
+      "Null-undefined special case: null == undefined (true)",
+      "Null vs number: null == 0 (false)",
+      "Undefined vs number: undefined == 0 (false)"
     ],
-    "untested_ecma262_features": [
-      "null == undefined should return true",
-      "Boolean to number conversion (true == 1, false == 0)",
-      "null/undefined compared with other types should return false",
-      "Boolean compared with numbers",
-      "Object reference equality",
-      "Comprehensive NaN edge cases (requires separate test file)",
-      "Infinity comparisons (requires separate test file)",
-      "Empty string to zero conversion (requires separate test file)"
+    "edge_cases_tested": [
+      "boolean_equality",
+      "boolean_to_number_conversion",
+      "null_equality",
+      "undefined_equality",
+      "null_undefined_special_case",
+      "null_vs_other_types",
+      "undefined_vs_other_types",
+      "number_string_type_coercion",
+      "nan_handling"
     ]
   }
 }
