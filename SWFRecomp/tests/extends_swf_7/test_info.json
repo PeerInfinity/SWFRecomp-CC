@@ -1,14 +1,34 @@
 {
   "metadata": {
     "name": "extends_swf_7",
-    "description": "Tests EXTENDS opcode (0x69) for prototype-based inheritance",
-    "swf_version": 7
+    "description": "Tests EXTENDS opcode (0x69) for prototype-based inheritance. Verifies that EXTENDS sets up __proto__ property correctly, though constructor property has a known bug and prototype chain traversal is not yet implemented.",
+    "swf_version": 7,
+    "fully_implemented": false,
+    "missing_features": [
+      "Constructor property not set correctly - Dog.prototype.constructor should equal Animal but comparison fails",
+      "Prototype chain traversal not implemented - GET_MEMBER only searches own properties, not __proto__ chain",
+      "instanceof opcode doesn't use prototype chain - always returns false (requires prototype chain support)",
+      "NEW_OBJECT not fully functional with inheritance",
+      "Method inheritance not working - child instances cannot call parent methods via prototype chain"
+    ]
   },
   "opcodes": {
     "tested": ["EXTENDS"],
-    "supporting": ["PUSH", "TRACE", "INIT_OBJECT", "GET_VARIABLE", "SET_VARIABLE", "SET_MEMBER", "DUPLICATE"]
+    "supporting": ["PUSH", "TRACE", "INIT_OBJECT", "GET_VARIABLE", "SET_VARIABLE", "SET_MEMBER", "GET_MEMBER", "DUPLICATE", "STRICT_EQUALS", "TYPEOF"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_extends_operation",
+    "proto_property_set_correctly",
+    "constructor_property_bug_documented"
+  ],
+  "known_bugs": [
+    {
+      "description": "Constructor property comparison fails",
+      "details": "After EXTENDS, Dog.prototype.constructor should point to Animal, but STRICT_EQUALS comparison returns false. The __proto__ property IS set correctly, so the issue is specific to how the constructor property is stored or compared.",
+      "test": "Step 3 returns 0 instead of 1"
+    }
+  ]
 }
