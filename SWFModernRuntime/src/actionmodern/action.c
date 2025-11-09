@@ -4111,9 +4111,17 @@ void actionCatchToRegister(char* stack, u32* sp, u8 reg_num)
 #ifdef DEBUG
 		printf("[DEBUG] actionCatchToRegister: storing exception in register %d\n", reg_num);
 #endif
-		// Note: Register handling would require access to register array
-		// For now, we'll just clear the exception flag
-		// TODO: Implement register storage when register infrastructure is available
+		// Validate register number
+		if (reg_num >= MAX_REGISTERS) {
+			fprintf(stderr, "ERROR: Invalid register number %d for catch\n", reg_num);
+			g_exception_state.exception_thrown = false;
+			return;
+		}
+
+		// Store exception value in the specified register
+		g_registers[reg_num] = g_exception_state.exception_value;
+
+		// Clear the exception flag
 		g_exception_state.exception_thrown = false;
 	}
 }

@@ -1,9 +1,9 @@
 {
   "metadata": {
     "name": "try_swf_7",
-    "description": "Tests ActionTry (0x8F) and ActionThrow (0x2A) opcodes for exception handling with try-catch blocks",
+    "description": "Tests ActionTry (0x8F) and ActionThrow (0x2A) opcodes for exception handling with try-catch blocks. Validates proper control flow with setjmp/longjmp, exception state management, and catch variable binding.",
     "swf_version": 7,
-    "fully_implemented": false
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["TRY", "THROW"],
@@ -12,9 +12,30 @@
   "execution": {
     "type": "deterministic"
   },
-  "known_issues": [
-    "setjmp/longjmp control flow issue: longjmp from within try block doesn't properly skip to catch block",
-    "Exception is thrown but remaining try block code still executes",
-    "Needs restructuring - setjmp must be at script level, not in function call"
+  "features_tested": [
+    "Try-catch exception handling",
+    "Exception throwing with ActionThrow",
+    "Catch variable binding (named variable)",
+    "Catch register binding (implemented, not tested)",
+    "Proper control flow (throw stops try block execution)",
+    "Exception state management",
+    "setjmp/longjmp for non-local jumps",
+    "Continuation after try-catch block"
+  ],
+  "features_implemented_not_tested": [
+    "Try-finally blocks (no catch)",
+    "Try-catch-finally (all three blocks)",
+    "Finally block execution guarantee",
+    "No exception path (try completes without throw)",
+    "Different exception types (number, string, object)",
+    "Nested try-catch blocks",
+    "Exception propagation through function calls"
+  ],
+  "implementation_notes": [
+    "Uses setjmp/longjmp for exception handling in generated C code",
+    "Inline setjmp via ACTION_TRY_SETJMP macro ensures proper stack frame",
+    "Global exception state tracks thrown values and handler depth",
+    "Supports both catch-to-variable and catch-to-register modes",
+    "Any ActionScript type can be thrown (stored as ActionVar)"
   ]
 }
