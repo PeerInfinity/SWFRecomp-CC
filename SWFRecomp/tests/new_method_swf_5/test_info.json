@@ -1,9 +1,18 @@
 {
   "metadata": {
     "name": "new_method_swf_5",
-    "description": "Tests NEW_METHOD opcode (0x53) - creates new object by calling method on object as constructor",
+    "description": "Tests NEW_METHOD opcode (0x53) - creates new object by calling method on object as constructor. Includes built-in constructors (Array, Object, Date, String, Number, Boolean) and blank method name handling.",
     "swf_version": 5,
-    "fully_implemented": false
+    "fully_implemented": false,
+    "missing_features": [
+      "Function objects as constructors - current implementation only supports string properties containing constructor names, not actual function objects",
+      "User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported",
+      "Constructor return value handling - spec says constructor return value should be discarded and new object returned, but this isn't fully tested",
+      "Proper 'this' binding for constructor calls - requires full function object implementation",
+      "Prototype chain for constructed objects - advanced feature not implemented",
+      "String/Number/Boolean wrapper objects - constructors create objects but don't properly store wrapped primitive values",
+      "Test relies on variable system which has persistence issues, causing test to output 'undefined' instead of expected value"
+    ]
   },
   "opcodes": {
     "tested": ["NEW_METHOD"],
@@ -12,11 +21,18 @@
   "execution": {
     "type": "deterministic"
   },
+  "edge_cases_tested": [
+    "Array constructor with length argument",
+    "Blank method name handling (returns undefined)",
+    "Built-in constructor lookup via object property"
+  ],
   "notes": [
     "Test creates object with constructor property ArrayCtor='Array'",
     "Uses NEW_METHOD to call obj.ArrayCtor(5) to create array with length 5",
     "Currently has known issue with variable persistence during initialization",
     "Expected output: 5, NEW_METHOD test completed",
-    "Actual output may show 'undefined' due to variable system limitations"
+    "Actual output may show 'undefined' due to variable system limitations",
+    "Blank method name handling added - returns undefined (function objects not implemented)",
+    "String, Number, Boolean constructors added but don't store primitive values yet"
   ]
 }
