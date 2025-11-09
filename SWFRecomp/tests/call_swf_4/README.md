@@ -21,14 +21,13 @@ The CALL opcode is a legacy feature from SWF 4 that calls frame actions (subrout
 The test performs the following operations:
 
 1. **PUSH** frame identifier "2" (as a string)
-2. **CALL** - calls frame 2 (simplified: logs the call instead of executing)
+2. **CALL** - attempts to call frame 2 (does nothing since frame doesn't exist)
 3. **PUSH** string "continued"
 4. **TRACE** - outputs "continued" to show execution resumed
 
 ### Expected Output
 
 ```
-// Call frame 2
 continued
 ```
 
@@ -40,32 +39,39 @@ SWF Runtime Loaded (Native Build)
 === SWF Execution Started (NO_GRAPHICS mode) ===
 
 [Frame 0]
-// Call frame 2
 continued
 [Tag] ShowFrame()
 
 === SWF Execution Completed ===
 ```
 
+Note: Since this is a single-frame SWF, frame 2 doesn't exist. Per the SWF spec, when a frame cannot be found, ActionCall does nothing and execution continues.
+
 ## Implementation Details
 
-### Simplified Implementation
+### Current Implementation
 
-The current implementation is simplified:
+The implementation now actually executes frame actions:
 - Pops the frame identifier from the stack
-- Parses it as a frame number or label
-- Logs the call to stdout
-- Does NOT actually execute frame actions
+- Parses it as a frame number (numeric strings are converted to numbers)
+- Validates the frame number is within bounds
+- Calls the frame function if it exists
+- Properly handles quit_swf state (saved/restored to prevent premature termination)
+- Does nothing if frame doesn't exist (per SWF spec)
 
-### Full Implementation (Future)
+### Implemented Features
 
-A complete implementation would require:
-- MovieClip structure with frame information
-- Frame label mapping
-- Frame action execution infrastructure
+✓ Frame calling by number
+✓ Proper frame execution
+✓ quit_swf state management
+✓ Bounds checking
+
+### Missing Features
+
+The following features are not yet implemented:
+- Frame label lookup (would require SWFRecomp to generate label->frame mapping)
 - Target path parsing (e.g., "/movieclip:2")
-- Call stack management
-- Recursion detection
+- Multi-MovieClip support (only main timeline is supported)
 
 ## Frame Identifier Format
 

@@ -3067,39 +3067,54 @@ void actionImplementsOp(char* stack, u32* sp)
 
 void actionCall(char* stack, u32* sp)
 {
+	// Access global frame info (set by swfStart)
+	extern frame_func* g_frame_funcs;
+	extern size_t g_frame_count;
+	extern int quit_swf;
+
 	// Pop frame identifier (string or number)
 	ActionVar frame_var;
 	popVar(stack, sp, &frame_var);
 
-	// Simplified implementation: log the call
-	// TODO: Actually execute frame actions when frame infrastructure is ready
-
 	int frame_num = -1;
 	const char* frame_id = NULL;
 
-	// Try to interpret as frame number or string
+	// Parse frame identifier (number or string)
 	if (frame_var.type == ACTION_STACK_VALUE_F32) {
 		frame_num = (int) frame_var.data.numeric_value;
-		printf("// Call frame %d\n", frame_num);
 	} else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
 		frame_id = (const char*) frame_var.data.numeric_value;
-		// Try to parse as number
-		char* endptr;
-		long num = strtol(frame_id, &endptr, 10);
-		if (*endptr == '\0') {
-			// It's a numeric string
-			frame_num = (int) num;
-			printf("// Call frame %d\n", frame_num);
-		} else {
-			// It's a frame label
-			printf("// Call frame label: %s\n", frame_id);
+
+		// Try to parse as numeric string
+		if (frame_id) {
+			char* endptr;
+			long num = strtol(frame_id, &endptr, 10);
+			if (*endptr == '\0') {
+				// It's a numeric string
+				frame_num = (int) num;
+			}
+			// else: It's a frame label (not supported yet)
 		}
 	}
 
-	// In a full implementation, this would:
-	// 1. Look up the frame by number or label
-	// 2. Execute the frame's actions
-	// 3. Return to the current frame when done
+	// Validate and call frame
+	if (frame_num >= 0 && g_frame_funcs && (size_t)frame_num < g_frame_count) {
+		// Save quit_swf state to prevent frame from terminating execution
+		int saved_quit_swf = quit_swf;
+		quit_swf = 0;
+
+		// Call the frame function (executes frame actions)
+		// Note: This calls the full frame function including ShowFrame
+		g_frame_funcs[frame_num]();
+
+		// Restore quit_swf state (only quit if we were already quitting)
+		quit_swf = saved_quit_swf;
+	} else if (frame_num < 0 && frame_id) {
+		// Frame label lookup not implemented yet
+		// Note: Full implementation would require a label->frame mapping
+		printf("// ActionCall: Frame labels not supported (requested: %s)\n", frame_id);
+	}
+	// If frame not found, do nothing (per spec)
 }
 
 void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag)

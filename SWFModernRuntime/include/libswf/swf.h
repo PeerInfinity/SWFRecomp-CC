@@ -26,6 +26,7 @@ extern frame_func frame_funcs[];
 typedef struct SWFAppContext
 {
 	frame_func* frame_funcs;
+	size_t frame_count;
 
 #ifndef NO_GRAPHICS
 	int width;
@@ -61,6 +62,10 @@ extern int is_playing;
 extern size_t current_frame;
 extern size_t next_frame;
 extern int manual_next_frame;
+
+// Global frame access for ActionCall opcode
+extern frame_func* g_frame_funcs;
+extern size_t g_frame_count;
 
 #ifndef NO_GRAPHICS
 extern Character* dictionary;
