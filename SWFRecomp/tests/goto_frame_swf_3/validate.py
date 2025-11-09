@@ -4,9 +4,12 @@ Validation script for goto_frame_swf_3
 
 Tests the ActionGotoFrame opcode (0x81).
 Expected output:
-- "Start" (from trace before goto)
+- "Before goto" (from trace before goto)
 - "// GotoFrame: 2" (from the actionGotoFrame call)
 - "After goto" (from trace after goto)
+
+Note: This test verifies that the opcode is correctly parsed and the
+frame parameter is extracted. Full frame navigation is not yet implemented.
 """
 import sys
 import json
@@ -30,7 +33,7 @@ def validate_output(output):
 
     # Expected output lines
     expected_lines = [
-        "Start",
+        "Before goto",
         "// GotoFrame: 2",
         "After goto"
     ]
