@@ -1,8 +1,9 @@
 {
   "metadata": {
     "name": "stop_swf_4",
-    "description": "Tests STOP opcode (0x07) - halts execution cleanly at current position",
-    "swf_version": 4
+    "description": "Tests STOP opcode (0x07) - verifies that STOP halts frame advancement while allowing current action block to complete",
+    "swf_version": 4,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["STOP"],
@@ -10,5 +11,9 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "current_action_block_completes_after_stop",
+    "trace_after_stop_executes"
+  ]
 }
