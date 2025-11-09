@@ -25,6 +25,11 @@ def validate_output(output):
     - Test 3: "Posting data"
     - Test 4: "Loading movie"
     - Test 5: "Opening page"
+    - Test 6: "Empty URL test"
+    - Test 7: "Empty target test"
+    - Test 8: "Sprite GET test"
+    - Test 9: "Sprite POST test"
+    - Test 10: "Multi-concat test"
     """
     lines = parse_output(output)
 
@@ -36,7 +41,12 @@ def validate_output(output):
         "Loading variables",
         "Posting data",
         "Loading movie",
-        "Opening page"
+        "Opening page",
+        "Empty URL test",
+        "Empty target test",
+        "Sprite GET test",
+        "Sprite POST test",
+        "Multi-concat test"
     ]
 
     test_names = [
@@ -44,7 +54,12 @@ def validate_output(output):
         "test_2_get_variables",
         "test_3_post_request",
         "test_4_load_movie_sprite",
-        "test_5_dynamic_url"
+        "test_5_dynamic_url",
+        "test_6_empty_url",
+        "test_7_empty_target",
+        "test_8_sprite_get",
+        "test_9_sprite_post",
+        "test_10_multi_concat"
     ]
 
     results = []

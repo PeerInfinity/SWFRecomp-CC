@@ -3328,6 +3328,22 @@ void actionCall(char* stack, u32* sp)
 	// If frame not found, do nothing (per spec)
 }
 
+// Helper function to print a string value that may be a regular string or STR_LIST
+static void printStringValue(ActionVar* var)
+{
+	if (var->type == ACTION_STACK_VALUE_STRING) {
+		printf("%s", (const char*)var->data.numeric_value);
+	} else if (var->type == ACTION_STACK_VALUE_STR_LIST) {
+		// STR_LIST: first element is count, rest are string pointers
+		u64* str_list = (u64*)var->data.numeric_value;
+		u64 count = str_list[0];
+		for (u64 i = 0; i < count; i++) {
+			printf("%s", (const char*)str_list[i + 1]);
+		}
+	}
+	// For other types, print nothing (empty string)
+}
+
 void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag)
 {
 	// Pop target from stack
@@ -3335,16 +3351,12 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 	ActionVar target_var;
 	convertString(stack, sp, target_str);
 	popVar(stack, sp, &target_var);
-	const char* target = (target_var.type == ACTION_STACK_VALUE_STRING) ?
-						 (const char*)target_var.data.numeric_value : "";
 
 	// Pop URL from stack
 	char url_str[17];
 	ActionVar url_var;
 	convertString(stack, sp, url_str);
 	popVar(stack, sp, &url_var);
-	const char* url = (url_var.type == ACTION_STACK_VALUE_STRING) ?
-					  (const char*)url_var.data.numeric_value : "";
 
 	// Determine HTTP method
 	const char* method = "NONE";
@@ -3360,19 +3372,32 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 		// Load into sprite/movieclip
 		if (load_vars) {
 			// Load variables into sprite
-			printf("// LoadVariables: %s -> %s (method: %s)\n", url, target, method);
+			printf("// LoadVariables: ");
+			printStringValue(&url_var);
+			printf(" -> ");
+			printStringValue(&target_var);
+			printf(" (method: %s)\n", method);
 		} else {
 			// Load SWF into sprite
-			printf("// LoadMovie: %s -> %s\n", url, target);
+			printf("// LoadMovie: ");
+			printStringValue(&url_var);
+			printf(" -> ");
+			printStringValue(&target_var);
+			printf("\n");
 		}
 	} else {
 		// Load into browser window
 		if (load_vars) {
 			// Load variables into timeline
-			printf("// LoadVariables: %s (method: %s)\n", url, method);
+			printf("// LoadVariables: ");
+			printStringValue(&url_var);
+			printf(" (method: %s)\n", method);
 		} else {
 			// Open URL in browser
-			printf("// OpenURL: %s (target: %s", url, target);
+			printf("// OpenURL: ");
+			printStringValue(&url_var);
+			printf(" (target: ");
+			printStringValue(&target_var);
 			if (send_vars_method != 0) {
 				printf(", method: %s", method);
 			}

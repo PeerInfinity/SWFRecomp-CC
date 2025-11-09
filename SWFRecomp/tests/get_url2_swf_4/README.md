@@ -49,7 +49,7 @@ The opcode pops two strings from the stack:
 
 ## Test Cases
 
-This test includes 5 comprehensive test cases:
+This test includes 10 comprehensive test cases covering all major scenarios and edge cases:
 
 ### Test 1: Load URL in new window (no method)
 - **URL**: https://www.example.com
@@ -86,6 +86,41 @@ This test includes 5 comprehensive test cases:
 - **Expected Output**: "Opening page"
 - **ActionScript Equivalent**: `getURL(base + page, target);`
 
+### Test 6: Empty URL
+- **URL**: "" (empty string)
+- **Target**: _self
+- **Flags**: 0x00 (no method, window, load content)
+- **Expected Output**: "Empty URL test"
+- **Tests**: Edge case handling of empty URL
+
+### Test 7: Empty Target
+- **URL**: test.html
+- **Target**: "" (empty string)
+- **Flags**: 0x00 (no method, window, load content)
+- **Expected Output**: "Empty target test"
+- **Tests**: Edge case handling of empty target (current window)
+
+### Test 8: Sprite target with GET
+- **URL**: data.txt
+- **Target**: _root.myClip
+- **Flags**: 0x43 (GET method, sprite, load variables)
+- **Expected Output**: "Sprite GET test"
+- **Tests**: Loading variables into sprite with GET method
+
+### Test 9: Sprite target with POST
+- **URL**: upload.php
+- **Target**: /level0/clip
+- **Flags**: 0x83 (POST method, sprite, load variables)
+- **Expected Output**: "Sprite POST test"
+- **Tests**: Loading variables into sprite with POST method
+
+### Test 10: Multiple concatenations
+- **URL**: Concatenated from "https://" + "api.example.com" + "/v1/data"
+- **Target**: _blank
+- **Flags**: 0x00 (no method, window, load content)
+- **Expected Output**: "Multi-concat test"
+- **Tests**: STR_LIST with 3+ concatenated strings
+
 ## Implementation Details
 
 ### Runtime Behavior
@@ -116,7 +151,7 @@ actionGetURL2(stack, sp, send_vars_method, load_target_flag, load_variables_flag
 
 ## Test Results
 
-All 5 test cases pass successfully:
+All 10 test cases pass successfully:
 
 ```
 [PASS] test_1_url_new_window
@@ -124,7 +159,41 @@ All 5 test cases pass successfully:
 [PASS] test_3_post_request
 [PASS] test_4_load_movie_sprite
 [PASS] test_5_dynamic_url
+[PASS] test_6_empty_url
+[PASS] test_7_empty_target
+[PASS] test_8_sprite_get
+[PASS] test_9_sprite_post
+[PASS] test_10_multi_concat
 ```
+
+## Implementation Status
+
+### ✅ What's Implemented
+
+- **Opcode parsing**: Correctly reads and decodes the GetURL2 opcode (0x9A)
+- **Flag byte parsing**: All flags correctly parsed
+  - SendVarsMethod (bits 7-6): 0=None, 1=GET, 2=POST
+  - LoadTargetFlag (bit 1): 0=window, 1=sprite
+  - LoadVariablesFlag (bit 0): 0=content, 1=variables
+- **Stack operations**: Correctly pops URL and target from stack
+- **String handling**: Handles both regular strings and STR_LIST (concatenated strings)
+- **Edge cases**: Empty strings, long URLs, all flag combinations
+- **Logging**: Debug output showing intended operations
+
+### ❌ What's NOT Implemented (Missing Features)
+
+These features are documented in `test_info.json` under `missing_features`:
+
+1. **HTTP client functionality** - No actual GET/POST requests are made
+2. **Variable encoding** - Movie clip variables are not encoded as x-www-form-urlencoded
+3. **Variable parsing** - HTTP responses are not parsed
+4. **Variable setting** - Variables from responses are not set in target scope
+5. **SWF file loading** - External SWF files are not actually downloaded or loaded
+6. **MovieClip/sprite management** - Sprite paths are not resolved, no actual sprite loading
+7. **Browser integration** - URLs are not opened in actual browser windows
+8. **Security sandbox** - No cross-domain restrictions enforced
+
+The current implementation correctly handles all bytecode-level operations (parsing, stack manipulation, flag interpretation) but does not implement the actual external communication functionality. This is expected for NO_GRAPHICS mode and would require significant infrastructure (HTTP client, SWF parser, browser integration) to fully implement.
 
 ## Building and Running
 
