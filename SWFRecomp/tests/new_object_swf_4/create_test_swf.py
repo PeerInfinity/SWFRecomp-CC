@@ -89,8 +89,8 @@ test4 += bytes([OP_NEW_OBJECT])       # Create object -> stack: [object]
 # Duplicate for SET_MEMBER (which will consume it)
 test4 += bytes([0x4C])                # PUSH_DUPLICATE -> stack: [object, object]
 # Set property: obj.x = 42;
-test4 += push_float(42.0)             # Push value: 42 -> stack: [object, object, 42]
-test4 += push_string("x")             # Push property name -> stack: [object, object, 42, "x"]
+test4 += push_string("x")             # Push property name -> stack: [object, object, "x"]
+test4 += push_float(42.0)             # Push value: 42 -> stack: [object, object, "x", 42]
 test4 += bytes([OP_SET_MEMBER])       # Set obj.x = 42 -> stack: [object]
 # Get property: trace(obj.x);
 test4 += push_string("x")             # Push property name -> stack: [object, "x"]
