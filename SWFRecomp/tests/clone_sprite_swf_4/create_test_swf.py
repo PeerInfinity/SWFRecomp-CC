@@ -2,8 +2,7 @@
 import struct
 
 # Create a minimal SWF4 file testing CLONE_SPRITE opcode (0x24)
-# Test case: duplicateMovieClip("originalSprite", "clonedSprite", 1);
-#             trace("Sprite cloned");
+# Tests multiple scenarios including edge cases
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -15,40 +14,79 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# ActionScript bytecode
+def make_push_string(s):
+    """Helper to create a PUSH action for a string"""
+    string_bytes = s.encode('utf-8') + b'\x00'
+    return struct.pack('<BHB', 0x96, len(string_bytes) + 1, 0) + string_bytes
+
+def make_push_float(f):
+    """Helper to create a PUSH action for a float"""
+    float_bytes = struct.pack('<f', f)
+    return struct.pack('<BHB', 0x96, 5, 1) + float_bytes
+
+# Build test actions
+actions = b''
+
+# Test 1: Basic clone operation
 # duplicateMovieClip("originalSprite", "clonedSprite", 1)
-# Stack order for CLONE_SPRITE: target, source, depth (pops in reverse)
+actions += make_push_string("clonedSprite")  # target
+actions += make_push_string("originalSprite")  # source
+actions += make_push_float(1.0)  # depth
+actions += bytes([0x24])  # CLONE_SPRITE
+actions += make_push_string("Test 1: Basic clone")
+actions += bytes([0x26])  # TRACE
 
-# Push target name "clonedSprite"
-target_string = b'clonedSprite\x00'
-action_push_target = struct.pack('<BHB', 0x96, len(target_string) + 1, 0)  # PUSH, length, type=0 (string)
-action_push_target += target_string
+# Test 2: Clone with different depth
+# duplicateMovieClip("sprite1", "sprite2", 10)
+actions += make_push_string("sprite2")  # target
+actions += make_push_string("sprite1")  # source
+actions += make_push_float(10.0)  # depth
+actions += bytes([0x24])  # CLONE_SPRITE
+actions += make_push_string("Test 2: Different depth")
+actions += bytes([0x26])  # TRACE
 
-# Push source name "originalSprite"
-source_string = b'originalSprite\x00'
-action_push_source = struct.pack('<BHB', 0x96, len(source_string) + 1, 0)  # PUSH, length, type=0 (string)
-action_push_source += source_string
+# Test 3: Clone with negative depth
+# duplicateMovieClip("source", "target", -5)
+actions += make_push_string("target")  # target
+actions += make_push_string("source")  # source
+actions += make_push_float(-5.0)  # negative depth
+actions += bytes([0x24])  # CLONE_SPRITE
+actions += make_push_string("Test 3: Negative depth")
+actions += bytes([0x26])  # TRACE
 
-# Push depth 1 (as float)
-depth_value = struct.pack('<f', 1.0)
-action_push_depth = struct.pack('<BHB', 0x96, 5, 1)  # PUSH, length=5, type=1 (float)
-action_push_depth += depth_value
+# Test 4: Clone with zero depth
+# duplicateMovieClip("src", "dst", 0)
+actions += make_push_string("dst")  # target
+actions += make_push_string("src")  # source
+actions += make_push_float(0.0)  # zero depth
+actions += bytes([0x24])  # CLONE_SPRITE
+actions += make_push_string("Test 4: Zero depth")
+actions += bytes([0x26])  # TRACE
 
-# CLONE_SPRITE action (0x24)
-action_clone_sprite = bytes([0x24])
+# Test 5: Clone with empty strings
+# duplicateMovieClip("", "", 1)
+actions += make_push_string("")  # empty target
+actions += make_push_string("")  # empty source
+actions += make_push_float(1.0)  # depth
+actions += bytes([0x24])  # CLONE_SPRITE
+actions += make_push_string("Test 5: Empty strings")
+actions += bytes([0x26])  # TRACE
 
-# trace("Sprite cloned")
-trace_string = b'Sprite cloned\x00'
-action_push_trace = struct.pack('<BHB', 0x96, len(trace_string) + 1, 0)  # PUSH, length, type=0 (string)
-action_push_trace += trace_string
-action_trace = bytes([0x26])  # TRACE action (0x26)
+# Test 6: Clone with long names
+# duplicateMovieClip("verylongspritename123", "anotherlongname456", 100)
+actions += make_push_string("anotherlongname456")  # target
+actions += make_push_string("verylongspritename123")  # source
+actions += make_push_float(100.0)  # depth
+actions += bytes([0x24])  # CLONE_SPRITE
+actions += make_push_string("Test 6: Long names")
+actions += bytes([0x26])  # TRACE
+
+# Test 7: Final confirmation
+actions += make_push_string("All tests complete")
+actions += bytes([0x26])  # TRACE
 
 # END action
-action_end = bytes([0x00])
-
-# Combine all actions
-actions = (action_push_target + action_push_source + action_push_depth +
-           action_clone_sprite + action_push_trace + action_trace + action_end)
+actions += bytes([0x00])
 
 # DoAction tag
 do_action_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
@@ -74,4 +112,11 @@ with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
-print("Test: duplicateMovieClip('originalSprite', 'clonedSprite', 1); trace('Sprite cloned');")
+print("Tests:")
+print("  1. Basic clone operation")
+print("  2. Clone with different depth")
+print("  3. Clone with negative depth")
+print("  4. Clone with zero depth")
+print("  5. Clone with empty strings")
+print("  6. Clone with long names")
+print("  7. All tests complete confirmation")
