@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "mb_ascii_to_char_swf_5",
+    "description": "Tests MB_ASCII_TO_CHAR opcode (0x37) in SWF5 - converts Unicode code points to UTF-8 character strings. Tests basic ASCII, multi-byte UTF-8, and out-of-range handling.",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["MB_ASCII_TO_CHAR"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "1_byte_utf8_ascii",
+    "2_byte_utf8_latin",
+    "3_byte_utf8_symbols",
+    "3_byte_utf8_cjk",
+    "out_of_range_beyond_unicode"
+  ]
+}

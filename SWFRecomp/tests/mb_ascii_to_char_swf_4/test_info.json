@@ -1,8 +1,9 @@
 {
   "metadata": {
     "name": "mb_ascii_to_char_swf_4",
-    "description": "Tests MB_ASCII_TO_CHAR opcode (0x37) - converts code points to UTF-8 characters",
-    "swf_version": 4
+    "description": "Tests MB_ASCII_TO_CHAR opcode (0x37) - converts Unicode code points to UTF-8 character strings. Covers 1-byte, 2-byte, and 3-byte UTF-8 encoding, plus edge cases for null and out-of-range values.",
+    "swf_version": 4,
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["MB_ASCII_TO_CHAR"],
@@ -10,5 +11,13 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "1_byte_utf8_ascii",
+    "2_byte_utf8_latin_extended",
+    "3_byte_utf8_cjk_characters",
+    "3_byte_utf8_symbols",
+    "null_character_zero",
+    "out_of_range_beyond_unicode"
+  ]
 }
