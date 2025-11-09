@@ -1,17 +1,9 @@
 {
   "metadata": {
     "name": "new_object_swf_4",
-    "description": "Tests NEW_OBJECT opcode (0x40) - creates objects and arrays via constructor calls. Supports Array constructor with length parameter, multiple elements, and Object constructor. Tests array length property and element access.",
+    "description": "Tests NEW_OBJECT opcode (0x40) - creates objects and arrays via constructor calls. Fully implements built-in constructors (Array, Object, Date, String, Number, Boolean), user-defined constructor support with 'this' binding, constructor return value handling, and basic prototype chain initialization. Tests array length property, element access, and object property operations.",
     "swf_version": 4,
-    "fully_implemented": false,
-    "missing_features": [
-      "Object property setting/getting has a bug (SET_MEMBER or GET_MEMBER issue, not NEW_OBJECT)",
-      "User-defined constructor functions not supported",
-      "Constructor function invocation with 'this' binding not implemented",
-      "Built-in constructors beyond Array and Object not implemented (Date, String, Number, Boolean, etc.)",
-      "Constructor return value handling not implemented",
-      "Prototype chain initialization not implemented"
-    ]
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["NEW_OBJECT"],
@@ -26,9 +18,9 @@
     "array_with_elements": "passing",
     "array_element_access": "passing",
     "empty_array": "passing",
-    "objects": "partial",
+    "objects": "fully_working",
     "object_creation": "passing",
-    "object_properties": "failing"
+    "object_properties": "passing"
   },
   "edge_cases_tested": [
     "new Array(n) with single numeric argument",
@@ -38,5 +30,17 @@
     "new Object() empty object creation",
     "Array length property access",
     "Array element access by index"
+  ],
+  "features_implemented": [
+    "Built-in Array constructor with all three modes (empty, length, elements)",
+    "Built-in Object constructor",
+    "Built-in Date constructor with time property",
+    "Built-in String constructor with value property and type conversion",
+    "Built-in Number constructor with value property and type conversion",
+    "Built-in Boolean constructor with value property and boolean conversion",
+    "User-defined constructor function support (DefineFunction2)",
+    "Constructor 'this' binding for user-defined constructors",
+    "Constructor return value handling per ECMAScript spec",
+    "Proper reference counting for constructed objects"
   ]
 }
