@@ -5512,22 +5512,29 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 
 void actionStartDrag(char* stack, u32* sp)
 {
-	// Pop target sprite name
+	// Buffer for string conversion (needed for numeric targets)
+	char str_buffer[17];
+
+	// Pop target sprite name (convert to string if needed)
+	convertString(stack, sp, str_buffer);
 	ActionVar target;
 	popVar(stack, sp, &target);
-	const char* target_name = (const char*) target.data.string_data.heap_ptr;
+	const char* target_name = (target.type == ACTION_STACK_VALUE_STRING) ?
+		(const char*) target.data.string_data.heap_ptr : "";
 
-	// Pop lock center flag
+	// Pop lock center flag (convert to float if needed)
+	convertFloat(stack, sp);
 	ActionVar lock_center;
 	popVar(stack, sp, &lock_center);
 
-	// Pop constrain flag
+	// Pop constrain flag (convert to float if needed)
+	convertFloat(stack, sp);
 	ActionVar constrain;
 	popVar(stack, sp, &constrain);
 
 	float x1 = 0, y1 = 0, x2 = 0, y2 = 0;
 	int has_constraint = 0;
-	
+
 	// Check if we need to pop constraint rectangle
 	// Convert to integer to check if non-zero
 	if (constrain.type == ACTION_STACK_VALUE_F32) {
@@ -5538,10 +5545,21 @@ void actionStartDrag(char* stack, u32* sp)
 
 	if (has_constraint) {
 		// Pop constraint rectangle (y2, x2, y1, x1 order)
-		ActionVar y2_var, x2_var, y1_var, x1_var;
+		// Convert each to float before popping
+		convertFloat(stack, sp);
+		ActionVar y2_var;
 		popVar(stack, sp, &y2_var);
+
+		convertFloat(stack, sp);
+		ActionVar x2_var;
 		popVar(stack, sp, &x2_var);
+
+		convertFloat(stack, sp);
+		ActionVar y1_var;
 		popVar(stack, sp, &y1_var);
+
+		convertFloat(stack, sp);
+		ActionVar x1_var;
 		popVar(stack, sp, &x1_var);
 
 		x1 = (x1_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &x1_var.data.numeric_value) : (float)VAL(double, &x1_var.data.numeric_value);
@@ -5564,7 +5582,16 @@ void actionStartDrag(char* stack, u32* sp)
 	}
 
 	is_dragging = 1;
-	dragged_target = (target_name && *target_name) ? strdup(target_name) : NULL;
+	// Duplicate the target name (manual strdup for portability)
+	if (target_name && *target_name) {
+		size_t len = strlen(target_name);
+		dragged_target = (char*) malloc(len + 1);
+		if (dragged_target) {
+			strcpy(dragged_target, target_name);
+		}
+	} else {
+		dragged_target = NULL;
+	}
 
 	#ifdef DEBUG
 	printf("[StartDrag] %s (lock:%d, constrain:%d)\n",
