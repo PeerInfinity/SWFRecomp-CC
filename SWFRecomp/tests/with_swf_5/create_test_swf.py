@@ -4,7 +4,7 @@ Test script for WITH opcode (0x94)
 
 This creates a simple SWF that tests the WITH statement.
 
-Test Case 1: Basic with statement
+Test Case: Basic with statement
   var obj = {x: 10, y: 20};
   with (obj) {
       trace(x); // Should output: 10
@@ -17,7 +17,7 @@ Test Case 1: Basic with statement
 
 import struct
 
-# Create a minimal SWF5 file with WITH tests
+# Create a minimal SWF5 file with WITH test
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 5  # WITH statement requires SWF 5+
@@ -32,7 +32,7 @@ frame_count = struct.pack('<H', 1)  # 1 frame
 actions = b''
 
 # ====================================================================
-# Test Case 1: Basic with statement
+# Test Case: Basic with statement
 # var obj = {x: 10, y: 20};
 # with (obj) { trace(x); trace(y); }
 # ====================================================================
@@ -124,8 +124,7 @@ action_with += struct.pack('<H', with_length)  # Length field (UI16)
 action_with += struct.pack('<H', with_block_size)  # Block size (UI16)
 action_with += with_block  # The actual actions
 
-# The object should still be on stack (from earlier duplicate)
-# We need to push it again for WITH to consume
+# The object should be pushed again for WITH to consume
 string_obj_get = b'obj\x00'
 action_push_obj_get = struct.pack('<BHB', 0x96, len(string_obj_get) + 1, 0)  # PUSH string
 action_push_obj_get += string_obj_get

@@ -1271,18 +1271,30 @@ namespace SWFRecomp
 				{
 					// Read block size from bytecode
 					u16 block_size = VAL(u16, action_buffer);
-					action_buffer += 2;
 
-					// Store the end position of the with block
-					char* block_end = action_buffer + block_size;
+					// Calculate where the WITH block ends
+					// block_end = current position + 2 (block_size field) + block_size (actions)
+					// But we need to account for the fact that 'length' already includes everything
+					// So block_end should just be: action_buffer + length
+					char* block_end = action_buffer + length;
+
+					// Now advance past the block_size field to the start of the actions
+					action_buffer += 2;
 
 					// Emit actionWithStart to push object onto scope chain
 					out_script << "\t" << "// WITH block (size=" << block_size << ")" << endl;
 					out_script << "\t" << "actionWithStart(stack, sp);" << endl;
 					out_script << "\t" << "{" << endl; // C scope for clarity
 
-					// Recursively parse the actions within the with block
-					parseActions(context, action_buffer, out_script);
+					// Copy the WITH block content and add END marker for parseActions
+					// This is necessary because parseActions parses until it hits END (0x00)
+					char* temp_buffer = (char*) malloc(block_size + 1);
+					memcpy(temp_buffer, action_buffer, block_size);
+					temp_buffer[block_size] = 0x00; // Add END_OF_ACTIONS marker
+
+					char* temp_ptr = temp_buffer;
+					parseActions(context, temp_ptr, out_script);
+					free(temp_buffer);
 
 					// Emit actionWithEnd to pop object from scope chain
 					out_script << "\t" << "}" << endl;
