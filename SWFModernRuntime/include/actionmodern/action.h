@@ -102,6 +102,9 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer);
 void actionGoToLabel(char* stack, u32* sp, const char* label);
 void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias);
 
+// Frame label lookup (returns -1 if not found, otherwise frame index)
+int findFrameByLabel(const char* label);
+
 void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 void actionStringLength(char* stack, u32* sp, char* v_str);
 void actionStringExtract(char* stack, u32* sp, char* str_buffer);
