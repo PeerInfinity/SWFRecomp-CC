@@ -2170,14 +2170,14 @@ void actionSetTarget2(char* stack, u32* sp)
 	// Try to resolve the target path
 	MovieClip* target_mc = getMovieClipByTarget(target_path);
 
+	// Always print the target path, regardless of whether it exists
+	printf("// SetTarget2: %s\n", target_path);
+
 	if (target_mc) {
 		// Valid target found - change context
 		setCurrentContext(target_mc);
-		printf("// SetTarget2: %s\n", target_path);
-	} else {
-		// Invalid target - context remains unchanged
-		printf("// SetTarget2: %s (not found, context unchanged)\n", target_path);
 	}
+	// If target not found, context remains unchanged (silent failure, as per Flash behavior)
 
 	// Note: In NO_GRAPHICS mode, only _root is available as a target.
 	// Full MovieClip hierarchy requires display list infrastructure.
