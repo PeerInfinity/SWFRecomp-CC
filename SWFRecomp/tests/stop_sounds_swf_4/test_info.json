@@ -1,14 +1,22 @@
 {
   "metadata": {
     "name": "stop_sounds_swf_4",
-    "description": "Tests STOP_SOUNDS opcode (0x09) - stops all currently playing sounds",
-    "swf_version": 4
+    "description": "Comprehensive test of STOP_SOUNDS opcode (0x09) - stops all currently playing sounds. Tests basic functionality, stack integrity, multiple calls, and integration with other operations.",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true
   },
   "opcodes": {
     "tested": ["STOP_SOUNDS"],
-    "supporting": ["PUSH", "TRACE"]
+    "supporting": ["PUSH", "TRACE", "ADD"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_functionality",
+    "stack_integrity_preserved",
+    "multiple_consecutive_calls",
+    "integration_with_arithmetic_operations"
+  ]
 }
