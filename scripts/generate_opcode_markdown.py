@@ -377,6 +377,79 @@ def generate_detailed_sections(index: Dict) -> str:
     return "\n".join(md)
 
 
+def generate_passing_tests_chart(index: Dict, with_links: bool = True) -> str:
+    """Generate a chart showing all passing primary tests."""
+    md = []
+
+    md.append("## Passing Primary Tests")
+    md.append("")
+
+    # Collect all passing primary tests
+    passing_tests = []
+
+    for entry in index['entries']:
+        if entry['type'] == 'spec':
+            hex_val = entry['hex']
+            spec_name = entry['name']
+
+            # Get test lists
+            primary_tests = entry.get('tests_primary', [])
+            passing_primary = set(entry.get('tests_primary_passing', []))
+
+            # Find passing primary tests
+            for test in primary_tests:
+                if test in passing_primary:
+                    passing_tests.append({
+                        'hex': hex_val,
+                        'spec_name': spec_name,
+                        'test_path': test,
+                        'has_function': False,
+                        'has_enum': False,
+                        'has_docs': bool(entry.get('documentation_prompt'))
+                    })
+
+    # Add implementation info to passing tests
+    for entry in index['entries']:
+        if entry['type'] == 'enum':
+            for test in passing_tests:
+                if test['hex'] == entry['hex']:
+                    test['has_enum'] = True
+        elif entry['type'] == 'function':
+            for test in passing_tests:
+                if test['hex'] == entry['hex']:
+                    test['has_function'] = True
+
+    if not passing_tests:
+        md.append("**No passing primary tests yet.**")
+        md.append("")
+        return "\n".join(md)
+
+    # Sort by hex value, then by test path
+    passing_tests.sort(key=lambda x: (x['hex'], x['test_path']))
+
+    md.append(f"**Total Passing Primary Tests**: {len(passing_tests)}")
+    md.append("")
+    md.append("| Hex | Opcode | Test Path | Enum | Function | Docs |")
+    md.append("|-----|--------|-----------|------|----------|------|")
+
+    for test in passing_tests:
+        if with_links:
+            hex_link = make_link(test['hex'], test['hex'], test['spec_name'])
+            spec_link = make_link(test['spec_name'], test['hex'], test['spec_name'])
+        else:
+            hex_link = test['hex']
+            spec_link = test['spec_name']
+
+        test_path = test['test_path']
+        # Shorten test path for readability - keep just the test directory name
+        test_name = test_path.split('/')[-1] if '/' in test_path else test_path
+
+        md.append(f"| {hex_link} | {spec_link} | `{test_name}` | {'✓' if test['has_enum'] else ''} | {'✓' if test['has_function'] else ''} | {'✓' if test['has_docs'] else ''} |")
+
+    md.append("")
+    return "\n".join(md)
+
+
 def generate_failing_tests_chart(index: Dict, with_links: bool = True) -> str:
     """Generate a chart showing all failing primary tests."""
     md = []
@@ -567,12 +640,14 @@ def generate_markdown():
     # Generate version WITH links
     print("\nGenerating version WITH links...")
     summary_with_links = generate_summary_table(index, with_links=True)
+    passing_tests_with_links = generate_passing_tests_chart(index, with_links=True)
     failing_tests_with_links = generate_failing_tests_chart(index, with_links=True)
     status_with_links = generate_implementation_status(index, with_links=True)
     missing_features_with_links = generate_missing_features_section(index, with_links=True)
 
     markdown_with_links = "\n".join([
         summary_with_links,
+        passing_tests_with_links,
         failing_tests_with_links,
         status_with_links,
         missing_features_with_links,
@@ -588,12 +663,14 @@ def generate_markdown():
     # Generate version WITHOUT links
     print("\nGenerating version WITHOUT links...")
     summary_no_links = generate_summary_table(index, with_links=False)
+    passing_tests_no_links = generate_passing_tests_chart(index, with_links=False)
     failing_tests_no_links = generate_failing_tests_chart(index, with_links=False)
     status_no_links = generate_implementation_status(index, with_links=False)
     missing_features_no_links = generate_missing_features_section(index, with_links=False)
 
     markdown_no_links = "\n".join([
         summary_no_links,
+        passing_tests_no_links,
         failing_tests_no_links,
         status_no_links,
         missing_features_no_links,

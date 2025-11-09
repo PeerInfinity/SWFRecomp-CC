@@ -69,8 +69,11 @@ def get_incomplete_opcodes():
 
     for entry in opcode_data['entries']:
         if entry.get('documentation_prompt'):
-            # Check if fully_implemented is False or missing
-            if not entry.get('fully_implemented', False):
+            # Check if BOTH fully_implemented and fully_implemented_no_graphics are False or missing
+            fully_implemented = entry.get('fully_implemented', False)
+            fully_implemented_no_graphics = entry.get('fully_implemented_no_graphics', False)
+
+            if not fully_implemented and not fully_implemented_no_graphics:
                 prompt = entry['documentation_prompt']
 
                 # Store info for this prompt (take first entry with this prompt)
@@ -78,7 +81,7 @@ def get_incomplete_opcodes():
                     incomplete_info[prompt] = {
                         'opcode_name': entry.get('name', 'Unknown'),
                         'hex': entry.get('hex', 'Unknown'),
-                        'fully_implemented_no_graphics': entry.get('fully_implemented_no_graphics', False),
+                        'fully_implemented_no_graphics': fully_implemented_no_graphics,
                         'missing_features': entry.get('missing_features', {})
                     }
 

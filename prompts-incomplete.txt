@@ -1,43 +1,17 @@
 Please read these files and follow their instructions:
 SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md
-
-NOTE: Opcode ActionDelete2 (0X3B) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md
-
-NOTE: Opcode ActionGetVariable (0X1C) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
 SWFRecompDocs/prompts/completed/opcode-call-0x9e.md
 
 NOTE: Opcode ActionCall (0X9E) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'call_swf_4':
+    - Frame labels not supported (would require SWFRecomp to generate label->frame mapping)
+    - Target path parsing not implemented (e.g., '/movieclip:frame')
+    - Multi-MovieClip support not implemented (only main timeline supported)
+    - Test coverage: need multi-frame test to verify actual frame execution
 
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md
-
-NOTE: Opcode ActionDefineLocal2 (0X41) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -48,18 +22,18 @@ SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md
 
 NOTE: Opcode ActionDefineFunction2 (0X8E) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'define_function2_swf_7':
+    - PreloadArguments flag: arguments object creation not implemented
+    - PreloadSuper flag: super reference not implemented
+    - PreloadRoot flag: _root preloading not implemented
+    - PreloadParent flag: _parent preloading not implemented
+    - PreloadGlobal flag: _global preloading not implemented
+    - Variable parameters (register=0) not tested (code generated but untested)
+    - Nested DefineFunction2 functions not tested
+    - Anonymous functions (empty name) not tested
 
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md
-
-NOTE: Opcode ActionStackSwap (0X3D) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -70,40 +44,14 @@ SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md
 
 NOTE: Opcode ActionEnumerate (0X46) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'enumerate_swf_4':
+    - Prototype chain enumeration - ASObject structure lacks prototype field, so inherited properties are not enumerated (required for full ActionScript compliance)
+    - DontEnum property filtering - No mechanism to mark properties as non-enumerable per ECMA-262 standard (all properties are currently enumerated)
+    - Slash-path/dot-path variable resolution - Spec mentions support for paths like '/path/to/obj' or 'obj.prop' but this is untested
+    - Property enumeration metadata - No support for property attributes (enumerable, writable, configurable)
 
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md
-
-NOTE: Opcode ActionGetProperty (0X22) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md
-
-NOTE: Opcode ActionGotoFrame2 (0X9F) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md
-
-NOTE: Opcode ActionInitArray (0X42) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -114,7 +62,17 @@ SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md
 
 NOTE: Opcode ActionNewMethod (0X53) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'new_method_swf_5':
+    - Function objects as constructors - current implementation only supports string properties containing constructor names, not actual function objects
+    - User-defined constructor functions - only built-in constructors (Array, Object, Date, String, Number, Boolean) are supported
+    - Constructor return value handling - spec says constructor return value should be discarded and new object returned, but this isn't fully tested
+    - Proper 'this' binding for constructor calls - requires full function object implementation
+    - Prototype chain for constructed objects - advanced feature not implemented
+    - String/Number/Boolean wrapper objects - constructors create objects but don't properly store wrapped primitive values
+    - Test relies on variable system which has persistence issues, causing test to output 'undefined' instead of expected value
+
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -125,18 +83,16 @@ SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md
 
 NOTE: Opcode ActionNewObject (0X40) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'new_object_swf_4':
+    - Object property setting/getting has a bug (SET_MEMBER or GET_MEMBER issue, not NEW_OBJECT)
+    - User-defined constructor functions not supported
+    - Constructor function invocation with 'this' binding not implemented
+    - Built-in constructors beyond Array and Object not implemented (Date, String, Number, Boolean, etc.)
+    - Constructor return value handling not implemented
+    - Prototype chain initialization not implemented
 
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md
-
-NOTE: Opcode ActionSetProperty (0X23) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -147,18 +103,14 @@ SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md
 
 NOTE: Opcode ActionTargetPath (0X45) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'target_path_swf_5':
+    - MovieClip infrastructure not implemented - cannot return actual target paths for MovieClips
+    - Display list hierarchy not available - cannot navigate or represent nested MovieClips
+    - Path construction not implemented - returns placeholder '_root' instead of actual paths like '_root.mc1.mc2'
+    - Test coverage: missing Object type test (would require INIT_OBJECT opcode support)
 
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/completed/opcode-with-0x94.md
-
-NOTE: Opcode ActionWith (0X94) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -169,40 +121,14 @@ SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md
 
 NOTE: Opcode ActionCastOp (0X2B) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'cast_op_swf_7':
+    - Complete prototype chain testing requires DefineFunction for creating constructor functions
+    - Interface implementation testing requires proper ImplementsOp setup
+    - Successful cast test (matching prototype chain) not included due to test complexity
+    - Test only validates failure cases and doesn't crash behavior, not successful cast scenarios
 
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md
-
-NOTE: Opcode ActionCloneSprite (0X24) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md
-
-NOTE: Opcode ActionDefineLocal (0X3C) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md
-
-NOTE: Opcode ActionEndDrag (0X28) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -213,7 +139,14 @@ SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md
 
 NOTE: Opcode ActionEquals2 (0X49) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'equals2_swf_5':
+    - Boolean type support not available in recompiler (cannot test true == 1, false == 0)
+    - Null type support not available in recompiler (cannot test null == undefined, null == 0)
+    - Additional edge case testing limited by test framework (NaN, Infinity, empty string tests would benefit from dedicated test files)
+    - Object reference equality not tested (requires object creation support)
+
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -224,18 +157,15 @@ SWFRecompDocs/prompts/pending/opcode-extends-0x69.md
 
 NOTE: Opcode ActionExtends (0X69) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'extends_swf_7':
+    - Constructor property not set correctly - Dog.prototype.constructor should equal Animal but comparison fails
+    - Prototype chain traversal not implemented - GET_MEMBER only searches own properties, not __proto__ chain
+    - instanceof opcode doesn't use prototype chain - always returns false (requires prototype chain support)
+    - NEW_OBJECT not fully functional with inheritance
+    - Method inheritance not working - child instances cannot call parent methods via prototype chain
 
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md
-
-NOTE: Opcode ActionGetURL (0X83) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -246,7 +176,18 @@ SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md
 
 NOTE: Opcode ActionGetURL2 (0X9A) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'get_url2_swf_4':
+    - HTTP client functionality - no actual GET/POST requests made
+    - Variable encoding (x-www-form-urlencoded) - movie clip variables not sent with requests
+    - Variable parsing from HTTP response - response not parsed into ActionScript variables
+    - Setting variables in target scope - variables from response not set in timeline or sprite
+    - SWF file downloading and loading - external SWF files not actually loaded
+    - MovieClip/sprite management - sprite paths not resolved, no actual sprite loading
+    - Browser window integration - URLs not opened in actual browser windows
+    - Security sandbox enforcement - no cross-domain restrictions implemented
+
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -257,7 +198,18 @@ SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md
 
 NOTE: Opcode ActionGotoFrame (0X81) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'goto_frame_swf_3':
+    - Actual frame navigation not implemented (only logs the frame index)
+    - Timeline jump semantics not implemented (go to frame N and stop)
+    - Frame execution order after jump not handled
+    - Stop/play state management after frame jump
+    - Display list updates on frame change
+    - Frame boundary validation (checking if target frame exists)
+    - Integration with MovieClip timeline system
+    - Proper handling of frame cycling and loops
+
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
 
@@ -268,182 +220,17 @@ SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md
 
 NOTE: Opcode ActionGoToLabel (0X8C) is marked as NOT fully implemented.
 
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md
-
-NOTE: Opcode ActionImplementsOp (0X2C) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md
-
-NOTE: Opcode ActionInstanceOf (0X54) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md
-
-NOTE: Opcode ActionMBAsciiToChar (0X37) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md
-
-NOTE: Opcode ActionNextFrame (0X04) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-play-0x06.md
-
-NOTE: Opcode ActionPlay (0X06) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md
-
-NOTE: Opcode ActionPreviousFrame (0X05) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md
-
-NOTE: Opcode ActionRemoveSprite (0X25) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md
-
-NOTE: Opcode ActionSetTarget (0X8B) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md
-
-NOTE: Opcode ActionSetTarget2 (0X20) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md
-
-NOTE: Opcode ActionStartDrag (0X27) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-stop-0x07.md
-
-NOTE: Opcode ActionStop (0X07) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md
-
-NOTE: Opcode ActionStopSounds (0X09) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md
-
-NOTE: Opcode ActionThrow (0X2A) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md
-
-NOTE: Opcode ActionToggleQuality (0X08) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-try-0x8f.md
-
-NOTE: Opcode ActionTry (0X8F) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
-
-When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).
-
-
-Please read these files and follow their instructions:
-SWFRecompDocs/complete-implementation-guide.md
-SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md
-
-NOTE: Opcode ActionWaitForFrame (0X8A) is marked as NOT fully implemented.
-
-No specific missing features are documented. Please review the specification, identify what's incomplete, implement missing features, add comprehensive tests, and document any remaining missing features in test_info.json using the 'missing_features' field.
+Documented missing features:
+  From test 'goto_label_swf_3':
+    - FrameLabel tag parsing and storage (tag type 43)
+    - Frame structure does not have label field
+    - Frame lookup by label functionality not implemented
+    - MovieClip/Timeline infrastructure not implemented
+    - Actual frame navigation not implemented
+    - Playback control (play/stop) not implemented
+    - Frame action execution on arrival not implemented
+    - Current implementation only logs the label string
+
+Please address these missing features to complete the implementation.
 
 When the opcode is fully complete, update test_info.json to set fully_implemented: true (or fully_implemented_no_graphics: true if graphics are the only missing piece).

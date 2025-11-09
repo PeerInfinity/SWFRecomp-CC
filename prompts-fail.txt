@@ -1,0 +1,68 @@
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md
+
+NOTE: The following test(s) for opcode ActionGetVariable (0X1C) are currently FAILING:
+  - SWFRecomp/tests/get_variable_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md
+
+NOTE: The following test(s) for opcode ActionGetProperty (0X22) are currently FAILING:
+  - SWFRecomp/tests/get_property_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md
+
+NOTE: The following test(s) for opcode ActionNewObject (0X40) are currently FAILING:
+  - SWFRecomp/tests/new_object_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md
+
+NOTE: The following test(s) for opcode ActionSetProperty (0X23) are currently FAILING:
+  - SWFRecomp/tests/set_property_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md
+
+NOTE: The following test(s) for opcode ActionGotoFrame (0X81) are currently FAILING:
+  - SWFRecomp/tests/goto_frame_swf_3
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md
+
+NOTE: The following test(s) for opcode ActionSetTarget2 (0X20) are currently FAILING:
+  - SWFRecomp/tests/set_target2_swf_4
+
+Please debug and fix these failing tests.
+
+
+Please read these files and follow their instructions:
+SWFRecompDocs/failing-test-fix-guide.md
+SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md
+
+NOTE: The following test(s) for opcode ActionStartDrag (0X27) are currently FAILING:
+  - SWFRecomp/tests/start_drag_swf_4
+
+Please debug and fix these failing tests.
