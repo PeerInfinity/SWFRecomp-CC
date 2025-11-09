@@ -4588,16 +4588,19 @@ void actionNewObject(char* stack, u32* sp)
 	ActionVar ctor_name_var;
 	popVar(stack, sp, &ctor_name_var);
 	const char* ctor_name;
+	u32 ctor_name_len;
 	if (ctor_name_var.type == ACTION_STACK_VALUE_STRING)
 	{
 		ctor_name = ctor_name_var.data.string_data.owns_memory ?
 			ctor_name_var.data.string_data.heap_ptr :
 			(const char*) ctor_name_var.data.numeric_value;
+		ctor_name_len = ctor_name_var.str_size;
 	}
 	else
 	{
 		// Fallback if not a string (shouldn't happen in normal cases)
 		ctor_name = "Object";
+		ctor_name_len = 6;
 	}
 
 	// 2. Pop number of arguments
@@ -4622,6 +4625,7 @@ void actionNewObject(char* stack, u32* sp)
 
 	// 4. Create new object based on constructor name
 	void* new_obj = NULL;
+	ActionStackValueType obj_type = ACTION_STACK_VALUE_OBJECT;
 
 	if (strcmp(ctor_name, "Array") == 0)
 	{
@@ -4666,7 +4670,9 @@ void actionNewObject(char* stack, u32* sp)
 			}
 			new_obj = arr;
 		}
+		obj_type = ACTION_STACK_VALUE_ARRAY;
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) new_obj);
+		return;
 	}
 	else if (strcmp(ctor_name, "Object") == 0)
 	{
@@ -4675,23 +4681,216 @@ void actionNewObject(char* stack, u32* sp)
 		ASObject* obj = allocObject(8);
 		new_obj = obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
 	}
 	else if (strcmp(ctor_name, "Date") == 0)
 	{
-		// Handle Date constructor (simplified)
+		// Handle Date constructor
 		// In a full implementation, this would parse date arguments
-		// For now, just create an empty object
+		// For now, create object with basic time property set to current time
 		ASObject* date = allocObject(4);
+
+		// Set time property to current milliseconds since epoch
+		ActionVar time_var;
+		time_var.type = ACTION_STACK_VALUE_F64;
+		double current_time = (double)time(NULL) * 1000.0;  // Convert to milliseconds
+		VAL(double, &time_var.data.numeric_value) = current_time;
+		setProperty(date, "time", 4, &time_var);
+
 		new_obj = date;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "String") == 0)
+	{
+		// Handle String constructor
+		// new String() or new String(value)
+		ASObject* str_obj = allocObject(4);
+
+		// If argument provided, convert to string and store as value property
+		if (num_args > 0)
+		{
+			// Convert first argument to string
+			char str_buffer[256];
+			const char* str_value = "";
+
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				str_value = args[0].data.string_data.owns_memory ?
+					args[0].data.string_data.heap_ptr :
+					(const char*) args[0].data.numeric_value;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				snprintf(str_buffer, sizeof(str_buffer), "%.15g", VAL(float, &args[0].data.numeric_value));
+				str_value = str_buffer;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				snprintf(str_buffer, sizeof(str_buffer), "%.15g", VAL(double, &args[0].data.numeric_value));
+				str_value = str_buffer;
+			}
+
+			// Store as property
+			ActionVar value_var;
+			value_var.type = ACTION_STACK_VALUE_STRING;
+			value_var.str_size = strlen(str_value);
+			value_var.data.string_data.heap_ptr = strdup(str_value);
+			value_var.data.string_data.owns_memory = true;
+			setProperty(str_obj, "value", 5, &value_var);
+		}
+
+		new_obj = str_obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "Number") == 0)
+	{
+		// Handle Number constructor
+		// new Number() or new Number(value)
+		ASObject* num_obj = allocObject(4);
+
+		// Store numeric value as property
+		ActionVar value_var;
+		if (num_args > 0)
+		{
+			// Convert first argument to number
+			if (args[0].type == ACTION_STACK_VALUE_F32 || args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				value_var = args[0];
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				const char* str = args[0].data.string_data.owns_memory ?
+					args[0].data.string_data.heap_ptr :
+					(const char*) args[0].data.numeric_value;
+				double num = atof(str);
+				value_var.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &value_var.data.numeric_value) = num;
+			}
+			else
+			{
+				// Default to 0
+				value_var.type = ACTION_STACK_VALUE_F32;
+				VAL(float, &value_var.data.numeric_value) = 0.0f;
+			}
+		}
+		else
+		{
+			// No arguments - default to 0
+			value_var.type = ACTION_STACK_VALUE_F32;
+			VAL(float, &value_var.data.numeric_value) = 0.0f;
+		}
+
+		setProperty(num_obj, "value", 5, &value_var);
+		new_obj = num_obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "Boolean") == 0)
+	{
+		// Handle Boolean constructor
+		// new Boolean() or new Boolean(value)
+		ASObject* bool_obj = allocObject(4);
+
+		// Store boolean value as property
+		ActionVar value_var;
+		value_var.type = ACTION_STACK_VALUE_F32;
+
+		if (num_args > 0)
+		{
+			// Convert first argument to boolean (0 or 1)
+			float bool_val = 0.0f;
+
+			if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				bool_val = (VAL(float, &args[0].data.numeric_value) != 0.0f) ? 1.0f : 0.0f;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				bool_val = (VAL(double, &args[0].data.numeric_value) != 0.0) ? 1.0f : 0.0f;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				const char* str = args[0].data.string_data.owns_memory ?
+					args[0].data.string_data.heap_ptr :
+					(const char*) args[0].data.numeric_value;
+				bool_val = (str != NULL && strlen(str) > 0) ? 1.0f : 0.0f;
+			}
+
+			VAL(float, &value_var.data.numeric_value) = bool_val;
+		}
+		else
+		{
+			// No arguments - default to false
+			VAL(float, &value_var.data.numeric_value) = 0.0f;
+		}
+
+		setProperty(bool_obj, "value", 5, &value_var);
+		new_obj = bool_obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
 	}
 	else
 	{
-		// Unknown constructor - create generic object
-		// In a full implementation, this would try to call user-defined constructor
-		ASObject* obj = allocObject(8);
-		new_obj = obj;
-		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		// Try to find user-defined constructor function
+		ASFunction* ctor_func = lookupFunctionByName(ctor_name, ctor_name_len);
+
+		if (ctor_func != NULL)
+		{
+			// User-defined constructor found
+			// Create new object to serve as 'this'
+			ASObject* obj = allocObject(8);
+			new_obj = obj;
+
+			// Call the constructor with 'this' binding
+			if (ctor_func->function_type == 1)
+			{
+				// DefineFunction (type 1) - simple function
+				// Push 'this' and arguments to stack, call function
+				// Note: Constructor return value is discarded per spec
+
+				// For now, just create the object without calling constructor
+				// Full implementation would require stack manipulation to call constructor
+			}
+			else if (ctor_func->function_type == 2)
+			{
+				// DefineFunction2 (type 2) - advanced function with registers
+				// This supports 'this' binding and proper constructor semantics
+
+				// Prepare arguments for the constructor
+				ActionVar registers[256] = {0};  // Max registers
+
+				// Call constructor with 'this' binding
+				// Note: Return value is discarded per ActionScript spec for constructors
+				if (ctor_func->advanced_func != NULL)
+				{
+					ActionVar return_value = ctor_func->advanced_func(stack, sp, args, num_args, registers, obj);
+
+					// Check if constructor returned an object (override default behavior)
+					// Per ECMAScript spec: if constructor returns object, use it; otherwise use 'this'
+					if (return_value.type == ACTION_STACK_VALUE_OBJECT && return_value.data.numeric_value != 0)
+					{
+						// Constructor returned an object - use it instead of default 'this'
+						releaseObject(obj);  // Release the originally created object
+						new_obj = (ASObject*) return_value.data.numeric_value;
+						retainObject((ASObject*) new_obj);  // Retain the returned object
+					}
+					// Note: If constructor returns non-object, we use the original 'this' object
+				}
+			}
+
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+			return;
+		}
+		else
+		{
+			// Unknown constructor - create generic object
+			ASObject* obj = allocObject(8);
+			new_obj = obj;
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+			return;
+		}
 	}
 }
 
