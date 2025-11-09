@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a minimal SWF4 file with GET_PROPERTY tests
+# Create a comprehensive SWF4 file with GET_PROPERTY tests for all 22 properties
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 4
@@ -15,16 +15,31 @@ frame_count = struct.pack('<H', 1)  # 1 frame
 # ActionScript bytecode for testing GET_PROPERTY
 actions = b''
 
-# Test 1: Get _xscale (property index 2)
-# Push target path "" (empty string refers to current MovieClip / _root)
-target = b'\x00'  # Empty string
-action_push_target = struct.pack('<BHB', 0x96, len(target) + 1, 0)  # PUSH action, length, type=0 (string)
-action_push_target += target
-
-# Push property index 2 (_xscale)
-prop_index = struct.pack('<f', 2.0)  # Float value 2.0
-action_push_index = struct.pack('<BHB', 0x96, 5, 1)  # PUSH action, length=5 (1 byte type + 4 bytes float), type=1 (float)
-action_push_index += prop_index
+# Property indices to test (all 22 properties)
+property_tests = [
+    (0, "_x"),
+    (1, "_y"),
+    (2, "_xscale"),
+    (3, "_yscale"),
+    (4, "_currentframe"),
+    (5, "_totalframes"),
+    (6, "_alpha"),
+    (7, "_visible"),
+    (8, "_width"),
+    (9, "_height"),
+    (10, "_rotation"),
+    (11, "_target"),
+    (12, "_framesloaded"),
+    (13, "_name"),
+    (14, "_droptarget"),
+    (15, "_url"),
+    (16, "_highquality"),
+    (17, "_focusrect"),
+    (18, "_soundbuftime"),
+    (19, "_quality"),
+    (20, "_xmouse"),
+    (21, "_ymouse"),
+]
 
 # GET_PROPERTY opcode (0x22)
 action_get_property = bytes([0x22])
@@ -32,63 +47,20 @@ action_get_property = bytes([0x22])
 # TRACE opcode (0x26)
 action_trace = bytes([0x26])
 
-# Add Test 1
-actions += action_push_target + action_push_index + action_get_property + action_trace
+# For each property, test GET_PROPERTY
+for prop_index, prop_name in property_tests:
+    # Push target path "" (empty string refers to current MovieClip / _root)
+    target = b'\x00'  # Empty string
+    action_push_target = struct.pack('<BHB', 0x96, len(target) + 1, 0)  # PUSH action, length, type=0 (string)
+    action_push_target += target
 
-# Test 2: Get _yscale (property index 3)
-target = b'\x00'
-action_push_target = struct.pack('<BHB', 0x96, len(target) + 1, 0)
-action_push_target += target
+    # Push property index
+    prop_index_val = struct.pack('<f', float(prop_index))  # Float value
+    action_push_index = struct.pack('<BHB', 0x96, 5, 1)  # PUSH action, length=5 (1 byte type + 4 bytes float), type=1 (float)
+    action_push_index += prop_index_val
 
-prop_index = struct.pack('<f', 3.0)  # Float value 3.0
-action_push_index = struct.pack('<BHB', 0x96, 5, 1)
-action_push_index += prop_index
-
-actions += action_push_target + action_push_index + action_get_property + action_trace
-
-# Test 3: Get _visible (property index 7)
-target = b'\x00'
-action_push_target = struct.pack('<BHB', 0x96, len(target) + 1, 0)
-action_push_target += target
-
-prop_index = struct.pack('<f', 7.0)  # Float value 7.0
-action_push_index = struct.pack('<BHB', 0x96, 5, 1)
-action_push_index += prop_index
-
-actions += action_push_target + action_push_index + action_get_property + action_trace
-
-# Test 4: Get _alpha (property index 6)
-target = b'\x00'
-action_push_target = struct.pack('<BHB', 0x96, len(target) + 1, 0)
-action_push_target += target
-
-prop_index = struct.pack('<f', 6.0)  # Float value 6.0
-action_push_index = struct.pack('<BHB', 0x96, 5, 1)
-action_push_index += prop_index
-
-actions += action_push_target + action_push_index + action_get_property + action_trace
-
-# Test 5: Get _x (property index 0)
-target = b'\x00'
-action_push_target = struct.pack('<BHB', 0x96, len(target) + 1, 0)
-action_push_target += target
-
-prop_index = struct.pack('<f', 0.0)  # Float value 0.0
-action_push_index = struct.pack('<BHB', 0x96, 5, 1)
-action_push_index += prop_index
-
-actions += action_push_target + action_push_index + action_get_property + action_trace
-
-# Test 6: Get _y (property index 1)
-target = b'\x00'
-action_push_target = struct.pack('<BHB', 0x96, len(target) + 1, 0)
-action_push_target += target
-
-prop_index = struct.pack('<f', 1.0)  # Float value 1.0
-action_push_index = struct.pack('<BHB', 0x96, 5, 1)
-action_push_index += prop_index
-
-actions += action_push_target + action_push_index + action_get_property + action_trace
+    # Add to actions
+    actions += action_push_target + action_push_index + action_get_property + action_trace
 
 # END action
 action_end = bytes([0x00])
@@ -117,4 +89,4 @@ swf_data = signature + struct.pack('<BI', version, file_length) + body
 with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
-print(f"Created test.swf ({len(swf_data)} bytes)")
+print(f"Created test.swf ({len(swf_data)} bytes) with tests for all 22 properties")

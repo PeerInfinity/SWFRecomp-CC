@@ -1,9 +1,9 @@
 {
   "metadata": {
     "name": "get_property_swf_4",
-    "description": "Tests GET_PROPERTY opcode (0x22) - gets MovieClip properties by numeric index",
+    "description": "Comprehensive test for GET_PROPERTY opcode (0x22) - tests all 22 MovieClip properties by numeric index including empty string properties, numeric properties, frame properties, quality settings, and mouse positions",
     "swf_version": 4,
-    "fully_implemented": false
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["GET_PROPERTY"],
@@ -11,5 +11,17 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "all_22_property_indices",
+    "numeric_properties",
+    "string_properties",
+    "empty_string_properties",
+    "frame_based_properties",
+    "transform_properties",
+    "visibility_and_alpha",
+    "quality_settings",
+    "mouse_position_no_graphics",
+    "target_path_resolution"
+  ]
 }
