@@ -1,9 +1,14 @@
 {
   "metadata": {
     "name": "gotoframe2_swf_5",
-    "description": "Tests GOTO_FRAME2 opcode - stack-based frame navigation with numeric and string frames",
+    "description": "Tests GOTO_FRAME2 opcode (0x9F) - stack-based frame navigation with comprehensive edge case coverage including numeric frames, string labels, negative frame handling, and target path parsing",
     "swf_version": 5,
-    "fully_implemented": false
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Actual frame navigation (requires MovieClip timeline management - graphics-only)",
+      "Frame label registry/lookup (requires SWF FrameLabel tag parsing - graphics-only)",
+      "MovieClip context switching for target paths (requires full MovieClip tree - graphics-only)"
+    ]
   },
   "opcodes": {
     "tested": ["GOTO_FRAME2"],
@@ -11,5 +16,19 @@
   },
   "execution": {
     "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "numeric_frame_navigation",
+    "string_label_navigation",
+    "negative_frame_clamping",
+    "target_path_with_numeric_frame",
+    "target_path_with_label",
+    "play_flag_handling",
+    "invalid_type_handling"
+  ],
+  "implementation_notes": {
+    "target_path_parsing": "Implemented - parses 'path:frame' syntax and separates target from frame identifier",
+    "scene_bias": "Implemented in code but not comprehensively tested - rare feature for multi-scene Flash movies",
+    "no_graphics_mode": "Logs frame navigation instead of actually changing frames - appropriate for NO_GRAPHICS mode"
   }
 }
