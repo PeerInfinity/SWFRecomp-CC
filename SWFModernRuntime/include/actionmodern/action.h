@@ -4,6 +4,36 @@
 #include <stackvalue.h>
 #include <setjmp.h>
 
+// Forward declarations
+typedef struct MovieClip MovieClip;
+
+// MovieClip structure for Flash movie clip properties
+struct MovieClip {
+	float x, y;
+	float xscale, yscale;
+	float rotation;
+	float alpha;
+	float width, height;
+	int visible;
+	int currentframe;
+	int totalframes;
+	int framesloaded;
+	char name[256];
+	char target[256];
+	char droptarget[256];
+	char url[512];
+	// SWF 4+ properties
+	float highquality;     // Property 16: _highquality (0, 1, or 2)
+	float focusrect;       // Property 17: _focusrect (0 or 1)
+	float soundbuftime;    // Property 18: _soundbuftime (in seconds)
+	char quality[16];      // Property 19: _quality ("LOW", "MEDIUM", "HIGH", "BEST")
+	float xmouse;
+	float ymouse;
+};
+
+// Global root MovieClip
+extern MovieClip root_movieclip;
+
 #define PUSH(t, v) \
 	do { \
 		u32 oldSP = *sp; \

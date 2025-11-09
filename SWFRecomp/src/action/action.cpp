@@ -1098,14 +1098,50 @@ namespace SWFRecomp
 				if (preload_arguments && !suppress_arguments)
 				{
 					context.out_script_defs << "\t// Preload 'arguments' into register " << next_reg << endl;
-					context.out_script_defs << "\t// TODO: Create arguments object" << endl;
+					context.out_script_defs << "\t// Create arguments array object" << endl;
+					context.out_script_defs << "\tASArray* arguments_array = allocArray(arg_count);" << endl;
+					context.out_script_defs << "\tfor (u32 i = 0; i < arg_count; i++) {" << endl;
+					context.out_script_defs << "\t\tsetArrayElement(arguments_array, i, &args[i]);" << endl;
+					context.out_script_defs << "\t}" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_ARRAY;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)arguments_array;" << endl;
 					next_reg++;
 				}
 
 				if (preload_super && !suppress_super)
 				{
 					context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
-					context.out_script_defs << "\t// TODO: Create super reference" << endl;
+					context.out_script_defs << "\t// TODO: Create super reference (requires prototype chain support)" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = 0;" << endl;
+					next_reg++;
+				}
+
+				if (preload_root)
+				{
+					context.out_script_defs << "\t// Preload '_root' into register " << next_reg << endl;
+					context.out_script_defs << "\textern MovieClip root_movieclip;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+					next_reg++;
+				}
+
+				if (preload_parent)
+				{
+					context.out_script_defs << "\t// Preload '_parent' into register " << next_reg << endl;
+					context.out_script_defs << "\t// For now, _parent points to _root (no clip hierarchy in NO_GRAPHICS mode)" << endl;
+					context.out_script_defs << "\textern MovieClip root_movieclip;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+					next_reg++;
+				}
+
+				if (preload_global)
+				{
+					context.out_script_defs << "\t// Preload '_global' into register " << next_reg << endl;
+					context.out_script_defs << "\textern ASObject* global_object;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)global_object;" << endl;
 					next_reg++;
 				}
 

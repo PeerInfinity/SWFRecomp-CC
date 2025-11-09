@@ -70,6 +70,11 @@ static ASFunction* lookupFunctionFromVar(ActionVar* var) {
 void initTime()
 {
 	start_time = get_elapsed_ms();
+
+	// Initialize global object if not already initialized
+	if (global_object == NULL) {
+		global_object = allocObject(16);  // Start with capacity for 16 global properties
+	}
 }
 
 // ==================================================================
@@ -171,32 +176,15 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
 
-typedef struct {
-	float x, y;
-	float xscale, yscale;
-	float rotation;
-	float alpha;
-	float width, height;
-	int visible;
-	int currentframe;
-	int totalframes;
-	int framesloaded;
-	char name[256];
-	char target[256];
-	char droptarget[256];
-	char url[512];
-	// SWF 4+ properties
-	float highquality;     // Property 16: _highquality (0, 1, or 2)
-	float focusrect;       // Property 17: _focusrect (0 or 1)
-	float soundbuftime;    // Property 18: _soundbuftime (in seconds)
-	char quality[16];      // Property 19: _quality ("LOW", "MEDIUM", "HIGH", "BEST")
-	float xmouse;
-	float ymouse;
-} MovieClip;
+// MovieClip structure is defined in action.h
 
-// Static _root MovieClip for simplified implementation
+// Global object for ActionScript _global
+// This is initialized on first use and persists for the lifetime of the runtime
+ASObject* global_object = NULL;
+
+// _root MovieClip for simplified implementation
 // Note: totalframes is set from SWF_FRAME_COUNT if available, otherwise defaults to 1
-static MovieClip root_movieclip = {
+MovieClip root_movieclip = {
 	.x = 0.0f,
 	.y = 0.0f,
 	.xscale = 100.0f,
