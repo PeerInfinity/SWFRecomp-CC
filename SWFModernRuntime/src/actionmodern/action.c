@@ -953,6 +953,63 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
+/**
+ * Helper structure to track enumerated property names
+ * Used to prevent duplicates when walking the prototype chain
+ */
+typedef struct EnumeratedName {
+	const char* name;
+	u32 name_length;
+	struct EnumeratedName* next;
+} EnumeratedName;
+
+/**
+ * Check if a property name has already been enumerated
+ */
+static int isPropertyEnumerated(EnumeratedName* head, const char* name, u32 name_length)
+{
+	EnumeratedName* current = head;
+	while (current != NULL)
+	{
+		if (current->name_length == name_length &&
+		    strncmp(current->name, name, name_length) == 0)
+		{
+			return 1; // Found - property was already enumerated
+		}
+		current = current->next;
+	}
+	return 0; // Not found
+}
+
+/**
+ * Add a property name to the enumerated list
+ */
+static void addEnumeratedName(EnumeratedName** head, const char* name, u32 name_length)
+{
+	EnumeratedName* node = (EnumeratedName*) malloc(sizeof(EnumeratedName));
+	if (node == NULL)
+	{
+		return; // Out of memory, skip this property
+	}
+	node->name = name;
+	node->name_length = name_length;
+	node->next = *head;
+	*head = node;
+}
+
+/**
+ * Free the enumerated names list
+ */
+static void freeEnumeratedNames(EnumeratedName* head)
+{
+	while (head != NULL)
+	{
+		EnumeratedName* next = head->next;
+		free(head);
+		head = next;
+	}
+}
+
 void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 {
 	// Step 1: Pop variable name from stack
@@ -963,7 +1020,7 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 	POP();
 
 #ifdef DEBUG
-	printf("[DEBUG] actionEnumerate: looking up variable '%.*s' (len=%u, id=%u)\n", 
+	printf("[DEBUG] actionEnumerate: looking up variable '%.*s' (len=%u, id=%u)\n",
 	       var_name_len, var_name, var_name_len, string_id);
 #endif
 
@@ -1006,26 +1063,118 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 		return;
 	}
 
+	// Step 5: Collect all enumerable properties from the entire prototype chain
+	// We need to collect them first to push in reverse order
+
+	// Temporary storage for property names (we'll push them to stack after collecting)
+	typedef struct PropList {
+		const char* name;
+		u32 name_length;
+		struct PropList* next;
+	} PropList;
+
+	PropList* prop_head = NULL;
+	u32 total_props = 0;
+
+	// Track which properties we've already seen (to handle shadowing)
+	EnumeratedName* enumerated_head = NULL;
+
+	// Walk the prototype chain
+	ASObject* current_obj = obj;
+	int chain_depth = 0;
+	const int MAX_CHAIN_DEPTH = 100; // Prevent infinite loops
+
+	while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
+	{
+		chain_depth++;
+
 #ifdef DEBUG
-	printf("[DEBUG] actionEnumerate: enumerating %u properties\n", obj->num_used);
+		printf("[DEBUG] actionEnumerate: walking prototype chain depth=%d, num_used=%u\n",
+		       chain_depth, current_obj->num_used);
 #endif
 
-	// Step 5: Push null terminator first
+		// Enumerate properties from this level
+		for (u32 i = 0; i < current_obj->num_used; i++)
+		{
+			const char* prop_name = current_obj->properties[i].name;
+			u32 prop_name_len = current_obj->properties[i].name_length;
+			u8 prop_flags = current_obj->properties[i].flags;
+
+			// Skip if property is not enumerable (DontEnum)
+			if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
+			{
+#ifdef DEBUG
+				printf("[DEBUG] actionEnumerate: skipping non-enumerable property '%.*s'\n",
+				       prop_name_len, prop_name);
+#endif
+				continue;
+			}
+
+			// Skip if we've already enumerated this property name (shadowing)
+			if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
+			{
+#ifdef DEBUG
+				printf("[DEBUG] actionEnumerate: skipping shadowed property '%.*s'\n",
+				       prop_name_len, prop_name);
+#endif
+				continue;
+			}
+
+			// Add to enumerated list
+			addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
+
+			// Add to property list (for later pushing to stack)
+			PropList* node = (PropList*) malloc(sizeof(PropList));
+			if (node != NULL)
+			{
+				node->name = prop_name;
+				node->name_length = prop_name_len;
+				node->next = prop_head;
+				prop_head = node;
+				total_props++;
+
+#ifdef DEBUG
+				printf("[DEBUG] actionEnumerate: added enumerable property '%.*s'\n",
+				       prop_name_len, prop_name);
+#endif
+			}
+		}
+
+		// Move to prototype via __proto__ property
+		ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+		if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+		{
+			current_obj = (ASObject*) proto_var->data.numeric_value;
+#ifdef DEBUG
+			printf("[DEBUG] actionEnumerate: following __proto__ to next level\n");
+#endif
+		}
+		else
+		{
+			// End of prototype chain
+			current_obj = NULL;
+		}
+	}
+
+	// Free the enumerated names list
+	freeEnumeratedNames(enumerated_head);
+
+#ifdef DEBUG
+	printf("[DEBUG] actionEnumerate: collected %u enumerable properties total\n", total_props);
+#endif
+
+	// Step 6: Push null terminator first
 	// This marks the end of the enumeration for for..in loops
 	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 
-	// Step 6: Push property names in reverse order
-	// This allows them to be popped in forward order during enumeration
-	for (int i = obj->num_used - 1; i >= 0; i--)
+	// Step 7: Push property names from the list (they're already in reverse order)
+	while (prop_head != NULL)
 	{
-		const char* prop_name = obj->properties[i].name;
-		u32 prop_name_len = obj->properties[i].name_length;
-		
-#ifdef DEBUG
-		printf("[DEBUG] actionEnumerate: pushing property '%.*s'\n", prop_name_len, prop_name);
-#endif
-		
-		PUSH_STR((char*)prop_name, prop_name_len);
+		PUSH_STR((char*)prop_head->name, prop_head->name_length);
+
+		PropList* next = prop_head->next;
+		free(prop_head);
+		prop_head = next;
 	}
 }
 

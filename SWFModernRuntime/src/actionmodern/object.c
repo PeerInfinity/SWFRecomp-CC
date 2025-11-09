@@ -266,6 +266,9 @@ void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* va
 	obj->properties[index].name[name_length] = '\0';
 	obj->properties[index].name_length = name_length;
 
+	// Set default property flags (enumerable, writable, configurable)
+	obj->properties[index].flags = PROPERTY_FLAGS_DEFAULT;
+
 	// Set value
 	obj->properties[index].value = *value;
 

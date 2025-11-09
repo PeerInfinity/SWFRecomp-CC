@@ -14,6 +14,21 @@
 // Forward declaration for property structure
 typedef struct ASProperty ASProperty;
 
+/**
+ * Property Attribute Flags (ECMA-262 compliant)
+ *
+ * These flags control property behavior during enumeration, deletion, and assignment.
+ */
+#define PROPERTY_FLAG_ENUMERABLE  0x01  // Property appears in for..in loops (default for user properties)
+#define PROPERTY_FLAG_WRITABLE    0x02  // Property can be modified (default for user properties)
+#define PROPERTY_FLAG_CONFIGURABLE 0x04 // Property can be deleted (default for user properties)
+
+// Default flags for user-created properties (fully mutable and enumerable)
+#define PROPERTY_FLAGS_DEFAULT (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE)
+
+// Flags for DontEnum properties (internal/built-in properties)
+#define PROPERTY_FLAGS_DONTENUM (PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE)
+
 typedef struct ASObject
 {
 	u32 refcount;           // Reference count (starts at 1 on allocation)
@@ -30,6 +45,7 @@ struct ASProperty
 {
 	char* name;             // Property name (heap-allocated)
 	u32 name_length;        // Length of property name
+	u8 flags;               // Property attribute flags (PROPERTY_FLAG_*)
 	ActionVar value;        // Property value (can be any type)
 };
 

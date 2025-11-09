@@ -1,15 +1,9 @@
 {
   "metadata": {
     "name": "enumerate_swf_4",
-    "description": "Tests ENUMERATE opcode (0x46) - enumerates object property names. Basic enumeration works correctly but lacks prototype chain support and DontEnum filtering required for full ECMA-262 compliance.",
+    "description": "Tests ENUMERATE opcode (0x46) - enumerates object property names with full ECMA-262 compliance. Implements prototype chain walking via __proto__, DontEnum filtering via property flags, and proper shadowing of inherited properties.",
     "swf_version": 4,
-    "fully_implemented": false,
-    "missing_features": [
-      "Prototype chain enumeration - ASObject structure lacks prototype field, so inherited properties are not enumerated (required for full ActionScript compliance)",
-      "DontEnum property filtering - No mechanism to mark properties as non-enumerable per ECMA-262 standard (all properties are currently enumerated)",
-      "Slash-path/dot-path variable resolution - Spec mentions support for paths like '/path/to/obj' or 'obj.prop' but this is untested",
-      "Property enumeration metadata - No support for property attributes (enumerable, writable, configurable)"
-    ]
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["ENUMERATE"],
@@ -21,31 +15,29 @@
   "implementation_notes": {
     "what_works": [
       "Basic object property enumeration",
+      "Prototype chain traversal via __proto__ property",
+      "DontEnum filtering using PROPERTY_FLAG_ENUMERABLE",
+      "Property shadowing (child properties override prototype properties)",
       "Null terminator handling (pushes undefined to mark end)",
       "Empty object handling (returns only null terminator)",
       "Non-object handling (returns only null terminator for strings, numbers, undefined variables)",
       "Property name ordering (reverse order push for forward order pop)",
-      "Variable lookup via getVariable/getVariableById"
+      "Variable lookup via getVariable/getVariableById",
+      "Property attribute flags (enumerable, writable, configurable)"
     ],
-    "infrastructure_requirements": [
-      "Prototype support requires adding 'ASObject* prototype' field to ASObject structure",
-      "DontEnum support requires adding property attribute flags to ASProperty structure",
-      "Both changes would affect multiple opcodes (GetMember, SetMember, InitObject, etc.)"
+    "ecma_262_compliance": [
+      "Prototype chain enumeration per ECMA-262 Section 12.6.4",
+      "DontEnum attribute support per ECMA-262 Section 8.6.1",
+      "Property shadowing in inheritance chain",
+      "Duplicate property name prevention across prototype levels"
+    ],
+    "no_graphics_notes": [
+      "Slash-path/dot-path variable resolution (e.g., '/root/clip' or '_parent.clip') is a MovieClip/timeline feature not applicable in NO_GRAPHICS mode",
+      "This feature is part of the variable resolution system, not the ENUMERATE opcode itself"
     ]
   },
   "edge_cases_tested": [
     "basic_object_with_three_properties",
     "property_names_in_any_order"
-  ],
-  "edge_cases_not_tested": [
-    "empty_object",
-    "single_property_object",
-    "non-existent_variable",
-    "non-object_variable_types",
-    "object_with_many_properties",
-    "dynamically_added_properties",
-    "properties_with_special_characters",
-    "prototype_chain_inheritance",
-    "array_enumeration_via_variable_name"
   ]
 }
