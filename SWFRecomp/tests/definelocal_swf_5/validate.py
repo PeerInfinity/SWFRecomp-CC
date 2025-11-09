@@ -19,35 +19,52 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected: Single line with value "42"
-    Test: var x = 42; trace(x);
+    Expected output (6 lines):
+    42       - Test 1: Basic definition
+    100      - Test 2: Redefinition
+    Hello    - Test 3: String value
+    0        - Test 4: Zero value
+    -5       - Test 5: Negative value
+    100      - Test 6: Variable persistence
     """
     lines = parse_output(output)
 
-    # Check we have at least one line of output
-    if len(lines) < 1:
-        return make_validation_result([
-            make_result(
-                "definelocal_basic",
-                False,
-                "42",
-                "",
-                "No output received"
-            )
-        ])
+    # Define expected outputs for each test
+    test_cases = [
+        ("definelocal_basic", "42", "Basic variable definition"),
+        ("definelocal_redefine", "100", "Variable redefinition"),
+        ("definelocal_string", "Hello", "String value"),
+        ("definelocal_zero", "0", "Zero value"),
+        ("definelocal_negative", "-5", "Negative value"),
+        ("definelocal_persistence", "100", "Variable persistence")
+    ]
 
-    # Verify the output is "42"
-    expected = "42"
-    actual = lines[0]
+    results = []
 
-    return make_validation_result([
-        make_result(
-            "definelocal_basic",
+    # Check we have enough output lines
+    if len(lines) < len(test_cases):
+        for i, (name, expected, description) in enumerate(test_cases):
+            actual = lines[i] if i < len(lines) else ""
+            results.append(make_result(
+                name,
+                i < len(lines) and actual == expected,
+                expected,
+                actual,
+                f"{description} - missing output" if i >= len(lines) else None
+            ))
+        return make_validation_result(results)
+
+    # Validate each test case
+    for i, (name, expected, description) in enumerate(test_cases):
+        actual = lines[i]
+        results.append(make_result(
+            name,
             actual == expected,
             expected,
             actual
-        )
-    ])
+        ))
+
+    return make_validation_result(results)
 
 
 if __name__ == "__main__":
