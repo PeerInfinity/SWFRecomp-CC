@@ -1,22 +1,53 @@
 {
   "metadata": {
     "name": "define_function2_swf_7",
-    "description": "Tests DEFINE_FUNCTION2 opcode (0x8E) - enhanced function definition with register support",
+    "description": "Comprehensive test of DEFINE_FUNCTION2 opcode (0x8E) - enhanced function definition with register support, function calling, and return values",
     "swf_version": 7,
-    "fully_implemented": false
+    "fully_implemented": false,
+    "missing_features": [
+      "PreloadArguments flag: arguments object creation not implemented",
+      "PreloadSuper flag: super reference not implemented",
+      "PreloadRoot flag: _root preloading not implemented",
+      "PreloadParent flag: _parent preloading not implemented",
+      "PreloadGlobal flag: _global preloading not implemented",
+      "Variable parameters (register=0) not tested (code generated but untested)",
+      "Nested DefineFunction2 functions not tested",
+      "Anonymous functions (empty name) not tested"
+    ]
   },
   "opcodes": {
     "tested": ["DEFINE_FUNCTION2"],
-    "supporting": ["PUSH", "TRACE"]
+    "supporting": ["PUSH", "CALL_FUNCTION", "RETURN", "ADD"]
   },
   "execution": {
     "type": "deterministic"
   },
+  "features_implemented": [
+    "Function definition with name",
+    "Register-based parameters",
+    "RegisterCount allocation",
+    "Function body parsing and execution",
+    "Function calling via CALL_FUNCTION",
+    "Return values",
+    "Multiple parameters",
+    "Functions with no parameters",
+    "ADD operation inside function body",
+    "PreloadThis flag support (implemented)",
+    "SuppressThis flag parsing",
+    "SuppressArguments flag parsing",
+    "SuppressSuper flag parsing"
+  ],
+  "test_cases": [
+    "add(10, 20) -> 30: Function with two register parameters",
+    "add(5, 7) -> 12: Same function with different arguments",
+    "getFortyTwo() -> 42: Function with no parameters returning constant",
+    "add(100.5, 200.5) -> 301: Function with floating-point arguments"
+  ],
   "notes": [
-    "This is a PARTIAL implementation",
-    "Function definition works but function body parsing is not yet complete",
-    "Function calling (CALL_FUNCTION) is not yet implemented",
-    "Test validates that functions can be defined without errors",
-    "Future enhancements needed: function body parsing, calling, preloading, arguments object"
+    "Core DefineFunction2 functionality is WORKING",
+    "Register-based parameters work correctly with local register arrays",
+    "Function calling and return values work",
+    "Some advanced preloading features not yet implemented (see missing_features)",
+    "This opcode provides significant functionality even without all preload flags"
   ]
 }
