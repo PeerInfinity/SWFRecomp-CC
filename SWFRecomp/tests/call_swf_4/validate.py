@@ -4,13 +4,13 @@ Validation script for call_swf_4
 
 Tests the CALL opcode (0x9E).
 Expected output:
-  Line 1: // Call frame 2
-  Line 2: continued
+  Line: continued
 
 The test demonstrates that:
 1. CALL opcode pops a frame identifier from the stack
-2. The simplified implementation logs the call
-3. Execution continues after the call
+2. ActionCall now actually executes frames (not just logging)
+3. Since frame 2 doesn't exist, CALL does nothing (per spec)
+4. Execution continues after the CALL
 """
 import sys
 import json
@@ -27,26 +27,28 @@ def validate_output(output):
     Validate test output.
 
     Expected:
-      Line 1: // Call frame 2
-      Line 2: continued
+      Line: continued
+
+    Note: ActionCall now actually executes frames. Since frame 2 doesn't exist
+    in this single-frame SWF, ActionCall does nothing (per spec), and execution
+    continues directly to the TRACE statement.
     """
     lines = parse_output(output)
 
+    # Filter out system/runtime messages to get actual trace output
+    filtered_lines = [
+        line for line in lines
+        if not line.startswith('SWF Runtime') and
+           not line.startswith('===') and
+           not line.startswith('[Frame') and
+           not line.startswith('[Tag]')
+    ]
+
     results = []
 
-    # Validation 1: Check first line (call log)
-    expected_call = "// Call frame 2"
-    actual_call = lines[0] if len(lines) > 0 else ""
-    results.append(make_result(
-        "call_log",
-        actual_call == expected_call,
-        expected_call,
-        actual_call
-    ))
-
-    # Validation 2: Check second line (continuation)
+    # Validation: Check that execution continues after CALL
     expected_continued = "continued"
-    actual_continued = lines[1] if len(lines) > 1 else ""
+    actual_continued = filtered_lines[0] if len(filtered_lines) > 0 else ""
     results.append(make_result(
         "execution_continued",
         actual_continued == expected_continued,

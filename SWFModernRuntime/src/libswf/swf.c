@@ -18,6 +18,10 @@ size_t next_frame;
 int manual_next_frame;
 ActionVar* temp_val;
 
+// Global frame access for ActionCall opcode
+frame_func* g_frame_funcs = NULL;
+size_t g_frame_count = 0;
+
 Character* dictionary = NULL;
 
 DisplayObject* display_list = NULL;
@@ -88,6 +92,10 @@ void swfStart(SWFAppContext* app_context)
 	quit_swf = 0;
 	bad_poll = 0;
 	next_frame = 0;
+
+	// Store frame info globally for ActionCall opcode
+	g_frame_funcs = app_context->frame_funcs;
+	g_frame_count = app_context->frame_count;
 
 	initTime();
 	initMap();

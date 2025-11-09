@@ -19,6 +19,10 @@ size_t next_frame = 0;
 int manual_next_frame = 0;
 ActionVar* temp_val = NULL;
 
+// Global frame access for ActionCall opcode
+frame_func* g_frame_funcs = NULL;
+size_t g_frame_count = 0;
+
 // Console-only swfStart implementation
 void swfStart(SWFAppContext* app_context)
 {
@@ -39,6 +43,10 @@ void swfStart(SWFAppContext* app_context)
 	current_frame = 0;
 	next_frame = 0;
 	manual_next_frame = 0;
+
+	// Store frame info globally for ActionCall opcode
+	g_frame_funcs = app_context->frame_funcs;
+	g_frame_count = app_context->frame_count;
 
 	initTime();
 	initMap();

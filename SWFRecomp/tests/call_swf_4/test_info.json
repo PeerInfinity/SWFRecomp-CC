@@ -1,9 +1,16 @@
 {
   "metadata": {
     "name": "call_swf_4",
-    "description": "Tests CALL opcode (0x9E) - calls frame actions (simplified implementation)",
+    "description": "Tests CALL opcode (0x9E) - calls frame actions by frame number",
     "swf_version": 4,
-    "fully_implemented": false
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": false,
+    "missing_features": [
+      "Frame labels not supported (would require SWFRecomp to generate label->frame mapping)",
+      "Target path parsing not implemented (e.g., '/movieclip:frame')",
+      "Multi-MovieClip support not implemented (only main timeline supported)",
+      "Test coverage: need multi-frame test to verify actual frame execution"
+    ]
   },
   "opcodes": {
     "tested": ["CALL"],
@@ -12,9 +19,16 @@
   "execution": {
     "type": "deterministic"
   },
+  "implementation_details": {
+    "frame_calling_by_number": "Implemented",
+    "frame_calling_by_label": "Not implemented",
+    "target_path_support": "Not implemented",
+    "quit_swf_handling": "Implemented (state saved/restored)"
+  },
   "notes": [
-    "Current implementation is simplified - logs the call instead of executing frame actions",
-    "Full implementation would require MovieClip structure and frame action infrastructure",
+    "ActionCall now actually executes frame actions (not just logging)",
+    "Frame number calling works with global frame_funcs array",
+    "quit_swf state is properly saved/restored to prevent premature termination",
     "CALL is a legacy opcode from SWF 4; modern ActionScript uses CALL_FUNCTION instead"
   ]
 }

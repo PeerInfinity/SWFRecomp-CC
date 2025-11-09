@@ -1,11 +1,13 @@
 #include <recomp.h>
 #include <swf.h>
+#include <out.h>  // For FRAME_COUNT
 
 // Create SWFAppContext
 // In NO_GRAPHICS mode, only frame_funcs is needed
 // In graphics mode, all fields are required
 static SWFAppContext app_context = {
-    .frame_funcs = NULL  // Will be set in main()
+    .frame_funcs = NULL,  // Will be set in main()
+    .frame_count = 0      // Will be set in main()
 #ifndef NO_GRAPHICS
     ,
     .width = 800,
@@ -43,6 +45,7 @@ void runSWF() {
 int main() {
     // Initialize app context with frame functions
     app_context.frame_funcs = frame_funcs;
+    app_context.frame_count = FRAME_COUNT;
 
 #ifndef __EMSCRIPTEN__
     // Native mode - run immediately

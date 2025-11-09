@@ -491,7 +491,11 @@ namespace SWFRecomp
 								 << "#define BITMAP_COUNT " << to_string(current_bitmap) << endl
 								 << "#define BITMAP_HIGHEST_W " << to_string(highest_w) << endl
 								 << "#define BITMAP_HIGHEST_H " << to_string(highest_h);
-		
+
+		// Add FRAME_COUNT to out.h for ActionCall opcode
+		context.out_script_header << endl << endl
+								  << "#define FRAME_COUNT " << to_string(next_frame_i);
+
 		context.out_script_header.close();
 		context.out_script_defs.close();
 		context.out_script_decls.close();
