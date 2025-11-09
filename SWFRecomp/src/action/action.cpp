@@ -1392,10 +1392,29 @@ namespace SWFRecomp
 							break;
 						}
 
+						case ACTION_STACK_VALUE_NULL:
+						{
+							out_script << "(null)" << endl;
+							out_script << "\t" << "PUSH(ACTION_STACK_VALUE_NULL, 0);" << endl;
+
+							break;
+						}
+
 						case ACTION_STACK_VALUE_UNDEFINED:
 						{
 							out_script << "(undefined)" << endl;
 							out_script << "\t" << "PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);" << endl;
+
+							break;
+						}
+
+						case ACTION_STACK_VALUE_BOOLEAN:
+						{
+							u8 bool_value = (u8) action_buffer[push_length];
+							push_length += 1;
+
+							out_script << "(boolean: " << (bool_value ? "true" : "false") << ")" << endl;
+							out_script << "\t" << "PUSH(ACTION_STACK_VALUE_BOOLEAN, " << (int)bool_value << ");" << endl;
 
 							break;
 						}

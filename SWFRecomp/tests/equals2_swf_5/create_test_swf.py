@@ -24,6 +24,18 @@ def push_string(s):
     length = 1 + len(s_bytes)
     return struct.pack('<BH', 0x96, length) + bytes([0x00]) + s_bytes
 
+# Helper function to create PUSH action for null
+def push_null():
+    return struct.pack('<BHB', 0x96, 1, 2)  # Type 2 = null
+
+# Helper function to create PUSH action for undefined
+def push_undefined():
+    return struct.pack('<BHB', 0x96, 1, 3)  # Type 3 = undefined
+
+# Helper function to create PUSH action for boolean
+def push_boolean(value):
+    return struct.pack('<BHBB', 0x96, 2, 5, 1 if value else 0)  # Type 5 = boolean
+
 # Helper function to create equals2 action
 def equals2():
     return bytes([0x49])  # EQUALS2 opcode
@@ -71,6 +83,60 @@ actions += push_float(10.0)  # arg1 (number)
 actions += equals2()
 actions += trace()
 
+# Test 7: Boolean equality - true == true (should be true = 1.0)
+actions += push_boolean(True)  # arg2
+actions += push_boolean(True)  # arg1
+actions += equals2()
+actions += trace()
+
+# Test 8: Boolean equality - true == false (should be false = 0.0)
+actions += push_boolean(False) # arg2
+actions += push_boolean(True)  # arg1
+actions += equals2()
+actions += trace()
+
+# Test 9: Boolean to number - true == 1 (should be true = 1.0)
+actions += push_float(1.0)     # arg2
+actions += push_boolean(True)  # arg1
+actions += equals2()
+actions += trace()
+
+# Test 10: Boolean to number - false == 0 (should be true = 1.0)
+actions += push_float(0.0)      # arg2
+actions += push_boolean(False)  # arg1
+actions += equals2()
+actions += trace()
+
+# Test 11: null == null (should be true = 1.0)
+actions += push_null()  # arg2
+actions += push_null()  # arg1
+actions += equals2()
+actions += trace()
+
+# Test 12: undefined == undefined (should be true = 1.0)
+actions += push_undefined()  # arg2
+actions += push_undefined()  # arg1
+actions += equals2()
+actions += trace()
+
+# Test 13: null == undefined (should be true = 1.0) - ECMA-262 special case
+actions += push_undefined()  # arg2
+actions += push_null()       # arg1
+actions += equals2()
+actions += trace()
+
+# Test 14: null == 0 (should be false = 0.0)
+actions += push_float(0.0)  # arg2
+actions += push_null()      # arg1
+actions += equals2()
+actions += trace()
+
+# Test 15: undefined == 0 (should be false = 0.0)
+actions += push_float(0.0)      # arg2
+actions += push_undefined()     # arg1
+actions += equals2()
+actions += trace()
+
 # End action
 actions += bytes([0x00])
 
@@ -99,9 +165,18 @@ with open('test.swf', 'wb') as f:
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
 print("Test cases:")
-print("  5 == 5 -> 1.0 (true)")
-print("  5 == 3 -> 0.0 (false)")
-print('  "hello" == "hello" -> 1.0 (true)')
-print('  "hello" == "world" -> 0.0 (false)')
-print('  5 == "5" -> 1.0 (true, type coercion)')
-print('  10 == "10" -> 1.0 (true, type coercion)')
+print("  1. 5 == 5 -> 1.0 (true)")
+print("  2. 5 == 3 -> 0.0 (false)")
+print('  3. "hello" == "hello" -> 1.0 (true)')
+print('  4. "hello" == "world" -> 0.0 (false)')
+print('  5. 5 == "5" -> 1.0 (true, type coercion)')
+print('  6. 10 == "10" -> 1.0 (true, type coercion)')
+print('  7. true == true -> 1.0 (true)')
+print('  8. true == false -> 0.0 (false)')
+print('  9. true == 1 -> 1.0 (true, boolean to number)')
+print(' 10. false == 0 -> 1.0 (true, boolean to number)')
+print(' 11. null == null -> 1.0 (true)')
+print(' 12. undefined == undefined -> 1.0 (true)')
+print(' 13. null == undefined -> 1.0 (true, ECMA-262 special case)')
+print(' 14. null == 0 -> 0.0 (false)')
+print(' 15. undefined == 0 -> 0.0 (false)')

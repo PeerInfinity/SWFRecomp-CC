@@ -3107,7 +3107,8 @@ void actionEquals2(char* stack, u32* sp)
 
 	float result = 0.0f;
 
-	// ECMA-262 equality algorithm
+	// ECMA-262 equality algorithm (Section 11.9.3)
+
 	// 1. If types are the same, use strict equality
 	if (a.type == b.type)
 	{
@@ -3151,6 +3152,22 @@ void actionEquals2(char* stack, u32* sp)
 				break;
 			}
 
+			case ACTION_STACK_VALUE_BOOLEAN:
+			{
+				// Boolean values are stored in numeric_value as 0 (false) or 1 (true)
+				u32 a_val = (u32) a.data.numeric_value;
+				u32 b_val = (u32) b.data.numeric_value;
+				result = (a_val == b_val) ? 1.0f : 0.0f;
+				break;
+			}
+
+			case ACTION_STACK_VALUE_NULL:
+			{
+				// null == null is true
+				result = 1.0f;
+				break;
+			}
+
 			case ACTION_STACK_VALUE_UNDEFINED:
 			{
 				// undefined == undefined is true
@@ -3159,12 +3176,18 @@ void actionEquals2(char* stack, u32* sp)
 			}
 
 			default:
-				// For other types (OBJECT, etc.), compare raw values
+				// For other types (OBJECT, etc.), compare raw values (reference equality)
 				result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
 				break;
 		}
 	}
-	// 2. Number vs String: convert string to number
+	// 2. Special case: null == undefined (ECMA-262)
+	else if ((a.type == ACTION_STACK_VALUE_NULL && b.type == ACTION_STACK_VALUE_UNDEFINED) ||
+	         (a.type == ACTION_STACK_VALUE_UNDEFINED && b.type == ACTION_STACK_VALUE_NULL))
+	{
+		result = 1.0f;
+	}
+	// 3. Number vs String: convert string to number
 	else if ((a.type == ACTION_STACK_VALUE_F32 || a.type == ACTION_STACK_VALUE_F64) &&
 	         b.type == ACTION_STACK_VALUE_STRING)
 	{
@@ -3195,7 +3218,69 @@ void actionEquals2(char* stack, u32* sp)
 			result = (a_num == b_val) ? 1.0f : 0.0f;
 		}
 	}
-	// 3. Different types not covered above: false
+	// 4. Boolean: convert to number and compare recursively
+	else if (a.type == ACTION_STACK_VALUE_BOOLEAN)
+	{
+		// Convert boolean to number (true = 1.0, false = 0.0)
+		u32 a_bool = (u32) a.data.numeric_value;
+		float a_num = a_bool ? 1.0f : 0.0f;
+		ActionVar a_as_num;
+		a_as_num.type = ACTION_STACK_VALUE_F32;
+		a_as_num.data.numeric_value = VAL(u64, &a_num);
+
+		// Push back and recurse (simulated)
+		// For efficiency, we inline the comparison instead
+		if (b.type == ACTION_STACK_VALUE_F32 || b.type == ACTION_STACK_VALUE_F64)
+		{
+			float b_val = (b.type == ACTION_STACK_VALUE_F32) ?
+			              VAL(float, &b.data.numeric_value) :
+			              (float)VAL(double, &b.data.numeric_value);
+			result = (a_num == b_val) ? 1.0f : 0.0f;
+		}
+		else if (b.type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* str_b = (const char*) b.data.numeric_value;
+			float b_num = (str_b != NULL) ? (float)atof(str_b) : 0.0f;
+			result = (a_num == b_num) ? 1.0f : 0.0f;
+		}
+		// Boolean vs null/undefined is false
+		else if (b.type == ACTION_STACK_VALUE_NULL || b.type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			result = 0.0f;
+		}
+	}
+	else if (b.type == ACTION_STACK_VALUE_BOOLEAN)
+	{
+		// Convert boolean to number (true = 1.0, false = 0.0)
+		u32 b_bool = (u32) b.data.numeric_value;
+		float b_num = b_bool ? 1.0f : 0.0f;
+
+		if (a.type == ACTION_STACK_VALUE_F32 || a.type == ACTION_STACK_VALUE_F64)
+		{
+			float a_val = (a.type == ACTION_STACK_VALUE_F32) ?
+			              VAL(float, &a.data.numeric_value) :
+			              (float)VAL(double, &a.data.numeric_value);
+			result = (a_val == b_num) ? 1.0f : 0.0f;
+		}
+		else if (a.type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* str_a = (const char*) a.data.numeric_value;
+			float a_num = (str_a != NULL) ? (float)atof(str_a) : 0.0f;
+			result = (a_num == b_num) ? 1.0f : 0.0f;
+		}
+		// Boolean vs null/undefined is false
+		else if (a.type == ACTION_STACK_VALUE_NULL || a.type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			result = 0.0f;
+		}
+	}
+	// 5. null or undefined compared with anything else (except each other) is false
+	else if (a.type == ACTION_STACK_VALUE_NULL || a.type == ACTION_STACK_VALUE_UNDEFINED ||
+	         b.type == ACTION_STACK_VALUE_NULL || b.type == ACTION_STACK_VALUE_UNDEFINED)
+	{
+		result = 0.0f;
+	}
+	// 6. Different types not covered above: false
 	// (This handles cases like object vs number, etc.)
 
 	// Push boolean result (1.0 = true, 0.0 = false)
