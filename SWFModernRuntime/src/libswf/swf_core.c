@@ -23,6 +23,10 @@ ActionVar* temp_val = NULL;
 frame_func* g_frame_funcs = NULL;
 size_t g_frame_count = 0;
 
+// Drag state tracking
+int is_dragging = 0;
+char* dragged_target = NULL;
+
 // Console-only swfStart implementation
 void swfStart(SWFAppContext* app_context)
 {

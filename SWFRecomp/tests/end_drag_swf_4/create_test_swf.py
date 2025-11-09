@@ -2,10 +2,17 @@
 import struct
 
 # Create a minimal SWF4 file testing END_DRAG opcode (0x28)
-# Test Case: End drag when nothing is dragging
+# Tests:
+#   1. END_DRAG when nothing is dragging (should be safe no-op)
+#   2. START_DRAG followed by END_DRAG (should start and stop drag)
+#   3. Multiple END_DRAG calls (should be safe)
+#
 # Expected output:
-#   Before stopDrag
-#   After stopDrag
+#   Test 1: END_DRAG with no drag
+#   Test 2: Before START_DRAG
+#   Test 3: After START_DRAG
+#   Test 4: After END_DRAG
+#   Test 5: After second END_DRAG
 
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
@@ -18,28 +25,47 @@ rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# Test: trace("Before stopDrag") -> END_DRAG -> trace("After stopDrag")
+# Helper function to create a PUSH string action
+def push_string(s):
+    string_bytes = s.encode('utf-8') + b'\x00'
+    return struct.pack('<BHB', 0x96, len(string_bytes) + 1, 0) + string_bytes
 
-# First trace: "Before stopDrag"
-string1 = b'Before stopDrag\x00'  # Null-terminated string
-action_push1 = struct.pack('<BHB', 0x96, len(string1) + 1, 0)  # PUSH action, length, type=0 (string)
-action_push1 += string1
-action_trace1 = bytes([0x26])  # TRACE action (0x26)
+# Helper for TRACE action
+def trace():
+    return bytes([0x26])
 
-# END_DRAG opcode (0x28)
-action_end_drag = bytes([0x28])  # END_DRAG action
+# Test 1: END_DRAG when nothing is dragging
+test1 = push_string("Test 1: END_DRAG with no drag") + trace()
+test1 += bytes([0x28])  # END_DRAG
 
-# Second trace: "After stopDrag"
-string2 = b'After stopDrag\x00'  # Null-terminated string
-action_push2 = struct.pack('<BHB', 0x96, len(string2) + 1, 0)  # PUSH action, length, type=0 (string)
-action_push2 += string2
-action_trace2 = bytes([0x26])  # TRACE action (0x26)
+# Test 2: START_DRAG followed by END_DRAG
+test2 = push_string("Test 2: Before START_DRAG") + trace()
+
+# Push parameters for START_DRAG (target, lockcenter, constrain)
+# Stack order: constrain, lockcenter, target
+# We'll use: target="mySprite", lockcenter=0, constrain=0
+test2 += push_string("mySprite")  # target name
+# Push 0.0 for lockcenter (type 1 = float)
+test2 += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 0.0)
+# Push 0.0 for constrain (type 1 = float)
+test2 += struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', 0.0)
+test2 += bytes([0x27])  # START_DRAG (0x27)
+
+test3 = push_string("Test 3: After START_DRAG") + trace()
+
+# Now END_DRAG
+test4 = bytes([0x28])  # END_DRAG
+test4 += push_string("Test 4: After END_DRAG") + trace()
+
+# Test calling END_DRAG again (should be safe no-op)
+test5 = bytes([0x28])  # END_DRAG again
+test5 += push_string("Test 5: After second END_DRAG") + trace()
 
 # End of actions
 action_end = bytes([0x00])  # END action
 
 # Combine all actions
-all_actions = action_push1 + action_trace1 + action_end_drag + action_push2 + action_trace2 + action_end
+all_actions = test1 + test2 + test3 + test4 + test5 + action_end
 
 # DoAction tag
 do_action_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form

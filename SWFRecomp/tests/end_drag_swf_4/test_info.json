@@ -1,14 +1,28 @@
 {
   "metadata": {
     "name": "end_drag_swf_4",
-    "description": "Tests END_DRAG opcode (0x28) - stops dragging sprite/MovieClip",
-    "swf_version": 4
+    "description": "Tests END_DRAG opcode (0x28) - stops dragging sprite/MovieClip. Comprehensively tests: END_DRAG when nothing is dragging (safe no-op), START_DRAG followed by END_DRAG (proper state management), and multiple END_DRAG calls (idempotent behavior).",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Graphics rendering: actual sprite/MovieClip drag visualization requires SDL3/Vulkan",
+      "Mouse interaction: drag positioning based on mouse input requires graphics mode",
+      "Display list integration: finding and updating sprites in the display list"
+    ]
   },
   "opcodes": {
     "tested": ["END_DRAG"],
-    "supporting": ["PUSH", "TRACE"]
+    "supporting": ["PUSH", "TRACE", "START_DRAG"]
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "end_drag_when_nothing_dragging",
+    "end_drag_after_start_drag",
+    "multiple_end_drag_calls",
+    "drag_state_management",
+    "memory_cleanup"
+  ]
 }

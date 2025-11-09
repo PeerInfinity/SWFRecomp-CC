@@ -22,6 +22,10 @@ ActionVar* temp_val;
 frame_func* g_frame_funcs = NULL;
 size_t g_frame_count = 0;
 
+// Drag state tracking
+int is_dragging = 0;
+char* dragged_target = NULL;
+
 Character* dictionary = NULL;
 
 DisplayObject* display_list = NULL;

@@ -2,10 +2,17 @@
 """
 Validation script for end_drag_swf_4
 
-Tests the END_DRAG opcode (0x28).
+Tests the END_DRAG opcode (0x28) comprehensively:
+  1. END_DRAG when nothing is dragging (no-op)
+  2. START_DRAG followed by END_DRAG (proper state management)
+  3. Multiple END_DRAG calls (safe to call multiple times)
+
 Expected output:
-  Before stopDrag
-  After stopDrag
+  Test 1: END_DRAG with no drag
+  Test 2: Before START_DRAG
+  Test 3: After START_DRAG
+  Test 4: After END_DRAG
+  Test 5: After second END_DRAG
 """
 import sys
 import json
@@ -21,43 +28,37 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected: Two traces showing END_DRAG executes without error
+    Expected: Five traces showing END_DRAG executes correctly in all scenarios
     """
     lines = parse_output(output)
 
-    # Check we have exactly 2 lines of output
-    if len(lines) < 2:
+    # Check we have exactly 5 lines of output
+    if len(lines) < 5:
         return make_validation_result([
             make_result(
-                "end_drag_test",
+                "line_count",
                 False,
-                "2 lines",
+                "5 lines",
                 f"{len(lines)} lines",
-                f"Expected 2 lines of output, got {len(lines)}"
+                f"Expected 5 lines of output, got {len(lines)}"
             )
         ])
 
-    # Check first line
-    expected1 = "Before stopDrag"
-    actual1 = lines[0] if len(lines) > 0 else ""
-    result1 = make_result(
-        "before_end_drag",
-        actual1 == expected1,
-        expected1,
-        actual1
-    )
+    # Define expected outputs
+    expected_outputs = [
+        ("test1_end_drag_no_drag", "Test 1: END_DRAG with no drag"),
+        ("test2_before_start_drag", "Test 2: Before START_DRAG"),
+        ("test3_after_start_drag", "Test 3: After START_DRAG"),
+        ("test4_after_end_drag", "Test 4: After END_DRAG"),
+        ("test5_second_end_drag", "Test 5: After second END_DRAG"),
+    ]
 
-    # Check second line
-    expected2 = "After stopDrag"
-    actual2 = lines[1] if len(lines) > 1 else ""
-    result2 = make_result(
-        "after_end_drag",
-        actual2 == expected2,
-        expected2,
-        actual2
-    )
+    results = []
+    for i, (name, expected) in enumerate(expected_outputs):
+        actual = lines[i] if i < len(lines) else ""
+        results.append(make_result(name, actual == expected, expected, actual))
 
-    return make_validation_result([result1, result2])
+    return make_validation_result(results)
 
 
 if __name__ == "__main__":

@@ -1621,21 +1621,46 @@ void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias)
 	}
 }
 
+/**
+ * actionEndDrag - Stops dragging the currently dragged sprite/MovieClip
+ *
+ * Opcode: 0x28 (ActionEndDrag)
+ * Stack: [] -> []
+ *
+ * Ends the drag operation in progress, if any. If no sprite is being dragged,
+ * this operation has no effect.
+ *
+ * In NO_GRAPHICS mode, this updates the drag state tracking but does not
+ * perform actual sprite/mouse interaction.
+ */
 void actionEndDrag(char* stack, u32* sp)
 {
-	#ifndef NO_GRAPHICS
-	// Full implementation would:
-	// 1. Clear dragging state
-	// 2. Stop updating sprite position with mouse
-	// if (ctx->dragged_sprite) {
-	//     ctx->dragged_sprite = NULL;
-	// }
-	#else
-	// NO_GRAPHICS mode: just log
-	#ifdef DEBUG
-	printf("[EndDrag]\n");
-	#endif
-	#endif
+	// Clear drag state
+	if (is_dragging) {
+		#ifdef DEBUG
+		printf("[EndDrag] Stopping drag of '%s'\n",
+			   dragged_target ? dragged_target : "(null)");
+		#endif
+
+		is_dragging = 0;
+
+		// Free the dragged target name if it was allocated
+		if (dragged_target) {
+			free(dragged_target);
+			dragged_target = NULL;
+		}
+
+		#ifndef NO_GRAPHICS
+		// In graphics mode, additional cleanup would happen here:
+		// - Stop updating sprite position with mouse
+		// - Re-enable normal sprite behavior
+		// - Update display list
+		#endif
+	} else {
+		#ifdef DEBUG
+		printf("[EndDrag] No drag in progress\n");
+		#endif
+	}
 
 	// No stack operations - END_DRAG has no parameters
 	(void)stack;  // Suppress unused parameter warning
@@ -5164,22 +5189,29 @@ void actionStartDrag(char* stack, u32* sp)
 		lock_flag = ((int)VAL(double, &lock_center.data.numeric_value) != 0);
 	}
 
-	#ifndef NO_GRAPHICS
-	// Full implementation would:
-	// 1. Find target MovieClip
-	// 2. Set dragging state
-	// 3. Store drag parameters
-	// 4. Update position each frame based on mouse
-	// startDragMovieClip(target_name, lock_flag, has_constraint, x1, y1, x2, y2);
-	#else
-	// NO_GRAPHICS mode: just log
+	// Set drag state
+	// First, clear any existing drag (Flash only allows one sprite to be dragged at a time)
+	if (is_dragging && dragged_target) {
+		free(dragged_target);
+	}
+
+	is_dragging = 1;
+	dragged_target = (target_name && *target_name) ? strdup(target_name) : NULL;
+
 	#ifdef DEBUG
 	printf("[StartDrag] %s (lock:%d, constrain:%d)\n",
-		   target_name, lock_flag, has_constraint);
+		   target_name ? target_name : "(null)", lock_flag, has_constraint);
 	if (has_constraint) {
 		printf("  Bounds: (%.1f,%.1f)-(%.1f,%.1f)\n", x1, y1, x2, y2);
 	}
 	#endif
+
+	#ifndef NO_GRAPHICS
+	// Full implementation would also:
+	// 1. Find target MovieClip in display list
+	// 2. Store drag parameters (lock_flag, constraints)
+	// 3. Update position each frame based on mouse input
+	// startDragMovieClip(target_name, lock_flag, has_constraint, x1, y1, x2, y2);
 	#endif
 }
 
