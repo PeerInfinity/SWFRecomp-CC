@@ -1,8 +1,19 @@
 {
   "metadata": {
     "name": "goto_label_swf_3",
-    "description": "Tests GOTO_LABEL opcode (0x8C) - jumps to frame by label",
-    "swf_version": 3
+    "description": "Comprehensive tests for GOTO_LABEL opcode (0x8C) - Tests label parsing with various label types: basic, underscores/numbers, mixed case, empty, single char, long, and special characters. Actual frame navigation not implemented.",
+    "swf_version": 3,
+    "fully_implemented": false,
+    "missing_features": [
+      "FrameLabel tag parsing and storage (tag type 43)",
+      "Frame structure does not have label field",
+      "Frame lookup by label functionality not implemented",
+      "MovieClip/Timeline infrastructure not implemented",
+      "Actual frame navigation not implemented",
+      "Playback control (play/stop) not implemented",
+      "Frame action execution on arrival not implemented",
+      "Current implementation only logs the label string"
+    ]
   },
   "opcodes": {
     "tested": ["GOTO_LABEL"],
@@ -10,5 +21,14 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "edge_cases_tested": [
+    "basic_label",
+    "label_with_underscores_and_numbers",
+    "mixed_case_label",
+    "empty_label",
+    "single_character_label",
+    "long_label",
+    "label_with_special_characters"
+  ]
 }
