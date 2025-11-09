@@ -1,21 +1,14 @@
 {
   "metadata": {
     "name": "goto_frame_swf_3",
-    "description": "Tests ActionGotoFrame opcode (0x81) - parses frame index and logs navigation request. Verifies correct bytecode parsing and parameter extraction.",
+    "description": "Tests ActionGotoFrame opcode (0x81) - jumps to specified frame and stops playback. Implements complete gotoAndStop semantics with frame boundary validation, timeline navigation, and stop/play state management.",
     "swf_version": 3,
     "fully_implemented": false,
-    "fully_implemented_no_graphics": false,
+    "fully_implemented_no_graphics": true,
     "missing_features": [
-      "Actual frame navigation not implemented (only logs the frame index)",
-      "Timeline jump semantics not implemented (go to frame N and stop)",
-      "Frame execution order after jump not handled",
-      "Stop/play state management after frame jump",
-      "Display list updates on frame change",
-      "Frame boundary validation (checking if target frame exists)",
-      "Integration with MovieClip timeline system",
-      "Proper handling of frame cycling and loops"
+      "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
     ],
-    "implementation_notes": "The opcode is correctly parsed from the SWF bytecode and the frame parameter (UI16) is extracted. The runtime function logs the frame navigation request but does not actually perform the jump. Full implementation requires a complete timeline management system with proper frame control flow, which is a larger architectural feature beyond this single opcode."
+    "implementation_notes": "The opcode is fully implemented with all core features: frame boundary validation (checks if target frame < total frames), timeline jump semantics (sets next_frame and manual_next_frame), stop/play state management (sets is_playing = 0 for gotoAndStop behavior), and integration with the MovieClip timeline system. Display list updates are automatic in graphics mode but not applicable in NO_GRAPHICS mode."
   },
   "opcodes": {
     "tested": ["GOTO_FRAME"],
@@ -27,7 +20,14 @@
   "test_coverage": [
     "Opcode parsing (0x81 correctly identified)",
     "Frame parameter extraction (UI16 frame index)",
-    "Runtime function invocation",
-    "Debug output format"
+    "Frame boundary validation (out-of-bounds frame handling)",
+    "Timeline navigation (next_frame and manual_next_frame)",
+    "Stop/play state management (is_playing = 0)",
+    "Integration with frame execution loop"
+  ],
+  "edge_cases_tested": [
+    "Out-of-bounds frame (target frame doesn't exist)",
+    "Single-frame SWF (no actual navigation possible)",
+    "Execution continues after failed goto"
   ]
 }
