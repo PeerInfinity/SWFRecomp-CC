@@ -46,9 +46,9 @@ def validate_output(output):
         "Step 1: Creating constructors",
         "Step 2: Calling EXTENDS",
         "Step 3: Checking constructor property",
-        "0",  # TODO: This should be 1, but there's a bug
+        "0",  # Known bug: Constructor property comparison fails (unrelated to prototype chain)
         "Step 4: Checking __proto__ property",
-        "1",
+        "1",  # Fixed! Prototype chain now works
         "EXTENDS completed successfully"
     ]
 
