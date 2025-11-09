@@ -1,8 +1,15 @@
 {
   "metadata": {
     "name": "equals2_swf_5",
-    "description": "Tests ActionEquals2 opcode (0x49) - Type-aware equality comparison following ECMA-262 specification",
-    "swf_version": 5
+    "description": "Tests ActionEquals2 opcode (0x49) - Type-aware equality comparison following ECMA-262 specification. Includes number equality, string equality, and number-to-string type coercion. NaN handling added to implementation.",
+    "swf_version": 5,
+    "fully_implemented": false,
+    "missing_features": [
+      "Boolean type support not available in recompiler (cannot test true == 1, false == 0)",
+      "Null type support not available in recompiler (cannot test null == undefined, null == 0)",
+      "Additional edge case testing limited by test framework (NaN, Infinity, empty string tests would benefit from dedicated test files)",
+      "Object reference equality not tested (requires object creation support)"
+    ]
   },
   "opcodes": {
     "tested": ["EQUALS2"],
@@ -10,5 +17,32 @@
   },
   "execution": {
     "type": "deterministic"
+  },
+  "implementation_notes": {
+    "completed_features": [
+      "Number equality comparison (F32 and F64)",
+      "String equality comparison with null safety",
+      "Number-to-string type coercion (ECMA-262 compliant)",
+      "String-to-number type coercion (ECMA-262 compliant)",
+      "NaN handling (NaN != NaN, NaN != anything)",
+      "Undefined type handling (undefined == undefined)"
+    ],
+    "tested_cases": [
+      "Same number equality (5 == 5)",
+      "Different number equality (5 == 3)",
+      "Same string equality (\"hello\" == \"hello\")",
+      "Different string equality (\"hello\" == \"world\")",
+      "Number-string type coercion (5 == \"5\", 10 == \"10\")"
+    ],
+    "untested_ecma262_features": [
+      "null == undefined should return true",
+      "Boolean to number conversion (true == 1, false == 0)",
+      "null/undefined compared with other types should return false",
+      "Boolean compared with numbers",
+      "Object reference equality",
+      "Comprehensive NaN edge cases (requires separate test file)",
+      "Infinity comparisons (requires separate test file)",
+      "Empty string to zero conversion (requires separate test file)"
+    ]
   }
 }
