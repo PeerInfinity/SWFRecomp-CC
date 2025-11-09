@@ -238,11 +238,13 @@ namespace SWFRecomp
 		std::string height = to_string(FRAME_HEIGHT/20);
 		std::string width_twips = to_string(FRAME_WIDTH);
 		std::string height_twips = to_string(FRAME_HEIGHT);
-		
+		std::string swf_frame_count = to_string(header.frame_count);
+
 		context.constants_header << "#define FRAME_WIDTH " << width << endl
 								 << "#define FRAME_HEIGHT " << height << endl
 								 << "#define FRAME_WIDTH_TWIPS " << width_twips << endl
-								 << "#define FRAME_HEIGHT_TWIPS " << height_twips << endl << endl
+								 << "#define FRAME_HEIGHT_TWIPS " << height_twips << endl
+								 << "#define SWF_FRAME_COUNT " << swf_frame_count << endl << endl
 								 << "extern const float stage_to_ndc[16];";
 		
 		context.constants << "#include \"constants.h\"" << endl << endl
