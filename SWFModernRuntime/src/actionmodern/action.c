@@ -1642,18 +1642,44 @@ void actionEndDrag(char* stack, u32* sp)
 	(void)sp;     // Suppress unused parameter warning
 }
 
+/**
+ * ActionStopSounds - Stops all currently playing sounds
+ *
+ * Stack: [ ... ] -> [ ... ] (no stack changes)
+ *
+ * Instructs Flash Player to stop playing all sounds. This operation:
+ * - Stops all currently playing audio across all timelines
+ * - Has global effect (not affected by SetTarget)
+ * - Does not prevent new sounds from playing
+ * - Has no effect on the stack
+ * - Has no parameters
+ *
+ * Implementation notes:
+ * - NO_GRAPHICS mode: This is a no-op (no audio system available)
+ * - Full graphics mode: Would interface with audio subsystem to stop all channels
+ *
+ * SWF version: 4+
+ * Opcode: 0x09
+ *
+ * @param stack Pointer to the runtime stack (unused - no stack operations)
+ * @param sp Pointer to stack pointer (unused - no stack operations)
+ */
 void actionStopSounds(char* stack, u32* sp)
 {
-	// In NO_GRAPHICS mode, this is a no-op
-	// No stack operations required
+	// Suppress unused parameter warnings
+	(void)stack;
+	(void)sp;
+
+	// In NO_GRAPHICS mode, this is a no-op since there is no audio subsystem
 	#ifndef NO_GRAPHICS
 	// In full graphics mode, would stop all audio channels
+	// This would require interfacing with the audio subsystem:
 	// if (audio_context) {
 	//     stopAllAudioChannels(audio_context);
 	// }
 	#endif
 
-	// For testing purposes, no action needed
+	// No stack operations required - opcode has no parameters and no return value
 	// This opcode has global effect and does not modify the stack
 }
 

@@ -2,8 +2,12 @@
 """
 Validation script for stop_sounds_swf_4
 
-Tests the STOP_SOUNDS opcode (0x09).
-Expected output: Two trace statements before and after stopAllSounds call.
+Comprehensive test of the STOP_SOUNDS opcode (0x09).
+Tests:
+1. Basic functionality - opcode executes without error
+2. Stack integrity - opcode doesn't affect the stack
+3. Multiple calls - opcode can be called multiple times
+4. Integration - opcode works with other operations
 """
 import sys
 import json
@@ -19,32 +23,78 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected:
-    Before stopAllSounds
-    After stopAllSounds
+    Expected output:
+    Test 1: Basic stopAllSounds
+    Success
+    Test 2: Stack integrity
+    42
+    Test 3: Multiple calls
+    Success
+    Test 4: Integration test
+    15
     """
     lines = parse_output(output)
 
     results = []
 
-    # Check first line
-    expected_line1 = "Before stopAllSounds"
-    actual_line1 = lines[0] if len(lines) > 0 else ""
+    # Test 1: Basic functionality
     results.append(make_result(
-        "before_stop_sounds",
-        actual_line1 == expected_line1,
-        expected_line1,
-        actual_line1
+        "test1_header",
+        lines[0] == "Test 1: Basic stopAllSounds" if len(lines) > 0 else False,
+        "Test 1: Basic stopAllSounds",
+        lines[0] if len(lines) > 0 else ""
     ))
 
-    # Check second line
-    expected_line2 = "After stopAllSounds"
-    actual_line2 = lines[1] if len(lines) > 1 else ""
     results.append(make_result(
-        "after_stop_sounds",
-        actual_line2 == expected_line2,
-        expected_line2,
-        actual_line2
+        "test1_success",
+        lines[1] == "Success" if len(lines) > 1 else False,
+        "Success",
+        lines[1] if len(lines) > 1 else ""
+    ))
+
+    # Test 2: Stack integrity - value should still be on stack after stopAllSounds
+    results.append(make_result(
+        "test2_header",
+        lines[2] == "Test 2: Stack integrity" if len(lines) > 2 else False,
+        "Test 2: Stack integrity",
+        lines[2] if len(lines) > 2 else ""
+    ))
+
+    results.append(make_result(
+        "test2_stack_integrity",
+        lines[3] == "42" if len(lines) > 3 else False,
+        "42",
+        lines[3] if len(lines) > 3 else ""
+    ))
+
+    # Test 3: Multiple calls
+    results.append(make_result(
+        "test3_header",
+        lines[4] == "Test 3: Multiple calls" if len(lines) > 4 else False,
+        "Test 3: Multiple calls",
+        lines[4] if len(lines) > 4 else ""
+    ))
+
+    results.append(make_result(
+        "test3_success",
+        lines[5] == "Success" if len(lines) > 5 else False,
+        "Success",
+        lines[5] if len(lines) > 5 else ""
+    ))
+
+    # Test 4: Integration with arithmetic - stopAllSounds shouldn't affect stack operations
+    results.append(make_result(
+        "test4_header",
+        lines[6] == "Test 4: Integration test" if len(lines) > 6 else False,
+        "Test 4: Integration test",
+        lines[6] if len(lines) > 6 else ""
+    ))
+
+    results.append(make_result(
+        "test4_arithmetic",
+        lines[7] == "15" if len(lines) > 7 else False,
+        "15",
+        lines[7] if len(lines) > 7 else ""
     ))
 
     return make_validation_result(results)
