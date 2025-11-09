@@ -38,7 +38,7 @@
         "SWFRecomp/tests/next_frame_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -59,7 +59,7 @@
         "SWFRecomp/tests/next_frame_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -80,7 +80,7 @@
         "SWFRecomp/tests/next_frame_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -101,7 +101,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -122,7 +122,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -143,7 +143,7 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -166,7 +166,7 @@
         "SWFRecomp/tests/play_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-play-0x06.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -193,7 +193,7 @@
         "SWFRecomp/tests/play_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-play-0x06.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -220,7 +220,7 @@
         "SWFRecomp/tests/play_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-play-0x06.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-play-0x06.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -257,7 +257,7 @@
         "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-0x07.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -290,7 +290,7 @@
         "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-0x07.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-0x07.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -311,7 +311,7 @@
         "SWFRecomp/tests/toggle_quality_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -336,7 +336,7 @@
         "SWFRecomp/tests/toggle_quality_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -361,7 +361,7 @@
         "SWFRecomp/tests/toggle_quality_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -386,7 +386,7 @@
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -407,7 +407,7 @@
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -428,7 +428,7 @@
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -461,7 +461,7 @@
         "SWFRecomp/tests/set_variable_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add-0x0a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -494,7 +494,7 @@
         "SWFRecomp/tests/set_variable_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add-0x0a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -527,7 +527,7 @@
         "SWFRecomp/tests/set_variable_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-add-0x0a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -548,7 +548,7 @@
         "SWFRecomp/tests/subtract_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -569,7 +569,7 @@
         "SWFRecomp/tests/subtract_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -590,7 +590,7 @@
         "SWFRecomp/tests/subtract_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -611,7 +611,7 @@
         "SWFRecomp/tests/multiply_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -632,7 +632,7 @@
         "SWFRecomp/tests/multiply_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -653,7 +653,7 @@
         "SWFRecomp/tests/multiply_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -678,7 +678,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/stack_swap_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -703,7 +703,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/stack_swap_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -728,7 +728,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/stack_swap_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -749,7 +749,7 @@
         "SWFRecomp/tests/equals_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -770,7 +770,7 @@
         "SWFRecomp/tests/equals_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -791,7 +791,7 @@
         "SWFRecomp/tests/equals_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -814,7 +814,7 @@
         "SWFRecomp/tests/less_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less-0x0f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -837,7 +837,7 @@
         "SWFRecomp/tests/less_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less-0x0f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -860,7 +860,7 @@
         "SWFRecomp/tests/less_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less-0x0f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -889,7 +889,7 @@
         "SWFRecomp/tests/and_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-and-0x10.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -918,7 +918,7 @@
         "SWFRecomp/tests/and_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-and-0x10.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -947,7 +947,7 @@
         "SWFRecomp/tests/and_floats_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-and-0x10.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-and-0x10.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -968,7 +968,7 @@
         "SWFRecomp/tests/or_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-or-0x11.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -989,7 +989,7 @@
         "SWFRecomp/tests/or_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-or-0x11.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1010,7 +1010,7 @@
         "SWFRecomp/tests/or_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-or-0x11.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-or-0x11.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1031,7 +1031,7 @@
         "SWFRecomp/tests/not_floats_nonzero_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-not-0x12.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1052,7 +1052,7 @@
         "SWFRecomp/tests/not_floats_nonzero_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-not-0x12.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1073,7 +1073,7 @@
         "SWFRecomp/tests/not_floats_nonzero_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-not-0x12.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-not-0x12.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1096,7 +1096,7 @@
         "SWFRecomp/tests/string_equals_1_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1119,7 +1119,7 @@
         "SWFRecomp/tests/string_equals_1_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1142,7 +1142,7 @@
         "SWFRecomp/tests/string_equals_1_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1163,7 +1163,7 @@
         "SWFRecomp/tests/string_length_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1184,7 +1184,7 @@
         "SWFRecomp/tests/string_length_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1205,7 +1205,7 @@
         "SWFRecomp/tests/string_length_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1301,7 +1301,7 @@
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/new_object_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-pop-0x17.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1334,7 +1334,7 @@
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/new_object_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-pop-0x17.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1440,7 +1440,7 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1483,7 +1483,7 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1526,7 +1526,7 @@
         "SWFRecomp/tests/try_swf_7",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1567,7 +1567,7 @@
         "SWFRecomp/tests/set_member_swf_5",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1608,7 +1608,7 @@
         "SWFRecomp/tests/set_member_swf_5",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1649,7 +1649,7 @@
         "SWFRecomp/tests/set_member_swf_5",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1670,7 +1670,7 @@
         "SWFRecomp/tests/set_target2_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -1699,7 +1699,7 @@
         "SWFRecomp/tests/set_target2_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -1728,7 +1728,7 @@
         "SWFRecomp/tests/set_target2_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -1765,7 +1765,7 @@
         "SWFRecomp/tests/mb_ascii_to_char_edge_cases_swf_4",
         "SWFRecomp/tests/try_swf_7"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1794,7 +1794,7 @@
         "SWFRecomp/tests/mb_ascii_to_char_edge_cases_swf_4",
         "SWFRecomp/tests/try_swf_7"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1823,7 +1823,7 @@
         "SWFRecomp/tests/mb_ascii_to_char_edge_cases_swf_4",
         "SWFRecomp/tests/try_swf_7"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -1970,7 +1970,7 @@
         "SWFRecomp/tests/clone_sprite_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -1996,7 +1996,7 @@
         "SWFRecomp/tests/clone_sprite_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -2022,7 +2022,7 @@
         "SWFRecomp/tests/clone_sprite_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -2048,7 +2048,7 @@
         "SWFRecomp/tests/remove_sprite_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -2075,7 +2075,7 @@
         "SWFRecomp/tests/remove_sprite_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -2102,7 +2102,7 @@
         "SWFRecomp/tests/remove_sprite_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -2353,7 +2353,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-trace-0x26.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -2598,7 +2598,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-trace-0x26.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -2843,7 +2843,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-trace-0x26.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -2868,7 +2868,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/end_drag_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -2893,7 +2893,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/end_drag_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -2918,7 +2918,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/end_drag_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
@@ -2939,7 +2939,7 @@
         "SWFRecomp/tests/end_drag_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -2966,7 +2966,7 @@
         "SWFRecomp/tests/end_drag_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -2993,7 +2993,7 @@
         "SWFRecomp/tests/end_drag_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -3085,7 +3085,7 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {
@@ -3117,7 +3117,7 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {
@@ -3149,7 +3149,7 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {
@@ -3179,7 +3179,7 @@
         "SWFRecomp/tests/cast_op_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3200,7 +3200,7 @@
         "SWFRecomp/tests/cast_op_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3221,7 +3221,7 @@
         "SWFRecomp/tests/cast_op_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3242,7 +3242,7 @@
         "SWFRecomp/tests/implements_op_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3263,7 +3263,7 @@
         "SWFRecomp/tests/implements_op_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3284,7 +3284,7 @@
         "SWFRecomp/tests/implements_op_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3368,7 +3368,7 @@
         "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3389,7 +3389,7 @@
         "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3410,7 +3410,7 @@
         "SWFRecomp/tests/mb_string_length_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3557,7 +3557,7 @@
         "SWFRecomp/tests/get_time_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3578,7 +3578,7 @@
         "SWFRecomp/tests/get_time_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3599,7 +3599,7 @@
         "SWFRecomp/tests/get_time_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3620,7 +3620,7 @@
         "SWFRecomp/tests/mb_string_extract_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3641,7 +3641,7 @@
         "SWFRecomp/tests/mb_string_extract_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3662,7 +3662,7 @@
         "SWFRecomp/tests/mb_string_extract_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3683,7 +3683,7 @@
         "SWFRecomp/tests/mb_char_to_ascii_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3704,7 +3704,7 @@
         "SWFRecomp/tests/mb_char_to_ascii_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3725,7 +3725,7 @@
         "SWFRecomp/tests/mb_char_to_ascii_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3750,7 +3750,7 @@
         "SWFRecomp/tests/mb_ascii_to_char_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3775,7 +3775,7 @@
         "SWFRecomp/tests/mb_ascii_to_char_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3800,7 +3800,7 @@
         "SWFRecomp/tests/mb_ascii_to_char_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3821,7 +3821,7 @@
         "SWFRecomp/tests/delete_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3842,7 +3842,7 @@
         "SWFRecomp/tests/delete_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3863,7 +3863,7 @@
         "SWFRecomp/tests/delete_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3884,7 +3884,7 @@
         "SWFRecomp/tests/delete2_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3905,7 +3905,7 @@
         "SWFRecomp/tests/delete2_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3926,7 +3926,7 @@
         "SWFRecomp/tests/delete2_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3947,7 +3947,7 @@
         "SWFRecomp/tests/definelocal_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3968,7 +3968,7 @@
         "SWFRecomp/tests/definelocal_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3989,7 +3989,7 @@
         "SWFRecomp/tests/definelocal_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4178,7 +4178,7 @@
         "SWFRecomp/tests/modulo_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4199,7 +4199,7 @@
         "SWFRecomp/tests/modulo_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4220,7 +4220,7 @@
         "SWFRecomp/tests/modulo_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4559,7 +4559,7 @@
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/init_object_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4586,7 +4586,7 @@
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/init_object_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4613,7 +4613,7 @@
         "SWFRecomp/tests/extends_swf_7",
         "SWFRecomp/tests/init_object_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4886,7 +4886,7 @@
         "SWFRecomp/tests/equals2_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4907,7 +4907,7 @@
         "SWFRecomp/tests/equals2_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4928,7 +4928,7 @@
         "SWFRecomp/tests/equals2_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5180,7 +5180,7 @@
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5207,7 +5207,7 @@
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5234,7 +5234,7 @@
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5441,7 +5441,7 @@
         "SWFRecomp/tests/increment_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-increment-0x50.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5462,7 +5462,7 @@
         "SWFRecomp/tests/increment_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-increment-0x50.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5483,7 +5483,7 @@
         "SWFRecomp/tests/increment_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-increment-0x50.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5504,7 +5504,7 @@
         "SWFRecomp/tests/decrement_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5525,7 +5525,7 @@
         "SWFRecomp/tests/decrement_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5546,7 +5546,7 @@
         "SWFRecomp/tests/decrement_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5569,7 +5569,7 @@
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5592,7 +5592,7 @@
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5615,7 +5615,7 @@
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5699,7 +5699,7 @@
         "SWFRecomp/tests/instanceof_swf_6"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5720,7 +5720,7 @@
         "SWFRecomp/tests/instanceof_swf_6"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5741,7 +5741,7 @@
         "SWFRecomp/tests/instanceof_swf_6"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6404,7 +6404,7 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-extends-0x69.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6425,7 +6425,7 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-extends-0x69.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6446,7 +6446,7 @@
         "SWFRecomp/tests/extends_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-extends-0x69.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-extends-0x69.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6471,7 +6471,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6500,7 +6500,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6529,7 +6529,7 @@
       "tests_secondary_passing": [
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6554,7 +6554,7 @@
         "SWFRecomp/tests/get_url_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6584,7 +6584,7 @@
         "SWFRecomp/tests/get_url_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6614,7 +6614,7 @@
         "SWFRecomp/tests/get_url_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6713,7 +6713,7 @@
         "SWFRecomp/tests/constant_pool_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6740,7 +6740,7 @@
         "SWFRecomp/tests/constant_pool_swf_5"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6761,7 +6761,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6782,7 +6782,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6803,7 +6803,7 @@
         "SWFRecomp/tests/set_target_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6829,7 +6829,7 @@
         "SWFRecomp/tests/set_target_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6855,7 +6855,7 @@
         "SWFRecomp/tests/set_target_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -6881,7 +6881,7 @@
         "SWFRecomp/tests/goto_label_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6902,7 +6902,7 @@
         "SWFRecomp/tests/goto_label_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -6923,7 +6923,7 @@
         "SWFRecomp/tests/goto_label_swf_3"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7067,7 +7067,7 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-try-0x8f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7088,7 +7088,7 @@
         "SWFRecomp/tests/try_swf_7"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-try-0x8f.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-try-0x8f.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7379,7 +7379,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-push-0x96.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7628,7 +7628,7 @@
         "SWFRecomp/tests/wait_for_frame_swf_3",
         "SWFRecomp/tests/with_swf_5"
       ],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-push-0x96.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-push-0x96.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7649,7 +7649,7 @@
         "SWFRecomp/tests/jump_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-jump-0x99.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7670,7 +7670,7 @@
         "SWFRecomp/tests/jump_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-jump-0x99.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7691,7 +7691,7 @@
         "SWFRecomp/tests/get_url2_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -7723,7 +7723,7 @@
         "SWFRecomp/tests/get_url2_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -7755,7 +7755,7 @@
         "SWFRecomp/tests/get_url2_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md",
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {
@@ -7831,7 +7831,7 @@
         "SWFRecomp/tests/if_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-if-0x9d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -7854,7 +7854,7 @@
         "SWFRecomp/tests/if_swf_4"
       ],
       "tests_secondary_passing": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-if-0x9d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},

@@ -522,7 +522,7 @@ void actionNextFrame();
 - parseActions (case SWF_ACTION_NEXT_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md](SWFRecompDocs/prompts/pending/opcode-next-frame-0x04.md)
+- [SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md](SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4310)
@@ -548,7 +548,7 @@ void actionPrevFrame(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_PREV_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md](SWFRecompDocs/prompts/pending/opcode-prev-frame-0x05.md)
+- [SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md](SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4324)
@@ -575,7 +575,7 @@ void actionPlay();
 - parseActions (case SWF_ACTION_PLAY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-play-0x06.md](SWFRecompDocs/prompts/pending/opcode-play-0x06.md)
+- [SWFRecompDocs/prompts/completed/opcode-play-0x06.md](SWFRecompDocs/prompts/completed/opcode-play-0x06.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4338)
@@ -602,7 +602,7 @@ void actionPlay();
 - parseActions (case SWF_ACTION_STOP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-stop-0x07.md](SWFRecompDocs/prompts/pending/opcode-stop-0x07.md)
+- [SWFRecompDocs/prompts/completed/opcode-stop-0x07.md](SWFRecompDocs/prompts/completed/opcode-stop-0x07.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4354)
@@ -628,7 +628,7 @@ void actionToggleQuality(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_TOGGLE_QUALITY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md](SWFRecompDocs/prompts/pending/opcode-toggle-quality-0x08.md)
+- [SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md](SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4368)
@@ -654,7 +654,7 @@ void actionStopSounds(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_STOP_SOUNDS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md](SWFRecompDocs/prompts/pending/opcode-stop-sounds-0x09.md)
+- [SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md](SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4379)
@@ -687,7 +687,7 @@ void actionAdd(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_ADD)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md](SWFRecompDocs/prompts/batch7/opcode-add-0x0a.md)
+- [SWFRecompDocs/prompts/completed/opcode-add-0x0a.md](SWFRecompDocs/prompts/completed/opcode-add-0x0a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4670)
@@ -713,7 +713,7 @@ void actionSubtract(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_SUBTRACT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md](SWFRecompDocs/prompts/batch7/opcode-subtract-0x0b.md)
+- [SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md](SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4693)
@@ -739,7 +739,7 @@ void actionMultiply(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_MULTIPLY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md](SWFRecompDocs/prompts/batch7/opcode-multiply-0x0c.md)
+- [SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md](SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4714)
@@ -768,7 +768,7 @@ void actionDivide(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_DIVIDE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md](SWFRecompDocs/prompts/batch7/opcode-divide-0x0d.md)
+- [SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md](SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4737)
@@ -794,7 +794,7 @@ void actionEquals(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_EQUALS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md](SWFRecompDocs/prompts/batch7/opcode-equals-0x0e.md)
+- [SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md](SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4761)
@@ -821,7 +821,7 @@ void actionLess(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_LESS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md](SWFRecompDocs/prompts/batch7/opcode-less-0x0f.md)
+- [SWFRecompDocs/prompts/completed/opcode-less-0x0f.md](SWFRecompDocs/prompts/completed/opcode-less-0x0f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4786)
@@ -851,7 +851,7 @@ void actionAnd(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_AND)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-and-0x10.md](SWFRecompDocs/prompts/batch7/opcode-and-0x10.md)
+- [SWFRecompDocs/prompts/completed/opcode-and-0x10.md](SWFRecompDocs/prompts/completed/opcode-and-0x10.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4808)
@@ -877,7 +877,7 @@ void actionOr(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_OR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-or-0x11.md](SWFRecompDocs/prompts/batch7/opcode-or-0x11.md)
+- [SWFRecompDocs/prompts/completed/opcode-or-0x11.md](SWFRecompDocs/prompts/completed/opcode-or-0x11.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4829)
@@ -903,7 +903,7 @@ void actionNot(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_NOT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-not-0x12.md](SWFRecompDocs/prompts/batch7/opcode-not-0x12.md)
+- [SWFRecompDocs/prompts/completed/opcode-not-0x12.md](SWFRecompDocs/prompts/completed/opcode-not-0x12.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4853)
@@ -930,7 +930,7 @@ void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
 - parseActions (case SWF_ACTION_STRING_EQUALS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md](SWFRecompDocs/prompts/batch7/opcode-string-equals-0x13.md)
+- [SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md](SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4882)
@@ -956,7 +956,7 @@ void actionStringLength(char* stack, u32* sp, char* v_str);
 - parseActions (case SWF_ACTION_STRING_LENGTH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md](SWFRecompDocs/prompts/batch7/opcode-string-length-0x14.md)
+- [SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md](SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4903)
@@ -1009,7 +1009,7 @@ void actionStringExtract(char* stack, u32* sp, char* str_buffer);
 - parseActions (case SWF_ACTION_POP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md](SWFRecompDocs/prompts/batch7/opcode-pop-0x17.md)
+- [SWFRecompDocs/prompts/completed/opcode-pop-0x17.md](SWFRecompDocs/prompts/completed/opcode-pop-0x17.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4651)
@@ -1073,7 +1073,7 @@ void actionGetVariable(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_GET_VARIABLE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md](SWFRecompDocs/prompts/batch7/opcode-get-variable-0x1c.md)
+- [SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md](SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5218)
@@ -1110,7 +1110,7 @@ void actionSetVariable(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_SET_VARIABLE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md](SWFRecompDocs/prompts/batch7/opcode-set-variable-0x1d.md)
+- [SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md](SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5240)
@@ -1136,7 +1136,7 @@ void actionSetTarget2(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_SET_TARGET2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md](SWFRecompDocs/prompts/pending/opcode-settarget2-0x20.md)
+- [SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md](SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5405)
@@ -1167,7 +1167,7 @@ void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);
 - parseActions (case SWF_ACTION_STRING_ADD)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md](SWFRecompDocs/prompts/batch7/opcode-string-add-0x21.md)
+- [SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md](SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4921)
@@ -1245,7 +1245,7 @@ void actionCloneSprite(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_CLONE_SPRITE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md](SWFRecompDocs/prompts/pending/opcode-clone-sprite-0x24.md)
+- [SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md](SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5561)
@@ -1271,7 +1271,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_REMOVE_SPRITE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md](SWFRecompDocs/prompts/pending/opcode-remove-sprite-0x25.md)
+- [SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md](SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5583)
@@ -1410,7 +1410,7 @@ void actionTrace(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_TRACE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md](SWFRecompDocs/prompts/batch7/opcode-trace-0x26.md)
+- [SWFRecompDocs/prompts/completed/opcode-trace-0x26.md](SWFRecompDocs/prompts/completed/opcode-trace-0x26.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5682)
@@ -1439,7 +1439,7 @@ void actionStartDrag(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_START_DRAG)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md](SWFRecompDocs/prompts/pending/opcode-start-drag-0x27.md)
+- [SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md](SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5601)
@@ -1465,7 +1465,7 @@ void actionEndDrag(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_END_DRAG)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md](SWFRecompDocs/prompts/pending/opcode-end-drag-0x28.md)
+- [SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md](SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5641)
@@ -1518,7 +1518,7 @@ void actionThrow(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_THROW)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md](SWFRecompDocs/prompts/pending/opcode-throw-0x2a.md)
+- [SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md](SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7289)
@@ -1544,7 +1544,7 @@ void actionCastOp(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_CAST_OP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md](SWFRecompDocs/prompts/pending/opcode-cast-op-0x2b.md)
+- [SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md](SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7141)
@@ -1570,7 +1570,7 @@ void actionImplementsOp(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_IMPLEMENTS_OP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md](SWFRecompDocs/prompts/pending/opcode-implements-op-0x2c.md)
+- [SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md](SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7164)
@@ -1622,7 +1622,7 @@ void actionMbStringLength(char* stack, u32* sp, char* v_str);
 - parseActions (case SWF_ACTION_MB_STRING_LENGTH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md](SWFRecompDocs/prompts/corrections/opcode-mb-string-length-0x31.md)
+- [SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md](SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4986)
@@ -1700,7 +1700,7 @@ void actionGetTime(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_GET_TIME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md](SWFRecompDocs/prompts/batch7/opcode-get-time-0x34.md)
+- [SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md](SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5703)
@@ -1726,7 +1726,7 @@ void actionMbStringExtract(char* stack, u32* sp, char* str_buffer);
 - parseActions (case SWF_ACTION_MB_STRING_EXTRACT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md](SWFRecompDocs/prompts/pending/opcode-mb-string-extract-0x35.md)
+- [SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md](SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5006)
@@ -1752,7 +1752,7 @@ void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);
 - parseActions (case SWF_ACTION_MB_CHAR_TO_ASCII)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md](SWFRecompDocs/prompts/corrections/opcode-mb-char-to-ascii-0x36-CORRECTED.md)
+- [SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md](SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5094)
@@ -1780,7 +1780,7 @@ void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);
 - parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md](SWFRecompDocs/prompts/pending/opcode-mbasciitochar-0x37.md)
+- [SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md](SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5115)
@@ -1806,7 +1806,7 @@ void actionDelete(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_DELETE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md](SWFRecompDocs/prompts/batch7/opcode-delete-0x3a.md)
+- [SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md](SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6007)
@@ -1832,7 +1832,7 @@ void actionDelete2(char* stack, u32* sp, char* str_buffer);
 - parseActions (case SWF_ACTION_DELETE2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md](SWFRecompDocs/prompts/batch7/opcode-delete2-0x3b.md)
+- [SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md](SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6025)
@@ -1858,7 +1858,7 @@ void actionDefineLocal(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_DEFINE_LOCAL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md](SWFRecompDocs/prompts/pending/opcode-definelocal-0x3c.md)
+- [SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md](SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5969)
@@ -1945,7 +1945,7 @@ void actionModulo(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_MODULO)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md](SWFRecompDocs/prompts/batch7/opcode-modulo-0x3f.md)
+- [SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md](SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6438)
@@ -2090,7 +2090,7 @@ void actionTypeof(char* stack, u32* sp, char* str_buffer);
 - parseActions (case SWF_ACTION_TYPEOF)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md](SWFRecompDocs/prompts/corrections/opcode-typeof-0x44.md)
+- [SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md](SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6380)
@@ -2220,7 +2220,7 @@ void actionEquals2(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_EQUALS2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md](SWFRecompDocs/prompts/pending/opcode-equals2-0x49.md)
+- [SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md](SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6068)
@@ -2335,7 +2335,7 @@ void actionStackSwap(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_STACK_SWAP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md](SWFRecompDocs/prompts/batch7/opcode-stack-swap-0x4d.md)
+- [SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md](SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6660)
@@ -2425,7 +2425,7 @@ void actionIncrement(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_INCREMENT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md](SWFRecompDocs/prompts/batch7/opcode-increment-0x50.md)
+- [SWFRecompDocs/prompts/completed/opcode-increment-0x50.md](SWFRecompDocs/prompts/completed/opcode-increment-0x50.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6605)
@@ -2451,7 +2451,7 @@ void actionDecrement(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_DECREMENT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md](SWFRecompDocs/prompts/batch7/opcode-decrement-0x51.md)
+- [SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md](SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6586)
@@ -2478,7 +2478,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer);
 - parseActions (case SWF_ACTION_CALL_METHOD)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md](SWFRecompDocs/prompts/batch7/opcode-call-method-0x52.md)
+- [SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md](SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5831)
@@ -2530,7 +2530,7 @@ void actionInstanceOf(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_INSTANCEOF)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md](SWFRecompDocs/prompts/pending/opcode-instanceof-0x54.md)
+- [SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md](SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6782)
@@ -2819,7 +2819,7 @@ void actionExtends(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_EXTENDS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-extends-0x69.md](SWFRecompDocs/prompts/pending/opcode-extends-0x69.md)
+- [SWFRecompDocs/prompts/completed/opcode-extends-0x69.md](SWFRecompDocs/prompts/completed/opcode-extends-0x69.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7120)
@@ -2848,7 +2848,7 @@ void actionGotoFrame(char* stack, u32* sp, u16 frame);
 - parseActions (case SWF_ACTION_GOTO_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md](SWFRecompDocs/prompts/pending/opcode-gotoframe-0x81.md)
+- [SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md](SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4258)
@@ -2874,7 +2874,7 @@ void actionGetURL(char* stack, u32* sp, const char* url, const char* target);
 - parseActions (case SWF_ACTION_GET_URL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md](SWFRecompDocs/prompts/pending/opcode-geturl-0x83.md)
+- [SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md](SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4281)
@@ -2923,7 +2923,7 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 - parseActions (case SWF_ACTION_CONSTANT_POOL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md](SWFRecompDocs/prompts/batch7/opcode-constant-pool-0x88.md)
+- [SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md](SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5868)
@@ -2943,7 +2943,7 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num);
 - parseActions (case SWF_ACTION_WAIT_FOR_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md](SWFRecompDocs/prompts/pending/opcode-waitforframe-0x8a.md)
+- [SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md](SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4393)
@@ -2969,7 +2969,7 @@ void actionSetTarget(char* stack, u32* sp, const char* target_name);
 - parseActions (case SWF_ACTION_SET_TARGET)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md](SWFRecompDocs/prompts/pending/opcode-settarget-0x8b.md)
+- [SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md](SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4437)
@@ -2995,7 +2995,7 @@ void actionGoToLabel(char* stack, u32* sp, const char* label);
 - parseActions (case SWF_ACTION_GOTO_LABEL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md](SWFRecompDocs/prompts/pending/opcode-gotolabel-0x8c.md)
+- [SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md](SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4449)
@@ -3065,7 +3065,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - parseActions (case SWF_ACTION_TRY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-try-0x8f.md](SWFRecompDocs/prompts/pending/opcode-try-0x8f.md)
+- [SWFRecompDocs/prompts/completed/opcode-try-0x8f.md](SWFRecompDocs/prompts/completed/opcode-try-0x8f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7191)
@@ -3220,7 +3220,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - parseActions (case SWF_ACTION_PUSH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-push-0x96.md](SWFRecompDocs/prompts/batch7/opcode-push-0x96.md)
+- [SWFRecompDocs/prompts/completed/opcode-push-0x96.md](SWFRecompDocs/prompts/completed/opcode-push-0x96.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4556)
@@ -3240,7 +3240,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 - parseActions (case SWF_ACTION_JUMP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md](SWFRecompDocs/prompts/batch7/opcode-jump-0x99.md)
+- [SWFRecompDocs/prompts/completed/opcode-jump-0x99.md](SWFRecompDocs/prompts/completed/opcode-jump-0x99.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5139)
@@ -3266,7 +3266,7 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 - parseActions (case SWF_ACTION_GET_URL2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md](SWFRecompDocs/prompts/pending/opcode-geturl2-0x9a.md)
+- [SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md](SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5262)
@@ -3307,7 +3307,7 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 - parseActions (case SWF_ACTION_IF)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md](SWFRecompDocs/prompts/batch7/opcode-if-0x9d.md)
+- [SWFRecompDocs/prompts/completed/opcode-if-0x9d.md](SWFRecompDocs/prompts/completed/opcode-if-0x9d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5163)

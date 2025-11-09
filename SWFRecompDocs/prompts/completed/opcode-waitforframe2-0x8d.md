@@ -1,235 +1,341 @@
-# ActionWaitForFrame2 (0x8D) Implementation - Completed
+# AS2 Opcode Implementation Task: ActionWaitForFrame2
 
-**Status**: ✅ COMPLETED
-**Date**: 2025-11-07
+Please read the implementation guide at `SWFRecompDocs/parallel-opcode-implementation-guide.md`.
+
+Your task is to implement support for the AS2 opcode: **ActionWaitForFrame2**
+
+## Opcode Specification
+
+**Opcode Name**: ActionWaitForFrame2
+**Hex Value**: 0x8D
+**Category**: Movie Control / Streaming
 **Estimated Complexity**: MEDIUM (2-4 hours)
-**Actual Time**: ~1.5 hours
 
-## Summary
+**Description**: Stack-based version of WaitForFrame. Waits for a frame to be loaded before executing subsequent actions.
 
-Successfully implemented the ActionWaitForFrame2 opcode (0x8D), a stack-based version of WaitForFrame that checks if a frame is loaded before executing subsequent actions.
+**Operation**: Pop frame from stack, check if loaded; if not, skip the next N actions.
 
-## Implementation Overview
+**Expected Behavior** (from SWF Spec 19):
+- Stack-based version of ActionWaitForFrame (0x8A)
+- Pops a frame off the stack
+- If the frame is loaded, skip the next n actions (where n = SkipCount)
+- Frame is evaluated the same way as ActionGotoFrame2 (can be number or label)
+- Action record contains: ActionCode = 0x8D, Length = 1, SkipCount (UI8)
 
-### Files Modified
-
-1. **SWFRecomp/include/action/action.hpp**
-   - Added `SWF_ACTION_WAIT_FOR_FRAME2 = 0x8D` enum definition
-
-2. **SWFRecomp/src/action/action.cpp**
-   - Added label marking in first pass (lines 54-79)
-   - Added translation case in second pass (lines 610-640)
-   - Implements skip logic by parsing ahead N actions
-
-3. **SWFModernRuntime/include/actionmodern/action.h**
-   - Added function declaration: `bool actionWaitForFrame2(char* stack, u32* sp);`
-
-4. **SWFModernRuntime/src/actionmodern/action.c**
-   - Implemented runtime function (lines 2626-2652)
-   - Simplified implementation assumes all frames are loaded
-   - Pops frame identifier from stack
-   - Returns true for non-streaming SWF files
-
-### Test Implementation
-
-Created comprehensive test in `SWFRecomp/tests/wait_for_frame2_swf_4/`:
-
-- **create_test_swf.py**: Generates minimal SWF4 test file
-  - Pushes frame number 1 to stack
-  - Executes WaitForFrame2 with skip count 1
-  - Traces "Frame 1 loaded" if not skipped
-  - Traces "Continued" (always executes)
-
-- **test_info.json**: Test metadata
-  - Tests WAIT_FOR_FRAME2 opcode
-  - Supporting opcodes: PUSH, TRACE
-  - Deterministic execution type
-
-- **validate.py**: Validation script
-  - Verifies both output lines
-  - Checks frame-loaded trace executes
-  - Verifies continuation trace always runs
-
-- **config.toml**: Recompiler configuration
-
-## Test Results
-
-**Status**: ✅ ALL TESTS PASSED
-
-```json
-{
-  "passed": true,
-  "sub_tests": [
-    {
-      "name": "frame_loaded_trace",
-      "passed": true,
-      "expected": "Frame 1 loaded",
-      "actual": "Frame 1 loaded"
-    },
-    {
-      "name": "continuation_trace",
-      "passed": true,
-      "expected": "Continued",
-      "actual": "Continued"
-    }
-  ]
-}
-```
-
-## Technical Details
-
-### Opcode Specification
-
-- **Opcode**: 0x8D
-- **Name**: ActionWaitForFrame2
-- **Length**: 1 byte (SkipCount parameter)
-- **SWF Version**: 4+
-- **Category**: Movie Control / Streaming
-
-### Operation
-
-1. Pops frame identifier from stack (number or label)
-2. Checks if frame is loaded
-3. If not loaded, skips next SkipCount actions
-4. If loaded, continues execution normally
-
-### Stack Operations
-
+**Stack Operations**:
 ```
 Before: [... frame]
 After:  [... ]
 ```
 
-### Implementation Approach
+**Action Record Format**:
+```
+Field          Type    Comment
+ActionCode     UI8     0x8D
+Length         UI16    Always 1
+SkipCount      UI8     Number of actions to skip if frame not loaded
+```
 
-**Simplified for Non-Streaming SWFs**:
-- Assumes all frames are loaded instantly
-- Always returns `true` (frame loaded)
-- Appropriate for modern non-streaming content
-- Can be enhanced later for streaming support
+## Your Task
 
-**Translation Logic**:
-- First pass: Calculate skip target by parsing ahead N actions
-- Mark skip target as a label
-- Second pass: Generate conditional jump code
-- If frame not loaded, jump to skip label
+Implement this opcode following the 7-step workflow:
 
-### Code Generation Example
+1. **Define Enum** - Add `SWF_ACTION_WAIT_FOR_FRAME2 = 0x8D` to `SWFRecomp/include/action/action.hpp`
+2. **Add Translation** - Add case to `SWFRecomp/src/action/action.cpp` (parse SkipCount)
+3. **Declare API** - Add function to `SWFModernRuntime/include/actionmodern/action.h`
+4. **Implement Runtime** - Implement in `SWFModernRuntime/src/actionmodern/action.c`
+5. **Create Test SWF** - Create ActionScript test with frame waiting
+6. **Setup Test Directory** - Create `SWFRecomp/tests/wait_for_frame2_swf_4/`
+7. **Build and Verify** - Compile and verify output matches expected
 
-For WaitForFrame2 with skip count 1:
+## Test Cases
 
-```c
-// WaitForFrame2: skip=1
-if (!actionWaitForFrame2(stack, sp)) {
-    // Frame not loaded, skip next 1 action(s)
-    goto label_45;
+### Test Case 1: Frame number already loaded
+```actionscript
+// Frame 1:
+var frame = 5;
+ifFrameLoaded(frame) {
+    trace("Frame 5 loaded");
+} else {
+    trace("Frame 5 not loaded");
+}
+```
+Expected output: `Frame 5 loaded`
+
+### Test Case 2: Frame label loaded
+```actionscript
+// Frame 1:
+var label = "scene2";
+ifFrameLoaded(label) {
+    trace("Scene2 loaded");
+}
+trace("Continued");
+```
+Expected output:
+```
+Scene2 loaded
+Continued
+```
+
+### Test Case 3: Dynamic frame check
+```actionscript
+// Frame 1:
+var totalFrames = _totalframes;
+ifFrameLoaded(totalFrames) {
+    gotoAndPlay(2);
+} else {
+    gotoAndPlay(1);  // Loop until loaded
+}
+```
+Expected behavior: Advances when all frames loaded
+
+### Test Case 4: Frame not loaded
+```actionscript
+var frame = 1000;  // Doesn't exist
+ifFrameLoaded(frame) {
+    trace("This won't print");
+}
+trace("Continued");
+```
+Expected output: `Continued`
+
+## Implementation Hints
+
+**Pattern**: This is a stack-based conditional control flow operation for streaming content.
+
+### Implementation Outline
+
+**SWFRecomp Translation** (in action.cpp):
+```cpp
+case SWF_ACTION_WAIT_FOR_FRAME2:
+{
+    // Read skip count (UI8)
+    u8 skip_count;
+    in.read((char*)&skip_count, sizeof(u8));
+
+    out_script << "\t" << "// WaitForFrame2: skip=" << (int)skip_count << endl
+               << "\t" << "if (!actionWaitForFrame2(stack, sp)) {" << endl
+               << "\t\t" << "// Skip next " << (int)skip_count << " actions" << endl
+               << "\t\t" << "goto skip_label_" << label_counter << ";" << endl
+               << "\t" << "}" << endl;
+
+    // Generate code for the next skip_count actions with a skip label
+    // Similar complexity to WaitForFrame (0x8A)
+
+    break;
 }
 ```
 
-## Edge Cases Handled
+**SWFModernRuntime API** (in action.h):
+```c
+bool actionWaitForFrame2(char* stack, u32* sp);
+```
 
-✅ Frame number on stack (float)
-✅ Frame label on stack (string)
-✅ Skip count of 0
-✅ Skip count > 0
-✅ Non-existent frames (returns false)
+**SWFModernRuntime Implementation** (in action.c):
+```c
+bool actionWaitForFrame2(char* stack, u32* sp)
+{
+    // Pop frame identifier from stack
+    ActionVar frame_var;
+    popVar(stack, sp, &frame_var);
 
-## Known Limitations
+    // Get current movie clip
+    MovieClip* mc = getCurrentMovieClip();
+    if (!mc) {
+        return false;
+    }
 
-1. **Streaming**: Current implementation doesn't track actual frame loading
-   - Always returns true (all frames loaded)
-   - Appropriate for non-streaming SWF files
+    int frame_index = -1;
 
-2. **Frame Labels**: Frame label lookup not fully implemented
-   - Would require MovieClip frame label infrastructure
-   - Currently treats as frame not found (returns false)
+    // Parse frame identifier (number or label)
+    if (frame_var.type == ACTION_STACK_VALUE_F32) {
+        // Frame number (1-based)
+        frame_index = (int)frame_var.value.f32 - 1;  // Convert to 0-based
+    }
+    else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
+        const char* frame_str = (const char*)frame_var.value.u64;
 
-3. **MovieClip Context**: No MovieClip context checking
-   - Could be enhanced to check actual frame count
-   - Would need MovieClip API integration
+        // Try to parse as number
+        char* endptr;
+        long frame_num = strtol(frame_str, &endptr, 10);
+        if (*endptr == '\0' && frame_num > 0) {
+            // It's a numeric string
+            frame_index = (int)frame_num - 1;  // Convert to 0-based
+        } else {
+            // It's a label
+            frame_index = findFrameByLabel(mc, frame_str);
+        }
+    }
 
-## Future Enhancements
+    // Check if frame is loaded
+    if (frame_index >= 0 && frame_index < mc->totalframes) {
+        return isFrameLoaded(mc, frame_index);
+    }
 
-1. **Streaming Support**:
-   - Track frames_loaded vs totalframes
-   - Check if frame data has been downloaded
-   - Implement progressive frame loading
+    return false;  // Frame doesn't exist
+}
 
-2. **Frame Label Resolution**:
-   - Implement `findFrameByLabel()` function
-   - Store frame labels in MovieClip
-   - Support dynamic frame lookup
+bool isFrameLoaded(MovieClip* mc, int frame_index)
+{
+    // Check if frame is within loaded range
+    if (frame_index < 0 || frame_index >= mc->totalframes) {
+        return false;
+    }
 
-3. **MovieClip Integration**:
-   - Add `getCurrentMovieClip()` API
-   - Track current frame context
-   - Validate frame indices against totalframes
+    // In streaming SWF, frames are loaded progressively
+    // For now, assume all frames are loaded (non-streaming)
+    if (frame_index < mc->frames_loaded) {
+        return true;
+    }
 
-4. **Advanced Skip Logic**:
-   - Optimize skip target calculation
-   - Support nested WaitForFrame operations
-   - Handle complex control flow
+    return false;
+}
+```
 
-## Related Opcodes
+### Simplified Implementation
 
-- **WaitForFrame (0x8A)**: Frame number in action record (not implemented)
-- **GotoFrame2 (0x9F)**: Similar stack-based frame evaluation
-- **If (0x9D)**: Conditional branching pattern
-- **Jump (0x99)**: Unconditional jump pattern
+For initial implementation, you can simplify:
 
-## Testing Strategy
+```c
+bool actionWaitForFrame2(char* stack, u32* sp)
+{
+    // Pop frame identifier
+    ActionVar frame_var;
+    popVar(stack, sp, &frame_var);
 
-1. **Unit Test**: Basic frame load check
-2. **Expected Output**: Two trace statements
-3. **Validation**: Both outputs verified
-4. **Integration**: No regressions in existing tests
+    // Simplified: assume all frames are loaded
+    MovieClip* mc = getCurrentMovieClip();
+
+    if (!mc) {
+        return false;
+    }
+
+    // For non-streaming SWF, all frames are loaded
+    printf("// WaitForFrame2 (frame from stack, loaded)\n");
+    return true;
+}
+```
+
+### Similar Opcodes
+
+Reference these opcodes:
+- `actionWaitForFrame` (0x8A) - Frame number embedded in action record
+- `actionGotoFrame2` (0x9F) - Also pops frame from stack
+- `actionIf` (0x9D) - Conditional branching
+- `actionJump` (0x99) - Unconditional jump
+
+### Edge Cases to Handle
+
+- Frame number out of range
+- Frame label not found
+- String that looks like number ("5")
+- Empty string
+- NULL value
+- Skip count of 0
+- Negative frame numbers
 
 ## Documentation
 
-See original task specification:
-- `SWFRecompDocs/prompts/pending/opcode-waitforframe2-0x8d.md`
-
-## Commit Information
-
-**Branch**: `claude/opcode-waitforframe2-0x8d-011CUuAdsDAn4z171LmG9sp2`
-**Commit**: 3d93514
-
-**Files Changed**: 8 files
-**Lines Added**: +261
-**Test Status**: PASS (2/2 sub-tests)
+Create or update these files as you work:
+- `SWFRecomp/tests/wait_for_frame2_swf_4/README.md` - Test description and expected output
+- Document difference from WaitForFrame (0x8A)
+- Explain frame evaluation (number vs label)
 
 ## Success Criteria
 
-✅ All 8 steps completed
-✅ SkipCount parameter correctly parsed
-✅ Frame popped from stack correctly
-✅ Test produces correct output
-✅ No build errors or warnings (new code)
-✅ Action skipping implemented correctly
-✅ Edge cases handled gracefully
-✅ Documentation created
-✅ Validation tests passing
+Your implementation is complete when:
+- [ ] All 7 steps completed
+- [ ] SkipCount parameter correctly parsed from action record
+- [ ] Frame popped from stack correctly
+- [ ] Test produces correct output for all test cases
+- [ ] No build errors or warnings
+- [ ] Frame number evaluation works
+- [ ] Frame label evaluation works
+- [ ] Action skipping implemented correctly
+- [ ] Edge cases handled gracefully
+- [ ] Documentation created
 
-## Notes
+## Important Notes
 
-- Implementation follows 8-step workflow exactly as specified
-- Build time: ~2 seconds per test (as expected)
-- Test file size: 79 bytes (minimal SWF4)
-- No regressions in existing tests
-- Code follows existing patterns and style
-- Ready for integration into main branch
+**Difference from WaitForFrame (0x8A)**:
+- WaitForFrame (0x8A): Frame number embedded in action record (static)
+- WaitForFrame2 (0x8D): Frame from stack (dynamic, expression-based)
 
-## Lessons Learned
+**Frame Evaluation**: Like GotoFrame2, this opcode evaluates the frame:
+- If number: Frame index (1-based)
+- If string that's numeric: Parse as frame number
+- If string that's not numeric: Treat as frame label
 
-1. **Skip Logic**: Parsing ahead N actions requires careful iteration
-2. **Label Generation**: Must mark skip targets in first pass
-3. **Stack Order**: Frame identifier popped before check
-4. **Simplified Start**: Always-loaded assumption is appropriate first step
-5. **Test Creation**: Python SWF generation works well for simple tests
+**Streaming Context**: Designed for streaming SWF files:
+- Check if frame data has been downloaded yet
+- Skip actions if not loaded (e.g., show loading screen)
+- Modern context: most files load instantly
 
-## Recommendations
+**Flash Version**: Available in SWF 4+
 
-1. Consider implementing WaitForFrame (0x8A) next for completeness
-2. Add integration test with frame labels when MovieClip API is ready
-3. Document streaming frame loading requirements for future implementation
-4. Consider adding more edge case tests (invalid frames, negative numbers, etc.)
+**ActionScript Equivalent**:
+```actionscript
+var frame = 10;
+ifFrameLoaded(frame) {
+    // Frame is loaded
+} else {
+    // Frame not loaded, skip this block
+}
+
+// Or check _framesloaded property:
+if (_framesloaded >= frame) {
+    // Frame loaded
+}
+```
+
+**Preloader Pattern** (Dynamic):
+```actionscript
+// Frame 1 (Preloader):
+var target = _totalframes;
+if (_framesloaded < target) {
+    // Show loading bar
+    loadingBar._xscale = (_framesloaded / target) * 100;
+    gotoAndPlay(1);  // Loop
+} else {
+    gotoAndPlay(2);  // Start movie
+}
+```
+
+**Skip Logic**: The skip mechanism is the same as WaitForFrame:
+- If frame not loaded, skip next N actions
+- Need to calculate byte offset or generate conditional jump
+- Requires parsing action stream to know sizes
+
+**Testing Strategy**:
+- Start with simplified implementation (always loaded)
+- Add frame popping from stack
+- Implement frame number evaluation
+- Add frame label evaluation
+- Test with various frame types
+- Add action skip logic
+- Test edge cases
+
+**Coordination**: This opcode relates to:
+- Frame loading infrastructure
+- Streaming SWF support
+- Control flow (jump/skip logic)
+- MovieClip frame management
+- Frame label lookup
+- Stack operations
+
+**Translation Complexity**: Similar to WaitForFrame (0x8A):
+- Need to parse ahead to calculate skip offset
+- Need to generate conditional jump in output
+- Need to handle action stream parsing
+
+**Frame Number vs Label**: Similar to GotoFrame2:
+```c
+// Check if it's a number or label
+if (is_numeric(frame_var)) {
+    // Use as frame number
+} else {
+    // Look up frame label
+}
+```
+
+Please work autonomously to complete this implementation. Test incrementally and document any issues or design decisions you encounter.
