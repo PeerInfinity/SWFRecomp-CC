@@ -4451,10 +4451,38 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 			}
 			else
 			{
-				// Simple DefineFunction - not yet supported for invocation
-				// Would need to handle differently since simple_func doesn't return a value
+				// Simple DefineFunction (type 1)
+				// Simple functions expect arguments on the stack, not in an array
+				// We need to push arguments back onto stack in correct order
+
+				// Remember stack position BEFORE pushing arguments
+				// After function executes (pops args + pushes return), sp should be sp_before + 24
+				u32 sp_before_args = *sp;
+
+				// Push arguments onto stack in order (first to last)
+				// The function will pop them and bind to parameter names
+				for (u32 i = 0; i < num_args; i++)
+				{
+					pushVar(stack, sp, &args[i]);
+				}
+
+				// Free args array before calling function
 				if (args != NULL) free(args);
-				pushUndefined(stack, sp);
+
+				// Call the simple function
+				// It will pop parameters, execute body, and may push a return value
+				func->simple_func(stack, sp);
+
+				// Check if a return value was pushed
+				// After function pops all args, sp should be back to sp_before_args
+				// If function pushed a return, sp should be sp_before_args + 24
+				if (*sp == sp_before_args)
+				{
+					// No return value was pushed - push undefined
+					// In ActionScript, functions that don't explicitly return push undefined
+					pushUndefined(stack, sp);
+				}
+				// else: return value (or multiple values) already on stack - keep it
 			}
 		}
 		else

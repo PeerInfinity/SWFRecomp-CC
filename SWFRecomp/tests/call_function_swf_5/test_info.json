@@ -1,9 +1,9 @@
 {
   "metadata": {
     "name": "call_function_swf_5",
-    "description": "Tests CALL_FUNCTION opcode (0x3D) - calls functions with arguments",
+    "description": "Tests CALL_FUNCTION opcode (0x3D) - calls functions with arguments including built-in functions and user-defined functions",
     "swf_version": 5,
-    "fully_implemented": false
+    "fully_implemented": true
   },
   "opcodes": {
     "tested": ["CALL_FUNCTION"],
@@ -11,5 +11,13 @@
   },
   "execution": {
     "type": "deterministic"
-  }
+  },
+  "features_implemented": [
+    "Built-in global functions (parseInt, parseFloat, isNaN, isFinite)",
+    "User-defined functions via DEFINE_FUNCTION2 (advanced)",
+    "User-defined functions via DEFINE_FUNCTION (simple)",
+    "Function not found returns undefined",
+    "Functions without explicit return push undefined",
+    "Proper argument passing and return value handling"
+  ]
 }
