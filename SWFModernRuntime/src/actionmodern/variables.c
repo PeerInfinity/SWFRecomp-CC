@@ -95,12 +95,15 @@ ActionVar* getVariableById(u32 string_id)
 			return NULL;
 		}
 
-		// Initialize with unset type
+		// Initialize with unset type (empty string)
 		var->type = ACTION_STACK_VALUE_STRING;
 		var->str_size = 0;
 		var->string_id = 0;
 		var->data.string_data.heap_ptr = NULL;
 		var->data.string_data.owns_memory = false;
+		// Initialize numeric_value to point to empty string to avoid segfault
+		// when pushVar tries to use it as a string pointer
+		var->data.numeric_value = (u64) "";
 
 		var_array[string_id] = var;
 	}
@@ -122,12 +125,15 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 		var = (ActionVar*) malloc(sizeof(ActionVar));
 	} while (errno != 0);
 
-	// Initialize with unset type
+	// Initialize with unset type (empty string)
 	var->type = ACTION_STACK_VALUE_STRING;
 	var->str_size = 0;
 	var->string_id = 0;
 	var->data.string_data.heap_ptr = NULL;
 	var->data.string_data.owns_memory = false;
+	// Initialize numeric_value to point to empty string to avoid segfault
+	// when pushVar tries to use it as a string pointer
+	var->data.numeric_value = (u64) "";
 
 	hashmap_set(var_map, var_name, key_size, (uintptr_t) var);
 
