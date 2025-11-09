@@ -1353,6 +1353,14 @@ namespace SWFRecomp
 							break;
 						}
 
+						case ACTION_STACK_VALUE_UNDEFINED:
+						{
+							out_script << "(undefined)" << endl;
+							out_script << "\t" << "PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);" << endl;
+
+							break;
+						}
+
 						case 8:  // Constant pool index (8-bit)
 						{
 							u8 pool_index = (u8) action_buffer[push_length];
