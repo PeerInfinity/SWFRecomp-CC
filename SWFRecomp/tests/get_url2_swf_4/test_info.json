@@ -40,6 +40,8 @@
     "flag_parsing": "All flags correctly parsed: SendVarsMethod (bits 7-6), LoadTargetFlag (bit 1), LoadVariablesFlag (bit 0)",
     "string_handling": "Handles both regular strings and STR_LIST (concatenated strings)",
     "logging": "Outputs debug messages showing what operation would be performed",
-    "current_behavior": "Logs the intended operation but does not perform actual HTTP requests, variable loading, or SWF loading"
+    "current_behavior": "Logs the intended operation but does not perform actual HTTP requests, variable loading, or SWF loading",
+    "no_graphics_mode_limitations": "Full implementation would require: HTTP client library (libcurl), SWF parser, platform-specific browser integration, and network access - none of which are available in NO_GRAPHICS sandbox environment",
+    "similar_opcodes": "Implementation approach similar to GOTO_FRAME (0x81) and GOTO_LABEL (0x8C) which also log operations without performing actual navigation in NO_GRAPHICS mode"
   }
 }
