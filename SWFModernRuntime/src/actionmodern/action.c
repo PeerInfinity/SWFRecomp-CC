@@ -171,7 +171,9 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
 // ==================================================================
 
-typedef struct {
+typedef struct MovieClip_s MovieClip;
+
+struct MovieClip_s {
 	float x, y;
 	float xscale, yscale;
 	float rotation;
@@ -192,7 +194,9 @@ typedef struct {
 	char quality[16];      // Property 19: _quality ("LOW", "MEDIUM", "HIGH", "BEST")
 	float xmouse;
 	float ymouse;
-} MovieClip;
+	// Hierarchy tracking for targetPath support
+	MovieClip* parent;     // Parent MovieClip (NULL for _root)
+};
 
 // Static _root MovieClip for simplified implementation
 // Note: totalframes is set from SWF_FRAME_COUNT if available, otherwise defaults to 1
@@ -222,7 +226,8 @@ static MovieClip root_movieclip = {
 	.soundbuftime = 5.0f,      // Default: 5 seconds
 	.quality = "HIGH",         // Default: HIGH quality
 	.xmouse = 0.0f,  // No mouse in NO_GRAPHICS mode
-	.ymouse = 0.0f  // No mouse in NO_GRAPHICS mode
+	.ymouse = 0.0f,  // No mouse in NO_GRAPHICS mode
+	.parent = NULL  // _root has no parent
 };
 
 // Helper function to get MovieClip by target path
@@ -232,6 +237,92 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		return &root_movieclip;
 	}
 	return NULL;  // Other paths not supported yet
+}
+
+/**
+ * Create a new MovieClip with the specified instance name and parent
+ *
+ * @param instance_name The name of this MovieClip instance (e.g., "mc1")
+ * @param parent The parent MovieClip (can be NULL for orphaned clips)
+ * @return Pointer to the newly allocated MovieClip
+ *
+ * Note: The caller is responsible for freeing the returned MovieClip
+ */
+static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) {
+	MovieClip* mc = (MovieClip*)malloc(sizeof(MovieClip));
+	if (!mc) {
+		return NULL;
+	}
+
+	// Initialize with default values similar to root_movieclip
+	mc->x = 0.0f;
+	mc->y = 0.0f;
+	mc->xscale = 100.0f;
+	mc->yscale = 100.0f;
+	mc->rotation = 0.0f;
+	mc->alpha = 100.0f;
+	mc->width = 0.0f;
+	mc->height = 0.0f;
+	mc->visible = 1;
+	mc->currentframe = 1;
+	mc->totalframes = 1;
+	mc->framesloaded = 1;
+	mc->highquality = 1.0f;
+	mc->focusrect = 1.0f;
+	mc->soundbuftime = 5.0f;
+	strcpy(mc->quality, "HIGH");
+	mc->xmouse = 0.0f;
+	mc->ymouse = 0.0f;
+	mc->droptarget[0] = '\0';
+	mc->url[0] = '\0';
+
+	// Set instance name
+	strncpy(mc->name, instance_name, sizeof(mc->name) - 1);
+	mc->name[sizeof(mc->name) - 1] = '\0';
+
+	// Set parent and construct target path
+	mc->parent = parent;
+
+	// Construct target path based on parent
+	if (parent == NULL) {
+		// No parent - standalone clip
+		strncpy(mc->target, instance_name, sizeof(mc->target) - 1);
+		mc->target[sizeof(mc->target) - 1] = '\0';
+	} else {
+		// Has parent - construct path as parent.child
+		int written = snprintf(mc->target, sizeof(mc->target), "%s.%s",
+		                       parent->target, instance_name);
+		if (written >= (int)sizeof(mc->target)) {
+			// Path was truncated
+			mc->target[sizeof(mc->target) - 1] = '\0';
+		}
+	}
+
+	return mc;
+}
+
+/**
+ * Construct the target path for a MovieClip
+ *
+ * @param mc The MovieClip to get the path for
+ * @param buffer The buffer to write the path to
+ * @param buffer_size Size of the buffer
+ * @return Pointer to the buffer (for convenience)
+ *
+ * Note: This function returns the pre-computed target path stored in the MovieClip
+ */
+static const char* constructPath(MovieClip* mc, char* buffer, size_t buffer_size) {
+	if (!mc || !buffer || buffer_size == 0) {
+		if (buffer && buffer_size > 0) {
+			buffer[0] = '\0';
+		}
+		return buffer;
+	}
+
+	// Return the pre-computed target path
+	strncpy(buffer, mc->target, buffer_size - 1);
+	buffer[buffer_size - 1] = '\0';
+	return buffer;
 }
 
 // ==================================================================
@@ -927,6 +1018,25 @@ void actionStackSwap(char* stack, u32* sp)
 	pushVar(stack, sp, &val2);
 }
 
+/**
+ * actionTargetPath - Returns the target path of a MovieClip
+ *
+ * Opcode: 0x45 (ActionTargetPath)
+ * Stack: [ movieclip ] -> [ path_string | undefined ]
+ *
+ * Pops a value from the stack. If it's a MovieClip, pushes its target path
+ * as a string (e.g., "_root.mc1.mc2"). If it's not a MovieClip, pushes undefined.
+ *
+ * Path format: Dot notation (e.g., "_root.mc1.mc2")
+ *
+ * Edge cases:
+ * - Non-MovieClip values (numbers, strings, objects): Returns undefined
+ * - _root MovieClip: Returns "_root"
+ * - Nested MovieClips: Returns full path from _root
+ *
+ * SWF version: 5+
+ * Opcode: 0x45
+ */
 void actionTargetPath(char* stack, u32* sp, char* str_buffer)
 {
 	// Get type of value on stack
@@ -936,16 +1046,26 @@ void actionTargetPath(char* stack, u32* sp, char* str_buffer)
 	ActionVar val;
 	popVar(stack, sp, &val);
 
-	// Check if value is an Object (treating as MovieClip placeholder)
-	// NOTE: This is a simplified implementation since full MovieClip
-	// infrastructure is not yet available. See SWFRecompDocs/prompts/opcode-target-path-0x45.md
-	if (type == ACTION_STACK_VALUE_OBJECT) {
-		// For Object type, return "_root" as placeholder
-		const char* path = "_root";
-		int len = 5; // length of "_root"
-		strncpy(str_buffer, path, 16);
-		str_buffer[len] = '\0';
-		PUSH_STR(str_buffer, len);
+	// Check if value is a MovieClip
+	if (type == ACTION_STACK_VALUE_MOVIECLIP) {
+		// Get the MovieClip pointer from the value
+		MovieClip* mc = (MovieClip*) val.data.numeric_value;
+
+		if (mc) {
+			// Get the pre-computed target path from the MovieClip
+			const char* path = mc->target;
+			int len = strlen(path);
+
+			// Copy path to string buffer
+			strncpy(str_buffer, path, 256);  // MovieClip.target is 256 bytes
+			str_buffer[255] = '\0';  // Ensure null termination
+
+			// Push the path string
+			PUSH_STR(str_buffer, len);
+		} else {
+			// Null MovieClip pointer - return undefined
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		}
 	} else {
 		// Not a MovieClip, return undefined per specification
 		// "If the object is not a MovieClip, the result is undefined"

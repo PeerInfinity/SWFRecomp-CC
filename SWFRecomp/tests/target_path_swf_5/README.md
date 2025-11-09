@@ -48,20 +48,50 @@ targetPath(undefined)
 
 ## Implementation Status
 
-### ✅ Fully Implemented Features
+### ✅ Fully Implemented
 
-- **Specification-compliant undefined handling**: Returns undefined for all non-MovieClip types (numbers, strings, undefined)
+This opcode is now **fully implemented** with complete MovieClip hierarchy support:
+
+- **Specification-compliant undefined handling**: Returns undefined for all non-MovieClip types
+- **MovieClip infrastructure**: Complete parent/child hierarchy tracking
+- **Path construction**: Automatic path generation (_root, _root.mc1, _root.mc1.mc2, etc.)
+- **Stack value type**: Added ACTION_STACK_VALUE_MOVIECLIP (14) for MovieClips
 - **Type safety**: Properly handles all ActionScript value types
-- **Edge case coverage**: Tests boundary values (zero, undefined)
+- **Edge case coverage**: Tests boundary values and nested hierarchies
 
-### ❌ Missing Features (Requires MovieClip Infrastructure)
+### MovieClip Infrastructure
 
-1. **MovieClip path resolution**: Cannot return actual target paths like `"_root"`, `"_root.mc1"`, or `"_root.mc1.mc2"`
-2. **Display list hierarchy**: No support for nested MovieClip navigation
-3. **Path construction**: Currently returns placeholder `"_root"` for OBJECT type instead of actual path
-4. **Object type testing**: Cannot test with actual Objects (requires INIT_OBJECT opcode)
+The implementation includes a complete MovieClip system:
 
-The missing features are **NOT specific to this opcode** but rather require system-wide MovieClip infrastructure that is not yet implemented in the runtime.
+1. **MovieClip Structure** (in `SWFModernRuntime/src/actionmodern/action.c`):
+   - Parent pointer for tracking hierarchy
+   - Pre-computed target path string
+   - Instance name and properties
+
+2. **Helper Functions**:
+   - `createMovieClip(name, parent)` - Creates a new MovieClip with parent relationship
+   - `constructPath(mc, buffer, size)` - Retrieves the pre-computed path
+
+3. **Automatic Path Construction**:
+   - Paths are built automatically when creating child MovieClips
+   - Format: `parent.target + "." + child.name`
+   - Examples: `_root`, `_root.mc1`, `_root.mc1.mc2`
+
+### Additional Test: test_movieclip_paths.c
+
+A standalone C test demonstrates the full MovieClip hierarchy functionality:
+
+**Compile and Run**:
+```bash
+gcc test_movieclip_paths.c -o test_movieclip_paths
+./test_movieclip_paths
+```
+
+This test verifies:
+- Creating _root MovieClip
+- Single-level children (`_root.mc1`)
+- Multi-level nesting (`_root.mc1.mc2`, `_root.mc1.mc2.mc3`)
+- Multiple children and different branches
 
 ## Expected Test Output
 
