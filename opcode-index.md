@@ -8,9 +8,7 @@
 
 ## Test Statistics
 
-**Primary Tests**: 117/118 passing (99.2%)
-  - 1 failing primary tests
-  - 1 opcodes with failing primary tests
+**Primary Tests**: 118/118 passing (100.0%)
 
 ## Implementation Progress
 
@@ -21,12 +19,6 @@
 **Opcodes with Primary Tests**: 99
 
 **Opcodes with Documentation**: 99
-
-## What Needs Attention
-
-- **1 failing primary tests** across 1 opcodes (see 'Failing Primary' column)
-- **15 opcodes** not yet marked as fully implemented
-- **1 opcodes** not yet marked as fully implemented for NO_GRAPHICS mode
 
 
 ## Summary Table
@@ -40,7 +32,7 @@
 | [0X07](#0x07-actionstop) | [ActionStop](#0x07-actionstop) | [SWF_ACTION_STOP](#0x07-actionstop) |  | 3/3 | 3/3 |  | ✓ | ✓ |  |
 | [0X08](#0x08-actiontogglequality) | [ActionToggleQuality](#0x08-actiontogglequality) | [SWF_ACTION_TOGGLE_QUALITY](#0x08-actiontogglequality) | [actionToggleQuality](#0x08-actiontogglequality) | 1/1 |  |  | ✓ |  | ✓ |
 | [0X09](#0x09-actionstopsounds) | [ActionStopSounds](#0x09-actionstopsounds) | [SWF_ACTION_STOP_SOUNDS](#0x09-actionstopsounds) | [actionStopSounds](#0x09-actionstopsounds) | 1/1 |  |  | ✓ |  | ✓ |
-| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | [SWF_ACTION_ADD](#0x0a-actionadd) | [actionAdd](#0x0a-actionadd) | 1/2 | 4/4 | 1 | ✓ | ✓ |  |
+| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | [SWF_ACTION_ADD](#0x0a-actionadd) | [actionAdd](#0x0a-actionadd) | 2/2 | 4/4 |  | ✓ | ✓ |  |
 | [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | [SWF_ACTION_SUBTRACT](#0x0b-actionsubtract) | [actionSubtract](#0x0b-actionsubtract) | 1/1 |  |  | ✓ | ✓ |  |
 | [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | [SWF_ACTION_MULTIPLY](#0x0c-actionmultiply) | [actionMultiply](#0x0c-actionmultiply) | 1/1 |  |  | ✓ | ✓ |  |
 | [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | [SWF_ACTION_DIVIDE](#0x0d-actiondivide) | [actionDivide](#0x0d-actiondivide) | 1/1 | 1/1 |  | ✓ | ✓ |  |
@@ -62,7 +54,7 @@
 | [0X23](#0x23-actionsetproperty) | [ActionSetProperty](#0x23-actionsetproperty) | [SWF_ACTION_SET_PROPERTY](#0x23-actionsetproperty) | [actionSetProperty](#0x23-actionsetproperty) | 1/1 |  |  | ✓ |  | ✓ |
 | [0X24](#0x24-actionclonesprite) | [ActionCloneSprite](#0x24-actionclonesprite) | [SWF_ACTION_CLONE_SPRITE](#0x24-actionclonesprite) | [actionCloneSprite](#0x24-actionclonesprite) | 1/1 |  |  | ✓ |  | ✓ |
 | [0X25](#0x25-actionremovesprite) | [ActionRemoveSprite](#0x25-actionremovesprite) | [SWF_ACTION_REMOVE_SPRITE](#0x25-actionremovesprite) | [actionRemoveSprite](#0x25-actionremovesprite) | 1/1 |  |  | ✓ |  | ✓ |
-| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 110/111 |  | ✓ | ✓ |  |
+| [0X26](#0x26-actiontrace) | [ActionTrace](#0x26-actiontrace) | [SWF_ACTION_TRACE](#0x26-actiontrace) | [actionTrace](#0x26-actiontrace) | 1/1 | 111/111 |  | ✓ | ✓ |  |
 | [0X27](#0x27-actionstartdrag) | [ActionStartDrag](#0x27-actionstartdrag) | [SWF_ACTION_START_DRAG](#0x27-actionstartdrag) | [actionStartDrag](#0x27-actionstartdrag) | 1/1 | 1/1 |  | ✓ |  | ✓ |
 | [0X28](#0x28-actionenddrag) | [ActionEndDrag](#0x28-actionenddrag) | [SWF_ACTION_END_DRAG](#0x28-actionenddrag) | [actionEndDrag](#0x28-actionenddrag) | 1/1 |  |  | ✓ |  | ✓ |
 | [0X29](#0x29-actionstringless) | [ActionStringLess](#0x29-actionstringless) | [SWF_ACTION_STRING_LESS](#0x29-actionstringless) | [actionStringLess](#0x29-actionstringless) | 1/1 |  |  | ✓ | ✓ |  |
@@ -126,7 +118,7 @@
 | [0X8E](#0x8e-actiondefinefunction2) | [ActionDefineFunction2](#0x8e-actiondefinefunction2) | [SWF_ACTION_DEFINE_FUNCTION2](#0x8e-actiondefinefunction2) | [actionDefineFunction2](#0x8e-actiondefinefunction2) | 2/2 | 1/1 |  | ✓ | ✓ |  |
 | [0X8F](#0x8f-actiontry) | [ActionTry](#0x8f-actiontry) | [SWF_ACTION_TRY](#0x8f-actiontry) |  | 1/1 |  |  | ✓ | ✓ |  |
 | [0X94](#0x94-actionwith) | [ActionWith](#0x94-actionwith) | [SWF_ACTION_WITH](#0x94-actionwith) |  | 1/1 |  |  | ✓ | ✓ |  |
-| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 112/113 |  | ✓ | ✓ |  |
+| [0X96](#0x96-actionpush) | [ActionPush](#0x96-actionpush) | [SWF_ACTION_PUSH](#0x96-actionpush) |  | 1/1 | 113/113 |  | ✓ | ✓ |  |
 | [0X99](#0x99-actionjump) | [ActionJump](#0x99-actionjump) | [SWF_ACTION_JUMP](#0x99-actionjump) |  | 1/1 |  |  | ✓ | ✓ |  |
 | [0X9A](#0x9a-actiongeturl2) | [ActionGetURL2](#0x9a-actiongeturl2) | [SWF_ACTION_GET_URL2](#0x9a-actiongeturl2) | [actionGetURL2](#0x9a-actiongeturl2) | 1/1 |  |  | ✓ |  | ✓ |
 | [0X9B](#0x9b-actiondefinefunction) | [ActionDefineFunction](#0x9b-actiondefinefunction) | [SWF_ACTION_DEFINE_FUNCTION](#0x9b-actiondefinefunction) |  | 1/1 |  |  | ✓ | ✓ |  |
@@ -136,7 +128,7 @@
 
 ## Passing Primary Tests
 
-**Total Passing Primary Tests**: 117
+**Total Passing Primary Tests**: 118
 
 | Hex | Opcode | Test Path | Enum | Function | Docs |
 |-----|--------|-----------|------|----------|------|
@@ -149,6 +141,7 @@
 | [0X07](#0x07-actionstop) | [ActionStop](#0x07-actionstop) | `stop_swf_4` | ✓ |  | ✓ |
 | [0X08](#0x08-actiontogglequality) | [ActionToggleQuality](#0x08-actiontogglequality) | `toggle_quality_swf_4` | ✓ | ✓ | ✓ |
 | [0X09](#0x09-actionstopsounds) | [ActionStopSounds](#0x09-actionstopsounds) | `stop_sounds_swf_4` | ✓ | ✓ | ✓ |
+| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | `add_floats_swf_4` | ✓ | ✓ | ✓ |
 | [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | `add_swf_4` | ✓ | ✓ | ✓ |
 | [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | `subtract_swf_4` | ✓ | ✓ | ✓ |
 | [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | `multiply_floats_swf_4` | ✓ | ✓ | ✓ |
@@ -260,11 +253,7 @@
 
 ## Failing Primary Tests
 
-**Total Failing Primary Tests**: 1
-
-| Hex | Opcode | Test Path | Enum | Function | Docs |
-|-----|--------|-----------|------|----------|------|
-| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | `add_floats_swf_4` | ✓ | ✓ | ✓ |
+**No failing primary tests! 🎉**
 
 ## Implementation Status
 
@@ -277,7 +266,7 @@
 | [0X05](#0x05-actionpreviousframe) | [ActionPreviousFrame](#0x05-actionpreviousframe) | ✓ | ✓ | 1/1 |  | ✓ |  |
 | [0X06](#0x06-actionplay) | [ActionPlay](#0x06-actionplay) | ✓ | ✓ | 2/2 |  | ✓ | ✓ |
 | [0X07](#0x07-actionstop) | [ActionStop](#0x07-actionstop) | ✓ |  | 3/3 |  | ✓ |  |
-| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | ✓ | ✓ | 1/2 | 1 | ✓ |  |
+| [0X0A](#0x0a-actionadd) | [ActionAdd](#0x0a-actionadd) | ✓ | ✓ | 2/2 |  | ✓ |  |
 | [0X0B](#0x0b-actionsubtract) | [ActionSubtract](#0x0b-actionsubtract) | ✓ | ✓ | 1/1 |  | ✓ |  |
 | [0X0C](#0x0c-actionmultiply) | [ActionMultiply](#0x0c-actionmultiply) | ✓ | ✓ | 1/1 |  | ✓ |  |
 | [0X0D](#0x0d-actiondivide) | [ActionDivide](#0x0d-actiondivide) | ✓ | ✓ | 1/1 |  | ✓ |  |
@@ -680,7 +669,7 @@ void actionStopSounds(char* stack, u32* sp);
 - `actionAdd` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/add_floats_swf_4`
+- [✓] `SWFRecomp/tests/add_floats_swf_4`
 - [✓] `SWFRecomp/tests/add_swf_4`
 
 **Secondary Tests:**
@@ -1301,7 +1290,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 
 **Secondary Tests:**
 - [✓] `SWFRecomp/tests/add2_swf_5`
-- [✗] `SWFRecomp/tests/add_floats_swf_4`
+- [✓] `SWFRecomp/tests/add_floats_swf_4`
 - [✓] `SWFRecomp/tests/add_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_both_0_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_first_1_swf_4`
@@ -3114,7 +3103,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 
 **Secondary Tests:**
 - [✓] `SWFRecomp/tests/add2_swf_5`
-- [✗] `SWFRecomp/tests/add_floats_swf_4`
+- [✓] `SWFRecomp/tests/add_floats_swf_4`
 - [✓] `SWFRecomp/tests/add_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_both_0_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_first_1_swf_4`

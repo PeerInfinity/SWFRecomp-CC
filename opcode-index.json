@@ -452,6 +452,7 @@
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
       "tests_primary_passing": [
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4"
       ],
       "tests_secondary_passing": [
@@ -484,6 +485,7 @@
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
       "tests_primary_passing": [
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4"
       ],
       "tests_secondary_passing": [
@@ -516,6 +518,7 @@
         "SWFRecomp/tests/stop_sounds_swf_4"
       ],
       "tests_primary_passing": [
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4"
       ],
       "tests_secondary_passing": [
@@ -2239,6 +2242,7 @@
       ],
       "tests_secondary_passing": [
         "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4",
         "SWFRecomp/tests/and_floats_both_0_swf_4",
         "SWFRecomp/tests/and_floats_first_1_swf_4",
@@ -2483,6 +2487,7 @@
       ],
       "tests_secondary_passing": [
         "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4",
         "SWFRecomp/tests/and_floats_both_0_swf_4",
         "SWFRecomp/tests/and_floats_first_1_swf_4",
@@ -2727,6 +2732,7 @@
       ],
       "tests_secondary_passing": [
         "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4",
         "SWFRecomp/tests/and_floats_both_0_swf_4",
         "SWFRecomp/tests/and_floats_first_1_swf_4",
@@ -7260,6 +7266,7 @@
       ],
       "tests_secondary_passing": [
         "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4",
         "SWFRecomp/tests/and_floats_both_0_swf_4",
         "SWFRecomp/tests/and_floats_first_1_swf_4",
@@ -7508,6 +7515,7 @@
       ],
       "tests_secondary_passing": [
         "SWFRecomp/tests/add2_swf_5",
+        "SWFRecomp/tests/add_floats_swf_4",
         "SWFRecomp/tests/add_swf_4",
         "SWFRecomp/tests/and_floats_both_0_swf_4",
         "SWFRecomp/tests/and_floats_first_1_swf_4",

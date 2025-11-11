@@ -8,9 +8,7 @@
 
 ## Test Statistics
 
-**Primary Tests**: 117/118 passing (99.2%)
-  - 1 failing primary tests
-  - 1 opcodes with failing primary tests
+**Primary Tests**: 118/118 passing (100.0%)
 
 ## Implementation Progress
 
@@ -21,12 +19,6 @@
 **Opcodes with Primary Tests**: 99
 
 **Opcodes with Documentation**: 99
-
-## What Needs Attention
-
-- **1 failing primary tests** across 1 opcodes (see 'Failing Primary' column)
-- **15 opcodes** not yet marked as fully implemented
-- **1 opcodes** not yet marked as fully implemented for NO_GRAPHICS mode
 
 
 ## Summary Table
@@ -40,7 +32,7 @@
 | 0X07 | ActionStop | SWF_ACTION_STOP |  | 3/3 | 3/3 |  | ✓ | ✓ |  |
 | 0X08 | ActionToggleQuality | SWF_ACTION_TOGGLE_QUALITY | actionToggleQuality | 1/1 |  |  | ✓ |  | ✓ |
 | 0X09 | ActionStopSounds | SWF_ACTION_STOP_SOUNDS | actionStopSounds | 1/1 |  |  | ✓ |  | ✓ |
-| 0X0A | ActionAdd | SWF_ACTION_ADD | actionAdd | 1/2 | 4/4 | 1 | ✓ | ✓ |  |
+| 0X0A | ActionAdd | SWF_ACTION_ADD | actionAdd | 2/2 | 4/4 |  | ✓ | ✓ |  |
 | 0X0B | ActionSubtract | SWF_ACTION_SUBTRACT | actionSubtract | 1/1 |  |  | ✓ | ✓ |  |
 | 0X0C | ActionMultiply | SWF_ACTION_MULTIPLY | actionMultiply | 1/1 |  |  | ✓ | ✓ |  |
 | 0X0D | ActionDivide | SWF_ACTION_DIVIDE | actionDivide | 1/1 | 1/1 |  | ✓ | ✓ |  |
@@ -62,7 +54,7 @@
 | 0X23 | ActionSetProperty | SWF_ACTION_SET_PROPERTY | actionSetProperty | 1/1 |  |  | ✓ |  | ✓ |
 | 0X24 | ActionCloneSprite | SWF_ACTION_CLONE_SPRITE | actionCloneSprite | 1/1 |  |  | ✓ |  | ✓ |
 | 0X25 | ActionRemoveSprite | SWF_ACTION_REMOVE_SPRITE | actionRemoveSprite | 1/1 |  |  | ✓ |  | ✓ |
-| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 110/111 |  | ✓ | ✓ |  |
+| 0X26 | ActionTrace | SWF_ACTION_TRACE | actionTrace | 1/1 | 111/111 |  | ✓ | ✓ |  |
 | 0X27 | ActionStartDrag | SWF_ACTION_START_DRAG | actionStartDrag | 1/1 | 1/1 |  | ✓ |  | ✓ |
 | 0X28 | ActionEndDrag | SWF_ACTION_END_DRAG | actionEndDrag | 1/1 |  |  | ✓ |  | ✓ |
 | 0X29 | ActionStringLess | SWF_ACTION_STRING_LESS | actionStringLess | 1/1 |  |  | ✓ | ✓ |  |
@@ -126,7 +118,7 @@
 | 0X8E | ActionDefineFunction2 | SWF_ACTION_DEFINE_FUNCTION2 | actionDefineFunction2 | 2/2 | 1/1 |  | ✓ | ✓ |  |
 | 0X8F | ActionTry | SWF_ACTION_TRY |  | 1/1 |  |  | ✓ | ✓ |  |
 | 0X94 | ActionWith | SWF_ACTION_WITH |  | 1/1 |  |  | ✓ | ✓ |  |
-| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 112/113 |  | ✓ | ✓ |  |
+| 0X96 | ActionPush | SWF_ACTION_PUSH |  | 1/1 | 113/113 |  | ✓ | ✓ |  |
 | 0X99 | ActionJump | SWF_ACTION_JUMP |  | 1/1 |  |  | ✓ | ✓ |  |
 | 0X9A | ActionGetURL2 | SWF_ACTION_GET_URL2 | actionGetURL2 | 1/1 |  |  | ✓ |  | ✓ |
 | 0X9B | ActionDefineFunction | SWF_ACTION_DEFINE_FUNCTION |  | 1/1 |  |  | ✓ | ✓ |  |
@@ -136,7 +128,7 @@
 
 ## Passing Primary Tests
 
-**Total Passing Primary Tests**: 117
+**Total Passing Primary Tests**: 118
 
 | Hex | Opcode | Test Path | Enum | Function | Docs |
 |-----|--------|-----------|------|----------|------|
@@ -149,6 +141,7 @@
 | 0X07 | ActionStop | `stop_swf_4` | ✓ |  | ✓ |
 | 0X08 | ActionToggleQuality | `toggle_quality_swf_4` | ✓ | ✓ | ✓ |
 | 0X09 | ActionStopSounds | `stop_sounds_swf_4` | ✓ | ✓ | ✓ |
+| 0X0A | ActionAdd | `add_floats_swf_4` | ✓ | ✓ | ✓ |
 | 0X0A | ActionAdd | `add_swf_4` | ✓ | ✓ | ✓ |
 | 0X0B | ActionSubtract | `subtract_swf_4` | ✓ | ✓ | ✓ |
 | 0X0C | ActionMultiply | `multiply_floats_swf_4` | ✓ | ✓ | ✓ |
@@ -260,11 +253,7 @@
 
 ## Failing Primary Tests
 
-**Total Failing Primary Tests**: 1
-
-| Hex | Opcode | Test Path | Enum | Function | Docs |
-|-----|--------|-----------|------|----------|------|
-| 0X0A | ActionAdd | `add_floats_swf_4` | ✓ | ✓ | ✓ |
+**No failing primary tests! 🎉**
 
 ## Implementation Status
 
@@ -277,7 +266,7 @@
 | 0X05 | ActionPreviousFrame | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X06 | ActionPlay | ✓ | ✓ | 2/2 |  | ✓ | ✓ |
 | 0X07 | ActionStop | ✓ |  | 3/3 |  | ✓ |  |
-| 0X0A | ActionAdd | ✓ | ✓ | 1/2 | 1 | ✓ |  |
+| 0X0A | ActionAdd | ✓ | ✓ | 2/2 |  | ✓ |  |
 | 0X0B | ActionSubtract | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X0C | ActionMultiply | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X0D | ActionDivide | ✓ | ✓ | 1/1 |  | ✓ |  |
@@ -680,7 +669,7 @@ void actionStopSounds(char* stack, u32* sp);
 - `actionAdd` (function, source: action.h)
 
 **Primary Tests:**
-- [✗] `SWFRecomp/tests/add_floats_swf_4`
+- [✓] `SWFRecomp/tests/add_floats_swf_4`
 - [✓] `SWFRecomp/tests/add_swf_4`
 
 **Secondary Tests:**
@@ -1301,7 +1290,7 @@ void actionRemoveSprite(char* stack, u32* sp);
 
 **Secondary Tests:**
 - [✓] `SWFRecomp/tests/add2_swf_5`
-- [✗] `SWFRecomp/tests/add_floats_swf_4`
+- [✓] `SWFRecomp/tests/add_floats_swf_4`
 - [✓] `SWFRecomp/tests/add_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_both_0_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_first_1_swf_4`
@@ -3114,7 +3103,7 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 
 **Secondary Tests:**
 - [✓] `SWFRecomp/tests/add2_swf_5`
-- [✗] `SWFRecomp/tests/add_floats_swf_4`
+- [✓] `SWFRecomp/tests/add_floats_swf_4`
 - [✓] `SWFRecomp/tests/add_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_both_0_swf_4`
 - [✓] `SWFRecomp/tests/and_floats_first_1_swf_4`
