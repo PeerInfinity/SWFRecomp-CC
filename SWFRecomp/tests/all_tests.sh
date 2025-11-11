@@ -94,6 +94,7 @@ filter_output() {
     grep -a -v "\[Frame" | \
     grep -a -v "\[Tag\]" | \
     grep -a -v "\[DEBUG" | \
+    grep -a -v "\[HEAP" | \
     grep -a -v "^$" || true
 }
 
@@ -103,7 +104,8 @@ filter_output_preserve_empty() {
     grep -a -v "=== SWF" | \
     grep -a -v "\[Frame" | \
     grep -a -v "\[Tag\]" | \
-    grep -a -v "\[DEBUG" || true
+    grep -a -v "\[DEBUG" | \
+    grep -a -v "\[HEAP" || true
 }
 
 # Initialize results JSON file
