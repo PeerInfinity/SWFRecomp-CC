@@ -57,4 +57,4 @@ test_vars
 test_results.json
 
 # Other
-__pycache__/
+__pycache__/test-and-doc-output.log
