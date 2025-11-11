@@ -148,6 +148,15 @@ cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
 # Copy hashmap library (required for variable storage)
 cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${BUILD_DIR}/"
 
+# Copy o1heap library (required for memory management)
+cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${BUILD_DIR}/"
+cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${BUILD_DIR}/"
+
+# Copy heap memory manager
+cp "${SWFMODERN_SRC}/memory/heap.c" "${BUILD_DIR}/"
+mkdir -p "${BUILD_DIR}/memory"
+cp "${SWFMODERN_INC}/memory/heap.h" "${BUILD_DIR}/memory/"
+
 # Copy generated files from SWFRecomp
 echo "Copying generated files..."
 cp "${TEST_DIR}/RecompiledScripts"/*.c "${BUILD_DIR}/" 2>/dev/null || true
@@ -174,6 +183,7 @@ if [ "$TARGET" == "wasm" ]; then
         -I"${SWFMODERN_INC}" \
         -I"${SWFMODERN_INC}/actionmodern" \
         -I"${SWFMODERN_INC}/libswf" \
+        -I"${SWFMODERN_INC}/memory" \
         -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
         -o "${TEST_NAME}.js" \
         -s WASM=1 \
@@ -205,6 +215,7 @@ else
         -I"${SWFMODERN_INC}" \
         -I"${SWFMODERN_INC}/actionmodern" \
         -I"${SWFMODERN_INC}/libswf" \
+        -I"${SWFMODERN_INC}/memory" \
         -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
         -Wall \
         -Wno-unused-variable \

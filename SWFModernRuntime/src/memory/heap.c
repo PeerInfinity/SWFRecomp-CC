@@ -46,19 +46,26 @@ static bool create_heap(size_t size)
 		return false;
 	}
 
-	// Allocate arena (use system malloc for the arena itself)
-	void* arena = malloc(size);
+	// Allocate arena with proper alignment for o1heap
+	// O1HEAP_ALIGNMENT = sizeof(void*) * 4 = 32 bytes on 64-bit systems
+	const size_t alignment = O1HEAP_ALIGNMENT;
+
+	// aligned_alloc requires size to be a multiple of alignment
+	size_t aligned_size = ((size + alignment - 1) / alignment) * alignment;
+
+	void* arena = aligned_alloc(alignment, aligned_size);
 	if (arena == NULL)
 	{
-		fprintf(stderr, "ERROR: Failed to allocate heap arena of size %zu bytes\n", size);
+		fprintf(stderr, "ERROR: Failed to allocate aligned heap arena of size %zu bytes\n", aligned_size);
 		return false;
 	}
 
 	// Initialize o1heap instance
-	O1HeapInstance* instance = o1heapInit(arena, size);
+	O1HeapInstance* instance = o1heapInit(arena, aligned_size);
 	if (instance == NULL)
 	{
-		fprintf(stderr, "ERROR: Failed to initialize o1heap (size=%zu, arena=%p)\n", size, arena);
+		fprintf(stderr, "ERROR: Failed to initialize o1heap (size=%zu, arena=%p, alignment=%zu)\n",
+			aligned_size, arena, alignment);
 		free(arena);
 		return false;
 	}
@@ -66,9 +73,9 @@ static bool create_heap(size_t size)
 	// Store heap entry
 	g_heaps[g_heap_count].instance = instance;
 	g_heaps[g_heap_count].arena = arena;
-	g_heaps[g_heap_count].arena_size = size;
+	g_heaps[g_heap_count].arena_size = aligned_size;
 	g_heaps[g_heap_count].arena_start = arena;
-	g_heaps[g_heap_count].arena_end = (char*)arena + size;
+	g_heaps[g_heap_count].arena_end = (char*)arena + aligned_size;
 
 	printf("[HEAP] Created heap %d: size=%zu MB (%zu bytes)\n",
 		g_heap_count, size / (1024 * 1024), size);
