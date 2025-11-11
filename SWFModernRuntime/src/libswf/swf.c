@@ -6,6 +6,7 @@
 #include <variables.h>
 #include <flashbang.h>
 #include <utils.h>
+#include <heap.h>
 
 char* stack;
 u32 sp;
@@ -104,10 +105,17 @@ void swfStart(SWFAppContext* app_context)
 	initTime();
 	initMap();
 
+	// Initialize heap allocator
+	if (!heap_init(0)) {  // 0 = use default size (32 MB)
+		fprintf(stderr, "Failed to initialize heap allocator\n");
+		return;
+	}
+
 	tagInit();
 
 	tagMain(frame_funcs);
 
+	heap_shutdown();
 	freeMap();
 
 	aligned_free(stack);

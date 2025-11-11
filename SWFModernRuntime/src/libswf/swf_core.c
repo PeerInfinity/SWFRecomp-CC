@@ -5,6 +5,7 @@
 #include <action.h>
 #include <variables.h>
 #include <utils.h>
+#include <heap.h>
 
 // Core runtime state - exported
 char* stack = NULL;
@@ -54,6 +55,13 @@ void swfStart(SWFAppContext* app_context)
 
 	initTime();
 	initMap();
+
+	// Initialize heap allocator
+	if (!heap_init(0)) {  // 0 = use default size (32 MB)
+		fprintf(stderr, "Failed to initialize heap allocator\n");
+		return;
+	}
+
 	tagInit();
 
 	// Run frames in console mode
@@ -99,6 +107,7 @@ void swfStart(SWFAppContext* app_context)
 	printf("\n=== SWF Execution Completed ===\n");
 
 	// Cleanup
+	heap_shutdown();
 	freeMap();
 	aligned_free(stack);
 }

@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include <actionmodern/object.h>
+#include <heap.h>
 
 /**
  * Object Allocation
@@ -109,7 +110,7 @@ void releaseObject(ASObject* obj)
 			// Free property name (always heap-allocated)
 			if (obj->properties[i].name != NULL)
 			{
-				free(obj->properties[i].name);
+				heap_free(obj->properties[i].name);
 			}
 
 			// If property value is an object, release it recursively
@@ -300,7 +301,7 @@ void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* va
 	obj->num_used++;
 
 	// Allocate and copy property name
-	obj->properties[index].name = (char*) malloc(name_length + 1);
+	obj->properties[index].name = (char*) heap_alloc(name_length + 1);
 	if (obj->properties[index].name == NULL)
 	{
 		fprintf(stderr, "ERROR: Failed to allocate property name\n");
@@ -372,7 +373,7 @@ bool deleteProperty(ASObject* obj, const char* name, u32 name_length)
 			// 2. Free the property name
 			if (obj->properties[i].name != NULL)
 			{
-				free(obj->properties[i].name);
+				heap_free(obj->properties[i].name);
 			}
 
 			// 3. Shift remaining properties down to fill the gap

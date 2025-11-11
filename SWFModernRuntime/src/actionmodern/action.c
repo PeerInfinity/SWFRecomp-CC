@@ -4,10 +4,18 @@
 #include <string.h>
 #include <time.h>
 
-#include "constants.h"  // For SWF_FRAME_COUNT
+// constants.h is generated per-test and contains SWF_FRAME_COUNT
+// It's optional - if not present, SWF_FRAME_COUNT defaults are used
+#ifdef __has_include
+#  if __has_include("constants.h")
+#    include "constants.h"
+#  endif
+#endif
+
 #include <recomp.h>
 #include <utils.h>
 #include <swf.h>
+#include <heap.h>
 #include <actionmodern/object.h>
 
 u32 start_time;
@@ -5024,7 +5032,7 @@ void actionNewMethod(char* stack, u32* sp)
 					// DefineFunction2 with full register support
 					ActionVar* registers = NULL;
 					if (func->register_count > 0) {
-						registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+						registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
 					}
 
 					// Create local scope for function
@@ -5042,7 +5050,7 @@ void actionNewMethod(char* stack, u32* sp)
 					}
 					releaseObject(local_scope);
 
-					if (registers != NULL) free(registers);
+					if (registers != NULL) heap_free(registers);
 				}
 				else
 				{
@@ -5338,7 +5346,7 @@ void actionNewMethod(char* stack, u32* sp)
 			}
 			releaseObject(local_scope);
 
-			if (registers != NULL) free(registers);
+			if (registers != NULL) heap_free(registers);
 		}
 		else
 		{
@@ -5964,7 +5972,7 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 	ActionVar* args = NULL;
 	if (num_args > 0)
 	{
-		args = (ActionVar*) malloc(sizeof(ActionVar) * num_args);
+		args = (ActionVar*) heap_alloc(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
 			popVar(stack, sp, &args[num_args - 1 - i]);
@@ -6009,14 +6017,14 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 
 			// Parse integer from string
 			float result = (float) atoi(str_value);
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - return NaN
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			float nan_val = 0.0f / 0.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
 			builtin_handled = 1;
@@ -6057,14 +6065,14 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 
 			// Parse float from string
 			float result = (float) atof(str_value);
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - return NaN
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			float nan_val = 0.0f / 0.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
 			builtin_handled = 1;
@@ -6093,14 +6101,14 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 			}
 
 			float result = (val != val) ? 1.0f : 0.0f;  // NaN != NaN is true
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - isNaN(undefined) = true
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			float result = 1.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
@@ -6129,14 +6137,14 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 
 			// Check if finite (not NaN and not infinity)
 			float result = (val == val && val != INFINITY && val != -INFINITY) ? 1.0f : 0.0f;
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - isFinite(undefined) = false
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			float result = 0.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
@@ -6155,7 +6163,7 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 				// DefineFunction2 with registers and this context
 				ActionVar* registers = NULL;
 				if (func->register_count > 0) {
-					registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+					registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
 				}
 
 				// Create local scope object for function-local variables
@@ -6178,8 +6186,8 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 				// Release decrements refcount and frees if refcount reaches 0
 				releaseObject(local_scope);
 
-				if (registers != NULL) free(registers);
-				if (args != NULL) free(args);
+				if (registers != NULL) heap_free(registers);
+				if (args != NULL) heap_free(args);
 
 				pushVar(stack, sp, &result);
 			}
@@ -6201,7 +6209,7 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 				}
 
 				// Free args array before calling function
-				if (args != NULL) free(args);
+				if (args != NULL) heap_free(args);
 
 				// Call the simple function
 				// It will pop parameters, execute body, and may push a return value
@@ -6222,7 +6230,7 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 		else
 		{
 			// Function not found - push undefined
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			pushUndefined(stack, sp);
 		}
 	}
@@ -6485,7 +6493,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 	ActionVar* args = NULL;
 	if (num_args > 0)
 	{
-		args = (ActionVar*) malloc(sizeof(ActionVar) * num_args);
+		args = (ActionVar*) heap_alloc(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
 			popVar(stack, sp, &args[num_args - 1 - i]);
@@ -6506,14 +6514,14 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 				// Invoke DefineFunction2
 				ActionVar* registers = NULL;
 				if (func->register_count > 0) {
-					registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+					registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
 				}
 
 				// No 'this' binding for direct function call (pass NULL)
 				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
 
-				if (registers != NULL) free(registers);
-				if (args != NULL) free(args);
+				if (registers != NULL) heap_free(registers);
+				if (args != NULL) heap_free(args);
 
 				pushVar(stack, sp, &result);
 				return;
@@ -6521,7 +6529,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 			else
 			{
 				// Simple function or invalid - push undefined
-				if (args != NULL) free(args);
+				if (args != NULL) heap_free(args);
 				pushUndefined(stack, sp);
 				return;
 			}
@@ -6529,7 +6537,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		else
 		{
 			// Object is not a function - cannot invoke, push undefined
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			pushUndefined(stack, sp);
 			return;
 		}
@@ -6543,7 +6551,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		if (obj == NULL)
 		{
 			// Null object - push undefined
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			pushUndefined(stack, sp);
 			return;
 		}
@@ -6561,27 +6569,27 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 				// Invoke DefineFunction2 with 'this' binding
 				ActionVar* registers = NULL;
 				if (func->register_count > 0) {
-					registers = (ActionVar*) calloc(func->register_count, sizeof(ActionVar));
+					registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
 				}
 
 				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, (void*) obj);
 
-				if (registers != NULL) free(registers);
-				if (args != NULL) free(args);
+				if (registers != NULL) heap_free(registers);
+				if (args != NULL) heap_free(args);
 
 				pushVar(stack, sp, &result);
 			}
 			else
 			{
 				// Simple function or invalid - push undefined
-				if (args != NULL) free(args);
+				if (args != NULL) heap_free(args);
 				pushUndefined(stack, sp);
 			}
 		}
 		else
 		{
 			// Method not found or not a function - push undefined
-			if (args != NULL) free(args);
+			if (args != NULL) heap_free(args);
 			pushUndefined(stack, sp);
 			return;
 		}
@@ -6597,7 +6605,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		                                         method_name, method_name_len,
 		                                         args, num_args);
 
-		if (args != NULL) free(args);
+		if (args != NULL) heap_free(args);
 
 		if (!handled)
 		{
@@ -6609,7 +6617,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 	else
 	{
 		// Not an object or string - push undefined
-		if (args != NULL) free(args);
+		if (args != NULL) heap_free(args);
 		pushUndefined(stack, sp);
 		return;
 	}

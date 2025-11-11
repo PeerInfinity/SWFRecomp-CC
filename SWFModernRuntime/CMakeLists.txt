@@ -20,6 +20,10 @@ set(CORE_SOURCES
 
     # Compile hashmap file directly to avoid undefined symbols on Linux
     ${PROJECT_SOURCE_DIR}/lib/c-hashmap/map.c
+
+    # O1heap - constant-time memory allocator
+    ${PROJECT_SOURCE_DIR}/lib/o1heap/o1heap.c
+    ${PROJECT_SOURCE_DIR}/src/memory/heap.c
 )
 
 if(NO_GRAPHICS)
@@ -85,7 +89,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/actionmodern
     ${PROJECT_SOURCE_DIR}/include/libswf
+    ${PROJECT_SOURCE_DIR}/include/memory
     ${PROJECT_SOURCE_DIR}/lib/c-hashmap
+    ${PROJECT_SOURCE_DIR}/lib/o1heap
     zlib
     lzma/liblzma/api
 )
