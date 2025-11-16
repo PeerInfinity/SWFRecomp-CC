@@ -13,11 +13,16 @@ typedef struct SWFAppContext SWFAppContext;
  * Wrapper around o1heap allocator using virtual memory for efficient expansion.
  *
  * Design:
- * - Reserves large virtual address space (e.g., 4 GB) upfront
- * - Commits physical pages on demand (starts with 64 MB)
- * - When heap is full, commits more pages in the same virtual space
+ * - Reserves large virtual address space (e.g., 4 GB) upfront (cheap, no physical RAM)
+ * - Initializes o1heap with the FULL reserved address space (manages entire range)
+ * - Commits physical pages on demand (starts with 64 MB committed)
+ * - When heap needs more space, commits additional pages (no reinitialization)
+ * - Physical RAM only allocated on first access (lazy allocation by OS)
  * - No copying or migration needed - all allocations stay at same addresses
  * - Heap state stored in app_context for proper lifecycle management
+ *
+ * Key benefit: Lazy physical allocation spreads memory overhead across frames,
+ * reducing stutter compared to traditional malloc/realloc approaches.
  */
 
 /**
