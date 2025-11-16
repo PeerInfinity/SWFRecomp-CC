@@ -45,8 +45,25 @@ u32 getpagesize()
 {
 	SYSTEM_INFO si;
 	GetSystemInfo(&si);
-	
+
 	return si.dwPageSize;
+}
+
+// Virtual memory functions for Windows
+char* vmem_reserve(size_t size)
+{
+	return (char*)VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
+}
+
+void vmem_commit(char* addr, size_t size)
+{
+	VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE);
+}
+
+void vmem_release(char* addr, size_t size)
+{
+	(void)size;  // size parameter unused on Windows
+	VirtualFree(addr, 0, MEM_RELEASE);
 }
 
 #elif defined(__GNUC__)
@@ -54,6 +71,8 @@ u32 getpagesize()
 
 #include <stdlib.h>
 #include <time.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 void aligned_free(void* memblock)
 {
@@ -65,6 +84,27 @@ u32 get_elapsed_ms()
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 	return (now.tv_sec)*1000 + (now.tv_nsec)/1000000;
+}
+
+// Virtual memory functions for Linux
+char* vmem_reserve(size_t size)
+{
+	void* addr = mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (addr == MAP_FAILED)
+	{
+		return NULL;
+	}
+	return (char*)addr;
+}
+
+void vmem_commit(char* addr, size_t size)
+{
+	mprotect(addr, size, PROT_READ | PROT_WRITE);
+}
+
+void vmem_release(char* addr, size_t size)
+{
+	munmap(addr, size);
 }
 
 #endif

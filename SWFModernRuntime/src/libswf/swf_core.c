@@ -57,7 +57,7 @@ void swfStart(SWFAppContext* app_context)
 	initMap();
 
 	// Initialize heap allocator
-	if (!heap_init(0)) {  // 0 = use default size (32 MB)
+	if (!heap_init(app_context, 0)) {  // 0 = use default size (64 MB)
 		fprintf(stderr, "Failed to initialize heap allocator\n");
 		return;
 	}

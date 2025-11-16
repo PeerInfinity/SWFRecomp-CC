@@ -4,25 +4,30 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+// Forward declaration
+typedef struct SWFAppContext SWFAppContext;
+
 /**
  * Memory Heap Manager
  *
- * Wrapper around o1heap allocator providing multi-heap support with automatic expansion.
+ * Wrapper around o1heap allocator using virtual memory for efficient expansion.
  *
  * Design:
- * - Starts with initial heap (default 32 MB)
- * - When current heap is full, creates a new larger heap
- * - Keeps chain of heaps alive (no migration needed)
- * - Heap sizes double: 32 MB -> 64 MB -> 128 MB -> 256 MB
+ * - Reserves large virtual address space (e.g., 4 GB) upfront
+ * - Commits physical pages on demand (starts with 64 MB)
+ * - When heap is full, commits more pages in the same virtual space
+ * - No copying or migration needed - all allocations stay at same addresses
+ * - Heap state stored in app_context for proper lifecycle management
  */
 
 /**
  * Initialize the heap system
  *
- * @param initial_size Initial heap size in bytes (default: 32 MB if 0)
+ * @param app_context The SWF application context to store heap state
+ * @param initial_size Initial heap size in bytes (default: 64 MB if 0)
  * @return true on success, false on failure
  */
-bool heap_init(size_t initial_size);
+bool heap_init(SWFAppContext* app_context, size_t initial_size);
 
 /**
  * Allocate memory from the heap

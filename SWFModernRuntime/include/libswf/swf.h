@@ -2,6 +2,9 @@
 
 #include <stackvalue.h>
 
+// Forward declaration for o1heap
+typedef struct O1HeapInstance O1HeapInstance;
+
 #ifndef NO_GRAPHICS
 #define INITIAL_DICTIONARY_CAPACITY 1024
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
@@ -51,6 +54,13 @@ typedef struct SWFAppContext
 	char* bitmap_data;
 	size_t bitmap_data_size;
 #endif
+
+	// Heap management fields
+	O1HeapInstance* heap_instance;
+	char* heap;
+	int heap_inited;
+	size_t heap_current_size;
+	size_t heap_full_size;
 } SWFAppContext;
 
 extern char* stack;
