@@ -10,9 +10,7 @@ void* aligned_alloc(size_t alignment, size_t size);
 void aligned_free(void* memblock);
 
 u32 get_elapsed_ms();
-#ifdef _MSC_VER
-u32 getpagesize();
-#endif
+int getpagesize();
 
 // Virtual memory functions for heap management
 char* vmem_reserve(size_t size);

@@ -41,12 +41,12 @@ u32 get_elapsed_ms()
 	return (u32) GetTickCount();
 }
 
-u32 getpagesize()
+int getpagesize()
 {
 	SYSTEM_INFO si;
 	GetSystemInfo(&si);
 
-	return si.dwPageSize;
+	return (int)si.dwPageSize;
 }
 
 // Virtual memory functions for Windows
