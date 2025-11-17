@@ -10,26 +10,28 @@ typedef struct SWFAppContext SWFAppContext;
 /**
  * Memory Heap Manager
  *
- * Wrapper around o1heap allocator using virtual memory for efficient expansion.
+ * Wrapper around o1heap allocator using virtual memory for efficient allocation.
  *
  * Design:
- * - Reserves large virtual address space (e.g., 4 GB) upfront (cheap, no physical RAM)
- * - Initializes o1heap with the FULL reserved address space (manages entire range)
- * - Commits physical pages on demand (starts with 64 MB committed)
- * - When heap needs more space, commits additional pages (no reinitialization)
+ * - Reserves 1 GB virtual address space upfront (cheap, no physical RAM)
+ * - Commits all pages immediately (still cheap, still no physical RAM!)
+ * - Initializes o1heap with full 1 GB space (no expansion needed)
  * - Physical RAM only allocated on first access (lazy allocation by OS)
- * - No copying or migration needed - all allocations stay at same addresses
  * - Heap state stored in app_context for proper lifecycle management
  *
- * Key benefit: Lazy physical allocation spreads memory overhead across frames,
- * reducing stutter compared to traditional malloc/realloc approaches.
+ * Key benefit: Lazy physical allocation by OS spreads memory overhead across frames,
+ * reducing stutter compared to traditional malloc approaches. Committing the full space
+ * upfront is faster and simpler than incremental expansion.
  */
 
 /**
  * Initialize the heap system
  *
+ * Reserves and commits 1 GB of virtual address space. Physical RAM is allocated
+ * lazily by the OS as memory is accessed.
+ *
  * @param app_context The SWF application context to store heap state
- * @param initial_size Initial heap size in bytes (default: 64 MB if 0)
+ * @param initial_size Unused (kept for API compatibility)
  * @return true on success, false on failure
  */
 bool heap_init(SWFAppContext* app_context, size_t initial_size);

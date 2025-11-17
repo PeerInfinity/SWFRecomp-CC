@@ -12,23 +12,26 @@
  * Virtual Memory-based Heap Implementation
  *
  * Strategy:
- * - Reserve large virtual address space (DEFAULT_FULL_HEAP_SIZE) upfront (e.g., 4 GB)
- * - Initialize o1heap with the FULL reserved size (entire virtual address space)
- * - Commit physical pages on demand starting with DEFAULT_INITIAL_HEAP_SIZE (e.g., 64 MB)
- * - When heap needs more space, commit additional pages (doubling committed size)
+ * - Reserve full virtual address space (1 GB) upfront - no physical RAM used
+ * - Commit all pages immediately - still no physical RAM used!
+ * - Initialize o1heap with the full 1 GB committed space
  * - Physical memory is lazily allocated by OS on first access (spreads overhead across frames)
- * - No reinitialization needed - o1heap manages entire virtual address space from start
- * - All allocations remain at same addresses (no migration, no copying)
+ * - No expansion logic needed - heap has full space from start
  * - Heap state stored in app_context for proper lifecycle management
  *
- * Key Insight: Virtual memory reservation is cheap (no physical RAM used).
- * Physical pages are only allocated when accessed, so committing pages upfront
- * doesn't actually use RAM until the memory is touched. This spreads allocation
- * overhead across many frames, reducing stutter.
+ * Key Insights:
+ * 1. Reserving virtual address space is cheap (no physical RAM)
+ * 2. Committing pages is also cheap (<1 ms for 1 GB) - still no physical RAM!
+ * 3. Physical RAM only allocated when memory is first touched (lazy allocation)
+ * 4. This spreads allocation overhead across many frames, preventing stutter
+ * 5. Pre-touching pages to force allocation is too slow (150 ms for 512 MB)
+ * 6. Trusting OS lazy allocation is fastest and smoothest
+ *
+ * Performance: Committing 1 GB upfront is faster than trying to be "smart" about
+ * incremental expansion. The OS handles lazy physical allocation better than we can.
  */
 
-#define DEFAULT_INITIAL_HEAP_SIZE (64 * 1024 * 1024)  // 64 MB
-#define DEFAULT_FULL_HEAP_SIZE (4ULL * 1024 * 1024 * 1024)  // 4 GB virtual space
+#define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB virtual space
 
 static SWFAppContext* g_app_context = NULL;
 
@@ -46,15 +49,10 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 		return true;
 	}
 
-	if (initial_size == 0)
-	{
-		initial_size = DEFAULT_INITIAL_HEAP_SIZE;
-	}
-
 	// Store reference to app_context for later use
 	g_app_context = app_context;
 
-	// Reserve large virtual address space
+	// Reserve large virtual address space (1 GB)
 	app_context->heap_full_size = DEFAULT_FULL_HEAP_SIZE;
 	app_context->heap = vmem_reserve(app_context->heap_full_size);
 
@@ -65,13 +63,12 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 		return false;
 	}
 
-	// Commit initial physical pages
-	app_context->heap_current_size = initial_size;
-	vmem_commit(app_context->heap, app_context->heap_current_size);
+	// Commit all pages upfront - physical memory still allocated lazily by OS on access
+	// This is fast (<1 ms) and allows o1heap to use the full space without expansion
+	vmem_commit(app_context->heap, app_context->heap_full_size);
+	app_context->heap_current_size = app_context->heap_full_size;
 
-	// Initialize o1heap with the FULL reserved size, not just committed size
-	// Virtual memory allows o1heap to manage the entire address space,
-	// while physical pages are only committed as needed
+	// Initialize o1heap with the full committed size
 	app_context->heap_instance = o1heapInit(app_context->heap, app_context->heap_full_size);
 
 	if (app_context->heap_instance == NULL)
@@ -85,8 +82,7 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 
 	app_context->heap_inited = 1;
 
-	printf("[HEAP] Initialized with %zu MB committed (%.1f GB reserved)\n",
-		app_context->heap_current_size / (1024 * 1024),
+	printf("[HEAP] Initialized: %.1f GB reserved and committed (physical RAM allocated on access)\n",
 		app_context->heap_full_size / (1024.0 * 1024.0 * 1024.0));
 
 	return true;
@@ -105,43 +101,14 @@ void* heap_alloc(size_t size)
 		return NULL;  // Standard malloc behavior
 	}
 
-	// Try to allocate from current heap
+	// Allocate from the heap
+	// All pages are already committed, so no expansion logic needed
+	// Physical RAM is allocated lazily by the OS when memory is first accessed
 	void* ptr = o1heapAllocate(g_app_context->heap_instance, size);
-
-	if (ptr != NULL)
-	{
-		return ptr;
-	}
-
-	// Heap is full - commit more physical pages
-	// O1heap was initialized with the full virtual address space,
-	// so we just need to commit additional pages without reinitializing
-	size_t new_size = g_app_context->heap_current_size * 2;
-
-	if (new_size > g_app_context->heap_full_size)
-	{
-		fprintf(stderr, "ERROR: Cannot expand heap beyond reserved virtual space (%llu bytes)\n",
-			(unsigned long long)g_app_context->heap_full_size);
-		return NULL;
-	}
-
-	// Commit additional pages - physical memory allocated on first access (lazy)
-	size_t additional_size = new_size - g_app_context->heap_current_size;
-	char* commit_addr = g_app_context->heap + g_app_context->heap_current_size;
-	vmem_commit(commit_addr, additional_size);
-
-	printf("[HEAP] Expanding: %zu MB -> %zu MB (committed pages, physical allocation on access)\n",
-		g_app_context->heap_current_size / (1024 * 1024),
-		new_size / (1024 * 1024));
-
-	g_app_context->heap_current_size = new_size;
-
-	// Try allocation again - o1heap already knows about this address space
-	ptr = o1heapAllocate(g_app_context->heap_instance, size);
 
 	if (ptr == NULL)
 	{
-		fprintf(stderr, "ERROR: heap_alloc(%zu) failed even after committing more pages\n", size);
+		fprintf(stderr, "ERROR: heap_alloc(%zu) failed - out of memory\n", size);
 	}
 
 	return ptr;
