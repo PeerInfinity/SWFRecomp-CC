@@ -38,21 +38,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake
 
-      - name: Clean generated files
+      - name: Run tests and generate documentation
         run: |
-          # Remove generated files to ensure fresh results
-          rm -f opcode-index-plain.md
-          rm -f opcode-index.json
-          rm -f opcode-index.md
-          rm -f SWFRecomp/tests/test_results.json
-          echo "Cleaned generated files"
-
-      - name: Run tests
-        run: |
-          cd SWFRecomp/tests
-
-          # Build test command with optional parameters
-          CMD="./all_tests.sh --build"
+          # Build command with optional parameters
+          CMD="python3 scripts/test-and-document.py --build"
 
           # Add --max-tests if specified
           if [ -n "${{ github.event.inputs.max_tests }}" ]; then
@@ -64,7 +53,7 @@ jobs:
             CMD="$CMD --clean"
           fi
 
-          # Run the tests
+          # Run the tests and generate documentation
           echo "Running: $CMD"
           $CMD
 
@@ -95,6 +84,17 @@ jobs:
               print(f"**Sub-tests Passed:** {summary.get('passed_sub_tests', 0)}/{summary.get('total_sub_tests', 0)}")
           PYTHON_SCRIPT
           fi
+
+      - name: Save generated files
+        if: always()
+        run: |
+          # Save the generated files to a temporary location before branch operations
+          mkdir -p /tmp/generated-files
+          cp -f opcode-index.json /tmp/generated-files/ 2>/dev/null || true
+          cp -f opcode-index.md /tmp/generated-files/ 2>/dev/null || true
+          cp -f opcode-index-plain.md /tmp/generated-files/ 2>/dev/null || true
+          echo "Saved generated files to /tmp/generated-files"
+          ls -la /tmp/generated-files
 
       - name: Create or switch to test-results-update branch
         if: always()
@@ -130,6 +130,14 @@ jobs:
             echo "Creating new branch test-results-update from master"
             git checkout -b test-results-update origin/master
           fi
+
+      - name: Restore generated files
+        if: always()
+        run: |
+          # Restore the saved generated files
+          cp -f /tmp/generated-files/* . 2>/dev/null || true
+          echo "Restored generated files"
+          ls -la opcode-index* 2>/dev/null || echo "No opcode-index files found"
 
       - name: Commit and push test results
         if: always()
