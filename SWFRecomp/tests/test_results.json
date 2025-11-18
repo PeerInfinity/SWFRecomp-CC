@@ -1,0 +1,43 @@
+{
+  "timestamp": "2025-11-18T01:06:08Z",
+  "summary": {
+    "total_tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "total_sub_tests": 3,
+    "passed_sub_tests": 3,
+    "failed_sub_tests": 0
+  },
+  "tests": [
+    {
+      "name": "add2_swf_5",
+      "passed": true,
+      "build_time_ms": 672,
+      "execution_time_ms": 66,
+      "opcodes_tested": [
+        "ADD2"
+      ],
+      "sub_tests": [
+        {
+          "name": "number_plus_number",
+          "passed": true,
+          "expected": "8",
+          "actual": "8"
+        },
+        {
+          "name": "string_plus_number",
+          "passed": true,
+          "expected": "Total: 42",
+          "actual": "Total: 42"
+        },
+        {
+          "name": "number_plus_string",
+          "passed": true,
+          "expected": "5 items",
+          "actual": "5 items"
+        }
+      ]
+    }
+  ]
+}
