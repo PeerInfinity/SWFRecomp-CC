@@ -38,64 +38,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake
 
-      - name: Run tests and generate documentation
-        run: |
-          # Build command with optional parameters
-          CMD="python3 scripts/test-and-document.py --build"
-
-          # Add --max-tests if specified
-          if [ -n "${{ github.event.inputs.max_tests }}" ]; then
-            CMD="$CMD --max-tests=${{ github.event.inputs.max_tests }}"
-          fi
-
-          # Add --clean if specified
-          if [ "${{ github.event.inputs.clean }}" = "true" ]; then
-            CMD="$CMD --clean"
-          fi
-
-          # Run the tests and generate documentation
-          echo "Running: $CMD"
-          $CMD
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            SWFRecomp/tests/test_results.json
-            SWFRecomp/opcode-index.json
-            SWFRecomp/opcode-index.md
-          retention-days: 30
-
-      - name: Display test summary
-        if: always()
-        run: |
-          if [ -f SWFRecomp/tests/test_results.json ]; then
-            echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-            python3 << 'PYTHON_SCRIPT' >> $GITHUB_STEP_SUMMARY
-          import json
-          with open('SWFRecomp/tests/test_results.json', 'r') as f:
-              data = json.load(f)
-              summary = data.get('summary', {})
-              print(f"**Total Tests:** {summary.get('total_tests', 0)}")
-              print(f"**Passed:** {summary.get('passed', 0)}")
-              print(f"**Failed:** {summary.get('failed', 0)}")
-              print(f"**Sub-tests Passed:** {summary.get('passed_sub_tests', 0)}/{summary.get('total_sub_tests', 0)}")
-          PYTHON_SCRIPT
-          fi
-
-      - name: Save generated files
-        if: always()
-        run: |
-          # Save the generated files to a temporary location before branch operations
-          mkdir -p /tmp/generated-files
-          cp -f opcode-index.json /tmp/generated-files/ 2>/dev/null || true
-          cp -f opcode-index.md /tmp/generated-files/ 2>/dev/null || true
-          cp -f opcode-index-plain.md /tmp/generated-files/ 2>/dev/null || true
-          echo "Saved generated files to /tmp/generated-files"
-          ls -la /tmp/generated-files
-
       - name: Create or switch to test-results-update branch
         if: always()
         run: |
@@ -131,13 +73,53 @@ jobs:
             git checkout -b test-results-update origin/master
           fi
 
-      - name: Restore generated files
+      - name: Run tests and generate documentation
+        run: |
+          # Build command with optional parameters
+          CMD="python3 scripts/test-and-document.py --build"
+
+          # Add --max-tests if specified
+          if [ -n "${{ github.event.inputs.max_tests }}" ]; then
+            CMD="$CMD --max-tests=${{ github.event.inputs.max_tests }}"
+          fi
+
+          # Add --clean if specified
+          if [ "${{ github.event.inputs.clean }}" = "true" ]; then
+            CMD="$CMD --clean"
+          fi
+
+          # Run the tests and generate documentation
+          echo "Running: $CMD"
+          $CMD
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            SWFRecomp/tests/test_results.json
+            opcode-index.json
+            opcode-index.md
+            opcode-index-plain.md
+          retention-days: 30
+
+      - name: Display test summary
         if: always()
         run: |
-          # Restore the saved generated files
-          cp -f /tmp/generated-files/* . 2>/dev/null || true
-          echo "Restored generated files"
-          ls -la opcode-index* 2>/dev/null || echo "No opcode-index files found"
+          if [ -f SWFRecomp/tests/test_results.json ]; then
+            echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+            python3 << 'PYTHON_SCRIPT' >> $GITHUB_STEP_SUMMARY
+          import json
+          with open('SWFRecomp/tests/test_results.json', 'r') as f:
+              data = json.load(f)
+              summary = data.get('summary', {})
+              print(f"**Total Tests:** {summary.get('total_tests', 0)}")
+              print(f"**Passed:** {summary.get('passed', 0)}")
+              print(f"**Failed:** {summary.get('failed', 0)}")
+              print(f"**Sub-tests Passed:** {summary.get('passed_sub_tests', 0)}/{summary.get('total_sub_tests', 0)}")
+          PYTHON_SCRIPT
+          fi
 
       - name: Commit and push test results
         if: always()
