@@ -47,14 +47,25 @@ def main():
         description="Run tests and update documentation"
     )
     parser.add_argument(
+        '--build',
+        action='store_true',
+        help='Build SWFRecomp if not already built (idempotent)'
+    )
+    parser.add_argument(
         '--clean',
         action='store_true',
-        help='Clean generated files before building tests'
+        help='Clean and rebuild SWFRecomp and regenerate all test files'
     )
     parser.add_argument(
         '--retest',
         action='store_true',
         help='Only run tests that failed in the previous run'
+    )
+    parser.add_argument(
+        '--max-tests',
+        type=int,
+        metavar='N',
+        help='Run only the first N tests (useful for CI/testing)'
     )
     args = parser.parse_args()
 
@@ -71,12 +82,16 @@ def main():
         print(f"✗ ERROR: Test script not found: {all_tests_script}")
         sys.exit(1)
 
-    # Build command with optional --clean and --retest flags
+    # Build command with optional --build, --clean, --retest, and --max-tests flags
     test_cmd = [str(all_tests_script)]
+    if args.build:
+        test_cmd.append('--build')
     if args.clean:
         test_cmd.append('--clean')
     if args.retest:
         test_cmd.append('--retest')
+    if args.max_tests:
+        test_cmd.append(f'--max-tests={args.max_tests}')
 
     success = run_command(
         test_cmd,

@@ -25,13 +25,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_SCRIPT="../scripts/build_test.sh"
 CLEAN_FLAG=""
 RETEST_FLAG=""
+BUILD_FLAG=""
+MAX_TESTS=""
 
-# Check for --clean and --retest flags
+# Check for --clean, --retest, --build, and --max-tests flags
 for arg in "$@"; do
     if [ "$arg" = "--clean" ]; then
         CLEAN_FLAG="--clean"
     elif [ "$arg" = "--retest" ]; then
         RETEST_FLAG="--retest"
+    elif [ "$arg" = "--build" ]; then
+        BUILD_FLAG="--build"
+    elif [[ "$arg" =~ ^--max-tests=([0-9]+)$ ]]; then
+        MAX_TESTS="${BASH_REMATCH[1]}"
     fi
 done
 
@@ -294,10 +300,10 @@ discover_tests() {
 
     local test_dirs=()
 
-    # Filter out --clean and --retest flags from specified tests
+    # Filter out --clean, --retest, --build, and --max-tests flags from specified tests
     local filtered_tests=()
     for test in "${specified_tests[@]}"; do
-        if [[ "$test" != "--clean" && "$test" != "--retest" ]]; then
+        if [[ "$test" != "--clean" && "$test" != "--retest" && "$test" != "--build" && ! "$test" =~ ^--max-tests= ]]; then
             filtered_tests+=("$test")
         fi
     done
@@ -565,22 +571,79 @@ run_all_tests() {
         log_info "Discovered ${#test_dirs[@]} tests"
     fi
 
-    # Report clean mode if enabled
+    # Handle --build flag (build SWFRecomp if needed)
+    if [[ -n "$BUILD_FLAG" ]]; then
+        log_info "Build mode enabled - ensuring SWFRecomp is built"
+
+        # Get the SWFRecomp root directory (parent of tests directory)
+        SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+        SWFRECOMP_BUILD="${SWFRECOMP_ROOT}/build"
+        SWFRECOMP_EXE="${SWFRECOMP_BUILD}/SWFRecomp"
+
+        # Check if SWFRecomp executable exists
+        if [[ ! -f "$SWFRECOMP_EXE" ]]; then
+            log_info "SWFRecomp not built, building now..."
+
+            # Create build directory if it doesn't exist
+            if [[ ! -d "$SWFRECOMP_BUILD" ]]; then
+                mkdir -p "$SWFRECOMP_BUILD"
+            fi
+
+            cd "$SWFRECOMP_BUILD"
+
+            # Run cmake if CMakeCache.txt doesn't exist
+            if [[ ! -f "CMakeCache.txt" ]]; then
+                log_info "Running CMake configuration..."
+                cmake .. > /dev/null 2>&1
+                if [[ $? -ne 0 ]]; then
+                    log_error "CMake configuration failed"
+                    exit 1
+                fi
+            fi
+
+            # Build SWFRecomp
+            log_info "Compiling SWFRecomp..."
+            make -j > /dev/null 2>&1
+
+            if [[ $? -ne 0 ]]; then
+                log_error "Failed to build SWFRecomp"
+                exit 1
+            fi
+
+            log_info "✅ SWFRecomp built successfully"
+            cd "$SCRIPT_DIR"
+        else
+            log_info "✅ SWFRecomp already built"
+        fi
+    fi
+
+    # Handle --clean flag (rebuild SWFRecomp with clean)
     if [[ -n "$CLEAN_FLAG" ]]; then
         log_info "Clean mode enabled - will regenerate all files from SWF sources"
-        log_info "Rebuilding SWFRecomp..."
+        log_info "Rebuilding SWFRecomp with clean..."
 
         # Get the SWFRecomp root directory (parent of tests directory)
         SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
         SWFRECOMP_BUILD="${SWFRECOMP_ROOT}/build"
 
+        # Create build directory if it doesn't exist
         if [[ ! -d "$SWFRECOMP_BUILD" ]]; then
-            log_error "SWFRecomp build directory not found: $SWFRECOMP_BUILD"
-            exit 1
+            log_info "Build directory doesn't exist, creating it..."
+            mkdir -p "$SWFRECOMP_BUILD"
+            cd "$SWFRECOMP_BUILD"
+
+            log_info "Running CMake configuration..."
+            cmake .. > /dev/null 2>&1
+            if [[ $? -ne 0 ]]; then
+                log_error "CMake configuration failed"
+                exit 1
+            fi
+        else
+            cd "$SWFRECOMP_BUILD"
+            make clean > /dev/null 2>&1
         fi
 
-        cd "$SWFRECOMP_BUILD"
-        make clean > /dev/null 2>&1
+        # Build SWFRecomp
         make -j > /dev/null 2>&1
 
         if [[ $? -ne 0 ]]; then
@@ -594,7 +657,14 @@ run_all_tests() {
     echo ""
 
     # Run each test
+    local tests_run=0
     for test_name in "${test_dirs[@]}"; do
+        # Check if we've hit the max test limit
+        if [[ -n "$MAX_TESTS" && $tests_run -ge $MAX_TESTS ]]; then
+            log_info "Reached maximum test limit ($MAX_TESTS tests)"
+            break
+        fi
+
         local test_dir="$SCRIPT_DIR/$test_name"
 
         # Validate test setup
@@ -659,6 +729,9 @@ run_all_tests() {
 
         # Process results
         process_test_result "$test_name" "$validation_json" "$build_time" "$run_time"
+
+        # Increment tests_run counter
+        tests_run=$((tests_run + 1))
     done
 
     # Update summary
