@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_date": "2025-11-18",
+    "generated_date": "2025-11-17",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287
@@ -5168,7 +5168,7 @@
       ],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5191,7 +5191,7 @@
       ],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5214,7 +5214,7 @@
       ],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
