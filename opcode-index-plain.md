@@ -1,6 +1,6 @@
 # AS2 Opcode Index
 
-**Generated**: 2025-11-17
+**Generated**: 2025-11-18
 
 **Total Opcodes**: 100
 
@@ -2207,7 +2207,7 @@ void actionLess2(char* stack, u32* sp);
 - parseActions (case SWF_ACTION_LESS2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-less2-0x48.md](SWFRecompDocs/prompts/completed/opcode-less2-0x48.md)
+- [SWFRecompDocs/prompts/completed/opcode-greater-0x48.md](SWFRecompDocs/prompts/completed/opcode-greater-0x48.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6414)
