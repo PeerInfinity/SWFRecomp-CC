@@ -48,8 +48,10 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     # Calculate comprehensive statistics
     total_primary_tests = 0
     passing_primary_tests = 0
+    no_results_primary_tests = 0
     total_secondary_tests = 0
     passing_secondary_tests = 0
+    no_results_secondary_tests = 0
     opcodes_with_primary = 0
     opcodes_with_failing_primary = 0
     opcodes_fully_implemented = 0
@@ -72,17 +74,23 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
             if entry['type'] == 'spec':
                 primary_tests = entry.get('tests_primary', [])
                 passing_primary = entry.get('tests_primary_passing', [])
+                no_results_primary = entry.get('tests_primary_no_results', [])
                 secondary_tests = entry.get('tests_secondary', [])
                 passing_secondary = entry.get('tests_secondary_passing', [])
+                no_results_secondary = entry.get('tests_secondary_no_results', [])
 
                 total_primary_tests += len(primary_tests)
                 passing_primary_tests += len(passing_primary)
+                no_results_primary_tests += len(no_results_primary)
                 total_secondary_tests += len(secondary_tests)
                 passing_secondary_tests += len(passing_secondary)
+                no_results_secondary_tests += len(no_results_secondary)
 
                 if len(primary_tests) > 0:
                     opcodes_with_primary += 1
-                    if len(passing_primary) < len(primary_tests):
+                    # Only count as failing if the test was actually run and failed
+                    failing_primary_count = len(primary_tests) - len(passing_primary) - len(no_results_primary)
+                    if failing_primary_count > 0:
                         opcodes_with_failing_primary += 1
 
                 if entry.get('fully_implemented'):
@@ -99,12 +107,14 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
             elif entry['type'] == 'enum':
                 opcodes_with_enum += 1
 
-    # Calculate percentages
-    primary_pass_rate = (passing_primary_tests / total_primary_tests * 100) if total_primary_tests > 0 else 0
-    secondary_pass_rate = (passing_secondary_tests / total_secondary_tests * 100) if total_secondary_tests > 0 else 0
-    total_tests = total_primary_tests + total_secondary_tests
-    total_passing = passing_primary_tests + passing_secondary_tests
-    overall_pass_rate = (total_passing / total_tests * 100) if total_tests > 0 else 0
+    # Calculate counts and percentages
+    failing_primary = total_primary_tests - passing_primary_tests - no_results_primary_tests
+    tests_with_results = total_primary_tests - no_results_primary_tests
+    primary_pass_rate = (passing_primary_tests / tests_with_results * 100) if tests_with_results > 0 else 0
+
+    failing_secondary = total_secondary_tests - passing_secondary_tests - no_results_secondary_tests
+    secondary_tests_with_results = total_secondary_tests - no_results_secondary_tests
+    secondary_pass_rate = (passing_secondary_tests / secondary_tests_with_results * 100) if secondary_tests_with_results > 0 else 0
 
     # Display basic metadata
     md.append(f"**Total Opcodes**: {index['metadata']['total_opcodes']}")
@@ -117,11 +127,12 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     md.append("")
 
     # Primary Tests
-    failing_primary = total_primary_tests - passing_primary_tests
-    md.append(f"**Primary Tests**: {passing_primary_tests}/{total_primary_tests} passing ({primary_pass_rate:.1f}%)")
+    md.append(f"**Primary Tests**: {passing_primary_tests}/{tests_with_results} passing ({primary_pass_rate:.1f}%)")
     if failing_primary > 0:
         md.append(f"  - {failing_primary} failing primary tests")
         md.append(f"  - {opcodes_with_failing_primary} opcodes with failing primary tests")
+    if no_results_primary_tests > 0:
+        md.append(f"  - {no_results_primary_tests} primary tests with no results (not run)")
     md.append("")
 
     # Implementation Progress
@@ -177,6 +188,8 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
         secondary_count = 0
         passing_primary_count = 0
         passing_secondary_count = 0
+        no_results_primary_count = 0
+        no_results_secondary_count = 0
         has_docs = ""
         fully_implemented = False
         fully_implemented_no_graphics = False
@@ -188,6 +201,8 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
                 secondary_count = len(entry.get('tests_secondary', []))
                 passing_primary_count = len(entry.get('tests_primary_passing', []))
                 passing_secondary_count = len(entry.get('tests_secondary_passing', []))
+                no_results_primary_count = len(entry.get('tests_primary_no_results', []))
+                no_results_secondary_count = len(entry.get('tests_secondary_no_results', []))
                 has_docs = "✓" if entry.get('documentation_prompt') else ""
                 fully_implemented = entry.get('fully_implemented', False)
                 fully_implemented_no_graphics = entry.get('fully_implemented_no_graphics', False)
@@ -196,12 +211,14 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
             elif entry['type'] == 'function':
                 func_name = entry['name']
 
-        # Format test counts as "passing/total"
-        primary_str = f"{passing_primary_count}/{primary_count}" if primary_count > 0 else ""
-        secondary_str = f"{passing_secondary_count}/{secondary_count}" if secondary_count > 0 else ""
+        # Format test counts as "passing/total" (excluding no-results tests from total)
+        primary_with_results = primary_count - no_results_primary_count
+        secondary_with_results = secondary_count - no_results_secondary_count
+        primary_str = f"{passing_primary_count}/{primary_with_results}" if primary_with_results > 0 else ""
+        secondary_str = f"{passing_secondary_count}/{secondary_with_results}" if secondary_with_results > 0 else ""
 
-        # Calculate failing tests
-        failing_primary_count = primary_count - passing_primary_count
+        # Calculate failing tests (only tests that were run and failed)
+        failing_primary_count = primary_count - passing_primary_count - no_results_primary_count
         failing_str = str(failing_primary_count) if failing_primary_count > 0 else ""
 
         # Format fully_implemented as checkbox
@@ -296,6 +313,11 @@ def generate_detailed_sections(index: Dict) -> str:
 
     md.append("## Detailed Information")
     md.append("")
+    md.append("**Test Result Legend:**")
+    md.append("- **✓** - Test passed")
+    md.append("- **✗** - Test failed")
+    md.append("- **?** - Test not run (no results)")
+    md.append("")
 
     for hex_val in sorted(opcodes.keys()):
         entries = opcodes[hex_val]
@@ -323,8 +345,14 @@ def generate_detailed_sections(index: Dict) -> str:
         if first_entry.get('tests_primary'):
             md.append("**Primary Tests:**")
             tests_primary_passing = set(first_entry.get('tests_primary_passing', []))
+            tests_primary_no_results = set(first_entry.get('tests_primary_no_results', []))
             for test_dir in first_entry['tests_primary']:
-                status = "✓" if test_dir in tests_primary_passing else "✗"
+                if test_dir in tests_primary_passing:
+                    status = "✓"
+                elif test_dir in tests_primary_no_results:
+                    status = "?"
+                else:
+                    status = "✗"
                 md.append(f"- [{status}] `{test_dir}`")
             md.append("")
 
@@ -332,8 +360,14 @@ def generate_detailed_sections(index: Dict) -> str:
         if first_entry.get('tests_secondary'):
             md.append("**Secondary Tests:**")
             tests_secondary_passing = set(first_entry.get('tests_secondary_passing', []))
+            tests_secondary_no_results = set(first_entry.get('tests_secondary_no_results', []))
             for test_dir in first_entry['tests_secondary']:
-                status = "✓" if test_dir in tests_secondary_passing else "✗"
+                if test_dir in tests_secondary_passing:
+                    status = "✓"
+                elif test_dir in tests_secondary_no_results:
+                    status = "?"
+                else:
+                    status = "✗"
                 md.append(f"- [{status}] `{test_dir}`")
             md.append("")
 
@@ -464,10 +498,11 @@ def generate_failing_tests_chart(index: Dict, with_links: bool = True) -> str:
             # Get test lists
             primary_tests = entry.get('tests_primary', [])
             passing_primary = set(entry.get('tests_primary_passing', []))
+            no_results_primary = set(entry.get('tests_primary_no_results', []))
 
-            # Find failing primary tests
+            # Find failing primary tests (exclude tests with no results)
             for test in primary_tests:
-                if test not in passing_primary:
+                if test not in passing_primary and test not in no_results_primary:
                     failing_tests.append({
                         'hex': hex_val,
                         'spec_name': spec_name,
@@ -502,6 +537,77 @@ def generate_failing_tests_chart(index: Dict, with_links: bool = True) -> str:
     md.append("|-----|--------|-----------|------|----------|------|")
 
     for test in failing_tests:
+        if with_links:
+            hex_link = make_link(test['hex'], test['hex'], test['spec_name'])
+            spec_link = make_link(test['spec_name'], test['hex'], test['spec_name'])
+        else:
+            hex_link = test['hex']
+            spec_link = test['spec_name']
+
+        test_path = test['test_path']
+        # Shorten test path for readability - keep just the test directory name
+        test_name = test_path.split('/')[-1] if '/' in test_path else test_path
+
+        md.append(f"| {hex_link} | {spec_link} | `{test_name}` | {'✓' if test['has_enum'] else ''} | {'✓' if test['has_function'] else ''} | {'✓' if test['has_docs'] else ''} |")
+
+    md.append("")
+    return "\n".join(md)
+
+
+def generate_no_results_tests_chart(index: Dict, with_links: bool = True) -> str:
+    """Generate a chart showing all primary tests with no results."""
+    md = []
+
+    md.append("## Tests With No Results")
+    md.append("")
+
+    # Collect all tests with no results
+    no_results_tests = []
+
+    for entry in index['entries']:
+        if entry['type'] == 'spec':
+            hex_val = entry['hex']
+            spec_name = entry['name']
+
+            # Get test lists
+            no_results_primary = entry.get('tests_primary_no_results', [])
+
+            # Find tests with no results
+            for test in no_results_primary:
+                no_results_tests.append({
+                    'hex': hex_val,
+                    'spec_name': spec_name,
+                    'test_path': test,
+                    'has_function': False,
+                    'has_enum': False,
+                    'has_docs': bool(entry.get('documentation_prompt'))
+                })
+
+    # Add implementation info to no-results tests
+    for entry in index['entries']:
+        if entry['type'] == 'enum':
+            for test in no_results_tests:
+                if test['hex'] == entry['hex']:
+                    test['has_enum'] = True
+        elif entry['type'] == 'function':
+            for test in no_results_tests:
+                if test['hex'] == entry['hex']:
+                    test['has_function'] = True
+
+    if not no_results_tests:
+        md.append("**All tests have results! 🎉**")
+        md.append("")
+        return "\n".join(md)
+
+    # Sort by hex value, then by test path
+    no_results_tests.sort(key=lambda x: (x['hex'], x['test_path']))
+
+    md.append(f"**Total Tests With No Results**: {len(no_results_tests)}")
+    md.append("")
+    md.append("| Hex | Opcode | Test Path | Enum | Function | Docs |")
+    md.append("|-----|--------|-----------|------|----------|------|")
+
+    for test in no_results_tests:
         if with_links:
             hex_link = make_link(test['hex'], test['hex'], test['spec_name'])
             spec_link = make_link(test['spec_name'], test['hex'], test['spec_name'])
@@ -638,6 +744,7 @@ def generate_markdown():
     summary_with_links = generate_summary_table(index, with_links=True)
     passing_tests_with_links = generate_passing_tests_chart(index, with_links=True)
     failing_tests_with_links = generate_failing_tests_chart(index, with_links=True)
+    no_results_tests_with_links = generate_no_results_tests_chart(index, with_links=True)
     status_with_links = generate_implementation_status(index, with_links=True)
     missing_features_with_links = generate_missing_features_section(index, with_links=True)
 
@@ -645,6 +752,7 @@ def generate_markdown():
         summary_with_links,
         passing_tests_with_links,
         failing_tests_with_links,
+        no_results_tests_with_links,
         status_with_links,
         missing_features_with_links,
         detailed
@@ -661,6 +769,7 @@ def generate_markdown():
     summary_no_links = generate_summary_table(index, with_links=False)
     passing_tests_no_links = generate_passing_tests_chart(index, with_links=False)
     failing_tests_no_links = generate_failing_tests_chart(index, with_links=False)
+    no_results_tests_no_links = generate_no_results_tests_chart(index, with_links=False)
     status_no_links = generate_implementation_status(index, with_links=False)
     missing_features_no_links = generate_missing_features_section(index, with_links=False)
 
@@ -668,6 +777,7 @@ def generate_markdown():
         summary_no_links,
         passing_tests_no_links,
         failing_tests_no_links,
+        no_results_tests_no_links,
         status_no_links,
         missing_features_no_links,
         detailed

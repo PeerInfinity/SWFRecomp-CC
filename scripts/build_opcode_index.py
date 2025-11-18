@@ -387,19 +387,29 @@ def build_opcode_index():
         fully_implemented_no_graphics = test_info["fully_implemented_no_graphics"]
         missing_features = test_info["missing_features"]
 
-        # Determine passing tests
+        # Determine passing tests and tests with no results
         tests_tested_passing = []
+        tests_tested_no_results = []
         tests_supporting_passing = []
+        tests_supporting_no_results = []
 
         for test_path in tests_tested:
             test_name = test_path.split('/')[-1]  # Extract test name from path
-            if test_results.get(test_name, False):
-                tests_tested_passing.append(test_path)
+            if test_name in test_results:
+                if test_results[test_name]:
+                    tests_tested_passing.append(test_path)
+            else:
+                # Test has no results (wasn't run)
+                tests_tested_no_results.append(test_path)
 
         for test_path in tests_supporting:
             test_name = test_path.split('/')[-1]
-            if test_results.get(test_name, False):
-                tests_supporting_passing.append(test_path)
+            if test_name in test_results:
+                if test_results[test_name]:
+                    tests_supporting_passing.append(test_path)
+            else:
+                # Test has no results (wasn't run)
+                tests_supporting_no_results.append(test_path)
 
         # Find matching function
         combined_info = {**spec_info, **enum_info}
@@ -420,7 +430,9 @@ def build_opcode_index():
                 'tests_primary': tests_tested,
                 'tests_secondary': tests_supporting,
                 'tests_primary_passing': tests_tested_passing,
+                'tests_primary_no_results': tests_tested_no_results,
                 'tests_secondary_passing': tests_supporting_passing,
+                'tests_secondary_no_results': tests_supporting_no_results,
                 'documentation_prompt': doc_prompt,
                 'fully_implemented': fully_implemented,
                 'fully_implemented_no_graphics': fully_implemented_no_graphics,
@@ -440,7 +452,9 @@ def build_opcode_index():
                 'tests_primary': tests_tested,
                 'tests_secondary': tests_supporting,
                 'tests_primary_passing': tests_tested_passing,
+                'tests_primary_no_results': tests_tested_no_results,
                 'tests_secondary_passing': tests_supporting_passing,
+                'tests_secondary_no_results': tests_supporting_no_results,
                 'documentation_prompt': doc_prompt,
                 'fully_implemented': fully_implemented,
                 'fully_implemented_no_graphics': fully_implemented_no_graphics,
@@ -460,7 +474,9 @@ def build_opcode_index():
                 'tests_primary': tests_tested,
                 'tests_secondary': tests_supporting,
                 'tests_primary_passing': tests_tested_passing,
+                'tests_primary_no_results': tests_tested_no_results,
                 'tests_secondary_passing': tests_supporting_passing,
+                'tests_secondary_no_results': tests_supporting_no_results,
                 'documentation_prompt': doc_prompt,
                 'fully_implemented': fully_implemented,
                 'fully_implemented_no_graphics': fully_implemented_no_graphics,
