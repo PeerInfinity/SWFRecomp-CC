@@ -38,6 +38,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake
 
+      - name: Clean generated files
+        run: |
+          # Remove generated files to ensure fresh results
+          rm -f opcode-index-plain.md
+          rm -f opcode-index.json
+          rm -f opcode-index.md
+          rm -f SWFRecomp/tests/test_results.json
+          echo "Cleaned generated files"
+
       - name: Run tests
         run: |
           cd SWFRecomp/tests
