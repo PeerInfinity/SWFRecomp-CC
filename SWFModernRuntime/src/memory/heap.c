@@ -63,9 +63,8 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 		return false;
 	}
 
-	// Commit all pages upfront - physical memory still allocated lazily by OS on access
-	// This is fast (<1 ms) and allows o1heap to use the full space without expansion
-	vmem_commit(app_context->heap, app_context->heap_full_size);
+	// vmem_reserve now does both reserve and commit in one step
+	// Physical memory is still allocated lazily by OS on first access
 	app_context->heap_current_size = app_context->heap_full_size;
 
 	// Initialize o1heap with the full committed size
