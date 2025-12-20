@@ -687,3 +687,313 @@ For contributors working on the merge:
 | Built-in functions | - | `action.c:5982-6465` |
 | Constructor dispatch | - | `action.c:4634-4830` |
 | Property access | `object.h:95-107` | `object.c:157-340` |
+
+---
+
+## Appendix C: Technical Implementation Details for Phase 0
+
+*Added December 20, 2025 after detailed analysis of upstream changes.*
+
+Reference files from upstream are available in `upstream-reference/` (gitignored).
+
+### C.1 SWFAppContext Structure Comparison
+
+#### Upstream (New)
+```c
+typedef struct SWFAppContext
+{
+    char* stack;          // NEW - moved from global
+    u32 sp;               // NEW - moved from global
+    u32 oldSP;            // NEW - moved from global
+
+    frame_func* frame_funcs;
+
+    int width;
+    int height;
+    const float* stage_to_ndc;
+
+    O1HeapInstance* heap_instance;
+    char* heap;
+    size_t heap_size;     // Simplified from heap_current_size/heap_full_size
+
+    size_t max_string_id; // NEW - for string ID lookups
+
+    size_t bitmap_count;
+    size_t bitmap_highest_w;
+    size_t bitmap_highest_h;
+
+    // Graphics data buffers...
+
+    // NEW - Font/Text support
+    u32* glyph_data;
+    size_t glyph_data_size;
+    u32* text_data;
+    size_t text_data_size;
+    char* cxform_data;
+    size_t cxform_data_size;
+} SWFAppContext;
+```
+
+#### Local (Current)
+```c
+typedef struct SWFAppContext
+{
+    frame_func* frame_funcs;
+    size_t frame_count;   // LOCAL ADDITION - keep this
+
+    // Graphics fields...
+
+    // Heap management
+    O1HeapInstance* heap_instance;
+    char* heap;
+    int heap_inited;           // Different from upstream
+    size_t heap_current_size;  // Different from upstream
+    size_t heap_full_size;     // Different from upstream
+} SWFAppContext;
+
+// These are currently GLOBALS - must move to struct:
+extern char* stack;
+extern u32 sp;
+extern u32 oldSP;
+```
+
+#### Migration Actions
+| Field | Action |
+|-------|--------|
+| `stack`, `sp`, `oldSP` | Move from globals into struct |
+| `frame_count` | Keep (local addition) |
+| `heap_inited`, `heap_current_size`, `heap_full_size` | Replace with `heap_size` |
+| `max_string_id` | Add |
+| `glyph_data`, `text_data`, `cxform_data` | Add (for font support) |
+
+---
+
+### C.2 Character Structure Changes
+
+#### Upstream (New) - Union for Shape + Text
+```c
+typedef enum {
+    CHAR_TYPE_SHAPE,
+    CHAR_TYPE_TEXT,
+} CharacterType;
+
+typedef struct Character {
+    CharacterType type;
+    union {
+        // DefineShape
+        struct {
+            size_t shape_offset;
+            size_t size;
+        };
+        // DefineText
+        struct {
+            size_t text_start;
+            size_t text_size;
+            u32 transform_start;
+            u32 cxform_id;
+        };
+    };
+} Character;
+```
+
+#### Local (Current) - Shape Only
+```c
+typedef struct Character {
+    size_t shape_offset;
+    size_t size;
+} Character;
+```
+
+**Migration:** Replace with upstream union version to support text.
+
+---
+
+### C.3 Frame Function Typedef
+
+#### Upstream (New)
+```c
+typedef void (*frame_func)(SWFAppContext* app_context);
+```
+
+#### Local (Current)
+```c
+typedef void (*frame_func)();
+```
+
+**Migration:** Update typedef and all frame function signatures.
+
+---
+
+### C.4 Stack Access Macros
+
+#### Upstream (New) - Uses app_context members
+```c
+#define STACK (app_context->stack)
+#define SP (app_context->sp)
+#define OLDSP (app_context->oldSP)
+
+#define PUSH(t, v) \
+    OLDSP = SP; \
+    SP -= 4 + 4 + 8 + 8; \
+    SP &= ~7; \
+    STACK[SP] = t; \
+    VAL(u32, &STACK[SP + 4]) = OLDSP; \
+    VAL(u64, &STACK[SP + 16]) = v;
+
+#define POP() \
+    SP = VAL(u32, &STACK[SP + 4]);
+
+#define PUSH_VAR(p) pushVar(app_context, p);
+```
+
+#### Local (Current) - Uses stack/sp parameters
+```c
+#define PUSH(t, v) \
+    do { \
+        u32 oldSP = *sp; \
+        *sp -= 4 + 4 + 8 + 8; \
+        *sp &= ~7; \
+        stack[*sp] = t; \
+        VAL(u32, &stack[*sp + 4]) = oldSP; \
+        VAL(u64, &stack[*sp + 16]) = v; \
+    } while(0)
+
+#define POP() \
+    *sp = VAL(u32, &stack[*sp + 4]);
+
+#define PUSH_VAR(p) pushVar(stack, sp, p);
+```
+
+**Migration:** Replace all macros with upstream versions that use `STACK`, `SP`, `OLDSP`.
+
+---
+
+### C.5 Action Function Signatures
+
+#### Upstream Pattern
+```c
+void actionAdd(SWFAppContext* app_context);
+void actionTrace(SWFAppContext* app_context);
+void actionStringEquals(SWFAppContext* app_context, char* a_str, char* b_str);
+void pushVar(SWFAppContext* app_context, ActionVar* p);
+int evaluateCondition(SWFAppContext* app_context);
+```
+
+#### Local Pattern
+```c
+void actionAdd(char* stack, u32* sp);
+void actionTrace(char* stack, u32* sp);
+void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
+void pushVar(char* stack, u32* sp, ActionVar* p);
+int evaluateCondition(char* stack, u32* sp);
+```
+
+#### Sed Commands for Bulk Refactoring
+```bash
+# In action.h - update declarations
+sed -i 's/void action\([A-Za-z0-9]*\)(char\* stack, u32\* sp)/void action\1(SWFAppContext* app_context)/g' action.h
+
+# In action.c - update definitions
+sed -i 's/void action\([A-Za-z0-9]*\)(char\* stack, u32\* sp)/void action\1(SWFAppContext* app_context)/g' action.c
+
+# In action.c - update stack/sp references to use macros
+# (This requires more careful manual review)
+```
+
+---
+
+### C.6 Compiler Code Generation Changes
+
+#### Upstream Pattern (action.cpp)
+```cpp
+out_script << "\t" << "actionAdd(app_context);" << endl;
+out_script << "\t" << "actionTrace(app_context);" << endl;
+out_script << "\t" << "if (evaluateCondition(app_context))" << endl;
+```
+
+#### Local Pattern (action.cpp)
+```cpp
+out_script << "\t" << "actionAdd(stack, sp);" << endl;
+out_script << "\t" << "actionTrace(stack, sp);" << endl;
+out_script << "\t" << "if (evaluateCondition(stack, sp))" << endl;
+```
+
+#### Sed Command for Compiler
+```bash
+# Replace (stack, sp) with (app_context) for action calls
+sed -i 's/action\([A-Za-z0-9]*\)(stack, sp)/action\1(app_context)/g' action.cpp
+sed -i 's/action\([A-Za-z0-9]*\)(stack, \&sp)/action\1(app_context)/g' action.cpp
+```
+
+---
+
+### C.7 Local Features to Preserve
+
+These features exist in local code but not upstream - must be preserved during merge:
+
+| Feature | Location | Notes |
+|---------|----------|-------|
+| MovieClip struct | `action.h:11-33` | Flash MovieClip properties |
+| Exception handling | `action.h:216-227` | actionThrow, actionTry*, etc. |
+| Function2Ptr typedef | `action.h:210` | For DefineFunction2 |
+| Object system | `object.h`, `object.c` | Full AS2 object model |
+| ~80 additional actions | `action.c` | Beyond upstream's ~20 |
+| 107 additional tests | `tests/` | Comprehensive test suite |
+
+---
+
+### C.8 Globals to Keep vs. Move
+
+#### Move to SWFAppContext
+- `stack` → `app_context->stack`
+- `sp` → `app_context->sp`
+- `oldSP` → `app_context->oldSP`
+
+#### Keep as Globals (runtime state)
+- `quit_swf` - exit flag
+- `is_playing` - playback state
+- `current_frame`, `next_frame` - frame navigation
+- `manual_next_frame` - frame control
+- `is_dragging`, `dragged_target` - drag state
+- `dictionary`, `display_list`, `max_depth` - display structures
+
+---
+
+### C.9 Implementation Order (Option A: Incremental)
+
+1. **Update swf.h**
+   - Add `stack`, `sp`, `oldSP` to SWFAppContext
+   - Add `STACK`, `SP`, `OLDSP` macros
+   - Update `frame_func` typedef
+   - Add missing fields (`max_string_id`, font data)
+
+2. **Update action.h macros**
+   - Replace `PUSH`, `POP`, etc. with upstream versions
+   - Update `PUSH_VAR` macro
+
+3. **Update action.h declarations**
+   - Change all function signatures to `(SWFAppContext* app_context, ...)`
+
+4. **Update action.c implementations**
+   - Change function signatures
+   - Replace `stack[*sp]` with `STACK[SP]`
+   - Replace `*sp` with `SP`
+
+5. **Update variables.c**
+   - Change function signatures
+   - Update stack access patterns
+
+6. **Update compiler (action.cpp)**
+   - Change generated action calls to use `app_context`
+
+7. **Update compiler (swf.cpp)**
+   - Change frame/script function signatures
+   - Update tag function calls
+
+8. **Update tag.c, swf.c**
+   - Update function signatures
+   - Pass `app_context` through call chain
+
+9. **Build and test incrementally**
+   - Test after each major file change
+   - Fix issues as they arise
