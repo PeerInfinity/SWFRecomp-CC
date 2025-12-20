@@ -8,6 +8,17 @@
 typedef struct SWFAppContext SWFAppContext;
 
 /**
+ * Convenience macros for heap allocation (upstream compatibility)
+ *
+ * These macros work with our global-context implementation while maintaining
+ * source compatibility with upstream code that uses HALLOC(s) and FREE(p).
+ * The app_context parameter in the macro invocation is ignored since our
+ * heap implementation uses a global context set during heap_init().
+ */
+#define HALLOC(s) heap_alloc(s)
+#define FREE(p) heap_free(p)
+
+/**
  * Memory Heap Manager
  *
  * Wrapper around o1heap allocator using virtual memory for efficient allocation.
