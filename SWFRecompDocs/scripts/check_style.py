@@ -81,7 +81,8 @@ def fix_blank_line_indentation(content, preserve_tabs=True):
                     brace_stack.pop()
 
             current_indent = get_indent_level(line)
-            result.append(line)
+            # Remove trailing whitespace from non-blank lines
+            result.append(line.rstrip())
         else:
             # Blank line
             if preserve_tabs and current_indent > 0:
@@ -189,12 +190,12 @@ def get_git_files(repo_path, branch='HEAD'):
     return [f for f in result.stdout.strip().split('\n') if f]
 
 
-def compare_repos(upstream_dir, local_dir, extensions=None, fix=False):
+def compare_repos(upstream_dir, local_dir, extensions=None, fix=False, upstream_branch='master'):
     """Compare all matching files between two repos."""
     if extensions is None:
         extensions = ['.cpp', '.hpp', '.c', '.h']
 
-    upstream_files = set(get_git_files(upstream_dir, 'master'))
+    upstream_files = set(get_git_files(upstream_dir, upstream_branch))
     local_files = set(get_git_files(local_dir, 'HEAD'))
 
     common_files = upstream_files & local_files
@@ -207,9 +208,9 @@ def compare_repos(upstream_dir, local_dir, extensions=None, fix=False):
         upstream_full = os.path.join(upstream_dir, file_path)
         local_full = os.path.join(local_dir, file_path)
 
-        # Use git show to get the upstream master version
+        # Use git show to get the upstream version
         result = subprocess.run(
-            ['git', 'show', f'master:{file_path}'],
+            ['git', 'show', f'{upstream_branch}:{file_path}'],
             cwd=upstream_dir,
             capture_output=True,
             text=True
@@ -236,16 +237,78 @@ def compare_repos(upstream_dir, local_dir, extensions=None, fix=False):
     return results
 
 
+def fix_repo_against_upstream(repo_dir, upstream_branch='upstream/master', extensions=None, dry_run=False):
+    """Fix all files in a repo to match upstream's style."""
+    if extensions is None:
+        extensions = ['.cpp', '.hpp', '.c', '.h']
+
+    # Get list of changed files
+    result = subprocess.run(
+        ['git', 'diff', '--name-only', upstream_branch],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        print(f"Error: Could not get diff against {upstream_branch}")
+        return
+
+    changed_files = [f for f in result.stdout.strip().split('\n') if f]
+
+    fixed_count = 0
+    for file_path in changed_files:
+        if not any(file_path.endswith(ext) for ext in extensions):
+            continue
+
+        local_full = os.path.join(repo_dir, file_path)
+        if not os.path.exists(local_full):
+            continue
+
+        # Get upstream version
+        result = subprocess.run(
+            ['git', 'show', f'{upstream_branch}:{file_path}'],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            # File doesn't exist in upstream (new file)
+            continue
+
+        # Write to temp file
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix=os.path.basename(file_path), delete=False) as tmp:
+            tmp.write(result.stdout)
+            tmp_path = tmp.name
+
+        try:
+            if fix_file_to_match_upstream(tmp_path, local_full, dry_run=dry_run):
+                fixed_count += 1
+        finally:
+            os.unlink(tmp_path)
+
+    print(f"\n{'Would fix' if dry_run else 'Fixed'} {fixed_count} files")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Check and fix code style to match upstream')
     parser.add_argument('--compare-repos', action='store_true', help='Compare entire repositories')
+    parser.add_argument('--fix-repo', action='store_true', help='Fix all changed files in a repo against upstream')
     parser.add_argument('--fix', action='store_true', help='Fix style issues')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be fixed without making changes')
+    parser.add_argument('--upstream', default='upstream/master', help='Upstream branch to compare against (default: upstream/master)')
     parser.add_argument('paths', nargs='*', help='File or directory paths')
 
     args = parser.parse_args()
 
-    if args.compare_repos:
+    if args.fix_repo:
+        if len(args.paths) != 1:
+            print("Usage: check_style.py --fix-repo <repo_dir> [--upstream <branch>] [--dry-run]")
+            sys.exit(1)
+
+        fix_repo_against_upstream(args.paths[0], upstream_branch=args.upstream, dry_run=args.dry_run)
+
+    elif args.compare_repos:
         if len(args.paths) != 2:
             print("Usage: check_style.py --compare-repos <upstream_dir> <local_dir>")
             sys.exit(1)
