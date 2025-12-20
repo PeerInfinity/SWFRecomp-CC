@@ -355,7 +355,7 @@ namespace SWFRecomp
 				 << "#include <out.h>" << endl
 				 << "#include \"draws.h\"" << endl
 				 << "#include \"script_decls.h\"" << endl << endl
-				 << "void frame_" << to_string(next_frame_i) << "()" << endl
+				 << "void frame_" << to_string(next_frame_i) << "(SWFAppContext* app_context)" << endl
 				 << "{" << endl;
 		next_frame_i += 1;
 		
@@ -405,8 +405,8 @@ namespace SWFRecomp
 			tag.clearFields();
 		}
 		
+		// frame_func typedef is already defined in swf.h, no need to redefine
 		context.tag_main << endl << endl
-						 << "typedef void (*frame_func)();" << endl << endl
 						 << "frame_func frame_funcs[] =" << endl
 						 << "{" << endl;
 		
@@ -543,7 +543,7 @@ namespace SWFRecomp
 		if (another_frame && tag.code != SWF_TAG_END_TAG)
 		{
 			context.tag_main << "}" << endl << endl
-							 << "void frame_" << to_string(next_frame_i) << "()" << endl
+							 << "void frame_" << to_string(next_frame_i) << "(SWFAppContext* app_context)" << endl
 							 << "{" << endl;
 			next_frame_i += 1;
 			
@@ -585,11 +585,11 @@ namespace SWFRecomp
 			{
 				while (last_queued_script < next_script_i)
 				{
-					context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(stack, &sp);" << endl;
+					context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(app_context);" << endl;
 					last_queued_script += 1;
 				}
 
-				context.tag_main << "\t" << "tagShowFrame();" << endl;
+				context.tag_main << "\t" << "tagShowFrame(app_context);" << endl;
 
 				another_frame = true;
 
@@ -793,13 +793,13 @@ namespace SWFRecomp
 			
 			case SWF_TAG_DO_ACTION:
 			{
-				context.out_script_header << endl << "void script_" << to_string(next_script_i) << "(char* stack, u32* sp);";
+				context.out_script_header << endl << "void script_" << to_string(next_script_i) << "(SWFAppContext* app_context);";
 
 				ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
 				out_script << "#include <recomp.h>" << endl
 						   << "#include <setjmp.h>" << endl
 						   << "#include \"script_decls.h\"" << endl << endl
-						   << "void script_" << next_script_i << "(char* stack, u32* sp)" << endl
+						   << "void script_" << next_script_i << "(SWFAppContext* app_context)" << endl
 						   << "{" << endl;
 				out_script << "\t" << "char str_buffer[17];" << endl << endl;
 				
@@ -874,7 +874,7 @@ namespace SWFRecomp
 					transform_id = 0;
 				}
 				
-				context.tag_main << "\t" << "tagPlaceObject2(" << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ");" << endl;
+				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ");" << endl;
 				
 				current_transform += 1;
 				
@@ -1917,7 +1917,7 @@ namespace SWFRecomp
 					}
 				}
 				
-				context.tag_main << "\t" << "tagDefineShape(" << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
+				context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
 				
 				current_tri += tris_size;
 				

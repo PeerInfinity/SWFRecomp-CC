@@ -152,7 +152,7 @@ namespace SWFRecomp
 				case SWF_ACTION_PREV_FRAME:
 				{
 					out_script << "\t" << "// Prev Frame" << endl
-							   << "\t" << "actionPrevFrame(stack, sp);" << endl;
+							   << "\t" << "actionPrevFrame(app_context);" << endl;
 
 					break;
 				}
@@ -176,7 +176,7 @@ namespace SWFRecomp
 				case SWF_ACTION_TOGGLE_QUALITY:
 				{
 					out_script << "\t" << "// Toggle Quality" << endl
-							   << "\t" << "actionToggleQuality(stack, sp);" << endl;
+							   << "\t" << "actionToggleQuality(app_context);" << endl;
 
 					break;
 				}
@@ -184,7 +184,7 @@ namespace SWFRecomp
 				case SWF_ACTION_STOP_SOUNDS:
 				{
 					out_script << "\t" << "// Stop Sounds" << endl
-							   << "\t" << "actionStopSounds(stack, sp);" << endl;
+							   << "\t" << "actionStopSounds(app_context);" << endl;
 
 					break;
 				}
@@ -192,7 +192,7 @@ namespace SWFRecomp
 				case SWF_ACTION_ADD:
 				{
 					out_script << "\t" << "// Add" << endl
-							   << "\t" << "actionAdd(stack, sp);" << endl;
+							   << "\t" << "actionAdd(app_context);" << endl;
 					
 					break;
 				}
@@ -200,7 +200,7 @@ namespace SWFRecomp
 				case SWF_ACTION_SUBTRACT:
 				{
 					out_script << "\t" << "// Subtract" << endl
-							   << "\t" << "actionSubtract(stack, sp);" << endl;
+							   << "\t" << "actionSubtract(app_context);" << endl;
 					
 					break;
 				}
@@ -208,7 +208,7 @@ namespace SWFRecomp
 				case SWF_ACTION_MULTIPLY:
 				{
 					out_script << "\t" << "// Multiply" << endl
-							   << "\t" << "actionMultiply(stack, sp);" << endl;
+							   << "\t" << "actionMultiply(app_context);" << endl;
 					
 					break;
 				}
@@ -216,7 +216,7 @@ namespace SWFRecomp
 				case SWF_ACTION_DIVIDE:
 				{
 					out_script << "\t" << "// Divide" << endl
-							   << "\t" << "actionDivide(stack, sp);" << endl;
+							   << "\t" << "actionDivide(app_context);" << endl;
 					
 					break;
 				}
@@ -224,7 +224,7 @@ namespace SWFRecomp
 				case SWF_ACTION_EQUALS:
 				{
 					out_script << "\t" << "// Equals" << endl
-							   << "\t" << "actionEquals(stack, sp);" << endl;
+							   << "\t" << "actionEquals(app_context);" << endl;
 					
 					break;
 				}
@@ -232,7 +232,7 @@ namespace SWFRecomp
 				case SWF_ACTION_LESS:
 				{
 					out_script << "\t" << "// Less" << endl
-							   << "\t" << "actionLess(stack, sp);" << endl;
+							   << "\t" << "actionLess(app_context);" << endl;
 					
 					break;
 				}
@@ -240,7 +240,7 @@ namespace SWFRecomp
 				case SWF_ACTION_AND:
 				{
 					out_script << "\t" << "// And" << endl
-							   << "\t" << "actionAnd(stack, sp);" << endl;
+							   << "\t" << "actionAnd(app_context);" << endl;
 					
 					break;
 				}
@@ -248,7 +248,7 @@ namespace SWFRecomp
 				case SWF_ACTION_OR:
 				{
 					out_script << "\t" << "// Or" << endl
-							   << "\t" << "actionOr(stack, sp);" << endl;
+							   << "\t" << "actionOr(app_context);" << endl;
 					
 					break;
 				}
@@ -256,7 +256,7 @@ namespace SWFRecomp
 				case SWF_ACTION_NOT:
 				{
 					out_script << "\t" << "// Not" << endl
-							   << "\t" << "actionNot(stack, sp);" << endl;
+							   << "\t" << "actionNot(app_context);" << endl;
 					
 					break;
 				}
@@ -267,7 +267,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 					
 					out_script << "\t" << "// StringEquals" << endl
-							   << "\t" << "actionStringEquals(stack, sp, "
+							   << "\t" << "actionStringEquals(app_context, "
 							   << "str_" << to_string(next_str_i - 2) << ", "
 							   << "str_" << to_string(next_str_i - 1) << ");" << endl;
 					
@@ -279,7 +279,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 					
 					out_script << "\t" << "// StringLength" << endl
-							   << "\t" << "actionStringLength(stack, sp, str_"
+							   << "\t" << "actionStringLength(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 					
 					break;
@@ -291,7 +291,7 @@ namespace SWFRecomp
 				declareEmptyString(context, 17);
 
 				out_script << "\t" << "// StringExtract" << endl
-						   << "\t" << "actionStringExtract(stack, sp, str_"
+						   << "\t" << "actionStringExtract(app_context, str_"
 						   << to_string(next_str_i - 1) << ");" << endl;
 
 				break;
@@ -302,7 +302,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// StringAdd" << endl
-							   << "\t" << "actionStringAdd(stack, sp, "
+							   << "\t" << "actionStringAdd(app_context, "
 							   << "str_" << to_string(next_str_i - 2) << ", "
 							   << "str_" << to_string(next_str_i - 1) << ");" << endl;
 
@@ -312,7 +312,7 @@ namespace SWFRecomp
 				case SWF_ACTION_GET_PROPERTY:
 				{
 					out_script << "\t" << "// GetProperty" << endl
-							   << "\t" << "actionGetProperty(stack, sp);" << endl;
+							   << "\t" << "actionGetProperty(app_context);" << endl;
 
 					break;
 				}
@@ -328,7 +328,7 @@ namespace SWFRecomp
 				case SWF_ACTION_TO_INTEGER:
 				{
 					out_script << "\t" << "// ToInteger" << endl
-							   << "\t" << "actionToInteger(stack, sp);" << endl;
+							   << "\t" << "actionToInteger(app_context);" << endl;
 
 					break;
 				}
@@ -336,7 +336,7 @@ namespace SWFRecomp
 				case SWF_ACTION_GET_VARIABLE:
 				{
 					out_script << "\t" << "// GetVariable" << endl
-							   << "\t" << "actionGetVariable(stack, sp);" << endl;
+							   << "\t" << "actionGetVariable(app_context);" << endl;
 
 					break;
 				}
@@ -344,7 +344,7 @@ namespace SWFRecomp
 				case SWF_ACTION_SET_VARIABLE:
 				{
 					out_script << "\t" << "// SetVariable" << endl
-							   << "\t" << "actionSetVariable(stack, sp);" << endl;
+							   << "\t" << "actionSetVariable(app_context);" << endl;
 
 					break;
 				}
@@ -352,7 +352,7 @@ namespace SWFRecomp
 				case SWF_ACTION_SET_TARGET2:
 				{
 					out_script << "\t" << "// SetTarget2" << endl
-							   << "\t" << "actionSetTarget2(stack, sp);" << endl;
+							   << "\t" << "actionSetTarget2(app_context);" << endl;
 
 					break;
 				}
@@ -360,7 +360,7 @@ namespace SWFRecomp
 				case SWF_ACTION_SET_PROPERTY:
 				{
 					out_script << "\t" << "// SetProperty" << endl
-							   << "\t" << "actionSetProperty(stack, sp);" << endl;
+							   << "\t" << "actionSetProperty(app_context);" << endl;
 
 					break;
 				}
@@ -368,7 +368,7 @@ namespace SWFRecomp
 				case SWF_ACTION_CLONE_SPRITE:
 				{
 					out_script << "\t" << "// CloneSprite" << endl
-							   << "\t" << "actionCloneSprite(stack, sp);" << endl;
+							   << "\t" << "actionCloneSprite(app_context);" << endl;
 
 					break;
 				}
@@ -376,7 +376,7 @@ namespace SWFRecomp
 				case SWF_ACTION_REMOVE_SPRITE:
 				{
 					out_script << "\t" << "// RemoveSprite" << endl
-						   << "\t" << "actionRemoveSprite(stack, sp);" << endl;
+						   << "\t" << "actionRemoveSprite(app_context);" << endl;
 
 					break;
 				}
@@ -384,7 +384,7 @@ namespace SWFRecomp
 				case SWF_ACTION_TRACE:
 				{
 					out_script << "\t" << "// Trace" << endl
-							   << "\t" << "actionTrace(stack, sp);" << endl;
+							   << "\t" << "actionTrace(app_context);" << endl;
 
 				break;
 				}
@@ -392,7 +392,7 @@ namespace SWFRecomp
 				case SWF_ACTION_START_DRAG:
 				{
 					out_script << "\t" << "// StartDrag" << endl
-							   << "\t" << "actionStartDrag(stack, sp);" << endl;
+							   << "\t" << "actionStartDrag(app_context);" << endl;
 
 					break;
 				}
@@ -400,7 +400,7 @@ namespace SWFRecomp
 				case SWF_ACTION_END_DRAG:
 				{
 					out_script << "\t" << "// End Drag" << endl
-							   << "\t" << "actionEndDrag(stack, sp);" << endl;
+							   << "\t" << "actionEndDrag(app_context);" << endl;
 
 					break;
 				}
@@ -408,7 +408,7 @@ namespace SWFRecomp
 				case SWF_ACTION_CAST_OP:
 				{
 					out_script << "\t" << "// CastOp" << endl
-							   << "\t" << "actionCastOp(stack, sp);" << endl;
+							   << "\t" << "actionCastOp(app_context);" << endl;
 
 					break;
 				}
@@ -416,7 +416,7 @@ namespace SWFRecomp
 				case SWF_ACTION_STRING_LESS:
 				{
 					out_script << "\t" << "// StringLess" << endl
-							   << "\t" << "actionStringLess(stack, sp);" << endl;
+							   << "\t" << "actionStringLess(app_context);" << endl;
 
 					break;
 				}
@@ -424,7 +424,7 @@ namespace SWFRecomp
 				case SWF_ACTION_THROW:
 				{
 					out_script << "\t" << "// Throw" << endl
-							   << "\t" << "actionThrow(stack, sp);" << endl;
+							   << "\t" << "actionThrow(app_context);" << endl;
 
 					break;
 				}
@@ -432,7 +432,7 @@ namespace SWFRecomp
 				case SWF_ACTION_IMPLEMENTS_OP:
 				{
 					out_script << "\t" << "// ImplementsOp" << endl
-							   << "\t" << "actionImplementsOp(stack, sp);" << endl;
+							   << "\t" << "actionImplementsOp(app_context);" << endl;
 
 					break;
 				}
@@ -440,7 +440,7 @@ namespace SWFRecomp
 				case SWF_ACTION_RANDOM_NUMBER:
 				{
 					out_script << "\t" << "// Random Number" << endl
-							   << "\t" << "actionRandomNumber(stack, sp);" << endl;
+							   << "\t" << "actionRandomNumber(app_context);" << endl;
 
 					break;
 				}
@@ -448,7 +448,7 @@ namespace SWFRecomp
 				case SWF_ACTION_CHAR_TO_ASCII:
 				{
 					out_script << "\t" << "// CharToAscii" << endl
-							   << "\t" << "actionCharToAscii(stack, sp);" << endl;
+							   << "\t" << "actionCharToAscii(app_context);" << endl;
 
 					break;
 				}
@@ -458,7 +458,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// AsciiToChar" << endl
-							   << "\t" << "actionAsciiToChar(stack, sp, str_"
+							   << "\t" << "actionAsciiToChar(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -469,7 +469,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// MbCharToAscii" << endl
-							   << "\t" << "actionMbCharToAscii(stack, sp, str_"
+							   << "\t" << "actionMbCharToAscii(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -478,7 +478,7 @@ namespace SWFRecomp
 				case SWF_ACTION_GET_TIME:
 				{
 					out_script << "\t" << "// GetTime" << endl
-							   << "\t" << "actionGetTime(stack, sp);" << endl;
+							   << "\t" << "actionGetTime(app_context);" << endl;
 
 					break;
 				}
@@ -488,7 +488,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// MbStringLength" << endl
-							   << "\t" << "actionMbStringLength(stack, sp, str_"
+							   << "\t" << "actionMbStringLength(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -499,7 +499,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// MbStringExtract" << endl
-							   << "\t" << "actionMbStringExtract(stack, sp, str_"
+							   << "\t" << "actionMbStringExtract(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -510,7 +510,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 5);  // Max 4 bytes for UTF-8 + null terminator
 
 					out_script << "\t" << "// MbAsciiToChar" << endl
-							   << "\t" << "actionMbAsciiToChar(stack, sp, "
+							   << "\t" << "actionMbAsciiToChar(app_context, "
 							   << "str_" << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -519,7 +519,7 @@ namespace SWFRecomp
 				case SWF_ACTION_DELETE:
 				{
 					out_script << "\t" << "// Delete" << endl
-							   << "\t" << "actionDelete(stack, sp);" << endl;
+							   << "\t" << "actionDelete(app_context);" << endl;
 
 					break;
 				}
@@ -529,7 +529,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 256);  // Buffer for variable name operations
 
 					out_script << "\t" << "// Delete2" << endl
-							   << "\t" << "actionDelete2(stack, sp, "
+							   << "\t" << "actionDelete2(app_context, "
 							   << "str_" << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -538,7 +538,7 @@ namespace SWFRecomp
 				case SWF_ACTION_DEFINE_LOCAL:
 				{
 					out_script << "\t" << "// DefineLocal" << endl
-							   << "\t" << "actionDefineLocal(stack, sp);" << endl;
+							   << "\t" << "actionDefineLocal(app_context);" << endl;
 
 					break;
 				}
@@ -548,7 +548,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// Typeof" << endl
-							   << "\t" << "actionTypeof(stack, sp, str_"
+							   << "\t" << "actionTypeof(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -557,7 +557,7 @@ namespace SWFRecomp
 				case SWF_ACTION_DUPLICATE:
 				{
 					out_script << "\t" << "// Duplicate" << endl
-							   << "\t" << "actionDuplicate(stack, sp);" << endl;
+							   << "\t" << "actionDuplicate(app_context);" << endl;
 
 					break;
 				}
@@ -567,7 +567,7 @@ namespace SWFRecomp
 					out_script << "\t" << "// Return" << endl
 							   << "\t" << "{" << endl
 							   << "\t\t" << "ActionVar ret_val;" << endl
-							   << "\t\t" << "popVar(stack, sp, &ret_val);" << endl
+							   << "\t\t" << "popVar(app_context, &ret_val);" << endl
 							   << "\t\t" << "return ret_val;" << endl
 							   << "\t" << "}" << endl;
 
@@ -577,7 +577,7 @@ namespace SWFRecomp
 				case SWF_ACTION_MODULO:
 				{
 					out_script << "\t" << "// Modulo" << endl
-							   << "\t" << "actionModulo(stack, sp);" << endl;
+							   << "\t" << "actionModulo(app_context);" << endl;
 
 					break;
 				}
@@ -585,7 +585,7 @@ namespace SWFRecomp
 			case SWF_ACTION_NEW_OBJECT:
 			{
 				out_script << "\t" << "// NewObject" << endl
-						   << "\t" << "actionNewObject(stack, sp);" << endl;
+						   << "\t" << "actionNewObject(app_context);" << endl;
 
 				break;
 			}
@@ -593,7 +593,7 @@ namespace SWFRecomp
 			case SWF_ACTION_NEW_METHOD:
 			{
 				out_script << "\t" << "// NewMethod" << endl
-						   << "\t" << "actionNewMethod(stack, sp);" << endl;
+						   << "\t" << "actionNewMethod(app_context);" << endl;
 
 				break;
 			}
@@ -601,7 +601,7 @@ namespace SWFRecomp
 			case SWF_ACTION_DECLARE_LOCAL:
 			{
 				out_script << "\t" << "// DeclareLocal" << endl
-						   << "\t" << "actionDeclareLocal(stack, sp);" << endl;
+						   << "\t" << "actionDeclareLocal(app_context);" << endl;
 
 				break;
 			}
@@ -609,7 +609,7 @@ namespace SWFRecomp
 			case SWF_ACTION_INIT_ARRAY:
 			{
 				out_script << "\t" << "// InitArray" << endl
-						   << "\t" << "actionInitArray(stack, sp);" << endl;
+						   << "\t" << "actionInitArray(app_context);" << endl;
 
 				break;
 			}
@@ -617,7 +617,7 @@ namespace SWFRecomp
 			case SWF_ACTION_INIT_OBJECT:
 			{
 				out_script << "\t" << "// InitObject" << endl
-						   << "\t" << "actionInitObject(stack, sp);" << endl;
+						   << "\t" << "actionInitObject(app_context);" << endl;
 
 				break;
 			}
@@ -627,7 +627,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// TargetPath" << endl
-							   << "\t" << "actionTargetPath(stack, sp, str_"
+							   << "\t" << "actionTargetPath(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -639,7 +639,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// Enumerate" << endl
-							   << "\t" << "actionEnumerate(stack, sp, str_"
+							   << "\t" << "actionEnumerate(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -650,7 +650,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// Add2 (Type-Aware Addition)" << endl
-							   << "\t" << "actionAdd2(stack, sp, str_"
+							   << "\t" << "actionAdd2(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -659,7 +659,7 @@ namespace SWFRecomp
 				case SWF_ACTION_LESS2:
 				{
 					out_script << "\t" << "// Less2" << endl
-							   << "\t" << "actionLess2(stack, sp);" << endl;
+							   << "\t" << "actionLess2(app_context);" << endl;
 
 					break;
 				}
@@ -667,7 +667,7 @@ namespace SWFRecomp
 				case SWF_ACTION_EQUALS2:
 				{
 					out_script << "\t" << "// Equals2" << endl
-							   << "\t" << "actionEquals2(stack, sp);" << endl;
+							   << "\t" << "actionEquals2(app_context);" << endl;
 
 					break;
 				}
@@ -675,7 +675,7 @@ namespace SWFRecomp
 				case SWF_ACTION_TO_NUMBER:
 				{
 					out_script << "\t" << "// ToNumber" << endl
-							   << "\t" << "actionToNumber(stack, sp);" << endl;
+							   << "\t" << "actionToNumber(app_context);" << endl;
 
 					break;
 				}
@@ -685,7 +685,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// ToString" << endl
-							   << "\t" << "actionToString(stack, sp, str_"
+							   << "\t" << "actionToString(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -694,7 +694,7 @@ namespace SWFRecomp
 				case SWF_ACTION_STACK_SWAP:
 				{
 					out_script << "\t" << "// Stack Swap" << endl
-							   << "\t" << "actionStackSwap(stack, sp);" << endl;
+							   << "\t" << "actionStackSwap(app_context);" << endl;
 
 					break;
 				}
@@ -702,7 +702,7 @@ namespace SWFRecomp
 				case SWF_ACTION_GET_MEMBER:
 				{
 					out_script << "\t" << "// GetMember" << endl
-							   << "\t" << "actionGetMember(stack, sp);" << endl;
+							   << "\t" << "actionGetMember(app_context);" << endl;
 
 					break;
 				}
@@ -710,7 +710,7 @@ namespace SWFRecomp
 				case SWF_ACTION_SET_MEMBER:
 				{
 					out_script << "\t" << "// SetMember" << endl
-							   << "\t" << "actionSetMember(stack, sp);" << endl;
+							   << "\t" << "actionSetMember(app_context);" << endl;
 
 					break;
 				}
@@ -718,7 +718,7 @@ namespace SWFRecomp
 				case SWF_ACTION_INCREMENT:
 				{
 					out_script << "\t" << "// Increment" << endl
-							   << "\t" << "actionIncrement(stack, sp);" << endl;
+							   << "\t" << "actionIncrement(app_context);" << endl;
 
 					break;
 				}
@@ -726,7 +726,7 @@ namespace SWFRecomp
 				case SWF_ACTION_DECREMENT:
 				{
 					out_script << "\t" << "// Decrement" << endl
-							   << "\t" << "actionDecrement(stack, sp);" << endl;
+							   << "\t" << "actionDecrement(app_context);" << endl;
 
 					break;
 				}
@@ -734,7 +734,7 @@ namespace SWFRecomp
 				case SWF_ACTION_INSTANCEOF:
 				{
 					out_script << "\t" << "// InstanceOf" << endl
-							   << "\t" << "actionInstanceOf(stack, sp);" << endl;
+							   << "\t" << "actionInstanceOf(app_context);" << endl;
 
 					break;
 				}
@@ -744,7 +744,7 @@ namespace SWFRecomp
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// Enumerate2" << endl
-							   << "\t" << "actionEnumerate2(stack, sp, str_"
+							   << "\t" << "actionEnumerate2(app_context, str_"
 							   << to_string(next_str_i - 1) << ");" << endl;
 
 					break;
@@ -753,7 +753,7 @@ namespace SWFRecomp
 				case SWF_ACTION_BIT_AND:
 				{
 					out_script << "\t" << "// Bit And" << endl
-							   << "\t" << "actionBitAnd(stack, sp);" << endl;
+							   << "\t" << "actionBitAnd(app_context);" << endl;
 
 					break;
 				}
@@ -761,7 +761,7 @@ namespace SWFRecomp
 				case SWF_ACTION_BIT_OR:
 				{
 					out_script << "\t" << "// Bit Or" << endl
-							   << "\t" << "actionBitOr(stack, sp);" << endl;
+							   << "\t" << "actionBitOr(app_context);" << endl;
 
 					break;
 				}
@@ -769,7 +769,7 @@ namespace SWFRecomp
 				case SWF_ACTION_BIT_XOR:
 				{
 					out_script << "\t" << "// BitXor" << endl
-							   << "\t" << "actionBitXor(stack, sp);" << endl;
+							   << "\t" << "actionBitXor(app_context);" << endl;
 
 					break;
 				}
@@ -777,7 +777,7 @@ namespace SWFRecomp
 				case SWF_ACTION_BIT_LSHIFT:
 				{
 					out_script << "\t" << "// BitLShift" << endl
-							   << "\t" << "actionBitLShift(stack, sp);" << endl;
+							   << "\t" << "actionBitLShift(app_context);" << endl;
 
 					break;
 				}
@@ -785,7 +785,7 @@ namespace SWFRecomp
 				case SWF_ACTION_BIT_RSHIFT:
 				{
 					out_script << "\t" << "// BitRShift" << endl
-							   << "\t" << "actionBitRShift(stack, sp);" << endl;
+							   << "\t" << "actionBitRShift(app_context);" << endl;
 
 					break;
 				}
@@ -793,7 +793,7 @@ namespace SWFRecomp
 				case SWF_ACTION_BIT_URSHIFT:
 				{
 					out_script << "\t" << "// BitURShift" << endl
-							   << "\t" << "actionBitURShift(stack, sp);" << endl;
+							   << "\t" << "actionBitURShift(app_context);" << endl;
 
 					break;
 				}
@@ -801,7 +801,7 @@ namespace SWFRecomp
 				case SWF_ACTION_STRICT_EQUALS:
 				{
 					out_script << "\t" << "// StrictEquals" << endl
-							   << "\t" << "actionStrictEquals(stack, sp);" << endl;
+							   << "\t" << "actionStrictEquals(app_context);" << endl;
 
 					break;
 				}
@@ -809,7 +809,7 @@ namespace SWFRecomp
 				case SWF_ACTION_GREATER:
 				{
 					out_script << "\t" << "// Greater" << endl
-							   << "\t" << "actionGreater(stack, sp);" << endl;
+							   << "\t" << "actionGreater(app_context);" << endl;
 
 					break;
 				}
@@ -817,7 +817,7 @@ namespace SWFRecomp
 				case SWF_ACTION_STRING_GREATER:
 				{
 					out_script << "\t" << "// StringGreater" << endl
-							   << "\t" << "actionStringGreater(stack, sp);" << endl;
+							   << "\t" << "actionStringGreater(app_context);" << endl;
 
 					break;
 				}
@@ -825,7 +825,7 @@ namespace SWFRecomp
 				case SWF_ACTION_EXTENDS:
 				{
 					out_script << "\t" << "// Extends - Set up prototype chain for inheritance" << endl
-							   << "\t" << "actionExtends(stack, sp);" << endl;
+							   << "\t" << "actionExtends(app_context);" << endl;
 
 					break;
 				}
@@ -836,7 +836,7 @@ namespace SWFRecomp
 					u16 frame_index = VAL(u16, action_buffer);
 
 					out_script << "	" << "// GotoFrame: " << frame_index << endl
-							   << "	" << "actionGotoFrame(stack, sp, " << frame_index << ");" << endl;
+							   << "	" << "actionGotoFrame(app_context, " << frame_index << ");" << endl;
 
 					action_buffer += length;
 					break;
@@ -856,7 +856,7 @@ namespace SWFRecomp
 
 				out_script << "\t" << "// GetURL: \"" << url_string
 						   << "\" -> \"" << target_string << "\"" << endl
-						   << "\t" << "actionGetURL(stack, sp, "
+						   << "\t" << "actionGetURL(app_context, "
 						   << "\"" << url_string << "\", "
 						   << "\"" << target_string << "\");" << endl;
 
@@ -873,12 +873,12 @@ namespace SWFRecomp
 					if (context.inside_function2)
 					{
 						// Inside DefineFunction2: store to local registers array
-						out_script << "\t" << "peekVar(stack, sp, &regs[" << (int)register_num << "]);" << endl;
+						out_script << "\t" << "peekVar(app_context, &regs[" << (int)register_num << "]);" << endl;
 					}
 					else
 					{
 						// Outside functions: store to global registers
-						out_script << "\t" << "actionStoreRegister(stack, sp, " << (int)register_num << ");" << endl;
+						out_script << "\t" << "actionStoreRegister(app_context, " << (int)register_num << ");" << endl;
 					}
 
 					action_buffer += length;
@@ -938,7 +938,7 @@ namespace SWFRecomp
 
 					out_script << "\t" << "// WaitForFrame: frame=" << frame
 							   << ", skip=" << (int)skip_count << " actions" << endl
-							   << "\t" << "if (!actionWaitForFrame(stack, sp, " << frame << "))" << endl
+							   << "\t" << "if (!actionWaitForFrame(app_context, " << frame << "))" << endl
 							   << "\t" << "{" << endl
 							   << "\t" << "\t" << "goto label_" << skip_label << ";" << endl
 							   << "\t" << "}" << endl;
@@ -967,7 +967,7 @@ namespace SWFRecomp
 					}
 
 					out_script << "\t" << "// SetTarget: \"" << escaped_target << "\"" << endl
-							   << "\t" << "actionSetTarget(stack, sp, \"" << escaped_target << "\");" << endl;
+							   << "\t" << "actionSetTarget(app_context, \"" << escaped_target << "\");" << endl;
 
 					break;
 				}
@@ -983,7 +983,7 @@ namespace SWFRecomp
 					}
 
 					out_script << "\t" << "// GoToLabel: \"" << label << "\"" << endl
-							   << "\t" << "actionGoToLabel(stack, sp, \"" << label << "\");" << endl;
+							   << "\t" << "actionGoToLabel(app_context, \"" << label << "\");" << endl;
 
 					action_buffer += length;
 					break;
@@ -1012,7 +1012,7 @@ namespace SWFRecomp
 				}
 
 				out_script << "\t" << "// WaitForFrame2: skip=" << (int)skip_count << endl
-						   << "\t" << "if (!actionWaitForFrame2(stack, sp)) {" << endl
+						   << "\t" << "if (!actionWaitForFrame2(app_context)) {" << endl
 						   << "\t\t" << "// Frame not loaded, skip next " << (int)skip_count << " action(s)" << endl
 						   << "\t\t" << "goto label_" << to_string((s16) (skip_ptr - action_buffer_start)) << ";" << endl
 						   << "\t" << "}" << endl;
@@ -1200,7 +1200,7 @@ namespace SWFRecomp
 
 				// Generate runtime call to register function
 				out_script << "\t// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl;
-				out_script << "\tactionDefineFunction2(stack, sp, \"" << (name_len > 0 ? func_name : "") << "\", "
+				out_script << "\tactionDefineFunction2(app_context, \"" << (name_len > 0 ? func_name : "") << "\", "
 						   << func_id << ", " << num_params << ", " << (int)register_count << ", " << flags << ");" << endl;
 
 				// action_buffer has already been advanced by parseActions
@@ -1250,8 +1250,8 @@ namespace SWFRecomp
 
 				// Generate try-catch-finally structure
 				out_script << "\t" << "// Try-Catch-Finally" << endl;
-				out_script << "\t" << "actionTryBegin(stack, sp);" << endl;
-				out_script << "\t" << "if (ACTION_TRY_SETJMP(stack, sp) == 0) {" << endl;
+				out_script << "\t" << "actionTryBegin(app_context);" << endl;
+				out_script << "\t" << "if (ACTION_TRY_SETJMP(app_context) == 0) {" << endl;
 
 				// Translate try block
 				out_script << "\t\t" << "// Try block" << endl;
@@ -1275,11 +1275,11 @@ namespace SWFRecomp
 
 					if (catch_in_register)
 					{
-						out_script << "\t\t" << "actionCatchToRegister(stack, sp, " << (int)catch_register << ");" << endl;
+						out_script << "\t\t" << "actionCatchToRegister(app_context, " << (int)catch_register << ");" << endl;
 					}
 					else
 					{
-						out_script << "\t\t" << "actionCatchToVariable(stack, sp, \"" << catch_name << "\");" << endl;
+						out_script << "\t\t" << "actionCatchToVariable(app_context, \"" << catch_name << "\");" << endl;
 					}
 
 					// Translate catch block
@@ -1312,7 +1312,7 @@ namespace SWFRecomp
 					}
 				}
 
-				out_script << "\t" << "actionTryEnd(stack, sp);" << endl;
+				out_script << "\t" << "actionTryEnd(app_context);" << endl;
 
 				// Advance action_buffer past all try-catch-finally blocks
 				action_buffer = after_try;
@@ -1336,7 +1336,7 @@ namespace SWFRecomp
 
 					// Emit actionWithStart to push object onto scope chain
 					out_script << "\t" << "// WITH block (size=" << block_size << ")" << endl;
-					out_script << "\t" << "actionWithStart(stack, sp);" << endl;
+					out_script << "\t" << "actionWithStart(app_context);" << endl;
 					out_script << "\t" << "{" << endl; // C scope for clarity
 
 					// Copy the WITH block content and add END marker for parseActions
@@ -1351,7 +1351,7 @@ namespace SWFRecomp
 
 					// Emit actionWithEnd to pop object from scope chain
 					out_script << "\t" << "}" << endl;
-					out_script << "\t" << "actionWithEnd(stack, sp);" << endl;
+					out_script << "\t" << "actionWithEnd(app_context);" << endl;
 
 					// Move action_buffer to the end of the block
 					action_buffer = block_end;
@@ -1417,12 +1417,12 @@ namespace SWFRecomp
 							if (context.inside_function2)
 							{
 								// Inside DefineFunction2: use local registers array
-								out_script << "\t" << "pushVar(stack, sp, &regs[" << (int)register_num << "]);" << endl;
+								out_script << "\t" << "pushVar(app_context, &regs[" << (int)register_num << "]);" << endl;
 							}
 							else
 							{
 								// Outside functions: use global registers
-								out_script << "\t" << "actionPushRegister(stack, sp, " << (int)register_num << ");" << endl;
+								out_script << "\t" << "actionPushRegister(app_context, " << (int)register_num << ");" << endl;
 							}
 
 							break;
@@ -1526,7 +1526,7 @@ namespace SWFRecomp
 					s16 offset = VAL(s16, action_buffer);
 
 					out_script << "\t" << "// If" << endl
-							   << "\t" << "if (evaluateCondition(stack, sp))" << endl
+							   << "\t" << "if (evaluateCondition(app_context))" << endl
 							   << "\t" << "{" << endl
 							   << "\t" << "\t" << "goto label_" << to_string((s16) (action_buffer + length - action_buffer_start + offset)) << ";" << endl
 							   << "\t" << "}" << endl;
@@ -1539,7 +1539,7 @@ namespace SWFRecomp
 				case SWF_ACTION_CALL:
 				{
 					out_script << "\t" << "// Call" << endl
-							   << "\t" << "actionCall(stack, sp);" << endl;
+							   << "\t" << "actionCall(app_context);" << endl;
 
 					break;
 				}
@@ -1559,7 +1559,7 @@ namespace SWFRecomp
 
 					out_script << "\t" << "// GotoFrame2 (play=" << (int)play_flag
 							   << ", sceneBias=" << scene_bias << ")" << endl
-							   << "\t" << "actionGotoFrame2(stack, sp, "
+							   << "\t" << "actionGotoFrame2(app_context, "
 							   << (int)play_flag << ", " << scene_bias << ");" << endl;
 
 					action_buffer += length;
@@ -1583,7 +1583,7 @@ namespace SWFRecomp
 					out_script << "\t" << "// GetURL2: method=" << method_str
 							   << ", loadTarget=" << (int)load_target_flag
 							   << ", loadVars=" << (int)load_variables_flag << endl
-							   << "\t" << "actionGetURL2(stack, sp, "
+							   << "\t" << "actionGetURL2(app_context, "
 							   << (int)send_vars_method << ", "
 							   << (int)load_target_flag << ", "
 							   << (int)load_variables_flag << ");" << endl;
@@ -1656,7 +1656,7 @@ namespace SWFRecomp
 
 				// Generate runtime call to register function
 				out_script << "\t// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl;
-				out_script << "\tactionDefineFunction(stack, sp, \"" << (name_len > 0 ? func_name : "") << "\", "
+				out_script << "\tactionDefineFunction(app_context, \"" << (name_len > 0 ? func_name : "") << "\", "
 						   << func_id << ", " << num_params << ");" << endl;
 
 				break;
@@ -1665,7 +1665,7 @@ namespace SWFRecomp
 			case SWF_ACTION_CALL_FUNCTION:
 			{
 				out_script << "\t" << "// CallFunction" << endl
-						   << "\t" << "actionCallFunction(stack, sp, str_buffer);" << endl;
+						   << "\t" << "actionCallFunction(app_context, str_buffer);" << endl;
 
 				break;
 			}
@@ -1673,7 +1673,7 @@ namespace SWFRecomp
 			case SWF_ACTION_CALL_METHOD:
 			{
 				out_script << "\t" << "// CallMethod" << endl
-						   << "\t" << "actionCallMethod(stack, sp, str_buffer);" << endl;
+						   << "\t" << "actionCallMethod(app_context, str_buffer);" << endl;
 
 				break;
 			}

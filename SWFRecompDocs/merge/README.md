@@ -1,47 +1,26 @@
 # Merge Documentation
 
-This directory contains branch merge analysis documents for the SWFRecomp project repositories.
+This directory contains merge analysis and planning documents for synchronizing SWFRecomp-CC with upstream repositories.
 
-## Purpose
+## Current Merge Plans
 
-Merge analysis documents provide:
-- Comprehensive comparison between branches
-- Detailed change summaries
-- Merge strategy recommendations
-- Risk assessment
-- Pre/post-merge verification steps
-- Conflict resolution guidance
+### Active
 
-## Files
+- **[upstream-downstream-merge-plan-2024-12.md](upstream-downstream-merge-plan-2024-12.md)** - Comprehensive plan for syncing with upstream SWFRecomp repositories (December 2025)
+  - Upstream merges: object system, extended action.c, 100+ tests
+  - Downstream merges: recent memory leak and Linux fixes
 
-### Branch Comparison Documents
+## Upstream Repositories
 
-- **[swfrecomp-branch-differences.md](swfrecomp-branch-differences.md)** - Complete diff analysis: SWFRecomp wasm-support vs master
-- **[swfmodernruntime-branch-differences.md](swfmodernruntime-branch-differences.md)** - Complete diff analysis: SWFModernRuntime wasm-support vs master
+- [SWFRecomp/SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) - Main recompiler
+- [SWFRecomp/SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) - Runtime library
 
-### Active Merge Analyses
+## Historical Documentation
 
-- **[swfrecomp-wasm-support-merge-analysis.md](swfrecomp-wasm-support-merge-analysis.md)** - Merge analysis for SWFRecomp wasm-support → master
-- **[swfmodernruntime-wasm-support-merge-analysis.md](swfmodernruntime-wasm-support-merge-analysis.md)** - Merge analysis for SWFModernRuntime wasm-support → master
-
-### Key Features in These Analyses
-
-Both documents analyze the string variable storage and optimization implementation:
-
-**swfrecomp-wasm-support-merge-analysis.md (SWFRecomp):**
-- 16 commits, 62 files modified
-- Compiler-side: string ID generation and deduplication
-- WASM build infrastructure
-- Test framework additions
-
-**swfmodernruntime-wasm-support-merge-analysis.md (SWFModernRuntime):**
-- 7 commits, 30 files modified
-- Runtime-side: variable storage and memory management
-- String ID optimization (O(1) access)
-- Comprehensive test suite (24 tests)
+Older merge documents from the initial fork creation (Oct-Nov 2025) have been moved to:
+- [`../deprecated/merge/`](../deprecated/merge/) - Historical records of wasm-support branch merges
 
 ## Related Documentation
 
 - **[../status/](../status/)** - Implementation status and summaries
-- **[../status/2025-11-01-string-variable-implementation.md](../status/2025-11-01-string-variable-implementation.md)** - Consolidated implementation summary
-- **[../deprecated/2025-11-01/](../deprecated/2025-11-01/)** - Archived individual documentation files
+- **[../../branch-merge-history.md](../../branch-merge-history.md)** - History of Claude-created branches merged into this repo
