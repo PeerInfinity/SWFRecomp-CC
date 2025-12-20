@@ -3,6 +3,9 @@
 #include <common.h>
 #include <actionmodern/variables.h>
 
+// Forward declaration
+typedef struct SWFAppContext SWFAppContext;
+
 /**
  * ASObject - ActionScript Object with Reference Counting
  *
@@ -67,7 +70,7 @@ extern ASObject* global_object;
 
 // Allocate new object with initial capacity
 // Returns object with refcount = 1
-ASObject* allocObject(u32 initial_capacity);
+ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity);
 
 // Increment reference count
 // Should be called when:
@@ -83,7 +86,7 @@ void retainObject(ASObject* obj);
 // - Overwriting a variable that held an object
 // - Removing object from array
 // - Function/scope cleanup
-void releaseObject(ASObject* obj);
+void releaseObject(SWFAppContext* app_context, ASObject* obj);
 
 /**
  * Property Management
@@ -100,11 +103,11 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 
 // Set property by name (creates if not exists)
 // Handles refcount management if value is an object
-void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* value);
+void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value);
 
 // Delete property by name (returns true if deleted or not found, false if protected)
 // Handles refcount management if value is an object
-bool deleteProperty(ASObject* obj, const char* name, u32 name_length);
+bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length);
 
 /**
  * Interface Management (ActionScript 2.0)
@@ -115,7 +118,7 @@ bool deleteProperty(ASObject* obj, const char* name, u32 name_length);
 // Set the list of interfaces that a constructor implements
 // Used by ActionImplementsOp (0x2C)
 // Takes ownership of the interfaces array
-void setInterfaceList(ASObject* constructor, ASObject** interfaces, u32 count);
+void setInterfaceList(SWFAppContext* app_context, ASObject* constructor, ASObject** interfaces, u32 count);
 
 // Check if an object implements a specific interface
 // Returns 1 if the object's constructor implements the interface, 0 otherwise
@@ -147,19 +150,19 @@ typedef struct ASArray
 
 // Allocate new array with initial capacity
 // Returns array with refcount = 1
-ASArray* allocArray(u32 initial_capacity);
+ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity);
 
 // Increment reference count for array
 void retainArray(ASArray* arr);
 
 // Decrement reference count for array, free if zero
-void releaseArray(ASArray* arr);
+void releaseArray(SWFAppContext* app_context, ASArray* arr);
 
 // Get element at index (returns NULL if out of bounds)
 ActionVar* getArrayElement(ASArray* arr, u32 index);
 
 // Set element at index (grows array if needed)
-void setArrayElement(ASArray* arr, u32 index, ActionVar* value);
+void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, ActionVar* value);
 
 /**
  * Debug/Testing Functions

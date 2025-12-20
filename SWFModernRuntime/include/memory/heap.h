@@ -8,15 +8,13 @@
 typedef struct SWFAppContext SWFAppContext;
 
 /**
- * Convenience macros for heap allocation (upstream compatibility)
+ * Convenience macros for heap allocation
  *
- * These macros work with our global-context implementation while maintaining
- * source compatibility with upstream code that uses HALLOC(s) and FREE(p).
- * The app_context parameter in the macro invocation is ignored since our
- * heap implementation uses a global context set during heap_init().
+ * These macros require app_context to be in scope.
  */
-#define HALLOC(s) heap_alloc(s)
-#define FREE(p) heap_free(p)
+#define HALLOC(s) heap_alloc(app_context, s)
+#define HCALLOC(n, s) heap_calloc(app_context, n, s)
+#define FREE(p) heap_free(app_context, p)
 
 /**
  * Memory Heap Manager
@@ -55,10 +53,11 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size);
  * - Returns NULL on allocation failure
  * - Size of 0 returns NULL (standard behavior)
  *
+ * @param app_context The SWF application context containing heap state
  * @param size Number of bytes to allocate
  * @return Pointer to allocated memory, or NULL on failure
  */
-void* heap_alloc(size_t size);
+void* heap_alloc(SWFAppContext* app_context, size_t size);
 
 /**
  * Allocate zero-initialized memory from the heap
@@ -68,11 +67,12 @@ void* heap_alloc(size_t size);
  * - Zeroes the memory before returning
  * - Returns NULL on allocation failure or overflow
  *
+ * @param app_context The SWF application context containing heap state
  * @param num Number of elements
  * @param size Size of each element
  * @return Pointer to allocated zero-initialized memory, or NULL on failure
  */
-void* heap_calloc(size_t num, size_t size);
+void* heap_calloc(SWFAppContext* app_context, size_t num, size_t size);
 
 /**
  * Free memory allocated by heap_alloc() or heap_calloc()
@@ -81,9 +81,10 @@ void* heap_calloc(size_t num, size_t size);
  * - Passing NULL is a no-op
  * - Pointer must have been returned by heap_alloc() or heap_calloc()
  *
+ * @param app_context The SWF application context containing heap state
  * @param ptr Pointer to memory to free
  */
-void heap_free(void* ptr);
+void heap_free(SWFAppContext* app_context, void* ptr);
 
 /**
  * Get heap statistics
@@ -94,15 +95,19 @@ void heap_free(void* ptr);
  * - Allocated memory
  * - Peak allocation
  * - OOM count
+ *
+ * @param app_context The SWF application context containing heap state
  */
-void heap_stats(void);
+void heap_stats(SWFAppContext* app_context);
 
 /**
  * Shutdown the heap system
  *
  * Frees all heap arenas. Should be called at program exit.
  * After calling this, heap_alloc() will fail until heap_init() is called again.
+ *
+ * @param app_context The SWF application context containing heap state
  */
-void heap_shutdown(void);
+void heap_shutdown(SWFAppContext* app_context);
 
 #endif // HEAP_H

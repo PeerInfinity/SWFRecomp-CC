@@ -75,13 +75,13 @@ static ASFunction* lookupFunctionFromVar(ActionVar* var) {
 	return (ASFunction*) var->data.numeric_value;
 }
 
-void initTime()
+void initTime(SWFAppContext* app_context)
 {
 	start_time = get_elapsed_ms();
 
 	// Initialize global object if not already initialized
 	if (global_object == NULL) {
-		global_object = allocObject(16);  // Start with capacity for 16 global properties
+		global_object = allocObject(app_context, 16);  // Start with capacity for 16 global properties
 	}
 }
 
@@ -2418,7 +2418,7 @@ void actionSetVariable(SWFAppContext* app_context)
 				// Found in scope chain - set it there
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
-				setProperty(scope_chain[i], var_name, var_name_len, &value_var);
+				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
 
 				// Pop both value and name
 				POP_2();
@@ -2485,7 +2485,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 
 		// Set property on the local scope object
 		// This will create the property if it doesn't exist, or update if it does
-		setProperty(local_scope, var_name, var_name_len, &value_var);
+		setProperty(app_context, local_scope, var_name, var_name_len, &value_var);
 
 		// Pop both value and name
 		POP_2();
@@ -2546,7 +2546,7 @@ void actionDeclareLocal(SWFAppContext* app_context)
 
 		// Set property on the local scope object
 		// This will create the property if it doesn't exist
-		setProperty(local_scope, var_name, var_name_len, &undefined_var);
+		setProperty(app_context, local_scope, var_name, var_name_len, &undefined_var);
 
 		// Pop the name
 		POP();
@@ -2948,7 +2948,7 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 			if (prop != NULL)
 			{
 				// Found in scope chain - delete it
-				success = deleteProperty(scope_chain[i], var_name, var_name_len);
+				success = deleteProperty(app_context, scope_chain[i], var_name, var_name_len);
 
 				// Push result and return
 				float result = success ? 1.0f : 0.0f;
@@ -3780,7 +3780,7 @@ void actionExtends(SWFAppContext* app_context)
 	}
 
 	// Create new prototype object
-	ASObject* new_proto = allocObject(0);
+	ASObject* new_proto = allocObject(app_context, 0);
 	if (new_proto == NULL)
 	{
 #ifdef DEBUG
@@ -3795,11 +3795,11 @@ void actionExtends(SWFAppContext* app_context)
 	// Set __proto__ of new prototype to superclass prototype
 	if (super_proto_var != NULL)
 	{
-		setProperty(new_proto, "__proto__", 9, super_proto_var);
+		setProperty(app_context, new_proto, "__proto__", 9, super_proto_var);
 	}
 
 	// Set constructor property to superclass
-	setProperty(new_proto, "constructor", 11, &superclass);
+	setProperty(app_context, new_proto, "constructor", 11, &superclass);
 
 #ifdef DEBUG
 	printf("[DEBUG] actionExtends: Set constructor property - type=%d, ptr=%p\n",
@@ -3819,11 +3819,11 @@ void actionExtends(SWFAppContext* app_context)
 	new_proto_var.data.numeric_value = (u64) new_proto;
 	new_proto_var.str_size = 0;
 
-	setProperty(sub_func, "prototype", 9, &new_proto_var);
+	setProperty(app_context, sub_func, "prototype", 9, &new_proto_var);
 
 	// Release our reference to new_proto
 	// (setProperty retained it when setting as prototype)
-	releaseObject(new_proto);
+	releaseObject(app_context, new_proto);
 
 #ifdef DEBUG
 	printf("[DEBUG] actionExtends: Prototype chain established\n");
@@ -3964,7 +3964,7 @@ void actionImplementsOp(SWFAppContext* app_context)
 				// Clean up allocated interfaces
 				for (u32 j = 0; j < i; j++)
 				{
-					releaseObject(interfaces[j]);
+					releaseObject(app_context, interfaces[j]);
 				}
 				free(interfaces);
 				return;
@@ -3977,7 +3977,7 @@ void actionImplementsOp(SWFAppContext* app_context)
 
 	// Step 4: Set the interface list on the constructor
 	// This transfers ownership of the interfaces array
-	setInterfaceList(constructor, interfaces, interface_count);
+	setInterfaceList(app_context, constructor, interfaces, interface_count);
 
 #ifdef DEBUG
 	printf("[DEBUG] actionImplementsOp: constructor=%p, interface_count=%u\n",
@@ -4281,7 +4281,7 @@ void actionInitArray(SWFAppContext* app_context)
 	u32 num_elements = (u32) VAL(float, &count_var.data.numeric_value);
 
 	// 2. Allocate array
-	ASArray* arr = allocArray(num_elements);
+	ASArray* arr = allocArray(app_context, num_elements);
 	if (!arr) {
 		// Handle allocation failure - push empty array or null
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &(float){0.0f}));
@@ -4372,7 +4372,7 @@ void actionSetMember(SWFAppContext* app_context)
 		if (obj != NULL)
 		{
 			// Set the property on the object
-			setProperty(obj, prop_name, prop_name_len, &value_var);
+			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
 		}
 	}
 	// If it's not an object type, we silently ignore the operation
@@ -4392,7 +4392,7 @@ void actionInitObject(SWFAppContext* app_context)
 #endif
 
 	// Step 2: Allocate object with the specified number of properties
-	ASObject* obj = allocObject(num_props);
+	ASObject* obj = allocObject(app_context, num_props);
 	if (obj == NULL)
 	{
 		fprintf(stderr, "ERROR: Failed to allocate object in actionInitObject\n");
@@ -4438,7 +4438,7 @@ void actionInitObject(SWFAppContext* app_context)
 
 		// Store property using the object API
 		// This handles refcount management if value is an object
-		setProperty(obj, name, name_length, &value);
+		setProperty(app_context, obj, name, name_length, &value);
 	}
 
 	// Step 4: Push object reference to stack
@@ -4539,7 +4539,7 @@ void actionDelete(SWFAppContext* app_context)
 	}
 
 	// Delete the property
-	bool success = deleteProperty(obj, prop_name, prop_name_len);
+	bool success = deleteProperty(app_context, obj, prop_name, prop_name_len);
 
 	// Push result (1.0 for success, 0.0 for failure)
 	float result = success ? 1.0f : 0.0f;
@@ -4710,7 +4710,7 @@ void actionNewObject(SWFAppContext* app_context)
 		if (num_args == 0)
 		{
 			// new Array() - empty array
-			ASArray* arr = allocArray(4);
+			ASArray* arr = allocArray(app_context, 4);
 			arr->length = 0;
 			new_obj = arr;
 		}
@@ -4723,14 +4723,14 @@ void actionNewObject(SWFAppContext* app_context)
 				VAL(float, &args[0].data.numeric_value) :
 				(float) VAL(double, &args[0].data.numeric_value);
 			u32 length = (u32) length_f;
-			ASArray* arr = allocArray(length > 0 ? length : 4);
+			ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
 			arr->length = length;
 			new_obj = arr;
 		}
 		else
 		{
 			// new Array(elem1, elem2, ...) - array with elements
-			ASArray* arr = allocArray(num_args);
+			ASArray* arr = allocArray(app_context, num_args);
 			arr->length = num_args;
 			for (u32 i = 0; i < num_args; i++)
 			{
@@ -4755,7 +4755,7 @@ void actionNewObject(SWFAppContext* app_context)
 	{
 		// Handle Object constructor
 		// Create empty object with initial capacity
-		ASObject* obj = allocObject(8);
+		ASObject* obj = allocObject(app_context, 8);
 		new_obj = obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
@@ -4765,14 +4765,14 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle Date constructor
 		// In a full implementation, this would parse date arguments
 		// For now, create object with basic time property set to current time
-		ASObject* date = allocObject(4);
+		ASObject* date = allocObject(app_context, 4);
 
 		// Set time property to current milliseconds since epoch
 		ActionVar time_var;
 		time_var.type = ACTION_STACK_VALUE_F64;
 		double current_time = (double)time(NULL) * 1000.0;  // Convert to milliseconds
 		VAL(double, &time_var.data.numeric_value) = current_time;
-		setProperty(date, "time", 4, &time_var);
+		setProperty(app_context, date, "time", 4, &time_var);
 
 		new_obj = date;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
@@ -4782,7 +4782,7 @@ void actionNewObject(SWFAppContext* app_context)
 	{
 		// Handle String constructor
 		// new String() or new String(value)
-		ASObject* str_obj = allocObject(4);
+		ASObject* str_obj = allocObject(app_context, 4);
 
 		// If argument provided, convert to string and store as value property
 		if (num_args > 0)
@@ -4814,7 +4814,7 @@ void actionNewObject(SWFAppContext* app_context)
 			value_var.str_size = strlen(str_value);
 			value_var.data.string_data.heap_ptr = strdup(str_value);
 			value_var.data.string_data.owns_memory = true;
-			setProperty(str_obj, "value", 5, &value_var);
+			setProperty(app_context, str_obj, "value", 5, &value_var);
 		}
 
 		new_obj = str_obj;
@@ -4825,7 +4825,7 @@ void actionNewObject(SWFAppContext* app_context)
 	{
 		// Handle Number constructor
 		// new Number() or new Number(value)
-		ASObject* num_obj = allocObject(4);
+		ASObject* num_obj = allocObject(app_context, 4);
 
 		// Store numeric value as property
 		ActionVar value_var;
@@ -4859,7 +4859,7 @@ void actionNewObject(SWFAppContext* app_context)
 			VAL(float, &value_var.data.numeric_value) = 0.0f;
 		}
 
-		setProperty(num_obj, "value", 5, &value_var);
+		setProperty(app_context, num_obj, "value", 5, &value_var);
 		new_obj = num_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
@@ -4868,7 +4868,7 @@ void actionNewObject(SWFAppContext* app_context)
 	{
 		// Handle Boolean constructor
 		// new Boolean() or new Boolean(value)
-		ASObject* bool_obj = allocObject(4);
+		ASObject* bool_obj = allocObject(app_context, 4);
 
 		// Store boolean value as property
 		ActionVar value_var;
@@ -4903,7 +4903,7 @@ void actionNewObject(SWFAppContext* app_context)
 			VAL(float, &value_var.data.numeric_value) = 0.0f;
 		}
 
-		setProperty(bool_obj, "value", 5, &value_var);
+		setProperty(app_context, bool_obj, "value", 5, &value_var);
 		new_obj = bool_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
@@ -4917,7 +4917,7 @@ void actionNewObject(SWFAppContext* app_context)
 		{
 			// User-defined constructor found
 			// Create new object to serve as 'this'
-			ASObject* obj = allocObject(8);
+			ASObject* obj = allocObject(app_context, 8);
 			new_obj = obj;
 
 			// Call the constructor with 'this' binding
@@ -4949,7 +4949,7 @@ void actionNewObject(SWFAppContext* app_context)
 					if (return_value.type == ACTION_STACK_VALUE_OBJECT && return_value.data.numeric_value != 0)
 					{
 						// Constructor returned an object - use it instead of default 'this'
-						releaseObject(obj);  // Release the originally created object
+						releaseObject(app_context, obj);  // Release the originally created object
 						new_obj = (ASObject*) return_value.data.numeric_value;
 						retainObject((ASObject*) new_obj);  // Retain the returned object
 					}
@@ -4963,7 +4963,7 @@ void actionNewObject(SWFAppContext* app_context)
 		else
 		{
 			// Unknown constructor - create generic object
-			ASObject* obj = allocObject(8);
+			ASObject* obj = allocObject(app_context, 8);
 			new_obj = obj;
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 			return;
@@ -5047,7 +5047,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			if (func != NULL)
 			{
 				// Create new object for 'this' context
-				ASObject* new_obj = allocObject(8);
+				ASObject* new_obj = allocObject(app_context, 8);
 
 				// TODO: Set up prototype chain (new_obj.__proto__ = func.prototype)
 				// This requires prototype support in the object system
@@ -5060,11 +5060,11 @@ void actionNewMethod(SWFAppContext* app_context)
 					// DefineFunction2 with full register support
 					ActionVar* registers = NULL;
 					if (func->register_count > 0) {
-						registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
+						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 					}
 
 					// Create local scope for function
-					ASObject* local_scope = allocObject(8);
+					ASObject* local_scope = allocObject(app_context, 8);
 					if (scope_depth < MAX_SCOPE_DEPTH) {
 						scope_chain[scope_depth++] = local_scope;
 					}
@@ -5076,9 +5076,9 @@ void actionNewMethod(SWFAppContext* app_context)
 					if (scope_depth > 0) {
 						scope_depth--;
 					}
-					releaseObject(local_scope);
+					releaseObject(app_context, local_scope);
 
-					if (registers != NULL) heap_free(registers);
+					if (registers != NULL) FREE(registers);
 				}
 				else
 				{
@@ -5156,7 +5156,7 @@ void actionNewMethod(SWFAppContext* app_context)
 		if (num_args == 0)
 		{
 			// new Array() - empty array
-			ASArray* arr = allocArray(4);
+			ASArray* arr = allocArray(app_context, 4);
 			arr->length = 0;
 			new_obj = arr;
 		}
@@ -5169,14 +5169,14 @@ void actionNewMethod(SWFAppContext* app_context)
 				VAL(float, &args[0].data.numeric_value) :
 				(float) VAL(double, &args[0].data.numeric_value);
 			u32 length = (u32) length_f;
-			ASArray* arr = allocArray(length > 0 ? length : 4);
+			ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
 			arr->length = length;
 			new_obj = arr;
 		}
 		else
 		{
 			// new Array(elem1, elem2, ...) - array with elements
-			ASArray* arr = allocArray(num_args);
+			ASArray* arr = allocArray(app_context, num_args);
 			arr->length = num_args;
 			for (u32 i = 0; i < num_args; i++)
 			{
@@ -5198,14 +5198,14 @@ void actionNewMethod(SWFAppContext* app_context)
 	else if (ctor_name != NULL && strcmp(ctor_name, "Object") == 0)
 	{
 		// Handle Object constructor
-		ASObject* obj = allocObject(8);
+		ASObject* obj = allocObject(app_context, 8);
 		new_obj = obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
 	else if (ctor_name != NULL && strcmp(ctor_name, "Date") == 0)
 	{
 		// Handle Date constructor (simplified)
-		ASObject* date = allocObject(4);
+		ASObject* date = allocObject(app_context, 4);
 		new_obj = date;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
@@ -5213,7 +5213,7 @@ void actionNewMethod(SWFAppContext* app_context)
 	{
 		// Handle String constructor
 		// new String() or new String(value)
-		ASObject* str_obj = allocObject(4);
+		ASObject* str_obj = allocObject(app_context, 4);
 
 		if (num_args > 0)
 		{
@@ -5223,7 +5223,7 @@ void actionNewMethod(SWFAppContext* app_context)
 
 			// If not already a string, we'd need to convert it
 			// For now, store the value as-is with property name "valueOf"
-			setProperty(str_obj, "valueOf", 7, &string_value);
+			setProperty(app_context, str_obj, "valueOf", 7, &string_value);
 		}
 		else
 		{
@@ -5231,7 +5231,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			ActionVar empty_str;
 			empty_str.type = ACTION_STACK_VALUE_STRING;
 			empty_str.data.numeric_value = (u64) "";
-			setProperty(str_obj, "valueOf", 7, &empty_str);
+			setProperty(app_context, str_obj, "valueOf", 7, &empty_str);
 		}
 
 		new_obj = str_obj;
@@ -5241,7 +5241,7 @@ void actionNewMethod(SWFAppContext* app_context)
 	{
 		// Handle Number constructor
 		// new Number() or new Number(value)
-		ASObject* num_obj = allocObject(4);
+		ASObject* num_obj = allocObject(app_context, 4);
 
 		if (num_args > 0)
 		{
@@ -5271,7 +5271,7 @@ void actionNewMethod(SWFAppContext* app_context)
 				}
 			}
 
-			setProperty(num_obj, "valueOf", 7, &num_value);
+			setProperty(app_context, num_obj, "valueOf", 7, &num_value);
 		}
 		else
 		{
@@ -5280,7 +5280,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			float zero = 0.0f;
 			zero_val.type = ACTION_STACK_VALUE_F32;
 			zero_val.data.numeric_value = VAL(u64, &zero);
-			setProperty(num_obj, "valueOf", 7, &zero_val);
+			setProperty(app_context, num_obj, "valueOf", 7, &zero_val);
 		}
 
 		new_obj = num_obj;
@@ -5290,7 +5290,7 @@ void actionNewMethod(SWFAppContext* app_context)
 	{
 		// Handle Boolean constructor
 		// new Boolean() or new Boolean(value)
-		ASObject* bool_obj = allocObject(4);
+		ASObject* bool_obj = allocObject(app_context, 4);
 
 		if (num_args > 0)
 		{
@@ -5325,7 +5325,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			float bool_as_float = truthy ? 1.0f : 0.0f;
 			bool_value.type = ACTION_STACK_VALUE_F32;
 			bool_value.data.numeric_value = VAL(u64, &bool_as_float);
-			setProperty(bool_obj, "valueOf", 7, &bool_value);
+			setProperty(app_context, bool_obj, "valueOf", 7, &bool_value);
 		}
 		else
 		{
@@ -5334,7 +5334,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			float zero = 0.0f;
 			false_val.type = ACTION_STACK_VALUE_F32;
 			false_val.data.numeric_value = VAL(u64, &zero);
-			setProperty(bool_obj, "valueOf", 7, &false_val);
+			setProperty(app_context, bool_obj, "valueOf", 7, &false_val);
 		}
 
 		new_obj = bool_obj;
@@ -5344,7 +5344,7 @@ void actionNewMethod(SWFAppContext* app_context)
 	{
 		// User-defined constructor function from object property
 		// Create new object for 'this' context
-		ASObject* new_obj_inst = allocObject(8);
+		ASObject* new_obj_inst = allocObject(app_context, 8);
 
 		// TODO: Set up prototype chain (new_obj.__proto__ = func.prototype)
 
@@ -5360,7 +5360,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			}
 
 			// Create local scope for function
-			ASObject* local_scope = allocObject(8);
+			ASObject* local_scope = allocObject(app_context, 8);
 			if (scope_depth < MAX_SCOPE_DEPTH) {
 				scope_chain[scope_depth++] = local_scope;
 			}
@@ -5372,9 +5372,9 @@ void actionNewMethod(SWFAppContext* app_context)
 			if (scope_depth > 0) {
 				scope_depth--;
 			}
-			releaseObject(local_scope);
+			releaseObject(app_context, local_scope);
 
-			if (registers != NULL) heap_free(registers);
+			if (registers != NULL) FREE(registers);
 		}
 		else
 		{
@@ -6000,7 +6000,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	ActionVar* args = NULL;
 	if (num_args > 0)
 	{
-		args = (ActionVar*) heap_alloc(sizeof(ActionVar) * num_args);
+		args = (ActionVar*) HALLOC(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
 			popVar(app_context, &args[num_args - 1 - i]);
@@ -6045,14 +6045,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			// Parse integer from string
 			float result = (float) atoi(str_value);
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - return NaN
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			float nan_val = 0.0f / 0.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
 			builtin_handled = 1;
@@ -6093,14 +6093,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			// Parse float from string
 			float result = (float) atof(str_value);
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - return NaN
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			float nan_val = 0.0f / 0.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
 			builtin_handled = 1;
@@ -6129,14 +6129,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 
 			float result = (val != val) ? 1.0f : 0.0f;  // NaN != NaN is true
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - isNaN(undefined) = true
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			float result = 1.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
@@ -6165,14 +6165,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			// Check if finite (not NaN and not infinity)
 			float result = (val == val && val != INFINITY && val != -INFINITY) ? 1.0f : 0.0f;
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - isFinite(undefined) = false
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			float result = 0.0f;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
@@ -6191,12 +6191,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// DefineFunction2 with registers and this context
 				ActionVar* registers = NULL;
 				if (func->register_count > 0) {
-					registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
+					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 				}
 
 				// Create local scope object for function-local variables
 				// Start with capacity for a few local variables
-				ASObject* local_scope = allocObject(8);
+				ASObject* local_scope = allocObject(app_context, 8);
 
 				// Push local scope onto scope chain
 				if (scope_depth < MAX_SCOPE_DEPTH) {
@@ -6212,10 +6212,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 				// Clean up local scope object
 				// Release decrements refcount and frees if refcount reaches 0
-				releaseObject(local_scope);
+				releaseObject(app_context, local_scope);
 
-				if (registers != NULL) heap_free(registers);
-				if (args != NULL) heap_free(args);
+				if (registers != NULL) FREE(registers);
+				if (args != NULL) FREE(args);
 
 				pushVar(app_context, &result);
 			}
@@ -6237,7 +6237,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				}
 
 				// Free args array before calling function
-				if (args != NULL) heap_free(args);
+				if (args != NULL) FREE(args);
 
 				// Call the simple function
 				// It will pop parameters, execute body, and may push a return value
@@ -6258,7 +6258,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		else
 		{
 			// Function not found - push undefined
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 		}
 	}
@@ -6521,7 +6521,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	ActionVar* args = NULL;
 	if (num_args > 0)
 	{
-		args = (ActionVar*) heap_alloc(sizeof(ActionVar) * num_args);
+		args = (ActionVar*) HALLOC(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
 			popVar(app_context, &args[num_args - 1 - i]);
@@ -6542,14 +6542,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Invoke DefineFunction2
 				ActionVar* registers = NULL;
 				if (func->register_count > 0) {
-					registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
+					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 				}
 
 				// No 'this' binding for direct function call (pass NULL)
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 
-				if (registers != NULL) heap_free(registers);
-				if (args != NULL) heap_free(args);
+				if (registers != NULL) FREE(registers);
+				if (args != NULL) FREE(args);
 
 				pushVar(app_context, &result);
 				return;
@@ -6557,7 +6557,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			else
 			{
 				// Simple function or invalid - push undefined
-				if (args != NULL) heap_free(args);
+				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 				return;
 			}
@@ -6565,7 +6565,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else
 		{
 			// Object is not a function - cannot invoke, push undefined
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
@@ -6579,7 +6579,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (obj == NULL)
 		{
 			// Null object - push undefined
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
@@ -6597,27 +6597,27 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Invoke DefineFunction2 with 'this' binding
 				ActionVar* registers = NULL;
 				if (func->register_count > 0) {
-					registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
+					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 				}
 
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
 
-				if (registers != NULL) heap_free(registers);
-				if (args != NULL) heap_free(args);
+				if (registers != NULL) FREE(registers);
+				if (args != NULL) FREE(args);
 
 				pushVar(app_context, &result);
 			}
 			else
 			{
 				// Simple function or invalid - push undefined
-				if (args != NULL) heap_free(args);
+				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}
 		}
 		else
 		{
 			// Method not found or not a function - push undefined
-			if (args != NULL) heap_free(args);
+			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
@@ -6633,7 +6633,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		                                         method_name, method_name_len,
 		                                         args, num_args);
 
-		if (args != NULL) heap_free(args);
+		if (args != NULL) FREE(args);
 
 		if (!handled)
 		{
@@ -6645,7 +6645,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	else
 	{
 		// Not an object or string - push undefined
-		if (args != NULL) heap_free(args);
+		if (args != NULL) FREE(args);
 		pushUndefined(app_context);
 		return;
 	}

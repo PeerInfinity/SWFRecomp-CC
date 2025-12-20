@@ -87,8 +87,6 @@ void swfStart(SWFAppContext* app_context)
 	context->cxform_data = app_context->cxform_data;
 	context->cxform_data_size = app_context->cxform_data_size;
 
-	flashbang_init(context);
-
 	dictionary = malloc(INITIAL_DICTIONARY_CAPACITY*sizeof(Character));
 	display_list = malloc(INITIAL_DISPLAYLIST_CAPACITY*sizeof(DisplayObject));
 
@@ -105,28 +103,30 @@ void swfStart(SWFAppContext* app_context)
 	g_frame_funcs = app_context->frame_funcs;
 	g_frame_count = app_context->frame_count;
 
-	initTime();
+	initTime(app_context);
 	initMap();
 
-	// Initialize heap allocator
+	// Initialize heap allocator (must be before flashbang_init which uses HALLOC)
 	if (!heap_init(app_context, 0)) {  // 0 = use default size (64 MB)
 		fprintf(stderr, "Failed to initialize heap allocator\n");
 		return;
 	}
 
+	flashbang_init(app_context, context);
+
 	tagInit();
 
 	tagMain(app_context);
 
-	heap_shutdown();
+	flashbang_free(app_context, context);
+
+	heap_shutdown(app_context);
 	freeMap();
 
 	free(app_context->stack);
 
 	free(dictionary);
 	free(display_list);
-
-	flashbang_free(context);
 }
 
 #endif // NO_GRAPHICS

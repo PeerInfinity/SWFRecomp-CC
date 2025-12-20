@@ -4,6 +4,7 @@
 
 #include <common.h>
 #include <flashbang.h>
+#include <swf.h>
 #include <utils.h>
 #include <heap.h>
 
@@ -58,16 +59,16 @@ FlashbangContext* flashbang_new()
 	return malloc(sizeof(FlashbangContext));
 }
 
-void flashbang_init(FlashbangContext* context)
+void flashbang_init(SWFAppContext* app_context, FlashbangContext* context)
 {
 	if (!once && !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
 	{
 		SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
-	
+
 	once = 1;
-	
+
 	context->current_bitmap = 0;
 	context->bitmap_sizes = (u32*) HALLOC(2*sizeof(u32)*context->bitmap_count);
 	
@@ -954,19 +955,22 @@ void flashbang_close_pass(FlashbangContext* context)
 	SDL_SubmitGPUCommandBuffer(context->command_buffer);
 }
 
-void flashbang_free(FlashbangContext* context)
+void flashbang_free(SWFAppContext* app_context, FlashbangContext* context)
 {
 	// release the pipeline
 	SDL_ReleaseGPUGraphicsPipeline(context->device, context->graphics_pipeline);
-	
+
 	// destroy the buffers
 	SDL_ReleaseGPUBuffer(context->device, context->vertex_buffer);
-	
+
+	// free heap-allocated memory
+	FREE(context->bitmap_sizes);
+
 	// destroy the GPU device
 	SDL_DestroyGPUDevice(context->device);
-	
+
 	// destroy the window
 	SDL_DestroyWindow(context->window);
-	
+
 	free(context);
 }

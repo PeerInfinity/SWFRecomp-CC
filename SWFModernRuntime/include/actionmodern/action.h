@@ -95,7 +95,7 @@ extern MovieClip root_movieclip;
 
 extern ActionVar* temp_val;
 
-void initTime();
+void initTime(SWFAppContext* app_context);
 
 void pushVar(SWFAppContext* app_context, ActionVar* p);
 void popVar(SWFAppContext* app_context, ActionVar* var);

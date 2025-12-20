@@ -4,6 +4,9 @@
 
 #include <common.h>
 
+// Forward declaration
+typedef struct SWFAppContext SWFAppContext;
+
 struct FlashbangContext
 {
 	int width;
@@ -72,7 +75,7 @@ struct FlashbangContext
 typedef struct FlashbangContext FlashbangContext;
 
 FlashbangContext* flashbang_new();
-void flashbang_init(FlashbangContext* context);
+void flashbang_init(SWFAppContext* app_context, FlashbangContext* context);
 int flashbang_poll();
 void flashbang_set_window_background(FlashbangContext* context, u8 r, u8 g, u8 b);
 void flashbang_upload_bitmap(FlashbangContext* context, size_t offset, size_t size, u32 width, u32 height);
@@ -84,4 +87,4 @@ void flashbang_upload_cxform_id(FlashbangContext* context, u32 cxform_id);
 void flashbang_upload_cxform(FlashbangContext* context, float* cxform);
 void flashbang_draw_shape(FlashbangContext* context, size_t offset, size_t num_verts, u32 transform_id);
 void flashbang_close_pass(FlashbangContext* context);
-void flashbang_free(FlashbangContext* context);
+void flashbang_free(SWFAppContext* app_context, FlashbangContext* context);

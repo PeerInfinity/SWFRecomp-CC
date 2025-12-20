@@ -14,15 +14,21 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <actionmodern/object.h>
+#include <memory/heap.h>
+#include <swf.h>
 
-void test_basic_lifecycle()
+// Test app_context for heap allocation
+static SWFAppContext test_app_context;
+
+void test_basic_lifecycle(SWFAppContext* app_context)
 {
 	printf("\n=== Test 1: Basic Lifecycle ===\n");
 	printf("Testing: allocate (refcount=1), retain twice (refcount=3), release three times (free)\n\n");
 
 	// Allocate object with refcount = 1
-	ASObject* obj = allocObject(0);
+	ASObject* obj = allocObject(app_context, 0);
 	assertRefcount(obj, 1);
 
 	// Retain twice (refcount = 3)
@@ -33,19 +39,19 @@ void test_basic_lifecycle()
 	assertRefcount(obj, 3);
 
 	// Release three times (refcount = 0, freed)
-	releaseObject(obj);  // refcount = 2
-	releaseObject(obj);  // refcount = 1
-	releaseObject(obj);  // refcount = 0, freed
+	releaseObject(app_context, obj);  // refcount = 2
+	releaseObject(app_context, obj);  // refcount = 1
+	releaseObject(app_context, obj);  // refcount = 0, freed
 
 	printf("\n✅ Test 1 PASSED: Object lifecycle works correctly\n");
 }
 
-void test_properties()
+void test_properties(SWFAppContext* app_context)
 {
 	printf("\n=== Test 2: Property Management ===\n");
 	printf("Testing: set properties, get properties, update properties\n\n");
 
-	ASObject* obj = allocObject(4);
+	ASObject* obj = allocObject(app_context, 4);
 	assertRefcount(obj, 1);
 
 	// Set numeric property
@@ -55,7 +61,7 @@ void test_properties()
 	num_var.data.numeric_value = *((u32*)&num_value);
 	num_var.str_size = 0;
 
-	setProperty(obj, "x", 1, &num_var);
+	setProperty(app_context, obj, "x", 1, &num_var);
 	printf("Set property 'x' = 42.5\n");
 
 	// Get numeric property
@@ -82,13 +88,13 @@ void test_properties()
 	str_var.str_size = 5;
 	str_var.data.string_data.owns_memory = false;
 
-	setProperty(obj, "name", 4, &str_var);
+	setProperty(app_context, obj, "name", 4, &str_var);
 	printf("Set property 'name' = 'hello'\n");
 
 	// Update existing property
 	float new_num_value = 100.0f;
 	num_var.data.numeric_value = *((u32*)&new_num_value);
-	setProperty(obj, "x", 1, &num_var);
+	setProperty(app_context, obj, "x", 1, &num_var);
 	printf("Updated property 'x' = 100.0\n");
 
 	retrieved = getProperty(obj, "x", 1);
@@ -106,22 +112,22 @@ void test_properties()
 	printf("\nObject state:\n");
 	printObject(obj);
 
-	releaseObject(obj);
+	releaseObject(app_context, obj);
 	printf("\n✅ Test 2 PASSED: Property management works correctly\n");
 }
 
-void test_nested_objects()
+void test_nested_objects(SWFAppContext* app_context)
 {
 	printf("\n=== Test 3: Nested Objects ===\n");
 	printf("Testing: object properties with refcount management\n\n");
 
 	// Create parent object
-	ASObject* parent = allocObject(2);
+	ASObject* parent = allocObject(app_context, 2);
 	assertRefcount(parent, 1);
 	printf("Created parent object\n");
 
 	// Create child object
-	ASObject* child = allocObject(1);
+	ASObject* child = allocObject(app_context, 1);
 	assertRefcount(child, 1);
 	printf("Created child object\n");
 
@@ -131,7 +137,7 @@ void test_nested_objects()
 	float num_value = 123.0f;
 	num_var.data.numeric_value = *((u32*)&num_value);
 	num_var.str_size = 0;
-	setProperty(child, "value", 5, &num_var);
+	setProperty(app_context, child, "value", 5, &num_var);
 	printf("Set child.value = 123.0\n");
 
 	// Store child in parent (should increment child's refcount)
@@ -140,7 +146,7 @@ void test_nested_objects()
 	child_var.data.numeric_value = (u64)child;
 	child_var.str_size = 0;
 
-	setProperty(parent, "child", 5, &child_var);
+	setProperty(app_context, parent, "child", 5, &child_var);
 	printf("Set parent.child = child object\n");
 	assertRefcount(child, 2);  // Should be 2: our reference + parent's reference
 
@@ -150,27 +156,27 @@ void test_nested_objects()
 
 	// Release our reference to child (should not free, still referenced by parent)
 	printf("\nReleasing our reference to child...\n");
-	releaseObject(child);
+	releaseObject(app_context, child);
 	// Child refcount should now be 1 (only parent's reference remains)
 
 	// Release parent (should free parent and child)
 	printf("Releasing parent...\n");
-	releaseObject(parent);
+	releaseObject(app_context, parent);
 	// Both parent and child should be freed
 
 	printf("\n✅ Test 3 PASSED: Nested object refcounts work correctly\n");
 }
 
-void test_property_replacement()
+void test_property_replacement(SWFAppContext* app_context)
 {
 	printf("\n=== Test 4: Property Replacement ===\n");
 	printf("Testing: replacing object property decrements old object refcount\n\n");
 
-	ASObject* parent = allocObject(1);
+	ASObject* parent = allocObject(app_context, 1);
 	printf("Created parent object\n");
 
 	// Create first child
-	ASObject* child1 = allocObject(0);
+	ASObject* child1 = allocObject(app_context, 0);
 	assertRefcount(child1, 1);
 	printf("Created child1\n");
 
@@ -179,18 +185,18 @@ void test_property_replacement()
 	obj_var.type = ACTION_STACK_VALUE_OBJECT;
 	obj_var.data.numeric_value = (u64)child1;
 	obj_var.str_size = 0;
-	setProperty(parent, "child", 5, &obj_var);
+	setProperty(app_context, parent, "child", 5, &obj_var);
 	assertRefcount(child1, 2);  // Our ref + parent ref
 	printf("Stored child1 in parent, refcount = 2\n");
 
 	// Create second child
-	ASObject* child2 = allocObject(0);
+	ASObject* child2 = allocObject(app_context, 0);
 	assertRefcount(child2, 1);
 	printf("Created child2\n");
 
 	// Replace child1 with child2 in parent
 	obj_var.data.numeric_value = (u64)child2;
-	setProperty(parent, "child", 5, &obj_var);  // Should release child1
+	setProperty(app_context, parent, "child", 5, &obj_var);  // Should release child1
 	printf("Replaced parent.child with child2\n");
 
 	// child1 should be back to refcount = 1 (only our reference)
@@ -202,20 +208,20 @@ void test_property_replacement()
 	printf("child2 refcount = 2 (our ref + parent ref)\n");
 
 	// Clean up
-	releaseObject(child1);  // Should free child1
-	releaseObject(child2);  // Decrements to 1 (parent still holds ref)
-	releaseObject(parent);  // Should free parent and child2
+	releaseObject(app_context, child1);  // Should free child1
+	releaseObject(app_context, child2);  // Decrements to 1 (parent still holds ref)
+	releaseObject(app_context, parent);  // Should free parent and child2
 
 	printf("\n✅ Test 4 PASSED: Property replacement manages refcounts correctly\n");
 }
 
-void test_grow_properties()
+void test_grow_properties(SWFAppContext* app_context)
 {
 	printf("\n=== Test 5: Property Array Growth ===\n");
 	printf("Testing: dynamic property array growth\n\n");
 
 	// Allocate object with capacity 0 (will need to grow)
-	ASObject* obj = allocObject(0);
+	ASObject* obj = allocObject(app_context, 0);
 	printf("Created object with capacity 0\n");
 
 	// Add 10 properties (should trigger growth)
@@ -230,7 +236,7 @@ void test_grow_properties()
 		num_var.data.numeric_value = *((u32*)&value);
 		num_var.str_size = 0;
 
-		setProperty(obj, name, strlen(name), &num_var);
+		setProperty(app_context, obj, name, strlen(name), &num_var);
 	}
 
 	printf("Added 10 properties, capacity grew from 0 to %u\n", obj->num_properties);
@@ -259,7 +265,7 @@ void test_grow_properties()
 		printf("❌ Missing properties\n");
 	}
 
-	releaseObject(obj);
+	releaseObject(app_context, obj);
 	printf("\n✅ Test 5 PASSED: Property array growth works correctly\n");
 }
 
@@ -269,11 +275,25 @@ int main()
 	printf("║  Reference Counting Proof of Concept - Experiment #4      ║\n");
 	printf("╚════════════════════════════════════════════════════════════╝\n");
 
-	test_basic_lifecycle();
-	test_properties();
-	test_nested_objects();
-	test_property_replacement();
-	test_grow_properties();
+	// Initialize test app_context
+	memset(&test_app_context, 0, sizeof(SWFAppContext));
+
+	// Initialize heap allocator
+	if (!heap_init(&test_app_context, 0)) {
+		fprintf(stderr, "Failed to initialize heap allocator\n");
+		return 1;
+	}
+
+	SWFAppContext* app_context = &test_app_context;
+
+	test_basic_lifecycle(app_context);
+	test_properties(app_context);
+	test_nested_objects(app_context);
+	test_property_replacement(app_context);
+	test_grow_properties(app_context);
+
+	// Shutdown heap
+	heap_shutdown(app_context);
 
 	printf("\n╔════════════════════════════════════════════════════════════╗\n");
 	printf("║  ALL TESTS PASSED ✅                                       ║\n");

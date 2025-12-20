@@ -51,7 +51,7 @@ void swfStart(SWFAppContext* app_context)
 	g_frame_funcs = app_context->frame_funcs;
 	g_frame_count = app_context->frame_count;
 
-	initTime();
+	initTime(app_context);
 	initMap();
 
 	// Initialize heap allocator
@@ -105,7 +105,7 @@ void swfStart(SWFAppContext* app_context)
 	printf("\n=== SWF Execution Completed ===\n");
 
 	// Cleanup
-	heap_shutdown();
+	heap_shutdown(app_context);
 	freeMap();
 	free(app_context->stack);
 }

@@ -12,7 +12,7 @@
  * Allocates a new ASObject with the specified initial capacity.
  * Returns object with refcount = 1 (caller owns the initial reference).
  */
-ASObject* allocObject(u32 initial_capacity)
+ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity)
 {
 	ASObject* obj = (ASObject*) malloc(sizeof(ASObject));
 	if (obj == NULL)
@@ -84,7 +84,7 @@ void retainObject(ASObject* obj)
  * When refcount reaches 0, frees the object and all its properties.
  * Recursively releases any objects stored in properties.
  */
-void releaseObject(ASObject* obj)
+void releaseObject(SWFAppContext* app_context, ASObject* obj)
 {
 	if (obj == NULL)
 	{
@@ -110,14 +110,14 @@ void releaseObject(ASObject* obj)
 			// Free property name (always heap-allocated)
 			if (obj->properties[i].name != NULL)
 			{
-				heap_free(obj->properties[i].name);
+				FREE(obj->properties[i].name);
 			}
 
 			// If property value is an object, release it recursively
 			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
 			{
 				ASObject* child_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
-				releaseObject(child_obj);
+				releaseObject(app_context, child_obj);
 			}
 			// If property value is a string that owns memory, free it
 			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
@@ -138,7 +138,7 @@ void releaseObject(ASObject* obj)
 		{
 			for (u32 i = 0; i < obj->interface_count; i++)
 			{
-				releaseObject(obj->interfaces[i]);
+				releaseObject(app_context, obj->interfaces[i]);
 			}
 			free(obj->interfaces);
 		}
@@ -226,7 +226,7 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
  * Sets a property value by name. Creates property if it doesn't exist.
  * Handles reference counting if value is an object.
  */
-void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* value)
+void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value)
 {
 	if (obj == NULL || name == NULL || value == NULL)
 	{
@@ -245,7 +245,7 @@ void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* va
 			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
 			{
 				ASObject* old_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
-				releaseObject(old_obj);
+				releaseObject(app_context, old_obj);
 			}
 			// Free old string if it owned memory
 			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
@@ -301,7 +301,7 @@ void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* va
 	obj->num_used++;
 
 	// Allocate and copy property name
-	obj->properties[index].name = (char*) heap_alloc(name_length + 1);
+	obj->properties[index].name = (char*) HALLOC(name_length + 1);
 	if (obj->properties[index].name == NULL)
 	{
 		fprintf(stderr, "ERROR: Failed to allocate property name\n");
@@ -337,7 +337,7 @@ void setProperty(ASObject* obj, const char* name, u32 name_length, ActionVar* va
  * Deletes a property by name. Returns true if deleted or not found (Flash behavior).
  * Handles reference counting if value is an object/array.
  */
-bool deleteProperty(ASObject* obj, const char* name, u32 name_length)
+bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL)
 	{
@@ -356,12 +356,12 @@ bool deleteProperty(ASObject* obj, const char* name, u32 name_length)
 			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
 			{
 				ASObject* child_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
-				releaseObject(child_obj);
+				releaseObject(app_context, child_obj);
 			}
 			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_ARRAY)
 			{
 				ASArray* child_arr = (ASArray*) obj->properties[i].value.data.numeric_value;
-				releaseArray(child_arr);
+				releaseArray(app_context, child_arr);
 			}
 			// Free string if it owns memory
 			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
@@ -373,7 +373,7 @@ bool deleteProperty(ASObject* obj, const char* name, u32 name_length)
 			// 2. Free the property name
 			if (obj->properties[i].name != NULL)
 			{
-				heap_free(obj->properties[i].name);
+				FREE(obj->properties[i].name);
 			}
 
 			// 3. Shift remaining properties down to fill the gap
@@ -417,7 +417,7 @@ bool deleteProperty(ASObject* obj, const char* name, u32 name_length)
  * Takes ownership of the interfaces array.
  * Called by ActionImplementsOp (0x2C).
  */
-void setInterfaceList(ASObject* constructor, ASObject** interfaces, u32 count)
+void setInterfaceList(SWFAppContext* app_context, ASObject* constructor, ASObject** interfaces, u32 count)
 {
 	if (constructor == NULL)
 	{
@@ -426,7 +426,7 @@ void setInterfaceList(ASObject* constructor, ASObject** interfaces, u32 count)
 		{
 			for (u32 i = 0; i < count; i++)
 			{
-				releaseObject(interfaces[i]);
+				releaseObject(app_context, interfaces[i]);
 			}
 			free(interfaces);
 		}
@@ -438,7 +438,7 @@ void setInterfaceList(ASObject* constructor, ASObject** interfaces, u32 count)
 	{
 		for (u32 i = 0; i < constructor->interface_count; i++)
 		{
-			releaseObject(constructor->interfaces[i]);
+			releaseObject(app_context, constructor->interfaces[i]);
 		}
 		free(constructor->interfaces);
 	}
@@ -657,7 +657,7 @@ void printArray(ASArray* arr)
  * Array Implementation
  */
 
-ASArray* allocArray(u32 initial_capacity)
+ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 {
 	ASArray* arr = (ASArray*) malloc(sizeof(ASArray));
 	if (arr == NULL)
@@ -705,7 +705,7 @@ void retainArray(ASArray* arr)
 #endif
 }
 
-void releaseArray(ASArray* arr)
+void releaseArray(SWFAppContext* app_context, ASArray* arr)
 {
 	if (arr == NULL)
 	{
@@ -732,13 +732,13 @@ void releaseArray(ASArray* arr)
 			if (arr->elements[i].type == ACTION_STACK_VALUE_OBJECT)
 			{
 				ASObject* child_obj = (ASObject*) arr->elements[i].data.numeric_value;
-				releaseObject(child_obj);
+				releaseObject(app_context, child_obj);
 			}
 			// If element is an array, release it recursively
 			else if (arr->elements[i].type == ACTION_STACK_VALUE_ARRAY)
 			{
 				ASArray* child_arr = (ASArray*) arr->elements[i].data.numeric_value;
-				releaseArray(child_arr);
+				releaseArray(app_context, child_arr);
 			}
 			// If element is a string that owns memory, free it
 			else if (arr->elements[i].type == ACTION_STACK_VALUE_STRING &&
@@ -769,7 +769,7 @@ ActionVar* getArrayElement(ASArray* arr, u32 index)
 	return &arr->elements[index];
 }
 
-void setArrayElement(ASArray* arr, u32 index, ActionVar* value)
+void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, ActionVar* value)
 {
 	if (arr == NULL || value == NULL)
 	{
@@ -803,12 +803,12 @@ void setArrayElement(ASArray* arr, u32 index, ActionVar* value)
 		if (arr->elements[index].type == ACTION_STACK_VALUE_OBJECT)
 		{
 			ASObject* old_obj = (ASObject*) arr->elements[index].data.numeric_value;
-			releaseObject(old_obj);
+			releaseObject(app_context, old_obj);
 		}
 		else if (arr->elements[index].type == ACTION_STACK_VALUE_ARRAY)
 		{
 			ASArray* old_arr = (ASArray*) arr->elements[index].data.numeric_value;
-			releaseArray(old_arr);
+			releaseArray(app_context, old_arr);
 		}
 		else if (arr->elements[index].type == ACTION_STACK_VALUE_STRING &&
 		         arr->elements[index].data.string_data.owns_memory)

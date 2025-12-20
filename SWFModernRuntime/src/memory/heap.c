@@ -33,8 +33,6 @@
 
 #define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB virtual space
 
-static SWFAppContext* g_app_context = NULL;
-
 bool heap_init(SWFAppContext* app_context, size_t initial_size)
 {
 	if (app_context == NULL)
@@ -48,9 +46,6 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 		fprintf(stderr, "WARNING: heap_init() called when already initialized\n");
 		return true;
 	}
-
-	// Store reference to app_context for later use
-	g_app_context = app_context;
 
 	// Reserve large virtual address space (1 GB)
 	app_context->heap_full_size = DEFAULT_FULL_HEAP_SIZE;
@@ -87,9 +82,9 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 	return true;
 }
 
-void* heap_alloc(size_t size)
+void* heap_alloc(SWFAppContext* app_context, size_t size)
 {
-	if (g_app_context == NULL || !g_app_context->heap_inited)
+	if (app_context == NULL || !app_context->heap_inited)
 	{
 		fprintf(stderr, "ERROR: heap_alloc() called before heap_init()\n");
 		return NULL;
@@ -103,7 +98,7 @@ void* heap_alloc(size_t size)
 	// Allocate from the heap
 	// All pages are already committed, so no expansion logic needed
 	// Physical RAM is allocated lazily by the OS when memory is first accessed
-	void* ptr = o1heapAllocate(g_app_context->heap_instance, size);
+	void* ptr = o1heapAllocate(app_context->heap_instance, size);
 
 	if (ptr == NULL)
 	{
@@ -113,7 +108,7 @@ void* heap_alloc(size_t size)
 	return ptr;
 }
 
-void* heap_calloc(size_t num, size_t size)
+void* heap_calloc(SWFAppContext* app_context, size_t num, size_t size)
 {
 	// Check for overflow
 	if (num != 0 && size > SIZE_MAX / num)
@@ -122,7 +117,7 @@ void* heap_calloc(size_t num, size_t size)
 	}
 
 	size_t total = num * size;
-	void* ptr = heap_alloc(total);
+	void* ptr = heap_alloc(app_context, total);
 
 	if (ptr != NULL)
 	{
@@ -132,22 +127,22 @@ void* heap_calloc(size_t num, size_t size)
 	return ptr;
 }
 
-void heap_free(void* ptr)
+void heap_free(SWFAppContext* app_context, void* ptr)
 {
 	if (ptr == NULL)
 	{
 		return;  // Standard free behavior
 	}
 
-	if (g_app_context == NULL || !g_app_context->heap_inited)
+	if (app_context == NULL || !app_context->heap_inited)
 	{
 		fprintf(stderr, "ERROR: heap_free() called before heap_init()\n");
 		return;
 	}
 
 	// Check if pointer is within our heap bounds
-	if (ptr < (void*)g_app_context->heap ||
-		ptr >= (void*)(g_app_context->heap + g_app_context->heap_current_size))
+	if (ptr < (void*)app_context->heap ||
+		ptr >= (void*)(app_context->heap + app_context->heap_current_size))
 	{
 		fprintf(stderr, "ERROR: heap_free() called with invalid pointer %p\n", ptr);
 		fprintf(stderr, "       This pointer was not allocated by heap_alloc()\n");
@@ -155,26 +150,26 @@ void heap_free(void* ptr)
 		return;
 	}
 
-	o1heapFree(g_app_context->heap_instance, ptr);
+	o1heapFree(app_context->heap_instance, ptr);
 }
 
-void heap_stats(void)
+void heap_stats(SWFAppContext* app_context)
 {
-	if (g_app_context == NULL || !g_app_context->heap_inited)
+	if (app_context == NULL || !app_context->heap_inited)
 	{
 		printf("[HEAP] Not initialized\n");
 		return;
 	}
 
-	O1HeapDiagnostics diag = o1heapGetDiagnostics(g_app_context->heap_instance);
+	O1HeapDiagnostics diag = o1heapGetDiagnostics(app_context->heap_instance);
 
 	printf("\n========== Heap Statistics ==========\n");
 	printf("Reserved space:  %.1f GB (%llu bytes)\n",
-		g_app_context->heap_full_size / (1024.0 * 1024.0 * 1024.0),
-		(unsigned long long)g_app_context->heap_full_size);
+		app_context->heap_full_size / (1024.0 * 1024.0 * 1024.0),
+		(unsigned long long)app_context->heap_full_size);
 	printf("Committed space: %zu MB (%zu bytes)\n",
-		g_app_context->heap_current_size / (1024 * 1024),
-		g_app_context->heap_current_size);
+		app_context->heap_current_size / (1024 * 1024),
+		app_context->heap_current_size);
 	printf("Capacity:        %zu MB (%zu bytes)\n",
 		diag.capacity / (1024 * 1024), diag.capacity);
 	printf("Allocated:       %zu MB (%zu bytes, %.1f%%)\n",
@@ -188,9 +183,9 @@ void heap_stats(void)
 	printf("=====================================\n\n");
 }
 
-void heap_shutdown(void)
+void heap_shutdown(SWFAppContext* app_context)
 {
-	if (g_app_context == NULL || !g_app_context->heap_inited)
+	if (app_context == NULL || !app_context->heap_inited)
 	{
 		return;
 	}
@@ -198,13 +193,11 @@ void heap_shutdown(void)
 	printf("[HEAP] Shutting down - releasing virtual memory\n");
 
 	// Release all virtual memory
-	vmem_release(g_app_context->heap, g_app_context->heap_full_size);
+	vmem_release(app_context->heap, app_context->heap_full_size);
 
-	g_app_context->heap_instance = NULL;
-	g_app_context->heap = NULL;
-	g_app_context->heap_inited = 0;
-	g_app_context->heap_current_size = 0;
-	g_app_context->heap_full_size = 0;
-
-	g_app_context = NULL;
+	app_context->heap_instance = NULL;
+	app_context->heap = NULL;
+	app_context->heap_inited = 0;
+	app_context->heap_current_size = 0;
+	app_context->heap_full_size = 0;
 }
