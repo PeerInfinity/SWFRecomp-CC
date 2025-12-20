@@ -30,7 +30,7 @@ void swfStart(SWFAppContext* app_context)
 	printf("=== SWF Execution Started (NO_GRAPHICS mode) ===\n");
 
 	// Allocate stack into app_context
-	app_context->stack = (char*) aligned_alloc(8, INITIAL_STACK_SIZE);
+	app_context->stack = (char*) HALLOC(INITIAL_STACK_SIZE);
 	if (!app_context->stack) {
 		fprintf(stderr, "Failed to allocate stack\n");
 		return;
@@ -106,7 +106,7 @@ void swfStart(SWFAppContext* app_context)
 	// Cleanup
 	heap_shutdown();
 	freeMap();
-	aligned_free(app_context->stack);
+	FREE(app_context->stack);
 }
 
 #endif // NO_GRAPHICS
