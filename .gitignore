@@ -61,3 +61,5 @@ __pycache__/
 test-and-doc-output.log
 test-run.log
 upstream/
+# Upstream reference files for merge comparison
+upstream-reference/
