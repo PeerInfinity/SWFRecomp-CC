@@ -36,7 +36,9 @@
         "SWFRecomp/tests/next_frame_swf_4"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/next_frame_swf_4"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
@@ -57,7 +59,9 @@
         "SWFRecomp/tests/next_frame_swf_4"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/next_frame_swf_4"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
@@ -78,7 +82,9 @@
         "SWFRecomp/tests/next_frame_swf_4"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/next_frame_swf_4"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
@@ -169,7 +175,10 @@
         "SWFRecomp/tests/play_swf_4"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
@@ -195,7 +204,10 @@
         "SWFRecomp/tests/play_swf_4"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
@@ -221,7 +233,10 @@
         "SWFRecomp/tests/play_swf_4"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
@@ -253,11 +268,14 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_primary_passing": [
+        "SWFRecomp/tests/play_stop_swf_4",
         "SWFRecomp/tests/stop_multiframe_swf_4",
         "SWFRecomp/tests/stop_swf_4"
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/next_frame_swf_4",
+        "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_secondary_no_results": [],
@@ -285,11 +303,14 @@
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_primary_passing": [
+        "SWFRecomp/tests/play_stop_swf_4",
         "SWFRecomp/tests/stop_multiframe_swf_4",
         "SWFRecomp/tests/stop_swf_4"
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/next_frame_swf_4",
+        "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4"
       ],
       "tests_secondary_no_results": [],
@@ -472,6 +493,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/duplicate_swf_4",
         "SWFRecomp/tests/set_variable_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4"
@@ -506,6 +528,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/duplicate_swf_4",
         "SWFRecomp/tests/set_variable_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4"
@@ -540,6 +563,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/define_function2_swf_7",
         "SWFRecomp/tests/duplicate_swf_4",
         "SWFRecomp/tests/set_variable_swf_4",
         "SWFRecomp/tests/stop_sounds_swf_4"
@@ -1524,6 +1548,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -1568,6 +1593,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -1612,6 +1638,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -1655,6 +1682,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/enumerate_swf_4",
         "SWFRecomp/tests/extends_swf_7",
@@ -1697,6 +1725,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/enumerate_swf_4",
         "SWFRecomp/tests/extends_swf_7",
@@ -1739,6 +1768,7 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/delete_swf_5",
         "SWFRecomp/tests/enumerate_swf_4",
         "SWFRecomp/tests/extends_swf_7",
@@ -2394,6 +2424,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -2405,6 +2436,7 @@
         "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -2447,8 +2479,11 @@
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/new_object_swf_4",
+        "SWFRecomp/tests/next_frame_swf_4",
         "SWFRecomp/tests/not_floats_nonzero_swf_4",
         "SWFRecomp/tests/or_swf_4",
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/pop_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/push_swf_4",
@@ -2636,6 +2671,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -2647,6 +2683,7 @@
         "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -2689,8 +2726,11 @@
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/new_object_swf_4",
+        "SWFRecomp/tests/next_frame_swf_4",
         "SWFRecomp/tests/not_floats_nonzero_swf_4",
         "SWFRecomp/tests/or_swf_4",
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/pop_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/push_swf_4",
@@ -2878,6 +2918,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -2889,6 +2930,7 @@
         "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -2931,8 +2973,11 @@
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/new_object_swf_4",
+        "SWFRecomp/tests/next_frame_swf_4",
         "SWFRecomp/tests/not_floats_nonzero_swf_4",
         "SWFRecomp/tests/or_swf_4",
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/pop_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/push_swf_4",
@@ -4243,7 +4288,8 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
+        "SWFRecomp/tests/declare_local_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
@@ -4271,7 +4317,8 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
+        "SWFRecomp/tests/declare_local_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
@@ -4299,7 +4346,8 @@
       ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
-        "SWFRecomp/tests/declare_local_swf_5"
+        "SWFRecomp/tests/declare_local_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
@@ -4327,7 +4375,11 @@
         "SWFRecomp/tests/return_swf_4"
       ],
       "tests_primary_no_results": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7",
+        "SWFRecomp/tests/define_function_swf_5"
+      ],
       "tests_secondary_no_results": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "fully_implemented": true,
@@ -4354,7 +4406,11 @@
         "SWFRecomp/tests/return_swf_4"
       ],
       "tests_primary_no_results": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7",
+        "SWFRecomp/tests/define_function_swf_5"
+      ],
       "tests_secondary_no_results": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "fully_implemented": true,
@@ -4381,7 +4437,11 @@
         "SWFRecomp/tests/return_swf_4"
       ],
       "tests_primary_no_results": [],
-      "tests_secondary_passing": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7",
+        "SWFRecomp/tests/define_function_swf_5"
+      ],
       "tests_secondary_no_results": [],
       "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-return-0x3e.md",
       "fully_implemented": true,
@@ -5905,6 +5965,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_primary_no_results": [],
@@ -5929,6 +5990,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_primary_no_results": [],
@@ -5953,6 +6015,7 @@
       ],
       "tests_secondary": [],
       "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5"
       ],
       "tests_primary_no_results": [],
@@ -7448,7 +7511,10 @@
       "tests_secondary": [
         "SWFRecomp/tests/declare_local_swf_5"
       ],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
         "SWFRecomp/tests/declare_local_swf_5"
@@ -7474,7 +7540,10 @@
       "tests_secondary": [
         "SWFRecomp/tests/declare_local_swf_5"
       ],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
         "SWFRecomp/tests/declare_local_swf_5"
@@ -7500,7 +7569,10 @@
       "tests_secondary": [
         "SWFRecomp/tests/declare_local_swf_5"
       ],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
+        "SWFRecomp/tests/define_function2_swf_7"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [
         "SWFRecomp/tests/declare_local_swf_5"
@@ -7750,6 +7822,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -7761,6 +7834,8 @@
         "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function2_swf_7",
+        "SWFRecomp/tests/define_function_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -7803,8 +7878,11 @@
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/new_object_swf_4",
+        "SWFRecomp/tests/next_frame_swf_4",
         "SWFRecomp/tests/not_floats_nonzero_swf_4",
         "SWFRecomp/tests/or_swf_4",
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/pop_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/random_number_swf_4",
@@ -7995,6 +8073,7 @@
         "SWFRecomp/tests/bit_urshift_swf_4",
         "SWFRecomp/tests/bit_xor_swf_4",
         "SWFRecomp/tests/call_function_swf_5",
+        "SWFRecomp/tests/call_method_empty_name_swf_5",
         "SWFRecomp/tests/call_method_swf_5",
         "SWFRecomp/tests/call_swf_4",
         "SWFRecomp/tests/cast_op_swf_7",
@@ -8006,6 +8085,8 @@
         "SWFRecomp/tests/constant_pool_swf_5",
         "SWFRecomp/tests/declare_local_swf_5",
         "SWFRecomp/tests/decrement_swf_4",
+        "SWFRecomp/tests/define_function2_swf_7",
+        "SWFRecomp/tests/define_function_swf_5",
         "SWFRecomp/tests/definelocal_swf_5",
         "SWFRecomp/tests/delete2_swf_5",
         "SWFRecomp/tests/delete_swf_5",
@@ -8048,8 +8129,11 @@
         "SWFRecomp/tests/multiply_floats_swf_4",
         "SWFRecomp/tests/new_method_swf_5",
         "SWFRecomp/tests/new_object_swf_4",
+        "SWFRecomp/tests/next_frame_swf_4",
         "SWFRecomp/tests/not_floats_nonzero_swf_4",
         "SWFRecomp/tests/or_swf_4",
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/play_swf_4",
         "SWFRecomp/tests/pop_swf_4",
         "SWFRecomp/tests/prev_frame_swf_4",
         "SWFRecomp/tests/random_number_swf_4",
@@ -8253,7 +8337,9 @@
         "SWFRecomp/tests/define_function_swf_5"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/define_function_swf_5"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
@@ -8274,7 +8360,9 @@
         "SWFRecomp/tests/define_function_swf_5"
       ],
       "tests_secondary": [],
-      "tests_primary_passing": [],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/define_function_swf_5"
+      ],
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
