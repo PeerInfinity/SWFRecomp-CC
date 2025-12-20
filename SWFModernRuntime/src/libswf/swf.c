@@ -92,7 +92,7 @@ void swfStart(SWFAppContext* app_context)
 	display_list = malloc(INITIAL_DISPLAYLIST_CAPACITY*sizeof(DisplayObject));
 
 	// Allocate stack into app_context
-	app_context->stack = (char*) aligned_alloc(8, INITIAL_STACK_SIZE);
+	app_context->stack = (char*) HALLOC(INITIAL_STACK_SIZE);
 	app_context->sp = INITIAL_SP;
 	app_context->oldSP = 0;
 
@@ -120,7 +120,7 @@ void swfStart(SWFAppContext* app_context)
 	heap_shutdown();
 	freeMap();
 
-	aligned_free(app_context->stack);
+	FREE(app_context->stack);
 
 	free(dictionary);
 	free(display_list);

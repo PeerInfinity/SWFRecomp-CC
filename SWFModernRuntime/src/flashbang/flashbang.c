@@ -5,6 +5,7 @@
 #include <common.h>
 #include <flashbang.h>
 #include <utils.h>
+#include <heap.h>
 
 int once = 0;
 
@@ -68,7 +69,7 @@ void flashbang_init(FlashbangContext* context)
 	once = 1;
 	
 	context->current_bitmap = 0;
-	context->bitmap_sizes = (u32*) aligned_alloc(8, 2*sizeof(u32)*context->bitmap_count);
+	context->bitmap_sizes = (u32*) HALLOC(2*sizeof(u32)*context->bitmap_count);
 	
 	// create a window
 	context->window = SDL_CreateWindow("TestSWFRecompiled", context->width, context->height, SDL_WINDOW_RESIZABLE);
