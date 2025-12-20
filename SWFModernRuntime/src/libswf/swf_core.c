@@ -1,5 +1,6 @@
 #ifdef NO_GRAPHICS
 
+#include <stdlib.h>
 #include <swf.h>
 #include <tag.h>
 #include <action.h>
@@ -29,8 +30,8 @@ void swfStart(SWFAppContext* app_context)
 {
 	printf("=== SWF Execution Started (NO_GRAPHICS mode) ===\n");
 
-	// Allocate stack into app_context
-	app_context->stack = (char*) HALLOC(INITIAL_STACK_SIZE);
+	// Allocate stack into app_context (use system malloc, not heap - stack is allocated before heap_init)
+	app_context->stack = (char*) malloc(INITIAL_STACK_SIZE);
 	if (!app_context->stack) {
 		fprintf(stderr, "Failed to allocate stack\n");
 		return;
@@ -106,7 +107,7 @@ void swfStart(SWFAppContext* app_context)
 	// Cleanup
 	heap_shutdown();
 	freeMap();
-	FREE(app_context->stack);
+	free(app_context->stack);
 }
 
 #endif // NO_GRAPHICS

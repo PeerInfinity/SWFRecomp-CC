@@ -1,5 +1,6 @@
 #ifndef NO_GRAPHICS
 
+#include <stdlib.h>
 #include <swf.h>
 #include <tag.h>
 #include <action.h>
@@ -91,8 +92,8 @@ void swfStart(SWFAppContext* app_context)
 	dictionary = malloc(INITIAL_DICTIONARY_CAPACITY*sizeof(Character));
 	display_list = malloc(INITIAL_DISPLAYLIST_CAPACITY*sizeof(DisplayObject));
 
-	// Allocate stack into app_context
-	app_context->stack = (char*) HALLOC(INITIAL_STACK_SIZE);
+	// Allocate stack into app_context (use system malloc, not heap - stack is allocated before heap_init)
+	app_context->stack = (char*) malloc(INITIAL_STACK_SIZE);
 	app_context->sp = INITIAL_SP;
 	app_context->oldSP = 0;
 
@@ -120,7 +121,7 @@ void swfStart(SWFAppContext* app_context)
 	heap_shutdown();
 	freeMap();
 
-	FREE(app_context->stack);
+	free(app_context->stack);
 
 	free(dictionary);
 	free(display_list);
