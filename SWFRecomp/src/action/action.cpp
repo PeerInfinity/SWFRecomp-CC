@@ -144,7 +144,7 @@ namespace SWFRecomp
 				case SWF_ACTION_NEXT_FRAME:
 				{
 					out_script << "\t" << "// NextFrame" << endl
-							   << "\t" << "actionNextFrame();" << endl;
+							   << "\t" << "actionNextFrame(app_context);" << endl;
 
 					break;
 				}
@@ -160,7 +160,7 @@ namespace SWFRecomp
 				case SWF_ACTION_PLAY:
 				{
 					out_script << "\t" << "// Play" << endl
-							   << "\t" << "actionPlay();" << endl;
+							   << "\t" << "actionPlay(app_context);" << endl;
 
 					break;
 				}
@@ -1058,12 +1058,12 @@ namespace SWFRecomp
 				static int func2_counter = 0;
 				std::string func_id = std::string("func2_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func2_counter++);
 
-			// Add function declaration to header
-			context.out_script_decls << endl << "ActionVar " << func_id << "(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);" << endl;
+			// Add function declaration to header (uses app_context)
+			context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);" << endl;
 				// Generate function definition in out_script_defs
 				context.out_script_defs << endl << endl
 					<< "// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl
-					<< "ActionVar " << func_id << "(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)" << endl
+					<< "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)" << endl
 					<< "{" << endl;
 
 				// Initialize local registers
@@ -1620,13 +1620,13 @@ namespace SWFRecomp
 				static int func_counter = 0;
 				std::string func_id = std::string("func_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func_counter++);
 
-				// Add function declaration to header
-				context.out_script_decls << endl << "void " << func_id << "(char* stack, u32* sp);" << endl;
+				// Add function declaration to header (uses app_context)
+				context.out_script_decls << endl << "void " << func_id << "(SWFAppContext* app_context);" << endl;
 
 				// Generate function definition
 				context.out_script_defs << endl << endl
 					<< "// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl
-					<< "void " << func_id << "(char* stack, u32* sp)" << endl
+					<< "void " << func_id << "(SWFAppContext* app_context)" << endl
 					<< "{" << endl;
 
 				// Bind parameters (simple DefineFunction uses variables, not registers)
