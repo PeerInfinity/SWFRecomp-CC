@@ -589,7 +589,7 @@ namespace SWFRecomp
 					last_queued_script += 1;
 				}
 
-				context.tag_main << "\t" << "tagShowFrame();" << endl;
+				context.tag_main << "\t" << "tagShowFrame(app_context);" << endl;
 
 				another_frame = true;
 
@@ -874,7 +874,7 @@ namespace SWFRecomp
 					transform_id = 0;
 				}
 				
-				context.tag_main << "\t" << "tagPlaceObject2(" << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ");" << endl;
+				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ");" << endl;
 				
 				current_transform += 1;
 				
@@ -1917,7 +1917,7 @@ namespace SWFRecomp
 					}
 				}
 				
-				context.tag_main << "\t" << "tagDefineShape(" << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
+				context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
 				
 				current_tri += tris_size;
 				

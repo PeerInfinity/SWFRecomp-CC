@@ -30,7 +30,9 @@ struct FlashbangContext
 	size_t gradient_data_size;
 	char* bitmap_data;
 	size_t bitmap_data_size;
-	
+	char* cxform_data;
+	size_t cxform_data_size;
+
 	SDL_Window* window;
 	SDL_GPUDevice* device;
 	
@@ -43,7 +45,8 @@ struct FlashbangContext
 	SDL_GPUBuffer* uninv_mat_buffer;
 	SDL_GPUBuffer* inv_mat_buffer;
 	SDL_GPUBuffer* bitmap_sizes_buffer;
-	
+	SDL_GPUBuffer* cxform_buffer;
+
 	SDL_GPUTexture* gradient_tex_array;
 	SDL_GPUSampler* gradient_sampler;
 	
@@ -75,6 +78,10 @@ void flashbang_set_window_background(FlashbangContext* context, u8 r, u8 g, u8 b
 void flashbang_upload_bitmap(FlashbangContext* context, size_t offset, size_t size, u32 width, u32 height);
 void flashbang_finalize_bitmaps(FlashbangContext* context);
 void flashbang_open_pass(FlashbangContext* context);
+void flashbang_upload_extra_transform_id(FlashbangContext* context, u32 transform_id);
+void flashbang_upload_extra_transform(FlashbangContext* context, float* transform);
+void flashbang_upload_cxform_id(FlashbangContext* context, u32 cxform_id);
+void flashbang_upload_cxform(FlashbangContext* context, float* cxform);
 void flashbang_draw_shape(FlashbangContext* context, size_t offset, size_t num_verts, u32 transform_id);
 void flashbang_close_pass(FlashbangContext* context);
 void flashbang_free(FlashbangContext* context);

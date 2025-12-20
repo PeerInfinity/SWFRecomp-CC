@@ -4,6 +4,14 @@
 
 #include <stddef.h>
 
+// Macro to ensure array has enough capacity
+// Note: Our grow_ptr doesn't take app_context, so we ignore it in the macro
+#define ENSURE_SIZE(ptr, new_size, capac, elem_size) \
+	if (new_size >= capac) \
+	{ \
+		grow_ptr((char**) &ptr, &capac, elem_size); \
+	}
+
 void grow_ptr(char** ptr, size_t* capacity_ptr, size_t elem_size);
 
 void* aligned_alloc(size_t alignment, size_t size);
