@@ -1,5 +1,6 @@
 #pragma once
 
+#include <swf.h>
 #include <variables.h>
 #include <stackvalue.h>
 #include <setjmp.h>
@@ -35,63 +36,59 @@ struct MovieClip {
 // Global root MovieClip
 extern MovieClip root_movieclip;
 
+// VAL macro must be defined before other macros that use it
+#define VAL(type, x) *((type*) x)
+
+// Stack macros - use STACK, SP, OLDSP from swf.h (app_context->stack, etc.)
 #define PUSH(t, v) \
-	do { \
-		u32 oldSP = *sp; \
-		*sp -= 4 + 4 + 8 + 8; \
-		*sp &= ~7; \
-		stack[*sp] = t; \
-		VAL(u32, &stack[*sp + 4]) = oldSP; \
-		VAL(u64, &stack[*sp + 16]) = v; \
-	} while(0)
+	OLDSP = SP; \
+	SP -= 4 + 4 + 8 + 8; \
+	SP &= ~7; \
+	STACK[SP] = t; \
+	VAL(u32, &STACK[SP + 4]) = OLDSP; \
+	VAL(u64, &STACK[SP + 16]) = v;
 
 // Push string with ID (for constant strings from compiler)
 #define PUSH_STR_ID(v, n, id) \
-	do { \
-		u32 oldSP = *sp; \
-		*sp -= 4 + 4 + 8 + 8; \
-		*sp &= ~7; \
-		stack[*sp] = ACTION_STACK_VALUE_STRING; \
-		VAL(u32, &stack[*sp + 4]) = oldSP; \
-		VAL(u32, &stack[*sp + 8]) = n; \
-		VAL(u32, &stack[*sp + 12]) = id; \
-		VAL(char*, &stack[*sp + 16]) = v; \
-	} while(0)
+	OLDSP = SP; \
+	SP -= 4 + 4 + 8 + 8; \
+	SP &= ~7; \
+	STACK[SP] = ACTION_STACK_VALUE_STRING; \
+	VAL(u32, &STACK[SP + 4]) = OLDSP; \
+	VAL(u32, &STACK[SP + 8]) = n; \
+	VAL(u32, &STACK[SP + 12]) = id; \
+	VAL(char*, &STACK[SP + 16]) = v;
 
 // Push string without ID (for dynamic strings, ID = 0)
 #define PUSH_STR(v, n) PUSH_STR_ID(v, n, 0)
 
 #define PUSH_STR_LIST(n, size) \
-	do { \
-		u32 oldSP = VAL(u32, &stack[SP_SECOND_TOP + 4]); \
-		*sp -= (u32) (4 + 4 + 8 + size); \
-		*sp &= ~7; \
-		stack[*sp] = ACTION_STACK_VALUE_STR_LIST; \
-		VAL(u32, &stack[*sp + 4]) = oldSP; \
-		VAL(u32, &stack[*sp + 8]) = n; \
-	} while(0)
+	OLDSP = VAL(u32, &STACK[SP_SECOND_TOP + 4]); \
+	SP -= (u32) (4 + 4 + 8 + size); \
+	SP &= ~7; \
+	STACK[SP] = ACTION_STACK_VALUE_STR_LIST; \
+	VAL(u32, &STACK[SP + 4]) = OLDSP; \
+	VAL(u32, &STACK[SP + 8]) = n;
 
-#define PUSH_VAR(p) pushVar(stack, sp, p);
+#define PUSH_VAR(p) pushVar(app_context, p);
 
 #define POP() \
-	*sp = VAL(u32, &stack[*sp + 4]); \
+	SP = VAL(u32, &STACK[SP + 4]);
 
 #define POP_2() \
 	POP(); \
-	POP(); \
+	POP();
 
-#define STACK_TOP_TYPE stack[*sp]
-#define STACK_TOP_N VAL(u32, &stack[*sp + 8])
-#define STACK_TOP_VALUE VAL(u64, &stack[*sp + 16])
+#define STACK_TOP_TYPE STACK[SP]
+#define STACK_TOP_N VAL(u32, &STACK[SP + 8])
+#define STACK_TOP_ID VAL(u32, &STACK[SP + 12])
+#define STACK_TOP_VALUE VAL(u64, &STACK[SP + 16])
 
-#define SP_SECOND_TOP VAL(u32, &stack[*sp + 4])
-#define STACK_SECOND_TOP_TYPE stack[SP_SECOND_TOP]
-#define STACK_SECOND_TOP_N VAL(u32, &stack[SP_SECOND_TOP + 8])
-#define STACK_SECOND_TOP_VALUE VAL(u64, &stack[SP_SECOND_TOP + 16])
-
-#define SET_VAR(p, t, n, v) setVariableWithValue(p, stack, *sp)
-
-#define VAL(type, x) *((type*) x)
+#define SP_SECOND_TOP VAL(u32, &STACK[SP + 4])
+#define STACK_SECOND_TOP_TYPE STACK[SP_SECOND_TOP]
+#define STACK_SECOND_TOP_N VAL(u32, &STACK[SP_SECOND_TOP + 8])
+#define STACK_SECOND_TOP_ID VAL(u32, &STACK[SP_SECOND_TOP + 12])
+#define STACK_SECOND_TOP_VALUE VAL(u64, &STACK[SP_SECOND_TOP + 16])
 
 #define INITIAL_STACK_SIZE 8388608  // 8 MB
 #define INITIAL_SP INITIAL_STACK_SIZE
@@ -100,132 +97,130 @@ extern ActionVar* temp_val;
 
 void initTime();
 
-void pushVar(char* stack, u32* sp, ActionVar* p);
-void popVar(char* stack, u32* sp, ActionVar* var);
+void pushVar(SWFAppContext* app_context, ActionVar* p);
+void popVar(SWFAppContext* app_context, ActionVar* var);
+void peekVar(SWFAppContext* app_context, ActionVar* var);
+void peekSecondVar(SWFAppContext* app_context, ActionVar* var);
 void setVariableByName(const char* var_name, ActionVar* value);
 
-void actionPrevFrame(char* stack, u32* sp);
-void actionToggleQuality(char* stack, u32* sp);
+void actionPrevFrame(SWFAppContext* app_context);
+void actionToggleQuality(SWFAppContext* app_context);
 
-void actionAdd(char* stack, u32* sp);
-void actionAdd2(char* stack, u32* sp, char* str_buffer);
-void actionSubtract(char* stack, u32* sp);
-void actionMultiply(char* stack, u32* sp);
-void actionDivide(char* stack, u32* sp);
-void actionModulo(char* stack, u32* sp);
-void actionEquals(char* stack, u32* sp);
-void actionLess(char* stack, u32* sp);
-void actionLess2(char* stack, u32* sp);
-void actionEquals2(char* stack, u32* sp);
-void actionAnd(char* stack, u32* sp);
-void actionOr(char* stack, u32* sp);
-void actionNot(char* stack, u32* sp);
-void actionToInteger(char* stack, u32* sp);
-void actionToNumber(char* stack, u32* sp);
-void actionToString(char* stack, u32* sp, char* str_buffer);
-void actionStackSwap(char* stack, u32* sp);
-void actionDuplicate(char* stack, u32* sp);
-void actionGetMember(char* stack, u32* sp);
-void actionTargetPath(char* stack, u32* sp, char* str_buffer);
-void actionEnumerate(char* stack, u32* sp, char* str_buffer);
+void actionAdd(SWFAppContext* app_context);
+void actionAdd2(SWFAppContext* app_context, char* str_buffer);
+void actionSubtract(SWFAppContext* app_context);
+void actionMultiply(SWFAppContext* app_context);
+void actionDivide(SWFAppContext* app_context);
+void actionModulo(SWFAppContext* app_context);
+void actionEquals(SWFAppContext* app_context);
+void actionLess(SWFAppContext* app_context);
+void actionLess2(SWFAppContext* app_context);
+void actionEquals2(SWFAppContext* app_context);
+void actionAnd(SWFAppContext* app_context);
+void actionOr(SWFAppContext* app_context);
+void actionNot(SWFAppContext* app_context);
+void actionToInteger(SWFAppContext* app_context);
+void actionToNumber(SWFAppContext* app_context);
+void actionToString(SWFAppContext* app_context, char* str_buffer);
+void actionStackSwap(SWFAppContext* app_context);
+void actionDuplicate(SWFAppContext* app_context);
+void actionGetMember(SWFAppContext* app_context);
+void actionTargetPath(SWFAppContext* app_context, char* str_buffer);
+void actionEnumerate(SWFAppContext* app_context, char* str_buffer);
 
 // Movie control
-void actionGoToLabel(char* stack, u32* sp, const char* label);
-void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias);
+void actionGoToLabel(SWFAppContext* app_context, const char* label);
+void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias);
 
 // Frame label lookup (returns -1 if not found, otherwise frame index)
 int findFrameByLabel(const char* label);
 
-void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str);
-void actionStringLength(char* stack, u32* sp, char* v_str);
-void actionStringExtract(char* stack, u32* sp, char* str_buffer);
-void actionMbStringLength(char* stack, u32* sp, char* v_str);
-void actionMbStringExtract(char* stack, u32* sp, char* str_buffer);
-void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str);
-void actionStringLess(char* stack, u32* sp);
-void actionImplementsOp(char* stack, u32* sp);
-void actionCharToAscii(char* stack, u32* sp);
+void actionStringEquals(SWFAppContext* app_context, char* a_str, char* b_str);
+void actionStringLength(SWFAppContext* app_context, char* v_str);
+void actionStringExtract(SWFAppContext* app_context, char* str_buffer);
+void actionMbStringLength(SWFAppContext* app_context, char* v_str);
+void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer);
+void actionStringAdd(SWFAppContext* app_context, char* a_str, char* b_str);
+void actionStringLess(SWFAppContext* app_context);
+void actionImplementsOp(SWFAppContext* app_context);
+void actionCharToAscii(SWFAppContext* app_context);
 
-void actionGetVariable(char* stack, u32* sp);
-void actionSetVariable(char* stack, u32* sp);
-void actionSetTarget2(char* stack, u32* sp);
-void actionDefineLocal(char* stack, u32* sp);
-void actionDeclareLocal(char* stack, u32* sp);
-void actionGetProperty(char* stack, u32* sp);
-void actionSetProperty(char* stack, u32* sp);
-void actionCloneSprite(char* stack, u32* sp);
-void actionRemoveSprite(char* stack, u32* sp);
-void actionSetTarget(char* stack, u32* sp, const char* target_name);
+void actionGetVariable(SWFAppContext* app_context);
+void actionSetVariable(SWFAppContext* app_context);
+void actionSetTarget2(SWFAppContext* app_context);
+void actionDefineLocal(SWFAppContext* app_context);
+void actionDeclareLocal(SWFAppContext* app_context);
+void actionGetProperty(SWFAppContext* app_context);
+void actionSetProperty(SWFAppContext* app_context);
+void actionCloneSprite(SWFAppContext* app_context);
+void actionRemoveSprite(SWFAppContext* app_context);
+void actionSetTarget(SWFAppContext* app_context, const char* target_name);
 
-void actionNextFrame();
-void actionPlay();
-void actionGotoFrame(char* stack, u32* sp, u16 frame);
-void actionTrace(char* stack, u32* sp);
-void actionStartDrag(char* stack, u32* sp);
-void actionEndDrag(char* stack, u32* sp);
-void actionStopSounds(char* stack, u32* sp);
-void actionGetURL(char* stack, u32* sp, const char* url, const char* target);
-void actionRandomNumber(char* stack, u32* sp);
-void actionAsciiToChar(char* stack, u32* sp, char* str_buffer);
-void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer);
-void actionGetTime(char* stack, u32* sp);
-void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer);
-void actionTypeof(char* stack, u32* sp, char* str_buffer);
-void actionCastOp(char* stack, u32* sp);
-void actionCallFunction(char* stack, u32* sp, char* str_buffer);
-void actionReturn(char* stack, u32* sp);
-void actionInitArray(char* stack, u32* sp);
-void actionInitObject(char* stack, u32* sp);
-void actionIncrement(char* stack, u32* sp);
-void actionDecrement(char* stack, u32* sp);
-void actionDuplicate(char* stack, u32* sp);
-void actionInstanceOf(char* stack, u32* sp);
-void actionEnumerate2(char* stack, u32* sp, char* str_buffer);
-void actionDelete(char* stack, u32* sp);
-void actionDelete2(char* stack, u32* sp, char* str_buffer);
-void actionDuplicate(char* stack, u32* sp);
-void actionBitAnd(char* stack, u32* sp);
-void actionBitOr(char* stack, u32* sp);
-void actionBitXor(char* stack, u32* sp);
-void actionBitLShift(char* stack, u32* sp);
-void actionBitRShift(char* stack, u32* sp);
-void actionBitURShift(char* stack, u32* sp);
-void actionStrictEquals(char* stack, u32* sp);
-void actionGreater(char* stack, u32* sp);
-void actionStringGreater(char* stack, u32* sp);
-void actionExtends(char* stack, u32* sp);
-void actionStoreRegister(char* stack, u32* sp, u8 register_num);
-void actionPushRegister(char* stack, u32* sp, u8 register_num);
-void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(char*, u32*), u32 param_count);
-void actionCall(char* stack, u32* sp);
-void actionCallMethod(char* stack, u32* sp, char* str_buffer);
-void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag);
-void actionInitObject(char* stack, u32* sp);
-void actionGetMember(char* stack, u32* sp);
-void actionSetMember(char* stack, u32* sp);
-void actionNewObject(char* stack, u32* sp);
-void actionNewMethod(char* stack, u32* sp);
+void actionNextFrame(SWFAppContext* app_context);
+void actionPlay(SWFAppContext* app_context);
+void actionGotoFrame(SWFAppContext* app_context, u16 frame);
+void actionTrace(SWFAppContext* app_context);
+void actionStartDrag(SWFAppContext* app_context);
+void actionEndDrag(SWFAppContext* app_context);
+void actionStopSounds(SWFAppContext* app_context);
+void actionGetURL(SWFAppContext* app_context, const char* url, const char* target);
+void actionRandomNumber(SWFAppContext* app_context);
+void actionAsciiToChar(SWFAppContext* app_context, char* str_buffer);
+void actionMbCharToAscii(SWFAppContext* app_context, char* str_buffer);
+void actionGetTime(SWFAppContext* app_context);
+void actionMbAsciiToChar(SWFAppContext* app_context, char* str_buffer);
+void actionTypeof(SWFAppContext* app_context, char* str_buffer);
+void actionCastOp(SWFAppContext* app_context);
+void actionCallFunction(SWFAppContext* app_context, char* str_buffer);
+void actionReturn(SWFAppContext* app_context);
+void actionInitArray(SWFAppContext* app_context);
+void actionInitObject(SWFAppContext* app_context);
+void actionIncrement(SWFAppContext* app_context);
+void actionDecrement(SWFAppContext* app_context);
+void actionInstanceOf(SWFAppContext* app_context);
+void actionEnumerate2(SWFAppContext* app_context, char* str_buffer);
+void actionDelete(SWFAppContext* app_context);
+void actionDelete2(SWFAppContext* app_context, char* str_buffer);
+void actionBitAnd(SWFAppContext* app_context);
+void actionBitOr(SWFAppContext* app_context);
+void actionBitXor(SWFAppContext* app_context);
+void actionBitLShift(SWFAppContext* app_context);
+void actionBitRShift(SWFAppContext* app_context);
+void actionBitURShift(SWFAppContext* app_context);
+void actionStrictEquals(SWFAppContext* app_context);
+void actionGreater(SWFAppContext* app_context);
+void actionStringGreater(SWFAppContext* app_context);
+void actionExtends(SWFAppContext* app_context);
+void actionStoreRegister(SWFAppContext* app_context, u8 register_num);
+void actionPushRegister(SWFAppContext* app_context, u8 register_num);
+void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*func)(SWFAppContext*), u32 param_count);
+void actionCall(SWFAppContext* app_context);
+void actionCallMethod(SWFAppContext* app_context, char* str_buffer);
+void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag);
+void actionSetMember(SWFAppContext* app_context);
+void actionNewObject(SWFAppContext* app_context);
+void actionNewMethod(SWFAppContext* app_context);
 
 // Function pointer type for DefineFunction2
-typedef ActionVar (*Function2Ptr)(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+typedef ActionVar (*Function2Ptr)(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 
-void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);
-void actionWithStart(char* stack, u32* sp);
-void actionWithEnd(char* stack, u32* sp);
+void actionDefineFunction2(SWFAppContext* app_context, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);
+void actionWithStart(SWFAppContext* app_context);
+void actionWithEnd(SWFAppContext* app_context);
 
 // Exception handling (try-catch-finally)
-void actionThrow(char* stack, u32* sp);
-void actionTryBegin(char* stack, u32* sp);
-bool actionTryExecute(char* stack, u32* sp);
-jmp_buf* actionGetExceptionJmpBuf(char* stack, u32* sp);
-void actionCatchToVariable(char* stack, u32* sp, const char* var_name);
-void actionCatchToRegister(char* stack, u32* sp, u8 reg_num);
-void actionTryEnd(char* stack, u32* sp);
+void actionThrow(SWFAppContext* app_context);
+void actionTryBegin(SWFAppContext* app_context);
+bool actionTryExecute(SWFAppContext* app_context);
+jmp_buf* actionGetExceptionJmpBuf(SWFAppContext* app_context);
+void actionCatchToVariable(SWFAppContext* app_context, const char* var_name);
+void actionCatchToRegister(SWFAppContext* app_context, u8 reg_num);
+void actionTryEnd(SWFAppContext* app_context);
 
 // Macro for inline setjmp in generated code
-#define ACTION_TRY_SETJMP(stack, sp) setjmp(*actionGetExceptionJmpBuf(stack, sp))
+#define ACTION_TRY_SETJMP(app_context) setjmp(*actionGetExceptionJmpBuf(app_context))
 
 // Control flow
-int evaluateCondition(char* stack, u32* sp);
-bool actionWaitForFrame(char* stack, u32* sp, u16 frame);
-bool actionWaitForFrame2(char* stack, u32* sp);
+int evaluateCondition(SWFAppContext* app_context);
+bool actionWaitForFrame(SWFAppContext* app_context, u16 frame);
+bool actionWaitForFrame2(SWFAppContext* app_context);

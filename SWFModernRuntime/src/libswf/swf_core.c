@@ -8,10 +8,6 @@
 #include <heap.h>
 
 // Core runtime state - exported
-char* stack = NULL;
-u32 sp = 0;
-u32 oldSP = 0;
-
 int quit_swf = 0;
 int is_playing = 1;
 int bad_poll = 0;
@@ -33,13 +29,14 @@ void swfStart(SWFAppContext* app_context)
 {
 	printf("=== SWF Execution Started (NO_GRAPHICS mode) ===\n");
 
-	// Allocate stack
-	stack = (char*) aligned_alloc(8, INITIAL_STACK_SIZE);
-	if (!stack) {
+	// Allocate stack into app_context
+	app_context->stack = (char*) aligned_alloc(8, INITIAL_STACK_SIZE);
+	if (!app_context->stack) {
 		fprintf(stderr, "Failed to allocate stack\n");
 		return;
 	}
-	sp = INITIAL_SP;
+	app_context->sp = INITIAL_SP;
+	app_context->oldSP = 0;
 
 	// Initialize subsystems
 	quit_swf = 0;
@@ -75,7 +72,7 @@ void swfStart(SWFAppContext* app_context)
 
 		if (funcs[current_frame])
 		{
-			funcs[current_frame]();
+			funcs[current_frame](app_context);
 		}
 		else
 		{
@@ -109,7 +106,7 @@ void swfStart(SWFAppContext* app_context)
 	// Cleanup
 	heap_shutdown();
 	freeMap();
-	aligned_free(stack);
+	aligned_free(app_context->stack);
 }
 
 #endif // NO_GRAPHICS

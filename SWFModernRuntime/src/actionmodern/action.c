@@ -33,8 +33,8 @@ static u32 scope_depth = 0;
 // ==================================================================
 
 // Function pointer types
-typedef void (*SimpleFunctionPtr)(char* stack, u32* sp);
-typedef ActionVar (*Function2Ptr)(char* stack, u32* sp, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+typedef void (*SimpleFunctionPtr)(SWFAppContext* app_context);
+typedef ActionVar (*Function2Ptr)(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 
 // Function object structure
 typedef struct ASFunction {
@@ -89,7 +89,7 @@ void initTime()
 // Display Control Operations
 // ==================================================================
 
-void actionToggleQuality(char* stack, u32* sp)
+void actionToggleQuality(SWFAppContext* app_context)
 {
 	// In NO_GRAPHICS mode, this is a no-op
 	// In full graphics mode, this would toggle between high and low quality rendering
@@ -335,7 +335,7 @@ static MovieClip* getCurrentContext(void) {
 	return g_current_context ? g_current_context : &root_movieclip;
 }
 
-ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
+ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
 	{
@@ -348,7 +348,7 @@ ActionStackValueType convertString(char* stack, u32* sp, char* var_str)
 	return ACTION_STACK_VALUE_STRING;
 }
 
-ActionStackValueType convertFloat(char* stack, u32* sp)
+ActionStackValueType convertFloat(SWFAppContext* app_context)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STRING)
 	{
@@ -362,7 +362,7 @@ ActionStackValueType convertFloat(char* stack, u32* sp)
 	return ACTION_STACK_VALUE_F32;
 }
 
-ActionStackValueType convertDouble(char* stack, u32* sp)
+ActionStackValueType convertDouble(SWFAppContext* app_context)
 {
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32)
 	{
@@ -374,7 +374,7 @@ ActionStackValueType convertDouble(char* stack, u32* sp)
 	return ACTION_STACK_VALUE_F64;
 }
 
-void pushVar(char* stack, u32* sp, ActionVar* var)
+void pushVar(SWFAppContext* app_context, ActionVar* var)
 {
 	switch (var->type)
 	{
@@ -403,7 +403,7 @@ void pushVar(char* stack, u32* sp, ActionVar* var)
 	}
 }
 
-void peekVar(char* stack, u32* sp, ActionVar* var)
+void peekVar(SWFAppContext* app_context, ActionVar* var)
 {
 	var->type = STACK_TOP_TYPE;
 	var->str_size = STACK_TOP_N;
@@ -419,7 +419,7 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 		var->data.numeric_value = VAL(u64, &STACK_TOP_VALUE);
 		var->data.string_data.heap_ptr = (char*) var->data.numeric_value;
 		var->data.string_data.owns_memory = false;
-		var->string_id = VAL(u32, &stack[*sp + 12]);  // Read string_id from stack
+		var->string_id = VAL(u32, &STACK[SP + 12]);  // Read string_id from stack
 	}
 	else
 	{
@@ -435,18 +435,47 @@ void peekVar(char* stack, u32* sp, ActionVar* var)
 	}
 }
 
-void popVar(char* stack, u32* sp, ActionVar* var)
+void popVar(SWFAppContext* app_context, ActionVar* var)
 {
-	peekVar(stack, sp, var);
+	peekVar(app_context, var);
 
 	POP();
 }
 
-void actionPrevFrame(char* stack, u32* sp)
+void peekSecondVar(SWFAppContext* app_context, ActionVar* var)
 {
-	// Suppress unused parameter warnings
-	(void)stack;
-	(void)sp;
+	u32 second_sp = SP_SECOND_TOP;
+	var->type = STACK[second_sp];
+	var->str_size = VAL(u32, &STACK[second_sp + 8]);
+
+	if (STACK[second_sp] == ACTION_STACK_VALUE_STR_LIST)
+	{
+		var->data.numeric_value = (u64) &VAL(u64, &STACK[second_sp + 16]);
+		var->string_id = 0;
+	}
+	else if (STACK[second_sp] == ACTION_STACK_VALUE_STRING)
+	{
+		var->data.numeric_value = VAL(u64, &STACK[second_sp + 16]);
+		var->data.string_data.heap_ptr = (char*) var->data.numeric_value;
+		var->data.string_data.owns_memory = false;
+		var->string_id = VAL(u32, &STACK[second_sp + 12]);
+	}
+	else
+	{
+		var->data.numeric_value = VAL(u64, &STACK[second_sp + 16]);
+		var->string_id = 0;
+	}
+
+	if (var->type == ACTION_STACK_VALUE_STRING)
+	{
+		var->data.string_data.owns_memory = false;
+	}
+}
+
+void actionPrevFrame(SWFAppContext* app_context)
+{
+	// Suppress unused parameter warning
+	(void)app_context;
 
 	// Access global frame control variables
 	extern size_t current_frame;
@@ -462,15 +491,15 @@ void actionPrevFrame(char* stack, u32* sp)
 	// If already at frame 0, do nothing (stay on current frame)
 }
 
-void actionAdd(char* stack, u32* sp)
+void actionAdd(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 	
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 	
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -497,14 +526,14 @@ void actionAdd(char* stack, u32* sp)
 	}
 }
 
-void actionAdd2(char* stack, u32* sp, char* str_buffer)
+void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 {
 	// Peek at types without popping
 	u8 type_a = STACK_TOP_TYPE;
 
 	// Move to second value
-	u32 sp_second = VAL(u32, &(stack[*sp + 4]));  // Get previous_sp
-	u8 type_b = stack[sp_second];  // Type of second value
+	u32 sp_second = VAL(u32, &(STACK[SP + 4]));  // Get previous_sp
+	u8 type_b = STACK[sp_second];  // Type of second value
 
 	// Check if either operand is a string
 	if (type_a == ACTION_STACK_VALUE_STRING || type_b == ACTION_STACK_VALUE_STRING) {
@@ -512,14 +541,14 @@ void actionAdd2(char* stack, u32* sp, char* str_buffer)
 
 		// Convert first operand to string (top of stack - right operand)
 		char str_a[17];
-		convertString(stack, sp, str_a);
+		convertString(app_context, str_a);
 		// Get the string pointer (either str_a if converted, or original if already string)
 		const char* str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
 		POP();
 
 		// Convert second operand to string (second on stack - left operand)
 		char str_b[17];
-		convertString(stack, sp, str_b);
+		convertString(app_context, str_b);
 		// Get the string pointer
 		const char* str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
 		POP();
@@ -533,14 +562,14 @@ void actionAdd2(char* stack, u32* sp, char* str_buffer)
 		// Numeric addition path
 
 		// Convert and pop first operand
-		convertFloat(stack, sp);
+		convertFloat(app_context);
 		ActionVar a;
-		popVar(stack, sp, &a);
+		popVar(app_context, &a);
 
 		// Convert and pop second operand
-		convertFloat(stack, sp);
+		convertFloat(app_context);
 		ActionVar b;
-		popVar(stack, sp, &b);
+		popVar(app_context, &b);
 
 		// Perform addition (same logic as actionAdd)
 		if (a.type == ACTION_STACK_VALUE_F64)
@@ -567,15 +596,15 @@ void actionAdd2(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
-void actionSubtract(char* stack, u32* sp)
+void actionSubtract(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 	
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 	
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -602,15 +631,15 @@ void actionSubtract(char* stack, u32* sp)
 	}
 }
 
-void actionMultiply(char* stack, u32* sp)
+void actionMultiply(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 	
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 	
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -637,15 +666,15 @@ void actionMultiply(char* stack, u32* sp)
 	}
 }
 
-void actionDivide(char* stack, u32* sp)
+void actionDivide(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 	
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 	
 	if (VAL(float, &a.data.numeric_value) == 0.0f)
 	{
@@ -697,15 +726,15 @@ void actionDivide(char* stack, u32* sp)
 	}
 }
 
-void actionModulo(char* stack, u32* sp)
+void actionModulo(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 
 	if (VAL(float, &a.data.numeric_value) == 0.0f)
 	{
@@ -741,15 +770,15 @@ void actionModulo(char* stack, u32* sp)
 	}
 }
 
-void actionEquals(char* stack, u32* sp)
+void actionEquals(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 	
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 	
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -776,15 +805,15 @@ void actionEquals(char* stack, u32* sp)
 	}
 }
 
-void actionLess(char* stack, u32* sp)
+void actionLess(SWFAppContext* app_context)
 {
 	ActionVar a;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &a);
+	convertFloat(app_context);
+	popVar(app_context, &a);
 
 	ActionVar b;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &b);
+	convertFloat(app_context);
+	popVar(app_context, &b);
 
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -811,15 +840,15 @@ void actionLess(char* stack, u32* sp)
 	}
 }
 
-void actionLess2(char* stack, u32* sp)
+void actionLess2(SWFAppContext* app_context)
 {
 	ActionVar a;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &a);
+	convertFloat(app_context);
+	popVar(app_context, &a);
 
 	ActionVar b;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &b);
+	convertFloat(app_context);
+	popVar(app_context, &b);
 
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -846,15 +875,15 @@ void actionLess2(char* stack, u32* sp)
 	}
 }
 
-void actionGreater(char* stack, u32* sp)
+void actionGreater(SWFAppContext* app_context)
 {
 	ActionVar a;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &a);
+	convertFloat(app_context);
+	popVar(app_context, &a);
 
 	ActionVar b;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &b);
+	convertFloat(app_context);
+	popVar(app_context, &b);
 
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -881,15 +910,15 @@ void actionGreater(char* stack, u32* sp)
 	}
 }
 
-void actionAnd(char* stack, u32* sp)
+void actionAnd(SWFAppContext* app_context)
 {
 	ActionVar a;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &a);
+	convertFloat(app_context);
+	popVar(app_context, &a);
 	
 	ActionVar b;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &b);
+	convertFloat(app_context);
+	popVar(app_context, &b);
 	
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -916,15 +945,15 @@ void actionAnd(char* stack, u32* sp)
 	}
 }
 
-void actionOr(char* stack, u32* sp)
+void actionOr(SWFAppContext* app_context)
 {
 	ActionVar a;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &a);
+	convertFloat(app_context);
+	popVar(app_context, &a);
 	
 	ActionVar b;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &b);
+	convertFloat(app_context);
+	popVar(app_context, &b);
 	
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -951,21 +980,21 @@ void actionOr(char* stack, u32* sp)
 	}
 }
 
-void actionNot(char* stack, u32* sp)
+void actionNot(SWFAppContext* app_context)
 {
 	ActionVar v;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &v);
+	convertFloat(app_context);
+	popVar(app_context, &v);
 
 	float result = v.data.numeric_value == 0.0f ? 1.0f : 0.0f;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u64, &result));
 }
 
-void actionToInteger(char* stack, u32* sp)
+void actionToInteger(SWFAppContext* app_context)
 {
 	ActionVar v;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &v);
+	convertFloat(app_context);
+	popVar(app_context, &v);
 
 	float f = VAL(float, &v.data.numeric_value);
 
@@ -982,7 +1011,7 @@ void actionToInteger(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &f));
 }
 
-void actionToNumber(char* stack, u32* sp)
+void actionToNumber(SWFAppContext* app_context)
 {
 	// Convert top of stack to number
 	// convertFloat() handles all type conversions:
@@ -990,33 +1019,33 @@ void actionToNumber(char* stack, u32* sp)
 	// - String: parse as number (empty→0, invalid→NaN)
 	// - Boolean: true→1, false→0
 	// - Null/undefined: NaN
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	// Value is already converted on stack in-place
 }
 
-void actionToString(char* stack, u32* sp, char* str_buffer)
+void actionToString(SWFAppContext* app_context, char* str_buffer)
 {
 	// Convert top of stack to string
 	// If already string, this does nothing
 	// If float, converts using snprintf with %.15g format
-	convertString(stack, sp, str_buffer);
+	convertString(app_context, str_buffer);
 }
 
-void actionStackSwap(char* stack, u32* sp)
+void actionStackSwap(SWFAppContext* app_context)
 {
 	// Pop top value (value1)
 	ActionVar val1;
-	popVar(stack, sp, &val1);
+	popVar(app_context, &val1);
 
 	// Pop second value (value2)
 	ActionVar val2;
-	popVar(stack, sp, &val2);
+	popVar(app_context, &val2);
 
 	// Push value1 (was on top, now goes to second position)
-	pushVar(stack, sp, &val1);
+	pushVar(app_context, &val1);
 
 	// Push value2 (was second, now goes to top)
-	pushVar(stack, sp, &val2);
+	pushVar(app_context, &val2);
 }
 
 /**
@@ -1038,14 +1067,14 @@ void actionStackSwap(char* stack, u32* sp)
  * SWF version: 5+
  * Opcode: 0x45
  */
-void actionTargetPath(char* stack, u32* sp, char* str_buffer)
+void actionTargetPath(SWFAppContext* app_context, char* str_buffer)
 {
 	// Get type of value on stack
 	u8 type = STACK_TOP_TYPE;
 
 	// Pop value from stack
 	ActionVar val;
-	popVar(stack, sp, &val);
+	popVar(app_context, &val);
 
 	// Check if value is a MovieClip
 	if (type == ACTION_STACK_VALUE_MOVIECLIP) {
@@ -1131,13 +1160,13 @@ static void freeEnumeratedNames(EnumeratedName* head)
 	}
 }
 
-void actionEnumerate(char* stack, u32* sp, char* str_buffer)
+void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 {
 	// Step 1: Pop variable name from stack
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
-	u32 string_id = VAL(u32, &stack[*sp + 12]);
-	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
-	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
+	u32 string_id = VAL(u32, &STACK[SP + 12]);
+	char* var_name = (char*) VAL(u64, &STACK[SP + 16]);
+	u32 var_name_len = VAL(u32, &STACK[SP + 8]);
 	POP();
 
 #ifdef DEBUG
@@ -1300,11 +1329,11 @@ void actionEnumerate(char* stack, u32* sp, char* str_buffer)
 }
 
 
-int evaluateCondition(char* stack, u32* sp)
+int evaluateCondition(SWFAppContext* app_context)
 {
 	ActionVar v;
-	convertFloat(stack, sp);
-	popVar(stack, sp, &v);
+	convertFloat(app_context);
+	popVar(app_context, &v);
 
 	return v.data.numeric_value != 0.0f;
 }
@@ -1463,15 +1492,15 @@ int strcmp_not_a_list_b(u64 a_value, u64 b_value)
 	return 0;
 }
 
-void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str)
+void actionStringEquals(SWFAppContext* app_context, char* a_str, char* b_str)
 {
 	ActionVar a;
-	convertString(stack, sp, a_str);
-	popVar(stack, sp, &a);
+	convertString(app_context, a_str);
+	popVar(app_context, &a);
 	
 	ActionVar b;
-	convertString(stack, sp, b_str);
-	popVar(stack, sp, &b);
+	convertString(app_context, b_str);
+	popVar(app_context, &b);
 	
 	int cmp_result;
 	
@@ -1502,35 +1531,35 @@ void actionStringEquals(char* stack, u32* sp, char* a_str, char* b_str)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionStringLength(char* stack, u32* sp, char* v_str)
+void actionStringLength(SWFAppContext* app_context, char* v_str)
 {
 	ActionVar v;
-	convertString(stack, sp, v_str);
-	popVar(stack, sp, &v);
+	convertString(app_context, v_str);
+	popVar(app_context, &v);
 
 	float str_size = (float) v.str_size;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &str_size));
 }
 
-void actionStringExtract(char* stack, u32* sp, char* str_buffer)
+void actionStringExtract(SWFAppContext* app_context, char* str_buffer)
 {
 	// Pop length
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar length_var;
-	popVar(stack, sp, &length_var);
+	popVar(app_context, &length_var);
 	int length = (int)VAL(float, &length_var.data.numeric_value);
 
 	// Pop index
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar index_var;
-	popVar(stack, sp, &index_var);
+	popVar(app_context, &index_var);
 	int index = (int)VAL(float, &index_var.data.numeric_value);
 
 	// Pop string
 	char src_buffer[17];
-	convertString(stack, sp, src_buffer);
+	convertString(app_context, src_buffer);
 	ActionVar src_var;
-	popVar(stack, sp, &src_var);
+	popVar(app_context, &src_var);
 	const char* src = src_var.data.string_data.owns_memory ?
 		src_var.data.string_data.heap_ptr :
 		(char*) src_var.data.numeric_value;
@@ -1563,10 +1592,10 @@ void actionStringExtract(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, i);
 }
 
-void actionMbStringLength(char* stack, u32* sp, char* v_str)
+void actionMbStringLength(SWFAppContext* app_context, char* v_str)
 {
 	// Convert top of stack to string (if it's a number, converts it to string in v_str)
-	convertString(stack, sp, v_str);
+	convertString(app_context, v_str);
 
 	// Get the string pointer from stack
 	const unsigned char* str = (const unsigned char*) VAL(u64, &STACK_TOP_VALUE);
@@ -1602,25 +1631,25 @@ void actionMbStringLength(char* stack, u32* sp, char* v_str)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionMbStringExtract(char* stack, u32* sp, char* str_buffer)
+void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer)
 {
 	// Pop count (number of characters to extract)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar count_var;
-	popVar(stack, sp, &count_var);
+	popVar(app_context, &count_var);
 	int count = (int)VAL(float, &count_var.data.numeric_value);
 
 	// Pop index (starting character position)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar index_var;
-	popVar(stack, sp, &index_var);
+	popVar(app_context, &index_var);
 	int index = (int)VAL(float, &index_var.data.numeric_value);
 
 	// Pop string
 	char input_buffer[17];
-	convertString(stack, sp, input_buffer);
+	convertString(app_context, input_buffer);
 	ActionVar src_var;
-	popVar(stack, sp, &src_var);
+	popVar(app_context, &src_var);
 	const char* src = src_var.data.string_data.owns_memory ?
 		src_var.data.string_data.heap_ptr :
 		(char*) src_var.data.numeric_value;
@@ -1690,15 +1719,15 @@ void actionMbStringExtract(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, length);
 }
 
-void actionCharToAscii(char* stack, u32* sp)
+void actionCharToAscii(SWFAppContext* app_context)
 {
 	// Convert top of stack to string
 	char str_buffer[17];
-	convertString(stack, sp, str_buffer);
+	convertString(app_context, str_buffer);
 
 	// Pop the string value
 	ActionVar v;
-	popVar(stack, sp, &v);
+	popVar(app_context, &v);
 
 	// Get pointer to the string
 	const char* str = (const char*) v.data.numeric_value;
@@ -1719,15 +1748,15 @@ void actionCharToAscii(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &code));
 }
 
-void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
+void actionStringAdd(SWFAppContext* app_context, char* a_str, char* b_str)
 {
 	ActionVar a;
-	convertString(stack, sp, a_str);
-	peekVar(stack, sp, &a);
+	convertString(app_context, a_str);
+	peekVar(app_context, &a);
 	
 	ActionVar b;
-	convertString(stack, sp, b_str);
-	peekVar(stack, &SP_SECOND_TOP, &b);
+	convertString(app_context, b_str);
+	peekSecondVar(app_context, &b);
 	
 	u64 num_a_strings;
 	u64 num_b_strings;
@@ -1797,8 +1826,9 @@ void actionStringAdd(char* stack, u32* sp, char* a_str, char* b_str)
 // MovieClip Control Actions
 // ==================================================================
 
-void actionNextFrame()
+void actionNextFrame(SWFAppContext* app_context)
 {
+	(void)app_context;  // Not used but required for consistent API
 	// Advance to the next frame
 	extern size_t current_frame;
 	extern size_t next_frame;
@@ -1846,14 +1876,15 @@ void actionNextFrame()
  *   - actionStop() / ActionStop (0x07): Stop playback
  *   - swf_core.c: Frame loop that checks is_playing
  */
-void actionPlay()
+void actionPlay(SWFAppContext* app_context)
 {
+	(void)app_context;  // Not used but required for consistent API
 	// Set playing state to true
 	// This allows the timeline to advance to the next frame
 	is_playing = 1;
 }
 
-void actionTrace(char* stack, u32* sp)
+void actionTrace(SWFAppContext* app_context)
 {
 	ActionStackValueType type = STACK_TOP_TYPE;
 
@@ -1926,11 +1957,10 @@ void actionTrace(char* stack, u32* sp)
  * @param sp - Pointer to stack pointer (unused but required for API consistency)
  * @param frame - Target frame index (0-based)
  */
-void actionGotoFrame(char* stack, u32* sp, u16 frame)
+void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 {
 	// Suppress unused parameter warnings
-	(void)stack;
-	(void)sp;
+	(void)app_context;
 
 	// Access global frame control variables
 	extern size_t current_frame;
@@ -2009,7 +2039,7 @@ int findFrameByLabel(const char* label)
  * @param sp - Stack pointer (unused)
  * @param label - The frame label to navigate to
  */
-void actionGoToLabel(char* stack, u32* sp, const char* label)
+void actionGoToLabel(SWFAppContext* app_context, const char* label)
 {
 	extern size_t next_frame;
 	extern int manual_next_frame;
@@ -2067,11 +2097,11 @@ void actionGoToLabel(char* stack, u32* sp, const char* label)
  * @param play_flag 0 = go to frame and stop, 1 = go to frame and play
  * @param scene_bias Number to add to numeric frame (for multi-scene movies)
  */
-void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias)
+void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 {
 	// Pop frame identifier from stack
 	ActionVar frame_var;
-	popVar(stack, sp, &frame_var);
+	popVar(app_context, &frame_var);
 
 	if (frame_var.type == ACTION_STACK_VALUE_F32) {
 		// Numeric frame
@@ -2176,7 +2206,7 @@ void actionGotoFrame2(char* stack, u32* sp, u8 play_flag, u16 scene_bias)
  * In NO_GRAPHICS mode, this updates the drag state tracking but does not
  * perform actual sprite/mouse interaction.
  */
-void actionEndDrag(char* stack, u32* sp)
+void actionEndDrag(SWFAppContext* app_context)
 {
 	// Clear drag state
 	if (is_dragging) {
@@ -2206,8 +2236,7 @@ void actionEndDrag(char* stack, u32* sp)
 	}
 
 	// No stack operations - END_DRAG has no parameters
-	(void)stack;  // Suppress unused parameter warning
-	(void)sp;     // Suppress unused parameter warning
+	(void)app_context;  // Suppress unused parameter warning
 }
 
 /**
@@ -2232,11 +2261,10 @@ void actionEndDrag(char* stack, u32* sp)
  * @param stack Pointer to the runtime stack (unused - no stack operations)
  * @param sp Pointer to stack pointer (unused - no stack operations)
  */
-void actionStopSounds(char* stack, u32* sp)
+void actionStopSounds(SWFAppContext* app_context)
 {
 	// Suppress unused parameter warnings
-	(void)stack;
-	(void)sp;
+	(void)app_context;
 
 	// In NO_GRAPHICS mode, this is a no-op since there is no audio subsystem
 	#ifndef NO_GRAPHICS
@@ -2285,7 +2313,7 @@ void actionStopSounds(char* stack, u32* sp)
  * @param url The URL to load (can be relative or absolute)
  * @param target The target window/frame/level
  */
-void actionGetURL(char* stack, u32* sp, const char* url, const char* target)
+void actionGetURL(SWFAppContext* app_context, const char* url, const char* target)
 {
 	// Handle null pointers
 	const char* safe_url = url ? url : "(null)";
@@ -2303,13 +2331,13 @@ void actionGetURL(char* stack, u32* sp, const char* url, const char* target)
 	// - Security: Check cross-domain policy, validate URL scheme
 }
 
-void actionGetVariable(char* stack, u32* sp)
+void actionGetVariable(SWFAppContext* app_context)
 {
 	// Read variable name info from stack
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
-	u32 string_id = VAL(u32, &stack[*sp + 12]);
-	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
-	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
+	u32 string_id = VAL(u32, &STACK[SP + 12]);
+	char* var_name = (char*) VAL(u64, &STACK[SP + 16]);
+	u32 var_name_len = VAL(u32, &STACK[SP + 8]);
 
 	// Pop variable name
 	POP();
@@ -2361,22 +2389,22 @@ void actionGetVariable(char* stack, u32* sp)
 	PUSH_VAR(var);
 }
 
-void actionSetVariable(char* stack, u32* sp)
+void actionSetVariable(SWFAppContext* app_context)
 {
 	// Stack layout: [name, value] <- sp
 	// According to spec: Pop value first, then name
 	// So VALUE is at top (*sp), NAME is at second (SP_SECOND_TOP)
 
-	u32 value_sp = *sp;
+	u32 value_sp = SP;
 	u32 var_name_sp = SP_SECOND_TOP;
 
 	// Read variable name info
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
-	u32 string_id = VAL(u32, &stack[var_name_sp + 12]);
+	u32 string_id = VAL(u32, &STACK[var_name_sp + 12]);
 
-	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
+	char* var_name = (char*) VAL(u64, &STACK[var_name_sp + 16]);
 
-	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
+	u32 var_name_len = VAL(u32, &STACK[var_name_sp + 8]);
 
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
@@ -2389,7 +2417,7 @@ void actionSetVariable(char* stack, u32* sp)
 			{
 				// Found in scope chain - set it there
 				ActionVar value_var;
-				peekVar(stack, sp, &value_var);
+				peekVar(app_context, &value_var);
 				setProperty(scope_chain[i], var_name, var_name_len, &value_var);
 
 				// Pop both value and name
@@ -2421,27 +2449,27 @@ void actionSetVariable(char* stack, u32* sp)
 	}
 
 	// Set variable value (uses existing string materialization!)
-	setVariableWithValue(var, stack, value_sp);
+	setVariableWithValue(var, STACK, value_sp);
 
 	// Pop both value and name
 	POP_2();
 }
 
-void actionDefineLocal(char* stack, u32* sp)
+void actionDefineLocal(SWFAppContext* app_context)
 {
 	// Stack layout: [name, value] <- sp
 	// According to AS2 spec for DefineLocal:
 	// Pop value first, then name
 	// So VALUE is at top (*sp), NAME is at second (SP_SECOND_TOP)
 
-	u32 value_sp = *sp;
+	u32 value_sp = SP;
 	u32 var_name_sp = SP_SECOND_TOP;
 
 	// Read variable name info
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
-	u32 string_id = VAL(u32, &stack[var_name_sp + 12]);
-	char* var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
-	u32 var_name_len = VAL(u32, &stack[var_name_sp + 8]);
+	u32 string_id = VAL(u32, &STACK[var_name_sp + 12]);
+	char* var_name = (char*) VAL(u64, &STACK[var_name_sp + 16]);
+	u32 var_name_len = VAL(u32, &STACK[var_name_sp + 8]);
 
 	// DefineLocal ALWAYS creates/updates in the local scope
 	// If there's a scope object (function context), define it there
@@ -2453,7 +2481,7 @@ void actionDefineLocal(char* stack, u32* sp)
 		ASObject* local_scope = scope_chain[scope_depth - 1];
 
 		ActionVar value_var;
-		peekVar(stack, sp, &value_var);
+		peekVar(app_context, &value_var);
 
 		// Set property on the local scope object
 		// This will create the property if it doesn't exist, or update if it does
@@ -2486,13 +2514,13 @@ void actionDefineLocal(char* stack, u32* sp)
 	}
 
 	// Set variable value
-	setVariableWithValue(var, stack, value_sp);
+	setVariableWithValue(var, STACK, value_sp);
 
 	// Pop both value and name
 	POP_2();
 }
 
-void actionDeclareLocal(char* stack, u32* sp)
+void actionDeclareLocal(SWFAppContext* app_context)
 {
 	// DECLARE_LOCAL pops only the variable name (no value)
 	// It declares a local variable initialized to undefined
@@ -2500,9 +2528,9 @@ void actionDeclareLocal(char* stack, u32* sp)
 	// Stack layout: [name] <- sp
 
 	// Read variable name info
-	u32 string_id = VAL(u32, &stack[*sp + 12]);
-	char* var_name = (char*) VAL(u64, &stack[*sp + 16]);
-	u32 var_name_len = VAL(u32, &stack[*sp + 8]);
+	u32 string_id = VAL(u32, &STACK[SP + 12]);
+	char* var_name = (char*) VAL(u64, &STACK[SP + 16]);
+	u32 var_name_len = VAL(u32, &STACK[SP + 8]);
 
 	// Check if we're in a local scope (function context)
 	if (scope_depth > 0 && scope_chain[scope_depth - 1] != NULL)
@@ -2533,10 +2561,10 @@ void actionDeclareLocal(char* stack, u32* sp)
 	POP();
 }
 
-void actionSetTarget2(char* stack, u32* sp)
+void actionSetTarget2(SWFAppContext* app_context)
 {
 	// Convert top of stack to string if needed
-	convertString(stack, sp, NULL);
+	convertString(app_context, NULL);
 
 	// Get target path from stack
 	const char* target_path = (const char*) VAL(u64, &STACK_TOP_VALUE);
@@ -2568,16 +2596,16 @@ void actionSetTarget2(char* stack, u32* sp)
 	// Full MovieClip hierarchy requires display list infrastructure.
 }
 
-void actionGetProperty(char* stack, u32* sp)
+void actionGetProperty(SWFAppContext* app_context)
 {
 	// Pop property index
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar index_var;
-	popVar(stack, sp, &index_var);
+	popVar(app_context, &index_var);
 	int prop_index = (int) VAL(float, &index_var.data.numeric_value);
 
 	// Pop target path
-	convertString(stack, sp, NULL);
+	convertString(app_context, NULL);
 	const char* target = (const char*) VAL(u64, &STACK_TOP_VALUE);
 	POP();
 
@@ -2689,12 +2717,12 @@ void actionGetProperty(char* stack, u32* sp)
 	}
 }
 
-void actionRandomNumber(char* stack, u32* sp)
+void actionRandomNumber(SWFAppContext* app_context)
 {
 	// Pop maximum value
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar max_var;
-	popVar(stack, sp, &max_var);
+	popVar(app_context, &max_var);
 	int max = (int) VAL(float, &max_var.data.numeric_value);
 
 	// Generate random number using avmplus-compatible RNG
@@ -2706,14 +2734,14 @@ void actionRandomNumber(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionAsciiToChar(char* stack, u32* sp, char* str_buffer)
+void actionAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 {
 	// Convert top of stack to number
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 
 	// Pop the numeric value
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	// Get integer code (truncate decimal)
 	float val = VAL(float, &a.data.numeric_value);
@@ -2730,10 +2758,10 @@ void actionAsciiToChar(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, 1);
 }
 
-void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer)
+void actionMbCharToAscii(SWFAppContext* app_context, char* str_buffer)
 {
 	// Convert top of stack to string
-	convertString(stack, sp, str_buffer);
+	convertString(app_context, str_buffer);
 
 	// Get string pointer from stack
 	const char* str = (const char*) VAL(u64, &STACK_TOP_VALUE);
@@ -2776,7 +2804,7 @@ void actionMbCharToAscii(char* stack, u32* sp, char* str_buffer)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionGetTime(char* stack, u32* sp)
+void actionGetTime(SWFAppContext* app_context)
 {
 	u32 delta_ms = get_elapsed_ms() - start_time;
 	float delta_ms_f32 = (float) delta_ms;
@@ -2784,14 +2812,14 @@ void actionGetTime(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &delta_ms_f32));
 }
 
-void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer)
+void actionMbAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 {
 	// Convert top of stack to number
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 
 	// Pop the numeric value
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	// Get integer code point
 	float value = a.type == ACTION_STACK_VALUE_F32 ? VAL(float, &a.data.numeric_value) : (float)VAL(double, &a.data.numeric_value);
@@ -2832,7 +2860,7 @@ void actionMbAsciiToChar(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, len);
 }
 
-void actionTypeof(char* stack, u32* sp, char* str_buffer)
+void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 {
 	// Peek at the type without modifying value
 	u8 type = STACK_TOP_TYPE;
@@ -2880,27 +2908,27 @@ void actionTypeof(char* stack, u32* sp, char* str_buffer)
 	PUSH_STR(str_buffer, len);
 }
 
-void actionDelete2(char* stack, u32* sp, char* str_buffer)
+void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 {
 	// Delete2 deletes a named property/variable
 	// Pops the name from the stack, deletes it, pushes success boolean
 
 	// Read variable name from stack
-	u32 var_name_sp = *sp;
-	u8 name_type = stack[var_name_sp];
+	u32 var_name_sp = SP;
+	u8 name_type = STACK[var_name_sp];
 	char* var_name = NULL;
 	u32 var_name_len = 0;
 
 	// Get the variable name string
 	if (name_type == ACTION_STACK_VALUE_STRING)
 	{
-		var_name = (char*) VAL(u64, &stack[var_name_sp + 16]);
-		var_name_len = VAL(u32, &stack[var_name_sp + 8]);
+		var_name = (char*) VAL(u64, &STACK[var_name_sp + 16]);
+		var_name_len = VAL(u32, &STACK[var_name_sp + 8]);
 	}
 	else if (name_type == ACTION_STACK_VALUE_STR_LIST)
 	{
 		// Materialize string list
-		var_name = materializeStringList(stack, var_name_sp);
+		var_name = materializeStringList(STACK, var_name_sp);
 		var_name_len = strlen(var_name);
 	}
 
@@ -3055,7 +3083,7 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 	return 0;
 }
 
-void actionCastOp(char* stack, u32* sp)
+void actionCastOp(SWFAppContext* app_context)
 {
 	// CastOp implementation (ActionScript 2.0 cast operator)
 	// Pops object to cast, pops constructor, checks if object is instance of constructor
@@ -3063,17 +3091,17 @@ void actionCastOp(char* stack, u32* sp)
 
 	// Pop object to cast
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	// Pop constructor function
 	ActionVar ctor_var;
-	popVar(stack, sp, &ctor_var);
+	popVar(app_context, &ctor_var);
 
 	// Check if object is an instance of constructor using prototype chain + interfaces
 	if (checkInstanceOf(&obj_var, &ctor_var))
 	{
 		// Cast succeeds - push the object back
-		pushVar(stack, sp, &obj_var);
+		pushVar(app_context, &obj_var);
 	}
 	else
 	{
@@ -3082,11 +3110,11 @@ void actionCastOp(char* stack, u32* sp)
 		null_var.type = ACTION_STACK_VALUE_UNDEFINED;
 		null_var.data.numeric_value = 0;
 		null_var.str_size = 0;
-		pushVar(stack, sp, &null_var);
+		pushVar(app_context, &null_var);
 	}
 }
 
-void actionDuplicate(char* stack, u32* sp)
+void actionDuplicate(SWFAppContext* app_context)
 {
 	// Get the type of the top stack entry
 	u8 type = STACK_TOP_TYPE;
@@ -3097,7 +3125,7 @@ void actionDuplicate(char* stack, u32* sp)
 		// For strings, we need to copy both the pointer and the length
 		const char* str = (const char*) VAL(u64, &STACK_TOP_VALUE);
 		u32 len = STACK_TOP_N;  // Length is stored at offset +8
-		u32 id = VAL(u32, &stack[*sp + 12]);  // String ID is at offset +12
+		u32 id = VAL(u32, &STACK[SP + 12]);  // String ID is at offset +12
 
 		// Push a copy of the string (shallow copy - same pointer)
 		PUSH_STR_ID(str, len, id);
@@ -3110,7 +3138,7 @@ void actionDuplicate(char* stack, u32* sp)
 	}
 }
 
-void actionReturn(char* stack, u32* sp)
+void actionReturn(SWFAppContext* app_context)
 {
 	// The return value is already at the top of the stack.
 	// The generated C code includes a "return;" statement that exits
@@ -3119,11 +3147,11 @@ void actionReturn(char* stack, u32* sp)
 	// the actual return via C return statement.
 }
 
-void actionIncrement(char* stack, u32* sp)
+void actionIncrement(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -3139,11 +3167,11 @@ void actionIncrement(char* stack, u32* sp)
 	}
 }
 
-void actionDecrement(char* stack, u32* sp)
+void actionDecrement(SWFAppContext* app_context)
 {
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -3159,15 +3187,15 @@ void actionDecrement(char* stack, u32* sp)
 	}
 }
 
-void actionInstanceOf(char* stack, u32* sp)
+void actionInstanceOf(SWFAppContext* app_context)
 {
 	// Pop constructor function
 	ActionVar constr_var;
-	popVar(stack, sp, &constr_var);
+	popVar(app_context, &constr_var);
 
 	// Pop object
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	// Check if object is an instance of constructor using prototype chain + interfaces
 	int result = checkInstanceOf(&obj_var, &constr_var);
@@ -3177,11 +3205,11 @@ void actionInstanceOf(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_val));
 }
 
-void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
+void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 {
 	// Pop object reference from stack
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	// Push undefined as terminator
 	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
@@ -3244,18 +3272,18 @@ void actionEnumerate2(char* stack, u32* sp, char* str_buffer)
 	}
 }
 
-void actionBitAnd(char* stack, u32* sp)
+void actionBitAnd(SWFAppContext* app_context)
 {
 
 	// Convert and pop second operand (a)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	// Convert and pop first operand (b)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 
 	// Convert to 32-bit signed integers (truncate, don't round)
 	int32_t a_int = (int32_t)VAL(float, &a.data.numeric_value);
@@ -3269,18 +3297,18 @@ void actionBitAnd(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
 
-void actionBitOr(char* stack, u32* sp)
+void actionBitOr(SWFAppContext* app_context)
 {
 
 	// Convert and pop second operand (a)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	// Convert and pop first operand (b)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 
 	// Convert to 32-bit signed integers (truncate, don't round)
 	int32_t a_int = (int32_t)VAL(float, &a.data.numeric_value);
@@ -3294,18 +3322,18 @@ void actionBitOr(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
 
-void actionBitXor(char* stack, u32* sp)
+void actionBitXor(SWFAppContext* app_context)
 {
 
 	// Convert and pop second operand (a)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	// Convert and pop first operand (b)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 
 	// Convert to 32-bit signed integers (truncate, don't round)
 	int32_t a_int = (int32_t)VAL(float, &a.data.numeric_value);
@@ -3319,18 +3347,18 @@ void actionBitXor(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
 
-void actionBitLShift(char* stack, u32* sp)
+void actionBitLShift(SWFAppContext* app_context)
 {
 
 	// Pop shift count (first argument)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar shift_count_var;
-	popVar(stack, sp, &shift_count_var);
+	popVar(app_context, &shift_count_var);
 
 	// Pop value to shift (second argument)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar value_var;
-	popVar(stack, sp, &value_var);
+	popVar(app_context, &value_var);
 
 	// Convert to 32-bit signed integers (truncate, don't round)
 	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
@@ -3347,18 +3375,18 @@ void actionBitLShift(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
 
-void actionBitRShift(char* stack, u32* sp)
+void actionBitRShift(SWFAppContext* app_context)
 {
 
 	// Pop shift count (first argument)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar shift_count_var;
-	popVar(stack, sp, &shift_count_var);
+	popVar(app_context, &shift_count_var);
 
 	// Pop value to shift (second argument)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar value_var;
-	popVar(stack, sp, &value_var);
+	popVar(app_context, &value_var);
 
 	// Convert to 32-bit signed integers
 	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
@@ -3378,18 +3406,18 @@ void actionBitRShift(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
 }
 
-void actionBitURShift(char* stack, u32* sp)
+void actionBitURShift(SWFAppContext* app_context)
 {
 
 	// Pop shift count (first argument)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar shift_count_var;
-	popVar(stack, sp, &shift_count_var);
+	popVar(app_context, &shift_count_var);
 
 	// Pop value to shift (second argument)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar value_var;
-	popVar(stack, sp, &value_var);
+	popVar(app_context, &value_var);
 
 	// Convert to integers
 	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
@@ -3412,15 +3440,15 @@ void actionBitURShift(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_float));
 }
 
-void actionStrictEquals(char* stack, u32* sp)
+void actionStrictEquals(SWFAppContext* app_context)
 {
 	// Pop first argument (no type conversion - strict equality!)
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	// Pop second argument (no type conversion - strict equality!)
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 
 	float result = 0.0f;
 
@@ -3491,15 +3519,15 @@ void actionStrictEquals(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionEquals2(char* stack, u32* sp)
+void actionEquals2(SWFAppContext* app_context)
 {
 	// Pop first argument (arg1)
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 
 	// Pop second argument (arg2)
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 
 	float result = 0.0f;
 
@@ -3683,17 +3711,17 @@ void actionEquals2(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionStringGreater(char* stack, u32* sp)
+void actionStringGreater(SWFAppContext* app_context)
 {
 
 	// Get first string (arg1)
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 	const char* str_a = (const char*) a.data.numeric_value;
 
 	// Get second string (arg2)
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 	const char* str_b = (const char*) b.data.numeric_value;
 
 	// Compare: b > a (using strcmp)
@@ -3708,15 +3736,15 @@ void actionStringGreater(char* stack, u32* sp)
 // Inheritance (EXTENDS opcode)
 // ==================================================================
 
-void actionExtends(char* stack, u32* sp)
+void actionExtends(SWFAppContext* app_context)
 {
 	// Pop superclass constructor from stack
 	ActionVar superclass;
-	popVar(stack, sp, &superclass);
+	popVar(app_context, &superclass);
 
 	// Pop subclass constructor from stack
 	ActionVar subclass;
-	popVar(stack, sp, &subclass);
+	popVar(app_context, &subclass);
 
 	// Verify both are objects/functions
 	if (superclass.type != ACTION_STACK_VALUE_OBJECT &&
@@ -3811,7 +3839,7 @@ void actionExtends(char* stack, u32* sp)
 #define MAX_REGISTERS 256
 static ActionVar g_registers[MAX_REGISTERS];
 
-void actionStoreRegister(char* stack, u32* sp, u8 register_num)
+void actionStoreRegister(SWFAppContext* app_context, u8 register_num)
 {
 	// Validate register number
 	if (register_num >= MAX_REGISTERS) {
@@ -3820,13 +3848,13 @@ void actionStoreRegister(char* stack, u32* sp, u8 register_num)
 
 	// Peek the top of stack (don't pop!)
 	ActionVar value;
-	peekVar(stack, sp, &value);
+	peekVar(app_context, &value);
 
 	// Store value in register
 	g_registers[register_num] = value;
 }
 
-void actionPushRegister(char* stack, u32* sp, u8 register_num)
+void actionPushRegister(SWFAppContext* app_context, u8 register_num)
 {
 	// Validate register number
 	if (register_num >= MAX_REGISTERS) {
@@ -3854,16 +3882,16 @@ void actionPushRegister(char* stack, u32* sp, u8 register_num)
 	}
 }
 
-void actionStringLess(char* stack, u32* sp)
+void actionStringLess(SWFAppContext* app_context)
 {
 	// Get first string (arg1)
 	ActionVar a;
-	popVar(stack, sp, &a);
+	popVar(app_context, &a);
 	const char* str_a = (const char*) a.data.numeric_value;
 
 	// Get second string (arg2)
 	ActionVar b;
-	popVar(stack, sp, &b);
+	popVar(app_context, &b);
 	const char* str_b = (const char*) b.data.numeric_value;
 
 	// Compare: b < a (using strcmp)
@@ -3874,14 +3902,14 @@ void actionStringLess(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionImplementsOp(char* stack, u32* sp)
+void actionImplementsOp(SWFAppContext* app_context)
 {
 	// ActionImplementsOp implements the ActionScript "implements" keyword
 	// It specifies the interfaces that a class implements, for use by instanceof and CastOp
 
 	// Step 1: Pop constructor function (the class) from stack
 	ActionVar constructor_var;
-	popVar(stack, sp, &constructor_var);
+	popVar(app_context, &constructor_var);
 
 	// Validate that it's an object
 	if (constructor_var.type != ACTION_STACK_VALUE_OBJECT)
@@ -3894,7 +3922,7 @@ void actionImplementsOp(char* stack, u32* sp)
 
 	// Step 2: Pop count of interfaces from stack
 	ActionVar count_var;
-	popVar(stack, sp, &count_var);
+	popVar(app_context, &count_var);
 
 	// Convert to number if needed
 	u32 interface_count = 0;
@@ -3928,7 +3956,7 @@ void actionImplementsOp(char* stack, u32* sp)
 		for (u32 i = 0; i < interface_count; i++)
 		{
 			ActionVar iface_var;
-			popVar(stack, sp, &iface_var);
+			popVar(app_context, &iface_var);
 
 			if (iface_var.type != ACTION_STACK_VALUE_OBJECT)
 			{
@@ -3988,7 +4016,7 @@ void actionImplementsOp(char* stack, u32* sp)
  * @param stack Pointer to the runtime stack
  * @param sp Pointer to stack pointer
  */
-void actionCall(char* stack, u32* sp)
+void actionCall(SWFAppContext* app_context)
 {
 	// Access global frame info (set by swfStart)
 	extern frame_func* g_frame_funcs;
@@ -3997,7 +4025,7 @@ void actionCall(char* stack, u32* sp)
 
 	// Pop frame identifier from stack
 	ActionVar frame_var;
-	popVar(stack, sp, &frame_var);
+	popVar(app_context, &frame_var);
 
 	if (frame_var.type == ACTION_STACK_VALUE_F32) {
 		// Numeric frame
@@ -4023,7 +4051,7 @@ void actionCall(char* stack, u32* sp)
 
 			// Call the frame function (executes frame actions)
 			// Note: This calls the full frame function including ShowFrame
-			g_frame_funcs[frame_num]();
+			g_frame_funcs[frame_num](app_context);
 
 			// Restore quit_swf state (only quit if we were already quitting)
 			quit_swf = saved_quit_swf;
@@ -4092,7 +4120,7 @@ void actionCall(char* stack, u32* sp)
 					quit_swf = 0;
 
 					// Call the frame function (executes frame actions)
-					g_frame_funcs[frame_num]();
+					g_frame_funcs[frame_num](app_context);
 
 					// Restore quit_swf state
 					quit_swf = saved_quit_swf;
@@ -4173,21 +4201,21 @@ static void printStringValue(ActionVar* var)
  * @param load_target_flag Target type: 0=window, 1=sprite
  * @param load_variables_flag Load type: 0=content, 1=variables
  */
-void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag)
+void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag)
 {
 	// Pop target from stack
 	// convertString() is called to handle the case where the value might be a number
 	// that needs to be converted to a string, though in practice URLs/targets are always strings
 	char target_str[17];
 	ActionVar target_var;
-	convertString(stack, sp, target_str);
-	popVar(stack, sp, &target_var);
+	convertString(app_context, target_str);
+	popVar(app_context, &target_var);
 
 	// Pop URL from stack
 	char url_str[17];
 	ActionVar url_var;
-	convertString(stack, sp, url_str);
-	popVar(stack, sp, &url_var);
+	convertString(app_context, url_str);
+	popVar(app_context, &url_var);
 
 	// Determine HTTP method
 	const char* method = "NONE";
@@ -4244,12 +4272,12 @@ void actionGetURL2(char* stack, u32* sp, u8 send_vars_method, u8 load_target_fla
 	}
 }
 
-void actionInitArray(char* stack, u32* sp)
+void actionInitArray(SWFAppContext* app_context)
 {
 	// 1. Pop array element count
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar count_var;
-	popVar(stack, sp, &count_var);
+	popVar(app_context, &count_var);
 	u32 num_elements = (u32) VAL(float, &count_var.data.numeric_value);
 
 	// 2. Allocate array
@@ -4267,7 +4295,7 @@ void actionInitArray(char* stack, u32* sp)
 	// We pop and store sequentially: pop elem_1 -> arr[0], pop elem_2 -> arr[1], etc.
 	for (u32 i = 0; i < num_elements; i++) {
 		ActionVar elem;
-		popVar(stack, sp, &elem);
+		popVar(app_context, &elem);
 		arr->elements[i] = elem;
 
 		// If element is array, increment refcount
@@ -4281,7 +4309,7 @@ void actionInitArray(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 }
 
-void actionSetMember(char* stack, u32* sp)
+void actionSetMember(SWFAppContext* app_context)
 {
 	// Stack layout (from top to bottom):
 	// 1. value (the value to assign)
@@ -4290,12 +4318,12 @@ void actionSetMember(char* stack, u32* sp)
 
 	// Pop the value to assign
 	ActionVar value_var;
-	popVar(stack, sp, &value_var);
+	popVar(app_context, &value_var);
 
 	// Pop the property name
 	// The property name should be a string on the stack
 	ActionVar prop_name_var;
-	popVar(stack, sp, &prop_name_var);
+	popVar(app_context, &prop_name_var);
 
 	// Get the property name as string
 	const char* prop_name = NULL;
@@ -4335,7 +4363,7 @@ void actionSetMember(char* stack, u32* sp)
 
 	// Pop the object
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	// Check if the object is actually an object type
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
@@ -4351,12 +4379,12 @@ void actionSetMember(char* stack, u32* sp)
 	// (Flash behavior for setting properties on non-objects)
 }
 
-void actionInitObject(char* stack, u32* sp)
+void actionInitObject(SWFAppContext* app_context)
 {
 	// Step 1: Pop property count from stack
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar count_var;
-	popVar(stack, sp, &count_var);
+	popVar(app_context, &count_var);
 	u32 num_props = (u32) VAL(float, &count_var.data.numeric_value);
 
 #ifdef DEBUG
@@ -4381,11 +4409,11 @@ void actionInitObject(char* stack, u32* sp)
 	{
 		// Pop property name first (it's on top)
 		ActionVar name_var;
-		popVar(stack, sp, &name_var);
+		popVar(app_context, &name_var);
 
 		// Pop property value (it's below the name)
 		ActionVar value;
-		popVar(stack, sp, &value);
+		popVar(app_context, &value);
 		const char* name = NULL;
 		u32 name_length = 0;
 
@@ -4423,12 +4451,12 @@ void actionInitObject(char* stack, u32* sp)
 }
 
 // Helper function to push undefined value
-static void pushUndefined(char* stack, u32* sp)
+static void pushUndefined(SWFAppContext* app_context)
 {
 	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 }
 
-void actionDelete(char* stack, u32* sp)
+void actionDelete(SWFAppContext* app_context)
 {
 	// Stack layout (from top to bottom):
 	// 1. property_name (string) - name of property to delete
@@ -4436,7 +4464,7 @@ void actionDelete(char* stack, u32* sp)
 
 	// Pop property name
 	ActionVar prop_name_var;
-	popVar(stack, sp, &prop_name_var);
+	popVar(app_context, &prop_name_var);
 
 	const char* prop_name = NULL;
 	u32 prop_name_len = 0;
@@ -4459,7 +4487,7 @@ void actionDelete(char* stack, u32* sp)
 
 	// Pop object name (variable name)
 	ActionVar obj_name_var;
-	popVar(stack, sp, &obj_name_var);
+	popVar(app_context, &obj_name_var);
 
 	const char* obj_name = NULL;
 	u32 obj_name_len = 0;
@@ -4518,18 +4546,18 @@ void actionDelete(char* stack, u32* sp)
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
-void actionGetMember(char* stack, u32* sp)
+void actionGetMember(SWFAppContext* app_context)
 {
 	// 1. Convert and pop property name (top of stack)
 	char str_buffer[17];
-	convertString(stack, sp, str_buffer);
+	convertString(app_context, str_buffer);
 	const char* prop_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
 	u32 prop_name_len = STACK_TOP_N;
 	POP();
 
 	// 2. Pop object (second on stack)
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	// 3. Handle different object types
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
@@ -4539,7 +4567,7 @@ void actionGetMember(char* stack, u32* sp)
 
 		if (obj == NULL)
 		{
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 			return;
 		}
 
@@ -4549,12 +4577,12 @@ void actionGetMember(char* stack, u32* sp)
 		if (prop != NULL)
 		{
 			// Property found - push its value
-			pushVar(stack, sp, prop);
+			pushVar(app_context, prop);
 		}
 		else
 		{
 			// Property not found - push undefined
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 		}
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
@@ -4574,7 +4602,7 @@ void actionGetMember(char* stack, u32* sp)
 		else
 		{
 			// Other properties don't exist on strings
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 		}
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
@@ -4584,7 +4612,7 @@ void actionGetMember(char* stack, u32* sp)
 
 		if (arr == NULL)
 		{
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 			return;
 		}
 
@@ -4609,33 +4637,33 @@ void actionGetMember(char* stack, u32* sp)
 				if (elem != NULL)
 				{
 					// Element exists - push its value
-					pushVar(stack, sp, elem);
+					pushVar(app_context, elem);
 				}
 				else
 				{
 					// Index out of bounds - push undefined
-					pushUndefined(stack, sp);
+					pushUndefined(app_context);
 				}
 			}
 			else
 			{
 				// Non-numeric property name - arrays don't have other properties
-				pushUndefined(stack, sp);
+				pushUndefined(app_context);
 			}
 		}
 	}
 	else
 	{
 		// Other primitive types (number, undefined, etc.) - push undefined
-		pushUndefined(stack, sp);
+		pushUndefined(app_context);
 	}
 }
 
-void actionNewObject(char* stack, u32* sp)
+void actionNewObject(SWFAppContext* app_context)
 {
 	// 1. Pop constructor name (string)
 	ActionVar ctor_name_var;
-	popVar(stack, sp, &ctor_name_var);
+	popVar(app_context, &ctor_name_var);
 	const char* ctor_name;
 	u32 ctor_name_len;
 	if (ctor_name_var.type == ACTION_STACK_VALUE_STRING)
@@ -4653,9 +4681,9 @@ void actionNewObject(char* stack, u32* sp)
 	}
 
 	// 2. Pop number of arguments
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar num_args_var;
-	popVar(stack, sp, &num_args_var);
+	popVar(app_context, &num_args_var);
 	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
 
 	// 3. Pop arguments from stack (store them temporarily)
@@ -4669,7 +4697,7 @@ void actionNewObject(char* stack, u32* sp)
 	// Pop arguments in reverse order (first arg is deepest on stack)
 	for (int i = (int)num_args - 1; i >= 0; i--)
 	{
-		popVar(stack, sp, &args[i]);
+		popVar(app_context, &args[i]);
 	}
 
 	// 4. Create new object based on constructor name
@@ -4914,7 +4942,7 @@ void actionNewObject(char* stack, u32* sp)
 				// Note: Return value is discarded per ActionScript spec for constructors
 				if (ctor_func->advanced_func != NULL)
 				{
-					ActionVar return_value = ctor_func->advanced_func(stack, sp, args, num_args, registers, obj);
+					ActionVar return_value = ctor_func->advanced_func(app_context, args, num_args, registers, obj);
 
 					// Check if constructor returned an object (override default behavior)
 					// Per ECMAScript spec: if constructor returns object, use it; otherwise use 'this'
@@ -4969,25 +4997,25 @@ void actionNewObject(char* stack, u32* sp)
  * - Prototype chains not implemented (requires __proto__ property support)
  * - DefineFunction (type 1) has limited 'this' context support
  */
-void actionNewMethod(char* stack, u32* sp)
+void actionNewMethod(SWFAppContext* app_context)
 {
 	// Pop in order: method_name, object, num_args, then args
 
 	// 1. Pop method name (string)
 	char str_buffer[17];
-	convertString(stack, sp, str_buffer);
+	convertString(app_context, str_buffer);
 	const char* method_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
 	u32 method_name_len = STACK_TOP_N;
 	POP();
 
 	// 2. Pop object reference
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	// 3. Pop number of arguments
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar num_args_var;
-	popVar(stack, sp, &num_args_var);
+	popVar(app_context, &num_args_var);
 	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
 
 	// 4. Pop arguments from stack (store them temporarily)
@@ -5001,7 +5029,7 @@ void actionNewMethod(char* stack, u32* sp)
 	// Pop arguments in reverse order (first arg is deepest on stack)
 	for (int i = (int)num_args - 1; i >= 0; i--)
 	{
-		popVar(stack, sp, &args[i]);
+		popVar(app_context, &args[i]);
 	}
 
 	// 5. Get the method property from the object
@@ -5042,7 +5070,7 @@ void actionNewMethod(char* stack, u32* sp)
 					}
 
 					// Call with 'this' context set to new object
-					return_value = func->advanced_func(stack, sp, args, num_args, registers, new_obj);
+					return_value = func->advanced_func(app_context, args, num_args, registers, new_obj);
 
 					// Pop local scope
 					if (scope_depth > 0) {
@@ -5058,17 +5086,17 @@ void actionNewMethod(char* stack, u32* sp)
 					// Push arguments onto stack for the function
 					for (u32 i = 0; i < num_args; i++)
 					{
-						pushVar(stack, sp, &args[i]);
+						pushVar(app_context, &args[i]);
 					}
 
 					// Call simple function
 					// Note: Simple functions don't have 'this' context support in current implementation
-					func->simple_func(stack, sp);
+					func->simple_func(app_context);
 
 					// Pop return value if one was pushed
-					if (*sp < INITIAL_SP)
+					if (SP < INITIAL_SP)
 					{
-						popVar(stack, sp, &return_value);
+						popVar(app_context, &return_value);
 					}
 					else
 					{
@@ -5086,7 +5114,7 @@ void actionNewMethod(char* stack, u32* sp)
 		}
 
 		// If not a function object, push undefined
-		pushUndefined(stack, sp);
+		pushUndefined(app_context);
 		return;
 	}
 
@@ -5338,7 +5366,7 @@ void actionNewMethod(char* stack, u32* sp)
 			}
 
 			// Call with 'this' context set to new object
-			return_value = user_ctor_func->advanced_func(stack, sp, args, num_args, registers, new_obj_inst);
+			return_value = user_ctor_func->advanced_func(app_context, args, num_args, registers, new_obj_inst);
 
 			// Pop local scope
 			if (scope_depth > 0) {
@@ -5354,17 +5382,17 @@ void actionNewMethod(char* stack, u32* sp)
 			// Push arguments onto stack for the function
 			for (u32 i = 0; i < num_args; i++)
 			{
-				pushVar(stack, sp, &args[i]);
+				pushVar(app_context, &args[i]);
 			}
 
 			// Call simple function
 			// Note: Simple functions don't have 'this' context support
-			user_ctor_func->simple_func(stack, sp);
+			user_ctor_func->simple_func(app_context);
 
 			// Pop return value if one was pushed
-			if (*sp < INITIAL_SP)
+			if (SP < INITIAL_SP)
 			{
-				popVar(stack, sp, &return_value);
+				popVar(app_context, &return_value);
 			}
 			else
 			{
@@ -5381,27 +5409,27 @@ void actionNewMethod(char* stack, u32* sp)
 	else
 	{
 		// Method not found or not a valid constructor - push undefined
-		pushUndefined(stack, sp);
+		pushUndefined(app_context);
 	}
 }
 
-void actionSetProperty(char* stack, u32* sp)
+void actionSetProperty(SWFAppContext* app_context)
 {
 	// Stack layout: [target_path] [property_index] [value] <- sp
 	// Pop in reverse order: value, index, target
 
 	// 1. Pop value
 	ActionVar value_var;
-	popVar(stack, sp, &value_var);
+	popVar(app_context, &value_var);
 
 	// 2. Pop property index
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar index_var;
-	popVar(stack, sp, &index_var);
+	popVar(app_context, &index_var);
 	int prop_index = (int) VAL(float, &index_var.data.numeric_value);
 
 	// 3. Pop target path
-	convertString(stack, sp, NULL);
+	convertString(app_context, NULL);
 	const char* target = (const char*) VAL(u64, &STACK_TOP_VALUE);
 	POP();
 
@@ -5492,19 +5520,19 @@ void actionSetProperty(char* stack, u32* sp)
  * SWF version: 4+
  * Opcode: 0x24
  */
-void actionCloneSprite(char* stack, u32* sp)
+void actionCloneSprite(SWFAppContext* app_context)
 {
 	// Stack layout: [target_name] [source_name] [depth] <- sp
 	// Pop in reverse order: depth, source, target
 
 	// Pop depth (convert to float first)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar depth;
-	popVar(stack, sp, &depth);
+	popVar(app_context, &depth);
 
 	// Pop source sprite name
 	ActionVar source;
-	popVar(stack, sp, &source);
+	popVar(app_context, &source);
 	const char* source_name = (const char*) source.data.numeric_value;
 
 	// Handle null source name
@@ -5514,7 +5542,7 @@ void actionCloneSprite(char* stack, u32* sp)
 
 	// Pop target sprite name
 	ActionVar target;
-	popVar(stack, sp, &target);
+	popVar(app_context, &target);
 	const char* target_name = (const char*) target.data.numeric_value;
 
 	// Handle null target name
@@ -5559,11 +5587,11 @@ void actionCloneSprite(char* stack, u32* sp)
  * SWF version: 4+
  * Opcode: 0x25
  */
-void actionRemoveSprite(char* stack, u32* sp)
+void actionRemoveSprite(SWFAppContext* app_context)
 {
 	// Pop target sprite name from stack
 	ActionVar target;
-	popVar(stack, sp, &target);
+	popVar(app_context, &target);
 	const char* target_name = (const char*) target.data.numeric_value;
 
 	// Handle null/empty gracefully
@@ -5600,7 +5628,7 @@ void actionRemoveSprite(char* stack, u32* sp)
 	#endif
 }
 
-void actionSetTarget(char* stack, u32* sp, const char* target_name)
+void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
 	// Empty string or NULL means return to main timeline
 	if (!target_name || strlen(target_name) == 0) {
@@ -5631,11 +5659,11 @@ void actionSetTarget(char* stack, u32* sp, const char* target_name)
 // WITH Statement Implementation
 // ==================================================================
 
-void actionWithStart(char* stack, u32* sp)
+void actionWithStart(SWFAppContext* app_context)
 {
 	// Pop object from stack
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
@@ -5679,7 +5707,7 @@ void actionWithStart(char* stack, u32* sp)
 	}
 }
 
-void actionWithEnd(char* stack, u32* sp)
+void actionWithEnd(SWFAppContext* app_context)
 {
 	// Pop from scope chain
 	if (scope_depth > 0)
@@ -5731,11 +5759,11 @@ typedef struct {
 
 static ExceptionState g_exception_state = {false, {0}, 0, {0}, 0};
 
-void actionThrow(char* stack, u32* sp)
+void actionThrow(SWFAppContext* app_context)
 {
 	// Pop value to throw
 	ActionVar throw_value;
-	popVar(stack, sp, &throw_value);
+	popVar(app_context, &throw_value);
 
 	// Set exception state
 	g_exception_state.exception_thrown = true;
@@ -5773,7 +5801,7 @@ void actionThrow(char* stack, u32* sp)
 	}
 }
 
-void actionTryBegin(char* stack, u32* sp)
+void actionTryBegin(SWFAppContext* app_context)
 {
 	// Push exception handler onto handler stack
 	g_exception_state.handler_depth++;
@@ -5783,7 +5811,7 @@ void actionTryBegin(char* stack, u32* sp)
 	g_exception_state.has_jmp_buf = 0;
 }
 
-bool actionTryExecute(char* stack, u32* sp)
+bool actionTryExecute(SWFAppContext* app_context)
 {
 	// Set up exception handler using setjmp
 	// This will be called again when longjmp is triggered
@@ -5801,7 +5829,7 @@ bool actionTryExecute(char* stack, u32* sp)
 	return true;
 }
 
-jmp_buf* actionGetExceptionJmpBuf(char* stack, u32* sp)
+jmp_buf* actionGetExceptionJmpBuf(SWFAppContext* app_context)
 {
 	// Return pointer to the exception handler jump buffer
 	// This allows setjmp to be called inline in generated code
@@ -5809,7 +5837,7 @@ jmp_buf* actionGetExceptionJmpBuf(char* stack, u32* sp)
 	return &g_exception_state.exception_handler;
 }
 
-void actionCatchToVariable(char* stack, u32* sp, const char* var_name)
+void actionCatchToVariable(SWFAppContext* app_context, const char* var_name)
 {
 	// Store caught exception in named variable
 	if (g_exception_state.exception_thrown)
@@ -5819,7 +5847,7 @@ void actionCatchToVariable(char* stack, u32* sp, const char* var_name)
 	}
 }
 
-void actionCatchToRegister(char* stack, u32* sp, u8 reg_num)
+void actionCatchToRegister(SWFAppContext* app_context, u8 reg_num)
 {
 	// Store caught exception in register
 	if (g_exception_state.exception_thrown)
@@ -5842,7 +5870,7 @@ void actionCatchToRegister(char* stack, u32* sp, u8 reg_num)
 	}
 }
 
-void actionTryEnd(char* stack, u32* sp)
+void actionTryEnd(SWFAppContext* app_context)
 {
 	// Pop exception handler from handler stack
 	g_exception_state.handler_depth--;
@@ -5863,7 +5891,7 @@ void actionTryEnd(char* stack, u32* sp)
 
 // ============================================================================
 
-void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(char*, u32*), u32 param_count)
+void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*func)(SWFAppContext*), u32 param_count)
 {
 	// Create function object
 	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
@@ -5904,7 +5932,7 @@ void actionDefineFunction(char* stack, u32* sp, const char* name, void (*func)(c
 	}
 }
 
-void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags)
+void actionDefineFunction2(SWFAppContext* app_context, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags)
 {
 	// Create function object
 	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
@@ -5945,18 +5973,18 @@ void actionDefineFunction2(char* stack, u32* sp, const char* name, Function2Ptr 
 	}
 }
 
-void actionCallFunction(char* stack, u32* sp, char* str_buffer)
+void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 {
 	// 1. Pop function name (string) from stack
 	char func_name_buffer[17];
-	convertString(stack, sp, func_name_buffer);
+	convertString(app_context, func_name_buffer);
 	const char* func_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
 	u32 func_name_len = STACK_TOP_N;
 	POP();
 
 	// 2. Pop number of arguments
 	ActionVar num_args_var;
-	popVar(stack, sp, &num_args_var);
+	popVar(app_context, &num_args_var);
 	u32 num_args = 0;
 
 	if (num_args_var.type == ACTION_STACK_VALUE_F32)
@@ -5975,7 +6003,7 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 		args = (ActionVar*) heap_alloc(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
-			popVar(stack, sp, &args[num_args - 1 - i]);
+			popVar(app_context, &args[num_args - 1 - i]);
 		}
 	}
 
@@ -6175,7 +6203,7 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 					scope_chain[scope_depth++] = local_scope;
 				}
 
-				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
+				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 
 				// Pop local scope from scope chain
 				if (scope_depth > 0) {
@@ -6189,7 +6217,7 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 				if (registers != NULL) heap_free(registers);
 				if (args != NULL) heap_free(args);
 
-				pushVar(stack, sp, &result);
+				pushVar(app_context, &result);
 			}
 			else
 			{
@@ -6199,13 +6227,13 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 
 				// Remember stack position BEFORE pushing arguments
 				// After function executes (pops args + pushes return), sp should be sp_before + 24
-				u32 sp_before_args = *sp;
+				u32 sp_before_args = SP;
 
 				// Push arguments onto stack in order (first to last)
 				// The function will pop them and bind to parameter names
 				for (u32 i = 0; i < num_args; i++)
 				{
-					pushVar(stack, sp, &args[i]);
+					pushVar(app_context, &args[i]);
 				}
 
 				// Free args array before calling function
@@ -6213,16 +6241,16 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 
 				// Call the simple function
 				// It will pop parameters, execute body, and may push a return value
-				func->simple_func(stack, sp);
+				func->simple_func(app_context);
 
 				// Check if a return value was pushed
 				// After function pops all args, sp should be back to sp_before_args
 				// If function pushed a return, sp should be sp_before_args + 24
-				if (*sp == sp_before_args)
+				if (SP == sp_before_args)
 				{
 					// No return value was pushed - push undefined
 					// In ActionScript, functions that don't explicitly return push undefined
-					pushUndefined(stack, sp);
+					pushUndefined(app_context);
 				}
 				// else: return value (or multiple values) already on stack - keep it
 			}
@@ -6231,14 +6259,14 @@ void actionCallFunction(char* stack, u32* sp, char* str_buffer)
 		{
 			// Function not found - push undefined
 			if (args != NULL) heap_free(args);
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 		}
 	}
 }
 
 // Helper function to call built-in string methods
 // Returns 1 if method was handled, 0 if not found
-static int callStringPrimitiveMethod(char* stack, u32* sp, char* str_buffer,
+static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffer,
                                       const char* str_value, u32 str_len,
                                       const char* method_name, u32 method_name_len,
                                       ActionVar* args, u32 num_args)
@@ -6462,22 +6490,22 @@ static int callStringPrimitiveMethod(char* stack, u32* sp, char* str_buffer,
 	return 0;
 }
 
-void actionCallMethod(char* stack, u32* sp, char* str_buffer)
+void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 {
 	// 1. Pop method name (string) from stack
 	char method_name_buffer[17];
-	convertString(stack, sp, method_name_buffer);
+	convertString(app_context, method_name_buffer);
 	const char* method_name = (const char*) VAL(u64, &STACK_TOP_VALUE);
 	u32 method_name_len = STACK_TOP_N;
 	POP();
 
 	// 2. Pop object (receiver/this) from stack
 	ActionVar obj_var;
-	popVar(stack, sp, &obj_var);
+	popVar(app_context, &obj_var);
 
 	// 3. Pop number of arguments
 	ActionVar num_args_var;
-	popVar(stack, sp, &num_args_var);
+	popVar(app_context, &num_args_var);
 	u32 num_args = 0;
 
 	if (num_args_var.type == ACTION_STACK_VALUE_F32)
@@ -6496,7 +6524,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		args = (ActionVar*) heap_alloc(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
-			popVar(stack, sp, &args[num_args - 1 - i]);
+			popVar(app_context, &args[num_args - 1 - i]);
 		}
 	}
 
@@ -6518,19 +6546,19 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 				}
 
 				// No 'this' binding for direct function call (pass NULL)
-				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, NULL);
+				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 
 				if (registers != NULL) heap_free(registers);
 				if (args != NULL) heap_free(args);
 
-				pushVar(stack, sp, &result);
+				pushVar(app_context, &result);
 				return;
 			}
 			else
 			{
 				// Simple function or invalid - push undefined
 				if (args != NULL) heap_free(args);
-				pushUndefined(stack, sp);
+				pushUndefined(app_context);
 				return;
 			}
 		}
@@ -6538,7 +6566,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		{
 			// Object is not a function - cannot invoke, push undefined
 			if (args != NULL) heap_free(args);
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 			return;
 		}
 	}
@@ -6552,7 +6580,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		{
 			// Null object - push undefined
 			if (args != NULL) heap_free(args);
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 			return;
 		}
 
@@ -6572,25 +6600,25 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 					registers = (ActionVar*) heap_calloc(func->register_count, sizeof(ActionVar));
 				}
 
-				ActionVar result = func->advanced_func(stack, sp, args, num_args, registers, (void*) obj);
+				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
 
 				if (registers != NULL) heap_free(registers);
 				if (args != NULL) heap_free(args);
 
-				pushVar(stack, sp, &result);
+				pushVar(app_context, &result);
 			}
 			else
 			{
 				// Simple function or invalid - push undefined
 				if (args != NULL) heap_free(args);
-				pushUndefined(stack, sp);
+				pushUndefined(app_context);
 			}
 		}
 		else
 		{
 			// Method not found or not a function - push undefined
 			if (args != NULL) heap_free(args);
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 			return;
 		}
 	}
@@ -6600,7 +6628,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		const char* str_value = (const char*) obj_var.data.numeric_value;
 		u32 str_len = obj_var.str_size;
 
-		int handled = callStringPrimitiveMethod(stack, sp, str_buffer,
+		int handled = callStringPrimitiveMethod(app_context, str_buffer,
 		                                         str_value, str_len,
 		                                         method_name, method_name_len,
 		                                         args, num_args);
@@ -6610,7 +6638,7 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 		if (!handled)
 		{
 			// Method not found - push undefined
-			pushUndefined(stack, sp);
+			pushUndefined(app_context);
 		}
 		return;
 	}
@@ -6618,32 +6646,32 @@ void actionCallMethod(char* stack, u32* sp, char* str_buffer)
 	{
 		// Not an object or string - push undefined
 		if (args != NULL) heap_free(args);
-		pushUndefined(stack, sp);
+		pushUndefined(app_context);
 		return;
 	}
 }
 
-void actionStartDrag(char* stack, u32* sp)
+void actionStartDrag(SWFAppContext* app_context)
 {
 	// Buffer for string conversion (needed for numeric targets)
 	char str_buffer[17];
 
 	// Pop target sprite name (convert to string if needed)
-	convertString(stack, sp, str_buffer);
+	convertString(app_context, str_buffer);
 	ActionVar target;
-	popVar(stack, sp, &target);
+	popVar(app_context, &target);
 	const char* target_name = (target.type == ACTION_STACK_VALUE_STRING) ?
 		(const char*) target.data.string_data.heap_ptr : "";
 
 	// Pop lock center flag (convert to float if needed)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar lock_center;
-	popVar(stack, sp, &lock_center);
+	popVar(app_context, &lock_center);
 
 	// Pop constrain flag (convert to float if needed)
-	convertFloat(stack, sp);
+	convertFloat(app_context);
 	ActionVar constrain;
-	popVar(stack, sp, &constrain);
+	popVar(app_context, &constrain);
 
 	float x1 = 0, y1 = 0, x2 = 0, y2 = 0;
 	int has_constraint = 0;
@@ -6659,21 +6687,21 @@ void actionStartDrag(char* stack, u32* sp)
 	if (has_constraint) {
 		// Pop constraint rectangle (y2, x2, y1, x1 order)
 		// Convert each to float before popping
-		convertFloat(stack, sp);
+		convertFloat(app_context);
 		ActionVar y2_var;
-		popVar(stack, sp, &y2_var);
+		popVar(app_context, &y2_var);
 
-		convertFloat(stack, sp);
+		convertFloat(app_context);
 		ActionVar x2_var;
-		popVar(stack, sp, &x2_var);
+		popVar(app_context, &x2_var);
 
-		convertFloat(stack, sp);
+		convertFloat(app_context);
 		ActionVar y1_var;
-		popVar(stack, sp, &y1_var);
+		popVar(app_context, &y1_var);
 
-		convertFloat(stack, sp);
+		convertFloat(app_context);
 		ActionVar x1_var;
-		popVar(stack, sp, &x1_var);
+		popVar(app_context, &x1_var);
 
 		x1 = (x1_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &x1_var.data.numeric_value) : (float)VAL(double, &x1_var.data.numeric_value);
 		y1 = (y1_var.type == ACTION_STACK_VALUE_F32) ? VAL(float, &y1_var.data.numeric_value) : (float)VAL(double, &y1_var.data.numeric_value);
@@ -6739,7 +6767,7 @@ void actionStartDrag(char* stack, u32* sp)
  * For modern usage with instantly-loaded SWFs, we simplify by assuming all frames
  * that exist are loaded.
  */
-bool actionWaitForFrame(char* stack, u32* sp, u16 frame)
+bool actionWaitForFrame(SWFAppContext* app_context, u16 frame)
 {
 	// Get the current MovieClip (simplified: always use root)
 	MovieClip* mc = &root_movieclip;
@@ -6766,11 +6794,11 @@ bool actionWaitForFrame(char* stack, u32* sp, u16 frame)
 	return true;
 }
 
-bool actionWaitForFrame2(char* stack, u32* sp)
+bool actionWaitForFrame2(SWFAppContext* app_context)
 {
 	// Pop frame identifier from stack
 	ActionVar frame_var;
-	popVar(stack, sp, &frame_var);
+	popVar(app_context, &frame_var);
 
 	// For simplified implementation: assume all frames are loaded
 	// In a full implementation, this would check if the frame is actually loaded

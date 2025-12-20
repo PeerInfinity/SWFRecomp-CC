@@ -8,10 +8,6 @@
 #include <utils.h>
 #include <heap.h>
 
-char* stack;
-u32 sp;
-u32 oldSP;
-
 int quit_swf;
 int bad_poll;
 size_t current_frame;
@@ -34,12 +30,14 @@ size_t max_depth = 0;
 
 FlashbangContext* context;
 
-void tagMain(frame_func* frame_funcs)
+void tagMain(SWFAppContext* app_context)
 {
+	frame_func* frame_funcs = app_context->frame_funcs;
+
 	while (!quit_swf)
 	{
 		current_frame = next_frame;
-		frame_funcs[next_frame]();
+		frame_funcs[next_frame](app_context);
 		if (!manual_next_frame)
 		{
 			next_frame += 1;
@@ -91,8 +89,10 @@ void swfStart(SWFAppContext* app_context)
 	dictionary = malloc(INITIAL_DICTIONARY_CAPACITY*sizeof(Character));
 	display_list = malloc(INITIAL_DISPLAYLIST_CAPACITY*sizeof(DisplayObject));
 
-	stack = (char*) aligned_alloc(8, INITIAL_STACK_SIZE);
-	sp = INITIAL_SP;
+	// Allocate stack into app_context
+	app_context->stack = (char*) aligned_alloc(8, INITIAL_STACK_SIZE);
+	app_context->sp = INITIAL_SP;
+	app_context->oldSP = 0;
 
 	quit_swf = 0;
 	bad_poll = 0;
@@ -113,12 +113,12 @@ void swfStart(SWFAppContext* app_context)
 
 	tagInit();
 
-	tagMain(frame_funcs);
+	tagMain(app_context);
 
 	heap_shutdown();
 	freeMap();
 
-	aligned_free(stack);
+	aligned_free(app_context->stack);
 
 	free(dictionary);
 	free(display_list);
