@@ -1,6 +1,7 @@
 # SWFRecomp-CC Upstream/Downstream Merge Plan
 
 **Date:** December 4, 2025
+**Last Updated:** December 20, 2025
 
 **Author:** Claude (via PeerInfinity/SWFRecomp-CC)
 
@@ -9,6 +10,54 @@
 - Upstream: [SWFRecomp/SWFRecomp](https://github.com/SWFRecomp/SWFRecomp)
 - Upstream: [SWFRecomp/SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime)
 - This repo: [PeerInfinity/SWFRecomp-CC](https://github.com/PeerInfinity/SWFRecomp-CC)
+
+---
+
+## UPDATE: December 20, 2025
+
+### Critical Upstream Changes Since Original Document
+
+Since this document was created on December 4, 2025, **significant architectural changes** have been made upstream that affect the merge strategy:
+
+#### New Commits - SWFRecomp/SWFRecomp
+
+| Date | SHA | Description | Priority |
+|------|-----|-------------|----------|
+| **Dec 20** | `06506c3` | **refactor stack and sp into app_context** | **CRITICAL** |
+| Dec 12 | `44324d8` | update README | LOW |
+| Dec 12 | `620c30f` | fix passing app_context to tagInit | HIGH |
+
+#### New Commits - SWFRecomp/SWFModernRuntime
+
+| Date | SHA | Description | Priority |
+|------|-----|-------------|----------|
+| **Dec 20** | `39ec6ad` | **refactor stack and sp into app_context** | **CRITICAL** |
+| Dec 12 | `b682cd2` | pass app_context to tagInit | HIGH |
+| Dec 5 | `669e40c` | if guard bitmap_transfer | LOW |
+
+### Impact on This Repository
+
+1. **app-context-migration-plan.md is now OBSOLETE** - The migration plan created in this repo on Dec 4 anticipated adopting the `app_context` convention. Upstream has now completed this refactoring AND gone further by moving `stack` and `sp` into the `SWFAppContext` structure.
+
+2. **Function signatures have fundamentally changed** - All action functions upstream now use:
+   ```c
+   // OLD (what we planned):
+   void actionAdd(SWFAppContext* app_context, char* stack, u32* sp);
+
+   // NEW (upstream Dec 20):
+   void actionAdd(SWFAppContext* app_context);
+   // stack and sp are now accessed via app_context->stack, app_context->sp
+   ```
+
+3. **Merge strategy must be revised** - The downstream merge of these architectural changes should now be **Phase 0** (immediate priority) before any upstream contributions.
+
+### Revised Priority Order
+
+1. **Phase 0 (NEW - CRITICAL):** Pull Dec 5-20 upstream commits, adopting new app_context architecture
+2. **Phase 1:** Memory/Linux fixes (already in Dec 2-3 commits, now part of Phase 0)
+3. **Phase 2:** Font/Text system (already documented)
+4. **Phase 3:** Heap reconciliation (may need revision based on new architecture)
+5. **Phases 4-8:** Upstream contributions (after downstream sync complete)
 
 ---
 
@@ -214,6 +263,9 @@ All commits after these points need to be evaluated for downstream merge.
 
 | Date | SHA | Author | Description | Priority |
 |------|-----|--------|-------------|----------|
+| **Dec 20** | `06506c3` | LittleCube | **refactor stack and sp into app_context** | **CRITICAL** |
+| Dec 12 | `44324d8` | LittleCube | update README | LOW |
+| Dec 12 | `620c30f` | LittleCube | fix passing app_context to tagInit | HIGH |
 | Dec 2 | `3690992` | LittleCube | update CMakeLists.txt and main.c for wild_shadow test | LOW |
 | Nov 28 | `989a0b4` | PeerInfinity | wasm support (#3) - **Already in this repo** | SKIP |
 | Nov 17 | `e26d958` | LittleCube | use GETVAR, use app_context | MEDIUM |
@@ -221,6 +273,9 @@ All commits after these points need to be evaluated for downstream merge.
 | Nov 10 | `45b15f6` | LittleCube | implement color transforms and text color, fix text position | **HIGH** |
 | Nov 8 | `17f07ee` | LittleCube | **implement glyph and text recompilation** | **HIGH** |
 | Oct 10 | `bc761f4` | LittleCube | remove unnecessary check | FORK POINT |
+
+**App Context Architecture (CRITICAL - Dec 2025):**
+The Dec 12-20 commits complete the `app_context` refactoring, moving `stack` and `sp` into the `SWFAppContext` structure. This is a major architectural change that must be merged before any upstream contributions.
 
 **Font/Text System (HIGH PRIORITY):**
 The Nov 8-10 commits add significant font and text rendering capabilities that are missing from this fork.
@@ -231,6 +286,9 @@ The Nov 8-10 commits add significant font and text rendering capabilities that a
 
 | Date | SHA | Author | Description | Priority |
 |------|-----|--------|-------------|----------|
+| **Dec 20** | `39ec6ad` | LittleCube | **refactor stack and sp into app_context** | **CRITICAL** |
+| Dec 12 | `b682cd2` | LittleCube | pass app_context to tagInit | HIGH |
+| Dec 5 | `669e40c` | LittleCube | if guard bitmap_transfer | LOW |
 | Dec 3 | `101b95b` | LittleCube | remove memory leaks from flashbang | **HIGH** |
 | Dec 2 | `3210b9a` | LittleCube | fix Linux support, fix freeMap signature, remove aligned | **HIGH** |
 | Dec 2 | `767b6a3` | LittleCube | clean up freeMap | MEDIUM |
@@ -249,6 +307,11 @@ The Nov 8-10 commits add significant font and text rendering capabilities that a
 | Nov 8 | `00166cc` | LittleCube | **implement glyph and text recompilation** | **HIGH** |
 | Oct 7 | `267553d` | LittleCube | select bitmap at style index | FORK POINT |
 
+**App Context Architecture (CRITICAL - Dec 2025):**
+- Dec 5: `669e40c` - bitmap_transfer guard
+- Dec 12: `b682cd2` - Pass app_context to tagInit
+- Dec 20: `39ec6ad` - **Refactor stack and sp into app_context** (major architectural change)
+
 **Font/Text System (HIGH PRIORITY):**
 - Nov 8: `00166cc` - Core glyph and text recompilation
 - Nov 9: `9041de4` - Text position implementation
@@ -262,6 +325,52 @@ The Nov 8-10 commits add significant font and text rendering capabilities that a
 ---
 
 ### 2.3 Categorized Downstream Merges
+
+#### Category 0: App Context Architecture (CRITICAL - NEW)
+
+**Why critical:** This is a fundamental architectural change that affects ALL function signatures. Must be merged first to establish compatibility with upstream.
+
+**What changed:**
+- `stack` and `sp` (stack pointer) are now members of `SWFAppContext`
+- All action functions now take only `SWFAppContext* app_context` parameter
+- Tag functions now receive `app_context`
+- Frame functions pass `app_context` throughout
+
+**SWFRecomp commits:**
+- `620c30f` - fix passing app_context to tagInit
+- `06506c3` - refactor stack and sp into app_context
+
+**SWFModernRuntime commits:**
+- `669e40c` - if guard bitmap_transfer
+- `b682cd2` - pass app_context to tagInit
+- `39ec6ad` - refactor stack and sp into app_context
+
+**Merge strategy:**
+1. This is a **breaking change** - the fork's action implementations must be refactored
+2. The `app-context-migration-plan.md` in this repo is now obsolete - upstream's approach is more aggressive
+3. All ~100 action function signatures must change from:
+   ```c
+   void actionXxx(char* stack, u32* sp)
+   // or
+   void actionXxx(SWFAppContext* app_context, char* stack, u32* sp)
+   ```
+   to:
+   ```c
+   void actionXxx(SWFAppContext* app_context)
+   // accessing via app_context->stack, app_context->sp
+   ```
+4. The compiler (SWFRecomp) must also be updated to generate the new calling convention
+5. **Recommended approach:**
+   - Fetch upstream as a remote
+   - Create a merge branch
+   - Carefully merge upstream changes, adapting our action implementations
+   - This will be the largest single merge effort
+
+**Dependencies:**
+- Must complete before any upstream contributions (our code won't compile against their headers otherwise)
+- Must complete before font/text merge (those commits use the new convention)
+
+---
 
 #### Category A: Font/Text System (HIGH PRIORITY)
 
@@ -338,13 +447,76 @@ These commits are already in this repo via the wasm-support merge:
 
 ## Part 3: Recommended Merge Order
 
-### Phase 1: Downstream - Memory/Linux Fixes (IMMEDIATE)
-**Priority:** Critical bugfixes
-1. Cherry-pick memory leak fixes (`101b95b`, `767b6a3`)
-2. Cherry-pick Linux support fixes (`3210b9a`)
-3. Cherry-pick minor cleanups (`566bc8a`)
-4. Verify local builds still work
-5. Run test suite
+> **NOTE (Dec 20, 2025):** The merge order has been revised due to the critical app_context architecture changes upstream. Phase 0 is now the immediate priority.
+
+### Phase 0: Downstream - App Context Architecture (CRITICAL - NEW)
+**Priority:** Must complete first - architectural foundation
+**Estimated effort:** HIGH (touches all action functions)
+
+1. Add upstream repos as remotes:
+   ```bash
+   git remote add upstream-recomp https://github.com/SWFRecomp/SWFRecomp.git
+   git remote add upstream-runtime https://github.com/SWFRecomp/SWFModernRuntime.git
+   git fetch upstream-recomp
+   git fetch upstream-runtime
+   ```
+
+2. Create architecture migration branch:
+   ```bash
+   git checkout -b feature/upstream-app-context-sync
+   ```
+
+3. Analyze upstream changes in detail:
+   - Review `39ec6ad` (SWFModernRuntime) - how stack/sp are now in app_context
+   - Review `06506c3` (SWFRecomp) - how compiler generates new calling convention
+   - Document all signature changes
+
+4. Update SWFAppContext structure to include stack and sp:
+   ```c
+   typedef struct SWFAppContext {
+       // ... existing fields ...
+       char* stack;      // NEW - was passed as parameter
+       u32 sp;           // NEW - was passed as parameter (or u32*)
+   } SWFAppContext;
+   ```
+
+5. Refactor all action function signatures (~100 functions):
+   - Update declarations in `action.h`
+   - Update implementations in `action.c`
+   - Change all `stack` and `*sp` references to `app_context->stack` and `app_context->sp`
+
+6. Update compiler code generation:
+   - Frame functions pass only `app_context`
+   - Script functions pass only `app_context`
+   - Action calls pass only `app_context`
+
+7. Update tag functions to receive `app_context`
+
+8. Build and test:
+   ```bash
+   cd SWFRecomp && mkdir build && cd build && cmake .. && make
+   cd ../../tests && ./all_tests.sh
+   ```
+
+9. Mark `app-context-migration-plan.md` as obsolete (superseded by upstream implementation)
+
+**Note:** This phase subsumes the original Phase 1 (memory/Linux fixes) since those commits will be included when syncing to the Dec 20 upstream state.
+
+---
+
+### Phase 1: Downstream - Memory/Linux Fixes (NOW INCLUDED IN PHASE 0)
+**Status:** Merged into Phase 0
+
+~~**Priority:** Critical bugfixes~~
+~~1. Cherry-pick memory leak fixes (`101b95b`, `767b6a3`)~~
+~~2. Cherry-pick Linux support fixes (`3210b9a`)~~
+~~3. Cherry-pick minor cleanups (`566bc8a`)~~
+~~4. Verify local builds still work~~
+~~5. Run test suite~~
+
+These commits are now part of the upstream state that Phase 0 will sync to.
+
+---
 
 ### Phase 2: Downstream - Font/Text System (HIGH PRIORITY)
 **Priority:** Major missing feature
@@ -418,6 +590,13 @@ These commits are already in this repo via the wasm-support merge:
 
 ## Part 4: Risk Assessment
 
+### Critical Risk Areas (NEW - Dec 2025)
+| Area | Risk | Mitigation |
+|------|------|------------|
+| **App context architecture** | All function signatures changed | Must sync with upstream before any contributions; largest single merge effort |
+| **Stack/SP in app_context** | All 100+ action implementations must change | Systematic refactoring with find/replace; thorough testing |
+| **Compiler code generation** | Generated code incompatible with old runtime | Update compiler and runtime together in same branch |
+
 ### High Risk Areas
 | Area | Risk | Mitigation |
 |------|------|------------|
@@ -436,6 +615,13 @@ These commits are already in this repo via the wasm-support merge:
 
 ## Part 5: Pre-Merge Checklist
 
+### Before Phase 0 (App Context Sync) - NEW
+- [ ] Archive or mark `app-context-migration-plan.md` as obsolete
+- [ ] Document current function signatures for reference
+- [ ] Create backup branch: `git checkout -b backup/pre-app-context-sync`
+- [ ] Verify all 159 tests pass on current codebase
+- [ ] Review upstream `SWFAppContext` structure in detail
+
 ### Before Each Upstream PR
 - [ ] Fetch latest upstream master
 - [ ] Rebase local changes
@@ -443,6 +629,7 @@ These commits are already in this repo via the wasm-support merge:
 - [ ] Check for memory leaks with valgrind/ASAN
 - [ ] Verify WASM build still works
 - [ ] Update relevant documentation
+- [ ] **NEW:** Ensure code uses new `app_context->stack` / `app_context->sp` convention
 
 ### Before Downstream Merge
 - [ ] Backup current state (tag or branch)

@@ -2,9 +2,22 @@
 
 **Date:** December 4, 2025
 
-**Status:** Planning
+**Status:** ~~Planning~~ **OBSOLETE** (as of December 20, 2025)
 
-**Goal:** Migrate SWFRecomp-CC to pass `SWFAppContext* app_context` through all function calls, matching upstream convention.
+> ⚠️ **THIS DOCUMENT IS OBSOLETE**
+>
+> On December 20, 2025, the upstream repositories implemented a more aggressive version of this refactoring:
+> - SWFRecomp commit `06506c3`: "refactor stack and sp into app_context"
+> - SWFModernRuntime commit `39ec6ad`: "refactor stack and sp into app_context"
+>
+> The upstream changes go further than this plan anticipated - they move `stack` and `sp` (stack pointer) directly into the `SWFAppContext` structure, eliminating these as separate function parameters entirely.
+>
+> **Instead of following this plan, sync with upstream's implementation via the merge plan:**
+> See: `SWFRecompDocs/merge/upstream-downstream-merge-plan-2024-12.md` (Phase 0)
+
+---
+
+**Original Goal:** Migrate SWFRecomp-CC to pass `SWFAppContext* app_context` through all function calls, matching upstream convention.
 
 ---
 
