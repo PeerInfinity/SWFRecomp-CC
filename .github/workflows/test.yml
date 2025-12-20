@@ -58,14 +58,29 @@ jobs:
             git checkout test-results-update
             git pull origin test-results-update
 
-            # Make test-results-update's content match master exactly while preserving history
-            echo "Syncing test-results-update to match master exactly..."
+            # Sync source code from master while preserving generated test result files
+            echo "Syncing source code from master..."
+
+            # Save the generated opcode files if they exist
+            for f in opcode-index.json opcode-index.md opcode-index-plain.md; do
+              if [ -f "$f" ]; then
+                cp "$f" "/tmp/$f.bak"
+              fi
+            done
 
             # Remove all tracked files
             git rm -rf .
 
             # Restore all files from master
             git checkout origin/master -- .
+
+            # Restore the saved opcode files (so they can be compared with newly generated ones)
+            for f in opcode-index.json opcode-index.md opcode-index-plain.md; do
+              if [ -f "/tmp/$f.bak" ]; then
+                cp "/tmp/$f.bak" "$f"
+                git add -f "$f"
+              fi
+            done
 
             # Commit the sync if there are changes
             if ! git diff --staged --quiet; then
