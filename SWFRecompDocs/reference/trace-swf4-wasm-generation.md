@@ -1070,7 +1070,7 @@ The build uses `-O2` optimization:
 
 1. **Graphics Rendering:** Not implemented in this example
    - `draws.c` is empty
-   - No Canvas2D/WebGL rendering
+   - No WebGPU/Canvas2D rendering
    - Only console output works
 
 2. **ActionScript Support:** SWF v4 only
@@ -1086,10 +1086,9 @@ The build uses `-O2` optimization:
 
 ### Future Enhancements
 
-**Phase 1: Canvas2D Rendering**
-- Implement shape rendering in draws.c
-- Use HTML5 Canvas 2D API
-- Translate fills, strokes, gradients
+**~~Phase 1b: Canvas2D Rendering~~ (Skipped)**
+- ~~Implement shape rendering in draws.c via Canvas2D~~
+- Skipped in favor of proceeding directly to WebGPU (Phase 2)
 
 **Phase 2: WebGPU Rendering (SDL + Dawn/wgpu)**
 - GPU-accelerated rendering via standardized webgpu.h C API
