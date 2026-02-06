@@ -11,6 +11,9 @@ set(CMAKE_INSTALL_RPATH "$\{ORIGIN\}")
 # Option to disable graphics support (console-only mode)
 option(NO_GRAPHICS "Build without graphics support (console-only)" OFF)
 
+# Option to use WebGPU rendering backend instead of SDL3 GPU (flashbang)
+option(USE_WEBGPU "Use WebGPU rendering backend (native + WASM)" OFF)
+
 # Core sources (always included)
 set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/action.c
@@ -37,9 +40,34 @@ if(NO_GRAPHICS)
     )
 
     set(SOURCES ${CORE_SOURCES} ${SWF_SOURCES})
+
+elseif(USE_WEBGPU)
+    # WebGPU rendering backend (works for both native and WASM)
+    message(STATUS "Building with WebGPU rendering backend")
+    add_definitions(-DUSE_WEBGPU)
+
+    set(SWF_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/libswf/swf.c
+        ${PROJECT_SOURCE_DIR}/src/libswf/tag.c
+        ${PROJECT_SOURCE_DIR}/src/rendering/render_webgpu.c
+    )
+
+    if(EMSCRIPTEN)
+        message(STATUS "  Target: WASM (emdawnwebgpu)")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --use-port=emdawnwebgpu")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --use-port=emdawnwebgpu -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=1")
+    else()
+        message(STATUS "  Target: Native (SDL3 + sdl3webgpu + Dawn/wgpu-native)")
+        list(APPEND SWF_SOURCES
+            ${PROJECT_SOURCE_DIR}/lib/sdl3webgpu/sdl3webgpu.c
+        )
+    endif()
+
+    set(SOURCES ${CORE_SOURCES} ${SWF_SOURCES})
+
 else()
-    # Full graphics mode
-    message(STATUS "Building in full graphics mode")
+    # Full graphics mode (original SDL3 GPU / flashbang backend)
+    message(STATUS "Building in full graphics mode (SDL3 GPU)")
 
     set(SWF_SOURCES
         ${PROJECT_SOURCE_DIR}/src/libswf/swf.c
@@ -63,18 +91,42 @@ set(RENAME_ZCONF OFF)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/zlib)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/lzma)
 
-if(NOT NO_GRAPHICS)
+if(NO_GRAPHICS)
+    # Console-only: no graphics libraries needed
+    target_link_libraries(${PROJECT_NAME} PUBLIC
+        zlibstatic
+        lzma
+    )
+elseif(USE_WEBGPU)
+    if(EMSCRIPTEN)
+        # WASM + WebGPU: emdawnwebgpu is linked via --use-port flag
+        target_link_libraries(${PROJECT_NAME} PUBLIC
+            zlibstatic
+            lzma
+        )
+    else()
+        # Native + WebGPU: need SDL3 (for windowing) + WebGPU implementation
+        add_subdirectory(${PROJECT_SOURCE_DIR}/lib/SDL3)
+        target_link_libraries(${PROJECT_NAME} PUBLIC
+            zlibstatic
+            lzma
+            SDL3::SDL3
+        )
+        # Link against Dawn or wgpu-native (user must provide via WEBGPU_LIB)
+        if(WEBGPU_LIB)
+            target_link_libraries(${PROJECT_NAME} PUBLIC ${WEBGPU_LIB})
+        else()
+            message(WARNING "USE_WEBGPU is ON but WEBGPU_LIB is not set. "
+                "Set -DWEBGPU_LIB=/path/to/libwebgpu to link against Dawn or wgpu-native.")
+        endif()
+    endif()
+else()
+    # Default: SDL3 GPU (flashbang)
     add_subdirectory(${PROJECT_SOURCE_DIR}/lib/SDL3)
-
     target_link_libraries(${PROJECT_NAME} PUBLIC
         zlibstatic
         lzma
         SDL3::SDL3
-    )
-else()
-    target_link_libraries(${PROJECT_NAME} PUBLIC
-        zlibstatic
-        lzma
     )
 endif()
 
@@ -96,9 +148,30 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     lzma/liblzma/api
 )
 
-if(NOT NO_GRAPHICS)
+if(USE_WEBGPU)
+    # WebGPU backend: include renderer.h and render_webgpu.h
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include/rendering
+    )
+    if(NOT EMSCRIPTEN)
+        # Native WebGPU: need SDL3 (for windowing) and sdl3webgpu
+        target_include_directories(${PROJECT_NAME} PRIVATE
+            ${PROJECT_SOURCE_DIR}/lib/SDL3/include
+            ${PROJECT_SOURCE_DIR}/lib/sdl3webgpu
+        )
+        # WebGPU headers (user must provide via WEBGPU_INCLUDE_DIR)
+        if(WEBGPU_INCLUDE_DIR)
+            target_include_directories(${PROJECT_NAME} PRIVATE ${WEBGPU_INCLUDE_DIR})
+        endif()
+    endif()
+elseif(NOT NO_GRAPHICS)
+    # Default SDL3 GPU (flashbang) backend
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${PROJECT_SOURCE_DIR}/include/flashbang
         ${PROJECT_SOURCE_DIR}/lib/SDL3/include
+    )
+    # Also include rendering/ so renderer.h can find flashbang.h
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include/rendering
     )
 endif()

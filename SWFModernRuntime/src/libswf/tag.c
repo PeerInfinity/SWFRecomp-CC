@@ -2,28 +2,28 @@
 
 #include <swf.h>
 #include <tag.h>
-#include <flashbang.h>
+#include <renderer.h>
 #include <utils.h>
 
-extern FlashbangContext* context;
+extern RenderContext* context;
 
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
 size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 
 void tagInit()
 {
-	// Graphics initialization happens in flashbang_init
-	// This is called after flashbang is set up
+	// Graphics initialization happens in renderer_init
+	// This is called after the renderer is set up
 }
 
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 {
-	flashbang_set_window_background(context, red, green, blue);
+	renderer_set_background(context, red, green, blue);
 }
 
 void tagShowFrame(SWFAppContext* app_context)
 {
-	flashbang_open_pass(context);
+	renderer_open_pass(context);
 
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
@@ -39,21 +39,21 @@ void tagShowFrame(SWFAppContext* app_context)
 		switch (ch->type)
 		{
 			case CHAR_TYPE_SHAPE:
-				flashbang_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id);
+				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id);
 				break;
 			case CHAR_TYPE_TEXT:
-				flashbang_upload_extra_transform_id(context, obj->transform_id);
-				flashbang_upload_cxform_id(context, ch->cxform_id);
+				renderer_upload_extra_transform_id(context, obj->transform_id);
+				renderer_upload_cxform_id(context, ch->cxform_id);
 				for (size_t j = 0; j < ch->text_size; ++j)
 				{
 					size_t glyph_index = 2*app_context->text_data[ch->text_start + j];
-					flashbang_draw_shape(context, app_context->glyph_data[glyph_index], app_context->glyph_data[glyph_index + 1], ch->transform_start + j);
+					renderer_draw_shape(context, app_context->glyph_data[glyph_index], app_context->glyph_data[glyph_index + 1], ch->transform_start + j);
 				}
 				break;
 		}
 	}
 
-	flashbang_close_pass(context);
+	renderer_close_pass(context);
 }
 
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size)
@@ -91,12 +91,12 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
 {
-	flashbang_upload_bitmap(context, offset, size, width, height);
+	renderer_upload_bitmap(context, offset, size, width, height);
 }
 
 void finalizeBitmaps()
 {
-	flashbang_finalize_bitmaps(context);
+	renderer_finalize_bitmaps(context);
 }
 
 #endif // NO_GRAPHICS
