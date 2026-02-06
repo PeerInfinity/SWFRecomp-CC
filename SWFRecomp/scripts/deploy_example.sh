@@ -55,6 +55,19 @@ cp "${BUILD_DIR}"/*.wasm "${DEPLOY_DIR}/" 2>/dev/null || true
 cp "${BUILD_DIR}"/*.js "${DEPLOY_DIR}/" 2>/dev/null || true
 cp "${BUILD_DIR}"/index.html "${DEPLOY_DIR}/" 2>/dev/null || true
 
+# Copy test.swf if available (for Ruffle comparison)
+TEST_SRC_DIR="${SWFRECOMP_ROOT}/tests/${TEST_NAME}"
+if [ -f "${TEST_SRC_DIR}/test.swf" ]; then
+    cp "${TEST_SRC_DIR}/test.swf" "${DEPLOY_DIR}/"
+    echo "  Copied test.swf"
+fi
+
+# Copy test_info.json if available (for metadata display)
+if [ -f "${TEST_SRC_DIR}/test_info.json" ]; then
+    cp "${TEST_SRC_DIR}/test_info.json" "${DEPLOY_DIR}/"
+    echo "  Copied test_info.json"
+fi
+
 # Write demo type marker
 echo "${DEMO_TYPE}" > "${DEPLOY_DIR}/.demo_type"
 

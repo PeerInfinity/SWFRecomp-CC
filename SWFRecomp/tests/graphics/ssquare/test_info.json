@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "ssquare",
+    "description": "WebGPU rendering test with a stroked square shape",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

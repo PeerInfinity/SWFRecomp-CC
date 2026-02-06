@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "mb_string_length_swf_5",
+    "description": "Tests MB_STRING_LENGTH opcode (0x31) - counts UTF-8 characters (not bytes)",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["MB_STRING_LENGTH"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

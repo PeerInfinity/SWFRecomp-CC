@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "wild_shadow",
+    "description": "WebGPU rendering test with shadow and filter effects",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

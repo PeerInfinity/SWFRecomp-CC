@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "add_floats_swf_4",
+    "description": "Tests ADD opcode with floating point numbers (1.5 + 1.25 = 2.75)",
+    "swf_version": 4
+  },
+  "opcodes": {
+    "tested": ["ADD"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

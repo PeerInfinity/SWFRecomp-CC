@@ -136,14 +136,20 @@ fi
 cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${BUILD_DIR}/"
 
 if [ "$TARGET" == "wasm" ]; then
-    # Copy HTML template for WASM builds
+    # Generate redirect stub that points to the dynamic demo page
+    # Relative path depends on nesting depth: trace = ../../, graphics = ../../../
     if [ "$GRAPHICS_FLAG" = true ]; then
-        cp "${SWFRECOMP_ROOT}/wasm_wrappers/index_template_graphics.html" "${BUILD_DIR}/index.html"
+        DEMO_REL="../../../demo.html?test=${TEST_NAME}"
     else
-        cp "${SWFRECOMP_ROOT}/wasm_wrappers/index_template.html" "${BUILD_DIR}/index.html"
+        DEMO_REL="../../demo.html?test=${TEST_NAME}"
     fi
-    # Customize HTML with output name (basename, no path separators)
-    sed -i "s/{{TEST_NAME}}/${OUTPUT_NAME}/g" "${BUILD_DIR}/index.html"
+    cat > "${BUILD_DIR}/index.html" <<REDIRECT_EOF
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="refresh" content="0;url=${DEMO_REL}">
+<script>window.location.replace('${DEMO_REL}');</script>
+</head><body>Redirecting...</body></html>
+REDIRECT_EOF
 fi
 
 # Copy SWFModernRuntime source files

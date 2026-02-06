@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "subtract_swf_4",
+    "description": "Comprehensive tests for SUBTRACT opcode (0x0B) including basic arithmetic, type conversion, and edge cases",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["SUBTRACT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

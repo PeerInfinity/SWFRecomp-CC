@@ -191,9 +191,20 @@ fi
 
 # Read the current index.html
 if [ ! -f "$INDEX_FILE" ]; then
-    echo "Error: Index file not found: $INDEX_FILE"
-    exit 1
+    echo "Warning: Index file not found: $INDEX_FILE — skipping HTML update"
+    # Skip to catalog.json generation below
+    SKIP_AWK=true
+else
+    SKIP_AWK=false
 fi
+
+# Check if index.html uses the new JS-driven format (no awk injection needed)
+if [ "$SKIP_AWK" = false ] && ! grep -q 'class="demo-section"' "$INDEX_FILE" 2>/dev/null; then
+    echo "Index uses JS-driven format — skipping awk HTML injection"
+    SKIP_AWK=true
+fi
+
+if [ "$SKIP_AWK" = false ]; then
 
 # Build the trace demos heading
 TRACE_HEADING="
@@ -282,3 +293,131 @@ if [ ${#GRAPHICS_EXAMPLES[@]} -gt 0 ]; then
         echo "  - $example"
     done
 fi
+
+fi  # end SKIP_AWK check
+
+# --- Generate catalog.json ---
+echo ""
+echo "Generating catalog.json..."
+
+CATALOG_FILE="${DOCS_DIR}/catalog.json"
+REPO_ROOT="${SWFRECOMP_ROOT}/.."
+
+# Build lists of test entries for the Python script
+TRACE_LIST=""
+for example in "${TRACE_EXAMPLES[@]}"; do
+    TRACE_LIST+="${example},"
+done
+
+GRAPHICS_LIST=""
+for example in "${GRAPHICS_EXAMPLES[@]}"; do
+    GRAPHICS_LIST+="${example},"
+done
+
+EXCLUDE_LIST=""
+for exclude_entry in "${EXCLUDE_TESTS[@]}"; do
+    EXCLUDE_LIST+="${exclude_entry}|"
+done
+
+python3 - "$EXAMPLES_DIR" "$TRACE_LIST" "$GRAPHICS_LIST" "$EXCLUDE_LIST" "$CATALOG_FILE" <<'PYEOF'
+import json, sys, os
+from datetime import datetime, timezone
+
+examples_dir = sys.argv[1]
+trace_names = [t for t in sys.argv[2].rstrip(',').split(',') if t]
+graphics_names = [g for g in sys.argv[3].rstrip(',').split(',') if g]
+exclude_raw = [e for e in sys.argv[4].rstrip('|').split('|') if e]
+catalog_file = sys.argv[5]
+
+tests = []
+
+for name in trace_names:
+    test_dir = os.path.join(examples_dir, name)
+    entry = {
+        "id": name,
+        "name": name,
+        "type": "trace",
+        "path": f"examples/{name}",
+        "has_swf": os.path.exists(os.path.join(test_dir, "test.swf")),
+    }
+
+    # Find JS/WASM files
+    for f in os.listdir(test_dir):
+        if f.endswith('.js') and not f.startswith('.'):
+            entry["js_file"] = f
+        elif f.endswith('.wasm'):
+            entry["wasm_file"] = f
+
+    # Read test_info.json if present
+    info_path = os.path.join(test_dir, "test_info.json")
+    if os.path.exists(info_path):
+        with open(info_path) as f:
+            info = json.load(f)
+        meta = info.get("metadata", {})
+        entry["description"] = meta.get("description", "")
+        entry["swf_version"] = meta.get("swf_version")
+        entry["fully_implemented"] = meta.get("fully_implemented", False)
+        opcodes = info.get("opcodes", {})
+        entry["opcodes_tested"] = opcodes.get("tested", [])
+        entry["opcodes_supporting"] = opcodes.get("supporting", [])
+
+    tests.append(entry)
+
+for name in graphics_names:
+    test_dir = os.path.join(examples_dir, "graphics", name)
+    entry = {
+        "id": f"graphics/{name}",
+        "name": name,
+        "type": "graphics",
+        "path": f"examples/graphics/{name}",
+        "has_swf": os.path.exists(os.path.join(test_dir, "test.swf")),
+    }
+
+    for f in os.listdir(test_dir):
+        if f.endswith('.js') and not f.startswith('.'):
+            entry["js_file"] = f
+        elif f.endswith('.wasm'):
+            entry["wasm_file"] = f
+
+    info_path = os.path.join(test_dir, "test_info.json")
+    if os.path.exists(info_path):
+        with open(info_path) as f:
+            info = json.load(f)
+        meta = info.get("metadata", {})
+        entry["description"] = meta.get("description", "")
+        entry["swf_version"] = meta.get("swf_version")
+        entry["fully_implemented"] = meta.get("fully_implemented", False)
+        opcodes = info.get("opcodes", {})
+        entry["opcodes_tested"] = opcodes.get("tested", [])
+        entry["opcodes_supporting"] = opcodes.get("supporting", [])
+
+    tests.append(entry)
+
+excluded = []
+for raw in exclude_raw:
+    parts = raw.split(':', 1)
+    excluded.append({
+        "name": parts[0].strip(),
+        "reason": parts[1].strip() if len(parts) > 1 else ""
+    })
+
+catalog = {
+    "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "tests": tests,
+    "excluded": excluded
+}
+
+with open(catalog_file, 'w') as f:
+    json.dump(catalog, f, indent=2)
+
+print(f"  Generated {catalog_file} with {len(tests)} tests and {len(excluded)} excluded")
+PYEOF
+
+# Copy opcode-index.json to docs/ if it exists in repo root
+OPCODE_INDEX="${REPO_ROOT}/opcode-index.json"
+if [ -f "$OPCODE_INDEX" ]; then
+    cp "$OPCODE_INDEX" "${DOCS_DIR}/opcode-index.json"
+    echo "  Copied opcode-index.json to ${DOCS_DIR}/"
+fi
+
+echo "✅ catalog.json generated"

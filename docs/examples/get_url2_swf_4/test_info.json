@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "get_url2_swf_4",
+    "description": "Tests GET_URL2 opcode (0x9A) - Stack-based URL loading with HTTP method support. Comprehensive test coverage including all flag combinations, edge cases (empty strings, concatenated URLs), and multiple HTTP methods (GET/POST) for both browser windows and sprite targets. In NO_GRAPHICS mode, verifies correct stack operations, flag parsing, and operation logging.",
+    "swf_version": 4,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Actual HTTP client functionality (requires libcurl or similar HTTP library)",
+      "Variable encoding to x-www-form-urlencoded format (requires variable enumeration)",
+      "HTTP response parsing (requires HTTP client and response parser)",
+      "Setting variables in target scope from response (requires full variable/scope management)",
+      "SWF file downloading and loading (requires HTTP client and SWF parser/loader)",
+      "MovieClip/sprite path resolution and management (requires full sprite hierarchy)",
+      "Browser window integration (requires platform-specific OS APIs)",
+      "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
+    ]
+  },
+  "opcodes": {
+    "tested": ["GET_URL2"],
+    "supporting": ["PUSH", "TRACE", "STRING_ADD"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "basic_url_window_target_no_method",
+    "get_request_with_variables_window",
+    "post_request_window",
+    "load_movie_into_sprite",
+    "dynamic_url_from_concatenation_str_list",
+    "empty_url_string",
+    "empty_target_string",
+    "sprite_target_with_get_method",
+    "sprite_target_with_post_method",
+    "multiple_string_concatenation_3_parts"
+  ],
+  "implementation_notes": {
+    "stack_operations": "Correctly pops URL and target from stack",
+    "flag_parsing": "All flags correctly parsed: SendVarsMethod (bits 7-6), LoadTargetFlag (bit 1), LoadVariablesFlag (bit 0)",
+    "string_handling": "Handles both regular strings and STR_LIST (concatenated strings)",
+    "logging": "Outputs debug messages showing what operation would be performed",
+    "current_behavior": "Logs the intended operation but does not perform actual HTTP requests, variable loading, or SWF loading",
+    "no_graphics_mode_limitations": "Full implementation would require: HTTP client library (libcurl), SWF parser, platform-specific browser integration, and network access - none of which are available in NO_GRAPHICS sandbox environment",
+    "similar_opcodes": "Implementation approach similar to GOTO_FRAME (0x81) and GOTO_LABEL (0x8C) which also log operations without performing actual navigation in NO_GRAPHICS mode"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "name": "equals2_swf_5",
+    "description": "Tests ActionEquals2 opcode (0x49) - Type-aware equality comparison following ECMA-262 specification. Comprehensive test coverage including number, string, boolean, null, and undefined types with proper type coercion.",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["EQUALS2"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "implementation_notes": {
+    "completed_features": [
+      "Number equality comparison (F32 and F64)",
+      "String equality comparison with null safety",
+      "Boolean equality comparison (true == true, true == false)",
+      "Boolean to number conversion (true == 1, false == 0)",
+      "Null equality comparison (null == null)",
+      "Undefined equality comparison (undefined == undefined)",
+      "ECMA-262 special case: null == undefined returns true",
+      "ECMA-262 rule: null/undefined vs other types returns false",
+      "Number-to-string type coercion (ECMA-262 compliant)",
+      "String-to-number type coercion (ECMA-262 compliant)",
+      "NaN handling (NaN != NaN, NaN != anything)"
+    ],
+    "tested_cases": [
+      "Number equality: 5 == 5 (true), 5 == 3 (false)",
+      "String equality: \"hello\" == \"hello\" (true), \"hello\" == \"world\" (false)",
+      "Number-string coercion: 5 == \"5\" (true), 10 == \"10\" (true)",
+      "Boolean equality: true == true (true), true == false (false)",
+      "Boolean-number coercion: true == 1 (true), false == 0 (true)",
+      "Null equality: null == null (true)",
+      "Undefined equality: undefined == undefined (true)",
+      "Null-undefined special case: null == undefined (true)",
+      "Null vs number: null == 0 (false)",
+      "Undefined vs number: undefined == 0 (false)"
+    ],
+    "edge_cases_tested": [
+      "boolean_equality",
+      "boolean_to_number_conversion",
+      "null_equality",
+      "undefined_equality",
+      "null_undefined_special_case",
+      "null_vs_other_types",
+      "undefined_vs_other_types",
+      "number_string_type_coercion",
+      "nan_handling"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "name": "stop_multiframe_swf_4",
+    "description": "Tests STOP opcode (0x07) multi-frame behavior - verifies that frames after STOP do not execute",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STOP"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "multi_frame_stop",
+    "frame_2_does_not_execute_after_stop"
+  ]
+}

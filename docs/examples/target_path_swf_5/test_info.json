@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "name": "target_path_swf_5",
+    "description": "Comprehensive tests for TARGET_PATH opcode (0x45) - returns target path for MovieClip (e.g., '_root.mc1.mc2') or undefined for non-MovieClip values. Tests number, string, zero, and undefined inputs. Includes standalone C test demonstrating full MovieClip hierarchy support.",
+    "swf_version": 5,
+    "fully_implemented": true,
+    "fully_implemented_no_graphics": false
+  },
+  "opcodes": {
+    "tested": ["TARGET_PATH"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "edge_cases_tested": [
+    "targetPath_with_number_returns_undefined",
+    "targetPath_with_string_returns_undefined",
+    "targetPath_with_zero_returns_undefined",
+    "targetPath_with_undefined_returns_undefined",
+    "movieclip_path_construction_single_level",
+    "movieclip_path_construction_two_level",
+    "movieclip_path_construction_three_level",
+    "movieclip_path_construction_multiple_children",
+    "movieclip_path_construction_different_branches"
+  ],
+  "notes": "Full implementation with MovieClip hierarchy support. MovieClip infrastructure includes parent/child relationships and automatic path construction. The test_movieclip_paths.c standalone program demonstrates creating nested MovieClips and verifying correct path generation (_root, _root.mc1, _root.mc1.mc2, etc.). In NO_GRAPHICS mode, MovieClips must be created programmatically; in graphics mode they would be created via display list tags."
+}

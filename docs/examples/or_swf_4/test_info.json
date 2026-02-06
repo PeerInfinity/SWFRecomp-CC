@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "or_swf_4",
+    "description": "Tests ActionOr (0x11) opcode - logical OR operation",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["OR"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

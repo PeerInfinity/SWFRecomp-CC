@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "string_extract_swf_4",
+    "description": "Tests STRING_EXTRACT opcode (0x15) - extracts substrings with various edge cases",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STRING_EXTRACT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

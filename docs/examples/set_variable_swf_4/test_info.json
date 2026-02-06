@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "set_variable_swf_4",
+    "description": "Tests SET_VARIABLE opcode (0x1D) - sets variable values in the variable store",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["SET_VARIABLE"],
+    "supporting": ["PUSH", "GET_VARIABLE", "TRACE", "ADD"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "char_to_ascii_swf_4",
+    "description": "Tests CHAR_TO_ASCII opcode (0x32) - converts first character of string to ASCII code",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["CHAR_TO_ASCII"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "name": "enumerate_swf_4",
+    "description": "Tests ENUMERATE opcode (0x46) - enumerates object property names with full ECMA-262 compliance. Implements prototype chain walking via __proto__, DontEnum filtering via property flags, and proper shadowing of inherited properties.",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["ENUMERATE"],
+    "supporting": ["PUSH", "INIT_OBJECT", "SET_VARIABLE", "TRACE", "POP"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "implementation_notes": {
+    "what_works": [
+      "Basic object property enumeration",
+      "Prototype chain traversal via __proto__ property",
+      "DontEnum filtering using PROPERTY_FLAG_ENUMERABLE",
+      "Property shadowing (child properties override prototype properties)",
+      "Null terminator handling (pushes undefined to mark end)",
+      "Empty object handling (returns only null terminator)",
+      "Non-object handling (returns only null terminator for strings, numbers, undefined variables)",
+      "Property name ordering (reverse order push for forward order pop)",
+      "Variable lookup via getVariable/getVariableById",
+      "Property attribute flags (enumerable, writable, configurable)"
+    ],
+    "ecma_262_compliance": [
+      "Prototype chain enumeration per ECMA-262 Section 12.6.4",
+      "DontEnum attribute support per ECMA-262 Section 8.6.1",
+      "Property shadowing in inheritance chain",
+      "Duplicate property name prevention across prototype levels"
+    ],
+    "no_graphics_notes": [
+      "Slash-path/dot-path variable resolution (e.g., '/root/clip' or '_parent.clip') is a MovieClip/timeline feature not applicable in NO_GRAPHICS mode",
+      "This feature is part of the variable resolution system, not the ENUMERATE opcode itself"
+    ]
+  },
+  "edge_cases_tested": [
+    "basic_object_with_three_properties",
+    "property_names_in_any_order"
+  ]
+}

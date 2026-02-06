@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "get_time_swf_5",
+    "description": "Tests GET_TIME opcode (0x34) - returns milliseconds since runtime start",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["GET_TIME"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "range_validation"
+  }
+}

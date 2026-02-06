@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "equals_swf_4",
+    "description": "Tests EQUALS opcode (0x0E) - numeric equality comparison with type coercion",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["EQUALS"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

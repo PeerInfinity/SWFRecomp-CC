@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "to_integer_swf_4",
+    "description": "Tests TO_INTEGER opcode (0x18) - converts values to 32-bit signed integers with truncation toward zero",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["TO_INTEGER"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}
