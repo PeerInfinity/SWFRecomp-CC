@@ -493,35 +493,44 @@ This section lists all missing features for opcodes that are not fully implement
 - MovieClip context switching for target paths (requires full MovieClip tree - graphics-only)
 
 
-## Graphics Features
+## SWF Features
 
-**Total Graphics Features**: 14
+**Total SWF Features**: 60
 
-**Features With Tests**: 14/14
+**Features With Tests**: 14/60
 
-**Total Graphics Tests**: 57
+**Features Without Tests**: 46
 
-**Fully Implemented**: 14/14
+**Total Feature Tests**: 57
 
-### SWF Tags
+**Fully Implemented**: 14/60
+
+### Shape Tags
+(2/4 with tests)
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
 | DefineShape | Basic shape definition (SWF tag 2) | 12 (awful_gradient, awful_radial_gradient, awful_shape_swf_4, coicle, mess, ssquare, sssquare, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares) | Yes |
-| DefineShape2 | Extended shape definition with new styles (SWF tag 22) | 2 (new_styles, wild_shadow) | Yes |
-| DefineBits | JPEG bitmap data (SWF tag 6) | 1 (mess) | Yes |
-| JPEGTables | Shared JPEG encoding tables (SWF tag 8) | 1 (mess) | Yes |
+| DefineShape2 | Extended shape with >255 styles (SWF tag 22) | 2 (new_styles, wild_shadow) | Yes |
+| DefineShape3 | Shape with full RGBA support (SWF tag 32) | **0** | No |
+| DefineShape4 | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | **0** | No |
 
 ### Fill Types
+(4/8 with tests)
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
-| SolidFill | Solid color fill style | 10 (awful_shape_swf_4, coicle, new_styles, ssquare, sssquare, three_boxes, three_boxes_hole, three_boxes_holes, two_squares, wild_shadow) | Yes |
-| LinearGradient | Linear gradient fill style | 2 (awful_gradient, awful_radial_gradient) | Yes |
-| RadialGradient | Radial gradient fill style | 1 (awful_radial_gradient) | Yes |
-| ClippedBitmap | Clipped bitmap fill style | 1 (mess) | Yes |
+| SolidFill | Solid color fill (type 0x00) | 10 (awful_shape_swf_4, coicle, new_styles, ssquare, sssquare, three_boxes, three_boxes_hole, three_boxes_holes, two_squares, wild_shadow) | Yes |
+| LinearGradient | Linear gradient fill (type 0x10) | 2 (awful_gradient, awful_radial_gradient) | Yes |
+| RadialGradient | Radial gradient fill (type 0x12) | 1 (awful_radial_gradient) | Yes |
+| FocalRadialGradient | Focal radial gradient fill (type 0x13, SWF 8+) | **0** | No |
+| RepeatingBitmap | Tiled bitmap fill (type 0x40) | **0** | No |
+| ClippedBitmap | Clipped bitmap fill (type 0x41) | 1 (mess) | Yes |
+| NonSmoothedRepeatingBitmap | Tiled bitmap without anti-aliasing (type 0x42) | **0** | No |
+| NonSmoothedClippedBitmap | Clipped bitmap without anti-aliasing (type 0x43) | **0** | No |
 
 ### Edge Types
+(2/2 with tests)
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
@@ -529,35 +538,134 @@ This section lists all missing features for opcodes that are not fully implement
 | CurvedEdge | Curved edge records (CurveTo) | 2 (coicle, wild_shadow) | Yes |
 
 ### Style Features
+(2/3 with tests)
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
-| LineStyle | Stroke line style | 8 (awful_gradient, awful_radial_gradient, new_styles, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares) | Yes |
+| LineStyle | Basic stroke line style (LINESTYLE) | 8 (awful_gradient, awful_radial_gradient, new_styles, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares) | Yes |
+| LineStyle2 | Advanced line style with caps/joins (LINESTYLE2, DefineShape4) | **0** | No |
 | NewStyles | Mid-shape style changes (StateNewStyles) | 2 (new_styles, wild_shadow) | Yes |
 
+### Image/Bitmap Tags
+(2/7 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DefineBits | JPEG bitmap requiring JPEGTables (SWF tag 6) | 1 (mess) | Yes |
+| JPEGTables | Shared JPEG encoding tables (SWF tag 8) | 1 (mess) | Yes |
+| DefineBitsJPEG2 | Self-contained JPEG image (SWF tag 21) | **0** | No |
+| DefineBitsJPEG3 | JPEG image with alpha channel (SWF tag 35) | **0** | No |
+| DefineBitsJPEG4 | JPEG with embedded alpha (SWF tag 90, SWF 10+) | **0** | No |
+| DefineBitsLossless | Lossless RGB bitmap (SWF tag 20) | **0** | No |
+| DefineBitsLossless2 | Lossless RGBA bitmap (SWF tag 36) | **0** | No |
+
+### Display List Tags
+(0/5 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| PlaceObject | Basic object placement (SWF tag 4) | **0** | No |
+| PlaceObject2 | Enhanced object placement (SWF tag 26) | **0** | No |
+| PlaceObject3 | Object placement with filters/blend (SWF tag 70) | **0** | No |
+| RemoveObject | Remove object by ID (SWF tag 5) | **0** | No |
+| RemoveObject2 | Remove object by depth (SWF tag 28) | **0** | No |
+
 ### Transform Features
+(2/4 with tests)
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
 | PlaceObject2 Scale | Scale transform in PlaceObject2 | 1 (wild_shadow) | Yes |
 | PlaceObject2 Skew | Skew transform in PlaceObject2 | 1 (wild_shadow) | Yes |
+| ColorTransform | Color transform (CXFORM/CXFORMWITHALPHA) | **0** | No |
+| ClipDepth | Clipping mask via PlaceObject2 ClipDepth | **0** | No |
+
+### Morph Shape Tags
+(0/2 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DefineMorphShape | Shape morphing/tweening (SWF tag 46) | **0** | No |
+| DefineMorphShape2 | Enhanced morphing with LINESTYLE2 (SWF tag 84) | **0** | No |
+
+### Text Tags
+(0/7 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DefineFont | Basic font with glyph shapes (SWF tag 10) | **0** | No |
+| DefineFont2 | Font with layout metrics (SWF tag 48) | **0** | No |
+| DefineFont3 | Enhanced font definition (SWF tag 75) | **0** | No |
+| DefineFont4 | CFF font for Flash Text Engine (SWF tag 91) | **0** | No |
+| DefineText | Static text with glyph indices (SWF tag 11) | **0** | No |
+| DefineText2 | Static text with RGBA colors (SWF tag 33) | **0** | No |
+| DefineEditText | Dynamic/editable text field (SWF tag 37) | **0** | No |
+
+### Sprite Tags
+(0/1 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DefineSprite | Embedded movie clip with own timeline (SWF tag 39) | **0** | No |
+
+### Button Tags
+(0/2 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DefineButton | Basic button with state shapes (SWF tag 7) | **0** | No |
+| DefineButton2 | Enhanced button with actions (SWF tag 34) | **0** | No |
+
+### Sound Tags
+(0/5 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DefineSound | Event sound definition (SWF tag 14) | **0** | No |
+| StartSound | Play/stop event sound (SWF tag 15) | **0** | No |
+| SoundStreamHead | Streaming sound header (SWF tag 18) | **0** | No |
+| SoundStreamHead2 | Enhanced streaming sound header (SWF tag 45) | **0** | No |
+| SoundStreamBlock | Streaming audio frame data (SWF tag 19) | **0** | No |
+
+### Video Tags
+(0/2 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DefineVideoStream | Video stream definition (SWF tag 60) | **0** | No |
+| VideoFrame | Video frame data (SWF tag 61) | **0** | No |
+
+### Filter Types
+(0/8 with tests)
+
+| Feature | Description | Tests | Implemented |
+|---------|-------------|-------|-------------|
+| DropShadowFilter | Drop shadow effect (filter ID 0) | **0** | No |
+| BlurFilter | Gaussian blur effect (filter ID 1) | **0** | No |
+| GlowFilter | Glow/halo effect (filter ID 2) | **0** | No |
+| BevelFilter | Beveled edge effect (filter ID 3) | **0** | No |
+| GradientGlowFilter | Gradient-based glow (filter ID 4) | **0** | No |
+| ConvolutionFilter | Convolution matrix filter (filter ID 5) | **0** | No |
+| ColorMatrixFilter | 4x5 color matrix transform (filter ID 6) | **0** | No |
+| GradientBevelFilter | Gradient-based bevel (filter ID 7) | **0** | No |
 
 ### Coverage Matrix
+(Only features with at least one test are shown)
 
 | Feature | awful_gradie | awful_radial | awful_shape_ | coicle | mess | new_styles | ssquare | sssquare | thiccie | three_boxes | three_boxes_ | three_boxes_ | two_squares | wild_shadow |
 |---------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | DefineShape | X | X | X | X | X |  | X | X | X | X | X | X | X |  |
 | DefineShape2 |  |  |  |  |  | X |  |  |  |  |  |  |  | X |
-| DefineBits |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
-| JPEGTables |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
 | SolidFill |  |  | X | X |  | X | X | X |  | X | X | X | X | X |
 | LinearGradient | X | X |  |  |  |  |  |  |  |  |  |  |  |  |
 | RadialGradient |  | X |  |  |  |  |  |  |  |  |  |  |  |  |
 | ClippedBitmap |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
-| LineStyle | X | X |  |  |  | X |  |  | X | X | X | X | X |  |
 | StraightEdge | X | X | X |  | X | X | X | X | X | X | X | X | X | X |
 | CurvedEdge |  |  |  | X |  |  |  |  |  |  |  |  |  | X |
+| LineStyle | X | X |  |  |  | X |  |  | X | X | X | X | X |  |
 | NewStyles |  |  |  |  |  | X |  |  |  |  |  |  |  | X |
+| DefineBits |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
+| JPEGTables |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
 | PlaceObject2 Scale |  |  |  |  |  |  |  |  |  |  |  |  |  | X |
 | PlaceObject2 Skew |  |  |  |  |  |  |  |  |  |  |  |  |  | X |
 

@@ -732,7 +732,7 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
 
 
 def generate_graphics_section(index: Dict) -> str:
-    """Generate a section covering graphics features and their test coverage."""
+    """Generate a section covering SWF features and their test coverage."""
     md = []
     graphics_entries = index.get('graphics_entries', [])
 
@@ -741,53 +741,39 @@ def generate_graphics_section(index: Dict) -> str:
 
     total_features = index['metadata'].get('total_graphics_features', 0)
     features_with_tests = index['metadata'].get('graphics_features_with_tests', 0)
+    features_without_tests = total_features - features_with_tests
     total_tests = sum(len(e['tests']) for e in graphics_entries)
     features_implemented = sum(1 for e in graphics_entries if e['fully_implemented'])
 
-    md.append("## Graphics Features")
+    md.append("## SWF Features")
     md.append("")
-    md.append(f"**Total Graphics Features**: {total_features}")
+    md.append(f"**Total SWF Features**: {total_features}")
     md.append("")
     md.append(f"**Features With Tests**: {features_with_tests}/{total_features}")
     md.append("")
-    md.append(f"**Total Graphics Tests**: {total_tests}")
+    if features_without_tests > 0:
+        md.append(f"**Features Without Tests**: {features_without_tests}")
+        md.append("")
+    md.append(f"**Total Feature Tests**: {total_tests}")
     md.append("")
     md.append(f"**Fully Implemented**: {features_implemented}/{total_features}")
     md.append("")
 
-    # Categorize features
-    tag_features = []
-    fill_features = []
-    edge_features = []
-    style_features = []
-    transform_features = []
-
+    # Group entries by category (using category field from data)
+    from collections import OrderedDict
+    categories = OrderedDict()
     for entry in graphics_entries:
-        fid = entry['id']
-        if fid.startswith('DEFINE_') or fid in ('JPEG_TABLES',):
-            tag_features.append(entry)
-        elif fid.endswith('_FILL') or fid in ('SOLID_FILL', 'LINEAR_GRADIENT', 'RADIAL_GRADIENT', 'CLIPPED_BITMAP'):
-            fill_features.append(entry)
-        elif fid.endswith('_EDGE'):
-            edge_features.append(entry)
-        elif fid in ('LINE_STYLE', 'NEW_STYLES'):
-            style_features.append(entry)
-        elif fid.startswith('PLACE_'):
-            transform_features.append(entry)
+        cat = entry.get('category', 'Other')
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(entry)
 
-    categories = [
-        ("SWF Tags", tag_features),
-        ("Fill Types", fill_features),
-        ("Edge Types", edge_features),
-        ("Style Features", style_features),
-        ("Transform Features", transform_features),
-    ]
-
-    for cat_name, cat_entries in categories:
-        if not cat_entries:
-            continue
+    for cat_name, cat_entries in categories.items():
+        tested_count = sum(1 for e in cat_entries if e['tests'])
+        total_count = len(cat_entries)
 
         md.append(f"### {cat_name}")
+        md.append(f"({tested_count}/{total_count} with tests)")
         md.append("")
         md.append("| Feature | Description | Tests | Implemented |")
         md.append("|---------|-------------|-------|-------------|")
@@ -799,33 +785,32 @@ def generate_graphics_section(index: Dict) -> str:
             impl_str = "Yes" if entry['fully_implemented'] else "No"
 
             if test_count > 0:
-                # Show test names
                 test_names = [t.split('/')[-1] for t in entry['tests']]
                 tests_str = f"{test_count} ({', '.join(test_names)})"
             else:
-                tests_str = "0"
+                tests_str = "**0**"
 
             md.append(f"| {name} | {desc} | {tests_str} | {impl_str} |")
 
         md.append("")
 
-    # Feature coverage matrix (features vs tests)
-    # Collect all unique test names from graphics entries
+    # Coverage matrix - only include features that have tests
     all_tests = set()
     for entry in graphics_entries:
         for t in entry['tests']:
             all_tests.add(t.split('/')[-1])
     all_tests = sorted(all_tests)
 
-    if all_tests:
+    tested_entries = [e for e in graphics_entries if e['tests']]
+
+    if all_tests and tested_entries:
         md.append("### Coverage Matrix")
+        md.append("(Only features with at least one test are shown)")
         md.append("")
 
-        # Build header
         header = "| Feature |"
         separator = "|---------|"
         for test_name in all_tests:
-            # Use abbreviated names to keep table manageable
             short = test_name[:12]
             header += f" {short} |"
             separator += "---|"
@@ -833,7 +818,7 @@ def generate_graphics_section(index: Dict) -> str:
         md.append(header)
         md.append(separator)
 
-        for entry in graphics_entries:
+        for entry in tested_entries:
             test_set = set(t.split('/')[-1] for t in entry['tests'])
             row = f"| {entry['name']} |"
             for test_name in all_tests:

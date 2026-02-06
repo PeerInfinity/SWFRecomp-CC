@@ -290,22 +290,96 @@ def scan_graphics_test_directories() -> Dict[str, Dict]:
     return feature_map
 
 
-# Canonical list of graphics features with metadata
+# Canonical list of all SWF features from the specification (v19),
+# organized by category for the coverage chart.
 GRAPHICS_FEATURES = {
-    "DEFINE_SHAPE": {"name": "DefineShape", "tag_id": 2, "description": "Basic shape definition (SWF tag 2)"},
-    "DEFINE_SHAPE2": {"name": "DefineShape2", "tag_id": 22, "description": "Extended shape definition with new styles (SWF tag 22)"},
-    "DEFINE_BITS": {"name": "DefineBits", "tag_id": 6, "description": "JPEG bitmap data (SWF tag 6)"},
-    "JPEG_TABLES": {"name": "JPEGTables", "tag_id": 8, "description": "Shared JPEG encoding tables (SWF tag 8)"},
-    "SOLID_FILL": {"name": "SolidFill", "description": "Solid color fill style"},
-    "LINEAR_GRADIENT": {"name": "LinearGradient", "description": "Linear gradient fill style"},
-    "RADIAL_GRADIENT": {"name": "RadialGradient", "description": "Radial gradient fill style"},
-    "CLIPPED_BITMAP": {"name": "ClippedBitmap", "description": "Clipped bitmap fill style"},
-    "LINE_STYLE": {"name": "LineStyle", "description": "Stroke line style"},
-    "STRAIGHT_EDGE": {"name": "StraightEdge", "description": "Straight edge records (LineTo)"},
-    "CURVED_EDGE": {"name": "CurvedEdge", "description": "Curved edge records (CurveTo)"},
-    "NEW_STYLES": {"name": "NewStyles", "description": "Mid-shape style changes (StateNewStyles)"},
-    "PLACE_SCALE": {"name": "PlaceObject2 Scale", "description": "Scale transform in PlaceObject2"},
-    "PLACE_SKEW": {"name": "PlaceObject2 Skew", "description": "Skew transform in PlaceObject2"},
+    # --- Shape Tags ---
+    "DEFINE_SHAPE": {"name": "DefineShape", "tag_id": 2, "category": "Shape Tags", "description": "Basic shape definition (SWF tag 2)"},
+    "DEFINE_SHAPE2": {"name": "DefineShape2", "tag_id": 22, "category": "Shape Tags", "description": "Extended shape with >255 styles (SWF tag 22)"},
+    "DEFINE_SHAPE3": {"name": "DefineShape3", "tag_id": 32, "category": "Shape Tags", "description": "Shape with full RGBA support (SWF tag 32)"},
+    "DEFINE_SHAPE4": {"name": "DefineShape4", "tag_id": 83, "category": "Shape Tags", "description": "Shape with LINESTYLE2 and edge bounds (SWF tag 83)"},
+
+    # --- Fill Types ---
+    "SOLID_FILL": {"name": "SolidFill", "category": "Fill Types", "description": "Solid color fill (type 0x00)"},
+    "LINEAR_GRADIENT": {"name": "LinearGradient", "category": "Fill Types", "description": "Linear gradient fill (type 0x10)"},
+    "RADIAL_GRADIENT": {"name": "RadialGradient", "category": "Fill Types", "description": "Radial gradient fill (type 0x12)"},
+    "FOCAL_RADIAL_GRADIENT": {"name": "FocalRadialGradient", "category": "Fill Types", "description": "Focal radial gradient fill (type 0x13, SWF 8+)"},
+    "REPEATING_BITMAP": {"name": "RepeatingBitmap", "category": "Fill Types", "description": "Tiled bitmap fill (type 0x40)"},
+    "CLIPPED_BITMAP": {"name": "ClippedBitmap", "category": "Fill Types", "description": "Clipped bitmap fill (type 0x41)"},
+    "NON_SMOOTHED_REPEATING_BITMAP": {"name": "NonSmoothedRepeatingBitmap", "category": "Fill Types", "description": "Tiled bitmap without anti-aliasing (type 0x42)"},
+    "NON_SMOOTHED_CLIPPED_BITMAP": {"name": "NonSmoothedClippedBitmap", "category": "Fill Types", "description": "Clipped bitmap without anti-aliasing (type 0x43)"},
+
+    # --- Edge Types ---
+    "STRAIGHT_EDGE": {"name": "StraightEdge", "category": "Edge Types", "description": "Straight edge records (LineTo)"},
+    "CURVED_EDGE": {"name": "CurvedEdge", "category": "Edge Types", "description": "Curved edge records (CurveTo)"},
+
+    # --- Style Features ---
+    "LINE_STYLE": {"name": "LineStyle", "category": "Style Features", "description": "Basic stroke line style (LINESTYLE)"},
+    "LINE_STYLE2": {"name": "LineStyle2", "category": "Style Features", "description": "Advanced line style with caps/joins (LINESTYLE2, DefineShape4)"},
+    "NEW_STYLES": {"name": "NewStyles", "category": "Style Features", "description": "Mid-shape style changes (StateNewStyles)"},
+
+    # --- Image/Bitmap Tags ---
+    "DEFINE_BITS": {"name": "DefineBits", "tag_id": 6, "category": "Image/Bitmap Tags", "description": "JPEG bitmap requiring JPEGTables (SWF tag 6)"},
+    "JPEG_TABLES": {"name": "JPEGTables", "tag_id": 8, "category": "Image/Bitmap Tags", "description": "Shared JPEG encoding tables (SWF tag 8)"},
+    "DEFINE_BITS_JPEG2": {"name": "DefineBitsJPEG2", "tag_id": 21, "category": "Image/Bitmap Tags", "description": "Self-contained JPEG image (SWF tag 21)"},
+    "DEFINE_BITS_JPEG3": {"name": "DefineBitsJPEG3", "tag_id": 35, "category": "Image/Bitmap Tags", "description": "JPEG image with alpha channel (SWF tag 35)"},
+    "DEFINE_BITS_JPEG4": {"name": "DefineBitsJPEG4", "tag_id": 90, "category": "Image/Bitmap Tags", "description": "JPEG with embedded alpha (SWF tag 90, SWF 10+)"},
+    "DEFINE_BITS_LOSSLESS": {"name": "DefineBitsLossless", "tag_id": 20, "category": "Image/Bitmap Tags", "description": "Lossless RGB bitmap (SWF tag 20)"},
+    "DEFINE_BITS_LOSSLESS2": {"name": "DefineBitsLossless2", "tag_id": 36, "category": "Image/Bitmap Tags", "description": "Lossless RGBA bitmap (SWF tag 36)"},
+
+    # --- Display List Tags ---
+    "PLACE_OBJECT": {"name": "PlaceObject", "tag_id": 4, "category": "Display List Tags", "description": "Basic object placement (SWF tag 4)"},
+    "PLACE_OBJECT2": {"name": "PlaceObject2", "tag_id": 26, "category": "Display List Tags", "description": "Enhanced object placement (SWF tag 26)"},
+    "PLACE_OBJECT3": {"name": "PlaceObject3", "tag_id": 70, "category": "Display List Tags", "description": "Object placement with filters/blend (SWF tag 70)"},
+    "REMOVE_OBJECT": {"name": "RemoveObject", "tag_id": 5, "category": "Display List Tags", "description": "Remove object by ID (SWF tag 5)"},
+    "REMOVE_OBJECT2": {"name": "RemoveObject2", "tag_id": 28, "category": "Display List Tags", "description": "Remove object by depth (SWF tag 28)"},
+
+    # --- Transform Features ---
+    "PLACE_SCALE": {"name": "PlaceObject2 Scale", "category": "Transform Features", "description": "Scale transform in PlaceObject2"},
+    "PLACE_SKEW": {"name": "PlaceObject2 Skew", "category": "Transform Features", "description": "Skew transform in PlaceObject2"},
+    "COLOR_TRANSFORM": {"name": "ColorTransform", "category": "Transform Features", "description": "Color transform (CXFORM/CXFORMWITHALPHA)"},
+    "CLIP_DEPTH": {"name": "ClipDepth", "category": "Transform Features", "description": "Clipping mask via PlaceObject2 ClipDepth"},
+
+    # --- Morph Shape Tags ---
+    "DEFINE_MORPH_SHAPE": {"name": "DefineMorphShape", "tag_id": 46, "category": "Morph Shape Tags", "description": "Shape morphing/tweening (SWF tag 46)"},
+    "DEFINE_MORPH_SHAPE2": {"name": "DefineMorphShape2", "tag_id": 84, "category": "Morph Shape Tags", "description": "Enhanced morphing with LINESTYLE2 (SWF tag 84)"},
+
+    # --- Text Tags ---
+    "DEFINE_FONT": {"name": "DefineFont", "tag_id": 10, "category": "Text Tags", "description": "Basic font with glyph shapes (SWF tag 10)"},
+    "DEFINE_FONT2": {"name": "DefineFont2", "tag_id": 48, "category": "Text Tags", "description": "Font with layout metrics (SWF tag 48)"},
+    "DEFINE_FONT3": {"name": "DefineFont3", "tag_id": 75, "category": "Text Tags", "description": "Enhanced font definition (SWF tag 75)"},
+    "DEFINE_FONT4": {"name": "DefineFont4", "tag_id": 91, "category": "Text Tags", "description": "CFF font for Flash Text Engine (SWF tag 91)"},
+    "DEFINE_TEXT": {"name": "DefineText", "tag_id": 11, "category": "Text Tags", "description": "Static text with glyph indices (SWF tag 11)"},
+    "DEFINE_TEXT2": {"name": "DefineText2", "tag_id": 33, "category": "Text Tags", "description": "Static text with RGBA colors (SWF tag 33)"},
+    "DEFINE_EDIT_TEXT": {"name": "DefineEditText", "tag_id": 37, "category": "Text Tags", "description": "Dynamic/editable text field (SWF tag 37)"},
+
+    # --- Sprite/Movie Clip Tags ---
+    "DEFINE_SPRITE": {"name": "DefineSprite", "tag_id": 39, "category": "Sprite Tags", "description": "Embedded movie clip with own timeline (SWF tag 39)"},
+
+    # --- Button Tags ---
+    "DEFINE_BUTTON": {"name": "DefineButton", "tag_id": 7, "category": "Button Tags", "description": "Basic button with state shapes (SWF tag 7)"},
+    "DEFINE_BUTTON2": {"name": "DefineButton2", "tag_id": 34, "category": "Button Tags", "description": "Enhanced button with actions (SWF tag 34)"},
+
+    # --- Sound Tags ---
+    "DEFINE_SOUND": {"name": "DefineSound", "tag_id": 14, "category": "Sound Tags", "description": "Event sound definition (SWF tag 14)"},
+    "START_SOUND": {"name": "StartSound", "tag_id": 15, "category": "Sound Tags", "description": "Play/stop event sound (SWF tag 15)"},
+    "SOUND_STREAM_HEAD": {"name": "SoundStreamHead", "tag_id": 18, "category": "Sound Tags", "description": "Streaming sound header (SWF tag 18)"},
+    "SOUND_STREAM_HEAD2": {"name": "SoundStreamHead2", "tag_id": 45, "category": "Sound Tags", "description": "Enhanced streaming sound header (SWF tag 45)"},
+    "SOUND_STREAM_BLOCK": {"name": "SoundStreamBlock", "tag_id": 19, "category": "Sound Tags", "description": "Streaming audio frame data (SWF tag 19)"},
+
+    # --- Video Tags ---
+    "DEFINE_VIDEO_STREAM": {"name": "DefineVideoStream", "tag_id": 60, "category": "Video Tags", "description": "Video stream definition (SWF tag 60)"},
+    "VIDEO_FRAME": {"name": "VideoFrame", "tag_id": 61, "category": "Video Tags", "description": "Video frame data (SWF tag 61)"},
+
+    # --- Filter Types ---
+    "DROP_SHADOW_FILTER": {"name": "DropShadowFilter", "category": "Filter Types", "description": "Drop shadow effect (filter ID 0)"},
+    "BLUR_FILTER": {"name": "BlurFilter", "category": "Filter Types", "description": "Gaussian blur effect (filter ID 1)"},
+    "GLOW_FILTER": {"name": "GlowFilter", "category": "Filter Types", "description": "Glow/halo effect (filter ID 2)"},
+    "BEVEL_FILTER": {"name": "BevelFilter", "category": "Filter Types", "description": "Beveled edge effect (filter ID 3)"},
+    "GRADIENT_GLOW_FILTER": {"name": "GradientGlowFilter", "category": "Filter Types", "description": "Gradient-based glow (filter ID 4)"},
+    "CONVOLUTION_FILTER": {"name": "ConvolutionFilter", "category": "Filter Types", "description": "Convolution matrix filter (filter ID 5)"},
+    "COLOR_MATRIX_FILTER": {"name": "ColorMatrixFilter", "category": "Filter Types", "description": "4x5 color matrix transform (filter ID 6)"},
+    "GRADIENT_BEVEL_FILTER": {"name": "GradientBevelFilter", "category": "Filter Types", "description": "Gradient-based bevel (filter ID 7)"},
 }
 
 
@@ -574,6 +648,7 @@ def build_opcode_index():
             'id': feature_id,
             'name': feature_meta['name'],
             'tag_id': feature_meta.get('tag_id'),
+            'category': feature_meta.get('category', 'Other'),
             'description': feature_meta['description'],
             'tests': test_info['tested'],
             'fully_implemented': test_info['fully_implemented'],
