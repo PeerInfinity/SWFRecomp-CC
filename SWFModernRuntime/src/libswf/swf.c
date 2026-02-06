@@ -5,7 +5,7 @@
 #include <tag.h>
 #include <action.h>
 #include <variables.h>
-#include <flashbang.h>
+#include <renderer.h>
 #include <utils.h>
 #include <heap.h>
 
@@ -29,7 +29,7 @@ Character* dictionary = NULL;
 DisplayObject* display_list = NULL;
 size_t max_depth = 0;
 
-FlashbangContext* context;
+RenderContext* context;
 
 void tagMain(SWFAppContext* app_context)
 {
@@ -44,7 +44,7 @@ void tagMain(SWFAppContext* app_context)
 			next_frame += 1;
 		}
 		manual_next_frame = 0;
-		bad_poll |= flashbang_poll();
+		bad_poll |= renderer_poll();
 		quit_swf |= bad_poll;
 	}
 
@@ -53,7 +53,7 @@ void tagMain(SWFAppContext* app_context)
 		return;
 	}
 
-	while (!flashbang_poll())
+	while (!renderer_poll())
 	{
 		tagShowFrame(app_context);
 	}
@@ -61,7 +61,7 @@ void tagMain(SWFAppContext* app_context)
 
 void swfStart(SWFAppContext* app_context)
 {
-	context = flashbang_new();
+	context = renderer_new();
 
 	context->width = app_context->width;
 	context->height = app_context->height;
@@ -106,19 +106,19 @@ void swfStart(SWFAppContext* app_context)
 	initTime(app_context);
 	initMap();
 
-	// Initialize heap allocator (must be before flashbang_init which uses HALLOC)
+	// Initialize heap allocator (must be before renderer_init which uses HALLOC)
 	if (!heap_init(app_context, 0)) {  // 0 = use default size (64 MB)
 		fprintf(stderr, "Failed to initialize heap allocator\n");
 		return;
 	}
 
-	flashbang_init(app_context, context);
+	renderer_init(app_context, context);
 
 	tagInit();
 
 	tagMain(app_context);
 
-	flashbang_free(app_context, context);
+	renderer_free(app_context, context);
 
 	heap_shutdown(app_context);
 	freeMap();
