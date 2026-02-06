@@ -11,5 +11,13 @@
   },
   "execution": {
     "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "SOLID_FILL",
+      "LINE_STYLE",
+      "STRAIGHT_EDGE"
+    ]
   }
 }

@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "name": "new_styles",
-    "description": "WebGPU rendering test with mixed line styles and fill types",
-    "swf_version": 4,
+    "name": "rgba_shape",
+    "description": "WebGPU rendering test with semi-transparent overlapping shapes using DefineShape3 RGBA colors",
+    "swf_version": 7,
     "fully_implemented": true
   },
   "opcodes": {
@@ -14,11 +14,10 @@
   },
   "graphics": {
     "tested": [
-      "DEFINE_SHAPE2",
+      "DEFINE_SHAPE3",
       "SOLID_FILL",
       "LINE_STYLE",
-      "STRAIGHT_EDGE",
-      "NEW_STYLES"
+      "STRAIGHT_EDGE"
     ]
   }
 }

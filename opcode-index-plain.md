@@ -1,6 +1,8 @@
 # AS2 Opcode Index
 
-**Generated**: 2025-12-20
+**Generated**: 2026-02-06
+
+See also: [SWF Graphics Feature Index](feature-index-plain.md)
 
 **Total Opcodes**: 100
 
@@ -253,15 +255,15 @@
 
 ## Failing Primary Tests
 
-**No failing primary tests! 🎉**
+**No failing primary tests!**
 
 ## Tests With No Results
 
-**All tests have results! 🎉**
+**All tests have results!**
 
 ## Implementation Status
 
-### ✅ Fully Implemented
+### Fully Implemented
 (Opcodes marked as fully_implemented in test_info.json)
 
 | Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs | No Graphics |
@@ -352,7 +354,7 @@
 | 0X9B | ActionDefineFunction | ✓ |  | 1/1 |  | ✓ |  |
 | 0X9D | ActionIf | ✓ |  | 2/2 |  | ✓ |  |
 
-### 🔄 Partially Implemented
+### Partially Implemented
 (Has enum or function, but not marked as fully implemented)
 
 | Hex | Spec Name | Enum | Function | Docs |
@@ -373,7 +375,7 @@
 | 0X9E | ActionCall | ✓ | ✓ | ✓ |
 | 0X9F | ActionGotoFrame2 | ✓ | ✓ | ✓ |
 
-### ❌ Not Implemented
+### Not Implemented
 (Only in spec, no implementation yet)
 
 | Hex | Spec Name |
@@ -2203,7 +2205,7 @@ void actionLess2(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_LESS2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-greater-0x48.md](SWFRecompDocs/prompts/completed/opcode-greater-0x48.md)
+- [SWFRecompDocs/prompts/completed/opcode-less2-0x48.md](SWFRecompDocs/prompts/completed/opcode-less2-0x48.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6414)

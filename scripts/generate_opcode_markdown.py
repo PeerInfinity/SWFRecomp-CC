@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-Generate a Markdown table from the opcode-index.json file.
+Generate Markdown documentation from the opcode-index.json file.
+
+Produces four output files:
+  - opcode-index.md / opcode-index-plain.md  (AS2 opcode coverage)
+  - feature-index.md / feature-index-plain.md (SWF graphics feature coverage)
 """
 
 import json
+from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List
 
@@ -28,6 +33,19 @@ def make_link(text: str, hex_val: str, spec_name: str) -> str:
     return f"[{text}](#{anchor})"
 
 
+def make_feature_anchor(feature_id: str) -> str:
+    """Generate a Markdown anchor for a feature entry."""
+    return feature_id.lower().replace('_', '-')
+
+
+def make_feature_link(text: str, feature_id: str) -> str:
+    """Generate a Markdown link to a feature detailed section."""
+    if not text:
+        return ""
+    anchor = make_feature_anchor(feature_id)
+    return f"[{text}](#{anchor})"
+
+
 def load_opcode_index() -> Dict:
     """Load the opcode index JSON file."""
     index_path = BASE_DIR / "opcode-index.json"
@@ -36,6 +54,10 @@ def load_opcode_index() -> Dict:
         return json.load(f)
 
 
+# ---------------------------------------------------------------------------
+# Opcode document generation
+# ---------------------------------------------------------------------------
+
 def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     """Generate a summary table grouped by opcode hex value."""
     md = []
@@ -43,6 +65,13 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     md.append("# AS2 Opcode Index")
     md.append("")
     md.append(f"**Generated**: {index['metadata']['generated_date']}")
+    md.append("")
+
+    # Cross-link to feature index
+    if with_links:
+        md.append("See also: [SWF Graphics Feature Index](feature-index.md)")
+    else:
+        md.append("See also: [SWF Graphics Feature Index](feature-index-plain.md)")
     md.append("")
 
     # Calculate comprehensive statistics
@@ -270,7 +299,7 @@ def generate_missing_features_section(index: Dict, with_links: bool = True) -> s
                 })
 
     if not opcodes_with_missing_features:
-        md.append("**No opcodes with documented missing features! 🎉**")
+        md.append("**No opcodes with documented missing features!**")
         md.append("")
         return "\n".join(md)
 
@@ -524,7 +553,7 @@ def generate_failing_tests_chart(index: Dict, with_links: bool = True) -> str:
                     test['has_function'] = True
 
     if not failing_tests:
-        md.append("**No failing primary tests! 🎉**")
+        md.append("**No failing primary tests!**")
         md.append("")
         return "\n".join(md)
 
@@ -595,7 +624,7 @@ def generate_no_results_tests_chart(index: Dict, with_links: bool = True) -> str
                     test['has_function'] = True
 
     if not no_results_tests:
-        md.append("**All tests have results! 🎉**")
+        md.append("**All tests have results!**")
         md.append("")
         return "\n".join(md)
 
@@ -664,7 +693,7 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     md.append("")
 
     # Fully implemented
-    md.append("### ✅ Fully Implemented")
+    md.append("### Fully Implemented")
     md.append("(Opcodes marked as fully_implemented in test_info.json)")
     md.append("")
     md.append("| Hex | Spec Name | Enum | Function | Primary Tests | Failing Primary | Docs | No Graphics |")
@@ -689,7 +718,7 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     md.append("")
 
     # Partially implemented
-    md.append("### 🔄 Partially Implemented")
+    md.append("### Partially Implemented")
     md.append("(Has enum or function, but not marked as fully implemented)")
     md.append("")
     md.append("| Hex | Spec Name | Enum | Function | Docs |")
@@ -709,7 +738,7 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     md.append("")
 
     # Not implemented
-    md.append("### ❌ Not Implemented")
+    md.append("### Not Implemented")
     md.append("(Only in spec, no implementation yet)")
     md.append("")
     md.append("| Hex | Spec Name |")
@@ -731,63 +760,281 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     return "\n".join(md)
 
 
+# ---------------------------------------------------------------------------
+# Feature document generation
+# ---------------------------------------------------------------------------
+
+def generate_features_summary_table(index: Dict, with_links: bool = True) -> str:
+    """Generate the feature index header, statistics, and per-category summary tables."""
+    md = []
+    graphics_entries = index.get('graphics_entries', [])
+
+    if not graphics_entries:
+        return ""
+
+    total_features = index['metadata'].get('total_graphics_features', 0)
+    features_with_tests = index['metadata'].get('graphics_features_with_tests', 0)
+    features_without_tests = total_features - features_with_tests
+    total_tests = sum(len(e['tests']) for e in graphics_entries)
+    features_implemented = sum(1 for e in graphics_entries if e['fully_implemented'])
+
+    md.append("# SWF Graphics Feature Index")
+    md.append("")
+    md.append(f"**Generated**: {index['metadata']['generated_date']}")
+    md.append("")
+
+    # Cross-link to opcode index
+    if with_links:
+        md.append("See also: [AS2 Opcode Index](opcode-index.md)")
+    else:
+        md.append("See also: [AS2 Opcode Index](opcode-index-plain.md)")
+    md.append("")
+
+    # Statistics
+    md.append("## Feature Statistics")
+    md.append("")
+    md.append(f"**Total SWF Features**: {total_features}")
+    md.append("")
+    md.append(f"**Features With Tests**: {features_with_tests}/{total_features}")
+    md.append("")
+    if features_without_tests > 0:
+        md.append(f"**Features Without Tests**: {features_without_tests}")
+        md.append("")
+    md.append(f"**Total Feature Tests**: {total_tests}")
+    md.append("")
+    md.append(f"**Fully Implemented**: {features_implemented}/{total_features}")
+    md.append("")
+
+    # Per-category summary tables
+    categories = OrderedDict()
+    for entry in graphics_entries:
+        cat = entry.get('category', 'Other')
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(entry)
+
+    md.append("## Summary Tables")
+    md.append("")
+
+    for cat_name, cat_entries in categories.items():
+        tested_count = sum(1 for e in cat_entries if e['tests'])
+        total_count = len(cat_entries)
+
+        md.append(f"### {cat_name}")
+        md.append(f"({tested_count}/{total_count} with tests)")
+        md.append("")
+        md.append("| Feature | Description | Tag ID | Tests | Implemented |")
+        md.append("|---------|-------------|--------|-------|-------------|")
+
+        for entry in cat_entries:
+            if with_links:
+                name = make_feature_link(entry['name'], entry['id'])
+            else:
+                name = entry['name']
+            desc = entry['description']
+            tag_id = str(entry['tag_id']) if entry['tag_id'] is not None else "-"
+            test_count = len(entry['tests'])
+            tests_str = str(test_count) if test_count > 0 else "**0**"
+            impl_str = "Yes" if entry['fully_implemented'] else "No"
+
+            md.append(f"| {name} | {desc} | {tag_id} | {tests_str} | {impl_str} |")
+
+        md.append("")
+
+    return "\n".join(md)
+
+
+def generate_features_implementation_status(index: Dict, with_links: bool = True) -> str:
+    """Generate implementation status tables for features."""
+    md = []
+    graphics_entries = index.get('graphics_entries', [])
+
+    if not graphics_entries:
+        return ""
+
+    md.append("## Implementation Status")
+    md.append("")
+
+    # Fully implemented
+    fully_impl = [e for e in graphics_entries if e['fully_implemented']]
+    has_tests_not_impl = [e for e in graphics_entries if e['tests'] and not e['fully_implemented']]
+    no_tests = [e for e in graphics_entries if not e['tests']]
+
+    md.append("### Fully Implemented")
+    md.append(f"({len(fully_impl)} features)")
+    md.append("")
+    md.append("| Feature | Category | Tag ID | Tests |")
+    md.append("|---------|----------|--------|-------|")
+
+    for entry in fully_impl:
+        if with_links:
+            name = make_feature_link(entry['name'], entry['id'])
+        else:
+            name = entry['name']
+        cat = entry.get('category', 'Other')
+        tag_id = str(entry['tag_id']) if entry['tag_id'] is not None else "-"
+        test_count = len(entry['tests'])
+        md.append(f"| {name} | {cat} | {tag_id} | {test_count} |")
+
+    md.append("")
+
+    # Has tests but not fully implemented
+    md.append("### Partially Tested")
+    md.append("(Has tests but not marked as fully implemented)")
+    md.append("")
+
+    if has_tests_not_impl:
+        md.append("| Feature | Category | Tag ID | Tests |")
+        md.append("|---------|----------|--------|-------|")
+
+        for entry in has_tests_not_impl:
+            if with_links:
+                name = make_feature_link(entry['name'], entry['id'])
+            else:
+                name = entry['name']
+            cat = entry.get('category', 'Other')
+            tag_id = str(entry['tag_id']) if entry['tag_id'] is not None else "-"
+            test_count = len(entry['tests'])
+            md.append(f"| {name} | {cat} | {tag_id} | {test_count} |")
+    else:
+        md.append("**No partially tested features.**")
+
+    md.append("")
+
+    # No tests
+    md.append("### Not Tested")
+    md.append("(No tests at all)")
+    md.append("")
+
+    if no_tests:
+        md.append("| Feature | Category | Tag ID |")
+        md.append("|---------|----------|--------|")
+
+        for entry in no_tests:
+            if with_links:
+                name = make_feature_link(entry['name'], entry['id'])
+            else:
+                name = entry['name']
+            cat = entry.get('category', 'Other')
+            tag_id = str(entry['tag_id']) if entry['tag_id'] is not None else "-"
+            md.append(f"| {name} | {cat} | {tag_id} |")
+    else:
+        md.append("**All features have tests!**")
+
+    md.append("")
+
+    return "\n".join(md)
+
+
+def generate_features_detailed_sections(index: Dict) -> str:
+    """Generate per-feature detail blocks with full test lists."""
+    md = []
+    graphics_entries = index.get('graphics_entries', [])
+
+    if not graphics_entries:
+        return ""
+
+    md.append("## Detailed Information")
+    md.append("")
+
+    for entry in graphics_entries:
+        # Anchor uses the feature ID lowercased with underscores to hyphens
+        md.append(f"### {entry['name']}")
+        md.append("")
+        md.append(f"**ID**: `{entry['id']}`")
+        md.append("")
+        md.append(f"**Description**: {entry['description']}")
+        md.append("")
+        md.append(f"**Category**: {entry.get('category', 'Other')}")
+        md.append("")
+        tag_id = str(entry['tag_id']) if entry['tag_id'] is not None else "N/A"
+        md.append(f"**Tag ID**: {tag_id}")
+        md.append("")
+        md.append(f"**Fully Implemented**: {'Yes' if entry['fully_implemented'] else 'No'}")
+        md.append("")
+
+        if entry['tests']:
+            md.append("**Tests:**")
+            for test_path in entry['tests']:
+                md.append(f"- `{test_path}`")
+        else:
+            md.append("**Tests:** None")
+        md.append("")
+
+        md.append("---")
+        md.append("")
+
+    return "\n".join(md)
+
+
+# ---------------------------------------------------------------------------
+# Main generation
+# ---------------------------------------------------------------------------
+
 def generate_markdown():
-    """Generate the complete Markdown documentation in two versions."""
+    """Generate the complete Markdown documentation in four files."""
     print("Loading opcode index...")
     index = load_opcode_index()
 
-    print("Generating detailed sections...")
+    # ------------------------------------------------------------------
+    # Opcode documents
+    # ------------------------------------------------------------------
+
+    print("Generating opcode detailed sections...")
     detailed = generate_detailed_sections(index)
 
-    # Generate version WITH links
-    print("\nGenerating version WITH links...")
-    summary_with_links = generate_summary_table(index, with_links=True)
-    passing_tests_with_links = generate_passing_tests_chart(index, with_links=True)
-    failing_tests_with_links = generate_failing_tests_chart(index, with_links=True)
-    no_results_tests_with_links = generate_no_results_tests_chart(index, with_links=True)
-    status_with_links = generate_implementation_status(index, with_links=True)
-    missing_features_with_links = generate_missing_features_section(index, with_links=True)
+    for with_links, suffix in [(True, ""), (False, "-plain")]:
+        label = "WITH" if with_links else "WITHOUT"
+        print(f"\nGenerating opcode-index{suffix}.md ({label} links)...")
 
-    markdown_with_links = "\n".join([
-        summary_with_links,
-        passing_tests_with_links,
-        failing_tests_with_links,
-        no_results_tests_with_links,
-        status_with_links,
-        missing_features_with_links,
-        detailed
-    ])
+        summary = generate_summary_table(index, with_links=with_links)
+        passing = generate_passing_tests_chart(index, with_links=with_links)
+        failing = generate_failing_tests_chart(index, with_links=with_links)
+        no_results = generate_no_results_tests_chart(index, with_links=with_links)
+        status = generate_implementation_status(index, with_links=with_links)
+        missing = generate_missing_features_section(index, with_links=with_links)
 
-    output_path_with_links = BASE_DIR / "opcode-index.md"
-    with open(output_path_with_links, 'w') as f:
-        f.write(markdown_with_links)
+        sections = [
+            summary,
+            passing,
+            failing,
+            no_results,
+            status,
+            missing,
+            detailed,
+        ]
+        markdown = "\n".join(s for s in sections if s)
 
-    print(f"  Generated: {output_path_with_links}")
+        output_path = BASE_DIR / f"opcode-index{suffix}.md"
+        with open(output_path, 'w') as f:
+            f.write(markdown)
+        print(f"  Generated: {output_path}")
 
-    # Generate version WITHOUT links
-    print("\nGenerating version WITHOUT links...")
-    summary_no_links = generate_summary_table(index, with_links=False)
-    passing_tests_no_links = generate_passing_tests_chart(index, with_links=False)
-    failing_tests_no_links = generate_failing_tests_chart(index, with_links=False)
-    no_results_tests_no_links = generate_no_results_tests_chart(index, with_links=False)
-    status_no_links = generate_implementation_status(index, with_links=False)
-    missing_features_no_links = generate_missing_features_section(index, with_links=False)
+    # ------------------------------------------------------------------
+    # Feature documents
+    # ------------------------------------------------------------------
 
-    markdown_no_links = "\n".join([
-        summary_no_links,
-        passing_tests_no_links,
-        failing_tests_no_links,
-        no_results_tests_no_links,
-        status_no_links,
-        missing_features_no_links,
-        detailed
-    ])
+    print("\nGenerating feature detailed sections...")
+    feature_detailed = generate_features_detailed_sections(index)
 
-    output_path_no_links = BASE_DIR / "opcode-index-plain.md"
-    with open(output_path_no_links, 'w') as f:
-        f.write(markdown_no_links)
+    for with_links, suffix in [(True, ""), (False, "-plain")]:
+        label = "WITH" if with_links else "WITHOUT"
+        print(f"\nGenerating feature-index{suffix}.md ({label} links)...")
 
-    print(f"  Generated: {output_path_no_links}")
+        feature_summary = generate_features_summary_table(index, with_links=with_links)
+        feature_status = generate_features_implementation_status(index, with_links=with_links)
+
+        sections = [
+            feature_summary,
+            feature_status,
+            feature_detailed,
+        ]
+        markdown = "\n".join(s for s in sections if s)
+
+        output_path = BASE_DIR / f"feature-index{suffix}.md"
+        with open(output_path, 'w') as f:
+            f.write(markdown)
+        print(f"  Generated: {output_path}")
 
     print("\nMarkdown documentation generated successfully!")
 

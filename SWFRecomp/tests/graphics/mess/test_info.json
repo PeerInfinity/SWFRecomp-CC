@@ -11,5 +11,14 @@
   },
   "execution": {
     "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE",
+      "DEFINE_BITS",
+      "JPEG_TABLES"
+    ]
   }
 }

@@ -56,7 +56,7 @@ Thumbs.db
 test_vars
 
 # Test results
-test_results.json
+#test_results.json
 
 # Other
 __pycache__/
