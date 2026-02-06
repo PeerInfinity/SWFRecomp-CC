@@ -5,7 +5,7 @@
 set -e
 
 TEST_NAME=$1
-EXAMPLES_DIR=${2:-../SWFRecompDocs/docs/examples}
+EXAMPLES_DIR=${2:-}
 NO_INDEX=false
 DEMO_TYPE="trace"
 
@@ -21,11 +21,14 @@ done
 
 # Handle flags passed as positional arg 2
 if [ "$EXAMPLES_DIR" = "--no-index" ] || [ "$EXAMPLES_DIR" = "--graphics" ]; then
-    EXAMPLES_DIR="../SWFRecompDocs/docs/examples"
+    EXAMPLES_DIR=""
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Default examples dir now that SWFRECOMP_ROOT is available
+EXAMPLES_DIR=${EXAMPLES_DIR:-"${SWFRECOMP_ROOT}/../docs/examples"}
 BUILD_DIR="${SWFRECOMP_ROOT}/tests/${TEST_NAME}/build/wasm"
 DEPLOY_DIR="${EXAMPLES_DIR}/${TEST_NAME}"
 DOCS_DIR="$(dirname "${EXAMPLES_DIR}")"

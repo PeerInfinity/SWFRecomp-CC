@@ -5,7 +5,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCS_DIR=${1:-../SWFRecompDocs/docs}
+SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DOCS_DIR=${1:-"${SWFRECOMP_ROOT}/../docs"}
 EXAMPLES_DIR="${DOCS_DIR}/examples"
 INDEX_FILE="${DOCS_DIR}/index.html"
 
@@ -194,34 +195,32 @@ if [ ! -f "$INDEX_FILE" ]; then
     exit 1
 fi
 
-# Build the "coming soon" or graphics section
-COMING_SOON_OR_GRAPHICS=""
-if [ "$HAS_GRAPHICS" = true ]; then
-    COMING_SOON_OR_GRAPHICS="
-                <h2 style=\"margin-top: 40px; color: #7B1FA2; border-bottom: 2px solid #7B1FA2; padding-bottom: 10px;\">Graphics Demos (WebGPU)</h2>
-                <p style=\"margin-bottom: 20px; color: #b0b0b0;\">These demos render Flash vector graphics via WebGPU. Requires a WebGPU-capable browser.</p>
-${GRAPHICS_CARDS}"
-else
-    COMING_SOON_OR_GRAPHICS="
-                <p style=\"margin-top: 20px; color: #666;\">
-                    More complex demos with graphics rendering coming soon!
-                </p>"
-fi
+# Build the trace demos heading
+TRACE_HEADING="
+                <h2 style=\"margin-top: 40px;\">Trace Demos</h2>
+                <p style=\"margin-bottom: 20px; color: #b0b0b0;\">These demos run recompiled ActionScript and display trace output in the browser.</p>"
 
 # Create a temporary file with updated content
 TEMP_FILE=$(mktemp)
 
 # Use awk to replace the demo-section content and add excluded section
-awk -v demos="$DEMO_CARDS" -v graphics="$COMING_SOON_OR_GRAPHICS" -v excluded="$EXCLUDED_SECTION" '
+# Graphics demos are listed first, then trace demos
+awk -v graphics_cards="$GRAPHICS_CARDS" -v trace_heading="$TRACE_HEADING" -v trace_cards="$DEMO_CARDS" -v has_graphics="$HAS_GRAPHICS" -v excluded="$EXCLUDED_SECTION" '
     BEGIN { in_demo_section = 0; in_excluded_section = 0; skip_next_section = 0 }
 
     # Start of demo section
     /<section class="demo-section">/ {
         in_demo_section = 1
         print
-        print "                <h2>Live Demos</h2>"
+        if (has_graphics == "true") {
+            print "                <h2 style=\"color: #7B1FA2; border-bottom: 2px solid #7B1FA2;\">Graphics Demos (WebGPU)</h2>"
+            print "                <p style=\"margin-bottom: 20px; color: #b0b0b0;\">These demos render Flash vector graphics via WebGPU. Requires a WebGPU-capable browser.</p>"
+            print ""
+            print graphics_cards
+        }
+        print trace_heading
         print ""
-        print demos
+        print trace_cards
         next
     }
 
@@ -229,7 +228,6 @@ awk -v demos="$DEMO_CARDS" -v graphics="$COMING_SOON_OR_GRAPHICS" -v excluded="$
     in_demo_section && /<\/section>/ {
         in_demo_section = 0
         skip_next_section = 1
-        print graphics
         print
         # Insert excluded section after demo section
         if (excluded != "") {

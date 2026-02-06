@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DOCS_DIR=${1:-../SWFRecompDocs/docs/examples}
+DOCS_DIR=${1:-"${SWFRECOMP_ROOT}/../docs/examples"}
 
 # Load exclude list from config file
 EXCLUDE_CONFIG="${SCRIPT_DIR}/excluded_tests.conf"
