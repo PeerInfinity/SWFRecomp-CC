@@ -454,13 +454,85 @@ fetch_and_merge() {
     fi
 }
 
+# Function to fetch all remote branches at once
+fetch_all_branches() {
+    echo -e "${BLUE}Contacting remote...${NC}"
+    local remote_refs=$(git ls-remote --heads origin)
+    local total=$(echo "$remote_refs" | wc -l)
+
+    echo -e "${BLUE}Found $total remote branches.${NC}"
+    echo
+
+    # Load local branch hashes for comparison
+    declare -A local_hashes
+    while IFS='|' read -r branch hash; do
+        local_hashes["$branch"]="$hash"
+    done < <(git for-each-ref --format='%(refname:short)|%(objectname)' refs/heads/)
+
+    # Count branches that need fetching
+    local to_fetch=0
+    while IFS=$'\t' read -r remote_hash ref; do
+        local branch_name="${ref#refs/heads/}"
+        local local_hash="${local_hashes[$branch_name]:-}"
+        if [ "$local_hash" != "$remote_hash" ]; then
+            ((to_fetch++))
+        fi
+    done <<< "$remote_refs"
+
+    if [ "$to_fetch" -eq 0 ]; then
+        echo -e "${GREEN}All remote branches are already up to date locally.${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}$to_fetch branches need to be fetched/updated.${NC}"
+    read -p "Proceed with fetching all branches? [Y/n]: " confirm
+
+    if [ -z "$confirm" ]; then
+        confirm="Y"
+    fi
+
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}Fetch cancelled.${NC}"
+        return 1
+    fi
+
+    echo
+    echo -e "${YELLOW}Fetching all branches...${NC}"
+
+    local fetched=0
+    local failed=0
+
+    while IFS=$'\t' read -r remote_hash ref; do
+        local branch_name="${ref#refs/heads/}"
+        local local_hash="${local_hashes[$branch_name]:-}"
+
+        # Skip if already up to date
+        if [ "$local_hash" = "$remote_hash" ]; then
+            continue
+        fi
+
+        echo -n "  Fetching $branch_name... "
+        if git fetch origin "$branch_name:$branch_name" --force 2>/dev/null; then
+            echo -e "${GREEN}OK${NC}"
+            ((fetched++))
+        else
+            echo -e "${RED}FAILED${NC}"
+            ((failed++))
+        fi
+    done <<< "$remote_refs"
+
+    echo
+    echo -e "${GREEN}Fetch complete: $fetched succeeded, $failed failed.${NC}"
+}
+
 # Function to select mode
-# Returns: fetch, merge, or abort
+# Returns: fetch, merge, fetch_all, or abort
 select_mode() {
     echo -e "${BLUE}=== Select Mode ===${NC}" >&2
     echo "1. Fetch and merge unfetched branches (default)" >&2
     echo "2. Merge existing local branches" >&2
-    echo "3. Abort current merge" >&2
+    echo "3. Fetch all remote branches (no merge)" >&2
+    echo "4. Abort current merge" >&2
     echo >&2
 
     read -p "Select mode [1]: " mode_choice >&2
@@ -477,6 +549,9 @@ select_mode() {
             echo "merge"
             ;;
         3)
+            echo "fetch_all"
+            ;;
+        4)
             echo "abort"
             ;;
         *)
@@ -506,6 +581,13 @@ main() {
             else
                 echo -e "${BLUE}No merge in progress to abort.${NC}"
             fi
+            echo
+            continue
+        fi
+
+        # Handle fetch_all mode
+        if [ "$mode_type" = "fetch_all" ]; then
+            fetch_all_branches
             echo
             continue
         fi
