@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 14
+    "graphics_features_with_tests": 15
   },
   "entries": [
     {
@@ -8640,8 +8640,10 @@
       "tag_id": 32,
       "category": "Shape Tags",
       "description": "Shape with full RGBA support (SWF tag 32)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/rgba_shape"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_SHAPE4",
@@ -8662,6 +8664,7 @@
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
         "SWFRecomp/tests/graphics/three_boxes",
@@ -8754,6 +8757,7 @@
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
         "SWFRecomp/tests/graphics/thiccie",
@@ -8787,6 +8791,7 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/thiccie",
         "SWFRecomp/tests/graphics/three_boxes",
         "SWFRecomp/tests/graphics/three_boxes_hole",

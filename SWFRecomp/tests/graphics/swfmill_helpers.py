@@ -21,15 +21,19 @@ from xml.dom import minidom
 
 class SolidFill:
     """Solid color fill."""
-    def __init__(self, r, g, b):
+    def __init__(self, r, g, b, a=None):
         self.r = r
         self.g = g
         self.b = b
+        self.a = a  # Alpha (0-255), None for RGB-only (DefineShape/DefineShape2)
 
     def to_xml(self, parent):
         solid = SubElement(parent, "Solid")
         color_el = SubElement(solid, "color")
-        SubElement(color_el, "Color", red=str(self.r), green=str(self.g), blue=str(self.b))
+        attrs = {"red": str(self.r), "green": str(self.g), "blue": str(self.b)}
+        if self.a is not None:
+            attrs["alpha"] = str(self.a)
+        SubElement(color_el, "Color", **attrs)
 
 
 class LinearGradientFill:
@@ -112,16 +116,20 @@ class ClippedBitmapFill:
 
 class LineStyle:
     """Line style with width (in twips) and color."""
-    def __init__(self, width, r, g, b):
+    def __init__(self, width, r, g, b, a=None):
         self.width = width
         self.r = r
         self.g = g
         self.b = b
+        self.a = a  # Alpha (0-255), None for RGB-only
 
     def to_xml(self, parent):
         ls = SubElement(parent, "LineStyle", width=str(self.width))
         color_el = SubElement(ls, "color")
-        SubElement(color_el, "Color", red=str(self.r), green=str(self.g), blue=str(self.b))
+        attrs = {"red": str(self.r), "green": str(self.g), "blue": str(self.b)}
+        if self.a is not None:
+            attrs["alpha"] = str(self.a)
+        SubElement(color_el, "Color", **attrs)
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +211,7 @@ class ShapeDefinition:
         self.fill_styles = []
         self.line_styles = []
         self.edges = []
-        self.shape_version = shape_version  # 1 = DefineShape, 2 = DefineShape2
+        self.shape_version = shape_version  # 1 = DefineShape, 2 = DefineShape2, 3 = DefineShape3
 
     def add_fill(self, fill):
         self.fill_styles.append(fill)
@@ -220,7 +228,8 @@ class ShapeDefinition:
         self.edges.extend(edges)
 
     def to_xml(self, parent):
-        tag_name = "DefineShape2" if self.shape_version == 2 else "DefineShape"
+        version_tags = {1: "DefineShape", 2: "DefineShape2", 3: "DefineShape3"}
+        tag_name = version_tags.get(self.shape_version, "DefineShape")
         shape_el = SubElement(parent, tag_name, objectID=str(self.object_id))
         bounds_el = SubElement(shape_el, "bounds")
         left, right, top, bottom = self.bounds

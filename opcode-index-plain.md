@@ -497,22 +497,22 @@ This section lists all missing features for opcodes that are not fully implement
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 14/60
+**Features With Tests**: 15/60
 
-**Features Without Tests**: 46
+**Features Without Tests**: 45
 
-**Total Feature Tests**: 57
+**Total Feature Tests**: 61
 
-**Fully Implemented**: 14/60
+**Fully Implemented**: 15/60
 
 ### Shape Tags
-(2/4 with tests)
+(3/4 with tests)
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
 | DefineShape | Basic shape definition (SWF tag 2) | 12 (awful_gradient, awful_radial_gradient, awful_shape_swf_4, coicle, mess, ssquare, sssquare, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares) | Yes |
 | DefineShape2 | Extended shape with >255 styles (SWF tag 22) | 2 (new_styles, wild_shadow) | Yes |
-| DefineShape3 | Shape with full RGBA support (SWF tag 32) | **0** | No |
+| DefineShape3 | Shape with full RGBA support (SWF tag 32) | 1 (rgba_shape) | Yes |
 | DefineShape4 | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | **0** | No |
 
 ### Fill Types
@@ -520,7 +520,7 @@ This section lists all missing features for opcodes that are not fully implement
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
-| SolidFill | Solid color fill (type 0x00) | 10 (awful_shape_swf_4, coicle, new_styles, ssquare, sssquare, three_boxes, three_boxes_hole, three_boxes_holes, two_squares, wild_shadow) | Yes |
+| SolidFill | Solid color fill (type 0x00) | 11 (awful_shape_swf_4, coicle, new_styles, rgba_shape, ssquare, sssquare, three_boxes, three_boxes_hole, three_boxes_holes, two_squares, wild_shadow) | Yes |
 | LinearGradient | Linear gradient fill (type 0x10) | 2 (awful_gradient, awful_radial_gradient) | Yes |
 | RadialGradient | Radial gradient fill (type 0x12) | 1 (awful_radial_gradient) | Yes |
 | FocalRadialGradient | Focal radial gradient fill (type 0x13, SWF 8+) | **0** | No |
@@ -534,7 +534,7 @@ This section lists all missing features for opcodes that are not fully implement
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
-| StraightEdge | Straight edge records (LineTo) | 13 (awful_gradient, awful_radial_gradient, awful_shape_swf_4, mess, new_styles, ssquare, sssquare, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares, wild_shadow) | Yes |
+| StraightEdge | Straight edge records (LineTo) | 14 (awful_gradient, awful_radial_gradient, awful_shape_swf_4, mess, new_styles, rgba_shape, ssquare, sssquare, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares, wild_shadow) | Yes |
 | CurvedEdge | Curved edge records (CurveTo) | 2 (coicle, wild_shadow) | Yes |
 
 ### Style Features
@@ -542,7 +542,7 @@ This section lists all missing features for opcodes that are not fully implement
 
 | Feature | Description | Tests | Implemented |
 |---------|-------------|-------|-------------|
-| LineStyle | Basic stroke line style (LINESTYLE) | 8 (awful_gradient, awful_radial_gradient, new_styles, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares) | Yes |
+| LineStyle | Basic stroke line style (LINESTYLE) | 9 (awful_gradient, awful_radial_gradient, new_styles, rgba_shape, thiccie, three_boxes, three_boxes_hole, three_boxes_holes, two_squares) | Yes |
 | LineStyle2 | Advanced line style with caps/joins (LINESTYLE2, DefineShape4) | **0** | No |
 | NewStyles | Mid-shape style changes (StateNewStyles) | 2 (new_styles, wild_shadow) | Yes |
 
@@ -652,22 +652,23 @@ This section lists all missing features for opcodes that are not fully implement
 ### Coverage Matrix
 (Only features with at least one test are shown)
 
-| Feature | awful_gradie | awful_radial | awful_shape_ | coicle | mess | new_styles | ssquare | sssquare | thiccie | three_boxes | three_boxes_ | three_boxes_ | two_squares | wild_shadow |
-|---------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| DefineShape | X | X | X | X | X |  | X | X | X | X | X | X | X |  |
-| DefineShape2 |  |  |  |  |  | X |  |  |  |  |  |  |  | X |
-| SolidFill |  |  | X | X |  | X | X | X |  | X | X | X | X | X |
-| LinearGradient | X | X |  |  |  |  |  |  |  |  |  |  |  |  |
-| RadialGradient |  | X |  |  |  |  |  |  |  |  |  |  |  |  |
-| ClippedBitmap |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
-| StraightEdge | X | X | X |  | X | X | X | X | X | X | X | X | X | X |
-| CurvedEdge |  |  |  | X |  |  |  |  |  |  |  |  |  | X |
-| LineStyle | X | X |  |  |  | X |  |  | X | X | X | X | X |  |
-| NewStyles |  |  |  |  |  | X |  |  |  |  |  |  |  | X |
-| DefineBits |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
-| JPEGTables |  |  |  |  | X |  |  |  |  |  |  |  |  |  |
-| PlaceObject2 Scale |  |  |  |  |  |  |  |  |  |  |  |  |  | X |
-| PlaceObject2 Skew |  |  |  |  |  |  |  |  |  |  |  |  |  | X |
+| Feature | awful_gradie | awful_radial | awful_shape_ | coicle | mess | new_styles | rgba_shape | ssquare | sssquare | thiccie | three_boxes | three_boxes_ | three_boxes_ | two_squares | wild_shadow |
+|---------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| DefineShape | X | X | X | X | X |  |  | X | X | X | X | X | X | X |  |
+| DefineShape2 |  |  |  |  |  | X |  |  |  |  |  |  |  |  | X |
+| DefineShape3 |  |  |  |  |  |  | X |  |  |  |  |  |  |  |  |
+| SolidFill |  |  | X | X |  | X | X | X | X |  | X | X | X | X | X |
+| LinearGradient | X | X |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| RadialGradient |  | X |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| ClippedBitmap |  |  |  |  | X |  |  |  |  |  |  |  |  |  |  |
+| StraightEdge | X | X | X |  | X | X | X | X | X | X | X | X | X | X | X |
+| CurvedEdge |  |  |  | X |  |  |  |  |  |  |  |  |  |  | X |
+| LineStyle | X | X |  |  |  | X | X |  |  | X | X | X | X | X |  |
+| NewStyles |  |  |  |  |  | X |  |  |  |  |  |  |  |  | X |
+| DefineBits |  |  |  |  | X |  |  |  |  |  |  |  |  |  |  |
+| JPEGTables |  |  |  |  | X |  |  |  |  |  |  |  |  |  |  |
+| PlaceObject2 Scale |  |  |  |  |  |  |  |  |  |  |  |  |  |  | X |
+| PlaceObject2 Skew |  |  |  |  |  |  |  |  |  |  |  |  |  |  | X |
 
 ## Detailed Information
 
