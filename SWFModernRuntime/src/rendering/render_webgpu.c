@@ -21,6 +21,9 @@
 #include <emscripten/html5.h>
 #endif
 
+// Helper: convert C string to WGPUStringView for descriptor labels.
+#define WGPU_LABEL(s) ((WGPUStringView){.data = (s), .length = WGPU_STRLEN})
+
 // ---------------------------------------------------------------------------
 // Embedded WGSL shader sources
 // ---------------------------------------------------------------------------
@@ -140,7 +143,7 @@ static const char* compute_wgsl =
 // Helper: create a WGPUBuffer and optionally upload data
 // ---------------------------------------------------------------------------
 static WGPUBuffer create_buffer(WGPUDevice device, WGPUQueue queue,
-                                WGPUBufferUsageFlags usage,
+                                WGPUBufferUsage usage,
                                 const void* data, size_t size,
                                 const char* label)
 {
@@ -149,7 +152,7 @@ static WGPUBuffer create_buffer(WGPUDevice device, WGPUQueue queue,
 	if (size < 16) size = 16;
 
 	WGPUBufferDescriptor desc = {0};
-	desc.label = label;
+	desc.label = WGPU_LABEL(label);
 	desc.size = size;
 	desc.usage = usage;
 	if (data)
@@ -176,7 +179,7 @@ static WGPUShaderModule create_shader(WGPUDevice device, const char* wgsl,
 	wgsl_src.code.length = strlen(wgsl);
 
 	WGPUShaderModuleDescriptor desc = {0};
-	desc.label = label;
+	desc.label = WGPU_LABEL(label);
 	desc.nextInChain = (const WGPUChainedStruct*)&wgsl_src;
 
 	return wgpuDeviceCreateShaderModule(device, &desc);
@@ -216,7 +219,7 @@ static void request_adapter_sync(WebGPURenderContext* ctx,
 	cb_info.callback = on_adapter_ready;
 	cb_info.userdata1 = ctx;
 
-	WGPUFuture future = wgpuInstanceRequestAdapter2(ctx->instance, opts, cb_info);
+	WGPUFuture future = wgpuInstanceRequestAdapter(ctx->instance, opts, cb_info);
 
 	// Poll until the callback fires
 	WGPUFutureWaitInfo wait_info = {0};
@@ -251,7 +254,7 @@ static void request_device_sync(WebGPURenderContext* ctx,
 	cb_info.callback = on_device_ready;
 	cb_info.userdata1 = ctx;
 
-	WGPUFuture future = wgpuAdapterRequestDevice2(ctx->adapter, desc, cb_info);
+	WGPUFuture future = wgpuAdapterRequestDevice(ctx->adapter, desc, cb_info);
 
 	WGPUFutureWaitInfo wait_info = {0};
 	wait_info.future = future;
@@ -264,7 +267,7 @@ static void request_device_sync(WebGPURenderContext* ctx,
 static void create_dummy_texture(WebGPURenderContext* ctx)
 {
 	WGPUTextureDescriptor tex_desc = {0};
-	tex_desc.label = "dummy_tex";
+	tex_desc.label = WGPU_LABEL("dummy_tex");
 	tex_desc.dimension = WGPUTextureDimension_2D;
 	tex_desc.size = (WGPUExtent3D){1, 1, 1};
 	tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
@@ -280,7 +283,7 @@ static void create_dummy_texture(WebGPURenderContext* ctx)
 	ctx->dummy_tex_view = wgpuTextureCreateView(ctx->dummy_tex, &view_desc);
 
 	WGPUSamplerDescriptor samp_desc = {0};
-	samp_desc.label = "dummy_sampler";
+	samp_desc.label = WGPU_LABEL("dummy_sampler");
 	samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
 	samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
 	samp_desc.magFilter = WGPUFilterMode_Nearest;
@@ -331,9 +334,9 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 
 	// --- Create surface ---
 #ifdef __EMSCRIPTEN__
-	WGPUSurfaceSourceCanvasHTMLSelector_Emscripten canvas_src = {0};
-	canvas_src.chain.sType = WGPUSType_SurfaceSourceCanvasHTMLSelector_Emscripten;
-	canvas_src.selector = "#canvas";
+	WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvas_src = {0};
+	canvas_src.chain.sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
+	canvas_src.selector = WGPU_LABEL("#canvas");
 
 	WGPUSurfaceDescriptor surf_desc = {0};
 	surf_desc.nextInChain = (const WGPUChainedStruct*)&canvas_src;
@@ -366,9 +369,9 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	// --- Request device ---
 	{
 		WGPUDeviceDescriptor dev_desc = {0};
-		dev_desc.label = "swf_device";
+		dev_desc.label = WGPU_LABEL("swf_device");
 		// Request defaults — no special limits or features needed
-		dev_desc.defaultQueue.label = "swf_queue";
+		dev_desc.defaultQueue.label = WGPU_LABEL("swf_queue");
 
 		request_device_sync(ctx, &dev_desc);
 		assert(ctx->device != NULL);
@@ -478,7 +481,7 @@ static void create_textures(WebGPURenderContext* ctx)
 	if (num_gradients > 0)
 	{
 		WGPUTextureDescriptor tex_desc = {0};
-		tex_desc.label = "gradient_tex";
+		tex_desc.label = WGPU_LABEL("gradient_tex");
 		tex_desc.dimension = WGPUTextureDimension_2D;
 		tex_desc.size = (WGPUExtent3D){256, 1, (u32)num_gradients};
 		tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
@@ -519,7 +522,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		                      num_gradients * 256 * 4, &layout, &extent);
 
 		WGPUSamplerDescriptor samp_desc = {0};
-		samp_desc.label = "gradient_sampler";
+		samp_desc.label = WGPU_LABEL("gradient_sampler");
 		samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
 		samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
 		samp_desc.magFilter = WGPUFilterMode_Linear;
@@ -534,7 +537,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		u32 bh = (u32)(ctx->bitmap_highest_h + 1);
 
 		WGPUTextureDescriptor tex_desc = {0};
-		tex_desc.label = "bitmap_tex";
+		tex_desc.label = WGPU_LABEL("bitmap_tex");
 		tex_desc.dimension = WGPUTextureDimension_2D;
 		tex_desc.size = (WGPUExtent3D){bw, bh, (u32)ctx->bitmap_count};
 		tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
@@ -550,7 +553,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		ctx->bitmap_tex_view = wgpuTextureCreateView(ctx->bitmap_tex, &view_desc);
 
 		WGPUSamplerDescriptor samp_desc = {0};
-		samp_desc.label = "bitmap_sampler";
+		samp_desc.label = WGPU_LABEL("bitmap_sampler");
 		samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
 		samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
 		samp_desc.magFilter = WGPUFilterMode_Linear;
@@ -561,7 +564,7 @@ static void create_textures(WebGPURenderContext* ctx)
 	// --- MSAA texture (4x) ---
 	{
 		WGPUTextureDescriptor tex_desc = {0};
-		tex_desc.label = "msaa_texture";
+		tex_desc.label = WGPU_LABEL("msaa_texture");
 		tex_desc.dimension = WGPUTextureDimension_2D;
 		tex_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
 		tex_desc.format = ctx->surface_format;
@@ -594,7 +597,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	}
 
 	WGPUBindGroupLayoutDescriptor bg0_desc = {0};
-	bg0_desc.label = "vertex_storage_bgl";
+	bg0_desc.label = WGPU_LABEL("vertex_storage_bgl");
 	bg0_desc.entryCount = 4;
 	bg0_desc.entries = bg0_entries;
 	ctx->vertex_storage_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg0_desc);
@@ -609,7 +612,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	bg1_entries[1].buffer.type = WGPUBufferBindingType_Uniform;
 
 	WGPUBindGroupLayoutDescriptor bg1_desc = {0};
-	bg1_desc.label = "vertex_uniform_bgl";
+	bg1_desc.label = WGPU_LABEL("vertex_uniform_bgl");
 	bg1_desc.entryCount = 2;
 	bg1_desc.entries = bg1_entries;
 	ctx->vertex_uniform_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg1_desc);
@@ -633,7 +636,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	bg2_entries[3].sampler.type = WGPUSamplerBindingType_Filtering;
 
 	WGPUBindGroupLayoutDescriptor bg2_desc = {0};
-	bg2_desc.label = "fragment_sampler_bgl";
+	bg2_desc.label = WGPU_LABEL("fragment_sampler_bgl");
 	bg2_desc.entryCount = 4;
 	bg2_desc.entries = bg2_entries;
 	ctx->fragment_sampler_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg2_desc);
@@ -645,7 +648,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		ctx->fragment_sampler_bgl,
 	};
 	WGPUPipelineLayoutDescriptor pl_desc = {0};
-	pl_desc.label = "render_pipeline_layout";
+	pl_desc.label = WGPU_LABEL("render_pipeline_layout");
 	pl_desc.bindGroupLayoutCount = 3;
 	pl_desc.bindGroupLayouts = render_bgls;
 	ctx->render_pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &pl_desc);
@@ -690,7 +693,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	frag_state.targets = &color_target;
 
 	WGPURenderPipelineDescriptor rp_desc = {0};
-	rp_desc.label = "render_pipeline";
+	rp_desc.label = WGPU_LABEL("render_pipeline");
 	rp_desc.layout = ctx->render_pipeline_layout;
 	rp_desc.vertex.module = vs_module;
 	rp_desc.vertex.entryPoint.data = "vs_main";
@@ -718,7 +721,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		comp0_entry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
 
 		WGPUBindGroupLayoutDescriptor comp0_desc = {0};
-		comp0_desc.label = "compute_read_bgl";
+		comp0_desc.label = WGPU_LABEL("compute_read_bgl");
 		comp0_desc.entryCount = 1;
 		comp0_desc.entries = &comp0_entry;
 		ctx->compute_read_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &comp0_desc);
@@ -729,14 +732,14 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		comp1_entry.buffer.type = WGPUBufferBindingType_Storage;
 
 		WGPUBindGroupLayoutDescriptor comp1_desc = {0};
-		comp1_desc.label = "compute_write_bgl";
+		comp1_desc.label = WGPU_LABEL("compute_write_bgl");
 		comp1_desc.entryCount = 1;
 		comp1_desc.entries = &comp1_entry;
 		ctx->compute_write_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &comp1_desc);
 
 		WGPUBindGroupLayout comp_bgls[2] = {ctx->compute_read_bgl, ctx->compute_write_bgl};
 		WGPUPipelineLayoutDescriptor comp_pl_desc = {0};
-		comp_pl_desc.label = "compute_pipeline_layout";
+		comp_pl_desc.label = WGPU_LABEL("compute_pipeline_layout");
 		comp_pl_desc.bindGroupLayoutCount = 2;
 		comp_pl_desc.bindGroupLayouts = comp_bgls;
 		ctx->compute_pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &comp_pl_desc);
@@ -744,7 +747,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		WGPUShaderModule cs_module = create_shader(ctx->device, compute_wgsl, "compute_shader");
 
 		WGPUComputePipelineDescriptor cp_desc = {0};
-		cp_desc.label = "compute_pipeline";
+		cp_desc.label = WGPU_LABEL("compute_pipeline");
 		cp_desc.layout = ctx->compute_pipeline_layout;
 		cp_desc.compute.module = cs_module;
 		cp_desc.compute.entryPoint.data = "cs_main";
@@ -778,7 +781,7 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 	bg0_entries[3].size = wgpuBufferGetSize(ctx->bitmap_sizes_buffer);
 
 	WGPUBindGroupDescriptor bg0_desc = {0};
-	bg0_desc.label = "vertex_storage_bg";
+	bg0_desc.label = WGPU_LABEL("vertex_storage_bg");
 	bg0_desc.layout = ctx->vertex_storage_bgl;
 	bg0_desc.entryCount = 4;
 	bg0_desc.entries = bg0_entries;
@@ -794,7 +797,7 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 	bg1_entries[1].size = 16; // u32 padded
 
 	WGPUBindGroupDescriptor bg1_desc = {0};
-	bg1_desc.label = "vertex_uniform_bg";
+	bg1_desc.label = WGPU_LABEL("vertex_uniform_bg");
 	bg1_desc.layout = ctx->vertex_uniform_bgl;
 	bg1_desc.entryCount = 2;
 	bg1_desc.entries = bg1_entries;
@@ -818,7 +821,7 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 	bg2_entries[3].sampler = bmp_samp;
 
 	WGPUBindGroupDescriptor bg2_desc = {0};
-	bg2_desc.label = "fragment_sampler_bg";
+	bg2_desc.label = WGPU_LABEL("fragment_sampler_bg");
 	bg2_desc.layout = ctx->fragment_sampler_bgl;
 	bg2_desc.entryCount = 4;
 	bg2_desc.entries = bg2_entries;
@@ -834,7 +837,7 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 		comp0_entry.size = wgpuBufferGetSize(ctx->uninv_mat_buffer);
 
 		WGPUBindGroupDescriptor comp0_desc = {0};
-		comp0_desc.label = "compute_read_bg";
+		comp0_desc.label = WGPU_LABEL("compute_read_bg");
 		comp0_desc.layout = ctx->compute_read_bgl;
 		comp0_desc.entryCount = 1;
 		comp0_desc.entries = &comp0_entry;
@@ -846,7 +849,7 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 		comp1_entry.size = wgpuBufferGetSize(ctx->inv_mat_buffer);
 
 		WGPUBindGroupDescriptor comp1_desc = {0};
-		comp1_desc.label = "compute_write_bg";
+		comp1_desc.label = WGPU_LABEL("compute_write_bg");
 		comp1_desc.layout = ctx->compute_write_bgl;
 		comp1_desc.entryCount = 1;
 		comp1_desc.entries = &comp1_entry;
@@ -867,7 +870,7 @@ static void run_compute_pass(WebGPURenderContext* ctx)
 	                     ctx->uninv_mat_data, ctx->uninv_mat_data_size);
 
 	WGPUCommandEncoderDescriptor enc_desc = {0};
-	enc_desc.label = "compute_encoder";
+	enc_desc.label = WGPU_LABEL("compute_encoder");
 	WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(ctx->device, &enc_desc);
 
 	WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
@@ -938,7 +941,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 
 	// Create command encoder
 	WGPUCommandEncoderDescriptor enc_desc = {0};
-	enc_desc.label = "frame_encoder";
+	enc_desc.label = WGPU_LABEL("frame_encoder");
 	ctx->encoder = wgpuDeviceCreateCommandEncoder(ctx->device, &enc_desc);
 
 	// Begin render pass with MSAA
@@ -952,7 +955,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	};
 
 	WGPURenderPassDescriptor rp_desc = {0};
-	rp_desc.label = "render_pass";
+	rp_desc.label = WGPU_LABEL("render_pass");
 	rp_desc.colorAttachmentCount = 1;
 	rp_desc.colorAttachments = &color_att;
 
