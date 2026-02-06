@@ -234,6 +234,81 @@ def scan_test_directories() -> Dict[str, Dict]:
     return test_map
 
 
+def scan_graphics_test_directories() -> Dict[str, Dict]:
+    """
+    Scan graphics test directories and map them to graphics features.
+
+    Returns a dict mapping feature names to test information:
+    {
+        "DEFINE_SHAPE": {
+            "tested": ["SWFRecomp/tests/graphics/two_squares", ...],
+            "fully_implemented": True
+        }
+    }
+    """
+    graphics_dir = BASE_DIR / "SWFRecomp/tests/graphics"
+    feature_map = {}
+
+    print(f"\nScanning graphics test directories: {graphics_dir}")
+
+    if not graphics_dir.exists():
+        print("  ERROR: Graphics test directory not found")
+        return feature_map
+
+    for item in sorted(graphics_dir.iterdir()):
+        if not item.is_dir():
+            continue
+
+        test_info_path = item / "test_info.json"
+        if not test_info_path.exists():
+            continue
+
+        try:
+            with open(test_info_path, 'r') as f:
+                test_info = json.load(f)
+
+            test_name = item.name
+            relative_path = f"SWFRecomp/tests/graphics/{test_name}"
+            graphics_features = test_info.get('graphics', {}).get('tested', [])
+            fully_implemented = test_info.get('metadata', {}).get('fully_implemented', False)
+
+            for feature in graphics_features:
+                if feature not in feature_map:
+                    feature_map[feature] = {
+                        "tested": [],
+                        "fully_implemented": True
+                    }
+                feature_map[feature]["tested"].append(relative_path)
+                if not fully_implemented:
+                    feature_map[feature]["fully_implemented"] = False
+                print(f"  Found: {relative_path} tests {feature}")
+
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"  WARNING: Could not parse {test_info_path}: {e}")
+
+    print(f"Total graphics features with tests: {len(feature_map)}")
+    return feature_map
+
+
+# Canonical list of graphics features with metadata
+GRAPHICS_FEATURES = {
+    "DEFINE_SHAPE": {"name": "DefineShape", "tag_id": 2, "description": "Basic shape definition (SWF tag 2)"},
+    "DEFINE_SHAPE2": {"name": "DefineShape2", "tag_id": 22, "description": "Extended shape definition with new styles (SWF tag 22)"},
+    "DEFINE_BITS": {"name": "DefineBits", "tag_id": 6, "description": "JPEG bitmap data (SWF tag 6)"},
+    "JPEG_TABLES": {"name": "JPEGTables", "tag_id": 8, "description": "Shared JPEG encoding tables (SWF tag 8)"},
+    "SOLID_FILL": {"name": "SolidFill", "description": "Solid color fill style"},
+    "LINEAR_GRADIENT": {"name": "LinearGradient", "description": "Linear gradient fill style"},
+    "RADIAL_GRADIENT": {"name": "RadialGradient", "description": "Radial gradient fill style"},
+    "CLIPPED_BITMAP": {"name": "ClippedBitmap", "description": "Clipped bitmap fill style"},
+    "LINE_STYLE": {"name": "LineStyle", "description": "Stroke line style"},
+    "STRAIGHT_EDGE": {"name": "StraightEdge", "description": "Straight edge records (LineTo)"},
+    "CURVED_EDGE": {"name": "CurvedEdge", "description": "Curved edge records (CurveTo)"},
+    "NEW_STYLES": {"name": "NewStyles", "description": "Mid-shape style changes (StateNewStyles)"},
+    "PLACE_SCALE": {"name": "PlaceObject2 Scale", "description": "Scale transform in PlaceObject2"},
+    "PLACE_SKEW": {"name": "PlaceObject2 Skew", "description": "Skew transform in PlaceObject2"},
+}
+
+
 def scan_documentation_prompts() -> Dict[str, str]:
     """Scan documentation prompt files and map them to opcodes."""
     prompts_dir = BASE_DIR / "SWFRecompDocs/prompts"
@@ -359,6 +434,7 @@ def build_opcode_index():
     enum_opcodes = parse_action_hpp()
     functions = parse_action_h()
     test_map = scan_test_directories()
+    graphics_map = scan_graphics_test_directories()
     prompt_map = scan_documentation_prompts()
     test_results = load_test_results()
 
@@ -490,15 +566,33 @@ def build_opcode_index():
         if entry.get('tests_primary'):
             implemented_hex_values.add(entry['hex'])
 
+    # Build graphics entries
+    graphics_entries = []
+    for feature_id, feature_meta in GRAPHICS_FEATURES.items():
+        test_info = graphics_map.get(feature_id, {"tested": [], "fully_implemented": False})
+        graphics_entries.append({
+            'id': feature_id,
+            'name': feature_meta['name'],
+            'tag_id': feature_meta.get('tag_id'),
+            'description': feature_meta['description'],
+            'tests': test_info['tested'],
+            'fully_implemented': test_info['fully_implemented'],
+        })
+
+    features_with_tests = sum(1 for e in graphics_entries if e['tests'])
+
     # Build final index
     index = {
         'metadata': {
             'generated_date': datetime.now().strftime('%Y-%m-%d'),
             'total_opcodes': len(all_hex_values),
             'implemented_opcodes': len(implemented_hex_values),
-            'total_entries': len(entries)
+            'total_entries': len(entries),
+            'total_graphics_features': len(GRAPHICS_FEATURES),
+            'graphics_features_with_tests': features_with_tests,
         },
-        'entries': entries
+        'entries': entries,
+        'graphics_entries': graphics_entries,
     }
 
     # Write to file
@@ -511,6 +605,7 @@ def build_opcode_index():
     print(f"  Total opcodes: {len(all_hex_values)}")
     print(f"  Implemented opcodes: {len(implemented_hex_values)}")
     print(f"  Total entries: {len(entries)}")
+    print(f"  Graphics features: {features_with_tests}/{len(GRAPHICS_FEATURES)} with tests")
     print("=" * 80)
 
     return index

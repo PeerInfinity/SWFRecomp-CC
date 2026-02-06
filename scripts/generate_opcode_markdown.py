@@ -40,7 +40,7 @@ def generate_summary_table(index: Dict, with_links: bool = True) -> str:
     """Generate a summary table grouped by opcode hex value."""
     md = []
 
-    md.append("# AS2 Opcode Index")
+    md.append("# SWF Feature Index")
     md.append("")
     md.append(f"**Generated**: {index['metadata']['generated_date']}")
     md.append("")
@@ -731,6 +731,120 @@ def generate_implementation_status(index: Dict, with_links: bool = True) -> str:
     return "\n".join(md)
 
 
+def generate_graphics_section(index: Dict) -> str:
+    """Generate a section covering graphics features and their test coverage."""
+    md = []
+    graphics_entries = index.get('graphics_entries', [])
+
+    if not graphics_entries:
+        return ""
+
+    total_features = index['metadata'].get('total_graphics_features', 0)
+    features_with_tests = index['metadata'].get('graphics_features_with_tests', 0)
+    total_tests = sum(len(e['tests']) for e in graphics_entries)
+    features_implemented = sum(1 for e in graphics_entries if e['fully_implemented'])
+
+    md.append("## Graphics Features")
+    md.append("")
+    md.append(f"**Total Graphics Features**: {total_features}")
+    md.append("")
+    md.append(f"**Features With Tests**: {features_with_tests}/{total_features}")
+    md.append("")
+    md.append(f"**Total Graphics Tests**: {total_tests}")
+    md.append("")
+    md.append(f"**Fully Implemented**: {features_implemented}/{total_features}")
+    md.append("")
+
+    # Categorize features
+    tag_features = []
+    fill_features = []
+    edge_features = []
+    style_features = []
+    transform_features = []
+
+    for entry in graphics_entries:
+        fid = entry['id']
+        if fid.startswith('DEFINE_') or fid in ('JPEG_TABLES',):
+            tag_features.append(entry)
+        elif fid.endswith('_FILL') or fid in ('SOLID_FILL', 'LINEAR_GRADIENT', 'RADIAL_GRADIENT', 'CLIPPED_BITMAP'):
+            fill_features.append(entry)
+        elif fid.endswith('_EDGE'):
+            edge_features.append(entry)
+        elif fid in ('LINE_STYLE', 'NEW_STYLES'):
+            style_features.append(entry)
+        elif fid.startswith('PLACE_'):
+            transform_features.append(entry)
+
+    categories = [
+        ("SWF Tags", tag_features),
+        ("Fill Types", fill_features),
+        ("Edge Types", edge_features),
+        ("Style Features", style_features),
+        ("Transform Features", transform_features),
+    ]
+
+    for cat_name, cat_entries in categories:
+        if not cat_entries:
+            continue
+
+        md.append(f"### {cat_name}")
+        md.append("")
+        md.append("| Feature | Description | Tests | Implemented |")
+        md.append("|---------|-------------|-------|-------------|")
+
+        for entry in cat_entries:
+            name = entry['name']
+            desc = entry['description']
+            test_count = len(entry['tests'])
+            impl_str = "Yes" if entry['fully_implemented'] else "No"
+
+            if test_count > 0:
+                # Show test names
+                test_names = [t.split('/')[-1] for t in entry['tests']]
+                tests_str = f"{test_count} ({', '.join(test_names)})"
+            else:
+                tests_str = "0"
+
+            md.append(f"| {name} | {desc} | {tests_str} | {impl_str} |")
+
+        md.append("")
+
+    # Feature coverage matrix (features vs tests)
+    # Collect all unique test names from graphics entries
+    all_tests = set()
+    for entry in graphics_entries:
+        for t in entry['tests']:
+            all_tests.add(t.split('/')[-1])
+    all_tests = sorted(all_tests)
+
+    if all_tests:
+        md.append("### Coverage Matrix")
+        md.append("")
+
+        # Build header
+        header = "| Feature |"
+        separator = "|---------|"
+        for test_name in all_tests:
+            # Use abbreviated names to keep table manageable
+            short = test_name[:12]
+            header += f" {short} |"
+            separator += "---|"
+
+        md.append(header)
+        md.append(separator)
+
+        for entry in graphics_entries:
+            test_set = set(t.split('/')[-1] for t in entry['tests'])
+            row = f"| {entry['name']} |"
+            for test_name in all_tests:
+                row += f" {'X' if test_name in test_set else ''} |"
+            md.append(row)
+
+        md.append("")
+
+    return "\n".join(md)
+
+
 def generate_markdown():
     """Generate the complete Markdown documentation in two versions."""
     print("Loading opcode index...")
@@ -738,6 +852,9 @@ def generate_markdown():
 
     print("Generating detailed sections...")
     detailed = generate_detailed_sections(index)
+
+    print("Generating graphics section...")
+    graphics = generate_graphics_section(index)
 
     # Generate version WITH links
     print("\nGenerating version WITH links...")
@@ -748,15 +865,17 @@ def generate_markdown():
     status_with_links = generate_implementation_status(index, with_links=True)
     missing_features_with_links = generate_missing_features_section(index, with_links=True)
 
-    markdown_with_links = "\n".join([
+    sections = [
         summary_with_links,
         passing_tests_with_links,
         failing_tests_with_links,
         no_results_tests_with_links,
         status_with_links,
         missing_features_with_links,
-        detailed
-    ])
+        graphics,
+        detailed,
+    ]
+    markdown_with_links = "\n".join(s for s in sections if s)
 
     output_path_with_links = BASE_DIR / "opcode-index.md"
     with open(output_path_with_links, 'w') as f:
@@ -773,15 +892,17 @@ def generate_markdown():
     status_no_links = generate_implementation_status(index, with_links=False)
     missing_features_no_links = generate_missing_features_section(index, with_links=False)
 
-    markdown_no_links = "\n".join([
+    sections_no_links = [
         summary_no_links,
         passing_tests_no_links,
         failing_tests_no_links,
         no_results_tests_no_links,
         status_no_links,
         missing_features_no_links,
-        detailed
-    ])
+        graphics,
+        detailed,
+    ]
+    markdown_no_links = "\n".join(s for s in sections_no_links if s)
 
     output_path_no_links = BASE_DIR / "opcode-index-plain.md"
     with open(output_path_no_links, 'w') as f:
