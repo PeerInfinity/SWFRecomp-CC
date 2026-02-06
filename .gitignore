@@ -17,6 +17,8 @@ RecompiledScripts/
 # Flash files
 *.swf
 sup*.swf
+# Allow deployed test SWFs (needed for Ruffle comparison on GitHub Pages)
+!docs/examples/**/test.swf
 
 # Libraries
 zlib.dll
