@@ -9,6 +9,10 @@
 #include <utils.h>
 #include <heap.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 int quit_swf;
 int bad_poll;
 size_t current_frame;
@@ -45,6 +49,9 @@ void tagMain(SWFAppContext* app_context)
 		}
 		manual_next_frame = 0;
 		bad_poll |= renderer_poll();
+#ifdef __EMSCRIPTEN__
+		emscripten_sleep(0);
+#endif
 		quit_swf |= bad_poll;
 	}
 
@@ -56,6 +63,9 @@ void tagMain(SWFAppContext* app_context)
 	while (!renderer_poll())
 	{
 		tagShowFrame(app_context);
+#ifdef __EMSCRIPTEN__
+		emscripten_sleep(0);
+#endif
 	}
 }
 

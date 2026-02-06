@@ -57,6 +57,10 @@ typedef struct WebGPURenderContext
 	// Uniform buffers (written per-frame or per-draw)
 	WGPUBuffer stage_to_ndc_buf;      // uniform: mat4
 	WGPUBuffer transform_id_buf;      // uniform: u32 (per-draw)
+	WGPUBuffer extra_transform_id_buf; // uniform: u32 padded to 16 bytes
+	WGPUBuffer extra_transform_buf;   // uniform: mat4 = 64 bytes
+	WGPUBuffer cxform_id_buf;         // uniform: u32 padded to 16 bytes
+	WGPUBuffer cxform_uniform_buf;    // uniform: 20 floats (5x4 cxform), 80 bytes
 
 	// --- Textures and samplers ---
 	WGPUTexture gradient_tex;

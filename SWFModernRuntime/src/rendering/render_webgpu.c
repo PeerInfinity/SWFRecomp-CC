@@ -448,6 +448,22 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 	ctx->transform_id_buf = create_buffer(ctx->device, ctx->queue,
 		WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
 		NULL, 16, "transform_id_uniform");  // u32 padded to 16 bytes (min uniform alignment)
+
+	ctx->extra_transform_id_buf = create_buffer(ctx->device, ctx->queue,
+		WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+		NULL, 16, "extra_transform_id_uniform");  // u32 padded to 16 bytes
+
+	ctx->extra_transform_buf = create_buffer(ctx->device, ctx->queue,
+		WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+		NULL, 64, "extra_transform_uniform");  // mat4 = 64 bytes
+
+	ctx->cxform_id_buf = create_buffer(ctx->device, ctx->queue,
+		WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+		NULL, 16, "cxform_id_uniform");  // u32 padded to 16 bytes
+
+	ctx->cxform_uniform_buf = create_buffer(ctx->device, ctx->queue,
+		WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+		NULL, 80, "cxform_uniform");  // 20 floats = 80 bytes
 }
 
 // ---------------------------------------------------------------------------
@@ -951,6 +967,29 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0,
 	                     ctx->stage_to_ndc, 16 * sizeof(float));
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+
+	// Initialize extra_transform_id to 0, extra_transform to identity,
+	// cxform_id to 0 (matching flashbang_open_pass behavior)
+	u32 identity_id[4] = {0, 0, 0, 0};
+	static const float identity_mat[16] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	static const float identity_cxform[20] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+		0.0f, 0.0f, 0.0f, 0.0f
+	};
+
+	wgpuQueueWriteBuffer(ctx->queue, ctx->extra_transform_id_buf, 0, identity_id, 16);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->extra_transform_buf, 0, identity_mat, 64);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_id_buf, 0, identity_id, 16);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_uniform_buf, 0, identity_cxform, 80);
 }
 
 // ---------------------------------------------------------------------------
@@ -1058,35 +1097,38 @@ void render_webgpu_finalize_bitmaps(WebGPURenderContext* ctx)
 
 // ---------------------------------------------------------------------------
 // Extra transform / cxform uploads (used for text rendering)
-// TODO: These require additional uniforms in the WGSL shaders.
-// Currently stubbed — text rendering will be added when shader support is ready.
+// Data is uploaded to GPU buffers (matching flashbang behavior) but not yet
+// bound to bind groups or used by shaders. Shader/bind-group integration is
+// deferred until both backends' shaders are updated.
 // ---------------------------------------------------------------------------
 void render_webgpu_upload_extra_transform_id(WebGPURenderContext* ctx, u32 transform_id)
 {
-	// TODO: Add extra_transform_id uniform to vertex shader and update here
-	(void)ctx;
-	(void)transform_id;
+	// Upload to GPU buffer (matching flashbang behavior).
+	// Not yet bound to shaders — deferred until both backends' shaders are updated.
+	u32 id_data[4] = {transform_id, 0, 0, 0};
+	wgpuQueueWriteBuffer(ctx->queue, ctx->extra_transform_id_buf, 0, id_data, 16);
 }
 
 void render_webgpu_upload_extra_transform(WebGPURenderContext* ctx, float* transform)
 {
-	// TODO: Add extra_transform uniform to vertex shader and update here
-	(void)ctx;
-	(void)transform;
+	// Upload mat4 to GPU buffer (matching flashbang behavior).
+	// Not yet bound to shaders — deferred until both backends' shaders are updated.
+	wgpuQueueWriteBuffer(ctx->queue, ctx->extra_transform_buf, 0, transform, 16 * sizeof(float));
 }
 
 void render_webgpu_upload_cxform_id(WebGPURenderContext* ctx, u32 cxform_id)
 {
-	// TODO: Add cxform_id uniform to fragment shader and update here
-	(void)ctx;
-	(void)cxform_id;
+	// Upload to GPU buffer (matching flashbang behavior).
+	// Not yet bound to shaders — deferred until both backends' shaders are updated.
+	u32 id_data[4] = {cxform_id, 0, 0, 0};
+	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_id_buf, 0, id_data, 16);
 }
 
 void render_webgpu_upload_cxform(WebGPURenderContext* ctx, float* cxform)
 {
-	// TODO: Add cxform uniform to fragment shader and update here
-	(void)ctx;
-	(void)cxform;
+	// Upload 20 floats (5x4 color transform) to GPU buffer (matching flashbang behavior).
+	// Not yet bound to shaders — deferred until both backends' shaders are updated.
+	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_uniform_buf, 0, cxform, 20 * sizeof(float));
 }
 
 // ---------------------------------------------------------------------------
@@ -1130,6 +1172,10 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->cxform_buffer) wgpuBufferRelease(ctx->cxform_buffer);
 	if (ctx->stage_to_ndc_buf) wgpuBufferRelease(ctx->stage_to_ndc_buf);
 	if (ctx->transform_id_buf) wgpuBufferRelease(ctx->transform_id_buf);
+	if (ctx->extra_transform_id_buf) wgpuBufferRelease(ctx->extra_transform_id_buf);
+	if (ctx->extra_transform_buf) wgpuBufferRelease(ctx->extra_transform_buf);
+	if (ctx->cxform_id_buf) wgpuBufferRelease(ctx->cxform_id_buf);
+	if (ctx->cxform_uniform_buf) wgpuBufferRelease(ctx->cxform_uniform_buf);
 
 	// Release textures and views
 	if (ctx->gradient_tex_view) wgpuTextureViewRelease(ctx->gradient_tex_view);
