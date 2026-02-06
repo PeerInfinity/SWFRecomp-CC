@@ -26,21 +26,25 @@ fn radial_t(v_args: vec4f) -> f32 {
 
 @fragment
 fn fs_main(in: FragmentInput) -> @location(0) vec4f {
+	// Sample all textures unconditionally (uniform control flow required by Chrome/Dawn)
+	let linear_sample = textureSample(gradient_tex, gradient_samp,
+		vec2f(linear_t(in.v_args), 0.5), i32(in.v_style_id));
+	let radial_sample = textureSample(gradient_tex, gradient_samp,
+		vec2f(radial_t(in.v_args), 0.5), i32(in.v_style_id));
+	let bitmap_sample = textureSample(bitmap_tex, bitmap_samp,
+		in.v_args.xy, i32(in.v_style_id));
 	if (in.v_style_type == 0x00u) {
 		// Solid color
 		return in.v_args;
 	} else if (in.v_style_type == 0x10u) {
 		// Linear gradient
-		return textureSample(gradient_tex, gradient_samp,
-			vec2f(linear_t(in.v_args), 0.5), i32(in.v_style_id));
+		return linear_sample;
 	} else if (in.v_style_type == 0x12u) {
 		// Radial gradient
-		return textureSample(gradient_tex, gradient_samp,
-			vec2f(radial_t(in.v_args), 0.5), i32(in.v_style_id));
+		return radial_sample;
 	} else if (in.v_style_type == 0x41u) {
 		// Bitmap
-		return textureSample(bitmap_tex, bitmap_samp,
-			in.v_args.xy, i32(in.v_style_id));
+		return bitmap_sample;
 	}
 	return vec4f(0.0);
 }
