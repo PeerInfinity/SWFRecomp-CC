@@ -10,11 +10,7 @@ extern RenderContext* context;
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
 size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 
-void tagInit()
-{
-	// Graphics initialization happens in renderer_init
-	// This is called after the renderer is set up
-}
+// Note: tagInit() is provided by the generated tagMain.c file
 
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 {

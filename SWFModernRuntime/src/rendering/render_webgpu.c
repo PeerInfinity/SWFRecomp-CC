@@ -147,9 +147,10 @@ static WGPUBuffer create_buffer(WGPUDevice device, WGPUQueue queue,
                                 const void* data, size_t size,
                                 const char* label)
 {
-	// Ensure minimum buffer size of 16 bytes (WebGPU requires non-zero, and
-	// some implementations require minimum alignment)
-	if (size < 16) size = 16;
+	// Ensure minimum buffer size of 64 bytes. WebGPU requires non-zero buffers,
+	// and shader bindings like array<mat4x4f> require at least 64 bytes even
+	// when no data is present.
+	if (size < 64) size = 64;
 
 	WGPUBufferDescriptor desc = {0};
 	desc.label = WGPU_LABEL(label);
@@ -221,10 +222,19 @@ static void request_adapter_sync(WebGPURenderContext* ctx,
 
 	WGPUFuture future = wgpuInstanceRequestAdapter(ctx->instance, opts, cb_info);
 
-	// Poll until the callback fires
+#ifdef __EMSCRIPTEN__
+	// In the browser, async WebGPU operations need us to yield back to
+	// the event loop so the browser can process the request.
+	while (ctx->adapter == NULL)
+	{
+		emscripten_sleep(10);
+	}
+#else
+	// Native: poll until the callback fires
 	WGPUFutureWaitInfo wait_info = {0};
 	wait_info.future = future;
 	wgpuInstanceWaitAny(ctx->instance, 1, &wait_info, UINT64_MAX);
+#endif
 }
 
 static void on_device_ready(WGPURequestDeviceStatus status,
@@ -256,9 +266,16 @@ static void request_device_sync(WebGPURenderContext* ctx,
 
 	WGPUFuture future = wgpuAdapterRequestDevice(ctx->adapter, desc, cb_info);
 
+#ifdef __EMSCRIPTEN__
+	while (ctx->device == NULL)
+	{
+		emscripten_sleep(10);
+	}
+#else
 	WGPUFutureWaitInfo wait_info = {0};
 	wait_info.future = future;
 	wgpuInstanceWaitAny(ctx->instance, 1, &wait_info, UINT64_MAX);
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +305,7 @@ static void create_dummy_texture(WebGPURenderContext* ctx)
 	samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
 	samp_desc.magFilter = WGPUFilterMode_Nearest;
 	samp_desc.minFilter = WGPUFilterMode_Nearest;
+	samp_desc.maxAnisotropy = 1;
 	ctx->dummy_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 
 	// Upload a single white pixel
@@ -527,6 +545,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
 		samp_desc.magFilter = WGPUFilterMode_Linear;
 		samp_desc.minFilter = WGPUFilterMode_Linear;
+		samp_desc.maxAnisotropy = 1;
 		ctx->gradient_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
 
@@ -558,6 +577,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
 		samp_desc.magFilter = WGPUFilterMode_Linear;
 		samp_desc.minFilter = WGPUFilterMode_Linear;
+		samp_desc.maxAnisotropy = 1;
 		ctx->bitmap_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
 
@@ -946,6 +966,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 
 	// Begin render pass with MSAA
 	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 	color_att.view = ctx->msaa_view;
 	color_att.resolveTarget = ctx->surface_view;
 	color_att.loadOp = WGPULoadOp_Clear;

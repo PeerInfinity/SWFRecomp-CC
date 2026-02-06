@@ -1,7 +1,8 @@
 #!/bin/bash
-# Usage: ./scripts/build_test.sh <test_name> [native|wasm] [--clean]
+# Usage: ./scripts/build_test.sh <test_name> [native|wasm] [--clean] [--graphics]
 # Example: ./scripts/build_test.sh trace_swf_4 wasm
 # Example: ./scripts/build_test.sh trace_swf_4 native --clean
+# Example: ./scripts/build_test.sh graphics/three_boxes wasm --graphics
 
 set -e
 
@@ -9,24 +10,33 @@ set -e
 TEST_NAME=$1
 TARGET=${2:-wasm}              # Default: wasm
 CLEAN_FLAG=false
+GRAPHICS_FLAG=false
 
-# Check for --clean flag in any position
+# Check for flags in any position
 for arg in "$@"; do
     if [ "$arg" = "--clean" ]; then
         CLEAN_FLAG=true
     fi
+    if [ "$arg" = "--graphics" ]; then
+        GRAPHICS_FLAG=true
+    fi
 done
 
-# If TARGET is --clean, set it to default and enable clean
+# If TARGET is a flag, set it to default and enable the flag
 if [ "$TARGET" = "--clean" ]; then
     TARGET="wasm"
     CLEAN_FLAG=true
+elif [ "$TARGET" = "--graphics" ]; then
+    TARGET="wasm"
+    GRAPHICS_FLAG=true
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TEST_DIR="${SWFRECOMP_ROOT}/tests/${TEST_NAME}"
 BUILD_DIR="${TEST_DIR}/build/${TARGET}"
+# Use basename for output filenames (handles paths like graphics/three_boxes)
+OUTPUT_NAME="$(basename "$TEST_NAME")"
 
 # Validate inputs
 if [ -z "$TEST_NAME" ]; then
@@ -127,9 +137,13 @@ cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${BUILD_DIR}/"
 
 if [ "$TARGET" == "wasm" ]; then
     # Copy HTML template for WASM builds
-    cp "${SWFRECOMP_ROOT}/wasm_wrappers/index_template.html" "${BUILD_DIR}/index.html"
-    # Customize HTML with test name
-    sed -i "s/{{TEST_NAME}}/${TEST_NAME}/g" "${BUILD_DIR}/index.html"
+    if [ "$GRAPHICS_FLAG" = true ]; then
+        cp "${SWFRECOMP_ROOT}/wasm_wrappers/index_template_graphics.html" "${BUILD_DIR}/index.html"
+    else
+        cp "${SWFRECOMP_ROOT}/wasm_wrappers/index_template.html" "${BUILD_DIR}/index.html"
+    fi
+    # Customize HTML with output name (basename, no path separators)
+    sed -i "s/{{TEST_NAME}}/${OUTPUT_NAME}/g" "${BUILD_DIR}/index.html"
 fi
 
 # Copy SWFModernRuntime source files
@@ -139,11 +153,16 @@ cp "${SWFMODERN_SRC}/actionmodern/variables.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/object.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
 
-# For both WASM and native builds, use NO_GRAPHICS mode (console-only)
-# Graphics mode requires SDL3 linking which needs proper build system setup
-echo "Using NO_GRAPHICS mode for ${TARGET} build..."
-cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
+if [ "$GRAPHICS_FLAG" = true ]; then
+    echo "Using GRAPHICS mode (WebGPU) for ${TARGET} build..."
+    cp "${SWFMODERN_SRC}/libswf/swf.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
+else
+    echo "Using NO_GRAPHICS mode for ${TARGET} build..."
+    cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
+fi
 
 # Copy hashmap library (required for variable storage)
 cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${BUILD_DIR}/"
@@ -176,26 +195,50 @@ if [ "$TARGET" == "wasm" ]; then
     fi
 
     cd "${BUILD_DIR}"
-    emcc \
-        *.c \
-        -DNO_GRAPHICS \
-        -I. \
-        -I"${SWFMODERN_INC}" \
-        -I"${SWFMODERN_INC}/actionmodern" \
-        -I"${SWFMODERN_INC}/libswf" \
-        -I"${SWFMODERN_INC}/memory" \
-        -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
-        -o "${TEST_NAME}.js" \
-        -s WASM=1 \
-        -s EXPORTED_FUNCTIONS='["_main","_runSWF"]' \
-        -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
-        -s ALLOW_MEMORY_GROWTH=1 \
-        -s INITIAL_MEMORY=16MB \
-        -O2
+
+    if [ "$GRAPHICS_FLAG" = true ]; then
+        emcc \
+            *.c \
+            -DUSE_WEBGPU \
+            --use-port=emdawnwebgpu \
+            -I. \
+            -I"${SWFMODERN_INC}" \
+            -I"${SWFMODERN_INC}/actionmodern" \
+            -I"${SWFMODERN_INC}/libswf" \
+            -I"${SWFMODERN_INC}/memory" \
+            -I"${SWFMODERN_INC}/rendering" \
+            -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
+            -o "${OUTPUT_NAME}.js" \
+            -s WASM=1 \
+            -s EXPORTED_FUNCTIONS='["_main","_runSWF"]' \
+            -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+            -s ALLOW_MEMORY_GROWTH=1 \
+            -s INITIAL_MEMORY=64MB \
+            -sASYNCIFY \
+            -sASYNCIFY_STACK_SIZE=65536 \
+            -O2
+    else
+        emcc \
+            *.c \
+            -DNO_GRAPHICS \
+            -I. \
+            -I"${SWFMODERN_INC}" \
+            -I"${SWFMODERN_INC}/actionmodern" \
+            -I"${SWFMODERN_INC}/libswf" \
+            -I"${SWFMODERN_INC}/memory" \
+            -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
+            -o "${OUTPUT_NAME}.js" \
+            -s WASM=1 \
+            -s EXPORTED_FUNCTIONS='["_main","_runSWF"]' \
+            -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+            -s ALLOW_MEMORY_GROWTH=1 \
+            -s INITIAL_MEMORY=16MB \
+            -O2
+    fi
 
     echo ""
     echo "✅ WASM build complete!"
-    echo "Output: ${BUILD_DIR}/${TEST_NAME}.wasm"
+    echo "Output: ${BUILD_DIR}/${OUTPUT_NAME}.wasm"
     echo ""
     echo "To test:"
     echo "  cd ${BUILD_DIR}"
@@ -206,10 +249,16 @@ else
     echo "Building native with SWFModernRuntime..."
     cd "${BUILD_DIR}"
 
-    # Compile SWFModernRuntime from source in NO_GRAPHICS mode
+    NATIVE_GRAPHICS_FLAGS=""
+    if [ "$GRAPHICS_FLAG" = true ]; then
+        NATIVE_GRAPHICS_FLAGS="-DUSE_WEBGPU -I${SWFMODERN_INC}/rendering"
+    else
+        NATIVE_GRAPHICS_FLAGS="-DNO_GRAPHICS"
+    fi
+
     gcc \
         *.c \
-        -DNO_GRAPHICS \
+        $NATIVE_GRAPHICS_FLAGS \
         -D_POSIX_C_SOURCE=199309L \
         -I. \
         -I"${SWFMODERN_INC}" \
@@ -220,12 +269,12 @@ else
         -Wall \
         -Wno-unused-variable \
         -std=c17 \
-        -o "${TEST_NAME}" \
+        -o "${OUTPUT_NAME}" \
         -lm
 
     echo ""
     echo "✅ Native build complete!"
-    echo "Output: ${BUILD_DIR}/${TEST_NAME}"
+    echo "Output: ${BUILD_DIR}/${OUTPUT_NAME}"
     echo ""
     echo "To run:"
     echo "  ${BUILD_DIR}/${TEST_NAME}"

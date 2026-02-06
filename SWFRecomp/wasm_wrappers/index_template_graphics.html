@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SWF → WASM Test: {{TEST_NAME}}</title>
+    <title>SWF → WASM Graphics: {{TEST_NAME}}</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%231a1a1a' stroke='%234CAF50' stroke-width='4'/%3E%3Ctext x='50' y='70' font-size='56' font-weight='bold' font-family='Arial,sans-serif' fill='%234CAF50' text-anchor='middle'%3EW%3C/text%3E%3C/svg%3E">
     <style>
         body {
@@ -29,6 +29,30 @@
         .info-box h3 {
             margin-top: 0;
             color: #4CAF50;
+        }
+        .badge {
+            display: inline-block;
+            background: #7B1FA2;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        .canvas-container {
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #fff;
         }
         .controls {
             background: #2a2a2a;
@@ -61,8 +85,8 @@
             border: 1px solid #333;
             font-family: 'Courier New', monospace;
             font-size: 14px;
-            min-height: 300px;
-            max-height: 500px;
+            min-height: 150px;
+            max-height: 300px;
             overflow-y: auto;
             white-space: pre-wrap;
             margin-top: 20px;
@@ -81,44 +105,51 @@
             background: #4CAF50;
             color: #fff;
         }
+        .status.running {
+            background: #7B1FA2;
+            color: #fff;
+        }
         .status.error {
             background: #f44336;
             color: #fff;
         }
-        .highlight {
-            color: #4CAF50;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
-    <h1>🎮 Flash SWF → WebAssembly</h1>
+    <h1>Flash SWF → WebAssembly <span class="badge">WebGPU Graphics</span></h1>
     <h2>Test: {{TEST_NAME}}</h2>
 
     <div class="info-box">
-        <h3>What's Happening Here?</h3>
-        <p>This is a <strong>real Flash SWF file</strong> that has been:</p>
+        <h3>WebGPU Graphics Demo</h3>
+        <p>This is a <strong>real Flash SWF file</strong> with graphical rendering:</p>
         <ol>
-            <li><strong>Recompiled</strong> by SWFRecomp into C code</li>
-            <li><strong>Compiled</strong> to WebAssembly with Emscripten</li>
-            <li><strong>Running</strong> natively in your browser!</li>
+            <li><strong>Recompiled</strong> by SWFRecomp into C code (shapes, transforms, colors)</li>
+            <li><strong>Compiled</strong> to WebAssembly with Emscripten + emdawnwebgpu</li>
+            <li><strong>Rendered</strong> via WebGPU in your browser!</li>
         </ol>
-        <p>No Flash Player. No emulation. Just pure WebAssembly. 🚀</p>
+        <p>No Flash Player. No emulation. Native WebGPU rendering.</p>
     </div>
 
     <div id="status" class="status loading">Loading WASM module...</div>
 
-    <div class="controls">
-        <h3>Controls:</h3>
-        <button onclick="runSwf()" id="btn-run" disabled>▶️ Run SWF</button>
-        <button onclick="clearOutput()" style="background: #666;">🗑️ Clear Output</button>
+    <div class="canvas-container">
+        <canvas id="canvas" width="550" height="400"></canvas>
     </div>
 
-    <h3>SWF Output:</h3>
+    <div class="controls">
+        <h3>Controls:</h3>
+        <button onclick="runSwf()" id="btn-run" disabled>Run SWF</button>
+        <button onclick="clearOutput()" style="background: #666;">Clear Log</button>
+    </div>
+
+    <h3>Output Log:</h3>
     <div id="output"></div>
 
     <script>
+        var swfRunning = false;
+
         var Module = {
+            canvas: document.getElementById('canvas'),
             preRun: [],
             postRun: [],
             print: function(text) {
@@ -130,17 +161,18 @@
                 addOutput(text, 'error');
             },
             onRuntimeInitialized: function() {
-                updateStatus('ready', '✅ WASM module loaded and ready!');
+                updateStatus('ready', 'WASM module loaded — ready to run!');
                 document.getElementById('btn-run').disabled = false;
-                addOutput('='.repeat(70), 'separator');
-                addOutput('WASM runtime ready! Click "Run SWF" to execute.', 'info');
-                addOutput('='.repeat(70), 'separator');
+                addOutput('='.repeat(60), 'separator');
+                addOutput('WASM runtime ready. Click "Run SWF" to render.', 'info');
+                addOutput('='.repeat(60), 'separator');
             }
         };
 
-        function addOutput(text, type = 'log') {
-            const output = document.getElementById('output');
-            const line = document.createElement('div');
+        function addOutput(text, type) {
+            type = type || 'log';
+            var output = document.getElementById('output');
+            var line = document.createElement('div');
 
             if (type === 'error') {
                 line.style.color = '#ff5555';
@@ -156,24 +188,40 @@
         }
 
         function updateStatus(type, message) {
-            const status = document.getElementById('status');
+            var status = document.getElementById('status');
             status.className = 'status ' + type;
             status.textContent = message;
         }
 
         function runSwf() {
-            addOutput('\n' + '='.repeat(70), 'separator');
-            addOutput('Running SWF execution...', 'info');
-            addOutput('='.repeat(70) + '\n', 'separator');
+            if (swfRunning) return;
+            swfRunning = true;
+            document.getElementById('btn-run').disabled = true;
+            updateStatus('running', 'SWF rendering in progress...');
+
+            addOutput('\n' + '='.repeat(60), 'separator');
+            addOutput('Starting SWF rendering...', 'info');
+            addOutput('='.repeat(60) + '\n', 'separator');
 
             try {
-                Module.ccall('runSWF', null, [], []);
-                addOutput('\n' + '='.repeat(70), 'separator');
-                addOutput('✅ SWF execution completed successfully!', 'info');
-                addOutput('='.repeat(70), 'separator');
+                Module.ccall('runSWF', null, [], [], {async: true}).then(function() {
+                    addOutput('\n' + '='.repeat(60), 'separator');
+                    addOutput('SWF rendering completed.', 'info');
+                    addOutput('='.repeat(60), 'separator');
+                    updateStatus('ready', 'Rendering complete.');
+                    swfRunning = false;
+                    document.getElementById('btn-run').disabled = false;
+                }).catch(function(e) {
+                    addOutput('Error: ' + e.message, 'error');
+                    updateStatus('error', 'Error during rendering');
+                    swfRunning = false;
+                    document.getElementById('btn-run').disabled = false;
+                });
             } catch (e) {
                 addOutput('Error: ' + e.message, 'error');
-                updateStatus('error', '❌ Error during SWF execution');
+                updateStatus('error', 'Error during SWF execution');
+                swfRunning = false;
+                document.getElementById('btn-run').disabled = false;
             }
         }
 
@@ -182,7 +230,7 @@
         }
 
         window.onerror = function(msg, url, line) {
-            updateStatus('error', '❌ Error loading WASM module');
+            updateStatus('error', 'Error loading WASM module');
             addOutput('Error: ' + msg, 'error');
         };
     </script>

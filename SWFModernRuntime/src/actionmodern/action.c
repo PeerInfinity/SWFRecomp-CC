@@ -231,6 +231,17 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 	return NULL;  // Other paths not supported yet
 }
 
+#ifndef NO_GRAPHICS
+/**
+ * Stub for cloneMovieClip - not yet implemented
+ * Called by ActionCloneSprite in graphics mode
+ */
+static void cloneMovieClip(const char* source_name, const char* target_name, int depth) {
+	printf("[CloneSprite] STUB: source='%s' -> target='%s' (depth=%d)\n",
+	       source_name, target_name, depth);
+}
+#endif
+
 /**
  * Create a new MovieClip with the specified instance name and parent
  *

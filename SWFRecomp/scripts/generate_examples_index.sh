@@ -28,22 +28,64 @@ if [ ! -d "$EXAMPLES_DIR" ]; then
     exit 1
 fi
 
-# Get list of examples (directories in examples/)
-EXAMPLES=($(cd "$EXAMPLES_DIR" && find . -maxdepth 1 -type d ! -name '.' -exec basename {} \; | sort))
+# Discover trace examples (top-level directories with .demo_type = "trace" or no .demo_type)
+TRACE_EXAMPLES=()
+GRAPHICS_EXAMPLES=()
 
-if [ ${#EXAMPLES[@]} -eq 0 ]; then
+for example_dir in "${EXAMPLES_DIR}"/*/; do
+    [ -d "$example_dir" ] || continue
+    example_name=$(basename "$example_dir")
+
+    # Check if this is the graphics/ subdirectory
+    if [ "$example_name" = "graphics" ]; then
+        # Scan graphics subdirectories
+        for gfx_dir in "${example_dir}"/*/; do
+            [ -d "$gfx_dir" ] || continue
+            gfx_name=$(basename "$gfx_dir")
+            GRAPHICS_EXAMPLES+=("$gfx_name")
+        done
+    else
+        # Read demo type from marker file
+        demo_type="trace"
+        if [ -f "${example_dir}/.demo_type" ]; then
+            demo_type=$(cat "${example_dir}/.demo_type" | tr -d '[:space:]')
+        fi
+
+        if [ "$demo_type" = "graphics" ]; then
+            GRAPHICS_EXAMPLES+=("$example_name")
+        else
+            TRACE_EXAMPLES+=("$example_name")
+        fi
+    fi
+done
+
+# Sort arrays
+if [ ${#TRACE_EXAMPLES[@]} -gt 0 ]; then
+    IFS=$'\n' TRACE_EXAMPLES=($(sort <<<"${TRACE_EXAMPLES[*]}"))
+    unset IFS
+fi
+if [ ${#GRAPHICS_EXAMPLES[@]} -gt 0 ]; then
+    IFS=$'\n' GRAPHICS_EXAMPLES=($(sort <<<"${GRAPHICS_EXAMPLES[*]}"))
+    unset IFS
+fi
+
+TOTAL_EXAMPLES=$(( ${#TRACE_EXAMPLES[@]} + ${#GRAPHICS_EXAMPLES[@]} ))
+
+if [ $TOTAL_EXAMPLES -eq 0 ]; then
     echo "No examples found in $EXAMPLES_DIR"
     exit 0
 fi
 
-echo "Found ${#EXAMPLES[@]} examples: ${EXAMPLES[*]}"
+echo "Found ${#TRACE_EXAMPLES[@]} trace examples and ${#GRAPHICS_EXAMPLES[@]} graphics examples"
 
-# Generate demo cards HTML
+HAS_GRAPHICS=false
+if [ ${#GRAPHICS_EXAMPLES[@]} -gt 0 ]; then
+    HAS_GRAPHICS=true
+fi
+
+# Generate trace demo cards HTML
 DEMO_CARDS=""
-for example in "${EXAMPLES[@]}"; do
-    # Create a human-readable title (replace underscores with spaces, capitalize)
-    TITLE=$(echo "$example" | sed 's/_/ /g' | sed 's/\b\(.\)/\u\1/g')
-
+for example in "${TRACE_EXAMPLES[@]}"; do
     # Determine description based on test name
     DESCRIPTION="Flash SWF test demonstrating "
     case "$example" in
@@ -75,6 +117,43 @@ for example in "${EXAMPLES[@]}"; do
                     <h3>$example</h3>
                     <p>$DESCRIPTION</p>
                     <a href=\"examples/$example/\" class=\"demo-link\">View Demo →</a>
+                </div>
+"
+done
+
+# Generate graphics demo cards HTML
+GRAPHICS_CARDS=""
+for example in "${GRAPHICS_EXAMPLES[@]}"; do
+    DESCRIPTION="WebGPU-rendered Flash graphics demo"
+    case "$example" in
+        *gradient*)
+            DESCRIPTION+=" showing gradient fills and color interpolation."
+            ;;
+        *box*|*square*)
+            DESCRIPTION+=" rendering geometric shapes with solid fills."
+            ;;
+        *circle*|*coicle*)
+            DESCRIPTION+=" rendering curved shapes and ellipses."
+            ;;
+        *text*)
+            DESCRIPTION+=" with text rendering and glyph layout."
+            ;;
+        *shadow*)
+            DESCRIPTION+=" with shadow and filter effects."
+            ;;
+        *style*|*shape*)
+            DESCRIPTION+=" with mixed line styles and fill types."
+            ;;
+        *)
+            DESCRIPTION+=" with shape rendering and color transforms."
+            ;;
+    esac
+
+    GRAPHICS_CARDS+="
+                <div class=\"demo-card\" style=\"border-left: 3px solid #7B1FA2;\">
+                    <h3>$example <span style=\"display:inline-block;background:#7B1FA2;color:white;padding:2px 8px;border-radius:10px;font-size:0.7em;vertical-align:middle;margin-left:8px;\">WebGPU</span></h3>
+                    <p>$DESCRIPTION</p>
+                    <a href=\"examples/graphics/$example/\" class=\"demo-link\" style=\"color:#7B1FA2;\">View Demo →</a>
                 </div>
 "
 done
@@ -115,11 +194,25 @@ if [ ! -f "$INDEX_FILE" ]; then
     exit 1
 fi
 
+# Build the "coming soon" or graphics section
+COMING_SOON_OR_GRAPHICS=""
+if [ "$HAS_GRAPHICS" = true ]; then
+    COMING_SOON_OR_GRAPHICS="
+                <h2 style=\"margin-top: 40px; color: #7B1FA2; border-bottom: 2px solid #7B1FA2; padding-bottom: 10px;\">Graphics Demos (WebGPU)</h2>
+                <p style=\"margin-bottom: 20px; color: #b0b0b0;\">These demos render Flash vector graphics via WebGPU. Requires a WebGPU-capable browser.</p>
+${GRAPHICS_CARDS}"
+else
+    COMING_SOON_OR_GRAPHICS="
+                <p style=\"margin-top: 20px; color: #666;\">
+                    More complex demos with graphics rendering coming soon!
+                </p>"
+fi
+
 # Create a temporary file with updated content
 TEMP_FILE=$(mktemp)
 
 # Use awk to replace the demo-section content and add excluded section
-awk -v demos="$DEMO_CARDS" -v excluded="$EXCLUDED_SECTION" '
+awk -v demos="$DEMO_CARDS" -v graphics="$COMING_SOON_OR_GRAPHICS" -v excluded="$EXCLUDED_SECTION" '
     BEGIN { in_demo_section = 0; in_excluded_section = 0; skip_next_section = 0 }
 
     # Start of demo section
@@ -136,9 +229,7 @@ awk -v demos="$DEMO_CARDS" -v excluded="$EXCLUDED_SECTION" '
     in_demo_section && /<\/section>/ {
         in_demo_section = 0
         skip_next_section = 1
-        print "                <p style=\"margin-top: 20px; color: #666;\">"
-        print "                    More complex demos with graphics rendering coming soon!"
-        print "                </p>"
+        print graphics
         print
         # Insert excluded section after demo section
         if (excluded != "") {
@@ -181,9 +272,15 @@ awk -v demos="$DEMO_CARDS" -v excluded="$EXCLUDED_SECTION" '
 # Replace the original file
 mv "$TEMP_FILE" "$INDEX_FILE"
 
-echo "✅ Updated $INDEX_FILE with ${#EXAMPLES[@]} examples"
+echo "✅ Updated $INDEX_FILE with ${#TRACE_EXAMPLES[@]} trace demos and ${#GRAPHICS_EXAMPLES[@]} graphics demos"
 echo ""
-echo "Examples included:"
-for example in "${EXAMPLES[@]}"; do
+echo "Trace demos:"
+for example in "${TRACE_EXAMPLES[@]}"; do
     echo "  - $example"
 done
+if [ ${#GRAPHICS_EXAMPLES[@]} -gt 0 ]; then
+    echo "Graphics demos:"
+    for example in "${GRAPHICS_EXAMPLES[@]}"; do
+        echo "  - $example"
+    done
+fi
