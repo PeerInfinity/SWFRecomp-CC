@@ -843,14 +843,15 @@ These need WebGPU/Canvas rendering (future work):
 
 ### Future Enhancements
 
-**Phase 2: Canvas2D Rendering**
-- Implement shape rendering
-- Use HTML5 Canvas 2D API
-- Remove NO_GRAPHICS flag for graphics tests
+**~~Phase 1b: Canvas2D Rendering~~ (Skipped)**
+- ~~Implement shape rendering via Canvas2D~~
+- Skipped in favor of proceeding directly to WebGPU
 
-**Phase 3: WebGPU Rendering**
-- Full graphics support
-- GPU-accelerated rendering
+**Phase 2: WebGPU Rendering (SDL + Dawn/wgpu) — Immediate Next Step**
+- Full graphics support via standardized webgpu.h C API
+- GPU-accelerated rendering with WGSL shaders
+- Native: SDL3 + sdl3webgpu + Dawn/wgpu-native
+- Browser: emdawnwebgpu (Emscripten 4.0.10+)
 - Feature parity with native builds
 
 ---

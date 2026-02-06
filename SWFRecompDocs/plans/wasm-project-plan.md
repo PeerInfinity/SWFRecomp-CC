@@ -1,14 +1,14 @@
 # SWFRecomp WASM Port - Project Plan
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 
 **Created:** October 27, 2025
 
-**Last Updated:** October 27, 2025
+**Last Updated:** February 5, 2026
 
 **Upstream Project:** SWFRecomp + SWFModernRuntime
 
-**Status:** Phase 1 - Implementation In Progress
+**Status:** Phase 1a Complete, Phase 1b Skipped → Proceeding to Phase 2 (WebGPU)
 
 ---
 
@@ -17,8 +17,8 @@
 1. [Project Overview](#project-overview)
 2. [Technical Architecture](#technical-architecture)
 3. [Phase 1: Canvas2D Prototype](#phase-1-canvas2d-prototype)
-4. [Phase 2: WebGL2 Backend (Optional)](#phase-2-webgl2-backend-optional)
-5. [Phase 3: SDL3 WebGPU Migration](#phase-3-sdl3-webgpu-migration)
+4. [Phase 2: WebGPU Backend (SDL + Dawn/wgpu)](#phase-2-webgpu-backend-sdl--dawnwgpu)
+5. [Phase 3: SDL_GPU WebGPU Migration](#phase-3-sdl_gpu-webgpu-migration)
 6. [Maintaining Native Runtime Compatibility](#maintaining-native-runtime-compatibility)
 7. [Build System Design](#build-system-design)
 8. [Testing Strategy](#testing-strategy)
@@ -37,13 +37,13 @@
 **Secondary Goals:**
 - Preserve all existing native runtime functionality
 - Maintain compatibility with upstream development
-- Create a path for future SDL3 WebGPU integration
+- Create a path for WebGPU rendering (SDL + Dawn/wgpu natively, emdawnwebgpu in browser)
 - Enable Flash games to run in modern browsers without plugins
 
 ### Non-Goals
 
 - ❌ Replacing or modifying upstream native runtime
-- ❌ Comprehensive WebGL2 optimization (unless needed)
+- ❌ Comprehensive WebGPU optimization beyond target FPS
 - ❌ Supporting browsers without WASM support
 
 ### Success Criteria
@@ -68,8 +68,8 @@
 - ⚠️ Rendering backend has significantly evolved since planning phase
 - ⚠️ Canvas2D backend will need to support gradients and bitmaps
 - ✅ Good news: These features improve visual quality targets
-- ⚠️ Complexity: WebGL2 backend may now be more essential than "optional"
-- ⚠️ Plan adjustment: Consider prioritizing WebGL2 over Canvas2D for feature parity
+- ⚠️ Complexity: WebGPU backend is now essential for feature parity (elevated to Phase 2)
+- ⚠️ Plan adjustment: WebGPU chosen over WebGL2 for better Vulkan alignment and compute shader support
 
 ---
 
@@ -110,10 +110,11 @@ SWFModernRuntime Core (WASM-compatible)
     ├─ actionmodern/ ✅ Portable
     └─ rendering/ (ABSTRACTED)
         ├─ render_api.h (interface)
-        ├─ render_native.c (SDL_GPU) #ifndef __EMSCRIPTEN__
-        ├─ render_canvas2d.c (Canvas2D) #ifdef __EMSCRIPTEN__
-        ├─ render_webgl2.c (WebGL2) #ifdef __EMSCRIPTEN__ && WEBGL2
-        └─ render_webgpu.c (Future) #ifdef __EMSCRIPTEN__ && WEBGPU
+        ├─ render_native.c (SDL_GPU/Vulkan) #ifndef __EMSCRIPTEN__ && !USE_WEBGPU
+        ├─ render_canvas2d.c (Canvas2D) #ifdef __EMSCRIPTEN__ && !USE_WEBGPU
+        └─ render_webgpu.c (WebGPU via webgpu.h) #ifdef USE_WEBGPU
+            ├─ Native: SDL3 + sdl3webgpu + Dawn/wgpu-native
+            └─ WASM: emdawnwebgpu (--use-port=emdawnwebgpu)
     ↓
 Build Target Selection
     ├─→ Native Executable (Linux/Windows/macOS)
@@ -125,13 +126,13 @@ Build Target Selection
 1. **Minimal Native Impact:** Native builds should compile exactly as before
 2. **Clean Abstraction:** Rendering backend swappable via compile-time flags
 3. **Upstream Friendly:** Changes isolated, easy to merge
-4. **Progressive Enhancement:** Start simple (Canvas2D), upgrade later (WebGPU)
+4. **Progressive Enhancement:** Start simple (Canvas2D), upgrade to WebGPU (Phase 2)
 
 ---
 
-## Phase 1: Canvas2D Prototype
+## Phase 1: WASM Compilation Proof-of-Concept
 
-**Status:** In Progress
+**Status:** Phase 1a Complete; Phase 1b (Canvas2D rendering) Skipped
 
 **Priority:** High
 
@@ -139,7 +140,7 @@ Build Target Selection
 
 ### Progress Update
 
-**✅ Completed:**
+**✅ Phase 1a Completed (WASM Infrastructure):**
 - Emscripten compilation working (trace_swf_4 example)
 - ActionScript VM execution in WASM
 - Frame management and execution
@@ -148,24 +149,25 @@ Build Target Selection
 - GitHub Pages deployment
 - Live demo at https://peerinfinity.github.io/SWFModernRuntime/
 
-**⏳ In Progress:**
-- Canvas2D rendering backend implementation
-- Shape rendering support
-- Gradient support (required due to upstream changes)
-- Bitmap support (required due to upstream changes)
+**⏭️ Phase 1b Skipped (Canvas2D Rendering):**
 
-**📋 Remaining:**
-- Complete Canvas2D backend
-- Test graphics examples (mess, wild_shadow)
-- Performance profiling
+Canvas2D rendering has been skipped in favor of proceeding directly to Phase 2 (WebGPU).
+
+**Rationale for skipping Canvas2D rendering:**
+1. Canvas2D code would be entirely thrown away when moving to WebGPU — zero reuse
+2. Upstream uses compute shaders for gradients; Canvas2D has no compute, requiring
+   CPU workarounds that are also thrown away
+3. WebGPU initialization is not fundamentally harder than Canvas2D EM_ASM interop
+4. The rendering abstraction layer (`render_api.h`) is the same regardless of backend
+5. NO_GRAPHICS mode already covers non-rendering WASM test cases
 
 ### Objectives
 
 1. ✅ Compile generated C code with Emscripten - **DONE**
-2. ⏳ Create Canvas2D rendering backend - **IN PROGRESS**
-3. ⏳ Render basic shapes in browser - **IN PROGRESS**
+2. ⏭️ ~~Create Canvas2D rendering backend~~ - **SKIPPED (proceeding to WebGPU)**
+3. ⏭️ ~~Render basic shapes via Canvas2D~~ - **SKIPPED (will render via WebGPU instead)**
 4. ✅ Verify ActionScript execution in WASM - **DONE** (trace_swf_4)
-5. ⏳ Run graphics tests in browser - **NEXT**
+5. ⏭️ ~~Run graphics tests with Canvas2D~~ - **SKIPPED (will use WebGPU)**
 
 ### Dependencies
 
@@ -502,203 +504,297 @@ emmake make
 
 ### Deliverables
 
+**Phase 1a (Complete):**
 - [x] `wasm/examples/trace-swf-test/` - Working ActionScript example
 - [x] `wasm/examples/trace-swf-test/runtime.c` - Basic runtime implementation
 - [x] `wasm/examples/trace-swf-test/build.sh` - Build script
 - [x] `wasm/shell-templates/` - HTML templates for hosting
 - [x] `docs/` - GitHub Pages site with live demos
 - [x] `README.md` - WASM build instructions
-- [ ] `render_api.h` - Platform-agnostic rendering interface (NEXT)
-- [ ] `render_canvas2d.c` - Canvas2D backend implementation (NEXT)
-- [ ] Graphics test examples (mess, wild_shadow) (NEXT)
-- [ ] Performance benchmarks document
 
-### Known Limitations (Phase 1)
+**Carried forward to Phase 2 (WebGPU):**
+- [ ] `render_api.h` - Platform-agnostic rendering interface → **Phase 2**
+- [ ] Graphics test examples (mess, wild_shadow) → **Phase 2**
+- [ ] Performance benchmarks document → **Phase 2**
 
-- ❌ Performance will be poor (CPU rendering)
-- ❌ Gradients may not work
-- ❌ Complex shapes may render incorrectly
-- ❌ No GPU acceleration
-- ⚠️ This is a **proof of concept**, not production-ready
+**Phase 1b (Skipped):**
+- ~~`render_canvas2d.c` - Canvas2D backend~~ → **Skipped, proceeding to WebGPU**
 
 ---
 
-## Phase 2: WebGL2 Backend (Optional → Recommended)
+## Phase 2: WebGPU Backend (SDL + Dawn/wgpu)
 
-**Status:** Planned (Priority Increased)
+**Status:** Immediate Next Step (Phase 1b Canvas2D skipped)
 
-**Priority:** Medium → High
+**Priority:** High
 
-**Goal:** GPU-accelerated rendering in browser
+**Goal:** GPU-accelerated rendering using WebGPU, for both browser (WASM) and native
 
-### Status Update
+### Rationale: Why WebGPU Instead of WebGL2
 
-**Priority has increased due to:**
-- Upstream now supports gradients, bitmaps, and MSAA
-- Canvas2D will struggle with complex graphics features
-- Performance requirements higher than originally anticipated
-- WebGL2 better matches upstream SDL_GPU feature set
+The original plan called for a WebGL2 backend as Phase 2. This has been revised to use
+WebGPU directly, for several reasons:
+
+1. **WebGPU is now universally supported in browsers:** Chrome (since 2023), Edge (since 2023),
+   Firefox (since July 2025, FF 141), and Safari (since June 2025, Safari 26) all ship WebGPU
+   in stable releases. The browser coverage concern that previously favored WebGL2 is resolved.
+
+2. **Closer to existing Vulkan code:** The upstream flashbang.c renderer uses SDL_GPU/Vulkan
+   with explicit command buffers, bind groups, and pipelines. WebGPU's API model is far closer
+   to Vulkan than WebGL2 is, making the port more natural and less error-prone.
+
+3. **Compute shader support:** The upstream runtime uses compute shaders for gradient matrix
+   inversion. WebGL2 lacks compute shaders entirely, requiring CPU workarounds. WebGPU has
+   full compute shader support, eliminating this gap.
+
+4. **Single rendering backend for native + WASM:** By writing against the standardized
+   `webgpu.h` C API, the same rendering code compiles for native (via Dawn or wgpu-native)
+   and for browser (via emdawnwebgpu). WebGL2 would only work in the browser.
+
+5. **Better path to Phase 3:** When SDL_GPU gains its WebGPU backend, the Phase 2 WebGPU
+   code and WGSL shaders transfer directly, unlike WebGL2/GLSL ES 3.0 which would be thrown
+   away.
+
+### Ecosystem Overview
+
+| Component | Role | Status |
+|-----------|------|--------|
+| **webgpu.h** | Standardized C header ([webgpu-native/webgpu-headers](https://github.com/webgpu-native/webgpu-headers)) | Stable |
+| **Dawn** | Google's WebGPU impl (Chrome/Edge); recommended for debugging | Active, production |
+| **wgpu-native** | Rust-based WebGPU impl (Firefox); pre-built binaries available | Active, not yet fully webgpu.h-conformant |
+| **emdawnwebgpu** | Emscripten port for browser WebGPU ([built into Emscripten 4.0.10+](https://github.com/emscripten-core/emscripten/pull/24220)) | Official, maintained |
+| **sdl3webgpu** | Bridge: SDL3 window → WGPUSurface ([eliemichel/sdl3webgpu](https://github.com/eliemichel/sdl3webgpu)) | Maintained, single .h/.c |
+| **Naga** | SPIR-V/GLSL → WGSL shader translation ([gfx-rs/wgpu/naga](https://github.com/gfx-rs/wgpu/tree/trunk/naga)) | Active, fast |
+| **Tint** | SPIR-V ↔ WGSL translation (C++, part of Dawn) | Active, thorough |
 
 ### Decision Point
 
 **Evaluate before starting Phase 2:**
-- ✅ Is Phase 1 working? → **Partially (ActionScript done, rendering next)**
-- ✅ Is SDL3 WebGPU support still 6+ months away? → **Yes, still future**
+- ✅ Is Phase 1a working? → **Yes (WASM compilation + ActionScript VM proven)**
+- ✅ Should we implement Canvas2D first? → **No (would be thrown away; skip to WebGPU)**
 - ✅ Do you need GPU performance now? → **Yes, for feature parity**
 - ✅ Are you willing to maintain shader code? → **Required for gradients/bitmaps**
+- ✅ Is WebGPU browser support sufficient? → **Yes, all major browsers ship it**
+- ✅ Is Emscripten WebGPU tooling mature? → **Yes, emdawnwebgpu in Emscripten 4.0.10+**
 
-**Decision:** Phase 2 now recommended after Phase 1 basics are working
+**Decision:** Proceed directly to Phase 2 — Phase 1b (Canvas2D) skipped
 
-### Objectives (if proceeding)
+### Objectives
 
-1. Implement WebGL2 rendering backend
-2. Port shaders from SDL_GPU to GLSL ES 3.0
-3. Achieve native-like rendering quality
-4. Support gradients and bitmaps
-5. Performance optimization
+1. Implement WebGPU rendering backend using the standardized `webgpu.h` C API
+2. Port shaders from SPIR-V/GLSL to WGSL
+3. Achieve native-like rendering quality on both desktop and browser
+4. Support gradients (linear + radial) and bitmaps via compute and fragment shaders
+5. Use SDL3 for windowing on native (via sdl3webgpu), HTML canvas for browser
 
 ### Architecture
 
 ```c
-// src/rendering/render_webgl2.c
-#ifdef __EMSCRIPTEN__ && USE_WEBGL2
-
-#include <emscripten.h>
-#include <GLES3/gl3.h>
+// src/rendering/render_webgpu.c
+#include <webgpu/webgpu.h>
 #include "render_api.h"
 
-typedef struct WebGL2Context {
-    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl_context;
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
+#include <SDL3/SDL.h>
+#include "sdl3webgpu.h"
+#endif
 
-    GLuint vertex_buffer;
-    GLuint transform_buffer;
-    GLuint color_buffer;
+typedef struct WebGPUContext {
+    WGPUInstance instance;
+    WGPUAdapter adapter;
+    WGPUDevice device;
+    WGPUQueue queue;
+    WGPUSurface surface;
 
-    GLuint shader_program;
-    GLuint vao;
+    WGPURenderPipeline shape_pipeline;
+    WGPUComputePipeline gradient_pipeline;
+
+    WGPUBuffer vertex_buffer;
+    WGPUBuffer transform_buffer;
+    WGPUBuffer color_buffer;
 
     // Cached data
     void* shape_data;
     size_t shape_data_size;
-} WebGL2Context;
+} WebGPUContext;
 
 RenderContext* render_init(int width, int height) {
-    // Create WebGL2 context
-    EmscriptenWebGLContextAttributes attrs;
-    emscripten_webgl_init_context_attributes(&attrs);
-    attrs.majorVersion = 2;
-    attrs.minorVersion = 0;
+    WebGPUContext* ctx = calloc(1, sizeof(WebGPUContext));
 
-    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx =
-        emscripten_webgl_create_context("#canvas", &attrs);
-    emscripten_webgl_make_context_current(ctx);
+    // Create WebGPU instance
+    WGPUInstanceDescriptor desc = { .nextInChain = NULL };
+    ctx->instance = wgpuCreateInstance(&desc);
 
-    // Initialize WebGL state...
-    // Compile shaders...
-    // Create buffers...
-
-    // ... (implementation details)
-}
-
-// ... rest of WebGL2 implementation
+    // Create surface (platform-specific)
+#ifdef __EMSCRIPTEN__
+    WGPUSurfaceDescriptorFromCanvasHTMLSelector canvasDesc = {
+        .chain = { .sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector },
+        .selector = "#canvas"
+    };
+    WGPUSurfaceDescriptor surfDesc = {
+        .nextInChain = (WGPUChainedStruct*)&canvasDesc
+    };
+    ctx->surface = wgpuInstanceCreateSurface(ctx->instance, &surfDesc);
+#else
+    // Native: use sdl3webgpu bridge
+    ctx->surface = SDL_GetWGPUSurface(ctx->instance, sdl_window);
 #endif
+
+    // Request adapter, device, queue...
+    // Create pipelines, buffers...
+
+    return (RenderContext*)ctx;
+}
+
+// ... rest of WebGPU implementation
 ```
 
-### Shader Porting
+### Shader Porting (WGSL)
 
-**Vertex Shader (GLSL ES 3.0):**
-```glsl
-// shaders/webgl2/vertex.glsl
-#version 300 es
-precision highp float;
+WebGPU mandates WGSL as the only shading language in browsers. Native implementations
+(Dawn, wgpu) optionally accept SPIR-V, but for cross-platform consistency we target WGSL.
 
-layout(location = 0) in vec4 a_position;
+**Conversion pipeline for existing shaders:**
+```
+GLSL (source) → glslangValidator/Shaderc → SPIR-V → naga-cli or Tint → WGSL
+```
 
-uniform mat4 u_transform;
-uniform mat4 u_stage_to_ndc;
+Install naga-cli: `cargo install naga-cli`
+Convert: `naga input.spv output.wgsl`
 
-void main() {
-    gl_Position = u_stage_to_ndc * u_transform * a_position;
+**Vertex Shader (WGSL):**
+```wgsl
+// shaders/webgpu/vertex.wgsl
+struct VertexInput {
+    @location(0) position: vec4<f32>,
+};
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+};
+
+@group(0) @binding(0) var<uniform> transform: mat4x4<f32>;
+@group(0) @binding(1) var<uniform> stage_to_ndc: mat4x4<f32>;
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.position = stage_to_ndc * transform * in.position;
+    return out;
 }
 ```
 
-**Fragment Shader (GLSL ES 3.0):**
-```glsl
-// shaders/webgl2/fragment.glsl
-#version 300 es
-precision highp float;
+**Fragment Shader (WGSL):**
+```wgsl
+// shaders/webgpu/fragment.wgsl
+@group(1) @binding(0) var<uniform> color: vec4<f32>;
 
-uniform vec4 u_color;
-out vec4 fragColor;
-
-void main() {
-    fragColor = u_color;
+@fragment
+fn fs_main() -> @location(0) vec4<f32> {
+    return color;
 }
 ```
 
 ### Build Configuration
 
 ```cmake
-if(EMSCRIPTEN)
-    option(USE_WEBGL2 "Use WebGL2 backend instead of Canvas2D" OFF)
+option(USE_WEBGPU "Use WebGPU rendering backend" OFF)
 
-    if(USE_WEBGL2)
-        message(STATUS "Building for WASM with WebGL2")
-        set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/rendering/render_webgl2.c)
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            LINK_FLAGS "-s USE_WEBGL2=1 -s FULL_ES3=1"
-        )
+if(USE_WEBGPU)
+    if(EMSCRIPTEN)
+        # Browser: use emdawnwebgpu port (requires Emscripten 4.0.10+)
+        message(STATUS "Building for WASM with WebGPU (emdawnwebgpu)")
+        set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/rendering/render_webgpu.c)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --use-port=emdawnwebgpu")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --use-port=emdawnwebgpu -sASYNCIFY=1")
     else()
-        message(STATUS "Building for WASM with Canvas2D")
-        set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/rendering/render_canvas2d.c)
+        # Native: use SDL3 + sdl3webgpu + Dawn or wgpu-native
+        message(STATUS "Building for native with WebGPU")
+        set(RENDER_SOURCES
+            ${PROJECT_SOURCE_DIR}/src/rendering/render_webgpu.c
+            ${PROJECT_SOURCE_DIR}/lib/sdl3webgpu/sdl3webgpu.c
+        )
+        # Link against Dawn or wgpu-native (set WEBGPU_BACKEND at configure time)
+        target_link_libraries(${PROJECT_NAME} PRIVATE webgpu)
     endif()
+elseif(EMSCRIPTEN)
+    message(STATUS "Building for WASM with Canvas2D")
+    set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/rendering/render_canvas2d.c)
+else()
+    message(STATUS "Building for native with SDL_GPU (Vulkan)")
+    set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/flashbang/flashbang.c)
 endif()
 ```
 
+### Surface Creation: Native vs Browser
+
+| Platform | Surface Source | Library |
+|----------|--------------|---------|
+| **Linux (X11)** | `SDL_PROP_WINDOW_X11_DISPLAY_POINTER` + window number | sdl3webgpu |
+| **Linux (Wayland)** | `SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER` + surface ptr | sdl3webgpu |
+| **Windows** | HWND + HINSTANCE from SDL properties | sdl3webgpu |
+| **macOS** | `NSWindow` → `CAMetalLayer` via SDL properties | sdl3webgpu (compile as ObjC) |
+| **Browser (WASM)** | `WGPUSurfaceDescriptorFromCanvasHTMLSelector("#canvas")` | emdawnwebgpu |
+
 ### Deliverables
 
-- [ ] `render_webgl2.c` - WebGL2 backend
-- [ ] Vertex/fragment shaders (GLSL ES 3.0)
-- [ ] Shader compilation system
-- [ ] Buffer management
-- [ ] Performance benchmarks
+- [ ] `render_webgpu.c` — WebGPU backend (shared native + WASM code)
+- [ ] WGSL shaders (vertex, fragment, compute for gradients)
+- [ ] Shader conversion pipeline (SPIR-V → WGSL via naga-cli)
+- [ ] sdl3webgpu integration for native builds
+- [ ] emdawnwebgpu integration for WASM builds
+- [ ] Performance benchmarks (native + browser)
 - [ ] Documentation
 
 ### Performance Targets
 
-- 60 FPS for simple games
-- 30 FPS for complex games
-- Sub-1MB WASM binary size
+- 60 FPS for simple games (native and browser)
+- 30 FPS for complex games (browser)
+- Sub-1MB WASM binary size (rendering code; emdawnwebgpu JS glue adds ~50-100KB)
 
 ---
 
-## Phase 3: SDL3 WebGPU Migration
+## Phase 3: SDL_GPU WebGPU Migration
 
-**Timeline:** TBD (waiting on SDL3)
+**Timeline:** TBD (waiting on SDL_GPU WebGPU backend)
 
-**Status:** Future
+**Status:** Future (monitoring)
 
 **Priority:** High (when available)
 
-**Goal:** Use official SDL3 WebGPU backend
+**Goal:** Migrate from Phase 2's direct `webgpu.h` rendering to SDL_GPU's WebGPU backend,
+unifying the native and WASM renderers into the single upstream `flashbang.c`
 
-### Monitoring SDL3 Progress
+### Context: Relationship to Phase 2
+
+Phase 2 provides a working WebGPU renderer that writes directly against `webgpu.h`. This
+requires maintaining a separate `render_webgpu.c` alongside the native `flashbang.c`. Phase 3
+eliminates this split: when SDL_GPU gains a WebGPU backend, `flashbang.c` (which already uses
+SDL_GPU) would work unmodified for WASM — no custom rendering code needed.
+
+**Key advantage of the Phase 2 → Phase 3 path:** The WGSL shaders written in Phase 2
+transfer directly to Phase 3, and the team gains WebGPU API experience. If Phase 3 never
+materializes, Phase 2 is a fully viable long-term solution.
+
+### Monitoring SDL_GPU Progress
 
 **Resources to watch:**
 - SDL3 GitHub: https://github.com/libsdl-org/SDL/projects
-- SDL_GPU documentation
-- Emscripten WebGPU support status
-- Browser WebGPU implementation status
+- SDL_GPU WebGPU backend feature request: https://github.com/libsdl-org/SDL/issues/10768
+- SDL_GPU documentation: https://wiki.libsdl.org/SDL3/CategoryGPU
+- Emscripten SDL3 support status
 
 **Key milestones to track:**
 - ✅ SDL_GPU API stabilization
+- ✅ Browser WebGPU availability (Chrome, Firefox, Safari, Edge — all ship it)
 - ⏳ Emscripten SDL3 support
 - ⏳ SDL_GPU WebGPU backend implementation
-- ⏳ Browser WebGPU availability (Chrome stable, Firefox, Safari)
 
 ### Migration Strategy
 
-**When SDL3 WebGPU is ready:**
+**When SDL_GPU's WebGPU backend is ready:**
 
 1. **Test upstream runtime with Emscripten**
    ```bash
@@ -708,13 +804,13 @@ endif()
 
 2. **Verify compatibility**
    - Does flashbang.c compile with Emscripten?
-   - Does SDL_GPU map to WebGPU?
-   - Do shaders compile (SPIR-V → WGSL)?
+   - Does SDL_GPU map to WebGPU correctly?
+   - Do shaders compile (SPIR-V → WGSL via SDL_GPU's internal pipeline)?
 
-3. **Deprecate custom backends**
-   - Keep Canvas2D as fallback
-   - Remove WebGL2 (if implemented)
-   - Use native flashbang.c for WASM
+3. **Deprecate Phase 2 custom backend**
+   - Keep Canvas2D as minimal fallback
+   - Deprecate `render_webgpu.c` (Phase 2 custom code)
+   - Use native `flashbang.c` for both native and WASM
 
 4. **Build configuration**
    ```cmake
@@ -731,18 +827,19 @@ endif()
 
 ### Expected Benefits
 
-- ✅ **Zero maintenance:** Same code as upstream
+- ✅ **Zero maintenance:** Same code as upstream `flashbang.c`
 - ✅ **Automatic updates:** Benefit from upstream improvements
 - ✅ **Full features:** All native features available in WASM
 - ✅ **Performance:** Native-like GPU acceleration
+- ✅ **Simplified build:** No separate rendering backends to maintain
 
 ### Deliverables
 
-- [ ] SDL3 WebGPU compatibility test
-- [ ] Migration guide
+- [ ] SDL_GPU WebGPU compatibility test
+- [ ] Migration guide (Phase 2 → Phase 3)
 - [ ] Updated build system
-- [ ] Deprecation plan for custom backends
-- [ ] Performance comparison (Canvas2D vs WebGL2 vs WebGPU)
+- [ ] Deprecation plan for `render_webgpu.c`
+- [ ] Performance comparison (Phase 2 WebGPU vs Phase 3 SDL_GPU WebGPU)
 
 ---
 
@@ -778,9 +875,9 @@ void mixed_function() {
 ```
 src/rendering/
 ├── render_api.h          # Shared interface
-├── render_native.c       # Native only (#ifndef __EMSCRIPTEN__)
-├── render_canvas2d.c     # WASM only (#ifdef __EMSCRIPTEN__)
-└── render_webgl2.c       # WASM only (#ifdef __EMSCRIPTEN__)
+├── render_native.c       # Native only (#ifndef __EMSCRIPTEN__ && !USE_WEBGPU)
+├── render_canvas2d.c     # WASM fallback (#ifdef __EMSCRIPTEN__ && !USE_WEBGPU)
+└── render_webgpu.c       # WebGPU backend (#ifdef USE_WEBGPU — native + WASM)
 ```
 
 #### 3. Build System Isolation
@@ -888,10 +985,10 @@ SWFRecomp/
     │       ├── render_api.h
     │       ├── render_native.c
     │       ├── render_canvas2d.c
-    │       └── render_webgl2.c
+    │       └── render_webgpu.c   # WebGPU backend (native + WASM)
     ├── shaders/
-    │   ├── spirv/              # Native shaders
-    │   └── glsl/               # WASM shaders (WebGL2)
+    │   ├── spirv/              # Native shaders (Vulkan)
+    │   └── wgsl/               # WebGPU shaders (Phase 2)
     ├── web/                    🆕 NEW
     │   ├── shell.html          # HTML template
     │   └── style.css           # Styling
@@ -929,12 +1026,12 @@ if(EMSCRIPTEN)
     message(STATUS "=== Building for WebAssembly ===")
 
     # WASM rendering options
-    option(USE_WEBGL2 "Use WebGL2 instead of Canvas2D" OFF)
+    option(USE_WEBGPU "Use WebGPU instead of Canvas2D" OFF)
 
-    if(USE_WEBGL2)
-        message(STATUS "Rendering backend: WebGL2")
-        set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/rendering/render_webgl2.c)
-        set(RENDER_FLAGS "-s USE_WEBGL2=1 -s FULL_ES3=1")
+    if(USE_WEBGPU)
+        message(STATUS "Rendering backend: WebGPU (emdawnwebgpu)")
+        set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/rendering/render_webgpu.c)
+        set(RENDER_FLAGS "--use-port=emdawnwebgpu -sASYNCIFY=1")
     else()
         message(STATUS "Rendering backend: Canvas2D")
         set(RENDER_SOURCES ${PROJECT_SOURCE_DIR}/src/rendering/render_canvas2d.c)
@@ -1068,8 +1165,8 @@ fi
 mkdir -p build-wasm
 cd build-wasm
 
-# Option: USE_WEBGL2=ON for WebGL2, OFF for Canvas2D
-emcmake cmake -DCMAKE_BUILD_TYPE=Release -DUSE_WEBGL2=OFF ..
+# Option: USE_WEBGPU=ON for WebGPU, OFF for Canvas2D
+emcmake cmake -DCMAKE_BUILD_TYPE=Release -DUSE_WEBGPU=OFF ..
 emmake make
 
 echo "✓ WASM build complete:"
@@ -1146,8 +1243,8 @@ endif()
 
 ### Test Matrix
 
-| Test Type | Native Build | WASM Canvas2D | WASM WebGL2 | WASM WebGPU |
-|-----------|--------------|---------------|-------------|-------------|
+| Test Type | Native Build | WASM Canvas2D | WASM WebGPU (Phase 2) | SDL_GPU WebGPU (Phase 3) |
+|-----------|--------------|---------------|----------------------|--------------------------|
 | **Compilation** | ✅ Required | ✅ Required | ⏳ Phase 2 | ⏳ Phase 3 |
 | **ActionScript Tests (50)** | ✅ All pass | ✅ All pass | ✅ All pass | ✅ All pass |
 | **Graphics Tests (14)** | ✅ All pass | ⚠️ Basic | ✅ All pass | ✅ All pass |
@@ -1163,12 +1260,12 @@ cd build-native && cmake .. && make
 # Expected: Clean compile, no warnings
 
 # WASM Canvas2D
-cd build-wasm && emcmake cmake -DUSE_WEBGL2=OFF .. && emmake make
+cd build-wasm && emcmake cmake -DUSE_WEBGPU=OFF .. && emmake make
 # Expected: Clean compile, WASM binary generated
 
-# WASM WebGL2 (Phase 2)
-cd build-wasm && emcmake cmake -DUSE_WEBGL2=ON .. && emmake make
-# Expected: Clean compile, shaders embedded
+# WASM WebGPU (Phase 2)
+cd build-wasm && emcmake cmake -DUSE_WEBGPU=ON .. && emmake make
+# Expected: Clean compile, WGSL shaders bundled, emdawnwebgpu linked
 ```
 
 #### 2. ActionScript Tests
@@ -1203,7 +1300,7 @@ cd build-wasm && emcmake cmake -DUSE_WEBGL2=ON .. && emmake make
 - Colors roughly correct
 - Positions roughly correct
 
-**WASM WebGL2 (Phase 2):**
+**WASM WebGPU (Phase 2):**
 - Canvas appears
 - Pixel-perfect rendering
 - Matches native output
@@ -1215,10 +1312,10 @@ cd build-wasm && emcmake cmake -DUSE_WEBGL2=ON .. && emmake make
 
 | Platform | Frame Time | FPS | Notes |
 |----------|-----------|-----|-------|
-| Native | 1-2ms | 500+ | Baseline |
+| Native (SDL_GPU/Vulkan) | 1-2ms | 500+ | Baseline |
 | WASM Canvas2D | 20-50ms | 20-50 | CPU limited |
-| WASM WebGL2 | 2-5ms | 200+ | GPU accelerated |
-| WASM WebGPU | 1-3ms | 300+ | Native-like |
+| WASM WebGPU (Phase 2) | 2-5ms | 200+ | GPU accelerated |
+| WASM SDL_GPU WebGPU (Phase 3) | 1-3ms | 300+ | Native-like |
 
 #### 5. Regression Testing
 
@@ -1321,7 +1418,7 @@ git merge upstream-runtime/master
 - WASM-specific code (unless requested)
 - Rendering abstraction layer
 - Emscripten build configuration
-- Canvas2D/WebGL2 backends
+- Canvas2D/WebGPU rendering backends
 
 ---
 
@@ -1349,54 +1446,55 @@ git merge upstream-runtime/master
 
 ---
 
-### Phase 2: WebGL2 Backend (Optionals)
+### Phase 2: WebGPU Backend (SDL + Dawn/wgpu)
 
-**Decision Point:** End of Phase 1
-- Evaluate: Is SDL3 WebGPU ready?
-- If NO and need performance: Proceed with Phase 2
-- If YES or acceptable performance: Skip to Phase 3
+**Decision:** Proceed immediately (Phase 1b Canvas2D skipped)
 
-**WebGL2 Setup**
-- [ ] WebGL2 context creation
-- [ ] Buffer management
-- [ ] Basic rendering pipeline
+**WebGPU Setup**
+- [ ] Integrate sdl3webgpu for native surface creation
+- [ ] Configure emdawnwebgpu for WASM builds (Emscripten 4.0.10+)
+- [ ] WebGPU device/adapter/queue initialization
+- [ ] Buffer management (vertex, transform, color)
+- [ ] Basic render pipeline creation
 
-**Shader Porting**
-- [ ] Port vertex shaders
-- [ ] Port fragment shaders
-- [ ] Shader compilation system
+**Shader Porting (SPIR-V/GLSL → WGSL)**
+- [ ] Install naga-cli (`cargo install naga-cli`)
+- [ ] Convert vertex shaders to WGSL
+- [ ] Convert fragment shaders to WGSL
+- [ ] Convert compute shaders (gradients) to WGSL
+- [ ] Shader loading and compilation system
 
 **Features**
 - [ ] Solid fills
-- [ ] Gradients
-- [ ] Bitmaps
-- [ ] Transforms
+- [ ] Gradients (linear + radial) via compute shaders
+- [ ] Bitmaps/textures
+- [ ] Matrix transforms
 
 **Testing & Optimization**
-- [ ] All graphics tests
+- [ ] All graphics tests (native + browser)
 - [ ] Performance profiling
 - [ ] Bundle size optimization
 
-**Milestone 2:** ✅ GPU-accelerated rendering in WASM
+**Milestone 2:** ✅ GPU-accelerated rendering on native and WASM via WebGPU
 
 ---
 
-### Phase 3: SDL3 WebGPU Migration
+### Phase 3: SDL_GPU WebGPU Migration
 
-**Timeline:** TBD (dependent on SDL3)
+**Timeline:** TBD (dependent on SDL_GPU WebGPU backend)
 
 **Monitoring Phase (ongoing):**
-- [ ] Monthly check: SDL3 WebGPU status
+- [ ] Monthly check: SDL_GPU WebGPU backend status (https://github.com/libsdl-org/SDL/issues/10768)
 - [ ] Test Emscripten + SDL3 compatibility
 - [ ] Follow SDL development blog/GitHub
 
 **Migration Phase (when ready):**
-- [ ] Test upstream runtime with Emscripten
+- [ ] Test upstream flashbang.c with Emscripten + SDL_GPU WebGPU
 - [ ] Migrate build system
-- [ ] Testing and validation
-- [ ] Documentation and deprecation
+- [ ] Deprecate Phase 2 custom `render_webgpu.c`
+- [ ] Testing, validation, and documentation
 
-**Milestone 3:** ✅ Using upstream runtime for both native and WASM
+**Milestone 3:** ✅ Using upstream `flashbang.c` for both native and WASM
 
 ---
 
@@ -1415,15 +1513,16 @@ git merge upstream-runtime/master
 - Avoid bleeding-edge features
 - Have fallback to Canvas2D
 
-#### Risk 2: SDL3 WebGPU Delayed
+#### Risk 2: SDL_GPU WebGPU Backend Delayed
 **Probability:** High
 
-**Impact:** Medium
+**Impact:** Low (reduced from Medium — Phase 2 is now a full WebGPU solution)
 
 **Mitigation:**
-- ✅ Phase 1 provides working solution
-- ✅ Phase 2 provides fallback
-- ⏳ No hard dependency on SDL3 timeline
+- ✅ Phase 2 provides full GPU-accelerated WebGPU rendering without SDL_GPU
+- ✅ Phase 2 works for both native (via Dawn/wgpu-native) and WASM (via emdawnwebgpu)
+- ✅ No hard dependency on SDL_GPU timeline — Phase 2 is viable long-term
+- ⏳ Monitor SDL_GPU WebGPU backend: https://github.com/libsdl-org/SDL/issues/10768
 
 #### Risk 3: Upstream Breaking Changes
 **Probability:** High (active development)
@@ -1453,8 +1552,9 @@ git merge upstream-runtime/master
 
 **Mitigation:**
 - Target modern browsers (last 2 years)
-- Use standard APIs (WebGL2, WebGPU)
-- Feature detection and fallbacks
+- WebGPU now supported in all major browsers: Chrome 113+, Edge 113+, Firefox 141+, Safari 26+
+- Canvas2D (Phase 1) available as fallback for older browsers
+- Feature detection: check `navigator.gpu` before initializing WebGPU
 - Document minimum browser versions
 
 ### Project Risks
@@ -1468,7 +1568,7 @@ git merge upstream-runtime/master
 - Clear phase boundaries
 - Stick to plan
 - Phase 1 is minimal viable product
-- Phase 2 is truly optional
+- Phase 2 is focused: one renderer (WebGPU) for native + WASM, not two separate backends
 
 #### Risk 2: Maintenance Burden
 **Probability:** High
@@ -1479,7 +1579,8 @@ git merge upstream-runtime/master
 - ✅ Minimize custom code (rendering backends only)
 - ✅ Automate testing (CI/CD)
 - ✅ Good documentation
-- ✅ Plan for Phase 3 migration (reduce to zero custom code)
+- ✅ Phase 2 WebGPU backend works for both native + WASM (single codebase)
+- ✅ Plan for Phase 3 migration (reduce to zero custom rendering code)
 
 #### Risk 3: Upstream Divergence
 **Probability:** Medium
@@ -1498,15 +1599,15 @@ git merge upstream-runtime/master
 - Consider alternative: asm.js fallback
 - Consider alternative: Wait for SDL3 only
 
-**If Phase 2 is too complex:**
-- Skip to Phase 3 (wait for SDL3)
+**If Phase 2 WebGPU is too complex:**
+- Fall back to WebGL2 as a simpler alternative (less Vulkan-like but well-documented)
 - Use Canvas2D as interim solution
-- Focus on non-graphics features
+- Focus on non-graphics features until WebGPU tooling matures further
 
-**If SDL3 WebGPU never materializes:**
-- Maintain WebGL2 backend long-term
+**If SDL_GPU WebGPU backend never materializes:**
+- Maintain Phase 2 `render_webgpu.c` long-term (viable — it works for native + WASM)
 - Consider contributing WebGPU backend to SDL3
-- Accept maintenance burden
+- Accept maintenance burden of separate rendering backend
 
 **If upstream rejects fork concept:**
 - Continue as independent project
@@ -1615,21 +1716,38 @@ cd emsdk
 source ./emsdk_env.sh
 ```
 
-### WebGL2
-
-**Browser Support:** All modern browsers (2020+)
-
-**Reference:** https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API
-
-**GLSL ES 3.0:** https://www.khronos.org/files/opengles_shading_language.pdf
-
 ### WebGPU
 
-**Browser Support:** Chrome 113+, Edge 113+, (Firefox/Safari experimental)
+**Browser Support:** Chrome 113+, Edge 113+, Firefox 141+, Safari 26+ (all major browsers)
 
-**Reference:** https://gpuweb.github.io/gpuweb/
+**Specification:** https://gpuweb.github.io/gpuweb/
+
+**WGSL Specification:** https://gpuweb.github.io/gpuweb/wgsl.html
 
 **Status:** https://caniuse.com/webgpu
+
+**C Header (webgpu.h):** https://github.com/webgpu-native/webgpu-headers
+
+### WebGPU Implementations
+
+**Dawn (Google):** https://dawn.googlesource.com/dawn (GitHub mirror: https://github.com/google/dawn)
+- Chrome/Edge WebGPU backend; excellent debug output
+- Emscripten integration: emdawnwebgpu (built into Emscripten 4.0.10+)
+
+**wgpu-native (Mozilla/gfx-rs):** https://github.com/gfx-rs/wgpu-native
+- Firefox WebGPU backend; pre-built binaries available
+- Note: not yet fully conformant with stable webgpu.h
+
+### WebGPU Tooling
+
+**sdl3webgpu:** https://github.com/eliemichel/sdl3webgpu
+- Bridge: SDL3 window → WGPUSurface (one .h/.c file)
+
+**Naga (shader compiler):** https://github.com/gfx-rs/wgpu/tree/trunk/naga
+- SPIR-V/GLSL → WGSL conversion; install: `cargo install naga-cli`
+
+**Tint (shader compiler):** Part of Dawn
+- SPIR-V ↔ WGSL conversion; build via depot_tools
 
 ### SDL3
 
@@ -1637,7 +1755,19 @@ source ./emsdk_env.sh
 
 **SDL_GPU Documentation:** https://wiki.libsdl.org/SDL3/CategoryGPU
 
+**SDL_GPU WebGPU Backend:** https://github.com/libsdl-org/SDL/issues/10768 (planned, not yet available)
+
 **Emscripten Support:** https://wiki.libsdl.org/SDL3/README/emscripten
+
+### WebGL2 (Fallback Reference)
+
+**Browser Support:** All modern browsers (2020+)
+
+**Reference:** https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API
+
+**Note:** WebGL2 was the original Phase 2 plan. It remains a viable fallback if WebGPU
+proves impractical, but lacks compute shaders and is less aligned with the Vulkan-based
+upstream renderer.
 
 ---
 
@@ -1768,9 +1898,10 @@ python3 -m http.server 8000
 
 ### Current Status
 
-- ✅ Phase 1: Canvas2D rendering (working)
-- ⏳ Phase 2: WebGL2 rendering (optional)
-- ⏳ Phase 3: SDL3 WebGPU (waiting on SDL3)
+- ✅ Phase 1a: WASM compilation + ActionScript VM (complete)
+- ⏭️ Phase 1b: Canvas2D rendering (skipped — proceeding to WebGPU)
+- ⏳ Phase 2: WebGPU rendering via SDL + Dawn/wgpu (immediate next step)
+- ⏳ Phase 3: SDL_GPU WebGPU migration (waiting on SDL_GPU backend)
 
 ### Upstream Sync
 
@@ -1805,7 +1936,9 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
 
 ### What's Next
 
-**Immediate Priorities (Phase 1b - Rendering):**
+**Immediate Priorities (Phase 2 - WebGPU):**
+
+Phase 1b (Canvas2D rendering) has been skipped. Proceeding directly to Phase 2.
 
 1. **Create Rendering Abstraction Layer**
    - Design `render_api.h` interface
@@ -1813,22 +1946,17 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
    - Plan for texture_info (not just color_info)
    - Support display lists and transforms
 
-2. **Implement Canvas2D Backend (Minimal)**
-   - Basic shape rendering
-   - Solid color fills
-   - Simple transforms
-   - Get `mess` test rendering *something*
+2. **Implement WebGPU Backend**
+   - Set up sdl3webgpu for native, emdawnwebgpu for WASM
+   - WebGPU device/adapter/queue initialization
+   - Render pipeline creation (vertex, fragment, compute)
+   - Port shaders to WGSL (via naga-cli from SPIR-V)
 
 3. **Test Graphics Examples**
-   - Port `mess` test to WASM
+   - Port `mess` test to WASM with WebGPU
    - Port `wild_shadow` test
    - Visual comparison with native
    - Document limitations
-
-4. **Evaluate Phase 2 Transition**
-   - Is Canvas2D sufficient?
-   - Or proceed directly to WebGL2?
-   - Document decision rationale
 
 ### Technical Debt to Address
 
@@ -1842,7 +1970,7 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
    - Gradients (linear + radial) - upstream has this
    - Bitmaps - upstream has this
    - MSAA - may skip for WASM
-   - Compute shaders - need WebGL2 compute or workaround
+   - Compute shaders - WebGPU (Phase 2) supports compute; Canvas2D needs CPU workaround
 
 3. **Build System Integration**
    - Current: standalone examples with shell scripts
@@ -1853,10 +1981,10 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
 
 **Strategic Shifts:**
 
-1. **Phase 1 → Phase 2 Faster**
+1. **Skip Canvas2D, Go Straight to WebGPU**
    - Original plan: Canvas2D proof-of-concept, then evaluate
-   - New reality: Upstream rendering is sophisticated
-   - Recommendation: Get Canvas2D working minimally, then prioritize WebGL2
+   - New reality: Upstream rendering is sophisticated; Canvas2D can't keep up
+   - Decision: Skip Phase 1b Canvas2D entirely, proceed directly to Phase 2 WebGPU
 
 2. **Feature Parity Focus**
    - Original goal: "basic rendering"
@@ -1866,13 +1994,13 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
 3. **Performance Bar Raised**
    - Original: Canvas2D acceptable for proof-of-concept
    - New: Complex games need GPU acceleration
-   - Impact: WebGL2 now essential, not optional
+   - Impact: WebGPU (Phase 2) now essential, not optional
 
 **Timeline Adjustments:**
 
-- **Phase 1a (ActionScript):** COMPLETE ✅
-- **Phase 1b (Canvas2D):**
-- **Phase 2 (WebGL2):** NOW RECOMMENDED (was: Optional)
+- **Phase 1a (ActionScript + WASM Infrastructure):** COMPLETE ✅
+- **Phase 1b (Canvas2D Rendering):** SKIPPED ⏭️ (proceeding directly to WebGPU)
+- **Phase 2 (WebGPU via SDL + Dawn/wgpu):** IMMEDIATE NEXT STEP
   - Priority: High
 
 ### Open Questions
@@ -1883,17 +2011,14 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
    - Trade-off: Code reuse vs. complexity
 
 2. **Rendering Backend Strategy:**
-   - Canvas2D minimal → WebGL2 full?
-   - Or skip Canvas2D, go directly to WebGL2?
-   - Current lean: Canvas2D minimal first for incremental progress
+   - ~~Canvas2D minimal → WebGPU full?~~
+   - ~~Or skip Canvas2D, go directly to WebGPU?~~
+   - **Resolved:** Skip Canvas2D, go directly to WebGPU (Phase 2)
 
-3. **Compute Shader Workaround:**
+3. **Compute Shader Strategy:**
    - Upstream uses compute shader for gradient matrix inversion
-   - WebGL2 doesn't have compute shaders
-   - Options:
-     - Pre-compute on CPU (WASM)
-     - Use WebGL2 fragment shader workaround
-     - Wait for WebGPU
+   - **Resolved:** WebGPU has full compute shader support — no workaround needed
+   - ~~Canvas2D would have needed CPU-side pre-computation~~ (Canvas2D skipped)
 
 4. **Test Suite:**
    - Which tests should WASM target?
@@ -1902,20 +2027,23 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
 
 ### Success Metrics (Updated)
 
-**Phase 1 Success (Revised):**
+**Phase 1a Success (Complete):**
 - [x] ActionScript VM working in WASM
 - [x] Build system and deployment pipeline
-- [ ] Canvas2D rendering showing *something* (even if imperfect)
-- [ ] At least 1 graphics test rendered in browser
-- [ ] Documentation of limitations and next steps
+- [x] Live demo deployed (trace_swf_4)
+
+**Phase 1b (Canvas2D rendering) — Skipped:**
+- ~~Canvas2D rendering showing *something*~~ → Proceeding directly to WebGPU
+- ~~At least 1 graphics test rendered in browser~~ → Will be done via WebGPU
+- [ ] Documentation of Phase 1b skip rationale → This document (v1.2)
 
 **Phase 2 Success (Elevated Priority):**
-- [ ] WebGL2 backend with shader support
-- [ ] Gradients working (linear + radial)
+- [ ] WebGPU backend with WGSL shader support (native + WASM)
+- [ ] Gradients working (linear + radial) via compute shaders
 - [ ] Bitmaps/textures working
 - [ ] All upstream graphics tests pass visually
-- [ ] Performance: 30+ FPS for test games
-- [ ] Bundle size: <2MB
+- [ ] Performance: 30+ FPS for test games (60+ on native)
+- [ ] Bundle size: <2MB (WASM)
 
 ## Document History
 
@@ -1923,6 +2051,7 @@ This fork tracks upstream regularly. All native functionality remains unchanged.
 |---------|------|---------|
 | 1.0 | 2025-10-27 | Initial planning document |
 | 1.1 | 2025-10-27 | Updated with current implementation status, upstream rendering progress, adjusted priorities and timelines |
+| 1.2 | 2026-02-05 | **Phase 2 redesigned: WebGL2 → WebGPU.** WebGPU now supported in all major browsers (Chrome, Edge, Firefox 141+, Safari 26+). Phase 2 uses SDL3 + sdl3webgpu + Dawn/wgpu-native for native, emdawnwebgpu for WASM. Shaders ported to WGSL. Phase 3 redefined as SDL_GPU WebGPU migration (was SDL3 WebGPU). **Phase 1b (Canvas2D rendering) skipped** — proceeding directly to Phase 2 WebGPU. Canvas2D code would be thrown away; WebGPU has compute shaders matching upstream. Updated ecosystem references, risk assessment, and contingency plans. |
 
 ---
 

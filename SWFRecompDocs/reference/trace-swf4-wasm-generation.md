@@ -1070,7 +1070,7 @@ The build uses `-O2` optimization:
 
 1. **Graphics Rendering:** Not implemented in this example
    - `draws.c` is empty
-   - No Canvas2D/WebGL rendering
+   - No WebGPU/Canvas2D rendering
    - Only console output works
 
 2. **ActionScript Support:** SWF v4 only
@@ -1086,19 +1086,19 @@ The build uses `-O2` optimization:
 
 ### Future Enhancements
 
-**Phase 1: Canvas2D Rendering**
-- Implement shape rendering in draws.c
-- Use HTML5 Canvas 2D API
-- Translate fills, strokes, gradients
+**~~Phase 1b: Canvas2D Rendering~~ (Skipped)**
+- ~~Implement shape rendering in draws.c via Canvas2D~~
+- Skipped in favor of proceeding directly to WebGPU (Phase 2)
 
-**Phase 2: WebGL2 Rendering**
-- GPU-accelerated rendering
-- Shader-based graphics pipeline
-- Better performance for complex scenes
+**Phase 2: WebGPU Rendering (SDL + Dawn/wgpu)**
+- GPU-accelerated rendering via standardized webgpu.h C API
+- WGSL shader-based graphics pipeline
+- Native: SDL3 + sdl3webgpu + Dawn/wgpu-native
+- Browser: emdawnwebgpu (Emscripten 4.0.10+)
 
-**Phase 3: SDL3 WebGPU**
-- Use upstream SWFModernRuntime rendering
-- WebGPU backend for maximum performance
+**Phase 3: SDL_GPU WebGPU Migration**
+- Use upstream flashbang.c with SDL_GPU's WebGPU backend
+- Zero custom rendering code
 - Full compatibility with native version
 
 ## Summary
