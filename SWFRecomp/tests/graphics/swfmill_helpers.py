@@ -446,6 +446,16 @@ class SWFMLBuilder:
         tag_b64 = base64.b64encode(tag_body).decode('ascii')
         self.tags.append(("DefineBitsLossless2", tag_b64))
 
+    def define_bits_jpeg2(self, object_id, jpeg_data_bytes):
+        """Add a DefineBitsJPEG2 tag (tag 21) with self-contained JPEG data.
+
+        jpeg_data_bytes: raw JPEG file bytes (complete JPEG, no JPEGTables needed).
+        """
+        # Tag body: CharacterID(UI16) + raw JPEG data
+        tag_body = struct.pack('<H', object_id) + jpeg_data_bytes
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+        self.tags.append(("DefineBitsJPEG2", tag_b64))
+
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
                      skew_x=None, skew_y=None,
@@ -512,6 +522,11 @@ class SWFMLBuilder:
 
             elif tag_type == "DefineBitsLossless2":
                 unk = SubElement(tags_el, "UnknownTag", id="0x24")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_data
+
+            elif tag_type == "DefineBitsJPEG2":
+                unk = SubElement(tags_el, "UnknownTag", id="0x15")
                 data_el = SubElement(unk, "data")
                 data_el.text = tag_data
 

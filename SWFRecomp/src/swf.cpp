@@ -760,6 +760,79 @@ namespace SWFRecomp
 				break;
 			}
 			
+			case SWF_TAG_DEFINE_BITS_JPEG2:
+			{
+				size_t new_length = tag.length;
+
+				tag.clearFields();
+				tag.setFieldCount(1);
+
+				tag.configureNextField(SWF_FIELD_UI16);
+
+				tag.parseFields(cur_pos);
+
+				u16 char_id = (u16) tag.fields[0].value;
+				new_length -= 2;
+
+				// Strip erroneous EOI+SOI marker (FF D9 FF D8) if present
+				// Tag 21 is self-contained, so a leading FF D8 alone is the valid SOI
+				if ((u8) cur_pos[0] == 0xFF &&
+					(u8) cur_pos[1] == 0xD9 &&
+					(u8) cur_pos[2] == 0xFF &&
+					(u8) cur_pos[3] == 0xD8)
+				{
+					cur_pos += 4;
+					new_length -= 4;
+				}
+
+				int w;
+				int h;
+				int comp;
+				u8* decompressed = stbi_load_from_memory((u8*) cur_pos, (int) new_length, &w, &h, &comp, 3);
+
+				if (decompressed == nullptr)
+				{
+					EXC("JPEG2 data returned NULL.\n");
+				}
+
+				Vertex v;
+				v.x = w;
+				v.y = h;
+
+				bitmap_sizes.push_back(v);
+
+				size_t bitmap_start = current_bitmap_pixel;
+
+				for (size_t i = 0; i < 3*w*h; i += 3)
+				{
+					bitmap_data << std::hex << std::uppercase << std::setw(2)
+								<< "\t0x" << (u32) decompressed[i] << "," << endl
+								<< "\t0x" << (u32) decompressed[i + 1] << "," << endl
+								<< "\t0x" << (u32) decompressed[i + 2] << "," << endl
+								<< "\t0xFF," << endl;
+
+					current_bitmap_pixel += 1;
+				}
+
+				char_id_to_bitmap_id[char_id] = current_bitmap;
+
+				tag_init << endl
+						 << "\tdefineBitmap("
+						 << to_string(4*bitmap_start) << ", "
+						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+						 << to_string(w) << ", "
+						 << to_string(h)
+						 << ");";
+
+				current_bitmap += 1;
+
+				stbi_image_free(decompressed);
+
+				cur_pos += new_length;
+
+				break;
+			}
+
 			case SWF_TAG_JPEG_TABLES:
 			{
 				if (jpeg_tables != nullptr)
