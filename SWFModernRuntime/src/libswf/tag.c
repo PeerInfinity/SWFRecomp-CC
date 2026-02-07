@@ -35,7 +35,16 @@ void tagShowFrame(SWFAppContext* app_context)
 		switch (ch->type)
 		{
 			case CHAR_TYPE_SHAPE:
+				if (obj->has_cxform)
+				{
+					renderer_upload_cxform_id(context, obj->cxform_id);
+				}
 				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id);
+				if (obj->has_cxform)
+				{
+					// Reset cxform to identity for subsequent shapes
+					renderer_upload_cxform_id(context, 0);
+				}
 				break;
 			case CHAR_TYPE_TEXT:
 				renderer_upload_extra_transform_id(context, obj->transform_id);
@@ -72,12 +81,14 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	dictionary[char_id].cxform_id = cxform_id;
 }
 
-void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id)
+void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id)
 {
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
+	display_list[depth].cxform_id = cxform_id;
+	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 
 	if (depth > max_depth)
 	{

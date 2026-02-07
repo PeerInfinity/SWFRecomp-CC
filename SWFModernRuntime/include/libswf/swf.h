@@ -44,6 +44,8 @@ typedef struct DisplayObject
 {
 	size_t char_id;
 	u32 transform_id;
+	u32 cxform_id;
+	u32 has_cxform;
 } DisplayObject;
 #endif
 

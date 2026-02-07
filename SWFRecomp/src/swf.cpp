@@ -1151,17 +1151,110 @@ namespace SWFRecomp
 				{
 					MATRIX matrix;
 					parseMatrix(matrix);
-					
+
 					recompileMatrix(matrix, transform_data);
 					current_transform += 1;
 				}
-				
+
 				else
 				{
 					transform_id = 0;
 				}
-				
-				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ");" << endl;
+
+				u32 cxform_id = 0;
+
+				if (has_color)
+				{
+					// Parse CXFORMWITHALPHA
+					u32 cur_byte_bits_left = 8;
+					SWFTag cxform_tag;
+
+					// Read HasAddTerms (1 bit), HasMultTerms (1 bit), Nbits (4 bits)
+					cxform_tag.clearFields();
+					cxform_tag.setFieldCount(3);
+					cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+					cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+					cxform_tag.configureNextField(SWF_FIELD_UB, 4);
+					cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+					bool has_add = cxform_tag.fields[0].value & 1;
+					bool has_mult = cxform_tag.fields[1].value & 1;
+					u32 nbits = (u32) cxform_tag.fields[2].value;
+
+					// Default multiply = 256 (1.0 in 8.8 fixed-point), default add = 0
+					s32 mult_r = 256, mult_g = 256, mult_b = 256, mult_a = 256;
+					s32 add_r = 0, add_g = 0, add_b = 0, add_a = 0;
+
+					if (has_mult)
+					{
+						cxform_tag.clearFields();
+						cxform_tag.setFieldCount(4);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+						mult_r = (s32) cxform_tag.fields[0].value;
+						mult_g = (s32) cxform_tag.fields[1].value;
+						mult_b = (s32) cxform_tag.fields[2].value;
+						mult_a = (s32) cxform_tag.fields[3].value;
+					}
+
+					if (has_add)
+					{
+						cxform_tag.clearFields();
+						cxform_tag.setFieldCount(4);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+						add_r = (s32) cxform_tag.fields[0].value;
+						add_g = (s32) cxform_tag.fields[1].value;
+						add_b = (s32) cxform_tag.fields[2].value;
+						add_a = (s32) cxform_tag.fields[3].value;
+					}
+
+					if (cur_byte_bits_left != 8)
+					{
+						cur_pos += 1;
+					}
+
+					cxform_id = (u32) current_cxform;
+
+					// Write 20-float cxform matrix: 4x4 diagonal multiply + 4 additive
+					// Row 0: R multiply
+					cxform_data << "\t" << to_string(mult_r) << "/256.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+					// Row 1: G multiply
+								<< "\t" << "0.0f," << endl
+								<< "\t" << to_string(mult_g) << "/256.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+					// Row 2: B multiply
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << to_string(mult_b) << "/256.0f," << endl
+								<< "\t" << "0.0f," << endl
+					// Row 3: A multiply
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << to_string(mult_a) << "/256.0f," << endl
+					// Row 4: Additive (RGBA)
+								<< "\t" << to_string(add_r) << "/255.0f," << endl
+								<< "\t" << to_string(add_g) << "/255.0f," << endl
+								<< "\t" << to_string(add_b) << "/255.0f," << endl
+								<< "\t" << to_string(add_a) << "/255.0f," << endl;
+
+					current_cxform += 1;
+				}
+
+				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ");" << endl;
 
 				break;
 			}
