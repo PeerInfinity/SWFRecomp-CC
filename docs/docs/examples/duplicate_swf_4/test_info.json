@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "duplicate_swf_4",
+    "description": "Tests DUPLICATE opcode (0x4C) - duplicates top stack value",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["DUPLICATE"],
+    "supporting": ["PUSH", "ADD", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

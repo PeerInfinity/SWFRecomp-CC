@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "name": "define_function2_swf_7",
+    "description": "Comprehensive test of DEFINE_FUNCTION2 opcode (0x8E) - enhanced function definition with register support, preloading flags, function calling, and return values",
+    "swf_version": 7,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["DEFINE_FUNCTION2"],
+    "supporting": ["PUSH", "CALL_FUNCTION", "RETURN", "ADD"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "features_implemented": [
+    "Function definition with name and anonymous functions",
+    "Register-based parameters",
+    "Variable parameters (register=0)",
+    "RegisterCount allocation",
+    "Function body parsing and execution",
+    "Function calling via CALL_FUNCTION",
+    "Return values",
+    "Multiple parameters",
+    "Functions with no parameters",
+    "Operations inside function body (ADD, etc.)",
+    "PreloadThis flag: preloads 'this' object into register",
+    "PreloadArguments flag: creates arguments array object",
+    "PreloadSuper flag: preloads super reference (undefined until prototype chain implemented)",
+    "PreloadRoot flag: preloads _root MovieClip",
+    "PreloadParent flag: preloads _parent MovieClip",
+    "PreloadGlobal flag: preloads _global object",
+    "SuppressThis flag parsing",
+    "SuppressArguments flag parsing",
+    "SuppressSuper flag parsing",
+    "Nested function definitions",
+    "Local register arrays (isolated per function)",
+    "Parameter binding to registers or variables"
+  ],
+  "test_cases": [
+    "add(10, 20) -> 30: Function with two register parameters",
+    "add(5, 7) -> 12: Same function with different arguments",
+    "getFortyTwo() -> 42: Function with no parameters returning constant",
+    "add(100.5, 200.5) -> 301: Function with floating-point arguments"
+  ],
+  "notes": [
+    "DefineFunction2 fully implemented with all preloading flags",
+    "Register-based parameters work correctly with local register arrays",
+    "Function calling and return values work",
+    "All preload flags implemented (arguments, this, super, root, parent, global)",
+    "PreloadSuper sets register to undefined (super requires prototype chain for full functionality)",
+    "Anonymous functions and variable parameters supported",
+    "This is the preferred function definition opcode for SWF 7+ content"
+  ]
+}

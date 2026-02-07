@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "string_greater_swf_4",
+    "description": "Tests STRING_GREATER opcode (0x68) - lexicographic string comparison",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["STRING_GREATER"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "enumerate2_swf_6",
+    "description": "Tests ENUMERATE2 opcode (0x55) - enumerates object properties from stack",
+    "swf_version": 6,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["ENUMERATE2"],
+    "supporting": ["PUSH", "INIT_OBJECT", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

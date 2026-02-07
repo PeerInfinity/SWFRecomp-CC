@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "less_floats_false_swf_4",
+    "description": "Tests ActionLess (0x0F) opcode - less-than comparison (5 < 3 = false)",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["LESS"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

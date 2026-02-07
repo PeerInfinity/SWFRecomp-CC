@@ -1,6 +1,6 @@
 # AS2 Opcode Index
 
-**Generated**: 2026-02-06
+**Generated**: 2026-02-07
 
 See also: [SWF Graphics Feature Index](feature-index-plain.md)
 
@@ -2205,7 +2205,7 @@ void actionLess2(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_LESS2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-less2-0x48.md](SWFRecompDocs/prompts/completed/opcode-less2-0x48.md)
+- [SWFRecompDocs/prompts/completed/opcode-greater-0x48.md](SWFRecompDocs/prompts/completed/opcode-greater-0x48.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6414)

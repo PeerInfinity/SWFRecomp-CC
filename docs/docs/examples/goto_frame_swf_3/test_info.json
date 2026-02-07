@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "name": "goto_frame_swf_3",
+    "description": "Tests ActionGotoFrame opcode (0x81) - jumps to specified frame and stops playback. Implements complete gotoAndStop semantics with frame boundary validation, timeline navigation, and stop/play state management.",
+    "swf_version": 3,
+    "fully_implemented": false,
+    "fully_implemented_no_graphics": true,
+    "missing_features": [
+      "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
+    ],
+    "implementation_notes": "The opcode is fully implemented with all core features: frame boundary validation (checks if target frame < total frames), timeline jump semantics (sets next_frame and manual_next_frame), stop/play state management (sets is_playing = 0 for gotoAndStop behavior), and integration with the MovieClip timeline system. Display list updates are automatic in graphics mode but not applicable in NO_GRAPHICS mode."
+  },
+  "opcodes": {
+    "tested": ["GOTO_FRAME"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "test_coverage": [
+    "Opcode parsing (0x81 correctly identified)",
+    "Frame parameter extraction (UI16 frame index)",
+    "Frame boundary validation (out-of-bounds frame handling)",
+    "Timeline navigation (next_frame and manual_next_frame)",
+    "Stop/play state management (is_playing = 0)",
+    "Integration with frame execution loop"
+  ],
+  "edge_cases_tested": [
+    "Out-of-bounds frame (target frame doesn't exist)",
+    "Single-frame SWF (no actual navigation possible)",
+    "Execution continues after failed goto"
+  ]
+}

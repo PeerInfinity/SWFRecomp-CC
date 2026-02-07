@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "random_number_swf_4",
+    "description": "Tests RANDOM_NUMBER opcode (0x30) - generates random integers in range [0, max)",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["RANDOM_NUMBER"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "range_validation"
+  }
+}

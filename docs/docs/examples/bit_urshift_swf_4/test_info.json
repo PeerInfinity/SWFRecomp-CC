@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "bit_urshift_swf_4",
+    "description": "Tests BIT_URSHIFT opcode (0x65) - unsigned/logical right shift (zero-fill)",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["BIT_URSHIFT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

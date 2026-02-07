@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "to_number_swf_4",
+    "description": "Tests TO_NUMBER opcode (0x4A) - converts values to numbers",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["TO_NUMBER"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

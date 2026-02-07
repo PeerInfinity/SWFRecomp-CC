@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "set_member_swf_5",
+    "description": "Tests SET_MEMBER opcode (0x4F) - sets a property value on an object",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["SET_MEMBER"],
+    "supporting": ["PUSH", "INIT_OBJECT", "GET_VARIABLE", "SET_VARIABLE", "GET_MEMBER", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

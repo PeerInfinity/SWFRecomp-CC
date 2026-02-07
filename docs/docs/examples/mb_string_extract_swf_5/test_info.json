@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "mb_string_extract_swf_5",
+    "description": "Tests MB_STRING_EXTRACT opcode - extracts substring with UTF-8 character awareness",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["MB_STRING_EXTRACT"],
+    "supporting": ["PUSH", "TRACE"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

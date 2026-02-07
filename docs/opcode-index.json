@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-06",
+    "generated_date": "2026-02-07",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 15
+    "graphics_features_with_tests": 16
   },
   "entries": [
     {
@@ -5167,7 +5167,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5190,7 +5190,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5213,7 +5213,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -8611,6 +8611,7 @@
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/coicle",
+        "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
@@ -8663,6 +8664,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/coicle",
+        "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
@@ -8755,6 +8757,7 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/rgba_shape",
@@ -8790,6 +8793,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
+        "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/thiccie",
@@ -8961,8 +8965,10 @@
       "tag_id": null,
       "category": "Transform Features",
       "description": "Color transform (CXFORM/CXFORMWITHALPHA)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/color_transform"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "CLIP_DEPTH",
