@@ -145,6 +145,8 @@ jobs:
             opcode-index.json
             opcode-index.md
             opcode-index-plain.md
+            feature-index.md
+            feature-index-plain.md
             docs/
           retention-days: 30
           if-no-files-found: ignore
@@ -164,7 +166,7 @@ jobs:
           if [ -f SWFRecomp/tests/test_results.json ]; then
             GENERATED_FILES+=(SWFRecomp/tests/test_results.json)
           fi
-          for f in opcode-index.json opcode-index.md opcode-index-plain.md; do
+          for f in opcode-index.json opcode-index.md opcode-index-plain.md feature-index.md feature-index-plain.md; do
             if [ -f "$f" ]; then
               GENERATED_FILES+=("$f")
             fi
