@@ -791,6 +791,91 @@ namespace SWFRecomp
 				break;
 			}
 			
+			case SWF_TAG_DEFINE_BITS_LOSSLESS:
+			{
+				size_t tag_start_remaining = tag.length;
+
+				tag.clearFields();
+				tag.setFieldCount(1);
+
+				tag.configureNextField(SWF_FIELD_UI16);
+
+				tag.parseFields(cur_pos);
+
+				u16 char_id = (u16) tag.fields[0].value;
+				tag_start_remaining -= 2;
+
+				tag.clearFields();
+				tag.setFieldCount(3);
+
+				tag.configureNextField(SWF_FIELD_UI8);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.configureNextField(SWF_FIELD_UI16);
+
+				tag.parseFields(cur_pos);
+
+				u8 bitmap_format = (u8) tag.fields[0].value;
+				u16 w = (u16) tag.fields[1].value;
+				u16 h = (u16) tag.fields[2].value;
+				tag_start_remaining -= 5;
+
+				if (bitmap_format != 5)
+				{
+					EXC_ARG("DefineBitsLossless format %d not yet supported (only format 5).\n", bitmap_format);
+				}
+
+				// Remaining data is ZLIB-compressed pixel data
+				uLongf uncompressed_size = (uLongf)(w * h * 4);
+				u8* uncompressed = new u8[uncompressed_size];
+
+				int zresult = uncompress(uncompressed, &uncompressed_size,
+				                         (const Bytef*) cur_pos, (uLong) tag_start_remaining);
+
+				if (zresult != Z_OK)
+				{
+					delete[] uncompressed;
+					EXC_ARG("DefineBitsLossless: ZLIB decompression failed (code %d).\n", zresult);
+				}
+
+				Vertex v;
+				v.x = w;
+				v.y = h;
+
+				bitmap_sizes.push_back(v);
+
+				size_t bitmap_start = current_bitmap_pixel;
+
+				// Format 5: PIX24 = [0x00_padding, R, G, B] per pixel
+				for (size_t i = 0; i < (size_t)(w * h * 4); i += 4)
+				{
+					bitmap_data << std::hex << std::uppercase << std::setw(2)
+								<< "\t0x" << (u32) uncompressed[i + 1] << "," << endl
+								<< "\t0x" << (u32) uncompressed[i + 2] << "," << endl
+								<< "\t0x" << (u32) uncompressed[i + 3] << "," << endl
+								<< "\t0xFF," << endl;
+
+					current_bitmap_pixel += 1;
+				}
+
+				delete[] uncompressed;
+
+				char_id_to_bitmap_id[char_id] = current_bitmap;
+
+				tag_init << endl
+						 << "\tdefineBitmap("
+						 << to_string(4*bitmap_start) << ", "
+						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+						 << to_string(w) << ", "
+						 << to_string(h)
+						 << ");";
+
+				current_bitmap += 1;
+
+				cur_pos += tag_start_remaining;
+
+				break;
+			}
+
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
@@ -799,7 +884,7 @@ namespace SWFRecomp
 
 				break;
 			}
-			
+
 			case SWF_TAG_SET_BACKGROUND_COLOR:
 			{
 				RGB.parseFields(cur_pos);

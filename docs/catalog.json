@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-07T21:58:28Z",
+  "generated": "2026-02-07T22:34:30Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2198,6 +2198,20 @@
       "js_file": "color_transform.js",
       "wasm_file": "color_transform.wasm",
       "description": "WebGPU rendering test with CXFORMWITHALPHA color transforms applied via PlaceObject2",
+      "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/lossless_bitmap",
+      "name": "lossless_bitmap",
+      "type": "graphics",
+      "path": "examples/graphics/lossless_bitmap",
+      "has_swf": true,
+      "js_file": "lossless_bitmap.js",
+      "wasm_file": "lossless_bitmap.wasm",
+      "description": "WebGPU rendering test with DefineBitsLossless (tag 20) lossless RGB bitmap fill",
       "swf_version": 4,
       "fully_implemented": true,
       "opcodes_tested": [],
