@@ -32,8 +32,9 @@ void tagDefineShape(size_t char_id, size_t shape_offset, size_t shape_size)
 	printf("[Tag] DefineShape(char_id=%zu) [ignored in NO_GRAPHICS mode]\n", char_id);
 }
 
-void tagPlaceObject2(size_t depth, size_t char_id, u32 transform_id, u32 cxform_id)
+void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
+	(void)app_context; (void)transform_id; (void)cxform_id; (void)clip_depth;
 	printf("[Tag] PlaceObject2(depth=%zu, char_id=%zu) [ignored in NO_GRAPHICS mode]\n", depth, char_id);
 }
 

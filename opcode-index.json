@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 17
+    "graphics_features_with_tests": 18
   },
   "entries": [
     {
@@ -3586,7 +3586,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3609,7 +3609,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3632,7 +3632,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5167,7 +5167,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5190,7 +5190,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5213,7 +5213,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -8610,6 +8610,7 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/mess",
@@ -8663,6 +8664,7 @@
       "description": "Solid color fill (type 0x00)",
       "tests": [
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/new_styles",
@@ -8757,6 +8759,7 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/new_styles",
@@ -8779,6 +8782,7 @@
       "category": "Edge Types",
       "description": "Curved edge records (CurveTo)",
       "tests": [
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/wild_shadow"
       ],
@@ -8793,6 +8797,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/rgba_shape",
@@ -8976,8 +8981,10 @@
       "tag_id": null,
       "category": "Transform Features",
       "description": "Clipping mask via PlaceObject2 ClipDepth",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/clip_mask"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_MORPH_SHAPE",

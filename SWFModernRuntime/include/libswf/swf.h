@@ -61,6 +61,7 @@ typedef struct DisplayObject
 	u32 transform_id;
 	u32 cxform_id;
 	u32 has_cxform;
+	u16 clip_depth;
 } DisplayObject;
 #endif
 

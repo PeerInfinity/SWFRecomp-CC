@@ -1267,11 +1267,33 @@ namespace SWFRecomp
 					current_cxform += 1;
 				}
 
-				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ");" << endl;
+				// Skip remaining optional fields
+				if (has_ratio)
+				{
+					cur_pos += 2; // UI16
+				}
+				if (has_name)
+				{
+					// Skip null-terminated string
+					while (*cur_pos != '\0') cur_pos++;
+					cur_pos++; // skip null terminator
+				}
+
+				u16 clip_depth_val = 0;
+				if (has_clip_depth)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+					clip_depth_val = (u16) tag.fields[0].value;
+				}
+
+				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ");" << endl;
 
 				break;
 			}
-			
+
 			case SWF_TAG_ENABLE_DEBUGGER:
 			{
 				cur_pos += tag.length;
@@ -1519,7 +1541,7 @@ namespace SWFRecomp
 								current_cxform += 1;
 							}
 
-							// Skip remaining optional fields we don't handle yet
+							// Skip remaining optional fields
 							if (has_ratio)
 							{
 								cur_pos += 2; // UI16
@@ -1530,16 +1552,23 @@ namespace SWFRecomp
 								while (*cur_pos != '\0') cur_pos++;
 								cur_pos++; // skip null terminator
 							}
+
+							u16 clip_depth_val = 0;
 							if (has_clip_depth)
 							{
-								cur_pos += 2; // UI16
+								sub_tag.clearFields();
+								sub_tag.setFieldCount(1);
+								sub_tag.configureNextField(SWF_FIELD_UI16);
+								sub_tag.parseFields(cur_pos);
+								clip_depth_val = (u16) sub_tag.fields[0].value;
 							}
 
 							sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
 											   << to_string(depth) << ", "
 											   << to_string(char_id) << ", "
 											   << to_string(transform_id) << ", "
-											   << to_string(cxform_id) << ");" << endl;
+											   << to_string(cxform_id) << ", "
+											   << to_string(clip_depth_val) << ");" << endl;
 
 							break;
 						}
