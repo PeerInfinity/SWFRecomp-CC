@@ -185,16 +185,17 @@ jobs:
             cp -r "$f" "$TMPDIR/$f"
           done
 
+          # Clean working tree before branch switch (generated files saved in TMPDIR)
+          git checkout -- .
+          git clean -fd
+
           # Switch to ci-update branch (create from master or sync existing)
           if git ls-remote --exit-code --heads origin ci-update; then
             echo "Branch ci-update exists, syncing with master"
             git checkout ci-update
-            git pull origin ci-update
 
             # Sync all source from master
-            git rm -rf . || true
             git checkout origin/master -- .
-            git reset HEAD -- . || true
           else
             echo "Creating new branch ci-update from master"
             git checkout -b ci-update origin/master
