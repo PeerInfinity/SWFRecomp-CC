@@ -38,6 +38,7 @@ wasm/examples/*/*.js
 !wasm/examples/*/*.html
 
 # Emscripten
+emsdk/
 .emscripten_cache/
 .emscripten_ports/
 

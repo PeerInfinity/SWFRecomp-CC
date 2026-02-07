@@ -52,9 +52,9 @@ static const char* vertex_wgsl =
 "};\n"
 "\n"
 "@vertex\n"
-"fn vs_main(in: VertexInput) -> VertexOutput {\n"
+"fn vs_main(in: VertexInput, @builtin(instance_index) instance_id: u32) -> VertexOutput {\n"
 "  var out: VertexOutput;\n"
-"  let transform = transforms[current_transform.id];\n"
+"  let transform = transforms[instance_id];\n"
 "  let pos = vec4f(in.position, 0.0, 1.0);\n"
 "  out.v_style_type = in.style.x;\n"
 "  out.v_style_id = in.style.y & 0xFFFFu;\n"
@@ -1026,22 +1026,16 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
                               size_t num_verts, u32 transform_id)
 {
-	// Update transform_id uniform
-	// Pad to 16 bytes (WGSL uniform minimum binding size)
-	u32 id_data[4] = {transform_id, 0, 0, 0};
-	wgpuQueueWriteBuffer(ctx->queue, ctx->transform_id_buf, 0, id_data, 16);
-
-	// Re-bind group 1 with updated uniform
-	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
-
 	// Set vertex buffer with byte offset
 	uint64_t byte_offset = offset * 4 * sizeof(u32);
 	uint64_t byte_size = num_verts * 4 * sizeof(u32);
 	wgpuRenderPassEncoderSetVertexBuffer(ctx->render_pass, 0, ctx->vertex_buffer,
 	                                     byte_offset, byte_size);
 
-	// Draw
-	wgpuRenderPassEncoderDraw(ctx->render_pass, (u32)num_verts, 1, 0, 0);
+	// Draw with transform_id as firstInstance — the vertex shader reads it
+	// via @builtin(instance_index). This avoids uniform buffer writes between
+	// draw calls, which don't take effect until the next queue submit.
+	wgpuRenderPassEncoderDraw(ctx->render_pass, (u32)num_verts, 1, 0, transform_id);
 }
 
 // ---------------------------------------------------------------------------

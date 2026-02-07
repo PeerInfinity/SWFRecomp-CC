@@ -124,16 +124,23 @@ namespace SWFRecomp
 								 current_glyph(0),
 								 current_text(0),
 								 current_cxform(0),
-								 jpeg_tables(nullptr)
+								 jpeg_tables(nullptr),
+							 shape_has_alpha(false)
 	{
 		// Configure reusable struct records
-		// 
+		//
 		// Using a SWFTag without parsing the header
 		// behaves exactly like a SWF struct record
 		RGB.setFieldCount(3);
 		RGB.configureNextField(SWF_FIELD_UI8);  // Red
 		RGB.configureNextField(SWF_FIELD_UI8);  // Green
 		RGB.configureNextField(SWF_FIELD_UI8);  // Blue
+
+		RGBA.setFieldCount(4);
+		RGBA.configureNextField(SWF_FIELD_UI8);  // Red
+		RGBA.configureNextField(SWF_FIELD_UI8);  // Green
+		RGBA.configureNextField(SWF_FIELD_UI8);  // Blue
+		RGBA.configureNextField(SWF_FIELD_UI8);  // Alpha
 		
 		printf("Reading %s...\n", context.swf_path.c_str());
 		
@@ -773,9 +780,10 @@ namespace SWFRecomp
 			
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
+			case SWF_TAG_DEFINE_SHAPE_3:
 			{
 				interpretShape(context, tag);
-				
+
 				break;
 			}
 			
@@ -1154,9 +1162,7 @@ namespace SWFRecomp
 				}
 				
 				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ");" << endl;
-				
-				current_transform += 1;
-				
+
 				break;
 			}
 			
@@ -1291,29 +1297,35 @@ namespace SWFRecomp
 			{
 				case FILL_SOLID:
 				{
-					fill_data.clearFields();
-					fill_data.setFieldCount(3);
-					
-					fill_data.configureNextField(SWF_FIELD_UI8, 8);
-					fill_data.configureNextField(SWF_FIELD_UI8, 8);
-					fill_data.configureNextField(SWF_FIELD_UI8, 8);
-					
-					fill_data.parseFields(cur_pos);
-					
-					fill_styles[i].r = (u8) fill_data.fields[0].value;
-					fill_styles[i].g = (u8) fill_data.fields[1].value;
-					fill_styles[i].b = (u8) fill_data.fields[2].value;
-					
+					if (shape_has_alpha)
+					{
+						RGBA.parseFields(cur_pos);
+
+						fill_styles[i].r = (u8) RGBA.fields[0].value;
+						fill_styles[i].g = (u8) RGBA.fields[1].value;
+						fill_styles[i].b = (u8) RGBA.fields[2].value;
+						fill_styles[i].a = (u8) RGBA.fields[3].value;
+					}
+					else
+					{
+						RGB.parseFields(cur_pos);
+
+						fill_styles[i].r = (u8) RGB.fields[0].value;
+						fill_styles[i].g = (u8) RGB.fields[1].value;
+						fill_styles[i].b = (u8) RGB.fields[2].value;
+						fill_styles[i].a = 255;
+					}
+
 					fill_styles[i].index = current_color;
-					
+
 					color_data << "\t" << "{ "
 							   << to_string(fill_styles[i].r) << "/255.0f, "
 							   << to_string(fill_styles[i].g) << "/255.0f, "
 							   << to_string(fill_styles[i].b) << "/255.0f, "
-							   << "255/255.0f }," << endl;
-					
+							   << to_string(fill_styles[i].a) << "/255.0f }," << endl;
+
 					current_color += 1;
-					
+
 					break;
 				}
 				
@@ -1343,58 +1355,73 @@ namespace SWFRecomp
 					{
 						fill_data.clearFields();
 						fill_data.setFieldCount(1);
-						
+
 						fill_data.configureNextField(SWF_FIELD_UI8);
-						
+
 						fill_data.parseFields(cur_pos);
-						
+
 						fill_styles[i].gradient.records[j].ratio = (u8) fill_data.fields[0].value;
-						
-						RGB.parseFields(cur_pos);
-						
-						fill_styles[i].gradient.records[j].r = (u8) RGB.fields[0].value;
-						fill_styles[i].gradient.records[j].g = (u8) RGB.fields[1].value;
-						fill_styles[i].gradient.records[j].b = (u8) RGB.fields[2].value;
-						
+
+						if (shape_has_alpha)
+						{
+							RGBA.parseFields(cur_pos);
+
+							fill_styles[i].gradient.records[j].r = (u8) RGBA.fields[0].value;
+							fill_styles[i].gradient.records[j].g = (u8) RGBA.fields[1].value;
+							fill_styles[i].gradient.records[j].b = (u8) RGBA.fields[2].value;
+							fill_styles[i].gradient.records[j].a = (u8) RGBA.fields[3].value;
+						}
+						else
+						{
+							RGB.parseFields(cur_pos);
+
+							fill_styles[i].gradient.records[j].r = (u8) RGB.fields[0].value;
+							fill_styles[i].gradient.records[j].g = (u8) RGB.fields[1].value;
+							fill_styles[i].gradient.records[j].b = (u8) RGB.fields[2].value;
+							fill_styles[i].gradient.records[j].a = 255;
+						}
+
 						if (j == 0)
 						{
 							continue;
 						}
-						
+
 						GradientRecord& last_grad = fill_styles[i].gradient.records[j - 1];
 						GradientRecord& grad = fill_styles[i].gradient.records[j];
-						
+
 						for (u8 ratio = last_grad.ratio; ratio < grad.ratio; ++ratio)
 						{
 							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
 							float t = (ratio - last_grad.ratio)/ratio_diff;
-							
+
 							u8 r = rgbLerp(last_grad.r, grad.r, t);
 							u8 g = rgbLerp(last_grad.g, grad.g, t);
 							u8 b = rgbLerp(last_grad.b, grad.b, t);
-							
+							u8 a = rgbLerp(last_grad.a, grad.a, t);
+
 							gradient_data << "\t" << "{ "
 										  << to_string(r) << ", "
 										  << to_string(g) << ", "
 										  << to_string(b) << ", "
-										  << "255 },"
+										  << to_string(a) << " },"
 										  << endl;
 						}
-						
+
 						if (grad.ratio == 255)
 						{
 							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
 							float t = (255 - last_grad.ratio)/ratio_diff;
-							
+
 							u8 r = rgbLerp(last_grad.r, grad.r, t);
 							u8 g = rgbLerp(last_grad.g, grad.g, t);
 							u8 b = rgbLerp(last_grad.b, grad.b, t);
-							
+							u8 a = rgbLerp(last_grad.a, grad.a, t);
+
 							gradient_data << "\t" << "{ "
 										  << to_string(r) << ", "
 										  << to_string(g) << ", "
 										  << to_string(b) << ", "
-										  << "255 },"
+										  << to_string(a) << " },"
 										  << endl;
 						}
 					}
@@ -1441,30 +1468,52 @@ namespace SWFRecomp
 		
 		for (u16 i = 0; i < line_style_count; ++i)
 		{
-			line_data.clearFields();
-			line_data.setFieldCount(4);
-			
-			line_data.configureNextField(SWF_FIELD_UI16, 16);
-			line_data.configureNextField(SWF_FIELD_UI8, 8);
-			line_data.configureNextField(SWF_FIELD_UI8, 8);
-			line_data.configureNextField(SWF_FIELD_UI8, 8);
-			
-			line_data.parseFields(cur_pos);
-			
-			line_styles[i].width = (u16) line_data.fields[0].value;
-			
-			line_styles[i].r = (u8) line_data.fields[1].value;
-			line_styles[i].g = (u8) line_data.fields[2].value;
-			line_styles[i].b = (u8) line_data.fields[3].value;
-			
+			if (shape_has_alpha)
+			{
+				line_data.clearFields();
+				line_data.setFieldCount(5);
+
+				line_data.configureNextField(SWF_FIELD_UI16, 16);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+
+				line_data.parseFields(cur_pos);
+
+				line_styles[i].width = (u16) line_data.fields[0].value;
+				line_styles[i].r = (u8) line_data.fields[1].value;
+				line_styles[i].g = (u8) line_data.fields[2].value;
+				line_styles[i].b = (u8) line_data.fields[3].value;
+				line_styles[i].a = (u8) line_data.fields[4].value;
+			}
+			else
+			{
+				line_data.clearFields();
+				line_data.setFieldCount(4);
+
+				line_data.configureNextField(SWF_FIELD_UI16, 16);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+
+				line_data.parseFields(cur_pos);
+
+				line_styles[i].width = (u16) line_data.fields[0].value;
+				line_styles[i].r = (u8) line_data.fields[1].value;
+				line_styles[i].g = (u8) line_data.fields[2].value;
+				line_styles[i].b = (u8) line_data.fields[3].value;
+				line_styles[i].a = 255;
+			}
+
 			line_styles[i].index = current_color;
-			
+
 			color_data << "\t" << "{ "
 					   << to_string(line_styles[i].r) << "/255.0f, "
 					   << to_string(line_styles[i].g) << "/255.0f, "
 					   << to_string(line_styles[i].b) << "/255.0f, "
-					   << "255/255.0f }," << endl;
-			
+					   << to_string(line_styles[i].a) << "/255.0f }," << endl;
+
 			current_color += 1;
 		}
 		
@@ -1473,15 +1522,16 @@ namespace SWFRecomp
 	
 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
 	{
-		// TODO: DefineShape3
 		// TODO: DefineShape4
-		
+
 		bool is_font = shape_tag.code == SWF_TAG_DEFINE_FONT;
-		
+		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3);
+
 		switch (shape_tag.code)
 		{
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
+			case SWF_TAG_DEFINE_SHAPE_3:
 			case SWF_TAG_DEFINE_FONT:
 			{
 				u16 shape_id;

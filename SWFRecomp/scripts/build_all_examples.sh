@@ -8,6 +8,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DOCS_DIR=${1:-"${SWFRECOMP_ROOT}/../docs/examples"}
 
+# ---------------------------------------------------------------
+# Preflight checks — fail BEFORE deleting anything
+# ---------------------------------------------------------------
+if ! command -v emcc &>/dev/null; then
+    echo "Error: Emscripten (emcc) not found in PATH!"
+    echo ""
+    echo "Run:  source scripts/setup_build_env.sh"
+    echo "  or: source emsdk/emsdk_env.sh"
+    exit 1
+fi
+
+if [ ! -x "${SWFRECOMP_ROOT}/build/SWFRecomp" ]; then
+    echo "Error: SWFRecomp binary not found at: ${SWFRECOMP_ROOT}/build/SWFRecomp"
+    echo "Build it first:  cd SWFRecomp/build && cmake .. && make"
+    exit 1
+fi
+
+echo "Using emcc: $(command -v emcc)"
+echo "  Version: $(emcc --version | head -1)"
+echo ""
+
 # Load exclude list from config file
 EXCLUDE_CONFIG="${SCRIPT_DIR}/excluded_tests.conf"
 EXCLUDE_TESTS=()
@@ -80,10 +101,12 @@ echo "Excluded ${#EXCLUDE_TESTS[@]} tests: ${EXCLUDE_TESTS[*]}"
 echo "Building ${TOTAL_COUNT} tests for WASM deployment..."
 echo ""
 
-# Clean existing examples for full regeneration
-echo "Cleaning existing examples for full regeneration..."
-rm -rf "${DOCS_DIR:?}/"*
-echo ""
+# ---------------------------------------------------------------
+# Build into a staging directory, then swap on success
+# ---------------------------------------------------------------
+STAGING_DIR="${DOCS_DIR}.staging"
+rm -rf "${STAGING_DIR}"
+mkdir -p "${STAGING_DIR}"
 
 SUCCESS_COUNT=0
 FAIL_COUNT=0
@@ -105,28 +128,28 @@ for test_name in "${TESTS[@]}"; do
     echo "Building: $test_name (${BUILD_NUM}/${TOTAL_COUNT}) [trace]"
     echo "========================================="
 
-    # Build with timeout (allow failures and continue)
-    if timeout "$BUILD_TIMEOUT" "${SCRIPT_DIR}/build_test.sh" "$test_name" wasm 2>&1 | grep -q "✅ WASM build complete"; then
+    # Build with timeout, capture output to check for success
+    BUILD_OUTPUT=$(timeout "$BUILD_TIMEOUT" "${SCRIPT_DIR}/build_test.sh" "$test_name" wasm 2>&1) || true
+    BUILD_EXIT=$?
+
+    if echo "$BUILD_OUTPUT" | grep -q "WASM build complete"; then
         # Deploy with --no-index (index generated once at end)
-        if "${SCRIPT_DIR}/deploy_example.sh" "$test_name" "$DOCS_DIR" --no-index >/dev/null 2>&1; then
-            echo "✅ $test_name - built and deployed"
+        if "${SCRIPT_DIR}/deploy_example.sh" "$test_name" "$STAGING_DIR" --no-index >/dev/null 2>&1; then
+            echo "  $test_name - built and deployed"
             SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
         else
-            echo "❌ $test_name - build succeeded but deploy failed"
+            echo "  $test_name - build succeeded but deploy failed"
             FAIL_COUNT=$((FAIL_COUNT + 1))
             FAILED_TESTS+=("$test_name")
         fi
+    elif [ $BUILD_EXIT -eq 124 ]; then
+        echo "  $test_name - build timeout (>${BUILD_TIMEOUT}s)"
+        TIMEOUT_COUNT=$((TIMEOUT_COUNT + 1))
+        TIMEOUT_TESTS+=("$test_name")
     else
-        # Check if it was a timeout (exit code 124)
-        if [ $? -eq 124 ]; then
-            echo "⏱️  $test_name - build timeout (>${BUILD_TIMEOUT}s)"
-            TIMEOUT_COUNT=$((TIMEOUT_COUNT + 1))
-            TIMEOUT_TESTS+=("$test_name")
-        else
-            echo "❌ $test_name - build failed"
-            FAIL_COUNT=$((FAIL_COUNT + 1))
-            FAILED_TESTS+=("$test_name")
-        fi
+        echo "  $test_name - build failed"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        FAILED_TESTS+=("$test_name")
     fi
 
     echo ""
@@ -140,30 +163,51 @@ for test_name in "${GRAPHICS_TESTS[@]}"; do
     echo "========================================="
 
     # Build with --graphics flag and longer timeout
-    if timeout "$GRAPHICS_BUILD_TIMEOUT" "${SCRIPT_DIR}/build_test.sh" "graphics/$test_name" wasm --graphics 2>&1 | grep -q "✅ WASM build complete"; then
+    BUILD_OUTPUT=$(timeout "$GRAPHICS_BUILD_TIMEOUT" "${SCRIPT_DIR}/build_test.sh" "graphics/$test_name" wasm --graphics 2>&1) || true
+    BUILD_EXIT=$?
+
+    if echo "$BUILD_OUTPUT" | grep -q "WASM build complete"; then
         # Deploy with --no-index and --graphics
-        if "${SCRIPT_DIR}/deploy_example.sh" "graphics/$test_name" "$DOCS_DIR" --no-index --graphics >/dev/null 2>&1; then
-            echo "✅ graphics/$test_name - built and deployed"
+        if "${SCRIPT_DIR}/deploy_example.sh" "graphics/$test_name" "$STAGING_DIR" --no-index --graphics >/dev/null 2>&1; then
+            echo "  graphics/$test_name - built and deployed"
             SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
         else
-            echo "❌ graphics/$test_name - build succeeded but deploy failed"
+            echo "  graphics/$test_name - build succeeded but deploy failed"
             FAIL_COUNT=$((FAIL_COUNT + 1))
             FAILED_TESTS+=("graphics/$test_name")
         fi
+    elif [ $BUILD_EXIT -eq 124 ]; then
+        echo "  graphics/$test_name - build timeout (>${GRAPHICS_BUILD_TIMEOUT}s)"
+        TIMEOUT_COUNT=$((TIMEOUT_COUNT + 1))
+        TIMEOUT_TESTS+=("graphics/$test_name")
     else
-        if [ $? -eq 124 ]; then
-            echo "⏱️  graphics/$test_name - build timeout (>${GRAPHICS_BUILD_TIMEOUT}s)"
-            TIMEOUT_COUNT=$((TIMEOUT_COUNT + 1))
-            TIMEOUT_TESTS+=("graphics/$test_name")
-        else
-            echo "❌ graphics/$test_name - build failed"
-            FAIL_COUNT=$((FAIL_COUNT + 1))
-            FAILED_TESTS+=("graphics/$test_name")
-        fi
+        echo "  graphics/$test_name - build failed"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        FAILED_TESTS+=("graphics/$test_name")
     fi
 
     echo ""
 done
+
+# ---------------------------------------------------------------
+# Only replace docs if we had some successes
+# ---------------------------------------------------------------
+if [ $SUCCESS_COUNT -eq 0 ]; then
+    echo "========================================="
+    echo "ERROR: All builds failed! Keeping existing docs intact."
+    echo "========================================="
+    rm -rf "${STAGING_DIR}"
+    echo ""
+    echo "Failed tests:"
+    for failed in "${FAILED_TESTS[@]}"; do
+        echo "  - $failed"
+    done
+    exit 1
+fi
+
+echo "Replacing docs/examples with ${SUCCESS_COUNT} successfully built tests..."
+rm -rf "${DOCS_DIR:?}"
+mv "${STAGING_DIR}" "${DOCS_DIR}"
 
 # Generate the examples index once at the end
 EXAMPLES_PARENT="$(dirname "$DOCS_DIR")"
@@ -174,9 +218,9 @@ echo ""
 echo "========================================="
 echo "Build Summary"
 echo "========================================="
-echo "✅ Successful: $SUCCESS_COUNT"
-echo "❌ Failed: $FAIL_COUNT"
-echo "⏱️  Timeout: $TIMEOUT_COUNT"
+echo "Successful: $SUCCESS_COUNT"
+echo "Failed: $FAIL_COUNT"
+echo "Timeout: $TIMEOUT_COUNT"
 echo "Total: ${TOTAL_COUNT}"
 
 if [ $FAIL_COUNT -gt 0 ]; then

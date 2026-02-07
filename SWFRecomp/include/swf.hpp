@@ -87,6 +87,7 @@ namespace SWFRecomp
 		u8 r;
 		u8 g;
 		u8 b;
+		u8 a;
 	};
 	
 	struct Gradient
@@ -116,6 +117,7 @@ namespace SWFRecomp
 		u8 r;
 		u8 g;
 		u8 b;
+		u8 a;
 		Gradient gradient;
 	};
 	
@@ -126,6 +128,7 @@ namespace SWFRecomp
 		u8 r;
 		u8 g;
 		u8 b;
+		u8 a;
 	};
 	
 	class SWFHeader
@@ -193,7 +196,9 @@ namespace SWFRecomp
 		SWFAction action;
 
 		SWFTag RGB;
-		
+		SWFTag RGBA;
+		bool shape_has_alpha;
+
 		SWF();
 		SWF(Context& context);
 		

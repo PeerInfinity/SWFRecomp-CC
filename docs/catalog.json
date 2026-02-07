@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-06T17:45:56Z",
+  "generated": "2026-02-07T00:13:08Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2199,6 +2199,20 @@
       "js_file": "new_styles.js",
       "description": "WebGPU rendering test with mixed line styles and fill types",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/rgba_shape",
+      "name": "rgba_shape",
+      "type": "graphics",
+      "path": "examples/graphics/rgba_shape",
+      "has_swf": true,
+      "js_file": "rgba_shape.js",
+      "wasm_file": "rgba_shape.wasm",
+      "description": "WebGPU rendering test with semi-transparent overlapping shapes using DefineShape3 RGBA colors",
+      "swf_version": 7,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

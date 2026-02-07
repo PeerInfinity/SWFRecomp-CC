@@ -196,7 +196,8 @@ if [ "$TARGET" == "wasm" ]; then
     # Check if emcc is available
     if ! command -v emcc &> /dev/null; then
         echo "Error: Emscripten (emcc) not found!"
-        echo "Run: source ~/tools/emsdk/emsdk_env.sh"
+        echo "Run: source scripts/setup_build_env.sh"
+        echo "  or: source emsdk/emsdk_env.sh"
         exit 1
     fi
 
