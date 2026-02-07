@@ -35,15 +35,14 @@ void tagShowFrame(SWFAppContext* app_context)
 		switch (ch->type)
 		{
 			case CHAR_TYPE_SHAPE:
-				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id);
+				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
 				break;
 			case CHAR_TYPE_TEXT:
 				renderer_upload_extra_transform_id(context, obj->transform_id);
-				renderer_upload_cxform_id(context, ch->cxform_id);
 				for (size_t j = 0; j < ch->text_size; ++j)
 				{
 					size_t glyph_index = 2*app_context->text_data[ch->text_start + j];
-					renderer_draw_shape(context, app_context->glyph_data[glyph_index], app_context->glyph_data[glyph_index + 1], ch->transform_start + j);
+					renderer_draw_shape(context, app_context->glyph_data[glyph_index], app_context->glyph_data[glyph_index + 1], ch->transform_start + j, ch->cxform_id);
 				}
 				break;
 		}
@@ -72,12 +71,14 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	dictionary[char_id].cxform_id = cxform_id;
 }
 
-void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id)
+void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id)
 {
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
+	display_list[depth].cxform_id = cxform_id;
+	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 
 	if (depth > max_depth)
 	{

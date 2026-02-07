@@ -129,6 +129,6 @@ void render_webgpu_upload_extra_transform_id(WebGPURenderContext* context, u32 t
 void render_webgpu_upload_extra_transform(WebGPURenderContext* context, float* transform);
 void render_webgpu_upload_cxform_id(WebGPURenderContext* context, u32 cxform_id);
 void render_webgpu_upload_cxform(WebGPURenderContext* context, float* cxform);
-void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_t num_verts, u32 transform_id);
+void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_t num_verts, u32 transform_id, u32 cxform_id);
 void render_webgpu_close_pass(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

@@ -111,6 +111,50 @@ class ClippedBitmapFill:
 
 
 # ---------------------------------------------------------------------------
+# Color transform
+# ---------------------------------------------------------------------------
+
+class ColorTransform:
+    """Color transform (CXFORMWITHALPHA).
+
+    Applies multiplicative and additive adjustments to each color channel.
+    The multiply factors use 8.8 fixed-point: 256 = 1.0 (identity).
+    The add terms are signed integers (-255 to 255).
+
+    Result: channel' = clamp((channel * factor / 256) + add, 0, 255)
+    """
+    def __init__(self, factor_red=256, factor_green=256, factor_blue=256,
+                 factor_alpha=256, add_red=0, add_green=0, add_blue=0,
+                 add_alpha=0):
+        self.factor_red = factor_red
+        self.factor_green = factor_green
+        self.factor_blue = factor_blue
+        self.factor_alpha = factor_alpha
+        self.add_red = add_red
+        self.add_green = add_green
+        self.add_blue = add_blue
+        self.add_alpha = add_alpha
+
+    def to_xml(self, parent):
+        ct_el = SubElement(parent, "colorTransform")
+        attrs = {
+            "factorRed": str(self.factor_red),
+            "factorGreen": str(self.factor_green),
+            "factorBlue": str(self.factor_blue),
+            "factorAlpha": str(self.factor_alpha),
+        }
+        if self.add_red != 0:
+            attrs["addRed"] = str(self.add_red)
+        if self.add_green != 0:
+            attrs["addGreen"] = str(self.add_green)
+        if self.add_blue != 0:
+            attrs["addBlue"] = str(self.add_blue)
+        if self.add_alpha != 0:
+            attrs["addAlpha"] = str(self.add_alpha)
+        SubElement(ct_el, "ColorTransform2", **attrs)
+
+
+# ---------------------------------------------------------------------------
 # Line style
 # ---------------------------------------------------------------------------
 
@@ -309,7 +353,8 @@ class SWFMLBuilder:
 
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
-                     skew_x=None, skew_y=None):
+                     skew_x=None, skew_y=None,
+                     color_transform=None):
         self.tags.append(("PlaceObject2", {
             "object_id": object_id,
             "depth": depth,
@@ -319,6 +364,7 @@ class SWFMLBuilder:
             "scale_y": scale_y,
             "skew_x": skew_x,
             "skew_y": skew_y,
+            "color_transform": color_transform,
         }))
 
     def show_frame(self):
@@ -387,6 +433,8 @@ class SWFMLBuilder:
                 if d.get("skew_y") is not None:
                     attrs["skewY"] = f"{d['skew_y']:.16f}"
                 SubElement(transform_el, "Transform", **attrs)
+                if d.get("color_transform") is not None:
+                    d["color_transform"].to_xml(po)
 
             elif tag_type == "ShowFrame":
                 SubElement(tags_el, "ShowFrame")

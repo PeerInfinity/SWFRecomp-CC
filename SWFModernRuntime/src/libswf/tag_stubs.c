@@ -26,7 +26,7 @@ void tagDefineShape(size_t char_id, size_t shape_offset, size_t shape_size)
 	printf("[Tag] DefineShape(char_id=%zu) [ignored in NO_GRAPHICS mode]\n", char_id);
 }
 
-void tagPlaceObject2(size_t depth, size_t char_id, u32 transform_id)
+void tagPlaceObject2(size_t depth, size_t char_id, u32 transform_id, u32 cxform_id)
 {
 	printf("[Tag] PlaceObject2(depth=%zu, char_id=%zu) [ignored in NO_GRAPHICS mode]\n", depth, char_id);
 }

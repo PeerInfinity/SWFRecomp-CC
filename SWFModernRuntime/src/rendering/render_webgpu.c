@@ -49,12 +49,15 @@ static const char* vertex_wgsl =
 "  @location(0) @interpolate(flat) v_style_type: u32,\n"
 "  @location(1) @interpolate(flat) v_style_id: u32,\n"
 "  @location(2) v_args: vec4f,\n"
+"  @location(3) @interpolate(flat) v_cxform_id: u32,\n"
 "};\n"
 "\n"
 "@vertex\n"
 "fn vs_main(in: VertexInput, @builtin(instance_index) instance_id: u32) -> VertexOutput {\n"
 "  var out: VertexOutput;\n"
-"  let transform = transforms[instance_id];\n"
+"  let transform_id = instance_id & 0xFFFFu;\n"
+"  let cxform_id = instance_id >> 16u;\n"
+"  let transform = transforms[transform_id];\n"
 "  let pos = vec4f(in.position, 0.0, 1.0);\n"
 "  out.v_style_type = in.style.x;\n"
 "  out.v_style_id = in.style.y & 0xFFFFu;\n"
@@ -72,10 +75,13 @@ static const char* vertex_wgsl =
 "  } else {\n"
 "    out.v_args = vec4f(0.0);\n"
 "  }\n"
+"  out.v_cxform_id = cxform_id;\n"
 "  return out;\n"
 "}\n";
 
 static const char* fragment_wgsl =
+"@group(0) @binding(4) var<storage, read> cxforms: array<vec4f>;\n"
+"\n"
 "@group(2) @binding(0) var gradient_tex: texture_2d_array<f32>;\n"
 "@group(2) @binding(1) var gradient_samp: sampler;\n"
 "@group(2) @binding(2) var bitmap_tex: texture_2d_array<f32>;\n"
@@ -85,10 +91,18 @@ static const char* fragment_wgsl =
 "  @location(0) @interpolate(flat) v_style_type: u32,\n"
 "  @location(1) @interpolate(flat) v_style_id: u32,\n"
 "  @location(2) v_args: vec4f,\n"
+"  @location(3) @interpolate(flat) v_cxform_id: u32,\n"
 "};\n"
 "\n"
 "fn linear_t(v_args: vec4f) -> f32 { return (v_args.x + 16384.0) / 32768.0; }\n"
 "fn radial_t(v_args: vec4f) -> f32 { return distance(v_args.xy, vec2f(0.0)) / 16384.0; }\n"
+"\n"
+"fn apply_cxform(color: vec4f, cxform_id: u32) -> vec4f {\n"
+"  let ci = cxform_id * 5u;\n"
+"  let mult = mat4x4f(cxforms[ci], cxforms[ci+1u], cxforms[ci+2u], cxforms[ci+3u]);\n"
+"  let add = cxforms[ci+4u];\n"
+"  return clamp(mult * color + add, vec4f(0.0), vec4f(1.0));\n"
+"}\n"
 "\n"
 "@fragment\n"
 "fn fs_main(in: FragmentInput) -> @location(0) vec4f {\n"
@@ -96,16 +110,19 @@ static const char* fragment_wgsl =
 "  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), 0.5), i32(in.v_style_id));\n"
 "  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), 0.5), i32(in.v_style_id));\n"
 "  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id));\n"
+"  var color: vec4f;\n"
 "  if (in.v_style_type == 0x00u) {\n"
-"    return in.v_args;\n"
+"    color = in.v_args;\n"
 "  } else if (in.v_style_type == 0x10u) {\n"
-"    return linear_sample;\n"
+"    color = linear_sample;\n"
 "  } else if (in.v_style_type == 0x12u) {\n"
-"    return radial_sample;\n"
+"    color = radial_sample;\n"
 "  } else if (in.v_style_type == 0x41u) {\n"
-"    return bitmap_sample;\n"
+"    color = bitmap_sample;\n"
+"  } else {\n"
+"    color = vec4f(0.0);\n"
 "  }\n"
-"  return vec4f(0.0);\n"
+"  return apply_cxform(color, in.v_cxform_id);\n"
 "}\n";
 
 static const char* compute_wgsl =
@@ -611,18 +628,22 @@ static void create_pipelines(WebGPURenderContext* ctx)
 {
 	// --- Bind group layouts ---
 
-	// Group 0: vertex storage buffers
-	WGPUBindGroupLayoutEntry bg0_entries[4] = {0};
+	// Group 0: storage buffers (vertex + fragment)
+	WGPUBindGroupLayoutEntry bg0_entries[5] = {0};
 	for (int i = 0; i < 4; i++)
 	{
 		bg0_entries[i].binding = i;
 		bg0_entries[i].visibility = WGPUShaderStage_Vertex;
 		bg0_entries[i].buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
 	}
+	// Entry 4: cxform buffer (fragment shader)
+	bg0_entries[4].binding = 4;
+	bg0_entries[4].visibility = WGPUShaderStage_Fragment;
+	bg0_entries[4].buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
 
 	WGPUBindGroupLayoutDescriptor bg0_desc = {0};
-	bg0_desc.label = WGPU_LABEL("vertex_storage_bgl");
-	bg0_desc.entryCount = 4;
+	bg0_desc.label = WGPU_LABEL("storage_bgl");
+	bg0_desc.entryCount = 5;
 	bg0_desc.entries = bg0_entries;
 	ctx->vertex_storage_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg0_desc);
 
@@ -789,8 +810,8 @@ static void create_pipelines(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 static void create_bind_groups(WebGPURenderContext* ctx)
 {
-	// --- Group 0: vertex storage buffers ---
-	WGPUBindGroupEntry bg0_entries[4] = {0};
+	// --- Group 0: storage buffers ---
+	WGPUBindGroupEntry bg0_entries[5] = {0};
 	bg0_entries[0].binding = 0;
 	bg0_entries[0].buffer = ctx->xform_buffer;
 	bg0_entries[0].size = wgpuBufferGetSize(ctx->xform_buffer);
@@ -803,11 +824,14 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 	bg0_entries[3].binding = 3;
 	bg0_entries[3].buffer = ctx->bitmap_sizes_buffer;
 	bg0_entries[3].size = wgpuBufferGetSize(ctx->bitmap_sizes_buffer);
+	bg0_entries[4].binding = 4;
+	bg0_entries[4].buffer = ctx->cxform_buffer;
+	bg0_entries[4].size = wgpuBufferGetSize(ctx->cxform_buffer);
 
 	WGPUBindGroupDescriptor bg0_desc = {0};
-	bg0_desc.label = WGPU_LABEL("vertex_storage_bg");
+	bg0_desc.label = WGPU_LABEL("storage_bg");
 	bg0_desc.layout = ctx->vertex_storage_bgl;
-	bg0_desc.entryCount = 4;
+	bg0_desc.entryCount = 5;
 	bg0_desc.entries = bg0_entries;
 	ctx->vertex_storage_bg = wgpuDeviceCreateBindGroup(ctx->device, &bg0_desc);
 
@@ -1024,7 +1048,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 // render_webgpu_draw_shape
 // ---------------------------------------------------------------------------
 void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
-                              size_t num_verts, u32 transform_id)
+                              size_t num_verts, u32 transform_id, u32 cxform_id)
 {
 	// Set vertex buffer with byte offset
 	uint64_t byte_offset = offset * 4 * sizeof(u32);
@@ -1032,10 +1056,12 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 	wgpuRenderPassEncoderSetVertexBuffer(ctx->render_pass, 0, ctx->vertex_buffer,
 	                                     byte_offset, byte_size);
 
-	// Draw with transform_id as firstInstance — the vertex shader reads it
-	// via @builtin(instance_index). This avoids uniform buffer writes between
-	// draw calls, which don't take effect until the next queue submit.
-	wgpuRenderPassEncoderDraw(ctx->render_pass, (u32)num_verts, 1, 0, transform_id);
+	// Pack transform_id (low 16 bits) and cxform_id (high 16 bits) into
+	// firstInstance. The vertex shader extracts both via @builtin(instance_index).
+	// This avoids uniform buffer writes between draw calls, which don't take
+	// effect until the next queue submit.
+	u32 packed_id = transform_id | (cxform_id << 16);
+	wgpuRenderPassEncoderDraw(ctx->render_pass, (u32)num_verts, 1, 0, packed_id);
 }
 
 // ---------------------------------------------------------------------------
