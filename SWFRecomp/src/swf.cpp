@@ -443,6 +443,12 @@ namespace SWFRecomp
 			tag.clearFields();
 		}
 		
+		// Emit sprite frame function definitions (before main frame_funcs array)
+		if (!sprite_definitions.str().empty())
+		{
+			context.tag_main << endl << sprite_definitions.str();
+		}
+
 		// frame_func typedef is already defined in swf.h, no need to redefine
 		context.tag_main << endl << endl
 						 << "frame_func frame_funcs[] =" << endl
@@ -560,7 +566,14 @@ namespace SWFRecomp
 								 << "extern u8 bitmap_data[" << to_string(current_bitmap_pixel ? 4*current_bitmap_pixel : 1) << "];" << endl
 								 << "extern u32 glyph_data[" << to_string(current_glyph ? 2*current_glyph : 1) << "][1];" << endl
 								 << "extern u32 text_data[" << to_string(current_text ? current_text : 1) << "];" << endl
-								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];";
+								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl;
+
+		// Emit sprite forward declarations (frame_func arrays)
+		if (!sprite_forward_decls.str().empty())
+		{
+			context.out_draws_header << endl << "// Sprite frame function forward declarations" << endl
+									 << sprite_forward_decls.str();
+		}
 		
 		size_t highest_w = 0;
 		size_t highest_h = 0;
@@ -1319,10 +1332,259 @@ namespace SWFRecomp
 			case SWF_TAG_METADATA:
 			{
 				cur_pos += tag.length;
-				
+
 				break;
 			}
-			
+
+			case SWF_TAG_DEFINE_SPRITE:
+			{
+				tag.clearFields();
+				tag.setFieldCount(2);
+				tag.configureNextField(SWF_FIELD_UI16); // spriteId
+				tag.configureNextField(SWF_FIELD_UI16); // frameCount
+				tag.parseFields(cur_pos);
+
+				u16 sprite_id = (u16) tag.fields[0].value;
+				u16 sprite_frame_count_declared = (u16) tag.fields[1].value;
+
+				std::string sp = "sprite_" + to_string(sprite_id);
+
+				// Forward declare the sprite frame_funcs array (written to draws.h)
+				sprite_forward_decls << "extern frame_func " << sp << "_frame_funcs[];" << endl;
+
+				// Emit tagDefineSprite call in the current main frame
+				context.tag_main << "\t" << "tagDefineSprite(app_context, "
+								 << to_string(sprite_id) << ", "
+								 << sp << "_frame_funcs, "
+								 << to_string(sprite_frame_count_declared) << ");" << endl;
+
+				// Parse sprite sub-tags and generate sprite frame functions
+				size_t sprite_frame_i = 0;
+				bool sprite_another_frame = false;
+
+				sprite_definitions << "void " << sp << "_frame_" << to_string(sprite_frame_i)
+								   << "(SWFAppContext* app_context)" << endl
+								   << "{" << endl;
+				sprite_frame_i += 1;
+
+				SWFTag sub_tag;
+				sub_tag.code = (TagType) 1;
+
+				while (sub_tag.code != SWF_TAG_END_TAG)
+				{
+					sub_tag.parseHeader(cur_pos);
+					printf("  sprite sub-tag code: %d, length: %d\n", sub_tag.code, sub_tag.length);
+
+					// Open new frame function if previous was closed by ShowFrame
+					if (sprite_another_frame && sub_tag.code != SWF_TAG_END_TAG)
+					{
+						sprite_definitions << "void " << sp << "_frame_" << to_string(sprite_frame_i)
+										   << "(SWFAppContext* app_context)" << endl
+										   << "{" << endl;
+						sprite_frame_i += 1;
+						sprite_another_frame = false;
+					}
+
+					switch (sub_tag.code)
+					{
+						case SWF_TAG_SHOW_FRAME:
+						{
+							sprite_definitions << "}" << endl << endl;
+							sprite_another_frame = true;
+							break;
+						}
+
+						case SWF_TAG_PLACE_OBJECT_2:
+						{
+							sub_tag.setFieldCount(2);
+							sub_tag.configureNextField(SWF_FIELD_UI8);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.parseFields(cur_pos);
+
+							u8 flags = (u8) sub_tag.fields[0].value;
+							u16 depth = (u16) sub_tag.fields[1].value;
+
+							bool has_clip_actions = (flags & 0b10000000) != 0;
+							bool has_clip_depth = (flags & 0b01000000) != 0;
+							bool has_name = (flags & 0b00100000) != 0;
+							bool has_ratio = (flags & 0b00010000) != 0;
+							bool has_color = (flags & 0b00001000) != 0;
+							bool has_matrix = (flags & 0b00000100) != 0;
+							bool has_character = (flags & 0b00000010) != 0;
+
+							u16 char_id = 0;
+							if (has_character)
+							{
+								sub_tag.clearFields();
+								sub_tag.setFieldCount(1);
+								sub_tag.configureNextField(SWF_FIELD_UI16);
+								sub_tag.parseFields(cur_pos);
+								char_id = (u16) sub_tag.fields[0].value;
+							}
+
+							size_t transform_id = current_transform;
+							if (has_matrix)
+							{
+								MATRIX matrix;
+								parseMatrix(matrix);
+								recompileMatrix(matrix, transform_data);
+								current_transform += 1;
+							}
+							else
+							{
+								transform_id = 0;
+							}
+
+							u32 cxform_id = 0;
+							if (has_color)
+							{
+								// Parse CXFORMWITHALPHA
+								u32 cur_byte_bits_left = 8;
+								SWFTag cxform_tag;
+
+								cxform_tag.clearFields();
+								cxform_tag.setFieldCount(3);
+								cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+								cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+								cxform_tag.configureNextField(SWF_FIELD_UB, 4);
+								cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+								bool has_add = cxform_tag.fields[0].value & 1;
+								bool has_mult = cxform_tag.fields[1].value & 1;
+								u32 nbits = (u32) cxform_tag.fields[2].value;
+
+								s32 mult_r = 256, mult_g = 256, mult_b = 256, mult_a = 256;
+								s32 add_r = 0, add_g = 0, add_b = 0, add_a = 0;
+
+								if (has_mult)
+								{
+									cxform_tag.clearFields();
+									cxform_tag.setFieldCount(4);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+									mult_r = (s32) cxform_tag.fields[0].value;
+									mult_g = (s32) cxform_tag.fields[1].value;
+									mult_b = (s32) cxform_tag.fields[2].value;
+									mult_a = (s32) cxform_tag.fields[3].value;
+								}
+
+								if (has_add)
+								{
+									cxform_tag.clearFields();
+									cxform_tag.setFieldCount(4);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+									add_r = (s32) cxform_tag.fields[0].value;
+									add_g = (s32) cxform_tag.fields[1].value;
+									add_b = (s32) cxform_tag.fields[2].value;
+									add_a = (s32) cxform_tag.fields[3].value;
+								}
+
+								if (cur_byte_bits_left != 8)
+								{
+									cur_pos += 1;
+								}
+
+								cxform_id = (u32) current_cxform;
+
+								cxform_data << "\t" << to_string(mult_r) << "/256.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << to_string(mult_g) << "/256.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << to_string(mult_b) << "/256.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << to_string(mult_a) << "/256.0f," << endl
+											<< "\t" << to_string(add_r) << "/255.0f," << endl
+											<< "\t" << to_string(add_g) << "/255.0f," << endl
+											<< "\t" << to_string(add_b) << "/255.0f," << endl
+											<< "\t" << to_string(add_a) << "/255.0f," << endl;
+
+								current_cxform += 1;
+							}
+
+							// Skip remaining optional fields we don't handle yet
+							if (has_ratio)
+							{
+								cur_pos += 2; // UI16
+							}
+							if (has_name)
+							{
+								// Skip null-terminated string
+								while (*cur_pos != '\0') cur_pos++;
+								cur_pos++; // skip null terminator
+							}
+							if (has_clip_depth)
+							{
+								cur_pos += 2; // UI16
+							}
+
+							sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
+											   << to_string(depth) << ", "
+											   << to_string(char_id) << ", "
+											   << to_string(transform_id) << ", "
+											   << to_string(cxform_id) << ");" << endl;
+
+							break;
+						}
+
+						case SWF_TAG_END_TAG:
+						{
+							if (!sprite_another_frame)
+							{
+								// Close the last frame function if ShowFrame didn't close it
+								sprite_definitions << "}" << endl << endl;
+							}
+							break;
+						}
+
+						case SWF_TAG_FRAME_LABEL:
+						{
+							// Skip frame labels in sprites for now
+							cur_pos += sub_tag.length;
+							break;
+						}
+
+						default:
+						{
+							// Skip unsupported sprite sub-tags
+							cur_pos += sub_tag.length;
+							break;
+						}
+					}
+
+					sub_tag.clearFields();
+					num_finished_tags += 1;
+				}
+
+				// Generate sprite frame_funcs array
+				sprite_definitions << "frame_func " << sp << "_frame_funcs[] =" << endl
+								   << "{" << endl;
+				for (size_t i = 0; i < sprite_frame_i; ++i)
+				{
+					sprite_definitions << "\t" << sp << "_frame_" << to_string(i) << "," << endl;
+				}
+				sprite_definitions << "};" << endl << endl;
+
+				break;
+			}
+
 			//~ case SWF_TAG_DO_ABC:
 			//~ {
 				//~ cur_pos += tag.length;

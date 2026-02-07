@@ -298,6 +298,62 @@ class ShapeDefinition:
 
 
 # ---------------------------------------------------------------------------
+# Sprite definition helper
+# ---------------------------------------------------------------------------
+
+class SpriteDefinition:
+    """Collects sub-tags (PlaceObject2, ShowFrame) for a DefineSprite tag."""
+    def __init__(self, object_id, frame_count=1):
+        self.object_id = object_id
+        self.frame_count = frame_count
+        self.sub_tags = []
+
+    def place_object(self, object_id, depth, trans_x=0, trans_y=0,
+                     scale_x=None, scale_y=None):
+        """Place an object in the sprite's display list."""
+        self.sub_tags.append(("PlaceObject2", {
+            "object_id": object_id,
+            "depth": depth,
+            "trans_x": trans_x,
+            "trans_y": trans_y,
+            "scale_x": scale_x,
+            "scale_y": scale_y,
+        }))
+
+    def show_frame(self):
+        """Add a ShowFrame to the sprite's timeline."""
+        self.sub_tags.append(("ShowFrame", None))
+
+    def to_xml(self, parent):
+        sprite_el = SubElement(parent, "DefineSprite",
+                               objectID=str(self.object_id),
+                               frames=str(self.frame_count))
+        tags_el = SubElement(sprite_el, "tags")
+
+        for tag_type, tag_data in self.sub_tags:
+            if tag_type == "PlaceObject2":
+                d = tag_data
+                po = SubElement(tags_el, "PlaceObject2",
+                                replace="0",
+                                depth=str(d["depth"]),
+                                objectID=str(d["object_id"]))
+                transform_el = SubElement(po, "transform")
+                attrs = {
+                    "transX": str(d["trans_x"]),
+                    "transY": str(d["trans_y"]),
+                }
+                if d.get("scale_x") is not None:
+                    attrs["scaleX"] = f"{d['scale_x']:.16f}"
+                if d.get("scale_y") is not None:
+                    attrs["scaleY"] = f"{d['scale_y']:.16f}"
+                SubElement(transform_el, "Transform", **attrs)
+            elif tag_type == "ShowFrame":
+                SubElement(tags_el, "ShowFrame")
+
+        SubElement(tags_el, "End")
+
+
+# ---------------------------------------------------------------------------
 # Main SWF builder
 # ---------------------------------------------------------------------------
 
@@ -367,6 +423,12 @@ class SWFMLBuilder:
             "color_transform": color_transform,
         }))
 
+    def define_sprite(self, object_id, frame_count=1):
+        """Create a sprite (movie clip) definition. Returns a SpriteDefinition for adding sub-tags."""
+        sprite = SpriteDefinition(object_id, frame_count)
+        self.tags.append(("DefineSprite", sprite))
+        return sprite
+
     def show_frame(self):
         self._frame_count += 1
         self.tags.append(("ShowFrame", None))
@@ -411,6 +473,9 @@ class SWFMLBuilder:
                 data_el.text = jpeg_b64
 
             elif tag_type == "DefineShape":
+                tag_data.to_xml(tags_el)
+
+            elif tag_type == "DefineSprite":
                 tag_data.to_xml(tags_el)
 
             elif tag_type == "PlaceObject2":

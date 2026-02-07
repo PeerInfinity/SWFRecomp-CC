@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 16
+    "graphics_features_with_tests": 17
   },
   "entries": [
     {
@@ -3586,7 +3586,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3609,7 +3609,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3632,7 +3632,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -9066,8 +9066,10 @@
       "tag_id": 39,
       "category": "Sprite Tags",
       "description": "Embedded movie clip with own timeline (SWF tag 39)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/sprite_basic"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BUTTON",

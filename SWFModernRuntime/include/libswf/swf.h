@@ -7,6 +7,14 @@ typedef struct O1HeapInstance O1HeapInstance;
 
 #define HEAP_SIZE 1024*1024*1024  // 1 GB
 
+// Forward declaration for SWFAppContext (needed for frame_func typedef)
+typedef struct SWFAppContext SWFAppContext;
+
+// Frame function now takes app_context parameter
+typedef void (*frame_func)(SWFAppContext* app_context);
+
+extern frame_func frame_funcs[];
+
 #ifndef NO_GRAPHICS
 #define INITIAL_DICTIONARY_CAPACITY 1024
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
@@ -16,6 +24,7 @@ typedef enum
 {
 	CHAR_TYPE_SHAPE,
 	CHAR_TYPE_TEXT,
+	CHAR_TYPE_SPRITE,
 } CharacterType;
 
 typedef struct Character
@@ -37,6 +46,12 @@ typedef struct Character
 			u32 transform_start;
 			u32 cxform_id;
 		};
+		// DefineSprite
+		struct
+		{
+			frame_func* sprite_frame_funcs;
+			size_t sprite_frame_count;
+		};
 	};
 } Character;
 
@@ -48,14 +63,6 @@ typedef struct DisplayObject
 	u32 has_cxform;
 } DisplayObject;
 #endif
-
-// Forward declaration for SWFAppContext (needed for frame_func typedef)
-typedef struct SWFAppContext SWFAppContext;
-
-// Frame function now takes app_context parameter
-typedef void (*frame_func)(SWFAppContext* app_context);
-
-extern frame_func frame_funcs[];
 
 // Macros for stack access via app_context
 #define STACK (app_context->stack)
