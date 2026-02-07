@@ -78,8 +78,13 @@ typedef struct WebGPURenderContext
 	WGPUTexture msaa_texture;
 	WGPUTextureView msaa_view;
 
+	WGPUTexture depth_stencil_texture;
+	WGPUTextureView depth_stencil_view;
+
 	// --- Pipelines ---
-	WGPURenderPipeline render_pipeline;
+	WGPURenderPipeline render_pipeline;         // normal: no stencil test
+	WGPURenderPipeline stencil_write_pipeline;  // writes stencil, no color output
+	WGPURenderPipeline stencil_test_pipeline;   // tests stencil, normal color output
 	WGPUComputePipeline compute_pipeline;
 
 	// --- Bind group layouts ---
@@ -130,5 +135,8 @@ void render_webgpu_upload_extra_transform(WebGPURenderContext* context, float* t
 void render_webgpu_upload_cxform_id(WebGPURenderContext* context, u32 cxform_id);
 void render_webgpu_upload_cxform(WebGPURenderContext* context, float* cxform);
 void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_t num_verts, u32 transform_id, u32 cxform_id);
+void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
+void render_webgpu_end_clip_mask(WebGPURenderContext* context);
+void render_webgpu_end_clip(WebGPURenderContext* context);
 void render_webgpu_close_pass(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

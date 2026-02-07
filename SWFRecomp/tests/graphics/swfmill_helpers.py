@@ -410,7 +410,7 @@ class SWFMLBuilder:
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
                      skew_x=None, skew_y=None,
-                     color_transform=None):
+                     color_transform=None, clip_depth=None):
         self.tags.append(("PlaceObject2", {
             "object_id": object_id,
             "depth": depth,
@@ -421,6 +421,7 @@ class SWFMLBuilder:
             "skew_x": skew_x,
             "skew_y": skew_y,
             "color_transform": color_transform,
+            "clip_depth": clip_depth,
         }))
 
     def define_sprite(self, object_id, frame_count=1):
@@ -480,10 +481,14 @@ class SWFMLBuilder:
 
             elif tag_type == "PlaceObject2":
                 d = tag_data
-                po = SubElement(tags_el, "PlaceObject2",
-                                replace="0",
-                                depth=str(d["depth"]),
-                                objectID=str(d["object_id"]))
+                po_attrs = {
+                    "replace": "0",
+                    "depth": str(d["depth"]),
+                    "objectID": str(d["object_id"]),
+                }
+                if d.get("clip_depth") is not None:
+                    po_attrs["clipDepth"] = str(d["clip_depth"])
+                po = SubElement(tags_el, "PlaceObject2", **po_attrs)
                 transform_el = SubElement(po, "transform")
                 attrs = {
                     "transX": str(d["trans_x"]),

@@ -21,12 +21,35 @@ void tagShowFrame(SWFAppContext* app_context)
 {
 	renderer_open_pass(context);
 
+	u16 active_clip_depth = 0;
+
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
+		// End active clip if we've passed its range
+		if (active_clip_depth > 0 && i > active_clip_depth)
+		{
+			renderer_end_clip(context);
+			active_clip_depth = 0;
+		}
+
 		DisplayObject* obj = &display_list[i];
 
 		if (obj->char_id == 0)
 		{
+			continue;
+		}
+
+		// Check if this object is a clip mask
+		if (obj->clip_depth > 0)
+		{
+			Character* ch = &dictionary[obj->char_id];
+			if (ch->type == CHAR_TYPE_SHAPE)
+			{
+				renderer_begin_clip_mask(context);
+				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
+				renderer_end_clip_mask(context);
+				active_clip_depth = obj->clip_depth;
+			}
 			continue;
 		}
 
@@ -87,6 +110,11 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 	}
 
+	if (active_clip_depth > 0)
+	{
+		renderer_end_clip(context);
+	}
+
 	renderer_close_pass(context);
 }
 
@@ -110,7 +138,7 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	dictionary[char_id].cxform_id = cxform_id;
 }
 
-void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id)
+void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
@@ -118,6 +146,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].transform_id = transform_id;
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+	display_list[depth].clip_depth = clip_depth;
 
 	if (depth > max_depth)
 	{

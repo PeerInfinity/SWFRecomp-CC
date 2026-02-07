@@ -1633,7 +1633,7 @@ void actionMbStringLength(SWFAppContext* app_context, char* v_str);
 - parseActions (case SWF_ACTION_MB_STRING_LENGTH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md](SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md)
+- [SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md](SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4986)
@@ -2205,7 +2205,7 @@ void actionLess2(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_LESS2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-greater-0x48.md](SWFRecompDocs/prompts/completed/opcode-greater-0x48.md)
+- [SWFRecompDocs/prompts/completed/opcode-less2-0x48.md](SWFRecompDocs/prompts/completed/opcode-less2-0x48.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6414)

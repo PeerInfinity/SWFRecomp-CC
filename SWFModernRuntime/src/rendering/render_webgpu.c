@@ -619,6 +619,24 @@ static void create_textures(WebGPURenderContext* ctx)
 		view_desc.arrayLayerCount = 1;
 		ctx->msaa_view = wgpuTextureCreateView(ctx->msaa_texture, &view_desc);
 	}
+
+	// --- Depth-stencil MSAA texture (for clip masks) ---
+	{
+		WGPUTextureDescriptor tex_desc = {0};
+		tex_desc.label = WGPU_LABEL("depth_stencil_texture");
+		tex_desc.dimension = WGPUTextureDimension_2D;
+		tex_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
+		tex_desc.format = WGPUTextureFormat_Depth24PlusStencil8;
+		tex_desc.mipLevelCount = 1;
+		tex_desc.sampleCount = 4;
+		tex_desc.usage = WGPUTextureUsage_RenderAttachment;
+		ctx->depth_stencil_texture = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
+
+		WGPUTextureViewDescriptor view_desc = {0};
+		view_desc.mipLevelCount = 1;
+		view_desc.arrayLayerCount = 1;
+		ctx->depth_stencil_view = wgpuTextureCreateView(ctx->depth_stencil_texture, &view_desc);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -737,6 +755,23 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	frag_state.targetCount = 1;
 	frag_state.targets = &color_target;
 
+	// --- Depth-stencil state (shared base for all pipelines) ---
+	// All pipelines must have depth-stencil state since the render pass
+	// always has a depth-stencil attachment (needed for clip masks).
+
+	// Normal pipeline: stencil always passes, never written (no-op)
+	WGPUDepthStencilState ds_normal = {0};
+	ds_normal.format = WGPUTextureFormat_Depth24PlusStencil8;
+	ds_normal.depthWriteEnabled = false;
+	ds_normal.depthCompare = WGPUCompareFunction_Always;
+	ds_normal.stencilFront.compare = WGPUCompareFunction_Always;
+	ds_normal.stencilFront.passOp = WGPUStencilOperation_Keep;
+	ds_normal.stencilFront.failOp = WGPUStencilOperation_Keep;
+	ds_normal.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+	ds_normal.stencilBack = ds_normal.stencilFront;
+	ds_normal.stencilReadMask = 0xFF;
+	ds_normal.stencilWriteMask = 0x00;
+
 	WGPURenderPipelineDescriptor rp_desc = {0};
 	rp_desc.label = WGPU_LABEL("render_pipeline");
 	rp_desc.layout = ctx->render_pipeline_layout;
@@ -749,9 +784,43 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	rp_desc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
 	rp_desc.multisample.count = 4;
 	rp_desc.multisample.mask = ~0u;
+	rp_desc.depthStencil = &ds_normal;
 
 	ctx->render_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
 	assert(ctx->render_pipeline != NULL);
+
+	// --- Stencil write pipeline: writes to stencil, no color output ---
+	// Used for clip mask shapes. The mask's geometry defines the clipping region.
+	WGPUDepthStencilState ds_write = ds_normal;
+	ds_write.stencilFront.compare = WGPUCompareFunction_Always;
+	ds_write.stencilFront.passOp = WGPUStencilOperation_Replace;
+	ds_write.stencilWriteMask = 0xFF;
+	ds_write.stencilBack = ds_write.stencilFront;
+
+	WGPUColorTargetState color_target_masked = color_target;
+	color_target_masked.writeMask = WGPUColorWriteMask_None;
+	WGPUFragmentState frag_state_masked = frag_state;
+	frag_state_masked.targets = &color_target_masked;
+
+	rp_desc.label = WGPU_LABEL("stencil_write_pipeline");
+	rp_desc.depthStencil = &ds_write;
+	rp_desc.fragment = &frag_state_masked;
+
+	ctx->stencil_write_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+	assert(ctx->stencil_write_pipeline != NULL);
+
+	// --- Stencil test pipeline: only draws where stencil == ref ---
+	// Used for objects clipped by a mask.
+	WGPUDepthStencilState ds_test = ds_normal;
+	ds_test.stencilFront.compare = WGPUCompareFunction_Equal;
+	ds_test.stencilBack = ds_test.stencilFront;
+
+	rp_desc.label = WGPU_LABEL("stencil_test_pipeline");
+	rp_desc.depthStencil = &ds_test;
+	rp_desc.fragment = &frag_state;  // normal color output
+
+	ctx->stencil_test_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+	assert(ctx->stencil_test_pipeline != NULL);
 
 	wgpuShaderModuleRelease(vs_module);
 	wgpuShaderModuleRelease(fs_module);
@@ -1003,10 +1072,20 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 		ctx->red / 255.0, ctx->green / 255.0, ctx->blue / 255.0, 1.0
 	};
 
+	WGPURenderPassDepthStencilAttachment ds_att = {0};
+	ds_att.view = ctx->depth_stencil_view;
+	ds_att.depthLoadOp = WGPULoadOp_Clear;
+	ds_att.depthStoreOp = WGPUStoreOp_Discard;
+	ds_att.depthClearValue = 1.0f;
+	ds_att.stencilLoadOp = WGPULoadOp_Clear;
+	ds_att.stencilStoreOp = WGPUStoreOp_Discard;
+	ds_att.stencilClearValue = 0;
+
 	WGPURenderPassDescriptor rp_desc = {0};
 	rp_desc.label = WGPU_LABEL("render_pass");
 	rp_desc.colorAttachmentCount = 1;
 	rp_desc.colorAttachments = &color_att;
+	rp_desc.depthStencilAttachment = &ds_att;
 
 	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
 
@@ -1062,6 +1141,29 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 	// effect until the next queue submit.
 	u32 packed_id = transform_id | (cxform_id << 16);
 	wgpuRenderPassEncoderDraw(ctx->render_pass, (u32)num_verts, 1, 0, packed_id);
+}
+
+// ---------------------------------------------------------------------------
+// Clip mask control: stencil-based clipping for PlaceObject2 clipDepth
+// ---------------------------------------------------------------------------
+void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)
+{
+	// Switch to stencil-write pipeline: draws to stencil buffer only (no color)
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
+}
+
+void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
+{
+	// Switch to stencil-test pipeline: only draws where stencil == 1 (inside mask)
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
+}
+
+void render_webgpu_end_clip(WebGPURenderContext* ctx)
+{
+	// Switch back to normal pipeline (no stencil testing)
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
 }
 
 // ---------------------------------------------------------------------------
@@ -1192,6 +1294,10 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	// Release pipelines
 	if (ctx->render_pipeline)
 		wgpuRenderPipelineRelease(ctx->render_pipeline);
+	if (ctx->stencil_write_pipeline)
+		wgpuRenderPipelineRelease(ctx->stencil_write_pipeline);
+	if (ctx->stencil_test_pipeline)
+		wgpuRenderPipelineRelease(ctx->stencil_test_pipeline);
 	if (ctx->compute_pipeline)
 		wgpuComputePipelineRelease(ctx->compute_pipeline);
 
@@ -1240,6 +1346,8 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->dummy_sampler) wgpuSamplerRelease(ctx->dummy_sampler);
 	if (ctx->msaa_view) wgpuTextureViewRelease(ctx->msaa_view);
 	if (ctx->msaa_texture) wgpuTextureRelease(ctx->msaa_texture);
+	if (ctx->depth_stencil_view) wgpuTextureViewRelease(ctx->depth_stencil_view);
+	if (ctx->depth_stencil_texture) wgpuTextureRelease(ctx->depth_stencil_texture);
 
 	// Release surface
 	if (ctx->surface) wgpuSurfaceRelease(ctx->surface);

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-07T21:19:41Z",
+  "generated": "2026-02-07T21:58:28Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2157,6 +2157,20 @@
       "wasm_file": "awful_shape_swf_4.wasm",
       "description": "WebGPU rendering test with complex shape definitions",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/clip_mask",
+      "name": "clip_mask",
+      "type": "graphics",
+      "path": "examples/graphics/clip_mask",
+      "has_swf": true,
+      "js_file": "clip_mask.js",
+      "wasm_file": "clip_mask.wasm",
+      "description": "WebGPU rendering test with PlaceObject2 ClipDepth for clipping masks",
+      "swf_version": 5,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

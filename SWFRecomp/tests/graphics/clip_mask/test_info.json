@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "name": "clip_mask",
+    "description": "WebGPU rendering test with PlaceObject2 ClipDepth for clipping masks",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "SOLID_FILL",
+      "LINE_STYLE",
+      "STRAIGHT_EDGE",
+      "CURVED_EDGE",
+      "CLIP_DEPTH"
+    ]
+  }
+}

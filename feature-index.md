@@ -8,13 +8,13 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 17/60
+**Features With Tests**: 18/60
 
-**Features Without Tests**: 43
+**Features Without Tests**: 42
 
-**Total Feature Tests**: 67
+**Total Feature Tests**: 73
 
-**Fully Implemented**: 17/60
+**Fully Implemented**: 18/60
 
 ## Summary Tables
 
@@ -23,7 +23,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [DefineShape](#define-shape) | Basic shape definition (SWF tag 2) | 2 | 13 | Yes |
+| [DefineShape](#define-shape) | Basic shape definition (SWF tag 2) | 2 | 14 | Yes |
 | [DefineShape2](#define-shape2) | Extended shape with >255 styles (SWF tag 22) | 22 | 2 | Yes |
 | [DefineShape3](#define-shape3) | Shape with full RGBA support (SWF tag 32) | 32 | 1 | Yes |
 | [DefineShape4](#define-shape4) | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | 83 | **0** | No |
@@ -33,7 +33,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [SolidFill](#solid-fill) | Solid color fill (type 0x00) | - | 12 | Yes |
+| [SolidFill](#solid-fill) | Solid color fill (type 0x00) | - | 13 | Yes |
 | [LinearGradient](#linear-gradient) | Linear gradient fill (type 0x10) | - | 2 | Yes |
 | [RadialGradient](#radial-gradient) | Radial gradient fill (type 0x12) | - | 1 | Yes |
 | [FocalRadialGradient](#focal-radial-gradient) | Focal radial gradient fill (type 0x13, SWF 8+) | - | **0** | No |
@@ -47,15 +47,15 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 15 | Yes |
-| [CurvedEdge](#curved-edge) | Curved edge records (CurveTo) | - | 2 | Yes |
+| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 16 | Yes |
+| [CurvedEdge](#curved-edge) | Curved edge records (CurveTo) | - | 3 | Yes |
 
 ### Style Features
 (2/3 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [LineStyle](#line-style) | Basic stroke line style (LINESTYLE) | - | 10 | Yes |
+| [LineStyle](#line-style) | Basic stroke line style (LINESTYLE) | - | 11 | Yes |
 | [LineStyle2](#line-style2) | Advanced line style with caps/joins (LINESTYLE2, DefineShape4) | - | **0** | No |
 | [NewStyles](#new-styles) | Mid-shape style changes (StateNewStyles) | - | 2 | Yes |
 
@@ -84,14 +84,14 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [RemoveObject2](#remove-object2) | Remove object by depth (SWF tag 28) | 28 | **0** | No |
 
 ### Transform Features
-(3/4 with tests)
+(4/4 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
 | [PlaceObject2 Scale](#place-scale) | Scale transform in PlaceObject2 | - | 1 | Yes |
 | [PlaceObject2 Skew](#place-skew) | Skew transform in PlaceObject2 | - | 1 | Yes |
 | [ColorTransform](#color-transform) | Color transform (CXFORM/CXFORMWITHALPHA) | - | 1 | Yes |
-| [ClipDepth](#clip-depth) | Clipping mask via PlaceObject2 ClipDepth | - | **0** | No |
+| [ClipDepth](#clip-depth) | Clipping mask via PlaceObject2 ClipDepth | - | 1 | Yes |
 
 ### Morph Shape Tags
 (0/2 with tests)
@@ -165,26 +165,27 @@ See also: [AS2 Opcode Index](opcode-index.md)
 ## Implementation Status
 
 ### Fully Implemented
-(17 features)
+(18 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
-| [DefineShape](#define-shape) | Shape Tags | 2 | 13 |
+| [DefineShape](#define-shape) | Shape Tags | 2 | 14 |
 | [DefineShape2](#define-shape2) | Shape Tags | 22 | 2 |
 | [DefineShape3](#define-shape3) | Shape Tags | 32 | 1 |
-| [SolidFill](#solid-fill) | Fill Types | - | 12 |
+| [SolidFill](#solid-fill) | Fill Types | - | 13 |
 | [LinearGradient](#linear-gradient) | Fill Types | - | 2 |
 | [RadialGradient](#radial-gradient) | Fill Types | - | 1 |
 | [ClippedBitmap](#clipped-bitmap) | Fill Types | - | 1 |
-| [StraightEdge](#straight-edge) | Edge Types | - | 15 |
-| [CurvedEdge](#curved-edge) | Edge Types | - | 2 |
-| [LineStyle](#line-style) | Style Features | - | 10 |
+| [StraightEdge](#straight-edge) | Edge Types | - | 16 |
+| [CurvedEdge](#curved-edge) | Edge Types | - | 3 |
+| [LineStyle](#line-style) | Style Features | - | 11 |
 | [NewStyles](#new-styles) | Style Features | - | 2 |
 | [DefineBits](#define-bits) | Image/Bitmap Tags | 6 | 1 |
 | [JPEGTables](#jpeg-tables) | Image/Bitmap Tags | 8 | 1 |
 | [PlaceObject2 Scale](#place-scale) | Transform Features | - | 1 |
 | [PlaceObject2 Skew](#place-skew) | Transform Features | - | 1 |
 | [ColorTransform](#color-transform) | Transform Features | - | 1 |
+| [ClipDepth](#clip-depth) | Transform Features | - | 1 |
 | [DefineSprite](#define-sprite) | Sprite Tags | 39 | 1 |
 
 ### Partially Tested
@@ -213,7 +214,6 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [PlaceObject3](#place-object3) | Display List Tags | 70 |
 | [RemoveObject](#remove-object) | Display List Tags | 5 |
 | [RemoveObject2](#remove-object2) | Display List Tags | 28 |
-| [ClipDepth](#clip-depth) | Transform Features | - |
 | [DefineMorphShape](#define-morph-shape) | Morph Shape Tags | 46 |
 | [DefineMorphShape2](#define-morph-shape2) | Morph Shape Tags | 84 |
 | [DefineFont](#define-font) | Text Tags | 10 |
@@ -259,6 +259,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/awful_gradient`
 - `SWFRecomp/tests/graphics/awful_radial_gradient`
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
+- `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_transform`
 - `SWFRecomp/tests/graphics/mess`
@@ -337,6 +338,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tests:**
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
+- `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_transform`
 - `SWFRecomp/tests/graphics/new_styles`
@@ -483,6 +485,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/awful_gradient`
 - `SWFRecomp/tests/graphics/awful_radial_gradient`
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
+- `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
 - `SWFRecomp/tests/graphics/mess`
 - `SWFRecomp/tests/graphics/new_styles`
@@ -511,6 +514,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 **Fully Implemented**: Yes
 
 **Tests:**
+- `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/wild_shadow`
 
@@ -531,6 +535,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 **Tests:**
 - `SWFRecomp/tests/graphics/awful_gradient`
 - `SWFRecomp/tests/graphics/awful_radial_gradient`
+- `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
 - `SWFRecomp/tests/graphics/new_styles`
 - `SWFRecomp/tests/graphics/rgba_shape`
@@ -831,9 +836,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/clip_mask`
 
 ---
 
