@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "jpeg3_bitmap",
+    "description": "WebGPU rendering test with DefineBitsJPEG3 (tag 35) JPEG bitmap with zlib-compressed alpha channel",
+    "swf_version": 7,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_JPEG3",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

@@ -833,6 +833,111 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_DEFINE_BITS_JPEG3:
+			{
+				size_t new_length = tag.length;
+
+				tag.clearFields();
+				tag.setFieldCount(1);
+
+				tag.configureNextField(SWF_FIELD_UI16);
+
+				tag.parseFields(cur_pos);
+
+				u16 char_id = (u16) tag.fields[0].value;
+				new_length -= 2;
+
+				tag.clearFields();
+				tag.setFieldCount(1);
+
+				tag.configureNextField(SWF_FIELD_UI32);
+
+				tag.parseFields(cur_pos);
+
+				u32 alpha_data_offset = (u32) tag.fields[0].value;
+				new_length -= 4;
+
+				// JPEG data is alpha_data_offset bytes, alpha data follows
+				char* jpeg_start = cur_pos;
+				size_t jpeg_len = alpha_data_offset;
+
+				// Strip erroneous EOI+SOI marker (FF D9 FF D8) if present
+				if (jpeg_len >= 4 &&
+					(u8) jpeg_start[0] == 0xFF &&
+					(u8) jpeg_start[1] == 0xD9 &&
+					(u8) jpeg_start[2] == 0xFF &&
+					(u8) jpeg_start[3] == 0xD8)
+				{
+					jpeg_start += 4;
+					jpeg_len -= 4;
+				}
+
+				int w;
+				int h;
+				int comp;
+				u8* decompressed = stbi_load_from_memory((u8*) jpeg_start, (int) jpeg_len, &w, &h, &comp, 3);
+
+				if (decompressed == nullptr)
+				{
+					EXC("JPEG3 data returned NULL.\n");
+				}
+
+				// Decompress zlib alpha data
+				char* alpha_compressed = cur_pos + alpha_data_offset;
+				size_t alpha_compressed_len = new_length - alpha_data_offset;
+
+				uLongf alpha_size = (uLongf)(w * h);
+				u8* alpha_data = new u8[alpha_size];
+
+				int zresult = uncompress(alpha_data, &alpha_size,
+				                         (const Bytef*) alpha_compressed, (uLong) alpha_compressed_len);
+
+				if (zresult != Z_OK)
+				{
+					stbi_image_free(decompressed);
+					delete[] alpha_data;
+					EXC_ARG("JPEG3: ZLIB alpha decompression failed (code %d).\n", zresult);
+				}
+
+				Vertex v;
+				v.x = w;
+				v.y = h;
+
+				bitmap_sizes.push_back(v);
+
+				size_t bitmap_start = current_bitmap_pixel;
+
+				for (size_t i = 0; i < (size_t)(w * h); i++)
+				{
+					bitmap_data << std::hex << std::uppercase << std::setw(2)
+								<< "\t0x" << (u32) decompressed[3*i] << "," << endl
+								<< "\t0x" << (u32) decompressed[3*i + 1] << "," << endl
+								<< "\t0x" << (u32) decompressed[3*i + 2] << "," << endl
+								<< "\t0x" << (u32) alpha_data[i] << "," << endl;
+
+					current_bitmap_pixel += 1;
+				}
+
+				char_id_to_bitmap_id[char_id] = current_bitmap;
+
+				tag_init << endl
+						 << "\tdefineBitmap("
+						 << to_string(4*bitmap_start) << ", "
+						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+						 << to_string(w) << ", "
+						 << to_string(h)
+						 << ");";
+
+				current_bitmap += 1;
+
+				stbi_image_free(decompressed);
+				delete[] alpha_data;
+
+				cur_pos += new_length;
+
+				break;
+			}
+
 			case SWF_TAG_JPEG_TABLES:
 			{
 				if (jpeg_tables != nullptr)

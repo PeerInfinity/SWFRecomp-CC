@@ -456,6 +456,19 @@ class SWFMLBuilder:
         tag_b64 = base64.b64encode(tag_body).decode('ascii')
         self.tags.append(("DefineBitsJPEG2", tag_b64))
 
+    def define_bits_jpeg3(self, object_id, jpeg_data_bytes, alpha_data):
+        """Add a DefineBitsJPEG3 tag (tag 35) with JPEG data + zlib-compressed alpha.
+
+        jpeg_data_bytes: raw JPEG file bytes (complete JPEG).
+        alpha_data: bytes/list of alpha values, one byte per pixel (length = width * height).
+        """
+        compressed_alpha = zlib.compress(bytes(alpha_data))
+        # Tag body: CharacterID(UI16) + AlphaDataOffset(UI32) + JPEG data + compressed alpha
+        alpha_data_offset = len(jpeg_data_bytes)
+        tag_body = struct.pack('<HI', object_id, alpha_data_offset) + jpeg_data_bytes + compressed_alpha
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+        self.tags.append(("DefineBitsJPEG3", tag_b64))
+
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
                      skew_x=None, skew_y=None,
@@ -527,6 +540,11 @@ class SWFMLBuilder:
 
             elif tag_type == "DefineBitsJPEG2":
                 unk = SubElement(tags_el, "UnknownTag", id="0x15")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_data
+
+            elif tag_type == "DefineBitsJPEG3":
+                unk = SubElement(tags_el, "UnknownTag", id="0x23")
                 data_el = SubElement(unk, "data")
                 data_el.text = tag_data
 

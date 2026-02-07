@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate test.swf for jpeg2_bitmap graphics test.
+"""Generate test.swf for jpeg3_bitmap graphics test.
 
-Tests DefineBitsJPEG2 (tag 21) with a self-contained JPEG bitmap used as
-a ClippedBitmap fill inside a rectangular shape.  The bitmap is an 8x8 pixel
-image split into four colored quadrants (red, green, blue, yellow).
+Tests DefineBitsJPEG3 (tag 35) with a JPEG bitmap + separate zlib-compressed
+alpha channel, used as a ClippedBitmap fill inside a rectangular shape.
+The bitmap is an 8x8 pixel image with four colored quadrants (red, green,
+blue, yellow) and varying alpha per quadrant (matching lossless_bitmap_rgba).
 """
 import io
 import sys
@@ -34,13 +35,24 @@ jpeg_buf = io.BytesIO()
 img.save(jpeg_buf, format="JPEG", quality=100, subsampling=0)
 jpeg_bytes = jpeg_buf.getvalue()
 
-swf = SWFMLBuilder(width=550, height=400, fps=12, version=4)
+# Build separate alpha channel: one byte per pixel
+#   Top-left:  255 (fully opaque)    Top-right:  191 (75% opaque)
+#   Bot-left:  128 (50% opaque)      Bot-right:   64 (25% opaque)
+alpha_data = bytearray()
+for y in range(H):
+    for x in range(W):
+        if y < H // 2:
+            alpha_data.append(255 if x < W // 2 else 191)
+        else:
+            alpha_data.append(128 if x < W // 2 else 64)
+
+swf = SWFMLBuilder(width=550, height=400, fps=12, version=7)
 swf.set_background(255, 255, 255)
 
-# DefineBitsJPEG2 tag (object_id=1) with self-contained JPEG
-swf.define_bits_jpeg2(object_id=1, jpeg_data_bytes=jpeg_bytes)
+# DefineBitsJPEG3 tag (object_id=1) with JPEG + alpha
+swf.define_bits_jpeg3(object_id=1, jpeg_data_bytes=jpeg_bytes, alpha_data=alpha_data)
 
-# Rectangle shape filled with the JPEG bitmap
+# Rectangle shape filled with the JPEG3 bitmap
 # Display at 200x200 pixels (quarter of 550x400 canvas), centered
 DISPLAY_W, DISPLAY_H = 200, 200
 left = (550 - DISPLAY_W) // 2 * 20   # center horizontally (twips)

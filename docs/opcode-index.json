@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 20
+    "graphics_features_with_tests": 21
   },
   "entries": [
     {
@@ -3586,7 +3586,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3609,7 +3609,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -3632,7 +3632,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-char-to-ascii-0x31.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4294,7 +4294,7 @@
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4323,7 +4323,7 @@
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4352,7 +4352,7 @@
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -8613,6 +8613,7 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
@@ -8729,6 +8730,7 @@
       "category": "Fill Types",
       "description": "Clipped bitmap fill (type 0x41)",
       "tests": [
+        "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess"
@@ -8765,6 +8767,7 @@
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
@@ -8864,8 +8867,10 @@
       "tag_id": 21,
       "category": "Image/Bitmap Tags",
       "description": "Self-contained JPEG image (SWF tag 21)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/jpeg2_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_JPEG3",

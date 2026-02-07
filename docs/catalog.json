@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-07T23:02:59Z",
+  "generated": "2026-02-07T23:24:01Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2213,6 +2213,20 @@
       "js_file": "jpeg2_bitmap.js",
       "description": "WebGPU rendering test with DefineBitsJPEG2 (tag 21) self-contained JPEG bitmap fill",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/jpeg3_bitmap",
+      "name": "jpeg3_bitmap",
+      "type": "graphics",
+      "path": "examples/graphics/jpeg3_bitmap",
+      "has_swf": true,
+      "wasm_file": "jpeg3_bitmap.wasm",
+      "js_file": "jpeg3_bitmap.js",
+      "description": "WebGPU rendering test with DefineBitsJPEG3 (tag 35) JPEG bitmap with zlib-compressed alpha channel",
+      "swf_version": 7,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

@@ -596,8 +596,8 @@ static void create_textures(WebGPURenderContext* ctx)
 		samp_desc.label = WGPU_LABEL("bitmap_sampler");
 		samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
 		samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
-		samp_desc.magFilter = WGPUFilterMode_Linear;
-		samp_desc.minFilter = WGPUFilterMode_Linear;
+		samp_desc.magFilter = WGPUFilterMode_Nearest;
+		samp_desc.minFilter = WGPUFilterMode_Nearest;
 		samp_desc.maxAnisotropy = 1;
 		ctx->bitmap_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
@@ -1231,9 +1231,11 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, size_t offset,
 	WGPUExtent3D extent = {bw, bh, 1};
 	wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
 
-	// Store bitmap dimensions
-	ctx->bitmap_sizes[2 * ctx->current_bitmap] = width;
-	ctx->bitmap_sizes[2 * ctx->current_bitmap + 1] = height;
+	// Store padded texture dimensions (not raw bitmap size) so that the
+	// vertex shader UV computation (texel_pos / size) maps correctly to the
+	// actual texture layer, which includes a +1 edge-clamp padding column/row.
+	ctx->bitmap_sizes[2 * ctx->current_bitmap] = bw;
+	ctx->bitmap_sizes[2 * ctx->current_bitmap + 1] = bh;
 	ctx->current_bitmap++;
 
 	free(temp);
