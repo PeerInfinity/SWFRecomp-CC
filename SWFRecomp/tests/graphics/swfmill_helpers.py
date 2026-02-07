@@ -428,6 +428,24 @@ class SWFMLBuilder:
         tag_b64 = base64.b64encode(tag_body).decode('ascii')
         self.tags.append(("DefineBitsLossless", tag_b64))
 
+    def define_bits_lossless2(self, object_id, width, height, pixels):
+        """Add a DefineBitsLossless2 tag (tag 36, format 5 = 32-bit ARGB).
+
+        pixels: list of (r, g, b, a) tuples, length must equal width * height.
+        Each channel is 0-255.
+        """
+        assert len(pixels) == width * height, \
+            f"Expected {width*height} pixels, got {len(pixels)}"
+        # Build uncompressed pixel data: ARGB per pixel
+        raw = bytearray()
+        for r, g, b, a in pixels:
+            raw.extend((a, r, g, b))
+        compressed = zlib.compress(bytes(raw))
+        # Tag body: CharacterID(UI16) + Format(UI8) + Width(UI16) + Height(UI16) + ZLIB data
+        tag_body = struct.pack('<HBHH', object_id, 5, width, height) + compressed
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+        self.tags.append(("DefineBitsLossless2", tag_b64))
+
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
                      skew_x=None, skew_y=None,
@@ -489,6 +507,11 @@ class SWFMLBuilder:
 
             elif tag_type == "DefineBitsLossless":
                 unk = SubElement(tags_el, "UnknownTag", id="0x14")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_data
+
+            elif tag_type == "DefineBitsLossless2":
+                unk = SubElement(tags_el, "UnknownTag", id="0x24")
                 data_el = SubElement(unk, "data")
                 data_el.text = tag_data
 
