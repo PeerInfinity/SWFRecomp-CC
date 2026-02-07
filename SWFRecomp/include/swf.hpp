@@ -184,6 +184,9 @@ namespace SWFRecomp
 		std::stringstream cxform_data;
 		size_t current_cxform;
 
+		std::stringstream sprite_definitions;
+		std::stringstream sprite_forward_decls;
+
 		u8* jpeg_tables;
 		size_t jpeg_tables_size;
 		

@@ -21,6 +21,12 @@ void tagShowFrame(SWFAppContext* app_context)
 // Stubs for graphics-only tags - should not be called in NO_GRAPHICS mode
 // but if they are, we provide empty implementations
 #ifdef INCLUDE_GRAPHICS_STUBS
+void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
+{
+	(void)app_context; (void)funcs; (void)frame_count;
+	printf("[Tag] DefineSprite(char_id=%zu, frame_count=%zu) [ignored in NO_GRAPHICS mode]\n", char_id, frame_count);
+}
+
 void tagDefineShape(size_t char_id, size_t shape_offset, size_t shape_size)
 {
 	printf("[Tag] DefineShape(char_id=%zu) [ignored in NO_GRAPHICS mode]\n", char_id);

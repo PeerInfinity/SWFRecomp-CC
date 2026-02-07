@@ -8,13 +8,13 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 16/60
+**Features With Tests**: 17/60
 
-**Features Without Tests**: 44
+**Features Without Tests**: 43
 
-**Total Feature Tests**: 66
+**Total Feature Tests**: 67
 
-**Fully Implemented**: 16/60
+**Fully Implemented**: 17/60
 
 ## Summary Tables
 
@@ -115,11 +115,11 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineEditText](#define-edit-text) | Dynamic/editable text field (SWF tag 37) | 37 | **0** | No |
 
 ### Sprite Tags
-(0/1 with tests)
+(1/1 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [DefineSprite](#define-sprite) | Embedded movie clip with own timeline (SWF tag 39) | 39 | **0** | No |
+| [DefineSprite](#define-sprite) | Embedded movie clip with own timeline (SWF tag 39) | 39 | 1 | Yes |
 
 ### Button Tags
 (0/2 with tests)
@@ -165,7 +165,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 ## Implementation Status
 
 ### Fully Implemented
-(16 features)
+(17 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
@@ -185,6 +185,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [PlaceObject2 Scale](#place-scale) | Transform Features | - | 1 |
 | [PlaceObject2 Skew](#place-skew) | Transform Features | - | 1 |
 | [ColorTransform](#color-transform) | Transform Features | - | 1 |
+| [DefineSprite](#define-sprite) | Sprite Tags | 39 | 1 |
 
 ### Partially Tested
 (Has tests but not marked as fully implemented)
@@ -222,7 +223,6 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineText](#define-text) | Text Tags | 11 |
 | [DefineText2](#define-text2) | Text Tags | 33 |
 | [DefineEditText](#define-edit-text) | Text Tags | 37 |
-| [DefineSprite](#define-sprite) | Sprite Tags | 39 |
 | [DefineButton](#define-button) | Button Tags | 7 |
 | [DefineButton2](#define-button2) | Button Tags | 34 |
 | [DefineSound](#define-sound) | Sound Tags | 14 |
@@ -991,9 +991,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 39
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/sprite_basic`
 
 ---
 

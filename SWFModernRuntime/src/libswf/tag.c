@@ -45,6 +45,45 @@ void tagShowFrame(SWFAppContext* app_context)
 					renderer_draw_shape(context, app_context->glyph_data[glyph_index], app_context->glyph_data[glyph_index + 1], ch->transform_start + j, ch->cxform_id);
 				}
 				break;
+			case CHAR_TYPE_SPRITE:
+			{
+				// Save current display list state
+				DisplayObject* saved_display_list = display_list;
+				size_t saved_max_depth = max_depth;
+				size_t saved_capacity = display_list_capacity;
+
+				// Create temporary sprite display list
+				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+				max_depth = 0;
+
+				// Execute sprite's first frame to build its display list
+				if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+				{
+					ch->sprite_frame_funcs[0](app_context);
+				}
+
+				// Render sprite's display list contents
+				for (size_t j = 1; j <= max_depth; ++j)
+				{
+					DisplayObject* sprite_obj = &display_list[j];
+					if (sprite_obj->char_id == 0) continue;
+
+					Character* sprite_ch = &dictionary[sprite_obj->char_id];
+					if (sprite_ch->type == CHAR_TYPE_SHAPE)
+					{
+						renderer_draw_shape(context, sprite_ch->shape_offset, sprite_ch->size,
+							sprite_obj->transform_id, sprite_obj->cxform_id);
+					}
+				}
+
+				// Restore main display list
+				free(display_list);
+				display_list = saved_display_list;
+				max_depth = saved_max_depth;
+				display_list_capacity = saved_capacity;
+				break;
+			}
 		}
 	}
 
@@ -84,6 +123,15 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		max_depth = depth;
 	}
+}
+
+void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
+{
+	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+
+	dictionary[char_id].type = CHAR_TYPE_SPRITE;
+	dictionary[char_id].sprite_frame_funcs = funcs;
+	dictionary[char_id].sprite_frame_count = frame_count;
 }
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
