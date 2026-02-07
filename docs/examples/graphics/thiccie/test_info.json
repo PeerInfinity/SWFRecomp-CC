@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "thiccie",
+    "description": "WebGPU rendering test with thick line strokes",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "LINE_STYLE",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

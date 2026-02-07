@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "name": "awful_radial_gradient",
+    "description": "WebGPU rendering test with radial gradient fills",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "LINEAR_GRADIENT",
+      "RADIAL_GRADIENT",
+      "LINE_STYLE",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

@@ -100,6 +100,18 @@ jobs:
           python3 scripts/build_opcode_index.py
           python3 scripts/generate_opcode_markdown.py
 
+      - name: Generate graphics test SWFs
+        if: inputs.build_wasm
+        run: |
+          for dir in SWFRecomp/tests/graphics/*/; do
+            if [ -f "${dir}/create_test_swf.py" ] && [ ! -f "${dir}/test.swf" ]; then
+              echo "Generating test.swf in ${dir}..."
+              cd "${dir}"
+              python3 create_test_swf.py
+              cd - > /dev/null
+            fi
+          done
+
       - name: Build WASM examples
         if: inputs.build_wasm
         run: |
@@ -173,16 +185,17 @@ jobs:
             cp -r "$f" "$TMPDIR/$f"
           done
 
+          # Clean working tree before branch switch (generated files saved in TMPDIR)
+          git checkout -- .
+          git clean -fd
+
           # Switch to ci-update branch (create from master or sync existing)
           if git ls-remote --exit-code --heads origin ci-update; then
             echo "Branch ci-update exists, syncing with master"
             git checkout ci-update
-            git pull origin ci-update
 
             # Sync all source from master
-            git rm -rf . || true
             git checkout origin/master -- .
-            git reset HEAD -- . || true
           else
             echo "Creating new branch ci-update from master"
             git checkout -b ci-update origin/master
@@ -191,6 +204,9 @@ jobs:
           # Restore generated files
           for f in "${GENERATED_FILES[@]}"; do
             mkdir -p "$(dirname "$f")"
+            if [ -d "$TMPDIR/$f" ]; then
+              rm -rf "$f"
+            fi
             cp -r "$TMPDIR/$f" "$f"
           done
           rm -rf "$TMPDIR"
@@ -218,7 +234,7 @@ jobs:
             PARTS+=("WASM examples")
           fi
 
-          SUMMARY=$(IFS=', '; echo "${PARTS[*]}")
+          SUMMARY=$(printf '%s, ' "${PARTS[@]}" | sed 's/, $//')
           if [ -z "$SUMMARY" ]; then
             SUMMARY="CI outputs"
           fi

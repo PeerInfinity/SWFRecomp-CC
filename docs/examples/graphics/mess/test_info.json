@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "name": "mess",
+    "description": "WebGPU rendering test with multiple overlapping shapes and transforms",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE",
+      "DEFINE_BITS",
+      "JPEG_TABLES"
+    ]
+  }
+}

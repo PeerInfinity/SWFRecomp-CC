@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "sssquare",
+    "description": "WebGPU rendering test with multiple stroked squares",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "SOLID_FILL",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

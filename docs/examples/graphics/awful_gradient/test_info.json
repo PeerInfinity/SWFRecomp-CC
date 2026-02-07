@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "awful_gradient",
+    "description": "WebGPU rendering test with gradient fills and color interpolation",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "LINEAR_GRADIENT",
+      "LINE_STYLE",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

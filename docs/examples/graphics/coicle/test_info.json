@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "coicle",
+    "description": "WebGPU rendering test with curved shapes and ellipses",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "SOLID_FILL",
+      "CURVED_EDGE"
+    ]
+  }
+}
