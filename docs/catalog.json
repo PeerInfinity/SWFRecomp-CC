@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-07T22:34:30Z",
+  "generated": "2026-02-07T22:52:02Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2213,6 +2213,20 @@
       "wasm_file": "lossless_bitmap.wasm",
       "description": "WebGPU rendering test with DefineBitsLossless (tag 20) lossless RGB bitmap fill",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/lossless_bitmap_rgba",
+      "name": "lossless_bitmap_rgba",
+      "type": "graphics",
+      "path": "examples/graphics/lossless_bitmap_rgba",
+      "has_swf": true,
+      "wasm_file": "lossless_bitmap_rgba.wasm",
+      "js_file": "lossless_bitmap_rgba.js",
+      "description": "WebGPU rendering test with DefineBitsLossless2 (tag 36) lossless RGBA bitmap fill with alpha transparency",
+      "swf_version": 7,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

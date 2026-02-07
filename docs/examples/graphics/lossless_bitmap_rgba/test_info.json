@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "lossless_bitmap_rgba",
+    "description": "WebGPU rendering test with DefineBitsLossless2 (tag 36) lossless RGBA bitmap fill with alpha transparency",
+    "swf_version": 7,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_LOSSLESS2",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}
