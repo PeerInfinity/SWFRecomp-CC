@@ -1079,14 +1079,17 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, size_t offset,
 	size_t slice_bytes = bw * bh * 4;
 	u8* temp = calloc(1, slice_bytes);
 
-	// Copy bitmap data row-by-row into padded buffer
-	u32* src = (u32*)(ctx->bitmap_data + offset * 4);
+	// Copy bitmap data row-by-row into padded buffer (with edge clamping for
+	// the extra padding column/row, matching flashbang_upload_bitmap behavior)
+	u32* src = (u32*)(ctx->bitmap_data + offset);
 	u32* dst = (u32*)temp;
 	for (u32 y = 0; y <= height; y++)
 	{
+		u32 sy = (y < height) ? y : height - 1;
 		for (u32 x = 0; x <= width; x++)
 		{
-			dst[y * bw + x] = src[y * (width + 1) + x];
+			u32 sx = (x < width) ? x : width - 1;
+			dst[y * bw + x] = src[sy * width + sx];
 		}
 	}
 
