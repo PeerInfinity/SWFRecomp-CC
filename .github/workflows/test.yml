@@ -6,22 +6,22 @@ on:
       run_tests:
         description: 'Run the trace test suite'
         required: false
-        default: false
+        default: true
         type: boolean
       build_wasm:
         description: 'Build all WASM examples and deploy to docs/'
         required: false
-        default: false
+        default: true
         type: boolean
       update_docs:
         description: 'Update opcode index and markdown docs (auto-enables run_tests)'
         required: false
-        default: false
+        default: true
         type: boolean
       clean:
         description: 'Clean build (rebuild SWFRecomp from scratch, re-generate test files)'
         required: false
-        default: false
+        default: true
         type: boolean
       limit_tests:
         description: 'Limit number of tests'
