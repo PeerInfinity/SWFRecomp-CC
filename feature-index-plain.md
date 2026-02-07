@@ -8,13 +8,13 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 18/60
+**Features With Tests**: 19/60
 
-**Features Without Tests**: 42
+**Features Without Tests**: 41
 
-**Total Feature Tests**: 73
+**Total Feature Tests**: 77
 
-**Fully Implemented**: 18/60
+**Fully Implemented**: 19/60
 
 ## Summary Tables
 
@@ -23,7 +23,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| DefineShape | Basic shape definition (SWF tag 2) | 2 | 14 | Yes |
+| DefineShape | Basic shape definition (SWF tag 2) | 2 | 15 | Yes |
 | DefineShape2 | Extended shape with >255 styles (SWF tag 22) | 22 | 2 | Yes |
 | DefineShape3 | Shape with full RGBA support (SWF tag 32) | 32 | 1 | Yes |
 | DefineShape4 | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | 83 | **0** | No |
@@ -38,7 +38,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | RadialGradient | Radial gradient fill (type 0x12) | - | 1 | Yes |
 | FocalRadialGradient | Focal radial gradient fill (type 0x13, SWF 8+) | - | **0** | No |
 | RepeatingBitmap | Tiled bitmap fill (type 0x40) | - | **0** | No |
-| ClippedBitmap | Clipped bitmap fill (type 0x41) | - | 1 | Yes |
+| ClippedBitmap | Clipped bitmap fill (type 0x41) | - | 2 | Yes |
 | NonSmoothedRepeatingBitmap | Tiled bitmap without anti-aliasing (type 0x42) | - | **0** | No |
 | NonSmoothedClippedBitmap | Clipped bitmap without anti-aliasing (type 0x43) | - | **0** | No |
 
@@ -47,7 +47,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| StraightEdge | Straight edge records (LineTo) | - | 16 | Yes |
+| StraightEdge | Straight edge records (LineTo) | - | 17 | Yes |
 | CurvedEdge | Curved edge records (CurveTo) | - | 3 | Yes |
 
 ### Style Features
@@ -60,7 +60,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | NewStyles | Mid-shape style changes (StateNewStyles) | - | 2 | Yes |
 
 ### Image/Bitmap Tags
-(2/7 with tests)
+(3/7 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
@@ -69,7 +69,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | DefineBitsJPEG2 | Self-contained JPEG image (SWF tag 21) | 21 | **0** | No |
 | DefineBitsJPEG3 | JPEG image with alpha channel (SWF tag 35) | 35 | **0** | No |
 | DefineBitsJPEG4 | JPEG with embedded alpha (SWF tag 90, SWF 10+) | 90 | **0** | No |
-| DefineBitsLossless | Lossless RGB bitmap (SWF tag 20) | 20 | **0** | No |
+| DefineBitsLossless | Lossless RGB bitmap (SWF tag 20) | 20 | 1 | Yes |
 | DefineBitsLossless2 | Lossless RGBA bitmap (SWF tag 36) | 36 | **0** | No |
 
 ### Display List Tags
@@ -165,23 +165,24 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 ## Implementation Status
 
 ### Fully Implemented
-(18 features)
+(19 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
-| DefineShape | Shape Tags | 2 | 14 |
+| DefineShape | Shape Tags | 2 | 15 |
 | DefineShape2 | Shape Tags | 22 | 2 |
 | DefineShape3 | Shape Tags | 32 | 1 |
 | SolidFill | Fill Types | - | 13 |
 | LinearGradient | Fill Types | - | 2 |
 | RadialGradient | Fill Types | - | 1 |
-| ClippedBitmap | Fill Types | - | 1 |
-| StraightEdge | Edge Types | - | 16 |
+| ClippedBitmap | Fill Types | - | 2 |
+| StraightEdge | Edge Types | - | 17 |
 | CurvedEdge | Edge Types | - | 3 |
 | LineStyle | Style Features | - | 11 |
 | NewStyles | Style Features | - | 2 |
 | DefineBits | Image/Bitmap Tags | 6 | 1 |
 | JPEGTables | Image/Bitmap Tags | 8 | 1 |
+| DefineBitsLossless | Image/Bitmap Tags | 20 | 1 |
 | PlaceObject2 Scale | Transform Features | - | 1 |
 | PlaceObject2 Skew | Transform Features | - | 1 |
 | ColorTransform | Transform Features | - | 1 |
@@ -207,7 +208,6 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | DefineBitsJPEG2 | Image/Bitmap Tags | 21 |
 | DefineBitsJPEG3 | Image/Bitmap Tags | 35 |
 | DefineBitsJPEG4 | Image/Bitmap Tags | 90 |
-| DefineBitsLossless | Image/Bitmap Tags | 20 |
 | DefineBitsLossless2 | Image/Bitmap Tags | 36 |
 | PlaceObject | Display List Tags | 4 |
 | PlaceObject2 | Display List Tags | 26 |
@@ -262,6 +262,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/lossless_bitmap`
 - `SWFRecomp/tests/graphics/mess`
 - `SWFRecomp/tests/graphics/ssquare`
 - `SWFRecomp/tests/graphics/sssquare`
@@ -433,6 +434,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 **Fully Implemented**: Yes
 
 **Tests:**
+- `SWFRecomp/tests/graphics/lossless_bitmap`
 - `SWFRecomp/tests/graphics/mess`
 
 ---
@@ -487,6 +489,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/lossless_bitmap`
 - `SWFRecomp/tests/graphics/mess`
 - `SWFRecomp/tests/graphics/new_styles`
 - `SWFRecomp/tests/graphics/rgba_shape`
@@ -673,9 +676,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: 20
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/lossless_bitmap`
 
 ---
 
