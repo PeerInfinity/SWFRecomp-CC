@@ -1,11 +1,30 @@
-name: Run SWFRecomp Tests
+name: SWFRecomp CI
 
 on:
-  # Manual trigger only
   workflow_dispatch:
     inputs:
+      run_tests:
+        description: 'Run the trace test suite'
+        required: false
+        default: false
+        type: boolean
+      build_wasm:
+        description: 'Build all WASM examples and deploy to docs/'
+        required: false
+        default: false
+        type: boolean
+      update_docs:
+        description: 'Update opcode index and markdown docs (auto-enables run_tests)'
+        required: false
+        default: false
+        type: boolean
+      clean:
+        description: 'Clean build (rebuild SWFRecomp from scratch, re-generate test files)'
+        required: false
+        default: false
+        type: boolean
       limit_tests:
-        description: 'Limit number of tests to run'
+        description: 'Limit number of tests'
         required: false
         default: false
         type: boolean
@@ -14,118 +33,81 @@ on:
         required: false
         default: '10'
         type: string
-      clean:
-        description: 'Clean build before running tests'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
-  contents: write  # Allow pushing commits and creating branches
+  contents: write
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake
+          sudo apt-get install -y build-essential cmake swfmill
 
-      - name: Create or switch to test-results-update branch
-        if: always()
+      - name: Build SWFRecomp
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Fetch all branches
-          git fetch origin
-
-          # Check if branch exists remotely
-          if git ls-remote --exit-code --heads origin test-results-update; then
-            echo "Branch test-results-update exists, syncing with master"
-            git checkout test-results-update
-            git pull origin test-results-update
-
-            # Sync source code from master while preserving generated test result files
-            echo "Syncing source code from master..."
-
-            # Save the generated opcode files if they exist
-            for f in opcode-index.json opcode-index.md opcode-index-plain.md; do
-              if [ -f "$f" ]; then
-                cp "$f" "/tmp/$f.bak"
-              fi
-            done
-
-            # Remove all tracked files
-            git rm -rf .
-
-            # Restore all files from master
-            git checkout origin/master -- .
-
-            # Restore the saved opcode files (so they can be compared with newly generated ones)
-            for f in opcode-index.json opcode-index.md opcode-index-plain.md; do
-              if [ -f "/tmp/$f.bak" ]; then
-                cp "/tmp/$f.bak" "$f"
-                git add -f "$f"
-              fi
-            done
-
-            # Commit the sync if there are changes
-            if ! git diff --staged --quiet; then
-              git commit -m "Sync test-results-update with master before updating test results"
-            else
-              echo "Already in sync with master"
-            fi
-          else
-            echo "Creating new branch test-results-update from master"
-            git checkout -b test-results-update origin/master
+          if [ "${{ inputs.clean }}" = "true" ] && [ -d SWFRecomp/build ]; then
+            echo "Clean build requested, removing build directory..."
+            rm -rf SWFRecomp/build
           fi
 
-      - name: Run tests and generate documentation
-        run: |
-          # Build command with optional parameters
-          CMD="python3 scripts/test-and-document.py --build"
+          mkdir -p SWFRecomp/build
+          cd SWFRecomp/build
+          cmake ..
+          make -j$(nproc)
+          echo "SWFRecomp built successfully"
 
-          # Add --max-tests if limit_tests is enabled
-          if [ "${{ github.event.inputs.limit_tests }}" = "true" ]; then
-            CMD="$CMD --max-tests=${{ github.event.inputs.max_tests }}"
+      - name: Setup Emscripten
+        if: inputs.build_wasm
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git emsdk
+          cd emsdk
+          ./emsdk install latest
+          ./emsdk activate latest
+
+      - name: Run tests
+        if: inputs.run_tests || inputs.update_docs
+        run: |
+          cd SWFRecomp/tests
+
+          CMD="./all_tests.sh --build"
+
+          if [ "${{ inputs.limit_tests }}" = "true" ]; then
+            CMD="$CMD --max-tests=${{ inputs.max_tests }}"
           fi
 
-          # Add --clean if specified
-          if [ "${{ github.event.inputs.clean }}" = "true" ]; then
+          if [ "${{ inputs.clean }}" = "true" ]; then
             CMD="$CMD --clean"
           fi
 
-          # Run the tests and generate documentation
           echo "Running: $CMD"
           $CMD
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            SWFRecomp/tests/test_results.json
-            opcode-index.json
-            opcode-index.md
-            opcode-index-plain.md
-          retention-days: 30
+      - name: Update opcode docs
+        if: inputs.update_docs
+        run: |
+          python3 scripts/build_opcode_index.py
+          python3 scripts/generate_opcode_markdown.py
+
+      - name: Build WASM examples
+        if: inputs.build_wasm
+        run: |
+          source emsdk/emsdk_env.sh
+          SWFRecomp/scripts/build_all_examples.sh
 
       - name: Display test summary
-        if: always()
+        if: always() && (inputs.run_tests || inputs.update_docs)
         run: |
           if [ -f SWFRecomp/tests/test_results.json ]; then
             echo "## Test Results" >> $GITHUB_STEP_SUMMARY
@@ -141,32 +123,112 @@ jobs:
           PYTHON_SCRIPT
           fi
 
-      - name: Commit and push test results
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-outputs
+          path: |
+            SWFRecomp/tests/test_results.json
+            opcode-index.json
+            opcode-index.md
+            opcode-index-plain.md
+            docs/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Commit and push to ci-update branch
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Add the generated documentation
-          git add -f opcode-index.json || true
-          git add -f opcode-index.md || true
-          git add -f opcode-index-plain.md || true
+          # Fetch all branches
+          git fetch origin
+
+          # Collect generated files that exist
+          GENERATED_FILES=()
+
+          if [ -f SWFRecomp/tests/test_results.json ]; then
+            GENERATED_FILES+=(SWFRecomp/tests/test_results.json)
+          fi
+          for f in opcode-index.json opcode-index.md opcode-index-plain.md; do
+            if [ -f "$f" ]; then
+              GENERATED_FILES+=("$f")
+            fi
+          done
+          if [ -d docs ]; then
+            GENERATED_FILES+=(docs)
+          fi
+
+          if [ ${#GENERATED_FILES[@]} -eq 0 ]; then
+            echo "No generated files to commit"
+            exit 0
+          fi
+
+          # Save generated files to a temp location
+          TMPDIR=$(mktemp -d)
+          for f in "${GENERATED_FILES[@]}"; do
+            mkdir -p "$TMPDIR/$(dirname "$f")"
+            cp -r "$f" "$TMPDIR/$f"
+          done
+
+          # Switch to ci-update branch (create from master or sync existing)
+          if git ls-remote --exit-code --heads origin ci-update; then
+            echo "Branch ci-update exists, syncing with master"
+            git checkout ci-update
+            git pull origin ci-update
+
+            # Sync all source from master
+            git rm -rf . || true
+            git checkout origin/master -- .
+            git reset HEAD -- . || true
+          else
+            echo "Creating new branch ci-update from master"
+            git checkout -b ci-update origin/master
+          fi
+
+          # Restore generated files
+          for f in "${GENERATED_FILES[@]}"; do
+            mkdir -p "$(dirname "$f")"
+            cp -r "$TMPDIR/$f" "$f"
+          done
+          rm -rf "$TMPDIR"
+
+          # Stage generated files
+          for f in "${GENERATED_FILES[@]}"; do
+            git add -f "$f"
+          done
 
           # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit"
-          else
-            # Determine test count for commit message
-            if [ "${{ github.event.inputs.limit_tests }}" = "true" ]; then
-              TEST_COUNT="${{ github.event.inputs.max_tests }} tests"
-            else
-              TEST_COUNT="all tests"
-            fi
-
-            git commit -m "Update opcode documentation ($TEST_COUNT)" -m "Generated by workflow run: ${{ github.run_id }}" -m "Triggered by: ${{ github.actor }}" -m "Test configuration:" -m "- Limited: ${{ github.event.inputs.limit_tests }}" -m "- Max tests: ${{ github.event.inputs.max_tests }}" -m "- Clean build: ${{ github.event.inputs.clean }}"
-
-            git push origin test-results-update
-
-            echo "✅ Test results committed to test-results-update branch"
-            echo "View the branch at: ${{ github.server_url }}/${{ github.repository }}/tree/test-results-update"
+            exit 0
           fi
+
+          # Build commit message
+          PARTS=()
+          if [ "${{ inputs.run_tests }}" = "true" ] || [ "${{ inputs.update_docs }}" = "true" ]; then
+            PARTS+=("test results")
+          fi
+          if [ "${{ inputs.update_docs }}" = "true" ]; then
+            PARTS+=("opcode docs")
+          fi
+          if [ "${{ inputs.build_wasm }}" = "true" ]; then
+            PARTS+=("WASM examples")
+          fi
+
+          SUMMARY=$(IFS=', '; echo "${PARTS[*]}")
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="CI outputs"
+          fi
+
+          git commit -m "Update ${SUMMARY}" \
+            -m "Generated by workflow run: ${{ github.run_id }}" \
+            -m "Triggered by: ${{ github.actor }}" \
+            -m "Options: run_tests=${{ inputs.run_tests }}, build_wasm=${{ inputs.build_wasm }}, update_docs=${{ inputs.update_docs }}, clean=${{ inputs.clean }}"
+
+          git push origin ci-update
+
+          echo "Committed to ci-update branch"
+          echo "View: ${{ github.server_url }}/${{ github.repository }}/tree/ci-update"
