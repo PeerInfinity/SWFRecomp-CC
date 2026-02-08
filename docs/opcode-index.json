@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 36
+    "graphics_features_with_tests": 37
   },
   "entries": [
     {
@@ -8794,6 +8794,7 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/define_font2",
+        "SWFRecomp/tests/graphics/define_font3",
         "SWFRecomp/tests/graphics/define_morph_shape",
         "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/define_text2",
@@ -9103,8 +9104,10 @@
       "tag_id": 75,
       "category": "Text Tags",
       "description": "Enhanced font definition (SWF tag 75)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_font3"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT4",
@@ -9123,6 +9126,7 @@
       "description": "Static text with glyph indices (SWF tag 11)",
       "tests": [
         "SWFRecomp/tests/graphics/define_font2",
+        "SWFRecomp/tests/graphics/define_font3",
         "SWFRecomp/tests/graphics/static_text"
       ],
       "fully_implemented": true

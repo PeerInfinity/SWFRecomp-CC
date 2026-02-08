@@ -8,13 +8,13 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 36/60
+**Features With Tests**: 37/60
 
-**Features Without Tests**: 24
+**Features Without Tests**: 23
 
-**Total Feature Tests**: 135
+**Total Feature Tests**: 138
 
-**Fully Implemented**: 36/60
+**Fully Implemented**: 37/60
 
 ## Summary Tables
 
@@ -47,7 +47,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 32 | Yes |
+| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 33 | Yes |
 | [CurvedEdge](#curved-edge) | Curved edge records (CurveTo) | - | 3 | Yes |
 
 ### Style Features
@@ -102,15 +102,15 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineMorphShape2](#define-morph-shape2) | Enhanced morphing with LINESTYLE2 (SWF tag 84) | 84 | **0** | No |
 
 ### Text Tags
-(4/7 with tests)
+(5/7 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
 | [DefineFont](#define-font) | Basic font with glyph shapes (SWF tag 10) | 10 | 2 | Yes |
 | [DefineFont2](#define-font2) | Font with layout metrics (SWF tag 48) | 48 | 1 | Yes |
-| [DefineFont3](#define-font3) | Enhanced font definition (SWF tag 75) | 75 | **0** | No |
+| [DefineFont3](#define-font3) | Enhanced font definition (SWF tag 75) | 75 | 1 | Yes |
 | [DefineFont4](#define-font4) | CFF font for Flash Text Engine (SWF tag 91) | 91 | **0** | No |
-| [DefineText](#define-text) | Static text with glyph indices (SWF tag 11) | 11 | 2 | Yes |
+| [DefineText](#define-text) | Static text with glyph indices (SWF tag 11) | 11 | 3 | Yes |
 | [DefineText2](#define-text2) | Static text with RGBA colors (SWF tag 33) | 33 | 1 | Yes |
 | [DefineEditText](#define-edit-text) | Dynamic/editable text field (SWF tag 37) | 37 | **0** | No |
 
@@ -165,7 +165,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 ## Implementation Status
 
 ### Fully Implemented
-(36 features)
+(37 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
@@ -181,7 +181,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [ClippedBitmap](#clipped-bitmap) | Fill Types | - | 6 |
 | [NonSmoothedRepeatingBitmap](#non-smoothed-repeating-bitmap) | Fill Types | - | 1 |
 | [NonSmoothedClippedBitmap](#non-smoothed-clipped-bitmap) | Fill Types | - | 1 |
-| [StraightEdge](#straight-edge) | Edge Types | - | 32 |
+| [StraightEdge](#straight-edge) | Edge Types | - | 33 |
 | [CurvedEdge](#curved-edge) | Edge Types | - | 3 |
 | [LineStyle](#line-style) | Style Features | - | 12 |
 | [LineStyle2](#line-style2) | Style Features | - | 1 |
@@ -202,7 +202,8 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineMorphShape](#define-morph-shape) | Morph Shape Tags | 46 | 1 |
 | [DefineFont](#define-font) | Text Tags | 10 | 2 |
 | [DefineFont2](#define-font2) | Text Tags | 48 | 1 |
-| [DefineText](#define-text) | Text Tags | 11 | 2 |
+| [DefineFont3](#define-font3) | Text Tags | 75 | 1 |
+| [DefineText](#define-text) | Text Tags | 11 | 3 |
 | [DefineText2](#define-text2) | Text Tags | 33 | 1 |
 | [DefineSprite](#define-sprite) | Sprite Tags | 39 | 1 |
 
@@ -220,7 +221,6 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [PlaceObject2](#place-object2) | Display List Tags | 26 |
 | [PlaceObject3](#place-object3) | Display List Tags | 70 |
 | [DefineMorphShape2](#define-morph-shape2) | Morph Shape Tags | 84 |
-| [DefineFont3](#define-font3) | Text Tags | 75 |
 | [DefineFont4](#define-font4) | Text Tags | 91 |
 | [DefineEditText](#define-edit-text) | Text Tags | 37 |
 | [DefineButton](#define-button) | Button Tags | 7 |
@@ -515,6 +515,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
 - `SWFRecomp/tests/graphics/define_font2`
+- `SWFRecomp/tests/graphics/define_font3`
 - `SWFRecomp/tests/graphics/define_morph_shape`
 - `SWFRecomp/tests/graphics/define_shape4`
 - `SWFRecomp/tests/graphics/define_text2`
@@ -976,9 +977,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 75
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_font3`
 
 ---
 
@@ -1012,6 +1014,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tests:**
 - `SWFRecomp/tests/graphics/define_font2`
+- `SWFRecomp/tests/graphics/define_font3`
 - `SWFRecomp/tests/graphics/static_text`
 
 ---

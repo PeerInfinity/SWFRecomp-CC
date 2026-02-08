@@ -199,6 +199,8 @@ namespace SWFRecomp
 		std::unordered_map<u16, size_t> char_id_to_bitmap_id;
 		std::vector<Vertex> bitmap_sizes;
 
+		std::unordered_map<u16, float> font_em_square;  // font_id → EM square size
+
 		// Frame label storage: label name -> frame number
 		std::unordered_map<std::string, size_t> frame_labels;
 

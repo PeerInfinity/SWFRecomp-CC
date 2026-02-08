@@ -1196,6 +1196,7 @@ namespace SWFRecomp
 			
 			case SWF_TAG_DEFINE_FONT:
 			case SWF_TAG_DEFINE_FONT_2:
+			case SWF_TAG_DEFINE_FONT_3:
 			{
 				tag.clearFields();
 				tag.setFieldCount(1);
@@ -1206,11 +1207,13 @@ namespace SWFRecomp
 
 				u16 font_id = (u16) tag.fields[0].value;
 
+				font_em_square[font_id] = (tag.code == SWF_TAG_DEFINE_FONT_3) ? 20480.0f : 1024.0f;
+
 				u16 num_entries;
 				char* offset_table;
 				std::vector<u16> entry_offsets;
 
-				if (tag.code == SWF_TAG_DEFINE_FONT_2)
+				if (tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
 				{
 					// DefineFont2 header: Flags(UI8), LanguageCode(UI8), FontNameLen(UI8), FontName(bytes), NumGlyphs(UI16)
 					tag.clearFields();
@@ -1487,8 +1490,11 @@ namespace SWFRecomp
 					if (has_font)
 					{
 						text_height = (u16) tag.fields[current_field++].value;
-						temp_matrix.scale_x = ((float) text_height)/1024.0f;
-						temp_matrix.scale_y = ((float) text_height)/1024.0f;
+						float em = 1024.0f;
+						auto it = font_em_square.find(font_id);
+						if (it != font_em_square.end()) em = it->second;
+						temp_matrix.scale_x = ((float) text_height) / em;
+						temp_matrix.scale_y = ((float) text_height) / em;
 					}
 
 					u8 glyph_count = (u8) tag.fields[current_field++].value;
@@ -2805,7 +2811,7 @@ namespace SWFRecomp
 
 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
 	{
-		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2);
+		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2 || shape_tag.code == SWF_TAG_DEFINE_FONT_3);
 		bool is_morph = (shape_tag.code == SWF_TAG_DEFINE_MORPH_SHAPE);
 		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || shape_tag.code == SWF_TAG_DEFINE_SHAPE_4 || is_morph);
 		shape_is_v4 = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
@@ -2819,6 +2825,7 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_MORPH_SHAPE:
 			case SWF_TAG_DEFINE_FONT:
 			case SWF_TAG_DEFINE_FONT_2:
+			case SWF_TAG_DEFINE_FONT_3:
 			{
 				u16 shape_id;
 				u16 fill_style_count;

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-08T22:37:40Z",
+  "generated": "2026-02-08T22:58:52Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2213,6 +2213,20 @@
       "wasm_file": "define_font2.wasm",
       "description": "WebGPU rendering test for DefineFont2 (tag 48) with DefineText",
       "swf_version": 6,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/define_font3",
+      "name": "define_font3",
+      "type": "graphics",
+      "path": "examples/graphics/define_font3",
+      "has_swf": true,
+      "js_file": "define_font3.js",
+      "wasm_file": "define_font3.wasm",
+      "description": "WebGPU rendering test for DefineFont3 (tag 75) with geometric glyphs rendered via DefineText",
+      "swf_version": 8,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

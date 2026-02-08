@@ -1350,6 +1350,18 @@ class SWFMLBuilder:
         self.tags.append(("DefineFont2", font))
         return font
 
+    def define_font3(self, object_id, font_name="TestFont"):
+        """Create and register a DefineFont3 definition (tag 75).
+
+        Same as DefineFont2 but uses 20480-unit EM square and always has
+        wide codes.  Glyph coordinates should use the higher-resolution
+        EM square (20x DefineFont2's 1024 units).
+        """
+        font = FontDefinition(object_id)
+        font.font_name = font_name
+        self.tags.append(("DefineFont3", font))
+        return font
+
     def define_text(self, object_id, bounds, transform=None):
         """Create and register a text definition. Returns a TextDefinition for adding text records.
 
@@ -1475,6 +1487,16 @@ class SWFMLBuilder:
                     getattr(font, 'font_name', 'TestFont'))
                 tag_b64 = base64.b64encode(font_body).decode('ascii')
                 unk = SubElement(tags_el, "UnknownTag", id="0x30")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_b64
+
+            elif tag_type == "DefineFont3":
+                font = tag_data
+                font_body = _build_define_font2_body(
+                    font.object_id, font.glyphs,
+                    getattr(font, 'font_name', 'TestFont'))
+                tag_b64 = base64.b64encode(font_body).decode('ascii')
+                unk = SubElement(tags_el, "UnknownTag", id="0x4b")
                 data_el = SubElement(unk, "data")
                 data_el.text = tag_b64
 
