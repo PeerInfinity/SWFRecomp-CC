@@ -125,7 +125,7 @@ void swfStart(SWFAppContext* app_context)
 
 	renderer_init(app_context, context);
 
-	tagInit();
+	tagInit(app_context);
 
 	tagMain(app_context);
 
