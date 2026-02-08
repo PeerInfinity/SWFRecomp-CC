@@ -1899,7 +1899,7 @@ void actionStackSwap(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_CALL_FUNCTION)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md](SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md)
+- [SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md](SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5796)

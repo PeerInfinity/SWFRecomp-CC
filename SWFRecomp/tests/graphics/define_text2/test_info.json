@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "define_text2",
+    "description": "WebGPU rendering test with DefineText2 (tag 33) RGBA text colors",
+    "swf_version": 7,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_TEXT2",
+      "DEFINE_FONT",
+      "STRAIGHT_EDGE",
+      "SOLID_FILL"
+    ]
+  }
+}

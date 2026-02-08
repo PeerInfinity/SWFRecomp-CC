@@ -697,6 +697,148 @@ def _build_define_font_body(object_id, glyphs):
     return bytes(body)
 
 
+def _build_rect_bits(left, right, top, bottom):
+    """Build a SWF RECT as bit-packed bytes."""
+    vals = [left, right, top, bottom]
+    nbits = max(_bits_needed_signed(v) for v in vals)
+    bw = _BitWriter()
+    bw.write_bits(nbits, 5)
+    for v in vals:
+        bw.write_sb(v, nbits)
+    return bw.to_bytes()
+
+
+def _build_matrix_bits(transform):
+    """Build a SWF MATRIX as bit-packed bytes.
+
+    transform: dict with keys from {transX, transY, scaleX, scaleY, skewX, skewY}
+    Values are in SWF fixed-point or twips as appropriate.
+    """
+    bw = _BitWriter()
+
+    # HasScale
+    has_scale = "scaleX" in transform or "scaleY" in transform
+    bw.write_bits(1 if has_scale else 0, 1)
+    if has_scale:
+        sx = int(round(transform.get("scaleX", 1.0) * 65536))
+        sy = int(round(transform.get("scaleY", 1.0) * 65536))
+        nbits = max(_bits_needed_signed(sx), _bits_needed_signed(sy), 1)
+        bw.write_bits(nbits, 5)
+        bw.write_sb(sx, nbits)
+        bw.write_sb(sy, nbits)
+
+    # HasRotate
+    has_rotate = "skewX" in transform or "skewY" in transform
+    bw.write_bits(1 if has_rotate else 0, 1)
+    if has_rotate:
+        rx = int(round(transform.get("skewX", 0.0) * 65536))
+        ry = int(round(transform.get("skewY", 0.0) * 65536))
+        nbits = max(_bits_needed_signed(rx), _bits_needed_signed(ry), 1)
+        bw.write_bits(nbits, 5)
+        bw.write_sb(rx, nbits)
+        bw.write_sb(ry, nbits)
+
+    # Translate (always present)
+    tx = transform.get("transX", 0)
+    ty = transform.get("transY", 0)
+    if tx == 0 and ty == 0:
+        bw.write_bits(0, 5)  # NTranslateBits = 0
+    else:
+        nbits = max(_bits_needed_signed(tx), _bits_needed_signed(ty), 1)
+        bw.write_bits(nbits, 5)
+        bw.write_sb(tx, nbits)
+        bw.write_sb(ty, nbits)
+
+    return bw.to_bytes()
+
+
+def _build_define_text2_body(text_def):
+    """Build the raw tag body for DefineText2 (tag 33).
+
+    DefineText2 is identical to DefineText (tag 11) except that colors
+    are RGBA (4 bytes) instead of RGB (3 bytes).
+
+    text_def: a TextDefinition instance.
+    Returns bytes containing the full tag body (including CharacterID).
+    """
+    body = bytearray()
+
+    # CharacterID (UI16)
+    body += struct.pack('<H', text_def.object_id)
+
+    # TextBounds (RECT)
+    left, right, top, bottom = text_def.bounds
+    body += _build_rect_bits(left, right, top, bottom)
+
+    # Matrix
+    body += _build_matrix_bits(text_def.transform)
+
+    # Collect all glyphs to determine GlyphBits and AdvanceBits
+    all_glyphs = []
+    for rec in text_def.records:
+        all_glyphs.extend(rec.glyphs)
+
+    max_glyph = max((g[0] for g in all_glyphs), default=0)
+    max_advance = max((abs(g[1]) for g in all_glyphs), default=0)
+
+    glyph_bits = max(max_glyph.bit_length(), 1) if max_glyph > 0 else 1
+    advance_bits = max(_bits_needed_signed(max_advance), 1)
+
+    # GlyphBits (UI8), AdvanceBits (UI8)
+    body.append(glyph_bits)
+    body.append(advance_bits)
+
+    # Text records
+    for rec in text_def.records:
+        # TextRecord flags byte: bit 7 = 1 (type flag), bits 3-0 = flags
+        flags = 0x80  # type flag
+        if rec.font_id is not None:
+            flags |= 0x08  # HasFont
+        if rec.color is not None:
+            flags |= 0x04  # HasColor
+        if rec.y_offset is not None:
+            flags |= 0x01  # HasYOffset
+        if rec.x_offset is not None:
+            flags |= 0x02  # HasXOffset
+
+        body.append(flags)
+
+        if rec.font_id is not None:
+            body += struct.pack('<H', rec.font_id)
+
+        if rec.color is not None:
+            if len(rec.color) == 4:
+                r, g, b, a = rec.color
+            else:
+                r, g, b = rec.color
+                a = 255
+            body.extend((r, g, b, a))  # RGBA for DefineText2
+
+        if rec.x_offset is not None:
+            body += struct.pack('<h', rec.x_offset)
+
+        if rec.y_offset is not None:
+            body += struct.pack('<h', rec.y_offset)
+
+        if rec.font_id is not None:
+            body += struct.pack('<H', rec.text_height)
+
+        # GlyphCount (UI8)
+        body.append(len(rec.glyphs))
+
+        # Glyph entries (bit-packed)
+        bw = _BitWriter()
+        for glyph_idx, advance in rec.glyphs:
+            bw.write_bits(glyph_idx, glyph_bits)
+            bw.write_sb(advance, advance_bits)
+        body += bw.to_bytes()
+
+    # End of records: 0x00 byte
+    body.append(0x00)
+
+    return bytes(body)
+
+
 class FontDefinition:
     """Collects glyph shape data for a DefineFont tag."""
     def __init__(self, object_id):
@@ -933,6 +1075,19 @@ class SWFMLBuilder:
         self.tags.append(("DefineText", text))
         return text
 
+    def define_text2(self, object_id, bounds, transform=None):
+        """Create and register a DefineText2 definition (tag 33, RGBA colors).
+
+        Same as define_text but uses RGBA colors instead of RGB.
+        TextRecord color should be a 4-tuple (r, g, b, a).
+
+        bounds: (left, right, top, bottom) in twips
+        transform: dict with transX, transY (optional)
+        """
+        text = TextDefinition(object_id, bounds, transform)
+        self.tags.append(("DefineText2", text))
+        return text
+
     def define_sprite(self, object_id, frame_count=1):
         """Create a sprite (movie clip) definition. Returns a SpriteDefinition for adding sub-tags."""
         sprite = SpriteDefinition(object_id, frame_count)
@@ -1075,6 +1230,14 @@ class SWFMLBuilder:
                 # End record (empty glyph record)
                 end_rec = SubElement(tr_records, "TextRecord6", isSetup="0")
                 SubElement(end_rec, "glyphs")
+
+            elif tag_type == "DefineText2":
+                text = tag_data
+                tag_body = _build_define_text2_body(text)
+                tag_b64 = base64.b64encode(tag_body).decode('ascii')
+                unk = SubElement(tags_el, "UnknownTag", id="0x21")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_b64
 
             elif tag_type == "DefineShape":
                 tag_data.to_xml(tags_el)

@@ -1,6 +1,6 @@
 # SWF Graphics Feature Index
 
-**Generated**: 2026-02-07
+**Generated**: 2026-02-08
 
 See also: [AS2 Opcode Index](opcode-index.md)
 
@@ -8,13 +8,13 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 32/60
+**Features With Tests**: 33/60
 
-**Features Without Tests**: 28
+**Features Without Tests**: 27
 
-**Total Feature Tests**: 120
+**Total Feature Tests**: 124
 
-**Fully Implemented**: 32/60
+**Fully Implemented**: 33/60
 
 ## Summary Tables
 
@@ -33,7 +33,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [SolidFill](#solid-fill) | Solid color fill (type 0x00) | - | 15 | Yes |
+| [SolidFill](#solid-fill) | Solid color fill (type 0x00) | - | 16 | Yes |
 | [LinearGradient](#linear-gradient) | Linear gradient fill (type 0x10) | - | 2 | Yes |
 | [RadialGradient](#radial-gradient) | Radial gradient fill (type 0x12) | - | 1 | Yes |
 | [FocalRadialGradient](#focal-radial-gradient) | Focal radial gradient fill (type 0x13, SWF 8+) | - | 1 | Yes |
@@ -47,7 +47,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 28 | Yes |
+| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 29 | Yes |
 | [CurvedEdge](#curved-edge) | Curved edge records (CurveTo) | - | 3 | Yes |
 
 ### Style Features
@@ -102,16 +102,16 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineMorphShape2](#define-morph-shape2) | Enhanced morphing with LINESTYLE2 (SWF tag 84) | 84 | **0** | No |
 
 ### Text Tags
-(2/7 with tests)
+(3/7 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [DefineFont](#define-font) | Basic font with glyph shapes (SWF tag 10) | 10 | 1 | Yes |
+| [DefineFont](#define-font) | Basic font with glyph shapes (SWF tag 10) | 10 | 2 | Yes |
 | [DefineFont2](#define-font2) | Font with layout metrics (SWF tag 48) | 48 | **0** | No |
 | [DefineFont3](#define-font3) | Enhanced font definition (SWF tag 75) | 75 | **0** | No |
 | [DefineFont4](#define-font4) | CFF font for Flash Text Engine (SWF tag 91) | 91 | **0** | No |
 | [DefineText](#define-text) | Static text with glyph indices (SWF tag 11) | 11 | 1 | Yes |
-| [DefineText2](#define-text2) | Static text with RGBA colors (SWF tag 33) | 33 | **0** | No |
+| [DefineText2](#define-text2) | Static text with RGBA colors (SWF tag 33) | 33 | 1 | Yes |
 | [DefineEditText](#define-edit-text) | Dynamic/editable text field (SWF tag 37) | 37 | **0** | No |
 
 ### Sprite Tags
@@ -165,7 +165,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 ## Implementation Status
 
 ### Fully Implemented
-(32 features)
+(33 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
@@ -173,7 +173,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineShape2](#define-shape2) | Shape Tags | 22 | 2 |
 | [DefineShape3](#define-shape3) | Shape Tags | 32 | 1 |
 | [DefineShape4](#define-shape4) | Shape Tags | 83 | 1 |
-| [SolidFill](#solid-fill) | Fill Types | - | 15 |
+| [SolidFill](#solid-fill) | Fill Types | - | 16 |
 | [LinearGradient](#linear-gradient) | Fill Types | - | 2 |
 | [RadialGradient](#radial-gradient) | Fill Types | - | 1 |
 | [FocalRadialGradient](#focal-radial-gradient) | Fill Types | - | 1 |
@@ -181,7 +181,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [ClippedBitmap](#clipped-bitmap) | Fill Types | - | 6 |
 | [NonSmoothedRepeatingBitmap](#non-smoothed-repeating-bitmap) | Fill Types | - | 1 |
 | [NonSmoothedClippedBitmap](#non-smoothed-clipped-bitmap) | Fill Types | - | 1 |
-| [StraightEdge](#straight-edge) | Edge Types | - | 28 |
+| [StraightEdge](#straight-edge) | Edge Types | - | 29 |
 | [CurvedEdge](#curved-edge) | Edge Types | - | 3 |
 | [LineStyle](#line-style) | Style Features | - | 12 |
 | [LineStyle2](#line-style2) | Style Features | - | 1 |
@@ -198,8 +198,9 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [PlaceObject2 Skew](#place-skew) | Transform Features | - | 1 |
 | [ColorTransform](#color-transform) | Transform Features | - | 1 |
 | [ClipDepth](#clip-depth) | Transform Features | - | 1 |
-| [DefineFont](#define-font) | Text Tags | 10 | 1 |
+| [DefineFont](#define-font) | Text Tags | 10 | 2 |
 | [DefineText](#define-text) | Text Tags | 11 | 1 |
+| [DefineText2](#define-text2) | Text Tags | 33 | 1 |
 | [DefineSprite](#define-sprite) | Sprite Tags | 39 | 1 |
 
 ### Partially Tested
@@ -221,7 +222,6 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineFont2](#define-font2) | Text Tags | 48 |
 | [DefineFont3](#define-font3) | Text Tags | 75 |
 | [DefineFont4](#define-font4) | Text Tags | 91 |
-| [DefineText2](#define-text2) | Text Tags | 33 |
 | [DefineEditText](#define-edit-text) | Text Tags | 37 |
 | [DefineButton](#define-button) | Button Tags | 7 |
 | [DefineButton2](#define-button2) | Button Tags | 34 |
@@ -353,6 +353,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_transform`
 - `SWFRecomp/tests/graphics/define_shape4`
+- `SWFRecomp/tests/graphics/define_text2`
 - `SWFRecomp/tests/graphics/new_styles`
 - `SWFRecomp/tests/graphics/remove_object2`
 - `SWFRecomp/tests/graphics/rgba_shape`
@@ -510,6 +511,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
 - `SWFRecomp/tests/graphics/define_shape4`
+- `SWFRecomp/tests/graphics/define_text2`
 - `SWFRecomp/tests/graphics/focal_radial_gradient`
 - `SWFRecomp/tests/graphics/jpeg2_bitmap`
 - `SWFRecomp/tests/graphics/jpeg3_bitmap`
@@ -933,6 +935,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 **Fully Implemented**: Yes
 
 **Tests:**
+- `SWFRecomp/tests/graphics/define_text2`
 - `SWFRecomp/tests/graphics/static_text`
 
 ---
@@ -1012,9 +1015,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 33
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_text2`
 
 ---
 

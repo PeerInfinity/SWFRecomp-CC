@@ -1234,7 +1234,10 @@ namespace SWFRecomp
 			}
 
 			case SWF_TAG_DEFINE_TEXT:
+			case SWF_TAG_DEFINE_TEXT_2:
 			{
+				bool text_has_alpha = (tag.code == SWF_TAG_DEFINE_TEXT_2);
+
 				tag.clearFields();
 				tag.setFieldCount(1);
 
@@ -1290,9 +1293,8 @@ namespace SWFRecomp
 					bool has_x_offset = (flags & 0b0010);
 					bool has_y_offset = (flags & 0b0001);
 
-					// TODO: handle RGBA for DefineText2
-
-					u32 field_count = 2*has_font + 3*has_color + has_x_offset + has_y_offset + 1;
+					u32 color_fields = text_has_alpha ? 4 : 3;
+					u32 field_count = 2*has_font + color_fields*has_color + has_x_offset + has_y_offset + 1;
 
 					tag.clearFields();
 					tag.setFieldCount(field_count);
@@ -1307,6 +1309,10 @@ namespace SWFRecomp
 						tag.configureNextField(SWF_FIELD_UI8);
 						tag.configureNextField(SWF_FIELD_UI8);
 						tag.configureNextField(SWF_FIELD_UI8);
+						if (text_has_alpha)
+						{
+							tag.configureNextField(SWF_FIELD_UI8);
+						}
 					}
 
 					if (has_x_offset)
@@ -1349,11 +1355,15 @@ namespace SWFRecomp
 
 					if (has_color)
 					{
-						// TODO: handle RGBA (DefineText2)
-
 						r = (u8) tag.fields[current_field++].value;
 						g = (u8) tag.fields[current_field++].value;
 						b = (u8) tag.fields[current_field++].value;
+
+						u8 a = 255;
+						if (text_has_alpha)
+						{
+							a = (u8) tag.fields[current_field++].value;
+						}
 
 						cxform_id = (u32) current_cxform;
 
@@ -1375,12 +1385,12 @@ namespace SWFRecomp
 									<< "\t" << "0.0f," << endl
 									<< "\t" << "0.0f," << endl
 									<< "\t" << "0.0f," << endl
-									<< "\t" << "1.0f," << endl
+									<< "\t" << (a == 255 ? "1.0f" : "0.0f") << "," << endl
 
 									<< "\t" << to_string(r) << "/255.0f," << endl
 									<< "\t" << to_string(g) << "/255.0f," << endl
 									<< "\t" << to_string(b) << "/255.0f," << endl
-									<< "\t" << "0.0f," << endl;
+									<< "\t" << (a == 255 ? "0.0f" : to_string(a) + "/255.0f") << "," << endl;
 
 						current_cxform += 1;
 					}
@@ -1442,7 +1452,7 @@ namespace SWFRecomp
 					size_t text_size = current_text - text_start;
 					tag_init << endl
 							 << "\t" << "tagDefineText("
-							 << "&app_context, "
+							 << "app_context, "
 							 << to_string(char_id) << ", "
 							 << to_string(text_start) << ", "
 							 << to_string(text_size) << ", "
