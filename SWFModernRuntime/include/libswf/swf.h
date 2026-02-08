@@ -90,6 +90,7 @@ typedef struct SWFAppContext
 
 	frame_func* frame_funcs;
 	size_t frame_count;  // Local addition - kept for compatibility
+	u16 fps;
 
 #ifndef NO_GRAPHICS
 	int width;

@@ -1325,6 +1325,10 @@ class SWFMLBuilder:
         """Remove the character at the given depth from the display list (RemoveObject2, tag 28)."""
         self.tags.append(("RemoveObject2", {"depth": depth}))
 
+    def remove_object_v1(self, object_id, depth):
+        """Remove a character by ID and depth from the display list (RemoveObject, tag 5)."""
+        self.tags.append(("RemoveObject", {"object_id": object_id, "depth": depth}))
+
     def define_font(self, object_id):
         """Create and register a font definition. Returns a FontDefinition for adding glyphs.
 
@@ -1586,6 +1590,12 @@ class SWFMLBuilder:
                     SubElement(transform_el, "Transform", **attrs)
                     if d.get("color_transform") is not None:
                         d["color_transform"].to_xml(po)
+
+            elif tag_type == "RemoveObject":
+                d = tag_data
+                SubElement(tags_el, "RemoveObject",
+                           objectID=str(d["object_id"]),
+                           depth=str(d["depth"]))
 
             elif tag_type == "RemoveObject2":
                 d = tag_data

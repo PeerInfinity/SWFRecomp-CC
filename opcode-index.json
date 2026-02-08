@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 33
+    "graphics_features_with_tests": 36
   },
   "entries": [
     {
@@ -8622,6 +8622,7 @@
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/ssquare",
@@ -8679,9 +8680,12 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_font2",
+        "SWFRecomp/tests/graphics/define_morph_shape",
         "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
@@ -8789,6 +8793,8 @@
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_font2",
+        "SWFRecomp/tests/graphics/define_morph_shape",
         "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/focal_radial_gradient",
@@ -8801,6 +8807,7 @@
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
@@ -8987,8 +8994,10 @@
       "tag_id": 5,
       "category": "Display List Tags",
       "description": "Remove object by ID (SWF tag 5)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/remove_object"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "REMOVE_OBJECT2",
@@ -9051,8 +9060,10 @@
       "tag_id": 46,
       "category": "Morph Shape Tags",
       "description": "Shape morphing/tweening (SWF tag 46)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_morph_shape"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_MORPH_SHAPE2",
@@ -9081,8 +9092,10 @@
       "tag_id": 48,
       "category": "Text Tags",
       "description": "Font with layout metrics (SWF tag 48)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_font2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT3",
@@ -9109,6 +9122,7 @@
       "category": "Text Tags",
       "description": "Static text with glyph indices (SWF tag 11)",
       "tests": [
+        "SWFRecomp/tests/graphics/define_font2",
         "SWFRecomp/tests/graphics/static_text"
       ],
       "fully_implemented": true

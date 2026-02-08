@@ -615,6 +615,10 @@ namespace SWFRecomp
 		context.out_script_header << endl << endl
 								  << "#define FRAME_COUNT " << to_string(next_frame_i);
 
+		// Add FRAME_RATE to out.h for runtime frame timing
+		context.out_script_header << endl << endl
+								  << "#define FRAME_RATE " << to_string(header.framerate >> 8);
+
 		context.out_script_header.close();
 		context.out_script_defs.close();
 		context.out_script_decls.close();
@@ -1763,6 +1767,21 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_REMOVE_OBJECT:
+			{
+				tag.setFieldCount(2);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+
+				u16 char_id = (u16) tag.fields[0].value;
+				u16 depth = (u16) tag.fields[1].value;
+
+				context.tag_main << "\t" << "tagRemoveObject(app_context, " << to_string(depth) << ");" << endl;
+
+				break;
+			}
+
 			case SWF_TAG_REMOVE_OBJECT_2:
 			{
 				tag.setFieldCount(1);
@@ -2069,6 +2088,21 @@ namespace SWFRecomp
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ");" << endl;
 							}
+
+							break;
+						}
+
+						case SWF_TAG_REMOVE_OBJECT:
+						{
+							sub_tag.setFieldCount(2);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.parseFields(cur_pos);
+
+							u16 char_id = (u16) sub_tag.fields[0].value;
+							u16 depth = (u16) sub_tag.fields[1].value;
+
+							sprite_definitions << "\t" << "tagRemoveObject(app_context, " << to_string(depth) << ");" << endl;
 
 							break;
 						}

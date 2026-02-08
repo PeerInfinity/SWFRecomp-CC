@@ -25,6 +25,7 @@ void runSWF() {
 int main() {
     app_context.frame_funcs = frame_funcs;
     app_context.frame_count = FRAME_COUNT;
+    app_context.fps = FRAME_RATE;
 
 #ifndef NO_GRAPHICS
     app_context.width = FRAME_WIDTH;

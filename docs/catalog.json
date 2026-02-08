@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-08T22:20:35Z",
+  "generated": "2026-02-08T22:37:40Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2395,6 +2395,20 @@
       "wasm_file": "nonsmoothed_repeating_bitmap.wasm",
       "description": "WebGPU rendering test with NonSmoothedRepeatingBitmap fill type (0x42)",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/remove_object",
+      "name": "remove_object",
+      "type": "graphics",
+      "path": "examples/graphics/remove_object",
+      "has_swf": true,
+      "js_file": "remove_object.js",
+      "wasm_file": "remove_object.wasm",
+      "description": "WebGPU rendering test with RemoveObject (tag 5) multi-frame object removal by character ID and depth",
+      "swf_version": 3,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

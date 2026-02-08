@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "name": "remove_object",
+    "description": "WebGPU rendering test with RemoveObject (tag 5) multi-frame object removal by character ID and depth",
+    "swf_version": 3,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": ["DEFINE_SHAPE", "SOLID_FILL", "STRAIGHT_EDGE", "REMOVE_OBJECT"]
+  }
+}

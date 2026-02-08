@@ -39,6 +39,7 @@ RenderContext* context;
 void tagMain(SWFAppContext* app_context)
 {
 	frame_func* frame_funcs = app_context->frame_funcs;
+	u32 frame_ms = app_context->fps > 0 ? 1000 / app_context->fps : 83;
 
 	while (!quit_swf)
 	{
@@ -51,7 +52,7 @@ void tagMain(SWFAppContext* app_context)
 		manual_next_frame = 0;
 		bad_poll |= renderer_poll();
 #ifdef __EMSCRIPTEN__
-		emscripten_sleep(0);
+		emscripten_sleep(frame_ms);
 #endif
 		quit_swf |= bad_poll;
 	}

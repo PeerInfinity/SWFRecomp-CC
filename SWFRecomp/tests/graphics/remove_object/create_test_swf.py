@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate test.swf for remove_object2 graphics test.
+"""Generate test.swf for remove_object graphics test.
 
-Tests RemoveObject2 (tag 28): places three colored squares side by side,
-renders a frame showing all three, then removes the middle square and
-renders a second frame showing only the left and right squares.
+Tests RemoveObject (tag 5): places three colored squares side by side,
+renders a frame showing all three, then removes the middle square using
+RemoveObject (which specifies both character ID and depth) and renders
+a second frame showing only the left and right squares.
 
 Frame 1: Red (depth 1) | Green (depth 2) | Blue (depth 3)
 Frame 2: Red (depth 1) |                 | Blue (depth 3)
@@ -17,7 +18,7 @@ from swfmill_helpers import (
 )
 
 # Stage: 550x400 pixels
-swf = SWFMLBuilder(width=550, height=400, fps=1, version=5)
+swf = SWFMLBuilder(width=550, height=400, fps=1, version=3)
 swf.set_background(255, 255, 255)
 
 # Define a red square (100x100 px = 2000x2000 twips), object ID 1
@@ -64,8 +65,9 @@ swf.place_object(object_id=3, depth=3, trans_x=7000, trans_y=3000)
 # Frame 1: all three squares visible
 swf.show_frame()
 
-# Remove the middle (green) square at depth 2
-swf.remove_object(depth=2)
+# Remove the middle (green) square using RemoveObject (tag 5)
+# This specifies both the character ID (2) and depth (2)
+swf.remove_object_v1(object_id=2, depth=2)
 
 # Frame 2: only red and blue visible
 swf.show_frame()

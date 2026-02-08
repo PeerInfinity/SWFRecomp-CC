@@ -250,6 +250,18 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	}
 }
 
+void tagRemoveObject(SWFAppContext* app_context, size_t depth)
+{
+	if (depth <= max_depth)
+	{
+		display_list[depth].char_id = 0;
+		display_list[depth].transform_id = 0;
+		display_list[depth].cxform_id = 0;
+		display_list[depth].has_cxform = 0;
+		display_list[depth].clip_depth = 0;
+	}
+}
+
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth)
