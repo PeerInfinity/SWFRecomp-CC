@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-07",
+    "generated_date": "2026-02-08",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 25
+    "graphics_features_with_tests": 27
   },
   "entries": [
     {
@@ -8660,8 +8660,10 @@
       "tag_id": 83,
       "category": "Shape Tags",
       "description": "Shape with LINESTYLE2 and edge bounds (SWF tag 83)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_shape4"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOLID_FILL",
@@ -8674,6 +8676,7 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
@@ -8778,6 +8781,7 @@
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
@@ -8839,8 +8843,10 @@
       "tag_id": null,
       "category": "Style Features",
       "description": "Advanced line style with caps/joins (LINESTYLE2, DefineShape4)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_shape4"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "NEW_STYLES",

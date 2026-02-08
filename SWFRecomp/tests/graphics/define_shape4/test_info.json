@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "define_shape4",
+    "description": "WebGPU rendering test with DefineShape4 (tag 83) and LineStyle2",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE4",
+      "SOLID_FILL",
+      "LINE_STYLE2",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

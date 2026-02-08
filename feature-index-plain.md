@@ -1,6 +1,6 @@
 # SWF Graphics Feature Index
 
-**Generated**: 2026-02-07
+**Generated**: 2026-02-08
 
 See also: [AS2 Opcode Index](opcode-index-plain.md)
 
@@ -8,32 +8,32 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 25/60
+**Features With Tests**: 27/60
 
-**Features Without Tests**: 35
+**Features Without Tests**: 33
 
-**Total Feature Tests**: 101
+**Total Feature Tests**: 105
 
-**Fully Implemented**: 25/60
+**Fully Implemented**: 27/60
 
 ## Summary Tables
 
 ### Shape Tags
-(3/4 with tests)
+(4/4 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
 | DefineShape | Basic shape definition (SWF tag 2) | 2 | 21 | Yes |
 | DefineShape2 | Extended shape with >255 styles (SWF tag 22) | 22 | 2 | Yes |
 | DefineShape3 | Shape with full RGBA support (SWF tag 32) | 32 | 1 | Yes |
-| DefineShape4 | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | 83 | **0** | No |
+| DefineShape4 | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | 83 | 1 | Yes |
 
 ### Fill Types
 (7/8 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| SolidFill | Solid color fill (type 0x00) | - | 13 | Yes |
+| SolidFill | Solid color fill (type 0x00) | - | 14 | Yes |
 | LinearGradient | Linear gradient fill (type 0x10) | - | 2 | Yes |
 | RadialGradient | Radial gradient fill (type 0x12) | - | 1 | Yes |
 | FocalRadialGradient | Focal radial gradient fill (type 0x13, SWF 8+) | - | **0** | No |
@@ -47,16 +47,16 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| StraightEdge | Straight edge records (LineTo) | - | 23 | Yes |
+| StraightEdge | Straight edge records (LineTo) | - | 24 | Yes |
 | CurvedEdge | Curved edge records (CurveTo) | - | 3 | Yes |
 
 ### Style Features
-(2/3 with tests)
+(3/3 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
 | LineStyle | Basic stroke line style (LINESTYLE) | - | 11 | Yes |
-| LineStyle2 | Advanced line style with caps/joins (LINESTYLE2, DefineShape4) | - | **0** | No |
+| LineStyle2 | Advanced line style with caps/joins (LINESTYLE2, DefineShape4) | - | 1 | Yes |
 | NewStyles | Mid-shape style changes (StateNewStyles) | - | 2 | Yes |
 
 ### Image/Bitmap Tags
@@ -165,23 +165,25 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 ## Implementation Status
 
 ### Fully Implemented
-(25 features)
+(27 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
 | DefineShape | Shape Tags | 2 | 21 |
 | DefineShape2 | Shape Tags | 22 | 2 |
 | DefineShape3 | Shape Tags | 32 | 1 |
-| SolidFill | Fill Types | - | 13 |
+| DefineShape4 | Shape Tags | 83 | 1 |
+| SolidFill | Fill Types | - | 14 |
 | LinearGradient | Fill Types | - | 2 |
 | RadialGradient | Fill Types | - | 1 |
 | RepeatingBitmap | Fill Types | - | 1 |
 | ClippedBitmap | Fill Types | - | 5 |
 | NonSmoothedRepeatingBitmap | Fill Types | - | 1 |
 | NonSmoothedClippedBitmap | Fill Types | - | 1 |
-| StraightEdge | Edge Types | - | 23 |
+| StraightEdge | Edge Types | - | 24 |
 | CurvedEdge | Edge Types | - | 3 |
 | LineStyle | Style Features | - | 11 |
+| LineStyle2 | Style Features | - | 1 |
 | NewStyles | Style Features | - | 2 |
 | DefineBits | Image/Bitmap Tags | 6 | 1 |
 | JPEGTables | Image/Bitmap Tags | 8 | 1 |
@@ -205,9 +207,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 | Feature | Category | Tag ID |
 |---------|----------|--------|
-| DefineShape4 | Shape Tags | 83 |
 | FocalRadialGradient | Fill Types | - |
-| LineStyle2 | Style Features | - |
 | DefineBitsJPEG4 | Image/Bitmap Tags | 90 |
 | PlaceObject | Display List Tags | 4 |
 | PlaceObject2 | Display List Tags | 26 |
@@ -325,9 +325,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: 83
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_shape4`
 
 ---
 
@@ -348,6 +349,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/define_shape4`
 - `SWFRecomp/tests/graphics/new_styles`
 - `SWFRecomp/tests/graphics/rgba_shape`
 - `SWFRecomp/tests/graphics/ssquare`
@@ -501,6 +503,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/define_shape4`
 - `SWFRecomp/tests/graphics/jpeg2_bitmap`
 - `SWFRecomp/tests/graphics/jpeg3_bitmap`
 - `SWFRecomp/tests/graphics/lossless_bitmap`
@@ -578,9 +581,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_shape4`
 
 ---
 

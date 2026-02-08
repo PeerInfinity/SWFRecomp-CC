@@ -1142,6 +1142,7 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
+			case SWF_TAG_DEFINE_SHAPE_4:
 			{
 				interpretShape(context, tag);
 
@@ -2255,18 +2256,125 @@ namespace SWFRecomp
 		return line_styles;
 	}
 	
+	LineStyle* SWF::parseLineStyles2(u16 line_style_count)
+	{
+		SWFTag line_data;
+
+		LineStyle* line_styles = new LineStyle[line_style_count];
+
+		for (u16 i = 0; i < line_style_count; ++i)
+		{
+			// LINESTYLE2: Width(UI16), then bit fields
+			line_data.clearFields();
+			line_data.setFieldCount(1);
+
+			line_data.configureNextField(SWF_FIELD_UI16, 16);
+
+			line_data.parseFields(cur_pos);
+
+			line_styles[i].width = (u16) line_data.fields[0].value;
+
+			// Bit fields (16 bits total): StartCapStyle(UB2), JoinStyle(UB2),
+			// HasFillFlag(UB1), NoHScaleFlag(UB1), NoVScaleFlag(UB1),
+			// PixelHintingFlag(UB1), Reserved(UB5), NoClose(UB1), EndCapStyle(UB2)
+			line_data.clearFields();
+			line_data.setFieldCount(9);
+
+			line_data.configureNextField(SWF_FIELD_UB, 2); // StartCapStyle
+			line_data.configureNextField(SWF_FIELD_UB, 2); // JoinStyle
+			line_data.configureNextField(SWF_FIELD_UB, 1); // HasFillFlag
+			line_data.configureNextField(SWF_FIELD_UB, 1); // NoHScaleFlag
+			line_data.configureNextField(SWF_FIELD_UB, 1); // NoVScaleFlag
+			line_data.configureNextField(SWF_FIELD_UB, 1); // PixelHintingFlag
+			line_data.configureNextField(SWF_FIELD_UB, 5); // Reserved
+			line_data.configureNextField(SWF_FIELD_UB, 1); // NoClose
+			line_data.configureNextField(SWF_FIELD_UB, 2); // EndCapStyle
+
+			line_data.parseFields(cur_pos);
+
+			u8 join_style = (u8) line_data.fields[1].value;
+			u8 has_fill_flag = (u8) line_data.fields[2].value;
+
+			// MiterLimitFactor (FIXED8) if JoinStyle == 2 (Miter)
+			if (join_style == 2)
+			{
+				line_data.clearFields();
+				line_data.setFieldCount(1);
+
+				line_data.configureNextField(SWF_FIELD_UI16, 16); // FIXED8 is 16 bits
+
+				line_data.parseFields(cur_pos);
+			}
+
+			if (has_fill_flag)
+			{
+				// FillType (FILLSTYLE) - parse and discard for now, use black as line color
+				// We need to skip the fill style data
+				FillStyle* fill = parseFillStyles(1);
+
+				// Use the fill color if it's a solid fill
+				if (fill[0].type == 0x00)
+				{
+					line_styles[i].r = fill[0].r;
+					line_styles[i].g = fill[0].g;
+					line_styles[i].b = fill[0].b;
+					line_styles[i].a = fill[0].a;
+				}
+				else
+				{
+					line_styles[i].r = 0;
+					line_styles[i].g = 0;
+					line_styles[i].b = 0;
+					line_styles[i].a = 255;
+				}
+
+				delete[] fill;
+			}
+			else
+			{
+				// Color (RGBA)
+				line_data.clearFields();
+				line_data.setFieldCount(4);
+
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+
+				line_data.parseFields(cur_pos);
+
+				line_styles[i].r = (u8) line_data.fields[0].value;
+				line_styles[i].g = (u8) line_data.fields[1].value;
+				line_styles[i].b = (u8) line_data.fields[2].value;
+				line_styles[i].a = (u8) line_data.fields[3].value;
+			}
+
+			line_styles[i].index = current_color;
+
+			color_data << "\t" << "{ "
+					   << to_string(line_styles[i].r) << "/255.0f, "
+					   << to_string(line_styles[i].g) << "/255.0f, "
+					   << to_string(line_styles[i].b) << "/255.0f, "
+					   << to_string(line_styles[i].a) << "/255.0f }," << endl;
+
+			current_color += 1;
+		}
+
+		return line_styles;
+	}
+
 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
 	{
-		// TODO: DefineShape4
-
 		bool is_font = shape_tag.code == SWF_TAG_DEFINE_FONT;
-		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3);
+		bool is_shape4 = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
+		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || is_shape4);
 
 		switch (shape_tag.code)
 		{
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
+			case SWF_TAG_DEFINE_SHAPE_4:
 			case SWF_TAG_DEFINE_FONT:
 			{
 				u16 shape_id;
@@ -2279,63 +2387,97 @@ namespace SWFRecomp
 				{
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(6);
-					
+
 					shape_tag.configureNextField(SWF_FIELD_UI16, 16);
 					shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
-					
+
 					shape_tag.parseFields(cur_pos);
-					
+
 					shape_id = (u16) shape_tag.fields[0].value;
-					
+
+					if (is_shape4)
+					{
+						// DefineShape4: EdgeBounds RECT
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(5);
+
+						shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+
+						shape_tag.parseFields(cur_pos);
+
+						// DefineShape4: Reserved(UB5), UsesFillWindingRule(UB1),
+						// UsesNonScalingStrokes(UB1), UsesScalingStrokes(UB1)
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(4);
+
+						shape_tag.configureNextField(SWF_FIELD_UB, 5);
+						shape_tag.configureNextField(SWF_FIELD_UB, 1);
+						shape_tag.configureNextField(SWF_FIELD_UB, 1);
+						shape_tag.configureNextField(SWF_FIELD_UB, 1);
+
+						shape_tag.parseFields(cur_pos);
+					}
+
 					// FILLSTYLEARRAY
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(1);
-					
+
 					shape_tag.configureNextField(SWF_FIELD_UI8, 8);
-					
+
 					shape_tag.parseFields(cur_pos);
-					
+
 					fill_style_count = (u8) shape_tag.fields[0].value;
-					
+
 					if (fill_style_count == 0xFF)
 					{
 						shape_tag.clearFields();
-						
+
 						shape_tag.configureNextField(SWF_FIELD_UI16, 16);
-						
+
 						shape_tag.parseFields(cur_pos);
-						
+
 						fill_style_count = (u16) shape_tag.fields[0].value;
 					}
-					
+
 					all_fill_styles.push_back(parseFillStyles(fill_style_count));
-					
+
 					// LINESTYLEARRAY
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(1);
-					
+
 					shape_tag.configureNextField(SWF_FIELD_UI8, 8);
-					
+
 					shape_tag.parseFields(cur_pos);
-					
+
 					line_style_count = (u8) shape_tag.fields[0].value;
-					
+
 					if (line_style_count == 0xFF)
 					{
 						shape_tag.clearFields();
-						
+
 						shape_tag.configureNextField(SWF_FIELD_UI16, 16);
-						
+
 						shape_tag.parseFields(cur_pos);
-						
+
 						line_style_count = (u16) shape_tag.fields[0].value;
 					}
-					
-					all_line_styles.push_back(parseLineStyles(line_style_count));
+
+					if (is_shape4)
+					{
+						all_line_styles.push_back(parseLineStyles2(line_style_count));
+					}
+					else
+					{
+						all_line_styles.push_back(parseLineStyles(line_style_count));
+					}
 				}
 				
 				else
@@ -2664,18 +2806,25 @@ namespace SWFRecomp
 							line_style_count = (u16) shape_tag.fields[0].value;
 						}
 						
-						all_line_styles.push_back(parseLineStyles(line_style_count));
-						
+						if (is_shape4)
+						{
+							all_line_styles.push_back(parseLineStyles2(line_style_count));
+						}
+						else
+						{
+							all_line_styles.push_back(parseLineStyles(line_style_count));
+						}
+
 						current_line_style_list += 1;
-						
+
 						shape_tag.clearFields();
 						shape_tag.setFieldCount(2);
-						
+
 						shape_tag.configureNextField(SWF_FIELD_UB, 4);
 						shape_tag.configureNextField(SWF_FIELD_UB, 4);
-						
+
 						shape_tag.parseFields(cur_pos);
-						
+
 						fill_bits = (u8) shape_tag.fields[0].value;
 						line_bits = (u8) shape_tag.fields[1].value;
 					}

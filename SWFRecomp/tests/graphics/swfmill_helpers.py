@@ -239,6 +239,26 @@ class LineStyle:
         SubElement(color_el, "Color", **attrs)
 
 
+class LineStyle2:
+    """Advanced line style (LINESTYLE2) with cap/join control.
+
+    Used with DefineShape4 (shape_version=4).
+    Cap styles: 0=round, 1=none, 2=square.
+    Join styles: 0=round, 1=bevel, 2=miter.
+    """
+    def __init__(self, width, r, g, b, a=255,
+                 start_cap=0, end_cap=0, join_style=0, miter_limit=None):
+        self.width = width
+        self.r = r
+        self.g = g
+        self.b = b
+        self.a = a
+        self.start_cap = start_cap
+        self.end_cap = end_cap
+        self.join_style = join_style
+        self.miter_limit = miter_limit  # FIXED8 (8.8), only if join_style==2
+
+
 # ---------------------------------------------------------------------------
 # Edge records
 # ---------------------------------------------------------------------------
@@ -307,6 +327,209 @@ class CurveTo:
 
 
 # ---------------------------------------------------------------------------
+# SWF binary bit-packing utilities (for DefineShape4 raw encoding)
+# ---------------------------------------------------------------------------
+
+class SWFBitWriter:
+    """Writes SWF-format bit-packed binary data."""
+    def __init__(self):
+        self.data = bytearray()
+        self._current_byte = 0
+        self._bits_left = 8
+
+    def write_ub(self, value, nbits):
+        """Write an unsigned bit field."""
+        for i in range(nbits - 1, -1, -1):
+            bit = (value >> i) & 1
+            self._current_byte = (self._current_byte << 1) | bit
+            self._bits_left -= 1
+            if self._bits_left == 0:
+                self.data.append(self._current_byte)
+                self._current_byte = 0
+                self._bits_left = 8
+
+    def write_sb(self, value, nbits):
+        """Write a signed bit field (two's complement)."""
+        if value < 0:
+            value = (1 << nbits) + value
+        self.write_ub(value, nbits)
+
+    def flush_byte(self):
+        """Pad the current byte with zeros and flush."""
+        if self._bits_left < 8:
+            self._current_byte <<= self._bits_left
+            self.data.append(self._current_byte)
+            self._current_byte = 0
+            self._bits_left = 8
+
+    def write_ui8(self, value):
+        """Write a byte-aligned UI8."""
+        self.flush_byte()
+        self.data.append(value & 0xFF)
+
+    def write_ui16(self, value):
+        """Write a byte-aligned UI16 (little-endian)."""
+        self.flush_byte()
+        self.data.extend(struct.pack('<H', value))
+
+    def write_rgba(self, r, g, b, a):
+        """Write an RGBA color (4 bytes)."""
+        self.flush_byte()
+        self.data.extend([r, g, b, a])
+
+    def write_rect(self, xmin, xmax, ymin, ymax):
+        """Write a RECT structure."""
+        values = [xmin, xmax, ymin, ymax]
+        max_val = max(abs(v) for v in values) if any(values) else 0
+        if max_val == 0:
+            nbits = 1
+        else:
+            nbits = max_val.bit_length() + 1  # +1 for sign bit
+        self.write_ub(nbits, 5)
+        for v in values:
+            self.write_sb(v, nbits)
+        self.flush_byte()
+
+    def get_bytes(self):
+        """Return the accumulated bytes (flushes any partial byte)."""
+        self.flush_byte()
+        return bytes(self.data)
+
+
+def _sb_bits_needed(*values):
+    """Calculate the minimum number of bits for signed bit fields."""
+    max_val = max(abs(v) for v in values) if any(values) else 0
+    if max_val == 0:
+        return 1
+    return max_val.bit_length() + 1  # +1 for sign bit
+
+
+def _ub_bits_needed(*values):
+    """Calculate the minimum number of bits for unsigned bit fields."""
+    max_val = max(values) if any(values) else 0
+    if max_val == 0:
+        return 1
+    return max_val.bit_length()
+
+
+def _encode_shape4_fill_style(fill, writer):
+    """Encode a single fill style into the binary writer (RGBA mode)."""
+    if isinstance(fill, SolidFill):
+        writer.write_ui8(0x00)  # type = solid
+        a = fill.a if fill.a is not None else 255
+        writer.write_rgba(fill.r, fill.g, fill.b, a)
+    else:
+        raise ValueError(f"Unsupported fill type for DefineShape4 binary encoding: {type(fill)}")
+
+
+def _encode_linestyle2(ls, writer):
+    """Encode a single LINESTYLE2 record into the binary writer."""
+    writer.write_ui16(ls.width)
+    # Bit fields: StartCapStyle(2), JoinStyle(2), HasFillFlag(1),
+    # NoHScaleFlag(1), NoVScaleFlag(1), PixelHintingFlag(1),
+    # Reserved(5), NoClose(1), EndCapStyle(2)
+    writer.write_ub(ls.start_cap, 2)
+    writer.write_ub(ls.join_style, 2)
+    writer.write_ub(0, 1)  # HasFillFlag = 0 (using color, not fill)
+    writer.write_ub(0, 1)  # NoHScaleFlag
+    writer.write_ub(0, 1)  # NoVScaleFlag
+    writer.write_ub(0, 1)  # PixelHintingFlag
+    writer.write_ub(0, 5)  # Reserved
+    writer.write_ub(0, 1)  # NoClose
+    writer.write_ub(ls.end_cap, 2)
+    # MiterLimitFactor if JoinStyle == 2
+    if ls.join_style == 2:
+        ml = ls.miter_limit if ls.miter_limit is not None else 2.0
+        # FIXED8: 8.8 fixed point (UI16 where high byte = integer, low byte = fraction)
+        fixed8 = int(ml * 256) & 0xFFFF
+        writer.write_ui16(fixed8)
+    # Color (RGBA) - since HasFillFlag=0
+    writer.write_rgba(ls.r, ls.g, ls.b, ls.a)
+
+
+def _encode_shape_records(edges, fill_count, line_count, writer):
+    """Encode shape records (edges + end marker) into the binary writer."""
+    fill_bits = _ub_bits_needed(fill_count)
+    line_bits = _ub_bits_needed(line_count)
+    writer.write_ub(fill_bits, 4)
+    writer.write_ub(line_bits, 4)
+
+    for edge in edges:
+        if isinstance(edge, ShapeSetup):
+            if (edge.x is None and edge.y is None and
+                edge.fillStyle0 is None and edge.fillStyle1 is None and
+                edge.lineStyle is None and edge.new_styles is None):
+                continue  # Skip end markers, we'll add our own
+            # Non-edge record: TypeFlag=0
+            state_move = edge.x is not None or edge.y is not None
+            state_fs0 = edge.fillStyle0 is not None
+            state_fs1 = edge.fillStyle1 is not None
+            state_ls = edge.lineStyle is not None
+            state_ns = edge.new_styles is not None
+
+            flags = ((1 if state_ns else 0) << 4 |
+                     (1 if state_ls else 0) << 3 |
+                     (1 if state_fs1 else 0) << 2 |
+                     (1 if state_fs0 else 0) << 1 |
+                     (1 if state_move else 0))
+
+            writer.write_ub(0, 1)   # TypeFlag = 0 (non-edge)
+            writer.write_ub(flags, 5)
+
+            if state_move:
+                mx = edge.x if edge.x is not None else 0
+                my = edge.y if edge.y is not None else 0
+                move_bits = _sb_bits_needed(mx, my)
+                writer.write_ub(move_bits, 5)
+                writer.write_sb(mx, move_bits)
+                writer.write_sb(my, move_bits)
+
+            if state_fs0:
+                writer.write_ub(edge.fillStyle0, fill_bits)
+            if state_fs1:
+                writer.write_ub(edge.fillStyle1, fill_bits)
+            if state_ls:
+                writer.write_ub(edge.lineStyle, line_bits)
+
+        elif isinstance(edge, LineTo):
+            # StraightEdgeRecord: TypeFlag=1, StraightFlag=1
+            dx = edge.x
+            dy = edge.y
+            nbits = _sb_bits_needed(dx, dy)
+            nbits = max(nbits, 2)  # minimum 2 per SWF spec
+            writer.write_ub(1, 1)   # TypeFlag = 1 (edge)
+            writer.write_ub(1, 1)   # StraightFlag = 1
+            writer.write_ub(nbits - 2, 4)  # NumBits - 2
+            if dx == 0:
+                writer.write_ub(0, 1)  # GeneralLineFlag = 0
+                writer.write_ub(1, 1)  # VertLineFlag = 1
+                writer.write_sb(dy, nbits)
+            elif dy == 0:
+                writer.write_ub(0, 1)  # GeneralLineFlag = 0
+                writer.write_ub(0, 1)  # VertLineFlag = 0
+                writer.write_sb(dx, nbits)
+            else:
+                writer.write_ub(1, 1)  # GeneralLineFlag = 1
+                writer.write_sb(dx, nbits)
+                writer.write_sb(dy, nbits)
+
+        elif isinstance(edge, CurveTo):
+            nbits = _sb_bits_needed(edge.x1, edge.y1, edge.x2, edge.y2)
+            nbits = max(nbits, 2)
+            writer.write_ub(1, 1)   # TypeFlag = 1 (edge)
+            writer.write_ub(0, 1)   # StraightFlag = 0 (curved)
+            writer.write_ub(nbits - 2, 4)
+            writer.write_sb(edge.x1, nbits)
+            writer.write_sb(edge.y1, nbits)
+            writer.write_sb(edge.x2, nbits)
+            writer.write_sb(edge.y2, nbits)
+
+    # EndShapeRecord: TypeFlag=0, flags=0 (6 zero bits)
+    writer.write_ub(0, 6)
+    writer.flush_byte()
+
+
+# ---------------------------------------------------------------------------
 # Shape definition helper
 # ---------------------------------------------------------------------------
 
@@ -318,7 +541,7 @@ class ShapeDefinition:
         self.fill_styles = []
         self.line_styles = []
         self.edges = []
-        self.shape_version = shape_version  # 1 = DefineShape, 2 = DefineShape2, 3 = DefineShape3
+        self.shape_version = shape_version  # 1 = DefineShape, 2 = DefineShape2, 3 = DefineShape3, 4 = DefineShape4
 
     def add_fill(self, fill):
         self.fill_styles.append(fill)
@@ -335,6 +558,10 @@ class ShapeDefinition:
         self.edges.extend(edges)
 
     def to_xml(self, parent):
+        if self.shape_version == 4:
+            self._to_xml_shape4(parent)
+            return
+
         version_tags = {1: "DefineShape", 2: "DefineShape2", 3: "DefineShape3"}
         tag_name = version_tags.get(self.shape_version, "DefineShape")
         shape_el = SubElement(parent, tag_name, objectID=str(self.object_id))
@@ -358,6 +585,63 @@ class ShapeDefinition:
             e.to_xml(edges_el)
         # End shape marker
         SubElement(edges_el, "ShapeSetup")
+
+    def _to_xml_shape4(self, parent):
+        """Emit DefineShape4 as an UnknownTag with raw binary data.
+
+        swfmill 0.3.6 doesn't fully support DefineShape4 structured XML,
+        so we build the tag body manually.
+        """
+        writer = SWFBitWriter()
+        left, right, top, bottom = self.bounds
+
+        # ShapeId (UI16)
+        writer.write_ui16(self.object_id)
+
+        # ShapeBounds RECT
+        writer.write_rect(left, right, top, bottom)
+
+        # EdgeBounds RECT (same as ShapeBounds for simplicity)
+        writer.write_rect(left, right, top, bottom)
+
+        # Flags byte: Reserved(5) + UsesFillWindingRule(1) +
+        # UsesNonScalingStrokes(1) + UsesScalingStrokes(1)
+        writer.write_ub(0, 5)  # Reserved
+        writer.write_ub(0, 1)  # UsesFillWindingRule
+        writer.write_ub(0, 1)  # UsesNonScalingStrokes
+        writer.write_ub(1, 1)  # UsesScalingStrokes
+        writer.flush_byte()
+
+        # FILLSTYLEARRAY
+        fill_count = len(self.fill_styles)
+        if fill_count < 0xFF:
+            writer.write_ui8(fill_count)
+        else:
+            writer.write_ui8(0xFF)
+            writer.write_ui16(fill_count)
+        for f in self.fill_styles:
+            _encode_shape4_fill_style(f, writer)
+
+        # LINESTYLE2ARRAY
+        line_count = len(self.line_styles)
+        if line_count < 0xFF:
+            writer.write_ui8(line_count)
+        else:
+            writer.write_ui8(0xFF)
+            writer.write_ui16(line_count)
+        for ls in self.line_styles:
+            _encode_linestyle2(ls, writer)
+
+        # Shape records
+        _encode_shape_records(self.edges, fill_count, line_count, writer)
+
+        tag_body = writer.get_bytes()
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+
+        # Tag 83 = 0x53
+        unk = SubElement(parent, "UnknownTag", id="0x53")
+        data_el = SubElement(unk, "data")
+        data_el.text = tag_b64
 
 
 # ---------------------------------------------------------------------------
