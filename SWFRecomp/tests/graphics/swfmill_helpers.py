@@ -383,6 +383,10 @@ class SpriteDefinition:
             "scale_y": scale_y,
         }))
 
+    def remove_object(self, depth):
+        """Remove an object from the sprite's display list by depth."""
+        self.sub_tags.append(("RemoveObject2", {"depth": depth}))
+
     def show_frame(self):
         """Add a ShowFrame to the sprite's timeline."""
         self.sub_tags.append(("ShowFrame", None))
@@ -410,6 +414,9 @@ class SpriteDefinition:
                 if d.get("scale_y") is not None:
                     attrs["scaleY"] = f"{d['scale_y']:.16f}"
                 SubElement(transform_el, "Transform", **attrs)
+            elif tag_type == "RemoveObject2":
+                d = tag_data
+                SubElement(tags_el, "RemoveObject2", depth=str(d["depth"]))
             elif tag_type == "ShowFrame":
                 SubElement(tags_el, "ShowFrame")
 
@@ -546,6 +553,10 @@ class SWFMLBuilder:
             "clip_depth": clip_depth,
         }))
 
+    def remove_object(self, depth):
+        """Remove an object from the display list by depth (RemoveObject2, tag 28)."""
+        self.tags.append(("RemoveObject2", {"depth": depth}))
+
     def define_sprite(self, object_id, frame_count=1):
         """Create a sprite (movie clip) definition. Returns a SpriteDefinition for adding sub-tags."""
         sprite = SpriteDefinition(object_id, frame_count)
@@ -647,6 +658,10 @@ class SWFMLBuilder:
                 SubElement(transform_el, "Transform", **attrs)
                 if d.get("color_transform") is not None:
                     d["color_transform"].to_xml(po)
+
+            elif tag_type == "RemoveObject2":
+                d = tag_data
+                SubElement(tags_el, "RemoveObject2", depth=str(d["depth"]))
 
             elif tag_type == "ShowFrame":
                 SubElement(tags_el, "ShowFrame")

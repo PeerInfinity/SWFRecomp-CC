@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "remove_object2",
+    "description": "WebGPU rendering test with RemoveObject2 (tag 28)",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "SOLID_FILL",
+      "STRAIGHT_EDGE",
+      "REMOVE_OBJECT2"
+    ]
+  }
+}

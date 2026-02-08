@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-07",
+    "generated_date": "2026-02-08",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 25
+    "graphics_features_with_tests": 26
   },
   "entries": [
     {
@@ -8620,6 +8620,7 @@
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
@@ -8675,6 +8676,7 @@
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
@@ -8786,6 +8788,7 @@
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
@@ -8974,8 +8977,10 @@
       "tag_id": 28,
       "category": "Display List Tags",
       "description": "Remove object by depth (SWF tag 28)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/remove_object2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_SCALE",

@@ -1642,13 +1642,26 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_REMOVE_OBJECT_2:
+			{
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+
+				u16 depth = (u16) tag.fields[0].value;
+
+				context.tag_main << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
+
+				break;
+			}
+
 			case SWF_TAG_ENABLE_DEBUGGER:
 			{
 				cur_pos += tag.length;
-				
+
 				break;
 			}
-			
+
 			case SWF_TAG_ENABLE_DEBUGGER_2:
 			{
 				cur_pos += tag.length;
@@ -1917,6 +1930,19 @@ namespace SWFRecomp
 											   << to_string(transform_id) << ", "
 											   << to_string(cxform_id) << ", "
 											   << to_string(clip_depth_val) << ");" << endl;
+
+							break;
+						}
+
+						case SWF_TAG_REMOVE_OBJECT_2:
+						{
+							sub_tag.setFieldCount(1);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.parseFields(cur_pos);
+
+							u16 depth = (u16) sub_tag.fields[0].value;
+
+							sprite_definitions << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
 
 							break;
 						}

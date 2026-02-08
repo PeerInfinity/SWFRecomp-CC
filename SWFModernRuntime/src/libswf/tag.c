@@ -154,6 +154,18 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 }
 
+void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
+{
+	if (depth <= max_depth)
+	{
+		display_list[depth].char_id = 0;
+		display_list[depth].transform_id = 0;
+		display_list[depth].cxform_id = 0;
+		display_list[depth].has_cxform = 0;
+		display_list[depth].clip_depth = 0;
+	}
+}
+
 void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
 {
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
