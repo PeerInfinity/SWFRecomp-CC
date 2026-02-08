@@ -37,6 +37,48 @@ void tagShowFrame(SWFAppContext* app_context)
 				ch->transform_start,
 				ch->text_size);
 		}
+		else if (ch->type == CHAR_TYPE_MORPH_SHAPE)
+		{
+			float t = (float)obj->ratio / 65535.0f;
+			size_t num_verts = ch->morph_start_size;
+
+			// Interpolate vertex positions
+			u32* start = (u32*)(app_context->shape_data + ch->morph_start_offset * 4 * sizeof(u32));
+			float* end = (float*)(app_context->morph_end_shape_data + ch->morph_end_offset * 2 * sizeof(float));
+			u32* scratch = (u32*)malloc(num_verts * 4 * sizeof(u32));
+
+			for (size_t v = 0; v < num_verts; v++)
+			{
+				float sx = *(float*)&start[v*4 + 0];
+				float sy = *(float*)&start[v*4 + 1];
+				float ex = end[v*2 + 0];
+				float ey = end[v*2 + 1];
+				float ix = sx + t * (ex - sx);
+				float iy = sy + t * (ey - sy);
+				scratch[v*4 + 0] = *(u32*)&ix;
+				scratch[v*4 + 1] = *(u32*)&iy;
+				scratch[v*4 + 2] = start[v*4 + 2];  // style_upper
+				scratch[v*4 + 3] = start[v*4 + 3];  // style_lower
+			}
+
+			renderer_update_vertices(context,
+				ch->morph_start_offset * 4 * sizeof(u32),
+				scratch, num_verts * 4 * sizeof(u32));
+			free(scratch);
+
+			// Interpolate colors
+			for (size_t c = 0; c < ch->morph_color_count; c++)
+			{
+				float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
+				float* ec = (float*)(app_context->morph_end_color_data) + c * 4;
+				float interp[4];
+				for (int k = 0; k < 4; k++)
+					interp[k] = sc[k] + t * (ec[k] - sc[k]);
+				renderer_update_colors(context,
+					(ch->morph_color_start + c) * 4 * sizeof(float),
+					interp, 4 * sizeof(float));
+			}
+		}
 	}
 
 	renderer_open_pass(context);
@@ -79,6 +121,9 @@ void tagShowFrame(SWFAppContext* app_context)
 		{
 			case CHAR_TYPE_SHAPE:
 				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
+				break;
+			case CHAR_TYPE_MORPH_SHAPE:
+				renderer_draw_shape(context, ch->morph_start_offset, ch->morph_start_size, obj->transform_id, obj->cxform_id);
 				break;
 			case CHAR_TYPE_TEXT:
 				for (size_t j = 0; j < ch->text_size; ++j)
@@ -146,6 +191,20 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 	dictionary[char_id].size = shape_size;
 }
 
+void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
+    size_t shape_offset, size_t shape_size,
+    size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count)
+{
+	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+
+	dictionary[char_id].type = CHAR_TYPE_MORPH_SHAPE;
+	dictionary[char_id].morph_start_offset = shape_offset;
+	dictionary[char_id].morph_start_size = shape_size;
+	dictionary[char_id].morph_end_offset = morph_end_offset;
+	dictionary[char_id].morph_color_start = morph_color_start;
+	dictionary[char_id].morph_color_count = morph_color_count;
+}
+
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id)
 {
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
@@ -166,6 +225,24 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
+
+	if (depth > max_depth)
+	{
+		max_depth = depth;
+	}
+}
+
+void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
+{
+	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
+
+	display_list[depth].char_id = char_id;
+	display_list[depth].transform_id = transform_id;
+	display_list[depth].cxform_id = cxform_id;
+	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+	display_list[depth].clip_depth = clip_depth;
+	display_list[depth].ratio = ratio;
 
 	if (depth > max_depth)
 	{

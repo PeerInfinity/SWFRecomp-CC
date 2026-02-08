@@ -124,6 +124,8 @@ namespace SWFRecomp
 								 current_glyph(0),
 								 current_text(0),
 								 current_cxform(0),
+								 current_morph_end_vertex(0),
+								 current_morph_end_color(0),
 								 jpeg_tables(nullptr),
 							 shape_has_alpha(false),
 							 shape_is_v4(false)
@@ -556,6 +558,16 @@ namespace SWFRecomp
 						  << "float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "] =" << endl
 						  << "{" << endl
 						  << (current_cxform ? cxform_data.str() : "\t0\n")
+						  << "};" << endl
+						  << endl
+						  << "float morph_end_shape_data[" << to_string(current_morph_end_vertex ? current_morph_end_vertex : 1) << "][2] =" << endl
+						  << "{" << endl
+						  << (current_morph_end_vertex ? morph_end_shape_data.str() : "\t0\n")
+						  << "};" << endl
+						  << endl
+						  << "float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4] =" << endl
+						  << "{" << endl
+						  << (current_morph_end_color ? morph_end_color_data.str() : "\t0\n")
 						  << "};";
 
 		context.out_draws_header << endl
@@ -567,7 +579,9 @@ namespace SWFRecomp
 								 << "extern u8 bitmap_data[" << to_string(current_bitmap_pixel ? 4*current_bitmap_pixel : 1) << "];" << endl
 								 << "extern u32 glyph_data[" << to_string(current_glyph ? 2*current_glyph : 1) << "][1];" << endl
 								 << "extern u32 text_data[" << to_string(current_text ? current_text : 1) << "];" << endl
-								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl;
+								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl
+								 << "extern float morph_end_shape_data[" << to_string(current_morph_end_vertex ? current_morph_end_vertex : 1) << "][2];" << endl
+								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl;
 
 		// Emit sprite forward declarations (frame_func arrays)
 		if (!sprite_forward_decls.str().empty())
@@ -1710,10 +1724,15 @@ namespace SWFRecomp
 					current_cxform += 1;
 				}
 
-				// Skip remaining optional fields
+				// Parse remaining optional fields
+				u16 ratio_val = 0;
 				if (has_ratio)
 				{
-					cur_pos += 2; // UI16
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+					ratio_val = (u16) tag.fields[0].value;
 				}
 				if (has_name)
 				{
@@ -1732,7 +1751,14 @@ namespace SWFRecomp
 					clip_depth_val = (u16) tag.fields[0].value;
 				}
 
-				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ");" << endl;
+				if (has_ratio)
+				{
+					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ");" << endl;
+				}
+				else
+				{
+					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ");" << endl;
+				}
 
 				break;
 			}
@@ -1997,10 +2023,15 @@ namespace SWFRecomp
 								current_cxform += 1;
 							}
 
-							// Skip remaining optional fields
+							// Parse remaining optional fields
+							u16 ratio_val = 0;
 							if (has_ratio)
 							{
-								cur_pos += 2; // UI16
+								sub_tag.clearFields();
+								sub_tag.setFieldCount(1);
+								sub_tag.configureNextField(SWF_FIELD_UI16);
+								sub_tag.parseFields(cur_pos);
+								ratio_val = (u16) sub_tag.fields[0].value;
 							}
 							if (has_name)
 							{
@@ -2019,12 +2050,25 @@ namespace SWFRecomp
 								clip_depth_val = (u16) sub_tag.fields[0].value;
 							}
 
-							sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
-											   << to_string(depth) << ", "
-											   << to_string(char_id) << ", "
-											   << to_string(transform_id) << ", "
-											   << to_string(cxform_id) << ", "
-											   << to_string(clip_depth_val) << ");" << endl;
+							if (has_ratio)
+							{
+								sprite_definitions << "\t" << "tagPlaceObject2Ratio(app_context, "
+												   << to_string(depth) << ", "
+												   << to_string(char_id) << ", "
+												   << to_string(transform_id) << ", "
+												   << to_string(cxform_id) << ", "
+												   << to_string(clip_depth_val) << ", "
+												   << to_string(ratio_val) << ");" << endl;
+							}
+							else
+							{
+								sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
+												   << to_string(depth) << ", "
+												   << to_string(char_id) << ", "
+												   << to_string(transform_id) << ", "
+												   << to_string(cxform_id) << ", "
+												   << to_string(clip_depth_val) << ");" << endl;
+							}
 
 							break;
 						}
@@ -2497,8 +2541,13 @@ namespace SWFRecomp
 					fill_styles[i].b = (u8) RGBA.fields[2].value;
 					fill_styles[i].a = (u8) RGBA.fields[3].value;
 
-					// Skip EndColor (RGBA = 4 bytes)
-					cur_pos += 4;
+					// EndColor (RGBA)
+					RGBA.parseFields(cur_pos);
+
+					u8 end_r = (u8) RGBA.fields[0].value;
+					u8 end_g = (u8) RGBA.fields[1].value;
+					u8 end_b = (u8) RGBA.fields[2].value;
+					u8 end_a = (u8) RGBA.fields[3].value;
 
 					fill_styles[i].index = current_color;
 
@@ -2509,6 +2558,14 @@ namespace SWFRecomp
 							   << to_string(fill_styles[i].a) << "/255.0f }," << endl;
 
 					current_color += 1;
+
+					morph_end_color_data << "\t" << "{ "
+							   << to_string(end_r) << "/255.0f, "
+							   << to_string(end_g) << "/255.0f, "
+							   << to_string(end_b) << "/255.0f, "
+							   << to_string(end_a) << "/255.0f }," << endl;
+
+					current_morph_end_color += 1;
 
 					break;
 				}
@@ -2734,6 +2791,8 @@ namespace SWFRecomp
 				std::vector<FillStyle*> all_fill_styles;
 				u16 line_style_count;
 				std::vector<LineStyle*> all_line_styles;
+				size_t morph_color_start_saved = current_color;
+				size_t morph_end_color_before = current_morph_end_color;
 				
 				// Save position at start of tag body for morph EndEdges skip
 				char* morph_tag_start = cur_pos;
@@ -2922,7 +2981,9 @@ namespace SWFRecomp
 				s32 last_y = FRAME_HEIGHT;
 				
 				u32 cur_byte_bits_left = 8;
-				
+
+				s32 morph_vertex_counter = 0;
+
 				while (true)
 				{
 					shape_tag.clearFields();
@@ -2966,16 +3027,17 @@ namespace SWFRecomp
 								
 								s16 delta_x = (s16) shape_tag.fields[0].value;
 								s16 delta_y = (s16) shape_tag.fields[1].value;
-								
+
 								Vertex v;
 								v.x = last_x + (s32) delta_x;
 								v.y = last_y - (s32) delta_y;
-								
+								if (is_morph) v.morph_index = morph_vertex_counter++;
+
 								current_path->verts.push_back(v);
-								
+
 								last_x = v.x;
 								last_y = v.y;
-								
+
 								continue;
 							}
 							
@@ -2989,27 +3051,29 @@ namespace SWFRecomp
 							
 							bool is_vertical_line = (shape_tag.fields[0].value & 1) != 0;
 							s16 delta = (s16) shape_tag.fields[1].value;
-							
+
 							Vertex v;
-							
+
 							v.x = last_x;
 							v.y = last_y;
-							
+
 							if (is_vertical_line)
 							{
 								v.y -= (s32) delta;
 							}
-							
+
 							else
 							{
 								v.x += (s32) delta;
 							}
-							
+
+							if (is_morph) v.morph_index = morph_vertex_counter++;
+
 							current_path->verts.push_back(v);
-							
+
 							last_x = v.x;
 							last_y = v.y;
-							
+
 							continue;
 						}
 						
@@ -3043,12 +3107,12 @@ namespace SWFRecomp
 						anchor.y = control.y - anchor_delta_y;
 						
 						u32 num_passes = 6;
-						
-						addCurvedEdge(current_path, current, control, anchor, num_passes);
-						
+
+						addCurvedEdge(current_path, current, control, anchor, num_passes, is_morph ? &morph_vertex_counter : nullptr);
+
 						last_x = anchor.x;
 						last_y = anchor.y;
-						
+
 						continue;
 					}
 					
@@ -3217,10 +3281,10 @@ namespace SWFRecomp
 						{
 							paths.pop_back();
 						}
-						
+
 						paths.push_back(Path());
 						current_path = &paths.back();
-						
+
 						current_path->verts.reserve(512);
 						current_path->fill_style_list = current_fill_style_list;
 						current_path->line_style_list = current_line_style_list;
@@ -3228,11 +3292,12 @@ namespace SWFRecomp
 						current_path->fill_styles[1] = fill_style_1;
 						current_path->line_style = line_style;
 						current_path->self_closed = false;
-						
+
 						Vertex v;
 						v.x = last_x;
 						v.y = last_y;
-						
+						if (is_morph) v.morph_index = morph_vertex_counter++;
+
 						current_path->verts.push_back(v);
 					}
 					
@@ -3246,7 +3311,169 @@ namespace SWFRecomp
 				{
 					cur_pos += 1;
 				}
-				
+
+				// Parse end edges for morph shapes
+				std::vector<Vertex> morph_end_positions;
+				if (is_morph)
+				{
+					// End edges header: NumFillBits(4) + NumLineBits(4) = 1 byte, both 0
+					shape_tag.clearFields();
+					shape_tag.setFieldCount(2);
+					shape_tag.configureNextField(SWF_FIELD_UB, 4);
+					shape_tag.configureNextField(SWF_FIELD_UB, 4);
+					shape_tag.parseFields(cur_pos);
+
+					s32 end_last_x = 0;
+					s32 end_last_y = FRAME_HEIGHT;
+					u32 end_bits_left = 8;
+
+					while (true)
+					{
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(2);
+						shape_tag.configureNextField(SWF_FIELD_UB, 1);
+						shape_tag.configureNextField(SWF_FIELD_UB, 5);
+						shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+
+						bool end_is_edge = (u8) shape_tag.fields[0].value;
+						u8 end_flags = (u8) shape_tag.fields[1].value;
+
+						if (end_is_edge)
+						{
+							bool end_is_straight = (end_flags & 0b10000) != 0;
+							u8 end_num_bits = end_flags & 0xF;
+
+							if (end_is_straight)
+							{
+								shape_tag.clearFields();
+								shape_tag.setFieldCount(1);
+								shape_tag.configureNextField(SWF_FIELD_UB, 1);
+								shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+
+								bool end_general = (shape_tag.fields[0].value & 1) != 0;
+
+								if (end_general)
+								{
+									shape_tag.clearFields();
+									shape_tag.setFieldCount(2);
+									shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+									shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+									shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+
+									s16 dx = (s16) shape_tag.fields[0].value;
+									s16 dy = (s16) shape_tag.fields[1].value;
+
+									Vertex ev;
+									ev.x = end_last_x + (s32) dx;
+									ev.y = end_last_y - (s32) dy;
+									morph_end_positions.push_back(ev);
+
+									end_last_x = ev.x;
+									end_last_y = ev.y;
+								}
+								else
+								{
+									shape_tag.clearFields();
+									shape_tag.setFieldCount(2);
+									shape_tag.configureNextField(SWF_FIELD_UB, 1);
+									shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+									shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+
+									bool end_vert = (shape_tag.fields[0].value & 1) != 0;
+									s16 delta = (s16) shape_tag.fields[1].value;
+
+									Vertex ev;
+									ev.x = end_last_x;
+									ev.y = end_last_y;
+									if (end_vert)
+										ev.y -= (s32) delta;
+									else
+										ev.x += (s32) delta;
+									morph_end_positions.push_back(ev);
+
+									end_last_x = ev.x;
+									end_last_y = ev.y;
+								}
+							}
+							else
+							{
+								// CurvedEdge in end shape
+								shape_tag.clearFields();
+								shape_tag.setFieldCount(4);
+								shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+								shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+								shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+								shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+								shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+
+								s16 cdx = (s16) shape_tag.fields[0].value;
+								s16 cdy = (s16) shape_tag.fields[1].value;
+								s16 adx = (s16) shape_tag.fields[2].value;
+								s16 ady = (s16) shape_tag.fields[3].value;
+
+								Vertex cur_v;
+								cur_v.x = end_last_x;
+								cur_v.y = end_last_y;
+
+								Vertex ctrl;
+								ctrl.x = end_last_x + cdx;
+								ctrl.y = end_last_y - cdy;
+
+								Vertex anch;
+								anch.x = ctrl.x + adx;
+								anch.y = ctrl.y - ady;
+
+								u32 passes = 6;
+								for (u32 p = 1; p <= passes; ++p)
+								{
+									float ft = (float) p / passes;
+									float fu = 1.0f - ft;
+									Vertex ev;
+									ev.x = (s32)(fu*fu*cur_v.x + 2*fu*ft*ctrl.x + ft*ft*anch.x);
+									ev.y = (s32)(fu*fu*cur_v.y + 2*fu*ft*ctrl.y + ft*ft*anch.y);
+									morph_end_positions.push_back(ev);
+								}
+
+								end_last_x = anch.x;
+								end_last_y = anch.y;
+							}
+
+							continue;
+						}
+
+						if (end_flags == 0)
+						{
+							// EndShapeRecord
+							break;
+						}
+
+						// StyleChangeRecord in end shape (only MoveTo)
+						bool end_move = (end_flags & 0b00001) != 0;
+						if (end_move)
+						{
+							shape_tag.clearFields();
+							shape_tag.setFieldCount(3);
+							shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+
+							end_last_x = (s32) shape_tag.fields[1].value;
+							end_last_y = FRAME_HEIGHT - (s32) shape_tag.fields[2].value;
+
+							Vertex ev;
+							ev.x = end_last_x;
+							ev.y = end_last_y;
+							morph_end_positions.push_back(ev);
+						}
+					}
+
+					if (end_bits_left != 8)
+					{
+						cur_pos += 1;
+					}
+				}
+
 				if (current_path == nullptr)
 				{
 					return;
@@ -3449,24 +3676,25 @@ namespace SWFRecomp
 				}
 				
 				size_t tris_size = 0;
-				
+				size_t morph_end_start_vertex = current_morph_end_vertex;
+
 				for (size_t i = 0; i < shapes.size(); ++i)
 				{
 					if (!shapes[i].invalid && shapes[i].closed && shapes[i].inner_fill != 0 && !shapes[i].hole)
 					{
 						std::vector<Tri> tris;
-						
+
 						fillShape(shapes[i], tris);
-						
+
 						tris_size += tris.size();
-						
+
 						for (Tri t : tris)
 						{
 							for (int j = 0; j < 3; ++j)
 							{
 								float x_f = (float) t.verts[j].x;
 								float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
-								
+
 								shape_data << "\t" << "{ "
 										   << std::hex << std::uppercase
 										   << "0x" << VAL(u32, &x_f) << ", "
@@ -3474,32 +3702,58 @@ namespace SWFRecomp
 										   << "0x" << (u32) all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1].type << ", "
 										   << "0x" << (u32) all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1].index
 										   << " }," << endl;
+
+								if (is_morph && t.verts[j].morph_index >= 0 && (size_t)t.verts[j].morph_index < morph_end_positions.size())
+								{
+									Vertex& end_v = morph_end_positions[t.verts[j].morph_index];
+									float end_x_f = (float) end_v.x;
+									float end_y_f = (float) (FRAME_HEIGHT - end_v.y);
+									morph_end_shape_data << "\t" << "{ "
+														 << std::dec << std::fixed << std::setprecision(1)
+														 << end_x_f << "f, "
+														 << end_y_f << "f"
+														 << " }," << endl;
+								}
+								else if (is_morph)
+								{
+									// Fallback: use start position
+									morph_end_shape_data << "\t" << "{ "
+														 << std::dec << std::fixed << std::setprecision(1)
+														 << x_f << "f, "
+														 << y_f << "f"
+														 << " }," << endl;
+								}
+
+								if (is_morph)
+								{
+									current_morph_end_vertex += 1;
+								}
 							}
 						}
 					}
 				}
-				
+
 				for (size_t i = 0; i < paths.size(); ++i)
 				{
 					u8 line_style_i = paths[i].line_style;
-					
+
 					if (line_style_i != 0)
 					{
 						LineStyle line_style = all_line_styles[paths[i].line_style_list][line_style_i - 1];
-						
+
 						std::vector<Tri> tris;
-						
+
 						drawLines(paths[i], line_style.width, tris);
-						
+
 						tris_size += tris.size();
-						
+
 						for (Tri t : tris)
 						{
 							for (int j = 0; j < 3; ++j)
 							{
 								float x_f = (float) t.verts[j].x;
 								float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
-								
+
 								shape_data << "\t" << "{ "
 										   << std::hex << std::uppercase
 										   << "0x" << VAL(u32, &x_f) << ", "
@@ -3511,19 +3765,28 @@ namespace SWFRecomp
 						}
 					}
 				}
-				
+
 				if (!is_font)
 				{
-					context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
+					if (is_morph)
+					{
+						size_t morph_color_count = current_morph_end_color - morph_end_color_before;
+						context.tag_main << "\t" << "tagDefineMorphShape(app_context, "
+										 << std::dec
+										 << to_string(shape_id) << ", "
+										 << to_string(3*current_tri) << ", "
+										 << to_string(3*tris_size) << ", "
+										 << to_string(morph_end_start_vertex) << ", "
+										 << to_string(morph_color_start_saved) << ", "
+										 << to_string(morph_color_count) << ");" << endl;
+					}
+					else
+					{
+						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
+					}
 				}
 
 				current_tri += tris_size;
-
-				// Skip EndEdges data for morph shapes (not needed at ratio=0)
-				if (is_morph)
-				{
-					cur_pos = morph_tag_start + shape_tag.length;
-				}
 
 				break;
 			}
@@ -3571,23 +3834,27 @@ namespace SWFRecomp
 		return windingNumber != 0;
 	}
 	
-	void SWF::addCurvedEdge(Path* path, Vertex current, Vertex control, Vertex anchor, u32 passes)
+	void SWF::addCurvedEdge(Path* path, Vertex current, Vertex control, Vertex anchor, u32 passes, s32* morph_counter)
 	{
 		std::vector<Vertex> left_points;
 		std::vector<Vertex> right_points;
-		
+
 		for (u32 i = 1; i <= passes; ++i)
 		{
 			float t = (float) i / passes;
 			float u = 1.0f - t;
-			
+
 			s32 x = (s32) (u*u*current.x + 2*u*t*control.x + t*t*anchor.x);
 			s32 y = (s32) (u*u*current.y + 2*u*t*control.y + t*t*anchor.y);
-			
+
 			Vertex v;
 			v.x = x;
 			v.y = y;
-			
+			if (morph_counter != nullptr)
+			{
+				v.morph_index = (*morph_counter)++;
+			}
+
 			path->verts.push_back(v);
 		}
 	}
@@ -3838,49 +4105,53 @@ namespace SWFRecomp
 		std::vector<std::vector<std::array<Coord, 2>>> polygon;
 		std::vector<std::array<Coord, 2>> shape_array;
 		std::array<Coord, 2> array;
-		
+
 		std::vector<std::array<Coord, 2>> all_points;
-		
+		std::vector<s32> all_morph_indices;
+
 		for (const Vertex& v : shape.verts)
 		{
 			array[0] = v.x;
 			array[1] = v.y;
-			
+
 			shape_array.push_back(array);
-			
+
 			all_points.push_back(array);
+			all_morph_indices.push_back(v.morph_index);
 		}
-		
+
 		polygon.push_back(shape_array);
-		
+
 		for (const Shape* h : shape.holes)
 		{
 			shape_array.clear();
-			
+
 			for (const Vertex& v : h->verts)
 			{
 				array[0] = v.x;
 				array[1] = v.y;
-				
+
 				shape_array.push_back(array);
-				
+
 				all_points.push_back(array);
+				all_morph_indices.push_back(v.morph_index);
 			}
-			
+
 			polygon.push_back(shape_array);
 		}
-		
+
 		std::vector<N> indices = mapbox::earcut<N>(polygon);
-		
+
 		Tri t;
-		
+
 		for (size_t i = 0; i < indices.size(); ++i)
 		{
 			size_t tri_index = i % 3;
-			
+
 			t.verts[tri_index].x = all_points[indices[i]][0];
 			t.verts[tri_index].y = all_points[indices[i]][1];
-			
+			t.verts[tri_index].morph_index = all_morph_indices[indices[i]];
+
 			if (tri_index == 2)
 			{
 				tris.push_back(t);

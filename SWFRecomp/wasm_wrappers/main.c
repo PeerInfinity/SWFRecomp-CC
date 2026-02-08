@@ -51,6 +51,10 @@ int main() {
     app_context.text_data_size = sizeof(text_data);
     app_context.cxform_data = (char*)cxform_data;
     app_context.cxform_data_size = sizeof(cxform_data);
+    app_context.morph_end_shape_data = (char*)morph_end_shape_data;
+    app_context.morph_end_shape_data_size = sizeof(morph_end_shape_data);
+    app_context.morph_end_color_data = (char*)morph_end_color_data;
+    app_context.morph_end_color_data_size = sizeof(morph_end_color_data);
 #endif
 
 #ifndef __EMSCRIPTEN__

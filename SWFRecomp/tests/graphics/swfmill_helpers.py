@@ -934,6 +934,48 @@ def _build_rect_bits(left, right, top, bottom):
     return bw.to_bytes()
 
 
+def _build_place_object2_body(d):
+    """Build raw PlaceObject2 (tag 26) body with ratio support.
+
+    d: dict with keys object_id, depth, trans_x, trans_y, scale_x, scale_y,
+       skew_x, skew_y, color_transform, clip_depth, ratio.
+    """
+    flags = 0
+    has_character = True
+    flags |= 0x02  # HasCharacter
+
+    # Build matrix
+    mat_dict = {"transX": d["trans_x"], "transY": d["trans_y"]}
+    if d.get("scale_x") is not None:
+        mat_dict["scaleX"] = d["scale_x"]
+    if d.get("scale_y") is not None:
+        mat_dict["scaleY"] = d["scale_y"]
+    if d.get("skew_x") is not None:
+        mat_dict["skewX"] = d["skew_x"]
+    if d.get("skew_y") is not None:
+        mat_dict["skewY"] = d["skew_y"]
+    flags |= 0x04  # HasMatrix
+
+    if d.get("ratio") is not None:
+        flags |= 0x10  # HasRatio
+    if d.get("clip_depth") is not None:
+        flags |= 0x40  # HasClipDepth
+
+    body = struct.pack('<B', flags)
+    body += struct.pack('<H', d["depth"])
+    # HasCharacter
+    body += struct.pack('<H', d["object_id"])
+    # HasMatrix
+    body += _build_matrix_bits(mat_dict)
+    # HasRatio
+    if d.get("ratio") is not None:
+        body += struct.pack('<H', d["ratio"])
+    # HasClipDepth
+    if d.get("clip_depth") is not None:
+        body += struct.pack('<H', d["clip_depth"])
+    return body
+
+
 def _build_matrix_bits(transform):
     """Build a SWF MATRIX as bit-packed bytes.
 
@@ -1263,7 +1305,8 @@ class SWFMLBuilder:
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
                      skew_x=None, skew_y=None,
-                     color_transform=None, clip_depth=None):
+                     color_transform=None, clip_depth=None,
+                     ratio=None):
         self.tags.append(("PlaceObject2", {
             "object_id": object_id,
             "depth": depth,
@@ -1275,6 +1318,7 @@ class SWFMLBuilder:
             "skew_y": skew_y,
             "color_transform": color_transform,
             "clip_depth": clip_depth,
+            "ratio": ratio,
         }))
 
     def remove_object(self, depth):
@@ -1510,30 +1554,38 @@ class SWFMLBuilder:
 
             elif tag_type == "PlaceObject2":
                 d = tag_data
-                po_attrs = {
-                    "replace": "0",
-                    "depth": str(d["depth"]),
-                    "objectID": str(d["object_id"]),
-                }
-                if d.get("clip_depth") is not None:
-                    po_attrs["clipDepth"] = str(d["clip_depth"])
-                po = SubElement(tags_el, "PlaceObject2", **po_attrs)
-                transform_el = SubElement(po, "transform")
-                attrs = {
-                    "transX": str(d["trans_x"]),
-                    "transY": str(d["trans_y"]),
-                }
-                if d.get("scale_x") is not None:
-                    attrs["scaleX"] = f"{d['scale_x']:.16f}"
-                if d.get("scale_y") is not None:
-                    attrs["scaleY"] = f"{d['scale_y']:.16f}"
-                if d.get("skew_x") is not None:
-                    attrs["skewX"] = f"{d['skew_x']:.16f}"
-                if d.get("skew_y") is not None:
-                    attrs["skewY"] = f"{d['skew_y']:.16f}"
-                SubElement(transform_el, "Transform", **attrs)
-                if d.get("color_transform") is not None:
-                    d["color_transform"].to_xml(po)
+                if d.get("ratio") is not None:
+                    # swfmill doesn't support ratio in xml2swf, build raw binary
+                    body = _build_place_object2_body(d)
+                    tag_b64 = base64.b64encode(body).decode('ascii')
+                    unk = SubElement(tags_el, "UnknownTag", id="0x1a")
+                    data_el = SubElement(unk, "data")
+                    data_el.text = tag_b64
+                else:
+                    po_attrs = {
+                        "replace": "0",
+                        "depth": str(d["depth"]),
+                        "objectID": str(d["object_id"]),
+                    }
+                    if d.get("clip_depth") is not None:
+                        po_attrs["clipDepth"] = str(d["clip_depth"])
+                    po = SubElement(tags_el, "PlaceObject2", **po_attrs)
+                    transform_el = SubElement(po, "transform")
+                    attrs = {
+                        "transX": str(d["trans_x"]),
+                        "transY": str(d["trans_y"]),
+                    }
+                    if d.get("scale_x") is not None:
+                        attrs["scaleX"] = f"{d['scale_x']:.16f}"
+                    if d.get("scale_y") is not None:
+                        attrs["scaleY"] = f"{d['scale_y']:.16f}"
+                    if d.get("skew_x") is not None:
+                        attrs["skewX"] = f"{d['skew_x']:.16f}"
+                    if d.get("skew_y") is not None:
+                        attrs["skewY"] = f"{d['skew_y']:.16f}"
+                    SubElement(transform_el, "Transform", **attrs)
+                    if d.get("color_transform") is not None:
+                        d["color_transform"].to_xml(po)
 
             elif tag_type == "RemoveObject2":
                 d = tag_data

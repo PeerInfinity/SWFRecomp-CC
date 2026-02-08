@@ -2,8 +2,8 @@
 """Generate test.swf for define_morph_shape graphics test.
 
 A DefineMorphShape (tag 46) that morphs from a red square (ratio=0) to a
-blue diamond (ratio=65535).  Placed with default ratio=0, so the red square
-should be rendered.
+blue diamond (ratio=65535).  Placed at ratio=32768 (50%), so an intermediate
+purple shape should be rendered.
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -49,7 +49,7 @@ morph.add_end_edges([
     LineTo(2000, -2000),
 ])
 
-swf.place_object(object_id=1, depth=1)
+swf.place_object(object_id=1, depth=1, ratio=32768)
 swf.show_frame()
 
 output_path = os.path.join(os.path.dirname(__file__), "test.swf")

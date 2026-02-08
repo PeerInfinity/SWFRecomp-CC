@@ -23,6 +23,7 @@ extern frame_func frame_funcs[];
 typedef enum
 {
 	CHAR_TYPE_SHAPE,
+	CHAR_TYPE_MORPH_SHAPE,
 	CHAR_TYPE_TEXT,
 	CHAR_TYPE_SPRITE,
 } CharacterType;
@@ -37,6 +38,15 @@ typedef struct Character
 		{
 			size_t shape_offset;
 			size_t size;
+		};
+		// DefineMorphShape
+		struct
+		{
+			size_t morph_start_offset;
+			size_t morph_start_size;
+			size_t morph_end_offset;
+			size_t morph_color_start;
+			size_t morph_color_count;
 		};
 		// DefineText
 		struct
@@ -62,6 +72,7 @@ typedef struct DisplayObject
 	u32 cxform_id;
 	u32 has_cxform;
 	u16 clip_depth;
+	u16 ratio;
 } DisplayObject;
 #endif
 
@@ -110,6 +121,10 @@ typedef struct SWFAppContext
 	size_t text_data_size;
 	char* cxform_data;
 	size_t cxform_data_size;
+	char* morph_end_shape_data;
+	size_t morph_end_shape_data_size;
+	char* morph_end_color_data;
+	size_t morph_end_color_data_size;
 #endif
 
 	// Heap management fields

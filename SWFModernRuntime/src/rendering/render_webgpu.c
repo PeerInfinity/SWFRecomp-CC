@@ -1357,6 +1357,22 @@ void render_webgpu_compose_text_transforms(WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
+// render_webgpu_update_vertices / render_webgpu_update_colors
+// Write interpolated morph data into GPU buffers before the render pass.
+// ---------------------------------------------------------------------------
+void render_webgpu_update_vertices(WebGPURenderContext* ctx,
+	size_t byte_offset, const void* data, size_t byte_size)
+{
+	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer, byte_offset, data, byte_size);
+}
+
+void render_webgpu_update_colors(WebGPURenderContext* ctx,
+	size_t byte_offset, const void* data, size_t byte_size)
+{
+	wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer, byte_offset, data, byte_size);
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_free: release all GPU resources
 // ---------------------------------------------------------------------------
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
