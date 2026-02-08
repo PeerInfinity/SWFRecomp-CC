@@ -93,6 +93,45 @@ class RadialGradientFill:
             SubElement(c, "Color", red=str(r), green=str(g), blue=str(b))
 
 
+class FocalRadialGradientFill:
+    """Focal radial gradient fill (type 0x13) with an off-center focal point.
+
+    The focal point shifts where the gradient radiates from, creating an
+    asymmetric radial effect.  swfmill represents this as a
+    ``<ShiftedRadialGradient shift="...">`` element.
+    """
+    def __init__(self, matrix, stops, focal_point=0.0):
+        """
+        matrix: dict with keys from {scaleX, scaleY, skewX, skewY, transX, transY}
+        stops: list of (position, r, g, b) tuples
+        focal_point: float in [-1.0, 1.0] — offset of the focal point along
+                     the gradient's x axis.  0 = centered (same as radial),
+                     positive = shifted right, negative = shifted left.
+        """
+        self.matrix = matrix
+        self.stops = stops
+        self.focal_point = focal_point
+
+    def to_xml(self, parent):
+        grad = SubElement(parent, "ShiftedRadialGradient",
+                          shift=f"{self.focal_point:.16f}")
+        mat_el = SubElement(grad, "matrix")
+        attrs = {}
+        for key in ("scaleX", "scaleY", "skewX", "skewY", "transX", "transY"):
+            if key in self.matrix:
+                val = self.matrix[key]
+                if isinstance(val, float):
+                    attrs[key] = f"{val:.16f}"
+                else:
+                    attrs[key] = str(val)
+        SubElement(mat_el, "Transform", **attrs)
+        colors = SubElement(grad, "gradientColors")
+        for pos, r, g, b in self.stops:
+            item = SubElement(colors, "GradientItem", position=str(pos))
+            c = SubElement(item, "color")
+            SubElement(c, "Color", red=str(r), green=str(g), blue=str(b))
+
+
 class ClippedBitmapFill:
     """Clipped bitmap fill referencing a DefineBits object."""
     def __init__(self, object_id, matrix):
@@ -239,6 +278,55 @@ class LineStyle:
         SubElement(color_el, "Color", **attrs)
 
 
+class LineStyle2:
+    """LINESTYLE2 with advanced cap/join styles for DefineShape4.
+
+    swfmill represents LINESTYLE2 as a ``<LineStyle>`` element with additional
+    attributes (startCapStyle, jointStyle, etc.) and the color inside a
+    ``<fillColor>`` child element instead of ``<color>``.
+    """
+    def __init__(self, width, r, g, b, a=255,
+                 start_cap=0, end_cap=0, join_style=0,
+                 no_h_scale=0, no_v_scale=0, pixel_hinting=0,
+                 no_close=0, miter_limit=None):
+        self.width = width
+        self.r = r
+        self.g = g
+        self.b = b
+        self.a = a
+        self.start_cap = start_cap    # 0=round, 1=none, 2=square
+        self.end_cap = end_cap        # 0=round, 1=none, 2=square
+        self.join_style = join_style  # 0=round, 1=bevel, 2=miter
+        self.no_h_scale = no_h_scale
+        self.no_v_scale = no_v_scale
+        self.pixel_hinting = pixel_hinting
+        self.no_close = no_close
+        self.miter_limit = miter_limit  # FIXED8, only used if join_style == 2
+
+    def to_xml(self, parent):
+        attrs = {
+            "width": str(self.width),
+            "startCapStyle": str(self.start_cap),
+            "jointStyle": str(self.join_style),
+            "hasFill": "0",
+            "noHScale": str(self.no_h_scale),
+            "noVScale": str(self.no_v_scale),
+            "pixelHinting": str(self.pixel_hinting),
+            "noClose": str(self.no_close),
+            "endCapStyle": str(self.end_cap),
+        }
+        if self.miter_limit is not None:
+            if isinstance(self.miter_limit, float):
+                attrs["miterLimitFactor"] = f"{self.miter_limit:.16f}"
+            else:
+                attrs["miterLimitFactor"] = str(self.miter_limit)
+        ls = SubElement(parent, "LineStyle", **attrs)
+        color_el = SubElement(ls, "fillColor")
+        SubElement(color_el, "Color",
+                   red=str(self.r), green=str(self.g),
+                   blue=str(self.b), alpha=str(self.a))
+
+
 # ---------------------------------------------------------------------------
 # Edge records
 # ---------------------------------------------------------------------------
@@ -318,7 +406,8 @@ class ShapeDefinition:
         self.fill_styles = []
         self.line_styles = []
         self.edges = []
-        self.shape_version = shape_version  # 1 = DefineShape, 2 = DefineShape2, 3 = DefineShape3
+        self.shape_version = shape_version  # 1 = DefineShape, 2 = DefineShape2, 3 = DefineShape3, 4 = DefineShape4
+        self.edge_bounds = None  # (left, right, top, bottom) for DefineShape4; defaults to bounds
 
     def add_fill(self, fill):
         self.fill_styles.append(fill)
@@ -335,14 +424,36 @@ class ShapeDefinition:
         self.edges.extend(edges)
 
     def to_xml(self, parent):
-        version_tags = {1: "DefineShape", 2: "DefineShape2", 3: "DefineShape3"}
+        version_tags = {
+            1: "DefineShape", 2: "DefineShape2",
+            3: "DefineShape3", 4: "DefineShape5",
+        }
         tag_name = version_tags.get(self.shape_version, "DefineShape")
-        shape_el = SubElement(parent, tag_name, objectID=str(self.object_id))
-        bounds_el = SubElement(shape_el, "bounds")
         left, right, top, bottom = self.bounds
-        SubElement(bounds_el, "Rectangle",
-                   left=str(left), right=str(right),
-                   top=str(top), bottom=str(bottom))
+
+        if self.shape_version == 4:
+            # DefineShape4 -> swfmill "DefineShape5"
+            shape_el = SubElement(parent, tag_name,
+                                  objectID=str(self.object_id),
+                                  nonScalingStrokes="0",
+                                  scalingStrokes="1")
+            bounds_el = SubElement(shape_el, "bounds")
+            SubElement(bounds_el, "Rectangle",
+                       left=str(left), right=str(right),
+                       top=str(top), bottom=str(bottom))
+            stroke_bounds_el = SubElement(shape_el, "strokeBounds")
+            eb = self.edge_bounds if self.edge_bounds else self.bounds
+            eb_left, eb_right, eb_top, eb_bottom = eb
+            SubElement(stroke_bounds_el, "Rectangle",
+                       left=str(eb_left), right=str(eb_right),
+                       top=str(eb_top), bottom=str(eb_bottom))
+        else:
+            shape_el = SubElement(parent, tag_name, objectID=str(self.object_id))
+            bounds_el = SubElement(shape_el, "bounds")
+            SubElement(bounds_el, "Rectangle",
+                       left=str(left), right=str(right),
+                       top=str(top), bottom=str(bottom))
+
         styles_el = SubElement(shape_el, "styles")
         style_list = SubElement(styles_el, "StyleList")
         fill_el = SubElement(style_list, "fillStyles")
@@ -383,6 +494,10 @@ class SpriteDefinition:
             "scale_y": scale_y,
         }))
 
+    def remove_object(self, depth):
+        """Remove the character at the given depth from the sprite's display list."""
+        self.sub_tags.append(("RemoveObject2", {"depth": depth}))
+
     def show_frame(self):
         """Add a ShowFrame to the sprite's timeline."""
         self.sub_tags.append(("ShowFrame", None))
@@ -410,10 +525,239 @@ class SpriteDefinition:
                 if d.get("scale_y") is not None:
                     attrs["scaleY"] = f"{d['scale_y']:.16f}"
                 SubElement(transform_el, "Transform", **attrs)
+            elif tag_type == "RemoveObject2":
+                d = tag_data
+                SubElement(tags_el, "RemoveObject2", depth=str(d["depth"]))
             elif tag_type == "ShowFrame":
                 SubElement(tags_el, "ShowFrame")
 
         SubElement(tags_el, "End")
+
+
+# ---------------------------------------------------------------------------
+# Main SWF builder
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Font definition helper
+# ---------------------------------------------------------------------------
+
+class _BitWriter:
+    """Writes bit-packed data to a byte buffer (MSB first, SWF convention)."""
+    def __init__(self):
+        self.buffer = bytearray()
+        self.current_byte = 0
+        self.bit_position = 7
+
+    def write_bits(self, value, num_bits):
+        for i in range(num_bits - 1, -1, -1):
+            bit = (value >> i) & 1
+            self.current_byte |= (bit << self.bit_position)
+            self.bit_position -= 1
+            if self.bit_position < 0:
+                self.buffer.append(self.current_byte)
+                self.current_byte = 0
+                self.bit_position = 7
+
+    def write_sb(self, value, num_bits):
+        if value < 0:
+            value = (1 << num_bits) + value
+        self.write_bits(value, num_bits)
+
+    def align(self):
+        if self.bit_position != 7:
+            self.buffer.append(self.current_byte)
+            self.current_byte = 0
+            self.bit_position = 7
+
+    def to_bytes(self):
+        self.align()
+        return bytes(self.buffer)
+
+
+def _bits_needed_signed(value):
+    """Minimum bits to represent a signed value."""
+    if value == 0:
+        return 1
+    if value > 0:
+        return value.bit_length() + 1
+    return (abs(value) - 1).bit_length() + 1
+
+
+def _build_glyph_shape_binary(edges):
+    """Build the binary SHAPE data for a single font glyph.
+
+    Font glyphs use a minimal shape format: only 1 fill-bit (fill 0/1),
+    0 line-bits, and only fillStyle0/fillStyle1 + moveTo + straight/curved
+    edges.
+
+    edges: list of ShapeSetup / LineTo / CurveTo instances describing the glyph.
+           The first edge should be a ShapeSetup with fillStyle1=1 and x,y coords.
+    """
+    bw = _BitWriter()
+    # NumFillBits = 1, NumLineBits = 0
+    bw.write_bits(1, 4)  # NumFillBits
+    bw.write_bits(0, 4)  # NumLineBits
+
+    for edge in edges:
+        if isinstance(edge, ShapeSetup):
+            bw.write_bits(0, 1)  # TypeFlag = non-edge
+            bw.write_bits(0, 1)  # StateNewStyles = 0
+            bw.write_bits(0, 1)  # StateLineStyle = 0
+
+            has_fs1 = edge.fillStyle1 is not None
+            has_fs0 = edge.fillStyle0 is not None
+            has_move = edge.x is not None and edge.y is not None
+
+            bw.write_bits(1 if has_fs1 else 0, 1)  # StateFillStyle1
+            bw.write_bits(1 if has_fs0 else 0, 1)  # StateFillStyle0
+            bw.write_bits(1 if has_move else 0, 1)  # StateMoveTo
+
+            if has_move:
+                move_nbits = max(_bits_needed_signed(edge.x),
+                                 _bits_needed_signed(edge.y), 1)
+                bw.write_bits(move_nbits, 5)
+                bw.write_sb(edge.x, move_nbits)
+                bw.write_sb(edge.y, move_nbits)
+
+            if has_fs0:
+                bw.write_bits(edge.fillStyle0, 1)  # 1 fill-bit
+            if has_fs1:
+                bw.write_bits(edge.fillStyle1, 1)  # 1 fill-bit
+
+        elif isinstance(edge, LineTo):
+            bw.write_bits(1, 1)  # TypeFlag = edge
+            bw.write_bits(1, 1)  # StraightFlag
+            nbits = max(_bits_needed_signed(edge.x),
+                        _bits_needed_signed(edge.y), 2)
+            bw.write_bits(nbits - 2, 4)  # NumBits - 2
+            if edge.x != 0 and edge.y != 0:
+                bw.write_bits(1, 1)  # GeneralLine
+                bw.write_sb(edge.x, nbits)
+                bw.write_sb(edge.y, nbits)
+            elif edge.y == 0:
+                bw.write_bits(0, 1)  # not GeneralLine
+                bw.write_bits(0, 1)  # Horizontal
+                bw.write_sb(edge.x, nbits)
+            else:
+                bw.write_bits(0, 1)  # not GeneralLine
+                bw.write_bits(1, 1)  # Vertical
+                bw.write_sb(edge.y, nbits)
+
+        elif isinstance(edge, CurveTo):
+            bw.write_bits(1, 1)  # TypeFlag = edge
+            bw.write_bits(0, 1)  # StraightFlag = 0 (curved)
+            nbits = max(_bits_needed_signed(edge.x1),
+                        _bits_needed_signed(edge.y1),
+                        _bits_needed_signed(edge.x2),
+                        _bits_needed_signed(edge.y2), 2)
+            bw.write_bits(nbits - 2, 4)  # NumBits - 2
+            bw.write_sb(edge.x1, nbits)
+            bw.write_sb(edge.y1, nbits)
+            bw.write_sb(edge.x2, nbits)
+            bw.write_sb(edge.y2, nbits)
+
+    # EndShape record: 6 zero bits
+    bw.write_bits(0, 6)
+    return bw.to_bytes()
+
+
+def _build_define_font_body(object_id, glyphs):
+    """Build the raw tag body (after the tag header) for DefineFont (tag 10).
+
+    object_id: character ID for the font
+    glyphs: list of edge-record lists, one per glyph.  Each is a list of
+            ShapeSetup / LineTo / CurveTo instances.
+
+    Returns bytes containing the full tag body.
+    """
+    num_glyphs = len(glyphs)
+
+    # First, build all glyph shape binaries
+    glyph_binaries = []
+    for g in glyphs:
+        glyph_binaries.append(_build_glyph_shape_binary(g))
+
+    # Offset table: num_glyphs UI16 entries
+    # First offset = num_glyphs * 2 (size of offset table itself)
+    offset_table_size = num_glyphs * 2
+    offsets = []
+    current_offset = offset_table_size
+    for gb in glyph_binaries:
+        offsets.append(current_offset)
+        current_offset += len(gb)
+
+    body = bytearray()
+    body += struct.pack('<H', object_id)
+    for off in offsets:
+        body += struct.pack('<H', off)
+    for gb in glyph_binaries:
+        body += gb
+
+    return bytes(body)
+
+
+class FontDefinition:
+    """Collects glyph shape data for a DefineFont tag."""
+    def __init__(self, object_id):
+        self.object_id = object_id
+        self.glyphs = []  # list of edge-record lists
+
+    def add_glyph(self, edges):
+        """Add a glyph defined by a list of edge records (ShapeSetup, LineTo, CurveTo).
+
+        The first edge should be a ShapeSetup with fillStyle1=1 and x/y coords.
+        Returns the 0-based glyph index.
+        """
+        self.glyphs.append(edges)
+        return len(self.glyphs) - 1
+
+
+# ---------------------------------------------------------------------------
+# Text definition helper
+# ---------------------------------------------------------------------------
+
+class TextRecord:
+    """A text record for DefineText.
+
+    A setup record sets font, color, position, and height; a glyph record
+    contains the actual glyph index + advance pairs.
+    """
+    def __init__(self, font_id=None, color=None, x_offset=None,
+                 y_offset=None, text_height=None, glyphs=None):
+        """
+        For a setup+glyph record:
+            font_id: UI16 character ID of a DefineFont
+            color: (r, g, b) tuple
+            x_offset: SI16 x position (twips)
+            y_offset: SI16 y position (twips)
+            text_height: UI16 font height (twips, e.g. 240 = 12pt)
+            glyphs: list of (glyph_index, advance) tuples
+        """
+        self.font_id = font_id
+        self.color = color
+        self.x_offset = x_offset
+        self.y_offset = y_offset
+        self.text_height = text_height
+        self.glyphs = glyphs or []
+
+
+class TextDefinition:
+    """Collects text records for a DefineText tag."""
+    def __init__(self, object_id, bounds, transform=None):
+        """
+        object_id: character ID for this text object
+        bounds: (left, right, top, bottom) in twips
+        transform: dict with transX, transY (default: origin)
+        """
+        self.object_id = object_id
+        self.bounds = bounds
+        self.transform = transform or {"transX": 0, "transY": 0}
+        self.records = []
+
+    def add_record(self, record):
+        """Add a TextRecord to this text definition."""
+        self.records.append(record)
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +873,25 @@ class SWFMLBuilder:
         tag_b64 = base64.b64encode(tag_body).decode('ascii')
         self.tags.append(("DefineBitsJPEG3", tag_b64))
 
+    def define_bits_jpeg4(self, object_id, jpeg_data_bytes, alpha_data,
+                          deblocking=0.0):
+        """Add a DefineBitsJPEG4 tag (tag 90) with JPEG data + zlib-compressed alpha + deblocking.
+
+        jpeg_data_bytes: raw JPEG file bytes (complete JPEG).
+        alpha_data: bytes/list of alpha values, one byte per pixel (length = width * height).
+        deblocking: float deblocking filter parameter (FIXED8: 8.8 fixed-point).
+                    0.0 means no deblocking.
+        """
+        compressed_alpha = zlib.compress(bytes(alpha_data))
+        # Encode deblocking as FIXED8 (signed 8.8): integer part in high byte, fraction in low byte
+        deblock_fixed = int(round(deblocking * 256.0))
+        deblock_u16 = deblock_fixed & 0xFFFF
+        # Tag body: CharacterID(UI16) + AlphaDataOffset(UI32) + DeblockParam(UI16) + JPEG data + compressed alpha
+        alpha_data_offset = len(jpeg_data_bytes)
+        tag_body = struct.pack('<HIH', object_id, alpha_data_offset, deblock_u16) + jpeg_data_bytes + compressed_alpha
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+        self.tags.append(("DefineBitsJPEG4", tag_b64))
+
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
                      skew_x=None, skew_y=None,
@@ -545,6 +908,30 @@ class SWFMLBuilder:
             "color_transform": color_transform,
             "clip_depth": clip_depth,
         }))
+
+    def remove_object(self, depth):
+        """Remove the character at the given depth from the display list (RemoveObject2, tag 28)."""
+        self.tags.append(("RemoveObject2", {"depth": depth}))
+
+    def define_font(self, object_id):
+        """Create and register a font definition. Returns a FontDefinition for adding glyphs.
+
+        Each glyph is a list of edge records (ShapeSetup, LineTo, CurveTo) that define
+        a mini-shape.  The first edge should be a ShapeSetup with fillStyle1=1 and x/y.
+        """
+        font = FontDefinition(object_id)
+        self.tags.append(("DefineFont", font))
+        return font
+
+    def define_text(self, object_id, bounds, transform=None):
+        """Create and register a text definition. Returns a TextDefinition for adding text records.
+
+        bounds: (left, right, top, bottom) in twips
+        transform: dict with transX, transY (optional)
+        """
+        text = TextDefinition(object_id, bounds, transform)
+        self.tags.append(("DefineText", text))
+        return text
 
     def define_sprite(self, object_id, frame_count=1):
         """Create a sprite (movie clip) definition. Returns a SpriteDefinition for adding sub-tags."""
@@ -608,12 +995,86 @@ class SWFMLBuilder:
                 data_el = SubElement(unk, "data")
                 data_el.text = tag_data
 
+            elif tag_type == "DefineBitsJPEG4":
+                unk = SubElement(tags_el, "UnknownTag", id="0x5a")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_data
+
             elif tag_type == "DefineBits":
                 obj_id, jpeg_b64 = tag_data
                 db = SubElement(tags_el, "DefineBits", objectID=str(obj_id))
                 data_wrap = SubElement(db, "data")
                 data_el = SubElement(data_wrap, "data")
                 data_el.text = jpeg_b64
+
+            elif tag_type == "DefineFont":
+                font = tag_data
+                font_body = _build_define_font_body(font.object_id, font.glyphs)
+                font_el = SubElement(tags_el, "DefineFont",
+                                     objectID=str(font.object_id))
+                data_outer = SubElement(font_el, "data")
+                data_inner = SubElement(data_outer, "data")
+                # swfmill expects base64-encoded tag body WITHOUT the
+                # character ID (DefineFont element has objectID attr).
+                # The <data> contains everything after the characterID field.
+                data_inner.text = base64.b64encode(font_body[2:]).decode('ascii')
+
+            elif tag_type == "DefineText":
+                text = tag_data
+                text_el = SubElement(tags_el, "DefineText",
+                                     objectID=str(text.object_id))
+                # Bounds
+                bounds_el = SubElement(text_el, "bounds")
+                left, right, top, bottom = text.bounds
+                SubElement(bounds_el, "Rectangle",
+                           left=str(left), right=str(right),
+                           top=str(top), bottom=str(bottom))
+                # Transform
+                transform_el = SubElement(text_el, "transform")
+                t_attrs = {}
+                for key in ("transX", "transY", "scaleX", "scaleY",
+                            "skewX", "skewY"):
+                    if key in text.transform:
+                        val = text.transform[key]
+                        if isinstance(val, float):
+                            t_attrs[key] = f"{val:.16f}"
+                        else:
+                            t_attrs[key] = str(val)
+                SubElement(transform_el, "Transform", **t_attrs)
+                # Records
+                records_el = SubElement(text_el, "records")
+                tr_outer = SubElement(records_el, "TextRecord")
+                tr_records = SubElement(tr_outer, "records")
+                for rec in text.records:
+                    # Setup record
+                    setup_attrs = {"isSetup": "1"}
+                    if rec.font_id is not None:
+                        setup_attrs["objectID"] = str(rec.font_id)
+                    if rec.text_height is not None:
+                        setup_attrs["fontHeight"] = str(rec.text_height)
+                    if rec.y_offset is not None:
+                        setup_attrs["y"] = str(rec.y_offset)
+                    if rec.x_offset is not None:
+                        setup_attrs["x"] = str(rec.x_offset)
+                    setup_el = SubElement(tr_records, "TextRecord6",
+                                          **setup_attrs)
+                    if rec.color is not None:
+                        color_el = SubElement(setup_el, "color")
+                        r, g, b = rec.color
+                        SubElement(color_el, "Color",
+                                   red=str(r), green=str(g), blue=str(b))
+                    # Glyph record
+                    if rec.glyphs:
+                        glyph_rec = SubElement(tr_records, "TextRecord6",
+                                               isSetup="0")
+                        glyphs_el = SubElement(glyph_rec, "glyphs")
+                        for glyph_idx, advance in rec.glyphs:
+                            SubElement(glyphs_el, "TextEntry",
+                                       glyph=str(glyph_idx),
+                                       advance=str(advance))
+                # End record (empty glyph record)
+                end_rec = SubElement(tr_records, "TextRecord6", isSetup="0")
+                SubElement(end_rec, "glyphs")
 
             elif tag_type == "DefineShape":
                 tag_data.to_xml(tags_el)
@@ -647,6 +1108,10 @@ class SWFMLBuilder:
                 SubElement(transform_el, "Transform", **attrs)
                 if d.get("color_transform") is not None:
                     d["color_transform"].to_xml(po)
+
+            elif tag_type == "RemoveObject2":
+                d = tag_data
+                SubElement(tags_el, "RemoveObject2", depth=str(d["depth"]))
 
             elif tag_type == "ShowFrame":
                 SubElement(tags_el, "ShowFrame")

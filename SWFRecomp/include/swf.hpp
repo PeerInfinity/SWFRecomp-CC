@@ -201,6 +201,7 @@ namespace SWFRecomp
 		SWFTag RGB;
 		SWFTag RGBA;
 		bool shape_has_alpha;
+		bool shape_is_v4;
 
 		SWF();
 		SWF(Context& context);

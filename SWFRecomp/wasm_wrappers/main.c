@@ -7,7 +7,7 @@
 #include "draws.h"
 #endif
 
-static SWFAppContext app_context = {
+SWFAppContext app_context = {
     .frame_funcs = NULL,
     .frame_count = 0
 };

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-08T01:31:38Z",
+  "generated": "2026-02-08T02:22:10Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2204,6 +2204,34 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/define_shape4",
+      "name": "define_shape4",
+      "type": "graphics",
+      "path": "examples/graphics/define_shape4",
+      "has_swf": true,
+      "wasm_file": "define_shape4.wasm",
+      "js_file": "define_shape4.js",
+      "description": "WebGPU rendering test with DefineShape4 (tag 83) and LineStyle2",
+      "swf_version": 8,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/focal_radial_gradient",
+      "name": "focal_radial_gradient",
+      "type": "graphics",
+      "path": "examples/graphics/focal_radial_gradient",
+      "has_swf": true,
+      "js_file": "focal_radial_gradient.js",
+      "wasm_file": "focal_radial_gradient.wasm",
+      "description": "WebGPU rendering test with focal radial gradient fill (type 0x13)",
+      "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
       "id": "graphics/jpeg2_bitmap",
       "name": "jpeg2_bitmap",
       "type": "graphics",
@@ -2227,6 +2255,20 @@
       "js_file": "jpeg3_bitmap.js",
       "description": "WebGPU rendering test with DefineBitsJPEG3 (tag 35) JPEG bitmap with zlib-compressed alpha channel",
       "swf_version": 7,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/jpeg4_bitmap",
+      "name": "jpeg4_bitmap",
+      "type": "graphics",
+      "path": "examples/graphics/jpeg4_bitmap",
+      "has_swf": true,
+      "js_file": "jpeg4_bitmap.js",
+      "wasm_file": "jpeg4_bitmap.wasm",
+      "description": "WebGPU rendering test with DefineBitsJPEG4 (tag 90) JPEG bitmap with zlib-compressed alpha channel and deblocking parameter",
+      "swf_version": 10,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []
@@ -2316,6 +2358,20 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/remove_object2",
+      "name": "remove_object2",
+      "type": "graphics",
+      "path": "examples/graphics/remove_object2",
+      "has_swf": true,
+      "js_file": "remove_object2.js",
+      "wasm_file": "remove_object2.wasm",
+      "description": "WebGPU rendering test with RemoveObject2 (tag 28) multi-frame object removal",
+      "swf_version": 5,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
       "id": "graphics/repeating_bitmap",
       "name": "repeating_bitmap",
       "type": "graphics",
@@ -2380,6 +2436,20 @@
       "wasm_file": "sssquare.wasm",
       "js_file": "sssquare.js",
       "description": "WebGPU rendering test with multiple stroked squares",
+      "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/static_text",
+      "name": "static_text",
+      "type": "graphics",
+      "path": "examples/graphics/static_text",
+      "has_swf": true,
+      "js_file": "static_text.js",
+      "wasm_file": "static_text.wasm",
+      "description": "WebGPU rendering test with DefineFont (tag 10) and DefineText (tag 11)",
       "swf_version": 4,
       "fully_implemented": true,
       "opcodes_tested": [],

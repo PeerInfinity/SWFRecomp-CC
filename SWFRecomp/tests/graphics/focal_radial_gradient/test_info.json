@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "focal_radial_gradient",
+    "description": "WebGPU rendering test with focal radial gradient fill (type 0x13)",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "FOCAL_RADIAL_GRADIENT",
+      "LINE_STYLE",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

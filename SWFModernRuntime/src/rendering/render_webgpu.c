@@ -67,7 +67,11 @@ static const char* vertex_wgsl =
 "    out.v_args = colors[out.v_style_id];\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x10u) {\n"
 "    let inv_pos = inv_mats[out.v_style_id] * pos;\n"
-"    out.v_args = vec4f(inv_pos.xy, 0.0, 0.0);\n"
+"    var focal_z = 0.0;\n"
+"    if (out.v_style_type == 0x13u) {\n"
+"      focal_z = (f32(style_upper) - 32768.0) / 16384.0;\n"
+"    }\n"
+"    out.v_args = vec4f(inv_pos.xy, focal_z, 0.0);\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x40u) {\n"
 "    let inv_pos = inv_mats[style_upper] * pos;\n"
 "    let sizes = bitmap_sizes[out.v_style_id];\n"
@@ -98,6 +102,20 @@ static const char* fragment_wgsl =
 "\n"
 "fn linear_t(v_args: vec4f) -> f32 { return (v_args.x + 16384.0) / 32768.0; }\n"
 "fn radial_t(v_args: vec4f) -> f32 { return distance(v_args.xy, vec2f(0.0)) / 16384.0; }\n"
+"fn focal_radial_t(v_args: vec4f) -> f32 {\n"
+"  let f = v_args.z;\n"
+"  let R = 16384.0;\n"
+"  let fx = f * R;\n"
+"  let dx = v_args.x - fx;\n"
+"  let dy = v_args.y;\n"
+"  let A = dx * dx + dy * dy;\n"
+"  let B = 2.0 * fx * dx;\n"
+"  let C = fx * fx - R * R;\n"
+"  let disc = B * B - 4.0 * A * C;\n"
+"  let s_denom = -B + sqrt(max(disc, 0.0));\n"
+"  if (s_denom < 0.001) { return 0.0; }\n"
+"  return clamp(2.0 * A / s_denom, 0.0, 1.0);\n"
+"}\n"
 "\n"
 "fn apply_cxform(color: vec4f, cxform_id: u32) -> vec4f {\n"
 "  let ci = cxform_id * 5u;\n"
@@ -111,6 +129,7 @@ static const char* fragment_wgsl =
 "  // Sample all textures unconditionally (uniform control flow required by Chrome/Dawn)\n"
 "  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), 0.5), i32(in.v_style_id));\n"
 "  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), 0.5), i32(in.v_style_id));\n"
+"  let focal_sample = textureSample(gradient_tex, gradient_samp, vec2f(focal_radial_t(in.v_args), 0.5), i32(in.v_style_id));\n"
 "  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id));\n"
 "  let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
 "  let bitmap_repeat_sample = textureSample(bitmap_tex, bitmap_samp, fract(in.v_args.xy / bm_ratio) * bm_ratio, i32(in.v_style_id));\n"
@@ -121,6 +140,8 @@ static const char* fragment_wgsl =
 "    color = linear_sample;\n"
 "  } else if (in.v_style_type == 0x12u) {\n"
 "    color = radial_sample;\n"
+"  } else if (in.v_style_type == 0x13u) {\n"
+"    color = focal_sample;\n"
 "  } else if (in.v_style_type == 0x40u || in.v_style_type == 0x42u) {\n"
 "    color = bitmap_repeat_sample;\n"
 "  } else if (in.v_style_type == 0x41u || in.v_style_type == 0x43u) {\n"
@@ -519,7 +540,7 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 static void create_textures(WebGPURenderContext* ctx)
 {
-	size_t sizeof_gradient = 256 * 4 * sizeof(float);
+	size_t sizeof_gradient = 256 * 4; // 256 RGBA8 entries per gradient = 1024 bytes
 	size_t num_gradients = ctx->gradient_data_size / sizeof_gradient;
 
 	// --- Gradient texture array ---
@@ -541,19 +562,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		view_desc.mipLevelCount = 1;
 		ctx->gradient_tex_view = wgpuTextureCreateView(ctx->gradient_tex, &view_desc);
 
-		// Upload gradient data (each gradient = 256 RGBA pixels = 1024 bytes)
-		// Note: gradient_data is stored as float RGBA (256 * 4 * sizeof(float) per gradient)
-		// but the texture is RGBA8Unorm, so the data is actually u8 per channel.
-		// Actually in flashbang.c, gradient_data_size / sizeof_gradient gives count,
-		// and sizeof_gradient = 256*4*sizeof(float). But the texture is RGBA8.
-		// The upstream stores gradient pixels as floats but uploads them to an
-		// R8G8B8A8 texture. So the data is actually packed u8 RGBA, and
-		// sizeof_gradient is just used for counting.
-		// Let's check: 256 pixels * 4 bytes/pixel = 1024 bytes per gradient as RGBA8.
-		// But sizeof_gradient = 256*4*4 = 4096. So the data is float per channel.
-		// flashbang.c uploads it directly to RGBA8 texture... this suggests
-		// the data is actually u8 despite sizeof_gradient being calculated with sizeof(float).
-		// Let's match flashbang: upload gradient_data directly.
+		// Upload gradient data: each gradient = 256 RGBA8 pixels = 1024 bytes
 		WGPUTexelCopyTextureInfo dest = {0};
 		dest.texture = ctx->gradient_tex;
 		WGPUTexelCopyBufferLayout layout = {0};

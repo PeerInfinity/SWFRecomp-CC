@@ -8,37 +8,37 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Total SWF Features**: 60
 
-**Features With Tests**: 25/60
+**Features With Tests**: 32/60
 
-**Features Without Tests**: 35
+**Features Without Tests**: 28
 
-**Total Feature Tests**: 101
+**Total Feature Tests**: 120
 
-**Fully Implemented**: 25/60
+**Fully Implemented**: 32/60
 
 ## Summary Tables
 
 ### Shape Tags
-(3/4 with tests)
+(4/4 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [DefineShape](#define-shape) | Basic shape definition (SWF tag 2) | 2 | 21 | Yes |
+| [DefineShape](#define-shape) | Basic shape definition (SWF tag 2) | 2 | 24 | Yes |
 | [DefineShape2](#define-shape2) | Extended shape with >255 styles (SWF tag 22) | 22 | 2 | Yes |
 | [DefineShape3](#define-shape3) | Shape with full RGBA support (SWF tag 32) | 32 | 1 | Yes |
-| [DefineShape4](#define-shape4) | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | 83 | **0** | No |
+| [DefineShape4](#define-shape4) | Shape with LINESTYLE2 and edge bounds (SWF tag 83) | 83 | 1 | Yes |
 
 ### Fill Types
-(7/8 with tests)
+(8/8 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [SolidFill](#solid-fill) | Solid color fill (type 0x00) | - | 13 | Yes |
+| [SolidFill](#solid-fill) | Solid color fill (type 0x00) | - | 15 | Yes |
 | [LinearGradient](#linear-gradient) | Linear gradient fill (type 0x10) | - | 2 | Yes |
 | [RadialGradient](#radial-gradient) | Radial gradient fill (type 0x12) | - | 1 | Yes |
-| [FocalRadialGradient](#focal-radial-gradient) | Focal radial gradient fill (type 0x13, SWF 8+) | - | **0** | No |
+| [FocalRadialGradient](#focal-radial-gradient) | Focal radial gradient fill (type 0x13, SWF 8+) | - | 1 | Yes |
 | [RepeatingBitmap](#repeating-bitmap) | Tiled bitmap fill (type 0x40) | - | 1 | Yes |
-| [ClippedBitmap](#clipped-bitmap) | Clipped bitmap fill (type 0x41) | - | 5 | Yes |
+| [ClippedBitmap](#clipped-bitmap) | Clipped bitmap fill (type 0x41) | - | 6 | Yes |
 | [NonSmoothedRepeatingBitmap](#non-smoothed-repeating-bitmap) | Tiled bitmap without anti-aliasing (type 0x42) | - | 1 | Yes |
 | [NonSmoothedClippedBitmap](#non-smoothed-clipped-bitmap) | Clipped bitmap without anti-aliasing (type 0x43) | - | 1 | Yes |
 
@@ -47,20 +47,20 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 23 | Yes |
+| [StraightEdge](#straight-edge) | Straight edge records (LineTo) | - | 28 | Yes |
 | [CurvedEdge](#curved-edge) | Curved edge records (CurveTo) | - | 3 | Yes |
 
 ### Style Features
-(2/3 with tests)
+(3/3 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [LineStyle](#line-style) | Basic stroke line style (LINESTYLE) | - | 11 | Yes |
-| [LineStyle2](#line-style2) | Advanced line style with caps/joins (LINESTYLE2, DefineShape4) | - | **0** | No |
+| [LineStyle](#line-style) | Basic stroke line style (LINESTYLE) | - | 12 | Yes |
+| [LineStyle2](#line-style2) | Advanced line style with caps/joins (LINESTYLE2, DefineShape4) | - | 1 | Yes |
 | [NewStyles](#new-styles) | Mid-shape style changes (StateNewStyles) | - | 2 | Yes |
 
 ### Image/Bitmap Tags
-(6/7 with tests)
+(7/7 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
@@ -68,12 +68,12 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [JPEGTables](#jpeg-tables) | Shared JPEG encoding tables (SWF tag 8) | 8 | 1 | Yes |
 | [DefineBitsJPEG2](#define-bits-jpeg2) | Self-contained JPEG image (SWF tag 21) | 21 | 1 | Yes |
 | [DefineBitsJPEG3](#define-bits-jpeg3) | JPEG image with alpha channel (SWF tag 35) | 35 | 1 | Yes |
-| [DefineBitsJPEG4](#define-bits-jpeg4) | JPEG with embedded alpha (SWF tag 90, SWF 10+) | 90 | **0** | No |
+| [DefineBitsJPEG4](#define-bits-jpeg4) | JPEG with embedded alpha (SWF tag 90, SWF 10+) | 90 | 1 | Yes |
 | [DefineBitsLossless](#define-bits-lossless) | Lossless RGB bitmap (SWF tag 20) | 20 | 4 | Yes |
 | [DefineBitsLossless2](#define-bits-lossless2) | Lossless RGBA bitmap (SWF tag 36) | 36 | 1 | Yes |
 
 ### Display List Tags
-(0/5 with tests)
+(1/5 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
@@ -81,7 +81,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [PlaceObject2](#place-object2) | Enhanced object placement (SWF tag 26) | 26 | **0** | No |
 | [PlaceObject3](#place-object3) | Object placement with filters/blend (SWF tag 70) | 70 | **0** | No |
 | [RemoveObject](#remove-object) | Remove object by ID (SWF tag 5) | 5 | **0** | No |
-| [RemoveObject2](#remove-object2) | Remove object by depth (SWF tag 28) | 28 | **0** | No |
+| [RemoveObject2](#remove-object2) | Remove object by depth (SWF tag 28) | 28 | 1 | Yes |
 
 ### Transform Features
 (4/4 with tests)
@@ -102,15 +102,15 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineMorphShape2](#define-morph-shape2) | Enhanced morphing with LINESTYLE2 (SWF tag 84) | 84 | **0** | No |
 
 ### Text Tags
-(0/7 with tests)
+(2/7 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| [DefineFont](#define-font) | Basic font with glyph shapes (SWF tag 10) | 10 | **0** | No |
+| [DefineFont](#define-font) | Basic font with glyph shapes (SWF tag 10) | 10 | 1 | Yes |
 | [DefineFont2](#define-font2) | Font with layout metrics (SWF tag 48) | 48 | **0** | No |
 | [DefineFont3](#define-font3) | Enhanced font definition (SWF tag 75) | 75 | **0** | No |
 | [DefineFont4](#define-font4) | CFF font for Flash Text Engine (SWF tag 91) | 91 | **0** | No |
-| [DefineText](#define-text) | Static text with glyph indices (SWF tag 11) | 11 | **0** | No |
+| [DefineText](#define-text) | Static text with glyph indices (SWF tag 11) | 11 | 1 | Yes |
 | [DefineText2](#define-text2) | Static text with RGBA colors (SWF tag 33) | 33 | **0** | No |
 | [DefineEditText](#define-edit-text) | Dynamic/editable text field (SWF tag 37) | 37 | **0** | No |
 
@@ -165,34 +165,41 @@ See also: [AS2 Opcode Index](opcode-index.md)
 ## Implementation Status
 
 ### Fully Implemented
-(25 features)
+(32 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
-| [DefineShape](#define-shape) | Shape Tags | 2 | 21 |
+| [DefineShape](#define-shape) | Shape Tags | 2 | 24 |
 | [DefineShape2](#define-shape2) | Shape Tags | 22 | 2 |
 | [DefineShape3](#define-shape3) | Shape Tags | 32 | 1 |
-| [SolidFill](#solid-fill) | Fill Types | - | 13 |
+| [DefineShape4](#define-shape4) | Shape Tags | 83 | 1 |
+| [SolidFill](#solid-fill) | Fill Types | - | 15 |
 | [LinearGradient](#linear-gradient) | Fill Types | - | 2 |
 | [RadialGradient](#radial-gradient) | Fill Types | - | 1 |
+| [FocalRadialGradient](#focal-radial-gradient) | Fill Types | - | 1 |
 | [RepeatingBitmap](#repeating-bitmap) | Fill Types | - | 1 |
-| [ClippedBitmap](#clipped-bitmap) | Fill Types | - | 5 |
+| [ClippedBitmap](#clipped-bitmap) | Fill Types | - | 6 |
 | [NonSmoothedRepeatingBitmap](#non-smoothed-repeating-bitmap) | Fill Types | - | 1 |
 | [NonSmoothedClippedBitmap](#non-smoothed-clipped-bitmap) | Fill Types | - | 1 |
-| [StraightEdge](#straight-edge) | Edge Types | - | 23 |
+| [StraightEdge](#straight-edge) | Edge Types | - | 28 |
 | [CurvedEdge](#curved-edge) | Edge Types | - | 3 |
-| [LineStyle](#line-style) | Style Features | - | 11 |
+| [LineStyle](#line-style) | Style Features | - | 12 |
+| [LineStyle2](#line-style2) | Style Features | - | 1 |
 | [NewStyles](#new-styles) | Style Features | - | 2 |
 | [DefineBits](#define-bits) | Image/Bitmap Tags | 6 | 1 |
 | [JPEGTables](#jpeg-tables) | Image/Bitmap Tags | 8 | 1 |
 | [DefineBitsJPEG2](#define-bits-jpeg2) | Image/Bitmap Tags | 21 | 1 |
 | [DefineBitsJPEG3](#define-bits-jpeg3) | Image/Bitmap Tags | 35 | 1 |
+| [DefineBitsJPEG4](#define-bits-jpeg4) | Image/Bitmap Tags | 90 | 1 |
 | [DefineBitsLossless](#define-bits-lossless) | Image/Bitmap Tags | 20 | 4 |
 | [DefineBitsLossless2](#define-bits-lossless2) | Image/Bitmap Tags | 36 | 1 |
+| [RemoveObject2](#remove-object2) | Display List Tags | 28 | 1 |
 | [PlaceObject2 Scale](#place-scale) | Transform Features | - | 1 |
 | [PlaceObject2 Skew](#place-skew) | Transform Features | - | 1 |
 | [ColorTransform](#color-transform) | Transform Features | - | 1 |
 | [ClipDepth](#clip-depth) | Transform Features | - | 1 |
+| [DefineFont](#define-font) | Text Tags | 10 | 1 |
+| [DefineText](#define-text) | Text Tags | 11 | 1 |
 | [DefineSprite](#define-sprite) | Sprite Tags | 39 | 1 |
 
 ### Partially Tested
@@ -205,22 +212,15 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 | Feature | Category | Tag ID |
 |---------|----------|--------|
-| [DefineShape4](#define-shape4) | Shape Tags | 83 |
-| [FocalRadialGradient](#focal-radial-gradient) | Fill Types | - |
-| [LineStyle2](#line-style2) | Style Features | - |
-| [DefineBitsJPEG4](#define-bits-jpeg4) | Image/Bitmap Tags | 90 |
 | [PlaceObject](#place-object) | Display List Tags | 4 |
 | [PlaceObject2](#place-object2) | Display List Tags | 26 |
 | [PlaceObject3](#place-object3) | Display List Tags | 70 |
 | [RemoveObject](#remove-object) | Display List Tags | 5 |
-| [RemoveObject2](#remove-object2) | Display List Tags | 28 |
 | [DefineMorphShape](#define-morph-shape) | Morph Shape Tags | 46 |
 | [DefineMorphShape2](#define-morph-shape2) | Morph Shape Tags | 84 |
-| [DefineFont](#define-font) | Text Tags | 10 |
 | [DefineFont2](#define-font2) | Text Tags | 48 |
 | [DefineFont3](#define-font3) | Text Tags | 75 |
 | [DefineFont4](#define-font4) | Text Tags | 91 |
-| [DefineText](#define-text) | Text Tags | 11 |
 | [DefineText2](#define-text2) | Text Tags | 33 |
 | [DefineEditText](#define-edit-text) | Text Tags | 37 |
 | [DefineButton](#define-button) | Button Tags | 7 |
@@ -262,13 +262,16 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/focal_radial_gradient`
 - `SWFRecomp/tests/graphics/jpeg2_bitmap`
 - `SWFRecomp/tests/graphics/jpeg3_bitmap`
+- `SWFRecomp/tests/graphics/jpeg4_bitmap`
 - `SWFRecomp/tests/graphics/lossless_bitmap`
 - `SWFRecomp/tests/graphics/lossless_bitmap_rgba`
 - `SWFRecomp/tests/graphics/mess`
 - `SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap`
 - `SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap`
+- `SWFRecomp/tests/graphics/remove_object2`
 - `SWFRecomp/tests/graphics/repeating_bitmap`
 - `SWFRecomp/tests/graphics/ssquare`
 - `SWFRecomp/tests/graphics/sssquare`
@@ -325,9 +328,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 83
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_shape4`
 
 ---
 
@@ -348,7 +352,9 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/define_shape4`
 - `SWFRecomp/tests/graphics/new_styles`
+- `SWFRecomp/tests/graphics/remove_object2`
 - `SWFRecomp/tests/graphics/rgba_shape`
 - `SWFRecomp/tests/graphics/ssquare`
 - `SWFRecomp/tests/graphics/sssquare`
@@ -405,9 +411,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/focal_radial_gradient`
 
 ---
 
@@ -443,6 +450,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 **Tests:**
 - `SWFRecomp/tests/graphics/jpeg2_bitmap`
 - `SWFRecomp/tests/graphics/jpeg3_bitmap`
+- `SWFRecomp/tests/graphics/jpeg4_bitmap`
 - `SWFRecomp/tests/graphics/lossless_bitmap`
 - `SWFRecomp/tests/graphics/lossless_bitmap_rgba`
 - `SWFRecomp/tests/graphics/mess`
@@ -501,18 +509,23 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/define_shape4`
+- `SWFRecomp/tests/graphics/focal_radial_gradient`
 - `SWFRecomp/tests/graphics/jpeg2_bitmap`
 - `SWFRecomp/tests/graphics/jpeg3_bitmap`
+- `SWFRecomp/tests/graphics/jpeg4_bitmap`
 - `SWFRecomp/tests/graphics/lossless_bitmap`
 - `SWFRecomp/tests/graphics/lossless_bitmap_rgba`
 - `SWFRecomp/tests/graphics/mess`
 - `SWFRecomp/tests/graphics/new_styles`
 - `SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap`
 - `SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap`
+- `SWFRecomp/tests/graphics/remove_object2`
 - `SWFRecomp/tests/graphics/repeating_bitmap`
 - `SWFRecomp/tests/graphics/rgba_shape`
 - `SWFRecomp/tests/graphics/ssquare`
 - `SWFRecomp/tests/graphics/sssquare`
+- `SWFRecomp/tests/graphics/static_text`
 - `SWFRecomp/tests/graphics/thiccie`
 - `SWFRecomp/tests/graphics/three_boxes`
 - `SWFRecomp/tests/graphics/three_boxes_hole`
@@ -558,6 +571,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 - `SWFRecomp/tests/graphics/awful_radial_gradient`
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/focal_radial_gradient`
 - `SWFRecomp/tests/graphics/new_styles`
 - `SWFRecomp/tests/graphics/rgba_shape`
 - `SWFRecomp/tests/graphics/thiccie`
@@ -578,9 +592,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_shape4`
 
 ---
 
@@ -680,9 +695,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 90
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/jpeg4_bitmap`
 
 ---
 
@@ -797,9 +813,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 28
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/remove_object2`
 
 ---
 
@@ -913,9 +930,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 10
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/static_text`
 
 ---
 
@@ -977,9 +995,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 11
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/static_text`
 
 ---
 

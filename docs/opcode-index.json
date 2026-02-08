@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 24
+    "graphics_features_with_tests": 32
   },
   "entries": [
     {
@@ -8613,12 +8613,16 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/focal_radial_gradient",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
@@ -8659,8 +8663,10 @@
       "tag_id": 83,
       "category": "Shape Tags",
       "description": "Shape with LINESTYLE2 and edge bounds (SWF tag 83)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_shape4"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOLID_FILL",
@@ -8673,7 +8679,9 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
@@ -8714,8 +8722,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Focal radial gradient fill (type 0x13, SWF 8+)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/focal_radial_gradient"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "REPEATING_BITMAP",
@@ -8737,6 +8747,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess"
@@ -8749,8 +8760,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Tiled bitmap without anti-aliasing (type 0x42)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "NON_SMOOTHED_CLIPPED_BITMAP",
@@ -8775,17 +8788,23 @@
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_shape4",
+        "SWFRecomp/tests/graphics/focal_radial_gradient",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
+        "SWFRecomp/tests/graphics/static_text",
         "SWFRecomp/tests/graphics/thiccie",
         "SWFRecomp/tests/graphics/three_boxes",
         "SWFRecomp/tests/graphics/three_boxes_hole",
@@ -8819,6 +8838,7 @@
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/focal_radial_gradient",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/thiccie",
@@ -8835,8 +8855,10 @@
       "tag_id": null,
       "category": "Style Features",
       "description": "Advanced line style with caps/joins (LINESTYLE2, DefineShape4)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_shape4"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "NEW_STYLES",
@@ -8900,8 +8922,10 @@
       "tag_id": 90,
       "category": "Image/Bitmap Tags",
       "description": "JPEG with embedded alpha (SWF tag 90, SWF 10+)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/jpeg4_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_LOSSLESS",
@@ -8912,6 +8936,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
         "SWFRecomp/tests/graphics/repeating_bitmap"
       ],
       "fully_implemented": true
@@ -8969,8 +8994,10 @@
       "tag_id": 28,
       "category": "Display List Tags",
       "description": "Remove object by depth (SWF tag 28)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/remove_object2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_SCALE",
@@ -9040,8 +9067,10 @@
       "tag_id": 10,
       "category": "Text Tags",
       "description": "Basic font with glyph shapes (SWF tag 10)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/static_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT2",
@@ -9076,8 +9105,10 @@
       "tag_id": 11,
       "category": "Text Tags",
       "description": "Static text with glyph indices (SWF tag 11)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/static_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_TEXT2",

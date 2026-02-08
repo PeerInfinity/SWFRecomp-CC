@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "static_text",
+    "description": "WebGPU rendering test with DefineFont (tag 10) and DefineText (tag 11)",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_FONT",
+      "DEFINE_TEXT",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

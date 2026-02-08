@@ -125,7 +125,8 @@ namespace SWFRecomp
 								 current_text(0),
 								 current_cxform(0),
 								 jpeg_tables(nullptr),
-							 shape_has_alpha(false)
+							 shape_has_alpha(false),
+							 shape_is_v4(false)
 	{
 		// Configure reusable struct records
 		//
@@ -505,7 +506,9 @@ namespace SWFRecomp
 							 << endl;
 		}
 
-		context.tag_main << "void tagInit()" << endl
+		context.tag_main << "extern SWFAppContext app_context;" << endl
+						 << endl
+						 << "void tagInit()" << endl
 						 << "{"
 						 << tag_init.str() << endl
 						 << "}";
@@ -834,7 +837,9 @@ namespace SWFRecomp
 			}
 
 			case SWF_TAG_DEFINE_BITS_JPEG3:
+			case SWF_TAG_DEFINE_BITS_JPEG4:
 			{
+				bool is_jpeg4 = (tag.code == SWF_TAG_DEFINE_BITS_JPEG4);
 				size_t new_length = tag.length;
 
 				tag.clearFields();
@@ -856,6 +861,17 @@ namespace SWFRecomp
 
 				u32 alpha_data_offset = (u32) tag.fields[0].value;
 				new_length -= 4;
+
+				// JPEG4 has an extra UI16 deblocking filter parameter (ignored)
+				if (is_jpeg4)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+					// deblockParam (FIXED8) - parsed and discarded
+					new_length -= 2;
+				}
 
 				// JPEG data is alpha_data_offset bytes, alpha data follows
 				char* jpeg_start = cur_pos;
@@ -1142,6 +1158,7 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
+			case SWF_TAG_DEFINE_SHAPE_4:
 			{
 				interpretShape(context, tag);
 
@@ -1427,7 +1444,7 @@ namespace SWFRecomp
 					size_t text_size = current_text - text_start;
 					tag_init << endl
 							 << "\t" << "tagDefineText("
-							 << "app_context, "
+							 << "&app_context, "
 							 << to_string(char_id) << ", "
 							 << to_string(text_start) << ", "
 							 << to_string(text_size) << ", "
@@ -1642,13 +1659,26 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_REMOVE_OBJECT_2:
+			{
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+
+				u16 depth = (u16) tag.fields[0].value;
+
+				context.tag_main << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
+
+				break;
+			}
+
 			case SWF_TAG_ENABLE_DEBUGGER:
 			{
 				cur_pos += tag.length;
-				
+
 				break;
 			}
-			
+
 			case SWF_TAG_ENABLE_DEBUGGER_2:
 			{
 				cur_pos += tag.length;
@@ -1921,6 +1951,19 @@ namespace SWFRecomp
 							break;
 						}
 
+						case SWF_TAG_REMOVE_OBJECT_2:
+						{
+							sub_tag.setFieldCount(1);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.parseFields(cur_pos);
+
+							u16 depth = (u16) sub_tag.fields[0].value;
+
+							sprite_definitions << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
+
+							break;
+						}
+
 						case SWF_TAG_END_TAG:
 						{
 							if (!sprite_another_frame)
@@ -2063,6 +2106,7 @@ namespace SWFRecomp
 				
 				case FILL_GRAD_LINEAR:
 				case FILL_GRAD_RADIAL:
+				case FILL_GRAD_FOCAL:
 				{
 					MATRIX matrix;
 					parseMatrix(matrix);
@@ -2159,12 +2203,32 @@ namespace SWFRecomp
 					}
 					
 					fill_styles[i].index = current_gradient;
-					
+
+					// Parse focal point for FOCALGRADIENT (fill type 0x13)
+					if (fill_styles[i].type == FILL_GRAD_FOCAL)
+					{
+						fill_data.clearFields();
+						fill_data.setFieldCount(1);
+
+						fill_data.configureNextField(SWF_FIELD_UI16);
+
+						fill_data.parseFields(cur_pos);
+
+						// FIXED8: signed 8.8 fixed-point, value / 256.0
+						s16 focal_fixed8 = (s16) fill_data.fields[0].value;
+						float focal_point = (float) focal_fixed8 / 256.0f;
+
+						// Encode focal point in upper 16 bits of index
+						// Shader decodes: focal = (style_upper - 32768) / 16384.0
+						u16 focal_encoded = (u16) (focal_point * 16384.0f + 32768.0f);
+						fill_styles[i].index |= ((size_t) focal_encoded << 16);
+					}
+
 					current_gradient += 1;
-					
+
 					break;
 				}
-				
+
 				case FILL_BITMAP_REPEAT:
 				case FILL_BITMAP_CLIPPED:
 				case FILL_BITMAP_REPEAT_NONSMOOTH:
@@ -2198,12 +2262,83 @@ namespace SWFRecomp
 	LineStyle* SWF::parseLineStyles(u16 line_style_count)
 	{
 		SWFTag line_data;
-		
+
 		LineStyle* line_styles = new LineStyle[line_style_count];
-		
+
 		for (u16 i = 0; i < line_style_count; ++i)
 		{
-			if (shape_has_alpha)
+			if (shape_is_v4)
+			{
+				// LINESTYLE2 format
+				// Width: UI16
+				line_data.clearFields();
+				line_data.setFieldCount(1);
+
+				line_data.configureNextField(SWF_FIELD_UI16, 16);
+
+				line_data.parseFields(cur_pos);
+
+				line_styles[i].width = (u16) line_data.fields[0].value;
+
+				// StartCapStyle(UB2), JoinStyle(UB2), HasFillFlag(UB1),
+				// NoHScaleFlag(UB1), NoVScaleFlag(UB1), PixelHintingFlag(UB1)
+				line_data.clearFields();
+				line_data.setFieldCount(1);
+
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+
+				line_data.parseFields(cur_pos);
+
+				u8 flags1 = (u8) line_data.fields[0].value;
+				u8 join_style = (flags1 >> 4) & 0x03;
+				bool has_fill = (flags1 >> 3) & 0x01;
+
+				// Reserved(UB5), NoClose(UB1), EndCapStyle(UB2)
+				line_data.clearFields();
+				line_data.setFieldCount(1);
+
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+
+				line_data.parseFields(cur_pos);
+
+				// MiterLimitFactor: FIXED8 (only if JoinStyle == 2)
+				if (join_style == 2)
+				{
+					line_data.clearFields();
+					line_data.setFieldCount(1);
+
+					line_data.configureNextField(SWF_FIELD_UI16, 16);
+
+					line_data.parseFields(cur_pos);
+
+					// Miter limit parsed and ignored for now
+				}
+
+				if (!has_fill)
+				{
+					// Color: RGBA
+					RGBA.parseFields(cur_pos);
+
+					line_styles[i].r = (u8) RGBA.fields[0].value;
+					line_styles[i].g = (u8) RGBA.fields[1].value;
+					line_styles[i].b = (u8) RGBA.fields[2].value;
+					line_styles[i].a = (u8) RGBA.fields[3].value;
+				}
+				else
+				{
+					// FillType: FILLSTYLE - parse and extract color for basic rendering
+					// For now, skip the fill style and use a default color
+					FillStyle* fill = parseFillStyles(1);
+
+					line_styles[i].r = fill[0].r;
+					line_styles[i].g = fill[0].g;
+					line_styles[i].b = fill[0].b;
+					line_styles[i].a = fill[0].a;
+
+					delete[] fill;
+				}
+			}
+			else if (shape_has_alpha)
 			{
 				line_data.clearFields();
 				line_data.setFieldCount(5);
@@ -2251,22 +2386,22 @@ namespace SWFRecomp
 
 			current_color += 1;
 		}
-		
+
 		return line_styles;
 	}
 	
 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
 	{
-		// TODO: DefineShape4
-
 		bool is_font = shape_tag.code == SWF_TAG_DEFINE_FONT;
-		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3);
+		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
+		shape_is_v4 = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
 
 		switch (shape_tag.code)
 		{
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
+			case SWF_TAG_DEFINE_SHAPE_4:
 			case SWF_TAG_DEFINE_FONT:
 			{
 				u16 shape_id;
@@ -2288,9 +2423,36 @@ namespace SWFRecomp
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
 					
 					shape_tag.parseFields(cur_pos);
-					
+
 					shape_id = (u16) shape_tag.fields[0].value;
-					
+
+					if (shape_is_v4)
+					{
+						// DefineShape4 has an additional EdgeBounds RECT after ShapeBounds
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(5);
+
+						shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+
+						shape_tag.parseFields(cur_pos);
+
+						// EdgeBounds parsed and ignored (used for player optimization only)
+
+						// Flags byte: Reserved(UB5) + UsesFillWindingRule(UB1) + UsesNonScalingStrokes(UB1) + UsesScalingStrokes(UB1)
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(1);
+
+						shape_tag.configureNextField(SWF_FIELD_UI8, 8);
+
+						shape_tag.parseFields(cur_pos);
+
+						// Flags parsed and ignored for rendering purposes
+					}
+
 					// FILLSTYLEARRAY
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(1);
@@ -2529,7 +2691,7 @@ namespace SWFRecomp
 					
 					// StyleChangeRecord
 					
-					// StateNewStyles is only used by DefineShape2 and DefineShape3
+					// StateNewStyles is only used by DefineShape2, DefineShape3, and DefineShape4
 					bool state_new_styles = (state_flags & 0b10000) != 0;
 					bool state_line_style = !is_font && (state_flags & 0b01000) != 0;
 					bool state_fill_style_1 = (state_flags & 0b00100) != 0;
@@ -2981,8 +3143,11 @@ namespace SWFRecomp
 					}
 				}
 				
-				context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
-				
+				if (!is_font)
+				{
+					context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
+				}
+
 				current_tri += tris_size;
 				
 				break;

@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "jpeg4_bitmap",
+    "description": "WebGPU rendering test with DefineBitsJPEG4 (tag 90) JPEG bitmap with zlib-compressed alpha channel and deblocking parameter",
+    "swf_version": 10,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_JPEG4",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

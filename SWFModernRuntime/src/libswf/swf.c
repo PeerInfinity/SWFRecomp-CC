@@ -14,6 +14,7 @@
 #endif
 
 int quit_swf;
+int is_playing = 1;
 int bad_poll;
 size_t current_frame;
 size_t next_frame;
