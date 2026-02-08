@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "repeating_bitmap",
+    "description": "WebGPU rendering test with RepeatingBitmap fill type (0x40) tiling a lossless bitmap",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_LOSSLESS",
+      "REPEATING_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

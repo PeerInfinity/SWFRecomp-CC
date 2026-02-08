@@ -2165,6 +2165,7 @@ namespace SWFRecomp
 					break;
 				}
 				
+				case FILL_BITMAP_REPEAT:
 				case FILL_BITMAP_CLIPPED:
 				{
 					fill_data.clearFields();

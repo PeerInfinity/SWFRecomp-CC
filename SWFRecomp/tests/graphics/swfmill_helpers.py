@@ -113,6 +113,26 @@ class ClippedBitmapFill:
         SubElement(mat_el, "Transform", **attrs)
 
 
+class RepeatingBitmapFill:
+    """Repeating (tiled) bitmap fill referencing a DefineBits object."""
+    def __init__(self, object_id, matrix):
+        self.object_id = object_id
+        self.matrix = matrix
+
+    def to_xml(self, parent):
+        bmp = SubElement(parent, "TiledBitmap", objectID=str(self.object_id))
+        mat_el = SubElement(bmp, "matrix")
+        attrs = {}
+        for key in ("scaleX", "scaleY", "skewX", "skewY", "transX", "transY"):
+            if key in self.matrix:
+                val = self.matrix[key]
+                if isinstance(val, float):
+                    attrs[key] = f"{val:.16f}"
+                else:
+                    attrs[key] = str(val)
+        SubElement(mat_el, "Transform", **attrs)
+
+
 # ---------------------------------------------------------------------------
 # Color transform
 # ---------------------------------------------------------------------------
