@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-08T20:41:16Z",
+  "generated": "2026-02-08T21:28:29Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2213,6 +2213,20 @@
       "wasm_file": "define_font2.wasm",
       "description": "WebGPU rendering test for DefineFont2 (tag 48) with DefineText",
       "swf_version": 6,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/define_morph_shape",
+      "name": "define_morph_shape",
+      "type": "graphics",
+      "path": "examples/graphics/define_morph_shape",
+      "has_swf": true,
+      "js_file": "define_morph_shape.js",
+      "wasm_file": "define_morph_shape.wasm",
+      "description": "DefineMorphShape (tag 46) rendered at ratio=0 (start shape)",
+      "swf_version": 7,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

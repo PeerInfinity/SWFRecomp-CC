@@ -1157,6 +1157,7 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
 			case SWF_TAG_DEFINE_SHAPE_4:
+			case SWF_TAG_DEFINE_MORPH_SHAPE:
 			{
 				interpretShape(context, tag);
 
@@ -2466,11 +2467,256 @@ namespace SWFRecomp
 
 		return line_styles;
 	}
-	
+
+	FillStyle* SWF::parseMorphFillStyles(u16 fill_style_count)
+	{
+		SWFTag fill_data;
+
+		FillStyle* fill_styles = new FillStyle[fill_style_count];
+
+		for (u16 i = 0; i < fill_style_count; ++i)
+		{
+			fill_data.clearFields();
+			fill_data.setFieldCount(1);
+
+			fill_data.configureNextField(SWF_FIELD_UI8, 8);
+
+			fill_data.parseFields(cur_pos);
+
+			fill_styles[i].type = (u8) fill_data.fields[0].value;
+
+			switch (fill_styles[i].type)
+			{
+				case FILL_SOLID:
+				{
+					// StartColor (RGBA)
+					RGBA.parseFields(cur_pos);
+
+					fill_styles[i].r = (u8) RGBA.fields[0].value;
+					fill_styles[i].g = (u8) RGBA.fields[1].value;
+					fill_styles[i].b = (u8) RGBA.fields[2].value;
+					fill_styles[i].a = (u8) RGBA.fields[3].value;
+
+					// Skip EndColor (RGBA = 4 bytes)
+					cur_pos += 4;
+
+					fill_styles[i].index = current_color;
+
+					color_data << "\t" << "{ "
+							   << to_string(fill_styles[i].r) << "/255.0f, "
+							   << to_string(fill_styles[i].g) << "/255.0f, "
+							   << to_string(fill_styles[i].b) << "/255.0f, "
+							   << to_string(fill_styles[i].a) << "/255.0f }," << endl;
+
+					current_color += 1;
+
+					break;
+				}
+
+				case FILL_GRAD_LINEAR:
+				case FILL_GRAD_RADIAL:
+				case FILL_GRAD_FOCAL:
+				{
+					// StartGradientMatrix
+					MATRIX matrix;
+					parseMatrix(matrix);
+
+					recompileMatrix(matrix, uninv_mat_data);
+					current_uninv += 1;
+
+					// Skip EndGradientMatrix
+					MATRIX end_matrix;
+					parseMatrix(end_matrix);
+
+					// Morph gradient count is a plain UI8 (no spread/interp mode bits)
+					fill_data.clearFields();
+					fill_data.setFieldCount(1);
+
+					fill_data.configureNextField(SWF_FIELD_UI8);
+
+					fill_data.parseFields(cur_pos);
+
+					fill_styles[i].gradient.spread_mode = 0;
+					fill_styles[i].gradient.interpolation_mode = 0;
+					fill_styles[i].gradient.num_grads = (u8) fill_data.fields[0].value;
+
+					for (int j = 0; j < fill_styles[i].gradient.num_grads; ++j)
+					{
+						// StartRatio (UI8)
+						fill_data.clearFields();
+						fill_data.setFieldCount(1);
+
+						fill_data.configureNextField(SWF_FIELD_UI8);
+
+						fill_data.parseFields(cur_pos);
+
+						fill_styles[i].gradient.records[j].ratio = (u8) fill_data.fields[0].value;
+
+						// StartColor (RGBA)
+						RGBA.parseFields(cur_pos);
+
+						fill_styles[i].gradient.records[j].r = (u8) RGBA.fields[0].value;
+						fill_styles[i].gradient.records[j].g = (u8) RGBA.fields[1].value;
+						fill_styles[i].gradient.records[j].b = (u8) RGBA.fields[2].value;
+						fill_styles[i].gradient.records[j].a = (u8) RGBA.fields[3].value;
+
+						// Skip EndRatio (1 byte) + EndColor (4 bytes) = 5 bytes
+						cur_pos += 5;
+
+						if (j == 0)
+						{
+							continue;
+						}
+
+						GradientRecord& last_grad = fill_styles[i].gradient.records[j - 1];
+						GradientRecord& grad = fill_styles[i].gradient.records[j];
+
+						for (u8 ratio = last_grad.ratio; ratio < grad.ratio; ++ratio)
+						{
+							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
+							float t = (ratio - last_grad.ratio)/ratio_diff;
+
+							u8 r = rgbLerp(last_grad.r, grad.r, t);
+							u8 g = rgbLerp(last_grad.g, grad.g, t);
+							u8 b = rgbLerp(last_grad.b, grad.b, t);
+							u8 a = rgbLerp(last_grad.a, grad.a, t);
+
+							gradient_data << "\t" << "{ "
+										  << to_string(r) << ", "
+										  << to_string(g) << ", "
+										  << to_string(b) << ", "
+										  << to_string(a) << " },"
+										  << endl;
+						}
+
+						if (grad.ratio == 255)
+						{
+							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
+							float t = (255 - last_grad.ratio)/ratio_diff;
+
+							u8 r = rgbLerp(last_grad.r, grad.r, t);
+							u8 g = rgbLerp(last_grad.g, grad.g, t);
+							u8 b = rgbLerp(last_grad.b, grad.b, t);
+							u8 a = rgbLerp(last_grad.a, grad.a, t);
+
+							gradient_data << "\t" << "{ "
+										  << to_string(r) << ", "
+										  << to_string(g) << ", "
+										  << to_string(b) << ", "
+										  << to_string(a) << " },"
+										  << endl;
+						}
+					}
+
+					fill_styles[i].index = current_gradient;
+
+					if (fill_styles[i].type == FILL_GRAD_FOCAL)
+					{
+						fill_data.clearFields();
+						fill_data.setFieldCount(1);
+
+						fill_data.configureNextField(SWF_FIELD_UI16);
+
+						fill_data.parseFields(cur_pos);
+
+						s16 focal_fixed8 = (s16) fill_data.fields[0].value;
+						float focal_point = (float) focal_fixed8 / 256.0f;
+
+						u16 focal_encoded = (u16) (focal_point * 16384.0f + 32768.0f);
+						fill_styles[i].index |= ((size_t) focal_encoded << 16);
+					}
+
+					current_gradient += 1;
+
+					break;
+				}
+
+				case FILL_BITMAP_REPEAT:
+				case FILL_BITMAP_CLIPPED:
+				case FILL_BITMAP_REPEAT_NONSMOOTH:
+				case FILL_BITMAP_CLIPPED_NONSMOOTH:
+				{
+					fill_data.clearFields();
+					fill_data.setFieldCount(1);
+
+					fill_data.configureNextField(SWF_FIELD_UI16);
+
+					fill_data.parseFields(cur_pos);
+
+					u16 char_id = (u16) fill_data.fields[0].value;
+
+					fill_styles[i].index = ((current_uninv & 0xFFFF) << 16) | char_id_to_bitmap_id[char_id];
+
+					// StartBitmapMatrix
+					MATRIX matrix;
+					parseMatrix(matrix);
+
+					recompileMatrix(matrix, uninv_mat_data);
+					current_uninv += 1;
+
+					// Skip EndBitmapMatrix
+					MATRIX end_matrix;
+					parseMatrix(end_matrix);
+
+					break;
+				}
+			}
+		}
+
+		return fill_styles;
+	}
+
+	LineStyle* SWF::parseMorphLineStyles(u16 line_style_count)
+	{
+		SWFTag line_data;
+
+		LineStyle* line_styles = new LineStyle[line_style_count];
+
+		for (u16 i = 0; i < line_style_count; ++i)
+		{
+			// StartWidth (UI16)
+			line_data.clearFields();
+			line_data.setFieldCount(1);
+
+			line_data.configureNextField(SWF_FIELD_UI16, 16);
+
+			line_data.parseFields(cur_pos);
+
+			line_styles[i].width = (u16) line_data.fields[0].value;
+
+			// Skip EndWidth (UI16 = 2 bytes)
+			cur_pos += 2;
+
+			// StartColor (RGBA)
+			RGBA.parseFields(cur_pos);
+
+			line_styles[i].r = (u8) RGBA.fields[0].value;
+			line_styles[i].g = (u8) RGBA.fields[1].value;
+			line_styles[i].b = (u8) RGBA.fields[2].value;
+			line_styles[i].a = (u8) RGBA.fields[3].value;
+
+			// Skip EndColor (RGBA = 4 bytes)
+			cur_pos += 4;
+
+			line_styles[i].index = current_color;
+
+			color_data << "\t" << "{ "
+					   << to_string(line_styles[i].r) << "/255.0f, "
+					   << to_string(line_styles[i].g) << "/255.0f, "
+					   << to_string(line_styles[i].b) << "/255.0f, "
+					   << to_string(line_styles[i].a) << "/255.0f }," << endl;
+
+			current_color += 1;
+		}
+
+		return line_styles;
+	}
+
 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
 	{
 		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2);
-		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
+		bool is_morph = (shape_tag.code == SWF_TAG_DEFINE_MORPH_SHAPE);
+		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || shape_tag.code == SWF_TAG_DEFINE_SHAPE_4 || is_morph);
 		shape_is_v4 = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
 
 		switch (shape_tag.code)
@@ -2479,6 +2725,7 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
 			case SWF_TAG_DEFINE_SHAPE_4:
+			case SWF_TAG_DEFINE_MORPH_SHAPE:
 			case SWF_TAG_DEFINE_FONT:
 			case SWF_TAG_DEFINE_FONT_2:
 			{
@@ -2488,18 +2735,21 @@ namespace SWFRecomp
 				u16 line_style_count;
 				std::vector<LineStyle*> all_line_styles;
 				
+				// Save position at start of tag body for morph EndEdges skip
+				char* morph_tag_start = cur_pos;
+
 				if (!is_font)
 				{
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(6);
-					
+
 					shape_tag.configureNextField(SWF_FIELD_UI16, 16);
 					shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
 					shape_tag.configureNextField(SWF_FIELD_SB, 0);
-					
+
 					shape_tag.parseFields(cur_pos);
 
 					shape_id = (u16) shape_tag.fields[0].value;
@@ -2531,37 +2781,71 @@ namespace SWFRecomp
 						// Flags parsed and ignored for rendering purposes
 					}
 
+					if (is_morph)
+					{
+						// DefineMorphShape: parse EndBounds RECT (skip) and Offset (skip)
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(5);
+
+						shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+						shape_tag.configureNextField(SWF_FIELD_SB, 0);
+
+						shape_tag.parseFields(cur_pos);
+
+						// EndBounds parsed and ignored (not needed at ratio=0)
+
+						// Offset (UI32) - distance from end of Offset to EndEdges
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(1);
+
+						shape_tag.configureNextField(SWF_FIELD_UI32, 32);
+
+						shape_tag.parseFields(cur_pos);
+
+						// Offset parsed and ignored (we skip EndEdges using tag length)
+					}
+
 					// FILLSTYLEARRAY
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(1);
-					
+
 					shape_tag.configureNextField(SWF_FIELD_UI8, 8);
-					
+
 					shape_tag.parseFields(cur_pos);
-					
+
 					fill_style_count = (u8) shape_tag.fields[0].value;
-					
+
 					if (fill_style_count == 0xFF)
 					{
 						shape_tag.clearFields();
-						
+
 						shape_tag.configureNextField(SWF_FIELD_UI16, 16);
-						
+
 						shape_tag.parseFields(cur_pos);
-						
+
 						fill_style_count = (u16) shape_tag.fields[0].value;
 					}
-					
-					all_fill_styles.push_back(parseFillStyles(fill_style_count));
-					
+
+					if (is_morph)
+					{
+						all_fill_styles.push_back(parseMorphFillStyles(fill_style_count));
+					}
+					else
+					{
+						all_fill_styles.push_back(parseFillStyles(fill_style_count));
+					}
+
 					// LINESTYLEARRAY
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(1);
-					
+
 					shape_tag.configureNextField(SWF_FIELD_UI8, 8);
-					
+
 					shape_tag.parseFields(cur_pos);
-					
+
 					line_style_count = (u8) shape_tag.fields[0].value;
 					
 					if (line_style_count == 0xFF)
@@ -2575,9 +2859,16 @@ namespace SWFRecomp
 						line_style_count = (u16) shape_tag.fields[0].value;
 					}
 					
-					all_line_styles.push_back(parseLineStyles(line_style_count));
+					if (is_morph)
+					{
+						all_line_styles.push_back(parseMorphLineStyles(line_style_count));
+					}
+					else
+					{
+						all_line_styles.push_back(parseLineStyles(line_style_count));
+					}
 				}
-				
+
 				else
 				{
 					fill_style_count = 1;
@@ -3227,12 +3518,18 @@ namespace SWFRecomp
 				}
 
 				current_tri += tris_size;
-				
+
+				// Skip EndEdges data for morph shapes (not needed at ratio=0)
+				if (is_morph)
+				{
+					cur_pos = morph_tag_start + shape_tag.length;
+				}
+
 				break;
 			}
 		}
 	}
-	
+
 	s32 pointOrientation(const Vertex& v0, const Vertex& v1, const Vertex& point)
 	{
 		return (v1.x - v0.x)*(point.y - v0.y) - (point.x - v0.x)*(v1.y - v0.y);

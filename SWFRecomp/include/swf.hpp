@@ -211,7 +211,9 @@ namespace SWFRecomp
 		void interpretTag(Context& context, SWFTag& tag);
 		void recompileMatrix(MATRIX matrix, std::stringstream& out);
 		FillStyle* parseFillStyles(u16 fill_style_count);
+		FillStyle* parseMorphFillStyles(u16 fill_style_count);
 		LineStyle* parseLineStyles(u16 line_style_count);
+		LineStyle* parseMorphLineStyles(u16 line_style_count);
 		LineStyle* parseLineStyles2(u16 line_style_count);
 		void interpretShape(Context& context, SWFTag& shape_tag);
 		bool isInShape(const Vertex& v, const Shape* shape);

@@ -662,6 +662,179 @@ def _build_glyph_shape_binary(edges):
     return bw.to_bytes()
 
 
+def _build_shape_binary(edges, fill_bits, line_bits):
+    """Build SWF SHAPE binary from edge records with configurable fill/line bits.
+
+    Generic version of _build_glyph_shape_binary that supports arbitrary
+    fill_bits, line_bits, and line style changes.
+
+    edges: list of ShapeSetup / LineTo / CurveTo instances.
+    fill_bits: number of bits for fill style indices.
+    line_bits: number of bits for line style indices.
+    """
+    bw = _BitWriter()
+    bw.write_bits(fill_bits, 4)  # NumFillBits
+    bw.write_bits(line_bits, 4)  # NumLineBits
+
+    for edge in edges:
+        if isinstance(edge, ShapeSetup):
+            bw.write_bits(0, 1)  # TypeFlag = non-edge
+            bw.write_bits(0, 1)  # StateNewStyles = 0
+            has_ls = edge.lineStyle is not None
+            has_fs1 = edge.fillStyle1 is not None
+            has_fs0 = edge.fillStyle0 is not None
+            has_move = edge.x is not None and edge.y is not None
+
+            bw.write_bits(1 if has_ls else 0, 1)   # StateLineStyle
+            bw.write_bits(1 if has_fs1 else 0, 1)  # StateFillStyle1
+            bw.write_bits(1 if has_fs0 else 0, 1)  # StateFillStyle0
+            bw.write_bits(1 if has_move else 0, 1)  # StateMoveTo
+
+            if has_move:
+                move_nbits = max(_bits_needed_signed(edge.x),
+                                 _bits_needed_signed(edge.y), 1)
+                bw.write_bits(move_nbits, 5)
+                bw.write_sb(edge.x, move_nbits)
+                bw.write_sb(edge.y, move_nbits)
+
+            if has_fs0:
+                bw.write_bits(edge.fillStyle0, fill_bits)
+            if has_fs1:
+                bw.write_bits(edge.fillStyle1, fill_bits)
+            if has_ls:
+                bw.write_bits(edge.lineStyle, line_bits)
+
+        elif isinstance(edge, LineTo):
+            bw.write_bits(1, 1)  # TypeFlag = edge
+            bw.write_bits(1, 1)  # StraightFlag
+            nbits = max(_bits_needed_signed(edge.x),
+                        _bits_needed_signed(edge.y), 2)
+            bw.write_bits(nbits - 2, 4)  # NumBits - 2
+            if edge.x != 0 and edge.y != 0:
+                bw.write_bits(1, 1)  # GeneralLine
+                bw.write_sb(edge.x, nbits)
+                bw.write_sb(edge.y, nbits)
+            elif edge.y == 0:
+                bw.write_bits(0, 1)  # not GeneralLine
+                bw.write_bits(0, 1)  # Horizontal
+                bw.write_sb(edge.x, nbits)
+            else:
+                bw.write_bits(0, 1)  # not GeneralLine
+                bw.write_bits(1, 1)  # Vertical
+                bw.write_sb(edge.y, nbits)
+
+        elif isinstance(edge, CurveTo):
+            bw.write_bits(1, 1)  # TypeFlag = edge
+            bw.write_bits(0, 1)  # StraightFlag = 0 (curved)
+            nbits = max(_bits_needed_signed(edge.x1),
+                        _bits_needed_signed(edge.y1),
+                        _bits_needed_signed(edge.x2),
+                        _bits_needed_signed(edge.y2), 2)
+            bw.write_bits(nbits - 2, 4)  # NumBits - 2
+            bw.write_sb(edge.x1, nbits)
+            bw.write_sb(edge.y1, nbits)
+            bw.write_sb(edge.x2, nbits)
+            bw.write_sb(edge.y2, nbits)
+
+    # EndShape record: 6 zero bits
+    bw.write_bits(0, 6)
+    return bw.to_bytes()
+
+
+class MorphShapeDefinition:
+    """Collects morph fill styles, line styles, and start/end edges for DefineMorphShape."""
+    def __init__(self, object_id, start_bounds, end_bounds):
+        self.object_id = object_id
+        self.start_bounds = start_bounds  # (left, right, top, bottom) in twips
+        self.end_bounds = end_bounds      # (left, right, top, bottom) in twips
+        self.fill_styles = []   # list of (start_fill, end_fill) tuples
+        self.line_styles = []   # list of (start_width, end_width, start_color, end_color)
+        self.start_edges = []   # edge records for start shape
+        self.end_edges = []     # edge records for end shape
+
+    def add_solid_fill(self, start_color, end_color):
+        """Add a solid morph fill style.
+
+        start_color: (r, g, b, a) for ratio=0
+        end_color: (r, g, b, a) for ratio=65535
+        Returns 1-based fill style index.
+        """
+        self.fill_styles.append(("solid", start_color, end_color))
+        return len(self.fill_styles)
+
+    def add_start_edges(self, edges):
+        self.start_edges.extend(edges)
+
+    def add_end_edges(self, edges):
+        self.end_edges.extend(edges)
+
+
+def _build_define_morph_shape_body(morph_def):
+    """Build the raw tag body for DefineMorphShape (tag 46).
+
+    morph_def: a MorphShapeDefinition instance.
+    Returns bytes containing the full tag body (including CharacterID).
+    """
+    body = bytearray()
+
+    # CharacterID (UI16)
+    body += struct.pack('<H', morph_def.object_id)
+
+    # StartBounds (RECT)
+    left, right, top, bottom = morph_def.start_bounds
+    body += _build_rect_bits(left, right, top, bottom)
+
+    # EndBounds (RECT)
+    left, right, top, bottom = morph_def.end_bounds
+    body += _build_rect_bits(left, right, top, bottom)
+
+    # Build fill styles, line styles, and start edges first to compute Offset
+    fill_count = len(morph_def.fill_styles)
+    line_count = len(morph_def.line_styles)
+
+    # MORPHFILLSTYLEARRAY
+    fill_bytes = bytearray()
+    fill_bytes.append(fill_count)  # FillStyleCount (UI8)
+    for fill_type, start_color, end_color in morph_def.fill_styles:
+        if fill_type == "solid":
+            fill_bytes.append(0x00)  # FillStyleType = solid
+            sr, sg, sb, sa = start_color
+            fill_bytes.extend((sr, sg, sb, sa))  # StartColor (RGBA)
+            er, eg, eb, ea = end_color
+            fill_bytes.extend((er, eg, eb, ea))  # EndColor (RGBA)
+
+    # MORPHLINESTYLEARRAY
+    line_bytes = bytearray()
+    line_bytes.append(line_count)  # LineStyleCount (UI8)
+    for start_width, end_width, start_color, end_color in morph_def.line_styles:
+        line_bytes += struct.pack('<H', start_width)   # StartWidth (UI16)
+        line_bytes += struct.pack('<H', end_width)     # EndWidth (UI16)
+        sr, sg, sb, sa = start_color
+        line_bytes.extend((sr, sg, sb, sa))  # StartColor (RGBA)
+        er, eg, eb, ea = end_color
+        line_bytes.extend((er, eg, eb, ea))  # EndColor (RGBA)
+
+    # StartEdges SHAPE
+    fill_bits = max(fill_count.bit_length(), 1) if fill_count > 0 else 0
+    line_bits = max(line_count.bit_length(), 1) if line_count > 0 else 0
+    start_edges_bytes = _build_shape_binary(morph_def.start_edges, fill_bits, line_bits)
+
+    # EndEdges SHAPE (fill/line bits = 0, edges only)
+    end_edges_bytes = _build_shape_binary(morph_def.end_edges, 0, 0)
+
+    # Offset = length from after Offset field to EndEdges start
+    # = fill_bytes + line_bytes + start_edges_bytes
+    offset = len(fill_bytes) + len(line_bytes) + len(start_edges_bytes)
+    body += struct.pack('<I', offset)  # Offset (UI32)
+
+    body += fill_bytes
+    body += line_bytes
+    body += start_edges_bytes
+    body += end_edges_bytes
+
+    return bytes(body)
+
+
 def _build_define_font2_body(object_id, glyphs, font_name="TestFont"):
     """Build the raw tag body for DefineFont2 (tag 48).
 
@@ -1152,6 +1325,15 @@ class SWFMLBuilder:
         self.tags.append(("DefineText2", text))
         return text
 
+    def define_morph_shape(self, object_id, start_bounds, end_bounds):
+        """Create and register a morph shape definition (tag 46).
+
+        Returns a MorphShapeDefinition for adding fill/line styles and edges.
+        """
+        morph = MorphShapeDefinition(object_id, start_bounds, end_bounds)
+        self.tags.append(("DefineMorphShape", morph))
+        return morph
+
     def define_sprite(self, object_id, frame_count=1):
         """Create a sprite (movie clip) definition. Returns a SpriteDefinition for adding sub-tags."""
         sprite = SpriteDefinition(object_id, frame_count)
@@ -1315,6 +1497,13 @@ class SWFMLBuilder:
 
             elif tag_type == "DefineShape":
                 tag_data.to_xml(tags_el)
+
+            elif tag_type == "DefineMorphShape":
+                morph_body = _build_define_morph_shape_body(tag_data)
+                tag_b64 = base64.b64encode(morph_body).decode('ascii')
+                unk = SubElement(tags_el, "UnknownTag", id="0x2e")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_b64
 
             elif tag_type == "DefineSprite":
                 tag_data.to_xml(tags_el)
