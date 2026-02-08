@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-07",
+    "generated_date": "2026-02-08",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 25
+    "graphics_features_with_tests": 27
   },
   "entries": [
     {
@@ -4294,7 +4294,7 @@
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4323,7 +4323,7 @@
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -4352,7 +4352,7 @@
         "SWFRecomp/tests/define_function2_swf_7"
       ],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-call-function-0x3d.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -8790,6 +8790,7 @@
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
+        "SWFRecomp/tests/graphics/static_text",
         "SWFRecomp/tests/graphics/thiccie",
         "SWFRecomp/tests/graphics/three_boxes",
         "SWFRecomp/tests/graphics/three_boxes_hole",
@@ -9045,8 +9046,10 @@
       "tag_id": 10,
       "category": "Text Tags",
       "description": "Basic font with glyph shapes (SWF tag 10)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/static_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT2",
@@ -9081,8 +9084,10 @@
       "tag_id": 11,
       "category": "Text Tags",
       "description": "Static text with glyph indices (SWF tag 11)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/static_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_TEXT2",

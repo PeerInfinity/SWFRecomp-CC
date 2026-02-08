@@ -505,7 +505,7 @@ namespace SWFRecomp
 							 << endl;
 		}
 
-		context.tag_main << "void tagInit()" << endl
+		context.tag_main << "void tagInit(SWFAppContext* app_context)" << endl
 						 << "{"
 						 << tag_init.str() << endl
 						 << "}";

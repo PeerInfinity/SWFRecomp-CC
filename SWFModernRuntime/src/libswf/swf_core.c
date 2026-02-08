@@ -60,7 +60,7 @@ void swfStart(SWFAppContext* app_context)
 		return;
 	}
 
-	tagInit();
+	tagInit(app_context);
 
 	// Run frames in console mode
 	frame_func* funcs = app_context->frame_funcs;

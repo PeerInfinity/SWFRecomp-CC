@@ -7,6 +7,7 @@ test's create_test_swf.py script.
 """
 
 import base64
+import math
 import os
 import shutil
 import struct
@@ -16,6 +17,172 @@ import tempfile
 import zlib
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom import minidom
+
+
+# ---------------------------------------------------------------------------
+# Bit-level writer for building raw SWF binary structures
+# ---------------------------------------------------------------------------
+
+class _BitWriter:
+    """Writes individual bits for SWF bit-packed structures."""
+    def __init__(self):
+        self.bits = []
+
+    def write_ub(self, value, nbits):
+        """Write an unsigned bit-field value."""
+        for i in range(nbits - 1, -1, -1):
+            self.bits.append((value >> i) & 1)
+
+    def write_sb(self, value, nbits):
+        """Write a signed bit-field value (two's complement)."""
+        if value < 0:
+            value = (1 << nbits) + value
+        self.write_ub(value, nbits)
+
+    def write_fb(self, value, nbits):
+        """Write a fixed-point 16.16 bit-field value."""
+        fixed = int(round(value * 65536))
+        self.write_sb(fixed, nbits)
+
+    def align(self):
+        """Pad to the next byte boundary."""
+        while len(self.bits) % 8 != 0:
+            self.bits.append(0)
+
+    def to_bytes(self):
+        """Convert accumulated bits to bytes (auto-aligns)."""
+        self.align()
+        result = bytearray()
+        for i in range(0, len(self.bits), 8):
+            byte = 0
+            for j in range(8):
+                byte = (byte << 1) | (self.bits[i + j] if i + j < len(self.bits) else 0)
+            result.append(byte)
+        return bytes(result)
+
+
+def _bits_needed_sb(value):
+    """Minimum bits to represent a signed value in SWF SB format."""
+    if value == 0:
+        return 1
+    if value > 0:
+        return value.bit_length() + 1
+    return (-value - 1).bit_length() + 1
+
+
+def _bits_needed_fb(value):
+    """Minimum bits to represent a fixed-point 16.16 value."""
+    fixed = int(round(value * 65536))
+    return _bits_needed_sb(fixed)
+
+
+def _build_rect_bytes(left, right, top, bottom):
+    """Build byte-aligned RECT structure."""
+    nbits = max(_bits_needed_sb(left), _bits_needed_sb(right),
+                _bits_needed_sb(top), _bits_needed_sb(bottom), 1)
+    bw = _BitWriter()
+    bw.write_ub(nbits, 5)
+    bw.write_sb(left, nbits)
+    bw.write_sb(right, nbits)
+    bw.write_sb(top, nbits)
+    bw.write_sb(bottom, nbits)
+    return bw.to_bytes()
+
+
+def _build_matrix_bytes(trans_x=0, trans_y=0, scale_x=None, scale_y=None):
+    """Build byte-aligned MATRIX structure."""
+    bw = _BitWriter()
+    has_scale = scale_x is not None and scale_y is not None
+    bw.write_ub(int(has_scale), 1)
+    if has_scale:
+        nbits = max(_bits_needed_fb(scale_x), _bits_needed_fb(scale_y))
+        bw.write_ub(nbits, 5)
+        bw.write_fb(scale_x, nbits)
+        bw.write_fb(scale_y, nbits)
+    # No rotate
+    bw.write_ub(0, 1)
+    # Translate
+    if trans_x == 0 and trans_y == 0:
+        bw.write_ub(0, 5)
+    else:
+        nbits = max(_bits_needed_sb(trans_x), _bits_needed_sb(trans_y))
+        bw.write_ub(nbits, 5)
+        bw.write_sb(trans_x, nbits)
+        bw.write_sb(trans_y, nbits)
+    return bw.to_bytes()
+
+
+def _build_glyph_shape_binary(edges):
+    """Build binary SHAPE data for a single font glyph.
+
+    Font glyphs have NumFillBits=1, NumLineBits=0 and use
+    fill style 1 as the implicit glyph fill.
+    """
+    bw = _BitWriter()
+    bw.write_ub(1, 4)  # NumFillBits
+    bw.write_ub(0, 4)  # NumLineBits
+    fill_bits = 1
+
+    for edge in edges:
+        if isinstance(edge, ShapeSetup):
+            has_move = edge.x is not None or edge.y is not None
+            has_fill0 = edge.fillStyle0 is not None
+            has_fill1 = edge.fillStyle1 is not None
+            state_flags = ((int(has_fill1) << 2) |
+                           (int(has_fill0) << 1) |
+                           (int(has_move)))
+            bw.write_ub(0, 1)  # TypeFlag = 0 (non-edge)
+            bw.write_ub(state_flags, 5)
+            if has_move:
+                x = edge.x if edge.x is not None else 0
+                y = edge.y if edge.y is not None else 0
+                move_bits = max(_bits_needed_sb(x), _bits_needed_sb(y), 1)
+                bw.write_ub(move_bits, 5)
+                bw.write_sb(x, move_bits)
+                bw.write_sb(y, move_bits)
+            if has_fill0:
+                bw.write_ub(edge.fillStyle0, fill_bits)
+            if has_fill1:
+                bw.write_ub(edge.fillStyle1, fill_bits)
+
+        elif isinstance(edge, LineTo):
+            dx, dy = edge.x, edge.y
+            actual_bits = max(_bits_needed_sb(dx), _bits_needed_sb(dy), 2)
+            num_bits_field = actual_bits - 2
+            bw.write_ub(1, 1)  # TypeFlag = 1 (edge)
+            bw.write_ub(1, 1)  # StraightFlag
+            bw.write_ub(num_bits_field, 4)
+            if dx != 0 and dy != 0:
+                bw.write_ub(1, 1)  # GeneralLine
+                bw.write_sb(dx, actual_bits)
+                bw.write_sb(dy, actual_bits)
+            elif dx == 0:
+                bw.write_ub(0, 1)  # Not general
+                bw.write_ub(1, 1)  # VertLine
+                bw.write_sb(dy, actual_bits)
+            else:
+                bw.write_ub(0, 1)  # Not general
+                bw.write_ub(0, 1)  # HorizLine
+                bw.write_sb(dx, actual_bits)
+
+        elif isinstance(edge, CurveTo):
+            cx, cy = edge.x1, edge.y1
+            ax, ay = edge.x2, edge.y2
+            actual_bits = max(_bits_needed_sb(cx), _bits_needed_sb(cy),
+                              _bits_needed_sb(ax), _bits_needed_sb(ay), 2)
+            num_bits_field = actual_bits - 2
+            bw.write_ub(1, 1)  # TypeFlag = 1 (edge)
+            bw.write_ub(0, 1)  # CurvedFlag
+            bw.write_ub(num_bits_field, 4)
+            bw.write_sb(cx, actual_bits)
+            bw.write_sb(cy, actual_bits)
+            bw.write_sb(ax, actual_bits)
+            bw.write_sb(ay, actual_bits)
+
+    # EndShape
+    bw.write_ub(0, 1)  # TypeFlag = 0
+    bw.write_ub(0, 5)  # All flags zero
+    return bw.to_bytes()
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +696,99 @@ class SWFMLBuilder:
         tag_b64 = base64.b64encode(tag_body).decode('ascii')
         self.tags.append(("DefineBitsJPEG3", tag_b64))
 
+    def define_font(self, object_id, glyphs):
+        """Add a DefineFont tag (tag 10) with glyph shapes.
+
+        object_id: character ID for the font
+        glyphs: list of edge-record lists, one per glyph. Each glyph's
+                edges should use fillStyle1=1 as the implicit glyph fill.
+                Example: [[ShapeSetup(x=0, y=0, fillStyle1=1), LineTo(500, 0), ...], ...]
+        """
+        glyph_binaries = [_build_glyph_shape_binary(g) for g in glyphs]
+        num_glyphs = len(glyphs)
+        offset_table_size = num_glyphs * 2  # UI16 per glyph offset
+        # Calculate offsets from start of offset table
+        offsets = []
+        pos = offset_table_size
+        for gb in glyph_binaries:
+            offsets.append(pos)
+            pos += len(gb)
+        # Build tag body: FontID + OffsetTable + GlyphShapes
+        body = struct.pack('<H', object_id)
+        for off in offsets:
+            body += struct.pack('<H', off)
+        for gb in glyph_binaries:
+            body += gb
+        tag_b64 = base64.b64encode(body).decode('ascii')
+        self.tags.append(("DefineFont", tag_b64))
+
+    def define_text(self, object_id, bounds, font_id, text_height, color,
+                    glyphs, x_offset=0, y_offset=0,
+                    matrix_trans_x=0, matrix_trans_y=0):
+        """Add a DefineText tag (tag 11) with a single text record.
+
+        object_id: character ID for this text object
+        bounds: (left, right, top, bottom) bounding box in twips
+        font_id: references a DefineFont character ID
+        text_height: em-square height in twips (controls glyph scaling)
+        color: (r, g, b) tuple, each 0-255
+        glyphs: list of (glyph_index, advance) tuples
+        x_offset: starting X offset in twips (default 0)
+        y_offset: starting Y offset in twips (default 0)
+        matrix_trans_x: MATRIX translateX in twips
+        matrix_trans_y: MATRIX translateY in twips
+        """
+        body = bytearray()
+        # CharacterID
+        body += struct.pack('<H', object_id)
+        # TextBounds (RECT)
+        body += _build_rect_bytes(*bounds)
+        # Matrix
+        body += _build_matrix_bytes(trans_x=matrix_trans_x, trans_y=matrix_trans_y)
+        # Calculate required bit widths
+        max_glyph_idx = max(g[0] for g in glyphs) if glyphs else 0
+        glyph_bits = max(max_glyph_idx.bit_length(), 1) if max_glyph_idx > 0 else 1
+        advances = [g[1] for g in glyphs]
+        advance_bits = max(max(_bits_needed_sb(a) for a in advances), 2) if advances else 2
+        body += struct.pack('BB', glyph_bits, advance_bits)
+        # Single TextRecord
+        # Flags: bit7=1(type), bit3=HasFont, bit2=HasColor, bit1=HasXOffset, bit0=HasYOffset
+        # NOTE: the recompiler maps bit1->x_offset and bit0->y_offset
+        flags = 0x80 | 0x08 | 0x04  # HasFont + HasColor
+        has_x = x_offset != 0
+        has_y = y_offset != 0
+        if has_x:
+            flags |= 0x02  # bit 1 -> recompiler reads as x_offset
+        if has_y:
+            flags |= 0x01  # bit 0 -> recompiler reads as y_offset
+        body += struct.pack('B', flags)
+        # FontID
+        body += struct.pack('<H', font_id)
+        # Color (RGB)
+        r, g, b = color
+        body += struct.pack('BBB', r, g, b)
+        # X offset
+        if has_x:
+            body += struct.pack('<h', x_offset)
+        # Y offset
+        if has_y:
+            body += struct.pack('<h', y_offset)
+        # TextHeight
+        body += struct.pack('<H', text_height)
+        # GlyphCount
+        body += struct.pack('B', len(glyphs))
+        # Glyph entries (bit-packed)
+        bw = _BitWriter()
+        for glyph_index, advance in glyphs:
+            bw.write_ub(glyph_index, glyph_bits)
+            bw.write_sb(advance, advance_bits)
+        body += bw.to_bytes()
+        # End marker
+        body += b'\x00'
+
+        tag_b64 = base64.b64encode(bytes(body)).decode('ascii')
+        self.tags.append(("DefineText", tag_b64))
+
     def place_object(self, object_id, depth, trans_x=0, trans_y=0,
                      scale_x=None, scale_y=None,
                      skew_x=None, skew_y=None,
@@ -614,6 +874,18 @@ class SWFMLBuilder:
                 data_wrap = SubElement(db, "data")
                 data_el = SubElement(data_wrap, "data")
                 data_el.text = jpeg_b64
+
+            elif tag_type == "DefineFont":
+                # Tag 10 = 0x0A, emitted as raw binary via UnknownTag
+                unk = SubElement(tags_el, "UnknownTag", id="0x0a")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_data
+
+            elif tag_type == "DefineText":
+                # Tag 11 = 0x0B, emitted as raw binary via UnknownTag
+                unk = SubElement(tags_el, "UnknownTag", id="0x0b")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_data
 
             elif tag_type == "DefineShape":
                 tag_data.to_xml(tags_el)
