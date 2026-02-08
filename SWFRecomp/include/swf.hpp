@@ -212,6 +212,7 @@ namespace SWFRecomp
 		void recompileMatrix(MATRIX matrix, std::stringstream& out);
 		FillStyle* parseFillStyles(u16 fill_style_count);
 		LineStyle* parseLineStyles(u16 line_style_count);
+		LineStyle* parseLineStyles2(u16 line_style_count);
 		void interpretShape(Context& context, SWFTag& shape_tag);
 		bool isInShape(const Vertex& v, const Shape* shape);
 		void addCurvedEdge(Path* path, Vertex current, Vertex control, Vertex anchor, u32 passes);
