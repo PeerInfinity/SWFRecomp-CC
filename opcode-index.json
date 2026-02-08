@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 24
+    "graphics_features_with_tests": 25
   },
   "entries": [
     {
@@ -8619,6 +8619,7 @@
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
@@ -8749,8 +8750,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Tiled bitmap without anti-aliasing (type 0x42)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "NON_SMOOTHED_CLIPPED_BITMAP",
@@ -8782,6 +8785,7 @@
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
@@ -8912,6 +8916,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
         "SWFRecomp/tests/graphics/repeating_bitmap"
       ],
       "fully_implemented": true

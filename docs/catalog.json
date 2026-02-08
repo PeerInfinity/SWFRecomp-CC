@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-08T01:22:07Z",
+  "generated": "2026-02-08T01:31:38Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2296,6 +2296,20 @@
       "wasm_file": "nonsmoothed_clipped_bitmap.wasm",
       "js_file": "nonsmoothed_clipped_bitmap.js",
       "description": "WebGPU rendering test with NonSmoothedClippedBitmap fill type (0x43) using DefineBitsLossless",
+      "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/nonsmoothed_repeating_bitmap",
+      "name": "nonsmoothed_repeating_bitmap",
+      "type": "graphics",
+      "path": "examples/graphics/nonsmoothed_repeating_bitmap",
+      "has_swf": true,
+      "js_file": "nonsmoothed_repeating_bitmap.js",
+      "wasm_file": "nonsmoothed_repeating_bitmap.wasm",
+      "description": "WebGPU rendering test with NonSmoothedRepeatingBitmap fill type (0x42)",
       "swf_version": 4,
       "fully_implemented": true,
       "opcodes_tested": [],
