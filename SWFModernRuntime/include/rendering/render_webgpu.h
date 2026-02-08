@@ -139,4 +139,5 @@ void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip(WebGPURenderContext* context);
 void render_webgpu_close_pass(WebGPURenderContext* context);
+void render_webgpu_compose_text_transforms(WebGPURenderContext* context, const char* transform_data, u32 place_transform_id, u32 glyph_start, size_t count);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

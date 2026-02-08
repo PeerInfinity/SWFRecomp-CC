@@ -19,6 +19,26 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 
 void tagShowFrame(SWFAppContext* app_context)
 {
+	// Compose PlaceObject2 transforms with glyph transforms on the CPU,
+	// writing composed results to the GPU xform buffer BEFORE the render pass.
+	// This avoids the per-draw uniform write issue (queue writes between draws
+	// in the same render pass only apply the last value).
+	for (size_t i = 1; i <= max_depth; ++i)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
+
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type == CHAR_TYPE_TEXT)
+		{
+			renderer_compose_text_transforms(context,
+				app_context->transform_data,
+				obj->transform_id,
+				ch->transform_start,
+				ch->text_size);
+		}
+	}
+
 	renderer_open_pass(context);
 
 	u16 active_clip_depth = 0;
@@ -61,7 +81,6 @@ void tagShowFrame(SWFAppContext* app_context)
 				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
 				break;
 			case CHAR_TYPE_TEXT:
-				renderer_upload_extra_transform_id(context, obj->transform_id);
 				for (size_t j = 0; j < ch->text_size; ++j)
 				{
 					size_t glyph_index = 2*app_context->text_data[ch->text_start + j];

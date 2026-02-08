@@ -126,13 +126,20 @@ static const char* fragment_wgsl =
 "\n"
 "@fragment\n"
 "fn fs_main(in: FragmentInput) -> @location(0) vec4f {\n"
-"  // Sample all textures unconditionally (uniform control flow required by Chrome/Dawn)\n"
-"  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), 0.5), i32(in.v_style_id));\n"
-"  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), 0.5), i32(in.v_style_id));\n"
-"  let focal_sample = textureSample(gradient_tex, gradient_samp, vec2f(focal_radial_t(in.v_args), 0.5), i32(in.v_style_id));\n"
-"  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id));\n"
+"  // Sample all textures unconditionally (uniform control flow required by Chrome/Dawn).\n"
+"  // Use select() for array layer indices: only use v_style_id when the fill type\n"
+"  // actually uses that texture, otherwise use 0 to avoid out-of-bounds access\n"
+"  // on 1-layer dummy textures (Chrome/Dawn and Firefox handle OOB differently).\n"
+"  let is_gradient = (in.v_style_type & 0xF0u) == 0x10u;\n"
+"  let is_bitmap = (in.v_style_type & 0xF0u) == 0x40u;\n"
+"  let grad_layer = select(0, i32(in.v_style_id), is_gradient);\n"
+"  let bmp_layer = select(0, i32(in.v_style_id), is_bitmap);\n"
+"  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), 0.5), grad_layer);\n"
+"  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), 0.5), grad_layer);\n"
+"  let focal_sample = textureSample(gradient_tex, gradient_samp, vec2f(focal_radial_t(in.v_args), 0.5), grad_layer);\n"
+"  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, bmp_layer);\n"
 "  let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
-"  let bitmap_repeat_sample = textureSample(bitmap_tex, bitmap_samp, fract(in.v_args.xy / bm_ratio) * bm_ratio, i32(in.v_style_id));\n"
+"  let bitmap_repeat_sample = textureSample(bitmap_tex, bitmap_samp, fract(in.v_args.xy / bm_ratio) * bm_ratio, bmp_layer);\n"
 "  var color: vec4f;\n"
 "  if (in.v_style_type == 0x00u) {\n"
 "    color = in.v_args;\n"
@@ -1299,6 +1306,54 @@ void render_webgpu_upload_cxform(WebGPURenderContext* ctx, float* cxform)
 	// Upload 20 floats (5x4 color transform) to GPU buffer (matching flashbang behavior).
 	// Not yet bound to shaders — deferred until both backends' shaders are updated.
 	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_uniform_buf, 0, cxform, 20 * sizeof(float));
+}
+
+// ---------------------------------------------------------------------------
+// mat4_multiply: C = A * B (column-major 4x4)
+// ---------------------------------------------------------------------------
+static void mat4_multiply(float* out, const float* A, const float* B)
+{
+	for (int col = 0; col < 4; col++)
+	{
+		for (int row = 0; row < 4; row++)
+		{
+			out[col * 4 + row] =
+				A[0 * 4 + row] * B[col * 4 + 0] +
+				A[1 * 4 + row] * B[col * 4 + 1] +
+				A[2 * 4 + row] * B[col * 4 + 2] +
+				A[3 * 4 + row] * B[col * 4 + 3];
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_compose_text_transforms: compose PlaceObject2 transform with
+// each glyph transform and write composed results to GPU xform_buffer.
+// Called before renderer_open_pass so all writes happen before the render pass.
+// Does NOT modify CPU-side transform_data (safe for multi-frame rendering).
+// ---------------------------------------------------------------------------
+void render_webgpu_compose_text_transforms(WebGPURenderContext* ctx,
+                                            const char* transform_data,
+                                            u32 place_transform_id,
+                                            u32 glyph_start,
+                                            size_t count)
+{
+	const float* transforms = (const float*)transform_data;
+	const float* place_xform = &transforms[place_transform_id * 16];
+
+	for (size_t i = 0; i < count; i++)
+	{
+		u32 glyph_xform_id = glyph_start + (u32)i;
+		const float* glyph_xform = &transforms[glyph_xform_id * 16];
+
+		float composed[16];
+		mat4_multiply(composed, place_xform, glyph_xform);
+
+		// Write composed transform to the GPU buffer at the glyph's slot
+		uint64_t offset = (uint64_t)glyph_xform_id * 16 * sizeof(float);
+		wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
+		                     composed, 16 * sizeof(float));
+	}
 }
 
 // ---------------------------------------------------------------------------

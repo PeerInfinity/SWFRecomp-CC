@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-07",
+    "generated_date": "2026-02-08",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 32
+    "graphics_features_with_tests": 33
   },
   "entries": [
     {
@@ -8680,6 +8680,7 @@
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/define_shape4",
+        "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
@@ -8789,6 +8790,7 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/define_shape4",
+        "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/focal_radial_gradient",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
@@ -9068,6 +9070,7 @@
       "category": "Text Tags",
       "description": "Basic font with glyph shapes (SWF tag 10)",
       "tests": [
+        "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/static_text"
       ],
       "fully_implemented": true
@@ -9116,8 +9119,10 @@
       "tag_id": 33,
       "category": "Text Tags",
       "description": "Static text with RGBA colors (SWF tag 33)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_text2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_EDIT_TEXT",

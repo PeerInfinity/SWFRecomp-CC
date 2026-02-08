@@ -1414,6 +1414,15 @@ namespace SWFRecomp
 
 					u8 glyph_count = (u8) tag.fields[current_field++].value;
 
+					if (has_x_offset)
+					{
+						temp_matrix.translate_x += x_offset;
+					}
+					if (has_y_offset)
+					{
+						temp_matrix.translate_y += y_offset;
+					}
+
 					size_t text_start = current_text;
 					size_t transform_start = current_transform;
 
