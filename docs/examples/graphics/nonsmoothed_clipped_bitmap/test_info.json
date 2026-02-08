@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "nonsmoothed_clipped_bitmap",
+    "description": "WebGPU rendering test with NonSmoothedClippedBitmap fill type (0x43) using DefineBitsLossless",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_LOSSLESS",
+      "NON_SMOOTHED_CLIPPED_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

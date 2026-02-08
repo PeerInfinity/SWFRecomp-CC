@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 21
+    "graphics_features_with_tests": 24
   },
   "entries": [
     {
@@ -8614,9 +8614,12 @@
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
+        "SWFRecomp/tests/graphics/jpeg3_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
         "SWFRecomp/tests/graphics/thiccie",
@@ -8720,8 +8723,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Tiled bitmap fill (type 0x40)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/repeating_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "CLIPPED_BITMAP",
@@ -8731,6 +8736,7 @@
       "description": "Clipped bitmap fill (type 0x41)",
       "tests": [
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
+        "SWFRecomp/tests/graphics/jpeg3_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess"
@@ -8752,8 +8758,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Clipped bitmap without anti-aliasing (type 0x43)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "STRAIGHT_EDGE",
@@ -8768,10 +8776,13 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
+        "SWFRecomp/tests/graphics/jpeg3_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
@@ -8878,8 +8889,10 @@
       "tag_id": 35,
       "category": "Image/Bitmap Tags",
       "description": "JPEG image with alpha channel (SWF tag 35)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/jpeg3_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_JPEG4",
@@ -8897,7 +8910,9 @@
       "category": "Image/Bitmap Tags",
       "description": "Lossless RGB bitmap (SWF tag 20)",
       "tests": [
-        "SWFRecomp/tests/graphics/lossless_bitmap"
+        "SWFRecomp/tests/graphics/lossless_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/repeating_bitmap"
       ],
       "fully_implemented": true
     },

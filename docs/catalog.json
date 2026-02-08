@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-08T01:14:38Z",
+  "generated": "2026-02-08T01:22:07Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2282,6 +2282,20 @@
       "wasm_file": "new_styles.wasm",
       "js_file": "new_styles.js",
       "description": "WebGPU rendering test with mixed line styles and fill types",
+      "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/nonsmoothed_clipped_bitmap",
+      "name": "nonsmoothed_clipped_bitmap",
+      "type": "graphics",
+      "path": "examples/graphics/nonsmoothed_clipped_bitmap",
+      "has_swf": true,
+      "wasm_file": "nonsmoothed_clipped_bitmap.wasm",
+      "js_file": "nonsmoothed_clipped_bitmap.js",
+      "description": "WebGPU rendering test with NonSmoothedClippedBitmap fill type (0x43) using DefineBitsLossless",
       "swf_version": 4,
       "fully_implemented": true,
       "opcodes_tested": [],

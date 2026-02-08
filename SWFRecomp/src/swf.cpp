@@ -2167,6 +2167,8 @@ namespace SWFRecomp
 				
 				case FILL_BITMAP_REPEAT:
 				case FILL_BITMAP_CLIPPED:
+				case FILL_BITMAP_REPEAT_NONSMOOTH:
+				case FILL_BITMAP_CLIPPED_NONSMOOTH:
 				{
 					fill_data.clearFields();
 					fill_data.setFieldCount(1);
