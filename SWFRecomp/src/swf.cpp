@@ -833,8 +833,10 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_DEFINE_BITS_JPEG4:
 			case SWF_TAG_DEFINE_BITS_JPEG3:
 			{
+				bool is_jpeg4 = (tag.code == SWF_TAG_DEFINE_BITS_JPEG4);
 				size_t new_length = tag.length;
 
 				tag.clearFields();
@@ -856,6 +858,20 @@ namespace SWFRecomp
 
 				u32 alpha_data_offset = (u32) tag.fields[0].value;
 				new_length -= 4;
+
+				// JPEG4 has an additional UI16 deblocking parameter (rendering hint, ignored)
+				if (is_jpeg4)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+
+					tag.configureNextField(SWF_FIELD_UI16);
+
+					tag.parseFields(cur_pos);
+
+					// Deblocking param is FIXED8 (0.0-1.0), parsed and ignored
+					new_length -= 2;
+				}
 
 				// JPEG data is alpha_data_offset bytes, alpha data follows
 				char* jpeg_start = cur_pos;
@@ -879,7 +895,7 @@ namespace SWFRecomp
 
 				if (decompressed == nullptr)
 				{
-					EXC("JPEG3 data returned NULL.\n");
+					EXC(is_jpeg4 ? "JPEG4 data returned NULL.\n" : "JPEG3 data returned NULL.\n");
 				}
 
 				// Decompress zlib alpha data
@@ -896,7 +912,8 @@ namespace SWFRecomp
 				{
 					stbi_image_free(decompressed);
 					delete[] alpha_data;
-					EXC_ARG("JPEG3: ZLIB alpha decompression failed (code %d).\n", zresult);
+					EXC_ARG(is_jpeg4 ? "JPEG4: ZLIB alpha decompression failed (code %d).\n"
+					        : "JPEG3: ZLIB alpha decompression failed (code %d).\n", zresult);
 				}
 
 				Vertex v;

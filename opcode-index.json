@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-07",
+    "generated_date": "2026-02-08",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287,
     "total_graphics_features": 60,
-    "graphics_features_with_tests": 25
+    "graphics_features_with_tests": 26
   },
   "entries": [
     {
@@ -8615,6 +8615,7 @@
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
@@ -8738,6 +8739,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess"
@@ -8780,6 +8782,7 @@
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
@@ -8904,8 +8907,10 @@
       "tag_id": 90,
       "category": "Image/Bitmap Tags",
       "description": "JPEG with embedded alpha (SWF tag 90, SWF 10+)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/jpeg4_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_LOSSLESS",
