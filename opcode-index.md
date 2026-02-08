@@ -1,6 +1,6 @@
 # AS2 Opcode Index
 
-**Generated**: 2026-02-07
+**Generated**: 2026-02-08
 
 See also: [SWF Graphics Feature Index](feature-index.md)
 
