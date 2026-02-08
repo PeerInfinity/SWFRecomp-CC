@@ -1176,45 +1176,105 @@ namespace SWFRecomp
 			}
 			
 			case SWF_TAG_DEFINE_FONT:
+			case SWF_TAG_DEFINE_FONT_2:
 			{
 				tag.clearFields();
 				tag.setFieldCount(1);
-				
+
 				tag.configureNextField(SWF_FIELD_UI16);
-				
+
 				tag.parseFields(cur_pos);
-				
+
 				u16 font_id = (u16) tag.fields[0].value;
-				
-				char* offset_table = cur_pos;
-				
-				tag.clearFields();
-				tag.setFieldCount(1);
-				
-				tag.configureNextField(SWF_FIELD_UI16);
-				
-				tag.parseFields(cur_pos);
-				
+
+				u16 num_entries;
+				char* offset_table;
 				std::vector<u16> entry_offsets;
-				entry_offsets.push_back((u16) tag.fields[0].value);
-				
-				u16 num_entries = entry_offsets.back()/2;
-				
-				tag.clearFields();
-				tag.setFieldCount(num_entries - 1);
-				
-				for (u16 i = 0; i < num_entries - 1; ++i)
+
+				if (tag.code == SWF_TAG_DEFINE_FONT_2)
 				{
+					// DefineFont2 header: Flags(UI8), LanguageCode(UI8), FontNameLen(UI8), FontName(bytes), NumGlyphs(UI16)
+					tag.clearFields();
+					tag.setFieldCount(2);
+					tag.configureNextField(SWF_FIELD_UI8);  // Flags
+					tag.configureNextField(SWF_FIELD_UI8);  // LanguageCode
+					tag.parseFields(cur_pos);
+
+					u8 flags = (u8) tag.fields[0].value;
+					bool wide_offsets = (flags & 0x08) != 0;
+					bool wide_codes = (flags & 0x04) != 0;
+
+					// FontName
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI8);  // FontNameLen
+					tag.parseFields(cur_pos);
+
+					u8 font_name_len = (u8) tag.fields[0].value;
+					cur_pos += font_name_len;  // skip font name bytes
+
+					// NumGlyphs
+					tag.clearFields();
+					tag.setFieldCount(1);
 					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+
+					num_entries = (u16) tag.fields[0].value;
+
+					// Offset table starts here (NumGlyphs offsets + CodeTableOffset)
+					offset_table = cur_pos;
+
+					if (num_entries > 0)
+					{
+						u16 num_offsets = num_entries + 1;  // glyph offsets + CodeTableOffset
+
+						if (wide_offsets)
+						{
+							tag.clearFields();
+							tag.setFieldCount(num_offsets);
+							for (u16 i = 0; i < num_offsets; ++i)
+								tag.configureNextField(SWF_FIELD_UI32);
+							tag.parseFields(cur_pos);
+
+							for (u16 i = 0; i < num_offsets; ++i)
+								entry_offsets.push_back((u16) tag.fields[i].value);
+						}
+						else
+						{
+							tag.clearFields();
+							tag.setFieldCount(num_offsets);
+							for (u16 i = 0; i < num_offsets; ++i)
+								tag.configureNextField(SWF_FIELD_UI16);
+							tag.parseFields(cur_pos);
+
+							for (u16 i = 0; i < num_offsets; ++i)
+								entry_offsets.push_back((u16) tag.fields[i].value);
+						}
+					}
 				}
-				
-				tag.parseFields(cur_pos);
-				
-				for (u16 i = 0; i < num_entries - 1; ++i)
+				else
 				{
-					entry_offsets.push_back((u16) tag.fields[i].value);
+					// DefineFont: derive num_entries from first offset
+					offset_table = cur_pos;
+
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+
+					entry_offsets.push_back((u16) tag.fields[0].value);
+					num_entries = entry_offsets.back()/2;
+
+					tag.clearFields();
+					tag.setFieldCount(num_entries - 1);
+					for (u16 i = 0; i < num_entries - 1; ++i)
+						tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+
+					for (u16 i = 0; i < num_entries - 1; ++i)
+						entry_offsets.push_back((u16) tag.fields[i].value);
 				}
-				
+
 				for (u16 i = 0; i < num_entries; ++i)
 				{
 					size_t glyph_start = 3*current_tri;
@@ -2409,7 +2469,7 @@ namespace SWFRecomp
 	
 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
 	{
-		bool is_font = shape_tag.code == SWF_TAG_DEFINE_FONT;
+		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2);
 		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
 		shape_is_v4 = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
 
@@ -2420,6 +2480,7 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_SHAPE_3:
 			case SWF_TAG_DEFINE_SHAPE_4:
 			case SWF_TAG_DEFINE_FONT:
+			case SWF_TAG_DEFINE_FONT_2:
 			{
 				u16 shape_id;
 				u16 fill_style_count;

@@ -662,6 +662,59 @@ def _build_glyph_shape_binary(edges):
     return bw.to_bytes()
 
 
+def _build_define_font2_body(object_id, glyphs, font_name="TestFont"):
+    """Build the raw tag body for DefineFont2 (tag 48).
+
+    object_id: character ID for the font
+    glyphs: list of edge-record lists, one per glyph.
+    font_name: font name string (ASCII).
+
+    Returns bytes containing the full tag body.
+    """
+    num_glyphs = len(glyphs)
+
+    # Build glyph shape binaries
+    glyph_binaries = [_build_glyph_shape_binary(g) for g in glyphs]
+
+    # Flags: bit 2 = WideCodes (1), all others 0 (no layout, no wide offsets)
+    flags = 0x04
+    language_code = 0
+    font_name_bytes = font_name.encode('ascii')
+
+    body = bytearray()
+    body += struct.pack('<H', object_id)  # FontID
+    body.append(flags)                     # Flags
+    body.append(language_code)             # LanguageCode
+    body.append(len(font_name_bytes))      # FontNameLen
+    body += font_name_bytes                # FontName
+    body += struct.pack('<H', num_glyphs)  # NumGlyphs
+
+    if num_glyphs > 0:
+        # Offset table: NumGlyphs glyph offsets + CodeTableOffset, all UI16
+        # Offsets are relative to start of offset table
+        offset_table_size = (num_glyphs + 1) * 2  # +1 for CodeTableOffset
+        offsets = []
+        current_offset = offset_table_size
+        for gb in glyph_binaries:
+            offsets.append(current_offset)
+            current_offset += len(gb)
+        # CodeTableOffset = offset after all glyph data
+        offsets.append(current_offset)
+
+        for off in offsets:
+            body += struct.pack('<H', off)
+
+        # Glyph shapes
+        for gb in glyph_binaries:
+            body += gb
+
+        # Code table: UI16 per glyph (sequential: 'A', 'B', 'C', ...)
+        for i in range(num_glyphs):
+            body += struct.pack('<H', 65 + i)
+
+    return bytes(body)
+
+
 def _build_define_font_body(object_id, glyphs):
     """Build the raw tag body (after the tag header) for DefineFont (tag 10).
 
@@ -1065,6 +1118,17 @@ class SWFMLBuilder:
         self.tags.append(("DefineFont", font))
         return font
 
+    def define_font2(self, object_id, font_name="TestFont"):
+        """Create and register a DefineFont2 definition (tag 48).
+
+        Same glyph API as define_font but produces a DefineFont2 tag with
+        font name, flags, code table, etc.
+        """
+        font = FontDefinition(object_id)
+        font.font_name = font_name
+        self.tags.append(("DefineFont2", font))
+        return font
+
     def define_text(self, object_id, bounds, transform=None):
         """Create and register a text definition. Returns a TextDefinition for adding text records.
 
@@ -1173,6 +1237,16 @@ class SWFMLBuilder:
                 # character ID (DefineFont element has objectID attr).
                 # The <data> contains everything after the characterID field.
                 data_inner.text = base64.b64encode(font_body[2:]).decode('ascii')
+
+            elif tag_type == "DefineFont2":
+                font = tag_data
+                font_body = _build_define_font2_body(
+                    font.object_id, font.glyphs,
+                    getattr(font, 'font_name', 'TestFont'))
+                tag_b64 = base64.b64encode(font_body).decode('ascii')
+                unk = SubElement(tags_el, "UnknownTag", id="0x30")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_b64
 
             elif tag_type == "DefineText":
                 text = tag_data
