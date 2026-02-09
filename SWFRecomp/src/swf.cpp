@@ -2441,6 +2441,9 @@ namespace SWFRecomp
 
 				std::string bp = "button_" + to_string(button_id);
 
+				u16 action_offset = 0;
+				char* action_offset_pos = nullptr;
+
 				if (is_button2)
 				{
 					// TrackAsMenu (UI8) — skip for now
@@ -2449,11 +2452,13 @@ namespace SWFRecomp
 					tag.configureNextField(SWF_FIELD_UI8);
 					tag.parseFields(cur_pos);
 
-					// ActionOffset (UI16) — skip for now
+					// ActionOffset (UI16) — byte offset from this field to first BUTTONCONDACTION
+					action_offset_pos = cur_pos;
 					tag.clearFields();
 					tag.setFieldCount(1);
 					tag.configureNextField(SWF_FIELD_UI16);
 					tag.parseFields(cur_pos);
+					action_offset = (u16) tag.fields[0].value;
 				}
 
 				// Collect button records by state
@@ -2679,14 +2684,95 @@ namespace SWFRecomp
 					current_transform += 1;
 				}
 
+				// Parse button actions
+				struct BtnAction { u16 condition; std::string func_name; };
+				std::vector<BtnAction> btn_actions;
+
+				if (!is_button2)
+				{
+					// DefineButton: remaining bytes are a simple ActionRecord sequence
+					// firing on OverDownToOverUp (condition bit 4 = 0x0010)
+					char* action_end = tag_body_start + button_tag_length;
+					if (cur_pos < action_end && *(u8*)cur_pos != 0x00)
+					{
+						std::string func_name = bp + "_action_" + to_string(next_script_i);
+						context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
+
+						ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						out_script << "#include <recomp.h>" << endl
+								   << "#include <setjmp.h>" << endl
+								   << "#include \"script_decls.h\"" << endl << endl
+								   << "void " << func_name << "(SWFAppContext* app_context)" << endl
+								   << "{" << endl;
+						out_script << "\t" << "char str_buffer[17];" << endl << endl;
+						next_script_i += 1;
+
+						action.parseActions(context, cur_pos, out_script);
+						out_script << "}";
+
+						btn_actions.push_back({ 0x0010, func_name }); // OverDownToOverUp
+					}
+				}
+				else if (action_offset > 0 && action_offset_pos != nullptr)
+				{
+					// DefineButton2: parse BUTTONCONDACTION chain
+					char* action_ptr = action_offset_pos + action_offset;
+
+					while (true)
+					{
+						u16 cond_action_size = *(u16*) action_ptr; action_ptr += 2;
+						u16 condition = *(u16*) action_ptr; action_ptr += 2;
+
+						std::string func_name = bp + "_action_" + to_string(next_script_i);
+						context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
+
+						ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						out_script << "#include <recomp.h>" << endl
+								   << "#include <setjmp.h>" << endl
+								   << "#include \"script_decls.h\"" << endl << endl
+								   << "void " << func_name << "(SWFAppContext* app_context)" << endl
+								   << "{" << endl;
+						out_script << "\t" << "char str_buffer[17];" << endl << endl;
+						next_script_i += 1;
+
+						action.parseActions(context, action_ptr, out_script);
+						out_script << "}";
+
+						btn_actions.push_back({ condition, func_name });
+
+						if (cond_action_size == 0)
+							break; // Last block
+					}
+				}
+
+				// Button action scripts are called via button dispatch, not inline
+				last_queued_script = next_script_i;
+
+				// Generate ButtonAction array (or NULL if no actions)
+				if (!btn_actions.empty())
+				{
+					sprite_forward_decls << "extern ButtonAction " << bp << "_actions[];" << endl;
+
+					sprite_definitions << "ButtonAction " << bp << "_actions[] =" << endl
+									   << "{" << endl;
+					for (auto& ba : btn_actions)
+					{
+						sprite_definitions << "\t" << "{ 0x" << std::hex << ba.condition << std::dec
+										   << ", " << ba.func_name << " }," << endl;
+					}
+					sprite_definitions << "};" << endl << endl;
+				}
+
 				// Emit tagDefineButton call
 				context.tag_main << "\t" << "tagDefineButton(app_context, "
 								 << to_string(button_id) << ", "
 								 << bp << "_state_funcs, "
 								 << to_string(hit_char_id >= 0 ? hit_char_id : 0) << ", "
-								 << to_string(hit_transform_id) << ");" << endl;
+								 << to_string(hit_transform_id) << ", "
+								 << (btn_actions.empty() ? "NULL" : bp + "_actions") << ", "
+								 << to_string(btn_actions.size()) << ");" << endl;
 
-				// Skip any remaining bytes (ActionRecords / BUTTONCONDACTIONs)
+				// Skip any remaining bytes
 				cur_pos = tag_body_start + button_tag_length;
 
 				break;

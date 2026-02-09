@@ -21,7 +21,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth);
 void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count);
-void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id);
+void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count);
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height);
 void finalizeBitmaps();
 #endif

@@ -19,6 +19,12 @@ extern frame_func frame_funcs[];
 #define INITIAL_DICTIONARY_CAPACITY 1024
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
 
+// Button action: condition bitmask + function to call on matching transition
+typedef struct ButtonAction {
+	u16 condition;        // bitmask of triggering transitions
+	frame_func action;    // function to call
+} ButtonAction;
+
 // Character type enum for shapes, text, sprites, and buttons
 typedef enum
 {
@@ -69,6 +75,8 @@ typedef struct Character
 			frame_func* button_state_funcs;  // [up, over, down]
 			size_t button_hit_char_id;       // character ID for hit-test shape
 			u32 button_hit_transform_id;     // transform for hit-test shape
+			ButtonAction* button_actions;    // condition→action pairs
+			size_t button_action_count;
 		};
 	};
 } Character;
@@ -81,7 +89,8 @@ typedef struct DisplayObject
 	u32 has_cxform;
 	u16 clip_depth;
 	u16 ratio;
-	u8 button_state;  // 0=up, 1=over, 2=down (used for CHAR_TYPE_BUTTON)
+	u8 button_state;       // 0=up, 1=over, 2=down (used for CHAR_TYPE_BUTTON)
+	u8 button_prev_state;  // previous frame's state (for transition detection)
 } DisplayObject;
 
 typedef struct MouseState {

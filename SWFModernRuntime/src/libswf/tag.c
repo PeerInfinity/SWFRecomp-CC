@@ -150,9 +150,17 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 	}
 
-	// --- Button hit testing + state machine ---
+	// --- Button hit testing + state machine + action dispatch ---
 	// Iterate front-to-back (highest depth first). The first button that hits
 	// gets the over/down state; all others stay in up state.
+	// Then dispatch actions for any state transitions.
+	//
+	// BUTTONCONDACTION condition bits:
+	//   Bit 0: IdleToOverDown       Bit 4: OverDownToOverUp (click/release)
+	//   Bit 1: OutDownToIdle        Bit 5: OverUpToOverDown (press)
+	//   Bit 2: OutDownToOverDown    Bit 6: OverUpToIdle (mouse leave)
+	//   Bit 3: OverDownToOutDown    Bit 7: IdleToOverUp (mouse enter)
+	//   Bit 8: OverDownToIdle
 	{
 		int found_hover = 0;
 		for (size_t i = max_depth; i >= 1; i--)
@@ -162,6 +170,8 @@ void tagShowFrame(SWFAppContext* app_context)
 
 			Character* ch = &dictionary[obj->char_id];
 			if (ch->type != CHAR_TYPE_BUTTON) continue;
+
+			u8 old_state = obj->button_state;
 
 			if (!found_hover)
 			{
@@ -185,13 +195,13 @@ void tagShowFrame(SWFAppContext* app_context)
 					{
 						found_hover = 1;
 						if (app_context->mouse.button_down)
-							obj->button_state = 2;  // down
+							obj->button_state = 2;  // down (OverDown)
 						else
-							obj->button_state = 1;  // over
+							obj->button_state = 1;  // over (OverUp)
 					}
 					else
 					{
-						obj->button_state = 0;  // up
+						obj->button_state = 0;  // up (Idle)
 					}
 				}
 			}
@@ -199,6 +209,31 @@ void tagShowFrame(SWFAppContext* app_context)
 			{
 				obj->button_state = 0;  // up (another button is hovered)
 			}
+
+			// Dispatch actions on state transitions
+			u8 new_state = obj->button_state;
+			if (old_state != new_state && ch->button_action_count > 0)
+			{
+				// Encode transition as BUTTONCONDACTION bitmask
+				u16 transition = 0;
+				if (old_state == 0 && new_state == 1)      transition = 0x0080; // IdleToOverUp
+				else if (old_state == 1 && new_state == 0)  transition = 0x0040; // OverUpToIdle
+				else if (old_state == 1 && new_state == 2)  transition = 0x0020; // OverUpToOverDown
+				else if (old_state == 2 && new_state == 1)  transition = 0x0010; // OverDownToOverUp
+				else if (old_state == 2 && new_state == 0)  transition = 0x0100; // OverDownToIdle
+				else if (old_state == 0 && new_state == 2)  transition = 0x0001; // IdleToOverDown
+
+				if (transition != 0)
+				{
+					for (size_t a = 0; a < ch->button_action_count; a++)
+					{
+						if (ch->button_actions[a].condition & transition)
+							ch->button_actions[a].action(app_context);
+					}
+				}
+			}
+
+			obj->button_prev_state = old_state;
 		}
 	}
 
@@ -440,7 +475,7 @@ void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* fun
 	dictionary[char_id].sprite_frame_count = frame_count;
 }
 
-void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id)
+void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count)
 {
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
@@ -448,6 +483,8 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 	dictionary[char_id].button_state_funcs = state_funcs;
 	dictionary[char_id].button_hit_char_id = hit_char_id;
 	dictionary[char_id].button_hit_transform_id = hit_transform_id;
+	dictionary[char_id].button_actions = actions;
+	dictionary[char_id].button_action_count = action_count;
 }
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)

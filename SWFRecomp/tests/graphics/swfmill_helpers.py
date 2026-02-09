@@ -539,10 +539,15 @@ class SpriteDefinition:
 # ---------------------------------------------------------------------------
 
 class ButtonDefinition:
-    """Collects button records for a DefineButton tag (tag 7)."""
+    """Collects button records for a DefineButton tag (tag 7).
+
+    Builds raw binary since swfmill's xml2swf omits the CharacterEndFlag
+    (0x00 record terminator) when actions are present.
+    """
     def __init__(self, object_id):
         self.object_id = object_id
         self.records = []  # list of record dicts
+        self.trace_actions = []  # list of message strings
 
     def add_record(self, char_id, depth, up=False, over=False, down=False,
                    hit_test=False, trans_x=0, trans_y=0):
@@ -564,26 +569,44 @@ class ButtonDefinition:
             "trans_y": trans_y,
         })
 
-    def to_xml(self, parent):
-        btn_el = SubElement(parent, "DefineButton",
-                            objectID=str(self.object_id))
-        buttons_el = SubElement(btn_el, "buttons")
+    def add_trace_action(self, message):
+        """Add a Trace action that prints a message (fires on click/release)."""
+        self.trace_actions.append(message)
+
+    def build_body(self):
+        """Build the raw DefineButton tag body as bytes."""
+        body = bytearray()
+        # ButtonId (UI16 LE)
+        body += struct.pack('<H', self.object_id)
+        # BUTTONRECORD entries
         for rec in self.records:
-            attrs = {
-                "hitTest": "1" if rec["hit_test"] else "0",
-                "down": "1" if rec["down"] else "0",
-                "over": "1" if rec["over"] else "0",
-                "up": "1" if rec["up"] else "0",
-                "objectID": str(rec["char_id"]),
-                "depth": str(rec["depth"]),
-            }
-            btn_rec = SubElement(buttons_el, "Button", **attrs)
-            transform_el = SubElement(btn_rec, "placeMatrix")
-            SubElement(transform_el, "Transform",
-                       transX=str(rec["trans_x"]),
-                       transY=str(rec["trans_y"]))
-        actions_el = SubElement(btn_el, "actions")
-        SubElement(actions_el, "EndAction")
+            flags = 0
+            if rec["up"]:       flags |= 0x01
+            if rec["over"]:     flags |= 0x02
+            if rec["down"]:     flags |= 0x04
+            if rec["hit_test"]: flags |= 0x08
+            body.append(flags)
+            body += struct.pack('<H', rec["char_id"])
+            body += struct.pack('<H', rec["depth"])
+            # MATRIX (bit-packed)
+            matrix = {"transX": rec["trans_x"], "transY": rec["trans_y"]}
+            body += _build_matrix_bits(matrix)
+        # CharacterEndFlag (UI8) — record terminator
+        body.append(0x00)
+        # ACTIONRECORD entries
+        for msg in self.trace_actions:
+            msg_bytes = msg.encode('ascii') + b'\x00'
+            # ActionPush (0x96) + length (UI16) + type 0x00 (string) + string
+            push_len = 1 + len(msg_bytes)
+            body.append(0x96)
+            body += struct.pack('<H', push_len)
+            body.append(0x00)  # type: string
+            body += msg_bytes
+            # ActionTrace (0x26)
+            body.append(0x26)
+        # ActionEnd (0x00)
+        body.append(0x00)
+        return bytes(body)
 
 
 class Button2Definition:
@@ -2026,7 +2049,11 @@ class SWFMLBuilder:
                 tag_data.to_xml(tags_el)
 
             elif tag_type == "DefineButton":
-                tag_data.to_xml(tags_el)
+                body = tag_data.build_body()
+                tag_b64 = base64.b64encode(body).decode('ascii')
+                unk = SubElement(tags_el, "UnknownTag", id="0x07")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_b64
 
             elif tag_type == "DefineButton2":
                 body = tag_data.build_body()
