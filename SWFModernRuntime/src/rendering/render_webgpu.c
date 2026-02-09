@@ -1357,6 +1357,28 @@ void render_webgpu_compose_text_transforms(WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
+// render_webgpu_compose_sprite_transform: compose parent PlaceObject2 transform
+// with a single child transform and write the result to the child's xform slot
+// in the GPU buffer.  Called before renderer_open_pass.
+// ---------------------------------------------------------------------------
+void render_webgpu_compose_sprite_transform(WebGPURenderContext* ctx,
+                                            const char* transform_data,
+                                            u32 parent_transform_id,
+                                            u32 child_transform_id)
+{
+	const float* transforms = (const float*)transform_data;
+	const float* parent_xform = &transforms[parent_transform_id * 16];
+	const float* child_xform  = &transforms[child_transform_id * 16];
+
+	float composed[16];
+	mat4_multiply(composed, parent_xform, child_xform);
+
+	uint64_t offset = (uint64_t)child_transform_id * 16 * sizeof(float);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
+	                     composed, 16 * sizeof(float));
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_update_vertices / render_webgpu_update_colors
 // Write interpolated morph data into GPU buffers before the render pass.
 // ---------------------------------------------------------------------------

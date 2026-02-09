@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-09T00:58:24Z",
+  "generated": "2026-02-09T01:44:21Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2199,6 +2199,20 @@
       "wasm_file": "color_transform.wasm",
       "description": "WebGPU rendering test with CXFORMWITHALPHA color transforms applied via PlaceObject2",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/define_button",
+      "name": "define_button",
+      "type": "graphics",
+      "path": "examples/graphics/define_button",
+      "has_swf": true,
+      "js_file": "define_button.js",
+      "wasm_file": "define_button.wasm",
+      "description": "DefineButton (tag 7) with up-state shape rendered as sprite",
+      "swf_version": 5,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

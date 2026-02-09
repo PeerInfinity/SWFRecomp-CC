@@ -32,6 +32,7 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_upload_cxform_id(ctx, id)         render_webgpu_upload_cxform_id(ctx, id)
 #define renderer_upload_cxform(ctx, cx)            render_webgpu_upload_cxform(ctx, cx)
 #define renderer_compose_text_transforms(ctx, td, pt, gs, c) render_webgpu_compose_text_transforms(ctx, td, pt, gs, c)
+#define renderer_compose_sprite_transform(ctx, td, pt, ct) render_webgpu_compose_sprite_transform(ctx, td, pt, ct)
 #define renderer_update_vertices(ctx, off, data, sz)  render_webgpu_update_vertices(ctx, off, data, sz)
 #define renderer_update_colors(ctx, off, data, sz)    render_webgpu_update_colors(ctx, off, data, sz)
 
@@ -58,6 +59,7 @@ typedef FlashbangContext RenderContext;
 #define renderer_upload_cxform_id(ctx, id)         flashbang_upload_cxform_id(ctx, id)
 #define renderer_upload_cxform(ctx, cx)            flashbang_upload_cxform(ctx, cx)
 #define renderer_compose_text_transforms(ctx, td, pt, gs, c) ((void)0)
+#define renderer_compose_sprite_transform(ctx, td, pt, ct) ((void)0)
 #define renderer_update_vertices(ctx, off, data, sz)  ((void)0)
 #define renderer_update_colors(ctx, off, data, sz)    ((void)0)
 

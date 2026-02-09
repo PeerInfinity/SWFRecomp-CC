@@ -37,6 +37,40 @@ void tagShowFrame(SWFAppContext* app_context)
 				ch->transform_start,
 				ch->text_size);
 		}
+		else if (ch->type == CHAR_TYPE_SPRITE)
+		{
+			// Execute sprite frame function into a temporary display list
+			// to discover child placements, then compose parent + child transforms.
+			DisplayObject* saved_display_list = display_list;
+			size_t saved_max_depth = max_depth;
+			size_t saved_capacity = display_list_capacity;
+
+			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+			max_depth = 0;
+
+			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+			{
+				ch->sprite_frame_funcs[0](app_context);
+			}
+
+			// Compose parent transform with each child's transform
+			for (size_t j = 1; j <= max_depth; ++j)
+			{
+				DisplayObject* sprite_obj = &display_list[j];
+				if (sprite_obj->char_id == 0) continue;
+
+				renderer_compose_sprite_transform(context,
+					app_context->transform_data,
+					obj->transform_id,
+					sprite_obj->transform_id);
+			}
+
+			free(display_list);
+			display_list = saved_display_list;
+			max_depth = saved_max_depth;
+			display_list_capacity = saved_capacity;
+		}
 		else if (ch->type == CHAR_TYPE_MORPH_SHAPE)
 		{
 			float t = (float)obj->ratio / 65535.0f;

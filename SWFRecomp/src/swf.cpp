@@ -2425,6 +2425,89 @@ namespace SWFRecomp
 				//~ break;
 			//~ }
 			
+			case SWF_TAG_DEFINE_BUTTON:
+			{
+				char* tag_body_start = cur_pos;
+				u32 button_tag_length = tag.length;
+
+				tag.clearFields();
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16); // ButtonId
+				tag.parseFields(cur_pos);
+
+				u16 button_id = (u16) tag.fields[0].value;
+
+				std::string bp = "button_" + to_string(button_id);
+
+				// Forward declare the button frame_funcs array (written to draws.h)
+				sprite_forward_decls << "extern frame_func " << bp << "_frame_funcs[];" << endl;
+
+				// Emit tagDefineSprite call to register button as sprite character
+				context.tag_main << "\t" << "tagDefineSprite(app_context, "
+								 << to_string(button_id) << ", "
+								 << bp << "_frame_funcs, "
+								 << "1);" << endl;
+
+				// Generate a single frame function containing up-state placements
+				sprite_definitions << "void " << bp << "_frame_0"
+								   << "(SWFAppContext* app_context)" << endl
+								   << "{" << endl;
+
+				// Parse BUTTONRECORD entries until flags == 0
+				while (true)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI8); // flags
+					tag.parseFields(cur_pos);
+
+					u8 flags = (u8) tag.fields[0].value;
+					if (flags == 0)
+						break;
+
+					bool state_up = (flags & 0x01) != 0;
+
+					tag.clearFields();
+					tag.setFieldCount(2);
+					tag.configureNextField(SWF_FIELD_UI16); // CharacterId
+					tag.configureNextField(SWF_FIELD_UI16); // PlaceDepth
+					tag.parseFields(cur_pos);
+
+					u16 char_id = (u16) tag.fields[0].value;
+					u16 depth = (u16) tag.fields[1].value;
+
+					MATRIX matrix;
+					parseMatrix(matrix);
+
+					if (state_up)
+					{
+						size_t transform_id = current_transform;
+						recompileMatrix(matrix, transform_data);
+						current_transform += 1;
+
+						sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
+										   << to_string(depth) << ", "
+										   << to_string(char_id) << ", "
+										   << to_string(transform_id) << ", "
+										   << "0, 0);" << endl;
+					}
+				}
+
+				// Close frame function
+				sprite_definitions << "}" << endl << endl;
+
+				// Generate frame_funcs array
+				sprite_definitions << "frame_func " << bp << "_frame_funcs[] =" << endl
+								   << "{" << endl
+								   << "\t" << bp << "_frame_0," << endl
+								   << "};" << endl << endl;
+
+				// Skip any remaining bytes (ActionRecords)
+				cur_pos = tag_body_start + button_tag_length;
+
+				break;
+			}
+
 			default:
 			{
 				EXC_ARG("Tag type %d not implemented.\n", tag.code);

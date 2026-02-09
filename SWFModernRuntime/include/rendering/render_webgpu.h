@@ -140,6 +140,7 @@ void render_webgpu_end_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip(WebGPURenderContext* context);
 void render_webgpu_close_pass(WebGPURenderContext* context);
 void render_webgpu_compose_text_transforms(WebGPURenderContext* context, const char* transform_data, u32 place_transform_id, u32 glyph_start, size_t count);
+void render_webgpu_compose_sprite_transform(WebGPURenderContext* context, const char* transform_data, u32 parent_transform_id, u32 child_transform_id);
 void render_webgpu_update_vertices(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
 void render_webgpu_update_colors(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

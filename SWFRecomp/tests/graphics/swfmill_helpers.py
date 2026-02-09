@@ -535,6 +535,58 @@ class SpriteDefinition:
 
 
 # ---------------------------------------------------------------------------
+# Button definition helper
+# ---------------------------------------------------------------------------
+
+class ButtonDefinition:
+    """Collects button records for a DefineButton tag (tag 7)."""
+    def __init__(self, object_id):
+        self.object_id = object_id
+        self.records = []  # list of record dicts
+
+    def add_record(self, char_id, depth, up=False, over=False, down=False,
+                   hit_test=False, trans_x=0, trans_y=0):
+        """Add a button record mapping a character to one or more button states.
+
+        char_id: character ID to display
+        depth: display list depth for this record
+        up/over/down/hit_test: which button states use this character
+        trans_x/trans_y: placement offset in twips
+        """
+        self.records.append({
+            "char_id": char_id,
+            "depth": depth,
+            "up": up,
+            "over": over,
+            "down": down,
+            "hit_test": hit_test,
+            "trans_x": trans_x,
+            "trans_y": trans_y,
+        })
+
+    def to_xml(self, parent):
+        btn_el = SubElement(parent, "DefineButton",
+                            objectID=str(self.object_id))
+        buttons_el = SubElement(btn_el, "buttons")
+        for rec in self.records:
+            attrs = {
+                "hitTest": "1" if rec["hit_test"] else "0",
+                "down": "1" if rec["down"] else "0",
+                "over": "1" if rec["over"] else "0",
+                "up": "1" if rec["up"] else "0",
+                "objectID": str(rec["char_id"]),
+                "depth": str(rec["depth"]),
+            }
+            btn_rec = SubElement(buttons_el, "Button", **attrs)
+            transform_el = SubElement(btn_rec, "placeMatrix")
+            SubElement(transform_el, "Transform",
+                       transX=str(rec["trans_x"]),
+                       transY=str(rec["trans_y"]))
+        actions_el = SubElement(btn_el, "actions")
+        SubElement(actions_el, "EndAction")
+
+
+# ---------------------------------------------------------------------------
 # Main SWF builder
 # ---------------------------------------------------------------------------
 
@@ -1712,6 +1764,12 @@ class SWFMLBuilder:
         self.tags.append(("DefineSprite", sprite))
         return sprite
 
+    def define_button(self, object_id):
+        """Create a button definition (tag 7). Returns a ButtonDefinition for adding records."""
+        button = ButtonDefinition(object_id)
+        self.tags.append(("DefineButton", button))
+        return button
+
     def show_frame(self):
         self._frame_count += 1
         self.tags.append(("ShowFrame", None))
@@ -1903,6 +1961,9 @@ class SWFMLBuilder:
                 data_el.text = tag_b64
 
             elif tag_type == "DefineSprite":
+                tag_data.to_xml(tags_el)
+
+            elif tag_type == "DefineButton":
                 tag_data.to_xml(tags_el)
 
             elif tag_type == "PlaceObject2":
