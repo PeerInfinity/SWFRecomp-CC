@@ -4265,19 +4265,9 @@ namespace SWFRecomp
 
 						// EndBounds parsed and ignored (not needed at ratio=0)
 
-						// Offset (UI32) - distance from end of Offset to EndEdges
-						shape_tag.clearFields();
-						shape_tag.setFieldCount(1);
-
-						shape_tag.configureNextField(SWF_FIELD_UI32, 32);
-
-						shape_tag.parseFields(cur_pos);
-
-						// Offset parsed and ignored (we skip EndEdges using tag length)
-
 						if (is_morph2)
 						{
-							// DefineMorphShape2 extra fields:
+							// DefineMorphShape2 extra fields (before Offset per SWF spec):
 							// StartEdgeBounds RECT (parse and ignore)
 							shape_tag.clearFields();
 							shape_tag.setFieldCount(5);
@@ -4305,6 +4295,16 @@ namespace SWFRecomp
 							shape_tag.parseFields(cur_pos);
 							// Flags parsed and ignored
 						}
+
+						// Offset (UI32) - distance from end of Offset to EndEdges
+						shape_tag.clearFields();
+						shape_tag.setFieldCount(1);
+
+						shape_tag.configureNextField(SWF_FIELD_UI32, 32);
+
+						shape_tag.parseFields(cur_pos);
+
+						// Offset parsed and ignored (we skip EndEdges using tag length)
 					}
 
 					// FILLSTYLEARRAY

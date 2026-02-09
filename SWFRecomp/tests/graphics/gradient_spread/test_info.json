@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "name": "gradient_spread",
+    "description": "Linear gradient with pad, reflect, and repeat spread modes",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "features": {
+    "tested": ["DEFINE_SHAPE_3", "LINEAR_GRADIENT_FILL", "GRADIENT_SPREAD_MODES"],
+    "supporting": ["PLACE_OBJECT_2", "STRAIGHT_EDGE"]
+  }
+}

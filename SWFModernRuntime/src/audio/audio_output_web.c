@@ -53,6 +53,7 @@ void audio_output_init(SWFAppContext* app_context)
 			var processor = ctx.createScriptProcessor(bufferSize, 0, 2);
 
 			processor.onaudioprocess = function(e) {
+				if (!Module.HEAPF32 || !Module._audio_fill_buffer) return;
 				var outL = e.outputBuffer.getChannelData(0);
 				var outR = e.outputBuffer.getChannelData(1);
 				var frames = e.outputBuffer.length;

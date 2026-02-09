@@ -2,6 +2,10 @@
 #include <swf.h>
 #include <out.h>
 
+#ifndef FRAME_RATE
+#define FRAME_RATE 12
+#endif
+
 #ifndef NO_GRAPHICS
 #include "constants.h"
 #include "draws.h"

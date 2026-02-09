@@ -1916,6 +1916,10 @@ class SWFMLBuilder:
         self.tags.append(("DefineButton2", button))
         return button
 
+    def add_raw_tag(self, tag_id, body_bytes):
+        """Add a raw binary tag (emitted as UnknownTag)."""
+        self.tags.append(("RawTag", (tag_id, body_bytes)))
+
     def show_frame(self):
         self._frame_count += 1
         self.tags.append(("ShowFrame", None))
@@ -2167,6 +2171,12 @@ class SWFMLBuilder:
             elif tag_type == "RemoveObject2":
                 d = tag_data
                 SubElement(tags_el, "RemoveObject2", depth=str(d["depth"]))
+
+            elif tag_type == "RawTag":
+                tag_id, body_bytes = tag_data
+                unk = SubElement(tags_el, "UnknownTag", id=hex(tag_id))
+                data_el = SubElement(unk, "data")
+                data_el.text = base64.b64encode(body_bytes).decode('ascii')
 
             elif tag_type == "ShowFrame":
                 SubElement(tags_el, "ShowFrame")

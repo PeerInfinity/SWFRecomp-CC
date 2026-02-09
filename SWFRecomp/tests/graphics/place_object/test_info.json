@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "place_object",
+    "description": "PlaceObject (tag 4) with optional RGB CXFORM tint",
+    "swf_version": 3,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "PLACE_OBJECT",
+      "SOLID_FILL",
+      "STRAIGHT_EDGE",
+      "COLOR_TRANSFORM"
+    ]
+  }
+}

@@ -9,44 +9,118 @@
 
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 {
-	printf("[Tag] SetBackgroundColor(%d, %d, %d)\n", red, green, blue);
+	(void)red; (void)green; (void)blue;
 }
 
 void tagShowFrame(SWFAppContext* app_context)
 {
-	(void)app_context;  // Unused in NO_GRAPHICS mode
-	printf("[Tag] ShowFrame()\n");
+	(void)app_context;
 }
 
-// Stubs for graphics-only tags - should not be called in NO_GRAPHICS mode
-// but if they are, we provide empty implementations
-#ifdef INCLUDE_GRAPHICS_STUBS
-void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
+// No-op stubs for all tag functions so trace tests that happen to
+// define shapes, sprites, buttons, sounds, etc. still compile and link.
+
+void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size)
 {
-	(void)app_context; (void)funcs; (void)frame_count;
-	printf("[Tag] DefineSprite(char_id=%zu, frame_count=%zu) [ignored in NO_GRAPHICS mode]\n", char_id, frame_count);
+	(void)app_context; (void)type; (void)char_id; (void)shape_offset; (void)shape_size;
 }
 
-void tagDefineShape(size_t char_id, size_t shape_offset, size_t shape_size)
+void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
+	size_t shape_offset, size_t shape_size,
+	size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count)
 {
-	printf("[Tag] DefineShape(char_id=%zu) [ignored in NO_GRAPHICS mode]\n", char_id);
+	(void)app_context; (void)char_id; (void)shape_offset; (void)shape_size;
+	(void)morph_end_offset; (void)morph_color_start; (void)morph_color_count;
+}
+
+void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id)
+{
+	(void)app_context; (void)char_id; (void)text_start; (void)text_size;
+	(void)transform_start; (void)cxform_id;
 }
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
-	(void)app_context; (void)transform_id; (void)cxform_id; (void)clip_depth;
-	printf("[Tag] PlaceObject2(depth=%zu, char_id=%zu) [ignored in NO_GRAPHICS mode]\n", depth, char_id);
+	(void)app_context; (void)depth; (void)char_id; (void)transform_id;
+	(void)cxform_id; (void)clip_depth;
+}
+
+void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
+	u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
+{
+	(void)app_context; (void)depth; (void)char_id; (void)transform_id;
+	(void)cxform_id; (void)clip_depth; (void)ratio;
+}
+
+void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
+	u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
+{
+	(void)app_context; (void)depth; (void)char_id; (void)transform_id;
+	(void)cxform_id; (void)clip_depth; (void)clip_actions; (void)clip_action_count;
+}
+
+void tagRemoveObject(SWFAppContext* app_context, size_t depth)
+{
+	(void)app_context; (void)depth;
+}
+
+void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
+{
+	(void)app_context; (void)depth;
+}
+
+void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
+{
+	(void)app_context; (void)char_id; (void)funcs; (void)frame_count;
+}
+
+void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count)
+{
+	(void)app_context; (void)char_id; (void)state_funcs; (void)hit_char_id;
+	(void)hit_transform_id; (void)actions; (void)action_count;
 }
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
 {
-	printf("[Tag] DefineBitmap(width=%u, height=%u) [ignored in NO_GRAPHICS mode]\n", width, height);
+	(void)offset; (void)size; (void)width; (void)height;
 }
 
 void finalizeBitmaps()
 {
-	printf("[Tag] FinalizeBitmaps() [ignored in NO_GRAPHICS mode]\n");
 }
-#endif
+
+void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
+	u8 format, u8 rate, u8 sample_size, u8 stereo,
+	u32 sample_count, const u8* data, size_t data_size)
+{
+	(void)app_context; (void)sound_id; (void)format; (void)rate;
+	(void)sample_size; (void)stereo; (void)sample_count; (void)data; (void)data_size;
+}
+
+void tagStartSound(SWFAppContext* app_context, u16 sound_id,
+	int stop, u32 loop_count, u32 in_point, u32 out_point)
+{
+	(void)app_context; (void)sound_id; (void)stop; (void)loop_count;
+	(void)in_point; (void)out_point;
+}
+
+void tagSoundStreamHead(SWFAppContext* app_context,
+	u8 format, u8 rate, u8 sample_size, u8 stereo,
+	u16 avg_sample_count)
+{
+	(void)app_context; (void)format; (void)rate; (void)sample_size;
+	(void)stereo; (void)avg_sample_count;
+}
+
+void tagSoundStreamBlock(SWFAppContext* app_context,
+	const u8* data, size_t data_size)
+{
+	(void)app_context; (void)data; (void)data_size;
+}
+
+void tagStopAllSounds(SWFAppContext* app_context)
+{
+	(void)app_context;
+}
 
 #endif // NO_GRAPHICS

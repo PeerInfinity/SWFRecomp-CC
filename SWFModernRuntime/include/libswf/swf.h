@@ -15,10 +15,6 @@ typedef void (*frame_func)(SWFAppContext* app_context);
 
 extern frame_func frame_funcs[];
 
-#ifndef NO_GRAPHICS
-#define INITIAL_DICTIONARY_CAPACITY 1024
-#define INITIAL_DISPLAYLIST_CAPACITY 1024
-
 // Button action: condition bitmask + function to call on matching transition
 typedef struct ButtonAction {
 	u16 condition;        // bitmask of triggering transitions
@@ -30,6 +26,20 @@ typedef struct ClipAction {
 	u32 event_flags;      // bitmask of triggering events
 	frame_func action;    // function to call
 } ClipAction;
+
+// Character type enum for shapes, text, sprites, and buttons
+typedef enum
+{
+	CHAR_TYPE_SHAPE,
+	CHAR_TYPE_MORPH_SHAPE,
+	CHAR_TYPE_TEXT,
+	CHAR_TYPE_SPRITE,
+	CHAR_TYPE_BUTTON,
+} CharacterType;
+
+#ifndef NO_GRAPHICS
+#define INITIAL_DICTIONARY_CAPACITY 1024
+#define INITIAL_DISPLAYLIST_CAPACITY 1024
 
 // Clip event flag bits (SWF spec)
 #define CLIP_EVENT_LOAD         0x00001
@@ -51,16 +61,6 @@ typedef struct ClipAction {
 #define CLIP_EVENT_DRAG_OUT     0x10000
 #define CLIP_EVENT_KEY_PRESS    0x20000
 #define CLIP_EVENT_CONSTRUCT    0x40000
-
-// Character type enum for shapes, text, sprites, and buttons
-typedef enum
-{
-	CHAR_TYPE_SHAPE,
-	CHAR_TYPE_MORPH_SHAPE,
-	CHAR_TYPE_TEXT,
-	CHAR_TYPE_SPRITE,
-	CHAR_TYPE_BUTTON,
-} CharacterType;
 
 typedef struct Character
 {

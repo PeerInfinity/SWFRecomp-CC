@@ -8,8 +8,8 @@ void tagInit(SWFAppContext* app_context);
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
 
-#ifndef NO_GRAPHICS
-// Graphics-only tag functions
+// Tag functions needed by both graphics and trace (NO_GRAPHICS) builds.
+// In NO_GRAPHICS mode, tag_stubs.c provides no-op implementations.
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size);
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
@@ -37,4 +37,3 @@ void tagSoundStreamHead(SWFAppContext* app_context,
 void tagSoundStreamBlock(SWFAppContext* app_context,
     const u8* data, size_t data_size);
 void tagStopAllSounds(SWFAppContext* app_context);
-#endif

@@ -128,6 +128,9 @@ for test_name in "${TESTS[@]}"; do
     echo "Building: $test_name (${BUILD_NUM}/${TOTAL_COUNT}) [trace]"
     echo "========================================="
 
+    # Force regeneration of recompiled output (ensures out.h is up-to-date)
+    rm -rf "${SWFRECOMP_ROOT}/tests/${test_name}/RecompiledScripts" "${SWFRECOMP_ROOT}/tests/${test_name}/RecompiledTags"
+
     # Build with timeout, capture output to check for success
     BUILD_OUTPUT=$(timeout "$BUILD_TIMEOUT" "${SCRIPT_DIR}/build_test.sh" "$test_name" wasm 2>&1) || true
     BUILD_EXIT=$?
@@ -161,6 +164,9 @@ for test_name in "${GRAPHICS_TESTS[@]}"; do
     echo "========================================="
     echo "Building: graphics/$test_name (${BUILD_NUM}/${TOTAL_COUNT}) [graphics/WebGPU]"
     echo "========================================="
+
+    # Force regeneration of recompiled output (ensures out.h is up-to-date)
+    rm -rf "${SWFRECOMP_ROOT}/tests/graphics/${test_name}/RecompiledScripts" "${SWFRECOMP_ROOT}/tests/graphics/${test_name}/RecompiledTags"
 
     # Build with --graphics flag and longer timeout
     BUILD_OUTPUT=$(timeout "$GRAPHICS_BUILD_TIMEOUT" "${SCRIPT_DIR}/build_test.sh" "graphics/$test_name" wasm --graphics 2>&1) || true

@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "name": "clip_actions",
+    "description": "PlaceObject2 with CLIPACTIONS (onLoad + onEnterFrame) on sprite",
+    "swf_version": 6,
+    "fully_implemented": true
+  },
+  "features": {
+    "tested": ["PLACE_OBJECT_2_CLIP_ACTIONS"],
+    "supporting": ["DEFINE_SPRITE", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}
