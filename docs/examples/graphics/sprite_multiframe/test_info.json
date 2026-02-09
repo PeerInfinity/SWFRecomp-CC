@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "sprite_multiframe",
+    "description": "WebGPU rendering test with a multi-frame DefineSprite that cycles through 3 frames",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SPRITE_MULTIFRAME"
+    ]
+  }
+}

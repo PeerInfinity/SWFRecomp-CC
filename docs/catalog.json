@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-09T04:00:29Z",
+  "generated": "2026-02-09T04:25:48Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2520,6 +2520,20 @@
       "js_file": "sprite_basic.js",
       "wasm_file": "sprite_basic.wasm",
       "description": "WebGPU rendering test with a DefineSprite containing a red square",
+      "swf_version": 5,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/sprite_multiframe",
+      "name": "sprite_multiframe",
+      "type": "graphics",
+      "path": "examples/graphics/sprite_multiframe",
+      "has_swf": true,
+      "wasm_file": "sprite_multiframe.wasm",
+      "js_file": "sprite_multiframe.js",
+      "description": "WebGPU rendering test with a multi-frame DefineSprite that cycles through 3 frames",
       "swf_version": 5,
       "fully_implemented": true,
       "opcodes_tested": [],

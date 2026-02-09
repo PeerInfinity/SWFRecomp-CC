@@ -91,6 +91,11 @@ typedef struct DisplayObject
 	u16 ratio;
 	u8 button_state;       // 0=up, 1=over, 2=down (used for CHAR_TYPE_BUTTON)
 	u8 button_prev_state;  // previous frame's state (for transition detection)
+	// Per-sprite persistent display list (for multi-frame sprites)
+	struct DisplayObject* sprite_display_list;
+	size_t sprite_max_depth;
+	size_t sprite_dl_capacity;
+	size_t sprite_current_frame;
 } DisplayObject;
 
 typedef struct MouseState {

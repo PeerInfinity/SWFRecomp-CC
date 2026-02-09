@@ -20,6 +20,61 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 
 void tagShowFrame(SWFAppContext* app_context)
 {
+	// --- Advance sprite timelines and execute frame functions ---
+	for (size_t i = 1; i <= max_depth; ++i)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+
+		// Allocate persistent display list on first encounter
+		if (obj->sprite_display_list == NULL)
+		{
+			obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			obj->sprite_display_list = calloc(obj->sprite_dl_capacity, sizeof(DisplayObject));
+			obj->sprite_max_depth = 0;
+			obj->sprite_current_frame = 0;
+		}
+
+		// Swap to sprite's display list context
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+
+		display_list = obj->sprite_display_list;
+		max_depth = obj->sprite_max_depth;
+		display_list_capacity = obj->sprite_dl_capacity;
+
+		// When looping back to frame 0, reset the display list (Flash behavior)
+		size_t frame = obj->sprite_current_frame;
+		if (frame == 0 && max_depth > 0)
+		{
+			for (size_t j = 1; j <= max_depth; ++j)
+				display_list[j].char_id = 0;
+			max_depth = 0;
+		}
+
+		// Execute current frame function
+		if (frame < ch->sprite_frame_count && ch->sprite_frame_funcs[frame] != NULL)
+		{
+			ch->sprite_frame_funcs[frame](app_context);
+		}
+
+		// Save back (display_list pointer may have changed if realloc'd)
+		obj->sprite_display_list = display_list;
+		obj->sprite_max_depth = max_depth;
+		obj->sprite_dl_capacity = display_list_capacity;
+
+		// Restore main display list
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+
+		// Advance frame (loop back to 0)
+		obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
+	}
+
 	// --- Button hit testing + state machine + action dispatch ---
 	// Must run BEFORE transform composition so the pre-render pass
 	// composes transforms for the correct (updated) button state.
@@ -128,37 +183,20 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 		else if (ch->type == CHAR_TYPE_SPRITE)
 		{
-			// Execute sprite frame function into a temporary display list
-			// to discover child placements, then compose parent + child transforms.
-			DisplayObject* saved_display_list = display_list;
-			size_t saved_max_depth = max_depth;
-			size_t saved_capacity = display_list_capacity;
-
-			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-			max_depth = 0;
-
-			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+			// Use the sprite's persistent display list (already populated by frame advancement)
+			if (obj->sprite_display_list != NULL)
 			{
-				ch->sprite_frame_funcs[0](app_context);
+				for (size_t j = 1; j <= obj->sprite_max_depth; ++j)
+				{
+					DisplayObject* sprite_obj = &obj->sprite_display_list[j];
+					if (sprite_obj->char_id == 0) continue;
+
+					renderer_compose_sprite_transform(context,
+						app_context->transform_data,
+						obj->transform_id,
+						sprite_obj->transform_id);
+				}
 			}
-
-			// Compose parent transform with each child's transform
-			for (size_t j = 1; j <= max_depth; ++j)
-			{
-				DisplayObject* sprite_obj = &display_list[j];
-				if (sprite_obj->char_id == 0) continue;
-
-				renderer_compose_sprite_transform(context,
-					app_context->transform_data,
-					obj->transform_id,
-					sprite_obj->transform_id);
-			}
-
-			free(display_list);
-			display_list = saved_display_list;
-			max_depth = saved_max_depth;
-			display_list_capacity = saved_capacity;
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
 		{
@@ -291,41 +329,21 @@ void tagShowFrame(SWFAppContext* app_context)
 				break;
 			case CHAR_TYPE_SPRITE:
 			{
-				// Save current display list state
-				DisplayObject* saved_display_list = display_list;
-				size_t saved_max_depth = max_depth;
-				size_t saved_capacity = display_list_capacity;
-
-				// Create temporary sprite display list
-				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-				max_depth = 0;
-
-				// Execute sprite's first frame to build its display list
-				if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+				if (obj->sprite_display_list != NULL)
 				{
-					ch->sprite_frame_funcs[0](app_context);
-				}
-
-				// Render sprite's display list contents
-				for (size_t j = 1; j <= max_depth; ++j)
-				{
-					DisplayObject* sprite_obj = &display_list[j];
-					if (sprite_obj->char_id == 0) continue;
-
-					Character* sprite_ch = &dictionary[sprite_obj->char_id];
-					if (sprite_ch->type == CHAR_TYPE_SHAPE)
+					for (size_t j = 1; j <= obj->sprite_max_depth; ++j)
 					{
-						renderer_draw_shape(context, sprite_ch->shape_offset, sprite_ch->size,
-							sprite_obj->transform_id, sprite_obj->cxform_id);
+						DisplayObject* sprite_obj = &obj->sprite_display_list[j];
+						if (sprite_obj->char_id == 0) continue;
+
+						Character* sprite_ch = &dictionary[sprite_obj->char_id];
+						if (sprite_ch->type == CHAR_TYPE_SHAPE)
+						{
+							renderer_draw_shape(context, sprite_ch->shape_offset, sprite_ch->size,
+								sprite_obj->transform_id, sprite_obj->cxform_id);
+						}
 					}
 				}
-
-				// Restore main display list
-				free(display_list);
-				display_list = saved_display_list;
-				max_depth = saved_max_depth;
-				display_list_capacity = saved_capacity;
 				break;
 			}
 			case CHAR_TYPE_BUTTON:
@@ -418,6 +436,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
+	display_list[depth].sprite_display_list = NULL;
+	display_list[depth].sprite_max_depth = 0;
+	display_list[depth].sprite_dl_capacity = 0;
+	display_list[depth].sprite_current_frame = 0;
 
 	if (depth > max_depth)
 	{
@@ -436,6 +458,10 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
 	display_list[depth].ratio = ratio;
+	display_list[depth].sprite_display_list = NULL;
+	display_list[depth].sprite_max_depth = 0;
+	display_list[depth].sprite_dl_capacity = 0;
+	display_list[depth].sprite_current_frame = 0;
 
 	if (depth > max_depth)
 	{
@@ -447,6 +473,11 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth)
 	{
+		if (display_list[depth].sprite_display_list != NULL)
+		{
+			free(display_list[depth].sprite_display_list);
+			display_list[depth].sprite_display_list = NULL;
+		}
 		display_list[depth].char_id = 0;
 		display_list[depth].transform_id = 0;
 		display_list[depth].cxform_id = 0;
@@ -459,6 +490,11 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth)
 	{
+		if (display_list[depth].sprite_display_list != NULL)
+		{
+			free(display_list[depth].sprite_display_list);
+			display_list[depth].sprite_display_list = NULL;
+		}
 		display_list[depth].char_id = 0;
 		display_list[depth].transform_id = 0;
 		display_list[depth].cxform_id = 0;
