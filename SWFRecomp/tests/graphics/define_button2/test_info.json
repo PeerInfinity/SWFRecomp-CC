@@ -6,6 +6,6 @@
     "fully_implemented": true
   },
   "graphics": {
-    "tested": ["DEFINE_BUTTON_2", "SOLID_FILL", "STRAIGHT_EDGE"]
+    "tested": ["DEFINE_BUTTON2", "SOLID_FILL", "STRAIGHT_EDGE"]
   }
 }

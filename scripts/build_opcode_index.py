@@ -313,6 +313,9 @@ GRAPHICS_FEATURES = {
     "STRAIGHT_EDGE": {"name": "StraightEdge", "category": "Edge Types", "description": "Straight edge records (LineTo)"},
     "CURVED_EDGE": {"name": "CurvedEdge", "category": "Edge Types", "description": "Curved edge records (CurveTo)"},
 
+    # --- Gradient Features ---
+    "GRADIENT_SPREAD": {"name": "GradientSpread", "category": "Gradient Features", "description": "Gradient spread modes (pad, reflect, repeat)"},
+
     # --- Style Features ---
     "LINE_STYLE": {"name": "LineStyle", "category": "Style Features", "description": "Basic stroke line style (LINESTYLE)"},
     "LINE_STYLE2": {"name": "LineStyle2", "category": "Style Features", "description": "Advanced line style with caps/joins (LINESTYLE2, DefineShape4)"},
@@ -339,6 +342,7 @@ GRAPHICS_FEATURES = {
     "PLACE_SKEW": {"name": "PlaceObject2 Skew", "category": "Transform Features", "description": "Skew transform in PlaceObject2"},
     "COLOR_TRANSFORM": {"name": "ColorTransform", "category": "Transform Features", "description": "Color transform (CXFORM/CXFORMWITHALPHA)"},
     "CLIP_DEPTH": {"name": "ClipDepth", "category": "Transform Features", "description": "Clipping mask via PlaceObject2 ClipDepth"},
+    "CLIP_ACTIONS": {"name": "ClipActions", "category": "Transform Features", "description": "CLIPACTIONS event handlers on PlaceObject2"},
 
     # --- Morph Shape Tags ---
     "DEFINE_MORPH_SHAPE": {"name": "DefineMorphShape", "tag_id": 46, "category": "Morph Shape Tags", "description": "Shape morphing/tweening (SWF tag 46)"},

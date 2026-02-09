@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-08",
+    "generated_date": "2026-02-09",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 287,
-    "total_graphics_features": 60,
-    "graphics_features_with_tests": 37
+    "total_graphics_features": 62,
+    "graphics_features_with_tests": 44
   },
   "entries": [
     {
@@ -8654,6 +8654,7 @@
       "category": "Shape Tags",
       "description": "Shape with full RGBA support (SWF tag 32)",
       "tests": [
+        "SWFRecomp/tests/graphics/gradient_spread",
         "SWFRecomp/tests/graphics/rgba_shape"
       ],
       "fully_implemented": true
@@ -8677,17 +8678,25 @@
       "description": "Solid color fill (type 0x00)",
       "tests": [
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_button",
+        "SWFRecomp/tests/graphics/define_button2",
+        "SWFRecomp/tests/graphics/define_edit_text",
         "SWFRecomp/tests/graphics/define_font2",
         "SWFRecomp/tests/graphics/define_morph_shape",
+        "SWFRecomp/tests/graphics/define_morph_shape2",
         "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/place_object",
         "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
+        "SWFRecomp/tests/graphics/sprite_multiframe",
+        "SWFRecomp/tests/graphics/sprite_nested",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
         "SWFRecomp/tests/graphics/three_boxes",
@@ -8706,7 +8715,8 @@
       "description": "Linear gradient fill (type 0x10)",
       "tests": [
         "SWFRecomp/tests/graphics/awful_gradient",
-        "SWFRecomp/tests/graphics/awful_radial_gradient"
+        "SWFRecomp/tests/graphics/awful_radial_gradient",
+        "SWFRecomp/tests/graphics/gradient_spread"
       ],
       "fully_implemented": true
     },
@@ -8791,14 +8801,20 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/define_button",
+        "SWFRecomp/tests/graphics/define_button2",
+        "SWFRecomp/tests/graphics/define_edit_text",
         "SWFRecomp/tests/graphics/define_font2",
         "SWFRecomp/tests/graphics/define_font3",
         "SWFRecomp/tests/graphics/define_morph_shape",
+        "SWFRecomp/tests/graphics/define_morph_shape2",
         "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/focal_radial_gradient",
+        "SWFRecomp/tests/graphics/gradient_spread",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
         "SWFRecomp/tests/graphics/jpeg4_bitmap",
@@ -8808,10 +8824,13 @@
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/place_object",
         "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
+        "SWFRecomp/tests/graphics/sprite_multiframe",
+        "SWFRecomp/tests/graphics/sprite_nested",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
         "SWFRecomp/tests/graphics/static_text",
@@ -8834,6 +8853,17 @@
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/wild_shadow"
+      ],
+      "fully_implemented": true
+    },
+    {
+      "id": "GRADIENT_SPREAD",
+      "name": "GradientSpread",
+      "tag_id": null,
+      "category": "Gradient Features",
+      "description": "Gradient spread modes (pad, reflect, repeat)",
+      "tests": [
+        "SWFRecomp/tests/graphics/gradient_spread"
       ],
       "fully_implemented": true
     },
@@ -8968,8 +8998,10 @@
       "tag_id": 4,
       "category": "Display List Tags",
       "description": "Basic object placement (SWF tag 4)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/place_object"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_OBJECT2",
@@ -9040,7 +9072,8 @@
       "category": "Transform Features",
       "description": "Color transform (CXFORM/CXFORMWITHALPHA)",
       "tests": [
-        "SWFRecomp/tests/graphics/color_transform"
+        "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/place_object"
       ],
       "fully_implemented": true
     },
@@ -9052,6 +9085,17 @@
       "description": "Clipping mask via PlaceObject2 ClipDepth",
       "tests": [
         "SWFRecomp/tests/graphics/clip_mask"
+      ],
+      "fully_implemented": true
+    },
+    {
+      "id": "CLIP_ACTIONS",
+      "name": "ClipActions",
+      "tag_id": null,
+      "category": "Transform Features",
+      "description": "CLIPACTIONS event handlers on PlaceObject2",
+      "tests": [
+        "SWFRecomp/tests/graphics/clip_actions"
       ],
       "fully_implemented": true
     },
@@ -9072,8 +9116,10 @@
       "tag_id": 84,
       "category": "Morph Shape Tags",
       "description": "Enhanced morphing with LINESTYLE2 (SWF tag 84)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_morph_shape2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT",
@@ -9094,6 +9140,7 @@
       "category": "Text Tags",
       "description": "Font with layout metrics (SWF tag 48)",
       "tests": [
+        "SWFRecomp/tests/graphics/define_edit_text",
         "SWFRecomp/tests/graphics/define_font2"
       ],
       "fully_implemented": true
@@ -9127,6 +9174,7 @@
       "tests": [
         "SWFRecomp/tests/graphics/define_font2",
         "SWFRecomp/tests/graphics/define_font3",
+        "SWFRecomp/tests/graphics/sprite_nested",
         "SWFRecomp/tests/graphics/static_text"
       ],
       "fully_implemented": true
@@ -9148,8 +9196,10 @@
       "tag_id": 37,
       "category": "Text Tags",
       "description": "Dynamic/editable text field (SWF tag 37)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_edit_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_SPRITE",
@@ -9158,7 +9208,10 @@
       "category": "Sprite Tags",
       "description": "Embedded movie clip with own timeline (SWF tag 39)",
       "tests": [
-        "SWFRecomp/tests/graphics/sprite_basic"
+        "SWFRecomp/tests/graphics/clip_actions",
+        "SWFRecomp/tests/graphics/sprite_basic",
+        "SWFRecomp/tests/graphics/sprite_multiframe",
+        "SWFRecomp/tests/graphics/sprite_nested"
       ],
       "fully_implemented": true
     },
@@ -9168,8 +9221,10 @@
       "tag_id": 7,
       "category": "Button Tags",
       "description": "Basic button with state shapes (SWF tag 7)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_button"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BUTTON2",
@@ -9177,8 +9232,10 @@
       "tag_id": 34,
       "category": "Button Tags",
       "description": "Enhanced button with actions (SWF tag 34)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_button2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_SOUND",

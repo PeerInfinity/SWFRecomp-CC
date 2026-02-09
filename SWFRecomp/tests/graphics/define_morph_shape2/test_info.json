@@ -5,8 +5,7 @@
     "swf_version": 8,
     "fully_implemented": true
   },
-  "features": {
-    "tested": ["DEFINE_MORPH_SHAPE_2"],
-    "supporting": ["PLACE_OBJECT_2", "SOLID_FILL", "STRAIGHT_EDGE"]
+  "graphics": {
+    "tested": ["DEFINE_MORPH_SHAPE2", "SOLID_FILL", "STRAIGHT_EDGE"]
   }
 }

@@ -305,6 +305,11 @@ When filling in `graphics.tested` in `test_info.json`, use these feature IDs. On
 | `STRAIGHT_EDGE` | Straight edges (LineTo) |
 | `CURVED_EDGE` | Quadratic Bezier curves (CurveTo) |
 
+### Gradient Features
+| ID | Description |
+|----|-------------|
+| `GRADIENT_SPREAD` | Gradient spread modes (pad, reflect, repeat) |
+
 ### Style Features
 | ID | Description |
 |----|-------------|
@@ -339,6 +344,7 @@ When filling in `graphics.tested` in `test_info.json`, use these feature IDs. On
 | `PLACE_SKEW` | Skew transform in PlaceObject2 |
 | `COLOR_TRANSFORM` | Color transform (CXFORM) |
 | `CLIP_DEPTH` | Clipping mask via ClipDepth |
+| `CLIP_ACTIONS` | CLIPACTIONS event handlers on PlaceObject2 |
 
 ### Morph Shape Tags
 | ID | Description |

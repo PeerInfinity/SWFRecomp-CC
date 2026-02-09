@@ -1,20 +1,11 @@
 {
   "metadata": {
     "name": "sprite_nested",
-    "description": "WebGPU rendering test with nested sprites containing shapes, text, and sprite children",
+    "description": "Nested sprites containing shapes, text, and sprite children",
     "swf_version": 5,
     "fully_implemented": true
   },
-  "opcodes": {
-    "tested": [],
-    "supporting": []
-  },
-  "execution": {
-    "type": "deterministic"
-  },
   "graphics": {
-    "tested": [
-      "SPRITE_NESTED_CHILDREN"
-    ]
+    "tested": ["DEFINE_SPRITE", "DEFINE_TEXT", "SOLID_FILL", "STRAIGHT_EDGE"]
   }
 }
