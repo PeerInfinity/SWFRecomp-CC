@@ -81,4 +81,22 @@ int hit_test_shape(const char* shape_data, size_t shape_offset, size_t shape_siz
 	return 0;
 }
 
+// ---------------------------------------------------------------------------
+// hit_test_mat4_multiply: C = A * B (column-major 4x4)
+// ---------------------------------------------------------------------------
+void hit_test_mat4_multiply(float* out, const float* A, const float* B)
+{
+	for (int col = 0; col < 4; col++)
+	{
+		for (int row = 0; row < 4; row++)
+		{
+			out[col * 4 + row] =
+				A[0 * 4 + row] * B[col * 4 + 0] +
+				A[1 * 4 + row] * B[col * 4 + 1] +
+				A[2 * 4 + row] * B[col * 4 + 2] +
+				A[3 * 4 + row] * B[col * 4 + 3];
+		}
+	}
+}
+
 #endif // NO_GRAPHICS

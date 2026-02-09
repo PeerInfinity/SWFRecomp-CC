@@ -2439,21 +2439,12 @@ namespace SWFRecomp
 
 				std::string bp = "button_" + to_string(button_id);
 
-				// Forward declare the button frame_funcs array (written to draws.h)
-				sprite_forward_decls << "extern frame_func " << bp << "_frame_funcs[];" << endl;
+				// Collect button records by state
+				struct ButtonRecord { u16 char_id; u16 depth; MATRIX matrix; };
+				std::vector<ButtonRecord> up_records, over_records, down_records;
+				int hit_char_id = -1;
+				MATRIX hit_matrix;
 
-				// Emit tagDefineSprite call to register button as sprite character
-				context.tag_main << "\t" << "tagDefineSprite(app_context, "
-								 << to_string(button_id) << ", "
-								 << bp << "_frame_funcs, "
-								 << "1);" << endl;
-
-				// Generate a single frame function containing up-state placements
-				sprite_definitions << "void " << bp << "_frame_0"
-								   << "(SWFAppContext* app_context)" << endl
-								   << "{" << endl;
-
-				// Parse BUTTONRECORD entries until flags == 0
 				while (true)
 				{
 					tag.clearFields();
@@ -2464,8 +2455,6 @@ namespace SWFRecomp
 					u8 flags = (u8) tag.fields[0].value;
 					if (flags == 0)
 						break;
-
-					bool state_up = (flags & 0x01) != 0;
 
 					tag.clearFields();
 					tag.setFieldCount(2);
@@ -2479,28 +2468,68 @@ namespace SWFRecomp
 					MATRIX matrix;
 					parseMatrix(matrix);
 
-					if (state_up)
+					ButtonRecord rec = { char_id, depth, matrix };
+					if (flags & 0x01) up_records.push_back(rec);
+					if (flags & 0x02) over_records.push_back(rec);
+					if (flags & 0x04) down_records.push_back(rec);
+					if (flags & 0x08) { hit_char_id = char_id; hit_matrix = matrix; }
+				}
+
+				// Fallback: empty states fall back to up
+				if (over_records.empty()) over_records = up_records;
+				if (down_records.empty()) down_records = over_records;
+
+				// Generate per-state frame functions
+				const char* state_names[] = { "up", "over", "down" };
+				std::vector<ButtonRecord>* state_records[] = { &up_records, &over_records, &down_records };
+
+				for (int s = 0; s < 3; s++)
+				{
+					sprite_definitions << "void " << bp << "_frame_" << state_names[s]
+									   << "(SWFAppContext* app_context)" << endl
+									   << "{" << endl;
+
+					for (auto& rec : *state_records[s])
 					{
 						size_t transform_id = current_transform;
-						recompileMatrix(matrix, transform_data);
+						recompileMatrix(rec.matrix, transform_data);
 						current_transform += 1;
 
 						sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
-										   << to_string(depth) << ", "
-										   << to_string(char_id) << ", "
+										   << to_string(rec.depth) << ", "
+										   << to_string(rec.char_id) << ", "
 										   << to_string(transform_id) << ", "
 										   << "0, 0);" << endl;
 					}
+
+					sprite_definitions << "}" << endl << endl;
 				}
 
-				// Close frame function
-				sprite_definitions << "}" << endl << endl;
+				// Generate state_funcs array: [up, over, down]
+				sprite_forward_decls << "extern frame_func " << bp << "_state_funcs[];" << endl;
 
-				// Generate frame_funcs array
-				sprite_definitions << "frame_func " << bp << "_frame_funcs[] =" << endl
+				sprite_definitions << "frame_func " << bp << "_state_funcs[] =" << endl
 								   << "{" << endl
-								   << "\t" << bp << "_frame_0," << endl
+								   << "\t" << bp << "_frame_up," << endl
+								   << "\t" << bp << "_frame_over," << endl
+								   << "\t" << bp << "_frame_down," << endl
 								   << "};" << endl << endl;
+
+				// Emit hit-test shape transform
+				u32 hit_transform_id = 0;
+				if (hit_char_id >= 0)
+				{
+					hit_transform_id = (u32) current_transform;
+					recompileMatrix(hit_matrix, transform_data);
+					current_transform += 1;
+				}
+
+				// Emit tagDefineButton call
+				context.tag_main << "\t" << "tagDefineButton(app_context, "
+								 << to_string(button_id) << ", "
+								 << bp << "_state_funcs, "
+								 << to_string(hit_char_id >= 0 ? hit_char_id : 0) << ", "
+								 << to_string(hit_transform_id) << ");" << endl;
 
 				// Skip any remaining bytes (ActionRecords)
 				cur_pos = tag_body_start + button_tag_length;

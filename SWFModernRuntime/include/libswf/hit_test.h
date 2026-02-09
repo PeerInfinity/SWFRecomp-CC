@@ -19,4 +19,8 @@
 int hit_test_shape(const char* shape_data, size_t shape_offset, size_t shape_size,
                    const float* transform, float stage_x, float stage_y);
 
+// Multiply two 4x4 column-major matrices: out = A * B
+// Used to compose parent + child transforms for hit testing.
+void hit_test_mat4_multiply(float* out, const float* A, const float* B);
+
 #endif

@@ -2,6 +2,7 @@
 
 #include <swf.h>
 #include <tag.h>
+#include <hit_test.h>
 #include <renderer.h>
 #include <utils.h>
 
@@ -71,6 +72,40 @@ void tagShowFrame(SWFAppContext* app_context)
 			max_depth = saved_max_depth;
 			display_list_capacity = saved_capacity;
 		}
+		else if (ch->type == CHAR_TYPE_BUTTON)
+		{
+			// Compose parent transform with button children (same as sprites).
+			// Use the frame function for the current button state.
+			DisplayObject* saved_display_list = display_list;
+			size_t saved_max_depth = max_depth;
+			size_t saved_capacity = display_list_capacity;
+
+			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+			max_depth = 0;
+
+			u8 state = obj->button_state;
+			if (ch->button_state_funcs[state] != NULL)
+			{
+				ch->button_state_funcs[state](app_context);
+			}
+
+			for (size_t j = 1; j <= max_depth; ++j)
+			{
+				DisplayObject* btn_obj = &display_list[j];
+				if (btn_obj->char_id == 0) continue;
+
+				renderer_compose_sprite_transform(context,
+					app_context->transform_data,
+					obj->transform_id,
+					btn_obj->transform_id);
+			}
+
+			free(display_list);
+			display_list = saved_display_list;
+			max_depth = saved_max_depth;
+			display_list_capacity = saved_capacity;
+		}
 		else if (ch->type == CHAR_TYPE_MORPH_SHAPE)
 		{
 			float t = (float)obj->ratio / 65535.0f;
@@ -111,6 +146,58 @@ void tagShowFrame(SWFAppContext* app_context)
 				renderer_update_colors(context,
 					(ch->morph_color_start + c) * 4 * sizeof(float),
 					interp, 4 * sizeof(float));
+			}
+		}
+	}
+
+	// --- Button hit testing + state machine ---
+	// Iterate front-to-back (highest depth first). The first button that hits
+	// gets the over/down state; all others stay in up state.
+	{
+		int found_hover = 0;
+		for (size_t i = max_depth; i >= 1; i--)
+		{
+			DisplayObject* obj = &display_list[i];
+			if (obj->char_id == 0) continue;
+
+			Character* ch = &dictionary[obj->char_id];
+			if (ch->type != CHAR_TYPE_BUTTON) continue;
+
+			if (!found_hover)
+			{
+				// Look up the hit-test shape
+				Character* hit_ch = &dictionary[ch->button_hit_char_id];
+				if (hit_ch->type == CHAR_TYPE_SHAPE)
+				{
+					// Compose PlaceObject2 transform with hit-record transform
+					const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
+					const float* hit_xf = (const float*)(app_context->transform_data) + ch->button_hit_transform_id * 16;
+					float composed[16];
+					hit_test_mat4_multiply(composed, place_xf, hit_xf);
+
+					int hit = hit_test_shape(app_context->shape_data,
+						hit_ch->shape_offset, hit_ch->size,
+						composed,
+						app_context->mouse.stage_x,
+						app_context->mouse.stage_y);
+
+					if (hit)
+					{
+						found_hover = 1;
+						if (app_context->mouse.button_down)
+							obj->button_state = 2;  // down
+						else
+							obj->button_state = 1;  // over
+					}
+					else
+					{
+						obj->button_state = 0;  // up
+					}
+				}
+			}
+			else
+			{
+				obj->button_state = 0;  // up (another button is hovered)
 			}
 		}
 	}
@@ -199,6 +286,42 @@ void tagShowFrame(SWFAppContext* app_context)
 				}
 
 				// Restore main display list
+				free(display_list);
+				display_list = saved_display_list;
+				max_depth = saved_max_depth;
+				display_list_capacity = saved_capacity;
+				break;
+			}
+			case CHAR_TYPE_BUTTON:
+			{
+				// Render button using the current state's frame function
+				DisplayObject* saved_display_list = display_list;
+				size_t saved_max_depth = max_depth;
+				size_t saved_capacity = display_list_capacity;
+
+				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+				max_depth = 0;
+
+				u8 state = obj->button_state;
+				if (ch->button_state_funcs[state] != NULL)
+				{
+					ch->button_state_funcs[state](app_context);
+				}
+
+				for (size_t j = 1; j <= max_depth; ++j)
+				{
+					DisplayObject* btn_obj = &display_list[j];
+					if (btn_obj->char_id == 0) continue;
+
+					Character* btn_ch = &dictionary[btn_obj->char_id];
+					if (btn_ch->type == CHAR_TYPE_SHAPE)
+					{
+						renderer_draw_shape(context, btn_ch->shape_offset, btn_ch->size,
+							btn_obj->transform_id, btn_obj->cxform_id);
+					}
+				}
+
 				free(display_list);
 				display_list = saved_display_list;
 				max_depth = saved_max_depth;
@@ -315,6 +438,16 @@ void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* fun
 	dictionary[char_id].type = CHAR_TYPE_SPRITE;
 	dictionary[char_id].sprite_frame_funcs = funcs;
 	dictionary[char_id].sprite_frame_count = frame_count;
+}
+
+void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id)
+{
+	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+
+	dictionary[char_id].type = CHAR_TYPE_BUTTON;
+	dictionary[char_id].button_state_funcs = state_funcs;
+	dictionary[char_id].button_hit_char_id = hit_char_id;
+	dictionary[char_id].button_hit_transform_id = hit_transform_id;
 }
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)

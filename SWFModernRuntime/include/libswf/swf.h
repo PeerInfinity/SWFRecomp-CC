@@ -19,13 +19,14 @@ extern frame_func frame_funcs[];
 #define INITIAL_DICTIONARY_CAPACITY 1024
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
 
-// Character type enum for shapes and text
+// Character type enum for shapes, text, sprites, and buttons
 typedef enum
 {
 	CHAR_TYPE_SHAPE,
 	CHAR_TYPE_MORPH_SHAPE,
 	CHAR_TYPE_TEXT,
 	CHAR_TYPE_SPRITE,
+	CHAR_TYPE_BUTTON,
 } CharacterType;
 
 typedef struct Character
@@ -62,6 +63,13 @@ typedef struct Character
 			frame_func* sprite_frame_funcs;
 			size_t sprite_frame_count;
 		};
+		// DefineButton
+		struct
+		{
+			frame_func* button_state_funcs;  // [up, over, down]
+			size_t button_hit_char_id;       // character ID for hit-test shape
+			u32 button_hit_transform_id;     // transform for hit-test shape
+		};
 	};
 } Character;
 
@@ -73,6 +81,7 @@ typedef struct DisplayObject
 	u32 has_cxform;
 	u16 clip_depth;
 	u16 ratio;
+	u8 button_state;  // 0=up, 1=over, 2=down (used for CHAR_TYPE_BUTTON)
 } DisplayObject;
 
 typedef struct MouseState {
