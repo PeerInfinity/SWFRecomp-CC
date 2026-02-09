@@ -1107,6 +1107,91 @@ def _build_define_text2_body(text_def):
     return bytes(body)
 
 
+def _build_define_edit_text_body(edit_text_def):
+    """Build the raw tag body for DefineEditText (tag 37).
+
+    edit_text_def: dict with keys:
+        object_id: UI16 character ID
+        bounds: (left, right, top, bottom) in twips
+        font_id: UI16 (optional)
+        font_height: UI16 in twips (optional, requires font_id)
+        color: (r, g, b, a) tuple (optional)
+        max_length: UI16 (optional)
+        initial_text: string (optional)
+        read_only: bool (default True)
+        layout: dict with align, left_margin, right_margin, indent, leading (optional)
+
+    Returns bytes containing the full tag body.
+    """
+    body = bytearray()
+
+    # CharacterID (UI16)
+    body += struct.pack('<H', edit_text_def['object_id'])
+
+    # Bounds (RECT)
+    left, right, top, bottom = edit_text_def['bounds']
+    body += _build_rect_bits(left, right, top, bottom)
+
+    # Build flags
+    has_font = 'font_id' in edit_text_def
+    has_text_color = 'color' in edit_text_def
+    has_max_length = 'max_length' in edit_text_def
+    has_text = 'initial_text' in edit_text_def
+    has_layout = 'layout' in edit_text_def
+    read_only = edit_text_def.get('read_only', True)
+
+    # First flags byte: HasText(0x80), WordWrap(0x40), Multiline(0x20),
+    #   Password(0x10), ReadOnly(0x08), HasTextColor(0x04), HasMaxLength(0x02), HasFont(0x01)
+    flags_lo = 0
+    if has_text:
+        flags_lo |= 0x80
+    if read_only:
+        flags_lo |= 0x08
+    if has_text_color:
+        flags_lo |= 0x04
+    if has_max_length:
+        flags_lo |= 0x02
+    if has_font:
+        flags_lo |= 0x01
+
+    # Second flags byte: HasFontClass(0x80), AutoSize(0x40), HasLayout(0x20),
+    #   NoSelect(0x10), Border(0x08), WasStatic(0x04), HTML(0x02), UseOutlines(0x01)
+    flags_hi = 0
+    if has_layout:
+        flags_hi |= 0x20
+
+    body.append(flags_lo)
+    body.append(flags_hi)
+
+    if has_font:
+        body += struct.pack('<H', edit_text_def['font_id'])
+        body += struct.pack('<H', edit_text_def.get('font_height', 240))
+
+    if has_text_color:
+        r, g, b, a = edit_text_def['color']
+        body.extend((r, g, b, a))
+
+    if has_max_length:
+        body += struct.pack('<H', edit_text_def['max_length'])
+
+    if has_layout:
+        layout = edit_text_def['layout']
+        body.append(layout.get('align', 0))
+        body += struct.pack('<H', layout.get('left_margin', 0))
+        body += struct.pack('<H', layout.get('right_margin', 0))
+        body += struct.pack('<H', layout.get('indent', 0))
+        body += struct.pack('<h', layout.get('leading', 0))
+
+    # VariableName (null-terminated STRING)
+    body.append(0x00)
+
+    # InitialText (null-terminated STRING, if HasText)
+    if has_text:
+        body += edit_text_def['initial_text'].encode('ascii') + b'\x00'
+
+    return bytes(body)
+
+
 class FontDefinition:
     """Collects glyph shape data for a DefineFont tag."""
     def __init__(self, object_id):
@@ -1385,6 +1470,35 @@ class SWFMLBuilder:
         self.tags.append(("DefineText2", text))
         return text
 
+    def define_edit_text(self, object_id, bounds, font_id=None, font_height=240,
+                         color=None, initial_text=None, read_only=True,
+                         max_length=None, layout=None):
+        """Create and register a DefineEditText definition (tag 37).
+
+        object_id: character ID
+        bounds: (left, right, top, bottom) in twips
+        font_id: UI16 character ID of a DefineFont2/3 (optional)
+        font_height: UI16 text height in twips (default 240 = 12pt)
+        color: (r, g, b, a) tuple (optional)
+        initial_text: string to pre-populate the field with (optional)
+        read_only: make the text field read-only (default True)
+        max_length: maximum character count (optional)
+        layout: dict with align, left_margin, right_margin, indent, leading (optional)
+        """
+        edit_text_def = {'object_id': object_id, 'bounds': bounds, 'read_only': read_only}
+        if font_id is not None:
+            edit_text_def['font_id'] = font_id
+            edit_text_def['font_height'] = font_height
+        if color is not None:
+            edit_text_def['color'] = color
+        if initial_text is not None:
+            edit_text_def['initial_text'] = initial_text
+        if max_length is not None:
+            edit_text_def['max_length'] = max_length
+        if layout is not None:
+            edit_text_def['layout'] = layout
+        self.tags.append(("DefineEditText", edit_text_def))
+
     def define_morph_shape(self, object_id, start_bounds, end_bounds):
         """Create and register a morph shape definition (tag 46).
 
@@ -1562,6 +1676,13 @@ class SWFMLBuilder:
                 tag_body = _build_define_text2_body(text)
                 tag_b64 = base64.b64encode(tag_body).decode('ascii')
                 unk = SubElement(tags_el, "UnknownTag", id="0x21")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_b64
+
+            elif tag_type == "DefineEditText":
+                edit_text_body = _build_define_edit_text_body(tag_data)
+                tag_b64 = base64.b64encode(edit_text_body).decode('ascii')
+                unk = SubElement(tags_el, "UnknownTag", id="0x25")
                 data_el = SubElement(unk, "data")
                 data_el.text = tag_b64
 

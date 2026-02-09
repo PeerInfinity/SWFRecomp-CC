@@ -112,7 +112,7 @@ See also: [AS2 Opcode Index](opcode-index.md)
 | [DefineFont4](#define-font4) | CFF font for Flash Text Engine (SWF tag 91) | 91 | **0** | No |
 | [DefineText](#define-text) | Static text with glyph indices (SWF tag 11) | 11 | 3 | Yes |
 | [DefineText2](#define-text2) | Static text with RGBA colors (SWF tag 33) | 33 | 1 | Yes |
-| [DefineEditText](#define-edit-text) | Dynamic/editable text field (SWF tag 37) | 37 | **0** | No |
+| [DefineEditText](#define-edit-text) | Dynamic/editable text field (SWF tag 37) | 37 | 1 | Yes |
 
 ### Sprite Tags
 (1/1 with tests)
@@ -1046,9 +1046,10 @@ See also: [AS2 Opcode Index](opcode-index.md)
 
 **Tag ID**: 37
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_edit_text`
 
 ---
 

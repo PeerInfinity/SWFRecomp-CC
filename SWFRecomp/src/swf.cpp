@@ -1212,6 +1212,7 @@ namespace SWFRecomp
 				u16 num_entries;
 				char* offset_table;
 				std::vector<u16> entry_offsets;
+				bool wide_codes = false;
 
 				if (tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
 				{
@@ -1224,7 +1225,7 @@ namespace SWFRecomp
 
 					u8 flags = (u8) tag.fields[0].value;
 					bool wide_offsets = (flags & 0x08) != 0;
-					bool wide_codes = (flags & 0x04) != 0;
+					wide_codes = (flags & 0x04) != 0;
 
 					// FontName
 					tag.clearFields();
@@ -1310,6 +1311,28 @@ namespace SWFRecomp
 							   << "\t" << to_string(glyph_size) << "," << endl;
 
 					current_glyph += 1;
+				}
+
+				// Read code table for DefineFont2/3
+				if (tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
+				{
+					cur_pos = offset_table + entry_offsets[num_entries];  // jump to code table
+					font_code_tables[font_id].resize(num_entries);
+					for (u16 i = 0; i < num_entries; ++i)
+					{
+						tag.clearFields();
+						tag.setFieldCount(1);
+						if (wide_codes)
+						{
+							tag.configureNextField(SWF_FIELD_UI16);
+						}
+						else
+						{
+							tag.configureNextField(SWF_FIELD_UI8);
+						}
+						tag.parseFields(cur_pos);
+						font_code_tables[font_id][i] = (u16) tag.fields[0].value;
+					}
 				}
 
 				break;
@@ -1541,6 +1564,199 @@ namespace SWFRecomp
 					if (cur_byte_bits_left != 8)
 					{
 						cur_pos += 1;
+					}
+
+					size_t text_size = current_text - text_start;
+					tag_init << endl
+							 << "\t" << "tagDefineText("
+							 << "app_context, "
+							 << to_string(char_id) << ", "
+							 << to_string(text_start) << ", "
+							 << to_string(text_size) << ", "
+							 << to_string(transform_start) << ", "
+							 << to_string(cxform_id)
+							 << ");";
+				}
+
+				break;
+			}
+
+			case SWF_TAG_DEFINE_EDIT_TEXT:
+			{
+				tag.clearFields();
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+
+				u16 char_id = (u16) tag.fields[0].value;
+
+				// Bounds RECT
+				tag.clearFields();
+				tag.setFieldCount(5);
+				tag.configureNextField(SWF_FIELD_UB, 5, true);
+				tag.configureNextField(SWF_FIELD_SB, 0);
+				tag.configureNextField(SWF_FIELD_SB, 0);
+				tag.configureNextField(SWF_FIELD_SB, 0);
+				tag.configureNextField(SWF_FIELD_SB, 0);
+				tag.parseFields(cur_pos);
+
+				// Flags (UI16, but stored as two UI8s: low byte first)
+				tag.clearFields();
+				tag.setFieldCount(2);
+				tag.configureNextField(SWF_FIELD_UI8);
+				tag.configureNextField(SWF_FIELD_UI8);
+				tag.parseFields(cur_pos);
+
+				u8 flags_lo = (u8) tag.fields[0].value;
+				u8 flags_hi = (u8) tag.fields[1].value;
+
+				bool has_text = (flags_lo & 0x80) != 0;
+				bool has_text_color = (flags_lo & 0x04) != 0;
+				bool has_max_length = (flags_lo & 0x02) != 0;
+				bool has_font = (flags_lo & 0x01) != 0;
+				bool has_layout = (flags_hi & 0x20) != 0;
+
+				u16 font_id = 0;
+				u16 font_height = 0;
+				u8 r = 0, g = 0, b = 0, a = 255;
+
+				if (has_font)
+				{
+					tag.clearFields();
+					tag.setFieldCount(2);
+					tag.configureNextField(SWF_FIELD_UI16);  // FontID
+					tag.configureNextField(SWF_FIELD_UI16);  // FontHeight
+					tag.parseFields(cur_pos);
+					font_id = (u16) tag.fields[0].value;
+					font_height = (u16) tag.fields[1].value;
+				}
+
+				if (has_text_color)
+				{
+					tag.clearFields();
+					tag.setFieldCount(4);
+					tag.configureNextField(SWF_FIELD_UI8);  // R
+					tag.configureNextField(SWF_FIELD_UI8);  // G
+					tag.configureNextField(SWF_FIELD_UI8);  // B
+					tag.configureNextField(SWF_FIELD_UI8);  // A
+					tag.parseFields(cur_pos);
+					r = (u8) tag.fields[0].value;
+					g = (u8) tag.fields[1].value;
+					b = (u8) tag.fields[2].value;
+					a = (u8) tag.fields[3].value;
+				}
+
+				if (has_max_length)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+					// skip MaxLength
+				}
+
+				if (has_layout)
+				{
+					tag.clearFields();
+					tag.setFieldCount(5);
+					tag.configureNextField(SWF_FIELD_UI8);   // Align
+					tag.configureNextField(SWF_FIELD_UI16);  // LeftMargin
+					tag.configureNextField(SWF_FIELD_UI16);  // RightMargin
+					tag.configureNextField(SWF_FIELD_UI16);  // Indent
+					tag.configureNextField(SWF_FIELD_SI16);  // Leading
+					tag.parseFields(cur_pos);
+					// skip layout fields
+				}
+
+				// VariableName (null-terminated STRING)
+				while (*cur_pos != '\0') cur_pos++;
+				cur_pos++;  // skip null terminator
+
+				// InitialText (null-terminated STRING, if HasText)
+				std::string initial_text;
+				if (has_text)
+				{
+					initial_text = std::string(cur_pos);
+					cur_pos += initial_text.size() + 1;  // skip string + null
+				}
+
+				// Only emit if we have font, text, and a code table
+				if (has_font && has_text && !initial_text.empty() &&
+					font_code_tables.find(font_id) != font_code_tables.end())
+				{
+					// Build reverse code table: character code → glyph index
+					const auto& code_table = font_code_tables[font_id];
+					std::unordered_map<u16, u16> char_to_glyph;
+					for (u16 i = 0; i < code_table.size(); ++i)
+					{
+						char_to_glyph[code_table[i]] = i;
+					}
+
+					// Build cxform for text color
+					u32 cxform_id = (u32) current_cxform;
+
+					cxform_data << "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << (a == 255 ? "1.0f" : "0.0f") << "," << endl
+
+								<< "\t" << to_string(r) << "/255.0f," << endl
+								<< "\t" << to_string(g) << "/255.0f," << endl
+								<< "\t" << to_string(b) << "/255.0f," << endl
+								<< "\t" << (a == 255 ? "0.0f" : to_string(a) + "/255.0f") << "," << endl;
+
+					current_cxform += 1;
+
+					// Build matrix for text rendering
+					MATRIX temp_matrix;
+					float em = 1024.0f;
+					auto it = font_em_square.find(font_id);
+					if (it != font_em_square.end()) em = it->second;
+					temp_matrix.scale_x = ((float) font_height) / em;
+					temp_matrix.scale_y = ((float) font_height) / em;
+					temp_matrix.rotateskew_0 = 0.0f;
+					temp_matrix.rotateskew_1 = 0.0f;
+					temp_matrix.translate_x = 0;
+					temp_matrix.translate_y = 0;
+
+					size_t text_start = current_text;
+					size_t transform_start = current_transform;
+
+					recompileMatrix(temp_matrix, transform_data);
+					current_transform += 1;
+
+					// Emit glyph indices for each character in InitialText
+					for (size_t i = 0; i < initial_text.size(); ++i)
+					{
+						u16 char_code = (u16)(unsigned char) initial_text[i];
+						auto git = char_to_glyph.find(char_code);
+						if (git == char_to_glyph.end()) continue;
+
+						u32 glyph_index = git->second;
+
+						text_data << "\t" << to_string(glyph_index) << "," << endl;
+
+						// Advance by EM square width (full glyph width)
+						temp_matrix.translate_x += (s32) em;
+						recompileMatrix(temp_matrix, transform_data);
+						current_transform += 1;
+
+						current_text += 1;
 					}
 
 					size_t text_size = current_text - text_start;
