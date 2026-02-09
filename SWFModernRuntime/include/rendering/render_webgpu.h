@@ -125,7 +125,7 @@ typedef struct WebGPURenderContext
 
 WebGPURenderContext* render_webgpu_new(void);
 void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* context);
-int render_webgpu_poll(void);
+int render_webgpu_poll(SWFAppContext* app_context);
 void render_webgpu_set_background(WebGPURenderContext* context, u8 r, u8 g, u8 b);
 void render_webgpu_upload_bitmap(WebGPURenderContext* context, size_t offset, size_t size, u32 width, u32 height);
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* context);

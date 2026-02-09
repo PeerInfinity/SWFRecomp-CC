@@ -384,6 +384,44 @@ static void create_bind_groups(WebGPURenderContext* ctx);
 static void run_compute_pass(WebGPURenderContext* ctx);
 
 // ---------------------------------------------------------------------------
+// WASM mouse input callbacks (registered in render_webgpu_init)
+// ---------------------------------------------------------------------------
+#ifdef __EMSCRIPTEN__
+static SWFAppContext* g_mouse_app_context = NULL;
+
+static EM_BOOL on_mouse_move(int type, const EmscriptenMouseEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context) {
+		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
+		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+	}
+	return EM_TRUE;
+}
+
+static EM_BOOL on_mouse_down(int type, const EmscriptenMouseEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context && evt->button == 0) {
+		g_mouse_app_context->mouse.button_down = 1;
+		g_mouse_app_context->mouse.clicked = 1;
+		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
+		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+	}
+	return EM_TRUE;
+}
+
+static EM_BOOL on_mouse_up(int type, const EmscriptenMouseEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context && evt->button == 0) {
+		g_mouse_app_context->mouse.button_down = 0;
+		g_mouse_app_context->mouse.released = 1;
+		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
+		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+	}
+	return EM_TRUE;
+}
+#endif
+
+// ---------------------------------------------------------------------------
 // render_webgpu_new
 // ---------------------------------------------------------------------------
 WebGPURenderContext* render_webgpu_new(void)
@@ -479,6 +517,14 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		// Actually the buffer is the same, just the contents changed, so
 		// the bind group remains valid.
 	}
+
+	// --- Register mouse input callbacks (WASM only) ---
+#ifdef __EMSCRIPTEN__
+	g_mouse_app_context = app_context;
+	emscripten_set_mousemove_callback("#canvas", NULL, 0, on_mouse_move);
+	emscripten_set_mousedown_callback("#canvas", NULL, 0, on_mouse_down);
+	emscripten_set_mouseup_callback("#canvas", NULL, 0, on_mouse_up);
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -1031,12 +1077,12 @@ static void run_compute_pass(WebGPURenderContext* ctx)
 }
 
 // ---------------------------------------------------------------------------
-// render_webgpu_poll: check for quit events
+// render_webgpu_poll: check for quit/mouse events
 // ---------------------------------------------------------------------------
-int render_webgpu_poll(void)
+int render_webgpu_poll(SWFAppContext* app_context)
 {
 #ifdef __EMSCRIPTEN__
-	// In WASM, the browser handles events. Return 0 (keep running).
+	// In WASM, mouse events are handled by callbacks registered in init.
 	return 0;
 #else
 	SDL_Event event;
@@ -1046,6 +1092,25 @@ int render_webgpu_poll(void)
 			return 1;
 		if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)
 			return 1;
+		if (event.type == SDL_EVENT_MOUSE_MOTION)
+		{
+			app_context->mouse.stage_x = event.motion.x * 20.0f;
+			app_context->mouse.stage_y = event.motion.y * 20.0f;
+		}
+		else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT)
+		{
+			app_context->mouse.button_down = 1;
+			app_context->mouse.clicked = 1;
+			app_context->mouse.stage_x = event.button.x * 20.0f;
+			app_context->mouse.stage_y = event.button.y * 20.0f;
+		}
+		else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT)
+		{
+			app_context->mouse.button_down = 0;
+			app_context->mouse.released = 1;
+			app_context->mouse.stage_x = event.button.x * 20.0f;
+			app_context->mouse.stage_y = event.button.y * 20.0f;
+		}
 	}
 	return 0;
 #endif

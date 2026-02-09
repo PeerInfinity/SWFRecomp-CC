@@ -44,13 +44,15 @@ void tagMain(SWFAppContext* app_context)
 	while (!quit_swf)
 	{
 		current_frame = next_frame;
+		app_context->mouse.clicked = 0;
+		app_context->mouse.released = 0;
 		frame_funcs[next_frame](app_context);
 		if (!manual_next_frame)
 		{
 			next_frame += 1;
 		}
 		manual_next_frame = 0;
-		bad_poll |= renderer_poll();
+		bad_poll |= renderer_poll(app_context);
 #ifdef __EMSCRIPTEN__
 		emscripten_sleep(frame_ms);
 #endif
@@ -62,7 +64,7 @@ void tagMain(SWFAppContext* app_context)
 		return;
 	}
 
-	while (!renderer_poll())
+	while (!renderer_poll(app_context))
 	{
 		tagShowFrame(app_context);
 #ifdef __EMSCRIPTEN__

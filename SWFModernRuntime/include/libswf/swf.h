@@ -74,6 +74,14 @@ typedef struct DisplayObject
 	u16 clip_depth;
 	u16 ratio;
 } DisplayObject;
+
+typedef struct MouseState {
+	float stage_x;      // Mouse X in twips (stage coordinates)
+	float stage_y;      // Mouse Y in twips
+	int button_down;    // 1 if left mouse button is held
+	int clicked;        // 1 if button was pressed this frame (edge)
+	int released;       // 1 if button was released this frame (edge)
+} MouseState;
 #endif
 
 // Macros for stack access via app_context
@@ -126,6 +134,8 @@ typedef struct SWFAppContext
 	size_t morph_end_shape_data_size;
 	char* morph_end_color_data;
 	size_t morph_end_color_data_size;
+
+	MouseState mouse;
 #endif
 
 	// Heap management fields
