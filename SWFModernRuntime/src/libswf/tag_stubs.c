@@ -66,6 +66,16 @@ void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
 	(void)cxform_id; (void)clip_depth; (void)blend_mode;
 }
 
+void tagSetFilter(SWFAppContext* app_context, size_t depth,
+	u8 type, float blur_x, float blur_y, u8 quality, u8 flags,
+	float r, float g, float b, float a, float strength,
+	float angle, float distance)
+{
+	(void)app_context; (void)depth; (void)type; (void)blur_x; (void)blur_y;
+	(void)quality; (void)flags; (void)r; (void)g; (void)b; (void)a;
+	(void)strength; (void)angle; (void)distance;
+}
+
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
 	(void)app_context; (void)depth; (void)name;

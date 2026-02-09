@@ -1237,6 +1237,84 @@ def _build_matrix_bits(transform):
     return bw.to_bytes()
 
 
+def build_place_object3(object_id, depth, trans_x=0, trans_y=0,
+                        scale_x=None, scale_y=None,
+                        blend_mode=0, filter_data=None):
+    """Build raw PlaceObject3 (tag 70) body.
+
+    filter_data: if present, dict with keys:
+      - type: 'blur', 'drop_shadow', or 'glow'
+      - blur_x, blur_y: float pixels
+      - quality: int (1-3)
+      - For drop_shadow/glow: color=(r,g,b,a), strength=float
+      - For drop_shadow: angle=float (degrees), distance=float (pixels)
+    """
+    flags1 = 0x02 | 0x04  # HasCharacter + HasMatrix
+    flags2 = 0
+
+    if filter_data:
+        flags2 |= 0x02  # HasFilterList
+    if blend_mode > 0:
+        flags2 |= 0x04  # HasBlendMode
+
+    body = struct.pack('<B', flags1)
+    body += struct.pack('<B', flags2)
+    body += struct.pack('<H', depth)
+    body += struct.pack('<H', object_id)
+
+    transform = {"transX": trans_x, "transY": trans_y}
+    if scale_x is not None:
+        transform["scaleX"] = scale_x
+    if scale_y is not None:
+        transform["scaleY"] = scale_y
+    body += _build_matrix_bits(transform)
+
+    if filter_data:
+        ftype = filter_data['type']
+        if ftype == 'blur':
+            body += struct.pack('<B', 1)  # 1 filter
+            body += struct.pack('<B', 1)  # BlurFilter ID
+            bx = int(round(filter_data.get('blur_x', 4.0) * 65536))
+            by = int(round(filter_data.get('blur_y', 4.0) * 65536))
+            q = filter_data.get('quality', 1)
+            body += struct.pack('<II', bx, by)
+            body += struct.pack('<B', (q << 3))
+        elif ftype == 'drop_shadow':
+            body += struct.pack('<B', 1)  # 1 filter
+            body += struct.pack('<B', 0)  # DropShadowFilter ID
+            r, g, b, a = filter_data.get('color', (0, 0, 0, 255))
+            body += struct.pack('<BBBB', r, g, b, a)
+            bx = int(round(filter_data.get('blur_x', 4.0) * 65536))
+            by = int(round(filter_data.get('blur_y', 4.0) * 65536))
+            angle_deg = filter_data.get('angle', 45.0)
+            angle_fixed = int(round(angle_deg * 65536))
+            dist = filter_data.get('distance', 4.0)
+            dist_fixed = int(round(dist * 65536))
+            strength = filter_data.get('strength', 1.0)
+            strength_fixed = int(round(strength * 256))
+            q = filter_data.get('quality', 1)
+            flags = (q << 3) | 0x06  # compositeSource + knockout bits (off by default, but set compositeSource)
+            body += struct.pack('<iiiiH', bx, by, angle_fixed, dist_fixed, strength_fixed)
+            body += struct.pack('<B', (q << 3) | 0x06)  # innerShadow=0, knockout=1, compositeSource=1
+        elif ftype == 'glow':
+            body += struct.pack('<B', 1)  # 1 filter
+            body += struct.pack('<B', 2)  # GlowFilter ID
+            r, g, b, a = filter_data.get('color', (255, 0, 0, 255))
+            body += struct.pack('<BBBB', r, g, b, a)
+            bx = int(round(filter_data.get('blur_x', 4.0) * 65536))
+            by = int(round(filter_data.get('blur_y', 4.0) * 65536))
+            strength = filter_data.get('strength', 2.0)
+            strength_fixed = int(round(strength * 256))
+            q = filter_data.get('quality', 1)
+            body += struct.pack('<iiH', bx, by, strength_fixed)
+            body += struct.pack('<B', (q << 3) | 0x06)
+
+    if blend_mode > 0:
+        body += struct.pack('<B', blend_mode)
+
+    return body
+
+
 def _build_define_text2_body(text_def):
     """Build the raw tag body for DefineText2 (tag 33).
 
@@ -1915,6 +1993,53 @@ class SWFMLBuilder:
         button = Button2Definition(object_id)
         self.tags.append(("DefineButton2", button))
         return button
+
+    def define_sound(self, sound_id, sample_rate=44100, sample_size=16,
+                     stereo=False, pcm_samples=None):
+        """Add a DefineSound tag (tag 14) with uncompressed little-endian PCM.
+
+        sound_id: character ID for the sound
+        sample_rate: 5512, 11025, 22050, or 44100 Hz
+        sample_size: 8 or 16 bits
+        stereo: True for stereo, False for mono
+        pcm_samples: raw PCM sample bytes (little-endian)
+        """
+        rate_map = {5512: 0, 11025: 1, 22050: 2, 44100: 3}
+        rate_code = rate_map[sample_rate]
+        size_bit = 1 if sample_size == 16 else 0
+        stereo_bit = 1 if stereo else 0
+        # Format 3 = uncompressed little-endian
+        flags = (3 << 4) | (rate_code << 2) | (size_bit << 1) | stereo_bit
+        bytes_per_sample = (sample_size // 8) * (2 if stereo else 1)
+        sample_count = len(pcm_samples) // bytes_per_sample
+        body = struct.pack('<HBI', sound_id, flags, sample_count) + pcm_samples
+        self.add_raw_tag(14, body)
+
+    def start_sound(self, sound_id, stop=False, loop_count=0,
+                    in_point=None, out_point=None):
+        """Add a StartSound tag (tag 15).
+
+        sound_id: character ID of the sound to play
+        stop: if True, stop the sound instead of starting it
+        loop_count: number of times to loop (0 = play once)
+        in_point: sample offset to start at (optional)
+        out_point: sample offset to stop at (optional)
+        """
+        si_flags = 0
+        if stop:
+            si_flags |= 0x20
+        extra = b''
+        if in_point is not None:
+            si_flags |= 0x01
+            extra += struct.pack('<I', in_point)
+        if out_point is not None:
+            si_flags |= 0x02
+            extra += struct.pack('<I', out_point)
+        if loop_count > 0:
+            si_flags |= 0x04
+            extra += struct.pack('<H', loop_count)
+        body = struct.pack('<HB', sound_id, si_flags) + extra
+        self.add_raw_tag(15, body)
 
     def add_raw_tag(self, tag_id, body_bytes):
         """Add a raw binary tag (emitted as UnknownTag)."""

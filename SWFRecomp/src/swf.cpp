@@ -1238,11 +1238,11 @@ namespace SWFRecomp
 				tag.parseFields(cur_pos);
 
 				u8 si_flags = (u8) tag.fields[0].value;
-				bool sync_stop = (si_flags & 0x01) != 0;
-				bool has_in_point = (si_flags & 0x04) != 0;
-				bool has_out_point = (si_flags & 0x08) != 0;
-				bool has_loops = (si_flags & 0x10) != 0;
-				bool has_envelope = (si_flags & 0x20) != 0;
+				bool sync_stop = (si_flags & 0x20) != 0;
+				bool has_envelope = (si_flags & 0x08) != 0;
+				bool has_loops = (si_flags & 0x04) != 0;
+				bool has_out_point = (si_flags & 0x02) != 0;
+				bool has_in_point = (si_flags & 0x01) != 0;
 
 				u32 in_point = 0, out_point = 0, loop_count = 0;
 
@@ -2370,6 +2370,15 @@ namespace SWFRecomp
 				u32 color_matrix_cxform_id = 0;
 				bool has_color_matrix = false;
 
+				// Filter data (first visual filter wins)
+				u8 parsed_filter_type = 0;
+				float parsed_blur_x = 0, parsed_blur_y = 0;
+				u8 parsed_filter_quality = 1;
+				u8 parsed_filter_flags = 0;
+				float parsed_filter_r = 0, parsed_filter_g = 0, parsed_filter_b = 0, parsed_filter_a = 0;
+				float parsed_filter_strength = 1.0f;
+				float parsed_filter_angle = 0, parsed_filter_distance = 0;
+
 				if (is_po3 && has_filter_list)
 				{
 					u8 num_filters = *(u8*) cur_pos; cur_pos += 1;
@@ -2378,9 +2387,72 @@ namespace SWFRecomp
 						u8 filter_id = *(u8*) cur_pos; cur_pos += 1;
 						switch (filter_id)
 						{
-							case 0: cur_pos += 23; break; // DropShadowFilter
-							case 1: cur_pos += 9; break;  // BlurFilter
-							case 2: cur_pos += 15; break; // GlowFilter
+							case 0: // DropShadowFilter (23 bytes)
+							{
+								u8 ds_r = *(u8*)cur_pos; u8 ds_g = *(u8*)(cur_pos+1);
+								u8 ds_b = *(u8*)(cur_pos+2); u8 ds_a = *(u8*)(cur_pos+3);
+								cur_pos += 4;
+								u32 ds_blur_x_raw; memcpy(&ds_blur_x_raw, cur_pos, 4); cur_pos += 4;
+								u32 ds_blur_y_raw; memcpy(&ds_blur_y_raw, cur_pos, 4); cur_pos += 4;
+								u32 ds_angle_raw; memcpy(&ds_angle_raw, cur_pos, 4); cur_pos += 4;
+								u32 ds_dist_raw; memcpy(&ds_dist_raw, cur_pos, 4); cur_pos += 4;
+								u16 ds_strength_raw; memcpy(&ds_strength_raw, cur_pos, 2); cur_pos += 2;
+								u8 ds_flags_byte = *(u8*)cur_pos; cur_pos += 1;
+								if (parsed_filter_type == 0) {
+									parsed_filter_type = 2;
+									parsed_filter_r = ds_r / 255.0f;
+									parsed_filter_g = ds_g / 255.0f;
+									parsed_filter_b = ds_b / 255.0f;
+									parsed_filter_a = ds_a / 255.0f;
+									parsed_blur_x = (float)(s32)ds_blur_x_raw / 65536.0f;
+									parsed_blur_y = (float)(s32)ds_blur_y_raw / 65536.0f;
+									parsed_filter_angle = (float)(s32)ds_angle_raw / 65536.0f;
+									parsed_filter_distance = (float)(s32)ds_dist_raw / 65536.0f;
+									parsed_filter_strength = (float)ds_strength_raw / 256.0f;
+									parsed_filter_quality = (ds_flags_byte >> 3) & 0x1F;
+									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
+									parsed_filter_flags = ds_flags_byte & 0x07;
+								}
+								break;
+							}
+							case 1: // BlurFilter (9 bytes)
+							{
+								u32 bl_x_raw; memcpy(&bl_x_raw, cur_pos, 4); cur_pos += 4;
+								u32 bl_y_raw; memcpy(&bl_y_raw, cur_pos, 4); cur_pos += 4;
+								u8 bl_flags = *(u8*)cur_pos; cur_pos += 1;
+								if (parsed_filter_type == 0) {
+									parsed_filter_type = 1;
+									parsed_blur_x = (float)(s32)bl_x_raw / 65536.0f;
+									parsed_blur_y = (float)(s32)bl_y_raw / 65536.0f;
+									parsed_filter_quality = (bl_flags >> 3) & 0x1F;
+									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
+								}
+								break;
+							}
+							case 2: // GlowFilter (15 bytes)
+							{
+								u8 gl_r = *(u8*)cur_pos; u8 gl_g = *(u8*)(cur_pos+1);
+								u8 gl_b = *(u8*)(cur_pos+2); u8 gl_a = *(u8*)(cur_pos+3);
+								cur_pos += 4;
+								u32 gl_blur_x_raw; memcpy(&gl_blur_x_raw, cur_pos, 4); cur_pos += 4;
+								u32 gl_blur_y_raw; memcpy(&gl_blur_y_raw, cur_pos, 4); cur_pos += 4;
+								u16 gl_strength_raw; memcpy(&gl_strength_raw, cur_pos, 2); cur_pos += 2;
+								u8 gl_flags = *(u8*)cur_pos; cur_pos += 1;
+								if (parsed_filter_type == 0) {
+									parsed_filter_type = 3;
+									parsed_filter_r = gl_r / 255.0f;
+									parsed_filter_g = gl_g / 255.0f;
+									parsed_filter_b = gl_b / 255.0f;
+									parsed_filter_a = gl_a / 255.0f;
+									parsed_blur_x = (float)(s32)gl_blur_x_raw / 65536.0f;
+									parsed_blur_y = (float)(s32)gl_blur_y_raw / 65536.0f;
+									parsed_filter_strength = (float)gl_strength_raw / 256.0f;
+									parsed_filter_quality = (gl_flags >> 3) & 0x1F;
+									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
+									parsed_filter_flags = gl_flags & 0x07;
+								}
+								break;
+							}
 							case 3: cur_pos += 27; break; // BevelFilter
 							case 4: // GradientGlowFilter
 							{
@@ -2618,6 +2690,26 @@ namespace SWFRecomp
 						escaped_name += c;
 					}
 					context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
+				}
+
+				// Emit filter if parsed
+				if (parsed_filter_type != 0)
+				{
+					context.tag_main << std::fixed
+						<< "\t" << "tagSetFilter(app_context, " << to_string(depth) << ", "
+						<< to_string(parsed_filter_type) << ", "
+						<< parsed_blur_x << "f, "
+						<< parsed_blur_y << "f, "
+						<< to_string(parsed_filter_quality) << ", "
+						<< to_string(parsed_filter_flags) << ", "
+						<< parsed_filter_r << "f, "
+						<< parsed_filter_g << "f, "
+						<< parsed_filter_b << "f, "
+						<< parsed_filter_a << "f, "
+						<< parsed_filter_strength << "f, "
+						<< parsed_filter_angle << "f, "
+						<< parsed_filter_distance << "f);"
+						<< std::defaultfloat << endl;
 				}
 
 				break;
@@ -3079,6 +3171,11 @@ namespace SWFRecomp
 
 							// PO3 extra fields in sprite context
 							u8 sp_blend_mode_val = 0;
+							u8 sp_filter_type = 0;
+							float sp_blur_x = 0, sp_blur_y = 0;
+							u8 sp_filter_quality = 1, sp_filter_flags = 0;
+							float sp_filter_r = 0, sp_filter_g = 0, sp_filter_b = 0, sp_filter_a = 0;
+							float sp_filter_strength = 1.0f, sp_filter_angle = 0, sp_filter_distance = 0;
 
 							if (is_sprite_po3 && sp_has_filter_list)
 							{
@@ -3088,9 +3185,58 @@ namespace SWFRecomp
 									u8 filter_id = *(u8*) cur_pos; cur_pos += 1;
 									switch (filter_id)
 									{
-										case 0: cur_pos += 23; break;
-										case 1: cur_pos += 9; break;
-										case 2: cur_pos += 15; break;
+										case 0: // DropShadowFilter
+										{
+											u8 ds_r = *(u8*)cur_pos; u8 ds_g = *(u8*)(cur_pos+1);
+											u8 ds_b = *(u8*)(cur_pos+2); u8 ds_a = *(u8*)(cur_pos+3);
+											cur_pos += 4;
+											u32 ds_bx; memcpy(&ds_bx, cur_pos, 4); cur_pos += 4;
+											u32 ds_by; memcpy(&ds_by, cur_pos, 4); cur_pos += 4;
+											u32 ds_ang; memcpy(&ds_ang, cur_pos, 4); cur_pos += 4;
+											u32 ds_dist; memcpy(&ds_dist, cur_pos, 4); cur_pos += 4;
+											u16 ds_str; memcpy(&ds_str, cur_pos, 2); cur_pos += 2;
+											u8 ds_fl = *(u8*)cur_pos; cur_pos += 1;
+											if (sp_filter_type == 0) {
+												sp_filter_type = 2; sp_filter_r = ds_r/255.0f; sp_filter_g = ds_g/255.0f;
+												sp_filter_b = ds_b/255.0f; sp_filter_a = ds_a/255.0f;
+												sp_blur_x = (float)(s32)ds_bx/65536.0f; sp_blur_y = (float)(s32)ds_by/65536.0f;
+												sp_filter_angle = (float)(s32)ds_ang/65536.0f; sp_filter_distance = (float)(s32)ds_dist/65536.0f;
+												sp_filter_strength = (float)ds_str/256.0f;
+												sp_filter_quality = (ds_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_flags = ds_fl & 0x07;
+											}
+											break;
+										}
+										case 1: // BlurFilter
+										{
+											u32 bl_x; memcpy(&bl_x, cur_pos, 4); cur_pos += 4;
+											u32 bl_y; memcpy(&bl_y, cur_pos, 4); cur_pos += 4;
+											u8 bl_fl = *(u8*)cur_pos; cur_pos += 1;
+											if (sp_filter_type == 0) {
+												sp_filter_type = 1; sp_blur_x = (float)(s32)bl_x/65536.0f; sp_blur_y = (float)(s32)bl_y/65536.0f;
+												sp_filter_quality = (bl_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+											}
+											break;
+										}
+										case 2: // GlowFilter
+										{
+											u8 gl_r = *(u8*)cur_pos; u8 gl_g = *(u8*)(cur_pos+1);
+											u8 gl_b = *(u8*)(cur_pos+2); u8 gl_a = *(u8*)(cur_pos+3);
+											cur_pos += 4;
+											u32 gl_bx; memcpy(&gl_bx, cur_pos, 4); cur_pos += 4;
+											u32 gl_by; memcpy(&gl_by, cur_pos, 4); cur_pos += 4;
+											u16 gl_str; memcpy(&gl_str, cur_pos, 2); cur_pos += 2;
+											u8 gl_fl = *(u8*)cur_pos; cur_pos += 1;
+											if (sp_filter_type == 0) {
+												sp_filter_type = 3; sp_filter_r = gl_r/255.0f; sp_filter_g = gl_g/255.0f;
+												sp_filter_b = gl_b/255.0f; sp_filter_a = gl_a/255.0f;
+												sp_blur_x = (float)(s32)gl_bx/65536.0f; sp_blur_y = (float)(s32)gl_by/65536.0f;
+												sp_filter_strength = (float)gl_str/256.0f;
+												sp_filter_quality = (gl_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_flags = gl_fl & 0x07;
+											}
+											break;
+										}
 										case 3: cur_pos += 27; break;
 										case 4: { u8 nc = *(u8*) cur_pos; cur_pos += 1; cur_pos += nc * 5 + 19; break; }
 										case 5: { u8 mx = *(u8*) cur_pos; cur_pos += 1; u8 my = *(u8*) cur_pos; cur_pos += 1; cur_pos += 8 + mx * my * 4 + 5; break; }
@@ -3265,6 +3411,26 @@ namespace SWFRecomp
 									escaped += c;
 								}
 								sprite_definitions << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped << "\");" << endl;
+							}
+
+							// Emit filter if parsed
+							if (sp_filter_type != 0)
+							{
+								sprite_definitions << std::fixed
+									<< "\t" << "tagSetFilter(app_context, " << to_string(depth) << ", "
+									<< to_string(sp_filter_type) << ", "
+									<< sp_blur_x << "f, "
+									<< sp_blur_y << "f, "
+									<< to_string(sp_filter_quality) << ", "
+									<< to_string(sp_filter_flags) << ", "
+									<< sp_filter_r << "f, "
+									<< sp_filter_g << "f, "
+									<< sp_filter_b << "f, "
+									<< sp_filter_a << "f, "
+									<< sp_filter_strength << "f, "
+									<< sp_filter_angle << "f, "
+									<< sp_filter_distance << "f);"
+									<< std::defaultfloat << endl;
 							}
 
 							break;

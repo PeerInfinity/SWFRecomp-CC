@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-09T20:16:50Z",
+  "generated": "2026-02-09T22:55:08Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2180,6 +2180,20 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/blur_filter",
+      "name": "blur_filter",
+      "type": "graphics",
+      "path": "examples/graphics/blur_filter",
+      "has_swf": true,
+      "wasm_file": "blur_filter.wasm",
+      "js_file": "blur_filter.js",
+      "description": "BlurFilter via PlaceObject3 FilterList",
+      "swf_version": 8,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
       "id": "graphics/clip_actions",
       "name": "clip_actions",
       "type": "graphics",
@@ -2362,6 +2376,20 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/define_sound",
+      "name": "define_sound",
+      "type": "graphics",
+      "path": "examples/graphics/define_sound",
+      "has_swf": true,
+      "wasm_file": "define_sound.wasm",
+      "js_file": "define_sound.js",
+      "description": "DefineSound (tag 14) + StartSound (tag 15) with uncompressed PCM sine wave",
+      "swf_version": 5,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
       "id": "graphics/define_text2",
       "name": "define_text2",
       "type": "graphics",
@@ -2376,6 +2404,20 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/drop_shadow_filter",
+      "name": "drop_shadow_filter",
+      "type": "graphics",
+      "path": "examples/graphics/drop_shadow_filter",
+      "has_swf": true,
+      "wasm_file": "drop_shadow_filter.wasm",
+      "js_file": "drop_shadow_filter.js",
+      "description": "DropShadowFilter via PlaceObject3 FilterList",
+      "swf_version": 8,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
       "id": "graphics/focal_radial_gradient",
       "name": "focal_radial_gradient",
       "type": "graphics",
@@ -2385,6 +2427,20 @@
       "wasm_file": "focal_radial_gradient.wasm",
       "description": "WebGPU rendering test with focal radial gradient fill (type 0x13)",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/glow_filter",
+      "name": "glow_filter",
+      "type": "graphics",
+      "path": "examples/graphics/glow_filter",
+      "has_swf": true,
+      "js_file": "glow_filter.js",
+      "wasm_file": "glow_filter.wasm",
+      "description": "GlowFilter via PlaceObject3 FilterList",
+      "swf_version": 8,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

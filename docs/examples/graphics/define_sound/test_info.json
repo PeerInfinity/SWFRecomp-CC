@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "define_sound",
+    "description": "DefineSound (tag 14) + StartSound (tag 15) with uncompressed PCM sine wave",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["DEFINE_SOUND", "START_SOUND", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

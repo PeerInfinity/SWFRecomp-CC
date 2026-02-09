@@ -127,11 +127,14 @@ void swfStart(SWFAppContext* app_context)
 		return;
 	}
 
+	// audio_output_init MUST run before renderer_init so the Web Audio
+	// AudioContext is created while the user gesture (click) is still active.
+	// renderer_init calls emscripten_sleep() which consumes the gesture.
+	audio_output_init(app_context);
+
 	renderer_init(app_context, context);
 
 	tagInit(app_context);
-
-	audio_output_init(app_context);
 
 	tagMain(app_context);
 

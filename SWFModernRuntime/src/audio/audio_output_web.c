@@ -39,7 +39,13 @@ void audio_output_init(SWFAppContext* app_context)
 
 		// Create audio context on first user interaction (autoplay policy)
 		var startAudio = function() {
-			if (window._swfAudioStarted) return;
+			if (window._swfAudioStarted) {
+				// Already initialized — but try to resume if suspended
+				if (window._swfAudioCtx && window._swfAudioCtx.state === 'suspended') {
+					window._swfAudioCtx.resume();
+				}
+				return;
+			}
 			window._swfAudioStarted = true;
 
 			var AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -53,18 +59,26 @@ void audio_output_init(SWFAppContext* app_context)
 			var processor = ctx.createScriptProcessor(bufferSize, 0, 2);
 
 			processor.onaudioprocess = function(e) {
-				if (!Module.HEAPF32 || !Module._audio_fill_buffer) return;
+				if (!Module._audio_fill_buffer) return;
 				var outL = e.outputBuffer.getChannelData(0);
 				var outR = e.outputBuffer.getChannelData(1);
 				var frames = e.outputBuffer.length;
 
 				// Call C to fill the buffer
 				var bufPtr = Module._audio_fill_buffer(frames);
-				var floatBuf = Module.HEAPF32.subarray(bufPtr / 4, bufPtr / 4 + frames * 2);
+
+				// Get float view of WASM memory (handle both exported HEAPF32 and direct access)
+				var heap = Module.HEAPF32;
+				if (!heap) {
+					var mem = Module.wasmMemory || (Module.asm && Module.asm.memory);
+					if (!mem) return;
+					heap = new Float32Array(mem.buffer);
+				}
+				var offset = bufPtr >> 2;
 
 				for (var i = 0; i < frames; i++) {
-					outL[i] = floatBuf[i * 2];
-					outR[i] = floatBuf[i * 2 + 1];
+					outL[i] = heap[offset + i * 2];
+					outR[i] = heap[offset + i * 2 + 1];
 				}
 			};
 

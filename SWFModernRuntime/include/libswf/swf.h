@@ -131,6 +131,19 @@ typedef struct DisplayObject
 	// Clip actions (PlaceObject2 HasClipActions)
 	ClipAction* clip_actions;
 	size_t clip_action_count;
+	// Visual filter (PlaceObject3 FilterList)
+	u8 filter_type;       // 0=none, 1=blur, 2=drop_shadow, 3=glow
+	u8 filter_quality;    // blur passes (1-3)
+	u8 filter_flags;      // inner/knockout/compositeSource
+	float filter_blur_x;
+	float filter_blur_y;
+	float filter_color_r;
+	float filter_color_g;
+	float filter_color_b;
+	float filter_color_a;
+	float filter_strength;
+	float filter_angle;
+	float filter_distance;
 } DisplayObject;
 
 typedef struct MouseState {

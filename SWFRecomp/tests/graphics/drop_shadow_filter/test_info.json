@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "drop_shadow_filter",
+    "description": "DropShadowFilter via PlaceObject3 FilterList",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["DROP_SHADOW_FILTER", "PLACE_OBJECT3", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

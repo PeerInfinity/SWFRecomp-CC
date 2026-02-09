@@ -6,6 +6,6 @@
     "fully_implemented": true
   },
   "graphics": {
-    "tested": ["PLACE_OBJECT_3", "BLEND_MODE_ADD", "SOLID_FILL", "STRAIGHT_EDGE"]
+    "tested": ["PLACE_OBJECT3", "SOLID_FILL", "STRAIGHT_EDGE"]
   }
 }

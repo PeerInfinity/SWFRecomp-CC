@@ -6,6 +6,7 @@
 #include <renderer.h>
 #include <utils.h>
 #include <string.h>
+#include <math.h>
 
 extern RenderContext* context;
 
@@ -299,6 +300,62 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 // Helper 3: Recursive display list rendering
 // ---------------------------------------------------------------------------
 // Renders all objects in a display list, recursing into sprites and buttons.
+// Forward declaration for mutual recursion
+static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max_depth);
+
+// Helper: render a single object into the current render pass
+static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
+{
+	Character* ch = &dictionary[obj->char_id];
+	switch (ch->type)
+	{
+		case CHAR_TYPE_SHAPE:
+			renderer_draw_shape(context, ch->shape_offset, ch->size,
+				obj->transform_id, obj->cxform_id);
+			break;
+		case CHAR_TYPE_MORPH_SHAPE:
+			renderer_draw_shape(context, ch->morph_start_offset, ch->morph_start_size,
+				obj->transform_id, obj->cxform_id);
+			break;
+		case CHAR_TYPE_TEXT:
+			for (size_t j = 0; j < ch->text_size; ++j)
+			{
+				size_t glyph_index = 2*app_context->text_data[ch->text_start + j];
+				renderer_draw_shape(context,
+					app_context->glyph_data[glyph_index],
+					app_context->glyph_data[glyph_index + 1],
+					ch->transform_start + j, ch->cxform_id);
+			}
+			break;
+		case CHAR_TYPE_SPRITE:
+			if (obj->sprite_display_list != NULL)
+				render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+			break;
+		case CHAR_TYPE_BUTTON:
+		{
+			DisplayObject* saved_display_list = display_list;
+			size_t saved_max_depth = max_depth;
+			size_t saved_capacity = display_list_capacity;
+
+			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+			max_depth = 0;
+
+			u8 state = obj->button_state;
+			if (ch->button_state_funcs[state] != NULL)
+				ch->button_state_funcs[state](app_context);
+
+			render_display_list(app_context, display_list, max_depth);
+
+			free(display_list);
+			display_list = saved_display_list;
+			max_depth = saved_max_depth;
+			display_list_capacity = saved_capacity;
+			break;
+		}
+	}
+}
+
 static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max_depth)
 {
 	for (size_t i = 1; i <= dl_max_depth; ++i)
@@ -601,53 +658,66 @@ void tagShowFrame(SWFAppContext* app_context)
 			continue;
 		}
 
-		Character* ch = &dictionary[obj->char_id];
-
 		// Set blend mode if non-default
 		if (obj->blend_mode > 1)
 			renderer_set_blend_mode(context, obj->blend_mode);
 
-		switch (ch->type)
+		// Check if this object has a visual filter
+		if (obj->filter_type != 0)
 		{
-			case CHAR_TYPE_SHAPE:
-				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
-				break;
-			case CHAR_TYPE_MORPH_SHAPE:
-				renderer_draw_shape(context, ch->morph_start_offset, ch->morph_start_size, obj->transform_id, obj->cxform_id);
-				break;
-			case CHAR_TYPE_TEXT:
-				for (size_t j = 0; j < ch->text_size; ++j)
-				{
-					size_t glyph_index = 2*app_context->text_data[ch->text_start + j];
-					renderer_draw_shape(context, app_context->glyph_data[glyph_index], app_context->glyph_data[glyph_index + 1], ch->transform_start + j, ch->cxform_id);
-				}
-				break;
-			case CHAR_TYPE_SPRITE:
-				if (obj->sprite_display_list != NULL)
-					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
-				break;
-			case CHAR_TYPE_BUTTON:
+			// Filtered rendering: suspend -> offscreen -> blur -> resume -> composite
+			renderer_suspend_pass(context);
+
+			// 1. Render object into offscreen (MSAA resolve to filter_tex_a)
+			renderer_begin_offscreen_pass(context);
+			render_single_object(app_context, obj);
+			renderer_end_offscreen_pass(context);
+
+			// 2. Apply blur
+			int is_shadow = (obj->filter_type == 2);
+			int is_glow = (obj->filter_type == 3);
+			int colorize = is_shadow || is_glow;
+			renderer_run_blur(context,
+				obj->filter_blur_x, obj->filter_blur_y,
+				obj->filter_quality, obj->filter_strength,
+				obj->filter_color_r, obj->filter_color_g,
+				obj->filter_color_b, obj->filter_color_a,
+				colorize);
+
+			// 3. Resume main pass and composite
+			renderer_resume_pass(context);
+
+			if (is_shadow)
 			{
-				DisplayObject* saved_display_list = display_list;
-				size_t saved_max_depth = max_depth;
-				size_t saved_capacity = display_list_capacity;
-
-				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-				max_depth = 0;
-
-				u8 state = obj->button_state;
-				if (ch->button_state_funcs[state] != NULL)
-					ch->button_state_funcs[state](app_context);
-
-				render_display_list(app_context, display_list, max_depth);
-
-				free(display_list);
-				display_list = saved_display_list;
-				max_depth = saved_max_depth;
-				display_list_capacity = saved_capacity;
-				break;
+				// DropShadow: composite shadow with offset, then render original on top
+				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
+				// Convert distance from twips to NDC
+				float dist_px = obj->filter_distance;
+				float offset_ndc_x = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
+				float offset_ndc_y = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				renderer_composite_filtered(context, offset_ndc_x, -offset_ndc_y);
+				// Re-render original on top
+				render_single_object(app_context, obj);
 			}
+			else if (is_glow)
+			{
+				// Glow: composite glow behind, then render original on top
+				renderer_composite_filtered(context, 0.0f, 0.0f);
+				render_single_object(app_context, obj);
+			}
+			else
+			{
+				// Pure blur: just composite the blurred result
+				renderer_composite_filtered(context, 0.0f, 0.0f);
+			}
+
+			// Re-bind blend state after filter pipeline switches
+			if (obj->blend_mode > 1)
+				renderer_set_blend_mode(context, obj->blend_mode);
+		}
+		else
+		{
+			render_single_object(app_context, obj);
 		}
 
 		// Restore default blend mode
@@ -717,6 +787,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].instance_name = NULL;
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
+	display_list[depth].filter_type = 0;
 
 	if (depth > max_depth)
 	{
@@ -763,6 +834,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].instance_name = NULL;
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
+	display_list[depth].filter_type = 0;
 
 	if (depth > max_depth)
 	{
@@ -852,6 +924,29 @@ void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
 {
 	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
 	display_list[depth].blend_mode = blend_mode;
+}
+
+void tagSetFilter(SWFAppContext* app_context, size_t depth,
+    u8 type, float blur_x, float blur_y, u8 quality, u8 flags,
+    float r, float g, float b, float a, float strength,
+    float angle, float distance)
+{
+	(void)app_context;
+	if (depth <= max_depth)
+	{
+		display_list[depth].filter_type = type;
+		display_list[depth].filter_blur_x = blur_x;
+		display_list[depth].filter_blur_y = blur_y;
+		display_list[depth].filter_quality = quality;
+		display_list[depth].filter_flags = flags;
+		display_list[depth].filter_color_r = r;
+		display_list[depth].filter_color_g = g;
+		display_list[depth].filter_color_b = b;
+		display_list[depth].filter_color_a = a;
+		display_list[depth].filter_strength = strength;
+		display_list[depth].filter_angle = angle;
+		display_list[depth].filter_distance = distance;
+	}
 }
 
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)

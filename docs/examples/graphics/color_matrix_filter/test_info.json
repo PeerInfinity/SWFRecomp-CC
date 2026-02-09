@@ -6,6 +6,6 @@
     "fully_implemented": true
   },
   "graphics": {
-    "tested": ["COLOR_MATRIX_FILTER", "PLACE_OBJECT_3", "SOLID_FILL", "STRAIGHT_EDGE"]
+    "tested": ["COLOR_MATRIX_FILTER", "PLACE_OBJECT3", "SOLID_FILL", "STRAIGHT_EDGE"]
   }
 }

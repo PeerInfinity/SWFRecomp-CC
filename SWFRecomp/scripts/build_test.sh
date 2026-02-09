@@ -222,7 +222,7 @@ if [ "$TARGET" == "wasm" ]; then
             -o "${OUTPUT_NAME}.js" \
             -s WASM=1 \
             -s EXPORTED_FUNCTIONS='["_main","_runSWF","_audio_fill_buffer"]' \
-            -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+            -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=64MB \
             -sASYNCIFY \

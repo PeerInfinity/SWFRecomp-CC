@@ -22,6 +22,10 @@ void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, si
     u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count);
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode);
+void tagSetFilter(SWFAppContext* app_context, size_t depth,
+    u8 type, float blur_x, float blur_y, u8 quality, u8 flags,
+    float r, float g, float b, float a, float strength,
+    float angle, float distance);
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth);

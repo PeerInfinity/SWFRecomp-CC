@@ -37,6 +37,13 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_update_vertices(ctx, off, data, sz)  render_webgpu_update_vertices(ctx, off, data, sz)
 #define renderer_update_colors(ctx, off, data, sz)    render_webgpu_update_colors(ctx, off, data, sz)
 #define renderer_set_blend_mode(ctx, mode)            render_webgpu_set_blend_mode(ctx, mode)
+#define renderer_suspend_pass(ctx)                    render_webgpu_suspend_pass(ctx)
+#define renderer_resume_pass(ctx)                     render_webgpu_resume_pass(ctx)
+#define renderer_begin_offscreen_pass(ctx)            render_webgpu_begin_offscreen_pass(ctx)
+#define renderer_end_offscreen_pass(ctx)              render_webgpu_end_offscreen_pass(ctx)
+#define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) render_webgpu_run_blur(ctx, bx, by, q, s, r, g, b, a, c)
+#define renderer_composite_filtered(ctx, ox, oy)      render_webgpu_composite_filtered(ctx, ox, oy)
+#define renderer_ensure_filter_resources(ctx)          render_webgpu_ensure_filter_resources(ctx)
 
 #else
 
@@ -66,5 +73,12 @@ typedef FlashbangContext RenderContext;
 #define renderer_update_vertices(ctx, off, data, sz)  ((void)0)
 #define renderer_update_colors(ctx, off, data, sz)    ((void)0)
 #define renderer_set_blend_mode(ctx, mode)            ((void)0)
+#define renderer_suspend_pass(ctx)                    ((void)0)
+#define renderer_resume_pass(ctx)                     ((void)0)
+#define renderer_begin_offscreen_pass(ctx)            ((void)0)
+#define renderer_end_offscreen_pass(ctx)              ((void)0)
+#define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) ((void)0)
+#define renderer_composite_filtered(ctx, ox, oy)      ((void)0)
+#define renderer_ensure_filter_resources(ctx)          ((void)0)
 
 #endif
