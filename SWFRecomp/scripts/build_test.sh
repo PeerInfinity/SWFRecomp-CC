@@ -163,6 +163,7 @@ if [ "$GRAPHICS_FLAG" = true ]; then
     echo "Using GRAPHICS mode (WebGPU) for ${TARGET} build..."
     cp "${SWFMODERN_SRC}/libswf/swf.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
 else
     echo "Using NO_GRAPHICS mode for ${TARGET} build..."
