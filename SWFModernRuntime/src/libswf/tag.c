@@ -87,12 +87,12 @@ void tagShowFrame(SWFAppContext* app_context)
 			{
 				// Encode transition as BUTTONCONDACTION bitmask
 				u16 transition = 0;
-				if (old_state == 0 && new_state == 1)      transition = 0x0080; // IdleToOverUp
-				else if (old_state == 1 && new_state == 0)  transition = 0x0040; // OverUpToIdle
-				else if (old_state == 1 && new_state == 2)  transition = 0x0020; // OverUpToOverDown
-				else if (old_state == 2 && new_state == 1)  transition = 0x0010; // OverDownToOverUp
+				if (old_state == 0 && new_state == 1)      transition = 0x0001; // IdleToOverUp
+				else if (old_state == 1 && new_state == 0)  transition = 0x0002; // OverUpToIdle
+				else if (old_state == 1 && new_state == 2)  transition = 0x0004; // OverUpToOverDown
+				else if (old_state == 2 && new_state == 1)  transition = 0x0008; // OverDownToOverUp
 				else if (old_state == 2 && new_state == 0)  transition = 0x0100; // OverDownToIdle
-				else if (old_state == 0 && new_state == 2)  transition = 0x0001; // IdleToOverDown
+				else if (old_state == 0 && new_state == 2)  transition = 0x0080; // IdleToOverDown
 
 				if (transition != 0)
 				{

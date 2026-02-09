@@ -61,12 +61,14 @@ shape_down.add_edges([
     LineTo(0, -1600),
 ])
 
-# Button2 (object_id=5): all four states
+# Button2 (object_id=5): all four states + BUTTONCONDACTION actions
 button = swf.define_button2(object_id=5)
 button.add_record(char_id=1, depth=1, up=True)
 button.add_record(char_id=3, depth=1, over=True)
 button.add_record(char_id=4, depth=1, down=True)
 button.add_record(char_id=2, depth=2, hit_test=True)
+button.add_trace_action("Button2 clicked!", condition=0x0008)   # OverDownToOverUp (release)
+button.add_trace_action("Button2 hover!", condition=0x0001)     # IdleToOverUp (mouse enter)
 
 # Place button at (100, 80) pixels = (2000, 1600) twips
 swf.place_object(object_id=5, depth=1, trans_x=2000, trans_y=1600)

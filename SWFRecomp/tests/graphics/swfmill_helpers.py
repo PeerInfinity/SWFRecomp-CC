@@ -617,6 +617,7 @@ class Button2Definition:
     def __init__(self, object_id):
         self.object_id = object_id
         self.records = []
+        self.actions = []  # list of (condition, message) tuples
 
     def add_record(self, char_id, depth, up=False, over=False, down=False,
                    hit_test=False, trans_x=0, trans_y=0):
@@ -632,6 +633,35 @@ class Button2Definition:
             "trans_y": trans_y,
         })
 
+    def add_trace_action(self, message, condition=0x0010):
+        """Add a BUTTONCONDACTION with a Trace action.
+
+        condition: bitmask of triggering transitions (default 0x0010 = OverDownToOverUp = click)
+        """
+        self.actions.append((condition, message))
+
+    def _build_action_block(self, condition, message, is_last):
+        """Build a single BUTTONCONDACTION block."""
+        # Build the action bytes first to know the size
+        action = bytearray()
+        msg_bytes = message.encode('ascii') + b'\x00'
+        push_len = 1 + len(msg_bytes)
+        action.append(0x96)  # ActionPush
+        action += struct.pack('<H', push_len)
+        action.append(0x00)  # type: string
+        action += msg_bytes
+        action.append(0x26)  # ActionTrace
+        action.append(0x00)  # ActionEnd
+
+        block = bytearray()
+        # CondActionSize (UI16): 0 for last block, otherwise size of this block
+        size = 4 + len(action)  # 2 (CondActionSize) + 2 (Condition) + actions
+        block += struct.pack('<H', 0 if is_last else size)
+        # Condition (UI16)
+        block += struct.pack('<H', condition)
+        block += action
+        return bytes(block)
+
     def build_body(self):
         """Build the raw DefineButton2 tag body as bytes."""
         body = bytearray()
@@ -639,7 +669,8 @@ class Button2Definition:
         body += struct.pack('<H', self.object_id)
         # Flags (UI8): TrackAsMenu=0
         body.append(0x00)
-        # ActionOffset (UI16 LE): 0 = no actions
+        # ActionOffset placeholder — fill in after building records
+        action_offset_pos = len(body)
         body += struct.pack('<H', 0)
         # BUTTONRECORD2 entries
         for rec in self.records:
@@ -662,6 +693,13 @@ class Button2Definition:
             body += cxform_bw.to_bytes()
         # Terminator
         body.append(0x00)
+        # Patch ActionOffset (byte offset from the ActionOffset field to first BUTTONCONDACTION)
+        if self.actions:
+            action_offset = len(body) - action_offset_pos
+            struct.pack_into('<H', body, action_offset_pos, action_offset)
+            for idx, (condition, message) in enumerate(self.actions):
+                is_last = (idx == len(self.actions) - 1)
+                body += self._build_action_block(condition, message, is_last)
         return bytes(body)
 
 

@@ -2710,7 +2710,7 @@ namespace SWFRecomp
 						action.parseActions(context, cur_pos, out_script);
 						out_script << "}";
 
-						btn_actions.push_back({ 0x0010, func_name }); // OverDownToOverUp
+						btn_actions.push_back({ 0x0008, func_name }); // OverDownToOverUp
 					}
 				}
 				else if (action_offset > 0 && action_offset_pos != nullptr)
