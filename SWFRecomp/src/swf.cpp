@@ -2150,17 +2150,49 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_PLACE_OBJECT_3:
 			case SWF_TAG_PLACE_OBJECT_2:
 			{
-				tag.setFieldCount(2);
+				bool is_po3 = (tag.code == SWF_TAG_PLACE_OBJECT_3);
 
+				// PlaceObject3 extra flags byte
+				bool has_filter_list = false;
+				bool has_blend_mode = false;
+				bool has_cache_as_bitmap = false;
+				bool has_visible = false;
+				bool has_opaque_background = false;
+				bool has_class_name = false;
+				bool has_image = false;
+
+				// PO2: flags(UI8) + depth(UI16)
+				// PO3: flags(UI8) + flags2(UI8) + depth(UI16)
+				tag.setFieldCount(1);
 				tag.configureNextField(SWF_FIELD_UI8);
-				tag.configureNextField(SWF_FIELD_UI16);
-
 				tag.parseFields(cur_pos);
-
 				u8 flags = (u8) tag.fields[0].value;
-				u16 depth = (u16) tag.fields[1].value;
+
+				if (is_po3)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI8);
+					tag.parseFields(cur_pos);
+					u8 flags2 = (u8) tag.fields[0].value;
+
+					has_opaque_background = (flags2 & 0b10000000) != 0;
+					has_visible = (flags2 & 0b01000000) != 0;
+					has_image = (flags2 & 0b00100000) != 0;
+					has_class_name = (flags2 & 0b00010000) != 0;
+					has_cache_as_bitmap = (flags2 & 0b00001000) != 0;
+					has_blend_mode = (flags2 & 0b00000100) != 0;
+					has_filter_list = (flags2 & 0b00000010) != 0;
+				}
+
+				tag.clearFields();
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+				u16 depth = (u16) tag.fields[0].value;
 
 				bool has_clip_actions = (flags & 0b10000000) != 0;
 				bool has_clip_depth = (flags & 0b01000000) != 0;
@@ -2170,6 +2202,13 @@ namespace SWFRecomp
 				bool has_matrix = (flags & 0b00000100) != 0;
 				bool has_character = (flags & 0b00000010) != 0;
 				bool move = (flags & 0b00000001) != 0;
+
+				// Skip ClassName (if HasClassName or (HasImage && HasCharacter))
+				if (is_po3 && (has_class_name || (has_image && has_character)))
+				{
+					while (*cur_pos != '\0') cur_pos++;
+					cur_pos++;
+				}
 				
 				u16 char_id = 0;
 				
@@ -2306,10 +2345,13 @@ namespace SWFRecomp
 					tag.parseFields(cur_pos);
 					ratio_val = (u16) tag.fields[0].value;
 				}
+				std::string instance_name_str;
 				if (has_name)
 				{
-					// Skip null-terminated string
+					// Capture instance name (null-terminated string)
+					char* name_start = cur_pos;
 					while (*cur_pos != '\0') cur_pos++;
+					instance_name_str = std::string(name_start, cur_pos - name_start);
 					cur_pos++; // skip null terminator
 				}
 
@@ -2321,6 +2363,118 @@ namespace SWFRecomp
 					tag.configureNextField(SWF_FIELD_UI16);
 					tag.parseFields(cur_pos);
 					clip_depth_val = (u16) tag.fields[0].value;
+				}
+
+				// PlaceObject3 extra fields: FilterList, BlendMode, BitmapCache, Visible, OpaqueBackground
+				u8 blend_mode_val = 0;
+				u32 color_matrix_cxform_id = 0;
+				bool has_color_matrix = false;
+
+				if (is_po3 && has_filter_list)
+				{
+					u8 num_filters = *(u8*) cur_pos; cur_pos += 1;
+					for (u8 f = 0; f < num_filters; f++)
+					{
+						u8 filter_id = *(u8*) cur_pos; cur_pos += 1;
+						switch (filter_id)
+						{
+							case 0: cur_pos += 23; break; // DropShadowFilter
+							case 1: cur_pos += 9; break;  // BlurFilter
+							case 2: cur_pos += 15; break; // GlowFilter
+							case 3: cur_pos += 27; break; // BevelFilter
+							case 4: // GradientGlowFilter
+							{
+								u8 nc = *(u8*) cur_pos; cur_pos += 1;
+								cur_pos += nc * 5 + 19;
+								break;
+							}
+							case 5: // ConvolutionFilter
+							{
+								u8 mx = *(u8*) cur_pos; cur_pos += 1;
+								u8 my = *(u8*) cur_pos; cur_pos += 1;
+								cur_pos += 8 + mx * my * 4 + 5;
+								break;
+							}
+							case 6: // ColorMatrixFilter — 20 FLOAT values (80 bytes)
+							{
+								// Read 20 floats (row-major 4x5: rows=R,G,B,A, cols=R,G,B,A,bias)
+								float cm[20];
+								memcpy(cm, cur_pos, 80);
+								cur_pos += 80;
+
+								// Convert to our cxform format:
+								// 4x4 column-major multiply matrix + 4 additive values
+								// SWF ColorMatrix row i: [mult_R, mult_G, mult_B, mult_A, bias]
+								// Our cxform is stored as 20 floats: 4x4 column-major + 4 additive
+								has_color_matrix = true;
+								color_matrix_cxform_id = (u32) current_cxform;
+
+								// Column-major: col j, row i = cm[i*5 + j]
+								// Col 0 (R mult): cm[0], cm[5], cm[10], cm[15]
+								cxform_data << std::fixed
+											<< "\t" << cm[0] << "f," << endl
+											<< "\t" << cm[5] << "f," << endl
+											<< "\t" << cm[10] << "f," << endl
+											<< "\t" << cm[15] << "f," << endl;
+								// Col 1 (G mult): cm[1], cm[6], cm[11], cm[16]
+								cxform_data << "\t" << cm[1] << "f," << endl
+											<< "\t" << cm[6] << "f," << endl
+											<< "\t" << cm[11] << "f," << endl
+											<< "\t" << cm[16] << "f," << endl;
+								// Col 2 (B mult): cm[2], cm[7], cm[12], cm[17]
+								cxform_data << "\t" << cm[2] << "f," << endl
+											<< "\t" << cm[7] << "f," << endl
+											<< "\t" << cm[12] << "f," << endl
+											<< "\t" << cm[17] << "f," << endl;
+								// Col 3 (A mult): cm[3], cm[8], cm[13], cm[18]
+								cxform_data << "\t" << cm[3] << "f," << endl
+											<< "\t" << cm[8] << "f," << endl
+											<< "\t" << cm[13] << "f," << endl
+											<< "\t" << cm[18] << "f," << endl;
+								// Additive (RGBA bias / 255): cm[4], cm[9], cm[14], cm[19]
+								cxform_data << "\t" << cm[4] << "f/255.0f," << endl
+											<< "\t" << cm[9] << "f/255.0f," << endl
+											<< "\t" << cm[14] << "f/255.0f," << endl
+											<< "\t" << cm[19] << "f/255.0f," << endl
+											<< std::defaultfloat;
+
+								current_cxform += 1;
+								break;
+							}
+							case 7: // GradientBevelFilter
+							{
+								u8 nc = *(u8*) cur_pos; cur_pos += 1;
+								cur_pos += nc * 5 + 19;
+								break;
+							}
+						}
+					}
+				}
+
+				if (is_po3 && has_blend_mode)
+				{
+					blend_mode_val = *(u8*) cur_pos; cur_pos += 1;
+				}
+
+				if (is_po3 && has_cache_as_bitmap)
+				{
+					cur_pos += 1; // skip BitmapCache UI8
+				}
+
+				if (is_po3 && has_visible)
+				{
+					cur_pos += 1; // skip Visible UI8
+				}
+
+				if (is_po3 && has_opaque_background)
+				{
+					cur_pos += 4; // skip BackgroundColor RGBA
+				}
+
+				// If ColorMatrixFilter provided a cxform, use it (compose with existing if any)
+				if (has_color_matrix)
+				{
+					cxform_id = color_matrix_cxform_id;
 				}
 
 				// Parse clip actions if present
@@ -2436,7 +2590,12 @@ namespace SWFRecomp
 					}
 				}
 
-				if (has_ratio)
+				// Emit the place call
+				if (blend_mode_val > 1)
+				{
+					context.tag_main << "\t" << "tagPlaceObject3(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(blend_mode_val) << ");" << endl;
+				}
+				else if (has_ratio)
 				{
 					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ");" << endl;
 				}
@@ -2447,6 +2606,18 @@ namespace SWFRecomp
 				else
 				{
 					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ");" << endl;
+				}
+
+				// Emit instance name if present
+				if (!instance_name_str.empty())
+				{
+					// Escape quotes in the name for C string
+					std::string escaped_name = "";
+					for (char c : instance_name_str) {
+						if (c == '"' || c == '\\') escaped_name += '\\';
+						escaped_name += c;
+					}
+					context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
 				}
 
 				break;
@@ -2710,15 +2881,50 @@ namespace SWFRecomp
 							break;
 						}
 
+					case SWF_TAG_PLACE_OBJECT_3:
 					case SWF_TAG_PLACE_OBJECT_2:
 						{
-							sub_tag.setFieldCount(2);
+							bool is_sprite_po3 = (sub_tag.code == SWF_TAG_PLACE_OBJECT_3);
+
+							// PO2: flags(UI8) + depth(UI16)
+							// PO3: flags(UI8) + flags2(UI8) + depth(UI16)
+							sub_tag.setFieldCount(1);
 							sub_tag.configureNextField(SWF_FIELD_UI8);
+							sub_tag.parseFields(cur_pos);
+							u8 flags = (u8) sub_tag.fields[0].value;
+
+							// PlaceObject3 extra flags
+							bool sp_has_filter_list = false;
+							bool sp_has_blend_mode = false;
+							bool sp_has_cache_as_bitmap = false;
+							bool sp_has_visible = false;
+							bool sp_has_opaque_background = false;
+							bool sp_has_class_name = false;
+							bool sp_has_image = false;
+
+							if (is_sprite_po3)
+							{
+								sub_tag.clearFields();
+								sub_tag.setFieldCount(1);
+								sub_tag.configureNextField(SWF_FIELD_UI8);
+								sub_tag.parseFields(cur_pos);
+								u8 flags2 = (u8) sub_tag.fields[0].value;
+
+								sp_has_opaque_background = (flags2 & 0b10000000) != 0;
+								sp_has_visible = (flags2 & 0b01000000) != 0;
+								sp_has_image = (flags2 & 0b00100000) != 0;
+								sp_has_class_name = (flags2 & 0b00010000) != 0;
+								sp_has_cache_as_bitmap = (flags2 & 0b00001000) != 0;
+								sp_has_blend_mode = (flags2 & 0b00000100) != 0;
+								sp_has_filter_list = (flags2 & 0b00000010) != 0;
+							}
+
+							// Now read depth
+							sub_tag.clearFields();
+							sub_tag.setFieldCount(1);
 							sub_tag.configureNextField(SWF_FIELD_UI16);
 							sub_tag.parseFields(cur_pos);
-
-							u8 flags = (u8) sub_tag.fields[0].value;
-							u16 depth = (u16) sub_tag.fields[1].value;
+							u16 depth = (u16) sub_tag.fields[0].value;
 
 							bool has_clip_actions = (flags & 0b10000000) != 0;
 							bool has_clip_depth = (flags & 0b01000000) != 0;
@@ -2727,6 +2933,13 @@ namespace SWFRecomp
 							bool has_color = (flags & 0b00001000) != 0;
 							bool has_matrix = (flags & 0b00000100) != 0;
 							bool has_character = (flags & 0b00000010) != 0;
+
+							// Skip ClassName
+							if (is_sprite_po3 && (sp_has_class_name || (sp_has_image && has_character)))
+							{
+								while (*cur_pos != '\0') cur_pos++;
+								cur_pos++;
+							}
 
 							u16 char_id = 0;
 							if (has_character)
@@ -2845,10 +3058,12 @@ namespace SWFRecomp
 								sub_tag.parseFields(cur_pos);
 								ratio_val = (u16) sub_tag.fields[0].value;
 							}
+							std::string sp_instance_name;
 							if (has_name)
 							{
-								// Skip null-terminated string
+								char* name_start = cur_pos;
 								while (*cur_pos != '\0') cur_pos++;
+								sp_instance_name = std::string(name_start, cur_pos - name_start);
 								cur_pos++; // skip null terminator
 							}
 
@@ -2861,6 +3076,38 @@ namespace SWFRecomp
 								sub_tag.parseFields(cur_pos);
 								clip_depth_val = (u16) sub_tag.fields[0].value;
 							}
+
+							// PO3 extra fields in sprite context
+							u8 sp_blend_mode_val = 0;
+
+							if (is_sprite_po3 && sp_has_filter_list)
+							{
+								u8 num_filters = *(u8*) cur_pos; cur_pos += 1;
+								for (u8 f = 0; f < num_filters; f++)
+								{
+									u8 filter_id = *(u8*) cur_pos; cur_pos += 1;
+									switch (filter_id)
+									{
+										case 0: cur_pos += 23; break;
+										case 1: cur_pos += 9; break;
+										case 2: cur_pos += 15; break;
+										case 3: cur_pos += 27; break;
+										case 4: { u8 nc = *(u8*) cur_pos; cur_pos += 1; cur_pos += nc * 5 + 19; break; }
+										case 5: { u8 mx = *(u8*) cur_pos; cur_pos += 1; u8 my = *(u8*) cur_pos; cur_pos += 1; cur_pos += 8 + mx * my * 4 + 5; break; }
+										case 6: cur_pos += 80; break;
+										case 7: { u8 nc = *(u8*) cur_pos; cur_pos += 1; cur_pos += nc * 5 + 19; break; }
+									}
+								}
+							}
+
+							if (is_sprite_po3 && sp_has_blend_mode)
+							{
+								sp_blend_mode_val = *(u8*) cur_pos; cur_pos += 1;
+							}
+
+							if (is_sprite_po3 && sp_has_cache_as_bitmap) cur_pos += 1;
+							if (is_sprite_po3 && sp_has_visible) cur_pos += 1;
+							if (is_sprite_po3 && sp_has_opaque_background) cur_pos += 4;
 
 							// Parse clip actions if present
 							std::string clip_actions_var;
@@ -2967,7 +3214,18 @@ namespace SWFRecomp
 								}
 							}
 
-							if (has_ratio)
+							// Emit the place call
+							if (sp_blend_mode_val > 1)
+							{
+								sprite_definitions << "\t" << "tagPlaceObject3(app_context, "
+												   << to_string(depth) << ", "
+												   << to_string(char_id) << ", "
+												   << to_string(transform_id) << ", "
+												   << to_string(cxform_id) << ", "
+												   << to_string(clip_depth_val) << ", "
+												   << to_string(sp_blend_mode_val) << ");" << endl;
+							}
+							else if (has_ratio)
 							{
 								sprite_definitions << "\t" << "tagPlaceObject2Ratio(app_context, "
 												   << to_string(depth) << ", "
@@ -2996,6 +3254,17 @@ namespace SWFRecomp
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ");" << endl;
+							}
+
+							// Emit instance name if present
+							if (!sp_instance_name.empty())
+							{
+								std::string escaped = "";
+								for (char c : sp_instance_name) {
+									if (c == '"' || c == '\\') escaped += '\\';
+									escaped += c;
+								}
+								sprite_definitions << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped << "\");" << endl;
 							}
 
 							break;

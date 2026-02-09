@@ -168,7 +168,7 @@ namespace SWFRecomp
 				case SWF_ACTION_STOP:
 				{
 					out_script << "\t" << "// Stop" << endl
-							   << "\t" << "is_playing = 0;" << endl;
+							   << "\t" << "actionStop(app_context);" << endl;
 
 					break;
 				}

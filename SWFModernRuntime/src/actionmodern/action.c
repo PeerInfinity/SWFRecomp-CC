@@ -233,6 +233,14 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 }
 
 #ifndef NO_GRAPHICS
+// Targeted sprite for SetTarget — when non-NULL, play/stop/goto operate on this sprite
+static DisplayObject* targeted_sprite = NULL;
+
+// Forward declaration
+extern DisplayObject* findDisplayObjectByName(const char* name);
+#endif
+
+#ifndef NO_GRAPHICS
 /**
  * Stub for cloneMovieClip - not yet implemented
  * Called by ActionCloneSprite in graphics mode
@@ -1890,10 +1898,28 @@ void actionNextFrame(SWFAppContext* app_context)
  */
 void actionPlay(SWFAppContext* app_context)
 {
-	(void)app_context;  // Not used but required for consistent API
-	// Set playing state to true
-	// This allows the timeline to advance to the next frame
+	(void)app_context;
+#ifndef NO_GRAPHICS
+	if (targeted_sprite != NULL)
+	{
+		targeted_sprite->sprite_is_playing = 1;
+		return;
+	}
+#endif
 	is_playing = 1;
+}
+
+void actionStop(SWFAppContext* app_context)
+{
+	(void)app_context;
+#ifndef NO_GRAPHICS
+	if (targeted_sprite != NULL)
+	{
+		targeted_sprite->sprite_is_playing = 0;
+		return;
+	}
+#endif
+	is_playing = 0;
 }
 
 void actionTrace(SWFAppContext* app_context)
@@ -1971,33 +1997,31 @@ void actionTrace(SWFAppContext* app_context)
  */
 void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 {
-	// Suppress unused parameter warnings
 	(void)app_context;
 
-	// Access global frame control variables
+#ifndef NO_GRAPHICS
+	if (targeted_sprite != NULL)
+	{
+		targeted_sprite->sprite_next_frame = frame;
+		targeted_sprite->sprite_manual_next_frame = 1;
+		targeted_sprite->sprite_is_playing = 0;
+		return;
+	}
+#endif
+
 	extern size_t current_frame;
 	extern size_t next_frame;
 	extern int manual_next_frame;
 	extern int is_playing;
 	extern size_t g_frame_count;
 
-	// Frame boundary validation
-	// If the target frame is out of bounds, ignore the jump
 	if (frame >= g_frame_count)
 	{
-		// Target frame doesn't exist - no-op
-		// Continue execution in current frame
 		return;
 	}
 
-	// Set the next frame to the specified frame index
 	next_frame = frame;
-
-	// Signal manual frame navigation (overrides automatic playback advancement)
 	manual_next_frame = 1;
-
-	// Stop playback at the target frame (gotoAndStop semantics)
-	// This is the key difference from just advancing the frame counter
 	is_playing = 0;
 }
 
@@ -2575,28 +2599,8 @@ void actionSetTarget2(SWFAppContext* app_context)
 	// Pop the target path
 	POP();
 
-	// Empty string or NULL means return to main timeline
-	if (target_path == NULL || strlen(target_path) == 0)
-	{
-		setCurrentContext(&root_movieclip);
-		printf("// SetTarget2: (main)\n");
-		return;
-	}
-
-	// Try to resolve the target path
-	MovieClip* target_mc = getMovieClipByTarget(target_path);
-
-	// Always print the target path, regardless of whether it exists
-	printf("// SetTarget2: %s\n", target_path);
-
-	if (target_mc) {
-		// Valid target found - change context
-		setCurrentContext(target_mc);
-	}
-	// If target not found, context remains unchanged (silent failure, as per Flash behavior)
-
-	// Note: In NO_GRAPHICS mode, only _root is available as a target.
-	// Full MovieClip hierarchy requires display list infrastructure.
+	// Delegate to actionSetTarget for unified resolution logic
+	actionSetTarget(app_context, target_path ? target_path : "");
 }
 
 void actionGetProperty(SWFAppContext* app_context)
@@ -5636,26 +5640,35 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// Empty string or NULL means return to main timeline
 	if (!target_name || strlen(target_name) == 0) {
 		setCurrentContext(&root_movieclip);
-		printf("// SetTarget: (main)\n");
+#ifndef NO_GRAPHICS
+		targeted_sprite = NULL;
+#endif
 		return;
 	}
 
-	// Try to resolve the target path
-	MovieClip* target_mc = getMovieClipByTarget(target_name);
-
-	if (target_mc) {
-		// Valid target found - change context
-		setCurrentContext(target_mc);
-		printf("// SetTarget: %s\n", target_name);
-	} else {
-		// Invalid target - context remains unchanged
-		// In Flash, if target is not found, the context doesn't change
-		printf("// SetTarget: %s (not found, context unchanged)\n", target_name);
+	// Check for _root
+	if (strcmp(target_name, "_root") == 0 || strcmp(target_name, "/") == 0) {
+		setCurrentContext(&root_movieclip);
+#ifndef NO_GRAPHICS
+		targeted_sprite = NULL;
+#endif
+		return;
 	}
 
-	// Note: In NO_GRAPHICS mode, only _root is available as a target.
-	// Full MovieClip hierarchy (named sprites, nested clips) requires
-	// display list infrastructure which is only available in graphics mode.
+#ifndef NO_GRAPHICS
+	// Try to resolve as a named sprite in the display list
+	DisplayObject* obj = findDisplayObjectByName(target_name);
+	if (obj != NULL) {
+		targeted_sprite = obj;
+		return;
+	}
+#endif
+
+	// Fallback to MovieClip resolution
+	MovieClip* target_mc = getMovieClipByTarget(target_name);
+	if (target_mc) {
+		setCurrentContext(target_mc);
+	}
 }
 
 // ==================================================================

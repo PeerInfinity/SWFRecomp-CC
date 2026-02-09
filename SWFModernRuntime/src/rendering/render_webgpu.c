@@ -905,6 +905,95 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	ctx->stencil_test_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
 	assert(ctx->stencil_test_pipeline != NULL);
 
+	// --- Blend mode pipelines ---
+	// Reset to normal depth-stencil state and normal color output
+	rp_desc.depthStencil = &ds_normal;
+	rp_desc.fragment = &frag_state;
+
+	// Add (blend mode 8): SrcAlpha / One / Add
+	{
+		WGPUBlendState blend_add = {0};
+		blend_add.color.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_add.color.dstFactor = WGPUBlendFactor_One;
+		blend_add.color.operation = WGPUBlendOperation_Add;
+		blend_add.alpha.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_add.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_add.alpha.operation = WGPUBlendOperation_Add;
+
+		WGPUColorTargetState ct_add = color_target;
+		ct_add.blend = &blend_add;
+		WGPUFragmentState fs_add = frag_state;
+		fs_add.targets = &ct_add;
+
+		rp_desc.label = WGPU_LABEL("blend_add_pipeline");
+		rp_desc.fragment = &fs_add;
+		ctx->blend_add_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_add_pipeline != NULL);
+	}
+
+	// Lighten (blend mode 5): One / One / Max
+	{
+		WGPUBlendState blend_lighten = {0};
+		blend_lighten.color.srcFactor = WGPUBlendFactor_One;
+		blend_lighten.color.dstFactor = WGPUBlendFactor_One;
+		blend_lighten.color.operation = WGPUBlendOperation_Max;
+		blend_lighten.alpha.srcFactor = WGPUBlendFactor_One;
+		blend_lighten.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_lighten.alpha.operation = WGPUBlendOperation_Max;
+
+		WGPUColorTargetState ct_lighten = color_target;
+		ct_lighten.blend = &blend_lighten;
+		WGPUFragmentState fs_lighten = frag_state;
+		fs_lighten.targets = &ct_lighten;
+
+		rp_desc.label = WGPU_LABEL("blend_lighten_pipeline");
+		rp_desc.fragment = &fs_lighten;
+		ctx->blend_lighten_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_lighten_pipeline != NULL);
+	}
+
+	// Darken (blend mode 6): One / One / Min
+	{
+		WGPUBlendState blend_darken = {0};
+		blend_darken.color.srcFactor = WGPUBlendFactor_One;
+		blend_darken.color.dstFactor = WGPUBlendFactor_One;
+		blend_darken.color.operation = WGPUBlendOperation_Min;
+		blend_darken.alpha.srcFactor = WGPUBlendFactor_One;
+		blend_darken.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_darken.alpha.operation = WGPUBlendOperation_Min;
+
+		WGPUColorTargetState ct_darken = color_target;
+		ct_darken.blend = &blend_darken;
+		WGPUFragmentState fs_darken = frag_state;
+		fs_darken.targets = &ct_darken;
+
+		rp_desc.label = WGPU_LABEL("blend_darken_pipeline");
+		rp_desc.fragment = &fs_darken;
+		ctx->blend_darken_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_darken_pipeline != NULL);
+	}
+
+	// Subtract (blend mode 9): SrcAlpha / One / ReverseSubtract
+	{
+		WGPUBlendState blend_sub = {0};
+		blend_sub.color.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_sub.color.dstFactor = WGPUBlendFactor_One;
+		blend_sub.color.operation = WGPUBlendOperation_ReverseSubtract;
+		blend_sub.alpha.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_sub.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_sub.alpha.operation = WGPUBlendOperation_ReverseSubtract;
+
+		WGPUColorTargetState ct_sub = color_target;
+		ct_sub.blend = &blend_sub;
+		WGPUFragmentState fs_sub = frag_state;
+		fs_sub.targets = &ct_sub;
+
+		rp_desc.label = WGPU_LABEL("blend_subtract_pipeline");
+		rp_desc.fragment = &fs_sub;
+		ctx->blend_subtract_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_subtract_pipeline != NULL);
+	}
+
 	wgpuShaderModuleRelease(vs_module);
 	wgpuShaderModuleRelease(fs_module);
 
@@ -1266,6 +1355,20 @@ void render_webgpu_end_clip(WebGPURenderContext* ctx)
 {
 	// Switch back to normal pipeline (no stencil testing)
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+}
+
+void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
+{
+	WGPURenderPipeline pipeline;
+	switch (blend_mode)
+	{
+		case 5: pipeline = ctx->blend_lighten_pipeline; break;
+		case 6: pipeline = ctx->blend_darken_pipeline; break;
+		case 8: pipeline = ctx->blend_add_pipeline; break;
+		case 9: pipeline = ctx->blend_subtract_pipeline; break;
+		default: pipeline = ctx->render_pipeline; break; // Normal or unsupported
+	}
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, pipeline);
 }
 
 // ---------------------------------------------------------------------------

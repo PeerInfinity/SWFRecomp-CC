@@ -118,11 +118,16 @@ typedef struct DisplayObject
 	u16 ratio;
 	u8 button_state;       // 0=up, 1=over, 2=down (used for CHAR_TYPE_BUTTON)
 	u8 button_prev_state;  // previous frame's state (for transition detection)
+	u8 blend_mode;         // 0=normal (default), see SWF spec blend modes
 	// Per-sprite persistent display list (for multi-frame sprites)
 	struct DisplayObject* sprite_display_list;
 	size_t sprite_max_depth;
 	size_t sprite_dl_capacity;
 	size_t sprite_current_frame;
+	u8 sprite_is_playing;         // 0=stopped, 1=playing (default 1)
+	int sprite_manual_next_frame;  // pending manual frame nav
+	size_t sprite_next_frame;      // target frame
+	char* instance_name;           // from PlaceObject2 HasName (or NULL)
 	// Clip actions (PlaceObject2 HasClipActions)
 	ClipAction* clip_actions;
 	size_t clip_action_count;

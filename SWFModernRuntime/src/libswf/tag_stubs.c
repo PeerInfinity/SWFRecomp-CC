@@ -59,6 +59,18 @@ void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, si
 	(void)cxform_id; (void)clip_depth; (void)clip_actions; (void)clip_action_count;
 }
 
+void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
+	u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode)
+{
+	(void)app_context; (void)depth; (void)char_id; (void)transform_id;
+	(void)cxform_id; (void)clip_depth; (void)blend_mode;
+}
+
+void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
+{
+	(void)app_context; (void)depth; (void)name;
+}
+
 void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
 	(void)app_context; (void)depth;

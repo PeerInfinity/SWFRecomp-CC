@@ -158,6 +158,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name);
 
 void actionNextFrame(SWFAppContext* app_context);
 void actionPlay(SWFAppContext* app_context);
+void actionStop(SWFAppContext* app_context);
 void actionGotoFrame(SWFAppContext* app_context, u16 frame);
 void actionTrace(SWFAppContext* app_context);
 void actionStartDrag(SWFAppContext* app_context);

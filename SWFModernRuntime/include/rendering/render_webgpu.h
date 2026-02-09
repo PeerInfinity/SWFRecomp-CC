@@ -85,6 +85,10 @@ typedef struct WebGPURenderContext
 	WGPURenderPipeline render_pipeline;         // normal: no stencil test
 	WGPURenderPipeline stencil_write_pipeline;  // writes stencil, no color output
 	WGPURenderPipeline stencil_test_pipeline;   // tests stencil, normal color output
+	WGPURenderPipeline blend_add_pipeline;      // blend mode 8: additive
+	WGPURenderPipeline blend_lighten_pipeline;  // blend mode 5: lighten (max)
+	WGPURenderPipeline blend_darken_pipeline;   // blend mode 6: darken (min)
+	WGPURenderPipeline blend_subtract_pipeline; // blend mode 9: subtract
 	WGPUComputePipeline compute_pipeline;
 
 	// --- Bind group layouts ---
@@ -144,4 +148,5 @@ void render_webgpu_compose_sprite_transform(WebGPURenderContext* context, const 
 void render_webgpu_write_transform(WebGPURenderContext* context, u32 transform_id, const float composed[16]);
 void render_webgpu_update_vertices(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
 void render_webgpu_update_colors(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
+void render_webgpu_set_blend_mode(WebGPURenderContext* context, u8 blend_mode);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "place_object3",
+    "description": "PlaceObject3 (tag 70) with additive blend mode",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["PLACE_OBJECT_3", "BLEND_MODE_ADD", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

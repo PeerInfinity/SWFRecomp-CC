@@ -5,6 +5,7 @@
 #include <hit_test.h>
 #include <renderer.h>
 #include <utils.h>
+#include <string.h>
 
 extern RenderContext* context;
 
@@ -35,7 +36,93 @@ static void advance_sprite_frames(SWFAppContext* app_context)
 			obj->sprite_display_list = calloc(obj->sprite_dl_capacity, sizeof(DisplayObject));
 			obj->sprite_max_depth = 0;
 			obj->sprite_current_frame = 0;
+			// Don't override sprite_is_playing — tagPlaceObject2 already set it to 1,
+			// and a script may have already set it to 0 (e.g. gotoAndStop before first ShowFrame)
 		}
+
+		// Check for manual frame navigation (gotoAndPlay/gotoAndStop)
+		size_t frame = obj->sprite_current_frame;
+		if (obj->sprite_manual_next_frame)
+		{
+			obj->sprite_manual_next_frame = 0;
+			size_t target = obj->sprite_next_frame;
+			if (target < ch->sprite_frame_count)
+			{
+				// If jumping backward, reset the display list
+				if (target <= frame)
+				{
+					// Swap to sprite's display list context
+					DisplayObject* saved_dl = display_list;
+					size_t saved_max = max_depth;
+					size_t saved_cap = display_list_capacity;
+
+					display_list = obj->sprite_display_list;
+					max_depth = obj->sprite_max_depth;
+					display_list_capacity = obj->sprite_dl_capacity;
+
+					for (size_t j = 1; j <= max_depth; ++j)
+					{
+						if (display_list[j].sprite_display_list != NULL)
+						{
+							free(display_list[j].sprite_display_list);
+							display_list[j].sprite_display_list = NULL;
+						}
+						display_list[j].char_id = 0;
+					}
+					max_depth = 0;
+
+					// Re-execute frames 0..target
+					for (size_t f = 0; f <= target; f++)
+					{
+						if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
+							ch->sprite_frame_funcs[f](app_context);
+					}
+
+					// Recurse nested sprites
+					advance_sprite_frames(app_context);
+
+					obj->sprite_display_list = display_list;
+					obj->sprite_max_depth = max_depth;
+					obj->sprite_dl_capacity = display_list_capacity;
+
+					display_list = saved_dl;
+					max_depth = saved_max;
+					display_list_capacity = saved_cap;
+				}
+				else
+				{
+					// Jumping forward: execute frames frame+1..target
+					DisplayObject* saved_dl = display_list;
+					size_t saved_max = max_depth;
+					size_t saved_cap = display_list_capacity;
+
+					display_list = obj->sprite_display_list;
+					max_depth = obj->sprite_max_depth;
+					display_list_capacity = obj->sprite_dl_capacity;
+
+					for (size_t f = frame + 1; f <= target; f++)
+					{
+						if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
+							ch->sprite_frame_funcs[f](app_context);
+					}
+
+					advance_sprite_frames(app_context);
+
+					obj->sprite_display_list = display_list;
+					obj->sprite_max_depth = max_depth;
+					obj->sprite_dl_capacity = display_list_capacity;
+
+					display_list = saved_dl;
+					max_depth = saved_max;
+					display_list_capacity = saved_cap;
+				}
+				obj->sprite_current_frame = target;
+			}
+			continue; // Manual nav done, skip normal advancement
+		}
+
+		// Only advance if playing
+		if (!obj->sprite_is_playing) continue;
 
 		// Swap to sprite's display list context
 		DisplayObject* saved_dl = display_list;
@@ -47,7 +134,6 @@ static void advance_sprite_frames(SWFAppContext* app_context)
 		display_list_capacity = obj->sprite_dl_capacity;
 
 		// When looping back to frame 0, reset the display list (Flash behavior)
-		size_t frame = obj->sprite_current_frame;
 		if (frame == 0 && max_depth > 0)
 		{
 			for (size_t j = 1; j <= max_depth; ++j)
@@ -517,6 +603,10 @@ void tagShowFrame(SWFAppContext* app_context)
 
 		Character* ch = &dictionary[obj->char_id];
 
+		// Set blend mode if non-default
+		if (obj->blend_mode > 1)
+			renderer_set_blend_mode(context, obj->blend_mode);
+
 		switch (ch->type)
 		{
 			case CHAR_TYPE_SHAPE:
@@ -559,6 +649,10 @@ void tagShowFrame(SWFAppContext* app_context)
 				break;
 			}
 		}
+
+		// Restore default blend mode
+		if (obj->blend_mode > 1)
+			renderer_set_blend_mode(context, 0);
 	}
 
 	if (active_clip_depth > 0)
@@ -612,10 +706,15 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
+	display_list[depth].blend_mode = 0;
 	display_list[depth].sprite_display_list = NULL;
 	display_list[depth].sprite_max_depth = 0;
 	display_list[depth].sprite_dl_capacity = 0;
 	display_list[depth].sprite_current_frame = 0;
+	display_list[depth].sprite_is_playing = 1;
+	display_list[depth].sprite_manual_next_frame = 0;
+	display_list[depth].sprite_next_frame = 0;
+	display_list[depth].instance_name = NULL;
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 
@@ -653,10 +752,15 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
 	display_list[depth].ratio = ratio;
+	display_list[depth].blend_mode = 0;
 	display_list[depth].sprite_display_list = NULL;
 	display_list[depth].sprite_max_depth = 0;
 	display_list[depth].sprite_dl_capacity = 0;
 	display_list[depth].sprite_current_frame = 0;
+	display_list[depth].sprite_is_playing = 1;
+	display_list[depth].sprite_manual_next_frame = 0;
+	display_list[depth].sprite_next_frame = 0;
+	display_list[depth].instance_name = NULL;
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 
@@ -741,6 +845,34 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 	dictionary[char_id].button_hit_transform_id = hit_transform_id;
 	dictionary[char_id].button_actions = actions;
 	dictionary[char_id].button_action_count = action_count;
+}
+
+void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode)
+{
+	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
+	display_list[depth].blend_mode = blend_mode;
+}
+
+void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
+{
+	(void)app_context;
+	if (depth <= max_depth)
+	{
+		display_list[depth].instance_name = (char*)name;
+	}
+}
+
+DisplayObject* findDisplayObjectByName(const char* name)
+{
+	for (size_t i = 1; i <= max_depth; ++i)
+	{
+		if (display_list[i].char_id == 0) continue;
+		if (display_list[i].instance_name != NULL &&
+		    strcmp(display_list[i].instance_name, name) == 0)
+			return &display_list[i];
+	}
+	return NULL;
 }
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)

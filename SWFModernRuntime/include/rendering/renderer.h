@@ -36,6 +36,7 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_write_transform(ctx, id, xf) render_webgpu_write_transform(ctx, id, xf)
 #define renderer_update_vertices(ctx, off, data, sz)  render_webgpu_update_vertices(ctx, off, data, sz)
 #define renderer_update_colors(ctx, off, data, sz)    render_webgpu_update_colors(ctx, off, data, sz)
+#define renderer_set_blend_mode(ctx, mode)            render_webgpu_set_blend_mode(ctx, mode)
 
 #else
 
@@ -64,5 +65,6 @@ typedef FlashbangContext RenderContext;
 #define renderer_write_transform(ctx, id, xf) ((void)0)
 #define renderer_update_vertices(ctx, off, data, sz)  ((void)0)
 #define renderer_update_colors(ctx, off, data, sz)    ((void)0)
+#define renderer_set_blend_mode(ctx, mode)            ((void)0)
 
 #endif

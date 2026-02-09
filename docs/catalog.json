@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-09T19:26:00Z",
+  "generated": "2026-02-09T20:16:50Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2187,7 +2187,7 @@
       "has_swf": true,
       "wasm_file": "clip_actions.wasm",
       "js_file": "clip_actions.js",
-      "description": "PlaceObject2 with CLIPACTIONS (onLoad + onEnterFrame) on sprite",
+      "description": "PlaceObject2 with CLIPACTIONS (onLoad) on sprite",
       "swf_version": 6,
       "fully_implemented": true,
       "opcodes_tested": [],
@@ -2217,6 +2217,20 @@
       "wasm_file": "coicle.wasm",
       "description": "WebGPU rendering test with curved shapes and ellipses",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/color_matrix_filter",
+      "name": "color_matrix_filter",
+      "type": "graphics",
+      "path": "examples/graphics/color_matrix_filter",
+      "has_swf": true,
+      "wasm_file": "color_matrix_filter.wasm",
+      "js_file": "color_matrix_filter.js",
+      "description": "ColorMatrixFilter via PlaceObject3 converting red to grayscale",
+      "swf_version": 8,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []
@@ -2474,6 +2488,20 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/movieclip_control",
+      "name": "movieclip_control",
+      "type": "graphics",
+      "path": "examples/graphics/movieclip_control",
+      "has_swf": true,
+      "js_file": "movieclip_control.js",
+      "wasm_file": "movieclip_control.wasm",
+      "description": "MovieClip timeline control via setTarget/gotoAndStop",
+      "swf_version": 8,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
       "id": "graphics/new_styles",
       "name": "new_styles",
       "type": "graphics",
@@ -2525,6 +2553,20 @@
       "js_file": "place_object.js",
       "description": "PlaceObject (tag 4) with optional RGB CXFORM tint",
       "swf_version": 3,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/place_object3",
+      "name": "place_object3",
+      "type": "graphics",
+      "path": "examples/graphics/place_object3",
+      "has_swf": true,
+      "js_file": "place_object3.js",
+      "wasm_file": "place_object3.wasm",
+      "description": "PlaceObject3 (tag 70) with additive blend mode",
+      "swf_version": 8,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []
@@ -2607,7 +2649,7 @@
       "has_swf": true,
       "wasm_file": "sprite_multiframe.wasm",
       "js_file": "sprite_multiframe.js",
-      "description": "WebGPU rendering test with a multi-frame DefineSprite that cycles through 3 frames",
+      "description": "Multi-frame DefineSprite that cycles through 3 frames",
       "swf_version": 5,
       "fully_implemented": true,
       "opcodes_tested": [],
@@ -2621,7 +2663,7 @@
       "has_swf": true,
       "js_file": "sprite_nested.js",
       "wasm_file": "sprite_nested.wasm",
-      "description": "WebGPU rendering test with nested sprites containing shapes, text, and sprite children",
+      "description": "Nested sprites containing shapes, text, and sprite children",
       "swf_version": 5,
       "fully_implemented": true,
       "opcodes_tested": [],
