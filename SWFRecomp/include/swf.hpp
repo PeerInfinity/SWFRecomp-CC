@@ -190,6 +190,11 @@ namespace SWFRecomp
 		std::stringstream morph_end_color_data;
 		size_t current_morph_end_color;
 
+		std::stringstream sound_data;
+		size_t current_sound_byte;
+		size_t current_sound_id;
+		bool has_streaming_sound;
+
 		std::stringstream sprite_definitions;
 		std::stringstream sprite_forward_decls;
 
@@ -212,6 +217,7 @@ namespace SWFRecomp
 		SWFTag RGBA;
 		bool shape_has_alpha;
 		bool shape_is_v4;
+		bool shape_is_morph2;
 
 		SWF();
 		SWF(Context& context);

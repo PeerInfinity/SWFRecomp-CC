@@ -285,6 +285,21 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Advance sprite timelines (recursive) ---
 	advance_sprite_frames(app_context);
 
+	// --- Dispatch onEnterFrame clip actions ---
+	for (size_t i = 1; i <= max_depth; ++i)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0 || obj->clip_action_count == 0) continue;
+
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME)
+			{
+				obj->clip_actions[a].action(app_context);
+			}
+		}
+	}
+
 	// --- Button hit testing + state machine + action dispatch ---
 	// Must run BEFORE transform composition so the pre-render pass
 	// composes transforms for the correct (updated) button state.
@@ -601,10 +616,29 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].sprite_max_depth = 0;
 	display_list[depth].sprite_dl_capacity = 0;
 	display_list[depth].sprite_current_frame = 0;
+	display_list[depth].clip_actions = NULL;
+	display_list[depth].clip_action_count = 0;
 
 	if (depth > max_depth)
 	{
 		max_depth = depth;
+	}
+}
+
+void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
+    u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
+{
+	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
+	display_list[depth].clip_actions = clip_actions;
+	display_list[depth].clip_action_count = clip_action_count;
+
+	// Dispatch onLoad immediately
+	for (size_t i = 0; i < clip_action_count; i++)
+	{
+		if (clip_actions[i].event_flags & CLIP_EVENT_LOAD)
+		{
+			clip_actions[i].action(app_context);
+		}
 	}
 }
 
@@ -623,6 +657,8 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].sprite_max_depth = 0;
 	display_list[depth].sprite_dl_capacity = 0;
 	display_list[depth].sprite_current_frame = 0;
+	display_list[depth].clip_actions = NULL;
+	display_list[depth].clip_action_count = 0;
 
 	if (depth > max_depth)
 	{
@@ -634,6 +670,15 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth)
 	{
+		// Dispatch onUnload clip actions before clearing
+		if (display_list[depth].clip_action_count > 0)
+		{
+			for (size_t a = 0; a < display_list[depth].clip_action_count; a++)
+			{
+				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+					display_list[depth].clip_actions[a].action(app_context);
+			}
+		}
 		if (display_list[depth].sprite_display_list != NULL)
 		{
 			free(display_list[depth].sprite_display_list);
@@ -644,6 +689,8 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 		display_list[depth].cxform_id = 0;
 		display_list[depth].has_cxform = 0;
 		display_list[depth].clip_depth = 0;
+		display_list[depth].clip_actions = NULL;
+		display_list[depth].clip_action_count = 0;
 	}
 }
 
@@ -651,6 +698,15 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth)
 	{
+		// Dispatch onUnload clip actions before clearing
+		if (display_list[depth].clip_action_count > 0)
+		{
+			for (size_t a = 0; a < display_list[depth].clip_action_count; a++)
+			{
+				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+					display_list[depth].clip_actions[a].action(app_context);
+			}
+		}
 		if (display_list[depth].sprite_display_list != NULL)
 		{
 			free(display_list[depth].sprite_display_list);
@@ -661,6 +717,8 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		display_list[depth].cxform_id = 0;
 		display_list[depth].has_cxform = 0;
 		display_list[depth].clip_depth = 0;
+		display_list[depth].clip_actions = NULL;
+		display_list[depth].clip_action_count = 0;
 	}
 }
 

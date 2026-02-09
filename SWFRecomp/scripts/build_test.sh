@@ -165,6 +165,8 @@ if [ "$GRAPHICS_FLAG" = true ]; then
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/audio/audio.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/audio/audio_output_web.c" "${BUILD_DIR}/"
 else
     echo "Using NO_GRAPHICS mode for ${TARGET} build..."
     cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
@@ -215,10 +217,11 @@ if [ "$TARGET" == "wasm" ]; then
             -I"${SWFMODERN_INC}/libswf" \
             -I"${SWFMODERN_INC}/memory" \
             -I"${SWFMODERN_INC}/rendering" \
+            -I"${SWFMODERN_INC}/audio" \
             -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
             -o "${OUTPUT_NAME}.js" \
             -s WASM=1 \
-            -s EXPORTED_FUNCTIONS='["_main","_runSWF"]' \
+            -s EXPORTED_FUNCTIONS='["_main","_runSWF","_audio_fill_buffer"]' \
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=64MB \
@@ -259,7 +262,7 @@ else
 
     NATIVE_GRAPHICS_FLAGS=""
     if [ "$GRAPHICS_FLAG" = true ]; then
-        NATIVE_GRAPHICS_FLAGS="-DUSE_WEBGPU -I${SWFMODERN_INC}/rendering"
+        NATIVE_GRAPHICS_FLAGS="-DUSE_WEBGPU -I${SWFMODERN_INC}/rendering -I${SWFMODERN_INC}/audio"
     else
         NATIVE_GRAPHICS_FLAGS="-DNO_GRAPHICS"
     fi

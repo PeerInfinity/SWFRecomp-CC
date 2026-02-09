@@ -25,6 +25,33 @@ typedef struct ButtonAction {
 	frame_func action;    // function to call
 } ButtonAction;
 
+// Clip action: event bitmask + function to call on matching event
+typedef struct ClipAction {
+	u32 event_flags;      // bitmask of triggering events
+	frame_func action;    // function to call
+} ClipAction;
+
+// Clip event flag bits (SWF spec)
+#define CLIP_EVENT_LOAD         0x00001
+#define CLIP_EVENT_ENTER_FRAME  0x00002
+#define CLIP_EVENT_UNLOAD       0x00004
+#define CLIP_EVENT_MOUSE_MOVE   0x00008
+#define CLIP_EVENT_MOUSE_DOWN   0x00010
+#define CLIP_EVENT_MOUSE_UP     0x00020
+#define CLIP_EVENT_KEY_DOWN     0x00040
+#define CLIP_EVENT_KEY_UP       0x00080
+#define CLIP_EVENT_DATA         0x00100
+#define CLIP_EVENT_INITIALIZE   0x00200
+#define CLIP_EVENT_PRESS        0x00400
+#define CLIP_EVENT_RELEASE      0x00800
+#define CLIP_EVENT_RELEASE_OUTSIDE 0x01000
+#define CLIP_EVENT_ROLL_OVER    0x02000
+#define CLIP_EVENT_ROLL_OUT     0x04000
+#define CLIP_EVENT_DRAG_OVER    0x08000
+#define CLIP_EVENT_DRAG_OUT     0x10000
+#define CLIP_EVENT_KEY_PRESS    0x20000
+#define CLIP_EVENT_CONSTRUCT    0x40000
+
 // Character type enum for shapes, text, sprites, and buttons
 typedef enum
 {
@@ -96,6 +123,9 @@ typedef struct DisplayObject
 	size_t sprite_max_depth;
 	size_t sprite_dl_capacity;
 	size_t sprite_current_frame;
+	// Clip actions (PlaceObject2 HasClipActions)
+	ClipAction* clip_actions;
+	size_t clip_action_count;
 } DisplayObject;
 
 typedef struct MouseState {
@@ -159,6 +189,8 @@ typedef struct SWFAppContext
 	size_t morph_end_color_data_size;
 
 	MouseState mouse;
+
+	void* audio_ctx;  // AudioContext* (opaque to avoid header dependency)
 #endif
 
 	// Heap management fields

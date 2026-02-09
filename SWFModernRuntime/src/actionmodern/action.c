@@ -15,6 +15,7 @@
 #include <recomp.h>
 #include <utils.h>
 #include <swf.h>
+#include <tag.h>
 #include <heap.h>
 #include <actionmodern/object.h>
 
@@ -2274,20 +2275,11 @@ void actionEndDrag(SWFAppContext* app_context)
  */
 void actionStopSounds(SWFAppContext* app_context)
 {
-	// Suppress unused parameter warnings
-	(void)app_context;
-
-	// In NO_GRAPHICS mode, this is a no-op since there is no audio subsystem
 	#ifndef NO_GRAPHICS
-	// In full graphics mode, would stop all audio channels
-	// This would require interfacing with the audio subsystem:
-	// if (audio_context) {
-	//     stopAllAudioChannels(audio_context);
-	// }
+	tagStopAllSounds(app_context);
+	#else
+	(void)app_context;
 	#endif
-
-	// No stack operations required - opcode has no parameters and no return value
-	// This opcode has global effect and does not modify the stack
 }
 
 /**

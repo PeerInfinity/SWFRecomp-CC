@@ -127,8 +127,12 @@ namespace SWFRecomp
 								 current_morph_end_vertex(0),
 								 current_morph_end_color(0),
 								 jpeg_tables(nullptr),
+								 current_sound_byte(0),
+								 current_sound_id(0),
+								 has_streaming_sound(false),
 							 shape_has_alpha(false),
-							 shape_is_v4(false)
+							 shape_is_v4(false),
+							 shape_is_morph2(false)
 	{
 		// Configure reusable struct records
 		//
@@ -568,6 +572,11 @@ namespace SWFRecomp
 						  << "float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4] =" << endl
 						  << "{" << endl
 						  << (current_morph_end_color ? morph_end_color_data.str() : "\t0\n")
+						  << "};" << endl
+						  << endl
+						  << "u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "] =" << endl
+						  << "{" << endl
+						  << (current_sound_byte ? sound_data.str() : "\t0\n")
 						  << "};";
 
 		context.out_draws_header << endl
@@ -581,7 +590,8 @@ namespace SWFRecomp
 								 << "extern u32 text_data[" << to_string(current_text ? current_text : 1) << "];" << endl
 								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl
 								 << "extern float morph_end_shape_data[" << to_string(current_morph_end_vertex ? current_morph_end_vertex : 1) << "][2];" << endl
-								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl;
+								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl
+								 << "extern u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "];" << endl;
 
 		// Emit sprite forward declarations (frame_func arrays)
 		if (!sprite_forward_decls.str().empty())
@@ -1171,11 +1181,173 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_DEFINE_SOUND:
+			{
+				// DefineSound: SoundId(UI16), Flags(UI8), SampleCount(UI32), SoundData(bytes)
+				tag.setFieldCount(3);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.configureNextField(SWF_FIELD_UI8);
+				tag.configureNextField(SWF_FIELD_UI32, 32);
+				tag.parseFields(cur_pos);
+
+				u16 sound_id = (u16) tag.fields[0].value;
+				u8 flags = (u8) tag.fields[1].value;
+				u32 sample_count = (u32) tag.fields[2].value;
+
+				u8 format = (flags >> 4) & 0x0F;
+				u8 rate = (flags >> 2) & 0x03;
+				u8 sample_size = (flags >> 1) & 0x01;
+				u8 stereo = flags & 0x01;
+
+				size_t sound_header_size = 2 + 1 + 4;
+				size_t data_size = tag.length - sound_header_size;
+				size_t data_offset = current_sound_byte;
+
+				for (size_t i = 0; i < data_size; ++i)
+				{
+					sound_data << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+							   << (u32)(u8)cur_pos[i] << "," << std::dec << endl;
+				}
+				current_sound_byte += data_size;
+				cur_pos += data_size;
+
+				tag_init << endl << "\ttagDefineSound(app_context, "
+						 << to_string(sound_id) << ", "
+						 << to_string(format) << ", "
+						 << to_string(rate) << ", "
+						 << to_string(sample_size) << ", "
+						 << to_string(stereo) << ", "
+						 << to_string(sample_count) << ", "
+						 << "sound_data + " << to_string(data_offset) << ", "
+						 << to_string(data_size) << ");";
+
+				break;
+			}
+
+			case SWF_TAG_START_SOUND:
+			{
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+
+				u16 sound_id = (u16) tag.fields[0].value;
+
+				tag.clearFields();
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI8);
+				tag.parseFields(cur_pos);
+
+				u8 si_flags = (u8) tag.fields[0].value;
+				bool sync_stop = (si_flags & 0x01) != 0;
+				bool has_in_point = (si_flags & 0x04) != 0;
+				bool has_out_point = (si_flags & 0x08) != 0;
+				bool has_loops = (si_flags & 0x10) != 0;
+				bool has_envelope = (si_flags & 0x20) != 0;
+
+				u32 in_point = 0, out_point = 0, loop_count = 0;
+
+				if (has_in_point)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI32, 32);
+					tag.parseFields(cur_pos);
+					in_point = (u32) tag.fields[0].value;
+				}
+				if (has_out_point)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI32, 32);
+					tag.parseFields(cur_pos);
+					out_point = (u32) tag.fields[0].value;
+				}
+				if (has_loops)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+					loop_count = (u32)(u16) tag.fields[0].value;
+				}
+				if (has_envelope)
+				{
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI8);
+					tag.parseFields(cur_pos);
+					u8 env_count = (u8) tag.fields[0].value;
+					cur_pos += env_count * 8;
+				}
+
+				context.tag_main << "\t" << "tagStartSound(app_context, "
+								 << to_string(sound_id) << ", "
+								 << (sync_stop ? "1" : "0") << ", "
+								 << to_string(loop_count) << ", "
+								 << to_string(in_point) << ", "
+								 << to_string(out_point) << ");" << endl;
+
+				break;
+			}
+
+			case SWF_TAG_SOUND_STREAM_HEAD:
+			case SWF_TAG_SOUND_STREAM_HEAD_2:
+			{
+				tag.setFieldCount(3);
+				tag.configureNextField(SWF_FIELD_UI8);
+				tag.configureNextField(SWF_FIELD_UI8);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+
+				u8 stream_flags = (u8) tag.fields[1].value;
+				u16 avg_sample_count = (u16) tag.fields[2].value;
+
+				u8 format = (stream_flags >> 4) & 0x0F;
+				u8 rate = (stream_flags >> 2) & 0x03;
+				u8 sample_size = (stream_flags >> 1) & 0x01;
+				u8 stereo_flag = stream_flags & 0x01;
+
+				if (format == 2 && tag.length > 4)
+					cur_pos += 2;
+
+				has_streaming_sound = true;
+
+				tag_init << endl << "\ttagSoundStreamHead(app_context, "
+						 << to_string(format) << ", "
+						 << to_string(rate) << ", "
+						 << to_string(sample_size) << ", "
+						 << to_string(stereo_flag) << ", "
+						 << to_string(avg_sample_count) << ");";
+
+				break;
+			}
+
+			case SWF_TAG_SOUND_STREAM_BLOCK:
+			{
+				size_t data_size = tag.length;
+				size_t data_offset = current_sound_byte;
+
+				for (size_t i = 0; i < data_size; ++i)
+				{
+					sound_data << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+							   << (u32)(u8)cur_pos[i] << "," << std::dec << endl;
+				}
+				current_sound_byte += data_size;
+				cur_pos += data_size;
+
+				context.tag_main << "\t" << "tagSoundStreamBlock(app_context, "
+								 << "sound_data + " << to_string(data_offset) << ", "
+								 << to_string(data_size) << ");" << endl;
+
+				break;
+			}
+
 			case SWF_TAG_DEFINE_SHAPE:
 			case SWF_TAG_DEFINE_SHAPE_2:
 			case SWF_TAG_DEFINE_SHAPE_3:
 			case SWF_TAG_DEFINE_SHAPE_4:
 			case SWF_TAG_DEFINE_MORPH_SHAPE:
+			case SWF_TAG_DEFINE_MORPH_SHAPE_2:
 			{
 				interpretShape(context, tag);
 
@@ -1830,13 +2002,154 @@ namespace SWFRecomp
 				break;
 			}
 			
+			case SWF_TAG_DO_INIT_ACTION:
+			{
+				// SpriteId (UI16) — identifies which sprite this init action belongs to
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+				// u16 sprite_id = (u16) tag.fields[0].value; // Not needed for emission
+
+				std::string func_name = "script_" + to_string(next_script_i);
+
+				context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
+
+				ofstream out_script(context.output_scripts_folder + func_name + ".c", ios_base::out);
+				out_script << "#include <recomp.h>" << endl
+						   << "#include <setjmp.h>" << endl
+						   << "#include \"script_decls.h\"" << endl << endl
+						   << "void " << func_name << "(SWFAppContext* app_context)" << endl
+						   << "{" << endl;
+				out_script << "\t" << "char str_buffer[17];" << endl << endl;
+
+				next_script_i += 1;
+
+				action.parseActions(context, cur_pos, out_script);
+
+				out_script << "}";
+
+				// Emit call in tagInit (runs once at startup)
+				tag_init << endl << "\t" << func_name << "(app_context);";
+
+				// Prevent ShowFrame from also calling this script
+				last_queued_script = next_script_i;
+
+				break;
+			}
+
 			case SWF_TAG_DEFINE_FONT_INFO:
 			{
 				cur_pos += tag.length;
-				
+
 				break;
 			}
-			
+
+			case SWF_TAG_PLACE_OBJECT:
+			{
+				// PlaceObject (tag 4): CharacterId(UI16), Depth(UI16), Matrix, optional CXFORM (RGB only)
+				char* tag_end = cur_pos + tag.length;
+
+				tag.setFieldCount(2);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.configureNextField(SWF_FIELD_UI16);
+				tag.parseFields(cur_pos);
+
+				u16 char_id = (u16) tag.fields[0].value;
+				u16 depth = (u16) tag.fields[1].value;
+
+				size_t transform_id = current_transform;
+				MATRIX matrix;
+				parseMatrix(matrix);
+				recompileMatrix(matrix, transform_data);
+				current_transform += 1;
+
+				u32 cxform_id = 0;
+
+				// Optional CXFORM (RGB only — 3 channels, no alpha)
+				if (cur_pos < tag_end)
+				{
+					u32 cur_byte_bits_left = 8;
+					SWFTag cxform_tag;
+
+					cxform_tag.clearFields();
+					cxform_tag.setFieldCount(3);
+					cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+					cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+					cxform_tag.configureNextField(SWF_FIELD_UB, 4);
+					cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+					bool has_add = cxform_tag.fields[0].value & 1;
+					bool has_mult = cxform_tag.fields[1].value & 1;
+					u32 nbits = (u32) cxform_tag.fields[2].value;
+
+					// Defaults: multiply = 256 (1.0), add = 0; alpha = identity
+					s32 mult_r = 256, mult_g = 256, mult_b = 256, mult_a = 256;
+					s32 add_r = 0, add_g = 0, add_b = 0, add_a = 0;
+
+					if (has_mult)
+					{
+						cxform_tag.clearFields();
+						cxform_tag.setFieldCount(3);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+						mult_r = (s32) cxform_tag.fields[0].value;
+						mult_g = (s32) cxform_tag.fields[1].value;
+						mult_b = (s32) cxform_tag.fields[2].value;
+					}
+
+					if (has_add)
+					{
+						cxform_tag.clearFields();
+						cxform_tag.setFieldCount(3);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+						cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+						add_r = (s32) cxform_tag.fields[0].value;
+						add_g = (s32) cxform_tag.fields[1].value;
+						add_b = (s32) cxform_tag.fields[2].value;
+					}
+
+					if (cur_byte_bits_left != 8)
+					{
+						cur_pos += 1;
+					}
+
+					cxform_id = (u32) current_cxform;
+
+					cxform_data << "\t" << to_string(mult_r) << "/256.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << to_string(mult_g) << "/256.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << to_string(mult_b) << "/256.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << "0.0f," << endl
+								<< "\t" << to_string(mult_a) << "/256.0f," << endl
+								<< "\t" << to_string(add_r) << "/255.0f," << endl
+								<< "\t" << to_string(add_g) << "/255.0f," << endl
+								<< "\t" << to_string(add_b) << "/255.0f," << endl
+								<< "\t" << to_string(add_a) << "/255.0f," << endl;
+
+					current_cxform += 1;
+				}
+
+				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", 0);" << endl;
+
+				break;
+			}
+
 			case SWF_TAG_PLACE_OBJECT_2:
 			{
 				tag.setFieldCount(2);
@@ -1848,9 +2161,7 @@ namespace SWFRecomp
 
 				u8 flags = (u8) tag.fields[0].value;
 				u16 depth = (u16) tag.fields[1].value;
-				
-				// TODO: SWF 5 and up uses PlaceFlagHasClipActions
-				
+
 				bool has_clip_actions = (flags & 0b10000000) != 0;
 				bool has_clip_depth = (flags & 0b01000000) != 0;
 				bool has_name = (flags & 0b00100000) != 0;
@@ -2012,9 +2323,126 @@ namespace SWFRecomp
 					clip_depth_val = (u16) tag.fields[0].value;
 				}
 
+				// Parse clip actions if present
+				std::string clip_actions_var;
+				size_t clip_action_count = 0;
+
+				if (has_clip_actions)
+				{
+					// CLIPACTIONS: Reserved(UI16), AllEventFlags(UI16 or UI32)
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+					// Reserved = 0, ignore
+
+					u32 all_event_flags;
+					if (header.version >= 6)
+					{
+						tag.clearFields();
+						tag.setFieldCount(1);
+						tag.configureNextField(SWF_FIELD_UI32, 32);
+						tag.parseFields(cur_pos);
+						all_event_flags = (u32) tag.fields[0].value;
+					}
+					else
+					{
+						tag.clearFields();
+						tag.setFieldCount(1);
+						tag.configureNextField(SWF_FIELD_UI16);
+						tag.parseFields(cur_pos);
+						all_event_flags = (u32)(u16) tag.fields[0].value;
+					}
+
+					// Parse CLIPACTIONRECORD entries
+					struct ClipActionEntry { u32 event_flags; std::string func_name; };
+					std::vector<ClipActionEntry> clip_entries;
+
+					while (true)
+					{
+						// EventFlags (UI16 or UI32)
+						u32 event_flags;
+						if (header.version >= 6)
+						{
+							tag.clearFields();
+							tag.setFieldCount(1);
+							tag.configureNextField(SWF_FIELD_UI32, 32);
+							tag.parseFields(cur_pos);
+							event_flags = (u32) tag.fields[0].value;
+						}
+						else
+						{
+							tag.clearFields();
+							tag.setFieldCount(1);
+							tag.configureNextField(SWF_FIELD_UI16);
+							tag.parseFields(cur_pos);
+							event_flags = (u32)(u16) tag.fields[0].value;
+						}
+
+						if (event_flags == 0)
+							break; // ClipActionEndFlag
+
+						// ActionRecordSize (UI32)
+						tag.clearFields();
+						tag.setFieldCount(1);
+						tag.configureNextField(SWF_FIELD_UI32, 32);
+						tag.parseFields(cur_pos);
+						u32 action_size = (u32) tag.fields[0].value;
+
+						// Optional KeyCode (UI8) if ClipEventKeyPress is set
+						if (event_flags & 0x20000) // ClipEventKeyPress
+						{
+							cur_pos += 1; // skip KeyCode
+							action_size -= 1;
+						}
+
+						// Generate script function for this clip action
+						std::string func_name = "clip_action_" + to_string(next_script_i);
+						context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
+
+						ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						out_script << "#include <recomp.h>" << endl
+								   << "#include <setjmp.h>" << endl
+								   << "#include \"script_decls.h\"" << endl << endl
+								   << "void " << func_name << "(SWFAppContext* app_context)" << endl
+								   << "{" << endl;
+						out_script << "\t" << "char str_buffer[17];" << endl << endl;
+						next_script_i += 1;
+
+						action.parseActions(context, cur_pos, out_script);
+						out_script << "}";
+
+						clip_entries.push_back({ event_flags, func_name });
+					}
+
+					// Clip action scripts are called via dispatch, not inline
+					last_queued_script = next_script_i;
+
+					if (!clip_entries.empty())
+					{
+						clip_actions_var = "clip_actions_" + to_string(num_finished_tags);
+
+						sprite_forward_decls << "extern ClipAction " << clip_actions_var << "[];" << endl;
+						sprite_definitions << "ClipAction " << clip_actions_var << "[] =" << endl
+										   << "{" << endl;
+						for (auto& ca : clip_entries)
+						{
+							sprite_definitions << "\t" << "{ 0x" << std::hex << ca.event_flags << std::dec
+											   << ", " << ca.func_name << " }," << endl;
+						}
+						sprite_definitions << "};" << endl << endl;
+
+						clip_action_count = clip_entries.size();
+					}
+				}
+
 				if (has_ratio)
 				{
 					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ");" << endl;
+				}
+				else if (clip_action_count > 0)
+				{
+					context.tag_main << "\t" << "tagPlaceObject2WithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
 				}
 				else
 				{
@@ -2174,7 +2602,115 @@ namespace SWFRecomp
 							break;
 						}
 
-						case SWF_TAG_PLACE_OBJECT_2:
+						case SWF_TAG_PLACE_OBJECT:
+						{
+							// PlaceObject (tag 4) inside sprite: CharacterId(UI16), Depth(UI16), Matrix, optional CXFORM (RGB only)
+							char* sub_tag_end = cur_pos + sub_tag.length;
+
+							sub_tag.setFieldCount(2);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.parseFields(cur_pos);
+
+							u16 char_id = (u16) sub_tag.fields[0].value;
+							u16 depth = (u16) sub_tag.fields[1].value;
+
+							size_t transform_id = current_transform;
+							MATRIX matrix;
+							parseMatrix(matrix);
+							recompileMatrix(matrix, transform_data);
+							current_transform += 1;
+
+							u32 cxform_id = 0;
+
+							if (cur_pos < sub_tag_end)
+							{
+								u32 cur_byte_bits_left = 8;
+								SWFTag cxform_tag;
+
+								cxform_tag.clearFields();
+								cxform_tag.setFieldCount(3);
+								cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+								cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+								cxform_tag.configureNextField(SWF_FIELD_UB, 4);
+								cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+								bool has_add = cxform_tag.fields[0].value & 1;
+								bool has_mult = cxform_tag.fields[1].value & 1;
+								u32 nbits = (u32) cxform_tag.fields[2].value;
+
+								s32 mult_r = 256, mult_g = 256, mult_b = 256, mult_a = 256;
+								s32 add_r = 0, add_g = 0, add_b = 0, add_a = 0;
+
+								if (has_mult)
+								{
+									cxform_tag.clearFields();
+									cxform_tag.setFieldCount(3);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+									mult_r = (s32) cxform_tag.fields[0].value;
+									mult_g = (s32) cxform_tag.fields[1].value;
+									mult_b = (s32) cxform_tag.fields[2].value;
+								}
+
+								if (has_add)
+								{
+									cxform_tag.clearFields();
+									cxform_tag.setFieldCount(3);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+									cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+									add_r = (s32) cxform_tag.fields[0].value;
+									add_g = (s32) cxform_tag.fields[1].value;
+									add_b = (s32) cxform_tag.fields[2].value;
+								}
+
+								if (cur_byte_bits_left != 8)
+								{
+									cur_pos += 1;
+								}
+
+								cxform_id = (u32) current_cxform;
+
+								cxform_data << "\t" << to_string(mult_r) << "/256.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << to_string(mult_g) << "/256.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << to_string(mult_b) << "/256.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << "0.0f," << endl
+											<< "\t" << to_string(mult_a) << "/256.0f," << endl
+											<< "\t" << to_string(add_r) << "/255.0f," << endl
+											<< "\t" << to_string(add_g) << "/255.0f," << endl
+											<< "\t" << to_string(add_b) << "/255.0f," << endl
+											<< "\t" << to_string(add_a) << "/255.0f," << endl;
+
+								current_cxform += 1;
+							}
+
+							sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
+											   << to_string(depth) << ", "
+											   << to_string(char_id) << ", "
+											   << to_string(transform_id) << ", "
+											   << to_string(cxform_id) << ", 0);" << endl;
+
+							break;
+						}
+
+					case SWF_TAG_PLACE_OBJECT_2:
 						{
 							sub_tag.setFieldCount(2);
 							sub_tag.configureNextField(SWF_FIELD_UI8);
@@ -2326,6 +2862,111 @@ namespace SWFRecomp
 								clip_depth_val = (u16) sub_tag.fields[0].value;
 							}
 
+							// Parse clip actions if present
+							std::string clip_actions_var;
+							size_t clip_action_count = 0;
+
+							if (has_clip_actions)
+							{
+								sub_tag.clearFields();
+								sub_tag.setFieldCount(1);
+								sub_tag.configureNextField(SWF_FIELD_UI16);
+								sub_tag.parseFields(cur_pos);
+
+								u32 all_event_flags;
+								if (header.version >= 6)
+								{
+									sub_tag.clearFields();
+									sub_tag.setFieldCount(1);
+									sub_tag.configureNextField(SWF_FIELD_UI32, 32);
+									sub_tag.parseFields(cur_pos);
+									all_event_flags = (u32) sub_tag.fields[0].value;
+								}
+								else
+								{
+									sub_tag.clearFields();
+									sub_tag.setFieldCount(1);
+									sub_tag.configureNextField(SWF_FIELD_UI16);
+									sub_tag.parseFields(cur_pos);
+									all_event_flags = (u32)(u16) sub_tag.fields[0].value;
+								}
+
+								struct ClipActionEntry { u32 event_flags; std::string func_name; };
+								std::vector<ClipActionEntry> clip_entries;
+
+								while (true)
+								{
+									u32 event_flags;
+									if (header.version >= 6)
+									{
+										sub_tag.clearFields();
+										sub_tag.setFieldCount(1);
+										sub_tag.configureNextField(SWF_FIELD_UI32, 32);
+										sub_tag.parseFields(cur_pos);
+										event_flags = (u32) sub_tag.fields[0].value;
+									}
+									else
+									{
+										sub_tag.clearFields();
+										sub_tag.setFieldCount(1);
+										sub_tag.configureNextField(SWF_FIELD_UI16);
+										sub_tag.parseFields(cur_pos);
+										event_flags = (u32)(u16) sub_tag.fields[0].value;
+									}
+
+									if (event_flags == 0)
+										break;
+
+									sub_tag.clearFields();
+									sub_tag.setFieldCount(1);
+									sub_tag.configureNextField(SWF_FIELD_UI32, 32);
+									sub_tag.parseFields(cur_pos);
+									u32 action_size = (u32) sub_tag.fields[0].value;
+
+									if (event_flags & 0x20000)
+									{
+										cur_pos += 1;
+										action_size -= 1;
+									}
+
+									std::string func_name = "clip_action_" + to_string(next_script_i);
+									context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
+
+									ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+									out_script << "#include <recomp.h>" << endl
+											   << "#include <setjmp.h>" << endl
+											   << "#include \"script_decls.h\"" << endl << endl
+											   << "void " << func_name << "(SWFAppContext* app_context)" << endl
+											   << "{" << endl;
+									out_script << "\t" << "char str_buffer[17];" << endl << endl;
+									next_script_i += 1;
+
+									action.parseActions(context, cur_pos, out_script);
+									out_script << "}";
+
+									clip_entries.push_back({ event_flags, func_name });
+								}
+
+								last_queued_script = next_script_i;
+
+								if (!clip_entries.empty())
+								{
+									clip_actions_var = "clip_actions_" + to_string(num_finished_tags);
+
+									sprite_forward_decls << "extern ClipAction " << clip_actions_var << "[];" << endl;
+									sprite_definitions << "ClipAction " << clip_actions_var << "[] =" << endl
+													   << "{" << endl;
+									for (auto& ca : clip_entries)
+									{
+										sprite_definitions << "\t" << "{ 0x" << std::hex << ca.event_flags << std::dec
+														   << ", " << ca.func_name << " }," << endl;
+									}
+									sprite_definitions << "};" << endl << endl;
+
+									clip_action_count = clip_entries.size();
+								}
+							}
+
 							if (has_ratio)
 							{
 								sprite_definitions << "\t" << "tagPlaceObject2Ratio(app_context, "
@@ -2335,6 +2976,17 @@ namespace SWFRecomp
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
 												   << to_string(ratio_val) << ");" << endl;
+							}
+							else if (clip_action_count > 0)
+							{
+								sprite_definitions << "\t" << "tagPlaceObject2WithClipActions(app_context, "
+												   << to_string(depth) << ", "
+												   << to_string(char_id) << ", "
+												   << to_string(transform_id) << ", "
+												   << to_string(cxform_id) << ", "
+												   << to_string(clip_depth_val) << ", "
+												   << clip_actions_var << ", "
+												   << to_string(clip_action_count) << ");" << endl;
 							}
 							else
 							{
@@ -2792,6 +3444,29 @@ namespace SWFRecomp
 		int diff = end - start;
 		return (u8) (start + t*diff);
 	}
+
+	// sRGB <-> linear conversion for linearRGB gradient interpolation mode
+	static float srgbToLinear(float c)
+	{
+		if (c <= 0.04045f)
+			return c / 12.92f;
+		return powf((c + 0.055f) / 1.055f, 2.4f);
+	}
+
+	static float linearToSrgb(float c)
+	{
+		if (c <= 0.0031308f)
+			return c * 12.92f;
+		return 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
+	}
+
+	static u8 linearRgbLerp(u8 start, u8 end, float t)
+	{
+		float s = srgbToLinear(start / 255.0f);
+		float e = srgbToLinear(end / 255.0f);
+		float result = s + t * (e - s);
+		return (u8)(linearToSrgb(result) * 255.0f + 0.5f);
+	}
 	
 	void SWF::recompileMatrix(MATRIX matrix, std::stringstream& out)
 	{
@@ -2887,12 +3562,12 @@ namespace SWFRecomp
 					
 					fill_data.parseFields(cur_pos);
 					
-					// TODO: implement other spread and interpolation modes
-					
 					fill_styles[i].gradient.spread_mode = (u8) ((fill_data.fields[0].value & 0b11000000) >> 6);
 					fill_styles[i].gradient.interpolation_mode = (u8) ((fill_data.fields[0].value & 0b00110000) >> 4);
 					fill_styles[i].gradient.num_grads = (u8) (fill_data.fields[0].value & 0b00001111);
-					
+
+					bool use_linear_rgb = (fill_styles[i].gradient.interpolation_mode == 1);
+
 					for (int j = 0; j < fill_styles[i].gradient.num_grads; ++j)
 					{
 						fill_data.clearFields();
@@ -2936,9 +3611,9 @@ namespace SWFRecomp
 							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
 							float t = (ratio - last_grad.ratio)/ratio_diff;
 
-							u8 r = rgbLerp(last_grad.r, grad.r, t);
-							u8 g = rgbLerp(last_grad.g, grad.g, t);
-							u8 b = rgbLerp(last_grad.b, grad.b, t);
+							u8 r = use_linear_rgb ? linearRgbLerp(last_grad.r, grad.r, t) : rgbLerp(last_grad.r, grad.r, t);
+							u8 g = use_linear_rgb ? linearRgbLerp(last_grad.g, grad.g, t) : rgbLerp(last_grad.g, grad.g, t);
+							u8 b = use_linear_rgb ? linearRgbLerp(last_grad.b, grad.b, t) : rgbLerp(last_grad.b, grad.b, t);
 							u8 a = rgbLerp(last_grad.a, grad.a, t);
 
 							gradient_data << "\t" << "{ "
@@ -2954,9 +3629,9 @@ namespace SWFRecomp
 							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
 							float t = (255 - last_grad.ratio)/ratio_diff;
 
-							u8 r = rgbLerp(last_grad.r, grad.r, t);
-							u8 g = rgbLerp(last_grad.g, grad.g, t);
-							u8 b = rgbLerp(last_grad.b, grad.b, t);
+							u8 r = use_linear_rgb ? linearRgbLerp(last_grad.r, grad.r, t) : rgbLerp(last_grad.r, grad.r, t);
+							u8 g = use_linear_rgb ? linearRgbLerp(last_grad.g, grad.g, t) : rgbLerp(last_grad.g, grad.g, t);
+							u8 b = use_linear_rgb ? linearRgbLerp(last_grad.b, grad.b, t) : rgbLerp(last_grad.b, grad.b, t);
 							u8 a = rgbLerp(last_grad.a, grad.a, t);
 
 							gradient_data << "\t" << "{ "
@@ -2967,7 +3642,7 @@ namespace SWFRecomp
 										  << endl;
 						}
 					}
-					
+
 					fill_styles[i].index = current_gradient;
 
 					// Parse focal point for FOCALGRADIENT (fill type 0x13)
@@ -3385,19 +4060,105 @@ namespace SWFRecomp
 
 			line_styles[i].width = (u16) line_data.fields[0].value;
 
-			// Skip EndWidth (UI16 = 2 bytes)
-			cur_pos += 2;
+			// EndWidth (UI16)
+			line_data.clearFields();
+			line_data.setFieldCount(1);
+			line_data.configureNextField(SWF_FIELD_UI16, 16);
+			line_data.parseFields(cur_pos);
+			// EndWidth parsed and ignored
 
-			// StartColor (RGBA)
-			RGBA.parseFields(cur_pos);
+			if (shape_is_morph2)
+			{
+				// MorphLineStyle2: caps, joins, flags
+				// StartCapStyle(UB2), JoinStyle(UB2), HasFillFlag(UB1),
+				// NoHScaleFlag(UB1), NoVScaleFlag(UB1), PixelHintingFlag(UB1)
+				line_data.clearFields();
+				line_data.setFieldCount(1);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.parseFields(cur_pos);
 
-			line_styles[i].r = (u8) RGBA.fields[0].value;
-			line_styles[i].g = (u8) RGBA.fields[1].value;
-			line_styles[i].b = (u8) RGBA.fields[2].value;
-			line_styles[i].a = (u8) RGBA.fields[3].value;
+				u8 flags1 = (u8) line_data.fields[0].value;
+				u8 join_style = (flags1 >> 4) & 0x03;
+				bool has_fill = (flags1 >> 3) & 0x01;
 
-			// Skip EndColor (RGBA = 4 bytes)
-			cur_pos += 4;
+				// Reserved(UB5), NoClose(UB1), EndCapStyle(UB2)
+				line_data.clearFields();
+				line_data.setFieldCount(1);
+				line_data.configureNextField(SWF_FIELD_UI8, 8);
+				line_data.parseFields(cur_pos);
+
+				// MiterLimitFactor: FIXED8 (only if JoinStyle == 2)
+				if (join_style == 2)
+				{
+					line_data.clearFields();
+					line_data.setFieldCount(1);
+					line_data.configureNextField(SWF_FIELD_UI16, 16);
+					line_data.parseFields(cur_pos);
+				}
+
+				if (has_fill)
+				{
+					// StartFillType — parse as a single fill style (reuse parseFillStyles for 1 entry)
+					// For simplicity, skip it — extract solid color equivalent
+					// FillStyleType (UI8) + color/gradient/bitmap data
+					line_data.clearFields();
+					line_data.setFieldCount(1);
+					line_data.configureNextField(SWF_FIELD_UI8, 8);
+					line_data.parseFields(cur_pos);
+
+					u8 fill_type = (u8) line_data.fields[0].value;
+					if (fill_type == 0x00)
+					{
+						// Solid fill: StartColor (RGBA)
+						RGBA.parseFields(cur_pos);
+						line_styles[i].r = (u8) RGBA.fields[0].value;
+						line_styles[i].g = (u8) RGBA.fields[1].value;
+						line_styles[i].b = (u8) RGBA.fields[2].value;
+						line_styles[i].a = (u8) RGBA.fields[3].value;
+
+						// EndFillType: same structure — skip EndColor (RGBA)
+						line_data.clearFields();
+						line_data.setFieldCount(1);
+						line_data.configureNextField(SWF_FIELD_UI8, 8);
+						line_data.parseFields(cur_pos);
+						cur_pos += 4; // skip EndColor RGBA
+					}
+					else
+					{
+						// Non-solid fill in morph line — not commonly used, fall back to black
+						line_styles[i].r = 0;
+						line_styles[i].g = 0;
+						line_styles[i].b = 0;
+						line_styles[i].a = 255;
+						// Skip remaining fill data — advance to next line style is imprecise
+						// This should be handled more thoroughly if needed
+					}
+				}
+				else
+				{
+					// StartColor (RGBA)
+					RGBA.parseFields(cur_pos);
+					line_styles[i].r = (u8) RGBA.fields[0].value;
+					line_styles[i].g = (u8) RGBA.fields[1].value;
+					line_styles[i].b = (u8) RGBA.fields[2].value;
+					line_styles[i].a = (u8) RGBA.fields[3].value;
+
+					// EndColor (RGBA) — skip
+					cur_pos += 4;
+				}
+			}
+			else
+			{
+				// MorphLineStyle1: StartColor (RGBA)
+				RGBA.parseFields(cur_pos);
+				line_styles[i].r = (u8) RGBA.fields[0].value;
+				line_styles[i].g = (u8) RGBA.fields[1].value;
+				line_styles[i].b = (u8) RGBA.fields[2].value;
+				line_styles[i].a = (u8) RGBA.fields[3].value;
+
+				// Skip EndColor (RGBA = 4 bytes)
+				cur_pos += 4;
+			}
 
 			line_styles[i].index = current_color;
 
@@ -3416,9 +4177,11 @@ namespace SWFRecomp
 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
 	{
 		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2 || shape_tag.code == SWF_TAG_DEFINE_FONT_3);
-		bool is_morph = (shape_tag.code == SWF_TAG_DEFINE_MORPH_SHAPE);
+		bool is_morph = (shape_tag.code == SWF_TAG_DEFINE_MORPH_SHAPE || shape_tag.code == SWF_TAG_DEFINE_MORPH_SHAPE_2);
+		bool is_morph2 = (shape_tag.code == SWF_TAG_DEFINE_MORPH_SHAPE_2);
 		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || shape_tag.code == SWF_TAG_DEFINE_SHAPE_4 || is_morph);
 		shape_is_v4 = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
+		shape_is_morph2 = is_morph2;
 
 		switch (shape_tag.code)
 		{
@@ -3427,6 +4190,7 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_SHAPE_3:
 			case SWF_TAG_DEFINE_SHAPE_4:
 			case SWF_TAG_DEFINE_MORPH_SHAPE:
+			case SWF_TAG_DEFINE_MORPH_SHAPE_2:
 			case SWF_TAG_DEFINE_FONT:
 			case SWF_TAG_DEFINE_FONT_2:
 			case SWF_TAG_DEFINE_FONT_3:
@@ -3510,6 +4274,37 @@ namespace SWFRecomp
 						shape_tag.parseFields(cur_pos);
 
 						// Offset parsed and ignored (we skip EndEdges using tag length)
+
+						if (is_morph2)
+						{
+							// DefineMorphShape2 extra fields:
+							// StartEdgeBounds RECT (parse and ignore)
+							shape_tag.clearFields();
+							shape_tag.setFieldCount(5);
+							shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.parseFields(cur_pos);
+
+							// EndEdgeBounds RECT (parse and ignore)
+							shape_tag.clearFields();
+							shape_tag.setFieldCount(5);
+							shape_tag.configureNextField(SWF_FIELD_UB, 5, true);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.configureNextField(SWF_FIELD_SB, 0);
+							shape_tag.parseFields(cur_pos);
+
+							// Flags byte: Reserved(UB6) + UsesNonScalingStrokes(UB1) + UsesScalingStrokes(UB1)
+							shape_tag.clearFields();
+							shape_tag.setFieldCount(1);
+							shape_tag.configureNextField(SWF_FIELD_UI8, 8);
+							shape_tag.parseFields(cur_pos);
+							// Flags parsed and ignored
+						}
 					}
 
 					// FILLSTYLEARRAY
@@ -4341,12 +5136,20 @@ namespace SWFRecomp
 								float x_f = (float) t.verts[j].x;
 								float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
 
+								FillStyle& fs = all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1];
+								// Encode spread_mode in bits 8-9 of the style type for gradients
+								u32 style_type_packed = (u32) fs.type;
+								if (fs.type == FILL_GRAD_LINEAR || fs.type == FILL_GRAD_RADIAL || fs.type == FILL_GRAD_FOCAL)
+								{
+									style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
+								}
+
 								shape_data << "\t" << "{ "
 										   << std::hex << std::uppercase
 										   << "0x" << VAL(u32, &x_f) << ", "
 										   << "0x" << VAL(u32, &y_f) << ", "
-										   << "0x" << (u32) all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1].type << ", "
-										   << "0x" << (u32) all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1].index
+										   << "0x" << style_type_packed << ", "
+										   << "0x" << (u32) fs.index
 										   << " }," << endl;
 
 								if (is_morph && t.verts[j].morph_index >= 0 && (size_t)t.verts[j].morph_index < morph_end_positions.size())

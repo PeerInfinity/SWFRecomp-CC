@@ -8,6 +8,7 @@
 #include <renderer.h>
 #include <utils.h>
 #include <heap.h>
+#include <audio/audio.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -130,7 +131,12 @@ void swfStart(SWFAppContext* app_context)
 
 	tagInit(app_context);
 
+	audio_output_init(app_context);
+
 	tagMain(app_context);
+
+	audio_output_shutdown();
+	audio_shutdown(app_context);
 
 	renderer_free(app_context, context);
 
