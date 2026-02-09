@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 288,
     "total_graphics_features": 62,
-    "graphics_features_with_tests": 47
+    "graphics_features_with_tests": 52
   },
   "entries": [
     {
@@ -8713,6 +8713,7 @@
       "description": "Solid color fill (type 0x00)",
       "tests": [
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/blur_filter",
         "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
@@ -8725,7 +8726,10 @@
         "SWFRecomp/tests/graphics/define_morph_shape",
         "SWFRecomp/tests/graphics/define_morph_shape2",
         "SWFRecomp/tests/graphics/define_shape4",
+        "SWFRecomp/tests/graphics/define_sound",
         "SWFRecomp/tests/graphics/define_text2",
+        "SWFRecomp/tests/graphics/drop_shadow_filter",
+        "SWFRecomp/tests/graphics/glow_filter",
         "SWFRecomp/tests/graphics/movieclip_control",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/place_object",
@@ -8839,6 +8843,7 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/blur_filter",
         "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_matrix_filter",
@@ -8851,8 +8856,11 @@
         "SWFRecomp/tests/graphics/define_morph_shape",
         "SWFRecomp/tests/graphics/define_morph_shape2",
         "SWFRecomp/tests/graphics/define_shape4",
+        "SWFRecomp/tests/graphics/define_sound",
         "SWFRecomp/tests/graphics/define_text2",
+        "SWFRecomp/tests/graphics/drop_shadow_filter",
         "SWFRecomp/tests/graphics/focal_radial_gradient",
+        "SWFRecomp/tests/graphics/glow_filter",
         "SWFRecomp/tests/graphics/gradient_spread",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
@@ -9062,7 +9070,10 @@
       "category": "Display List Tags",
       "description": "Object placement with filters/blend (SWF tag 70)",
       "tests": [
+        "SWFRecomp/tests/graphics/blur_filter",
         "SWFRecomp/tests/graphics/color_matrix_filter",
+        "SWFRecomp/tests/graphics/drop_shadow_filter",
+        "SWFRecomp/tests/graphics/glow_filter",
         "SWFRecomp/tests/graphics/place_object3"
       ],
       "fully_implemented": true
@@ -9290,8 +9301,10 @@
       "tag_id": 14,
       "category": "Sound Tags",
       "description": "Event sound definition (SWF tag 14)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_sound"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "START_SOUND",
@@ -9299,8 +9312,10 @@
       "tag_id": 15,
       "category": "Sound Tags",
       "description": "Play/stop event sound (SWF tag 15)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_sound"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOUND_STREAM_HEAD",
@@ -9353,8 +9368,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Drop shadow effect (filter ID 0)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/drop_shadow_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "BLUR_FILTER",
@@ -9362,8 +9379,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Gaussian blur effect (filter ID 1)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/blur_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "GLOW_FILTER",
@@ -9371,8 +9390,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Glow/halo effect (filter ID 2)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/glow_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "BEVEL_FILTER",
