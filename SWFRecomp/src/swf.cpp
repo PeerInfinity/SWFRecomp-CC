@@ -2426,7 +2426,9 @@ namespace SWFRecomp
 			//~ }
 			
 			case SWF_TAG_DEFINE_BUTTON:
+			case SWF_TAG_DEFINE_BUTTON_2:
 			{
+				bool is_button2 = (tag.code == SWF_TAG_DEFINE_BUTTON_2);
 				char* tag_body_start = cur_pos;
 				u32 button_tag_length = tag.length;
 
@@ -2439,8 +2441,23 @@ namespace SWFRecomp
 
 				std::string bp = "button_" + to_string(button_id);
 
+				if (is_button2)
+				{
+					// TrackAsMenu (UI8) — skip for now
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI8);
+					tag.parseFields(cur_pos);
+
+					// ActionOffset (UI16) — skip for now
+					tag.clearFields();
+					tag.setFieldCount(1);
+					tag.configureNextField(SWF_FIELD_UI16);
+					tag.parseFields(cur_pos);
+				}
+
 				// Collect button records by state
-				struct ButtonRecord { u16 char_id; u16 depth; MATRIX matrix; };
+				struct ButtonRecord { u16 char_id; u16 depth; MATRIX matrix; u32 cxform_id; };
 				std::vector<ButtonRecord> up_records, over_records, down_records;
 				int hit_char_id = -1;
 				MATRIX hit_matrix;
@@ -2456,6 +2473,9 @@ namespace SWFRecomp
 					if (flags == 0)
 						break;
 
+					bool has_blend_mode = is_button2 && (flags & 0x20);
+					bool has_filter_list = is_button2 && (flags & 0x10);
+
 					tag.clearFields();
 					tag.setFieldCount(2);
 					tag.configureNextField(SWF_FIELD_UI16); // CharacterId
@@ -2468,7 +2488,142 @@ namespace SWFRecomp
 					MATRIX matrix;
 					parseMatrix(matrix);
 
-					ButtonRecord rec = { char_id, depth, matrix };
+					u32 rec_cxform_id = 0;
+
+					if (is_button2)
+					{
+						// Parse CXFORMWITHALPHA
+						u32 cur_byte_bits_left = 8;
+						SWFTag cxform_tag;
+
+						cxform_tag.clearFields();
+						cxform_tag.setFieldCount(3);
+						cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+						cxform_tag.configureNextField(SWF_FIELD_UB, 1);
+						cxform_tag.configureNextField(SWF_FIELD_UB, 4);
+						cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+						bool has_add = cxform_tag.fields[0].value & 1;
+						bool has_mult = cxform_tag.fields[1].value & 1;
+						u32 nbits = (u32) cxform_tag.fields[2].value;
+
+						s32 mult_r = 256, mult_g = 256, mult_b = 256, mult_a = 256;
+						s32 add_r = 0, add_g = 0, add_b = 0, add_a = 0;
+
+						if (has_mult)
+						{
+							cxform_tag.clearFields();
+							cxform_tag.setFieldCount(4);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+							mult_r = (s32) cxform_tag.fields[0].value;
+							mult_g = (s32) cxform_tag.fields[1].value;
+							mult_b = (s32) cxform_tag.fields[2].value;
+							mult_a = (s32) cxform_tag.fields[3].value;
+						}
+
+						if (has_add)
+						{
+							cxform_tag.clearFields();
+							cxform_tag.setFieldCount(4);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.configureNextField(SWF_FIELD_SB, nbits);
+							cxform_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+
+							add_r = (s32) cxform_tag.fields[0].value;
+							add_g = (s32) cxform_tag.fields[1].value;
+							add_b = (s32) cxform_tag.fields[2].value;
+							add_a = (s32) cxform_tag.fields[3].value;
+						}
+
+						if (cur_byte_bits_left != 8)
+						{
+							cur_pos += 1;
+						}
+
+						// Check if cxform is non-identity
+						bool is_identity = (mult_r == 256 && mult_g == 256 && mult_b == 256 && mult_a == 256 &&
+											add_r == 0 && add_g == 0 && add_b == 0 && add_a == 0);
+
+						if (!is_identity)
+						{
+							rec_cxform_id = (u32) current_cxform;
+
+							cxform_data << "\t" << to_string(mult_r) << "/256.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << to_string(mult_g) << "/256.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << to_string(mult_b) << "/256.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << "0.0f," << endl
+										<< "\t" << to_string(mult_a) << "/256.0f," << endl
+										<< "\t" << to_string(add_r) << "/255.0f," << endl
+										<< "\t" << to_string(add_g) << "/255.0f," << endl
+										<< "\t" << to_string(add_b) << "/255.0f," << endl
+										<< "\t" << to_string(add_a) << "/255.0f," << endl;
+
+							current_cxform += 1;
+						}
+
+						// Skip FilterList if present
+						if (has_filter_list)
+						{
+							u8 num_filters = *(u8*) cur_pos; cur_pos += 1;
+							for (u8 f = 0; f < num_filters; f++)
+							{
+								u8 filter_id = *(u8*) cur_pos; cur_pos += 1;
+								switch (filter_id)
+								{
+									case 0: cur_pos += 23; break; // DropShadowFilter
+									case 1: cur_pos += 9; break;  // BlurFilter
+									case 2: cur_pos += 15; break; // GlowFilter
+									case 3: cur_pos += 27; break; // BevelFilter
+									case 4: // GradientGlowFilter
+									{
+										u8 nc = *(u8*) cur_pos; cur_pos += 1;
+										cur_pos += nc * 5 + 19;
+										break;
+									}
+									case 5: // ConvolutionFilter
+									{
+										u8 mx = *(u8*) cur_pos; cur_pos += 1;
+										u8 my = *(u8*) cur_pos; cur_pos += 1;
+										cur_pos += 8 + mx * my * 4 + 5;
+										break;
+									}
+									case 6: cur_pos += 80; break; // ColorMatrixFilter
+									case 7: // GradientBevelFilter
+									{
+										u8 nc = *(u8*) cur_pos; cur_pos += 1;
+										cur_pos += nc * 5 + 19;
+										break;
+									}
+								}
+							}
+						}
+
+						// Skip BlendMode if present
+						if (has_blend_mode)
+						{
+							cur_pos += 1;
+						}
+					}
+
+					ButtonRecord rec = { char_id, depth, matrix, rec_cxform_id };
 					if (flags & 0x01) up_records.push_back(rec);
 					if (flags & 0x02) over_records.push_back(rec);
 					if (flags & 0x04) down_records.push_back(rec);
@@ -2499,7 +2654,7 @@ namespace SWFRecomp
 										   << to_string(rec.depth) << ", "
 										   << to_string(rec.char_id) << ", "
 										   << to_string(transform_id) << ", "
-										   << "0, 0);" << endl;
+										   << to_string(rec.cxform_id) << ", 0);" << endl;
 					}
 
 					sprite_definitions << "}" << endl << endl;
@@ -2531,7 +2686,7 @@ namespace SWFRecomp
 								 << to_string(hit_char_id >= 0 ? hit_char_id : 0) << ", "
 								 << to_string(hit_transform_id) << ");" << endl;
 
-				// Skip any remaining bytes (ActionRecords)
+				// Skip any remaining bytes (ActionRecords / BUTTONCONDACTIONs)
 				cur_pos = tag_body_start + button_tag_length;
 
 				break;

@@ -586,6 +586,62 @@ class ButtonDefinition:
         SubElement(actions_el, "EndAction")
 
 
+class Button2Definition:
+    """Collects button records for a DefineButton2 tag (tag 34).
+
+    Builds raw binary since DefineButton2 has CXFORMWITHALPHA per record.
+    """
+    def __init__(self, object_id):
+        self.object_id = object_id
+        self.records = []
+
+    def add_record(self, char_id, depth, up=False, over=False, down=False,
+                   hit_test=False, trans_x=0, trans_y=0):
+        """Add a button record mapping a character to one or more button states."""
+        self.records.append({
+            "char_id": char_id,
+            "depth": depth,
+            "up": up,
+            "over": over,
+            "down": down,
+            "hit_test": hit_test,
+            "trans_x": trans_x,
+            "trans_y": trans_y,
+        })
+
+    def build_body(self):
+        """Build the raw DefineButton2 tag body as bytes."""
+        body = bytearray()
+        # ButtonId (UI16 LE)
+        body += struct.pack('<H', self.object_id)
+        # Flags (UI8): TrackAsMenu=0
+        body.append(0x00)
+        # ActionOffset (UI16 LE): 0 = no actions
+        body += struct.pack('<H', 0)
+        # BUTTONRECORD2 entries
+        for rec in self.records:
+            flags = 0
+            if rec["up"]:       flags |= 0x01
+            if rec["over"]:     flags |= 0x02
+            if rec["down"]:     flags |= 0x04
+            if rec["hit_test"]: flags |= 0x08
+            body.append(flags)
+            body += struct.pack('<H', rec["char_id"])
+            body += struct.pack('<H', rec["depth"])
+            # MATRIX (bit-packed)
+            matrix = {"transX": rec["trans_x"], "transY": rec["trans_y"]}
+            body += _build_matrix_bits(matrix)
+            # CXFORMWITHALPHA: identity (HasAdd=0, HasMult=0, Nbits=0) = 6 bits
+            cxform_bw = _BitWriter()
+            cxform_bw.write_bits(0, 1)  # HasAddTerms
+            cxform_bw.write_bits(0, 1)  # HasMultTerms
+            cxform_bw.write_bits(0, 4)  # Nbits
+            body += cxform_bw.to_bytes()
+        # Terminator
+        body.append(0x00)
+        return bytes(body)
+
+
 # ---------------------------------------------------------------------------
 # Main SWF builder
 # ---------------------------------------------------------------------------
@@ -1770,6 +1826,12 @@ class SWFMLBuilder:
         self.tags.append(("DefineButton", button))
         return button
 
+    def define_button2(self, object_id):
+        """Create a button definition (tag 34). Returns a Button2Definition for adding records."""
+        button = Button2Definition(object_id)
+        self.tags.append(("DefineButton2", button))
+        return button
+
     def show_frame(self):
         self._frame_count += 1
         self.tags.append(("ShowFrame", None))
@@ -1965,6 +2027,13 @@ class SWFMLBuilder:
 
             elif tag_type == "DefineButton":
                 tag_data.to_xml(tags_el)
+
+            elif tag_type == "DefineButton2":
+                body = tag_data.build_body()
+                tag_b64 = base64.b64encode(body).decode('ascii')
+                unk = SubElement(tags_el, "UnknownTag", id="0x22")
+                data_el = SubElement(unk, "data")
+                data_el.text = tag_b64
 
             elif tag_type == "PlaceObject2":
                 d = tag_data
