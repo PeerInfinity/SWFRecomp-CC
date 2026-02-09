@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-09T01:44:21Z",
+  "generated": "2026-02-09T03:25:50Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2213,6 +2213,20 @@
       "wasm_file": "define_button.wasm",
       "description": "DefineButton (tag 7) with up-state shape rendered as sprite",
       "swf_version": 5,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/define_button2",
+      "name": "define_button2",
+      "type": "graphics",
+      "path": "examples/graphics/define_button2",
+      "has_swf": true,
+      "wasm_file": "define_button2.wasm",
+      "js_file": "define_button2.js",
+      "description": "DefineButton2 (tag 34) with up/over/down state shapes and hit-test area",
+      "swf_version": 8,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []
