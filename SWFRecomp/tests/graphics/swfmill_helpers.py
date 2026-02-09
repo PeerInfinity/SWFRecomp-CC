@@ -620,8 +620,13 @@ class Button2Definition:
         self.actions = []  # list of (condition, message) tuples
 
     def add_record(self, char_id, depth, up=False, over=False, down=False,
-                   hit_test=False, trans_x=0, trans_y=0):
-        """Add a button record mapping a character to one or more button states."""
+                   hit_test=False, trans_x=0, trans_y=0,
+                   mult_r=256, mult_g=256, mult_b=256, mult_a=256,
+                   add_r=0, add_g=0, add_b=0, add_a=0):
+        """Add a button record mapping a character to one or more button states.
+
+        CXFORMWITHALPHA params: mult_* are 8.8 fixed point (256=1.0), add_* are -255..255.
+        """
         self.records.append({
             "char_id": char_id,
             "depth": depth,
@@ -631,6 +636,8 @@ class Button2Definition:
             "hit_test": hit_test,
             "trans_x": trans_x,
             "trans_y": trans_y,
+            "mult_r": mult_r, "mult_g": mult_g, "mult_b": mult_b, "mult_a": mult_a,
+            "add_r": add_r, "add_g": add_g, "add_b": add_b, "add_a": add_a,
         })
 
     def add_trace_action(self, message, condition=0x0010):
@@ -685,11 +692,27 @@ class Button2Definition:
             # MATRIX (bit-packed)
             matrix = {"transX": rec["trans_x"], "transY": rec["trans_y"]}
             body += _build_matrix_bits(matrix)
-            # CXFORMWITHALPHA: identity (HasAdd=0, HasMult=0, Nbits=0) = 6 bits
+            # CXFORMWITHALPHA
+            mr, mg, mb, ma = rec["mult_r"], rec["mult_g"], rec["mult_b"], rec["mult_a"]
+            ar, ag, ab, aa = rec["add_r"], rec["add_g"], rec["add_b"], rec["add_a"]
+            has_mult = not (mr == 256 and mg == 256 and mb == 256 and ma == 256)
+            has_add = not (ar == 0 and ag == 0 and ab == 0 and aa == 0)
             cxform_bw = _BitWriter()
-            cxform_bw.write_bits(0, 1)  # HasAddTerms
-            cxform_bw.write_bits(0, 1)  # HasMultTerms
-            cxform_bw.write_bits(0, 4)  # Nbits
+            cxform_bw.write_bits(1 if has_add else 0, 1)   # HasAddTerms
+            cxform_bw.write_bits(1 if has_mult else 0, 1)  # HasMultTerms
+            if has_mult or has_add:
+                vals = []
+                if has_mult: vals += [mr, mg, mb, ma]
+                if has_add: vals += [ar, ag, ab, aa]
+                nbits = max(_bits_needed_signed(v) for v in vals)
+                nbits = max(nbits, 1)
+                cxform_bw.write_bits(nbits, 4)
+                if has_mult:
+                    for v in [mr, mg, mb, ma]: cxform_bw.write_sb(v, nbits)
+                if has_add:
+                    for v in [ar, ag, ab, aa]: cxform_bw.write_sb(v, nbits)
+            else:
+                cxform_bw.write_bits(0, 4)  # Nbits=0
             body += cxform_bw.to_bytes()
         # Terminator
         body.append(0x00)
