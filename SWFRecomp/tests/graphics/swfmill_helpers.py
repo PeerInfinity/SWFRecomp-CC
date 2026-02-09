@@ -835,12 +835,17 @@ def _build_define_morph_shape_body(morph_def):
     return bytes(body)
 
 
-def _build_define_font2_body(object_id, glyphs, font_name="TestFont"):
+def _build_define_font2_body(object_id, glyphs, font_name="TestFont",
+                             char_codes=None, advance_widths=None,
+                             ascent=0, descent=0, leading=0):
     """Build the raw tag body for DefineFont2 (tag 48).
 
     object_id: character ID for the font
     glyphs: list of edge-record lists, one per glyph.
     font_name: font name string (ASCII).
+    char_codes: list of UI16 character codes (parallel to glyphs). If None, sequential A/B/C...
+    advance_widths: list of SI16 advance widths (parallel to glyphs). If provided, layout section is emitted.
+    ascent/descent/leading: SI16 font metrics for layout section.
 
     Returns bytes containing the full tag body.
     """
@@ -849,8 +854,10 @@ def _build_define_font2_body(object_id, glyphs, font_name="TestFont"):
     # Build glyph shape binaries
     glyph_binaries = [_build_glyph_shape_binary(g) for g in glyphs]
 
-    # Flags: bit 2 = WideCodes (1), all others 0 (no layout, no wide offsets)
+    # Flags: bit 2 = WideCodes (1)
     flags = 0x04
+    if advance_widths is not None:
+        flags |= 0x80  # HasLayout
     language_code = 0
     font_name_bytes = font_name.encode('ascii')
 
@@ -881,9 +888,27 @@ def _build_define_font2_body(object_id, glyphs, font_name="TestFont"):
         for gb in glyph_binaries:
             body += gb
 
-        # Code table: UI16 per glyph (sequential: 'A', 'B', 'C', ...)
-        for i in range(num_glyphs):
-            body += struct.pack('<H', 65 + i)
+        # Code table: UI16 per glyph
+        if char_codes is not None:
+            for code in char_codes:
+                body += struct.pack('<H', code)
+        else:
+            for i in range(num_glyphs):
+                body += struct.pack('<H', 65 + i)
+
+    # Layout section (if advance_widths provided)
+    if advance_widths is not None and num_glyphs > 0:
+        body += struct.pack('<h', ascent)   # FontAscent (SI16)
+        body += struct.pack('<h', descent)  # FontDescent (SI16)
+        body += struct.pack('<h', leading)  # FontLeading (SI16)
+        # Advance table: SI16 per glyph
+        for adv in advance_widths:
+            body += struct.pack('<h', adv)
+        # Bounds table: one RECT per glyph (empty RECTs: Nbits=0 → 1 byte each)
+        for _ in range(num_glyphs):
+            body += _build_rect_bits(0, 0, 0, 0)
+        # Kerning count = 0
+        body += struct.pack('<H', 0)
 
     return bytes(body)
 
@@ -1197,6 +1222,11 @@ class FontDefinition:
     def __init__(self, object_id):
         self.object_id = object_id
         self.glyphs = []  # list of edge-record lists
+        self.char_codes = []  # list of character codes (parallel to glyphs)
+        self.advance_widths = []  # list of advance widths in EM units (parallel to glyphs)
+        self.ascent = 0  # font ascent in EM units
+        self.descent = 0  # font descent in EM units
+        self.leading = 0  # font leading in EM units
 
     def add_glyph(self, edges):
         """Add a glyph defined by a list of edge records (ShapeSetup, LineTo, CurveTo).
@@ -1206,6 +1236,19 @@ class FontDefinition:
         """
         self.glyphs.append(edges)
         return len(self.glyphs) - 1
+
+    def add_glyph_mapped(self, edges, char_code, advance_width):
+        """Add a glyph with explicit character code and advance width.
+
+        edges: list of edge records (ShapeSetup, LineTo, CurveTo)
+        char_code: Unicode code point for this glyph
+        advance_width: advance width in EM units (e.g. 1024-based for DefineFont2)
+        Returns the 0-based glyph index.
+        """
+        idx = self.add_glyph(edges)
+        self.char_codes.append(char_code)
+        self.advance_widths.append(advance_width)
+        return idx
 
 
 # ---------------------------------------------------------------------------
@@ -1253,6 +1296,161 @@ class TextDefinition:
     def add_record(self, record):
         """Add a TextRecord to this text definition."""
         self.records.append(record)
+
+
+# ---------------------------------------------------------------------------
+# TTF glyph extraction
+# ---------------------------------------------------------------------------
+
+def extract_ttf_glyphs(ttf_path, characters, em_square=1024):
+    """Extract glyph outlines from a TTF file for use with DefineFont2.
+
+    ttf_path: path to TTF file
+    characters: string of characters to extract (e.g. "Hello World")
+    em_square: target EM square size (1024 for DefineFont2, 20480 for DefineFont3)
+
+    Returns dict with:
+        'glyphs': list of (char_code, edges, advance_width) tuples
+        'ascent': font ascent in EM units
+        'descent': font descent in EM units
+        'leading': font leading in EM units (always 0)
+    """
+    from fontTools.ttLib import TTFont
+    from fontTools.pens.recordingPen import RecordingPen
+
+    font = TTFont(ttf_path)
+    cmap = font.getBestCmap()
+    glyf_table = font['glyf']
+    hmtx = font['hmtx']
+    head = font['head']
+    os2 = font['OS/2']
+
+    upm = head.unitsPerEm
+    scale = em_square / upm
+
+    ascent = round(os2.sTypoAscender * scale)
+    descent = round(abs(os2.sTypoDescender) * scale)
+
+    # Deduplicate characters while preserving order
+    seen = set()
+    unique_chars = []
+    for ch in characters:
+        if ch not in seen:
+            seen.add(ch)
+            unique_chars.append(ch)
+
+    glyphs = []
+    for ch in unique_chars:
+        code_point = ord(ch)
+        if code_point not in cmap:
+            continue
+
+        glyph_name = cmap[code_point]
+        advance_raw = hmtx[glyph_name][0]
+        advance = round(advance_raw * scale)
+
+        glyph = glyf_table[glyph_name]
+        if glyph.numberOfContours == 0 or not hasattr(glyph, 'coordinates') or len(glyph.coordinates) == 0:
+            # Space or empty glyph — emit empty edges
+            glyphs.append((code_point, [], advance))
+            continue
+
+        # Extract contours from glyph coordinates
+        edges = []
+        coords = glyph.coordinates
+        end_pts = glyph.endPtsOfContours
+
+        # First pass: convert all contours to SWF coordinates and compute
+        # signed areas to determine winding direction.
+        ascent_ttf = ascent / scale  # ascent in TTF units
+        swf_contours = []  # list of (swf_points, signed_area)
+        contour_start = 0
+        for end_pt in end_pts:
+            raw = coords[contour_start:end_pt + 1]
+            contour_start = end_pt + 1
+            if len(raw) < 2:
+                continue
+            pts = [(round(p[0] * scale), round((ascent_ttf - p[1]) * scale))
+                   for p in raw]
+            # Signed area (shoelace): positive = CW in Y-down, negative = CCW
+            area = 0
+            n = len(pts)
+            for i in range(n):
+                x1, y1 = pts[i]
+                x2, y2 = pts[(i + 1) % n]
+                area += x1 * y2 - x2 * y1
+            swf_contours.append((pts, area / 2))
+
+        if swf_contours:
+            # Determine which contours are holes via point-in-polygon.
+            # A contour is a hole if any of its points lies inside another
+            # contour with larger absolute area.
+            def _point_in_polygon(px, py, polygon):
+                """Ray-casting point-in-polygon test."""
+                inside = False
+                n = len(polygon)
+                j = n - 1
+                for i in range(n):
+                    xi, yi = polygon[i]
+                    xj, yj = polygon[j]
+                    if ((yi > py) != (yj > py)) and \
+                       (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
+                        inside = not inside
+                    j = i
+                return inside
+
+            is_hole = [False] * len(swf_contours)
+            for i, (pts_i, area_i) in enumerate(swf_contours):
+                for j, (pts_j, area_j) in enumerate(swf_contours):
+                    if i == j:
+                        continue
+                    # If contour j has larger area and contains a point of i
+                    if abs(area_j) > abs(area_i) and \
+                       _point_in_polygon(pts_i[0][0], pts_i[0][1], pts_j):
+                        is_hole[i] = True
+                        break
+
+            for ci, (pts, area) in enumerate(swf_contours):
+                if is_hole[ci]:
+                    # Hole: should be CCW (negative area)
+                    if area > 0:
+                        pts = list(reversed(pts))
+                else:
+                    # Outer/independent solid: should be CW (positive area)
+                    if area < 0:
+                        pts = list(reversed(pts))
+
+                # First point (absolute, with fillStyle1=1 on first contour)
+                x0, y0 = pts[0]
+                setup_kwargs = {"x": x0, "y": y0}
+                if ci == 0:
+                    setup_kwargs["fillStyle1"] = 1
+                edges.append(ShapeSetup(**setup_kwargs))
+
+                # Subsequent points as LineTo (delta from previous)
+                prev_x, prev_y = x0, y0
+                for px, py in pts[1:]:
+                    dx = px - prev_x
+                    dy = py - prev_y
+                    if dx != 0 or dy != 0:
+                        edges.append(LineTo(dx, dy))
+                    prev_x, prev_y = px, py
+
+                # Close contour
+                dx = x0 - prev_x
+                dy = y0 - prev_y
+                if dx != 0 or dy != 0:
+                    edges.append(LineTo(dx, dy))
+
+        glyphs.append((code_point, edges, advance))
+
+    font.close()
+    return {
+        'glyphs': glyphs,
+        'ascent': ascent,
+        'descent': descent,
+        'leading': 0,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1598,7 +1796,11 @@ class SWFMLBuilder:
                 font = tag_data
                 font_body = _build_define_font2_body(
                     font.object_id, font.glyphs,
-                    getattr(font, 'font_name', 'TestFont'))
+                    getattr(font, 'font_name', 'TestFont'),
+                    char_codes=font.char_codes or None,
+                    advance_widths=font.advance_widths or None,
+                    ascent=font.ascent, descent=font.descent,
+                    leading=font.leading)
                 tag_b64 = base64.b64encode(font_body).decode('ascii')
                 unk = SubElement(tags_el, "UnknownTag", id="0x30")
                 data_el = SubElement(unk, "data")
@@ -1608,7 +1810,11 @@ class SWFMLBuilder:
                 font = tag_data
                 font_body = _build_define_font2_body(
                     font.object_id, font.glyphs,
-                    getattr(font, 'font_name', 'TestFont'))
+                    getattr(font, 'font_name', 'TestFont'),
+                    char_codes=font.char_codes or None,
+                    advance_widths=font.advance_widths or None,
+                    ascent=font.ascent, descent=font.descent,
+                    leading=font.leading)
                 tag_b64 = base64.b64encode(font_body).decode('ascii')
                 unk = SubElement(tags_el, "UnknownTag", id="0x4b")
                 data_el = SubElement(unk, "data")

@@ -1198,6 +1198,9 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_FONT_2:
 			case SWF_TAG_DEFINE_FONT_3:
 			{
+				char* font_tag_start = cur_pos;
+				size_t font_tag_length = tag.length;
+
 				tag.clearFields();
 				tag.setFieldCount(1);
 
@@ -1213,6 +1216,7 @@ namespace SWFRecomp
 				char* offset_table;
 				std::vector<u16> entry_offsets;
 				bool wide_codes = false;
+				bool has_layout = false;
 
 				if (tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
 				{
@@ -1224,6 +1228,7 @@ namespace SWFRecomp
 					tag.parseFields(cur_pos);
 
 					u8 flags = (u8) tag.fields[0].value;
+					has_layout = (flags & 0x80) != 0;
 					bool wide_offsets = (flags & 0x08) != 0;
 					wide_codes = (flags & 0x04) != 0;
 
@@ -1333,6 +1338,32 @@ namespace SWFRecomp
 						tag.parseFields(cur_pos);
 						font_code_tables[font_id][i] = (u16) tag.fields[0].value;
 					}
+
+					// Read layout section if present
+					if (has_layout && num_entries > 0)
+					{
+						// FontAscent(SI16), FontDescent(SI16), FontLeading(SI16) — skip
+						tag.clearFields();
+						tag.setFieldCount(3);
+						tag.configureNextField(SWF_FIELD_SI16);
+						tag.configureNextField(SWF_FIELD_SI16);
+						tag.configureNextField(SWF_FIELD_SI16);
+						tag.parseFields(cur_pos);
+
+						// Advance table: num_entries SI16 values
+						font_advance_tables[font_id].resize(num_entries);
+						for (u16 i = 0; i < num_entries; ++i)
+						{
+							tag.clearFields();
+							tag.setFieldCount(1);
+							tag.configureNextField(SWF_FIELD_SI16);
+							tag.parseFields(cur_pos);
+							font_advance_tables[font_id][i] = (s16) tag.fields[0].value;
+						}
+					}
+
+					// Skip any remaining data (bounds table, kerning, etc.)
+					cur_pos = font_tag_start + font_tag_length;
 				}
 
 				break;
@@ -1751,8 +1782,12 @@ namespace SWFRecomp
 
 						text_data << "\t" << to_string(glyph_index) << "," << endl;
 
-						// Advance by EM square width (full glyph width)
-						temp_matrix.translate_x += (s32) em;
+						// Advance by per-glyph width if available, otherwise full EM
+						s32 advance = (s32) em;
+						auto ait = font_advance_tables.find(font_id);
+						if (ait != font_advance_tables.end() && glyph_index < ait->second.size())
+							advance = (s32) ait->second[glyph_index];
+						temp_matrix.translate_x += advance;
 						recompileMatrix(temp_matrix, transform_data);
 						current_transform += 1;
 
@@ -3927,8 +3962,9 @@ namespace SWFRecomp
 						}
 						
 						std::sort(final_outer_candidates.begin(), final_outer_candidates.end(), compareAreaPtr);
-						
-						final_outer_candidates.back()->holes.push_back(&hole);
+
+						if (!final_outer_candidates.empty())
+							final_outer_candidates.back()->holes.push_back(&hole);
 					}
 				}
 				
