@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-09T04:25:48Z",
+  "generated": "2026-02-09T05:16:04Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2534,6 +2534,20 @@
       "wasm_file": "sprite_multiframe.wasm",
       "js_file": "sprite_multiframe.js",
       "description": "WebGPU rendering test with a multi-frame DefineSprite that cycles through 3 frames",
+      "swf_version": 5,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/sprite_nested",
+      "name": "sprite_nested",
+      "type": "graphics",
+      "path": "examples/graphics/sprite_nested",
+      "has_swf": true,
+      "js_file": "sprite_nested.js",
+      "wasm_file": "sprite_nested.wasm",
+      "description": "WebGPU rendering test with nested sprites containing shapes, text, and sprite children",
       "swf_version": 5,
       "fully_implemented": true,
       "opcodes_tested": [],

@@ -1444,6 +1444,18 @@ void render_webgpu_compose_sprite_transform(WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
+// render_webgpu_write_transform: write a pre-computed composed transform to the
+// GPU xform_buffer at the given slot.  Used by tag.c's recursive composition.
+// ---------------------------------------------------------------------------
+void render_webgpu_write_transform(WebGPURenderContext* ctx,
+                                   u32 transform_id, const float composed[16])
+{
+	uint64_t offset = (uint64_t)transform_id * 16 * sizeof(float);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
+	                     composed, 16 * sizeof(float));
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_update_vertices / render_webgpu_update_colors
 // Write interpolated morph data into GPU buffers before the render pass.
 // ---------------------------------------------------------------------------

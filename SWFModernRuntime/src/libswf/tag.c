@@ -13,14 +13,14 @@ size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 
 // Note: tagInit() is provided by the generated tagMain.c file
 
-void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
+// ---------------------------------------------------------------------------
+// Helper 1: Advance sprite timelines recursively
+// ---------------------------------------------------------------------------
+// Iterates the current global display_list for sprites and advances their
+// timelines.  After executing each sprite's frame function (while globals are
+// swapped to the sprite's list), recurse to advance any nested sprites.
+static void advance_sprite_frames(SWFAppContext* app_context)
 {
-	renderer_set_background(context, red, green, blue);
-}
-
-void tagShowFrame(SWFAppContext* app_context)
-{
-	// --- Advance sprite timelines and execute frame functions ---
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		DisplayObject* obj = &display_list[i];
@@ -51,7 +51,14 @@ void tagShowFrame(SWFAppContext* app_context)
 		if (frame == 0 && max_depth > 0)
 		{
 			for (size_t j = 1; j <= max_depth; ++j)
+			{
+				if (display_list[j].sprite_display_list != NULL)
+				{
+					free(display_list[j].sprite_display_list);
+					display_list[j].sprite_display_list = NULL;
+				}
 				display_list[j].char_id = 0;
+			}
 			max_depth = 0;
 		}
 
@@ -61,12 +68,15 @@ void tagShowFrame(SWFAppContext* app_context)
 			ch->sprite_frame_funcs[frame](app_context);
 		}
 
+		// Recurse: advance nested sprites within this sprite's display list
+		advance_sprite_frames(app_context);
+
 		// Save back (display_list pointer may have changed if realloc'd)
 		obj->sprite_display_list = display_list;
 		obj->sprite_max_depth = max_depth;
 		obj->sprite_dl_capacity = display_list_capacity;
 
-		// Restore main display list
+		// Restore parent display list
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
@@ -74,6 +84,206 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Advance frame (loop back to 0)
 		obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Helper 2: Recursive transform composition for sprite/button children
+// ---------------------------------------------------------------------------
+// Composes each child's local transform with the parent's already-composed
+// global transform, writes the result to GPU, and recurses for nested
+// structures (text glyphs, nested sprites, buttons).
+//
+// Unlike the old compose_child_transforms, this function receives the parent's
+// COMPOSED transform (not a transform_id), so it works correctly at any
+// nesting depth.  The CPU-side transform_data is never modified — all composed
+// results go directly to the GPU xform buffer via renderer_write_transform.
+static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+	size_t dl_max_depth, const float parent_composed[16])
+{
+	const float* transforms = (const float*)app_context->transform_data;
+
+	for (size_t i = 1; i <= dl_max_depth; ++i)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		Character* ch = &dictionary[obj->char_id];
+
+		// Compose this child's local transform with the parent's global transform
+		const float* local_xform = &transforms[obj->transform_id * 16];
+		float composed[16];
+		hit_test_mat4_multiply(composed, parent_composed, local_xform);
+		renderer_write_transform(context, obj->transform_id, composed);
+
+		switch (ch->type)
+		{
+			case CHAR_TYPE_TEXT:
+				// Compose each glyph transform with the composed text transform
+				for (size_t j = 0; j < ch->text_size; j++)
+				{
+					u32 glyph_xform_id = ch->transform_start + (u32)j;
+					const float* glyph_local = &transforms[glyph_xform_id * 16];
+					float glyph_composed[16];
+					hit_test_mat4_multiply(glyph_composed, composed, glyph_local);
+					renderer_write_transform(context, glyph_xform_id, glyph_composed);
+				}
+				break;
+
+			case CHAR_TYPE_MORPH_SHAPE:
+			{
+				float t = (float)obj->ratio / 65535.0f;
+				size_t num_verts = ch->morph_start_size;
+
+				u32* start = (u32*)(app_context->shape_data + ch->morph_start_offset * 4 * sizeof(u32));
+				float* end = (float*)(app_context->morph_end_shape_data + ch->morph_end_offset * 2 * sizeof(float));
+				u32* scratch = (u32*)malloc(num_verts * 4 * sizeof(u32));
+
+				for (size_t v = 0; v < num_verts; v++)
+				{
+					float sx = *(float*)&start[v*4 + 0];
+					float sy = *(float*)&start[v*4 + 1];
+					float ex = end[v*2 + 0];
+					float ey = end[v*2 + 1];
+					float ix = sx + t * (ex - sx);
+					float iy = sy + t * (ey - sy);
+					scratch[v*4 + 0] = *(u32*)&ix;
+					scratch[v*4 + 1] = *(u32*)&iy;
+					scratch[v*4 + 2] = start[v*4 + 2];
+					scratch[v*4 + 3] = start[v*4 + 3];
+				}
+
+				renderer_update_vertices(context,
+					ch->morph_start_offset * 4 * sizeof(u32),
+					scratch, num_verts * 4 * sizeof(u32));
+				free(scratch);
+
+				for (size_t c = 0; c < ch->morph_color_count; c++)
+				{
+					float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
+					float* ec = (float*)(app_context->morph_end_color_data) + c * 4;
+					float interp[4];
+					for (int k = 0; k < 4; k++)
+						interp[k] = sc[k] + t * (ec[k] - sc[k]);
+					renderer_update_colors(context,
+						(ch->morph_color_start + c) * 4 * sizeof(float),
+						interp, 4 * sizeof(float));
+				}
+				break;
+			}
+
+			case CHAR_TYPE_SPRITE:
+			{
+				if (obj->sprite_display_list != NULL)
+					compose_children(app_context,
+						obj->sprite_display_list, obj->sprite_max_depth,
+						composed);
+				break;
+			}
+
+			case CHAR_TYPE_BUTTON:
+			{
+				DisplayObject* saved_display_list = display_list;
+				size_t saved_max_depth = max_depth;
+				size_t saved_capacity = display_list_capacity;
+
+				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+				max_depth = 0;
+
+				u8 state = obj->button_state;
+				if (ch->button_state_funcs[state] != NULL)
+					ch->button_state_funcs[state](app_context);
+
+				compose_children(app_context, display_list, max_depth, composed);
+
+				free(display_list);
+				display_list = saved_display_list;
+				max_depth = saved_max_depth;
+				display_list_capacity = saved_capacity;
+				break;
+			}
+
+			default:
+				break;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Helper 3: Recursive display list rendering
+// ---------------------------------------------------------------------------
+// Renders all objects in a display list, recursing into sprites and buttons.
+static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max_depth)
+{
+	for (size_t i = 1; i <= dl_max_depth; ++i)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		Character* ch = &dictionary[obj->char_id];
+		switch (ch->type)
+		{
+			case CHAR_TYPE_SHAPE:
+				renderer_draw_shape(context, ch->shape_offset, ch->size,
+					obj->transform_id, obj->cxform_id);
+				break;
+
+			case CHAR_TYPE_MORPH_SHAPE:
+				renderer_draw_shape(context, ch->morph_start_offset, ch->morph_start_size,
+					obj->transform_id, obj->cxform_id);
+				break;
+
+			case CHAR_TYPE_TEXT:
+				for (size_t j = 0; j < ch->text_size; ++j)
+				{
+					size_t glyph_index = 2*app_context->text_data[ch->text_start + j];
+					renderer_draw_shape(context,
+						app_context->glyph_data[glyph_index],
+						app_context->glyph_data[glyph_index + 1],
+						ch->transform_start + j, ch->cxform_id);
+				}
+				break;
+
+			case CHAR_TYPE_SPRITE:
+				if (obj->sprite_display_list != NULL)
+					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+				break;
+
+			case CHAR_TYPE_BUTTON:
+			{
+				DisplayObject* saved_display_list = display_list;
+				size_t saved_max_depth = max_depth;
+				size_t saved_capacity = display_list_capacity;
+
+				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+				max_depth = 0;
+
+				u8 state = obj->button_state;
+				if (ch->button_state_funcs[state] != NULL)
+					ch->button_state_funcs[state](app_context);
+
+				render_display_list(app_context, display_list, max_depth);
+
+				free(display_list);
+				display_list = saved_display_list;
+				max_depth = saved_max_depth;
+				display_list_capacity = saved_capacity;
+				break;
+			}
+		}
+	}
+}
+
+void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
+{
+	renderer_set_background(context, red, green, blue);
+}
+
+void tagShowFrame(SWFAppContext* app_context)
+{
+	// --- Advance sprite timelines (recursive) ---
+	advance_sprite_frames(app_context);
 
 	// --- Button hit testing + state machine + action dispatch ---
 	// Must run BEFORE transform composition so the pre-render pass
@@ -163,45 +373,29 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 	}
 
-	// Compose PlaceObject2 transforms with glyph transforms on the CPU,
-	// writing composed results to the GPU xform buffer BEFORE the render pass.
-	// This avoids the per-draw uniform write issue (queue writes between draws
-	// in the same render pass only apply the last value).
+	// Compose transforms recursively BEFORE the render pass.
+	// For sprites/buttons: compose_children handles all nesting levels,
+	// passing the composed parent transform down so nested text/sprite/button
+	// children get correctly composed global transforms.
+	// For top-level text/morph: compose directly (parent is identity/self).
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
 
 		Character* ch = &dictionary[obj->char_id];
-		if (ch->type == CHAR_TYPE_TEXT)
+		if (ch->type == CHAR_TYPE_SPRITE)
 		{
-			renderer_compose_text_transforms(context,
-				app_context->transform_data,
-				obj->transform_id,
-				ch->transform_start,
-				ch->text_size);
-		}
-		else if (ch->type == CHAR_TYPE_SPRITE)
-		{
-			// Use the sprite's persistent display list (already populated by frame advancement)
 			if (obj->sprite_display_list != NULL)
 			{
-				for (size_t j = 1; j <= obj->sprite_max_depth; ++j)
-				{
-					DisplayObject* sprite_obj = &obj->sprite_display_list[j];
-					if (sprite_obj->char_id == 0) continue;
-
-					renderer_compose_sprite_transform(context,
-						app_context->transform_data,
-						obj->transform_id,
-						sprite_obj->transform_id);
-				}
+				const float* sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				compose_children(app_context,
+					obj->sprite_display_list, obj->sprite_max_depth,
+					sprite_xform);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
 		{
-			// Compose parent transform with button children (same as sprites).
-			// Use the frame function for the current button state.
 			DisplayObject* saved_display_list = display_list;
 			size_t saved_max_depth = max_depth;
 			size_t saved_capacity = display_list_capacity;
@@ -212,32 +406,29 @@ void tagShowFrame(SWFAppContext* app_context)
 
 			u8 state = obj->button_state;
 			if (ch->button_state_funcs[state] != NULL)
-			{
 				ch->button_state_funcs[state](app_context);
-			}
 
-			for (size_t j = 1; j <= max_depth; ++j)
-			{
-				DisplayObject* btn_obj = &display_list[j];
-				if (btn_obj->char_id == 0) continue;
-
-				renderer_compose_sprite_transform(context,
-					app_context->transform_data,
-					obj->transform_id,
-					btn_obj->transform_id);
-			}
+			const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+			compose_children(app_context, display_list, max_depth, btn_xform);
 
 			free(display_list);
 			display_list = saved_display_list;
 			max_depth = saved_max_depth;
 			display_list_capacity = saved_capacity;
 		}
+		else if (ch->type == CHAR_TYPE_TEXT)
+		{
+			renderer_compose_text_transforms(context,
+				app_context->transform_data,
+				obj->transform_id,
+				ch->transform_start,
+				ch->text_size);
+		}
 		else if (ch->type == CHAR_TYPE_MORPH_SHAPE)
 		{
 			float t = (float)obj->ratio / 65535.0f;
 			size_t num_verts = ch->morph_start_size;
 
-			// Interpolate vertex positions
 			u32* start = (u32*)(app_context->shape_data + ch->morph_start_offset * 4 * sizeof(u32));
 			float* end = (float*)(app_context->morph_end_shape_data + ch->morph_end_offset * 2 * sizeof(float));
 			u32* scratch = (u32*)malloc(num_verts * 4 * sizeof(u32));
@@ -252,8 +443,8 @@ void tagShowFrame(SWFAppContext* app_context)
 				float iy = sy + t * (ey - sy);
 				scratch[v*4 + 0] = *(u32*)&ix;
 				scratch[v*4 + 1] = *(u32*)&iy;
-				scratch[v*4 + 2] = start[v*4 + 2];  // style_upper
-				scratch[v*4 + 3] = start[v*4 + 3];  // style_lower
+				scratch[v*4 + 2] = start[v*4 + 2];
+				scratch[v*4 + 3] = start[v*4 + 3];
 			}
 
 			renderer_update_vertices(context,
@@ -261,7 +452,6 @@ void tagShowFrame(SWFAppContext* app_context)
 				scratch, num_verts * 4 * sizeof(u32));
 			free(scratch);
 
-			// Interpolate colors
 			for (size_t c = 0; c < ch->morph_color_count; c++)
 			{
 				float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
@@ -328,27 +518,11 @@ void tagShowFrame(SWFAppContext* app_context)
 				}
 				break;
 			case CHAR_TYPE_SPRITE:
-			{
 				if (obj->sprite_display_list != NULL)
-				{
-					for (size_t j = 1; j <= obj->sprite_max_depth; ++j)
-					{
-						DisplayObject* sprite_obj = &obj->sprite_display_list[j];
-						if (sprite_obj->char_id == 0) continue;
-
-						Character* sprite_ch = &dictionary[sprite_obj->char_id];
-						if (sprite_ch->type == CHAR_TYPE_SHAPE)
-						{
-							renderer_draw_shape(context, sprite_ch->shape_offset, sprite_ch->size,
-								sprite_obj->transform_id, sprite_obj->cxform_id);
-						}
-					}
-				}
+					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 				break;
-			}
 			case CHAR_TYPE_BUTTON:
 			{
-				// Render button using the current state's frame function
 				DisplayObject* saved_display_list = display_list;
 				size_t saved_max_depth = max_depth;
 				size_t saved_capacity = display_list_capacity;
@@ -359,22 +533,9 @@ void tagShowFrame(SWFAppContext* app_context)
 
 				u8 state = obj->button_state;
 				if (ch->button_state_funcs[state] != NULL)
-				{
 					ch->button_state_funcs[state](app_context);
-				}
 
-				for (size_t j = 1; j <= max_depth; ++j)
-				{
-					DisplayObject* btn_obj = &display_list[j];
-					if (btn_obj->char_id == 0) continue;
-
-					Character* btn_ch = &dictionary[btn_obj->char_id];
-					if (btn_ch->type == CHAR_TYPE_SHAPE)
-					{
-						renderer_draw_shape(context, btn_ch->shape_offset, btn_ch->size,
-							btn_obj->transform_id, btn_obj->cxform_id);
-					}
-				}
+				render_display_list(app_context, display_list, max_depth);
 
 				free(display_list);
 				display_list = saved_display_list;
