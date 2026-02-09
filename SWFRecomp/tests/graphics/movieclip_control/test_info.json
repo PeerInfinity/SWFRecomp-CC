@@ -6,6 +6,6 @@
     "fully_implemented": true
   },
   "graphics": {
-    "tested": ["MOVIECLIP_GOTO_STOP", "SET_TARGET", "INSTANCE_NAME", "DEFINE_SPRITE"]
+    "tested": ["PLACE_OBJECT2", "DEFINE_SPRITE", "SOLID_FILL", "STRAIGHT_EDGE"]
   }
 }

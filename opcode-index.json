@@ -3,9 +3,9 @@
     "generated_date": "2026-02-09",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
-    "total_entries": 287,
+    "total_entries": 288,
     "total_graphics_features": 62,
-    "graphics_features_with_tests": 44
+    "graphics_features_with_tests": 47
   },
   "entries": [
     {
@@ -323,6 +323,41 @@
       "notes": "C++ enum value for opcode"
     },
     {
+      "hex": "0X07",
+      "name": "actionStop",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStop(SWFAppContext* app_context);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "tests_primary": [
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/stop_multiframe_swf_4",
+        "SWFRecomp/tests/stop_swf_4"
+      ],
+      "tests_secondary": [
+        "SWFRecomp/tests/next_frame_swf_4",
+        "SWFRecomp/tests/play_swf_4",
+        "SWFRecomp/tests/prev_frame_swf_4"
+      ],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/stop_multiframe_swf_4",
+        "SWFRecomp/tests/stop_swf_4"
+      ],
+      "tests_primary_no_results": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/next_frame_swf_4",
+        "SWFRecomp/tests/play_swf_4",
+        "SWFRecomp/tests/prev_frame_swf_4"
+      ],
+      "tests_secondary_no_results": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-0x07.md",
+      "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 161)"
+    },
+    {
       "hex": "0X08",
       "name": "ActionToggleQuality",
       "source": "SWF Specification v19",
@@ -470,7 +505,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 165)"
+      "notes": "Runtime function (action.h line 166)"
     },
     {
       "hex": "0X0A",
@@ -3021,7 +3056,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 162)"
+      "notes": "Runtime function (action.h line 163)"
     },
     {
       "hex": "0X27",
@@ -3102,7 +3137,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 163)"
+      "notes": "Runtime function (action.h line 164)"
     },
     {
       "hex": "0X28",
@@ -3189,7 +3224,7 @@
           "Display list integration: finding and updating sprites in the display list"
         ]
       },
-      "notes": "Runtime function (action.h line 164)"
+      "notes": "Runtime function (action.h line 165)"
     },
     {
       "hex": "0X29",
@@ -3360,7 +3395,7 @@
           "Only tested uncaught exceptions (requires ActionTry 0x8F for full testing)"
         ]
       },
-      "notes": "Runtime function (action.h line 212)"
+      "notes": "Runtime function (action.h line 213)"
     },
     {
       "hex": "0X2B",
@@ -3429,7 +3464,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 173)"
+      "notes": "Runtime function (action.h line 174)"
     },
     {
       "hex": "0X2C",
@@ -3567,7 +3602,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 167)"
+      "notes": "Runtime function (action.h line 168)"
     },
     {
       "hex": "0X31",
@@ -3774,7 +3809,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 168)"
+      "notes": "Runtime function (action.h line 169)"
     },
     {
       "hex": "0X34",
@@ -3843,7 +3878,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 170)"
+      "notes": "Runtime function (action.h line 171)"
     },
     {
       "hex": "0X35",
@@ -3981,7 +4016,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 169)"
+      "notes": "Runtime function (action.h line 170)"
     },
     {
       "hex": "0X37",
@@ -4062,7 +4097,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 171)"
+      "notes": "Runtime function (action.h line 172)"
     },
     {
       "hex": "0X3A",
@@ -4131,7 +4166,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 182)"
+      "notes": "Runtime function (action.h line 183)"
     },
     {
       "hex": "0X3B",
@@ -4200,7 +4235,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 183)"
+      "notes": "Runtime function (action.h line 184)"
     },
     {
       "hex": "0X3C",
@@ -4449,7 +4484,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 175)"
+      "notes": "Runtime function (action.h line 176)"
     },
     {
       "hex": "0X3F",
@@ -4587,7 +4622,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 201)"
+      "notes": "Runtime function (action.h line 202)"
     },
     {
       "hex": "0X41",
@@ -4725,7 +4760,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 176)"
+      "notes": "Runtime function (action.h line 177)"
     },
     {
       "hex": "0X43",
@@ -4854,7 +4889,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 177)"
+      "notes": "Runtime function (action.h line 178)"
     },
     {
       "hex": "0X44",
@@ -4941,7 +4976,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 172)"
+      "notes": "Runtime function (action.h line 173)"
     },
     {
       "hex": "0X45",
@@ -5814,7 +5849,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 200)"
+      "notes": "Runtime function (action.h line 201)"
     },
     {
       "hex": "0X50",
@@ -5883,7 +5918,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 178)"
+      "notes": "Runtime function (action.h line 179)"
     },
     {
       "hex": "0X51",
@@ -5952,7 +5987,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 179)"
+      "notes": "Runtime function (action.h line 180)"
     },
     {
       "hex": "0X52",
@@ -6027,7 +6062,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 198)"
+      "notes": "Runtime function (action.h line 199)"
     },
     {
       "hex": "0X53",
@@ -6096,7 +6131,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 202)"
+      "notes": "Runtime function (action.h line 203)"
     },
     {
       "hex": "0X54",
@@ -6165,7 +6200,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 180)"
+      "notes": "Runtime function (action.h line 181)"
     },
     {
       "hex": "0X55",
@@ -6234,7 +6269,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 181)"
+      "notes": "Runtime function (action.h line 182)"
     },
     {
       "hex": "0X60",
@@ -6303,7 +6338,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 184)"
+      "notes": "Runtime function (action.h line 185)"
     },
     {
       "hex": "0X61",
@@ -6372,7 +6407,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 185)"
+      "notes": "Runtime function (action.h line 186)"
     },
     {
       "hex": "0X62",
@@ -6441,7 +6476,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 186)"
+      "notes": "Runtime function (action.h line 187)"
     },
     {
       "hex": "0X63",
@@ -6510,7 +6545,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 187)"
+      "notes": "Runtime function (action.h line 188)"
     },
     {
       "hex": "0X64",
@@ -6579,7 +6614,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 188)"
+      "notes": "Runtime function (action.h line 189)"
     },
     {
       "hex": "0X65",
@@ -6648,7 +6683,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 189)"
+      "notes": "Runtime function (action.h line 190)"
     },
     {
       "hex": "0X66",
@@ -6729,7 +6764,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 190)"
+      "notes": "Runtime function (action.h line 191)"
     },
     {
       "hex": "0X67",
@@ -6798,7 +6833,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 191)"
+      "notes": "Runtime function (action.h line 192)"
     },
     {
       "hex": "0X68",
@@ -6867,7 +6902,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 192)"
+      "notes": "Runtime function (action.h line 193)"
     },
     {
       "hex": "0X69",
@@ -6936,7 +6971,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 193)"
+      "notes": "Runtime function (action.h line 194)"
     },
     {
       "hex": "0X81",
@@ -7029,7 +7064,7 @@
           "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
         ]
       },
-      "notes": "Runtime function (action.h line 161)"
+      "notes": "Runtime function (action.h line 162)"
     },
     {
       "hex": "0X83",
@@ -7125,7 +7160,7 @@
           "URL scheme validation and sanitization"
         ]
       },
-      "notes": "Runtime function (action.h line 166)"
+      "notes": "Runtime function (action.h line 167)"
     },
     {
       "hex": "0X87",
@@ -7194,7 +7229,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 194)"
+      "notes": "Runtime function (action.h line 195)"
     },
     {
       "hex": "0X88",
@@ -7584,7 +7619,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 207)"
+      "notes": "Runtime function (action.h line 208)"
     },
     {
       "hex": "0X8F",
@@ -8326,7 +8361,7 @@
           "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
         ]
       },
-      "notes": "Runtime function (action.h line 199)"
+      "notes": "Runtime function (action.h line 200)"
     },
     {
       "hex": "0X9B",
@@ -8509,7 +8544,7 @@
           "Multi-MovieClip support (requires MovieClip context switching - graphics-only)"
         ]
       },
-      "notes": "Runtime function (action.h line 197)"
+      "notes": "Runtime function (action.h line 198)"
     },
     {
       "hex": "0X9F",
@@ -8681,6 +8716,7 @@
         "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
+        "SWFRecomp/tests/graphics/color_matrix_filter",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/define_button",
         "SWFRecomp/tests/graphics/define_button2",
@@ -8690,8 +8726,10 @@
         "SWFRecomp/tests/graphics/define_morph_shape2",
         "SWFRecomp/tests/graphics/define_shape4",
         "SWFRecomp/tests/graphics/define_text2",
+        "SWFRecomp/tests/graphics/movieclip_control",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/place_object",
+        "SWFRecomp/tests/graphics/place_object3",
         "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
@@ -8803,6 +8841,7 @@
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
         "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
+        "SWFRecomp/tests/graphics/color_matrix_filter",
         "SWFRecomp/tests/graphics/color_transform",
         "SWFRecomp/tests/graphics/define_button",
         "SWFRecomp/tests/graphics/define_button2",
@@ -8821,10 +8860,12 @@
         "SWFRecomp/tests/graphics/lossless_bitmap",
         "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
+        "SWFRecomp/tests/graphics/movieclip_control",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
         "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
         "SWFRecomp/tests/graphics/place_object",
+        "SWFRecomp/tests/graphics/place_object3",
         "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
@@ -9009,8 +9050,10 @@
       "tag_id": 26,
       "category": "Display List Tags",
       "description": "Enhanced object placement (SWF tag 26)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/movieclip_control"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_OBJECT3",
@@ -9018,8 +9061,11 @@
       "tag_id": 70,
       "category": "Display List Tags",
       "description": "Object placement with filters/blend (SWF tag 70)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/color_matrix_filter",
+        "SWFRecomp/tests/graphics/place_object3"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "REMOVE_OBJECT",
@@ -9209,6 +9255,7 @@
       "description": "Embedded movie clip with own timeline (SWF tag 39)",
       "tests": [
         "SWFRecomp/tests/graphics/clip_actions",
+        "SWFRecomp/tests/graphics/movieclip_control",
         "SWFRecomp/tests/graphics/sprite_basic",
         "SWFRecomp/tests/graphics/sprite_multiframe",
         "SWFRecomp/tests/graphics/sprite_nested"
@@ -9360,8 +9407,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "4x5 color matrix transform (filter ID 6)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/color_matrix_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "GRADIENT_BEVEL_FILTER",

@@ -31,7 +31,7 @@ See also: [SWF Graphics Feature Index](feature-index-plain.md)
 | 0X04 | ActionNextFrame | SWF_ACTION_NEXT_FRAME | actionNextFrame | 1/1 |  |  | ✓ | ✓ | ✓ |
 | 0X05 | ActionPreviousFrame | SWF_ACTION_PREV_FRAME | actionPrevFrame | 1/1 |  |  | ✓ | ✓ |  |
 | 0X06 | ActionPlay | SWF_ACTION_PLAY | actionPlay | 2/2 |  |  | ✓ | ✓ | ✓ |
-| 0X07 | ActionStop | SWF_ACTION_STOP |  | 3/3 | 3/3 |  | ✓ | ✓ |  |
+| 0X07 | ActionStop | SWF_ACTION_STOP | actionStop | 3/3 | 3/3 |  | ✓ | ✓ |  |
 | 0X08 | ActionToggleQuality | SWF_ACTION_TOGGLE_QUALITY | actionToggleQuality | 1/1 |  |  | ✓ |  | ✓ |
 | 0X09 | ActionStopSounds | SWF_ACTION_STOP_SOUNDS | actionStopSounds | 1/1 |  |  | ✓ |  | ✓ |
 | 0X0A | ActionAdd | SWF_ACTION_ADD | actionAdd | 2/2 | 4/4 |  | ✓ | ✓ |  |
@@ -138,9 +138,9 @@ See also: [SWF Graphics Feature Index](feature-index-plain.md)
 | 0X05 | ActionPreviousFrame | `prev_frame_swf_4` | ✓ | ✓ | ✓ |
 | 0X06 | ActionPlay | `play_stop_swf_4` | ✓ | ✓ | ✓ |
 | 0X06 | ActionPlay | `play_swf_4` | ✓ | ✓ | ✓ |
-| 0X07 | ActionStop | `play_stop_swf_4` | ✓ |  | ✓ |
-| 0X07 | ActionStop | `stop_multiframe_swf_4` | ✓ |  | ✓ |
-| 0X07 | ActionStop | `stop_swf_4` | ✓ |  | ✓ |
+| 0X07 | ActionStop | `play_stop_swf_4` | ✓ | ✓ | ✓ |
+| 0X07 | ActionStop | `stop_multiframe_swf_4` | ✓ | ✓ | ✓ |
+| 0X07 | ActionStop | `stop_swf_4` | ✓ | ✓ | ✓ |
 | 0X08 | ActionToggleQuality | `toggle_quality_swf_4` | ✓ | ✓ | ✓ |
 | 0X09 | ActionStopSounds | `stop_sounds_swf_4` | ✓ | ✓ | ✓ |
 | 0X0A | ActionAdd | `add_floats_swf_4` | ✓ | ✓ | ✓ |
@@ -271,7 +271,7 @@ See also: [SWF Graphics Feature Index](feature-index-plain.md)
 | 0X04 | ActionNextFrame | ✓ | ✓ | 1/1 |  | ✓ | ✓ |
 | 0X05 | ActionPreviousFrame | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X06 | ActionPlay | ✓ | ✓ | 2/2 |  | ✓ | ✓ |
-| 0X07 | ActionStop | ✓ |  | 3/3 |  | ✓ |  |
+| 0X07 | ActionStop | ✓ | ✓ | 3/3 |  | ✓ |  |
 | 0X0A | ActionAdd | ✓ | ✓ | 2/2 |  | ✓ |  |
 | 0X0B | ActionSubtract | ✓ | ✓ | 1/1 |  | ✓ |  |
 | 0X0C | ActionMultiply | ✓ | ✓ | 1/1 |  | ✓ |  |
@@ -598,6 +598,7 @@ void actionPlay(SWFAppContext* app_context);
 **Name Variations:**
 - `ActionStop` (spec, source: SWF Specification v19)
 - `SWF_ACTION_STOP` (enum, source: action.hpp)
+- `actionStop` (function, source: action.h)
 
 **Primary Tests:**
 - [✓] `SWFRecomp/tests/play_stop_swf_4`
@@ -608,6 +609,11 @@ void actionPlay(SWFAppContext* app_context);
 - [✓] `SWFRecomp/tests/next_frame_swf_4`
 - [✓] `SWFRecomp/tests/play_swf_4`
 - [✓] `SWFRecomp/tests/prev_frame_swf_4`
+
+**Function Declaration:**
+```c
+void actionStop(SWFAppContext* app_context);
+```
 
 **Implementation:**
 - parseActions (case SWF_ACTION_STOP)
