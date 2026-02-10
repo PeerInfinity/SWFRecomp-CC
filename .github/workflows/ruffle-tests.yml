@@ -9,6 +9,9 @@ on:
         default: '0'
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   ruffle-tests:
     runs-on: ubuntu-latest
@@ -75,3 +78,47 @@ jobs:
           path: ruffle-tests/results.json
           retention-days: 90
           if-no-files-found: ignore
+
+      - name: Commit results to ruffle-test-results branch
+        if: always()
+        run: |
+          if [ ! -f ruffle-tests/results.json ]; then
+            echo "No results file to commit"
+            exit 0
+          fi
+
+          # Save results before switching branches
+          cp ruffle-tests/results.json /tmp/results.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin
+
+          # Switch to ruffle-test-results branch (create from master or update existing)
+          if git ls-remote --exit-code --heads origin ruffle-test-results; then
+            git checkout ruffle-test-results
+            git reset --hard origin/ruffle-test-results
+          else
+            git checkout --orphan ruffle-test-results
+            git rm -rf .
+          fi
+
+          # Restore results
+          mkdir -p ruffle-tests
+          cp /tmp/results.json ruffle-tests/results.json
+          git add ruffle-tests/results.json
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          LIMIT_MSG=""
+          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
+            LIMIT_MSG=" (limit=${{ inputs.limit }})"
+          fi
+
+          git commit -m "Update Ruffle test results${LIMIT_MSG}" \
+            -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          git push origin ruffle-test-results
