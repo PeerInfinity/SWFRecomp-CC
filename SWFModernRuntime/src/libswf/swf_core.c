@@ -65,7 +65,11 @@ void swfStart(SWFAppContext* app_context)
 	// Run frames in console mode
 	frame_func* funcs = app_context->frame_funcs;
 	current_frame = 0;
+#ifdef MAX_FRAMES
+	const size_t max_frames = MAX_FRAMES;
+#else
 	const size_t max_frames = 10000;
+#endif
 
 	while (!quit_swf && current_frame < max_frames)
 	{

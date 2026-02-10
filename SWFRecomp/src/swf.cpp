@@ -380,6 +380,7 @@ namespace SWFRecomp
 		context.out_script_header << "#pragma once" << endl;
 		
 		context.out_script_defs = ofstream(context.output_scripts_folder + "script_defs.c", ios_base::out);
+		context.out_script_defs << "#include <recomp.h>" << endl;
 		context.out_script_defs << "#include \"script_decls.h\"" << endl;
 		context.out_script_defs << "#include <string.h>" << endl;  // For memset
 		

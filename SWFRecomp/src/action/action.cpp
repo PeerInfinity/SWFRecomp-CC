@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <set>
 
 #include <action.hpp>
 
@@ -14,6 +15,38 @@ using std::endl;
 
 namespace SWFRecomp
 {
+	// Escape a raw string for use inside C string literals
+	static std::string escape_c_string(const char* str)
+	{
+		std::string result;
+		for (const char* p = str; *p; ++p)
+		{
+			unsigned char c = (unsigned char)*p;
+			switch (c)
+			{
+				case '"':  result += "\\\""; break;
+				case '\\': result += "\\\\"; break;
+				case '\n': result += "\\n"; break;
+				case '\r': result += "\\r"; break;
+				case '\t': result += "\\t"; break;
+				case '\0': result += "\\0"; break;
+				default:
+					if (c < 0x20 || c == 0x7f)
+					{
+						char buf[5];
+						snprintf(buf, sizeof(buf), "\\x%02x", c);
+						result += buf;
+					}
+					else
+					{
+						result += (char)c;
+					}
+					break;
+			}
+		}
+		return result;
+	}
+
 	SWFAction::SWFAction() : next_str_i(0)
 	{
 		
@@ -31,7 +64,7 @@ namespace SWFRecomp
 
 		char* action_buffer_start = action_buffer;
 
-		std::vector<char*> labels;
+		std::set<char*> labels;
 
 		// Parse action bytes once to mark labels
 		while (code != SWF_ACTION_END_OF_ACTIONS)
@@ -52,7 +85,7 @@ namespace SWFRecomp
 				case SWF_ACTION_IF:
 				{
 					s16 offset = VAL(s16, action_buffer);
-					labels.push_back(action_buffer + length + ((s64) offset));
+					labels.insert(action_buffer + length + ((s64) offset));
 					break;
 				}
 
@@ -78,7 +111,7 @@ namespace SWFRecomp
 					}
 
 					// Add skip target as a label
-					labels.push_back(skip_ptr);
+					labels.insert(skip_ptr);
 					break;
 				}
 
@@ -105,7 +138,7 @@ namespace SWFRecomp
 				}
 
 				// Mark the skip target as a label
-				labels.push_back(skip_ptr);
+				labels.insert(skip_ptr);
 				break;
 			}
 			}
@@ -1066,7 +1099,8 @@ namespace SWFRecomp
 				context.out_script_defs << endl << endl
 					<< "// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl
 					<< "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)" << endl
-					<< "{" << endl;
+					<< "{" << endl
+					<< "\tchar str_buffer[17];" << endl;
 
 				// Initialize local registers
 				if (register_count > 0)
@@ -1101,9 +1135,9 @@ namespace SWFRecomp
 				{
 					context.out_script_defs << "\t// Preload 'arguments' into register " << next_reg << endl;
 					context.out_script_defs << "\t// Create arguments array object" << endl;
-					context.out_script_defs << "\tASArray* arguments_array = allocArray(arg_count);" << endl;
+					context.out_script_defs << "\tASArray* arguments_array = allocArray(app_context, arg_count);" << endl;
 					context.out_script_defs << "\tfor (u32 i = 0; i < arg_count; i++) {" << endl;
-					context.out_script_defs << "\t\tsetArrayElement(arguments_array, i, &args[i]);" << endl;
+					context.out_script_defs << "\t\tsetArrayElement(app_context, arguments_array, i, &args[i]);" << endl;
 					context.out_script_defs << "\t}" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_ARRAY;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)arguments_array;" << endl;
@@ -1663,7 +1697,8 @@ namespace SWFRecomp
 				context.out_script_defs << endl << endl
 					<< "// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl
 					<< "void " << func_id << "(SWFAppContext* app_context)" << endl
-					<< "{" << endl;
+					<< "{" << endl
+					<< "\tchar str_buffer[17];" << endl;
 
 				// Bind parameters (simple DefineFunction uses variables, not registers)
 				for (size_t i = 0; i < params.size(); i++)
@@ -1757,7 +1792,7 @@ namespace SWFRecomp
 
 		// New string - assign ID and declare
 		string_to_id[str] = next_str_i;
-		context.out_script_defs << endl << "char* str_" << next_str_i << " = \"" << str << "\";";
+		context.out_script_defs << endl << "char* str_" << next_str_i << " = \"" << escape_c_string(str) << "\";";
 		context.out_script_decls << endl << "extern char* str_" << next_str_i << ";";
 		next_str_i += 1;
 	}
