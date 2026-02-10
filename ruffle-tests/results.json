@@ -1,4 +1,10 @@
 {
+  "metadata": {
+    "timestamp": "2026-02-10T04:46:25.423705+00:00",
+    "git_sha": "3ac879e95ff1fde0512f36061bef43ae798ecbfe",
+    "duration_seconds": 17.61,
+    "total_available": 614
+  },
   "total": 10,
   "pass": 1,
   "fail": 9,
@@ -9,43 +15,140 @@
   "tests": [
     {
       "test": "access_unnamed_shape",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 1.62,
       "status": "pass"
     },
     {
       "test": "action_to_integer",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 28,
+        "expected_lines": 28,
+        "matching_lines": 24
+      },
+      "duration": 1.68,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=28, expected=28)",
+      "actual_output": "... (12 lines before) ...\n// int({})\n0\n// int(hello)\n0\n// int(ten)\n0\n// int(float)\n0\n// int(negative)\n0\n// int(NaN)\n0\n// int(valof)\n0\n// int(0xffffffff)\n-2147483648",
+      "expected_output": "... (12 lines before) ...\n// int({})\n0\n// int(hello)\n0\n// int(ten)\n10\n// int(float)\n10\n// int(negative)\n-10\n// int(NaN)\n0\n// int(valof)\n42\n// int(0xffffffff)\n-2147483648"
     },
     {
       "test": "add",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 28,
+        "matching_lines": 23
+      },
+      "duration": 1.7,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=26, expected=28)",
+      "actual_output": "... (5 lines before) ...\n\n// '300' + '150a'\nNaN\n\n// '300' + '0x96' + '010'\n460\n\n// '300' + undefined\nNaN\n\n// '300' + null\n300\n\n// '300' + NaN\nNaN\n\n// '300' + Infinity\nInfinity\n\n// obj_1 + obj_2\nNaN",
+      "expected_output": "... (5 lines before) ...\n\n// '300' + '150a'\nNaN\n\n// '300' + '0x96' + '010'\n458\n\n// '300' + undefined\nNaN\n\n// '300' + null\nNaN\n\n// '300' + NaN\nNaN\n\n// '300' + Infinity\nInfinity\n\n// obj_1 + obj_2\nOBJ_1\nOBJ_2\n5"
     },
     {
       "test": "add2",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 299,
+        "expected_lines": 354,
+        "matching_lines": 79
+      },
+      "duration": 2.13,
+      "status": "output_mismatch",
+      "detail": "275 line(s) differ (actual=299, expected=354)",
+      "actual_output": "// 0 + 0\n0\n// 0 + 0\n0\n\n// 2 + 1\n3\n// 1 + 2\n3\n\n// 1 + \n1\n//  + 1\n1\n\n//  + \n\n//  + \n\n\n//  + \n\n//  + \n\n\n// NaN + \nNaN\n//  + NaN\nNaN\n\n// false + false\n0\n// false + false\n0\n\n// false + true\n1\n// true + false\n1\n\n// true + true\n2\n// true + true\n2\n\n// false + true\n1\n// true + false\n1\n\n... (249 lines after) ...",
+      "expected_output": "// 0 + 0\n0\n// 0 + 0\n0\n\n// 1 + 2\n3\n// 2 + 1\n3\n\n// NaN + 1\nNaN\n// 1 + NaN\nNaN\n\n// NaN + NaN\nNaN\n// NaN + NaN\nNaN\n\n// Infinity + Infinity\nInfinity\n// Infinity + Infinity\nInfinity\n\n// Infinity + -Infinity\nNaN\n// -Infinity + Infinity\nNaN\n\n// false + false\n0\n// false + false\n0\n\n// true + false\n1\n// false + true\n1\n\n// true + true\n2\n// true + true\n2\n\n// true + false\n1\n// false + true\n1\n\n... (304 lines after) ..."
     },
     {
       "test": "add_property",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 1
+      },
+      "duration": 1.77,
+      "status": "output_mismatch",
+      "detail": "14 line(s) differ (actual=15, expected=15)",
+      "actual_output": "undefined\nundefined\nundefined\nundefined\nundefined\n0\nundefined\n0\n0\nundefined\n0\nundefined\nundefined\nundefined\nundefined",
+      "expected_output": "false\nfalse\nfalse\ntrue\n10\n10\ntrue\n10\n0\ntrue\n10\n4\ntrue\n10\n3"
     },
     {
       "test": "add_swf4",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 28,
+        "matching_lines": 21
+      },
+      "duration": 1.69,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=26, expected=28)",
+      "actual_output": "// 'ab' + 'cd'\nNaN\n\n// 300 + '150' + true\n451\n\n// '300' + '150a'\nNaN\n\n// '300' + '0x96' + '010'\n460\n\n// '300' + undefined\nNaN\n\n// '300' + null\n300\n\n// '300' + NaN\nNaN\n\n// '300' + Infinity\nInfinity\n\n// obj_1 + obj_2\nNaN",
+      "expected_output": "// 'ab' + 'cd'\n0\n\n// 300 + '150' + true\n451\n\n// '300' + '150a'\n450\n\n// '300' + '0x96' + '010'\n310\n\n// '300' + undefined\n300\n\n// '300' + null\n300\n\n// '300' + NaN\nNaN\n\n// '300' + Infinity\nInfinity\n\n// obj_1 + obj_2\nOBJ_1\nOBJ_2\n5"
     },
     {
       "test": "add_swf5",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 28,
+        "matching_lines": 23
+      },
+      "duration": 1.69,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=26, expected=28)",
+      "actual_output": "... (5 lines before) ...\n\n// '300' + '150a'\nNaN\n\n// '300' + '0x96' + '010'\n460\n\n// '300' + undefined\nNaN\n\n// '300' + null\n300\n\n// '300' + NaN\nNaN\n\n// '300' + Infinity\nInfinity\n\n// obj_1 + obj_2\nNaN",
+      "expected_output": "... (5 lines before) ...\n\n// '300' + '150a'\nNaN\n\n// '300' + '0x96' + '010'\nNaN\n\n// '300' + undefined\n300\n\n// '300' + null\n300\n\n// '300' + NaN\nNaN\n\n// '300' + Infinity\nInfinity\n\n// obj_1 + obj_2\nOBJ_1\nOBJ_2\n5"
     },
     {
       "test": "arguments",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 92,
+        "expected_lines": 127,
+        "matching_lines": 77
+      },
+      "duration": 1.72,
+      "status": "output_mismatch",
+      "detail": "50 line(s) differ (actual=92, expected=127)",
+      "actual_output": "... (3 lines before) ...\n\n// arguments.length\n0\n\n// arguments instanceof Array\n0\n\n// arguments.__proto__ === Array.prototype\ntrue\n\n// arguments.callee\nundefined\n\n// arguments.callee === dump\nfalse\n\n// arguments.caller\nundefined\n\n// arguments.caller === indirectDump\nfalse\n\n\n\n// dump(\"a\")\n// arguments\na\n\n// arguments.length\n1\n\n// arguments instanceof Array\n0\n\n// arguments.__proto__ === Array.prototype\ntrue\n\n// arguments.callee\nundefined\n\n// arguments.callee === dump\nfalse\n\n// arguments.caller\nundefined\n\n// arguments.caller === indirectDump\nfalse\n\n// arguments[0]\n... (39 lines after) ...",
+      "expected_output": "... (3 lines before) ...\n\n// arguments.length\n0\n\n// arguments instanceof Array\ntrue\n\n// arguments.__proto__ === Array.prototype\ntrue\n\n// arguments.callee\n[type Function]\n\n// arguments.callee === dump\ntrue\n\n// arguments.caller\nnull\n\n// arguments.caller === indirectDump\nfalse\n\n\n\n// dump(\"a\")\n// arguments\na\n\n// arguments.length\n1\n\n// arguments instanceof Array\ntrue\n\n// arguments.__proto__ === Array.prototype\ntrue\n\n// arguments.callee\n[type Function]\n\n// arguments.callee === dump\ntrue\n\n// arguments.caller\nnull\n\n// arguments.caller === indirectDump\nfalse\n\n// arguments[0]\n... (74 lines after) ..."
     },
     {
       "test": "array_call_method",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 9,
+        "matching_lines": 0
+      },
+      "duration": 1.73,
+      "status": "output_mismatch",
+      "detail": "9 line(s) differ (actual=1, expected=9)",
+      "actual_output": "",
+      "expected_output": "Test_First\nTest_second\nTest_third\nTest_bool\nTest_obj\nTest_null\nf\nf\nf"
     },
     {
       "test": "array_concat",
-      "status": "output_mismatch"
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 98,
+        "expected_lines": 98,
+        "matching_lines": 73
+      },
+      "duration": 1.88,
+      "status": "output_mismatch",
+      "detail": "25 line(s) differ (actual=98, expected=98)",
+      "actual_output": "// a\n\n\n// a[0]\nundefined\n\n// a[1]\nundefined\n\n// a[2]\nundefined\n\n// a[3]\nundefined\n\n// a[4]\nundefined\n\n// a.length\n0\n\n\n// b\n\n\n// b[0]\nundefined\n\n// b[1]\nundefined\n\n// b[2]\nundefined\n\n// b[3]\nundefined\n\n// b[4]\nundefined\n\n// b.length\n0\n\n\n// c\nundefined\n\n// c[0]\nundefined\n\n... (48 lines after) ...",
+      "expected_output": "// a\na,b\n\n// a[0]\na\n\n// a[1]\nb\n\n// a[2]\nundefined\n\n// a[3]\nundefined\n\n// a[4]\nundefined\n\n// a.length\n2\n\n\n// b\nc,d\n\n// b[0]\nc\n\n// b[1]\nd\n\n// b[2]\nundefined\n\n// b[3]\nundefined\n\n// b[4]\nundefined\n\n// b.length\n2\n\n\n// c\na,b,c,d\n\n// c[0]\na\n\n... (48 lines after) ..."
     }
   ]
 }
