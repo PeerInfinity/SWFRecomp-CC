@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-09T22:55:08Z",
+  "generated": "2026-02-10T00:14:28Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2180,6 +2180,20 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/bevel_filter",
+      "name": "bevel_filter",
+      "type": "graphics",
+      "path": "examples/graphics/bevel_filter",
+      "has_swf": true,
+      "wasm_file": "bevel_filter.wasm",
+      "js_file": "bevel_filter.js",
+      "description": "BevelFilter (filter ID 3) with shadow and highlight colors",
+      "swf_version": 8,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
       "id": "graphics/blur_filter",
       "name": "blur_filter",
       "type": "graphics",
@@ -2259,6 +2273,20 @@
       "wasm_file": "color_transform.wasm",
       "description": "WebGPU rendering test with CXFORMWITHALPHA color transforms applied via PlaceObject2",
       "swf_version": 4,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/convolution_filter",
+      "name": "convolution_filter",
+      "type": "graphics",
+      "path": "examples/graphics/convolution_filter",
+      "has_swf": true,
+      "js_file": "convolution_filter.js",
+      "wasm_file": "convolution_filter.wasm",
+      "description": "ConvolutionFilter (filter ID 5) with 5x5 box blur kernel",
+      "swf_version": 8,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []
@@ -2440,6 +2468,34 @@
       "js_file": "glow_filter.js",
       "wasm_file": "glow_filter.wasm",
       "description": "GlowFilter via PlaceObject3 FilterList",
+      "swf_version": 8,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/gradient_bevel_filter",
+      "name": "gradient_bevel_filter",
+      "type": "graphics",
+      "path": "examples/graphics/gradient_bevel_filter",
+      "has_swf": true,
+      "wasm_file": "gradient_bevel_filter.wasm",
+      "js_file": "gradient_bevel_filter.js",
+      "description": "GradientBevelFilter (filter ID 7) with dark-to-light gradient",
+      "swf_version": 8,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/gradient_glow_filter",
+      "name": "gradient_glow_filter",
+      "type": "graphics",
+      "path": "examples/graphics/gradient_glow_filter",
+      "has_swf": true,
+      "wasm_file": "gradient_glow_filter.wasm",
+      "js_file": "gradient_glow_filter.js",
+      "description": "GradientGlowFilter (filter ID 4) with red-to-yellow gradient glow",
       "swf_version": 8,
       "fully_implemented": true,
       "opcodes_tested": [],
@@ -2679,6 +2735,34 @@
       "wasm_file": "rgba_shape.wasm",
       "description": "WebGPU rendering test with semi-transparent overlapping shapes using DefineShape3 RGBA colors",
       "swf_version": 7,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/sound_stream",
+      "name": "sound_stream",
+      "type": "graphics",
+      "path": "examples/graphics/sound_stream",
+      "has_swf": true,
+      "wasm_file": "sound_stream.wasm",
+      "js_file": "sound_stream.js",
+      "description": "SoundStreamHead (tag 18) + SoundStreamBlock (tag 19) with streamed PCM sine wave",
+      "swf_version": 5,
+      "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/sound_stream_head2",
+      "name": "sound_stream_head2",
+      "type": "graphics",
+      "path": "examples/graphics/sound_stream_head2",
+      "has_swf": true,
+      "js_file": "sound_stream_head2.js",
+      "wasm_file": "sound_stream_head2.wasm",
+      "description": "SoundStreamHead2 (tag 45) + SoundStreamBlock (tag 19) with streamed PCM sine wave",
+      "swf_version": 5,
       "fully_implemented": true,
       "opcodes_tested": [],
       "opcodes_supporting": []

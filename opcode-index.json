@@ -5,7 +5,7 @@
     "implemented_opcodes": 99,
     "total_entries": 288,
     "total_graphics_features": 62,
-    "graphics_features_with_tests": 52
+    "graphics_features_with_tests": 59
   },
   "entries": [
     {
@@ -8713,12 +8713,14 @@
       "description": "Solid color fill (type 0x00)",
       "tests": [
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/bevel_filter",
         "SWFRecomp/tests/graphics/blur_filter",
         "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_matrix_filter",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/convolution_filter",
         "SWFRecomp/tests/graphics/define_button",
         "SWFRecomp/tests/graphics/define_button2",
         "SWFRecomp/tests/graphics/define_edit_text",
@@ -8730,6 +8732,8 @@
         "SWFRecomp/tests/graphics/define_text2",
         "SWFRecomp/tests/graphics/drop_shadow_filter",
         "SWFRecomp/tests/graphics/glow_filter",
+        "SWFRecomp/tests/graphics/gradient_bevel_filter",
+        "SWFRecomp/tests/graphics/gradient_glow_filter",
         "SWFRecomp/tests/graphics/movieclip_control",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/place_object",
@@ -8737,6 +8741,8 @@
         "SWFRecomp/tests/graphics/remove_object",
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
+        "SWFRecomp/tests/graphics/sound_stream",
+        "SWFRecomp/tests/graphics/sound_stream_head2",
         "SWFRecomp/tests/graphics/sprite_multiframe",
         "SWFRecomp/tests/graphics/sprite_nested",
         "SWFRecomp/tests/graphics/ssquare",
@@ -8843,11 +8849,13 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/bevel_filter",
         "SWFRecomp/tests/graphics/blur_filter",
         "SWFRecomp/tests/graphics/clip_actions",
         "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_matrix_filter",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/convolution_filter",
         "SWFRecomp/tests/graphics/define_button",
         "SWFRecomp/tests/graphics/define_button2",
         "SWFRecomp/tests/graphics/define_edit_text",
@@ -8861,6 +8869,8 @@
         "SWFRecomp/tests/graphics/drop_shadow_filter",
         "SWFRecomp/tests/graphics/focal_radial_gradient",
         "SWFRecomp/tests/graphics/glow_filter",
+        "SWFRecomp/tests/graphics/gradient_bevel_filter",
+        "SWFRecomp/tests/graphics/gradient_glow_filter",
         "SWFRecomp/tests/graphics/gradient_spread",
         "SWFRecomp/tests/graphics/jpeg2_bitmap",
         "SWFRecomp/tests/graphics/jpeg3_bitmap",
@@ -8878,6 +8888,8 @@
         "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
+        "SWFRecomp/tests/graphics/sound_stream",
+        "SWFRecomp/tests/graphics/sound_stream_head2",
         "SWFRecomp/tests/graphics/sprite_multiframe",
         "SWFRecomp/tests/graphics/sprite_nested",
         "SWFRecomp/tests/graphics/ssquare",
@@ -9323,8 +9335,10 @@
       "tag_id": 18,
       "category": "Sound Tags",
       "description": "Streaming sound header (SWF tag 18)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/sound_stream"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOUND_STREAM_HEAD2",
@@ -9332,8 +9346,10 @@
       "tag_id": 45,
       "category": "Sound Tags",
       "description": "Enhanced streaming sound header (SWF tag 45)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/sound_stream_head2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOUND_STREAM_BLOCK",
@@ -9341,8 +9357,11 @@
       "tag_id": 19,
       "category": "Sound Tags",
       "description": "Streaming audio frame data (SWF tag 19)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/sound_stream",
+        "SWFRecomp/tests/graphics/sound_stream_head2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_VIDEO_STREAM",
@@ -9401,8 +9420,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Beveled edge effect (filter ID 3)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/bevel_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "GRADIENT_GLOW_FILTER",
@@ -9410,8 +9431,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Gradient-based glow (filter ID 4)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/gradient_glow_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "CONVOLUTION_FILTER",
@@ -9419,8 +9442,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Convolution matrix filter (filter ID 5)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/convolution_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "COLOR_MATRIX_FILTER",
@@ -9439,8 +9464,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Gradient-based bevel (filter ID 7)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/gradient_bevel_filter"
+      ],
+      "fully_implemented": true
     }
   ]
 }

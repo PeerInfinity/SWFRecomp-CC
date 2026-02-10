@@ -8,13 +8,13 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Total SWF Features**: 62
 
-**Features With Tests**: 52/62
+**Features With Tests**: 59/62
 
-**Features Without Tests**: 10
+**Features Without Tests**: 3
 
-**Total Feature Tests**: 197
+**Total Feature Tests**: 217
 
-**Fully Implemented**: 52/62
+**Fully Implemented**: 59/62
 
 ## Summary Tables
 
@@ -33,7 +33,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| SolidFill | Solid color fill (type 0x00) | - | 34 | Yes |
+| SolidFill | Solid color fill (type 0x00) | - | 40 | Yes |
 | LinearGradient | Linear gradient fill (type 0x10) | - | 3 | Yes |
 | RadialGradient | Radial gradient fill (type 0x12) | - | 1 | Yes |
 | FocalRadialGradient | Focal radial gradient fill (type 0x13, SWF 8+) | - | 1 | Yes |
@@ -47,7 +47,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| StraightEdge | Straight edge records (LineTo) | - | 49 | Yes |
+| StraightEdge | Straight edge records (LineTo) | - | 55 | Yes |
 | CurvedEdge | Curved edge records (CurveTo) | - | 3 | Yes |
 
 ### Gradient Features
@@ -138,15 +138,15 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | DefineButton2 | Enhanced button with actions (SWF tag 34) | 34 | 1 | Yes |
 
 ### Sound Tags
-(2/5 with tests)
+(5/5 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
 | DefineSound | Event sound definition (SWF tag 14) | 14 | 1 | Yes |
 | StartSound | Play/stop event sound (SWF tag 15) | 15 | 1 | Yes |
-| SoundStreamHead | Streaming sound header (SWF tag 18) | 18 | **0** | No |
-| SoundStreamHead2 | Enhanced streaming sound header (SWF tag 45) | 45 | **0** | No |
-| SoundStreamBlock | Streaming audio frame data (SWF tag 19) | 19 | **0** | No |
+| SoundStreamHead | Streaming sound header (SWF tag 18) | 18 | 1 | Yes |
+| SoundStreamHead2 | Enhanced streaming sound header (SWF tag 45) | 45 | 1 | Yes |
+| SoundStreamBlock | Streaming audio frame data (SWF tag 19) | 19 | 2 | Yes |
 
 ### Video Tags
 (0/2 with tests)
@@ -157,23 +157,23 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | VideoFrame | Video frame data (SWF tag 61) | 61 | **0** | No |
 
 ### Filter Types
-(4/8 with tests)
+(8/8 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
 | DropShadowFilter | Drop shadow effect (filter ID 0) | - | 1 | Yes |
 | BlurFilter | Gaussian blur effect (filter ID 1) | - | 1 | Yes |
 | GlowFilter | Glow/halo effect (filter ID 2) | - | 1 | Yes |
-| BevelFilter | Beveled edge effect (filter ID 3) | - | **0** | No |
-| GradientGlowFilter | Gradient-based glow (filter ID 4) | - | **0** | No |
-| ConvolutionFilter | Convolution matrix filter (filter ID 5) | - | **0** | No |
+| BevelFilter | Beveled edge effect (filter ID 3) | - | 1 | Yes |
+| GradientGlowFilter | Gradient-based glow (filter ID 4) | - | 1 | Yes |
+| ConvolutionFilter | Convolution matrix filter (filter ID 5) | - | 1 | Yes |
 | ColorMatrixFilter | 4x5 color matrix transform (filter ID 6) | - | 1 | Yes |
-| GradientBevelFilter | Gradient-based bevel (filter ID 7) | - | **0** | No |
+| GradientBevelFilter | Gradient-based bevel (filter ID 7) | - | 1 | Yes |
 
 ## Implementation Status
 
 ### Fully Implemented
-(52 features)
+(59 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
@@ -181,7 +181,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | DefineShape2 | Shape Tags | 22 | 2 |
 | DefineShape3 | Shape Tags | 32 | 2 |
 | DefineShape4 | Shape Tags | 83 | 1 |
-| SolidFill | Fill Types | - | 34 |
+| SolidFill | Fill Types | - | 40 |
 | LinearGradient | Fill Types | - | 3 |
 | RadialGradient | Fill Types | - | 1 |
 | FocalRadialGradient | Fill Types | - | 1 |
@@ -189,7 +189,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | ClippedBitmap | Fill Types | - | 6 |
 | NonSmoothedRepeatingBitmap | Fill Types | - | 1 |
 | NonSmoothedClippedBitmap | Fill Types | - | 1 |
-| StraightEdge | Edge Types | - | 49 |
+| StraightEdge | Edge Types | - | 55 |
 | CurvedEdge | Edge Types | - | 3 |
 | GradientSpread | Gradient Features | - | 1 |
 | LineStyle | Style Features | - | 12 |
@@ -225,10 +225,17 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | DefineButton2 | Button Tags | 34 | 1 |
 | DefineSound | Sound Tags | 14 | 1 |
 | StartSound | Sound Tags | 15 | 1 |
+| SoundStreamHead | Sound Tags | 18 | 1 |
+| SoundStreamHead2 | Sound Tags | 45 | 1 |
+| SoundStreamBlock | Sound Tags | 19 | 2 |
 | DropShadowFilter | Filter Types | - | 1 |
 | BlurFilter | Filter Types | - | 1 |
 | GlowFilter | Filter Types | - | 1 |
+| BevelFilter | Filter Types | - | 1 |
+| GradientGlowFilter | Filter Types | - | 1 |
+| ConvolutionFilter | Filter Types | - | 1 |
 | ColorMatrixFilter | Filter Types | - | 1 |
+| GradientBevelFilter | Filter Types | - | 1 |
 
 ### Partially Tested
 (Has tests but not marked as fully implemented)
@@ -241,15 +248,8 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | Feature | Category | Tag ID |
 |---------|----------|--------|
 | DefineFont4 | Text Tags | 91 |
-| SoundStreamHead | Sound Tags | 18 |
-| SoundStreamHead2 | Sound Tags | 45 |
-| SoundStreamBlock | Sound Tags | 19 |
 | DefineVideoStream | Video Tags | 60 |
 | VideoFrame | Video Tags | 61 |
-| BevelFilter | Filter Types | - |
-| GradientGlowFilter | Filter Types | - |
-| ConvolutionFilter | Filter Types | - |
-| GradientBevelFilter | Filter Types | - |
 
 ## Detailed Information
 
@@ -361,12 +361,14 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tests:**
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
+- `SWFRecomp/tests/graphics/bevel_filter`
 - `SWFRecomp/tests/graphics/blur_filter`
 - `SWFRecomp/tests/graphics/clip_actions`
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/coicle`
 - `SWFRecomp/tests/graphics/color_matrix_filter`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/convolution_filter`
 - `SWFRecomp/tests/graphics/define_button`
 - `SWFRecomp/tests/graphics/define_button2`
 - `SWFRecomp/tests/graphics/define_edit_text`
@@ -378,6 +380,8 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/define_text2`
 - `SWFRecomp/tests/graphics/drop_shadow_filter`
 - `SWFRecomp/tests/graphics/glow_filter`
+- `SWFRecomp/tests/graphics/gradient_bevel_filter`
+- `SWFRecomp/tests/graphics/gradient_glow_filter`
 - `SWFRecomp/tests/graphics/movieclip_control`
 - `SWFRecomp/tests/graphics/new_styles`
 - `SWFRecomp/tests/graphics/place_object`
@@ -385,6 +389,8 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/remove_object`
 - `SWFRecomp/tests/graphics/remove_object2`
 - `SWFRecomp/tests/graphics/rgba_shape`
+- `SWFRecomp/tests/graphics/sound_stream`
+- `SWFRecomp/tests/graphics/sound_stream_head2`
 - `SWFRecomp/tests/graphics/sprite_multiframe`
 - `SWFRecomp/tests/graphics/sprite_nested`
 - `SWFRecomp/tests/graphics/ssquare`
@@ -539,11 +545,13 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/awful_gradient`
 - `SWFRecomp/tests/graphics/awful_radial_gradient`
 - `SWFRecomp/tests/graphics/awful_shape_swf_4`
+- `SWFRecomp/tests/graphics/bevel_filter`
 - `SWFRecomp/tests/graphics/blur_filter`
 - `SWFRecomp/tests/graphics/clip_actions`
 - `SWFRecomp/tests/graphics/clip_mask`
 - `SWFRecomp/tests/graphics/color_matrix_filter`
 - `SWFRecomp/tests/graphics/color_transform`
+- `SWFRecomp/tests/graphics/convolution_filter`
 - `SWFRecomp/tests/graphics/define_button`
 - `SWFRecomp/tests/graphics/define_button2`
 - `SWFRecomp/tests/graphics/define_edit_text`
@@ -557,6 +565,8 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/drop_shadow_filter`
 - `SWFRecomp/tests/graphics/focal_radial_gradient`
 - `SWFRecomp/tests/graphics/glow_filter`
+- `SWFRecomp/tests/graphics/gradient_bevel_filter`
+- `SWFRecomp/tests/graphics/gradient_glow_filter`
 - `SWFRecomp/tests/graphics/gradient_spread`
 - `SWFRecomp/tests/graphics/jpeg2_bitmap`
 - `SWFRecomp/tests/graphics/jpeg3_bitmap`
@@ -574,6 +584,8 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 - `SWFRecomp/tests/graphics/remove_object2`
 - `SWFRecomp/tests/graphics/repeating_bitmap`
 - `SWFRecomp/tests/graphics/rgba_shape`
+- `SWFRecomp/tests/graphics/sound_stream`
+- `SWFRecomp/tests/graphics/sound_stream_head2`
 - `SWFRecomp/tests/graphics/sprite_multiframe`
 - `SWFRecomp/tests/graphics/sprite_nested`
 - `SWFRecomp/tests/graphics/ssquare`
@@ -1240,9 +1252,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: 18
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/sound_stream`
 
 ---
 
@@ -1256,9 +1269,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: 45
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/sound_stream_head2`
 
 ---
 
@@ -1272,9 +1286,11 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: 19
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/sound_stream`
+- `SWFRecomp/tests/graphics/sound_stream_head2`
 
 ---
 
@@ -1371,9 +1387,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/bevel_filter`
 
 ---
 
@@ -1387,9 +1404,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/gradient_glow_filter`
 
 ---
 
@@ -1403,9 +1421,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/convolution_filter`
 
 ---
 
@@ -1436,8 +1455,9 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: N/A
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/gradient_bevel_filter`
 
 ---

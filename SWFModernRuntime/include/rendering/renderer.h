@@ -42,7 +42,7 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_begin_offscreen_pass(ctx)            render_webgpu_begin_offscreen_pass(ctx)
 #define renderer_end_offscreen_pass(ctx)              render_webgpu_end_offscreen_pass(ctx)
 #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) render_webgpu_run_blur(ctx, bx, by, q, s, r, g, b, a, c)
-#define renderer_composite_filtered(ctx, ox, oy)      render_webgpu_composite_filtered(ctx, ox, oy)
+#define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) render_webgpu_composite_filtered(ctx, ox, oy, tr, tg, tb, ta)
 #define renderer_ensure_filter_resources(ctx)          render_webgpu_ensure_filter_resources(ctx)
 
 #else
@@ -78,7 +78,7 @@ typedef FlashbangContext RenderContext;
 #define renderer_begin_offscreen_pass(ctx)            ((void)0)
 #define renderer_end_offscreen_pass(ctx)              ((void)0)
 #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) ((void)0)
-#define renderer_composite_filtered(ctx, ox, oy)      ((void)0)
+#define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) ((void)0)
 #define renderer_ensure_filter_resources(ctx)          ((void)0)
 
 #endif

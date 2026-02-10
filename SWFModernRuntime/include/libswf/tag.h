@@ -26,6 +26,8 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
     u8 type, float blur_x, float blur_y, u8 quality, u8 flags,
     float r, float g, float b, float a, float strength,
     float angle, float distance);
+void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+    float r, float g, float b, float a);
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth);

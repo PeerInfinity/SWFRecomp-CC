@@ -63,6 +63,8 @@ typedef struct StreamingSound {
 	size_t read_pos;      // Next read position
 	int sample_rate;
 	int channels;
+	size_t prebuffer;     // Samples to buffer before starting playback
+	int started;          // 1 once prebuffer threshold reached
 } StreamingSound;
 
 // Audio context

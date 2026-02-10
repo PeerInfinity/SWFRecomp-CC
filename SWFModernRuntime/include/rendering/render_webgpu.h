@@ -172,6 +172,6 @@ void render_webgpu_resume_pass(WebGPURenderContext* context);
 void render_webgpu_begin_offscreen_pass(WebGPURenderContext* context);
 void render_webgpu_end_offscreen_pass(WebGPURenderContext* context);
 void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float blur_y, u8 quality, float strength, float r, float g, float b, float a, int colorize);
-void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y);
+void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

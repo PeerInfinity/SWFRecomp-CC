@@ -44,6 +44,9 @@ void tagMain(SWFAppContext* app_context)
 
 	while (!quit_swf)
 	{
+#ifdef __EMSCRIPTEN__
+		double frame_start = emscripten_get_now();
+#endif
 		current_frame = next_frame;
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
@@ -55,7 +58,9 @@ void tagMain(SWFAppContext* app_context)
 		manual_next_frame = 0;
 		bad_poll |= renderer_poll(app_context);
 #ifdef __EMSCRIPTEN__
-		emscripten_sleep(frame_ms);
+		double elapsed = emscripten_get_now() - frame_start;
+		u32 sleep_ms = (elapsed < (double)frame_ms) ? (u32)((double)frame_ms - elapsed) : 0;
+		emscripten_sleep(sleep_ms);
 #endif
 		quit_swf |= bad_poll;
 	}

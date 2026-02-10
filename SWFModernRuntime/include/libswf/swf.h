@@ -132,7 +132,7 @@ typedef struct DisplayObject
 	ClipAction* clip_actions;
 	size_t clip_action_count;
 	// Visual filter (PlaceObject3 FilterList)
-	u8 filter_type;       // 0=none, 1=blur, 2=drop_shadow, 3=glow
+	u8 filter_type;       // 0=none, 1=blur, 2=drop_shadow, 3=glow, 4=bevel
 	u8 filter_quality;    // blur passes (1-3)
 	u8 filter_flags;      // inner/knockout/compositeSource
 	float filter_blur_x;
@@ -144,6 +144,11 @@ typedef struct DisplayObject
 	float filter_strength;
 	float filter_angle;
 	float filter_distance;
+	// Bevel highlight color (shadow color uses filter_color_*)
+	float filter_highlight_r;
+	float filter_highlight_g;
+	float filter_highlight_b;
+	float filter_highlight_a;
 } DisplayObject;
 
 typedef struct MouseState {

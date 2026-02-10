@@ -76,6 +76,12 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
 	(void)strength; (void)angle; (void)distance;
 }
 
+void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+	float r, float g, float b, float a)
+{
+	(void)app_context; (void)depth; (void)r; (void)g; (void)b; (void)a;
+}
+
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
 	(void)app_context; (void)depth; (void)name;

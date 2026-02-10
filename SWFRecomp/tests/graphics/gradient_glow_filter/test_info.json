@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "gradient_glow_filter",
+    "description": "GradientGlowFilter (filter ID 4) with red-to-yellow gradient glow",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["GRADIENT_GLOW_FILTER", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "sound_stream_head2",
+    "description": "SoundStreamHead2 (tag 45) + SoundStreamBlock (tag 19) with streamed PCM sine wave",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["SOUND_STREAM_HEAD_2", "SOUND_STREAM_BLOCK", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

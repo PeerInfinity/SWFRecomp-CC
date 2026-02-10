@@ -676,6 +676,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			// 2. Apply blur
 			int is_shadow = (obj->filter_type == 2);
 			int is_glow = (obj->filter_type == 3);
+			int is_bevel = (obj->filter_type == 4);
 			int colorize = is_shadow || is_glow;
 			renderer_run_blur(context,
 				obj->filter_blur_x, obj->filter_blur_y,
@@ -691,24 +692,39 @@ void tagShowFrame(SWFAppContext* app_context)
 			{
 				// DropShadow: composite shadow with offset, then render original on top
 				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
-				// Convert distance from twips to NDC
 				float dist_px = obj->filter_distance;
 				float offset_ndc_x = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
 				float offset_ndc_y = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
-				renderer_composite_filtered(context, offset_ndc_x, -offset_ndc_y);
-				// Re-render original on top
+				renderer_composite_filtered(context, offset_ndc_x, -offset_ndc_y, 0, 0, 0, 0);
 				render_single_object(app_context, obj);
 			}
 			else if (is_glow)
 			{
 				// Glow: composite glow behind, then render original on top
-				renderer_composite_filtered(context, 0.0f, 0.0f);
+				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+				render_single_object(app_context, obj);
+			}
+			else if (is_bevel)
+			{
+				// Bevel: composite shadow + highlight at opposite offsets, then original
+				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
+				float dist_px = obj->filter_distance;
+				float shadow_ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
+				float shadow_oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				// Shadow: offset in angle direction, tinted with shadow color
+				renderer_composite_filtered(context, shadow_ox, -shadow_oy,
+					obj->filter_color_r, obj->filter_color_g,
+					obj->filter_color_b, obj->filter_color_a);
+				// Highlight: offset in opposite direction, tinted with highlight color
+				renderer_composite_filtered(context, -shadow_ox, shadow_oy,
+					obj->filter_highlight_r, obj->filter_highlight_g,
+					obj->filter_highlight_b, obj->filter_highlight_a);
 				render_single_object(app_context, obj);
 			}
 			else
 			{
 				// Pure blur: just composite the blurred result
-				renderer_composite_filtered(context, 0.0f, 0.0f);
+				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
 			}
 
 			// Re-bind blend state after filter pipeline switches
@@ -946,6 +962,19 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
 		display_list[depth].filter_strength = strength;
 		display_list[depth].filter_angle = angle;
 		display_list[depth].filter_distance = distance;
+	}
+}
+
+void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+    float r, float g, float b, float a)
+{
+	(void)app_context;
+	if (depth <= max_depth)
+	{
+		display_list[depth].filter_highlight_r = r;
+		display_list[depth].filter_highlight_g = g;
+		display_list[depth].filter_highlight_b = b;
+		display_list[depth].filter_highlight_a = a;
 	}
 }
 

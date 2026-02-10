@@ -260,6 +260,13 @@ void audio_stream_head(SWFAppContext* app_context,
 	ctx->stream.sample_rate = rate_code_to_hz(rate);
 	ctx->stream.channels = stereo ? 2 : 1;
 
+	// Pre-buffer 0.5 seconds of audio before starting playback.
+	// emscripten_sleep() has inherent overhead making frames run slightly slower
+	// than real-time, so the audio callback consumes data faster than frames
+	// produce it. A large pre-buffer absorbs this drift for many seconds.
+	ctx->stream.prebuffer = (size_t)ctx->stream.sample_rate / 2;
+	ctx->stream.started = 0;
+
 	// Allocate a streaming buffer (enough for ~2 seconds)
 	size_t buf_samples = (size_t)ctx->stream.sample_rate * 2;
 	ctx->stream.buffer_size = buf_samples;
@@ -297,6 +304,34 @@ void audio_stream_block(SWFAppContext* app_context,
 		}
 
 		free(pcm);
+	}
+	else if (ctx->stream.format == SOUND_FORMAT_UNCOMPRESSED_NE ||
+			 ctx->stream.format == SOUND_FORMAT_UNCOMPRESSED_LE)
+	{
+		int ch = ctx->stream.channels;
+		if (ctx->stream.sample_size == 1) // 16-bit
+		{
+			size_t pcm_samples = data_size / (2 * ch);
+			const s16* src = (const s16*)data;
+			for (size_t i = 0; i < pcm_samples; i++)
+			{
+				size_t wp = ctx->stream.write_pos % ctx->stream.buffer_size;
+				for (int c = 0; c < ch; c++)
+					ctx->stream.pcm_buffer[wp * ch + c] = src[i * ch + c] / 32768.0f;
+				ctx->stream.write_pos++;
+			}
+		}
+		else // 8-bit
+		{
+			size_t pcm_samples = data_size / ch;
+			for (size_t i = 0; i < pcm_samples; i++)
+			{
+				size_t wp = ctx->stream.write_pos % ctx->stream.buffer_size;
+				for (int c = 0; c < ch; c++)
+					ctx->stream.pcm_buffer[wp * ch + c] = (data[i * ch + c] - 128) / 128.0f;
+				ctx->stream.write_pos++;
+			}
+		}
 	}
 }
 
@@ -341,20 +376,36 @@ void audio_mix(AudioContext* ctx, float* output, size_t frames, int out_channels
 	// Mix streaming sound
 	if (ctx->stream.active && ctx->stream.pcm_buffer)
 	{
-		int ch = ctx->stream.channels;
-		for (size_t f = 0; f < frames; f++)
+		// Wait until enough data is buffered before starting playback.
+		// Also re-triggers after underrun to accumulate a fresh buffer.
+		if (!ctx->stream.started)
 		{
-			if (ctx->stream.read_pos >= ctx->stream.write_pos)
-				break; // No more data
+			size_t available = ctx->stream.write_pos - ctx->stream.read_pos;
+			if (available >= ctx->stream.prebuffer)
+				ctx->stream.started = 1;
+		}
 
-			size_t rp = ctx->stream.read_pos % ctx->stream.buffer_size;
-			for (int c = 0; c < out_channels; c++)
+		if (ctx->stream.started)
+		{
+			int ch = ctx->stream.channels;
+			for (size_t f = 0; f < frames; f++)
 			{
-				int src_c = (c < ch) ? c : 0;
-				output[f * out_channels + c] +=
-					ctx->stream.pcm_buffer[rp * ch + src_c] * ctx->master_volume;
+				if (ctx->stream.read_pos >= ctx->stream.write_pos)
+				{
+					// Buffer underrun — stop reading and rebuffer
+					ctx->stream.started = 0;
+					break;
+				}
+
+				size_t rp = ctx->stream.read_pos % ctx->stream.buffer_size;
+				for (int c = 0; c < out_channels; c++)
+				{
+					int src_c = (c < ch) ? c : 0;
+					output[f * out_channels + c] +=
+						ctx->stream.pcm_buffer[rp * ch + src_c] * ctx->master_volume;
+				}
+				ctx->stream.read_pos++;
 			}
-			ctx->stream.read_pos++;
 		}
 	}
 

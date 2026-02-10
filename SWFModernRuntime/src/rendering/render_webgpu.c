@@ -1647,9 +1647,13 @@ static const char* blur_wgsl =
 	"}\n";
 
 static const char* composite_wgsl =
+	"struct Params {\n"
+	"  offset_and_mode: vec4f,\n"  // xy=NDC offset, z=tint_mode (0=passthrough, 1=tint), w=unused
+	"  tint: vec4f,\n"             // RGBA tint color (used when tint_mode > 0.5)
+	"}\n"
 	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
 	"@group(0) @binding(1) var in_samp: sampler;\n"
-	"@group(0) @binding(2) var<uniform> offset: vec4f;\n"  // xy = pixel offset in NDC, zw = unused
+	"@group(0) @binding(2) var<uniform> params: Params;\n"
 	"\n"
 	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
 	"\n"
@@ -1663,14 +1667,16 @@ static const char* composite_wgsl =
 	"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
 	"  );\n"
 	"  var out: VSOut;\n"
-	"  out.pos = vec4f(positions[vi] + offset.xy, 0.0, 1.0);\n"
+	"  out.pos = vec4f(positions[vi] + params.offset_and_mode.xy, 0.0, 1.0);\n"
 	"  out.uv = uvs[vi];\n"
 	"  return out;\n"
 	"}\n"
 	"\n"
 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
 	"  let c = textureSample(in_tex, in_samp, uv);\n"
-	"  return c;\n"
+	"  let a_tinted = c.a * params.tint.a;\n"
+	"  let tinted = vec4f(params.tint.rgb * a_tinted, a_tinted);\n"
+	"  return select(c, tinted, params.offset_and_mode.z > 0.5);\n"
 	"}\n";
 
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
@@ -1800,9 +1806,9 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		entries[1].visibility = WGPUShaderStage_Fragment;
 		entries[1].sampler.type = WGPUSamplerBindingType_Filtering;
 		entries[2].binding = 2;
-		entries[2].visibility = WGPUShaderStage_Vertex;
+		entries[2].visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
 		entries[2].buffer.type = WGPUBufferBindingType_Uniform;
-		entries[2].buffer.minBindingSize = 16;
+		entries[2].buffer.minBindingSize = 32;
 
 		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
 		bgl_desc.entryCount = 3;
@@ -1862,15 +1868,12 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		wgpuShaderModuleRelease(comp_sm);
 	}
 
-	// --- Offset uniform buffer for composite ---
+	// --- Composite params uniform buffer (32 bytes: offset+mode vec4f + tint vec4f) ---
 	{
 		WGPUBufferDescriptor buf_desc = {0};
-		buf_desc.label = WGPU_LABEL("composite_offset");
-		buf_desc.size = 16;
+		buf_desc.label = WGPU_LABEL("composite_params");
+		buf_desc.size = 32;
 		buf_desc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
-		// Reuse blur_params_buf's first 16 bytes? No, use a dedicated small one.
-		// We can just pass offset via blur_params_buf since we can use different bind groups.
-		// Actually, let's create a tiny buffer. We'll store it as filter_quad_buffer.
 		ctx->filter_quad_buffer = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
 	}
 }
@@ -2058,11 +2061,14 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 	}
 }
 
-void render_webgpu_composite_filtered(WebGPURenderContext* ctx, float offset_x, float offset_y)
+void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
+	float offset_x, float offset_y,
+	float tint_r, float tint_g, float tint_b, float tint_a)
 {
-	// offset_x/y are in NDC space
-	float offset[4] = {offset_x, offset_y, 0, 0};
-	wgpuQueueWriteBuffer(ctx->queue, ctx->filter_quad_buffer, 0, offset, 16);
+	// offset_x/y are in NDC space; tint rgba = 0 means passthrough
+	float has_tint = (tint_r != 0 || tint_g != 0 || tint_b != 0 || tint_a != 0) ? 1.0f : 0.0f;
+	float params[8] = {offset_x, offset_y, has_tint, 0, tint_r, tint_g, tint_b, tint_a};
+	wgpuQueueWriteBuffer(ctx->queue, ctx->filter_quad_buffer, 0, params, 32);
 
 	// Create bind group for composite: read filter_tex_a
 	WGPUBindGroupEntry bg_entries[3] = {0};
@@ -2072,7 +2078,7 @@ void render_webgpu_composite_filtered(WebGPURenderContext* ctx, float offset_x, 
 	bg_entries[1].sampler = ctx->filter_sampler;
 	bg_entries[2].binding = 2;
 	bg_entries[2].buffer = ctx->filter_quad_buffer;
-	bg_entries[2].size = 16;
+	bg_entries[2].size = 32;
 
 	WGPUBindGroupDescriptor bg_desc = {0};
 	bg_desc.layout = ctx->composite_bgl;

@@ -1243,11 +1243,12 @@ def build_place_object3(object_id, depth, trans_x=0, trans_y=0,
     """Build raw PlaceObject3 (tag 70) body.
 
     filter_data: if present, dict with keys:
-      - type: 'blur', 'drop_shadow', or 'glow'
+      - type: 'blur', 'drop_shadow', 'glow', or 'bevel'
       - blur_x, blur_y: float pixels
       - quality: int (1-3)
       - For drop_shadow/glow: color=(r,g,b,a), strength=float
       - For drop_shadow: angle=float (degrees), distance=float (pixels)
+      - For bevel: shadow_color=(r,g,b,a), highlight_color=(r,g,b,a), angle, distance, strength
     """
     flags1 = 0x02 | 0x04  # HasCharacter + HasMatrix
     flags2 = 0
@@ -1307,6 +1308,85 @@ def build_place_object3(object_id, depth, trans_x=0, trans_y=0,
             strength_fixed = int(round(strength * 256))
             q = filter_data.get('quality', 1)
             body += struct.pack('<iiH', bx, by, strength_fixed)
+            body += struct.pack('<B', (q << 3) | 0x06)
+        elif ftype == 'bevel':
+            body += struct.pack('<B', 1)  # 1 filter
+            body += struct.pack('<B', 3)  # BevelFilter ID
+            sr, sg, sb, sa = filter_data.get('shadow_color', (0, 0, 0, 255))
+            hr, hg, hb, ha = filter_data.get('highlight_color', (255, 255, 255, 255))
+            body += struct.pack('<BBBB', sr, sg, sb, sa)
+            body += struct.pack('<BBBB', hr, hg, hb, ha)
+            bx = int(round(filter_data.get('blur_x', 4.0) * 65536))
+            by = int(round(filter_data.get('blur_y', 4.0) * 65536))
+            angle_deg = filter_data.get('angle', 45.0)
+            angle_fixed = int(round(angle_deg * 65536))
+            dist = filter_data.get('distance', 4.0)
+            dist_fixed = int(round(dist * 65536))
+            strength = filter_data.get('strength', 1.0)
+            strength_fixed = int(round(strength * 256))
+            q = filter_data.get('quality', 1)
+            body += struct.pack('<iiiiH', bx, by, angle_fixed, dist_fixed, strength_fixed)
+            body += struct.pack('<B', (q << 3) | 0x06)
+        elif ftype == 'gradient_glow':
+            body += struct.pack('<B', 1)  # 1 filter
+            body += struct.pack('<B', 4)  # GradientGlowFilter ID
+            colors = filter_data.get('colors', [(255, 0, 0, 0), (255, 0, 0, 255)])
+            ratios = filter_data.get('ratios', [0, 255])
+            body += struct.pack('<B', len(colors))
+            for r, g, b, a in colors:
+                body += struct.pack('<BBBB', r, g, b, a)
+            for ratio in ratios:
+                body += struct.pack('<B', ratio)
+            bx = int(round(filter_data.get('blur_x', 4.0) * 65536))
+            by = int(round(filter_data.get('blur_y', 4.0) * 65536))
+            angle_deg = filter_data.get('angle', 45.0)
+            angle_fixed = int(round(angle_deg * 65536))
+            dist = filter_data.get('distance', 4.0)
+            dist_fixed = int(round(dist * 65536))
+            strength = filter_data.get('strength', 1.0)
+            strength_fixed = int(round(strength * 256))
+            q = filter_data.get('quality', 1)
+            body += struct.pack('<iiiiH', bx, by, angle_fixed, dist_fixed, strength_fixed)
+            body += struct.pack('<B', (q << 3) | 0x06)
+        elif ftype == 'convolution':
+            body += struct.pack('<B', 1)  # 1 filter
+            body += struct.pack('<B', 5)  # ConvolutionFilter ID
+            mx = filter_data.get('matrix_x', 3)
+            my = filter_data.get('matrix_y', 3)
+            divisor = filter_data.get('divisor', 1.0)
+            bias = filter_data.get('bias', 0.0)
+            matrix = filter_data.get('matrix', [1.0/(mx*my)] * (mx*my))
+            body += struct.pack('<BB', mx, my)
+            body += struct.pack('<f', divisor)
+            body += struct.pack('<f', bias)
+            for val in matrix:
+                body += struct.pack('<f', val)
+            dr, dg, db, da = filter_data.get('default_color', (0, 0, 0, 0))
+            body += struct.pack('<BBBB', dr, dg, db, da)
+            flags = 0x02 if filter_data.get('preserve_alpha', True) else 0
+            if filter_data.get('clamp', True):
+                flags |= 0x01
+            body += struct.pack('<B', flags)
+        elif ftype == 'gradient_bevel':
+            body += struct.pack('<B', 1)  # 1 filter
+            body += struct.pack('<B', 7)  # GradientBevelFilter ID
+            colors = filter_data.get('colors', [(0, 0, 0, 255), (255, 255, 255, 255)])
+            ratios = filter_data.get('ratios', [0, 255])
+            body += struct.pack('<B', len(colors))
+            for r, g, b, a in colors:
+                body += struct.pack('<BBBB', r, g, b, a)
+            for ratio in ratios:
+                body += struct.pack('<B', ratio)
+            bx = int(round(filter_data.get('blur_x', 4.0) * 65536))
+            by = int(round(filter_data.get('blur_y', 4.0) * 65536))
+            angle_deg = filter_data.get('angle', 45.0)
+            angle_fixed = int(round(angle_deg * 65536))
+            dist = filter_data.get('distance', 4.0)
+            dist_fixed = int(round(dist * 65536))
+            strength = filter_data.get('strength', 1.0)
+            strength_fixed = int(round(strength * 256))
+            q = filter_data.get('quality', 1)
+            body += struct.pack('<iiiiH', bx, by, angle_fixed, dist_fixed, strength_fixed)
             body += struct.pack('<B', (q << 3) | 0x06)
 
     if blend_mode > 0:
@@ -2040,6 +2120,33 @@ class SWFMLBuilder:
             extra += struct.pack('<H', loop_count)
         body = struct.pack('<HB', sound_id, si_flags) + extra
         self.add_raw_tag(15, body)
+
+    def sound_stream_head(self, stream_format=3, stream_rate=3, stream_size=1,
+                          stream_stereo=False, playback_rate=3, playback_size=1,
+                          playback_stereo=False, avg_sample_count=0):
+        """Add a SoundStreamHead tag (tag 18).
+
+        stream_format: 0=uncompressed_ne, 1=ADPCM, 2=MP3, 3=uncompressed_le
+        stream_rate/playback_rate: 0=5512, 1=11025, 2=22050, 3=44100
+        stream_size/playback_size: 0=8-bit, 1=16-bit
+        """
+        playback_flags = (playback_rate << 2) | (playback_size << 1) | (1 if playback_stereo else 0)
+        stream_flags = (stream_format << 4) | (stream_rate << 2) | (stream_size << 1) | (1 if stream_stereo else 0)
+        body = struct.pack('<BBH', playback_flags, stream_flags, avg_sample_count)
+        self.add_raw_tag(18, body)
+
+    def sound_stream_head2(self, stream_format=3, stream_rate=3, stream_size=1,
+                           stream_stereo=False, playback_rate=3, playback_size=1,
+                           playback_stereo=False, avg_sample_count=0):
+        """Add a SoundStreamHead2 tag (tag 45). Same format as SoundStreamHead."""
+        playback_flags = (playback_rate << 2) | (playback_size << 1) | (1 if playback_stereo else 0)
+        stream_flags = (stream_format << 4) | (stream_rate << 2) | (stream_size << 1) | (1 if stream_stereo else 0)
+        body = struct.pack('<BBH', playback_flags, stream_flags, avg_sample_count)
+        self.add_raw_tag(45, body)
+
+    def sound_stream_block(self, pcm_samples=None):
+        """Add a SoundStreamBlock tag (tag 19) with raw PCM data."""
+        self.add_raw_tag(19, pcm_samples if pcm_samples else b'')
 
     def add_raw_tag(self, tag_id, body_bytes):
         """Add a raw binary tag (emitted as UnknownTag)."""
