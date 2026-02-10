@@ -2886,7 +2886,8 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
 	{
-		// Check special variables
+#if !defined(SWF_VERSION) || SWF_VERSION >= 5
+		// Check special variables (SWF5+ only — SWF4 has no built-in constants)
 		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
 		{
 			// "this" refers to the current object context (root MovieClip)
@@ -2918,6 +2919,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_NULL, 0);
 			return;
 		}
+#endif
 
 		// Variable not found
 #if defined(SWF_VERSION) && SWF_VERSION >= 6
