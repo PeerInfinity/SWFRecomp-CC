@@ -94,19 +94,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin
 
-          # Switch to ruffle-test-results branch (create from master or update existing)
-          if git ls-remote --exit-code --heads origin ruffle-test-results; then
-            git checkout ruffle-test-results
-            git reset --hard origin/ruffle-test-results
-          else
-            git checkout --orphan ruffle-test-results
-            git rm -rf .
-          fi
+          # Create branch from current HEAD (shares history with master, so it can be merged)
+          git checkout -b ruffle-test-results
 
           # Restore results
           mkdir -p ruffle-tests
           cp /tmp/results.json ruffle-tests/results.json
-          git add ruffle-tests/results.json
+          git add -f ruffle-tests/results.json
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -121,4 +115,4 @@ jobs:
           git commit -m "Update Ruffle test results${LIMIT_MSG}" \
             -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          git push origin ruffle-test-results
+          git push -f origin ruffle-test-results
