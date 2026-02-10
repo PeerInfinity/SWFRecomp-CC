@@ -3,8 +3,31 @@
 #include <stdio.h>
 #include <assert.h>
 
+#ifdef __has_include
+#  if __has_include("constants.h")
+#    include "constants.h"
+#  endif
+#endif
+
 #include <actionmodern/object.h>
 #include <heap.h>
+
+// Version-based property hiding masks for ASSetPropFlags
+// When (property->flash_flags & FLASH_HIDE_MASK) != 0, property is hidden from GetMember
+#if defined(SWF_VERSION)
+static const u16 flash_hide_masks[] = {
+	0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // SWF 0-4
+	0x7480, // SWF 5
+	0x7500, // SWF 6
+	0x7000, // SWF 7
+	0x6000, // SWF 8
+	0x4000, // SWF 9
+	0x0000, // SWF 10+
+};
+#define FLASH_HIDE_MASK (SWF_VERSION <= 10 ? flash_hide_masks[SWF_VERSION] : 0)
+#else
+#define FLASH_HIDE_MASK 0
+#endif
 
 /**
  * Object Allocation
@@ -154,6 +177,21 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
  * Retrieves a property value by name.
  * Returns pointer to ActionVar, or NULL if property not found.
  */
+// Find property struct by name (ignoring version hiding) - for ASSetPropFlags
+static ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
+{
+	if (obj == NULL || name == NULL) return NULL;
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name_length == name_length &&
+		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		{
+			return &obj->properties[i];
+		}
+	}
+	return NULL;
+}
+
 ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL)
@@ -168,6 +206,11 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 		if (obj->properties[i].name_length == name_length &&
 		    strncmp(obj->properties[i].name, name, name_length) == 0)
 		{
+			// Check version-based hiding (ASSetPropFlags)
+			if (FLASH_HIDE_MASK && (obj->properties[i].flash_flags & FLASH_HIDE_MASK))
+			{
+				return NULL;  // Property hidden by version flags
+			}
 			return &obj->properties[i].value;
 		}
 	}

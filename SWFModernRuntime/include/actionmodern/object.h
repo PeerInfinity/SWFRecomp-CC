@@ -49,6 +49,7 @@ struct ASProperty
 	char* name;             // Property name (heap-allocated)
 	u32 name_length;        // Length of property name
 	u8 flags;               // Property attribute flags (PROPERTY_FLAG_*)
+	u16 flash_flags;        // Flash property flags (for ASSetPropFlags version visibility)
 	ActionVar value;        // Property value (can be any type)
 };
 

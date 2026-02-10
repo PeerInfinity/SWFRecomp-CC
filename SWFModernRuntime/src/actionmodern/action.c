@@ -409,6 +409,68 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 	return ACTION_STACK_VALUE_STRING;
 }
 
+// Helper: read numeric value from ActionVar as double, regardless of F32/F64 type
+static inline double varToDouble(ActionVar* v)
+{
+	if (v->type == ACTION_STACK_VALUE_F64)
+		return VAL(double, &v->data.numeric_value);
+	return (double)VAL(float, &v->data.numeric_value);
+}
+
+// Helper: convert ActionVar to int32 (ECMA-262 ToInt32)
+static inline int32_t varToInt32(ActionVar* v)
+{
+	double d = varToDouble(v);
+	if (isnan(d) || isinf(d)) return 0;
+	return (int32_t)d;
+}
+
+// Helper: parse string to number matching ECMA-262 ToNumber
+// Returns NaN for non-numeric strings (atof returns 0 which is wrong)
+static inline double parseStringToNumber(const char* str)
+{
+	if (str == NULL || str[0] == '\0') return NAN;
+	char* end;
+	double val = strtod(str, &end);
+	if (end == str) return NAN;
+	while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
+	if (*end != '\0') return NAN;
+	return val;
+}
+
+// Helper: check if a double is "truthy" (non-zero and not NaN)
+static inline int isTruthy(double d)
+{
+	return !isnan(d) && d != 0.0;
+}
+
+// Check truthiness of an ActionVar, respecting type semantics
+// Objects, functions, arrays are always truthy
+static inline int isVarTruthy(ActionVar* var)
+{
+	switch (var->type)
+	{
+		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_FUNCTION:
+		case ACTION_STACK_VALUE_ARRAY:
+		case ACTION_STACK_VALUE_MOVIECLIP:
+			return 1;
+		case ACTION_STACK_VALUE_BOOLEAN:
+			return var->data.numeric_value != 0;
+		case ACTION_STACK_VALUE_UNDEFINED:
+		case ACTION_STACK_VALUE_NULL:
+			return 0;
+		case ACTION_STACK_VALUE_STRING:
+		case ACTION_STACK_VALUE_STR_LIST:
+		{
+			char* s = (char*)(u64)var->data.numeric_value;
+			return s != NULL && s[0] != '\0';
+		}
+		default:
+			return isTruthy(varToDouble(var));
+	}
+}
+
 ActionStackValueType convertFloat(SWFAppContext* app_context)
 {
 	switch (STACK_TOP_TYPE)
@@ -436,18 +498,25 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 					temp = NAN;
 				}
 				// If there are trailing non-whitespace characters, it's NaN
+				// Exception: SWF < 5 uses parseFloat semantics (accepts partial parses)
 				else
 				{
+#if !defined(SWF_VERSION) || SWF_VERSION >= 5
 					while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
 					if (*end != '\0') temp = NAN;
+#endif
 				}
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 				VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			}
 			else
 			{
-				// Empty string -> 0 (SWF5) or NaN (SWF6+), use NaN as default
+				// Empty string -> 0 (SWF5) or NaN (SWF6+)
+#if defined(SWF_VERSION) && SWF_VERSION < 6
+				double temp = 0.0;
+#else
 				double temp = NAN;
+#endif
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 				VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			}
@@ -465,7 +534,11 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_NULL:
 		{
+#if defined(SWF_VERSION) && SWF_VERSION >= 7
+			double temp = NAN;
+#else
 			double temp = 0.0;
+#endif
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
@@ -473,7 +546,11 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_UNDEFINED:
 		{
+#if defined(SWF_VERSION) && SWF_VERSION < 6
+			double temp = 0.0;
+#else
 			double temp = NAN;
+#endif
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
@@ -484,6 +561,18 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_F64:
 			return ACTION_STACK_VALUE_F64;
+
+		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_FUNCTION:
+		case ACTION_STACK_VALUE_ARRAY:
+		case ACTION_STACK_VALUE_MOVIECLIP:
+		{
+			// Objects convert to NaN (TODO: call valueOf() if available)
+			double temp = NAN;
+			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
+			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
+			return ACTION_STACK_VALUE_F64;
+		}
 
 		default:
 			return STACK_TOP_TYPE;
@@ -815,28 +904,11 @@ void actionDivide(SWFAppContext* app_context)
 	ActionVar b;
 	popVar(app_context, &b);
 	
-	if (VAL(float, &a.data.numeric_value) == 0.0f)
+	if (varToDouble(&a) == 0.0)
 	{
 		// SWF 4:
 		PUSH_STR("#ERROR#", 8);
-		
-		// SWF 5:
-		//~ if (a->value == 0.0f)
-		//~ {
-			//~ float c = NAN;
-		//~ }
-		
-		//~ else if (a->value > 0.0f)
-		//~ {
-			//~ float c = INFINITY;
-		//~ }
-		
-		//~ else
-		//~ {
-			//~ float c = -INFINITY;
-		//~ }
 	}
-	
 	else
 	{
 		if (a.type == ACTION_STACK_VALUE_F64)
@@ -875,12 +947,11 @@ void actionModulo(SWFAppContext* app_context)
 	ActionVar b;
 	popVar(app_context, &b);
 
-	if (VAL(float, &a.data.numeric_value) == 0.0f)
+	if (varToDouble(&a) == 0.0)
 	{
 		// SWF 4: Division by zero returns error string
 		PUSH_STR("#ERROR#", 8);
 	}
-
 	else
 	{
 		if (a.type == ACTION_STACK_VALUE_F64)
@@ -1034,71 +1105,35 @@ void actionGreater(SWFAppContext* app_context)
 void actionAnd(SWFAppContext* app_context)
 {
 	ActionVar a;
-	convertFloat(app_context);
 	popVar(app_context, &a);
-	
+
 	ActionVar b;
-	convertFloat(app_context);
 	popVar(app_context, &b);
-	
-	if (a.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = VAL(double, &a.data.numeric_value);
-		double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-		
-		float c = b_val != 0.0 && a_val != 0.0 ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-	
-	else if (b.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
-		double b_val = VAL(double, &b.data.numeric_value);
-		
-		float c = b_val != 0.0 && a_val != 0.0 ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-	
-	else
-	{
-		float c = VAL(float, &b.data.numeric_value) != 0.0f && VAL(float, &a.data.numeric_value) != 0.0f ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-	}
+
+	int result = isVarTruthy(&a) && isVarTruthy(&b);
+#if defined(SWF_VERSION) && SWF_VERSION >= 5
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
+#else
+	double c = result ? 1.0 : 0.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+#endif
 }
 
 void actionOr(SWFAppContext* app_context)
 {
 	ActionVar a;
-	convertFloat(app_context);
 	popVar(app_context, &a);
-	
+
 	ActionVar b;
-	convertFloat(app_context);
 	popVar(app_context, &b);
-	
-	if (a.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = VAL(double, &a.data.numeric_value);
-		double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-		
-		float c = b_val != 0.0 || a_val != 0.0 ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-	
-	else if (b.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
-		double b_val = VAL(double, &b.data.numeric_value);
-		
-		float c = b_val != 0.0 || a_val != 0.0 ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-	
-	else
-	{
-		float c = VAL(float, &b.data.numeric_value) != 0.0f || VAL(float, &a.data.numeric_value) != 0.0f ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-	}
+
+	int result = isVarTruthy(&a) || isVarTruthy(&b);
+#if defined(SWF_VERSION) && SWF_VERSION >= 5
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
+#else
+	double c = result ? 1.0 : 0.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+#endif
 }
 
 void actionNot(SWFAppContext* app_context)
@@ -1143,8 +1178,13 @@ void actionNot(SWFAppContext* app_context)
 	}
 
 	POP();
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+	double d = is_truthy ? 0.0 : 1.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &d));
+#else
 	u64 result = is_truthy ? 0 : 1;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
+#endif
 }
 
 void actionToInteger(SWFAppContext* app_context)
@@ -1153,19 +1193,16 @@ void actionToInteger(SWFAppContext* app_context)
 	convertFloat(app_context);
 	popVar(app_context, &v);
 
-	float f = VAL(float, &v.data.numeric_value);
+	double d = varToDouble(&v);
+	double result;
 
-	// Handle special values: NaN and Infinity -> 0
-	if (isnan(f) || isinf(f)) {
-		f = 0.0f;
+	if (isnan(d) || isinf(d)) {
+		result = 0.0;
 	} else {
-		// Convert to 32-bit signed integer (truncate toward zero)
-		int32_t int_value = (int32_t)f;
-		// Convert back to float for pushing
-		f = (float)int_value;
+		result = (double)(int32_t)d;
 	}
 
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &f));
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
 void actionToNumber(SWFAppContext* app_context)
@@ -1730,13 +1767,13 @@ void actionStringExtract(SWFAppContext* app_context, char* str_buffer)
 	convertFloat(app_context);
 	ActionVar length_var;
 	popVar(app_context, &length_var);
-	int length = (int)VAL(float, &length_var.data.numeric_value);
+	int length = varToInt32(&length_var);
 
 	// Pop index
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
-	int index = (int)VAL(float, &index_var.data.numeric_value);
+	int index = varToInt32(&index_var);
 
 	// Pop string
 	char src_buffer[17];
@@ -1820,13 +1857,13 @@ void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer)
 	convertFloat(app_context);
 	ActionVar count_var;
 	popVar(app_context, &count_var);
-	int count = (int)VAL(float, &count_var.data.numeric_value);
+	int count = varToInt32(&count_var);
 
 	// Pop index (starting character position)
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
-	int index = (int)VAL(float, &index_var.data.numeric_value);
+	int index = varToInt32(&index_var);
 
 	// Pop string
 	char input_buffer[17];
@@ -2116,6 +2153,7 @@ void actionTrace(SWFAppContext* app_context)
 			float f = VAL(float, &STACK_TOP_VALUE);
 			if (isnan(f)) printf("NaN\n");
 			else if (isinf(f)) printf("%sInfinity\n", f < 0 ? "-" : "");
+			else if (f == 0.0f) printf("0\n");
 			else printf("%.15g\n", f);
 			break;
 		}
@@ -2125,6 +2163,7 @@ void actionTrace(SWFAppContext* app_context)
 			double d = VAL(double, &STACK_TOP_VALUE);
 			if (isnan(d)) printf("NaN\n");
 			else if (isinf(d)) printf("%sInfinity\n", d < 0 ? "-" : "");
+			else if (d == 0.0) printf("0\n");
 			else printf("%.15g\n", d);
 			break;
 		}
@@ -2655,6 +2694,30 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	if (!var)
 	{
+		// Check built-in global constants
+		if (var_name_len == 3 && strncmp(var_name, "NaN", 3) == 0)
+		{
+			double nan_val = NAN;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &nan_val));
+			return;
+		}
+		else if (var_name_len == 8 && strncmp(var_name, "Infinity", 8) == 0)
+		{
+			double inf_val = INFINITY;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &inf_val));
+			return;
+		}
+		else if (var_name_len == 9 && strncmp(var_name, "undefined", 9) == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+		else if (var_name_len == 4 && strncmp(var_name, "null", 4) == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_NULL, 0);
+			return;
+		}
+
 		// Variable not found - push empty string
 		PUSH_STR("", 0);
 		return;
@@ -2857,7 +2920,7 @@ void actionGetProperty(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
-	int prop_index = (int) VAL(float, &index_var.data.numeric_value);
+	int prop_index = varToInt32(&index_var);
 
 	// Pop target path
 	convertString(app_context, NULL);
@@ -2978,7 +3041,7 @@ void actionRandomNumber(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar max_var;
 	popVar(app_context, &max_var);
-	int max = (int) VAL(float, &max_var.data.numeric_value);
+	int max = varToInt32(&max_var);
 
 	// Generate random number using avmplus-compatible RNG
 	// This matches Flash Player's exact behavior for speedrunners
@@ -2999,8 +3062,7 @@ void actionAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 	popVar(app_context, &a);
 
 	// Get integer code (truncate decimal)
-	float val = VAL(float, &a.data.numeric_value);
-	int code = (int)val;
+	int code = varToInt32(&a);
 
 	// Handle out-of-range values (wrap to 0-255)
 	code = code & 0xFF;
@@ -3538,170 +3600,98 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 
 void actionBitAnd(SWFAppContext* app_context)
 {
-
-	// Convert and pop second operand (a)
 	convertFloat(app_context);
 	ActionVar a;
 	popVar(app_context, &a);
 
-	// Convert and pop first operand (b)
 	convertFloat(app_context);
 	ActionVar b;
 	popVar(app_context, &b);
 
-	// Convert to 32-bit signed integers (truncate, don't round)
-	int32_t a_int = (int32_t)VAL(float, &a.data.numeric_value);
-	int32_t b_int = (int32_t)VAL(float, &b.data.numeric_value);
-
-	// Perform bitwise AND
-	int32_t result = b_int & a_int;
-
-	// Push result as float (ActionScript stores all numbers as float)
-	float result_f = (float)result;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
+	int32_t a_int = varToInt32(&a);
+	int32_t b_int = varToInt32(&b);
+	double result = (double)(b_int & a_int);
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
 void actionBitOr(SWFAppContext* app_context)
 {
-
-	// Convert and pop second operand (a)
 	convertFloat(app_context);
 	ActionVar a;
 	popVar(app_context, &a);
 
-	// Convert and pop first operand (b)
 	convertFloat(app_context);
 	ActionVar b;
 	popVar(app_context, &b);
 
-	// Convert to 32-bit signed integers (truncate, don't round)
-	int32_t a_int = (int32_t)VAL(float, &a.data.numeric_value);
-	int32_t b_int = (int32_t)VAL(float, &b.data.numeric_value);
-
-	// Perform bitwise OR
-	int32_t result = b_int | a_int;
-
-	// Push result as float (ActionScript stores all numbers as float)
-	float result_f = (float)result;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
+	int32_t a_int = varToInt32(&a);
+	int32_t b_int = varToInt32(&b);
+	double result = (double)(b_int | a_int);
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
 void actionBitXor(SWFAppContext* app_context)
 {
-
-	// Convert and pop second operand (a)
 	convertFloat(app_context);
 	ActionVar a;
 	popVar(app_context, &a);
 
-	// Convert and pop first operand (b)
 	convertFloat(app_context);
 	ActionVar b;
 	popVar(app_context, &b);
 
-	// Convert to 32-bit signed integers (truncate, don't round)
-	int32_t a_int = (int32_t)VAL(float, &a.data.numeric_value);
-	int32_t b_int = (int32_t)VAL(float, &b.data.numeric_value);
-
-	// Perform bitwise XOR
-	int32_t result = b_int ^ a_int;
-
-	// Push result as float (ActionScript stores all numbers as float)
-	float result_f = (float)result;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
+	int32_t a_int = varToInt32(&a);
+	int32_t b_int = varToInt32(&b);
+	double result = (double)(b_int ^ a_int);
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
 void actionBitLShift(SWFAppContext* app_context)
 {
-
-	// Pop shift count (first argument)
 	convertFloat(app_context);
 	ActionVar shift_count_var;
 	popVar(app_context, &shift_count_var);
 
-	// Pop value to shift (second argument)
 	convertFloat(app_context);
 	ActionVar value_var;
 	popVar(app_context, &value_var);
 
-	// Convert to 32-bit signed integers (truncate, don't round)
-	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
-	int32_t value = (int32_t)VAL(float, &value_var.data.numeric_value);
-
-	// Mask shift count to 5 bits (0-31 range)
-	shift_count = shift_count & 0x1F;
-
-	// Perform left shift
-	int32_t result = value << shift_count;
-
-	// Push result as float (ActionScript stores all numbers as float)
-	float result_f = (float)result;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
+	int32_t shift_count = varToInt32(&shift_count_var) & 0x1F;
+	int32_t value = varToInt32(&value_var);
+	double result = (double)(value << shift_count);
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
 void actionBitRShift(SWFAppContext* app_context)
 {
-
-	// Pop shift count (first argument)
 	convertFloat(app_context);
 	ActionVar shift_count_var;
 	popVar(app_context, &shift_count_var);
 
-	// Pop value to shift (second argument)
 	convertFloat(app_context);
 	ActionVar value_var;
 	popVar(app_context, &value_var);
 
-	// Convert to 32-bit signed integers
-	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
-	int32_t value = (int32_t)VAL(float, &value_var.data.numeric_value);
-
-	// Mask shift count to 5 bits (0-31 range)
-	shift_count = shift_count & 0x1F;
-
-	// Perform arithmetic right shift (sign-extending)
-	// In C, >> on signed int is arithmetic shift
-	int32_t result = value >> shift_count;
-
-	// Convert result back to float for stack
-	float result_f = (float)result;
-
-	// Push result
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_f));
+	int32_t shift_count = varToInt32(&shift_count_var) & 0x1F;
+	int32_t value = varToInt32(&value_var);
+	double result = (double)(value >> shift_count);
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
 void actionBitURShift(SWFAppContext* app_context)
 {
-
-	// Pop shift count (first argument)
 	convertFloat(app_context);
 	ActionVar shift_count_var;
 	popVar(app_context, &shift_count_var);
 
-	// Pop value to shift (second argument)
 	convertFloat(app_context);
 	ActionVar value_var;
 	popVar(app_context, &value_var);
 
-	// Convert to integers
-	int32_t shift_count = (int32_t)VAL(float, &shift_count_var.data.numeric_value);
-
-	// IMPORTANT: Use UNSIGNED for logical shift
-	uint32_t value = (uint32_t)((int32_t)VAL(float, &value_var.data.numeric_value));
-
-	// Mask shift count to 5 bits (0-31 range)
-	shift_count = shift_count & 0x1F;
-
-	// Perform logical (unsigned) right shift
-	// In C, >> on unsigned int is logical shift (zero-fill)
-	uint32_t result = value >> shift_count;
-
-	// Convert result back to float for stack
-	// Cast through double to preserve full 32-bit unsigned value
-	float result_float = (float)((double)result);
-
-	// Push result
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_float));
+	int32_t shift_count = varToInt32(&shift_count_var) & 0x1F;
+	uint32_t value = (uint32_t)varToInt32(&value_var);
+	double result = (double)(value >> shift_count);
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
 void actionStrictEquals(SWFAppContext* app_context)
@@ -3881,11 +3871,8 @@ void actionEquals2(SWFAppContext* app_context)
 	         b.type == ACTION_STACK_VALUE_STRING)
 	{
 		const char* str_b = (const char*) b.data.numeric_value;
-		float b_num = (str_b != NULL) ? (float)atof(str_b) : 0.0f;
-		float a_val = (a.type == ACTION_STACK_VALUE_F32) ?
-		              VAL(float, &a.data.numeric_value) :
-		              (float)VAL(double, &a.data.numeric_value);
-		// NaN is never equal to anything (ECMA-262)
+		double b_num = parseStringToNumber(str_b);
+		double a_val = varToDouble(&a);
 		if (isnan(a_val) || isnan(b_num)) {
 			result = 0.0f;
 		} else {
@@ -3896,11 +3883,8 @@ void actionEquals2(SWFAppContext* app_context)
 	         (b.type == ACTION_STACK_VALUE_F32 || b.type == ACTION_STACK_VALUE_F64))
 	{
 		const char* str_a = (const char*) a.data.numeric_value;
-		float a_num = (str_a != NULL) ? (float)atof(str_a) : 0.0f;
-		float b_val = (b.type == ACTION_STACK_VALUE_F32) ?
-		              VAL(float, &b.data.numeric_value) :
-		              (float)VAL(double, &b.data.numeric_value);
-		// NaN is never equal to anything (ECMA-262)
+		double a_num = parseStringToNumber(str_a);
+		double b_val = varToDouble(&b);
 		if (isnan(a_num) || isnan(b_val)) {
 			result = 0.0f;
 		} else {
@@ -3910,29 +3894,27 @@ void actionEquals2(SWFAppContext* app_context)
 	// 4. Boolean: convert to number and compare recursively
 	else if (a.type == ACTION_STACK_VALUE_BOOLEAN)
 	{
-		// Convert boolean to number (true = 1.0, false = 0.0)
-		u32 a_bool = (u32) a.data.numeric_value;
-		float a_num = a_bool ? 1.0f : 0.0f;
-		ActionVar a_as_num;
-		a_as_num.type = ACTION_STACK_VALUE_F32;
-		a_as_num.data.numeric_value = VAL(u64, &a_num);
+		double a_num = a.data.numeric_value ? 1.0 : 0.0;
 
-		// Push back and recurse (simulated)
-		// For efficiency, we inline the comparison instead
 		if (b.type == ACTION_STACK_VALUE_F32 || b.type == ACTION_STACK_VALUE_F64)
 		{
-			float b_val = (b.type == ACTION_STACK_VALUE_F32) ?
-			              VAL(float, &b.data.numeric_value) :
-			              (float)VAL(double, &b.data.numeric_value);
-			result = (a_num == b_val) ? 1.0f : 0.0f;
+			double b_val = varToDouble(&b);
+			if (isnan(b_val)) {
+				result = 0.0f;
+			} else {
+				result = (a_num == b_val) ? 1.0f : 0.0f;
+			}
 		}
 		else if (b.type == ACTION_STACK_VALUE_STRING)
 		{
 			const char* str_b = (const char*) b.data.numeric_value;
-			float b_num = (str_b != NULL) ? (float)atof(str_b) : 0.0f;
-			result = (a_num == b_num) ? 1.0f : 0.0f;
+			double b_num = parseStringToNumber(str_b);
+			if (isnan(b_num)) {
+				result = 0.0f;
+			} else {
+				result = (a_num == b_num) ? 1.0f : 0.0f;
+			}
 		}
-		// Boolean vs null/undefined is false
 		else if (b.type == ACTION_STACK_VALUE_NULL || b.type == ACTION_STACK_VALUE_UNDEFINED)
 		{
 			result = 0.0f;
@@ -3940,24 +3922,27 @@ void actionEquals2(SWFAppContext* app_context)
 	}
 	else if (b.type == ACTION_STACK_VALUE_BOOLEAN)
 	{
-		// Convert boolean to number (true = 1.0, false = 0.0)
-		u32 b_bool = (u32) b.data.numeric_value;
-		float b_num = b_bool ? 1.0f : 0.0f;
+		double b_num = b.data.numeric_value ? 1.0 : 0.0;
 
 		if (a.type == ACTION_STACK_VALUE_F32 || a.type == ACTION_STACK_VALUE_F64)
 		{
-			float a_val = (a.type == ACTION_STACK_VALUE_F32) ?
-			              VAL(float, &a.data.numeric_value) :
-			              (float)VAL(double, &a.data.numeric_value);
-			result = (a_val == b_num) ? 1.0f : 0.0f;
+			double a_val = varToDouble(&a);
+			if (isnan(a_val)) {
+				result = 0.0f;
+			} else {
+				result = (a_val == b_num) ? 1.0f : 0.0f;
+			}
 		}
 		else if (a.type == ACTION_STACK_VALUE_STRING)
 		{
 			const char* str_a = (const char*) a.data.numeric_value;
-			float a_num = (str_a != NULL) ? (float)atof(str_a) : 0.0f;
-			result = (a_num == b_num) ? 1.0f : 0.0f;
+			double a_num = parseStringToNumber(str_a);
+			if (isnan(a_num)) {
+				result = 0.0f;
+			} else {
+				result = (a_num == b_num) ? 1.0f : 0.0f;
+			}
 		}
-		// Boolean vs null/undefined is false
 		else if (a.type == ACTION_STACK_VALUE_NULL || a.type == ACTION_STACK_VALUE_UNDEFINED)
 		{
 			result = 0.0f;
@@ -4544,7 +4529,7 @@ void actionInitArray(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar count_var;
 	popVar(app_context, &count_var);
-	u32 num_elements = (u32) VAL(float, &count_var.data.numeric_value);
+	u32 num_elements = (u32) varToInt32(&count_var);
 
 	// 2. Allocate array
 	ASArray* arr = allocArray(app_context, num_elements);
@@ -4651,7 +4636,7 @@ void actionInitObject(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar count_var;
 	popVar(app_context, &count_var);
-	u32 num_props = (u32) VAL(float, &count_var.data.numeric_value);
+	u32 num_props = (u32) varToInt32(&count_var);
 
 #ifdef DEBUG
 	printf("[DEBUG] actionInitObject: creating object with %u properties\n", num_props);
@@ -4950,7 +4935,7 @@ void actionNewObject(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar num_args_var;
 	popVar(app_context, &num_args_var);
-	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
+	u32 num_args = (u32) varToInt32(&num_args_var);
 
 	// 3. Pop arguments from stack (store them temporarily)
 	// Limit to 16 arguments for simplicity
@@ -5282,7 +5267,7 @@ void actionNewMethod(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar num_args_var;
 	popVar(app_context, &num_args_var);
-	u32 num_args = (u32) VAL(float, &num_args_var.data.numeric_value);
+	u32 num_args = (u32) varToInt32(&num_args_var);
 
 	// 4. Pop arguments from stack (store them temporarily)
 	// Limit to 16 arguments for simplicity
@@ -5692,7 +5677,7 @@ void actionSetProperty(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
-	int prop_index = (int) VAL(float, &index_var.data.numeric_value);
+	int prop_index = varToInt32(&index_var);
 
 	// 3. Pop target path
 	convertString(app_context, NULL);
@@ -6452,6 +6437,44 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
+	}
+
+	// ASSetPropFlags(obj, props, clearFlags, setFlags)
+	// Modifies property attribute flags for version-based visibility
+	else if (func_name_len == 14 && strncmp(func_name, "ASSetPropFlags", 14) == 0)
+	{
+		if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT)
+		{
+			ASObject* obj = (ASObject*)(u64)args[3].data.numeric_value;
+			s32 clear_flags = varToInt32(&args[0]);
+			s32 set_flags = varToInt32(&args[1]);
+
+			// Get property name(s)
+			const char* prop_name = NULL;
+			u32 prop_name_len = 0;
+			if (args[2].type == ACTION_STACK_VALUE_STRING)
+			{
+				prop_name = (const char*)args[2].data.numeric_value;
+				prop_name_len = args[2].str_size;
+			}
+
+			if (obj != NULL && prop_name != NULL)
+			{
+				// Find property and modify its flash_flags
+				for (u32 i = 0; i < obj->num_used; i++)
+				{
+					if (obj->properties[i].name_length == prop_name_len &&
+					    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0)
+					{
+						obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+						break;
+					}
+				}
+			}
+		}
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+		builtin_handled = 1;
 	}
 
 	// If not a built-in function, look up user-defined functions

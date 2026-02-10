@@ -261,7 +261,8 @@ namespace SWFRecomp
 								 << "#define FRAME_HEIGHT " << height << endl
 								 << "#define FRAME_WIDTH_TWIPS " << width_twips << endl
 								 << "#define FRAME_HEIGHT_TWIPS " << height_twips << endl
-								 << "#define SWF_FRAME_COUNT " << swf_frame_count << endl << endl
+								 << "#define SWF_FRAME_COUNT " << swf_frame_count << endl
+								 << "#define SWF_VERSION " << to_string((int)header.version) << endl << endl
 								 << "extern const float stage_to_ndc[16];";
 		
 		context.constants << "#include \"constants.h\"" << endl << endl
