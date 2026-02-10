@@ -59,8 +59,16 @@ jobs:
           import json
           with open("ruffle-tests/results.json") as f:
               r = json.load(f)
+          m = r.get("metadata", {})
           print("## Ruffle AVM1 Test Results")
           print(f"**{r['pass']}/{r['total']}** tests passing ({r['pass_rate']}%)\n")
+          if m.get("git_sha"):
+              print(f"Commit: `{m['git_sha'][:12]}`")
+          if m.get("duration_seconds"):
+              print(f"Duration: {m['duration_seconds']:.0f}s")
+          if m.get("total_available") and m["total_available"] != r["total"]:
+              print(f"Ran {r['total']} of {m['total_available']} available tests")
+          print()
           if r.get("breakdown"):
               print("| Category | Count |")
               print("|----------|------:|")

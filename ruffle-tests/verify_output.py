@@ -16,6 +16,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
 
@@ -41,6 +43,21 @@ BOILERPLATE_PATTERNS = [
     re.compile(r"^Call runSWF"),
     re.compile(r"^Starting SWF execution"),
 ]
+
+
+def get_git_sha():
+    """Get the current git commit SHA, or None."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
 
 
 def get_num_frames(test_dir):
@@ -165,16 +182,28 @@ def run_binary(build_dir):
 
 def compare_output(actual, expected):
     """Compare filtered actual output with expected output.
-    Returns (match, diff_summary)."""
+    Returns (match, diff_summary, stats_dict)."""
     actual_lines = actual.split("\n")
     expected_lines = expected.rstrip("\n").split("\n")
 
+    max_lines = max(len(actual_lines), len(expected_lines))
+    matching = sum(
+        1
+        for i in range(max_lines)
+        if (actual_lines[i] if i < len(actual_lines) else "<missing>")
+        == (expected_lines[i] if i < len(expected_lines) else "<missing>")
+    )
+    line_stats = {
+        "actual_lines": len(actual_lines),
+        "expected_lines": len(expected_lines),
+        "matching_lines": matching,
+    }
+
     if actual_lines == expected_lines:
-        return True, ""
+        return True, "", line_stats
 
     # Generate a brief diff summary
     diff = []
-    max_lines = max(len(actual_lines), len(expected_lines))
     mismatches = 0
     for i in range(min(max_lines, 20)):
         a = actual_lines[i] if i < len(actual_lines) else "<missing>"
@@ -184,17 +213,11 @@ def compare_output(actual, expected):
             if mismatches <= 3:
                 diff.append(f"  line {i+1}: got {a!r}, expected {e!r}")
 
-    total_mismatches = sum(
-        1
-        for i in range(max_lines)
-        if (actual_lines[i] if i < len(actual_lines) else "<missing>")
-        != (expected_lines[i] if i < len(expected_lines) else "<missing>")
-    )
-
+    total_mismatches = max_lines - matching
     summary = f"{total_mismatches} line(s) differ (actual={len(actual_lines)}, expected={len(expected_lines)})"
     if diff:
         summary += "\n" + "\n".join(diff)
-    return False, summary
+    return False, summary, line_stats
 
 
 def main():
@@ -228,9 +251,11 @@ def main():
             and (d / "output.txt").exists()
         )
 
+    total_available = len(tests)
     if limit:
         tests = tests[:limit]
 
+    run_start = time.monotonic()
     stats = Counter()
     pass_list = []
     fail_list = []
@@ -242,19 +267,23 @@ def main():
         if verbose:
             print(f"[{i+1}/{len(tests)}] {name}...", end=" ", flush=True)
 
+        test_start = time.monotonic()
+        num_frames = get_num_frames(test_dir)
+        entry = {"test": name, "num_frames": num_frames}
+
         # Step 1: Recompile SWF
         if not recompile_swf(test_dir):
             stats["recomp_fail"] += 1
             fail_list.append(name)
             fail_details[name] = "SWFRecomp failed"
-            test_results.append({"test": name, "status": "recomp_fail"})
+            entry.update(status="recomp_fail", detail="SWFRecomp failed",
+                         duration=round(time.monotonic() - test_start, 2))
+            test_results.append(entry)
             if verbose:
                 print("RECOMP_FAIL")
             continue
 
         # Step 2: Compile native
-        num_frames = get_num_frames(test_dir)
-
         with tempfile.TemporaryDirectory(prefix="swf_verify_") as tmpdir:
             build_dir = Path(tmpdir)
             ok, err = compile_native(test_dir, num_frames, build_dir)
@@ -266,10 +295,13 @@ def main():
                     first_err = next(
                         (l for l in err.splitlines() if "error:" in l), err[:200]
                     )
-                    fail_details[name] = f"compile: {first_err.strip()[:120]}"
+                    detail = first_err.strip()[:200]
                 else:
-                    fail_details[name] = f"compile: {err[:120]}"
-                test_results.append({"test": name, "status": "compile_fail"})
+                    detail = err[:200]
+                fail_details[name] = f"compile: {detail[:120]}"
+                entry.update(status="compile_fail", detail=detail,
+                             duration=round(time.monotonic() - test_start, 2))
+                test_results.append(entry)
                 if verbose:
                     print("COMPILE_FAIL")
                 continue
@@ -280,7 +312,9 @@ def main():
                 stats["timeout"] += 1
                 fail_list.append(name)
                 fail_details[name] = "runtime timeout"
-                test_results.append({"test": name, "status": "timeout"})
+                entry.update(status="timeout", detail="runtime timeout (>10s)",
+                             duration=round(time.monotonic() - test_start, 2))
+                test_results.append(entry)
                 if verbose:
                     print("TIMEOUT")
                 continue
@@ -288,7 +322,9 @@ def main():
                 stats["runtime_error"] += 1
                 fail_list.append(name)
                 fail_details[name] = f"runtime error (rc={rc})"
-                test_results.append({"test": name, "status": "runtime_error"})
+                entry.update(status="runtime_error", detail=f"exit code {rc}",
+                             duration=round(time.monotonic() - test_start, 2))
+                test_results.append(entry)
                 if verbose:
                     print(f"RUNTIME_ERROR(rc={rc})")
                 continue
@@ -296,7 +332,9 @@ def main():
                 stats["runtime_segfault"] += 1
                 fail_list.append(name)
                 fail_details[name] = "runtime segfault"
-                test_results.append({"test": name, "status": "segfault"})
+                entry.update(status="segfault", detail="SIGSEGV",
+                             duration=round(time.monotonic() - test_start, 2))
+                test_results.append(entry)
                 if verbose:
                     print("SEGFAULT")
                 continue
@@ -305,18 +343,23 @@ def main():
         actual = filter_output(raw_output)
         expected = (test_dir / "output.txt").read_text().rstrip("\n")
 
-        match, diff_summary = compare_output(actual, expected)
+        match, diff_summary, line_stats = compare_output(actual, expected)
+        entry["lines"] = line_stats
+        entry["duration"] = round(time.monotonic() - test_start, 2)
         if match:
             stats["pass"] += 1
             pass_list.append(name)
-            test_results.append({"test": name, "status": "pass"})
+            entry["status"] = "pass"
+            test_results.append(entry)
             if verbose:
                 print("PASS")
         else:
             stats["output_mismatch"] += 1
             fail_list.append(name)
             fail_details[name] = diff_summary
-            test_results.append({"test": name, "status": "output_mismatch"})
+            entry["status"] = "output_mismatch"
+            entry["detail"] = diff_summary.split("\n")[0]  # first line only
+            test_results.append(entry)
             if verbose:
                 print("MISMATCH")
 
@@ -345,7 +388,14 @@ def main():
 
     # Write JSON results
     if json_path:
+        total_duration = round(time.monotonic() - run_start, 2)
         report = {
+            "metadata": {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "git_sha": get_git_sha(),
+                "duration_seconds": total_duration,
+                "total_available": total_available,
+            },
             "total": total,
             "pass": stats["pass"],
             "fail": total - stats["pass"],
