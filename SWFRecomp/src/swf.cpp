@@ -443,8 +443,14 @@ namespace SWFRecomp
 		// prime the loop
 		tag.code = (TagType) 1;
 		
+		char* swf_end = swf_buffer + header.file_length;
 		while (tag.code != 0)
 		{
+			if (cur_pos >= swf_end)
+			{
+				fprintf(stderr, "Warning: cur_pos past end of SWF buffer, stopping tag parse\n");
+				break;
+			}
 			tag.parseHeader(cur_pos);
 			interpretTag(context, tag);
 			tag.clearFields();
@@ -1491,7 +1497,7 @@ namespace SWFRecomp
 				}
 
 				// Read code table for DefineFont2/3
-				if (tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
+				if ((tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3) && num_entries > 0)
 				{
 					cur_pos = offset_table + entry_offsets[num_entries];  // jump to code table
 					font_code_tables[font_id].resize(num_entries);
@@ -2929,6 +2935,12 @@ namespace SWFRecomp
 			}
 			
 			case SWF_TAG_METADATA:
+			case SWF_TAG_EXPORT_ASSETS:
+			case SWF_TAG_DEBUG_ID:
+			case SWF_TAG_DEFINE_FONT_ALIGN_ZONES:
+			case SWF_TAG_DEFINE_FONT_NAME:
+			case SWF_TAG_FREE_CHARACTER:
+			case SWF_TAG_CSM_TEXT_SETTINGS:
 			{
 				cur_pos += tag.length;
 
@@ -4872,6 +4884,7 @@ namespace SWFRecomp
 				u16 shape_id;
 				u16 fill_style_count;
 				std::vector<FillStyle*> all_fill_styles;
+				std::vector<u16> all_fill_style_counts;
 				u16 line_style_count;
 				std::vector<LineStyle*> all_line_styles;
 				size_t morph_color_start_saved = current_color;
@@ -5010,6 +5023,7 @@ namespace SWFRecomp
 					{
 						all_fill_styles.push_back(parseFillStyles(fill_style_count));
 					}
+					all_fill_style_counts.push_back(fill_style_count);
 
 					// LINESTYLEARRAY
 					shape_tag.clearFields();
@@ -5048,9 +5062,10 @@ namespace SWFRecomp
 					line_style_count = 0;
 					
 					FillStyle* fill_style = new FillStyle[fill_style_count];
-					
+
 					all_fill_styles.push_back(fill_style);
-					
+					all_fill_style_counts.push_back(fill_style_count);
+
 					fill_style->r = 0xFF;
 					fill_style->g = 0xFF;
 					fill_style->b = 0xFF;
@@ -5113,6 +5128,26 @@ namespace SWFRecomp
 					
 					if (is_edge_record)
 					{
+						// Ensure a path exists (some shapes emit edges before any StyleChangeRecord)
+						if (current_path == nullptr)
+						{
+							paths.push_back(Path());
+							current_path = &paths.back();
+							current_path->verts.reserve(512);
+							current_path->fill_style_list = current_fill_style_list;
+							current_path->line_style_list = current_line_style_list;
+							current_path->fill_styles[0] = last_fill_style_0;
+							current_path->fill_styles[1] = last_fill_style_1;
+							current_path->line_style = last_line_style;
+							current_path->self_closed = false;
+
+							Vertex v;
+							v.x = last_x;
+							v.y = last_y;
+							if (is_morph) v.morph_index = morph_vertex_counter++;
+							current_path->verts.push_back(v);
+						}
+
 						bool is_straight_edge = (state_flags & 0b10000) != 0;
 						u8 num_bits = (u8) state_flags & 0xF;
 						
@@ -5349,7 +5384,8 @@ namespace SWFRecomp
 						}
 						
 						all_fill_styles.push_back(parseFillStyles(fill_style_count));
-						
+						all_fill_style_counts.push_back(fill_style_count);
+
 						current_fill_style_list += 1;
 						
 						// LINESTYLEARRAY
@@ -5797,6 +5833,13 @@ namespace SWFRecomp
 				{
 					if (!shapes[i].invalid && shapes[i].closed && shapes[i].inner_fill != 0 && !shapes[i].hole)
 					{
+						// Bounds check: ensure fill_style_list and inner_fill index are valid
+						if (shapes[i].fill_style_list >= all_fill_styles.size() ||
+							shapes[i].inner_fill > all_fill_style_counts[shapes[i].fill_style_list])
+						{
+							continue;
+						}
+
 						std::vector<Tri> tris;
 
 						fillShape(shapes[i], tris);

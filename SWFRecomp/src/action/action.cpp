@@ -21,8 +21,10 @@ namespace SWFRecomp
 	
 	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
 	{
-		// Clear constant pool at script boundary (per SWF spec)
-		constant_pool.clear();
+		// Save and clear constant pool at script boundary.
+		// Nested parseActions calls (DefineFunction2, Try, With) will inherit the
+		// parent's pool since we save it here and restore it after the call returns.
+		std::vector<size_t> saved_pool = constant_pool;
 
 		SWFActionType code = SWF_ACTION_CONSTANT_POOL;
 		u16 length;
@@ -1402,10 +1404,44 @@ namespace SWFRecomp
 								snprintf(hex_float, 11, "0x%08X", (u32) push_value);
 								
 								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F32, " << hex_float << ");" << endl;
-								
+
 								break;
 							}
-							
+
+							case ACTION_STACK_VALUE_F64:
+							{
+								out_script << "(double)" << endl;
+
+								u64 raw = VAL(u64, &action_buffer[push_length]);
+								push_length += 8;
+
+								char hex_double[19];
+								snprintf(hex_double, 19, "0x%016llX", (unsigned long long) raw);
+
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, " << hex_double << "ULL);" << endl;
+
+								break;
+							}
+
+							case ACTION_STACK_VALUE_I32:
+							{
+								s32 int_value = VAL(s32, &action_buffer[push_length]);
+								push_length += 4;
+
+								out_script << "(integer: " << int_value << ")" << endl;
+
+								// Push as F64 via bit-cast of the double value
+								double d = (double) int_value;
+								u64 raw;
+								memcpy(&raw, &d, sizeof(raw));
+
+								char hex_double[19];
+								snprintf(hex_double, 19, "0x%016llX", (unsigned long long) raw);
+
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, " << hex_double << "ULL);" << endl;
+
+								break;
+							}
 
 						case ACTION_STACK_VALUE_REGISTER:
 						{
@@ -1693,6 +1729,10 @@ namespace SWFRecomp
 		                        << "#define MAX_STRING_ID " << next_str_i << endl;
 		context.out_script_decls << endl
 		                         << "#define MAX_STRING_ID " << next_str_i << endl;
+
+		// Restore parent's constant pool (so recursive calls from
+		// DefineFunction2/Try/With don't destroy the caller's pool)
+		constant_pool = saved_pool;
 	}
 
 	void SWFAction::declareVariable(Context& context, char* var_name)

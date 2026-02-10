@@ -66,3 +66,6 @@ test-run.log
 upstream/
 # Upstream reference files for merge comparison
 upstream-reference/
+
+# Downloaded external test SWFs
+ruffle-tests/
