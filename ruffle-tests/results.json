@@ -1,0 +1,51 @@
+{
+  "total": 10,
+  "pass": 1,
+  "fail": 9,
+  "pass_rate": 10.0,
+  "breakdown": {
+    "output_mismatch": 9
+  },
+  "tests": [
+    {
+      "test": "access_unnamed_shape",
+      "status": "pass"
+    },
+    {
+      "test": "action_to_integer",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "add",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "add2",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "add_property",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "add_swf4",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "add_swf5",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "arguments",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "array_call_method",
+      "status": "output_mismatch"
+    },
+    {
+      "test": "array_concat",
+      "status": "output_mismatch"
+    }
+  ]
+}
