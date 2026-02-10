@@ -422,7 +422,18 @@ static inline int32_t varToInt32(ActionVar* v)
 {
 	double d = varToDouble(v);
 	if (isnan(d) || isinf(d)) return 0;
-	return (int32_t)d;
+	return (int32_t)(int64_t)d;
+}
+
+// ECMA-262 ToUint32 - handles values outside int32_t range correctly
+static inline uint32_t varToUint32(ActionVar* v)
+{
+	double d = varToDouble(v);
+	if (isnan(d) || isinf(d) || d == 0.0) return 0;
+	double posInt = (d > 0 ? 1.0 : -1.0) * floor(fabs(d));
+	double mod = fmod(posInt, 4294967296.0);
+	if (mod < 0) mod += 4294967296.0;
+	return (uint32_t)mod;
 }
 
 // Helper: parse string to number matching ECMA-262 ToNumber
@@ -491,20 +502,75 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 			if (str != NULL && str[0] != '\0')
 			{
 				char* end;
-				double temp = strtod(str, &end);
-				// If no characters were consumed, it's NaN
-				if (end == str)
+				double temp;
+				int parsed = 0;
+#if defined(SWF_VERSION) && SWF_VERSION >= 6
+				// SWF6+ supports hex (0x) and octal (0) prefix in string-to-number
+				const char* s = str;
+				int neg = 0;
+				while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+				if (*s == '-') { neg = 1; s++; }
+				else if (*s == '+') { s++; }
+				if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
 				{
+					long val = strtol(s, &end, 16);
+					if (end != s) { temp = neg ? -(double)val : (double)val; parsed = 1; }
+				}
+				else if (s[0] == '0' && s[1] >= '0' && s[1] <= '7')
+				{
+					long val = strtol(s, &end, 8);
+					if (end != s) { temp = neg ? -(double)val : (double)val; parsed = 1; }
+				}
+#endif
+				if (!parsed)
+				{
+					// Prevent C strtod from parsing special values that
+					// ActionScript doesn't recognize as string-to-number
+					const char* p = str;
+					while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+					if (*p == '+' || *p == '-') p++;
+					if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
+					{
+						// Hex prefix — only SWF6+ handles via strtol above
+						end = (char*)str;
+						temp = 0.0;
+					}
+					else if ((p[0] == 'I' || p[0] == 'i' || p[0] == 'N' || p[0] == 'n') &&
+							 (strncasecmp(p, "Infinity", 8) == 0 || strncasecmp(p, "inf", 3) == 0 ||
+							  strncasecmp(p, "nan", 3) == 0))
+					{
+						// C strtod recognizes Infinity/inf/NaN but Flash doesn't
+						end = (char*)str;
+						temp = 0.0;
+					}
+					else
+					{
+						temp = strtod(str, &end);
+					}
+				}
+				// If no characters were consumed, it's NaN (or 0 in SWF < 5)
+				if (!parsed && end == str)
+				{
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+					temp = 0.0;
+#else
 					temp = NAN;
+#endif
 				}
 				// If there are trailing non-whitespace characters, it's NaN
 				// Exception: SWF < 5 uses parseFloat semantics (accepts partial parses)
-				else
+				else if (!parsed)
 				{
 #if !defined(SWF_VERSION) || SWF_VERSION >= 5
 					while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
 					if (*end != '\0') temp = NAN;
 #endif
+				}
+				else
+				{
+					// parsed via hex/octal — check trailing chars
+					while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
+					if (*end != '\0') temp = NAN;
 				}
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 				VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
@@ -567,8 +633,12 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 		case ACTION_STACK_VALUE_ARRAY:
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			// Objects convert to NaN (TODO: call valueOf() if available)
+			// Objects convert to NaN (or 0 in SWF < 5; TODO: call valueOf() if available)
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+			double temp = 0.0;
+#else
 			double temp = NAN;
+#endif
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
@@ -2692,7 +2762,7 @@ void actionGetVariable(SWFAppContext* app_context)
 		var = getVariable(var_name, var_name_len);
 	}
 
-	if (!var)
+	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
 	{
 		// Check built-in global constants
 		if (var_name_len == 3 && strncmp(var_name, "NaN", 3) == 0)
@@ -3688,9 +3758,15 @@ void actionBitURShift(SWFAppContext* app_context)
 	ActionVar value_var;
 	popVar(app_context, &value_var);
 
-	int32_t shift_count = varToInt32(&shift_count_var) & 0x1F;
-	uint32_t value = (uint32_t)varToInt32(&value_var);
-	double result = (double)(value >> shift_count);
+	uint32_t shift_count = varToUint32(&shift_count_var) & 0x1F;
+	uint32_t value = varToUint32(&value_var);
+	uint32_t shifted = value >> shift_count;
+	// SWF8 treats unsigned right shift result as signed (Flash bug/quirk)
+#if defined(SWF_VERSION) && SWF_VERSION == 8
+	double result = (double)(int32_t)shifted;
+#else
+	double result = (double)shifted;
+#endif
 	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
@@ -3722,9 +3798,8 @@ void actionStrictEquals(SWFAppContext* app_context)
 
 			case ACTION_STACK_VALUE_F64:
 			{
-				double a_val = VAL(double, &a.data.numeric_value);
-				double b_val = VAL(double, &b.data.numeric_value);
-				result = (a_val == b_val) ? 1.0f : 0.0f;
+				// Compare raw bits so NaN === NaN is true (Flash quirk)
+				result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
 				break;
 			}
 
@@ -3808,14 +3883,8 @@ void actionEquals2(SWFAppContext* app_context)
 
 			case ACTION_STACK_VALUE_F64:
 			{
-				double a_val = VAL(double, &a.data.numeric_value);
-				double b_val = VAL(double, &b.data.numeric_value);
-				// NaN is never equal to anything, including itself (ECMA-262)
-				if (isnan(a_val) || isnan(b_val)) {
-					result = 0.0f;
-				} else {
-					result = (a_val == b_val) ? 1.0f : 0.0f;
-				}
+				// Compare raw bits so NaN == NaN is true (Flash quirk)
+				result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
 				break;
 			}
 
