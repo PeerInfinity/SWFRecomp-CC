@@ -1055,34 +1055,15 @@ void actionEquals(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar a;
 	popVar(app_context, &a);
-	
+
 	convertFloat(app_context);
 	ActionVar b;
 	popVar(app_context, &b);
-	
-	if (a.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = VAL(double, &a.data.numeric_value);
-		double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-		
-		float c = b_val == a_val ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-	}
-	
-	else if (b.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
-		double b_val = VAL(double, &b.data.numeric_value);
-		
-		float c = b_val == a_val ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-	}
-	
-	else
-	{
-		float c = VAL(float, &b.data.numeric_value) == VAL(float, &a.data.numeric_value) ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-	}
+
+	double a_val = varToDouble(&a);
+	double b_val = varToDouble(&b);
+	u64 result = (a_val == b_val) ? 1 : 0;
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
 
 void actionLess(SWFAppContext* app_context)
@@ -1095,29 +1076,10 @@ void actionLess(SWFAppContext* app_context)
 	convertFloat(app_context);
 	popVar(app_context, &b);
 
-	if (a.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = VAL(double, &a.data.numeric_value);
-		double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-
-		float c = b_val < a_val ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-
-	else if (b.type == ACTION_STACK_VALUE_F64)
-	{
-		double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
-		double b_val = VAL(double, &b.data.numeric_value);
-
-		float c = b_val < a_val ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-	}
-
-	else
-	{
-		float c = VAL(float, &b.data.numeric_value) < VAL(float, &a.data.numeric_value) ? 1.0f : 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-	}
+	double a_val = varToDouble(&a);
+	double b_val = varToDouble(&b);
+	u64 result = (b_val < a_val) ? 1 : 0;
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
 
 void actionLess2(SWFAppContext* app_context)
@@ -1130,20 +1092,18 @@ void actionLess2(SWFAppContext* app_context)
 	convertFloat(app_context);
 	popVar(app_context, &b);
 
-	int less = 0;
-	if (a.type == ACTION_STACK_VALUE_F64 || b.type == ACTION_STACK_VALUE_F64)
+	double a_val = varToDouble(&a);
+	double b_val = varToDouble(&b);
+	// ECMA-262 11.8.5: if either is NaN, result is undefined
+	if (isnan(a_val) || isnan(b_val))
 	{
-		double a_val = (a.type == ACTION_STACK_VALUE_F64) ? VAL(double, &a.data.numeric_value) : (double) VAL(float, &a.data.numeric_value);
-		double b_val = (b.type == ACTION_STACK_VALUE_F64) ? VAL(double, &b.data.numeric_value) : (double) VAL(float, &b.data.numeric_value);
-		less = (b_val < a_val);
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 	}
 	else
 	{
-		less = (VAL(float, &b.data.numeric_value) < VAL(float, &a.data.numeric_value));
+		u64 bool_val = (b_val < a_val) ? 1 : 0;
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 	}
-
-	u64 bool_val = less ? 1 : 0;
-	PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 }
 
 void actionGreater(SWFAppContext* app_context)
@@ -1156,20 +1116,18 @@ void actionGreater(SWFAppContext* app_context)
 	convertFloat(app_context);
 	popVar(app_context, &b);
 
-	int greater = 0;
-	if (a.type == ACTION_STACK_VALUE_F64 || b.type == ACTION_STACK_VALUE_F64)
+	double a_val = varToDouble(&a);
+	double b_val = varToDouble(&b);
+	// ECMA-262 11.8.5: if either is NaN, result is undefined
+	if (isnan(a_val) || isnan(b_val))
 	{
-		double a_val = (a.type == ACTION_STACK_VALUE_F64) ? VAL(double, &a.data.numeric_value) : (double) VAL(float, &a.data.numeric_value);
-		double b_val = (b.type == ACTION_STACK_VALUE_F64) ? VAL(double, &b.data.numeric_value) : (double) VAL(float, &b.data.numeric_value);
-		greater = (b_val > a_val);
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 	}
 	else
 	{
-		greater = (VAL(float, &b.data.numeric_value) > VAL(float, &a.data.numeric_value));
+		u64 bool_val = (b_val > a_val) ? 1 : 0;
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 	}
-
-	u64 bool_val = greater ? 1 : 0;
-	PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 }
 
 void actionAnd(SWFAppContext* app_context)
@@ -1181,12 +1139,7 @@ void actionAnd(SWFAppContext* app_context)
 	popVar(app_context, &b);
 
 	int result = isVarTruthy(&a) && isVarTruthy(&b);
-#if defined(SWF_VERSION) && SWF_VERSION >= 5
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
-#else
-	double c = result ? 1.0 : 0.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-#endif
 }
 
 void actionOr(SWFAppContext* app_context)
@@ -1198,12 +1151,7 @@ void actionOr(SWFAppContext* app_context)
 	popVar(app_context, &b);
 
 	int result = isVarTruthy(&a) || isVarTruthy(&b);
-#if defined(SWF_VERSION) && SWF_VERSION >= 5
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
-#else
-	double c = result ? 1.0 : 0.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-#endif
 }
 
 void actionNot(SWFAppContext* app_context)
@@ -1248,13 +1196,8 @@ void actionNot(SWFAppContext* app_context)
 	}
 
 	POP();
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-	double d = is_truthy ? 0.0 : 1.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &d));
-#else
 	u64 result = is_truthy ? 0 : 1;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
-#endif
 }
 
 void actionToInteger(SWFAppContext* app_context)
@@ -1817,8 +1760,8 @@ void actionStringEquals(SWFAppContext* app_context, char* a_str, char* b_str)
 		cmp_result = strcmp((char*) a.data.numeric_value, (char*) b.data.numeric_value);
 	}
 	
-	float result = cmp_result == 0 ? 1.0f : 0.0f;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+	u64 result = (cmp_result == 0) ? 1 : 0;
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
 
 void actionStringLength(SWFAppContext* app_context, char* v_str)
@@ -2246,7 +2189,11 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_BOOLEAN:
 		{
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+			printf("%d\n", STACK_TOP_VALUE ? 1 : 0);
+#else
 			printf("%s\n", STACK_TOP_VALUE ? "true" : "false");
+#endif
 			break;
 		}
 
@@ -4216,10 +4163,8 @@ void actionStringLess(SWFAppContext* app_context)
 
 	// Compare: b < a (using strcmp)
 	// strcmp returns negative if str_b < str_a
-	float result = (strcmp(str_b, str_a) < 0) ? 1.0f : 0.0f;
-
-	// Push boolean result
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+	u64 result = (strcmp(str_b, str_a) < 0) ? 1 : 0;
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
 
 void actionImplementsOp(SWFAppContext* app_context)

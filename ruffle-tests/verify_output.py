@@ -396,7 +396,7 @@ def main():
 
         # Step 4: Filter and compare
         actual = filter_output(raw_output)
-        expected = (test_dir / "output.txt").read_text().rstrip("\n")
+        expected = (test_dir / "output.txt").read_text().replace("\r\n", "\n").rstrip("\n")
 
         match, diff_summary, line_stats = compare_output(actual, expected)
         entry["lines"] = line_stats
