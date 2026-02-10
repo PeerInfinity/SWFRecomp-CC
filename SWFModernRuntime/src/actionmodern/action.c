@@ -391,7 +391,11 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 		{
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
+#if defined(SWF_VERSION) && SWF_VERSION >= 7
 			snprintf(var_str, 17, "undefined");
+#else
+			var_str[0] = '\0';
+#endif
 			break;
 		}
 		case ACTION_STACK_VALUE_NULL:
@@ -399,6 +403,22 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
 			snprintf(var_str, 17, "null");
+			break;
+		}
+		case ACTION_STACK_VALUE_FUNCTION:
+		{
+			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
+			snprintf(var_str, 17, "[type Function]");
+			break;
+		}
+		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_ARRAY:
+		case ACTION_STACK_VALUE_MOVIECLIP:
+		{
+			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
+			snprintf(var_str, 17, "[type Object]");
 			break;
 		}
 		default:
@@ -577,12 +597,9 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Empty string -> 0 (SWF5) or NaN (SWF6+)
-#if defined(SWF_VERSION) && SWF_VERSION < 6
+				// Empty string -> 0.0 in all SWF versions
+				// ECMA-262 section 9.3.1: empty string converts to +0
 				double temp = 0.0;
-#else
-				double temp = NAN;
-#endif
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 				VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			}
@@ -600,6 +617,8 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_NULL:
 		{
+			// SWF < 7: null converts to 0.0
+			// SWF >= 7: null converts to NaN (ECMA-262)
 #if defined(SWF_VERSION) && SWF_VERSION >= 7
 			double temp = NAN;
 #else
@@ -612,7 +631,9 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_UNDEFINED:
 		{
-#if defined(SWF_VERSION) && SWF_VERSION < 6
+			// SWF < 7: undefined converts to 0.0
+			// SWF >= 7: undefined converts to NaN (ECMA-262)
+#if defined(SWF_VERSION) && SWF_VERSION < 7
 			double temp = 0.0;
 #else
 			double temp = NAN;
@@ -628,13 +649,67 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 		case ACTION_STACK_VALUE_F64:
 			return ACTION_STACK_VALUE_F64;
 
+		case ACTION_STACK_VALUE_MOVIECLIP:
+		{
+			// MovieClips convert to NaN in all SWF versions
+			// (their toString returns the target path like "_level0" which is non-numeric)
+			double temp = NAN;
+			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
+			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
+			return ACTION_STACK_VALUE_F64;
+		}
+
 		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_FUNCTION:
 		case ACTION_STACK_VALUE_ARRAY:
-		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			// Objects convert to NaN (or 0 in SWF < 5; TODO: call valueOf() if available)
-#if defined(SWF_VERSION) && SWF_VERSION < 5
+			// Try to call valueOf() on the object
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT)
+			{
+				ASObject* obj = (ASObject*) STACK_TOP_VALUE;
+				if (obj != NULL)
+				{
+					ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
+					if (valueOf_prop != NULL && valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
+					{
+						ASFunction* func = lookupFunctionFromVar(valueOf_prop);
+						if (func != NULL)
+						{
+							ActionVar result;
+							if (func->function_type == 2 && func->advanced_func != NULL)
+							{
+								ActionVar* regs = NULL;
+								if (func->register_count > 0)
+									regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+								result = func->advanced_func(app_context, NULL, 0, regs, obj);
+								if (regs != NULL) FREE(regs);
+							}
+							else if (func->function_type == 1 && func->simple_func != NULL)
+							{
+								result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+							}
+							else
+							{
+								result.type = ACTION_STACK_VALUE_UNDEFINED;
+								result.data.numeric_value = 0;
+							}
+
+							// If valueOf returned a number, use it
+							if (result.type == ACTION_STACK_VALUE_F64 || result.type == ACTION_STACK_VALUE_F32)
+							{
+								POP();
+								pushVar(app_context, &result);
+								return result.type;
+							}
+						}
+					}
+				}
+			}
+
+			// No valueOf or valueOf didn't return a number
+			// SWF < 7: objects convert to 0.0 (Flash 6 and earlier behavior)
+			// SWF >= 7: objects convert to NaN (ECMA-262 compliant)
+#if defined(SWF_VERSION) && SWF_VERSION < 7
 			double temp = 0.0;
 #else
 			double temp = NAN;
@@ -852,10 +927,22 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		POP();
 
 		// Concatenate (left + right = b + a)
-		snprintf(str_buffer, 17, "%s%s", str_b_ptr, str_a_ptr);
+		size_t len_a = str_a_ptr ? strlen(str_a_ptr) : 0;
+		size_t len_b = str_b_ptr ? strlen(str_b_ptr) : 0;
+		size_t total_len = len_a + len_b;
 
-		// Push result
-		PUSH_STR(str_buffer, strlen(str_buffer));
+		if (total_len < 17) {
+			// Fits in caller's str_buffer
+			snprintf(str_buffer, 17, "%s%s", str_b_ptr, str_a_ptr);
+			PUSH_STR(str_buffer, strlen(str_buffer));
+		} else {
+			// Needs heap allocation for longer strings
+			char* heap_str = (char*) HALLOC(total_len + 1);
+			memcpy(heap_str, str_b_ptr, len_b);
+			memcpy(heap_str + len_b, str_a_ptr, len_a);
+			heap_str[total_len] = '\0';
+			PUSH_STR(heap_str, total_len);
+		}
 	} else {
 		// Numeric addition path
 
@@ -1084,49 +1171,140 @@ void actionLess(SWFAppContext* app_context)
 
 void actionLess2(SWFAppContext* app_context)
 {
-	ActionVar a;
-	convertFloat(app_context);
-	popVar(app_context, &a);
+	// ActionLess2 (0x48) — SWF5+ only
+	// If both operands are strings, do lexicographic comparison.
+	// Otherwise, convert to numbers and compare.
+	ActionStackValueType a_type = STACK_TOP_TYPE;
 
-	ActionVar b;
-	convertFloat(app_context);
-	popVar(app_context, &b);
-
-	double a_val = varToDouble(&a);
-	double b_val = varToDouble(&b);
-	// ECMA-262 11.8.5: if either is NaN, result is undefined
-	if (isnan(a_val) || isnan(b_val))
+	int both_strings = 0;
+	if (a_type == ACTION_STACK_VALUE_STRING || a_type == ACTION_STACK_VALUE_STR_LIST)
 	{
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		u32 a_old_sp = VAL(u32, &STACK[SP + 4]);
+		ActionStackValueType b_type = STACK[a_old_sp];
+		if (b_type == ACTION_STACK_VALUE_STRING || b_type == ACTION_STACK_VALUE_STR_LIST)
+			both_strings = 1;
+	}
+
+	if (both_strings)
+	{
+		// Both operands are strings — lexicographic comparison
+		char a_buf[17];
+		convertString(app_context, a_buf);
+		ActionVar a;
+		popVar(app_context, &a);
+
+		char b_buf[17];
+		convertString(app_context, b_buf);
+		ActionVar b;
+		popVar(app_context, &b);
+
+		const char* a_str = (a.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&a.data.numeric_value)[1] :
+			(const char*)a.data.numeric_value;
+		const char* b_str = (b.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&b.data.numeric_value)[1] :
+			(const char*)b.data.numeric_value;
+
+		if (a_str == NULL) a_str = "";
+		if (b_str == NULL) b_str = "";
+
+		u64 bool_val = (strcmp(b_str, a_str) < 0) ? 1 : 0;
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 	}
 	else
 	{
-		u64 bool_val = (b_val < a_val) ? 1 : 0;
-		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+		// Numeric comparison
+		ActionVar a;
+		convertFloat(app_context);
+		popVar(app_context, &a);
+
+		ActionVar b;
+		convertFloat(app_context);
+		popVar(app_context, &b);
+
+		double a_val = varToDouble(&a);
+		double b_val = varToDouble(&b);
+		if (isnan(a_val) || isnan(b_val))
+		{
+			// NaN comparison always returns undefined
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		}
+		else
+		{
+			u64 bool_val = (b_val < a_val) ? 1 : 0;
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+		}
 	}
 }
 
 void actionGreater(SWFAppContext* app_context)
 {
-	ActionVar a;
-	convertFloat(app_context);
-	popVar(app_context, &a);
+	// ActionGreater (0x67) — SWF6+ only
+	// If both operands are strings, do lexicographic comparison.
+	// Otherwise, convert to numbers and compare.
+	ActionStackValueType a_type = STACK_TOP_TYPE;
 
-	ActionVar b;
-	convertFloat(app_context);
-	popVar(app_context, &b);
-
-	double a_val = varToDouble(&a);
-	double b_val = varToDouble(&b);
-	// ECMA-262 11.8.5: if either is NaN, result is undefined
-	if (isnan(a_val) || isnan(b_val))
+	// Check if top of stack is a string (but we need to check both operands)
+	// Peek at both types before popping
+	int both_strings = 0;
+	if (a_type == ACTION_STACK_VALUE_STRING || a_type == ACTION_STACK_VALUE_STR_LIST)
 	{
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		// Peek at second operand's type
+		u32 a_old_sp = VAL(u32, &STACK[SP + 4]);
+		ActionStackValueType b_type = STACK[a_old_sp];
+		if (b_type == ACTION_STACK_VALUE_STRING || b_type == ACTION_STACK_VALUE_STR_LIST)
+			both_strings = 1;
+	}
+
+	if (both_strings)
+	{
+		// Both operands are strings — lexicographic comparison
+		char a_buf[17];
+		convertString(app_context, a_buf);
+		ActionVar a;
+		popVar(app_context, &a);
+
+		char b_buf[17];
+		convertString(app_context, b_buf);
+		ActionVar b;
+		popVar(app_context, &b);
+
+		const char* a_str = (a.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&a.data.numeric_value)[1] :
+			(const char*)a.data.numeric_value;
+		const char* b_str = (b.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&b.data.numeric_value)[1] :
+			(const char*)b.data.numeric_value;
+
+		if (a_str == NULL) a_str = "";
+		if (b_str == NULL) b_str = "";
+
+		u64 bool_val = (strcmp(b_str, a_str) > 0) ? 1 : 0;
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 	}
 	else
 	{
-		u64 bool_val = (b_val > a_val) ? 1 : 0;
-		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+		// Numeric comparison
+		ActionVar a;
+		convertFloat(app_context);
+		popVar(app_context, &a);
+
+		ActionVar b;
+		convertFloat(app_context);
+		popVar(app_context, &b);
+
+		double a_val = varToDouble(&a);
+		double b_val = varToDouble(&b);
+		if (isnan(a_val) || isnan(b_val))
+		{
+			// NaN comparison yields undefined
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		}
+		else
+		{
+			u64 bool_val = (b_val > a_val) ? 1 : 0;
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+		}
 	}
 }
 
@@ -2183,7 +2361,11 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_UNDEFINED:
 		{
+#if defined(SWF_VERSION) && SWF_VERSION >= 6
 			printf("undefined\n");
+#else
+			printf("\n");
+#endif
 			break;
 		}
 
@@ -2299,6 +2481,22 @@ void actionTrace(SWFAppContext* app_context)
  * @param sp - Pointer to stack pointer (unused but required for API consistency)
  * @param frame - Target frame index (0-based)
  */
+/**
+ * utf8_strlen - Count the number of Unicode characters in a UTF-8 string.
+ * Continuation bytes (0x80-0xBF) are skipped, so multi-byte characters count as 1.
+ */
+static size_t utf8_strlen(const char* str)
+{
+	size_t count = 0;
+	for (const unsigned char* p = (const unsigned char*)str; *p; ++p)
+	{
+		// Count only non-continuation bytes (leading bytes start a new character)
+		if ((*p & 0xC0) != 0x80)
+			count++;
+	}
+	return count;
+}
+
 void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 {
 	(void)app_context;
@@ -2327,6 +2525,9 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	next_frame = frame;
 	manual_next_frame = 1;
 	is_playing = 0;
+
+	// Update _currentframe immediately so scripts can read the new value
+	root_movieclip.currentframe = frame + 1;  // 1-indexed
 }
 
 /**
@@ -2443,94 +2644,68 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	ActionVar frame_var;
 	popVar(app_context, &frame_var);
 
+	// Resolve frame number from stack value
+	s32 frame_num = -1;
+	int resolved = 0;
+
 	if (frame_var.type == ACTION_STACK_VALUE_F32) {
-		// Numeric frame
 		float frame_float;
 		memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
-
-		// Handle negative frames (treat as 0)
-		s32 frame_num = (s32)frame_float;
-		if (frame_num < 0) {
-			frame_num = 0;
-		}
-
-		// Apply scene bias
-		frame_num += scene_bias;
-
-		printf("GotoFrame2: frame %d (play=%d)\n", frame_num, play_flag);
-		fflush(stdout);
-
-		// Note: Actual frame navigation requires MovieClip structure and frame management
-		// In NO_GRAPHICS mode, we just log the navigation
+		frame_num = (s32)frame_float;
+		resolved = 1;
+	}
+	else if (frame_var.type == ACTION_STACK_VALUE_F64) {
+		double frame_double;
+		memcpy(&frame_double, &frame_var.data.numeric_value, sizeof(double));
+		frame_num = (s32)frame_double;
+		resolved = 1;
+	}
+	else if (frame_var.type == ACTION_STACK_VALUE_I32) {
+		s32 frame_int;
+		memcpy(&frame_int, &frame_var.data.numeric_value, sizeof(s32));
+		frame_num = frame_int;
+		resolved = 1;
+	}
+	else if (frame_var.type == ACTION_STACK_VALUE_BOOLEAN) {
+		frame_num = (s32)(frame_var.data.numeric_value & 1);
+		resolved = 1;
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
-		// Frame label - may include target path
 		const char* frame_str = (const char*)frame_var.data.numeric_value;
-
-		if (frame_str == NULL) {
-			printf("GotoFrame2: null label (ignored)\n");
-			fflush(stdout);
-			return;
-		}
+		if (frame_str == NULL) return;
 
 		// Parse target path if present (format: "target:frame" or "/target:frame")
-		const char* target = NULL;
 		const char* frame_part = frame_str;
 		const char* colon = strchr(frame_str, ':');
 
 		if (colon != NULL) {
-			// Target path present
-			size_t target_len = colon - frame_str;
-			static char target_buffer[256];
-
-			if (target_len < sizeof(target_buffer)) {
-				memcpy(target_buffer, frame_str, target_len);
-				target_buffer[target_len] = '\0';
-				target = target_buffer;
-				frame_part = colon + 1;  // Frame label/number after the colon
-			}
+			frame_part = colon + 1;
 		}
 
-		// Check if frame_part is numeric or a label
+		// Check if frame_part is numeric
 		char* endptr;
-		long frame_num = strtol(frame_part, &endptr, 10);
+		long parsed = strtol(frame_part, &endptr, 10);
 
 		if (endptr != frame_part && *endptr == '\0') {
-			// It's a numeric frame
-			if (frame_num < 0) {
-				frame_num = 0;
-			}
-
-			if (target) {
-				printf("GotoFrame2: target '%s', frame %ld (play=%d)\n", target, frame_num, play_flag);
-			} else {
-				printf("GotoFrame2: frame %ld (play=%d)\n", frame_num, play_flag);
-			}
-		} else {
-			// It's a frame label
-			if (target) {
-				printf("GotoFrame2: target '%s', label '%s' (play=%d)\n", target, frame_part, play_flag);
-			} else {
-				printf("GotoFrame2: label '%s' (play=%d)\n", frame_part, play_flag);
-			}
+			frame_num = (s32)parsed;
+			resolved = 1;
 		}
-
-		fflush(stdout);
-
-		// Note: Frame label lookup and navigation requires:
-		// - Frame label registry (mapping labels to frame numbers)
-		// - MovieClip context switching for target paths
-		// In NO_GRAPHICS mode, we just log the navigation
+		// else: frame label — not yet supported
 	}
-	else if (frame_var.type == ACTION_STACK_VALUE_UNDEFINED) {
-		// Undefined - ignore
-		printf("GotoFrame2: undefined frame (ignored)\n");
-		fflush(stdout);
+
+	if (!resolved) {
+		// Undefined, null, or unsupported type — silently ignore
+		return;
 	}
-	else {
-		// Invalid type - ignore with warning
-		printf("GotoFrame2: invalid frame type %d (ignored)\n", frame_var.type);
-		fflush(stdout);
+
+	if (frame_num < 0) frame_num = 0;
+	frame_num += scene_bias;
+
+	// Navigate: GotoFrame2 uses 1-based frame numbers, actionGotoFrame uses 0-based
+	actionGotoFrame(app_context, (u16)(frame_num - 1));
+
+	if (play_flag) {
+		is_playing = 1;
 	}
 }
 
@@ -2711,6 +2886,15 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
 	{
+		// Check special variables
+		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
+		{
+			// "this" refers to the current object context (root MovieClip)
+			extern MovieClip root_movieclip;
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+			return;
+		}
+
 		// Check built-in global constants
 		if (var_name_len == 3 && strncmp(var_name, "NaN", 3) == 0)
 		{
@@ -2735,8 +2919,14 @@ void actionGetVariable(SWFAppContext* app_context)
 			return;
 		}
 
-		// Variable not found - push empty string
+		// Variable not found
+#if defined(SWF_VERSION) && SWF_VERSION >= 6
+		// SWF6+: undefined variables return undefined
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+#else
+		// SWF < 6: undefined variables return empty string
 		PUSH_STR("", 0);
+#endif
 		return;
 	}
 
@@ -4860,8 +5050,8 @@ void actionGetMember(SWFAppContext* app_context)
 				obj_var.data.string_data.heap_ptr :
 				(const char*) obj_var.data.numeric_value;
 
-			// Push length as float
-			float len = (float) strlen(str);
+			// Push length as float (UTF-8 character count, not byte count)
+			float len = (float) utf8_strlen(str);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
 		}
 		else
@@ -6866,9 +7056,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushVar(app_context, &result);
 				return;
 			}
+			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
+			{
+				// Invoke simple function (DefineFunction type 1)
+				// Simple functions use the global stack for return values
+				ActionVar result;
+				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+				if (args != NULL) FREE(args);
+
+				pushVar(app_context, &result);
+				return;
+			}
 			else
 			{
-				// Simple function or invalid - push undefined
+				// Unknown function type or NULL - push undefined
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 				return;

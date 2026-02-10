@@ -256,6 +256,7 @@ namespace SWFRecomp
 		std::string width_twips = to_string(FRAME_WIDTH);
 		std::string height_twips = to_string(FRAME_HEIGHT);
 		std::string swf_frame_count = to_string(header.frame_count);
+		context.swf_version = header.version;
 
 		context.constants_header << "#define FRAME_WIDTH " << width << endl
 								 << "#define FRAME_HEIGHT " << height << endl
@@ -3731,6 +3732,35 @@ namespace SWFRecomp
 						{
 							// Skip frame labels in sprites for now
 							cur_pos += sub_tag.length;
+							break;
+						}
+
+						case SWF_TAG_DO_ACTION:
+						{
+							// DoAction inside sprite — create script file and emit call
+							std::string script_name = "script_" + to_string(next_script_i);
+							context.out_script_header << endl << "void " << script_name << "(SWFAppContext* app_context);";
+
+							ofstream sprite_out_script(context.output_scripts_folder + script_name + ".c", ios_base::out);
+							sprite_out_script << "#include <recomp.h>" << endl
+											  << "#include <setjmp.h>" << endl
+											  << "#include \"script_decls.h\"" << endl << endl
+											  << "void " << script_name << "(SWFAppContext* app_context)" << endl
+											  << "{" << endl;
+							sprite_out_script << "\t" << "char str_buffer[17];" << endl << endl;
+
+							next_script_i += 1;
+
+							action.parseActions(context, cur_pos, sprite_out_script);
+
+							sprite_out_script << "}";
+
+							// Emit the script call into the current sprite frame function
+							sprite_definitions << "\t" << script_name << "(app_context);" << endl;
+
+							// Update last_queued_script so main timeline doesn't also emit this script
+							last_queued_script = next_script_i;
+
 							break;
 						}
 

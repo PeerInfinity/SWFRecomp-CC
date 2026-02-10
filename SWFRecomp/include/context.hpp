@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <cstdint>
 
 using std::string;
 using std::ofstream;
@@ -25,6 +26,9 @@ namespace SWFRecomp
 		// Track if we're inside a DefineFunction2 (for local register handling)
 		bool inside_function2;
 
-		Context() : inside_function2(false) {}
+		// SWF version (needed for string encoding: SWF<6 uses Latin-1/Win-1252)
+		uint8_t swf_version;
+
+		Context() : inside_function2(false), swf_version(0) {}
 	};
 };

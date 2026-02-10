@@ -16,7 +16,8 @@ using std::endl;
 namespace SWFRecomp
 {
 	// Escape a raw string for use inside C string literals
-	static std::string escape_c_string(const char* str)
+	// For SWF < 6 (Latin-1/Win-1252 encoding), convert bytes 0x80-0xFF to UTF-8
+	static std::string escape_c_string(const char* str, int swf_version = 6)
 	{
 		std::string result;
 		for (const char* p = str; *p; ++p)
@@ -35,6 +36,38 @@ namespace SWFRecomp
 					{
 						char buf[5];
 						snprintf(buf, sizeof(buf), "\\x%02x", c);
+						result += buf;
+					}
+					else if (c >= 0x80 && swf_version < 6)
+					{
+						// Latin-1/Win-1252 byte → UTF-8
+						// For 0x80-0x9F (Win-1252 specific), use the standard mapping
+						// For 0xA0-0xFF (shared Latin-1), direct conversion
+						static const unsigned short win1252_map[32] = {
+							0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+							0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+							0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+							0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178
+						};
+						unsigned int codepoint;
+						if (c >= 0x80 && c <= 0x9F)
+							codepoint = win1252_map[c - 0x80];
+						else
+							codepoint = c; // Latin-1: codepoint == byte value
+
+						char buf[13];
+						if (codepoint < 0x80) {
+							snprintf(buf, sizeof(buf), "%c", (char)codepoint);
+						} else if (codepoint < 0x800) {
+							snprintf(buf, sizeof(buf), "\\x%02x\\x%02x",
+								0xC0 | (codepoint >> 6),
+								0x80 | (codepoint & 0x3F));
+						} else {
+							snprintf(buf, sizeof(buf), "\\x%02x\\x%02x\\x%02x",
+								0xE0 | (codepoint >> 12),
+								0x80 | ((codepoint >> 6) & 0x3F),
+								0x80 | (codepoint & 0x3F));
+						}
 						result += buf;
 					}
 					else
@@ -1812,7 +1845,7 @@ namespace SWFRecomp
 
 		// New string - assign ID and declare
 		string_to_id[str] = next_str_i;
-		context.out_script_defs << endl << "char* str_" << next_str_i << " = \"" << escape_c_string(str) << "\";";
+		context.out_script_defs << endl << "char* str_" << next_str_i << " = \"" << escape_c_string(str, context.swf_version) << "\";";
 		context.out_script_decls << endl << "extern char* str_" << next_str_i << ";";
 		next_str_i += 1;
 	}

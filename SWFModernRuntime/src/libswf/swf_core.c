@@ -66,15 +66,22 @@ void swfStart(SWFAppContext* app_context)
 	frame_func* funcs = app_context->frame_funcs;
 	current_frame = 0;
 #ifdef MAX_FRAMES
-	const size_t max_frames = MAX_FRAMES;
+	const size_t max_ticks = MAX_FRAMES;
 #else
-	const size_t max_frames = 10000;
+	const size_t max_ticks = 10000;
 #endif
+	size_t tick_count = 0;
 
-	while (!quit_swf && current_frame < max_frames)
+	while (!quit_swf && tick_count < max_ticks)
 	{
+		tick_count++;
 		printf("\n[Frame %zu]\n", current_frame);
 
+		if (current_frame >= g_frame_count)
+		{
+			printf("Frame %zu out of bounds (max %zu), stopping.\n", current_frame, g_frame_count);
+			break;
+		}
 		if (funcs[current_frame])
 		{
 			funcs[current_frame](app_context);
