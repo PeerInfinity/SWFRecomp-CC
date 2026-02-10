@@ -273,11 +273,17 @@ def main():
     show_diff = "--diff" in sys.argv
     json_path = None
     limit = None
+    shard_idx = None
+    shard_total = None
     for arg in sys.argv[1:]:
         if arg.startswith("--limit="):
             limit = int(arg.split("=")[1])
         if arg.startswith("--json="):
             json_path = arg.split("=", 1)[1]
+        if arg.startswith("--shard="):
+            parts = arg.split("=")[1].split("/")
+            shard_idx = int(parts[0])
+            shard_total = int(parts[1])
         if arg.startswith("--test="):
             # Run a single test
             test_name = arg.split("=")[1]
@@ -296,6 +302,14 @@ def main():
     total_available = len(tests)
     if limit:
         tests = tests[:limit]
+
+    # Shard: divide test list into shard_total chunks, run chunk shard_idx (1-based)
+    if shard_idx is not None:
+        chunk = len(tests) // shard_total
+        rem = len(tests) % shard_total
+        start = sum(chunk + (1 if j <= rem else 0) for j in range(1, shard_idx))
+        count = chunk + (1 if shard_idx <= rem else 0)
+        tests = tests[start:start + count]
 
     run_start = time.monotonic()
     stats = Counter()
