@@ -45,6 +45,48 @@ BOILERPLATE_PATTERNS = [
 ]
 
 
+OUTPUT_CONTEXT_LINES = 50
+OUTPUT_CONTEXT_BEFORE = 5
+
+
+def snippet_around_mismatch(actual, expected, max_lines=OUTPUT_CONTEXT_LINES,
+                            before=OUTPUT_CONTEXT_BEFORE):
+    """Return (actual_snippet, expected_snippet) centered on the first mismatch.
+
+    Shows `before` lines of matching context, then up to max_lines - before
+    lines from the mismatch onward. Adds truncation notes if trimmed.
+    """
+    actual_lines = actual.split("\n")
+    expected_lines = expected.split("\n")
+
+    # Find first mismatching line
+    first_diff = 0
+    for i in range(min(len(actual_lines), len(expected_lines))):
+        if actual_lines[i] != expected_lines[i]:
+            first_diff = i
+            break
+    else:
+        # All common lines match — mismatch is due to different lengths
+        first_diff = min(len(actual_lines), len(expected_lines))
+
+    start = max(0, first_diff - before)
+    end_actual = min(len(actual_lines), start + max_lines)
+    end_expected = min(len(expected_lines), start + max_lines)
+
+    def format_snippet(lines, start, end, total):
+        parts = []
+        if start > 0:
+            parts.append(f"... ({start} lines before) ...")
+        parts.extend(lines[start:end])
+        remaining = total - end
+        if remaining > 0:
+            parts.append(f"... ({remaining} lines after) ...")
+        return "\n".join(parts)
+
+    return (format_snippet(actual_lines, start, end_actual, len(actual_lines)),
+            format_snippet(expected_lines, start, end_expected, len(expected_lines)))
+
+
 def get_git_sha():
     """Get the current git commit SHA, or None."""
     try:
@@ -359,6 +401,9 @@ def main():
             fail_details[name] = diff_summary
             entry["status"] = "output_mismatch"
             entry["detail"] = diff_summary.split("\n")[0]  # first line only
+            actual_snip, expected_snip = snippet_around_mismatch(actual, expected)
+            entry["actual_output"] = actual_snip
+            entry["expected_output"] = expected_snip
             test_results.append(entry)
             if verbose:
                 print("MISMATCH")
