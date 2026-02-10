@@ -214,10 +214,9 @@ def run_binary(build_dir):
         result = subprocess.run(
             [str(build_dir / "test_run")],
             capture_output=True,
-            text=True,
             timeout=10,
         )
-        return result.stdout, result.returncode
+        return result.stdout.decode("utf-8", errors="replace"), result.returncode
     except subprocess.TimeoutExpired:
         return None, -1
 
