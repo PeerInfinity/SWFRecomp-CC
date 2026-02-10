@@ -1102,13 +1102,6 @@ namespace SWFRecomp
 					<< "{" << endl
 					<< "\tchar str_buffer[17];" << endl;
 
-				// Initialize local registers
-				if (register_count > 0)
-				{
-					context.out_script_defs << "\tActionVar regs[" << (int)register_count << "];" << endl;
-					context.out_script_defs << "\tmemset(regs, 0, sizeof(regs));" << endl;
-				}
-
 				// Parse flags
 				bool preload_this = (flags & 0x0001);
 				bool preload_arguments = (flags & 0x0002);
@@ -1120,8 +1113,25 @@ namespace SWFRecomp
 				bool suppress_arguments = (flags & 0x0100);
 				bool suppress_super = (flags & 0x0200);
 
-				// Preload special variables into registers
+				// Calculate actual register count needed (may exceed declared register_count)
 				int next_reg = 1; // Register 0 is reserved
+				if (preload_this && !suppress_this) next_reg++;
+				if (preload_arguments && !suppress_arguments) next_reg++;
+				if (preload_super && !suppress_super) next_reg++;
+				if (preload_root) next_reg++;
+				if (preload_parent) next_reg++;
+				if (preload_global) next_reg++;
+				int actual_reg_count = next_reg > (int)register_count ? next_reg : (int)register_count;
+
+				// Initialize local registers
+				if (actual_reg_count > 0)
+				{
+					context.out_script_defs << "\tActionVar regs[" << actual_reg_count << "];" << endl;
+					context.out_script_defs << "\tmemset(regs, 0, sizeof(regs));" << endl;
+				}
+
+				// Preload special variables into registers
+				next_reg = 1; // Reset for actual emission
 
 				if (preload_this && !suppress_this)
 				{
@@ -1446,8 +1456,14 @@ namespace SWFRecomp
 							{
 								out_script << "(double)" << endl;
 
+								// SWF stores doubles in middle-endian (word-swapped) format:
+								// the two 32-bit halves are stored high-word first, then low-word
 								u64 raw = VAL(u64, &action_buffer[push_length]);
 								push_length += 8;
+								// Swap the two 32-bit halves to get correct IEEE 754 double
+								u32 lo = (u32)(raw & 0xFFFFFFFF);
+								u32 hi = (u32)((raw >> 32) & 0xFFFFFFFF);
+								raw = ((u64)lo << 32) | (u64)hi;
 
 								char hex_double[19];
 								snprintf(hex_double, 19, "0x%016llX", (unsigned long long) raw);
@@ -1691,12 +1707,12 @@ namespace SWFRecomp
 				std::string func_id = std::string("func_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func_counter++);
 
 				// Add function declaration to header (uses app_context)
-				context.out_script_decls << endl << "void " << func_id << "(SWFAppContext* app_context);" << endl;
+				context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context);" << endl;
 
-				// Generate function definition
+				// Generate function definition (returns ActionVar for consistency with DefineFunction2)
 				context.out_script_defs << endl << endl
 					<< "// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl
-					<< "void " << func_id << "(SWFAppContext* app_context)" << endl
+					<< "ActionVar " << func_id << "(SWFAppContext* app_context)" << endl
 					<< "{" << endl
 					<< "\tchar str_buffer[17];" << endl;
 
@@ -1723,12 +1739,16 @@ namespace SWFRecomp
 
 				action_buffer = func_body_end;
 
+				// Default return for functions without explicit Return action
+				context.out_script_defs << "\tActionVar _default_ret = {0};" << endl;
+				context.out_script_defs << "\t_default_ret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+				context.out_script_defs << "\treturn _default_ret;" << endl;
 				context.out_script_defs << "}" << endl;
 
 				// Generate runtime call to register function
 				out_script << "\t// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl;
 				out_script << "\tactionDefineFunction(app_context, \"" << (name_len > 0 ? func_name : "") << "\", "
-						   << func_id << ", " << num_params << ");" << endl;
+						   << "(void(*)(SWFAppContext*))" << func_id << ", " << num_params << ");" << endl;
 
 				break;
 			}
