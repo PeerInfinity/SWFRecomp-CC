@@ -1,0 +1,77 @@
+name: Ruffle AVM1 Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max number of tests to run (0 = all)'
+        required: false
+        default: '0'
+        type: string
+
+jobs:
+  ruffle-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+
+      - name: Build SWFRecomp
+        run: |
+          mkdir -p SWFRecomp/build
+          cd SWFRecomp/build
+          cmake ..
+          make -j$(nproc)
+
+      - name: Download Ruffle test SWFs
+        run: |
+          cd ruffle-tests
+          bash download_tests.sh
+
+      - name: Run recompiler on test SWFs
+        run: python3 ruffle-tests/run_tests.py
+
+      - name: Verify runtime output
+        run: |
+          ARGS="-v --json=ruffle-tests/results.json"
+          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
+            ARGS="$ARGS --limit=${{ inputs.limit }}"
+          fi
+          python3 ruffle-tests/verify_output.py $ARGS
+
+      - name: Generate step summary
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          with open("ruffle-tests/results.json") as f:
+              r = json.load(f)
+          print("## Ruffle AVM1 Test Results")
+          print(f"**{r['pass']}/{r['total']}** tests passing ({r['pass_rate']}%)\n")
+          if r.get("breakdown"):
+              print("| Category | Count |")
+              print("|----------|------:|")
+              print(f"| Pass | {r['pass']} |")
+              for k, v in r["breakdown"].items():
+                  print(f"| {k} | {v} |")
+          EOF
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruffle-test-results
+          path: ruffle-tests/results.json
+          retention-days: 90
+          if-no-files-found: ignore

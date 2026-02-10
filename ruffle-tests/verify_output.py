@@ -9,6 +9,7 @@ Pipeline for each test:
 5. Compare against output.txt
 """
 
+import json
 import os
 import re
 import shutil
@@ -205,10 +206,13 @@ def main():
     list_pass = "--list-pass" in sys.argv
     list_fail = "--list-fail" in sys.argv
     show_diff = "--diff" in sys.argv
+    json_path = None
     limit = None
     for arg in sys.argv[1:]:
         if arg.startswith("--limit="):
             limit = int(arg.split("=")[1])
+        if arg.startswith("--json="):
+            json_path = arg.split("=", 1)[1]
         if arg.startswith("--test="):
             # Run a single test
             test_name = arg.split("=")[1]
@@ -231,6 +235,7 @@ def main():
     pass_list = []
     fail_list = []
     fail_details = {}
+    test_results = []  # Per-test results for JSON output
 
     for i, name in enumerate(tests):
         test_dir = SCRIPT_DIR / name
@@ -242,6 +247,7 @@ def main():
             stats["recomp_fail"] += 1
             fail_list.append(name)
             fail_details[name] = "SWFRecomp failed"
+            test_results.append({"test": name, "status": "recomp_fail"})
             if verbose:
                 print("RECOMP_FAIL")
             continue
@@ -263,6 +269,7 @@ def main():
                     fail_details[name] = f"compile: {first_err.strip()[:120]}"
                 else:
                     fail_details[name] = f"compile: {err[:120]}"
+                test_results.append({"test": name, "status": "compile_fail"})
                 if verbose:
                     print("COMPILE_FAIL")
                 continue
@@ -273,6 +280,7 @@ def main():
                 stats["timeout"] += 1
                 fail_list.append(name)
                 fail_details[name] = "runtime timeout"
+                test_results.append({"test": name, "status": "timeout"})
                 if verbose:
                     print("TIMEOUT")
                 continue
@@ -280,6 +288,7 @@ def main():
                 stats["runtime_error"] += 1
                 fail_list.append(name)
                 fail_details[name] = f"runtime error (rc={rc})"
+                test_results.append({"test": name, "status": "runtime_error"})
                 if verbose:
                     print(f"RUNTIME_ERROR(rc={rc})")
                 continue
@@ -287,6 +296,7 @@ def main():
                 stats["runtime_segfault"] += 1
                 fail_list.append(name)
                 fail_details[name] = "runtime segfault"
+                test_results.append({"test": name, "status": "segfault"})
                 if verbose:
                     print("SEGFAULT")
                 continue
@@ -299,12 +309,14 @@ def main():
         if match:
             stats["pass"] += 1
             pass_list.append(name)
+            test_results.append({"test": name, "status": "pass"})
             if verbose:
                 print("PASS")
         else:
             stats["output_mismatch"] += 1
             fail_list.append(name)
             fail_details[name] = diff_summary
+            test_results.append({"test": name, "status": "output_mismatch"})
             if verbose:
                 print("MISMATCH")
 
@@ -330,6 +342,25 @@ def main():
         for name in fail_list:
             detail = fail_details.get(name, "")
             print(f"  {name}: {detail}")
+
+    # Write JSON results
+    if json_path:
+        report = {
+            "total": total,
+            "pass": stats["pass"],
+            "fail": total - stats["pass"],
+            "pass_rate": round(100 * stats["pass"] / total, 1) if total else 0,
+            "breakdown": {
+                k: stats[k]
+                for k in ["output_mismatch", "compile_fail", "recomp_fail",
+                           "runtime_segfault", "runtime_error", "timeout"]
+                if stats[k]
+            },
+            "tests": test_results,
+        }
+        with open(json_path, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"\nResults written to {json_path}")
 
 
 if __name__ == "__main__":

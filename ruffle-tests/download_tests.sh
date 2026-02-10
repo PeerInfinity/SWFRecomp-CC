@@ -5,13 +5,16 @@
 # These are used by run_tests.py and verify_output.py for regression testing
 # against the SWFRecomp pipeline.
 #
+# Uses git sparse-checkout to download only the AVM1 test subtree instead of
+# the entire Ruffle repository (~100x smaller download).
+#
 # Usage: ./download_tests.sh [--clean]
 #   --clean   Remove existing test directories before downloading
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="ruffle-rs/ruffle"
+REPO_URL="https://github.com/ruffle-rs/ruffle.git"
 BRANCH="master"
 # AVM1 test directories live under this path in the Ruffle repo
 BASE_PATH="tests/tests/swfs/avm1"
@@ -22,41 +25,28 @@ if [[ "${1:-}" == "--clean" ]]; then
 fi
 
 # Check dependencies
-if ! command -v gh &>/dev/null; then
-    echo "Error: 'gh' (GitHub CLI) is required. Install from https://cli.github.com/"
+if ! command -v git &>/dev/null; then
+    echo "Error: 'git' is required."
     exit 1
 fi
 
-if ! command -v tar &>/dev/null; then
-    echo "Error: 'tar' is required."
-    exit 1
-fi
+echo "Downloading Ruffle AVM1 tests (branch: ${BRANCH})..."
 
-echo "Downloading Ruffle AVM1 tests from ${REPO} (branch: ${BRANCH})..."
-
-# Create a temporary directory for the download
+# Create a temporary directory for the checkout
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "${TMPDIR}"' EXIT
 
-# Download the repo tarball (only the avm1 test subtree)
-echo "Fetching repository archive..."
-gh api "repos/${REPO}/tarball/${BRANCH}" > "${TMPDIR}/repo.tar.gz"
+# Sparse checkout: clone only tree metadata, then fetch blobs for avm1 tests only
+echo "Cloning with sparse checkout (only ${BASE_PATH}/)..."
+git clone --depth=1 --filter=blob:none --sparse --branch="${BRANCH}" \
+    "${REPO_URL}" "${TMPDIR}/ruffle" 2>&1 | tail -3
 
-# Extract just the avm1 test directories
-echo "Extracting AVM1 test directories..."
-# The tarball has a top-level directory like ruffle-rs-ruffle-<sha>/
-# We need to strip that prefix and the tests/tests/swfs/avm1/ prefix
-TOP_PREFIX=$(tar tzf "${TMPDIR}/repo.tar.gz" | head -1 | cut -d/ -f1)
-STRIP_PREFIX="${TOP_PREFIX}/${BASE_PATH}/"
+git -C "${TMPDIR}/ruffle" sparse-checkout set "${BASE_PATH}" 2>&1
 
-mkdir -p "${TMPDIR}/extracted"
-tar xzf "${TMPDIR}/repo.tar.gz" \
-    --strip-components=5 \
-    -C "${TMPDIR}/extracted" \
-    "${STRIP_PREFIX}" 2>/dev/null || true
+SRC_DIR="${TMPDIR}/ruffle/${BASE_PATH}"
 
 # Count what we got
-NUM_TESTS=$(find "${TMPDIR}/extracted" -maxdepth 1 -mindepth 1 -type d | wc -l)
+NUM_TESTS=$(find "${SRC_DIR}" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
 if [[ "${NUM_TESTS}" -eq 0 ]]; then
     echo "Error: No test directories found. The Ruffle repo structure may have changed."
     echo "Expected tests at: ${BASE_PATH}/"
@@ -81,7 +71,7 @@ fi
 echo "Installing test directories..."
 INSTALLED=0
 SKIPPED=0
-for test_dir in "${TMPDIR}/extracted"/*/; do
+for test_dir in "${SRC_DIR}"/*/; do
     test_name="$(basename "${test_dir}")"
 
     # Skip if no test.swf exists (some dirs are support/framework dirs)
@@ -111,9 +101,9 @@ for test_dir in "${TMPDIR}/extracted"/*/; do
 done
 
 # Also install the __framework__ directory if present
-if [[ -d "${TMPDIR}/extracted/__framework__" ]]; then
+if [[ -d "${SRC_DIR}/__framework__" ]]; then
     mkdir -p "${SCRIPT_DIR}/__framework__"
-    cp -r "${TMPDIR}/extracted/__framework__/"* "${SCRIPT_DIR}/__framework__/"
+    cp -r "${SRC_DIR}/__framework__/"* "${SCRIPT_DIR}/__framework__/"
 fi
 
 echo ""
