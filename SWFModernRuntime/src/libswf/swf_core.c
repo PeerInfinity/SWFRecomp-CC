@@ -75,7 +75,7 @@ void swfStart(SWFAppContext* app_context)
 	while (!quit_swf && tick_count < max_ticks)
 	{
 		tick_count++;
-		printf("\n[Frame %zu]\n", current_frame);
+		printf("[Frame %zu]\n", current_frame);
 
 		if (current_frame >= g_frame_count)
 		{

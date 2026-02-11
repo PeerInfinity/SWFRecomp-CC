@@ -30,6 +30,13 @@ static ASObject* scope_chain[MAX_SCOPE_DEPTH];
 static u32 scope_depth = 0;
 
 // ==================================================================
+// Recursion Depth Limit
+// ==================================================================
+
+#define MAX_CALL_DEPTH 256
+static u32 g_call_depth = 0;
+
+// ==================================================================
 // Function Storage and Management
 // ==================================================================
 
@@ -537,7 +544,7 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 		{
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
-			snprintf(var_str, 17, "[type Object]");
+			snprintf(var_str, 17, "[object Object]");
 			break;
 		}
 		default:
@@ -1001,32 +1008,38 @@ void actionPrevFrame(SWFAppContext* app_context)
 
 void actionAdd(SWFAppContext* app_context)
 {
-	convertFloat(app_context);
-	ActionVar a;
-	popVar(app_context, &a);
-	
+	// Flash evaluates left operand before right.
+	// Pop right raw, convert left first, then right.
+	ActionVar a_raw;
+	popVar(app_context, &a_raw);
+
 	convertFloat(app_context);
 	ActionVar b;
 	popVar(app_context, &b);
-	
+
+	pushVar(app_context, &a_raw);
+	convertFloat(app_context);
+	ActionVar a;
+	popVar(app_context, &a);
+
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
 		double a_val = VAL(double, &a.data.numeric_value);
 		double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-		
+
 		double c = b_val + a_val;
 		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
 	}
-	
+
 	else if (b.type == ACTION_STACK_VALUE_F64)
 	{
 		double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
 		double b_val = VAL(double, &b.data.numeric_value);
-		
+
 		double c = b_val + a_val;
 		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
 	}
-	
+
 	else
 	{
 		float c = VAL(float, &b.data.numeric_value) + VAL(float, &a.data.numeric_value);
@@ -1080,16 +1093,35 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		}
 	} else {
 		// Numeric addition path
+		// Flash evaluates left operand before right, so we must convert
+		// left (deeper on stack) first. Pop right raw, convert left, then right.
 
-		// Convert and pop first operand
-		convertFloat(app_context);
-		ActionVar a;
-		popVar(app_context, &a);
+		// Pop right operand (raw, no conversion yet)
+		ActionVar a_raw;
+		popVar(app_context, &a_raw);
 
-		// Convert and pop second operand
+		// Convert left operand (now on top) — valueOf called first
 		convertFloat(app_context);
 		ActionVar b;
 		popVar(app_context, &b);
+
+		// Convert right operand via objectToPrimitive if needed
+		ActionVar a;
+		if (a_raw.type == ACTION_STACK_VALUE_OBJECT || a_raw.type == ACTION_STACK_VALUE_FUNCTION ||
+		    a_raw.type == ACTION_STACK_VALUE_ARRAY)
+		{
+			// Push back and convert via convertFloat for full conversion
+			pushVar(app_context, &a_raw);
+			convertFloat(app_context);
+			popVar(app_context, &a);
+		}
+		else
+		{
+			// Non-object: push and convert normally
+			pushVar(app_context, &a_raw);
+			convertFloat(app_context);
+			popVar(app_context, &a);
+		}
 
 		// Perform addition (same logic as actionAdd)
 		if (a.type == ACTION_STACK_VALUE_F64)
@@ -1284,8 +1316,14 @@ void actionEquals(SWFAppContext* app_context)
 
 	double a_val = varToDouble(&a);
 	double b_val = varToDouble(&b);
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+	// SWF4: Equals returns numeric 1/0
+	double result = (a_val == b_val) ? 1.0 : 0.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+#else
 	u64 result = (a_val == b_val) ? 1 : 0;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
+#endif
 }
 
 void actionLess(SWFAppContext* app_context)
@@ -1307,8 +1345,14 @@ void actionLess(SWFAppContext* app_context)
 
 	double left_val = varToDouble(&left);
 	double right_val = varToDouble(&right);
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+	// SWF4: Less returns numeric 1/0
+	double result = (left_val < right_val) ? 1.0 : 0.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+#else
 	u64 result = (left_val < right_val) ? 1 : 0;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
+#endif
 }
 
 void actionLess2(SWFAppContext* app_context)
@@ -1477,7 +1521,12 @@ void actionAnd(SWFAppContext* app_context)
 	popVar(app_context, &b);
 
 	int result = isVarTruthy(&a) && isVarTruthy(&b);
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+	double d = result ? 1.0 : 0.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &d));
+#else
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
+#endif
 }
 
 void actionOr(SWFAppContext* app_context)
@@ -1489,7 +1538,12 @@ void actionOr(SWFAppContext* app_context)
 	popVar(app_context, &b);
 
 	int result = isVarTruthy(&a) || isVarTruthy(&b);
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+	double d = result ? 1.0 : 0.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &d));
+#else
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
+#endif
 }
 
 void actionNot(SWFAppContext* app_context)
@@ -1534,8 +1588,14 @@ void actionNot(SWFAppContext* app_context)
 	}
 
 	POP();
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+	// SWF4: Not returns numeric 1/0
+	double result = is_truthy ? 0.0 : 1.0;
+	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+#else
 	u64 result = is_truthy ? 0 : 1;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
+#endif
 }
 
 void actionToInteger(SWFAppContext* app_context)
@@ -2554,7 +2614,7 @@ void actionTrace(SWFAppContext* app_context)
 		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			printf("[object Object]\n");
+			printf("[type Object]\n");
 			break;
 		}
 
@@ -3096,6 +3156,27 @@ void actionGetVariable(SWFAppContext* app_context)
 				global_valueOf_set = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
+			return;
+		}
+		else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
+		{
+			// Lazily create System built-in object
+			static ASObject* system_object = NULL;
+			if (system_object == NULL)
+			{
+				system_object = allocObject(app_context, 4);
+				ASObject* security_obj = allocObject(app_context, 4);
+				ActionVar sandbox_val = {0};
+				sandbox_val.type = ACTION_STACK_VALUE_STRING;
+				sandbox_val.str_size = 13;
+				VAL(u64, &sandbox_val.data.numeric_value) = (u64)"localWithFile";
+				setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
+				ActionVar security_var = {0};
+				security_var.type = ACTION_STACK_VALUE_OBJECT;
+				VAL(u64, &security_var.data.numeric_value) = (u64)security_obj;
+				setProperty(app_context, system_object, "security", 8, &security_var);
+			}
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)system_object);
 			return;
 		}
 #endif
@@ -3822,7 +3903,7 @@ void actionCastOp(SWFAppContext* app_context)
 	{
 		// Cast fails - push null
 		ActionVar null_var;
-		null_var.type = ACTION_STACK_VALUE_UNDEFINED;
+		null_var.type = ACTION_STACK_VALUE_NULL;
 		null_var.data.numeric_value = 0;
 		null_var.str_size = 0;
 		pushVar(app_context, &null_var);
@@ -6937,8 +7018,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	{
 		ASFunction* func = lookupFunctionByName(func_name, func_name_len);
 
-		if (func != NULL)
+		if (func != NULL && g_call_depth >= MAX_CALL_DEPTH)
 		{
+			// Recursion depth limit reached - push undefined
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+		else if (func != NULL)
+		{
+			g_call_depth++;
+
 			if (func->function_type == 2)
 			{
 				// DefineFunction2 with registers and this context
@@ -6996,6 +7085,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 				pushVar(app_context, &func_result);
 			}
+
+			g_call_depth--;
 		}
 		else
 		{
@@ -7279,7 +7370,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Object is a function - invoke it
 			ASFunction* func = lookupFunctionFromVar(&obj_var);
 
-			if (func != NULL && func->function_type == 2)
+			if (func != NULL && g_call_depth >= MAX_CALL_DEPTH)
+			{
+				// Recursion depth limit reached
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			else if (func != NULL && func->function_type == 2)
 			{
 				// Invoke DefineFunction2
 				ActionVar* registers = NULL;
@@ -7288,7 +7386,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 
 				// No 'this' binding for direct function call (pass NULL)
+				g_call_depth++;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+				g_call_depth--;
 
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
@@ -7300,8 +7400,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			{
 				// Invoke simple function (DefineFunction type 1)
 				// Simple functions use the global stack for return values
+				g_call_depth++;
 				ActionVar result;
 				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				g_call_depth--;
 
 				if (args != NULL) FREE(args);
 
@@ -7346,7 +7448,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Get function object
 			ASFunction* func = lookupFunctionFromVar(method_prop);
 
-			if (func != NULL && func->function_type == 2)
+			if (func != NULL && g_call_depth >= MAX_CALL_DEPTH)
+			{
+				// Recursion depth limit reached
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+			else if (func != NULL && func->function_type == 2)
 			{
 				// Invoke DefineFunction2 with 'this' binding
 				ActionVar* registers = NULL;
@@ -7354,7 +7462,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 				}
 
+				g_call_depth++;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
+				g_call_depth--;
 
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
