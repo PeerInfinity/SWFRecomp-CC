@@ -1789,9 +1789,19 @@ namespace SWFRecomp
 					<< "\tchar str_buffer[17];" << endl;
 
 				// Bind parameters (simple DefineFunction uses variables, not registers)
-				for (size_t i = 0; i < params.size(); i++)
+				// Parameters are pushed onto the stack by actionCallFunction in order
+				// Pop them in reverse order and set as local variables
+				if (params.size() > 0)
 				{
-					context.out_script_defs << "\t// TODO: Bind parameter '" << params[i] << "' from arguments" << endl;
+					context.out_script_defs << "\t// Bind " << params.size() << " parameter(s) from stack" << endl;
+					context.out_script_defs << "\t{" << endl;
+					for (int i = (int)params.size() - 1; i >= 0; i--)
+					{
+						context.out_script_defs << "\t\tActionVar _param_" << i << ";" << endl;
+						context.out_script_defs << "\t\tpopVar(app_context, &_param_" << i << ");" << endl;
+						context.out_script_defs << "\t\tsetVariableByName(\"" << params[i] << "\", &_param_" << i << ");" << endl;
+					}
+					context.out_script_defs << "\t}" << endl;
 				}
 
 				// Parse function body recursively

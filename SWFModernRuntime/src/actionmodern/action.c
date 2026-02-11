@@ -19,6 +19,13 @@
 #include <heap.h>
 #include <actionmodern/object.h>
 
+// Forward declarations for array helpers (defined later in file)
+static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size);
+static double varToDoubleSimple(ActionVar* v);
+static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
+                           const char* method_name, u32 method_name_len,
+                           ActionVar* args, u32 num_args);
+
 u32 start_time;
 
 // ==================================================================
@@ -510,7 +517,11 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			u64 val = STACK_TOP_VALUE;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+			snprintf(var_str, 17, "%s", val ? "1" : "0");
+#else
 			snprintf(var_str, 17, "%s", val ? "true" : "false");
+#endif
 			break;
 		}
 		case ACTION_STACK_VALUE_UNDEFINED:
@@ -1228,36 +1239,24 @@ void actionDivide(SWFAppContext* app_context)
 	ActionVar b;
 	popVar(app_context, &b);
 	
-	if (varToDouble(&a) == 0.0)
+	double a_val = varToDouble(&a);
+	double b_val = varToDouble(&b);
+
+	if (a_val == 0.0)
 	{
-		// SWF 4:
+#if defined(SWF_VERSION) && SWF_VERSION < 5
+		// SWF4: divide by zero returns "#ERROR#"
 		PUSH_STR("#ERROR#", 8);
+#else
+		// SWF5+: divide by zero returns Infinity/-Infinity/NaN
+		double c = b_val / a_val;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+#endif
 	}
 	else
 	{
-		if (a.type == ACTION_STACK_VALUE_F64)
-		{
-			double a_val = VAL(double, &a.data.numeric_value);
-			double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-			
-			double c = b_val/a_val;
-			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-		}
-		
-		else if (b.type == ACTION_STACK_VALUE_F64)
-		{
-			double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
-			double b_val = VAL(double, &b.data.numeric_value);
-			
-			double c = b_val/a_val;
-			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-		}
-		
-		else
-		{
-			float c = VAL(float, &b.data.numeric_value)/VAL(float, &a.data.numeric_value);
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
-		}
+		double c = b_val / a_val;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
 	}
 }
 
@@ -1316,14 +1315,8 @@ void actionEquals(SWFAppContext* app_context)
 
 	double a_val = varToDouble(&a);
 	double b_val = varToDouble(&b);
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-	// SWF4: Equals returns numeric 1/0
-	double result = (a_val == b_val) ? 1.0 : 0.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
-#else
 	u64 result = (a_val == b_val) ? 1 : 0;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
-#endif
 }
 
 void actionLess(SWFAppContext* app_context)
@@ -1345,14 +1338,8 @@ void actionLess(SWFAppContext* app_context)
 
 	double left_val = varToDouble(&left);
 	double right_val = varToDouble(&right);
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-	// SWF4: Less returns numeric 1/0
-	double result = (left_val < right_val) ? 1.0 : 0.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
-#else
 	u64 result = (left_val < right_val) ? 1 : 0;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
-#endif
 }
 
 void actionLess2(SWFAppContext* app_context)
@@ -1521,12 +1508,7 @@ void actionAnd(SWFAppContext* app_context)
 	popVar(app_context, &b);
 
 	int result = isVarTruthy(&a) && isVarTruthy(&b);
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-	double d = result ? 1.0 : 0.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &d));
-#else
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
-#endif
 }
 
 void actionOr(SWFAppContext* app_context)
@@ -1538,12 +1520,7 @@ void actionOr(SWFAppContext* app_context)
 	popVar(app_context, &b);
 
 	int result = isVarTruthy(&a) || isVarTruthy(&b);
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-	double d = result ? 1.0 : 0.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &d));
-#else
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)result);
-#endif
 }
 
 void actionNot(SWFAppContext* app_context)
@@ -1588,14 +1565,8 @@ void actionNot(SWFAppContext* app_context)
 	}
 
 	POP();
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-	// SWF4: Not returns numeric 1/0
-	double result = is_truthy ? 0.0 : 1.0;
-	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
-#else
 	u64 result = is_truthy ? 0 : 1;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
-#endif
 }
 
 void actionToInteger(SWFAppContext* app_context)
@@ -2581,11 +2552,7 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_UNDEFINED:
 		{
-#if defined(SWF_VERSION) && SWF_VERSION >= 6
 			printf("undefined\n");
-#else
-			printf("\n");
-#endif
 			break;
 		}
 
@@ -2620,46 +2587,23 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_ARRAY:
 		{
-			// Print array as comma-separated values
+			// Print array as comma-separated values using join(",")
 			ASArray* arr = (ASArray*) STACK_TOP_VALUE;
 			if (arr != NULL)
 			{
-				for (u32 i = 0; i < arr->length; i++)
+				// Use callArrayMethod toString for consistent formatting
+				ActionVar comma_arg = {0};
+				comma_arg.type = ACTION_STACK_VALUE_STRING;
+				comma_arg.str_size = 1;
+				VAL(u64, &comma_arg.data.numeric_value) = (u64) ",";
+				callArrayMethod(app_context, arr, "join", 4, &comma_arg, 1);
+				// The result is on the stack — print it
+				if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STRING)
 				{
-					if (i > 0) printf(",");
-					ActionVar* elem = getArrayElement(arr, i);
-					if (elem != NULL)
-					{
-						switch (elem->type)
-						{
-							case ACTION_STACK_VALUE_STRING:
-							{
-								char* s = elem->data.string_data.owns_memory ?
-									elem->data.string_data.heap_ptr :
-									(char*) elem->data.numeric_value;
-								if (s) printf("%s", s);
-								break;
-							}
-							case ACTION_STACK_VALUE_F32:
-								printf("%.15g", VAL(float, &elem->data.numeric_value));
-								break;
-							case ACTION_STACK_VALUE_F64:
-								printf("%.15g", VAL(double, &elem->data.numeric_value));
-								break;
-							case ACTION_STACK_VALUE_BOOLEAN:
-								printf("%s", elem->data.numeric_value ? "true" : "false");
-								break;
-							case ACTION_STACK_VALUE_UNDEFINED:
-								printf("undefined");
-								break;
-							case ACTION_STACK_VALUE_NULL:
-								printf("null");
-								break;
-							default:
-								break;
-						}
-					}
+					const char* s = (const char*) VAL(u64, &STACK_TOP_VALUE);
+					if (s) printf("%s", s);
 				}
+				POP();
 			}
 			printf("\n");
 			break;
@@ -5146,7 +5090,50 @@ void actionSetMember(SWFAppContext* app_context)
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
 		}
 	}
-	// If it's not an object type, we silently ignore the operation
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+		if (arr != NULL)
+		{
+			// Check for "length" property
+			if (prop_name_len == 6 && strncmp(prop_name, "length", 6) == 0)
+			{
+				// Set array length (truncate or extend)
+				int new_len = 0;
+				if (value_var.type == ACTION_STACK_VALUE_F32)
+					new_len = (int) VAL(float, &value_var.data.numeric_value);
+				else if (value_var.type == ACTION_STACK_VALUE_F64)
+					new_len = (int) VAL(double, &value_var.data.numeric_value);
+				if (new_len >= 0)
+				{
+					if ((u32)new_len > arr->capacity)
+					{
+						arr->elements = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_len);
+						// Zero-init new elements
+						for (u32 i = arr->capacity; i < (u32)new_len; i++)
+						{
+							arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+							arr->elements[i].data.numeric_value = 0;
+							arr->elements[i].str_size = 0;
+						}
+						arr->capacity = new_len;
+					}
+					arr->length = new_len;
+				}
+			}
+			else
+			{
+				// Try as numeric index
+				char* endptr;
+				long index = strtol(prop_name, &endptr, 10);
+				if (*endptr == '\0' && index >= 0)
+				{
+					setArrayElement(app_context, arr, (u32)index, &value_var);
+				}
+			}
+		}
+	}
+	// If it's not an object or array type, we silently ignore the operation
 	// (Flash behavior for setting properties on non-objects)
 }
 
@@ -5465,8 +5452,8 @@ void actionNewObject(SWFAppContext* app_context)
 		num_args = 16;
 	}
 
-	// Pop arguments in reverse order (first arg is deepest on stack)
-	for (int i = (int)num_args - 1; i >= 0; i--)
+	// Pop arguments: SWF pushes last arg first, so first arg is on top of stack
+	for (u32 i = 0; i < num_args; i++)
 	{
 		popVar(app_context, &args[i]);
 	}
@@ -5797,8 +5784,8 @@ void actionNewMethod(SWFAppContext* app_context)
 		num_args = 16;
 	}
 
-	// Pop arguments in reverse order (first arg is deepest on stack)
-	for (int i = (int)num_args - 1; i >= 0; i--)
+	// Pop arguments: SWF pushes last arg first, so first arg is on top
+	for (u32 i = 0; i < num_args; i++)
 	{
 		popVar(app_context, &args[i]);
 	}
@@ -6759,7 +6746,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		args = (ActionVar*) HALLOC(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
-			popVar(app_context, &args[num_args - 1 - i]);
+			popVar(app_context, &args[i]);
 		}
 	}
 
@@ -7097,6 +7084,457 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	}
 }
 
+// Helper: convert an ActionVar to a string for array join/toString.
+// Writes into buf (max buf_size chars), returns length written.
+static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size)
+{
+	if (v == NULL || v->type == ACTION_STACK_VALUE_UNDEFINED || v->type == ACTION_STACK_VALUE_NULL)
+	{
+		buf[0] = '\0';
+		return 0;
+	}
+	switch (v->type)
+	{
+		case ACTION_STACK_VALUE_STRING:
+		{
+			const char* s = v->data.string_data.owns_memory ?
+				v->data.string_data.heap_ptr : (const char*) v->data.numeric_value;
+			if (s == NULL) { buf[0] = '\0'; return 0; }
+			int len = snprintf(buf, buf_size, "%s", s);
+			return len < buf_size ? len : buf_size - 1;
+		}
+		case ACTION_STACK_VALUE_F32:
+		{
+			float f = VAL(float, &v->data.numeric_value);
+			if (isnan(f)) return snprintf(buf, buf_size, "NaN");
+			if (isinf(f)) return snprintf(buf, buf_size, "%sInfinity", f < 0 ? "-" : "");
+			int len = snprintf(buf, buf_size, "%.15g", (double)f);
+			return len < buf_size ? len : buf_size - 1;
+		}
+		case ACTION_STACK_VALUE_F64:
+		{
+			double d = VAL(double, &v->data.numeric_value);
+			if (isnan(d)) return snprintf(buf, buf_size, "NaN");
+			if (isinf(d)) return snprintf(buf, buf_size, "%sInfinity", d < 0 ? "-" : "");
+			int len = snprintf(buf, buf_size, "%.15g", d);
+			return len < buf_size ? len : buf_size - 1;
+		}
+		case ACTION_STACK_VALUE_BOOLEAN:
+			return snprintf(buf, buf_size, "%s", v->data.numeric_value ? "true" : "false");
+		case ACTION_STACK_VALUE_ARRAY:
+		{
+			// Recursively convert nested array to comma-separated string
+			ASArray* nested = (ASArray*) v->data.numeric_value;
+			if (nested == NULL) { buf[0] = '\0'; return 0; }
+			int pos = 0;
+			for (u32 i = 0; i < nested->length && pos < buf_size - 1; i++)
+			{
+				if (i > 0 && pos < buf_size - 1) buf[pos++] = ',';
+				ActionVar* elem = getArrayElement(nested, i);
+				char elem_str[64];
+				int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+				for (int j = 0; j < elen && pos < buf_size - 1; j++)
+					buf[pos++] = elem_str[j];
+			}
+			buf[pos] = '\0';
+			return pos;
+		}
+		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_MOVIECLIP:
+			return snprintf(buf, buf_size, "[object Object]");
+		case ACTION_STACK_VALUE_FUNCTION:
+			return snprintf(buf, buf_size, "[type Function]");
+		default:
+			buf[0] = '\0';
+			return 0;
+	}
+}
+
+// Helper: convert ActionVar to double for array methods
+static double varToDoubleSimple(ActionVar* v)
+{
+	if (v == NULL) return 0.0;
+	switch (v->type)
+	{
+		case ACTION_STACK_VALUE_F32: return (double) VAL(float, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_F64: return VAL(double, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_BOOLEAN: return v->data.numeric_value ? 1.0 : 0.0;
+		case ACTION_STACK_VALUE_STRING:
+		{
+			const char* s = v->data.string_data.owns_memory ?
+				v->data.string_data.heap_ptr : (const char*) v->data.numeric_value;
+			if (s == NULL) return 0.0;
+			char* endptr;
+			double d = strtod(s, &endptr);
+			if (endptr == s) return NAN;
+			return d;
+		}
+		case ACTION_STACK_VALUE_NULL: return 0.0;
+		default: return NAN;
+	}
+}
+
+// Helper function to call built-in array methods
+// Returns 1 if method was handled, 0 if not found
+static int callArrayMethod(SWFAppContext* app_context,
+                           ASArray* arr,
+                           const char* method_name, u32 method_name_len,
+                           ActionVar* args, u32 num_args)
+{
+	// push(elem1, elem2, ...) - add elements, return new length
+	if (method_name_len == 4 && strncmp(method_name, "push", 4) == 0)
+	{
+		for (u32 i = 0; i < num_args; i++)
+		{
+			setArrayElement(app_context, arr, arr->length, &args[i]);
+		}
+		double len = (double) arr->length;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &len));
+		return 1;
+	}
+
+	// pop() - remove and return last element
+	if (method_name_len == 3 && strncmp(method_name, "pop", 3) == 0)
+	{
+		if (arr->length == 0)
+		{
+			pushUndefined(app_context);
+		}
+		else
+		{
+			arr->length--;
+			ActionVar* elem = &arr->elements[arr->length];
+			pushVar(app_context, elem);
+		}
+		return 1;
+	}
+
+	// shift() - remove and return first element
+	if (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0)
+	{
+		if (arr->length == 0)
+		{
+			pushUndefined(app_context);
+		}
+		else
+		{
+			ActionVar first = arr->elements[0];
+			for (u32 i = 0; i < arr->length - 1; i++)
+			{
+				arr->elements[i] = arr->elements[i + 1];
+			}
+			arr->length--;
+			pushVar(app_context, &first);
+		}
+		return 1;
+	}
+
+	// unshift(elem1, ...) - prepend elements, return new length
+	if (method_name_len == 7 && strncmp(method_name, "unshift", 7) == 0)
+	{
+		if (num_args > 0)
+		{
+			// Ensure capacity
+			u32 new_length = arr->length + num_args;
+			while (new_length > arr->capacity)
+			{
+				u32 new_cap = arr->capacity * 2;
+				if (new_cap < new_length) new_cap = new_length;
+				arr->elements = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_cap);
+				arr->capacity = new_cap;
+			}
+			// Shift existing elements right
+			for (int i = (int)arr->length - 1; i >= 0; i--)
+			{
+				arr->elements[i + num_args] = arr->elements[i];
+			}
+			// Insert new elements at front
+			for (u32 i = 0; i < num_args; i++)
+			{
+				arr->elements[i] = args[i];
+			}
+			arr->length = new_length;
+		}
+		double len = (double) arr->length;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &len));
+		return 1;
+	}
+
+	// reverse() - reverse in place, return array ref
+	if (method_name_len == 7 && strncmp(method_name, "reverse", 7) == 0)
+	{
+		for (u32 i = 0; i < arr->length / 2; i++)
+		{
+			ActionVar tmp = arr->elements[i];
+			arr->elements[i] = arr->elements[arr->length - 1 - i];
+			arr->elements[arr->length - 1 - i] = tmp;
+		}
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+		return 1;
+	}
+
+	// join(separator) - join elements with separator string
+	if (method_name_len == 4 && strncmp(method_name, "join", 4) == 0)
+	{
+		const char* sep = ",";
+		u32 sep_len = 1;
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			sep = args[0].data.string_data.owns_memory ?
+				args[0].data.string_data.heap_ptr : (const char*) args[0].data.numeric_value;
+			if (sep == NULL) sep = "null";
+			sep_len = strlen(sep);
+		}
+		else if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			// undefined separator → use comma (Flash behavior)
+			sep = ",";
+			sep_len = 1;
+		}
+
+		// Build joined string
+		u32 buf_cap = 256;
+		char* buf = (char*) HALLOC(buf_cap);
+		u32 buf_len = 0;
+
+		for (u32 i = 0; i < arr->length; i++)
+		{
+			if (i > 0)
+			{
+				while (buf_len + sep_len + 1 > buf_cap)
+				{
+					buf_cap *= 2;
+					buf = (char*) realloc(buf, buf_cap);
+				}
+				memcpy(buf + buf_len, sep, sep_len);
+				buf_len += sep_len;
+			}
+			char elem_str[64];
+			ActionVar* elem = getArrayElement(arr, i);
+			int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+			while (buf_len + elen + 1 > buf_cap)
+			{
+				buf_cap *= 2;
+				buf = (char*) realloc(buf, buf_cap);
+			}
+			memcpy(buf + buf_len, elem_str, elen);
+			buf_len += elen;
+		}
+		buf[buf_len] = '\0';
+
+		// Push as heap-allocated string
+		ActionVar result = {0};
+		result.type = ACTION_STACK_VALUE_STRING;
+		result.str_size = buf_len;
+		result.data.string_data.heap_ptr = buf;
+		result.data.string_data.owns_memory = true;
+		pushVar(app_context, &result);
+		return 1;
+	}
+
+	// toString() - same as join(",")
+	if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
+	{
+		// Reuse join logic with ","
+		ActionVar comma_arg = {0};
+		comma_arg.type = ACTION_STACK_VALUE_STRING;
+		comma_arg.str_size = 1;
+		VAL(u64, &comma_arg.data.numeric_value) = (u64) ",";
+		return callArrayMethod(app_context, arr, "join", 4, &comma_arg, 1);
+	}
+
+	// concat(arr1, arr2, ...) - return new array with all elements
+	if (method_name_len == 6 && strncmp(method_name, "concat", 6) == 0)
+	{
+		// Count total elements needed
+		u32 total = arr->length;
+		for (u32 i = 0; i < num_args; i++)
+		{
+			if (args[i].type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ASArray* other = (ASArray*) args[i].data.numeric_value;
+				if (other) total += other->length;
+			}
+			else
+			{
+				total++;
+			}
+		}
+
+		ASArray* result = allocArray(app_context, total > 0 ? total : 4);
+		// Copy this array's elements
+		for (u32 i = 0; i < arr->length; i++)
+		{
+			setArrayElement(app_context, result, result->length, &arr->elements[i]);
+		}
+		// Append each argument
+		for (u32 i = 0; i < num_args; i++)
+		{
+			if (args[i].type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ASArray* other = (ASArray*) args[i].data.numeric_value;
+				if (other)
+				{
+					for (u32 j = 0; j < other->length; j++)
+					{
+						setArrayElement(app_context, result, result->length, &other->elements[j]);
+					}
+				}
+			}
+			else
+			{
+				setArrayElement(app_context, result, result->length, &args[i]);
+			}
+		}
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) result);
+		return 1;
+	}
+
+	// slice(start, end) - return new array with elements [start, end)
+	if (method_name_len == 5 && strncmp(method_name, "slice", 5) == 0)
+	{
+		int start = 0;
+		int end = (int) arr->length;
+
+		if (num_args > 0) start = (int) varToDoubleSimple(&args[0]);
+		if (num_args > 1 && args[1].type != ACTION_STACK_VALUE_UNDEFINED)
+		{
+			double d = varToDoubleSimple(&args[1]);
+			if (!isnan(d)) end = (int) d;
+		}
+
+		// Handle negative indices
+		if (start < 0) start = (int)arr->length + start;
+		if (end < 0) end = (int)arr->length + end;
+		if (start < 0) start = 0;
+		if (end > (int)arr->length) end = (int)arr->length;
+		if (start > end) start = end;
+
+		ASArray* result = allocArray(app_context, (end - start) > 0 ? (end - start) : 4);
+		for (int i = start; i < end; i++)
+		{
+			setArrayElement(app_context, result, result->length, &arr->elements[i]);
+		}
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) result);
+		return 1;
+	}
+
+	// splice(start, deleteCount, insert1, insert2, ...) - modify in-place, return deleted
+	if (method_name_len == 6 && strncmp(method_name, "splice", 6) == 0)
+	{
+		// Flash: splice() with no args or splice(undefined) returns undefined
+		if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			pushUndefined(app_context);
+			return 1;
+		}
+
+		int start = (int) varToDoubleSimple(&args[0]);
+
+		// Handle negative start and clamp
+		if (start < 0) start = (int)arr->length + start;
+		if (start < 0) start = 0;
+		if (start > (int)arr->length) start = (int)arr->length;
+
+		int delete_count;
+		if (num_args <= 1)
+		{
+			// No deleteCount: delete from start to end
+			delete_count = (int) arr->length - start;
+		}
+		else if (args[1].type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			// Flash: splice(start, undefined) returns undefined
+			pushUndefined(app_context);
+			return 1;
+		}
+		else
+		{
+			double dc = varToDoubleSimple(&args[1]);
+			if (isnan(dc)) { pushUndefined(app_context); return 1; }
+			delete_count = (int) dc;
+			// Flash: negative deleteCount returns undefined (no modification)
+			if (delete_count < 0) { pushUndefined(app_context); return 1; }
+		}
+
+		if (start + delete_count > (int)arr->length) delete_count = (int)arr->length - start;
+
+		// Collect deleted elements into result array
+		ASArray* deleted = allocArray(app_context, delete_count > 0 ? delete_count : 4);
+		for (int i = 0; i < delete_count; i++)
+		{
+			setArrayElement(app_context, deleted, deleted->length, &arr->elements[start + i]);
+		}
+
+		// Number of elements to insert
+		u32 insert_count = (num_args > 2) ? num_args - 2 : 0;
+		int shift = (int)insert_count - delete_count;
+
+		if (shift > 0)
+		{
+			// Growing: ensure capacity and shift right
+			u32 new_length = arr->length + shift;
+			while (new_length > arr->capacity)
+			{
+				u32 new_cap = arr->capacity * 2;
+				if (new_cap < new_length) new_cap = new_length;
+				arr->elements = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_cap);
+				arr->capacity = new_cap;
+			}
+			// Shift tail right
+			for (int i = (int)arr->length - 1; i >= start + delete_count; i--)
+			{
+				arr->elements[i + shift] = arr->elements[i];
+			}
+			arr->length = new_length;
+		}
+		else if (shift < 0)
+		{
+			// Shrinking: shift left
+			for (u32 i = start + delete_count; i < arr->length; i++)
+			{
+				arr->elements[i + shift] = arr->elements[i];
+			}
+			arr->length += shift;
+		}
+
+		// Insert new elements
+		for (u32 i = 0; i < insert_count; i++)
+		{
+			arr->elements[start + i] = args[2 + i];
+		}
+
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) deleted);
+		return 1;
+	}
+
+	// sort() - sort array (simplified: lexicographic by default)
+	if (method_name_len == 4 && strncmp(method_name, "sort", 4) == 0)
+	{
+		// Simple bubble sort with string comparison (Flash default)
+		// TODO: support sort flags and custom comparators
+		for (u32 i = 0; i < arr->length; i++)
+		{
+			for (u32 j = i + 1; j < arr->length; j++)
+			{
+				char a_str[64], b_str[64];
+				varToStringBuf(app_context, &arr->elements[i], a_str, sizeof(a_str));
+				varToStringBuf(app_context, &arr->elements[j], b_str, sizeof(b_str));
+				if (strcmp(a_str, b_str) > 0)
+				{
+					ActionVar tmp = arr->elements[i];
+					arr->elements[i] = arr->elements[j];
+					arr->elements[j] = tmp;
+				}
+			}
+		}
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+		return 1;
+	}
+
+	return 0;
+}
+
 // Helper function to call built-in string methods
 // Returns 1 if method was handled, 0 if not found
 static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffer,
@@ -7357,7 +7795,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		args = (ActionVar*) HALLOC(sizeof(ActionVar) * num_args);
 		for (u32 i = 0; i < num_args; i++)
 		{
-			popVar(app_context, &args[num_args - 1 - i]);
+			popVar(app_context, &args[i]);
 		}
 	}
 
@@ -7486,6 +7924,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Array - call built-in array methods
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+
+		if (arr == NULL)
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
+		int handled = callArrayMethod(app_context, arr,
+		                               method_name, method_name_len,
+		                               args, num_args);
+
+		if (args != NULL) FREE(args);
+
+		if (!handled)
+		{
+			pushUndefined(app_context);
+		}
+		return;
+	}
 	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
 	{
 		// String primitive - call built-in string methods
@@ -7508,7 +7970,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	}
 	else
 	{
-		// Not an object or string - push undefined
+		// Not an object, array, or string - push undefined
 		if (args != NULL) FREE(args);
 		pushUndefined(app_context);
 		return;
