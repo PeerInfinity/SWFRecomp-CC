@@ -40,7 +40,8 @@ static u32 scope_depth = 0;
 // Recursion Depth Limit
 // ==================================================================
 
-#define MAX_CALL_DEPTH 256
+u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
+u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
 static u32 g_call_depth = 0;
 
 // ==================================================================
@@ -2506,6 +2507,8 @@ void actionStop(SWFAppContext* app_context)
 
 void actionTrace(SWFAppContext* app_context)
 {
+	if (g_execution_halted) { POP(); return; }
+
 	ActionStackValueType type = STACK_TOP_TYPE;
 
 	switch (type)
@@ -6718,6 +6721,8 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 
 void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 {
+	if (g_execution_halted) return;
+
 	// 1. Pop function name (string) from stack
 	char func_name_buffer[17];
 	convertString(app_context, func_name_buffer);
@@ -7005,10 +7010,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	{
 		ASFunction* func = lookupFunctionByName(func_name, func_name_len);
 
-		if (func != NULL && g_call_depth >= MAX_CALL_DEPTH)
+		if (func != NULL && g_call_depth >= g_max_call_depth - 1)
 		{
-			// Recursion depth limit reached - push undefined
+			// Recursion depth limit reached - halt all script execution
 			if (args != NULL) FREE(args);
+			g_execution_halted = 1;
 			pushUndefined(app_context);
 		}
 		else if (func != NULL)
@@ -7763,6 +7769,8 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 {
+	if (g_execution_halted) return;
+
 	// 1. Pop method name (string) from stack
 	char method_name_buffer[17];
 	convertString(app_context, method_name_buffer);
@@ -7808,10 +7816,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Object is a function - invoke it
 			ASFunction* func = lookupFunctionFromVar(&obj_var);
 
-			if (func != NULL && g_call_depth >= MAX_CALL_DEPTH)
+			if (func != NULL && g_call_depth >= g_max_call_depth - 1)
 			{
-				// Recursion depth limit reached
+				// Recursion depth limit reached - halt all script execution
 				if (args != NULL) FREE(args);
+				g_execution_halted = 1;
 				pushUndefined(app_context);
 				return;
 			}
@@ -7837,13 +7846,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
 			{
 				// Invoke simple function (DefineFunction type 1)
-				// Simple functions use the global stack for return values
+				// Push arguments onto stack for parameter binding
+				for (u32 i = 0; i < num_args; i++)
+				{
+					pushVar(app_context, &args[i]);
+				}
+				if (args != NULL) FREE(args);
+
 				g_call_depth++;
 				ActionVar result;
 				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 				g_call_depth--;
-
-				if (args != NULL) FREE(args);
 
 				pushVar(app_context, &result);
 				return;
@@ -7886,10 +7899,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Get function object
 			ASFunction* func = lookupFunctionFromVar(method_prop);
 
-			if (func != NULL && g_call_depth >= MAX_CALL_DEPTH)
+			if (func != NULL && g_call_depth >= g_max_call_depth - 1)
 			{
-				// Recursion depth limit reached
+				// Recursion depth limit reached - halt all script execution
 				if (args != NULL) FREE(args);
+				g_execution_halted = 1;
 				pushUndefined(app_context);
 			}
 			else if (func != NULL && func->function_type == 2)

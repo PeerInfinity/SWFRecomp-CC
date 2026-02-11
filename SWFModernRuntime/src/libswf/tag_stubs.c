@@ -3,6 +3,7 @@
 #include <tag.h>
 #include <swf.h>
 #include <common.h>
+#include <action.h>
 
 // Simple sprite registry for NO_GRAPHICS mode
 // Allows sprite frame scripts (e.g. DoAction inside DefineSprite) to execute
@@ -251,7 +252,8 @@ void tagStopAllSounds(SWFAppContext* app_context)
 
 void tagScriptLimits(u16 max_recursion, u16 timeout)
 {
-	(void)max_recursion; (void)timeout;
+	(void)timeout;
+	g_max_call_depth = max_recursion;
 }
 
 #endif // NO_GRAPHICS

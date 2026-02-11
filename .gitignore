@@ -70,3 +70,4 @@ upstream-reference/
 # Ruffle tests: ignore test subdirectories (downloaded data), keep top-level files
 ruffle-tests/*/
 !ruffle-tests/_shared/
+!ruffle-tests/_investigation/

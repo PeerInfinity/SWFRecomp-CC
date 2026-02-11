@@ -5,6 +5,11 @@
 #include <stackvalue.h>
 #include <setjmp.h>
 
+// Recursion depth limit (set by tagScriptLimits, default 256)
+extern u32 g_max_call_depth;
+// Execution halt flag — set when recursion limit is hit, prevents all further script execution
+extern u8 g_execution_halted;
+
 // Forward declarations
 typedef struct MovieClip MovieClip;
 
