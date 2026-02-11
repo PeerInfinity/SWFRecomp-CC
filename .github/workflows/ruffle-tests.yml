@@ -133,16 +133,11 @@ jobs:
 
           git push -f origin ruffle-test-results
 
-  # --- Parallel runner path (10 shards) ---
-  ruffle-tests-shard:
-    name: Shard ${{ matrix.shard }}/10
+  # --- Parallel runner path: shared setup ---
+  setup-parallel:
+    name: Setup (Build + Download + Recompile)
     if: inputs.parallel == '10'
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     steps:
       - name: Checkout repository
@@ -170,6 +165,59 @@ jobs:
 
       - name: Run recompiler on test SWFs
         run: python3 ruffle-tests/run_tests.py
+
+      - name: Upload SWFRecomp binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-binary
+          path: SWFRecomp/build/SWFRecomp
+          retention-days: 1
+
+      - name: Upload recompiled test data
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-tests
+          path: ruffle-tests/
+          retention-days: 1
+
+  # --- Parallel runner path: shards ---
+  ruffle-tests-shard:
+    name: Shard ${{ matrix.shard }}/10
+    if: inputs.parallel == '10'
+    needs: setup-parallel
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Download SWFRecomp binary
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-binary
+          path: SWFRecomp/build/
+
+      - name: Make SWFRecomp binary executable
+        run: chmod +x SWFRecomp/build/SWFRecomp
+
+      - name: Download recompiled test data
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-tests
+          path: ruffle-tests/
 
       - name: Verify runtime output (shard ${{ matrix.shard }}/10)
         run: |
