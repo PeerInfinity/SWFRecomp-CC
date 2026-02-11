@@ -45,6 +45,49 @@ u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all furth
 static u32 g_call_depth = 0;
 
 // ==================================================================
+// Special Recursion Counter (for getter/setter/valueOf/toString)
+// ==================================================================
+// Flash/Ruffle tracks a separate "special" recursion counter for
+// getter/setter invocations. Hard limit of 66 — non-fatal (returns
+// undefined instead of halting execution).
+
+#define MAX_SPECIAL_DEPTH 66
+static u32 g_special_depth = 0;
+
+// ==================================================================
+// Virtual Property Table (addProperty getter/setter support)
+// ==================================================================
+// Stores getter/setter function pairs registered via addProperty().
+// When a variable is accessed/set, this table is checked first.
+
+// Forward declaration (ASFunction is defined below)
+typedef struct ASFunction ASFunction;
+
+typedef struct VirtualProperty {
+	char name[256];
+	u32 name_length;
+	ASFunction* getter;   // NULL = no getter
+	ASFunction* setter;   // NULL = no setter
+} VirtualProperty;
+
+#define MAX_VIRTUAL_PROPERTIES 64
+static VirtualProperty virtual_properties[MAX_VIRTUAL_PROPERTIES];
+static u32 virtual_property_count = 0;
+
+static VirtualProperty* findVirtualProperty(const char* name, u32 name_length)
+{
+	for (u32 i = 0; i < virtual_property_count; i++)
+	{
+		if (virtual_properties[i].name_length == name_length &&
+		    strncmp(virtual_properties[i].name, name, name_length) == 0)
+		{
+			return &virtual_properties[i];
+		}
+	}
+	return NULL;
+}
+
+// ==================================================================
 // Function Storage and Management
 // ==================================================================
 
@@ -89,6 +132,71 @@ static ASFunction* lookupFunctionFromVar(ActionVar* var) {
 		return NULL;
 	}
 	return (ASFunction*) var->data.numeric_value;
+}
+
+// Invoke a getter/setter function as a "special" invocation.
+// Uses g_special_depth (not g_call_depth). Returns the function's return value.
+// If special depth limit is reached, returns undefined without invoking.
+static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* func, ActionVar* arg)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	if (func == NULL || g_execution_halted) return undef;
+
+	// Check special recursion limit (non-fatal)
+	// Increment before check — Ruffle increments first, then checks >= 66
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH)
+	{
+		g_special_depth--;
+		return undef;
+	}
+
+	ActionVar result;
+	if (func->function_type == 2)
+	{
+		// DefineFunction2
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+		{
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		if (arg != NULL)
+		{
+			// Setter: pass one argument
+			result = func->advanced_func(app_context, arg, 1, registers, NULL);
+		}
+		else
+		{
+			// Getter: no arguments
+			result = func->advanced_func(app_context, NULL, 0, registers, NULL);
+		}
+
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else
+	{
+		// Simple DefineFunction (type 1)
+		// If setter, push the value arg onto the stack for the function to pop
+		if (arg != NULL)
+		{
+			pushVar(app_context, arg);
+		}
+		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+	}
+
+	g_special_depth--;
+	return result;
 }
 
 // Convert an object to a primitive value via valueOf/toString.
@@ -3015,6 +3123,17 @@ void actionGetVariable(SWFAppContext* app_context)
 	// Pop variable name
 	POP();
 
+	// Check virtual property table first (addProperty getters)
+	{
+		VirtualProperty* vp = findVirtualProperty(var_name, var_name_len);
+		if (vp != NULL && vp->getter != NULL)
+		{
+			ActionVar result = invokeSpecialFunction(app_context, vp->getter, NULL);
+			pushVar(app_context, &result);
+			return;
+		}
+	}
+
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
@@ -3159,6 +3278,20 @@ void actionSetVariable(SWFAppContext* app_context)
 	char* var_name = (char*) VAL(u64, &STACK[var_name_sp + 16]);
 
 	u32 var_name_len = VAL(u32, &STACK[var_name_sp + 8]);
+
+	// Check virtual property table first (addProperty setters)
+	{
+		VirtualProperty* vp = findVirtualProperty(var_name, var_name_len);
+		if (vp != NULL && vp->setter != NULL)
+		{
+			// Pop the value from stack and invoke setter with it
+			ActionVar value_var;
+			peekVar(app_context, &value_var);
+			POP_2();
+			invokeSpecialFunction(app_context, vp->setter, &value_var);
+			return;
+		}
+	}
 
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
@@ -7002,6 +7135,58 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		}
 		if (args != NULL) FREE(args);
 		pushUndefined(app_context);
+		builtin_handled = 1;
+	}
+
+	// addProperty(name, getter, setter) — registers virtual getter/setter on _root
+	else if (func_name_len == 11 && strncmp(func_name, "addProperty", 11) == 0)
+	{
+		float result = 0.0f;  // false by default
+
+		if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* prop_name = (const char*) args[0].data.numeric_value;
+			u32 prop_name_len = args[0].str_size;
+
+			// Get getter function (arg 1)
+			ASFunction* getter = NULL;
+			if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				getter = (ASFunction*) args[1].data.numeric_value;
+			}
+
+			// Get setter function (arg 2, can be null)
+			ASFunction* setter = NULL;
+			if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				setter = (ASFunction*) args[2].data.numeric_value;
+			}
+
+			// Register in virtual property table
+			if (virtual_property_count < MAX_VIRTUAL_PROPERTIES && prop_name_len < 256)
+			{
+				// Check if already exists — update in place
+				VirtualProperty* existing = findVirtualProperty(prop_name, prop_name_len);
+				if (existing != NULL)
+				{
+					existing->getter = getter;
+					existing->setter = setter;
+				}
+				else
+				{
+					VirtualProperty* vp = &virtual_properties[virtual_property_count++];
+					strncpy(vp->name, prop_name, prop_name_len);
+					vp->name[prop_name_len] = '\0';
+					vp->name_length = prop_name_len;
+					vp->getter = getter;
+					vp->setter = setter;
+				}
+				result = 1.0f;  // true = success
+			}
+		}
+
+		if (args != NULL) FREE(args);
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 		builtin_handled = 1;
 	}
 
