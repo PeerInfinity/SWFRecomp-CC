@@ -76,6 +76,125 @@ static ASFunction* lookupFunctionFromVar(ActionVar* var) {
 	return (ASFunction*) var->data.numeric_value;
 }
 
+// Convert an object to a primitive value via valueOf/toString.
+// If the var is already a primitive, returns it unchanged.
+// If no conversion possible, returns undefined.
+static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_var, int* out_success)
+{
+	if (out_success) *out_success = 1;
+
+	if (obj_var->type != ACTION_STACK_VALUE_OBJECT &&
+	    obj_var->type != ACTION_STACK_VALUE_ARRAY &&
+	    obj_var->type != ACTION_STACK_VALUE_FUNCTION)
+	{
+		return *obj_var;
+	}
+
+	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+	if (obj == NULL)
+	{
+		ActionVar undef = {0};
+		undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		return undef;
+	}
+
+	// Try valueOf
+	ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
+	if (valueOf_prop != NULL)
+	{
+		if (valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* func = lookupFunctionFromVar(valueOf_prop);
+			if (func != NULL)
+			{
+				ActionVar result;
+				if (func->function_type == 2 && func->advanced_func != NULL)
+				{
+					ActionVar* regs = NULL;
+					if (func->register_count > 0)
+						regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+					result = func->advanced_func(app_context, NULL, 0, regs, obj);
+					if (regs != NULL) FREE(regs);
+				}
+				else if (func->function_type == 1 && func->simple_func != NULL)
+				{
+					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				}
+				else
+				{
+					result.type = ACTION_STACK_VALUE_UNDEFINED;
+					result.data.numeric_value = 0;
+				}
+
+				// If result is a primitive (not an object), use it
+				if (result.type != ACTION_STACK_VALUE_OBJECT &&
+				    result.type != ACTION_STACK_VALUE_ARRAY &&
+				    result.type != ACTION_STACK_VALUE_FUNCTION)
+				{
+					return result;
+				}
+			}
+		}
+		// valueOf is a stored primitive value (boxed Number/Boolean/undefined)
+		else if (valueOf_prop->type == ACTION_STACK_VALUE_F32 ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_F64 ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_STRING ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_BOOLEAN ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			return *valueOf_prop;
+		}
+	}
+
+	// Try toString
+	ActionVar* toString_prop = getPropertyWithPrototype(obj, "toString", 8);
+	if (toString_prop != NULL)
+	{
+		if (toString_prop->type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* func = lookupFunctionFromVar(toString_prop);
+			if (func != NULL)
+			{
+				ActionVar result;
+				if (func->function_type == 2 && func->advanced_func != NULL)
+				{
+					ActionVar* regs = NULL;
+					if (func->register_count > 0)
+						regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+					result = func->advanced_func(app_context, NULL, 0, regs, obj);
+					if (regs != NULL) FREE(regs);
+				}
+				else if (func->function_type == 1 && func->simple_func != NULL)
+				{
+					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				}
+				else
+				{
+					result.type = ACTION_STACK_VALUE_UNDEFINED;
+					result.data.numeric_value = 0;
+				}
+
+				if (result.type != ACTION_STACK_VALUE_OBJECT &&
+				    result.type != ACTION_STACK_VALUE_ARRAY &&
+				    result.type != ACTION_STACK_VALUE_FUNCTION)
+				{
+					return result;
+				}
+			}
+		}
+		else if (toString_prop->type == ACTION_STACK_VALUE_STRING)
+		{
+			return *toString_prop;
+		}
+	}
+
+	// No conversion possible
+	if (out_success) *out_success = 0;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	return undef;
+}
+
 void initTime(SWFAppContext* app_context)
 {
 	start_time = get_elapsed_ms();
@@ -663,14 +782,17 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 		case ACTION_STACK_VALUE_FUNCTION:
 		case ACTION_STACK_VALUE_ARRAY:
 		{
-			// Try to call valueOf() on the object
-			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT)
+			// Try to extract primitive via valueOf
+			ASObject* obj = NULL;
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT || STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY)
+				obj = (ASObject*) STACK_TOP_VALUE;
+
+			if (obj != NULL)
 			{
-				ASObject* obj = (ASObject*) STACK_TOP_VALUE;
-				if (obj != NULL)
+				ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
+				if (valueOf_prop != NULL)
 				{
-					ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
-					if (valueOf_prop != NULL && valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
+					if (valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
 					{
 						ASFunction* func = lookupFunctionFromVar(valueOf_prop);
 						if (func != NULL)
@@ -694,14 +816,27 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 								result.data.numeric_value = 0;
 							}
 
-							// If valueOf returned a number, use it
-							if (result.type == ACTION_STACK_VALUE_F64 || result.type == ACTION_STACK_VALUE_F32)
+							// If valueOf returned a primitive, use it
+							if (result.type != ACTION_STACK_VALUE_OBJECT &&
+							    result.type != ACTION_STACK_VALUE_ARRAY &&
+							    result.type != ACTION_STACK_VALUE_FUNCTION)
 							{
 								POP();
 								pushVar(app_context, &result);
-								return result.type;
+								if (result.type == ACTION_STACK_VALUE_F64 || result.type == ACTION_STACK_VALUE_F32)
+									return result.type;
+								// Recursively convert non-numeric primitives (string, boolean, etc.)
+								return convertFloat(app_context);
 							}
 						}
+					}
+					// valueOf is a stored primitive value (boxed Number/Boolean)
+					else if (valueOf_prop->type == ACTION_STACK_VALUE_F32 ||
+					         valueOf_prop->type == ACTION_STACK_VALUE_F64)
+					{
+						POP();
+						pushVar(app_context, valueOf_prop);
+						return valueOf_prop->type;
 					}
 				}
 			}
@@ -1155,83 +1290,108 @@ void actionEquals(SWFAppContext* app_context)
 
 void actionLess(SWFAppContext* app_context)
 {
-	ActionVar a;
-	convertFloat(app_context);
-	popVar(app_context, &a);
+	// Pop both raw first, then convert left-to-right (Flash evaluation order)
+	ActionVar right;
+	popVar(app_context, &right);
+	ActionVar left;
+	popVar(app_context, &left);
 
-	ActionVar b;
+	// Convert left operand first (for correct valueOf side-effect ordering)
+	pushVar(app_context, &left);
 	convertFloat(app_context);
-	popVar(app_context, &b);
+	popVar(app_context, &left);
 
-	double a_val = varToDouble(&a);
-	double b_val = varToDouble(&b);
-	u64 result = (b_val < a_val) ? 1 : 0;
+	pushVar(app_context, &right);
+	convertFloat(app_context);
+	popVar(app_context, &right);
+
+	double left_val = varToDouble(&left);
+	double right_val = varToDouble(&right);
+	u64 result = (left_val < right_val) ? 1 : 0;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
 
 void actionLess2(SWFAppContext* app_context)
 {
 	// ActionLess2 (0x48) — SWF5+ only
-	// If both operands are strings, do lexicographic comparison.
-	// Otherwise, convert to numbers and compare.
-	ActionStackValueType a_type = STACK_TOP_TYPE;
+	// Pop both operands raw, convert objects, then compare.
+	ActionVar right;
+	popVar(app_context, &right);
+	ActionVar left;
+	popVar(app_context, &left);
 
-	int both_strings = 0;
-	if (a_type == ACTION_STACK_VALUE_STRING || a_type == ACTION_STACK_VALUE_STR_LIST)
+	// Track which operands were objects
+	int left_was_obj = (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY);
+	int right_was_obj = (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY);
+
+	// Convert objects to primitives (left first for correct valueOf evaluation order)
+	// Distinguish "no valueOf found" (conversion failed → false) from
+	// "valueOf returned undefined" (conversion succeeded → use undefined in comparison)
+	if (left_was_obj)
 	{
-		u32 a_old_sp = VAL(u32, &STACK[SP + 4]);
-		ActionStackValueType b_type = STACK[a_old_sp];
-		if (b_type == ACTION_STACK_VALUE_STRING || b_type == ACTION_STACK_VALUE_STR_LIST)
-			both_strings = 1;
+		int left_ok = 1;
+		ActionVar prim = objectToPrimitive(app_context, &left, &left_ok);
+		if (!left_ok)
+		{
+			// Left has no valueOf/toString at all — return false immediately
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
+		}
+		left = prim;
+	}
+	if (right_was_obj)
+	{
+		int right_ok = 1;
+		ActionVar prim = objectToPrimitive(app_context, &right, &right_ok);
+		if (!right_ok)
+		{
+			// Right has no valueOf/toString — return false
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
+		}
+		right = prim;
 	}
 
-	if (both_strings)
+	// If both are strings, lexicographic comparison
+	int left_is_str = (left.type == ACTION_STACK_VALUE_STRING || left.type == ACTION_STACK_VALUE_STR_LIST);
+	int right_is_str = (right.type == ACTION_STACK_VALUE_STRING || right.type == ACTION_STACK_VALUE_STR_LIST);
+
+	if (left_is_str && right_is_str)
 	{
-		// Both operands are strings — lexicographic comparison
-		char a_buf[17];
-		convertString(app_context, a_buf);
-		ActionVar a;
-		popVar(app_context, &a);
+		const char* left_str = (left.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&left.data.numeric_value)[1] :
+			(const char*)left.data.numeric_value;
+		const char* right_str = (right.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&right.data.numeric_value)[1] :
+			(const char*)right.data.numeric_value;
 
-		char b_buf[17];
-		convertString(app_context, b_buf);
-		ActionVar b;
-		popVar(app_context, &b);
+		if (left_str == NULL) left_str = "";
+		if (right_str == NULL) right_str = "";
 
-		const char* a_str = (a.type == ACTION_STACK_VALUE_STR_LIST) ?
-			(const char*)((u64*)&a.data.numeric_value)[1] :
-			(const char*)a.data.numeric_value;
-		const char* b_str = (b.type == ACTION_STACK_VALUE_STR_LIST) ?
-			(const char*)((u64*)&b.data.numeric_value)[1] :
-			(const char*)b.data.numeric_value;
-
-		if (a_str == NULL) a_str = "";
-		if (b_str == NULL) b_str = "";
-
-		u64 bool_val = (strcmp(b_str, a_str) < 0) ? 1 : 0;
+		u64 bool_val = (strcmp(left_str, right_str) < 0) ? 1 : 0;
 		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 	}
 	else
 	{
-		// Numeric comparison
-		ActionVar a;
+		// Numeric comparison — convert both to double via stack-based convertFloat
+		pushVar(app_context, &left);
 		convertFloat(app_context);
-		popVar(app_context, &a);
+		popVar(app_context, &left);
 
-		ActionVar b;
+		pushVar(app_context, &right);
 		convertFloat(app_context);
-		popVar(app_context, &b);
+		popVar(app_context, &right);
 
-		double a_val = varToDouble(&a);
-		double b_val = varToDouble(&b);
-		if (isnan(a_val) || isnan(b_val))
+		double left_val = varToDouble(&left);
+		double right_val = varToDouble(&right);
+		if (isnan(left_val) || isnan(right_val))
 		{
-			// NaN comparison always returns undefined
+			// NaN comparison returns undefined
 			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		}
 		else
 		{
-			u64 bool_val = (b_val < a_val) ? 1 : 0;
+			u64 bool_val = (left_val < right_val) ? 1 : 0;
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 		}
 	}
@@ -2926,6 +3086,15 @@ void actionGetVariable(SWFAppContext* app_context)
 			{
 				global_object = allocObject(app_context, 16);
 			}
+			// Lazily add valueOf=undefined (heap must be ready for HALLOC)
+			static int global_valueOf_set = 0;
+			if (!global_valueOf_set)
+			{
+				ActionVar undef_val = {0};
+				undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, global_object, "valueOf", 7, &undef_val);
+				global_valueOf_set = 1;
+			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
 			return;
 		}
@@ -4009,6 +4178,48 @@ void actionEquals2(SWFAppContext* app_context)
 	ActionVar b;
 	popVar(app_context, &b);
 
+	// Object-to-primitive conversion via valueOf/toString
+	int a_is_obj = (a.type == ACTION_STACK_VALUE_OBJECT || a.type == ACTION_STACK_VALUE_ARRAY);
+	int b_is_obj = (b.type == ACTION_STACK_VALUE_OBJECT || b.type == ACTION_STACK_VALUE_ARRAY);
+
+	if (a_is_obj && b_is_obj)
+	{
+#if !defined(SWF_VERSION) || SWF_VERSION < 6
+		// SWF5 and below: try valueOf on both; if both produce primitives, compare those.
+		// If either fails to produce a primitive, fall back to reference equality.
+		ActionVar a_prim = objectToPrimitive(app_context, &a, NULL);
+		ActionVar b_prim = objectToPrimitive(app_context, &b, NULL);
+		int a_ok = (a_prim.type != ACTION_STACK_VALUE_UNDEFINED);
+		int b_ok = (b_prim.type != ACTION_STACK_VALUE_UNDEFINED);
+		if (a_ok && b_ok)
+		{
+			a = a_prim;
+			b = b_prim;
+			// fall through to primitive comparison
+		}
+		else
+		{
+			// Reference equality
+			u64 bool_val = (a.data.numeric_value == b.data.numeric_value) ? 1 : 0;
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+			return;
+		}
+#else
+		// SWF6+: reference equality for object vs object
+		u64 bool_val = (a.data.numeric_value == b.data.numeric_value) ? 1 : 0;
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+		return;
+#endif
+	}
+	else if (a_is_obj)
+	{
+		a = objectToPrimitive(app_context, &a, NULL);
+	}
+	else if (b_is_obj)
+	{
+		b = objectToPrimitive(app_context, &b, NULL);
+	}
+
 	float result = 0.0f;
 
 	// ECMA-262 equality algorithm (Section 11.9.3)
@@ -4084,6 +4295,17 @@ void actionEquals2(SWFAppContext* app_context)
 	         (a.type == ACTION_STACK_VALUE_UNDEFINED && b.type == ACTION_STACK_VALUE_NULL))
 	{
 		result = 1.0f;
+	}
+	// 2b. Number type mismatch (F32 vs F64): convert both to double
+	else if ((a.type == ACTION_STACK_VALUE_F32 || a.type == ACTION_STACK_VALUE_F64) &&
+	         (b.type == ACTION_STACK_VALUE_F32 || b.type == ACTION_STACK_VALUE_F64))
+	{
+		double a_val = varToDouble(&a);
+		double b_val = varToDouble(&b);
+		// Flash quirk: NaN == NaN is true (compare as doubles after conversion)
+		u64 a_bits = VAL(u64, &a_val);
+		u64 b_bits = VAL(u64, &b_val);
+		result = (a_bits == b_bits) ? 1.0f : 0.0f;
 	}
 	// 3. Number vs String: convert string to number
 	else if ((a.type == ACTION_STACK_VALUE_F32 || a.type == ACTION_STACK_VALUE_F64) &&
@@ -4869,19 +5091,19 @@ void actionInitObject(SWFAppContext* app_context)
 		return;
 	}
 
-	// Step 3: Pop property name/value pairs from stack
-	// Properties are in reverse order: rightmost property is on top of stack
-	// Stack order is: [..., value1, name1, ..., valueN, nameN, count]
-	// So after popping count, top of stack is nameN
+	// Step 3: Pop property value/name pairs from stack
+	// SWF bytecode pushes name first, then value, so value is on top
+	// Stack order is: [..., name1, value1, ..., nameN, valueN, count]
+	// So after popping count, top of stack is valueN
 	for (u32 i = 0; i < num_props; i++)
 	{
-		// Pop property name first (it's on top)
-		ActionVar name_var;
-		popVar(app_context, &name_var);
-
-		// Pop property value (it's below the name)
+		// Pop property value first (it's on top)
 		ActionVar value;
 		popVar(app_context, &value);
+
+		// Pop property name (it's below the value)
+		ActionVar name_var;
+		popVar(app_context, &name_var);
 		const char* name = NULL;
 		u32 name_length = 0;
 
@@ -6630,6 +6852,46 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
+	}
+
+	// Object(value) — wraps primitives in wrapper objects
+	else if (func_name_len == 6 && strncmp(func_name, "Object", 6) == 0)
+	{
+		if (num_args > 0)
+		{
+			ActionVar* arg = &args[0];
+			if (arg->type == ACTION_STACK_VALUE_OBJECT || arg->type == ACTION_STACK_VALUE_ARRAY ||
+			    arg->type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				// Object(object) returns the object itself
+				ActionVar result = *arg;
+				if (args != NULL) FREE(args);
+				pushVar(app_context, &result);
+			}
+			else if (arg->type == ACTION_STACK_VALUE_NULL || arg->type == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				// Object(null/undefined) returns empty object
+				ASObject* obj = allocObject(app_context, 8);
+				if (args != NULL) FREE(args);
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+			}
+			else
+			{
+				// Wrap number/boolean/string in an object with valueOf property
+				ASObject* wrapper = allocObject(app_context, 4);
+				setProperty(app_context, wrapper, "valueOf", 7, arg);
+				if (args != NULL) FREE(args);
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)wrapper);
+			}
+		}
+		else
+		{
+			// Object() with no args returns empty object
+			ASObject* obj = allocObject(app_context, 8);
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+		}
+		builtin_handled = 1;
 	}
 
 	// ASSetPropFlags(obj, props, clearFlags, setFlags)
