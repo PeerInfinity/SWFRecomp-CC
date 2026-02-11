@@ -2963,6 +2963,8 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_FONT_NAME:
 			case SWF_TAG_FREE_CHARACTER:
 			case SWF_TAG_CSM_TEXT_SETTINGS:
+			case SWF_TAG_DEFINE_VIDEO_STREAM:
+			case SWF_TAG_VIDEO_FRAME:
 			{
 				cur_pos += tag.length;
 
