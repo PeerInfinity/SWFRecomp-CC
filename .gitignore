@@ -67,10 +67,6 @@ upstream/
 # Upstream reference files for merge comparison
 upstream-reference/
 
-# Downloaded external test SWFs (keep our scripts, ignore downloaded data)
-ruffle-tests/*
-!ruffle-tests/run_tests.py
-!ruffle-tests/verify_output.py
-!ruffle-tests/download_tests.sh
+# Ruffle tests: ignore test subdirectories (downloaded data), keep top-level files
+ruffle-tests/*/
 !ruffle-tests/_shared/
-!ruffle-tests/README.md
