@@ -199,6 +199,106 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 	return result;
 }
 
+// Call just valueOf on an object. Returns the raw result (even if non-primitive).
+// Sets *found=1 if valueOf was found and called, 0 otherwise.
+// If the input is not an object, returns it unchanged with *found=0.
+static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found)
+{
+	*found = 0;
+	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+	if (obj == NULL)
+	{
+		ActionVar undef = {0};
+		undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		return undef;
+	}
+
+	ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
+	if (valueOf_prop != NULL)
+	{
+		if (valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* func = lookupFunctionFromVar(valueOf_prop);
+			if (func != NULL)
+			{
+				*found = 1;
+				ActionVar result;
+				if (func->function_type == 2 && func->advanced_func != NULL)
+				{
+					ActionVar* regs = NULL;
+					if (func->register_count > 0)
+						regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+					result = func->advanced_func(app_context, NULL, 0, regs, obj);
+					if (regs != NULL) FREE(regs);
+				}
+				else if (func->function_type == 1 && func->simple_func != NULL)
+				{
+					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				}
+				else
+				{
+					result.type = ACTION_STACK_VALUE_UNDEFINED;
+					result.data.numeric_value = 0;
+				}
+				return result;
+			}
+		}
+		// valueOf is a stored primitive value
+		else if (valueOf_prop->type == ACTION_STACK_VALUE_F32 ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_F64 ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_STRING ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_BOOLEAN)
+		{
+			*found = 1;
+			return *valueOf_prop;
+		}
+	}
+	return *obj_var;  // No valueOf found, return original
+}
+
+// Call just toString on an object. Returns the raw result.
+static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var)
+{
+	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+	if (obj == NULL)
+	{
+		ActionVar undef = {0};
+		undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		return undef;
+	}
+
+	ActionVar* toString_prop = getPropertyWithPrototype(obj, "toString", 8);
+	if (toString_prop != NULL && toString_prop->type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* func = lookupFunctionFromVar(toString_prop);
+		if (func != NULL)
+		{
+			ActionVar result;
+			if (func->function_type == 2 && func->advanced_func != NULL)
+			{
+				ActionVar* regs = NULL;
+				if (func->register_count > 0)
+					regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+				result = func->advanced_func(app_context, NULL, 0, regs, obj);
+				if (regs != NULL) FREE(regs);
+			}
+			else if (func->function_type == 1 && func->simple_func != NULL)
+			{
+				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+			}
+			else
+			{
+				result.type = ACTION_STACK_VALUE_UNDEFINED;
+				result.data.numeric_value = 0;
+			}
+			return result;
+		}
+	}
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	return undef;
+}
+
 // Convert an object to a primitive value via valueOf/toString.
 // If the var is already a primitive, returns it unchanged.
 // If no conversion possible, returns undefined.
@@ -658,9 +758,15 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			snprintf(var_str, 17, "[type Function]");
 			break;
 		}
+		case ACTION_STACK_VALUE_MOVIECLIP:
+		{
+			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
+			snprintf(var_str, 17, "_level0");
+			break;
+		}
 		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_ARRAY:
-		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
@@ -1169,100 +1275,209 @@ void actionAdd(SWFAppContext* app_context)
 
 void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 {
-	// Peek at types without popping
-	u8 type_a = STACK_TOP_TYPE;
+	// Flash Add2 algorithm:
+	// 1. Pop both operands
+	// 2. Call valueOf on each object operand (right first for Flash evaluation order)
+	// 3. If either raw type or valueOf result is a string → string concatenation
+	//    - Objects with primitive valueOf: convert that primitive to string
+	//    - Objects with non-primitive valueOf: call toString, fallback to "[type Object]"
+	//    - Objects with no valueOf: use convertString → "[object Object]"
+	// 4. Else → numeric addition using original operands (convertFloat calls valueOf again)
+	//    - Objects with primitive valueOf: use that result for numeric conversion
+	//    - Objects with non-primitive valueOf: convertFloat on original (valueOf called again)
 
-	// Move to second value
-	u32 sp_second = VAL(u32, &(STACK[SP + 4]));  // Get previous_sp
-	u8 type_b = STACK[sp_second];  // Type of second value
+	// Pop right operand (a = top of stack)
+	ActionVar a_raw;
+	popVar(app_context, &a_raw);
 
-	// Check if either operand is a string
-	if (type_a == ACTION_STACK_VALUE_STRING || type_b == ACTION_STACK_VALUE_STRING) {
-		// String concatenation path
+	// Pop left operand (b = second on stack)
+	ActionVar b_raw;
+	popVar(app_context, &b_raw);
 
-		// Convert first operand to string (top of stack - right operand)
-		char str_a[17];
-		convertString(app_context, str_a);
-		// Get the string pointer (either str_a if converted, or original if already string)
-		const char* str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
-		POP();
+	// Determine which operands are objects
+	int a_is_obj = (a_raw.type == ACTION_STACK_VALUE_OBJECT ||
+	                a_raw.type == ACTION_STACK_VALUE_ARRAY ||
+	                a_raw.type == ACTION_STACK_VALUE_FUNCTION);
+	int b_is_obj = (b_raw.type == ACTION_STACK_VALUE_OBJECT ||
+	                b_raw.type == ACTION_STACK_VALUE_ARRAY ||
+	                b_raw.type == ACTION_STACK_VALUE_FUNCTION);
 
-		// Convert second operand to string (second on stack - left operand)
-		char str_b[17];
-		convertString(app_context, str_b);
-		// Get the string pointer
-		const char* str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
-		POP();
+	// Call valueOf on object operands (right first for Flash evaluation order)
+	ActionVar a_vo = a_raw;
+	int a_vo_found = 0;
+	int a_vo_is_prim = !a_is_obj;  // non-objects are already primitive
+	if (a_is_obj)
+	{
+		a_vo = objectCallValueOf(app_context, &a_raw, &a_vo_found);
+		a_vo_is_prim = (a_vo.type != ACTION_STACK_VALUE_OBJECT &&
+		                a_vo.type != ACTION_STACK_VALUE_ARRAY &&
+		                a_vo.type != ACTION_STACK_VALUE_FUNCTION);
+	}
+
+	ActionVar b_vo = b_raw;
+	int b_vo_found = 0;
+	int b_vo_is_prim = !b_is_obj;
+	if (b_is_obj)
+	{
+		b_vo = objectCallValueOf(app_context, &b_raw, &b_vo_found);
+		b_vo_is_prim = (b_vo.type != ACTION_STACK_VALUE_OBJECT &&
+		                b_vo.type != ACTION_STACK_VALUE_ARRAY &&
+		                b_vo.type != ACTION_STACK_VALUE_FUNCTION);
+	}
+
+	// Check if string path: either raw type or valueOf result is a string
+	if (a_raw.type == ACTION_STACK_VALUE_STRING || b_raw.type == ACTION_STACK_VALUE_STRING ||
+	    a_vo.type == ACTION_STACK_VALUE_STRING || b_vo.type == ACTION_STACK_VALUE_STRING)
+	{
+		// STRING CONCATENATION PATH
+		char str_b_buf[17], str_a_buf[17];
+		const char* str_b_ptr = NULL;
+		const char* str_a_ptr = NULL;
+		size_t len_b = 0, len_a = 0;
+
+		// Get string for left operand (b)
+		if (!b_is_obj)
+		{
+			pushVar(app_context, &b_raw);
+			convertString(app_context, str_b_buf);
+			str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+			POP();
+			len_b = str_b_ptr ? strlen(str_b_ptr) : 0;
+		}
+		else if (b_vo_is_prim)
+		{
+			// valueOf returned a primitive — convert it to string
+			pushVar(app_context, &b_vo);
+			convertString(app_context, str_b_buf);
+			str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+			POP();
+			len_b = str_b_ptr ? strlen(str_b_ptr) : 0;
+		}
+		else if (b_vo_found)
+		{
+			// valueOf was found but returned non-primitive — try toString
+			ActionVar ts = objectCallToString(app_context, &b_raw);
+			if (ts.type == ACTION_STACK_VALUE_STRING)
+			{
+				str_b_ptr = (const char*) ts.data.numeric_value;
+				len_b = ts.str_size ? ts.str_size : (str_b_ptr ? strlen(str_b_ptr) : 0);
+			}
+			else
+			{
+				str_b_ptr = "[type Object]";
+				len_b = 13;
+			}
+		}
+		else
+		{
+			// No valueOf found — use default object string representation
+			pushVar(app_context, &b_raw);
+			convertString(app_context, str_b_buf);
+			str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+			POP();
+			len_b = str_b_ptr ? strlen(str_b_ptr) : 0;
+		}
+
+		// Get string for right operand (a)
+		if (!a_is_obj)
+		{
+			pushVar(app_context, &a_raw);
+			convertString(app_context, str_a_buf);
+			str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+			POP();
+			len_a = str_a_ptr ? strlen(str_a_ptr) : 0;
+		}
+		else if (a_vo_is_prim)
+		{
+			pushVar(app_context, &a_vo);
+			convertString(app_context, str_a_buf);
+			str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+			POP();
+			len_a = str_a_ptr ? strlen(str_a_ptr) : 0;
+		}
+		else if (a_vo_found)
+		{
+			ActionVar ts = objectCallToString(app_context, &a_raw);
+			if (ts.type == ACTION_STACK_VALUE_STRING)
+			{
+				str_a_ptr = (const char*) ts.data.numeric_value;
+				len_a = ts.str_size ? ts.str_size : (str_a_ptr ? strlen(str_a_ptr) : 0);
+			}
+			else
+			{
+				str_a_ptr = "[type Object]";
+				len_a = 13;
+			}
+		}
+		else
+		{
+			pushVar(app_context, &a_raw);
+			convertString(app_context, str_a_buf);
+			str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+			POP();
+			len_a = str_a_ptr ? strlen(str_a_ptr) : 0;
+		}
 
 		// Concatenate (left + right = b + a)
-		size_t len_a = str_a_ptr ? strlen(str_a_ptr) : 0;
-		size_t len_b = str_b_ptr ? strlen(str_b_ptr) : 0;
-		size_t total_len = len_a + len_b;
-
-		if (total_len < 17) {
-			// Fits in caller's str_buffer
-			snprintf(str_buffer, 17, "%s%s", str_b_ptr, str_a_ptr);
-			PUSH_STR(str_buffer, strlen(str_buffer));
-		} else {
-			// Needs heap allocation for longer strings
+		size_t total_len = len_b + len_a;
+		if (total_len < 17)
+		{
+			memcpy(str_buffer, str_b_ptr, len_b);
+			memcpy(str_buffer + len_b, str_a_ptr, len_a);
+			str_buffer[total_len] = '\0';
+			PUSH_STR(str_buffer, total_len);
+		}
+		else
+		{
 			char* heap_str = (char*) HALLOC(total_len + 1);
 			memcpy(heap_str, str_b_ptr, len_b);
 			memcpy(heap_str + len_b, str_a_ptr, len_a);
 			heap_str[total_len] = '\0';
 			PUSH_STR(heap_str, total_len);
 		}
-	} else {
-		// Numeric addition path
-		// Flash evaluates left operand before right, so we must convert
-		// left (deeper on stack) first. Pop right raw, convert left, then right.
+	}
+	else
+	{
+		// NUMERIC ADDITION PATH
+		// For objects with primitive valueOf: use that result
+		// For objects with non-primitive valueOf or no valueOf: push original (convertFloat
+		// calls valueOf again, matching Flash's double-valueOf behavior)
 
-		// Pop right operand (raw, no conversion yet)
-		ActionVar a_raw;
-		popVar(app_context, &a_raw);
-
-		// Convert left operand (now on top) — valueOf called first
+		// Left (b)
+		if (b_is_obj && b_vo_is_prim)
+			pushVar(app_context, &b_vo);
+		else
+			pushVar(app_context, &b_raw);
 		convertFloat(app_context);
-		ActionVar b;
-		popVar(app_context, &b);
+		ActionVar b_num;
+		popVar(app_context, &b_num);
 
-		// Convert right operand via objectToPrimitive if needed
-		ActionVar a;
-		if (a_raw.type == ACTION_STACK_VALUE_OBJECT || a_raw.type == ACTION_STACK_VALUE_FUNCTION ||
-		    a_raw.type == ACTION_STACK_VALUE_ARRAY)
-		{
-			// Push back and convert via convertFloat for full conversion
-			pushVar(app_context, &a_raw);
-			convertFloat(app_context);
-			popVar(app_context, &a);
-		}
+		// Right (a)
+		if (a_is_obj && a_vo_is_prim)
+			pushVar(app_context, &a_vo);
 		else
-		{
-			// Non-object: push and convert normally
 			pushVar(app_context, &a_raw);
-			convertFloat(app_context);
-			popVar(app_context, &a);
-		}
+		convertFloat(app_context);
+		ActionVar a_num;
+		popVar(app_context, &a_num);
 
-		// Perform addition (same logic as actionAdd)
-		if (a.type == ACTION_STACK_VALUE_F64)
+		if (a_num.type == ACTION_STACK_VALUE_F64)
 		{
-			double a_val = VAL(double, &a.data.numeric_value);
-			double b_val = b.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b.data.numeric_value) : VAL(double, &b.data.numeric_value);
-
+			double a_val = VAL(double, &a_num.data.numeric_value);
+			double b_val = b_num.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &b_num.data.numeric_value) : VAL(double, &b_num.data.numeric_value);
 			double c = b_val + a_val;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
 		}
-		else if (b.type == ACTION_STACK_VALUE_F64)
+		else if (b_num.type == ACTION_STACK_VALUE_F64)
 		{
-			double a_val = a.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a.data.numeric_value) : VAL(double, &a.data.numeric_value);
-			double b_val = VAL(double, &b.data.numeric_value);
-
+			double a_val = a_num.type == ACTION_STACK_VALUE_F32 ? (double) VAL(float, &a_num.data.numeric_value) : VAL(double, &a_num.data.numeric_value);
+			double b_val = VAL(double, &b_num.data.numeric_value);
 			double c = b_val + a_val;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
 		}
 		else
 		{
-			float c = VAL(float, &b.data.numeric_value) + VAL(float, &a.data.numeric_value);
+			float c = VAL(float, &b_num.data.numeric_value) + VAL(float, &a_num.data.numeric_value);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &c));
 		}
 	}
@@ -3177,6 +3392,15 @@ void actionGetVariable(SWFAppContext* app_context)
 		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
 		{
 			// "this" refers to the current object context (root MovieClip)
+			extern MovieClip root_movieclip;
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+			return;
+		}
+
+		// _root and _level0 both refer to the root MovieClip
+		if ((var_name_len == 5 && strncmp(var_name, "_root", 5) == 0) ||
+		    (var_name_len == 7 && strncmp(var_name, "_level0", 7) == 0))
+		{
 			extern MovieClip root_movieclip;
 			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 			return;
