@@ -182,31 +182,34 @@ def compile_native(test_dir, num_frames, build_dir):
 
     # Compile
     inc = SWFMODERN / "include"
-    result = subprocess.run(
-        [
-            "gcc",
-            *[str(f) for f in sorted(build_dir.glob("*.c"))],
-            "-DNO_GRAPHICS",
-            f"-DMAX_FRAMES={num_frames}",
-            "-D_POSIX_C_SOURCE=199309L",
-            f"-I{build_dir}",
-            f"-I{inc}",
-            f"-I{inc}/actionmodern",
-            f"-I{inc}/libswf",
-            f"-I{inc}/memory",
-            f"-I{SWFMODERN}/lib/c-hashmap",
-            "-w",
-            "-std=c17",
-            "-O2",
-            "-o",
-            str(build_dir / "test_run"),
-            "-lm",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    return result.returncode == 0, result.stderr
+    try:
+        result = subprocess.run(
+            [
+                "gcc",
+                *[str(f) for f in sorted(build_dir.glob("*.c"))],
+                "-DNO_GRAPHICS",
+                f"-DMAX_FRAMES={num_frames}",
+                "-D_POSIX_C_SOURCE=199309L",
+                f"-I{build_dir}",
+                f"-I{inc}",
+                f"-I{inc}/actionmodern",
+                f"-I{inc}/libswf",
+                f"-I{inc}/memory",
+                f"-I{SWFMODERN}/lib/c-hashmap",
+                "-w",
+                "-std=c17",
+                "-O2",
+                "-o",
+                str(build_dir / "test_run"),
+                "-lm",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return result.returncode == 0, result.stderr
+    except subprocess.TimeoutExpired:
+        return False, "compilation timed out after 30 seconds"
 
 
 def run_binary(build_dir):

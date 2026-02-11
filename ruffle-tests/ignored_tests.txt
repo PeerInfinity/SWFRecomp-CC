@@ -129,6 +129,12 @@ sound_props_swf5
 sound_props_swf6
 sound_start_load
 
+# --- Video streaming (NetStream/NetConnection) ---
+# These tests require video streaming APIs not implemented in the runtime.
+netstream_play_flv
+netstream_play_flv_screen
+netstream_seek_flv
+
 # --- Bitmap data operations ---
 # These tests require pixel-level bitmap manipulation.
 bitmap_data
