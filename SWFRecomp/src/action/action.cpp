@@ -94,6 +94,18 @@ namespace SWFRecomp
 		return result;
 	}
 
+	// Sanitize a string to be a valid C identifier (replace non-alnum with '_')
+	static std::string sanitize_identifier(const std::string& name)
+	{
+		std::string result;
+		result.reserve(name.size());
+		for (char c : name)
+		{
+			result += (isalnum(c) || c == '_') ? c : '_';
+		}
+		return result;
+	}
+
 	SWFAction::SWFAction() : next_str_i(0), parse_depth(0)
 	{
 
@@ -1197,7 +1209,7 @@ namespace SWFRecomp
 
 				// Generate unique function ID
 				static int func2_counter = 0;
-				std::string func_id = std::string("func2_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func2_counter++);
+				std::string func_id = std::string("func2_") + (name_len > 0 ? sanitize_identifier(func_name) : "anonymous") + "_" + std::to_string(func2_counter++);
 
 			// Add function declaration to header (uses app_context)
 			context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);" << endl;
@@ -1641,7 +1653,11 @@ namespace SWFRecomp
 
 							default:
 							{
-								EXC_ARG("Undefined push type: %d\n", push_type);
+								fprintf(stderr, "Undefined push type: %d\n", push_type);
+								out_script << "\t" << "// Undefined push type: " << (int)push_type << endl;
+								// Skip remaining push data since we don't know the size
+								push_length = length;
+								break;
 							}
 						}
 					}
@@ -1760,7 +1776,7 @@ namespace SWFRecomp
 
 				// Generate unique function ID
 				static int func_counter = 0;
-				std::string func_id = std::string("func_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func_counter++);
+				std::string func_id = std::string("func_") + (name_len > 0 ? sanitize_identifier(func_name) : "anonymous") + "_" + std::to_string(func_counter++);
 
 				// Add function declaration to header (uses app_context)
 				context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context);" << endl;
@@ -1827,7 +1843,9 @@ namespace SWFRecomp
 
 				default:
 				{
-					EXC_ARG("Unimplemented action 0x%02X\n", code);
+					fprintf(stderr, "Unimplemented action 0x%02X\n", code);
+					out_script << "\t" << "// Unimplemented action 0x"
+							   << std::hex << (int)code << std::dec << endl;
 
 					break;
 				}

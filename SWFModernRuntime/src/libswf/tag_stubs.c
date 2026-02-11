@@ -249,4 +249,9 @@ void tagStopAllSounds(SWFAppContext* app_context)
 	(void)app_context;
 }
 
+void tagScriptLimits(u16 max_recursion, u16 timeout)
+{
+	(void)max_recursion; (void)timeout;
+}
+
 #endif // NO_GRAPHICS

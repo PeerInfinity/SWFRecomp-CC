@@ -48,9 +48,20 @@ namespace SWFRecomp
 		context.out_draws_header << "#pragma once" << endl;
 		
 		SWF swf = SWF(context);
-		
-		swf.parseAllTags(context);
-		
+
+		try
+		{
+			swf.parseAllTags(context);
+		}
+		catch (const std::exception& e)
+		{
+			fprintf(stderr, "Caught exception in parseAllTags: %s\n", e.what());
+		}
+		catch (...)
+		{
+			fprintf(stderr, "Caught unknown exception in parseAllTags\n");
+		}
+
 		context.tag_main.close();
 		context.constants.close();
 		context.constants_header.close();

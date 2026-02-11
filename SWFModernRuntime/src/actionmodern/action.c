@@ -2919,6 +2919,16 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_NULL, 0);
 			return;
 		}
+		else if (var_name_len == 7 && strncmp(var_name, "_global", 7) == 0)
+		{
+			extern ASObject* global_object;
+			if (global_object == NULL)
+			{
+				global_object = allocObject(app_context, 16);
+			}
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
+			return;
+		}
 #endif
 
 		// Variable not found
@@ -3111,7 +3121,8 @@ void actionDeclareLocal(SWFAppContext* app_context)
 void actionSetTarget2(SWFAppContext* app_context)
 {
 	// Convert top of stack to string if needed
-	convertString(app_context, NULL);
+	char str_buffer[17];
+	convertString(app_context, str_buffer);
 
 	// Get target path from stack
 	const char* target_path = (const char*) VAL(u64, &STACK_TOP_VALUE);
@@ -5546,20 +5557,8 @@ void actionNewMethod(SWFAppContext* app_context)
 						pushVar(app_context, &args[i]);
 					}
 
-					// Call simple function
-					// Note: Simple functions don't have 'this' context support in current implementation
-					func->simple_func(app_context);
-
-					// Pop return value if one was pushed
-					if (SP < INITIAL_SP)
-					{
-						popVar(app_context, &return_value);
-					}
-					else
-					{
-						return_value.type = ACTION_STACK_VALUE_UNDEFINED;
-						return_value.data.numeric_value = 0;
-					}
+					// Call simple function (cast to correct return type — generated functions return ActionVar)
+					return_value = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 				}
 
 				// According to SWF spec: constructor return value should be discarded
@@ -5842,20 +5841,8 @@ void actionNewMethod(SWFAppContext* app_context)
 				pushVar(app_context, &args[i]);
 			}
 
-			// Call simple function
-			// Note: Simple functions don't have 'this' context support
-			user_ctor_func->simple_func(app_context);
-
-			// Pop return value if one was pushed
-			if (SP < INITIAL_SP)
-			{
-				popVar(app_context, &return_value);
-			}
-			else
-			{
-				return_value.type = ACTION_STACK_VALUE_UNDEFINED;
-				return_value.data.numeric_value = 0;
-			}
+			// Call simple function (cast to correct return type — generated functions return ActionVar)
+			return_value = ((ActionVar(*)(SWFAppContext*))user_ctor_func->simple_func)(app_context);
 		}
 
 		// According to SWF spec: constructor return value should be discarded
@@ -6743,20 +6730,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Free args array before calling function
 				if (args != NULL) FREE(args);
 
-				// Call the simple function
-				// It will pop parameters, execute body, and may push a return value
-				func->simple_func(app_context);
-
-				// Check if a return value was pushed
-				// After function pops all args, sp should be back to sp_before_args
-				// If function pushed a return, sp should be sp_before_args + 24
-				if (SP == sp_before_args)
-				{
-					// No return value was pushed - push undefined
-					// In ActionScript, functions that don't explicitly return push undefined
-					pushUndefined(app_context);
-				}
-				// else: return value (or multiple values) already on stack - keep it
+				// Call the simple function (cast to correct return type — generated functions return ActionVar)
+				ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				pushVar(app_context, &func_result);
 			}
 		}
 		else

@@ -46,3 +46,4 @@ void tagSoundStreamHead(SWFAppContext* app_context,
 void tagSoundStreamBlock(SWFAppContext* app_context,
     const u8* data, size_t data_size);
 void tagStopAllSounds(SWFAppContext* app_context);
+void tagScriptLimits(u16 max_recursion, u16 timeout);

@@ -285,7 +285,7 @@ namespace SWFRecomp
 						  << "\t" << "1.0f," << endl
 						  << "\t" << "0.0f," << endl
 						  << "\t" << "1.0f," << endl
-						  << "};";
+						  << "};" << endl;
 	}
 	
 	void SWF::parseMatrix(MATRIX& matrix_out)
@@ -454,8 +454,19 @@ namespace SWFRecomp
 				fprintf(stderr, "Warning: cur_pos past end of SWF buffer, stopping tag parse\n");
 				break;
 			}
+			char* tag_start = cur_pos;
 			tag.parseHeader(cur_pos);
-			interpretTag(context, tag);
+			char* tag_data_end = cur_pos + tag.length;
+			try
+			{
+				interpretTag(context, tag);
+			}
+			catch (const std::exception& e)
+			{
+				fprintf(stderr, "Warning: tag %d failed: %s", tag.code, e.what());
+				// Skip past the tag data to continue parsing
+				cur_pos = tag_data_end;
+			}
 			tag.clearFields();
 		}
 		
@@ -605,7 +616,7 @@ namespace SWFRecomp
 						  << "u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "] =" << endl
 						  << "{" << endl
 						  << (current_sound_byte ? sound_data.str() : "\t0\n")
-						  << "};";
+						  << "};" << endl;
 
 		context.out_draws_header << endl
 								 << "extern u32 shape_data[" << to_string(current_tri ? 3*current_tri : 1) << "][4];" << endl
@@ -4187,7 +4198,8 @@ namespace SWFRecomp
 
 			default:
 			{
-				EXC_ARG("Tag type %d not implemented.\n", tag.code);
+				fprintf(stderr, "Tag type %d not implemented.\n", tag.code);
+				break;
 			}
 		}
 		

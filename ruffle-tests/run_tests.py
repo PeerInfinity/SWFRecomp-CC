@@ -31,7 +31,8 @@ def main():
         test_dir = SCRIPT_DIR / name
         try:
             result = subprocess.run(
-                [str(RECOMP), str(CONFIG)],
+                ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
+                 str(RECOMP), str(CONFIG)],
                 cwd=str(test_dir),
                 capture_output=True,
                 text=True,

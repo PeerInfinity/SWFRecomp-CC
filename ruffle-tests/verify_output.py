@@ -137,7 +137,8 @@ def recompile_swf(test_dir):
 
     try:
         result = subprocess.run(
-            [str(RECOMP_BIN), str(RECOMP_CONFIG)],
+            ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
+             str(RECOMP_BIN), str(RECOMP_CONFIG)],
             cwd=str(test_dir),
             capture_output=True,
             text=True,
