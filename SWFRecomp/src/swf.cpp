@@ -459,6 +459,25 @@ namespace SWFRecomp
 			tag.clearFields();
 		}
 		
+
+		// If we exited the tag loop early (cur_pos past end), close the current frame function
+		if (tag.code != 0)
+		{
+			if (next_frame_i == 1)
+			{
+				context.tag_main << "\t" << "quit_swf = 1;" << endl;
+			}
+			else
+			{
+				context.tag_main << "\t" << "if (!manual_next_frame && is_playing)" << endl
+								 << "\t" << "{" << endl
+								 << "\t\t" << "next_frame = 0;" << endl
+								 << "\t\t" << "manual_next_frame = 1;" << endl
+								 << "\t" << "}" << endl;
+			}
+			context.tag_main << "}" << endl;
+		}
+
 		// Emit sprite frame function definitions (before main frame_funcs array)
 		if (!sprite_definitions.str().empty())
 		{
@@ -2952,6 +2971,9 @@ namespace SWFRecomp
 
 			case SWF_TAG_DEFINE_SPRITE:
 			{
+				// Save content boundary before reading any content
+				char* sprite_content_end = cur_pos + tag.length;
+
 				tag.clearFields();
 				tag.setFieldCount(2);
 				tag.configureNextField(SWF_FIELD_UI16); // spriteId
@@ -2986,6 +3008,10 @@ namespace SWFRecomp
 
 				while (sub_tag.code != SWF_TAG_END_TAG)
 				{
+					// Check boundary to avoid reading past DefineSprite content
+					if (cur_pos >= sprite_content_end)
+						break;
+
 					sub_tag.parseHeader(cur_pos);
 					printf("  sprite sub-tag code: %d, length: %d\n", sub_tag.code, sub_tag.length);
 
@@ -3775,6 +3801,15 @@ namespace SWFRecomp
 					sub_tag.clearFields();
 					num_finished_tags += 1;
 				}
+
+				// If loop exited by boundary (no EndTag found), close last frame function
+				if (sub_tag.code != SWF_TAG_END_TAG && !sprite_another_frame)
+				{
+					sprite_definitions << "}" << endl << endl;
+				}
+
+				// Ensure cur_pos is past the DefineSprite content for the main loop
+				cur_pos = sprite_content_end;
 
 				// Generate sprite frame_funcs array
 				sprite_definitions << "frame_func " << sp << "_frame_funcs[] =" << endl

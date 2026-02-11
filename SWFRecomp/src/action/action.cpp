@@ -15,6 +15,20 @@ using std::endl;
 
 namespace SWFRecomp
 {
+	// Struct for tracking try/catch/finally block boundaries during inline parsing
+	struct TryBlockBoundary {
+		char* catch_start;      // Start of catch body (nullptr if no catch)
+		char* finally_start;    // Start of finally body (nullptr if no finally)
+		char* after_end;        // First byte after the entire try-catch-finally construct
+		bool has_catch;
+		bool has_finally;
+		bool catch_in_register;
+		std::string catch_name;
+		u8 catch_register;
+		// State: 0=in try, 1=in catch, 2=in finally, 3=done
+		int state;
+	};
+
 	// Escape a raw string for use inside C string literals
 	// For SWF < 6 (Latin-1/Win-1252 encoding), convert bytes 0x80-0xFF to UTF-8
 	static std::string escape_c_string(const char* str, int swf_version = 6)
@@ -80,13 +94,15 @@ namespace SWFRecomp
 		return result;
 	}
 
-	SWFAction::SWFAction() : next_str_i(0)
+	SWFAction::SWFAction() : next_str_i(0), parse_depth(0)
 	{
-		
+
 	}
 	
 	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
 	{
+		parse_depth++;
+
 		// Save and clear constant pool at script boundary.
 		// Nested parseActions calls (DefineFunction2, Try, With) will inherit the
 		// parent's pool since we save it here and restore it after the call returns.
@@ -181,9 +197,66 @@ namespace SWFRecomp
 		
 		action_buffer = action_buffer_start;
 		code = SWF_ACTION_CONSTANT_POOL;
+
+		// Stack of active try/catch/finally block boundaries for inline parsing
+		std::vector<TryBlockBoundary> try_boundaries;
 		
 		while (code != SWF_ACTION_END_OF_ACTIONS)
 		{
+			// Check try/catch/finally block boundaries before processing next action
+			while (!try_boundaries.empty())
+			{
+				TryBlockBoundary& tb = try_boundaries.back();
+				if (tb.state == 0 && tb.has_catch && action_buffer >= tb.catch_start)
+				{
+					// Transition from try body to catch body
+					out_script << "\t" << "} else {" << endl;
+					out_script << "\t\t" << "// Catch block" << endl;
+					if (tb.catch_in_register)
+					{
+						out_script << "\t\t" << "actionCatchToRegister(app_context, " << (int)tb.catch_register << ");" << endl;
+					}
+					else
+					{
+						out_script << "\t\t" << "actionCatchToVariable(app_context, \"" << tb.catch_name << "\");" << endl;
+					}
+					tb.state = 1;
+				}
+				else if ((tb.state == 0 || tb.state == 1) && tb.has_finally && action_buffer >= tb.finally_start)
+				{
+					// Transition to finally body
+					if (tb.state == 0)
+					{
+						// try-only -> finally (no catch block)
+						out_script << "\t" << "}" << endl;
+					}
+					else
+					{
+						// catch -> finally
+						out_script << "\t" << "}" << endl;
+					}
+					out_script << "\t" << "// Finally block" << endl;
+					tb.state = 2;
+				}
+				else if (tb.state <= 2 && action_buffer >= tb.after_end)
+				{
+					// End of entire try-catch-finally construct
+					if (tb.state == 0 || tb.state == 1)
+					{
+						// Close the if or else block
+						out_script << "\t" << "}" << endl;
+					}
+					out_script << "\t" << "actionTryEnd(app_context);" << endl;
+					tb.state = 3;
+					try_boundaries.pop_back();
+					continue; // Check next boundary in stack
+				}
+				else
+				{
+					break; // No boundary reached
+				}
+			}
+
 			for (const char* ptr : labels)
 			{
 				if (action_buffer == ptr)
@@ -1304,98 +1377,48 @@ namespace SWFRecomp
 				u16 finally_size = VAL(u16, action_buffer);
 				action_buffer += 2;
 
-				// Read catch name or register
+				// Always read catch name or register (field is present regardless of has_catch)
 				std::string catch_name;
 				u8 catch_register = 0;
-				if (has_catch)
+				if (catch_in_register)
 				{
-					if (catch_in_register)
-					{
-						catch_register = VAL(u8, action_buffer);
-						action_buffer += 1;
-					}
-					else
-					{
-						catch_name = std::string(action_buffer);
-						action_buffer += catch_name.length() + 1; // +1 for null terminator
-					}
+					catch_register = VAL(u8, action_buffer);
+					action_buffer += 1;
+				}
+				else
+				{
+					catch_name = std::string(action_buffer);
+					action_buffer += catch_name.length() + 1; // +1 for null terminator
 				}
 
-				// Store positions for each block
+				// Compute block boundary addresses
 				char* try_body = action_buffer;
 				char* catch_body = try_body + try_size;
 				char* finally_body = catch_body + catch_size;
 				char* after_try = finally_body + finally_size;
 
-				// Generate try-catch-finally structure
+				// Push boundary info for inline parsing (no temp buffers)
+				TryBlockBoundary boundary;
+				boundary.catch_start = has_catch ? catch_body : nullptr;
+				boundary.finally_start = has_finally ? finally_body : nullptr;
+				boundary.after_end = after_try;
+				boundary.has_catch = has_catch;
+				boundary.has_finally = has_finally;
+				boundary.catch_in_register = catch_in_register;
+				boundary.catch_name = catch_name;
+				boundary.catch_register = catch_register;
+				boundary.state = 0; // Starting in try body
+				try_boundaries.push_back(boundary);
+
+				// Emit try block header
 				out_script << "\t" << "// Try-Catch-Finally" << endl;
 				out_script << "\t" << "actionTryBegin(app_context);" << endl;
 				out_script << "\t" << "if (ACTION_TRY_SETJMP(app_context) == 0) {" << endl;
-
-				// Translate try block
 				out_script << "\t\t" << "// Try block" << endl;
-				if (try_size > 0)
-				{
-					char* temp_buffer = (char*)malloc(try_size + 1);
-					memcpy(temp_buffer, try_body, try_size);
-					temp_buffer[try_size] = 0x00; // Add END_OF_ACTIONS marker
-					char* temp_ptr = temp_buffer;
 
-					// Temporarily increase indentation for nested block
-					std::string indent_backup = "\t";
-					parseActions(context, temp_ptr, out_script);
-					free(temp_buffer);
-				}
-
-				if (has_catch)
-				{
-					out_script << "\t" << "} else {" << endl;
-					out_script << "\t\t" << "// Catch block" << endl;
-
-					if (catch_in_register)
-					{
-						out_script << "\t\t" << "actionCatchToRegister(app_context, " << (int)catch_register << ");" << endl;
-					}
-					else
-					{
-						out_script << "\t\t" << "actionCatchToVariable(app_context, \"" << catch_name << "\");" << endl;
-					}
-
-					// Translate catch block
-					if (catch_size > 0)
-					{
-						char* temp_buffer = (char*)malloc(catch_size + 1);
-						memcpy(temp_buffer, catch_body, catch_size);
-						temp_buffer[catch_size] = 0x00; // Add END_OF_ACTIONS marker
-						char* temp_ptr = temp_buffer;
-						parseActions(context, temp_ptr, out_script);
-						free(temp_buffer);
-					}
-				}
-
-				out_script << "\t" << "}" << endl;
-
-				if (has_finally)
-				{
-					out_script << "\t" << "// Finally block" << endl;
-
-					// Translate finally block
-					if (finally_size > 0)
-					{
-						char* temp_buffer = (char*)malloc(finally_size + 1);
-						memcpy(temp_buffer, finally_body, finally_size);
-						temp_buffer[finally_size] = 0x00; // Add END_OF_ACTIONS marker
-						char* temp_ptr = temp_buffer;
-						parseActions(context, temp_ptr, out_script);
-						free(temp_buffer);
-					}
-				}
-
-				out_script << "\t" << "actionTryEnd(app_context);" << endl;
-
-				// Advance action_buffer past all try-catch-finally blocks
-				action_buffer = after_try;
-
+				// action_buffer now points to try_body start
+				// The main loop will continue parsing try body actions inline
+				// Boundary transitions (catch/finally/end) are handled at the top of the loop
 				break;
 			}
 
@@ -1811,12 +1834,28 @@ namespace SWFRecomp
 			}
 		}
 
-		// Generate MAX_STRING_ID constant for runtime initialization
-		context.out_script_defs << endl << endl
-		                        << "// Maximum string ID for variable array allocation" << endl
-		                        << "#define MAX_STRING_ID " << next_str_i << endl;
-		context.out_script_decls << endl
-		                         << "#define MAX_STRING_ID " << next_str_i << endl;
+		parse_depth--;
+
+		// Only emit string definitions and MAX_STRING_ID at the outermost level
+		// (not inside recursive calls from DefineFunction/DefineFunction2/Try)
+		if (parse_depth == 0)
+		{
+			// Flush pending string definitions at file scope
+			std::string defs = pending_string_defs.str();
+			if (!defs.empty())
+			{
+				context.out_script_defs << defs;
+				pending_string_defs.str("");
+				pending_string_defs.clear();
+			}
+
+			// Generate MAX_STRING_ID constant for runtime initialization
+			context.out_script_defs << endl << endl
+			                        << "// Maximum string ID for variable array allocation" << endl
+			                        << "#define MAX_STRING_ID " << next_str_i << endl;
+			context.out_script_decls << endl
+			                         << "#define MAX_STRING_ID " << next_str_i << endl;
+		}
 
 		// Restore parent's constant pool (so recursive calls from
 		// DefineFunction2/Try/With don't destroy the caller's pool)
@@ -1845,14 +1884,14 @@ namespace SWFRecomp
 
 		// New string - assign ID and declare
 		string_to_id[str] = next_str_i;
-		context.out_script_defs << endl << "char* str_" << next_str_i << " = \"" << escape_c_string(str, context.swf_version) << "\";";
+		pending_string_defs << endl << "char* str_" << next_str_i << " = \"" << escape_c_string(str, context.swf_version) << "\";";
 		context.out_script_decls << endl << "extern char* str_" << next_str_i << ";";
 		next_str_i += 1;
 	}
 	
 	void SWFAction::declareEmptyString(Context& context, size_t size)
 	{
-		context.out_script_defs << endl << "char str_" << next_str_i << "[" << to_string(size) << "];";
+		pending_string_defs << endl << "char str_" << next_str_i << "[" << to_string(size) << "];";
 		context.out_script_decls << endl << "extern char str_" << next_str_i << "[];";
 		next_str_i += 1;
 	}
