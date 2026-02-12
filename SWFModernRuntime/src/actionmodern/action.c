@@ -472,9 +472,8 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 		return undef;
 	}
 
-	// Try valueOf (own properties only — inherited Object.prototype.valueOf/toString
-	// should not cause bare {} to convert; Flash comparisons bail early for bare objects)
-	ActionVar* valueOf_prop = getProperty(obj, "valueOf", 7);
+	// Try valueOf via prototype chain (finds Object.prototype.valueOf too)
+	ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
 	if (valueOf_prop != NULL)
 	{
 		if (valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
@@ -508,6 +507,14 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 				{
 					return result;
 				}
+
+				// valueOf returned non-primitive (e.g. Object.prototype.valueOf
+				// returning `this`) — bail without falling through to toString.
+				// Flash comparisons return false for bare objects.
+				if (out_success) *out_success = 0;
+				ActionVar undef = {0};
+				undef.type = ACTION_STACK_VALUE_UNDEFINED;
+				return undef;
 			}
 		}
 		// valueOf is a stored primitive value (boxed Number/Boolean/undefined)
@@ -521,8 +528,8 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 		}
 	}
 
-	// Try toString (own properties only — same rationale as valueOf above)
-	ActionVar* toString_prop = getProperty(obj, "toString", 8);
+	// No valueOf found at all — try toString as last resort
+	ActionVar* toString_prop = getPropertyWithPrototype(obj, "toString", 8);
 	if (toString_prop != NULL)
 	{
 		if (toString_prop->type == ACTION_STACK_VALUE_FUNCTION)
@@ -6463,6 +6470,11 @@ void actionNewObject(SWFAppContext* app_context)
 				proto_var.str_size = 0;
 				proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
 				setProperty(app_context, obj, "__proto__", 9, &proto_var);
+			}
+			else
+			{
+				// No explicit prototype — link to Object.prototype so toString works
+				setObjectProto(app_context, obj);
 			}
 
 			// Call the constructor with 'this' binding

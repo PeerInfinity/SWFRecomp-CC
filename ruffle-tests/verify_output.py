@@ -9,6 +9,7 @@ Pipeline for each test:
 5. Compare against output.txt
 """
 
+import argparse
 import json
 import os
 import re
@@ -27,8 +28,14 @@ RECOMP_BIN = PROJECT_ROOT / "SWFRecomp" / "build" / "SWFRecomp"
 RECOMP_CONFIG = SCRIPT_DIR / "_shared" / "config.toml"
 SWFMODERN = PROJECT_ROOT / "SWFModernRuntime"
 MAIN_C = PROJECT_ROOT / "SWFRecomp" / "wasm_wrappers" / "main.c"
+DIFF_SCRIPT = PROJECT_ROOT / "scripts" / "diff_ruffle_results.py"
 
-SKIP = {"_shared", "__framework__"}
+# JSON result files
+RESULTS_FINAL = SCRIPT_DIR / "results.json"
+RESULTS_PREVIOUS = SCRIPT_DIR / "results_previous.json"
+RESULTS_CURRENT = SCRIPT_DIR / "results_current.json"
+
+SKIP = {"_shared", "__framework__", "_investigation"}
 
 # Lines to filter from runtime output
 BOILERPLATE_PATTERNS = [
@@ -130,10 +137,17 @@ def filter_output(raw_output):
     return "\n".join(filtered)
 
 
-def recompile_swf(test_dir):
-    """Run SWFRecomp on test.swf if not already done."""
-    if (test_dir / "RecompiledScripts").exists():
+def recompile_swf(test_dir, force=False):
+    """Run SWFRecomp on test.swf if not already done (or if forced)."""
+    if not force and (test_dir / "RecompiledScripts").exists():
         return True
+
+    # Remove old output if forcing
+    if force:
+        for d in ["RecompiledScripts", "RecompiledTags"]:
+            p = test_dir / d
+            if p.exists():
+                shutil.rmtree(p)
 
     try:
         result = subprocess.run(
@@ -265,33 +279,171 @@ def compare_output(actual, expected):
     return False, summary, line_stats
 
 
+def format_diff(actual, expected, context=3):
+    """Generate a unified-diff-style view showing mismatches with context."""
+    actual_lines = actual.split("\n")
+    expected_lines = expected.split("\n")
+    max_lines = max(len(actual_lines), len(expected_lines))
+
+    out = []
+    in_context = False
+    skipped = 0
+
+    for i in range(max_lines):
+        a = actual_lines[i] if i < len(actual_lines) else None
+        e = expected_lines[i] if i < len(expected_lines) else None
+
+        if a == e:
+            if in_context:
+                skipped += 1
+                if skipped <= context:
+                    out.append(f"  {i+1:4d}  {a}")
+                elif skipped == context + 1:
+                    out.append(f"       ...")
+            continue
+
+        # Show context lines before this mismatch
+        if not in_context or skipped > context:
+            # Show leading context
+            start = max(0, i - context)
+            if start > 0 and not in_context:
+                out.append(f"       ...")
+            for j in range(start, i):
+                line = actual_lines[j] if j < len(actual_lines) else ""
+                if not in_context or j >= i - context:
+                    out.append(f"  {j+1:4d}  {line}")
+
+        in_context = True
+        skipped = 0
+
+        if e is not None:
+            out.append(f"- {i+1:4d}  {e}")
+        else:
+            out.append(f"- {i+1:4d}  <end of expected>")
+        if a is not None:
+            out.append(f"+ {i+1:4d}  {a}")
+        else:
+            out.append(f"+ {i+1:4d}  <end of actual>")
+
+    return "\n".join(out)
+
+
+def build_report(test_results, stats, total, total_available, run_start):
+    """Build a JSON-serializable results report dict."""
+    total_duration = round(time.monotonic() - run_start, 2)
+    return {
+        "metadata": {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "git_sha": get_git_sha(),
+            "duration_seconds": total_duration,
+            "total_available": total_available,
+        },
+        "total": total,
+        "pass": stats["pass"],
+        "fail": total - stats["pass"],
+        "pass_rate": round(100 * stats["pass"] / total, 1) if total else 0,
+        "breakdown": {
+            k: stats[k]
+            for k in ["output_mismatch", "compile_fail", "recomp_fail",
+                       "runtime_segfault", "runtime_error", "timeout"]
+            if stats[k]
+        },
+        "tests": test_results,
+    }
+
+
+def write_json(report, path):
+    """Write report dict to a JSON file."""
+    with open(path, "w") as f:
+        json.dump(report, f, indent=2)
+
+
+def run_diff_comparison(new_path, partial=False):
+    """Run diff_ruffle_results.py comparing previous results to new_path.
+
+    Prints a one-line summary to stdout. Requires results_previous.json to exist.
+    """
+    if not RESULTS_PREVIOUS.exists():
+        return
+    if not DIFF_SCRIPT.exists():
+        return
+
+    cmd = [
+        sys.executable, str(DIFF_SCRIPT),
+        str(RESULTS_PREVIOUS), str(new_path),
+        "--summary-only", "--no-write",
+    ]
+    if partial:
+        cmd.append("--partial")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and result.stdout.strip():
+            print(f"  [diff] {result.stdout.strip()}")
+    except Exception:
+        pass
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Verify SWFRecomp runtime output against Ruffle AVM1 expected output.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+examples:
+  %(prog)s                          Run all tests
+  %(prog)s --test=this_swf7         Run a single test
+  %(prog)s --test=this_swf7 --diff  Show diff for a single test
+  %(prog)s --recompile              Force SWF recompilation for all tests
+  %(prog)s --diff --limit=50        Run first 50 tests, show diffs for failures
+  %(prog)s --json=results.json      Write JSON report
+  %(prog)s --shard=1/4              Run first quarter of tests (for CI)
+""",
+    )
+    parser.add_argument(
+        "--test", metavar="NAME",
+        help="Run a single test by name (e.g. this_swf7)")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="Print status for each test as it runs")
+    parser.add_argument(
+        "--diff", action="store_true",
+        help="Show unified diff for each failing test")
+    parser.add_argument(
+        "--list-pass", action="store_true",
+        help="List all passing test names")
+    parser.add_argument(
+        "--list-fail", action="store_true",
+        help="List all failing test names with failure reason")
+    parser.add_argument(
+        "--recompile", action="store_true",
+        help="Force SWF recompilation (delete and regenerate RecompiledScripts)")
+    parser.add_argument(
+        "--limit", type=int, metavar="N",
+        help="Only run the first N tests")
+    parser.add_argument(
+        "--shard", metavar="I/N",
+        help="Run shard I of N (1-based, for CI parallelism)")
+    parser.add_argument(
+        "--json", metavar="PATH",
+        help="Write JSON results report to PATH")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     if not RECOMP_BIN.exists():
         print(f"Error: SWFRecomp not found at {RECOMP_BIN}")
+        print(f"Build it first:  cd {PROJECT_ROOT}/SWFRecomp/build && cmake .. && make -j")
         sys.exit(1)
 
-    verbose = "--verbose" in sys.argv or "-v" in sys.argv
-    list_pass = "--list-pass" in sys.argv
-    list_fail = "--list-fail" in sys.argv
-    show_diff = "--diff" in sys.argv
-    json_path = None
-    limit = None
-    shard_idx = None
-    shard_total = None
-    for arg in sys.argv[1:]:
-        if arg.startswith("--limit="):
-            limit = int(arg.split("=")[1])
-        if arg.startswith("--json="):
-            json_path = arg.split("=", 1)[1]
-        if arg.startswith("--shard="):
-            parts = arg.split("=")[1].split("/")
-            shard_idx = int(parts[0])
-            shard_total = int(parts[1])
-        if arg.startswith("--test="):
-            # Run a single test
-            test_name = arg.split("=")[1]
-            tests = [test_name]
-            break
+    # Determine test list
+    if args.test:
+        test_dir = SCRIPT_DIR / args.test
+        if not test_dir.is_dir():
+            print(f"Error: test directory not found: {test_dir}")
+            sys.exit(1)
+        tests = [args.test]
     else:
         tests = sorted(
             d.name
@@ -303,27 +455,47 @@ def main():
         )
 
     total_available = len(tests)
-    if limit:
-        tests = tests[:limit]
+    if args.limit:
+        tests = tests[:args.limit]
 
     # Shard: divide test list into shard_total chunks, run chunk shard_idx (1-based)
-    if shard_idx is not None:
+    shard_idx = shard_total = None
+    if args.shard:
+        parts = args.shard.split("/")
+        shard_idx = int(parts[0])
+        shard_total = int(parts[1])
         chunk = len(tests) // shard_total
         rem = len(tests) % shard_total
         start = sum(chunk + (1 if j <= rem else 0) for j in range(1, shard_idx))
         count = chunk + (1 if shard_idx <= rem else 0)
         tests = tests[start:start + count]
 
+    # Save previous results before starting
+    if RESULTS_FINAL.exists() and not args.test:
+        shutil.copy2(RESULTS_FINAL, RESULTS_PREVIOUS)
+
     run_start = time.monotonic()
     stats = Counter()
     pass_list = []
     fail_list = []
     fail_details = {}
+    fail_diffs = {}
     test_results = []  # Per-test results for JSON output
+
+    incremental = not args.test  # Write live results when running full suite
+
+    def save_incremental():
+        """Write current results to results_current.json and run diff."""
+        if not incremental:
+            return
+        completed = len(test_results)
+        report = build_report(test_results, stats, completed, total_available, run_start)
+        write_json(report, RESULTS_CURRENT)
+        run_diff_comparison(RESULTS_CURRENT, partial=True)
 
     for i, name in enumerate(tests):
         test_dir = SCRIPT_DIR / name
-        if verbose:
+        if args.verbose:
             print(f"[{i+1}/{len(tests)}] {name}...", end=" ", flush=True)
 
         test_start = time.monotonic()
@@ -331,15 +503,16 @@ def main():
         entry = {"test": name, "num_frames": num_frames}
 
         # Step 1: Recompile SWF
-        if not recompile_swf(test_dir):
+        if not recompile_swf(test_dir, force=args.recompile):
             stats["recomp_fail"] += 1
             fail_list.append(name)
             fail_details[name] = "SWFRecomp failed"
             entry.update(status="recomp_fail", detail="SWFRecomp failed",
                          duration=round(time.monotonic() - test_start, 2))
             test_results.append(entry)
-            if verbose:
+            if args.verbose:
                 print("RECOMP_FAIL")
+            save_incremental()
             continue
 
         # Step 2: Compile native
@@ -361,8 +534,9 @@ def main():
                 entry.update(status="compile_fail", detail=detail,
                              duration=round(time.monotonic() - test_start, 2))
                 test_results.append(entry)
-                if verbose:
+                if args.verbose:
                     print("COMPILE_FAIL")
+                save_incremental()
                 continue
 
             # Step 3: Run binary
@@ -374,8 +548,9 @@ def main():
                 entry.update(status="timeout", detail="runtime timeout (>10s)",
                              duration=round(time.monotonic() - test_start, 2))
                 test_results.append(entry)
-                if verbose:
+                if args.verbose:
                     print("TIMEOUT")
+                save_incremental()
                 continue
             if rc != 0 and rc not in (-11, 139):
                 stats["runtime_error"] += 1
@@ -384,8 +559,9 @@ def main():
                 entry.update(status="runtime_error", detail=f"exit code {rc}",
                              duration=round(time.monotonic() - test_start, 2))
                 test_results.append(entry)
-                if verbose:
+                if args.verbose:
                     print(f"RUNTIME_ERROR(rc={rc})")
+                save_incremental()
                 continue
             if rc in (-11, 139):
                 stats["runtime_segfault"] += 1
@@ -394,8 +570,9 @@ def main():
                 entry.update(status="segfault", detail="SIGSEGV",
                              duration=round(time.monotonic() - test_start, 2))
                 test_results.append(entry)
-                if verbose:
+                if args.verbose:
                     print("SEGFAULT")
+                save_incremental()
                 continue
 
         # Step 4: Filter and compare
@@ -410,20 +587,23 @@ def main():
             pass_list.append(name)
             entry["status"] = "pass"
             test_results.append(entry)
-            if verbose:
+            if args.verbose:
                 print("PASS")
         else:
             stats["output_mismatch"] += 1
             fail_list.append(name)
             fail_details[name] = diff_summary
+            if args.diff:
+                fail_diffs[name] = format_diff(actual, expected)
             entry["status"] = "output_mismatch"
             entry["detail"] = diff_summary.split("\n")[0]  # first line only
             actual_snip, expected_snip = snippet_around_mismatch(actual, expected)
             entry["actual_output"] = actual_snip
             entry["expected_output"] = expected_snip
             test_results.append(entry)
-            if verbose:
+            if args.verbose:
                 print("MISMATCH")
+        save_incremental()
 
     # Print results
     total = len(tests)
@@ -437,42 +617,32 @@ def main():
         if stats[key]:
             print(f"  {stats[key]:4d}  {key}")
 
-    if list_pass:
+    if args.list_pass:
         print(f"\nPassing tests ({len(pass_list)}):")
         for name in pass_list:
             print(f"  {name}")
 
-    if list_fail or show_diff:
+    if args.list_fail:
         print(f"\nFailing tests ({len(fail_list)}):")
         for name in fail_list:
             detail = fail_details.get(name, "")
             print(f"  {name}: {detail}")
 
-    # Write JSON results
-    if json_path:
-        total_duration = round(time.monotonic() - run_start, 2)
-        report = {
-            "metadata": {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "git_sha": get_git_sha(),
-                "duration_seconds": total_duration,
-                "total_available": total_available,
-            },
-            "total": total,
-            "pass": stats["pass"],
-            "fail": total - stats["pass"],
-            "pass_rate": round(100 * stats["pass"] / total, 1) if total else 0,
-            "breakdown": {
-                k: stats[k]
-                for k in ["output_mismatch", "compile_fail", "recomp_fail",
-                           "runtime_segfault", "runtime_error", "timeout"]
-                if stats[k]
-            },
-            "tests": test_results,
-        }
-        with open(json_path, "w") as f:
-            json.dump(report, f, indent=2)
-        print(f"\nResults written to {json_path}")
+    if args.diff and fail_diffs:
+        for name, diff_text in fail_diffs.items():
+            print(f"\n--- {name} (expected vs actual) ---")
+            print(diff_text)
+
+    # Write final JSON results
+    if args.json:
+        report = build_report(test_results, stats, total, total_available, run_start)
+        write_json(report, args.json)
+        print(f"\nResults written to {args.json}")
+
+        # Run final diff comparison (non-partial)
+        if not args.test:
+            print("\nFinal diff vs previous results:")
+            run_diff_comparison(args.json, partial=False)
 
 
 if __name__ == "__main__":

@@ -1254,8 +1254,14 @@ namespace SWFRecomp
 				if (preload_this && !suppress_this)
 				{
 					context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
+					context.out_script_defs << "\tif (this_obj != NULL) {" << endl;
+					context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
+					context.out_script_defs << "\t} else {" << endl;
+					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
+					context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+					context.out_script_defs << "\t}" << endl;
 					next_reg++;
 				}
 
@@ -1467,8 +1473,8 @@ namespace SWFRecomp
 					out_script << "\t" << "}" << endl;
 					out_script << "\t" << "actionWithEnd(app_context);" << endl;
 
-					// Move action_buffer to the end of the block
-					action_buffer = block_end;
+					// Move action_buffer past the block_size field AND the body
+					action_buffer = block_end + block_size;
 
 					break;
 				}
