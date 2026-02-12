@@ -9,7 +9,10 @@
 |--------|----------|---------|-------|
 | Passing | 81 | 82 | +1 |
 | Total | 616 | 616 | 0 |
-| Pass rate | 13.1% | 13.3% | +0.20000000000000107% |
+| Pass rate | 13.1% | 13.3% | +0.2% |
+| Mismatched lines | 56715 | 56616 | -99 |
+|   Decreased | | | -103 |
+|   Increased | | | +4 |
 
 ## Newly Passing (1)
 
@@ -19,15 +22,15 @@
 
 ## Line Count Changed (10)
 
-| Test | Status | Lines (prev) | Lines (now) |
-|------|--------|--------------|-------------|
-| `as1_constructor_v7` | output_mismatch | 29/35 | 30/35 |
-| `define_local_with_paths` | output_mismatch | 15/54 | 15/54 |
-| `funky_function_calls` | output_mismatch | 4/56 | 3/56 |
-| `set_variable_scope` | output_mismatch | 43/58 | 50/58 |
-| `string_coercion` | output_mismatch | 81/117 | 116/117 |
-| `this_scoping` | output_mismatch | 5/52 | 2/52 |
-| `this_swf5` | output_mismatch | 15/41 | 19/41 |
-| `this_swf6` | output_mismatch | 14/41 | 18/41 |
-| `with` | output_mismatch | 7/49 | 31/49 |
-| `with_variable_scopes` | output_mismatch | 1/43 | 25/43 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `string_coercion` | output_mismatch | 81/117 | 116/117 | -35 |
+| `with` | output_mismatch | 7/49 | 31/49 | -24 |
+| `with_variable_scopes` | output_mismatch | 1/43 | 25/43 | -24 |
+| `set_variable_scope` | output_mismatch | 43/58 | 50/58 | -7 |
+| `this_swf5` | output_mismatch | 15/41 | 19/41 | -4 |
+| `this_swf6` | output_mismatch | 14/41 | 18/41 | -4 |
+| `as1_constructor_v7` | output_mismatch | 29/35 | 30/35 | -1 |
+| `define_local_with_paths` | output_mismatch | 15/54 | 15/54 | 0 |
+| `funky_function_calls` | output_mismatch | 4/56 | 3/56 | +1 |
+| `this_scoping` | output_mismatch | 5/52 | 2/52 | +3 |

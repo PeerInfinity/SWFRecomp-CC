@@ -10,10 +10,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
 
 def load_md_files():
     """Load the list of .md files from md-files.json."""
-    json_file = Path(__file__).parent / 'md-files.json'
+    json_file = PROJECT_ROOT / 'md-files.json'
 
     if not json_file.exists():
         print(f"Error: {json_file} does not exist", file=sys.stderr)
@@ -26,7 +28,7 @@ def load_md_files():
 
 def get_last_index():
     """Get the last processed index from the state file."""
-    state_file = Path(__file__).parent / 'prompt-state.txt'
+    state_file = PROJECT_ROOT / 'CC' / 'prompt-state.txt'
 
     if not state_file.exists():
         return -1
@@ -43,7 +45,7 @@ def get_last_index():
 
 def save_last_index(index):
     """Save the last processed index to the state file."""
-    state_file = Path(__file__).parent / 'prompt-state.txt'
+    state_file = PROJECT_ROOT / 'CC' / 'prompt-state.txt'
 
     with open(state_file, 'w') as f:
         f.write(str(index))
@@ -83,7 +85,7 @@ def process_next_file(md_files, text_mode=False, prompt_mode=False):
         # Run prompt.py with the md file path
         result = subprocess.run(
             cmd,
-            cwd=script_dir,
+            cwd=PROJECT_ROOT,
             check=False
         )
 
@@ -143,7 +145,7 @@ def process_files(md_files, start_index=0, count=None, text_mode=False, prompt_m
             # Run prompt.py with the md file path
             result = subprocess.run(
                 cmd,
-                cwd=script_dir,
+                cwd=PROJECT_ROOT,
                 check=False
             )
 
@@ -178,7 +180,7 @@ def main():
 
     # Handle reset-next flag
     if args.reset_next:
-        state_file = Path(__file__).parent / 'prompt-state.txt'
+        state_file = PROJECT_ROOT / 'CC' / 'prompt-state.txt'
         if state_file.exists():
             state_file.unlink()
             print("Reset prompt-state.txt - next run with --next will start from the beginning")

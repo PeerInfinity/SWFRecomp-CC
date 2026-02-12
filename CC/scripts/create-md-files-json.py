@@ -8,10 +8,12 @@ import json
 import os
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
 
 def find_md_files():
     """Find all .md files in SWFRecompDocs/prompts, excluding README.md."""
-    base_dir = Path(__file__).parent / 'SWFRecompDocs' / 'prompts'
+    base_dir = PROJECT_ROOT / 'SWFRecompDocs' / 'prompts'
 
     if not base_dir.exists():
         print(f"Error: Directory {base_dir} does not exist")
@@ -26,7 +28,7 @@ def find_md_files():
                 # Get full path
                 full_path = Path(root) / file
                 # Convert to relative path from project root
-                relative_path = full_path.relative_to(Path(__file__).parent)
+                relative_path = full_path.relative_to(PROJECT_ROOT)
                 md_files.append(str(relative_path))
 
     # Sort the files for consistency
@@ -47,7 +49,7 @@ def main():
         print(f"Found {len(md_files)} .md files")
 
     # Save to JSON file
-    output_file = Path(__file__).parent / 'md-files.json'
+    output_file = PROJECT_ROOT / 'md-files.json'
     with open(output_file, 'w') as f:
         json.dump(md_files, f, indent=2)
 

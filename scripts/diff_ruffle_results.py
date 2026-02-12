@@ -24,6 +24,16 @@ def build_test_map(results):
     return {t["test"]: t for t in results.get("tests", [])}
 
 
+def count_mismatched_lines(results):
+    """Count total mismatched lines across all tests with line data."""
+    total = 0
+    for t in results.get("tests", []):
+        lines = t.get("lines")
+        if lines:
+            total += lines["expected_lines"] - lines["matching_lines"]
+    return total
+
+
 def diff_results(old, new, partial=False):
     """Compare old and new results.
 
@@ -110,6 +120,26 @@ def diff_results(old, new, partial=False):
     compared_count = len([n for n in all_tests if n in old_map and n in new_map])
     changed_both = len([c for c in changes if c["change_type"] == "changed"])
 
+    old_mismatched = count_mismatched_lines(old)
+    new_mismatched = count_mismatched_lines(new)
+
+    # Per-test mismatch deltas (for tests present in both)
+    increased_mismatches = 0
+    decreased_mismatches = 0
+    for name in all_tests:
+        old_t = old_map.get(name)
+        new_t = new_map.get(name)
+        if old_t and new_t:
+            old_l = old_t.get("lines")
+            new_l = new_t.get("lines")
+            old_m = (old_l["expected_lines"] - old_l["matching_lines"]) if old_l else 0
+            new_m = (new_l["expected_lines"] - new_l["matching_lines"]) if new_l else 0
+            d = new_m - old_m
+            if d > 0:
+                increased_mismatches += d
+            elif d < 0:
+                decreased_mismatches += -d
+
     report = {
         "metadata": {
             "old_timestamp": old_meta.get("timestamp"),
@@ -125,6 +155,10 @@ def diff_results(old, new, partial=False):
             "new_pass": new.get("pass", 0),
             "new_total": new.get("total", 0),
             "new_pass_rate": new.get("pass_rate", 0),
+            "old_mismatched_lines": old_mismatched,
+            "new_mismatched_lines": new_mismatched,
+            "increased_mismatches": increased_mismatches,
+            "decreased_mismatches": decreased_mismatches,
             "newly_passing": newly_passing,
             "newly_failing": newly_failing,
             "status_changed": status_changed,
@@ -200,12 +234,21 @@ def generate_markdown(diff):
     pass_delta = delta_str(s["old_pass"], s["new_pass"])
     total_delta = delta_str(s["old_total"], s["new_total"])
 
+    mismatch_delta = delta_str(s["old_mismatched_lines"], s["new_mismatched_lines"])
+
     lines.append("## Summary\n")
     lines.append("| Metric | Previous | Current | Delta |")
     lines.append("|--------|----------|---------|-------|")
     lines.append(f"| Passing | {s['old_pass']} | {s['new_pass']} | {pass_delta} |")
     lines.append(f"| Total | {s['old_total']} | {s['new_total']} | {total_delta} |")
-    lines.append(f"| Pass rate | {s['old_pass_rate']}% | {s['new_pass_rate']}% | {delta_str(s['old_pass_rate'], s['new_pass_rate'])}% |")
+    rate_delta = s["new_pass_rate"] - s["old_pass_rate"]
+    rate_delta_str = f"+{rate_delta:.1f}" if rate_delta > 0 else f"{rate_delta:.1f}" if rate_delta < 0 else "0"
+    lines.append(f"| Pass rate | {s['old_pass_rate']:.1f}% | {s['new_pass_rate']:.1f}% | {rate_delta_str}% |")
+    lines.append(f"| Mismatched lines | {s['old_mismatched_lines']} | {s['new_mismatched_lines']} | {mismatch_delta} |")
+    if s["decreased_mismatches"] > 0:
+        lines.append(f"| \u2003\u2003Decreased | | | -{s['decreased_mismatches']} |")
+    if s["increased_mismatches"] > 0:
+        lines.append(f"| \u2003\u2003Increased | | | +{s['increased_mismatches']} |")
     lines.append("")
 
     if s["newly_passing"] == 0 and s["newly_failing"] == 0 and s["status_changed"] == 0 and s["added"] == 0 and s["removed"] == 0:
@@ -289,10 +332,18 @@ def generate_markdown(diff):
     ]
     if line_changes:
         lines.append(f"## Line Count Changed ({len(line_changes)})\n")
-        lines.append("| Test | Status | Lines (prev) | Lines (now) |")
-        lines.append("|------|--------|--------------|-------------|")
-        for c in sorted(line_changes, key=lambda x: x["test"]):
-            lines.append(f"| `{c['test']}` | {c['new_status']} | {format_lines(c['old_lines'])} | {format_lines(c['new_lines'])} |")
+        lines.append("| Test | Status | Lines (prev) | Lines (now) | Diff |")
+        lines.append("|------|--------|--------------|-------------|------|")
+        def mismatch_diff(c):
+            old_m = c["old_lines"]["expected_lines"] - c["old_lines"]["matching_lines"] if c["old_lines"] else 0
+            new_m = c["new_lines"]["expected_lines"] - c["new_lines"]["matching_lines"] if c["new_lines"] else 0
+            return new_m - old_m
+        for c in sorted(line_changes, key=lambda x: (mismatch_diff(x), x["test"])):
+            diff = delta_str(
+                (c["old_lines"]["expected_lines"] - c["old_lines"]["matching_lines"]) if c["old_lines"] else 0,
+                (c["new_lines"]["expected_lines"] - c["new_lines"]["matching_lines"]) if c["new_lines"] else 0,
+            )
+            lines.append(f"| `{c['test']}` | {c['new_status']} | {format_lines(c['old_lines'])} | {format_lines(c['new_lines'])} | {diff} |")
         lines.append("")
 
     return "\n".join(lines)
@@ -353,6 +404,7 @@ examples:
     s = diff["summary"]
     print(f"\nPass: {s['old_pass']} -> {s['new_pass']} ({delta_str(s['old_pass'], s['new_pass'])})")
     print(f"Total: {s['old_total']} -> {s['new_total']} ({delta_str(s['old_total'], s['new_total'])})")
+    print(f"Mismatched lines: {s['old_mismatched_lines']} -> {s['new_mismatched_lines']} ({delta_str(s['old_mismatched_lines'], s['new_mismatched_lines'])})")
     print(f"Newly passing: {s['newly_passing']}")
     print(f"Newly failing: {s['newly_failing']}")
     print(f"Status changed: {s['status_changed']}")

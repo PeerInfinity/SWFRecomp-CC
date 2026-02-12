@@ -10,10 +10,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
 
 def load_md_files():
     """Load the list of .md files from md-files.json."""
-    json_file = Path(__file__).parent / 'md-files.json'
+    json_file = PROJECT_ROOT / 'md-files.json'
 
     if not json_file.exists():
         print(f"Error: {json_file} does not exist", file=sys.stderr)
@@ -26,7 +28,7 @@ def load_md_files():
 
 def load_opcode_index():
     """Load the opcode index from opcode-index.json."""
-    json_file = Path(__file__).parent / 'opcode-index.json'
+    json_file = PROJECT_ROOT / 'opcode-index.json'
 
     if not json_file.exists():
         print(f"Error: {json_file} does not exist", file=sys.stderr)
@@ -97,8 +99,6 @@ def create_prompts_text(md_files, output_file, failing_info=None, incomplete_inf
         failing_info: Optional dict mapping prompts to failing test info
         incomplete_info: Optional dict mapping prompts to incomplete opcode info
     """
-    script_dir = Path(__file__).parent
-
     with open(output_file, 'w') as f:
         for i, md_file in enumerate(md_files):
             # Choose guide based on mode
@@ -230,7 +230,8 @@ def main():
     else:
         output_filename = 'prompts.txt'
 
-    output_file = Path(__file__).parent / output_filename
+    cc_dir = PROJECT_ROOT / 'CC'
+    output_file = cc_dir / output_filename
     create_prompts_text(md_files, output_file, failing_info, incomplete_info)
 
 

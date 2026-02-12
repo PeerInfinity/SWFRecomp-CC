@@ -1,17 +1,45 @@
 # Live Demo List
 
-**Generated**: 2026-02-08
+**Generated**: 2026-02-12
 
-**Total demos**: 146 (31 graphics, 115 trace)
+**Total demos**: 174 (58 graphics, 116 trace)
 
 ## Graphics Demos
 
 | Demo | Description | Last Updated |
 |------|-------------|--------------|
+| [define_video_stream](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_video_stream) | WebGPU rendering test with DefineVideoStream (tag 60) and VideoFrame (tag 61) stub parsing | 2026-02-10 |
+| [bevel_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/bevel_filter) | BevelFilter (filter ID 3) with shadow and highlight colors | 2026-02-09 |
+| [convolution_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/convolution_filter) | ConvolutionFilter (filter ID 5) with 5x5 box blur kernel | 2026-02-09 |
+| [gradient_bevel_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/gradient_bevel_filter) | GradientBevelFilter (filter ID 7) with dark-to-light gradient | 2026-02-09 |
+| [gradient_glow_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/gradient_glow_filter) | GradientGlowFilter (filter ID 4) with red-to-yellow gradient glow | 2026-02-09 |
+| [sound_stream](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/sound_stream) | SoundStreamHead (tag 18) + SoundStreamBlock (tag 19) with streamed PCM sine wave | 2026-02-09 |
+| [sound_stream_head2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/sound_stream_head2) | SoundStreamHead2 (tag 45) + SoundStreamBlock (tag 19) with streamed PCM sine wave | 2026-02-09 |
+| [blur_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/blur_filter) | BlurFilter via PlaceObject3 FilterList | 2026-02-09 |
+| [define_sound](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_sound) | DefineSound (tag 14) + StartSound (tag 15) with uncompressed PCM sine wave | 2026-02-09 |
+| [drop_shadow_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/drop_shadow_filter) | DropShadowFilter via PlaceObject3 FilterList | 2026-02-09 |
+| [glow_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/glow_filter) | GlowFilter via PlaceObject3 FilterList | 2026-02-09 |
+| [color_matrix_filter](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/color_matrix_filter) | ColorMatrixFilter via PlaceObject3 converting red to grayscale | 2026-02-09 |
+| [movieclip_control](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/movieclip_control) | MovieClip timeline control via setTarget/gotoAndStop | 2026-02-09 |
+| [place_object3](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/place_object3) | PlaceObject3 (tag 70) with additive blend mode | 2026-02-09 |
+| [clip_actions](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/clip_actions) | PlaceObject2 with CLIPACTIONS (onLoad) on sprite | 2026-02-09 |
+| [define_button2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_button2) | DefineButton2 (tag 34) with up/over/down state shapes and hit-test area | 2026-02-09 |
+| [define_morph_shape2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_morph_shape2) | DefineMorphShape2 (tag 84) with solid fill at 50% morph ratio | 2026-02-09 |
+| [gradient_spread](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/gradient_spread) | Linear gradient with pad, reflect, and repeat spread modes | 2026-02-09 |
+| [sprite_multiframe](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/sprite_multiframe) | Multi-frame DefineSprite that cycles through 3 frames | 2026-02-09 |
+| [sprite_nested](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/sprite_nested) | Nested sprites containing shapes, text, and sprite children | 2026-02-09 |
+| [place_object](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/place_object) | PlaceObject (tag 4) with optional RGB CXFORM tint | 2026-02-09 |
+| [define_button](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_button) | DefineButton (tag 7) with up-state shape rendered as sprite | 2026-02-08 |
+| [define_edit_text](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_edit_text) | WebGPU rendering test for DefineEditText (tag 37) with DefineFont2 | 2026-02-08 |
+| [define_font3](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_font3) | WebGPU rendering test for DefineFont3 (tag 75) with geometric glyphs rendered via DefineText | 2026-02-08 |
+| [remove_object](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/remove_object) | WebGPU rendering test with RemoveObject (tag 5) multi-frame object removal by character ID and depth | 2026-02-08 |
+| [remove_object2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/remove_object2) | WebGPU rendering test with RemoveObject2 (tag 28) multi-frame object removal | 2026-02-08 |
+| [define_morph_shape](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_morph_shape) | DefineMorphShape (tag 46) rendered at ratio=0 (start shape) | 2026-02-08 |
+| [define_font2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_font2) | WebGPU rendering test for DefineFont2 (tag 48) with DefineText | 2026-02-08 |
+| [define_text2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_text2) | WebGPU rendering test with DefineText2 (tag 33) RGBA text colors | 2026-02-08 |
 | [define_shape4](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_shape4) | WebGPU rendering test with DefineShape4 (tag 83) and LineStyle2 | 2026-02-07 |
 | [focal_radial_gradient](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/focal_radial_gradient) | WebGPU rendering test with focal radial gradient fill (type 0x13) | 2026-02-07 |
 | [jpeg4_bitmap](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/jpeg4_bitmap) | WebGPU rendering test with DefineBitsJPEG4 (tag 90) JPEG bitmap with zlib-compressed alpha channel and deblocking parameter | 2026-02-07 |
-| [remove_object2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/remove_object2) | WebGPU rendering test with RemoveObject2 (tag 28) multi-frame object removal | 2026-02-07 |
 | [static_text](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/static_text) | WebGPU rendering test with DefineFont (tag 10) and DefineText (tag 11) | 2026-02-07 |
 | [nonsmoothed_repeating_bitmap](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/nonsmoothed_repeating_bitmap) | WebGPU rendering test with NonSmoothedRepeatingBitmap fill type (0x42) | 2026-02-07 |
 | [nonsmoothed_clipped_bitmap](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/nonsmoothed_clipped_bitmap) | WebGPU rendering test with NonSmoothedClippedBitmap fill type (0x43) using DefineBitsLossless | 2026-02-07 |
@@ -38,12 +66,12 @@
 | [three_boxes_holes](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/three_boxes_holes) | WebGPU rendering test with multiple box shapes and cutout holes | 2026-02-06 |
 | [two_squares](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/two_squares) | WebGPU rendering test with two filled square shapes | 2026-02-06 |
 | [wild_shadow](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/wild_shadow) | WebGPU rendering test with shadow and filter effects | 2026-02-06 |
-| [define_text2](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=graphics/define_text2) | WebGPU rendering test with DefineText2 (tag 33) RGBA text colors | unknown |
 
 ## Trace Demos
 
 | Demo | Description | Last Updated |
 |------|-------------|--------------|
+| [do_init_action_swf_5](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=do_init_action_swf_5) | DoInitAction (tag 59) runs once when sprite is defined | 2026-02-09 |
 | [add_floats_swf_4](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=add_floats_swf_4) | Tests ADD opcode with floating point numbers (1.5 + 1.25 = 2.75) | 2025-11-11 |
 | [get_url2_swf_4](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=get_url2_swf_4) | Tests GET_URL2 opcode (0x9A) - Stack-based URL loading with HTTP method support. Comprehensive test coverage including all flag combinations, edge cases (empty strings, concatenated URLs), and multiple HTTP methods (GET/POST) for both browser windows and sprite targets. In NO_GRAPHICS mode, verifies correct stack operations, flag parsing, and operation logging. | 2025-11-09 |
 | [new_method_swf_5](https://peerinfinity.github.io/SWFRecomp-CC/demo.html?test=new_method_swf_5) | Tests NEW_METHOD opcode (0x53) - creates new object by calling method on object as constructor. Fully implements SWF specification including built-in constructors (Array, Object, Date, String, Number, Boolean), user-defined function constructors with 'this' binding, blank method name support, and proper constructor return value handling. | 2025-11-09 |
