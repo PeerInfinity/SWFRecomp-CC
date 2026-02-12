@@ -461,6 +461,16 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 			*found = 1;
 			return *valueOf_prop;
 		}
+		// valueOf is a non-callable object (e.g. obj.valueOf = {}) — treat as found,
+		// return undefined to prevent fallback to toString
+		else if (valueOf_prop->type == ACTION_STACK_VALUE_OBJECT ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_ARRAY)
+		{
+			*found = 1;
+			ActionVar undef = {0};
+			undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			return undef;
+		}
 	}
 	return *obj_var;  // No valueOf found, return original
 }
@@ -753,6 +763,10 @@ static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
 // This is initialized on first use and persists for the lifetime of the runtime
 ASObject* global_object = NULL;
 
+// MovieClip constructor function (for MovieClip.prototype access)
+ASFunction g_movieclip_constructor;
+int g_movieclip_constructor_init = 0;
+
 // _root MovieClip for simplified implementation
 // Note: totalframes is set from SWF_FRAME_COUNT if available, otherwise defaults to 1
 MovieClip root_movieclip = {
@@ -772,8 +786,8 @@ MovieClip root_movieclip = {
 	.totalframes = 1,
 #endif
 	.framesloaded = 1,  // All frames loaded in NO_GRAPHICS mode
-	.name = "_root",
-	.target = "_root",
+	.name = "",       // _root._name is empty string in Flash
+	.target = "/",    // _root._target is "/" (slash-path format)
 	.droptarget = "",  // No drag/drop in NO_GRAPHICS mode
 	.url = "",  // Could be set to actual SWF URL if known
 	.highquality = 1.0f,       // Default: high quality
@@ -3790,6 +3804,22 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
 			return;
 		}
+		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0)
+		{
+			// Return the built-in MovieClip constructor as a function
+			extern ASFunction g_movieclip_constructor;
+			extern int g_movieclip_constructor_init;
+			if (!g_movieclip_constructor_init)
+			{
+				memset(&g_movieclip_constructor, 0, sizeof(ASFunction));
+				strncpy(g_movieclip_constructor.name, "MovieClip", 255);
+				g_movieclip_constructor.function_type = 1;
+				g_movieclip_constructor.param_count = 0;
+				g_movieclip_constructor_init = 1;
+			}
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_movieclip_constructor);
+			return;
+		}
 		else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
 		{
 			// Lazily create System built-in object
@@ -3812,6 +3842,20 @@ void actionGetVariable(SWFAppContext* app_context)
 			return;
 		}
 #endif
+
+		// Check _global object properties as fallback
+		{
+			extern ASObject* global_object;
+			if (global_object != NULL)
+			{
+				ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+				if (gprop != NULL)
+				{
+					PUSH_VAR(gprop);
+					return;
+				}
+			}
+		}
 
 		// Variable not found
 #if defined(SWF_VERSION) && SWF_VERSION >= 6
@@ -4138,9 +4182,9 @@ void actionGetProperty(SWFAppContext* app_context)
 			value = mc ? mc->ymouse : 0.0f;
 			break;
 		default:
-			// Unknown property - push 0
-			value = 0.0f;
-			break;
+			// Unknown/out-of-range property index - push undefined (Flash behavior)
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
 	}
 
 	// Push result
@@ -4698,9 +4742,10 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 
 		if (obj != NULL && obj->num_used > 0)
 		{
-			// Enumerate properties in reverse order (last to first)
-			// This way when they're popped, they'll come out in the correct order
-			for (int i = obj->num_used - 1; i >= 0; i--)
+			// Push properties forward (first to last insertion order)
+			// Stack LIFO means they pop in reverse insertion order (most recent first)
+			// which matches Flash enumeration order
+			for (u32 i = 0; i < obj->num_used; i++)
 			{
 				const char* prop_name = obj->properties[i].name;
 				u32 prop_name_len = obj->properties[i].name_length;
@@ -6411,6 +6456,51 @@ void actionGetMember(SWFAppContext* app_context)
 		{
 			pushUndefined(app_context);
 		}
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// MovieClip member access — check built-in properties, then MovieClip.prototype
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+
+		// Check built-in MovieClip properties (case-insensitive for _ prefixed ones)
+		if (mc != NULL && prop_name_len > 0 && prop_name[0] == '_')
+		{
+			// Case-insensitive comparison for built-in MC properties
+			if (strcasecmp(prop_name, "_x") == 0) { float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_y") == 0) { float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_visible") == 0) { float v = mc->visible ? 1.0f : 0.0f; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_width") == 0) { float v = mc->width; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_height") == 0) { float v = mc->height; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
+			if (strcasecmp(prop_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
+			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
+			if (strcasecmp(prop_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
+			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
+			if (strcasecmp(prop_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+		}
+
+		// Fall back to MovieClip.prototype chain for user-defined properties
+		extern ASFunction g_movieclip_constructor;
+		extern int g_movieclip_constructor_init;
+		if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL)
+		{
+			ActionVar* prop = getPropertyWithPrototype(g_movieclip_constructor.prototype_obj, prop_name, prop_name_len);
+			if (prop != NULL)
+			{
+				pushVar(app_context, prop);
+				return;
+			}
+		}
+
+		pushUndefined(app_context);
 	}
 	else
 	{
