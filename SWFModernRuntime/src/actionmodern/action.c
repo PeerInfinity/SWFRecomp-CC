@@ -118,9 +118,11 @@ typedef struct ASFunction {
 static ASFunction* function_registry[MAX_FUNCTIONS];
 static u32 function_count = 0;
 
-// Global Object.prototype with built-in toString returning "[object Object]"
+// Global Object.prototype with built-in toString and valueOf
 static ASObject* g_object_prototype = NULL;
 static ASFunction g_object_toString_func;
+static ASFunction g_object_valueOf_func;
+static ASFunction g_object_hasOwnProperty_func;
 
 static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
@@ -131,12 +133,64 @@ static ActionVar builtin_object_toString(SWFAppContext* app_context)
 	return ret;
 }
 
+// Built-in hasOwnProperty checks if a property exists directly on the object
+static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.str_size = 0;
+	ret.data.numeric_value = 0; // false by default
+
+	if (this_obj != NULL && args != NULL && arg_count >= 1)
+	{
+		ASObject* obj = (ASObject*) this_obj;
+		const char* prop_name = NULL;
+		u32 prop_name_len = 0;
+
+		if (args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			prop_name = (const char*) args[0].data.numeric_value;
+			prop_name_len = args[0].str_size;
+		}
+
+		if (prop_name != NULL)
+		{
+			// Use getProperty (NOT getPropertyWithPrototype) for own-property check
+			ActionVar* prop = getProperty(obj, prop_name, prop_name_len);
+			if (prop != NULL)
+			{
+				ret.data.numeric_value = 1; // true
+			}
+		}
+	}
+	return ret;
+}
+
+// Built-in valueOf returns `this` (the object it's called on)
+static ActionVar builtin_object_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	if (this_obj != NULL)
+	{
+		ret.type = ACTION_STACK_VALUE_OBJECT;
+		ret.str_size = 0;
+		ret.data.numeric_value = (u64) this_obj;
+	}
+	else
+	{
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
+		ret.str_size = 0;
+		ret.data.numeric_value = 0;
+	}
+	return ret;
+}
+
 // Get or create the global Object.prototype
 static ASObject* getObjectPrototype(SWFAppContext* app_context)
 {
 	if (g_object_prototype == NULL)
 	{
-		g_object_prototype = allocObject(app_context, 4);
+		g_object_prototype = allocObject(app_context, 12);
 		retainObject(g_object_prototype);
 
 		// Set up the built-in toString function
@@ -156,6 +210,42 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		ts_var.str_size = 0;
 		ts_var.data.numeric_value = (u64) &g_object_toString_func;
 		setProperty(app_context, g_object_prototype, "toString", 8, &ts_var);
+
+		// Set up the built-in valueOf function (type-2: needs this_obj)
+		memset(&g_object_valueOf_func, 0, sizeof(ASFunction));
+		strncpy(g_object_valueOf_func.name, "valueOf", 255);
+		g_object_valueOf_func.function_type = 2;
+		g_object_valueOf_func.param_count = 0;
+		g_object_valueOf_func.register_count = 0;
+		g_object_valueOf_func.advanced_func = (Function2Ptr) builtin_object_valueOf;
+
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_valueOf_func;
+
+		// Set valueOf property on Object.prototype
+		ActionVar vo_var;
+		vo_var.type = ACTION_STACK_VALUE_FUNCTION;
+		vo_var.str_size = 0;
+		vo_var.data.numeric_value = (u64) &g_object_valueOf_func;
+		setProperty(app_context, g_object_prototype, "valueOf", 7, &vo_var);
+
+		// Set up the built-in hasOwnProperty function (type-2: needs this_obj + args)
+		memset(&g_object_hasOwnProperty_func, 0, sizeof(ASFunction));
+		strncpy(g_object_hasOwnProperty_func.name, "hasOwnProperty", 255);
+		g_object_hasOwnProperty_func.function_type = 2;
+		g_object_hasOwnProperty_func.param_count = 1;
+		g_object_hasOwnProperty_func.register_count = 0;
+		g_object_hasOwnProperty_func.advanced_func = (Function2Ptr) builtin_object_hasOwnProperty;
+
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_hasOwnProperty_func;
+
+		// Set hasOwnProperty on Object.prototype
+		ActionVar hop_var;
+		hop_var.type = ACTION_STACK_VALUE_FUNCTION;
+		hop_var.str_size = 0;
+		hop_var.data.numeric_value = (u64) &g_object_hasOwnProperty_func;
+		setProperty(app_context, g_object_prototype, "hasOwnProperty", 14, &hop_var);
 	}
 	return g_object_prototype;
 }
@@ -1824,8 +1914,8 @@ void actionLess2(SWFAppContext* app_context)
 		double right_val = varToDouble(&right);
 		if (isnan(left_val) || isnan(right_val))
 		{
-			// NaN comparison returns undefined
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			// NaN comparison returns false (not undefined) per ECMAScript/SWF spec
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
 		}
 		else
 		{
@@ -1900,7 +1990,8 @@ void actionGreater(SWFAppContext* app_context)
 		double right_val = varToDouble(&right);
 		if (isnan(left_val) || isnan(right_val))
 		{
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			// NaN comparison returns false (not undefined) per ECMAScript/SWF spec
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
 		}
 		else
 		{
@@ -3599,6 +3690,23 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
 			return;
 		}
+		else if (var_name_len == 6 && strncmp(var_name, "Object", 6) == 0)
+		{
+			// Return the built-in Object constructor as a function
+			static ASFunction g_object_constructor;
+			static int g_object_constructor_init = 0;
+			if (!g_object_constructor_init)
+			{
+				memset(&g_object_constructor, 0, sizeof(ASFunction));
+				strncpy(g_object_constructor.name, "Object", 255);
+				g_object_constructor.function_type = 1;
+				g_object_constructor.param_count = 0;
+				g_object_constructor.simple_func = (SimpleFunctionPtr) builtin_object_toString; // placeholder
+				g_object_constructor_init = 1;
+			}
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
+			return;
+		}
 		else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
 		{
 			// Lazily create System built-in object
@@ -4481,6 +4589,10 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			{
 				const char* prop_name = obj->properties[i].name;
 				u32 prop_name_len = obj->properties[i].name_length;
+
+				// Skip __proto__ (not enumerable in Flash)
+				if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0)
+					continue;
 
 				// Push property name as string
 				PUSH_STR(prop_name, prop_name_len);
@@ -5690,6 +5802,22 @@ void actionSetMember(SWFAppContext* app_context)
 		}
 		prop_name = index_buffer;
 		prop_name_len = strlen(index_buffer);
+	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		// Object used as property name - coerce to string via toString
+		ActionVar str_result = objectCallToString(app_context, &prop_name_var, NULL);
+		if (str_result.type == ACTION_STACK_VALUE_STRING)
+		{
+			prop_name = (const char*) str_result.data.numeric_value;
+			prop_name_len = str_result.str_size;
+		}
+		else
+		{
+			// toString didn't return a string - fall back to "[type Object]"
+			prop_name = "[type Object]";
+			prop_name_len = 13;
+		}
 	}
 	else
 	{
@@ -8709,7 +8837,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 		if (!handled)
 		{
-			pushUndefined(app_context);
+			// Array.valueOf() returns the array itself
+			if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
+			{
+				pushVar(app_context, &obj_var);
+			}
+			else
+			{
+				pushUndefined(app_context);
+			}
 		}
 		return;
 	}
@@ -8733,9 +8869,33 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		return;
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		// Function object - handle toString and valueOf
+		if (args != NULL) FREE(args);
+		if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
+		{
+			// Function.toString() returns "[type Function]"
+			ActionVar result;
+			result.type = ACTION_STACK_VALUE_STRING;
+			result.str_size = 15;
+			result.data.numeric_value = (u64) "[type Function]";
+			pushVar(app_context, &result);
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
+		{
+			// Function.valueOf() returns the function itself
+			pushVar(app_context, &obj_var);
+		}
+		else
+		{
+			pushUndefined(app_context);
+		}
+		return;
+	}
 	else
 	{
-		// Not an object, array, or string - push undefined
+		// Not an object, array, function, or string - push undefined
 		if (args != NULL) FREE(args);
 		pushUndefined(app_context);
 		return;
