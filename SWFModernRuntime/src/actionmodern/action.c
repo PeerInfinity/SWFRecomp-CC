@@ -3677,6 +3677,40 @@ void actionGetVariable(SWFAppContext* app_context)
 	// Pop variable name
 	POP();
 
+	// Handle dot-path resolution (e.g., "a.b.c", "_root.x.y", "_global.x.y.z")
+	{
+		char* dot = (char*) memchr(var_name, '.', var_name_len);
+		if (dot != NULL)
+		{
+			u32 first_len = (u32)(dot - var_name);
+
+			// Resolve first segment by pushing it and recursing
+			PUSH_STR(var_name, first_len);
+			actionGetVariable(app_context);
+
+			// Walk remaining segments via GetMember
+			const char* rest = dot + 1;
+			u32 rest_len = var_name_len - first_len - 1;
+			while (rest_len > 0)
+			{
+				char* next_dot = (char*) memchr(rest, '.', rest_len);
+				u32 seg_len = next_dot ? (u32)(next_dot - rest) : rest_len;
+
+				// Push segment name on top, then GetMember pops (name, obj) → pushes result
+				PUSH_STR(rest, seg_len);
+				actionGetMember(app_context);
+
+				if (next_dot) {
+					rest = next_dot + 1;
+					rest_len -= seg_len + 1;
+				} else {
+					rest_len = 0;
+				}
+			}
+			return;
+		}
+	}
+
 	// Check virtual property table first (addProperty getters)
 	{
 		VirtualProperty* vp = findVirtualProperty(var_name, var_name_len);
@@ -3820,6 +3854,35 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_movieclip_constructor);
 			return;
 		}
+		else if (var_name_len == 5 && strncmp(var_name, "Error", 5) == 0)
+		{
+			// Return the built-in Error constructor as a function
+			static ASFunction g_error_constructor;
+			static int g_error_constructor_init = 0;
+			if (!g_error_constructor_init)
+			{
+				memset(&g_error_constructor, 0, sizeof(ASFunction));
+				strncpy(g_error_constructor.name, "Error", 255);
+				g_error_constructor.function_type = 1;
+				g_error_constructor.param_count = 0;
+				// Set up prototype with name and message properties
+				g_error_constructor.prototype_obj = allocObject(app_context, 8);
+				retainObject(g_error_constructor.prototype_obj);
+				ActionVar name_val = {0};
+				name_val.type = ACTION_STACK_VALUE_STRING;
+				name_val.str_size = 5;
+				VAL(u64, &name_val.data.numeric_value) = (u64)"Error";
+				setProperty(app_context, g_error_constructor.prototype_obj, "name", 4, &name_val);
+				ActionVar msg_val = {0};
+				msg_val.type = ACTION_STACK_VALUE_STRING;
+				msg_val.str_size = 5;
+				VAL(u64, &msg_val.data.numeric_value) = (u64)"Error";
+				setProperty(app_context, g_error_constructor.prototype_obj, "message", 7, &msg_val);
+				g_error_constructor_init = 1;
+			}
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_error_constructor);
+			return;
+		}
 		else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
 		{
 			// Lazily create System built-in object
@@ -3888,6 +3951,40 @@ void actionSetVariable(SWFAppContext* app_context)
 	char* var_name = (char*) VAL(u64, &STACK[var_name_sp + 16]);
 
 	u32 var_name_len = VAL(u32, &STACK[var_name_sp + 8]);
+
+	// Handle dot-path resolution for SetVariable (e.g., "a.b.c" → resolve a.b, then SetMember c)
+	{
+		char* dot = (char*) memchr(var_name, '.', var_name_len);
+		if (dot != NULL)
+		{
+			// Find the LAST dot to split into container path and final property name
+			char* last_dot = dot;
+			for (char* p = dot + 1; p < var_name + var_name_len; p++)
+			{
+				if (*p == '.') last_dot = p;
+			}
+
+			u32 container_len = (u32)(last_dot - var_name);
+			const char* final_prop = last_dot + 1;
+			u32 final_prop_len = var_name_len - container_len - 1;
+
+			// Save value from stack
+			ActionVar value_var;
+			peekVar(app_context, &value_var);
+			POP_2();
+
+			// Resolve container path via GetVariable (which handles dots recursively)
+			PUSH_STR(var_name, container_len);
+			actionGetVariable(app_context);
+
+			// Now stack has: [container_obj]
+			// Push final property name, then value for SetMember
+			PUSH_STR(final_prop, final_prop_len);
+			pushVar(app_context, &value_var);
+			actionSetMember(app_context);
+			return;
+		}
+	}
 
 	// Check virtual property table first (addProperty setters)
 	{
@@ -4080,6 +4177,24 @@ void actionGetProperty(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
+
+	// Check for NaN property index — Flash returns undefined
+	{
+		double d = 0.0;
+		if (index_var.type == ACTION_STACK_VALUE_F64)
+			d = VAL(double, &index_var.data.numeric_value);
+		else if (index_var.type == ACTION_STACK_VALUE_F32)
+			d = (double) VAL(float, &index_var.data.numeric_value);
+		if (isnan(d))
+		{
+			// Pop target, push undefined
+			convertString(app_context, NULL);
+			POP();
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+	}
+
 	int prop_index = varToInt32(&index_var);
 
 	// Pop target path
@@ -4157,23 +4272,9 @@ void actionGetProperty(SWFAppContext* app_context)
 		case 18: // _soundbuftime
 			value = mc ? mc->soundbuftime : 5.0f;
 			break;
-		case 19: // _quality (returns numeric: 0=LOW, 1=MEDIUM, 2=HIGH, 3=BEST)
-			// Convert quality string to numeric value
-			if (mc) {
-				if (strcmp(mc->quality, "LOW") == 0) {
-					value = 0.0f;
-				} else if (strcmp(mc->quality, "MEDIUM") == 0) {
-					value = 1.0f;
-				} else if (strcmp(mc->quality, "HIGH") == 0) {
-					value = 2.0f;
-				} else if (strcmp(mc->quality, "BEST") == 0) {
-					value = 3.0f;
-				} else {
-					value = 2.0f;  // Default to HIGH
-				}
-			} else {
-				value = 2.0f;  // Default to HIGH
-			}
+		case 19: // _quality (returns string: "LOW", "MEDIUM", "HIGH", "BEST")
+			str_value = mc ? mc->quality : "HIGH";
+			is_string = 1;
 			break;
 		case 20: // _xmouse (SWF 5+)
 			value = mc ? mc->xmouse : 0.0f;
@@ -6654,6 +6755,51 @@ void actionNewObject(SWFAppContext* app_context)
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
 	}
+	else if (strcmp(ctor_name, "Error") == 0)
+	{
+		// Handle Error constructor — new Error([message])
+		ASObject* err = allocObject(app_context, 8);
+		// Set __proto__ to Error.prototype (via the Error constructor function)
+		// Use GetVariable("Error") to find the constructor and its prototype
+		// For simplicity, just set the message property
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* msg = args[0].data.string_data.owns_memory ?
+				args[0].data.string_data.heap_ptr : (const char*) args[0].data.numeric_value;
+			ActionVar msg_val = {0};
+			msg_val.type = ACTION_STACK_VALUE_STRING;
+			msg_val.str_size = strlen(msg);
+			VAL(u64, &msg_val.data.numeric_value) = (u64) msg;
+			setProperty(app_context, err, "message", 7, &msg_val);
+		}
+		else if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_NULL)
+		{
+			ActionVar msg_val = {0};
+			msg_val.type = ACTION_STACK_VALUE_STRING;
+			msg_val.str_size = 4;
+			VAL(u64, &msg_val.data.numeric_value) = (u64) "null";
+			setProperty(app_context, err, "message", 7, &msg_val);
+		}
+		// Set __proto__ to Error.prototype
+		// Look up Error constructor's prototype
+		PUSH_STR("Error", 5);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* ctor = (ASFunction*) STACK_TOP_VALUE;
+			if (ctor->prototype_obj != NULL)
+			{
+				ActionVar proto_var = {0};
+				proto_var.type = ACTION_STACK_VALUE_OBJECT;
+				proto_var.data.numeric_value = (u64) ctor->prototype_obj;
+				setProperty(app_context, err, "__proto__", 9, &proto_var);
+			}
+		}
+		POP();
+		new_obj = err;
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
+	}
 	else if (strcmp(ctor_name, "Date") == 0)
 	{
 		// Handle Date constructor
@@ -8180,6 +8326,53 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
+	}
+
+	// escape(string) — URL-encode a string
+	else if (func_name_len == 6 && strncmp(func_name, "escape", 6) == 0)
+	{
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* src = args[0].data.string_data.owns_memory ?
+				args[0].data.string_data.heap_ptr : (const char*) args[0].data.numeric_value;
+			if (src == NULL) src = "";
+			u32 src_len = strlen(src);
+			// Allocate worst case: each byte → %XX (3 chars), stops at NUL
+			char* buf = (char*) HALLOC(src_len * 3 + 1);
+			u32 out = 0;
+			for (u32 i = 0; i < src_len; i++)
+			{
+				unsigned char c = (unsigned char) src[i];
+				if (c == 0) break;  // Flash escape stops at NUL
+				if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+				    (c >= '0' && c <= '9'))
+				{
+					buf[out++] = c;
+				}
+				else
+				{
+					// Percent-encode
+					buf[out++] = '%';
+					buf[out++] = "0123456789ABCDEF"[c >> 4];
+					buf[out++] = "0123456789ABCDEF"[c & 0x0F];
+				}
+			}
+			buf[out] = '\0';
+			if (args != NULL) FREE(args);
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_STRING;
+			result.str_size = out;
+			result.data.string_data.heap_ptr = buf;
+			result.data.string_data.owns_memory = true;
+			pushVar(app_context, &result);
+		}
+		else
+		{
+			// No args or non-string → undefined
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+		builtin_handled = 1;
 	}
 
 	// Array() — called as function, same behavior as new Array()
