@@ -58,7 +58,7 @@ void vmem_release(char* addr, size_t size)
 u32 get_elapsed_ms()
 {
 	struct timespec now;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	clock_gettime(CLOCK_MONOTONIC, &now);
 	return (now.tv_sec)*1000 + (now.tv_nsec)/1000000;
 }
 

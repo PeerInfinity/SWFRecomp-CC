@@ -723,8 +723,13 @@ ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 		return NULL;
 	}
 
-	// Initialize elements to zero
-	memset(arr->elements, 0, sizeof(ActionVar) * arr->capacity);
+	// Initialize elements to undefined
+	for (u32 i = 0; i < arr->capacity; i++)
+	{
+		arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+		arr->elements[i].str_size = 0;
+		arr->elements[i].data.numeric_value = 0;
+	}
 
 #ifdef DEBUG
 	printf("[DEBUG] allocArray: arr=%p, refcount=%u, capacity=%u\n",
@@ -834,9 +839,13 @@ void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, Action
 
 		arr->elements = new_elements;
 
-		// Zero out new slots
-		memset(&arr->elements[arr->capacity], 0,
-		       sizeof(ActionVar) * (new_capacity - arr->capacity));
+		// Initialize new slots to undefined
+		for (u32 i = arr->capacity; i < new_capacity; i++)
+		{
+			arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+			arr->elements[i].str_size = 0;
+			arr->elements[i].data.numeric_value = 0;
+		}
 
 		arr->capacity = new_capacity;
 	}

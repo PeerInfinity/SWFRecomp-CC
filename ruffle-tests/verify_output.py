@@ -219,11 +219,11 @@ def compile_native(test_dir, num_frames, build_dir):
             ],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
         )
         return result.returncode == 0, result.stderr
     except subprocess.TimeoutExpired:
-        return False, "compilation timed out after 30 seconds"
+        return False, "compilation timed out after 60 seconds"
 
 
 def run_binary(build_dir):

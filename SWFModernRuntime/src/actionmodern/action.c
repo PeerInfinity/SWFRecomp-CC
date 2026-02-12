@@ -6210,9 +6210,9 @@ void actionGetMember(SWFAppContext* app_context)
 		// Check if accessing the "length" property
 		if (strcmp(prop_name, "length") == 0)
 		{
-			// Push array length as float
-			float len = (float) arr->length;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
+			// Push array length as double
+			double len = (double) arr->length;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &len));
 		}
 		else
 		{
@@ -6337,13 +6337,23 @@ void actionNewObject(SWFAppContext* app_context)
 		          args[0].type == ACTION_STACK_VALUE_F64))
 		{
 			// new Array(length) - array with specified length
-			float length_f = (args[0].type == ACTION_STACK_VALUE_F32) ?
-				VAL(float, &args[0].data.numeric_value) :
-				(float) VAL(double, &args[0].data.numeric_value);
-			u32 length = (u32) length_f;
-			ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
-			arr->length = length;
-			new_obj = arr;
+			double length_d = (args[0].type == ACTION_STACK_VALUE_F32) ?
+				(double) VAL(float, &args[0].data.numeric_value) :
+				VAL(double, &args[0].data.numeric_value);
+			if (length_d < 0 || length_d != length_d || length_d > 0x7FFFFFFF)
+			{
+				// Negative, NaN, or too large — create empty array
+				ASArray* arr = allocArray(app_context, 4);
+				arr->length = 0;
+				new_obj = arr;
+			}
+			else
+			{
+				u32 length = (u32) length_d;
+				ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
+				arr->length = length;
+				new_obj = arr;
+			}
 		}
 		else
 		{
@@ -6561,6 +6571,17 @@ void actionNewObject(SWFAppContext* app_context)
 				setProperty(app_context, obj, "__proto__", 9, &proto_var);
 			}
 
+			// SWF6 and below: set constructor directly on each instance
+#if !defined(SWF_VERSION) || SWF_VERSION < 7
+			{
+				ActionVar ctor_inst_var;
+				ctor_inst_var.type = ACTION_STACK_VALUE_FUNCTION;
+				ctor_inst_var.str_size = 0;
+				ctor_inst_var.data.numeric_value = (u64) ctor_func;
+				setProperty(app_context, obj, "constructor", 11, &ctor_inst_var);
+			}
+#endif
+
 			// Call the constructor with 'this' binding
 			if (ctor_func->function_type == 1)
 			{
@@ -6716,8 +6737,34 @@ void actionNewMethod(SWFAppContext* app_context)
 				// Create new object for 'this' context
 				ASObject* new_obj = allocObject(app_context, 8);
 
-				// TODO: Set up prototype chain (new_obj.__proto__ = func.prototype)
-				// This requires prototype support in the object system
+				// Set up prototype chain (new_obj.__proto__ = func.prototype)
+				if (func->prototype_obj == NULL)
+				{
+					func->prototype_obj = allocObject(app_context, 4);
+					retainObject(func->prototype_obj);
+					setObjectProto(app_context, func->prototype_obj);
+					ActionVar ctor_pv;
+					ctor_pv.type = ACTION_STACK_VALUE_FUNCTION;
+					ctor_pv.str_size = 0;
+					ctor_pv.data.numeric_value = (u64) func;
+					setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_pv);
+				}
+				{
+					ActionVar proto_pv;
+					proto_pv.type = ACTION_STACK_VALUE_OBJECT;
+					proto_pv.str_size = 0;
+					proto_pv.data.numeric_value = (u64) func->prototype_obj;
+					setProperty(app_context, new_obj, "__proto__", 9, &proto_pv);
+				}
+#if !defined(SWF_VERSION) || SWF_VERSION < 7
+				{
+					ActionVar ctor_iv;
+					ctor_iv.type = ACTION_STACK_VALUE_FUNCTION;
+					ctor_iv.str_size = 0;
+					ctor_iv.data.numeric_value = (u64) func;
+					setProperty(app_context, new_obj, "constructor", 11, &ctor_iv);
+				}
+#endif
 
 				// Call function as constructor with 'this' binding
 				ActionVar return_value;
@@ -6820,13 +6867,23 @@ void actionNewMethod(SWFAppContext* app_context)
 		          args[0].type == ACTION_STACK_VALUE_F64))
 		{
 			// new Array(length) - array with specified length
-			float length_f = (args[0].type == ACTION_STACK_VALUE_F32) ?
-				VAL(float, &args[0].data.numeric_value) :
-				(float) VAL(double, &args[0].data.numeric_value);
-			u32 length = (u32) length_f;
-			ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
-			arr->length = length;
-			new_obj = arr;
+			double length_d = (args[0].type == ACTION_STACK_VALUE_F32) ?
+				(double) VAL(float, &args[0].data.numeric_value) :
+				VAL(double, &args[0].data.numeric_value);
+			if (length_d < 0 || length_d != length_d || length_d > 0x7FFFFFFF)
+			{
+				// Negative, NaN, or too large — create empty array
+				ASArray* arr = allocArray(app_context, 4);
+				arr->length = 0;
+				new_obj = arr;
+			}
+			else
+			{
+				u32 length = (u32) length_d;
+				ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
+				arr->length = length;
+				new_obj = arr;
+			}
 		}
 		else
 		{
@@ -7020,6 +7077,17 @@ void actionNewMethod(SWFAppContext* app_context)
 			proto_v.data.numeric_value = (u64) user_ctor_func->prototype_obj;
 			setProperty(app_context, new_obj_inst, "__proto__", 9, &proto_v);
 		}
+
+		// SWF6 and below: set constructor directly on each instance
+#if !defined(SWF_VERSION) || SWF_VERSION < 7
+		{
+			ActionVar ctor_inst_v;
+			ctor_inst_v.type = ACTION_STACK_VALUE_FUNCTION;
+			ctor_inst_v.str_size = 0;
+			ctor_inst_v.data.numeric_value = (u64) user_ctor_func;
+			setProperty(app_context, new_obj_inst, "constructor", 11, &ctor_inst_v);
+		}
+#endif
 
 		// Call function as constructor with 'this' binding
 		ActionVar return_value;
@@ -8091,11 +8159,15 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 // Writes into buf (max buf_size chars), returns length written.
 static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size)
 {
-	if (v == NULL || v->type == ACTION_STACK_VALUE_UNDEFINED || v->type == ACTION_STACK_VALUE_NULL)
+	if (v == NULL)
 	{
 		buf[0] = '\0';
 		return 0;
 	}
+	if (v->type == ACTION_STACK_VALUE_UNDEFINED)
+		return snprintf(buf, buf_size, "undefined");
+	if (v->type == ACTION_STACK_VALUE_NULL)
+		return snprintf(buf, buf_size, "null");
 	switch (v->type)
 	{
 		case ACTION_STACK_VALUE_STRING:
