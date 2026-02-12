@@ -1,123 +1,123 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-02-12 18:43 UTC
+**Date**: 2026-02-12 19:17 UTC
 
-**Git SHA**: `89513b9d28`
+**Git SHA**: `2d0fc53dda`
 
-**Run Duration**: 28m 31s
+**Run Duration**: 28m 56s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 616 |
-| Passing | **85** (13.8%) |
-| Failing | 531 |
+| Passing | **86** (14.0%) |
+| Failing | 530 |
 | Total expected lines | 89556 |
-| Matching lines | 32315 (36.1%) |
-| Mismatched lines | 57241 |
+| Matching lines | 32339 (36.1%) |
+| Mismatched lines | 57217 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 514 | 96.8% |
-| Runtime Segfault | 9 | 1.7% |
+| Output Mismatch | 514 | 97.0% |
+| Runtime Segfault | 10 | 1.9% |
 | Timeout | 4 | 0.8% |
-| Runtime Error | 3 | 0.6% |
-| Compile Fail | 1 | 0.2% |
+| Runtime Error | 2 | 0.4% |
 
 ## Passing Tests
 
-**85 tests passing**
+**86 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `access_unnamed_shape` | 1 | 7.4s |  |
-| 2 | `action_to_integer` | 28 | 2.1s |  |
-| 3 | `add` | 28 | 2.1s |  |
-| 4 | `add2` | 354 | 2.5s | [investigation](ruffle-tests/_investigation/add2.md) |
-| 5 | `add_swf4` | 28 | 2.1s |  |
-| 6 | `add_swf5` | 28 | 2.1s |  |
-| 7 | `array_concat` | 98 | 2.3s |  |
-| 8 | `array_slice` | 34 | 2.3s |  |
-| 9 | `array_splice` | 207 | 2.9s |  |
-| 10 | `array_trivial` | 209 | 2.6s |  |
-| 11 | `as1_constructor_v7` | 35 | 2.2s |  |
-| 12 | `as_broadcaster_initialize` | 10 | 2.1s |  |
-| 13 | `as_set_prop_flags_version_swf5` | 1 | 2.1s |  |
-| 14 | `bad_swf_tag_past_eof` | 1 | 2.0s |  |
-| 15 | `bitand` | 1058 | 10.4s |  |
-| 16 | `bitmap_data_colortransform` | 1 | 2.4s |  |
-| 17 | `bitmap_data_fillrect` | 1 | 2.3s |  |
-| 18 | `bitmap_data_perlinnoise` | 1 | 2.9s |  |
-| 19 | `bitmap_data_pixeldissolve_image` | 1 | 2.6s |  |
-| 20 | `bitmapdata_applyfilter_colormatrix` | 1 | 2.1s |  |
-| 21 | `bitor` | 1058 | 10.5s |  |
-| 22 | `biturshift` | 14 | 2.2s |  |
-| 23 | `biturshift_swf8` | 14 | 2.2s |  |
-| 24 | `bitxor` | 1058 | 11.5s |  |
-| 25 | `catch_references_registers` | 2 | 2.0s |  |
-| 26 | `define_function_case_sensitive` | 2 | 2.0s |  |
-| 27 | `divide_swf4` | 107 | 2.2s |  |
-| 28 | `do_init_action` | 3 | 2.1s |  |
-| 29 | `equals` | 32 | 2.2s |  |
-| 30 | `equals2_swf5` | 926 | 10.5s |  |
-| 31 | `equals2_swf6` | 926 | 10.3s |  |
-| 32 | `equals2_swf7` | 926 | 10.3s |  |
-| 33 | `equals_swf4` | 665 | 5.7s |  |
-| 34 | `equals_swf4_alt` | 32 | 2.1s |  |
-| 35 | `equals_swf5` | 32 | 2.2s |  |
-| 36 | `focusrect_mouse_swf8` | 1 | 2.0s |  |
-| 37 | `focusrect_mouse_swf9` | 1 | 2.0s |  |
-| 38 | `global_is_bare` | 7 | 2.0s |  |
-| 39 | `goto_execution_order` | 2 | 2.1s |  |
-| 40 | `goto_rewind1` | 1 | 2.2s |  |
-| 41 | `greater_swf6` | 1175 | 11.5s |  |
-| 42 | `greater_swf7` | 1175 | 11.7s |  |
-| 43 | `greaterthan_swf5` | 1 | 2.2s |  |
-| 44 | `greaterthan_swf8` | 1 | 2.2s |  |
-| 45 | `has_own_property` | 32 | 2.3s |  |
-| 46 | `infinite_recursion_function` | 4 | 2.1s | [investigation](ruffle-tests/_investigation/infinite_recursion_function.md) |
-| 47 | `infinite_recursion_function_in_setter` | 131 | 2.1s |  |
-| 48 | `infinite_recursion_virtual_property` | 67 | 2.1s |  |
-| 49 | `issue_1086` | 1 | 2.1s |  |
-| 50 | `issue_1671` | 1 | 2.1s |  |
-| 51 | `issue_3446` | 1 | 2.2s |  |
-| 52 | `issue_4377` | 2 | 2.2s |  |
-| 53 | `issue_768` | 3 | 2.1s | [investigation](ruffle-tests/_investigation/issue_768.md) |
-| 54 | `lessthan` | 41 | 2.3s |  |
-| 55 | `lessthan2_swf5` | 1226 | 12.2s |  |
-| 56 | `lessthan2_swf6` | 1226 | 12.2s |  |
-| 57 | `lessthan2_swf7` | 1226 | 12.3s |  |
-| 58 | `lessthan_swf4` | 902 | 7.8s |  |
-| 59 | `lessthan_swf4_alt` | 41 | 2.3s |  |
-| 60 | `lessthan_swf5` | 41 | 2.3s |  |
-| 61 | `logical_ops_swf4` | 90 | 2.2s |  |
-| 62 | `logical_ops_swf8` | 108 | 2.2s |  |
-| 63 | `looping` | 6 | 2.1s |  |
-| 64 | `mask_reapply` | 1 | 2.1s |  |
-| 65 | `mask_with_drawing` | 1 | 2.1s |  |
-| 66 | `movieclip_begin_gradient_fill` | 1 | 2.8s |  |
-| 67 | `movieclip_line_gradient_style` | 1 | 2.8s |  |
-| 68 | `nested_textfields_in_buttons` | 1 | 2.1s |  |
-| 69 | `object_function` | 32 | 2.3s |  |
-| 70 | `sandbox_type_local_file` | 1 | 2.0s |  |
-| 71 | `single_frame` | 1 | 2.0s |  |
-| 72 | `sound_start_load` | 1 | 2.1s |  |
-| 73 | `strictequals_swf6` | 902 | 8.4s |  |
-| 74 | `strictly_equals` | 7 | 2.1s |  |
-| 75 | `string_paths_keyevents` | 1 | 2.1s |  |
-| 76 | `string_paths_timer` | 1 | 2.1s |  |
-| 77 | `swf4_actions_bool` | 96 | 2.2s |  |
-| 78 | `swf4_bool` | 4 | 2.0s |  |
-| 79 | `swf5_encoding` | 3 | 2.6s |  |
-| 80 | `this_swf7` | 41 | 2.3s | [investigation](ruffle-tests/_investigation/this_swf7.md) |
-| 81 | `timeline_function_def` | 7 | 2.3s |  |
-| 82 | `try_finally_simple` | 16 | 2.1s |  |
-| 83 | `typeof_globals` | 7 | 2.1s |  |
-| 84 | `undefined_to_string_swf6` | 4 | 2.0s |  |
-| 85 | `with_return` | 2 | 2.1s |  |
+| 1 | `access_unnamed_shape` | 1 | 2.3s |  |
+| 2 | `action_to_integer` | 28 | 2.2s |  |
+| 3 | `add` | 28 | 2.2s |  |
+| 4 | `add2` | 354 | 2.6s | [investigation](ruffle-tests/_investigation/add2.md) |
+| 5 | `add_swf4` | 28 | 2.2s |  |
+| 6 | `add_swf5` | 28 | 2.2s |  |
+| 7 | `array_concat` | 98 | 2.4s |  |
+| 8 | `array_slice` | 34 | 2.4s |  |
+| 9 | `array_splice` | 207 | 3.0s |  |
+| 10 | `array_trivial` | 209 | 2.7s |  |
+| 11 | `as1_constructor_v6` | 35 | 2.2s |  |
+| 12 | `as1_constructor_v7` | 35 | 2.2s |  |
+| 13 | `as_broadcaster_initialize` | 10 | 2.1s |  |
+| 14 | `as_set_prop_flags_version_swf5` | 1 | 2.2s |  |
+| 15 | `bad_swf_tag_past_eof` | 1 | 2.0s |  |
+| 16 | `bitand` | 1058 | 11.1s |  |
+| 17 | `bitmap_data_colortransform` | 1 | 2.5s |  |
+| 18 | `bitmap_data_fillrect` | 1 | 2.3s |  |
+| 19 | `bitmap_data_perlinnoise` | 1 | 3.0s |  |
+| 20 | `bitmap_data_pixeldissolve_image` | 1 | 2.6s |  |
+| 21 | `bitmapdata_applyfilter_colormatrix` | 1 | 2.2s |  |
+| 22 | `bitor` | 1058 | 10.9s |  |
+| 23 | `biturshift` | 14 | 2.7s |  |
+| 24 | `biturshift_swf8` | 14 | 2.2s |  |
+| 25 | `bitxor` | 1058 | 11.2s |  |
+| 26 | `catch_references_registers` | 2 | 2.1s |  |
+| 27 | `define_function_case_sensitive` | 2 | 2.1s |  |
+| 28 | `divide_swf4` | 107 | 2.3s |  |
+| 29 | `do_init_action` | 3 | 2.2s |  |
+| 30 | `equals` | 32 | 2.2s |  |
+| 31 | `equals2_swf5` | 926 | 10.0s |  |
+| 32 | `equals2_swf6` | 926 | 10.0s |  |
+| 33 | `equals2_swf7` | 926 | 10.0s |  |
+| 34 | `equals_swf4` | 665 | 5.5s |  |
+| 35 | `equals_swf4_alt` | 32 | 2.1s |  |
+| 36 | `equals_swf5` | 32 | 2.1s |  |
+| 37 | `focusrect_mouse_swf8` | 1 | 2.2s |  |
+| 38 | `focusrect_mouse_swf9` | 1 | 2.2s |  |
+| 39 | `global_is_bare` | 7 | 2.2s |  |
+| 40 | `goto_execution_order` | 2 | 2.1s |  |
+| 41 | `goto_rewind1` | 1 | 2.2s |  |
+| 42 | `greater_swf6` | 1175 | 11.3s |  |
+| 43 | `greater_swf7` | 1175 | 11.3s |  |
+| 44 | `greaterthan_swf5` | 1 | 2.1s |  |
+| 45 | `greaterthan_swf8` | 1 | 2.1s |  |
+| 46 | `has_own_property` | 32 | 2.2s |  |
+| 47 | `infinite_recursion_function` | 4 | 2.1s | [investigation](ruffle-tests/_investigation/infinite_recursion_function.md) |
+| 48 | `infinite_recursion_function_in_setter` | 131 | 2.1s |  |
+| 49 | `infinite_recursion_virtual_property` | 67 | 2.1s |  |
+| 50 | `issue_1086` | 1 | 2.1s |  |
+| 51 | `issue_1671` | 1 | 2.1s |  |
+| 52 | `issue_3446` | 1 | 2.1s |  |
+| 53 | `issue_4377` | 2 | 2.1s |  |
+| 54 | `issue_768` | 3 | 2.1s | [investigation](ruffle-tests/_investigation/issue_768.md) |
+| 55 | `lessthan` | 41 | 2.2s |  |
+| 56 | `lessthan2_swf5` | 1226 | 11.8s |  |
+| 57 | `lessthan2_swf6` | 1226 | 11.9s |  |
+| 58 | `lessthan2_swf7` | 1226 | 11.8s |  |
+| 59 | `lessthan_swf4` | 902 | 7.6s |  |
+| 60 | `lessthan_swf4_alt` | 41 | 2.2s |  |
+| 61 | `lessthan_swf5` | 41 | 2.2s |  |
+| 62 | `logical_ops_swf4` | 90 | 2.2s |  |
+| 63 | `logical_ops_swf8` | 108 | 2.3s |  |
+| 64 | `looping` | 6 | 2.2s |  |
+| 65 | `mask_reapply` | 1 | 2.1s |  |
+| 66 | `mask_with_drawing` | 1 | 2.2s |  |
+| 67 | `movieclip_begin_gradient_fill` | 1 | 3.0s |  |
+| 68 | `movieclip_line_gradient_style` | 1 | 2.8s |  |
+| 69 | `nested_textfields_in_buttons` | 1 | 2.1s |  |
+| 70 | `object_function` | 32 | 2.2s |  |
+| 71 | `sandbox_type_local_file` | 1 | 2.2s |  |
+| 72 | `single_frame` | 1 | 2.2s |  |
+| 73 | `sound_start_load` | 1 | 2.3s |  |
+| 74 | `strictequals_swf6` | 902 | 9.5s |  |
+| 75 | `strictly_equals` | 7 | 2.3s |  |
+| 76 | `string_paths_keyevents` | 1 | 2.2s |  |
+| 77 | `string_paths_timer` | 1 | 2.3s |  |
+| 78 | `swf4_actions_bool` | 96 | 2.4s |  |
+| 79 | `swf4_bool` | 4 | 2.2s |  |
+| 80 | `swf5_encoding` | 3 | 2.2s |  |
+| 81 | `this_swf7` | 41 | 2.2s | [investigation](ruffle-tests/_investigation/this_swf7.md) |
+| 82 | `timeline_function_def` | 7 | 2.2s |  |
+| 83 | `try_finally_simple` | 16 | 2.1s |  |
+| 84 | `typeof_globals` | 7 | 2.1s |  |
+| 85 | `undefined_to_string_swf6` | 4 | 2.1s |  |
+| 86 | `with_return` | 2 | 2.1s |  |
 
 ## Near-Passing Tests
 
@@ -129,10 +129,10 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 |---|------|------------|----------|-------|------------|-------|
 | 1 | `string_coercion` | 99.1% | 116 | 117 | 1 | [investigation](ruffle-tests/_investigation/string_coercion.md) |
 | 2 | `object_string_coerce_swf5` | 95.4% | 62 | 65 | 3 |  |
-| 3 | `set_variable_scope` | 86.2% | 50 | 58 | 8 |  |
-| 4 | `as1_constructor_v6` | 85.7% | 30 | 35 | 5 |  |
-| 5 | `swf7_case_sensitive` | 84.1% | 37 | 44 | 7 |  |
-| 6 | `array_properties` | 83.3% | 30 | 36 | 6 |  |
+| 3 | `array_constructor` | 93.3% | 28 | 30 | 2 |  |
+| 4 | `array_properties` | 91.7% | 33 | 36 | 3 |  |
+| 5 | `set_variable_scope` | 86.2% | 50 | 58 | 8 |  |
+| 6 | `swf7_case_sensitive` | 84.1% | 37 | 44 | 7 |  |
 | 7 | `getproperty_swf4` | 82.1% | 23 | 28 | 5 |  |
 | 8 | `local_to_global` | 81.6% | 40 | 49 | 9 |  |
 | 9 | `movieclip_prototype_extension` | 80.0% | 4 | 5 | 1 |  |
@@ -241,29 +241,29 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 ## Segfaults
 
-**9 tests** crash with SIGSEGV
+**10 tests** crash with SIGSEGV
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
-| 1 | `array_constructor` | 4.3s |  |
+| 1 | `array_length` | 4.3s |  |
 | 2 | `as2_oop` | 4.3s |  |
-| 3 | `device_font_spacing` | 8.5s |  |
-| 4 | `duplicate_movie_clip_drawing` | 3.5s |  |
-| 5 | `enumerate` | 4.3s |  |
+| 3 | `device_font_spacing` | 11.6s |  |
+| 4 | `duplicate_movie_clip_drawing` | 4.2s |  |
+| 5 | `enumerate` | 4.2s |  |
 | 6 | `extends_chain` | 4.8s |  |
 | 7 | `issue_2166` | 4.2s |  |
-| 8 | `path_string` | 4.8s |  |
-| 9 | `swf4_actions_coercion_order` | 4.4s |  |
+| 8 | `netstream_play_flv_screen` | 31.1s |  |
+| 9 | `path_string` | 4.6s |  |
+| 10 | `swf4_actions_coercion_order` | 4.4s |  |
 
 ## Runtime Errors
 
-**3 tests** fail with runtime errors
+**2 tests** fail with runtime errors
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `array_length` | exit code -6 | 4.3s |  |
-| 2 | `uncaught_exception` | exit code 1 | 2.0s |  |
-| 3 | `uncaught_exception_bubbled` | exit code 1 | 2.1s |  |
+| 1 | `uncaught_exception` | exit code 1 | 2.1s |  |
+| 2 | `uncaught_exception_bubbled` | exit code 1 | 2.1s |  |
 
 ## Timeouts
 
@@ -271,9 +271,9 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `parse_float` | runtime timeout (>10s) | 13.3s |  |
-| 2 | `placeobject_occupied_depth` | runtime timeout (>10s) | 12.3s |  |
-| 3 | `timeout` | runtime timeout (>10s) | 12.4s |  |
+| 1 | `parse_float` | runtime timeout (>10s) | 13.2s |  |
+| 2 | `placeobject_occupied_depth` | runtime timeout (>10s) | 12.2s |  |
+| 3 | `timeout` | runtime timeout (>10s) | 16.7s |  |
 | 4 | `try_catch_finally` | runtime timeout (>10s) | 12.6s |  |
 
 ## All Output Mismatches
@@ -284,10 +284,10 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `string_coercion` | 99.1% | 116/117 | 117 | 117 | [investigation](ruffle-tests/_investigation/string_coercion.md) |
 | 2 | `object_string_coerce_swf5` | 95.4% | 62/65 | 65 | 62 |  |
-| 3 | `set_variable_scope` | 86.2% | 50/58 | 58 | 58 |  |
-| 4 | `as1_constructor_v6` | 85.7% | 30/35 | 35 | 35 |  |
-| 5 | `swf7_case_sensitive` | 84.1% | 37/44 | 44 | 44 |  |
-| 6 | `array_properties` | 83.3% | 30/36 | 36 | 36 |  |
+| 3 | `array_constructor` | 93.3% | 28/30 | 30 | 30 |  |
+| 4 | `array_properties` | 91.7% | 33/36 | 36 | 36 |  |
+| 5 | `set_variable_scope` | 86.2% | 50/58 | 58 | 58 |  |
+| 6 | `swf7_case_sensitive` | 84.1% | 37/44 | 44 | 44 |  |
 | 7 | `getproperty_swf4` | 82.1% | 23/28 | 28 | 28 |  |
 | 8 | `local_to_global` | 81.6% | 40/49 | 49 | 49 |  |
 | 9 | `movieclip_prototype_extension` | 80.0% | 4/5 | 5 | 5 |  |
