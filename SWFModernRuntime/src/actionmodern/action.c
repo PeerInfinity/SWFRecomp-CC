@@ -472,8 +472,9 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 		return undef;
 	}
 
-	// Try valueOf
-	ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
+	// Try valueOf (own properties only — inherited Object.prototype.valueOf/toString
+	// should not cause bare {} to convert; Flash comparisons bail early for bare objects)
+	ActionVar* valueOf_prop = getProperty(obj, "valueOf", 7);
 	if (valueOf_prop != NULL)
 	{
 		if (valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
@@ -520,8 +521,8 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 		}
 	}
 
-	// Try toString
-	ActionVar* toString_prop = getPropertyWithPrototype(obj, "toString", 8);
+	// Try toString (own properties only — same rationale as valueOf above)
+	ActionVar* toString_prop = getProperty(obj, "toString", 8);
 	if (toString_prop != NULL)
 	{
 		if (toString_prop->type == ACTION_STACK_VALUE_FUNCTION)
