@@ -499,12 +499,24 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found)
 {
 	*found = 0;
-	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
-	if (obj == NULL)
+	if (obj_var->data.numeric_value == 0)
 	{
 		ActionVar undef = {0};
 		undef.type = ACTION_STACK_VALUE_UNDEFINED;
 		return undef;
+	}
+
+	// For functions, use own_props (not the ASFunction struct) for property lookup
+	ASObject* obj;
+	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* fn = (ASFunction*) obj_var->data.numeric_value;
+		obj = fn->own_props;
+		if (obj == NULL) return *obj_var;  // No own_props, no valueOf
+	}
+	else
+	{
+		obj = (ASObject*) obj_var->data.numeric_value;
 	}
 
 	ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
@@ -567,12 +579,29 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found)
 {
 	if (found) *found = 0;
-	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
-	if (obj == NULL)
+	if (obj_var->data.numeric_value == 0)
 	{
 		ActionVar undef = {0};
 		undef.type = ACTION_STACK_VALUE_UNDEFINED;
 		return undef;
+	}
+
+	// For functions, use own_props for property lookup
+	ASObject* obj;
+	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* fn = (ASFunction*) obj_var->data.numeric_value;
+		obj = fn->own_props;
+		if (obj == NULL)
+		{
+			ActionVar undef = {0};
+			undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			return undef;
+		}
+	}
+	else
+	{
+		obj = (ASObject*) obj_var->data.numeric_value;
 	}
 
 	ActionVar* toString_prop = getPropertyWithPrototype(obj, "toString", 8);
@@ -622,12 +651,31 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 		return *obj_var;
 	}
 
-	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
-	if (obj == NULL)
+	if (obj_var->data.numeric_value == 0)
 	{
 		ActionVar undef = {0};
 		undef.type = ACTION_STACK_VALUE_UNDEFINED;
 		return undef;
+	}
+
+	// For functions, use own_props (not the function struct itself) for property lookup
+	ASObject* obj;
+	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* func = (ASFunction*) obj_var->data.numeric_value;
+		obj = func->own_props;
+		if (obj == NULL)
+		{
+			// No own_props — function has no valueOf/toString, return undefined
+			if (out_success) *out_success = 0;
+			ActionVar undef = {0};
+			undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			return undef;
+		}
+	}
+	else
+	{
+		obj = (ASObject*) obj_var->data.numeric_value;
 	}
 
 	// Try valueOf via prototype chain (finds Object.prototype.valueOf too)
@@ -4752,31 +4800,42 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 		return 0;
 	}
 
-	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
-	ASObject* ctor = (ASObject*) ctor_var->data.numeric_value;
-
-	if (obj == NULL || ctor == NULL)
+	if (obj_var->data.numeric_value == 0 || ctor_var->data.numeric_value == 0)
 	{
 		return 0;
 	}
 
-	// Get the constructor's "prototype" property
-	ActionVar* ctor_proto_var = getProperty(ctor, "prototype", 9);
-	if (ctor_proto_var == NULL)
+	// Get the constructor's "prototype" — handle ASFunction vs ASObject
+	ASObject* ctor_proto = NULL;
+	if (ctor_var->type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		return 0;
+		ASFunction* ctor_func = (ASFunction*) ctor_var->data.numeric_value;
+		ctor_proto = ctor_func->prototype_obj;
+	}
+	else
+	{
+		ASObject* ctor = (ASObject*) ctor_var->data.numeric_value;
+		ActionVar* ctor_proto_var = getProperty(ctor, "prototype", 9);
+		if (ctor_proto_var != NULL && ctor_proto_var->type == ACTION_STACK_VALUE_OBJECT)
+			ctor_proto = (ASObject*) ctor_proto_var->data.numeric_value;
 	}
 
-	// Get the prototype object
-	if (ctor_proto_var->type != ACTION_STACK_VALUE_OBJECT)
-	{
-		return 0;
-	}
-
-	ASObject* ctor_proto = (ASObject*) ctor_proto_var->data.numeric_value;
 	if (ctor_proto == NULL)
 	{
 		return 0;
+	}
+
+	// Get the object for __proto__ chain walk — handle ASFunction vs ASObject
+	ASObject* obj;
+	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* obj_func = (ASFunction*) obj_var->data.numeric_value;
+		obj = obj_func->own_props;
+		if (obj == NULL) return 0;
+	}
+	else
+	{
+		obj = (ASObject*) obj_var->data.numeric_value;
 	}
 
 	// Walk up the object's prototype chain via __proto__ property
@@ -4813,9 +4872,14 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 	}
 
 	// Check interface implementation (ActionScript 2.0 implements keyword)
-	if (implementsInterface(obj, ctor))
+	// Only applicable when both are actual ASObject types (not ASFunction)
+	if (obj_var->type != ACTION_STACK_VALUE_FUNCTION &&
+	    ctor_var->type != ACTION_STACK_VALUE_FUNCTION)
 	{
-		return 1;
+		if (implementsInterface(obj, (ASObject*) ctor_var->data.numeric_value))
+		{
+			return 1;
+		}
 	}
 
 	// Not found in prototype chain or interfaces
@@ -5557,14 +5621,10 @@ void actionExtends(SWFAppContext* app_context)
 		return;
 	}
 
-	// Get constructor objects
-	ASObject* super_func = (ASObject*) superclass.data.numeric_value;
-	ASObject* sub_func = (ASObject*) subclass.data.numeric_value;
-
-	if (super_func == NULL || sub_func == NULL)
+	if (superclass.data.numeric_value == 0 || subclass.data.numeric_value == 0)
 	{
 #ifdef DEBUG
-		printf("[DEBUG] actionExtends: NULL constructor object\n");
+		printf("[DEBUG] actionExtends: NULL constructor\n");
 #endif
 		return;
 	}
@@ -5579,13 +5639,44 @@ void actionExtends(SWFAppContext* app_context)
 		return;
 	}
 
-	// Get superclass prototype property
-	ActionVar* super_proto_var = getProperty(super_func, "prototype", 9);
+	// Get superclass prototype — handle ASFunction vs ASObject
+	ASObject* super_proto = NULL;
+	if (superclass.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* super_func = (ASFunction*) superclass.data.numeric_value;
+		// Lazily create prototype if needed (same pattern as actionGetMember)
+		if (super_func->prototype_obj == NULL)
+		{
+			super_func->prototype_obj = allocObject(app_context, 4);
+			retainObject(super_func->prototype_obj);
+			setObjectProto(app_context, super_func->prototype_obj);
+			ActionVar ctor_var;
+			ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+			ctor_var.str_size = 0;
+			ctor_var.data.numeric_value = (u64) super_func;
+			setProperty(app_context, super_func->prototype_obj, "constructor", 11, &ctor_var);
+		}
+		super_proto = super_func->prototype_obj;
+	}
+	else
+	{
+		ASObject* super_obj = (ASObject*) superclass.data.numeric_value;
+		ActionVar* super_proto_var = getProperty(super_obj, "prototype", 9);
+		if (super_proto_var != NULL && (super_proto_var->type == ACTION_STACK_VALUE_OBJECT ||
+		    super_proto_var->type == ACTION_STACK_VALUE_ARRAY))
+		{
+			super_proto = (ASObject*) super_proto_var->data.numeric_value;
+		}
+	}
 
 	// Set __proto__ of new prototype to superclass prototype
-	if (super_proto_var != NULL)
+	if (super_proto != NULL)
 	{
-		setProperty(app_context, new_proto, "__proto__", 9, super_proto_var);
+		ActionVar proto_var;
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.str_size = 0;
+		proto_var.data.numeric_value = (u64) super_proto;
+		setProperty(app_context, new_proto, "__proto__", 9, &proto_var);
 	}
 
 	// Set constructor property to superclass
@@ -5594,25 +5685,27 @@ void actionExtends(SWFAppContext* app_context)
 #ifdef DEBUG
 	printf("[DEBUG] actionExtends: Set constructor property - type=%d, ptr=%p\n",
 		superclass.type, (void*)superclass.data.numeric_value);
-
-	// Verify it was set correctly
-	ActionVar* check = getProperty(new_proto, "constructor", 11);
-	if (check != NULL) {
-		printf("[DEBUG] actionExtends: Retrieved constructor - type=%d, ptr=%p\n",
-			check->type, (void*)check->data.numeric_value);
-	}
 #endif
 
-	// Set subclass prototype to new object
-	ActionVar new_proto_var;
-	new_proto_var.type = ACTION_STACK_VALUE_OBJECT;
-	new_proto_var.data.numeric_value = (u64) new_proto;
-	new_proto_var.str_size = 0;
-
-	setProperty(app_context, sub_func, "prototype", 9, &new_proto_var);
+	// Set subclass prototype to new object — handle ASFunction vs ASObject
+	if (subclass.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* sub_func = (ASFunction*) subclass.data.numeric_value;
+		retainObject(new_proto);
+		if (sub_func->prototype_obj != NULL)
+			releaseObject(app_context, sub_func->prototype_obj);
+		sub_func->prototype_obj = new_proto;
+	}
+	else
+	{
+		ActionVar new_proto_var;
+		new_proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		new_proto_var.data.numeric_value = (u64) new_proto;
+		new_proto_var.str_size = 0;
+		setProperty(app_context, (ASObject*) subclass.data.numeric_value, "prototype", 9, &new_proto_var);
+	}
 
 	// Release our reference to new_proto
-	// (setProperty retained it when setting as prototype)
 	releaseObject(app_context, new_proto);
 
 #ifdef DEBUG
@@ -6679,6 +6772,22 @@ void actionGetMember(SWFAppContext* app_context)
 				setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+		}
+		else if (func != NULL)
+		{
+			// Check own_props for arbitrary properties set on the function
+			int found = 0;
+			if (func->own_props != NULL)
+			{
+				ActionVar* pv = getPropertyWithPrototype(func->own_props, prop_name, prop_name_len);
+				if (pv != NULL)
+				{
+					pushVar(app_context, pv);
+					found = 1;
+				}
+			}
+			if (!found)
+				pushUndefined(app_context);
 		}
 		else
 		{
