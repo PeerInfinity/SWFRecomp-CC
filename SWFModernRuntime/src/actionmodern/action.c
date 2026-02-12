@@ -123,6 +123,35 @@ static ASObject* g_object_prototype = NULL;
 static ASFunction g_object_toString_func;
 static ASFunction g_object_valueOf_func;
 static ASFunction g_object_hasOwnProperty_func;
+static ASFunction g_wrapper_toString_func;
+static int g_wrapper_toString_init = 0;
+
+// Built-in toString for Object(primitive) wrappers — returns valueOf as string
+static ActionVar builtin_wrapper_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 15;
+	ret.data.numeric_value = (u64) "[object Object]";
+
+	if (this_obj != NULL)
+	{
+		ASObject* obj = (ASObject*) this_obj;
+		ActionVar* val_prop = getProperty(obj, "valueOf", 7);
+		if (val_prop != NULL && val_prop->type != ACTION_STACK_VALUE_FUNCTION)
+		{
+			char buf[64];
+			int len = varToStringBuf(app_context, val_prop, buf, sizeof(buf));
+			char* str = (char*) HALLOC(len + 1);
+			memcpy(str, buf, len);
+			str[len] = '\0';
+			ret.data.string_data.heap_ptr = str;
+			ret.data.string_data.owns_memory = true;
+			ret.str_size = len;
+		}
+	}
+	return ret;
+}
 
 static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
@@ -146,11 +175,33 @@ static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, Actio
 		ASObject* obj = (ASObject*) this_obj;
 		const char* prop_name = NULL;
 		u32 prop_name_len = 0;
+		char coerced_buf[64];
 
 		if (args[0].type == ACTION_STACK_VALUE_STRING)
 		{
-			prop_name = (const char*) args[0].data.numeric_value;
+			prop_name = args[0].data.string_data.owns_memory ?
+				args[0].data.string_data.heap_ptr :
+				(const char*) args[0].data.numeric_value;
 			prop_name_len = args[0].str_size;
+		}
+		else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			// undefined coerces to "undefined" for property names
+			prop_name = "undefined";
+			prop_name_len = 9;
+		}
+		else if (args[0].type == ACTION_STACK_VALUE_NULL)
+		{
+			// null coerces to "null" for property names
+			prop_name = "null";
+			prop_name_len = 4;
+		}
+		else
+		{
+			// Coerce non-string argument to string (numbers, booleans)
+			int len = varToStringBuf(app_context, &args[0], coerced_buf, sizeof(coerced_buf));
+			prop_name = coerced_buf;
+			prop_name_len = (u32) len;
 		}
 
 		if (prop_name != NULL)
@@ -5892,7 +5943,27 @@ void actionSetMember(SWFAppContext* app_context)
 			}
 		}
 	}
-	// If it's not an object or array type, we silently ignore the operation
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+		if (func != NULL && prop_name_len == 9 && strncmp(prop_name, "prototype", 9) == 0)
+		{
+			// Setting func.prototype = value
+			if (value_var.type == ACTION_STACK_VALUE_OBJECT)
+			{
+				ASObject* new_proto = (ASObject*) value_var.data.numeric_value;
+				if (new_proto != NULL)
+				{
+					retainObject(new_proto);
+					// Release old prototype if any
+					if (func->prototype_obj != NULL)
+						releaseObject(app_context, func->prototype_obj);
+					func->prototype_obj = new_proto;
+				}
+			}
+		}
+	}
+	// If it's not an object, array, or function type, we silently ignore the operation
 	// (Flash behavior for setting properties on non-objects)
 }
 
@@ -6185,6 +6256,12 @@ void actionGetMember(SWFAppContext* app_context)
 				retainObject(func->prototype_obj);
 				// Set Object.prototype as __proto__ for prototype chain
 				setObjectProto(app_context, func->prototype_obj);
+				// Set constructor property pointing back to the function
+				ActionVar ctor_var;
+				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+				ctor_var.str_size = 0;
+				ctor_var.data.numeric_value = (u64) func;
+				setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
 		}
@@ -6463,18 +6540,25 @@ void actionNewObject(SWFAppContext* app_context)
 			new_obj = obj;
 
 			// Set __proto__ to constructor's prototype (for prototype chain inheritance)
-			if (ctor_func->prototype_obj != NULL)
+			// Lazily create prototype if it doesn't exist yet
+			if (ctor_func->prototype_obj == NULL)
+			{
+				ctor_func->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor_func->prototype_obj);
+				setObjectProto(app_context, ctor_func->prototype_obj);
+				// Set constructor property pointing back to the function
+				ActionVar ctor_var;
+				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+				ctor_var.str_size = 0;
+				ctor_var.data.numeric_value = (u64) ctor_func;
+				setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+			}
 			{
 				ActionVar proto_var;
 				proto_var.type = ACTION_STACK_VALUE_OBJECT;
 				proto_var.str_size = 0;
 				proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
 				setProperty(app_context, obj, "__proto__", 9, &proto_var);
-			}
-			else
-			{
-				// No explicit prototype — link to Object.prototype so toString works
-				setObjectProto(app_context, obj);
 			}
 
 			// Call the constructor with 'this' binding
@@ -6917,7 +7001,25 @@ void actionNewMethod(SWFAppContext* app_context)
 		// Create new object for 'this' context
 		ASObject* new_obj_inst = allocObject(app_context, 8);
 
-		// TODO: Set up prototype chain (new_obj.__proto__ = func.prototype)
+		// Set up prototype chain (new_obj.__proto__ = func.prototype)
+		if (user_ctor_func->prototype_obj == NULL)
+		{
+			user_ctor_func->prototype_obj = allocObject(app_context, 4);
+			retainObject(user_ctor_func->prototype_obj);
+			setObjectProto(app_context, user_ctor_func->prototype_obj);
+			ActionVar ctor_v;
+			ctor_v.type = ACTION_STACK_VALUE_FUNCTION;
+			ctor_v.str_size = 0;
+			ctor_v.data.numeric_value = (u64) user_ctor_func;
+			setProperty(app_context, user_ctor_func->prototype_obj, "constructor", 11, &ctor_v);
+		}
+		{
+			ActionVar proto_v;
+			proto_v.type = ACTION_STACK_VALUE_OBJECT;
+			proto_v.str_size = 0;
+			proto_v.data.numeric_value = (u64) user_ctor_func->prototype_obj;
+			setProperty(app_context, new_obj_inst, "__proto__", 9, &proto_v);
+		}
 
 		// Call function as constructor with 'this' binding
 		ActionVar return_value;
@@ -7774,9 +7876,28 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 			else
 			{
-				// Wrap number/boolean/string in an object with valueOf property
-				ASObject* wrapper = allocObject(app_context, 4);
+				// Object(primitive) returns a wrapper object with valueOf and toString
+				if (!g_wrapper_toString_init)
+				{
+					memset(&g_wrapper_toString_func, 0, sizeof(ASFunction));
+					strncpy(g_wrapper_toString_func.name, "toString", 255);
+					g_wrapper_toString_func.function_type = 2;
+					g_wrapper_toString_func.param_count = 0;
+					g_wrapper_toString_func.register_count = 0;
+					g_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_wrapper_toString;
+					if (function_count < MAX_FUNCTIONS)
+						function_registry[function_count++] = &g_wrapper_toString_func;
+					g_wrapper_toString_init = 1;
+				}
+				ASObject* wrapper = allocObject(app_context, 8);
+				setObjectProto(app_context, wrapper);
 				setProperty(app_context, wrapper, "valueOf", 7, arg);
+				// Set toString function that returns the primitive's string form
+				ActionVar ts_func_var;
+				ts_func_var.type = ACTION_STACK_VALUE_FUNCTION;
+				ts_func_var.str_size = 0;
+				ts_func_var.data.numeric_value = (u64) &g_wrapper_toString_func;
+				setProperty(app_context, wrapper, "toString", 8, &ts_func_var);
 				if (args != NULL) FREE(args);
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)wrapper);
 			}

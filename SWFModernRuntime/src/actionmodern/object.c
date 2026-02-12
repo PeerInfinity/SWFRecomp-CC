@@ -271,7 +271,7 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
  */
 void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value)
 {
-	if (obj == NULL || name == NULL || value == NULL)
+	if (obj == NULL || name == NULL || value == NULL || name_length == 0)
 	{
 		return;
 	}

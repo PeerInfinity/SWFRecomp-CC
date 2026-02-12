@@ -553,25 +553,38 @@ def main():
                 save_incremental()
                 continue
             if rc != 0 and rc not in (-11, 139):
+                crash_status = "runtime_error"
+                crash_detail = f"exit code {rc}"
                 stats["runtime_error"] += 1
-                fail_list.append(name)
-                fail_details[name] = f"runtime error (rc={rc})"
-                entry.update(status="runtime_error", detail=f"exit code {rc}",
-                             duration=round(time.monotonic() - test_start, 2))
-                test_results.append(entry)
-                if args.verbose:
-                    print(f"RUNTIME_ERROR(rc={rc})")
-                save_incremental()
-                continue
-            if rc in (-11, 139):
+            elif rc in (-11, 139):
+                crash_status = "segfault"
+                crash_detail = "SIGSEGV"
                 stats["runtime_segfault"] += 1
+            else:
+                crash_status = None
+
+            if crash_status is not None:
                 fail_list.append(name)
-                fail_details[name] = "runtime segfault"
-                entry.update(status="segfault", detail="SIGSEGV",
+                fail_details[name] = f"{crash_status} ({crash_detail})"
+                entry.update(status=crash_status, detail=crash_detail,
                              duration=round(time.monotonic() - test_start, 2))
+                # Still compare output even for crashing tests
+                if raw_output and raw_output.strip():
+                    crash_actual = filter_output(raw_output)
+                    crash_expected = (test_dir / "output.txt").read_text().replace("\r\n", "\n").rstrip("\n")
+                    crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected)
+                    entry["lines"] = crash_line_stats
+                    if crash_match:
+                        entry["detail"] += " (output matches)"
+                    if args.diff:
+                        fail_diffs[name] = format_diff(crash_actual, crash_expected)
                 test_results.append(entry)
                 if args.verbose:
-                    print("SEGFAULT")
+                    line_info = ""
+                    if "lines" in entry:
+                        ls = entry["lines"]
+                        line_info = f" [{ls.get('matched',0)}/{ls.get('expected',0)} lines]"
+                    print(f"{crash_status.upper()}{line_info}")
                 save_incremental()
                 continue
 
