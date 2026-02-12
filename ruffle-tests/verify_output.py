@@ -245,11 +245,13 @@ def compare_output(actual, expected):
     actual_lines = actual.split("\n")
     expected_lines = expected.rstrip("\n").split("\n")
 
-    # Strip leading/trailing blank lines from expected (same as filter_output does for actual)
-    while expected_lines and expected_lines[0].strip() == "":
-        expected_lines.pop(0)
-    while expected_lines and expected_lines[-1].strip() == "":
-        expected_lines.pop()
+    # Strip leading/trailing blank lines from both (filter_output strips actual,
+    # but split() can re-introduce a trailing empty element; treat both the same)
+    for lines in (actual_lines, expected_lines):
+        while lines and lines[0].strip() == "":
+            lines.pop(0)
+        while lines and lines[-1].strip() == "":
+            lines.pop()
 
     max_lines = max(len(actual_lines), len(expected_lines))
     matching = sum(
