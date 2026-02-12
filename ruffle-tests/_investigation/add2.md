@@ -10,110 +10,110 @@ A `testAdd(a, b)` function is called for each pair. It calls `ToPrimitive` on ea
 (checking for a `name` property to print a label), performs `a + b` and `b + a`, and traces the
 results.
 
-### SWFRecomp result: 86/118 blocks match (72.9%)
+### SWFRecomp result: PASS (fixed in commit 79c7aee)
+
+Previously: 86/118 blocks match (72.9%)
 
 ---
 
-## Issue Categories
+## Issues Found and Fixed
 
 ### 1. `_root` variable resolves to `undefined` instead of MovieClip (14 blocks)
 
-The bytecode pushes `"_root"` and calls `actionGetVariable`. The runtime returns `undefined`
+The bytecode pushes `"_root"` and calls `actionGetVariable`. The runtime returned `undefined`
 instead of the root MovieClip reference. In Flash, `_root` converts to the string `"_level0"`.
 
-**Where the fix goes**: `actionGetVariable` (action.c:3123-3139). The special-variable handling
-already checks for `"this"` and returns `root_movieclip`, but `"_root"` is not handled.
+**Fix**: Added `"_root"` and `"_level0"` to the special variable handling in `actionGetVariable`,
+returning `ACTION_STACK_VALUE_MOVIECLIP` with `&root_movieclip`. Also separated MovieClip from
+Object/Array in `convertString` so it renders as `"_level0"` instead of `"[object Object]"`.
 
-**Note**: There's already a check for `"this"` that returns `ACTION_STACK_VALUE_MOVIECLIP`. Need
-to add the same for `"_root"` and `"_level0"`.
+### 2-5. actionAdd2 ToPrimitive semantics (18 blocks combined)
 
-### 2. Object-to-primitive conversion order is wrong — left-to-right instead of right-to-left (8 blocks)
+Issues 2-5 all stemmed from the same architectural problem: the original `actionAdd2` checked
+raw stack types to decide string-vs-numeric BEFORE calling valueOf/toString on objects.
 
-Flash's `Add2` evaluates `ToPrimitive` on the **right** operand first, then the left. This is
-observable when valueOf has side effects (like `trace()`). The current implementation evaluates
-left first (deeper on stack).
-
-**Expected order (from test output)**:
-
-```
-// objValue1 + objValue2:  prints objValue2.valueOf, then objValue1.valueOf
-// objValue2 + objValue1:  prints objValue1.valueOf, then objValue2.valueOf
-```
-
-So for `a + b`, Flash calls `ToPrimitive(b)` first, then `ToPrimitive(a)`.
-
-**Where the fix goes**: `actionAdd2` (action.c:1170). The function currently peeks at types,
-then branches into string-concat or numeric. The numeric path pops right, converts left, then
-converts right. Both paths need to ToPrimitive both operands in right-to-left order BEFORE
-deciding string vs numeric.
-
-### 3. String operand bypasses ToPrimitive on the other operand (2 blocks)
-
-When one operand is a string and the other is an object, the current code goes directly to
-the string concatenation path (line 1180: `if type_a == STRING || type_b == STRING`). This
-converts the object via `convertString` which produces `"[object Object]"` — but it should
-instead call `ToPrimitive` first, which would invoke `valueOf` and get a numeric/string result.
-
-**Example**: `objValue1 + "abc"` should call `objValue1.valueOf()` (returns 1), then
-`"1" + "abc"` = `"1abc"`. Instead it gets `"[object Object]abc"`.
-
-**Root cause**: The type check at line 1180 happens before `ToPrimitive` is called on objects.
-Per the ECMAScript/Flash spec for `Add2`:
-
-1. Call `ToPrimitive(a)` and `ToPrimitive(b)` — right operand first in Flash
-2. If EITHER result is a string, do string concatenation
-3. Otherwise, do numeric addition
-
-### 4. valueOf returning string triggers numeric path instead of string concat (6 blocks)
-
-`objValue2.valueOf` returns the string `"xyz"`. After `ToPrimitive`, the result is a string.
-The current numeric path doesn't re-check types after ToPrimitive — it blindly does
-`convertFloat` which turns `"xyz"` into `NaN`.
-
-**Root cause**: Same as #3 — ToPrimitive must happen first, THEN the string-vs-numeric
-decision must be made based on the ToPrimitive results.
-
-### 5. No toString fallback when valueOf returns a non-primitive (2 blocks)
-
-`objValue3.valueOf` returns a new empty Object (non-primitive). Per the spec, `ToPrimitive`
-should then fall back to `toString()`. The current `objectToPrimitive` function DOES have a
-toString fallback (line 272), but the issue is that it's not being reached in the Add2 context
-because the string/numeric path decision happens before ToPrimitive.
+**Fix**: Complete rewrite of `actionAdd2`. See "Flash Add2 Algorithm" below for details.
 
 ---
 
-## Root Cause Summary
+## Flash Add2 Algorithm (key finding)
 
-All issues 2-5 stem from the same architectural problem in `actionAdd2`:
+Flash's `+` operator does NOT follow a clean "ToPrimitive → check → convert" flow. It has a
+more nuanced algorithm that was discovered by analyzing the side-effect trace patterns:
 
-**Current flow:**
-1. Peek at raw types on stack
-2. If either is STRING → string concat path (convert both via `convertString`)
-3. Else → numeric path (convert both via `convertFloat`)
+### Algorithm
 
-**Correct flow (per ECMAScript/Flash spec):**
-1. Pop both operands
-2. Call `ToPrimitive` on each (right operand first for Flash evaluation order)
-3. If either ToPrimitive result is a string → string concatenation
-4. Else → numeric addition
+1. **Pop both operands** from the stack (right = top, left = second)
+2. **Call valueOf on each object operand** (right first, then left — Flash's evaluation order)
+3. **Check if string path**: if either raw type OR valueOf result is a string → string concatenation
+4. **String path** — for each operand:
+   - Non-object: `convertString` directly
+   - Object with primitive valueOf result: convert that primitive to string
+   - Object with non-primitive valueOf result: call `toString`. If returns STRING → use it.
+     Otherwise → `"[type Object]"` fallback
+   - Object with no valueOf: `convertString` on original → `"[object Object]"`
+5. **Numeric path** — for each operand:
+   - Object with primitive valueOf result: use that result (no second valueOf call)
+   - Object with non-primitive valueOf or no valueOf: push ORIGINAL and `convertFloat`
+     (which calls valueOf again — this is the "double valueOf" behavior)
+   - Non-object: push and `convertFloat` normally
 
-The `objectToPrimitive` function already handles valueOf→toString fallback correctly. It just
-needs to be called at the right point in the `actionAdd2` pipeline.
+### Key observations
 
-## What Would Be Needed to Fix
+- **valueOf is called in the initial check phase** (step 2), and if it returned a non-primitive,
+  **valueOf is called AGAIN** in the numeric path via `convertFloat`. This "double valueOf" is
+  intentional Flash behavior, observable via side effects.
+- **valueOf returning a primitive skips the second call**: if valueOf returned a primitive (even
+  non-numeric like `undefined`), the numeric path uses that result directly — no second valueOf.
+- **String path uses toString as fallback**: when valueOf returned non-primitive AND toString
+  returns a non-string → `"[type Object]"`. When no valueOf exists at all → `"[object Object]"`.
+- **Evaluation order is right-to-left**: for `a + b`, valueOf(b) is called first, then valueOf(a).
 
-### For `_root` / `_level0` (issue 1):
-Add `"_root"` and `"_level0"` to the special variable handling in `actionGetVariable`, returning
-`ACTION_STACK_VALUE_MOVIECLIP` with `&root_movieclip`. Also need `_root` MovieClip to convert
-to string `"_level0"` when used in string context (in `convertString`).
+### Evidence from test output
 
-### For ToPrimitive ordering and string-vs-numeric decision (issues 2-5):
-Rewrite `actionAdd2` to:
-1. Pop right operand (a), pop left operand (b)
-2. Call `objectToPrimitive(a)` — this invokes valueOf/toString with proper fallback
-3. Call `objectToPrimitive(b)`
-4. If either result is a string → concatenate as strings
-5. Else → convert both to numbers and add
+```
+// objValue1 + objValue3 (valueOf returns Object, valueOf returns 1)
+objValue3.valueOf        ← step 2: valueOf(right=objValue3) → Object (non-primitive)
+objValue1.valueOf        ← step 2: valueOf(left=objValue1) → 1 (primitive)
+objValue3.valueOf        ← step 5: numeric path, convertFloat on original → valueOf again
+NaN                      ← 1 + NaN = NaN
 
-This requires `objectToPrimitive` to be usable from `actionAdd2`, which it already is (it's
-a static function in the same file).
+// objValue2 + objValue3 (valueOf returns "xyz", valueOf returns Object)
+objValue3.valueOf        ← step 2: valueOf(right=objValue3) → Object (non-primitive)
+objValue2.valueOf        ← step 2: valueOf(left=objValue2) → "xyz" (string!)
+objValue3.toString       ← step 4: string path, toString fallback for non-primitive valueOf
+xyz[type Object]         ← "xyz" + "[type Object]" (toString returned non-string)
+```
+
+---
+
+## Helper functions added
+
+- `objectCallValueOf(app_context, obj_var, &found)` — calls just valueOf, returns raw result
+  (even non-primitive). Sets `found=1` if valueOf existed and was called.
+- `objectCallToString(app_context, obj_var)` — calls just toString, returns raw result.
+
+These are distinct from `objectToPrimitive` which does the full valueOf→toString chain. The
+Add2 operator needs them separately because:
+- It needs to know if valueOf was found (to distinguish `[type Object]` vs `[object Object]`)
+- It needs valueOf results before deciding string-vs-numeric path
+- It may need to call valueOf again in the numeric path (via convertFloat on original)
+
+---
+
+## Other runtime issues discovered
+
+### convertString STACK_TOP_N bug
+
+When `convertString` converts a non-string type (F32, boolean, etc.) to STRING, it writes the
+string pointer to `STACK_TOP_VALUE` but does NOT update `STACK_TOP_N` (the length field at
+SP+8). The PUSH macro also doesn't initialize SP+8 for non-string types. This means reading
+`STACK_TOP_N` after convertString on a converted value gives garbage data.
+
+**Rule**: Always use `strlen()` to get string length after `convertString`, never `STACK_TOP_N`,
+unless the value was originally pushed as a STRING type (which sets N correctly via PUSH_STR_ID).
+
+### MovieClip string representation
+
+MovieClip should convert to `"_level0"` in string context, not `"[object Object]"`. Fixed by
+separating `ACTION_STACK_VALUE_MOVIECLIP` from the Object/Array case in `convertString`.

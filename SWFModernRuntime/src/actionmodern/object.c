@@ -321,8 +321,9 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	// Check if we need to grow the property array
 	if (obj->num_used >= obj->num_properties)
 	{
-		// Grow by 50% or at least 4 slots
-		u32 new_capacity = obj->num_properties == 0 ? 4 : (obj->num_properties * 3) / 2;
+		// Grow by 50% or at least 4 slots, ensuring at least +1
+		u32 grow = (obj->num_properties * 3) / 2;
+		u32 new_capacity = grow > obj->num_properties + 1 ? grow : obj->num_properties + 4;
 		ASProperty* new_props = (ASProperty*) realloc(obj->properties,
 		                                               sizeof(ASProperty) * new_capacity);
 		if (new_props == NULL)

@@ -69,6 +69,13 @@ jobs:
             python3 ruffle-tests/filter_results.py ruffle-tests/results.json ruffle-tests/results_filtered.json
           fi
 
+      - name: Generate markdown reports
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 scripts/generate_ruffle_results_markdown.py
+          fi
+
       - name: Generate step summary
         if: always()
         run: |
@@ -112,6 +119,8 @@ jobs:
           path: |
             ruffle-tests/results.json
             ruffle-tests/results_filtered.json
+            ruffle-results.md
+            ruffle-results-filtered.md
           retention-days: 90
           if-no-files-found: ignore
 
@@ -125,6 +134,8 @@ jobs:
 
           cp ruffle-tests/results.json /tmp/results.json
           cp ruffle-tests/results_filtered.json /tmp/results_filtered.json 2>/dev/null || true
+          cp ruffle-results.md /tmp/ruffle-results.md 2>/dev/null || true
+          cp ruffle-results-filtered.md /tmp/ruffle-results-filtered.md 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -135,8 +146,11 @@ jobs:
           mkdir -p ruffle-tests
           cp /tmp/results.json ruffle-tests/results.json
           cp /tmp/results_filtered.json ruffle-tests/results_filtered.json 2>/dev/null || true
+          cp /tmp/ruffle-results.md ruffle-results.md 2>/dev/null || true
+          cp /tmp/ruffle-results-filtered.md ruffle-results-filtered.md 2>/dev/null || true
           git add -f ruffle-tests/results.json ruffle-tests/results_filtered.json 2>/dev/null
           git add -f ruffle-tests/results.json
+          git add -f ruffle-results.md ruffle-results-filtered.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -332,6 +346,13 @@ jobs:
             python3 ruffle-tests/filter_results.py ruffle-tests/results.json ruffle-tests/results_filtered.json
           fi
 
+      - name: Generate markdown reports
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 scripts/generate_ruffle_results_markdown.py
+          fi
+
       - name: Generate step summary
         if: always()
         run: |
@@ -376,6 +397,8 @@ jobs:
           path: |
             ruffle-tests/results.json
             ruffle-tests/results_filtered.json
+            ruffle-results.md
+            ruffle-results-filtered.md
           retention-days: 90
           if-no-files-found: ignore
 
@@ -389,6 +412,8 @@ jobs:
 
           cp ruffle-tests/results.json /tmp/results.json
           cp ruffle-tests/results_filtered.json /tmp/results_filtered.json 2>/dev/null || true
+          cp ruffle-results.md /tmp/ruffle-results.md 2>/dev/null || true
+          cp ruffle-results-filtered.md /tmp/ruffle-results-filtered.md 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -399,8 +424,11 @@ jobs:
           mkdir -p ruffle-tests
           cp /tmp/results.json ruffle-tests/results.json
           cp /tmp/results_filtered.json ruffle-tests/results_filtered.json 2>/dev/null || true
+          cp /tmp/ruffle-results.md ruffle-results.md 2>/dev/null || true
+          cp /tmp/ruffle-results-filtered.md ruffle-results-filtered.md 2>/dev/null || true
           git add -f ruffle-tests/results.json ruffle-tests/results_filtered.json 2>/dev/null
           git add -f ruffle-tests/results.json
+          git add -f ruffle-results.md ruffle-results-filtered.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
             echo "No changes to commit"

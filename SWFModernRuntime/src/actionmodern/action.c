@@ -108,12 +108,68 @@ typedef struct ASFunction {
 	Function2Ptr advanced_func;
 	u8 register_count;
 	u16 flags;
+
+	// Prototype object (for constructor usage)
+	ASObject* prototype_obj;  // Created lazily on first access
 } ASFunction;
 
 // Function registry
 #define MAX_FUNCTIONS 256
 static ASFunction* function_registry[MAX_FUNCTIONS];
 static u32 function_count = 0;
+
+// Global Object.prototype with built-in toString returning "[object Object]"
+static ASObject* g_object_prototype = NULL;
+static ASFunction g_object_toString_func;
+
+static ActionVar builtin_object_toString(SWFAppContext* app_context)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 15;
+	ret.data.numeric_value = (u64) "[object Object]";
+	return ret;
+}
+
+// Get or create the global Object.prototype
+static ASObject* getObjectPrototype(SWFAppContext* app_context)
+{
+	if (g_object_prototype == NULL)
+	{
+		g_object_prototype = allocObject(app_context, 4);
+		retainObject(g_object_prototype);
+
+		// Set up the built-in toString function
+		memset(&g_object_toString_func, 0, sizeof(ASFunction));
+		strncpy(g_object_toString_func.name, "toString", 255);
+		g_object_toString_func.function_type = 1;
+		g_object_toString_func.param_count = 0;
+		g_object_toString_func.simple_func = (SimpleFunctionPtr) builtin_object_toString;
+
+		// Register in function registry so lookupFunctionFromVar can find it
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_toString_func;
+
+		// Set toString property on Object.prototype
+		ActionVar ts_var;
+		ts_var.type = ACTION_STACK_VALUE_FUNCTION;
+		ts_var.str_size = 0;
+		ts_var.data.numeric_value = (u64) &g_object_toString_func;
+		setProperty(app_context, g_object_prototype, "toString", 8, &ts_var);
+	}
+	return g_object_prototype;
+}
+
+// Set __proto__ to Object.prototype on a user-created object
+static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
+{
+	ASObject* proto = getObjectPrototype(app_context);
+	ActionVar proto_var;
+	proto_var.type = ACTION_STACK_VALUE_OBJECT;
+	proto_var.str_size = 0;
+	proto_var.data.numeric_value = (u64) proto;
+	setProperty(app_context, obj, "__proto__", 9, &proto_var);
+}
 
 // Helper to look up function by name
 static ASFunction* lookupFunctionByName(const char* name, u32 name_len) {
@@ -243,11 +299,13 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 				return result;
 			}
 		}
-		// valueOf is a stored primitive value
+		// valueOf is a stored primitive value (including undefined/null from explicit assignment)
 		else if (valueOf_prop->type == ACTION_STACK_VALUE_F32 ||
 		         valueOf_prop->type == ACTION_STACK_VALUE_F64 ||
 		         valueOf_prop->type == ACTION_STACK_VALUE_STRING ||
-		         valueOf_prop->type == ACTION_STACK_VALUE_BOOLEAN)
+		         valueOf_prop->type == ACTION_STACK_VALUE_BOOLEAN ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_UNDEFINED ||
+		         valueOf_prop->type == ACTION_STACK_VALUE_NULL)
 		{
 			*found = 1;
 			return *valueOf_prop;
@@ -257,8 +315,10 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 }
 
 // Call just toString on an object. Returns the raw result.
-static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var)
+// If found is non-NULL, sets *found = 1 if toString existed and was called, 0 otherwise.
+static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found)
 {
+	if (found) *found = 0;
 	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
 	if (obj == NULL)
 	{
@@ -273,6 +333,7 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		ASFunction* func = lookupFunctionFromVar(toString_prop);
 		if (func != NULL)
 		{
+			if (found) *found = 1;
 			ActionVar result;
 			if (func->function_type == 2 && func->advanced_func != NULL)
 			{
@@ -1356,7 +1417,7 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		else if (b_vo_found)
 		{
 			// valueOf was found but returned non-primitive — try toString
-			ActionVar ts = objectCallToString(app_context, &b_raw);
+			ActionVar ts = objectCallToString(app_context, &b_raw, NULL);
 			if (ts.type == ACTION_STACK_VALUE_STRING)
 			{
 				str_b_ptr = (const char*) ts.data.numeric_value;
@@ -1370,12 +1431,27 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
-			// No valueOf found — use default object string representation
-			pushVar(app_context, &b_raw);
-			convertString(app_context, str_b_buf);
-			str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
-			POP();
-			len_b = str_b_ptr ? strlen(str_b_ptr) : 0;
+			// No valueOf found — try toString before falling back to convertString
+			int ts_found = 0;
+			ActionVar ts = objectCallToString(app_context, &b_raw, &ts_found);
+			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			{
+				str_b_ptr = (const char*) ts.data.numeric_value;
+				len_b = ts.str_size ? ts.str_size : (str_b_ptr ? strlen(str_b_ptr) : 0);
+			}
+			else if (ts_found)
+			{
+				str_b_ptr = "[type Object]";
+				len_b = 13;
+			}
+			else
+			{
+				pushVar(app_context, &b_raw);
+				convertString(app_context, str_b_buf);
+				str_b_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+				POP();
+				len_b = str_b_ptr ? strlen(str_b_ptr) : 0;
+			}
 		}
 
 		// Get string for right operand (a)
@@ -1397,7 +1473,7 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (a_vo_found)
 		{
-			ActionVar ts = objectCallToString(app_context, &a_raw);
+			ActionVar ts = objectCallToString(app_context, &a_raw, NULL);
 			if (ts.type == ACTION_STACK_VALUE_STRING)
 			{
 				str_a_ptr = (const char*) ts.data.numeric_value;
@@ -1411,11 +1487,27 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
-			pushVar(app_context, &a_raw);
-			convertString(app_context, str_a_buf);
-			str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
-			POP();
-			len_a = str_a_ptr ? strlen(str_a_ptr) : 0;
+			// No valueOf found — try toString before falling back to convertString
+			int ts_found = 0;
+			ActionVar ts = objectCallToString(app_context, &a_raw, &ts_found);
+			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			{
+				str_a_ptr = (const char*) ts.data.numeric_value;
+				len_a = ts.str_size ? ts.str_size : (str_a_ptr ? strlen(str_a_ptr) : 0);
+			}
+			else if (ts_found)
+			{
+				str_a_ptr = "[type Object]";
+				len_a = 13;
+			}
+			else
+			{
+				pushVar(app_context, &a_raw);
+				convertString(app_context, str_a_buf);
+				str_a_ptr = (const char*) VAL(u64, &STACK_TOP_VALUE);
+				POP();
+				len_a = str_a_ptr ? strlen(str_a_ptr) : 0;
+			}
 		}
 
 		// Concatenate (left + right = b + a)
@@ -1675,36 +1767,27 @@ void actionLess2(SWFAppContext* app_context)
 	ActionVar left;
 	popVar(app_context, &left);
 
-	// Track which operands were objects
-	int left_was_obj = (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY);
-	int right_was_obj = (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY);
-
-	// Convert objects to primitives (left first for correct valueOf evaluation order)
-	// Distinguish "no valueOf found" (conversion failed → false) from
-	// "valueOf returned undefined" (conversion succeeded → use undefined in comparison)
-	if (left_was_obj)
+	// Convert object operands via valueOf only (number hint — no toString fallback)
+	if (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY)
 	{
-		int left_ok = 1;
-		ActionVar prim = objectToPrimitive(app_context, &left, &left_ok);
-		if (!left_ok)
+		int vo_found = 0;
+		ActionVar vo = objectCallValueOf(app_context, &left, &vo_found);
+		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
+		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
 		{
-			// Left has no valueOf/toString at all — return false immediately
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
-			return;
+			left = vo;
 		}
-		left = prim;
+		// else: no valueOf or returned non-primitive → numeric path gives NaN
 	}
-	if (right_was_obj)
+	if (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY)
 	{
-		int right_ok = 1;
-		ActionVar prim = objectToPrimitive(app_context, &right, &right_ok);
-		if (!right_ok)
+		int vo_found = 0;
+		ActionVar vo = objectCallValueOf(app_context, &right, &vo_found);
+		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
+		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
 		{
-			// Right has no valueOf/toString — return false
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
-			return;
+			right = vo;
 		}
-		right = prim;
 	}
 
 	// If both are strings, lexicographic comparison
@@ -1755,69 +1838,73 @@ void actionLess2(SWFAppContext* app_context)
 void actionGreater(SWFAppContext* app_context)
 {
 	// ActionGreater (0x67) — SWF6+ only
-	// If both operands are strings, do lexicographic comparison.
-	// Otherwise, convert to numbers and compare.
-	ActionStackValueType a_type = STACK_TOP_TYPE;
+	// Pop both, convert objects via valueOf (number hint), then compare.
+	ActionVar right;
+	popVar(app_context, &right);
+	ActionVar left;
+	popVar(app_context, &left);
 
-	// Check if top of stack is a string (but we need to check both operands)
-	// Peek at both types before popping
-	int both_strings = 0;
-	if (a_type == ACTION_STACK_VALUE_STRING || a_type == ACTION_STACK_VALUE_STR_LIST)
+	// Convert object operands via valueOf only (number hint — no toString fallback)
+	if (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY)
 	{
-		// Peek at second operand's type
-		u32 a_old_sp = VAL(u32, &STACK[SP + 4]);
-		ActionStackValueType b_type = STACK[a_old_sp];
-		if (b_type == ACTION_STACK_VALUE_STRING || b_type == ACTION_STACK_VALUE_STR_LIST)
-			both_strings = 1;
+		int vo_found = 0;
+		ActionVar vo = objectCallValueOf(app_context, &left, &vo_found);
+		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
+		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		{
+			left = vo;
+		}
+	}
+	if (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		int vo_found = 0;
+		ActionVar vo = objectCallValueOf(app_context, &right, &vo_found);
+		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
+		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		{
+			right = vo;
+		}
 	}
 
-	if (both_strings)
+	// If both are strings, lexicographic comparison
+	int left_is_str = (left.type == ACTION_STACK_VALUE_STRING || left.type == ACTION_STACK_VALUE_STR_LIST);
+	int right_is_str = (right.type == ACTION_STACK_VALUE_STRING || right.type == ACTION_STACK_VALUE_STR_LIST);
+
+	if (left_is_str && right_is_str)
 	{
-		// Both operands are strings — lexicographic comparison
-		char a_buf[17];
-		convertString(app_context, a_buf);
-		ActionVar a;
-		popVar(app_context, &a);
+		const char* left_str = (left.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&left.data.numeric_value)[1] :
+			(const char*)left.data.numeric_value;
+		const char* right_str = (right.type == ACTION_STACK_VALUE_STR_LIST) ?
+			(const char*)((u64*)&right.data.numeric_value)[1] :
+			(const char*)right.data.numeric_value;
 
-		char b_buf[17];
-		convertString(app_context, b_buf);
-		ActionVar b;
-		popVar(app_context, &b);
+		if (left_str == NULL) left_str = "";
+		if (right_str == NULL) right_str = "";
 
-		const char* a_str = (a.type == ACTION_STACK_VALUE_STR_LIST) ?
-			(const char*)((u64*)&a.data.numeric_value)[1] :
-			(const char*)a.data.numeric_value;
-		const char* b_str = (b.type == ACTION_STACK_VALUE_STR_LIST) ?
-			(const char*)((u64*)&b.data.numeric_value)[1] :
-			(const char*)b.data.numeric_value;
-
-		if (a_str == NULL) a_str = "";
-		if (b_str == NULL) b_str = "";
-
-		u64 bool_val = (strcmp(b_str, a_str) > 0) ? 1 : 0;
+		u64 bool_val = (strcmp(left_str, right_str) > 0) ? 1 : 0;
 		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 	}
 	else
 	{
 		// Numeric comparison
-		ActionVar a;
+		pushVar(app_context, &right);
 		convertFloat(app_context);
-		popVar(app_context, &a);
+		popVar(app_context, &right);
 
-		ActionVar b;
+		pushVar(app_context, &left);
 		convertFloat(app_context);
-		popVar(app_context, &b);
+		popVar(app_context, &left);
 
-		double a_val = varToDouble(&a);
-		double b_val = varToDouble(&b);
-		if (isnan(a_val) || isnan(b_val))
+		double left_val = varToDouble(&left);
+		double right_val = varToDouble(&right);
+		if (isnan(left_val) || isnan(right_val))
 		{
-			// NaN comparison yields undefined
 			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		}
 		else
 		{
-			u64 bool_val = (b_val > a_val) ? 1 : 0;
+			u64 bool_val = (left_val > right_val) ? 1 : 0;
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 		}
 	}
@@ -2420,39 +2507,78 @@ int strcmp_not_a_list_b(u64 a_value, u64 b_value)
 
 void actionStringEquals(SWFAppContext* app_context, char* a_str, char* b_str)
 {
+	// Pop both raw values first so we can check types before conversion
 	ActionVar a;
-	convertString(app_context, a_str);
 	popVar(app_context, &a);
-	
 	ActionVar b;
-	convertString(app_context, b_str);
 	popVar(app_context, &b);
-	
+
+	// Convert object operands via toString only (string hint — no valueOf fallback)
+	if (a.type == ACTION_STACK_VALUE_OBJECT || a.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		int ts_found = 0;
+		ActionVar ts = objectCallToString(app_context, &a, &ts_found);
+		if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			a = ts;
+		else
+		{
+			a.type = ACTION_STACK_VALUE_STRING;
+			a.data.numeric_value = ts_found ? (u64)"[type Object]" : (u64)"[object Object]";
+		}
+	}
+	if (b.type == ACTION_STACK_VALUE_OBJECT || b.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		int ts_found = 0;
+		ActionVar ts = objectCallToString(app_context, &b, &ts_found);
+		if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			b = ts;
+		else
+		{
+			b.type = ACTION_STACK_VALUE_STRING;
+			b.data.numeric_value = ts_found ? (u64)"[type Object]" : (u64)"[object Object]";
+		}
+	}
+
+	// Convert non-string types to strings via the stack
+	if (a.type != ACTION_STACK_VALUE_STRING && a.type != ACTION_STACK_VALUE_STR_LIST)
+	{
+		pushVar(app_context, &a);
+		convertString(app_context, a_str);
+		popVar(app_context, &a);
+	}
+	if (b.type != ACTION_STACK_VALUE_STRING && b.type != ACTION_STACK_VALUE_STR_LIST)
+	{
+		pushVar(app_context, &b);
+		convertString(app_context, b_str);
+		popVar(app_context, &b);
+	}
+
 	int cmp_result;
-	
+
 	int a_is_list = a.type == ACTION_STACK_VALUE_STR_LIST;
 	int b_is_list = b.type == ACTION_STACK_VALUE_STR_LIST;
-	
+
 	if (a_is_list && b_is_list)
 	{
 		cmp_result = strcmp_list_a_list_b(a.data.numeric_value, b.data.numeric_value);
 	}
-	
 	else if (a_is_list && !b_is_list)
 	{
 		cmp_result = strcmp_list_a_not_b(a.data.numeric_value, b.data.numeric_value);
 	}
-	
 	else if (!a_is_list && b_is_list)
 	{
 		cmp_result = strcmp_not_a_list_b(a.data.numeric_value, b.data.numeric_value);
 	}
-	
 	else
 	{
-		cmp_result = strcmp((char*) a.data.numeric_value, (char*) b.data.numeric_value);
+		const char* sa = (const char*) a.data.numeric_value;
+		const char* sb = (const char*) b.data.numeric_value;
+		if (sa == NULL) sa = "";
+		if (sb == NULL) sb = "";
+		cmp_result = strcmp(sa, sb);
 	}
-	
+
 	u64 result = (cmp_result == 0) ? 1 : 0;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
@@ -2904,10 +3030,35 @@ void actionTrace(SWFAppContext* app_context)
 			break;
 		}
 
-		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			printf("[type Object]\n");
+			// MovieClip traces as its target path
+			// TODO: use actual target path for non-root MovieClips
+			printf("_level0\n");
+			break;
+		}
+
+		case ACTION_STACK_VALUE_OBJECT:
+		{
+			// Flash's trace() calls toString on objects:
+			// - toString found, returns string → print that string
+			//   (e.g. Object.prototype.toString returns "[object Object]")
+			// - toString found, returns non-string → "[type Object]"
+			// - no toString found → "[type Object]"
+			ActionVar obj_var;
+			obj_var.type = STACK_TOP_TYPE;
+			obj_var.data.numeric_value = STACK_TOP_VALUE;
+			int ts_found = 0;
+			ActionVar ts = objectCallToString(app_context, &obj_var, &ts_found);
+			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			{
+				const char* s = (const char*) ts.data.numeric_value;
+				printf("%s\n", s ? s : "");
+			}
+			else
+			{
+				printf("[type Object]\n");
+			}
 			break;
 		}
 
@@ -3983,9 +4134,11 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 
 		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_ARRAY:
-		case ACTION_STACK_VALUE_MOVIECLIP:
-			// Arrays and MovieClips are objects in ActionScript
 			type_str = "object";
+			break;
+
+		case ACTION_STACK_VALUE_MOVIECLIP:
+			type_str = "movieclip";
 			break;
 
 		case ACTION_STACK_VALUE_NULL:
@@ -4598,11 +4751,25 @@ void actionEquals2(SWFAppContext* app_context)
 	}
 	else if (a_is_obj)
 	{
-		a = objectToPrimitive(app_context, &a, NULL);
+		// Convert via valueOf only (number hint — no toString fallback)
+		int vo_found = 0;
+		ActionVar vo = objectCallValueOf(app_context, &a, &vo_found);
+		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
+		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		{
+			a = vo;
+		}
+		// else: leave as object (will likely mismatch types → false)
 	}
 	else if (b_is_obj)
 	{
-		b = objectToPrimitive(app_context, &b, NULL);
+		int vo_found = 0;
+		ActionVar vo = objectCallValueOf(app_context, &b, &vo_found);
+		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
+		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		{
+			b = vo;
+		}
 	}
 
 	float result = 0.0f;
@@ -4790,23 +4957,69 @@ void actionEquals2(SWFAppContext* app_context)
 
 void actionStringGreater(SWFAppContext* app_context)
 {
-
-	// Get first string (arg1)
+	// Pop both operands
 	ActionVar a;
 	popVar(app_context, &a);
-	const char* str_a = (const char*) a.data.numeric_value;
-
-	// Get second string (arg2)
 	ActionVar b;
 	popVar(app_context, &b);
-	const char* str_b = (const char*) b.data.numeric_value;
 
-	// Compare: b > a (using strcmp)
-	// strcmp returns positive if str_b > str_a
-	float result = (strcmp(str_b, str_a) > 0) ? 1.0f : 0.0f;
+	// Convert object operands via toString only (string hint — no valueOf fallback)
+	if (a.type == ACTION_STACK_VALUE_OBJECT || a.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		int ts_found = 0;
+		ActionVar ts = objectCallToString(app_context, &a, &ts_found);
+		if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			a = ts;
+		else
+		{
+			a.type = ACTION_STACK_VALUE_STRING;
+			a.data.numeric_value = ts_found ? (u64)"[type Object]" : (u64)"[object Object]";
+		}
+	}
+	if (b.type == ACTION_STACK_VALUE_OBJECT || b.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		int ts_found = 0;
+		ActionVar ts = objectCallToString(app_context, &b, &ts_found);
+		if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			b = ts;
+		else
+		{
+			b.type = ACTION_STACK_VALUE_STRING;
+			b.data.numeric_value = ts_found ? (u64)"[type Object]" : (u64)"[object Object]";
+		}
+	}
 
-	// Push boolean result
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+	// Convert non-string primitives to strings for comparison
+	char buf_a[17], buf_b[17];
+	const char* str_a;
+	const char* str_b;
+
+	if (a.type == ACTION_STACK_VALUE_STRING)
+		str_a = (const char*) a.data.numeric_value;
+	else
+	{
+		pushVar(app_context, &a);
+		convertString(app_context, buf_a);
+		str_a = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		POP();
+	}
+
+	if (b.type == ACTION_STACK_VALUE_STRING)
+		str_b = (const char*) b.data.numeric_value;
+	else
+	{
+		pushVar(app_context, &b);
+		convertString(app_context, buf_b);
+		str_b = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		POP();
+	}
+
+	if (str_a == NULL) str_a = "";
+	if (str_b == NULL) str_b = "";
+
+	// Compare: b > a
+	u64 result = (strcmp(str_b, str_a) > 0) ? 1 : 0;
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
 
 // ==================================================================
@@ -4961,18 +5174,68 @@ void actionPushRegister(SWFAppContext* app_context, u8 register_num)
 
 void actionStringLess(SWFAppContext* app_context)
 {
-	// Get first string (arg1)
+	// Pop both operands
 	ActionVar a;
 	popVar(app_context, &a);
-	const char* str_a = (const char*) a.data.numeric_value;
-
-	// Get second string (arg2)
 	ActionVar b;
 	popVar(app_context, &b);
-	const char* str_b = (const char*) b.data.numeric_value;
 
-	// Compare: b < a (using strcmp)
-	// strcmp returns negative if str_b < str_a
+	// Convert object operands via toString only (string hint — no valueOf fallback)
+	if (a.type == ACTION_STACK_VALUE_OBJECT || a.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		int ts_found = 0;
+		ActionVar ts = objectCallToString(app_context, &a, &ts_found);
+		if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			a = ts;
+		else
+		{
+			// toString not found or returned non-string → use fallback
+			a.type = ACTION_STACK_VALUE_STRING;
+			a.data.numeric_value = ts_found ? (u64)"[type Object]" : (u64)"[object Object]";
+		}
+	}
+	if (b.type == ACTION_STACK_VALUE_OBJECT || b.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		int ts_found = 0;
+		ActionVar ts = objectCallToString(app_context, &b, &ts_found);
+		if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+			b = ts;
+		else
+		{
+			b.type = ACTION_STACK_VALUE_STRING;
+			b.data.numeric_value = ts_found ? (u64)"[type Object]" : (u64)"[object Object]";
+		}
+	}
+
+	// Convert non-string primitives to strings for comparison
+	char buf_a[17], buf_b[17];
+	const char* str_a;
+	const char* str_b;
+
+	if (a.type == ACTION_STACK_VALUE_STRING)
+		str_a = (const char*) a.data.numeric_value;
+	else
+	{
+		pushVar(app_context, &a);
+		convertString(app_context, buf_a);
+		str_a = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		POP();
+	}
+
+	if (b.type == ACTION_STACK_VALUE_STRING)
+		str_b = (const char*) b.data.numeric_value;
+	else
+	{
+		pushVar(app_context, &b);
+		convertString(app_context, buf_b);
+		str_b = (const char*) VAL(u64, &STACK_TOP_VALUE);
+		POP();
+	}
+
+	if (str_a == NULL) str_a = "";
+	if (str_b == NULL) str_b = "";
+
+	// Compare: b < a
 	u64 result = (strcmp(str_b, str_a) < 0) ? 1 : 0;
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 }
@@ -5559,6 +5822,9 @@ void actionInitObject(SWFAppContext* app_context)
 		setProperty(app_context, obj, name, name_length, &value);
 	}
 
+	// Set __proto__ to Object.prototype for prototype chain inheritance
+	setObjectProto(app_context, obj);
+
 	// Step 4: Push object reference to stack
 	// The object has refcount = 1 from allocation
 	PUSH(ACTION_STACK_VALUE_OBJECT, (u64) obj);
@@ -5770,6 +6036,27 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 		}
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		// Handle function properties (e.g., MyClass.prototype)
+		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+		if (func != NULL && strcmp(prop_name, "prototype") == 0)
+		{
+			// Lazily create prototype object on first access
+			if (func->prototype_obj == NULL)
+			{
+				func->prototype_obj = allocObject(app_context, 4);
+				retainObject(func->prototype_obj);
+				// Set Object.prototype as __proto__ for prototype chain
+				setObjectProto(app_context, func->prototype_obj);
+			}
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+		}
+		else
+		{
+			pushUndefined(app_context);
+		}
+	}
 	else
 	{
 		// Other primitive types (number, undefined, etc.) - push undefined
@@ -5874,6 +6161,7 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle Object constructor
 		// Create empty object with initial capacity
 		ASObject* obj = allocObject(app_context, 8);
+		setObjectProto(app_context, obj);
 		new_obj = obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
@@ -6038,15 +6326,51 @@ void actionNewObject(SWFAppContext* app_context)
 			ASObject* obj = allocObject(app_context, 8);
 			new_obj = obj;
 
+			// Set __proto__ to constructor's prototype (for prototype chain inheritance)
+			if (ctor_func->prototype_obj != NULL)
+			{
+				ActionVar proto_var;
+				proto_var.type = ACTION_STACK_VALUE_OBJECT;
+				proto_var.str_size = 0;
+				proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
+				setProperty(app_context, obj, "__proto__", 9, &proto_var);
+			}
+
 			// Call the constructor with 'this' binding
 			if (ctor_func->function_type == 1)
 			{
 				// DefineFunction (type 1) - simple function
-				// Push 'this' and arguments to stack, call function
-				// Note: Constructor return value is discarded per spec
+				// Set 'this' variable to new object, push args, call constructor
+				if (ctor_func->simple_func != NULL)
+				{
+					// Set 'this' as a local variable so GetVariable("this") finds it
+					ActionVar this_var;
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.str_size = 0;
+					this_var.data.numeric_value = (u64) obj;
+					setVariableByName("this", &this_var);
 
-				// For now, just create the object without calling constructor
-				// Full implementation would require stack manipulation to call constructor
+					// Push arguments onto stack for parameter binding
+					// Arguments are already in args[] in pop order (first arg = args[0])
+					// But DefineFunction binds params by popping, so push in reverse
+					for (int i = (int)num_args - 1; i >= 0; i--)
+					{
+						pushVar(app_context, &args[i]);
+					}
+
+					g_call_depth++;
+					ActionVar return_value;
+					return_value = ((ActionVar(*)(SWFAppContext*))ctor_func->simple_func)(app_context);
+					g_call_depth--;
+
+					// Per ECMAScript spec: if constructor returns object, use it
+					if (return_value.type == ACTION_STACK_VALUE_OBJECT && return_value.data.numeric_value != 0)
+					{
+						releaseObject(app_context, obj);
+						new_obj = (ASObject*) return_value.data.numeric_value;
+						retainObject((ASObject*) new_obj);
+					}
+				}
 			}
 			else if (ctor_func->function_type == 2)
 			{
@@ -7012,6 +7336,7 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	as_func->advanced_func = NULL;
 	as_func->register_count = 0;
 	as_func->flags = 0;
+	as_func->prototype_obj = NULL;
 
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
@@ -7053,6 +7378,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	as_func->advanced_func = func;
 	as_func->register_count = register_count;
 	as_func->flags = flags;
+	as_func->prototype_obj = NULL;
 
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
@@ -8300,8 +8626,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		// Look up the method property
-		ActionVar* method_prop = getProperty(obj, method_name, method_name_len);
+		// Look up the method property (with prototype chain support)
+		ActionVar* method_prop = getPropertyWithPrototype(obj, method_name, method_name_len);
 
 		if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
 		{
@@ -8332,9 +8658,25 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				pushVar(app_context, &result);
 			}
+			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
+			{
+				// Invoke simple function (DefineFunction type 1) as method
+				for (u32 i = 0; i < num_args; i++)
+				{
+					pushVar(app_context, &args[i]);
+				}
+				if (args != NULL) FREE(args);
+
+				g_call_depth++;
+				ActionVar result;
+				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				g_call_depth--;
+
+				pushVar(app_context, &result);
+			}
 			else
 			{
-				// Simple function or invalid - push undefined
+				// Invalid function - push undefined
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}

@@ -95,15 +95,12 @@ The special_count hits 65 after 65 setter calls + 65 recursive calls = 130 trace
 lines. The `SpecialRecursionLimit` error is NOT fatal (unlike `FunctionRecursionLimit`
 with ScriptLimits) — execution continues, so "end" prints as line 131.
 
-### SWFRecomp result: 1 line ("end") — output_mismatch
+### SWFRecomp result: PASS
 
-`addProperty` is not implemented in the runtime. The setter/getter never fire.
-Setting `variable = 5` is a plain variable assignment. Only "end" prints.
-
-### Root causes
-1. `addProperty` (virtual property getter/setter) is not implemented
-2. No concept of "special" recursion counter separate from function call depth
-3. Even if addProperty worked, the mutual recursion semantics would be wrong
+Fixed in commit d84fa66. Implemented `addProperty` with virtual property table,
+`invokeSpecialFunction` helper, and a separate `g_special_depth` counter (limit 66).
+Getter/setter calls increment `g_special_depth` instead of `g_call_depth`. When
+the special limit is hit, returns `undefined` (non-fatal).
 
 ---
 
@@ -139,37 +136,29 @@ instead of calling the getter again. Since this is NOT the fatal
 Note: lines have a leading space: ` // start of getter() function` (this is how
 the original SWF's constant pool stores the string).
 
-### SWFRecomp result: 2 lines ("undefined", "end") — output_mismatch
+### SWFRecomp result: PASS
 
-`addProperty` is not implemented, so `variable` is just an undefined variable.
-`trace(variable)` prints "undefined", then "end" prints.
-
-### Root causes
-1. `addProperty` not implemented (same as test 2)
-2. No special recursion counter
+Fixed in commit d84fa66 (same as test 2).
 
 ---
 
-## Summary of Differences
+## Summary
 
-| Aspect | Flash/Ruffle | SWFRecomp |
-|--------|-------------|-----------|
-| ScriptLimits tag | Sets max_recursion_depth | Stores in `g_max_call_depth` (fixed) |
-| Default max recursion | 255 (Ruffle) / 256 (Flash) | 256 (default, overridden by ScriptLimits) |
-| FunctionRecursionLimit | Fatal — halts all execution | Fatal — sets `g_execution_halted` (fixed) |
-| Special recursion limit | 66, non-fatal — returns undefined | Does not exist |
-| addProperty | Virtual getter/setter on objects | Not implemented |
-| Getter/setter calls | Counted as "Special" (separate counter) | N/A |
+| Test | Status | Fixed In |
+|------|--------|----------|
+| infinite_recursion_function | PASS | 0ed2aef (ScriptLimits, g_execution_halted) |
+| infinite_recursion_function_in_setter | PASS | d84fa66 (addProperty, special recursion counter) |
+| infinite_recursion_virtual_property | PASS | d84fa66 (addProperty, special recursion counter) |
 
-## What Would Be Needed to Fix
+### Implementation details
 
-### For test 1 (infinite_recursion_function): DONE
-All three items implemented in commit 0ed2aef. Test passes.
-
-### For tests 2 and 3 (setter / virtual_property):
-1. Implement `addProperty` builtin on objects — register getter/setter function
-   pairs for named properties
-2. When getting/setting a virtual property, invoke the registered getter/setter
-3. Add a separate "special" recursion counter (limit 66) for getter/setter and
-   other "special" invocations (valueOf, toString, event callbacks)
-4. When special limit is hit, return undefined (non-fatal), don't halt execution
+- **Virtual property table**: `VirtualProperty` struct mapping variable names to getter/setter
+  `ASFunction*` pointers. Checked in `actionGetVariable` and `actionSetVariable` before normal
+  variable lookup.
+- **Special recursion counter**: `g_special_depth` (limit `MAX_SPECIAL_DEPTH=66`), incremented
+  by `invokeSpecialFunction()`. Non-fatal — returns `undefined` when exceeded.
+- **addProperty built-in**: Handled in `actionCallFunction` alongside other built-ins like
+  `ASSetPropFlags`. Returns `true` (1.0f) on success, `false` (0.0f) on failure.
+- **Off-by-one fix**: The counter must be incremented BEFORE the limit check (`g_special_depth++`
+  then check `>= 66`), not checked before incrementing. The latter allows 66 invocations instead
+  of the correct 65.
