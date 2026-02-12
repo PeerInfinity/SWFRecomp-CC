@@ -121,6 +121,9 @@ typedef struct ASFunction {
 
 	// Prototype object (for constructor usage)
 	ASObject* prototype_obj;  // Created lazily on first access
+
+	// Own properties on the function object itself (e.g., toString override)
+	ASObject* own_props;  // Created lazily when SetMember is called
 } ASFunction;
 
 // Function registry
@@ -245,6 +248,90 @@ static ActionVar builtin_object_valueOf(SWFAppContext* app_context, ActionVar* a
 	}
 	return ret;
 }
+
+// Built-in Error.prototype.toString — returns the message property
+static ActionVar builtin_error_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 5;
+	ret.data.numeric_value = (u64) "Error";
+
+	if (this_obj != NULL)
+	{
+		ASObject* obj = (ASObject*) this_obj;
+		ActionVar* msg = getPropertyWithPrototype(obj, "message", 7);
+		if (msg != NULL && msg->type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* s = msg->data.string_data.owns_memory ?
+				msg->data.string_data.heap_ptr : (const char*) msg->data.numeric_value;
+			if (s != NULL)
+			{
+				ret.data.numeric_value = (u64) s;
+				ret.str_size = strlen(s);
+			}
+		}
+	}
+	return ret;
+}
+
+static ASFunction g_error_toString_func;
+
+// Built-in valueOf for primitive wrapper objects (new Object(5))
+static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ret.str_size = 0;
+	ret.data.numeric_value = 0;
+
+	if (this_obj != NULL)
+	{
+		ASObject* obj = (ASObject*) this_obj;
+		ActionVar* prim = getProperty(obj, "valueOf_value", 13);
+		if (prim != NULL)
+			ret = *prim;
+	}
+	return ret;
+}
+
+// Built-in toString for Object(primitive) wrappers — returns primitive value as string
+static ActionVar builtin_prim_wrapper_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 0;
+	ret.data.numeric_value = 0;
+
+	if (this_obj != NULL)
+	{
+		ASObject* obj = (ASObject*) this_obj;
+		ActionVar* prim = getProperty(obj, "valueOf_value", 13);
+		if (prim != NULL)
+		{
+			if (prim->type == ACTION_STACK_VALUE_STRING)
+			{
+				return *prim;
+			}
+			else
+			{
+				// Convert primitive to string
+				static char buf[64];
+				int len = varToStringBuf(app_context, prim, buf, sizeof(buf));
+				ret.data.numeric_value = (u64) buf;
+				ret.str_size = len;
+				return ret;
+			}
+		}
+	}
+	ret.data.numeric_value = (u64) "[object Object]";
+	ret.str_size = 15;
+	return ret;
+}
+
+static ASFunction g_wrapper_valueOf_func;
+static ASFunction g_prim_wrapper_toString_func;
+static int g_wrapper_funcs_init = 0;
 
 // Get or create the global Object.prototype
 static ASObject* getObjectPrototype(SWFAppContext* app_context)
@@ -3821,6 +3908,22 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
 			return;
 		}
+		else if (var_name_len == 5 && strncmp(var_name, "Array", 5) == 0)
+		{
+			// Return the built-in Array constructor as a function
+			static ASFunction g_array_constructor;
+			static int g_array_constructor_init = 0;
+			if (!g_array_constructor_init)
+			{
+				memset(&g_array_constructor, 0, sizeof(ASFunction));
+				strncpy(g_array_constructor.name, "Array", 255);
+				g_array_constructor.function_type = 1;
+				g_array_constructor.param_count = 0;
+				g_array_constructor_init = 1;
+			}
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_array_constructor);
+			return;
+		}
 		else if (var_name_len == 6 && strncmp(var_name, "Object", 6) == 0)
 		{
 			// Return the built-in Object constructor as a function
@@ -3866,8 +3969,9 @@ void actionGetVariable(SWFAppContext* app_context)
 				g_error_constructor.function_type = 1;
 				g_error_constructor.param_count = 0;
 				// Set up prototype with name and message properties
-				g_error_constructor.prototype_obj = allocObject(app_context, 8);
+				g_error_constructor.prototype_obj = allocObject(app_context, 12);
 				retainObject(g_error_constructor.prototype_obj);
+				setObjectProto(app_context, g_error_constructor.prototype_obj);
 				ActionVar name_val = {0};
 				name_val.type = ACTION_STACK_VALUE_STRING;
 				name_val.str_size = 5;
@@ -3878,6 +3982,20 @@ void actionGetVariable(SWFAppContext* app_context)
 				msg_val.str_size = 5;
 				VAL(u64, &msg_val.data.numeric_value) = (u64)"Error";
 				setProperty(app_context, g_error_constructor.prototype_obj, "message", 7, &msg_val);
+
+				// Set up toString method on Error.prototype
+				memset(&g_error_toString_func, 0, sizeof(ASFunction));
+				strncpy(g_error_toString_func.name, "toString", 255);
+				g_error_toString_func.function_type = 2;
+				g_error_toString_func.param_count = 0;
+				g_error_toString_func.advanced_func = (Function2Ptr) builtin_error_toString;
+				if (function_count < MAX_FUNCTIONS)
+					function_registry[function_count++] = &g_error_toString_func;
+				ActionVar ts_val = {0};
+				ts_val.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &ts_val.data.numeric_value) = (u64) &g_error_toString_func;
+				setProperty(app_context, g_error_constructor.prototype_obj, "toString", 8, &ts_val);
+
 				g_error_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_error_constructor);
@@ -6227,6 +6345,16 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 			}
 		}
+		else if (func != NULL)
+		{
+			// Store arbitrary properties on the function's own_props object
+			if (func->own_props == NULL)
+			{
+				func->own_props = allocObject(app_context, 4);
+				retainObject(func->own_props);
+			}
+			setProperty(app_context, func->own_props, prop_name, prop_name_len, &value_var);
+		}
 	}
 	// If it's not an object, array, or function type, we silently ignore the operation
 	// (Flash behavior for setting properties on non-objects)
@@ -6742,9 +6870,50 @@ void actionNewObject(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Primitive (number, string, boolean) → push as-is
-				// Flash wraps but trace still shows primitive value
-				pushVar(app_context, arg);
+				// Primitive (number, string, boolean) → wrap in object
+				// typeof returns "object" but trace still shows primitive value
+				ASObject* wrapper = allocObject(app_context, 8);
+				setObjectProto(app_context, wrapper);
+
+				// Store the primitive value for valueOf/toString
+				ActionVar prim_val;
+				prim_val = *arg;
+				setProperty(app_context, wrapper, "valueOf_value", 13, &prim_val);
+
+				// Lazily init wrapper valueOf/toString functions
+				if (!g_wrapper_funcs_init)
+				{
+					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+					g_wrapper_valueOf_func.function_type = 2;
+					g_wrapper_valueOf_func.param_count = 0;
+					g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+					if (function_count < MAX_FUNCTIONS)
+						function_registry[function_count++] = &g_wrapper_valueOf_func;
+
+					memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+					strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+					g_prim_wrapper_toString_func.function_type = 2;
+					g_prim_wrapper_toString_func.param_count = 0;
+					g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+					if (function_count < MAX_FUNCTIONS)
+						function_registry[function_count++] = &g_prim_wrapper_toString_func;
+
+					g_wrapper_funcs_init = 1;
+				}
+
+				ActionVar vo_val = {0};
+				vo_val.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &vo_val.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
+				setProperty(app_context, wrapper, "valueOf", 7, &vo_val);
+
+				ActionVar ts_val = {0};
+				ts_val.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &ts_val.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
+				setProperty(app_context, wrapper, "toString", 8, &ts_val);
+
+				new_obj = wrapper;
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 				return;
 			}
 		}
@@ -9628,11 +9797,66 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		// Function object - handle toString and valueOf
+		// Function object - handle toString, valueOf, call, apply
+		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+
+		if (method_name_len == 4 && strncmp(method_name, "call", 4) == 0)
+		{
+			// Function.call(thisArg, arg1, arg2, ...)
+			// Skip thisArg (args[0]), pass remaining args to the function
+			if (func != NULL)
+			{
+				u32 call_args = num_args > 1 ? num_args - 1 : 0;
+				// Push args in reverse order (actionCallFunction pops them back)
+				for (int i = (int)num_args - 1; i >= 1; i--)
+					pushVar(app_context, &args[i]);
+				// Push arg count
+				PUSH(ACTION_STACK_VALUE_F64, 0);
+				VAL(double, &STACK_TOP_VALUE) = (double) call_args;
+				// Push function name on top
+				PUSH_STR(func->name, strlen(func->name));
+				if (args != NULL) FREE(args);
+				char buf[17];
+				actionCallFunction(app_context, buf);
+			}
+			else
+			{
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+			return;
+		}
+
 		if (args != NULL) FREE(args);
+
 		if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
 		{
-			// Function.toString() returns "[type Function]"
+			// Check if toString was overridden on this function's own_props
+			if (func != NULL && func->own_props != NULL)
+			{
+				ActionVar* ts_prop = getProperty(func->own_props, "toString", 8);
+				if (ts_prop != NULL)
+				{
+					// toString exists on own_props — if it's undefined, return undefined
+					if (ts_prop->type == ACTION_STACK_VALUE_UNDEFINED)
+					{
+						pushUndefined(app_context);
+						return;
+					}
+					// If it's a function, call it
+					if (ts_prop->type == ACTION_STACK_VALUE_FUNCTION)
+					{
+						ASFunction* ts_func = lookupFunctionFromVar(ts_prop);
+						if (ts_func != NULL && ts_func->function_type == 1 && ts_func->simple_func != NULL)
+						{
+							ActionVar result = ((ActionVar(*)(SWFAppContext*))ts_func->simple_func)(app_context);
+							pushVar(app_context, &result);
+							return;
+						}
+					}
+				}
+			}
+			// Default: Function.toString() returns "[type Function]"
 			ActionVar result;
 			result.type = ACTION_STACK_VALUE_STRING;
 			result.str_size = 15;
