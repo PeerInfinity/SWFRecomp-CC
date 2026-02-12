@@ -1,36 +1,44 @@
 # Ruffle Test Results Diff
 
-**Previous:** `dee8f35ae47f` (2026-02-12T03:55:38.920698+00:00)
-**Current:** `f245517a7d2a` (2026-02-12T17:23:50.449896+00:00)
+**Previous:** `f245517a7d2a` (2026-02-12T17:23:50.449896+00:00)
+**Current:** `89513b9d2880` (2026-02-12T18:43:05.339640+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 81 | 82 | +1 |
+| Passing | 82 | 85 | +3 |
 | Total | 616 | 616 | 0 |
-| Pass rate | 13.1% | 13.3% | +0.2% |
-| Mismatched lines | 56715 | 56616 | -99 |
-|   Decreased | | | -103 |
-|   Increased | | | +4 |
+| Pass rate | 13.3% | 13.8% | +0.5% |
+| Mismatched lines | 56616 | 57241 | +625 |
+|   Decreased | | | -15 |
+|   Increased | | | +640 |
 
-## Newly Passing (1)
+## Newly Passing (3)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `this_swf7` | output_mismatch | 37/41 | 41/41 |
+| `as1_constructor_v7` | output_mismatch | 30/35 | 35/35 |
+| `has_own_property` | output_mismatch | 28/32 | 32/32 |
+| `object_function` | output_mismatch | 29/32 | 32/32 |
+
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `netstream_play_flv_screen` | segfault | compile_fail | - | - |
 
 ## Line Count Changed (10)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `string_coercion` | output_mismatch | 81/117 | 116/117 | -35 |
-| `with` | output_mismatch | 7/49 | 31/49 | -24 |
-| `with_variable_scopes` | output_mismatch | 1/43 | 25/43 | -24 |
-| `set_variable_scope` | output_mismatch | 43/58 | 50/58 | -7 |
-| `this_swf5` | output_mismatch | 15/41 | 19/41 | -4 |
-| `this_swf6` | output_mismatch | 14/41 | 18/41 | -4 |
-| `as1_constructor_v7` | output_mismatch | 29/35 | 30/35 | -1 |
-| `define_local_with_paths` | output_mismatch | 15/54 | 15/54 | 0 |
-| `funky_function_calls` | output_mismatch | 4/56 | 3/56 | +1 |
-| `this_scoping` | output_mismatch | 5/52 | 2/52 | +3 |
+| `as1_constructor_v6` | output_mismatch | 27/35 | 30/35 | -3 |
+| `uncaught_exception` | runtime_error | - | 0/1 | +1 |
+| `uncaught_exception_bubbled` | runtime_error | - | 0/1 | +1 |
+| `duplicate_movie_clip_drawing` | segfault | - | 0/2 | +2 |
+| `array_constructor` | segfault | - | 12/30 | +18 |
+| `array_length` | runtime_error | - | 13/42 | +29 |
+| `enumerate` | segfault | - | 1/64 | +63 |
+| `device_font_spacing` | segfault | - | 0/91 | +91 |
+| `swf4_actions_coercion_order` | segfault | - | 9/158 | +149 |
+| `path_string` | segfault | - | 36/322 | +286 |
