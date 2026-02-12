@@ -4939,9 +4939,8 @@ void actionInstanceOf(SWFAppContext* app_context)
 	// Check if object is an instance of constructor using prototype chain + interfaces
 	int result = checkInstanceOf(&obj_var, &constr_var);
 
-	// Push result as float (1.0 for true, 0.0 for false)
-	float result_val = result ? 1.0f : 0.0f;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result_val));
+	// Push result as boolean
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, result ? 1 : 0);
 }
 
 void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
@@ -8538,6 +8537,90 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		else
 		{
 			// No args or non-string → undefined
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+		builtin_handled = 1;
+	}
+
+	// unescape(string) — URL-decode a string
+	else if (func_name_len == 8 && strncmp(func_name, "unescape", 8) == 0)
+	{
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* src = args[0].data.string_data.owns_memory ?
+				args[0].data.string_data.heap_ptr : (const char*) args[0].data.numeric_value;
+			if (src == NULL) src = "";
+			u32 src_len = strlen(src);
+			// Allocate same size (decoded is always <= encoded)
+			char* buf = (char*) HALLOC(src_len + 1);
+			u32 out = 0;
+			for (u32 i = 0; i < src_len; )
+			{
+				if (src[i] == '%')
+				{
+					// Check for %uXXXX (Unicode escape) — Flash outputs the 4 hex chars literally
+					if (i + 5 < src_len && src[i+1] == 'u' &&
+					    isxdigit((unsigned char)src[i+2]) && isxdigit((unsigned char)src[i+3]) &&
+					    isxdigit((unsigned char)src[i+4]) && isxdigit((unsigned char)src[i+5]))
+					{
+						buf[out++] = src[i+2];
+						buf[out++] = src[i+3];
+						buf[out++] = src[i+4];
+						buf[out++] = src[i+5];
+						i += 6;
+						continue;
+					}
+					// Regular %XX hex escape
+					if (i + 2 < src_len &&
+					    isxdigit((unsigned char)src[i+1]) && isxdigit((unsigned char)src[i+2]))
+					{
+						char hex[3] = { src[i+1], src[i+2], 0 };
+						unsigned long val = strtoul(hex, NULL, 16);
+						buf[out++] = (char) val;
+						i += 3;
+						continue;
+					}
+					// Invalid %XX — Flash strips % + next char(s)
+					// If first char after % is hex, strip 2 chars total after %
+					// If first char after % is not hex, strip 1 char after %
+					i++; // skip %
+					if (i < src_len)
+					{
+						int first_is_hex = isxdigit((unsigned char)src[i]);
+						i++; // skip first char after %
+						if (first_is_hex && i < src_len) i++; // skip second if first was hex
+					}
+					continue;
+				}
+				if (src[i] == '+')
+				{
+					buf[out++] = ' ';
+					i++;
+				}
+				else
+				{
+					buf[out++] = src[i++];
+				}
+			}
+			buf[out] = '\0';
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_STRING;
+			result.str_size = out;
+			result.data.string_data.heap_ptr = buf;
+			result.data.string_data.owns_memory = true;
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &result);
+		}
+		else if (num_args > 0)
+		{
+			// Non-string arg — return undefined
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+		else
+		{
+			// No args
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 		}
