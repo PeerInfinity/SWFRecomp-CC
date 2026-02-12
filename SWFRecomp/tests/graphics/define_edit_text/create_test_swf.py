@@ -12,7 +12,9 @@ from swfmill_helpers import (
     SWFMLBuilder, extract_ttf_glyphs,
 )
 
-TTF_PATH = "/home/robert/projects/Seedling/src/net/flashpunk/graphics/04B_03__.TTF"
+# 04B_03 pixel font from the Flash game "Seedling" by Connor Ullmann & Rekcahdam
+# https://github.com/ConnorUllmann/Seedling
+TTF_PATH = os.path.join(os.path.dirname(__file__), "04B_03__.TTF")
 TEXT = "Hello World"
 
 # Extract glyph outlines from the TTF
