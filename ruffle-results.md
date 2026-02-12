@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-02-12 22:25 UTC
+**Date**: 2026-02-12 23:53 UTC
 
-**Git SHA**: `98b84df526`
+**Git SHA**: `bf6dde7673`
 
-**Run Duration**: 30m 60s
+**Run Duration**: 30m 17s
 
 ## Summary
 
@@ -13,19 +13,18 @@
 | Total tests | 616 |
 | Passing | **101** (16.4%) |
 | Failing | 515 |
-| Total expected lines | 88892 |
-| Matching lines | 32486 (36.5%) |
-| Mismatched lines | 56406 |
+| Total expected lines | 89534 |
+| Matching lines | 32531 (36.3%) |
+| Mismatched lines | 57003 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 493 | 95.7% |
-| Runtime Segfault | 15 | 2.9% |
+| Output Mismatch | 500 | 97.1% |
+| Runtime Segfault | 9 | 1.7% |
 | Timeout | 4 | 0.8% |
 | Runtime Error | 2 | 0.4% |
-| Compile Fail | 1 | 0.2% |
 
 ## Passing Tests
 
@@ -33,107 +32,107 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `access_unnamed_shape` | 1 | 2.6s |  |
-| 2 | `action_to_integer` | 28 | 2.5s |  |
-| 3 | `add` | 28 | 2.4s |  |
+| 1 | `access_unnamed_shape` | 1 | 2.4s |  |
+| 2 | `action_to_integer` | 28 | 2.3s |  |
+| 3 | `add` | 28 | 2.3s |  |
 | 4 | `add2` | 354 | 2.8s | [investigation](ruffle-tests/_investigation/add2.md) |
-| 5 | `add_swf4` | 28 | 2.4s |  |
+| 5 | `add_swf4` | 28 | 2.3s |  |
 | 6 | `add_swf5` | 28 | 2.4s |  |
-| 7 | `array_concat` | 98 | 2.6s |  |
+| 7 | `array_concat` | 98 | 2.5s |  |
 | 8 | `array_constructor` | 30 | 2.4s |  |
 | 9 | `array_properties` | 36 | 2.4s |  |
 | 10 | `array_slice` | 34 | 2.5s |  |
-| 11 | `array_splice` | 207 | 3.2s |  |
-| 12 | `array_trivial` | 209 | 3.0s |  |
-| 13 | `as1_constructor_v6` | 35 | 2.5s |  |
-| 14 | `as1_constructor_v7` | 35 | 2.5s |  |
-| 15 | `as_broadcaster_initialize` | 10 | 2.4s |  |
-| 16 | `as_set_prop_flags_version_swf5` | 1 | 2.4s |  |
-| 17 | `bad_swf_tag_past_eof` | 0 | 2.3s |  |
-| 18 | `bitand` | 1058 | 11.3s |  |
-| 19 | `bitmap_data_colortransform` | 0 | 2.7s |  |
+| 11 | `array_splice` | 207 | 3.1s |  |
+| 12 | `array_trivial` | 209 | 2.9s |  |
+| 13 | `as1_constructor_v6` | 35 | 2.4s |  |
+| 14 | `as1_constructor_v7` | 35 | 2.4s |  |
+| 15 | `as_broadcaster_initialize` | 10 | 2.3s |  |
+| 16 | `as_set_prop_flags_version_swf5` | 1 | 2.3s |  |
+| 17 | `bad_swf_tag_past_eof` | 0 | 2.2s |  |
+| 18 | `bitand` | 1058 | 10.5s |  |
+| 19 | `bitmap_data_colortransform` | 0 | 2.6s |  |
 | 20 | `bitmap_data_fillrect` | 0 | 2.5s |  |
 | 21 | `bitmap_data_perlinnoise` | 0 | 3.1s |  |
-| 22 | `bitmap_data_pixeldissolve_image` | 0 | 2.9s |  |
-| 23 | `bitmapdata_applyfilter_colormatrix` | 0 | 2.4s |  |
-| 24 | `bitor` | 1058 | 11.3s |  |
-| 25 | `biturshift` | 14 | 2.5s |  |
+| 22 | `bitmap_data_pixeldissolve_image` | 0 | 2.8s |  |
+| 23 | `bitmapdata_applyfilter_colormatrix` | 0 | 2.3s |  |
+| 24 | `bitor` | 1058 | 10.5s |  |
+| 25 | `biturshift` | 14 | 2.6s |  |
 | 26 | `biturshift_swf8` | 14 | 2.3s |  |
-| 27 | `bitxor` | 1058 | 11.1s |  |
+| 27 | `bitxor` | 1058 | 10.7s |  |
 | 28 | `catch_references_registers` | 2 | 2.3s |  |
 | 29 | `define_function_case_sensitive` | 2 | 2.3s |  |
 | 30 | `delete` | 3 | 2.4s |  |
 | 31 | `divide_swf4` | 107 | 2.4s |  |
 | 32 | `do_init_action` | 3 | 2.3s |  |
 | 33 | `equals` | 32 | 2.4s |  |
-| 34 | `equals2_swf5` | 926 | 10.3s |  |
-| 35 | `equals2_swf6` | 926 | 10.0s |  |
-| 36 | `equals2_swf7` | 926 | 10.0s |  |
-| 37 | `equals_swf4` | 665 | 5.6s |  |
+| 34 | `equals2_swf5` | 926 | 10.6s |  |
+| 35 | `equals2_swf6` | 926 | 10.4s |  |
+| 36 | `equals2_swf7` | 926 | 10.3s |  |
+| 37 | `equals_swf4` | 665 | 5.7s |  |
 | 38 | `equals_swf4_alt` | 32 | 2.3s |  |
-| 39 | `equals_swf5` | 32 | 2.3s |  |
-| 40 | `error` | 58 | 2.4s |  |
-| 41 | `escape` | 14 | 2.2s |  |
+| 39 | `equals_swf5` | 32 | 2.4s |  |
+| 40 | `error` | 58 | 2.5s |  |
+| 41 | `escape` | 14 | 2.3s |  |
 | 42 | `focusrect_mouse_swf8` | 0 | 2.4s |  |
-| 43 | `focusrect_mouse_swf9` | 0 | 2.3s |  |
+| 43 | `focusrect_mouse_swf9` | 0 | 2.4s |  |
 | 44 | `getproperty` | 28 | 2.4s |  |
 | 45 | `getproperty_swf4` | 28 | 2.4s |  |
-| 46 | `getproperty_swf5` | 28 | 2.4s |  |
-| 47 | `global_array` | 3 | 2.3s |  |
-| 48 | `global_is_bare` | 7 | 2.3s |  |
-| 49 | `goto_execution_order` | 2 | 2.5s |  |
+| 46 | `getproperty_swf5` | 28 | 2.5s |  |
+| 47 | `global_array` | 3 | 2.4s |  |
+| 48 | `global_is_bare` | 7 | 2.4s |  |
+| 49 | `goto_execution_order` | 2 | 2.3s |  |
 | 50 | `goto_rewind1` | 1 | 2.4s |  |
-| 51 | `greater_swf6` | 1175 | 11.6s |  |
+| 51 | `greater_swf6` | 1175 | 11.5s |  |
 | 52 | `greater_swf7` | 1175 | 11.6s |  |
-| 53 | `greaterthan_swf5` | 1 | 2.4s |  |
-| 54 | `greaterthan_swf8` | 1 | 2.4s |  |
+| 53 | `greaterthan_swf5` | 1 | 2.3s |  |
+| 54 | `greaterthan_swf8` | 1 | 2.3s |  |
 | 55 | `has_own_property` | 32 | 2.5s |  |
 | 56 | `infinite_recursion_function` | 4 | 2.4s | [investigation](ruffle-tests/_investigation/infinite_recursion_function.md) |
 | 57 | `infinite_recursion_function_in_setter` | 131 | 2.4s |  |
-| 58 | `infinite_recursion_virtual_property` | 67 | 2.4s |  |
+| 58 | `infinite_recursion_virtual_property` | 67 | 2.3s |  |
 | 59 | `issue_1086` | 1 | 2.3s |  |
-| 60 | `issue_1671` | 0 | 2.4s |  |
-| 61 | `issue_3446` | 1 | 2.4s |  |
-| 62 | `issue_4377` | 2 | 2.4s |  |
-| 63 | `issue_768` | 3 | 2.4s | [investigation](ruffle-tests/_investigation/issue_768.md) |
-| 64 | `lessthan` | 41 | 2.5s |  |
-| 65 | `lessthan2_swf5` | 1226 | 12.2s |  |
+| 60 | `issue_1671` | 0 | 2.3s |  |
+| 61 | `issue_3446` | 1 | 2.3s |  |
+| 62 | `issue_4377` | 2 | 2.3s |  |
+| 63 | `issue_768` | 3 | 2.3s | [investigation](ruffle-tests/_investigation/issue_768.md) |
+| 64 | `lessthan` | 41 | 2.4s |  |
+| 65 | `lessthan2_swf5` | 1226 | 12.0s |  |
 | 66 | `lessthan2_swf6` | 1226 | 12.2s |  |
 | 67 | `lessthan2_swf7` | 1226 | 12.2s |  |
-| 68 | `lessthan_swf4` | 902 | 7.8s |  |
-| 69 | `lessthan_swf4_alt` | 41 | 2.5s |  |
+| 68 | `lessthan_swf4` | 902 | 7.9s |  |
+| 69 | `lessthan_swf4_alt` | 41 | 2.4s |  |
 | 70 | `lessthan_swf5` | 41 | 2.5s |  |
 | 71 | `logical_ops_swf4` | 90 | 2.4s |  |
-| 72 | `logical_ops_swf8` | 108 | 2.5s |  |
+| 72 | `logical_ops_swf8` | 108 | 2.4s |  |
 | 73 | `looping` | 6 | 2.3s |  |
 | 74 | `mask_reapply` | 0 | 2.3s |  |
 | 75 | `mask_with_drawing` | 0 | 2.3s |  |
 | 76 | `movieclip_begin_gradient_fill` | 0 | 3.0s |  |
-| 77 | `movieclip_line_gradient_style` | 0 | 3.1s |  |
-| 78 | `movieclip_prototype_extension` | 5 | 2.3s |  |
-| 79 | `nested_textfields_in_buttons` | 0 | 2.4s |  |
-| 80 | `new_object_enumerate` | 7 | 2.5s |  |
-| 81 | `object_function` | 32 | 2.4s |  |
-| 82 | `object_string_coerce_swf5` | 62 | 2.5s |  |
-| 83 | `prototype_delete` | 12 | 2.5s |  |
+| 77 | `movieclip_line_gradient_style` | 0 | 2.9s |  |
+| 78 | `movieclip_prototype_extension` | 5 | 2.2s |  |
+| 79 | `nested_textfields_in_buttons` | 0 | 2.2s |  |
+| 80 | `new_object_enumerate` | 7 | 2.3s |  |
+| 81 | `object_function` | 32 | 2.3s |  |
+| 82 | `object_string_coerce_swf5` | 62 | 2.4s |  |
+| 83 | `prototype_delete` | 12 | 2.3s |  |
 | 84 | `sandbox_type_local_file` | 1 | 2.3s |  |
-| 85 | `single_frame` | 1 | 2.3s |  |
+| 85 | `single_frame` | 1 | 2.2s |  |
 | 86 | `sound_start_load` | 0 | 2.3s |  |
-| 87 | `strictequals_swf6` | 902 | 8.8s |  |
+| 87 | `strictequals_swf6` | 902 | 8.5s |  |
 | 88 | `strictly_equals` | 7 | 2.4s |  |
 | 89 | `string_coercion` | 117 | 3.0s | [investigation](ruffle-tests/_investigation/string_coercion.md) |
-| 90 | `string_paths_keyevents` | 0 | 2.4s |  |
-| 91 | `string_paths_timer` | 0 | 2.4s |  |
+| 90 | `string_paths_keyevents` | 0 | 2.3s |  |
+| 91 | `string_paths_timer` | 0 | 2.3s |  |
 | 92 | `swf4_actions_bool` | 96 | 2.4s |  |
 | 93 | `swf4_bool` | 4 | 2.3s |  |
 | 94 | `swf5_encoding` | 3 | 2.5s |  |
 | 95 | `this_swf7` | 41 | 2.4s | [investigation](ruffle-tests/_investigation/this_swf7.md) |
 | 96 | `timeline_function_def` | 7 | 2.4s |  |
-| 97 | `try_finally_simple` | 16 | 2.4s |  |
-| 98 | `typeof_globals` | 7 | 2.5s |  |
-| 99 | `undefined_to_string_swf6` | 4 | 2.4s |  |
-| 100 | `unescape` | 43 | 2.8s |  |
-| 101 | `with_return` | 2 | 2.4s |  |
+| 97 | `try_finally_simple` | 16 | 2.3s |  |
+| 98 | `typeof_globals` | 7 | 2.3s |  |
+| 99 | `undefined_to_string_swf6` | 4 | 2.3s |  |
+| 100 | `unescape` | 43 | 2.4s |  |
+| 101 | `with_return` | 2 | 2.3s |  |
 
 ## Near-Passing Tests
 
@@ -247,25 +246,19 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 ## Segfaults
 
-**15 tests** crash with SIGSEGV
+**9 tests** crash with SIGSEGV
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
-| 1 | `as2_oop` | 4.7s |  |
-| 2 | `clip_constructors` | 4.5s |  |
-| 3 | `device_font_spacing` | 11.9s |  |
-| 4 | `duplicate_movie_clip_drawing` | 4.3s |  |
-| 5 | `enumerate` | 4.4s |  |
-| 6 | `extends_chain` | 5.0s |  |
-| 7 | `init_object_order` | 4.4s |  |
-| 8 | `issue_2166` | 4.2s |  |
-| 9 | `loadmovie_registerclass` | 4.4s |  |
-| 10 | `netstream_play_flv_screen` | 32.7s |  |
-| 11 | `path_string` | 4.9s |  |
-| 12 | `register_and_init_order` | 5.2s |  |
-| 13 | `resolve_different_root` | 4.4s |  |
-| 14 | `swf4_actions_coercion_order` | 4.6s |  |
-| 15 | `timer_run_actions` | 4.2s |  |
+| 1 | `as2_oop` | 4.5s |  |
+| 2 | `device_font_spacing` | 12.1s |  |
+| 3 | `duplicate_movie_clip_drawing` | 4.3s |  |
+| 4 | `enumerate` | 4.5s |  |
+| 5 | `extends_chain` | 5.0s |  |
+| 6 | `issue_2166` | 4.5s |  |
+| 7 | `netstream_play_flv_screen` | 30.8s |  |
+| 8 | `path_string` | 4.1s |  |
+| 9 | `swf4_actions_coercion_order` | 4.7s |  |
 
 ## Runtime Errors
 
@@ -273,8 +266,8 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `uncaught_exception` | exit code 1 | 2.7s |  |
-| 2 | `uncaught_exception_bubbled` | exit code 1 | 2.6s |  |
+| 1 | `uncaught_exception` | exit code 1 | 2.3s |  |
+| 2 | `uncaught_exception_bubbled` | exit code 1 | 2.4s |  |
 
 ## Timeouts
 
@@ -282,14 +275,14 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `parse_float` | runtime timeout (>10s) | 13.4s |  |
-| 2 | `placeobject_occupied_depth` | runtime timeout (>10s) | 12.4s |  |
-| 3 | `timeout` | runtime timeout (>10s) | 12.8s |  |
-| 4 | `try_catch_finally` | runtime timeout (>10s) | 13.5s |  |
+| 1 | `parse_float` | runtime timeout (>10s) | 13.3s |  |
+| 2 | `placeobject_occupied_depth` | runtime timeout (>10s) | 12.3s |  |
+| 3 | `timeout` | runtime timeout (>10s) | 12.5s |  |
+| 4 | `try_catch_finally` | runtime timeout (>10s) | 12.8s |  |
 
 ## All Output Mismatches
 
-**493 tests** with output mismatch, sorted by match rate (best first)
+**500 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -462,327 +455,334 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 167 | `mcl_loadclip` | 16.8% | 25/149 | 35 | 149 |  |
 | 168 | `execution_order4` | 16.7% | 2/12 | 10 | 12 |  |
 | 169 | `focusrect_swf5` | 16.7% | 1/6 | 1 | 6 |  |
-| 170 | `as_broadcaster` | 14.6% | 6/41 | 25 | 41 |  |
-| 171 | `color_transform` | 14.6% | 7/48 | 37 | 48 |  |
-| 172 | `file_reference_download_cancel` | 14.3% | 1/7 | 2 | 7 |  |
-| 173 | `loading_avm2` | 14.3% | 1/7 | 5 | 7 |  |
-| 174 | `movieclip_setmask` | 14.3% | 2/14 | 14 | 14 |  |
-| 175 | `string_paths_eval2` | 14.3% | 1/7 | 1 | 7 |  |
-| 176 | `waitforframe` | 14.3% | 1/7 | 2 | 7 |  |
-| 177 | `xml_inspect_doctype` | 14.3% | 1/7 | 7 | 7 |  |
-| 178 | `xml_inspect_xmldecl` | 14.3% | 1/7 | 7 | 7 |  |
-| 179 | `text_format` | 13.6% | 156/1146 | 1137 | 1146 |  |
-| 180 | `printjob_props_swf6` | 13.3% | 6/45 | 35 | 45 |  |
-| 181 | `watch_virtual_property` | 13.3% | 8/60 | 52 | 60 |  |
-| 182 | `external_interface` | 13.1% | 11/84 | 23 | 84 |  |
-| 183 | `movieclip_getbounds` | 13.1% | 25/191 | 107 | 191 |  |
-| 184 | `loadmovie_var_persistence` | 12.5% | 1/8 | 1 | 8 |  |
-| 185 | `loadvariables2` | 12.5% | 1/8 | 3 | 8 |  |
-| 186 | `stage_display_state` | 12.5% | 2/16 | 12 | 16 |  |
-| 187 | `trace` | 12.5% | 1/8 | 6 | 8 |  |
-| 188 | `textfield_props_swf5` | 12.0% | 21/175 | 139 | 175 |  |
-| 189 | `load_vars` | 11.4% | 4/35 | 26 | 35 |  |
-| 190 | `textsnapshot_findtext` | 11.4% | 5/44 | 44 | 44 |  |
-| 191 | `external_interface_toxml_basic` | 11.2% | 20/179 | 179 | 179 |  |
-| 192 | `printjob_props_swf7` | 11.1% | 5/45 | 35 | 45 |  |
-| 193 | `string_paths_other` | 11.1% | 4/36 | 28 | 36 |  |
-| 194 | `tell_target` | 10.8% | 4/37 | 33 | 37 |  |
-| 195 | `movieclip_invalid_get_bounds_6` | 10.0% | 1/10 | 1 | 10 |  |
-| 196 | `movieclip_invalid_get_bounds_7` | 10.0% | 1/10 | 1 | 10 |  |
-| 197 | `xml_idmap` | 9.5% | 2/21 | 8 | 21 |  |
-| 198 | `movieclip_invalid_get_bounds_5` | 9.1% | 1/11 | 1 | 11 |  |
-| 199 | `movieclip_invalid_get_bounds_8` | 9.1% | 1/11 | 1 | 11 |  |
-| 200 | `external_interface_toxml_array` | 8.0% | 2/25 | 25 | 25 |  |
-| 201 | `file_reference_download_httperror_dns_error` | 7.7% | 1/13 | 2 | 13 |  |
-| 202 | `movieclip_invalid_get_bounds_3` | 7.7% | 1/13 | 1 | 13 |  |
-| 203 | `movieclip_invalid_get_bounds_4` | 7.7% | 1/13 | 1 | 13 |  |
-| 204 | `netconnection_close` | 7.7% | 3/39 | 11 | 39 |  |
-| 205 | `define_local` | 7.4% | 2/27 | 26 | 27 |  |
-| 206 | `textsnapshot_gettext` | 7.3% | 4/55 | 55 | 55 |  |
-| 207 | `printjob_props_swf5` | 6.7% | 3/45 | 34 | 45 |  |
-| 208 | `removed_clip_halts_script` | 6.7% | 1/15 | 2 | 15 |  |
-| 209 | `xml` | 6.7% | 1/15 | 8 | 15 |  |
-| 210 | `default_names` | 5.8% | 3/52 | 32 | 52 |  |
-| 211 | `file_reference_upload_httperror_dns_error` | 5.6% | 1/18 | 2 | 18 |  |
-| 212 | `textsnapshot_props_swf6` | 5.4% | 3/56 | 38 | 56 |  |
-| 213 | `clip_events` | 5.3% | 1/19 | 4 | 19 |  |
-| 214 | `edittext_default_format_empty` | 5.3% | 5/95 | 95 | 95 |  |
-| 215 | `swf5_no_closure` | 5.3% | 1/19 | 11 | 19 |  |
-| 216 | `context_menu` | 5.1% | 2/39 | 11 | 39 |  |
-| 217 | `context_menu_item` | 4.9% | 2/41 | 7 | 41 |  |
-| 218 | `focus_visibility_change` | 4.4% | 2/45 | 27 | 45 |  |
-| 219 | `file_reference_download_httperror_status_code` | 4.3% | 1/23 | 2 | 23 |  |
-| 220 | `file_reference_upload_httperror_status_code` | 4.3% | 1/23 | 2 | 23 |  |
-| 221 | `file_reference_upload_success` | 4.3% | 1/23 | 2 | 23 |  |
-| 222 | `bitmap_data` | 4.1% | 46/1126 | 318 | 1126 |  |
-| 223 | `function_base_clip_removed` | 4.0% | 1/25 | 6 | 25 |  |
-| 224 | `xml_namespaces` | 3.9% | 8/203 | 16 | 203 |  |
-| 225 | `this_scoping` | 3.8% | 2/52 | 35 | 52 |  |
-| 226 | `selection_handlers` | 3.7% | 1/27 | 9 | 27 |  |
-| 227 | `xml_inspect_parsexml` | 3.2% | 2/62 | 32 | 62 |  |
-| 228 | `focus_remove` | 3.0% | 1/33 | 15 | 33 |  |
-| 229 | `register_class` | 3.0% | 2/66 | 27 | 66 |  |
-| 230 | `tab_ordering_properties` | 2.7% | 8/293 | 180 | 293 |  |
-| 231 | `bitmap_data_threshold` | 2.3% | 4/176 | 38 | 176 |  |
-| 232 | `stylesheet_load` | 2.0% | 1/49 | 2 | 49 |  |
-| 233 | `mcl_replace_root_swf7_to_swf5` | 1.8% | 1/57 | 1 | 57 |  |
-| 234 | `mcl_replace_root_swf7_to_swf6` | 1.8% | 1/57 | 1 | 57 |  |
-| 235 | `sound_id3` | 1.7% | 11/633 | 11 | 633 |  |
-| 236 | `movieclip_default_state` | 1.4% | 1/69 | 69 | 69 |  |
-| 237 | `movieclip_invalid_get_bounds_1` | 1.3% | 1/75 | 1 | 75 |  |
-| 238 | `movieclip_invalid_get_bounds_2` | 1.3% | 1/75 | 1 | 75 |  |
-| 239 | `textfield_props_swf6` | 1.0% | 2/210 | 140 | 210 |  |
-| 240 | `textfield_props_swf7` | 1.0% | 2/210 | 140 | 210 |  |
-| 241 | `textfield_props_swf8` | 1.0% | 2/210 | 140 | 210 |  |
-| 242 | `movieclip_gettextsnapshot` | 0.9% | 1/112 | 21 | 112 |  |
-| 243 | `movieclip_state_values` | 0.9% | 1/114 | 4 | 114 |  |
-| 244 | `sound_id3_prop` | 0.7% | 1/138 | 1 | 138 |  |
-| 245 | `sound_duration_position_props` | 0.7% | 2/290 | 2 | 290 |  |
-| 246 | `stage_property_representation` | 0.7% | 4/586 | 586 | 586 |  |
-| 247 | `tab_ordering_events` | 0.7% | 1/150 | 12 | 150 |  |
-| 248 | `swf5_global_funcs` | 0.4% | 1/232 | 232 | 232 |  |
-| 249 | `swf6_global_funcs` | 0.4% | 1/232 | 232 | 232 |  |
-| 250 | `swf7_global_funcs` | 0.4% | 1/232 | 232 | 232 |  |
-| 251 | `external_interface_toas_basic` | 0.3% | 1/354 | 249 | 354 |  |
-| 252 | `focusrect_property_swf5` | 0.2% | 3/1241 | 1241 | 1237 |  |
-| 253 | `focusrect_property_swf6` | 0.2% | 3/1241 | 1241 | 1237 |  |
-| 254 | `focusrect_property_swf7` | 0.2% | 2/1241 | 1241 | 1237 |  |
-| 255 | `bitmap_data_noise` | 0.2% | 1/631 | 37 | 631 |  |
-| 256 | `array_call_method` | 0.0% | 0/9 | 1 | 9 |  |
-| 257 | `array_enumerate` | 0.0% | 0/4 | 4 | 4 |  |
-| 258 | `array_sort_random` | 0.0% | 0/443 | 0 | 443 |  |
-| 259 | `as2_super_and_this_v6` | 0.0% | 0/97 | 0 | 97 |  |
-| 260 | `as2_super_and_this_v8` | 0.0% | 0/85 | 0 | 85 |  |
-| 261 | `as2_super_via_manual_prototype` | 0.0% | 0/40 | 0 | 40 |  |
-| 262 | `as_set_prop_flags_version_swf6` | 0.0% | 0/1 | 1 | 1 |  |
-| 263 | `as_set_prop_flags_version_swf7` | 0.0% | 0/1 | 1 | 1 |  |
-| 264 | `as_set_prop_flags_version_swf8` | 0.0% | 0/1 | 1 | 1 |  |
-| 265 | `as_set_prop_flags_version_swf9` | 0.0% | 0/1 | 1 | 1 |  |
-| 266 | `asfunction` | 0.0% | 0/11 | 0 | 11 |  |
-| 267 | `asnew` | 0.0% | 0/34 | 0 | 34 |  |
-| 268 | `bad_placeobject_clipaction` | 0.0% | 0/2 | 0 | 2 |  |
-| 269 | `bitmap_data_copypixels` | 0.0% | 0/17 | 0 | 17 |  |
-| 270 | `bitmap_data_pixeldissolve` | 0.0% | 0/1075 | 0 | 1075 |  |
-| 271 | `bitmap_filters` | 0.0% | 0/548 | 0 | 548 |  |
-| 272 | `boxed_primitives` | 0.0% | 0/24 | 0 | 24 |  |
-| 273 | `button_children` | 0.0% | 0/8 | 0 | 8 |  |
-| 274 | `button_goto` | 0.0% | 0/4 | 0 | 4 |  |
-| 275 | `button_key_events` | 0.0% | 0/14 | 0 | 14 |  |
-| 276 | `button_key_events_special` | 0.0% | 0/45 | 0 | 45 |  |
-| 277 | `button_keypress` | 0.0% | 0/3 | 0 | 3 |  |
-| 278 | `button_keypress_vs_press` | 0.0% | 0/25 | 0 | 25 |  |
-| 279 | `button_keypress_vs_tab` | 0.0% | 0/20 | 0 | 20 |  |
-| 280 | `button_keypress_vs_textinput` | 0.0% | 0/4 | 0 | 4 |  |
-| 281 | `button_order` | 0.0% | 0/2 | 0 | 2 |  |
-| 282 | `button_properties_special_cases` | 0.0% | 0/22 | 0 | 22 |  |
-| 283 | `button_v5` | 0.0% | 0/18 | 0 | 18 |  |
-| 284 | `button_v6` | 0.0% | 0/18 | 0 | 18 |  |
-| 285 | `call` | 0.0% | 0/63 | 0 | 63 |  |
-| 286 | `call_method_empty_name` | 0.0% | 0/1 | 0 | 1 |  |
-| 287 | `click_block` | 0.0% | 0/5 | 0 | 5 |  |
-| 288 | `clip_event_propagation_order` | 0.0% | 0/17 | 0 | 17 |  |
-| 289 | `clone_sprite_edittext` | 0.0% | 0/94 | 94 | 94 |  |
-| 290 | `clone_sprite_edittext_dynamic` | 0.0% | 0/86 | 86 | 86 |  |
-| 291 | `closure_scope` | 0.0% | 0/7 | 3 | 7 |  |
-| 292 | `coerce_to_object_monkeypatch` | 0.0% | 0/129 | 0 | 129 |  |
-| 293 | `coerce_to_primitive_resolve` | 0.0% | 0/17 | 0 | 17 |  |
-| 294 | `color` | 0.0% | 0/57 | 0 | 57 |  |
-| 295 | `constructor_function` | 0.0% | 0/2 | 2 | 2 |  |
-| 296 | `cross_movie_root` | 0.0% | 0/10 | 8 | 10 |  |
-| 297 | `custom_clip_methods` | 0.0% | 0/4 | 1 | 4 |  |
-| 298 | `define_function2_preload_order` | 0.0% | 0/4 | 2 | 4 |  |
-| 299 | `displacementmapfilter_mappoint_throw_error` | 0.0% | 0/13 | 13 | 13 |  |
-| 300 | `display_object_properties` | 0.0% | 0/2 | 2 | 2 |  |
-| 301 | `drag_drop` | 0.0% | 0/10 | 0 | 10 |  |
-| 302 | `drag_over_from_outside` | 0.0% | 0/1 | 0 | 1 |  |
-| 303 | `drag_over_without_startdrag` | 0.0% | 0/1 | 0 | 1 |  |
-| 304 | `duplicate_movie_clip` | 0.0% | 0/20 | 0 | 20 |  |
-| 305 | `edittext_autosize_setter` | 0.0% | 0/20 | 20 | 20 |  |
-| 306 | `edittext_drag_select` | 0.0% | 0/9 | 0 | 9 |  |
-| 307 | `edittext_focus_selection` | 0.0% | 0/2 | 2 | 2 |  |
-| 308 | `edittext_html_roundtrip` | 0.0% | 0/17 | 0 | 17 |  |
-| 309 | `edittext_ime_focus_lost` | 0.0% | 0/7 | 0 | 7 |  |
-| 310 | `edittext_input` | 0.0% | 0/1 | 0 | 1 |  |
-| 311 | `edittext_input_newlines` | 0.0% | 0/9 | 0 | 9 |  |
-| 312 | `edittext_password` | 0.0% | 0/5 | 0 | 5 |  |
-| 313 | `edittext_password_copy` | 0.0% | 0/4 | 0 | 4 |  |
-| 314 | `edittext_paste_empty` | 0.0% | 0/2 | 0 | 2 |  |
-| 315 | `edittext_place_caret` | 0.0% | 0/2 | 0 | 2 |  |
-| 316 | `edittext_programmatic_focus` | 0.0% | 0/12 | 12 | 12 |  |
-| 317 | `edittext_restrict` | 0.0% | 0/191 | 0 | 191 |  |
-| 318 | `edittext_restrict_paste` | 0.0% | 0/5 | 0 | 5 |  |
-| 319 | `edittext_tab_focus` | 0.0% | 0/13 | 0 | 13 |  |
-| 320 | `edittext_tag_indent` | 0.0% | 0/31 | 31 | 31 |  |
-| 321 | `edittext_text_height_leading` | 0.0% | 0/20 | 20 | 20 |  |
-| 322 | `execution_order1` | 0.0% | 0/5 | 2 | 5 |  |
-| 323 | `extends_native_type` | 0.0% | 0/11 | 0 | 11 |  |
-| 324 | `external_interface_escapexml` | 0.0% | 0/26 | 26 | 26 |  |
-| 325 | `external_interface_jsquotestring` | 0.0% | 0/21 | 21 | 21 |  |
-| 326 | `external_interface_unescapexml` | 0.0% | 0/40 | 40 | 40 |  |
-| 327 | `file_reference_browse_cancel` | 0.0% | 0/21 | 0 | 21 |  |
-| 328 | `focus_keyboard_press` | 0.0% | 0/60 | 0 | 60 |  |
-| 329 | `focus_mouse` | 0.0% | 0/45 | 0 | 45 |  |
-| 330 | `focus_mouse_focusable` | 0.0% | 0/8 | 0 | 8 |  |
-| 331 | `focus_mouse_rollout` | 0.0% | 0/4 | 0 | 4 |  |
-| 332 | `focus_root_movie` | 0.0% | 0/2 | 1 | 2 |  |
-| 333 | `focusrect_focuslost` | 0.0% | 0/4 | 0 | 4 |  |
-| 334 | `focusrect_swf6` | 0.0% | 0/42 | 0 | 42 |  |
-| 335 | `form_loader_encoding_1` | 0.0% | 0/1 | 1 | 1 |  |
-| 336 | `form_loader_encoding_2` | 0.0% | 0/6 | 6 | 3 |  |
-| 337 | `form_loader_encoding_3` | 0.0% | 0/3 | 3 | 3 |  |
-| 338 | `form_loader_encoding_4` | 0.0% | 0/3 | 3 | 3 |  |
-| 339 | `function_base_clip` | 0.0% | 0/8 | 0 | 8 |  |
-| 340 | `function_base_clip_readded` | 0.0% | 0/11 | 0 | 11 |  |
-| 341 | `function_suppress_and_preload` | 0.0% | 0/28 | 0 | 28 |  |
-| 342 | `get_bytes_total` | 0.0% | 0/4 | 4 | 4 |  |
-| 343 | `geturl` | 0.0% | 0/7 | 1 | 7 |  |
-| 344 | `global_instance_decls` | 0.0% | 0/758 | 81 | 758 |  |
-| 345 | `global_proto_decls` | 0.0% | 0/4497 | 2 | 4497 |  |
-| 346 | `global_proto_decls_delete` | 0.0% | 0/4158 | 2 | 4158 |  |
-| 347 | `global_swf5_6_7_8_9` | 0.0% | 0/1145 | 0 | 1145 |  |
-| 348 | `global_swf6_7_8` | 0.0% | 0/15 | 0 | 15 |  |
-| 349 | `goto_execution_order2` | 0.0% | 0/2 | 0 | 2 |  |
-| 350 | `goto_frame` | 0.0% | 0/12 | 0 | 12 |  |
-| 351 | `goto_frame2` | 0.0% | 0/44 | 0 | 44 |  |
-| 352 | `goto_label` | 0.0% | 0/17 | 0 | 17 |  |
-| 353 | `goto_methods` | 0.0% | 0/40 | 0 | 40 |  |
-| 354 | `hittest_lockroot` | 0.0% | 0/15 | 0 | 15 |  |
-| 355 | `hittest_morph` | 0.0% | 0/70 | 0 | 70 |  |
-| 356 | `hittest_morph_input` | 0.0% | 0/1 | 0 | 1 |  |
-| 357 | `hittest_winding_rule` | 0.0% | 0/12 | 0 | 12 |  |
-| 358 | `init_array_invalid` | 0.0% | 0/4 | 0 | 4 |  |
-| 359 | `init_object_invalid` | 0.0% | 0/4 | 0 | 4 |  |
-| 360 | `input_dead_keys_windows` | 0.0% | 0/15 | 0 | 15 |  |
-| 361 | `instanceof_coercions` | 0.0% | 0/88 | 0 | 88 |  |
-| 362 | `interface_implements_op` | 0.0% | 0/47 | 0 | 47 |  |
-| 363 | `issue_1104` | 0.0% | 0/2 | 0 | 2 |  |
-| 364 | `issue_2084` | 0.0% | 0/16 | 0 | 16 |  |
-| 365 | `issue_2870` | 0.0% | 0/3 | 0 | 3 |  |
-| 366 | `issue_3169` | 0.0% | 0/2 | 0 | 2 |  |
-| 367 | `issue_9327` | 0.0% | 0/2 | 0 | 2 |  |
-| 368 | `issue_9885` | 0.0% | 0/2 | 0 | 2 |  |
-| 369 | `key_isToggled` | 0.0% | 0/9 | 0 | 9 |  |
-| 370 | `loadmovie_fail` | 0.0% | 0/2 | 0 | 2 |  |
-| 371 | `loadmovie_replace_root` | 0.0% | 0/5 | 1 | 5 |  |
-| 372 | `loadmovienum_cross_version_prototype` | 0.0% | 0/9 | 0 | 9 |  |
-| 373 | `loadvariables` | 0.0% | 0/2 | 1 | 2 |  |
-| 374 | `loadvariables_method` | 0.0% | 0/7 | 0 | 7 |  |
-| 375 | `loadvariablesnum` | 0.0% | 0/2 | 1 | 2 |  |
-| 376 | `localconnection` | 0.0% | 0/579 | 0 | 579 |  |
-| 377 | `lock_root` | 0.0% | 0/1 | 0 | 1 |  |
-| 378 | `mcl_as_broadcaster` | 0.0% | 0/12 | 0 | 12 |  |
-| 379 | `mcl_events_swf_version` | 0.0% | 0/232 | 0 | 232 |  |
-| 380 | `mcl_getprogress` | 0.0% | 0/30 | 29 | 30 |  |
-| 381 | `mcl_loadclip_properties` | 0.0% | 0/6 | 0 | 6 |  |
-| 382 | `mcl_loadclip_replace_root` | 0.0% | 0/1 | 0 | 1 |  |
-| 383 | `mcl_mislabeled_target` | 0.0% | 0/6 | 0 | 6 |  |
-| 384 | `mcl_target_gif87a` | 0.0% | 0/6 | 0 | 6 |  |
-| 385 | `mcl_target_gif89a` | 0.0% | 0/6 | 0 | 6 |  |
-| 386 | `mcl_target_jpg` | 0.0% | 0/6 | 0 | 6 |  |
-| 387 | `mcl_target_png` | 0.0% | 0/6 | 0 | 6 |  |
-| 388 | `mcl_unloadclip` | 0.0% | 0/5 | 0 | 5 |  |
-| 389 | `mixed_avm_load_into_root` | 0.0% | 0/2 | 0 | 2 |  |
-| 390 | `mouse_events` | 0.0% | 0/8 | 0 | 8 |  |
-| 391 | `mouse_events_visible_enabled` | 0.0% | 0/12 | 0 | 12 |  |
-| 392 | `mouse_hover_events_while_dragging` | 0.0% | 0/1 | 0 | 1 |  |
-| 393 | `mouse_pos` | 0.0% | 0/665 | 2 | 665 |  |
-| 394 | `mouse_pos_with_scale_factor` | 0.0% | 0/260 | 2 | 260 |  |
-| 395 | `mouse_wheel_enabled` | 0.0% | 0/2 | 2 | 2 |  |
-| 396 | `movieclip_blend_mode_property` | 0.0% | 0/35 | 0 | 35 |  |
-| 397 | `movieclip_create_text_field` | 0.0% | 0/90 | 90 | 90 |  |
-| 398 | `movieclip_in_removed_button` | 0.0% | 0/4 | 0 | 4 |  |
-| 399 | `movieclip_init_object` | 0.0% | 0/5 | 0 | 5 |  |
-| 400 | `movieclip_library_state_values` | 0.0% | 0/78 | 3 | 78 |  |
-| 401 | `movieclip_methods_with_loaded_image` | 0.0% | 0/4 | 0 | 4 |  |
-| 402 | `named_shapes` | 0.0% | 0/14 | 0 | 14 |  |
-| 403 | `native_double_construct` | 0.0% | 0/12 | 0 | 12 |  |
-| 404 | `native_objects_swf6` | 0.0% | 0/84 | 0 | 84 |  |
-| 405 | `native_objects_swf7` | 0.0% | 0/84 | 0 | 84 |  |
-| 406 | `native_objects_swf8` | 0.0% | 0/84 | 0 | 84 |  |
-| 407 | `native_subclasses` | 0.0% | 0/191 | 0 | 191 |  |
-| 408 | `netconnection_send_remote` | 0.0% | 0/50 | 0 | 50 |  |
-| 409 | `netstream_play_flv` | 0.0% | 0/21 | 2 | 21 |  |
-| 410 | `netstream_seek_flv` | 0.0% | 0/25 | 0 | 25 |  |
-| 411 | `new_method_wrap` | 0.0% | 0/4 | 0 | 4 |  |
-| 412 | `new_object_wrap` | 0.0% | 0/4 | 0 | 4 |  |
-| 413 | `object_properties` | 0.0% | 0/31 | 0 | 31 |  |
-| 414 | `object_resolve` | 0.0% | 0/38 | 0 | 38 |  |
-| 415 | `on_construct` | 0.0% | 0/25 | 0 | 25 |  |
-| 416 | `parse_int` | 0.0% | 0/193 | 193 | 64 |  |
-| 417 | `place_and_lookup` | 0.0% | 0/30 | 0 | 30 |  |
-| 418 | `prototype_enumerate` | 0.0% | 0/5 | 2 | 5 |  |
-| 419 | `recursive_prototypes` | 0.0% | 0/2 | 2 | 0 |  |
-| 420 | `register_class_return_value` | 0.0% | 0/16 | 0 | 16 |  |
-| 421 | `register_class_swf6` | 0.0% | 0/37 | 0 | 37 |  |
-| 422 | `register_class_with_sound` | 0.0% | 0/11 | 0 | 11 |  |
-| 423 | `removed_base_clip_tell_target` | 0.0% | 0/2 | 1 | 2 |  |
-| 424 | `removed_target_clip_scope` | 0.0% | 0/35 | 0 | 35 |  |
-| 425 | `root_button_mode` | 0.0% | 0/10 | 1 | 10 |  |
-| 426 | `root_onload` | 0.0% | 0/1 | 0 | 1 |  |
-| 427 | `sandbox_type_local_network` | 0.0% | 0/1 | 1 | 1 |  |
-| 428 | `sandbox_type_remote` | 0.0% | 0/3 | 1 | 3 |  |
-| 429 | `selection` | 0.0% | 0/454 | 0 | 454 |  |
-| 430 | `set_interval` | 0.0% | 0/27 | 18 | 27 |  |
-| 431 | `slash_syntax` | 0.0% | 0/14 | 0 | 14 |  |
-| 432 | `sound_load_start` | 0.0% | 0/3 | 0 | 3 |  |
-| 433 | `sound_multiple_load` | 0.0% | 0/1 | 0 | 1 |  |
-| 434 | `stage_object_enumerate` | 0.0% | 0/4 | 0 | 4 |  |
-| 435 | `string_methods_negative_args` | 0.0% | 0/240 | 0 | 240 |  |
-| 436 | `string_ops_swf6` | 0.0% | 0/96 | 96 | 95 |  |
-| 437 | `string_paths_eval` | 0.0% | 0/4 | 0 | 4 |  |
-| 438 | `string_paths_reference_launder` | 0.0% | 0/2 | 2 | 2 |  |
-| 439 | `string_paths_unload` | 0.0% | 0/1 | 0 | 1 |  |
-| 440 | `string_paths_variable_scopes` | 0.0% | 0/5 | 0 | 5 |  |
-| 441 | `stylesheet` | 0.0% | 0/283 | 0 | 283 |  |
-| 442 | `super_edge_cases` | 0.0% | 0/39 | 0 | 39 |  |
-| 443 | `swf5_to_6_cross_call` | 0.0% | 0/29 | 1 | 29 |  |
-| 444 | `swf5_xml_event_handler_context` | 0.0% | 0/2 | 1 | 2 |  |
-| 445 | `swf6_string_as_bool` | 0.0% | 0/23 | 23 | 15 |  |
-| 446 | `swf6_to_5_cross_call` | 0.0% | 0/29 | 1 | 29 |  |
-| 447 | `tab_ordering_automatic_basic` | 0.0% | 0/92 | 0 | 92 |  |
-| 448 | `tab_ordering_automatic_order_grid` | 0.0% | 0/21 | 0 | 21 |  |
-| 449 | `tab_ordering_automatic_order_same_position` | 0.0% | 0/12 | 0 | 12 |  |
-| 450 | `tab_ordering_children` | 0.0% | 0/208 | 0 | 208 |  |
-| 451 | `tab_ordering_custom_basic` | 0.0% | 0/71 | 0 | 71 |  |
-| 452 | `tab_ordering_custom_duplicate_index` | 0.0% | 0/22 | 0 | 22 |  |
-| 453 | `tab_ordering_custom_i32_vs_u32` | 0.0% | 0/12 | 0 | 12 |  |
-| 454 | `tab_ordering_custom_m1` | 0.0% | 0/29 | 0 | 29 |  |
-| 455 | `tab_ordering_events_mouse` | 0.0% | 0/65 | 0 | 65 |  |
-| 456 | `tab_ordering_movieclip_enabled_default` | 0.0% | 0/462 | 0 | 462 |  |
-| 457 | `tab_ordering_properties_tab_index_edge_case` | 0.0% | 0/4 | 4 | 4 |  |
-| 458 | `tab_ordering_reverse` | 0.0% | 0/51 | 0 | 51 |  |
-| 459 | `tab_ordering_tabbable` | 0.0% | 0/47 | 0 | 47 |  |
-| 460 | `target_clip_removed` | 0.0% | 0/5 | 4 | 5 |  |
-| 461 | `target_clip_swf5` | 0.0% | 0/2 | 0 | 2 |  |
-| 462 | `target_clip_swf6` | 0.0% | 0/2 | 0 | 2 |  |
-| 463 | `target_path` | 0.0% | 0/14 | 0 | 14 |  |
-| 464 | `tell_target_invalid` | 0.0% | 0/6 | 2 | 6 |  |
-| 465 | `tell_target_invalid_swf6` | 0.0% | 0/5 | 2 | 5 |  |
-| 466 | `text_blocks_clicks` | 0.0% | 0/4 | 0 | 4 |  |
-| 467 | `text_format_font_max_length` | 0.0% | 0/2 | 2 | 2 |  |
-| 468 | `textfield_cache_as_bitmap` | 0.0% | 0/1 | 0 | 1 |  |
-| 469 | `textsnapshot_props_swf5` | 0.0% | 0/56 | 37 | 56 |  |
-| 470 | `textsnapshot_text_order` | 0.0% | 0/1 | 1 | 1 |  |
-| 471 | `typeof` | 0.0% | 0/22 | 0 | 22 |  |
-| 472 | `unload` | 0.0% | 0/52 | 23 | 52 |  |
-| 473 | `unload_clip_event` | 0.0% | 0/4 | 0 | 4 |  |
-| 474 | `unload_nested_child` | 0.0% | 0/5 | 3 | 5 |  |
-| 475 | `use_hand_cursor` | 0.0% | 0/8 | 0 | 8 |  |
-| 476 | `variable_args` | 0.0% | 0/5 | 3 | 5 |  |
-| 477 | `watch` | 0.0% | 0/117 | 0 | 117 |  |
-| 478 | `watch_textfield` | 0.0% | 0/12 | 0 | 12 |  |
-| 479 | `watch_virtual_property_proto` | 0.0% | 0/2 | 0 | 2 |  |
-| 480 | `xml_child_nodes_edge_cases` | 0.0% | 0/4 | 4 | 4 |  |
-| 481 | `xml_has_child_nodes` | 0.0% | 0/3 | 3 | 3 |  |
-| 482 | `xml_ignore_comments` | 0.0% | 0/21 | 0 | 21 |  |
-| 483 | `xml_inspect_createmethods` | 0.0% | 0/15 | 5 | 15 |  |
-| 484 | `xml_load` | 0.0% | 0/2 | 0 | 2 |  |
-| 485 | `xml_reparenting` | 0.0% | 0/14 | 0 | 14 |  |
-| 486 | `xml_socket` | 0.0% | 0/8 | 0 | 8 |  |
-| 487 | `xml_socket_close_in_handler` | 0.0% | 0/6 | 0 | 6 |  |
-| 488 | `xml_socket_on_data` | 0.0% | 0/7 | 0 | 7 |  |
-| 489 | `xml_socket_segmented` | 0.0% | 0/29 | 0 | 29 |  |
-| 490 | `xml_to_string` | 0.0% | 0/13 | 5 | 13 |  |
-| 491 | `xml_to_string_comment` | 0.0% | 0/1 | 1 | 1 |  |
-| 492 | `xml_unescaping` | 0.0% | 0/23 | 0 | 23 |  |
-| 493 | `xmlnode_proto` | 0.0% | 0/1 | 0 | 1 |  |
+| 170 | `register_and_init_order` | 15.2% | 35/231 | 68 | 231 |  |
+| 171 | `as_broadcaster` | 14.6% | 6/41 | 25 | 41 |  |
+| 172 | `color_transform` | 14.6% | 7/48 | 37 | 48 |  |
+| 173 | `file_reference_download_cancel` | 14.3% | 1/7 | 2 | 7 |  |
+| 174 | `loading_avm2` | 14.3% | 1/7 | 5 | 7 |  |
+| 175 | `movieclip_setmask` | 14.3% | 2/14 | 14 | 14 |  |
+| 176 | `string_paths_eval2` | 14.3% | 1/7 | 1 | 7 |  |
+| 177 | `waitforframe` | 14.3% | 1/7 | 2 | 7 |  |
+| 178 | `xml_inspect_doctype` | 14.3% | 1/7 | 7 | 7 |  |
+| 179 | `xml_inspect_xmldecl` | 14.3% | 1/7 | 7 | 7 |  |
+| 180 | `text_format` | 13.6% | 156/1146 | 1137 | 1146 |  |
+| 181 | `printjob_props_swf6` | 13.3% | 6/45 | 35 | 45 |  |
+| 182 | `watch_virtual_property` | 13.3% | 8/60 | 52 | 60 |  |
+| 183 | `external_interface` | 13.1% | 11/84 | 23 | 84 |  |
+| 184 | `movieclip_getbounds` | 13.1% | 25/191 | 107 | 191 |  |
+| 185 | `loadmovie_var_persistence` | 12.5% | 1/8 | 1 | 8 |  |
+| 186 | `loadvariables2` | 12.5% | 1/8 | 3 | 8 |  |
+| 187 | `stage_display_state` | 12.5% | 2/16 | 12 | 16 |  |
+| 188 | `trace` | 12.5% | 1/8 | 6 | 8 |  |
+| 189 | `textfield_props_swf5` | 12.0% | 21/175 | 139 | 175 |  |
+| 190 | `load_vars` | 11.4% | 4/35 | 26 | 35 |  |
+| 191 | `textsnapshot_findtext` | 11.4% | 5/44 | 44 | 44 |  |
+| 192 | `external_interface_toxml_basic` | 11.2% | 20/179 | 179 | 179 |  |
+| 193 | `printjob_props_swf7` | 11.1% | 5/45 | 35 | 45 |  |
+| 194 | `string_paths_other` | 11.1% | 4/36 | 28 | 36 |  |
+| 195 | `tell_target` | 10.8% | 4/37 | 33 | 37 |  |
+| 196 | `movieclip_invalid_get_bounds_6` | 10.0% | 1/10 | 1 | 10 |  |
+| 197 | `movieclip_invalid_get_bounds_7` | 10.0% | 1/10 | 1 | 10 |  |
+| 198 | `xml_idmap` | 9.5% | 2/21 | 8 | 21 |  |
+| 199 | `movieclip_invalid_get_bounds_5` | 9.1% | 1/11 | 1 | 11 |  |
+| 200 | `movieclip_invalid_get_bounds_8` | 9.1% | 1/11 | 1 | 11 |  |
+| 201 | `external_interface_toxml_array` | 8.0% | 2/25 | 25 | 25 |  |
+| 202 | `file_reference_download_httperror_dns_error` | 7.7% | 1/13 | 2 | 13 |  |
+| 203 | `movieclip_invalid_get_bounds_3` | 7.7% | 1/13 | 1 | 13 |  |
+| 204 | `movieclip_invalid_get_bounds_4` | 7.7% | 1/13 | 1 | 13 |  |
+| 205 | `netconnection_close` | 7.7% | 3/39 | 11 | 39 |  |
+| 206 | `define_local` | 7.4% | 2/27 | 26 | 27 |  |
+| 207 | `textsnapshot_gettext` | 7.3% | 4/55 | 55 | 55 |  |
+| 208 | `printjob_props_swf5` | 6.7% | 3/45 | 34 | 45 |  |
+| 209 | `removed_clip_halts_script` | 6.7% | 1/15 | 2 | 15 |  |
+| 210 | `xml` | 6.7% | 1/15 | 8 | 15 |  |
+| 211 | `default_names` | 5.8% | 3/52 | 32 | 52 |  |
+| 212 | `file_reference_upload_httperror_dns_error` | 5.6% | 1/18 | 2 | 18 |  |
+| 213 | `textsnapshot_props_swf6` | 5.4% | 3/56 | 38 | 56 |  |
+| 214 | `clip_events` | 5.3% | 1/19 | 4 | 19 |  |
+| 215 | `edittext_default_format_empty` | 5.3% | 5/95 | 95 | 95 |  |
+| 216 | `swf5_no_closure` | 5.3% | 1/19 | 11 | 19 |  |
+| 217 | `context_menu` | 5.1% | 2/39 | 11 | 39 |  |
+| 218 | `context_menu_item` | 4.9% | 2/41 | 7 | 41 |  |
+| 219 | `focus_visibility_change` | 4.4% | 2/45 | 27 | 45 |  |
+| 220 | `file_reference_download_httperror_status_code` | 4.3% | 1/23 | 2 | 23 |  |
+| 221 | `file_reference_upload_httperror_status_code` | 4.3% | 1/23 | 2 | 23 |  |
+| 222 | `file_reference_upload_success` | 4.3% | 1/23 | 2 | 23 |  |
+| 223 | `bitmap_data` | 4.1% | 46/1126 | 318 | 1126 |  |
+| 224 | `function_base_clip_removed` | 4.0% | 1/25 | 6 | 25 |  |
+| 225 | `xml_namespaces` | 3.9% | 8/203 | 16 | 203 |  |
+| 226 | `this_scoping` | 3.8% | 2/52 | 35 | 52 |  |
+| 227 | `selection_handlers` | 3.7% | 1/27 | 9 | 27 |  |
+| 228 | `xml_inspect_parsexml` | 3.2% | 2/62 | 32 | 62 |  |
+| 229 | `focus_remove` | 3.0% | 1/33 | 15 | 33 |  |
+| 230 | `register_class` | 3.0% | 2/66 | 27 | 66 |  |
+| 231 | `movieclip_hittest_shapeflag` | 3.0% | 10/338 | 191 | 338 |  |
+| 232 | `tab_ordering_properties` | 2.7% | 8/293 | 180 | 293 |  |
+| 233 | `bitmap_data_threshold` | 2.3% | 4/176 | 38 | 176 |  |
+| 234 | `stylesheet_load` | 2.0% | 1/49 | 2 | 49 |  |
+| 235 | `mcl_replace_root_swf7_to_swf5` | 1.8% | 1/57 | 1 | 57 |  |
+| 236 | `mcl_replace_root_swf7_to_swf6` | 1.8% | 1/57 | 1 | 57 |  |
+| 237 | `sound_id3` | 1.7% | 11/633 | 11 | 633 |  |
+| 238 | `movieclip_default_state` | 1.4% | 1/69 | 69 | 69 |  |
+| 239 | `movieclip_invalid_get_bounds_1` | 1.3% | 1/75 | 1 | 75 |  |
+| 240 | `movieclip_invalid_get_bounds_2` | 1.3% | 1/75 | 1 | 75 |  |
+| 241 | `textfield_props_swf6` | 1.0% | 2/210 | 140 | 210 |  |
+| 242 | `textfield_props_swf7` | 1.0% | 2/210 | 140 | 210 |  |
+| 243 | `textfield_props_swf8` | 1.0% | 2/210 | 140 | 210 |  |
+| 244 | `movieclip_gettextsnapshot` | 0.9% | 1/112 | 21 | 112 |  |
+| 245 | `movieclip_state_values` | 0.9% | 1/114 | 4 | 114 |  |
+| 246 | `sound_id3_prop` | 0.7% | 1/138 | 1 | 138 |  |
+| 247 | `sound_duration_position_props` | 0.7% | 2/290 | 2 | 290 |  |
+| 248 | `stage_property_representation` | 0.7% | 4/586 | 586 | 586 |  |
+| 249 | `tab_ordering_events` | 0.7% | 1/150 | 12 | 150 |  |
+| 250 | `swf5_global_funcs` | 0.4% | 1/232 | 232 | 232 |  |
+| 251 | `swf6_global_funcs` | 0.4% | 1/232 | 232 | 232 |  |
+| 252 | `swf7_global_funcs` | 0.4% | 1/232 | 232 | 232 |  |
+| 253 | `external_interface_toas_basic` | 0.3% | 1/354 | 249 | 354 |  |
+| 254 | `focusrect_property_swf5` | 0.2% | 3/1241 | 1241 | 1237 |  |
+| 255 | `focusrect_property_swf6` | 0.2% | 3/1241 | 1241 | 1237 |  |
+| 256 | `focusrect_property_swf7` | 0.2% | 2/1241 | 1241 | 1237 |  |
+| 257 | `bitmap_data_noise` | 0.2% | 1/631 | 37 | 631 |  |
+| 258 | `array_call_method` | 0.0% | 0/9 | 1 | 9 |  |
+| 259 | `array_enumerate` | 0.0% | 0/4 | 4 | 4 |  |
+| 260 | `array_sort_random` | 0.0% | 0/443 | 0 | 443 |  |
+| 261 | `as2_super_and_this_v6` | 0.0% | 0/97 | 0 | 97 |  |
+| 262 | `as2_super_and_this_v8` | 0.0% | 0/85 | 0 | 85 |  |
+| 263 | `as2_super_via_manual_prototype` | 0.0% | 0/40 | 0 | 40 |  |
+| 264 | `as_set_prop_flags_version_swf6` | 0.0% | 0/1 | 1 | 1 |  |
+| 265 | `as_set_prop_flags_version_swf7` | 0.0% | 0/1 | 1 | 1 |  |
+| 266 | `as_set_prop_flags_version_swf8` | 0.0% | 0/1 | 1 | 1 |  |
+| 267 | `as_set_prop_flags_version_swf9` | 0.0% | 0/1 | 1 | 1 |  |
+| 268 | `asfunction` | 0.0% | 0/11 | 0 | 11 |  |
+| 269 | `asnew` | 0.0% | 0/34 | 0 | 34 |  |
+| 270 | `bad_placeobject_clipaction` | 0.0% | 0/2 | 0 | 2 |  |
+| 271 | `bitmap_data_copypixels` | 0.0% | 0/17 | 0 | 17 |  |
+| 272 | `bitmap_data_pixeldissolve` | 0.0% | 0/1075 | 0 | 1075 |  |
+| 273 | `bitmap_filters` | 0.0% | 0/548 | 0 | 548 |  |
+| 274 | `boxed_primitives` | 0.0% | 0/24 | 0 | 24 |  |
+| 275 | `button_children` | 0.0% | 0/8 | 0 | 8 |  |
+| 276 | `button_goto` | 0.0% | 0/4 | 0 | 4 |  |
+| 277 | `button_key_events` | 0.0% | 0/14 | 0 | 14 |  |
+| 278 | `button_key_events_special` | 0.0% | 0/45 | 0 | 45 |  |
+| 279 | `button_keypress` | 0.0% | 0/3 | 0 | 3 |  |
+| 280 | `button_keypress_vs_press` | 0.0% | 0/25 | 0 | 25 |  |
+| 281 | `button_keypress_vs_tab` | 0.0% | 0/20 | 0 | 20 |  |
+| 282 | `button_keypress_vs_textinput` | 0.0% | 0/4 | 0 | 4 |  |
+| 283 | `button_order` | 0.0% | 0/2 | 0 | 2 |  |
+| 284 | `button_properties_special_cases` | 0.0% | 0/22 | 0 | 22 |  |
+| 285 | `button_v5` | 0.0% | 0/18 | 0 | 18 |  |
+| 286 | `button_v6` | 0.0% | 0/18 | 0 | 18 |  |
+| 287 | `call` | 0.0% | 0/63 | 0 | 63 |  |
+| 288 | `call_method_empty_name` | 0.0% | 0/1 | 0 | 1 |  |
+| 289 | `click_block` | 0.0% | 0/5 | 0 | 5 |  |
+| 290 | `clip_constructors` | 0.0% | 0/8 | 0 | 8 |  |
+| 291 | `clip_event_propagation_order` | 0.0% | 0/17 | 0 | 17 |  |
+| 292 | `clone_sprite_edittext` | 0.0% | 0/94 | 94 | 94 |  |
+| 293 | `clone_sprite_edittext_dynamic` | 0.0% | 0/86 | 86 | 86 |  |
+| 294 | `closure_scope` | 0.0% | 0/7 | 3 | 7 |  |
+| 295 | `coerce_to_object_monkeypatch` | 0.0% | 0/129 | 0 | 129 |  |
+| 296 | `coerce_to_primitive_resolve` | 0.0% | 0/17 | 0 | 17 |  |
+| 297 | `color` | 0.0% | 0/57 | 0 | 57 |  |
+| 298 | `constructor_function` | 0.0% | 0/2 | 2 | 2 |  |
+| 299 | `cross_movie_root` | 0.0% | 0/10 | 8 | 10 |  |
+| 300 | `custom_clip_methods` | 0.0% | 0/4 | 1 | 4 |  |
+| 301 | `define_function2_preload_order` | 0.0% | 0/4 | 2 | 4 |  |
+| 302 | `displacementmapfilter_mappoint_throw_error` | 0.0% | 0/13 | 13 | 13 |  |
+| 303 | `display_object_properties` | 0.0% | 0/2 | 2 | 2 |  |
+| 304 | `drag_drop` | 0.0% | 0/10 | 0 | 10 |  |
+| 305 | `drag_over_from_outside` | 0.0% | 0/1 | 0 | 1 |  |
+| 306 | `drag_over_without_startdrag` | 0.0% | 0/1 | 0 | 1 |  |
+| 307 | `duplicate_movie_clip` | 0.0% | 0/20 | 0 | 20 |  |
+| 308 | `edittext_autosize_setter` | 0.0% | 0/20 | 20 | 20 |  |
+| 309 | `edittext_drag_select` | 0.0% | 0/9 | 0 | 9 |  |
+| 310 | `edittext_focus_selection` | 0.0% | 0/2 | 2 | 2 |  |
+| 311 | `edittext_html_roundtrip` | 0.0% | 0/17 | 0 | 17 |  |
+| 312 | `edittext_ime_focus_lost` | 0.0% | 0/7 | 0 | 7 |  |
+| 313 | `edittext_input` | 0.0% | 0/1 | 0 | 1 |  |
+| 314 | `edittext_input_newlines` | 0.0% | 0/9 | 0 | 9 |  |
+| 315 | `edittext_password` | 0.0% | 0/5 | 0 | 5 |  |
+| 316 | `edittext_password_copy` | 0.0% | 0/4 | 0 | 4 |  |
+| 317 | `edittext_paste_empty` | 0.0% | 0/2 | 0 | 2 |  |
+| 318 | `edittext_place_caret` | 0.0% | 0/2 | 0 | 2 |  |
+| 319 | `edittext_programmatic_focus` | 0.0% | 0/12 | 12 | 12 |  |
+| 320 | `edittext_restrict` | 0.0% | 0/191 | 0 | 191 |  |
+| 321 | `edittext_restrict_paste` | 0.0% | 0/5 | 0 | 5 |  |
+| 322 | `edittext_tab_focus` | 0.0% | 0/13 | 0 | 13 |  |
+| 323 | `edittext_tag_indent` | 0.0% | 0/31 | 31 | 31 |  |
+| 324 | `edittext_text_height_leading` | 0.0% | 0/20 | 20 | 20 |  |
+| 325 | `execution_order1` | 0.0% | 0/5 | 2 | 5 |  |
+| 326 | `extends_native_type` | 0.0% | 0/11 | 0 | 11 |  |
+| 327 | `external_interface_escapexml` | 0.0% | 0/26 | 26 | 26 |  |
+| 328 | `external_interface_jsquotestring` | 0.0% | 0/21 | 21 | 21 |  |
+| 329 | `external_interface_unescapexml` | 0.0% | 0/40 | 40 | 40 |  |
+| 330 | `file_reference_browse_cancel` | 0.0% | 0/21 | 0 | 21 |  |
+| 331 | `focus_keyboard_press` | 0.0% | 0/60 | 0 | 60 |  |
+| 332 | `focus_mouse` | 0.0% | 0/45 | 0 | 45 |  |
+| 333 | `focus_mouse_focusable` | 0.0% | 0/8 | 0 | 8 |  |
+| 334 | `focus_mouse_rollout` | 0.0% | 0/4 | 0 | 4 |  |
+| 335 | `focus_root_movie` | 0.0% | 0/2 | 1 | 2 |  |
+| 336 | `focusrect_focuslost` | 0.0% | 0/4 | 0 | 4 |  |
+| 337 | `focusrect_swf6` | 0.0% | 0/42 | 0 | 42 |  |
+| 338 | `form_loader_encoding_1` | 0.0% | 0/1 | 1 | 1 |  |
+| 339 | `form_loader_encoding_2` | 0.0% | 0/6 | 6 | 3 |  |
+| 340 | `form_loader_encoding_3` | 0.0% | 0/3 | 3 | 3 |  |
+| 341 | `form_loader_encoding_4` | 0.0% | 0/3 | 3 | 3 |  |
+| 342 | `function_base_clip` | 0.0% | 0/8 | 0 | 8 |  |
+| 343 | `function_base_clip_readded` | 0.0% | 0/11 | 0 | 11 |  |
+| 344 | `function_suppress_and_preload` | 0.0% | 0/28 | 0 | 28 |  |
+| 345 | `get_bytes_total` | 0.0% | 0/4 | 4 | 4 |  |
+| 346 | `geturl` | 0.0% | 0/7 | 1 | 7 |  |
+| 347 | `global_instance_decls` | 0.0% | 0/758 | 81 | 758 |  |
+| 348 | `global_proto_decls` | 0.0% | 0/4497 | 2 | 4497 |  |
+| 349 | `global_proto_decls_delete` | 0.0% | 0/4158 | 2 | 4158 |  |
+| 350 | `global_swf5_6_7_8_9` | 0.0% | 0/1145 | 0 | 1145 |  |
+| 351 | `global_swf6_7_8` | 0.0% | 0/15 | 0 | 15 |  |
+| 352 | `goto_execution_order2` | 0.0% | 0/2 | 0 | 2 |  |
+| 353 | `goto_frame` | 0.0% | 0/12 | 0 | 12 |  |
+| 354 | `goto_frame2` | 0.0% | 0/44 | 0 | 44 |  |
+| 355 | `goto_label` | 0.0% | 0/17 | 0 | 17 |  |
+| 356 | `goto_methods` | 0.0% | 0/40 | 0 | 40 |  |
+| 357 | `hittest_lockroot` | 0.0% | 0/15 | 0 | 15 |  |
+| 358 | `hittest_morph` | 0.0% | 0/70 | 0 | 70 |  |
+| 359 | `hittest_morph_input` | 0.0% | 0/1 | 0 | 1 |  |
+| 360 | `hittest_winding_rule` | 0.0% | 0/12 | 0 | 12 |  |
+| 361 | `init_array_invalid` | 0.0% | 0/4 | 0 | 4 |  |
+| 362 | `init_object_invalid` | 0.0% | 0/4 | 0 | 4 |  |
+| 363 | `init_object_order` | 0.0% | 0/15 | 0 | 15 |  |
+| 364 | `input_dead_keys_windows` | 0.0% | 0/15 | 0 | 15 |  |
+| 365 | `instanceof_coercions` | 0.0% | 0/88 | 0 | 88 |  |
+| 366 | `interface_implements_op` | 0.0% | 0/47 | 0 | 47 |  |
+| 367 | `issue_1104` | 0.0% | 0/2 | 0 | 2 |  |
+| 368 | `issue_2084` | 0.0% | 0/16 | 0 | 16 |  |
+| 369 | `issue_2870` | 0.0% | 0/3 | 0 | 3 |  |
+| 370 | `issue_3169` | 0.0% | 0/2 | 0 | 2 |  |
+| 371 | `issue_9327` | 0.0% | 0/2 | 0 | 2 |  |
+| 372 | `issue_9885` | 0.0% | 0/2 | 0 | 2 |  |
+| 373 | `key_isToggled` | 0.0% | 0/9 | 0 | 9 |  |
+| 374 | `loadmovie_fail` | 0.0% | 0/2 | 0 | 2 |  |
+| 375 | `loadmovie_registerclass` | 0.0% | 0/30 | 0 | 30 |  |
+| 376 | `loadmovie_replace_root` | 0.0% | 0/5 | 1 | 5 |  |
+| 377 | `loadmovienum_cross_version_prototype` | 0.0% | 0/9 | 0 | 9 |  |
+| 378 | `loadvariables` | 0.0% | 0/2 | 1 | 2 |  |
+| 379 | `loadvariables_method` | 0.0% | 0/7 | 0 | 7 |  |
+| 380 | `loadvariablesnum` | 0.0% | 0/2 | 1 | 2 |  |
+| 381 | `localconnection` | 0.0% | 0/579 | 0 | 579 |  |
+| 382 | `lock_root` | 0.0% | 0/1 | 0 | 1 |  |
+| 383 | `mcl_as_broadcaster` | 0.0% | 0/12 | 0 | 12 |  |
+| 384 | `mcl_events_swf_version` | 0.0% | 0/232 | 0 | 232 |  |
+| 385 | `mcl_getprogress` | 0.0% | 0/30 | 29 | 30 |  |
+| 386 | `mcl_loadclip_properties` | 0.0% | 0/6 | 0 | 6 |  |
+| 387 | `mcl_loadclip_replace_root` | 0.0% | 0/1 | 0 | 1 |  |
+| 388 | `mcl_mislabeled_target` | 0.0% | 0/6 | 0 | 6 |  |
+| 389 | `mcl_target_gif87a` | 0.0% | 0/6 | 0 | 6 |  |
+| 390 | `mcl_target_gif89a` | 0.0% | 0/6 | 0 | 6 |  |
+| 391 | `mcl_target_jpg` | 0.0% | 0/6 | 0 | 6 |  |
+| 392 | `mcl_target_png` | 0.0% | 0/6 | 0 | 6 |  |
+| 393 | `mcl_unloadclip` | 0.0% | 0/5 | 0 | 5 |  |
+| 394 | `mixed_avm_load_into_root` | 0.0% | 0/2 | 0 | 2 |  |
+| 395 | `mouse_events` | 0.0% | 0/8 | 0 | 8 |  |
+| 396 | `mouse_events_visible_enabled` | 0.0% | 0/12 | 0 | 12 |  |
+| 397 | `mouse_hover_events_while_dragging` | 0.0% | 0/1 | 0 | 1 |  |
+| 398 | `mouse_pos` | 0.0% | 0/665 | 2 | 665 |  |
+| 399 | `mouse_pos_with_scale_factor` | 0.0% | 0/260 | 2 | 260 |  |
+| 400 | `mouse_wheel_enabled` | 0.0% | 0/2 | 2 | 2 |  |
+| 401 | `movieclip_blend_mode_property` | 0.0% | 0/35 | 0 | 35 |  |
+| 402 | `movieclip_create_text_field` | 0.0% | 0/90 | 90 | 90 |  |
+| 403 | `movieclip_in_removed_button` | 0.0% | 0/4 | 0 | 4 |  |
+| 404 | `movieclip_init_object` | 0.0% | 0/5 | 0 | 5 |  |
+| 405 | `movieclip_library_state_values` | 0.0% | 0/78 | 3 | 78 |  |
+| 406 | `movieclip_methods_with_loaded_image` | 0.0% | 0/4 | 0 | 4 |  |
+| 407 | `named_shapes` | 0.0% | 0/14 | 0 | 14 |  |
+| 408 | `native_double_construct` | 0.0% | 0/12 | 0 | 12 |  |
+| 409 | `native_objects_swf6` | 0.0% | 0/84 | 0 | 84 |  |
+| 410 | `native_objects_swf7` | 0.0% | 0/84 | 0 | 84 |  |
+| 411 | `native_objects_swf8` | 0.0% | 0/84 | 0 | 84 |  |
+| 412 | `native_subclasses` | 0.0% | 0/191 | 0 | 191 |  |
+| 413 | `netconnection_send_remote` | 0.0% | 0/50 | 0 | 50 |  |
+| 414 | `netstream_play_flv` | 0.0% | 0/21 | 2 | 21 |  |
+| 415 | `netstream_seek_flv` | 0.0% | 0/25 | 0 | 25 |  |
+| 416 | `new_method_wrap` | 0.0% | 0/4 | 0 | 4 |  |
+| 417 | `new_object_wrap` | 0.0% | 0/4 | 0 | 4 |  |
+| 418 | `object_properties` | 0.0% | 0/31 | 0 | 31 |  |
+| 419 | `object_resolve` | 0.0% | 0/38 | 0 | 38 |  |
+| 420 | `on_construct` | 0.0% | 0/25 | 0 | 25 |  |
+| 421 | `parse_int` | 0.0% | 0/193 | 193 | 64 |  |
+| 422 | `place_and_lookup` | 0.0% | 0/30 | 0 | 30 |  |
+| 423 | `prototype_enumerate` | 0.0% | 0/5 | 2 | 5 |  |
+| 424 | `recursive_prototypes` | 0.0% | 0/2 | 2 | 0 |  |
+| 425 | `register_class_return_value` | 0.0% | 0/16 | 0 | 16 |  |
+| 426 | `register_class_swf6` | 0.0% | 0/37 | 0 | 37 |  |
+| 427 | `register_class_with_sound` | 0.0% | 0/11 | 0 | 11 |  |
+| 428 | `removed_base_clip_tell_target` | 0.0% | 0/2 | 1 | 2 |  |
+| 429 | `removed_target_clip_scope` | 0.0% | 0/35 | 0 | 35 |  |
+| 430 | `resolve_different_root` | 0.0% | 0/2 | 0 | 2 |  |
+| 431 | `root_button_mode` | 0.0% | 0/10 | 1 | 10 |  |
+| 432 | `root_onload` | 0.0% | 0/1 | 0 | 1 |  |
+| 433 | `sandbox_type_local_network` | 0.0% | 0/1 | 1 | 1 |  |
+| 434 | `sandbox_type_remote` | 0.0% | 0/3 | 1 | 3 |  |
+| 435 | `selection` | 0.0% | 0/454 | 0 | 454 |  |
+| 436 | `set_interval` | 0.0% | 0/27 | 18 | 27 |  |
+| 437 | `slash_syntax` | 0.0% | 0/14 | 0 | 14 |  |
+| 438 | `sound_load_start` | 0.0% | 0/3 | 0 | 3 |  |
+| 439 | `sound_multiple_load` | 0.0% | 0/1 | 0 | 1 |  |
+| 440 | `stage_object_enumerate` | 0.0% | 0/4 | 0 | 4 |  |
+| 441 | `string_methods_negative_args` | 0.0% | 0/240 | 0 | 240 |  |
+| 442 | `string_ops_swf6` | 0.0% | 0/96 | 96 | 95 |  |
+| 443 | `string_paths_eval` | 0.0% | 0/4 | 0 | 4 |  |
+| 444 | `string_paths_reference_launder` | 0.0% | 0/2 | 2 | 2 |  |
+| 445 | `string_paths_unload` | 0.0% | 0/1 | 0 | 1 |  |
+| 446 | `string_paths_variable_scopes` | 0.0% | 0/5 | 0 | 5 |  |
+| 447 | `stylesheet` | 0.0% | 0/283 | 0 | 283 |  |
+| 448 | `super_edge_cases` | 0.0% | 0/39 | 0 | 39 |  |
+| 449 | `swf5_to_6_cross_call` | 0.0% | 0/29 | 1 | 29 |  |
+| 450 | `swf5_xml_event_handler_context` | 0.0% | 0/2 | 1 | 2 |  |
+| 451 | `swf6_string_as_bool` | 0.0% | 0/23 | 23 | 15 |  |
+| 452 | `swf6_to_5_cross_call` | 0.0% | 0/29 | 1 | 29 |  |
+| 453 | `tab_ordering_automatic_basic` | 0.0% | 0/92 | 0 | 92 |  |
+| 454 | `tab_ordering_automatic_order_grid` | 0.0% | 0/21 | 0 | 21 |  |
+| 455 | `tab_ordering_automatic_order_same_position` | 0.0% | 0/12 | 0 | 12 |  |
+| 456 | `tab_ordering_children` | 0.0% | 0/208 | 0 | 208 |  |
+| 457 | `tab_ordering_custom_basic` | 0.0% | 0/71 | 0 | 71 |  |
+| 458 | `tab_ordering_custom_duplicate_index` | 0.0% | 0/22 | 0 | 22 |  |
+| 459 | `tab_ordering_custom_i32_vs_u32` | 0.0% | 0/12 | 0 | 12 |  |
+| 460 | `tab_ordering_custom_m1` | 0.0% | 0/29 | 0 | 29 |  |
+| 461 | `tab_ordering_events_mouse` | 0.0% | 0/65 | 0 | 65 |  |
+| 462 | `tab_ordering_movieclip_enabled_default` | 0.0% | 0/462 | 0 | 462 |  |
+| 463 | `tab_ordering_properties_tab_index_edge_case` | 0.0% | 0/4 | 4 | 4 |  |
+| 464 | `tab_ordering_reverse` | 0.0% | 0/51 | 0 | 51 |  |
+| 465 | `tab_ordering_tabbable` | 0.0% | 0/47 | 0 | 47 |  |
+| 466 | `target_clip_removed` | 0.0% | 0/5 | 4 | 5 |  |
+| 467 | `target_clip_swf5` | 0.0% | 0/2 | 0 | 2 |  |
+| 468 | `target_clip_swf6` | 0.0% | 0/2 | 0 | 2 |  |
+| 469 | `target_path` | 0.0% | 0/14 | 0 | 14 |  |
+| 470 | `tell_target_invalid` | 0.0% | 0/6 | 2 | 6 |  |
+| 471 | `tell_target_invalid_swf6` | 0.0% | 0/5 | 2 | 5 |  |
+| 472 | `text_blocks_clicks` | 0.0% | 0/4 | 0 | 4 |  |
+| 473 | `text_format_font_max_length` | 0.0% | 0/2 | 2 | 2 |  |
+| 474 | `textfield_cache_as_bitmap` | 0.0% | 0/1 | 0 | 1 |  |
+| 475 | `textsnapshot_props_swf5` | 0.0% | 0/56 | 37 | 56 |  |
+| 476 | `textsnapshot_text_order` | 0.0% | 0/1 | 1 | 1 |  |
+| 477 | `timer_run_actions` | 0.0% | 0/18 | 0 | 18 |  |
+| 478 | `typeof` | 0.0% | 0/22 | 0 | 22 |  |
+| 479 | `unload` | 0.0% | 0/52 | 23 | 52 |  |
+| 480 | `unload_clip_event` | 0.0% | 0/4 | 0 | 4 |  |
+| 481 | `unload_nested_child` | 0.0% | 0/5 | 3 | 5 |  |
+| 482 | `use_hand_cursor` | 0.0% | 0/8 | 0 | 8 |  |
+| 483 | `variable_args` | 0.0% | 0/5 | 3 | 5 |  |
+| 484 | `watch` | 0.0% | 0/117 | 0 | 117 |  |
+| 485 | `watch_textfield` | 0.0% | 0/12 | 0 | 12 |  |
+| 486 | `watch_virtual_property_proto` | 0.0% | 0/2 | 0 | 2 |  |
+| 487 | `xml_child_nodes_edge_cases` | 0.0% | 0/4 | 4 | 4 |  |
+| 488 | `xml_has_child_nodes` | 0.0% | 0/3 | 3 | 3 |  |
+| 489 | `xml_ignore_comments` | 0.0% | 0/21 | 0 | 21 |  |
+| 490 | `xml_inspect_createmethods` | 0.0% | 0/15 | 5 | 15 |  |
+| 491 | `xml_load` | 0.0% | 0/2 | 0 | 2 |  |
+| 492 | `xml_reparenting` | 0.0% | 0/14 | 0 | 14 |  |
+| 493 | `xml_socket` | 0.0% | 0/8 | 0 | 8 |  |
+| 494 | `xml_socket_close_in_handler` | 0.0% | 0/6 | 0 | 6 |  |
+| 495 | `xml_socket_on_data` | 0.0% | 0/7 | 0 | 7 |  |
+| 496 | `xml_socket_segmented` | 0.0% | 0/29 | 0 | 29 |  |
+| 497 | `xml_to_string` | 0.0% | 0/13 | 5 | 13 |  |
+| 498 | `xml_to_string_comment` | 0.0% | 0/1 | 1 | 1 |  |
+| 499 | `xml_unescaping` | 0.0% | 0/23 | 0 | 23 |  |
+| 500 | `xmlnode_proto` | 0.0% | 0/1 | 0 | 1 |  |
