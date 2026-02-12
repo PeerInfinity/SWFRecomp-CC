@@ -7,8 +7,8 @@ combinations of `valueOf` and `toString` returning String, undefined, or Object 
 
 Tests both plain Objects and Date objects (which have different ToPrimitive hint order).
 
-- **SWF5**: `object_string_coerce_swf5` — 63/65 lines match (actual=74, expected=65)
-- **SWF6**: `object_string_coerce_swf6` — 47/69 lines match (actual=74, expected=69)
+- **SWF5**: `object_string_coerce_swf5` — 62/62 lines match (actual=65, 3 extra lines)
+- **SWF6**: `object_string_coerce_swf6` — 46/68 lines match (actual=65)
 
 ---
 
@@ -50,16 +50,23 @@ Flash's behavior.
 
 ## Remaining Issues
 
-### SWF5: Extra toString call at end (2 extra lines)
+### SWF5: Extra toString call at end (3 extra lines)
 
-Actual output has 2 extra lines near the end:
+Actual output has 65 lines vs 62 expected (62/62 matching). The extra lines appear
+near the end:
 ```
+Date.toString -> {}, valueOf -> {}
 toString called
 [type Object]
+
+toString called     ← extra
+[type Object]       ← extra
 ```
 
-This appears to be a spurious extra toString invocation. Needs investigation into
-whether it's from a Date object section or an extra coercion path.
+This appears to be a spurious extra toString invocation in the Date section. The
+Date `toString->{}` case traces the toString call, gets `[type Object]` from the
+fallback, but then an additional toString call + `[type Object]` output is produced
+(likely from the Add2 `"" + date_obj` path double-calling toString).
 
 ### SWF6: Date ToPrimitive prefers wrong method (~22 lines)
 
