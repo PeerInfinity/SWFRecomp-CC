@@ -4362,12 +4362,14 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 	u8 name_type = STACK[var_name_sp];
 	char* var_name = NULL;
 	u32 var_name_len = 0;
+	u32 string_id = 0;
 
 	// Get the variable name string
 	if (name_type == ACTION_STACK_VALUE_STRING)
 	{
 		var_name = (char*) VAL(u64, &STACK[var_name_sp + 16]);
 		var_name_len = VAL(u32, &STACK[var_name_sp + 8]);
+		string_id = VAL(u32, &STACK[var_name_sp + 12]);
 	}
 	else if (name_type == ACTION_STACK_VALUE_STR_LIST)
 	{
@@ -4402,18 +4404,48 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
-	// Not found in scope chain - check global variables
-	// Note: In Flash, you cannot delete variables declared with 'var', so we return false
-	// However, if the variable doesn't exist at all, we return true (Flash behavior)
-	if (hasVariable(var_name, var_name_len))
+	// Not found in scope chain - try global variables
+	// Check both var_array (by string_id) and var_map (by name)
 	{
-		// Variable exists but is a 'var' declaration - cannot delete
-		success = false;
-	}
-	else
-	{
-		// Variable doesn't exist - Flash returns true
-		success = true;
+		bool found = false;
+		// Check var_array first (used by actionDefineLocal with constant strings)
+		if (string_id != 0)
+		{
+			ActionVar* var = getVariableById(string_id);
+			if (var && !(var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
+			{
+				// Variable exists in var_array — set to undefined
+				if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
+				{
+					free(var->data.string_data.heap_ptr);
+					var->data.string_data.heap_ptr = NULL;
+					var->data.string_data.owns_memory = false;
+				}
+				var->type = ACTION_STACK_VALUE_UNDEFINED;
+				var->data.numeric_value = 0;
+				var->str_size = 0;
+				found = true;
+			}
+		}
+		// Also check var_map
+		if (!found && hasVariable(var_name, var_name_len))
+		{
+			ActionVar* var = getVariable(var_name, var_name_len);
+			if (var)
+			{
+				if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
+				{
+					free(var->data.string_data.heap_ptr);
+					var->data.string_data.heap_ptr = NULL;
+					var->data.string_data.owns_memory = false;
+				}
+				var->type = ACTION_STACK_VALUE_UNDEFINED;
+				var->data.numeric_value = 0;
+				var->str_size = 0;
+				found = true;
+			}
+		}
+		success = true;  // Flash always returns true for Delete2
 	}
 
 	// Push result
@@ -6457,9 +6489,7 @@ void actionNewObject(SWFAppContext* app_context)
 			if (signed_len > 0)
 				alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
 			ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
-			// new Array(n): elements are UNDEFINED (not HOLE)
-			for (u32 i = 0; i < alloc_size; i++)
-				arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+			// new Array(n): elements stay as HOLE (don't enumerate, but join as "undefined")
 			arr->length = length;
 			new_obj = arr;
 		}
@@ -6490,7 +6520,44 @@ void actionNewObject(SWFAppContext* app_context)
 	else if (strcmp(ctor_name, "Object") == 0)
 	{
 		// Handle Object constructor
-		// Create empty object with initial capacity
+		if (num_args > 0)
+		{
+			// Object(x) with an argument — pass through objects/arrays, wrap primitives
+			ActionVar* arg = &args[0];
+			if (arg->type == ACTION_STACK_VALUE_OBJECT)
+			{
+				// Pass through existing object (same reference)
+				retainObject((ASObject*) arg->data.numeric_value);
+				PUSH(ACTION_STACK_VALUE_OBJECT, arg->data.numeric_value);
+				return;
+			}
+			else if (arg->type == ACTION_STACK_VALUE_ARRAY)
+			{
+				// Pass through existing array
+				retainArray((ASArray*) arg->data.numeric_value);
+				PUSH(ACTION_STACK_VALUE_ARRAY, arg->data.numeric_value);
+				return;
+			}
+			else if (arg->type == ACTION_STACK_VALUE_MOVIECLIP)
+			{
+				// Pass through movie clip
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, arg->data.numeric_value);
+				return;
+			}
+			else if (arg->type == ACTION_STACK_VALUE_NULL ||
+			         arg->type == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				// null/undefined → create new empty object (fall through)
+			}
+			else
+			{
+				// Primitive (number, string, boolean) → push as-is
+				// Flash wraps but trace still shows primitive value
+				pushVar(app_context, arg);
+				return;
+			}
+		}
+		// No args or null/undefined arg → create empty object
 		ASObject* obj = allocObject(app_context, 8);
 		setObjectProto(app_context, obj);
 		new_obj = obj;
@@ -6985,9 +7052,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			if (signed_len > 0)
 				alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
 			ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
-			// new Array(n): elements are UNDEFINED (not HOLE)
-			for (u32 i = 0; i < alloc_size; i++)
-				arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+			// new Array(n): elements stay as HOLE (don't enumerate, but join as "undefined")
 			arr->length = length;
 			new_obj = arr;
 		}
@@ -8025,6 +8090,50 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			builtin_handled = 1;
 		}
+	}
+
+	// Array() — called as function, same behavior as new Array()
+	else if (func_name_len == 5 && strncmp(func_name, "Array", 5) == 0)
+	{
+		if (num_args == 0)
+		{
+			// Array() — empty array
+			ASArray* arr = allocArray(app_context, 4);
+			arr->length = 0;
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+		}
+		else if (num_args == 1 &&
+		         (args[0].type == ACTION_STACK_VALUE_F32 ||
+		          args[0].type == ACTION_STACK_VALUE_F64))
+		{
+			// Array(length)
+			double length_d = (args[0].type == ACTION_STACK_VALUE_F32) ?
+				(double) VAL(float, &args[0].data.numeric_value) :
+				VAL(double, &args[0].data.numeric_value);
+			u32 length = (u32) ecmaToInt32(length_d);
+			int32_t signed_len = (int32_t) length;
+			u32 alloc_size = 0;
+			if (signed_len > 0)
+				alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
+			ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
+			arr->length = length;
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+		}
+		else
+		{
+			// Array(elem1, elem2, ...) — array with elements
+			ASArray* arr = allocArray(app_context, num_args);
+			arr->length = num_args;
+			for (u32 i = 0; i < num_args; i++)
+			{
+				setArrayElement(app_context, arr, i, &args[i]);
+			}
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+		}
+		builtin_handled = 1;
 	}
 
 	// Object(value) — wraps primitives in wrapper objects
