@@ -723,13 +723,15 @@ ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 		return NULL;
 	}
 
-	// Initialize elements to undefined
+	// Initialize elements to HOLE (unset sentinel)
 	for (u32 i = 0; i < arr->capacity; i++)
 	{
-		arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+		arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
 		arr->elements[i].str_size = 0;
 		arr->elements[i].data.numeric_value = 0;
 	}
+
+	arr->props = NULL;  // Lazily allocated for non-index properties
 
 #ifdef DEBUG
 	printf("[DEBUG] allocArray: arr=%p, refcount=%u, capacity=%u\n",
@@ -803,6 +805,12 @@ void releaseArray(SWFAppContext* app_context, ASArray* arr)
 			free(arr->elements);
 		}
 
+		// Free non-index properties object
+		if (arr->props != NULL)
+		{
+			releaseObject(app_context, arr->props);
+		}
+
 		// Free array itself
 		free(arr);
 	}
@@ -839,10 +847,10 @@ void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, Action
 
 		arr->elements = new_elements;
 
-		// Initialize new slots to undefined
+		// Initialize new slots to HOLE (unset)
 		for (u32 i = arr->capacity; i < new_capacity; i++)
 		{
-			arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+			arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
 			arr->elements[i].str_size = 0;
 			arr->elements[i].data.numeric_value = 0;
 		}

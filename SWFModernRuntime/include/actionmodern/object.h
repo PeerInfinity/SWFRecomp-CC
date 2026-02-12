@@ -140,9 +140,10 @@ ASObject* getConstructor(ASObject* obj);
 typedef struct ASArray
 {
 	u32 refcount;           // Reference count (starts at 1 on allocation)
-	u32 length;             // Number of elements in the array
+	u32 length;             // Logical length (stored as u32, displayed as i32)
 	u32 capacity;           // Allocated capacity
 	ActionVar* elements;    // Dynamic array of elements
+	ASObject* props;        // Non-index string properties (lazily allocated)
 } ASArray;
 
 /**

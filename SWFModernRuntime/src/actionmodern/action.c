@@ -28,6 +28,16 @@ static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
 
 u32 start_time;
 
+// ECMAScript ToInt32 conversion (used for array length)
+static int32_t ecmaToInt32(double d)
+{
+	if (isnan(d) || isinf(d) || d == 0.0) return 0;
+	double n = fmod(d, 4294967296.0);
+	if (n < 0) n += 4294967296.0;
+	if (n >= 2147483648.0) n -= 4294967296.0;
+	return (int32_t) n;
+}
+
 // ==================================================================
 // Scope Chain for WITH statement
 // ==================================================================
@@ -4679,25 +4689,49 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
 	{
-		// Array enumeration - push indices as strings
+		// Array enumeration - push set indices and non-index props
 		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
 
-		if (arr != NULL && arr->length > 0)
+		if (arr != NULL)
 		{
-			// Enumerate indices in reverse order
-			for (int i = arr->length - 1; i >= 0; i--)
-			{
-				// Convert index to string
-				snprintf(str_buffer, 17, "%d", i);
-				u32 len = strlen(str_buffer);
+			// Push in LIFO order: indices ascending first, then props forward
+			// When popped, this gives: props in reverse, then indices descending
+			// Which matches Flash enumeration order
 
-				// Push index as string
-				PUSH_STR(str_buffer, len);
+			// Push set array indices in ascending order (skip HOLEs)
+			// Use signed length: if negative, don't iterate any element indices
+			int32_t signed_len = (int32_t) arr->length;
+			u32 iter_limit = 0;
+			if (signed_len > 0)
+				iter_limit = (u32)signed_len < arr->capacity ? (u32)signed_len : arr->capacity;
+			for (u32 i = 0; i < iter_limit; i++)
+			{
+				if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
+					continue;
+				char idx_buf[16];
+				snprintf(idx_buf, sizeof(idx_buf), "%u", i);
+				u32 len = strlen(idx_buf);
+				char* idx_str = (char*) HALLOC(len + 1);
+				memcpy(idx_str, idx_buf, len + 1);
+				PUSH_STR(idx_str, len);
+			}
+
+			// Push non-index properties in forward order
+			if (arr->props != NULL && arr->props->num_used > 0)
+			{
+				for (u32 i = 0; i < arr->props->num_used; i++)
+				{
+					const char* pn = arr->props->properties[i].name;
+					u32 pn_len = arr->props->properties[i].name_length;
+					if (pn_len == 9 && strncmp(pn, "__proto__", 9) == 0)
+						continue;
+					PUSH_STR(pn, pn_len);
+				}
 			}
 		}
 
 		#ifdef DEBUG
-		printf("// Enumerate2: enumerated %u indices from array\n",
+		printf("// Enumerate2: enumerated array (length=%u)\n",
 			arr ? arr->length : 0);
 		#endif
 	}
@@ -5908,37 +5942,90 @@ void actionSetMember(SWFAppContext* app_context)
 			// Check for "length" property
 			if (prop_name_len == 6 && strncmp(prop_name, "length", 6) == 0)
 			{
-				// Set array length (truncate or extend)
-				int new_len = 0;
+				// Flash AS2: length is stored as signed 32-bit
+				double dval = 0;
 				if (value_var.type == ACTION_STACK_VALUE_F32)
-					new_len = (int) VAL(float, &value_var.data.numeric_value);
+					dval = (double) VAL(float, &value_var.data.numeric_value);
 				else if (value_var.type == ACTION_STACK_VALUE_F64)
-					new_len = (int) VAL(double, &value_var.data.numeric_value);
-				if (new_len >= 0)
+					dval = VAL(double, &value_var.data.numeric_value);
+
+				u32 new_len = (u32) ecmaToInt32(dval);
+
+				// Truncation: mark elements beyond new_len as HOLE
+				if (new_len < arr->length)
 				{
-					if ((u32)new_len > arr->capacity)
+					u32 cap_limit = new_len < arr->capacity ? arr->capacity : new_len;
+					for (u32 i = new_len; i < cap_limit && i < arr->length; i++)
 					{
-						arr->elements = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_len);
-						// Zero-init new elements
-						for (u32 i = arr->capacity; i < (u32)new_len; i++)
+						arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
+						arr->elements[i].data.numeric_value = 0;
+						arr->elements[i].str_size = 0;
+					}
+				}
+
+				// Extension: only allocate if new_len is reasonable (< 1M)
+				// and greater than current capacity
+				if (new_len > arr->capacity && (int32_t)new_len > 0 && new_len < 1048576)
+				{
+					u32 new_cap = new_len * 2;
+					ActionVar* new_elems = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_cap);
+					if (new_elems != NULL)
+					{
+						arr->elements = new_elems;
+						for (u32 i = arr->capacity; i < new_cap; i++)
 						{
-							arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+							arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
 							arr->elements[i].data.numeric_value = 0;
 							arr->elements[i].str_size = 0;
 						}
-						arr->capacity = new_len;
+						arr->capacity = new_cap;
 					}
-					arr->length = new_len;
 				}
+
+				arr->length = new_len;
 			}
 			else
 			{
 				// Try as numeric index
+				// Flash AS2: non-negative integer indices 0..INT_MAX update length
 				char* endptr;
-				long index = strtol(prop_name, &endptr, 10);
-				if (*endptr == '\0' && index >= 0)
+				long long index_ll = strtoll(prop_name, &endptr, 10);
+				int is_valid_index = (*endptr == '\0' && index_ll >= 0 && index_ll <= 2147483647LL);
+
+				if (is_valid_index)
 				{
-					setArrayElement(app_context, arr, (u32)index, &value_var);
+					u32 idx_u32 = (u32) index_ll;
+
+					// Small index: store in elements array
+					if (idx_u32 < 1048576 || idx_u32 < arr->capacity)
+					{
+						setArrayElement(app_context, arr, idx_u32, &value_var);
+					}
+					else
+					{
+						// Large index: store as string prop
+						if (arr->props == NULL)
+						{
+							arr->props = allocObject(app_context, 4);
+							retainObject(arr->props);
+						}
+						setProperty(app_context, arr->props, prop_name, prop_name_len, &value_var);
+					}
+
+					// Update length = max(length, index+1) unsigned
+					u32 new_len = idx_u32 + 1;
+					if (new_len > arr->length)
+						arr->length = new_len;
+				}
+				else if (prop_name_len > 0)
+				{
+					// Non-index property (negative, fractional, or string key)
+					if (arr->props == NULL)
+					{
+						arr->props = allocObject(app_context, 4);
+						retainObject(arr->props);
+					}
+					setProperty(app_context, arr->props, prop_name, prop_name_len, &value_var);
 				}
 			}
 		}
@@ -6210,36 +6297,59 @@ void actionGetMember(SWFAppContext* app_context)
 		// Check if accessing the "length" property
 		if (strcmp(prop_name, "length") == 0)
 		{
-			// Push array length as double
-			double len = (double) arr->length;
+			// Push array length as signed i32 → double (Flash AS2 semantics)
+			double len = (double) (int32_t) arr->length;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &len));
 		}
 		else
 		{
 			// Try to parse property name as an array index
 			char* endptr;
-			long index = strtol(prop_name, &endptr, 10);
+			long long index = strtoll(prop_name, &endptr, 10);
 
 			// Check if conversion was successful and entire string was consumed
-			if (*endptr == '\0' && index >= 0)
+			// Valid array indices are 0 to INT_MAX (2147483647)
+			if (*endptr == '\0' && index >= 0 && index <= 2147483647LL)
 			{
-				// Valid numeric index
+				// Valid numeric index — try elements array first
 				ActionVar* elem = getArrayElement(arr, (u32)index);
-				if (elem != NULL)
+				if (elem != NULL && elem->type != ACTION_STACK_VALUE_HOLE)
 				{
-					// Element exists - push its value
 					pushVar(app_context, elem);
+				}
+				else if (arr->props != NULL)
+				{
+					// Might be stored in props (large index)
+					ActionVar* pv = getProperty(arr->props, prop_name, prop_name_len);
+					if (pv != NULL)
+						pushVar(app_context, pv);
+					else
+						pushUndefined(app_context);
 				}
 				else
 				{
-					// Index out of bounds - push undefined
 					pushUndefined(app_context);
 				}
 			}
 			else
 			{
-				// Non-numeric property name - arrays don't have other properties
-				pushUndefined(app_context);
+				// Non-index property — check array's props object
+				if (arr->props != NULL)
+				{
+					ActionVar* pv = getPropertyWithPrototype(arr->props, prop_name, prop_name_len);
+					if (pv != NULL)
+					{
+						pushVar(app_context, pv);
+					}
+					else
+					{
+						pushUndefined(app_context);
+					}
+				}
+				else
+				{
+					pushUndefined(app_context);
+				}
 			}
 		}
 	}
@@ -6337,23 +6447,21 @@ void actionNewObject(SWFAppContext* app_context)
 		          args[0].type == ACTION_STACK_VALUE_F64))
 		{
 			// new Array(length) - array with specified length
+			// Flash stores length as u32 via ToInt32, negative values wrap (e.g. -1 → 0xFFFFFFFF)
 			double length_d = (args[0].type == ACTION_STACK_VALUE_F32) ?
 				(double) VAL(float, &args[0].data.numeric_value) :
 				VAL(double, &args[0].data.numeric_value);
-			if (length_d < 0 || length_d != length_d || length_d > 0x7FFFFFFF)
-			{
-				// Negative, NaN, or too large — create empty array
-				ASArray* arr = allocArray(app_context, 4);
-				arr->length = 0;
-				new_obj = arr;
-			}
-			else
-			{
-				u32 length = (u32) length_d;
-				ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
-				arr->length = length;
-				new_obj = arr;
-			}
+			u32 length = (u32) ecmaToInt32(length_d);
+			int32_t signed_len = (int32_t) length;
+			u32 alloc_size = 0;
+			if (signed_len > 0)
+				alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
+			ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
+			// new Array(n): elements are UNDEFINED (not HOLE)
+			for (u32 i = 0; i < alloc_size; i++)
+				arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+			arr->length = length;
+			new_obj = arr;
 		}
 		else
 		{
@@ -6867,23 +6975,21 @@ void actionNewMethod(SWFAppContext* app_context)
 		          args[0].type == ACTION_STACK_VALUE_F64))
 		{
 			// new Array(length) - array with specified length
+			// Flash stores length as u32 via ToInt32, negative values wrap (e.g. -1 → 0xFFFFFFFF)
 			double length_d = (args[0].type == ACTION_STACK_VALUE_F32) ?
 				(double) VAL(float, &args[0].data.numeric_value) :
 				VAL(double, &args[0].data.numeric_value);
-			if (length_d < 0 || length_d != length_d || length_d > 0x7FFFFFFF)
-			{
-				// Negative, NaN, or too large — create empty array
-				ASArray* arr = allocArray(app_context, 4);
-				arr->length = 0;
-				new_obj = arr;
-			}
-			else
-			{
-				u32 length = (u32) length_d;
-				ASArray* arr = allocArray(app_context, length > 0 ? length : 4);
-				arr->length = length;
-				new_obj = arr;
-			}
+			u32 length = (u32) ecmaToInt32(length_d);
+			int32_t signed_len = (int32_t) length;
+			u32 alloc_size = 0;
+			if (signed_len > 0)
+				alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
+			ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
+			// new Array(n): elements are UNDEFINED (not HOLE)
+			for (u32 i = 0; i < alloc_size; i++)
+				arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+			arr->length = length;
+			new_obj = arr;
 		}
 		else
 		{
@@ -8164,7 +8270,7 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 		buf[0] = '\0';
 		return 0;
 	}
-	if (v->type == ACTION_STACK_VALUE_UNDEFINED)
+	if (v->type == ACTION_STACK_VALUE_UNDEFINED || v->type == ACTION_STACK_VALUE_HOLE)
 		return snprintf(buf, buf_size, "undefined");
 	if (v->type == ACTION_STACK_VALUE_NULL)
 		return snprintf(buf, buf_size, "null");
@@ -8372,7 +8478,12 @@ static int callArrayMethod(SWFAppContext* app_context,
 		char* buf = (char*) HALLOC(buf_cap);
 		u32 buf_len = 0;
 
-		for (u32 i = 0; i < arr->length; i++)
+		// Use signed length for iteration: negative = empty
+		int32_t signed_join_len = (int32_t) arr->length;
+		u32 join_limit = 0;
+		if (signed_join_len > 0)
+			join_limit = (u32)signed_join_len < arr->capacity ? (u32)signed_join_len : arr->capacity;
+		for (u32 i = 0; i < join_limit; i++)
 		{
 			if (i > 0)
 			{
@@ -8386,7 +8497,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 			}
 			char elem_str[64];
 			ActionVar* elem = getArrayElement(arr, i);
-			int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+			int elen;
+			// Flash: HOLE elements produce "undefined" in join (unlike JS empty string)
+			elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
 			while (buf_len + elen + 1 > buf_cap)
 			{
 				buf_cap *= 2;
@@ -8580,6 +8693,52 @@ static int callArrayMethod(SWFAppContext* app_context,
 		}
 
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) deleted);
+		return 1;
+	}
+
+	// hasOwnProperty(key) - check if array has own property at key
+	if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
+	{
+		if (num_args > 0)
+		{
+			// Convert argument to string
+			char key_buf[64];
+			int key_len = varToStringBuf(app_context, &args[0], key_buf, sizeof(key_buf));
+
+			// Try as numeric index
+			char* endptr;
+			long index = strtol(key_buf, &endptr, 10);
+			if (*endptr == '\0' && index >= 0 && index <= 2147483647L)
+			{
+				// Check if array element is set (not a hole)
+				ActionVar* elem = getArrayElement(arr, (u32)index);
+				if (elem != NULL && elem->type != ACTION_STACK_VALUE_HOLE)
+				{
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, 1);
+				}
+				else
+				{
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+				}
+			}
+			else
+			{
+				// Check non-index props
+				if (arr->props != NULL)
+				{
+					ActionVar* pv = getProperty(arr->props, key_buf, key_len);
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, pv != NULL ? 1 : 0);
+				}
+				else
+				{
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+				}
+			}
+		}
+		else
+		{
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+		}
 		return 1;
 	}
 
