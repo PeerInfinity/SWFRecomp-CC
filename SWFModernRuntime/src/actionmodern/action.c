@@ -1857,27 +1857,36 @@ void actionLess2(SWFAppContext* app_context)
 	ActionVar left;
 	popVar(app_context, &left);
 
-	// Convert object operands via valueOf only (number hint — no toString fallback)
-	if (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY)
+	// Track which operands were objects
+	int left_was_obj = (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY);
+	int right_was_obj = (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY);
+
+	// Convert objects to primitives (left first for correct valueOf evaluation order)
+	// Distinguish "no valueOf found" (conversion failed → false) from
+	// "valueOf returned undefined" (conversion succeeded → use undefined in comparison)
+	if (left_was_obj)
 	{
-		int vo_found = 0;
-		ActionVar vo = objectCallValueOf(app_context, &left, &vo_found);
-		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
-		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		int left_ok = 1;
+		ActionVar prim = objectToPrimitive(app_context, &left, &left_ok);
+		if (!left_ok)
 		{
-			left = vo;
+			// Left has no valueOf/toString at all — return false immediately
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
 		}
-		// else: no valueOf or returned non-primitive → numeric path gives NaN
+		left = prim;
 	}
-	if (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY)
+	if (right_was_obj)
 	{
-		int vo_found = 0;
-		ActionVar vo = objectCallValueOf(app_context, &right, &vo_found);
-		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
-		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		int right_ok = 1;
+		ActionVar prim = objectToPrimitive(app_context, &right, &right_ok);
+		if (!right_ok)
 		{
-			right = vo;
+			// Right has no valueOf/toString — return false
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
 		}
+		right = prim;
 	}
 
 	// If both are strings, lexicographic comparison
@@ -1914,8 +1923,8 @@ void actionLess2(SWFAppContext* app_context)
 		double right_val = varToDouble(&right);
 		if (isnan(left_val) || isnan(right_val))
 		{
-			// NaN comparison returns false (not undefined) per ECMAScript/SWF spec
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			// NaN comparison returns undefined in Flash (differs from ECMAScript)
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		}
 		else
 		{
@@ -1928,32 +1937,37 @@ void actionLess2(SWFAppContext* app_context)
 void actionGreater(SWFAppContext* app_context)
 {
 	// ActionGreater (0x67) — SWF6+ only
-	// Pop both, convert objects via valueOf (number hint), then compare.
+	// Pop both, convert objects via objectToPrimitive, then compare.
 	ActionVar right;
 	popVar(app_context, &right);
 	ActionVar left;
 	popVar(app_context, &left);
 
-	// Convert object operands via valueOf only (number hint — no toString fallback)
-	if (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY)
+	// Convert objects to primitives (with early bail if no valueOf/toString)
+	int left_was_obj = (left.type == ACTION_STACK_VALUE_OBJECT || left.type == ACTION_STACK_VALUE_ARRAY);
+	int right_was_obj = (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY);
+
+	if (left_was_obj)
 	{
-		int vo_found = 0;
-		ActionVar vo = objectCallValueOf(app_context, &left, &vo_found);
-		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
-		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		int left_ok = 1;
+		ActionVar prim = objectToPrimitive(app_context, &left, &left_ok);
+		if (!left_ok)
 		{
-			left = vo;
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
 		}
+		left = prim;
 	}
-	if (right.type == ACTION_STACK_VALUE_OBJECT || right.type == ACTION_STACK_VALUE_ARRAY)
+	if (right_was_obj)
 	{
-		int vo_found = 0;
-		ActionVar vo = objectCallValueOf(app_context, &right, &vo_found);
-		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
-		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
+		int right_ok = 1;
+		ActionVar prim = objectToPrimitive(app_context, &right, &right_ok);
+		if (!right_ok)
 		{
-			right = vo;
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
 		}
+		right = prim;
 	}
 
 	// If both are strings, lexicographic comparison
@@ -1990,8 +2004,8 @@ void actionGreater(SWFAppContext* app_context)
 		double right_val = varToDouble(&right);
 		if (isnan(left_val) || isnan(right_val))
 		{
-			// NaN comparison returns false (not undefined) per ECMAScript/SWF spec
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			// NaN comparison returns undefined in Flash (differs from ECMAScript)
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		}
 		else
 		{
@@ -4863,25 +4877,11 @@ void actionEquals2(SWFAppContext* app_context)
 	}
 	else if (a_is_obj)
 	{
-		// Convert via valueOf only (number hint — no toString fallback)
-		int vo_found = 0;
-		ActionVar vo = objectCallValueOf(app_context, &a, &vo_found);
-		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
-		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
-		{
-			a = vo;
-		}
-		// else: leave as object (will likely mismatch types → false)
+		a = objectToPrimitive(app_context, &a, NULL);
 	}
 	else if (b_is_obj)
 	{
-		int vo_found = 0;
-		ActionVar vo = objectCallValueOf(app_context, &b, &vo_found);
-		if (vo_found && vo.type != ACTION_STACK_VALUE_OBJECT &&
-		    vo.type != ACTION_STACK_VALUE_ARRAY && vo.type != ACTION_STACK_VALUE_FUNCTION)
-		{
-			b = vo;
-		}
+		b = objectToPrimitive(app_context, &b, NULL);
 	}
 
 	float result = 0.0f;
