@@ -64,6 +64,10 @@ Do NOT run the full suite locally. Instead:
 | `SWFModernRuntime/include/actionmodern/stackvalue.h` | Type enum |
 | `SWFRecomp/src/action/action.cpp` | Bytecode → C translator |
 
+### SWF specification
+
+The SWF file format specification (version 19) is at `SWFRecompDocs/specs/swf-spec-19.txt`. Use this as the authoritative reference for tag formats, bytecode opcodes, and data structures.
+
 ## Test Infrastructure Reference
 
 ### Ruffle test files

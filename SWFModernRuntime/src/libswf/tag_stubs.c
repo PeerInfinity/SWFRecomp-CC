@@ -33,6 +33,12 @@ static size_t ng_find_sprite(size_t char_id)
 	return (size_t)-1;
 }
 
+// Clear the NO_GRAPHICS display list (called on goto-rewind)
+void ng_display_clear(void)
+{
+	ng_display_count = 0;
+}
+
 // Stub implementations for console-only mode
 // Note: tagInit() is provided by the generated tagMain.c file
 

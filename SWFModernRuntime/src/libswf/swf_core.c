@@ -66,7 +66,10 @@ void swfStart(SWFAppContext* app_context)
 	frame_func* funcs = app_context->frame_funcs;
 	current_frame = 0;
 #ifdef MAX_FRAMES
-	const size_t max_ticks = MAX_FRAMES;
+	// MAX_FRAMES is the Ruffle test's num_frames (number of frame advances).
+	// Our tick-based loop may need more iterations because goto jumps consume
+	// ticks without advancing the frame count. Use a generous multiplier.
+	const size_t max_ticks = MAX_FRAMES * 10 + 10;
 #else
 	const size_t max_ticks = 10000;
 #endif

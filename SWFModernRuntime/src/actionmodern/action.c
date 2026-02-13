@@ -3494,6 +3494,13 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		return;
 	}
 
+#ifdef NO_GRAPHICS
+	// Clear the NO_GRAPHICS display list so sprites get re-placed
+	// and their frame_0 functions re-execute on the target frame
+	extern void ng_display_clear(void);
+	ng_display_clear();
+#endif
+
 	next_frame = frame;
 	manual_next_frame = 1;
 	is_playing = 0;
