@@ -6524,7 +6524,48 @@ void actionSetMember(SWFAppContext* app_context)
 			setProperty(app_context, func->own_props, prop_name, prop_name_len, &value_var);
 		}
 	}
-	// If it's not an object, array, or function type, we silently ignore the operation
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+		if (mc != NULL)
+		{
+			// Handle built-in writable properties
+			if (prop_name_len > 0 && prop_name[0] == '_')
+			{
+				double dval = varToDouble(&value_var);
+				float fval = (float)dval;
+				if (strcasecmp(prop_name, "_x") == 0) { mc->x = fval; return; }
+				if (strcasecmp(prop_name, "_y") == 0) { mc->y = fval; return; }
+				if (strcasecmp(prop_name, "_xscale") == 0) { mc->xscale = fval; return; }
+				if (strcasecmp(prop_name, "_yscale") == 0) { mc->yscale = fval; return; }
+				if (strcasecmp(prop_name, "_rotation") == 0) { mc->rotation = fval; return; }
+				if (strcasecmp(prop_name, "_alpha") == 0) { mc->alpha = fval; return; }
+				if (strcasecmp(prop_name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; return; }
+				if (strcasecmp(prop_name, "_width") == 0) { mc->width = fval; return; }
+				if (strcasecmp(prop_name, "_height") == 0) { mc->height = fval; return; }
+				if (strcasecmp(prop_name, "_quality") == 0)
+				{
+					char buf[16];
+					int len = varToStringBuf(app_context, &value_var, buf, sizeof(buf));
+					if (len > 0) { memcpy(mc->quality, buf, len); mc->quality[len] = '\0'; }
+					return;
+				}
+				if (strcasecmp(prop_name, "_highquality") == 0) { mc->highquality = fval; return; }
+				if (strcasecmp(prop_name, "_focusrect") == 0) { mc->focusrect = fval; return; }
+				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
+			}
+			// User-defined property: store in dynamic_props and as global variable
+			if (mc->dynamic_props == NULL)
+			{
+				mc->dynamic_props = (void*) allocObject(app_context, 4);
+				retainObject((ASObject*) mc->dynamic_props);
+			}
+			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
+			// Also set as global variable (timeline variables are mc properties and vice versa)
+			setVariableByName(prop_name, &value_var);
+		}
+	}
+	// If it's not an object, array, function, or movieclip type, we silently ignore the operation
 	// (Flash behavior for setting properties on non-objects)
 }
 
@@ -6911,7 +6952,28 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 		}
 
-		// Fall back to MovieClip.prototype chain for user-defined properties
+		// Check user-defined dynamic properties
+		if (mc != NULL && mc->dynamic_props != NULL)
+		{
+			ActionVar* prop = getProperty((ASObject*) mc->dynamic_props, prop_name, prop_name_len);
+			if (prop != NULL)
+			{
+				pushVar(app_context, prop);
+				return;
+			}
+		}
+
+		// Fall back to global variable map (timeline variables are accessible as mc properties)
+		{
+			ActionVar* var = getVariable((char*)prop_name, prop_name_len);
+			if (var != NULL)
+			{
+				pushVar(app_context, var);
+				return;
+			}
+		}
+
+		// Fall back to MovieClip.prototype chain
 		extern ASFunction g_movieclip_constructor;
 		extern int g_movieclip_constructor_init;
 		if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL)

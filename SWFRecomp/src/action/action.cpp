@@ -1220,16 +1220,16 @@ namespace SWFRecomp
 					<< "{" << endl
 					<< "\tchar str_buffer[17];" << endl;
 
-				// Parse flags
-				bool preload_this = (flags & 0x0001);
-				bool preload_arguments = (flags & 0x0002);
-				bool preload_super = (flags & 0x0004);
-				bool preload_root = (flags & 0x0008);
-				bool preload_parent = (flags & 0x0010);
-				bool preload_global = (flags & 0x0020);
-				bool suppress_this = (flags & 0x0080);
-				bool suppress_arguments = (flags & 0x0100);
-				bool suppress_super = (flags & 0x0200);
+				// Parse flags (SWF spec bit layout)
+				bool preload_this       = (flags & 0x0001); // Bit 0
+				bool suppress_this      = (flags & 0x0002); // Bit 1
+				bool preload_arguments  = (flags & 0x0004); // Bit 2
+				bool suppress_arguments = (flags & 0x0008); // Bit 3
+				bool preload_super      = (flags & 0x0010); // Bit 4
+				bool suppress_super     = (flags & 0x0020); // Bit 5
+				bool preload_root       = (flags & 0x0040); // Bit 6
+				bool preload_parent     = (flags & 0x0080); // Bit 7
+				bool preload_global     = (flags & 0x0100); // Bit 8
 
 				// Calculate actual register count needed (may exceed declared register_count)
 				int next_reg = 1; // Register 0 is reserved

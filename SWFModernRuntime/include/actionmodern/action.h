@@ -36,6 +36,7 @@ struct MovieClip {
 	float xmouse;
 	float ymouse;
 	MovieClip* parent;     // Parent MovieClip (_root has NULL parent)
+	void* dynamic_props;   // ASObject* for user-defined properties (lazily allocated)
 };
 
 // Global root MovieClip
