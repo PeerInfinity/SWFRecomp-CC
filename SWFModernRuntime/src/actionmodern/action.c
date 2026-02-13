@@ -10680,30 +10680,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
-			// Check MovieClip prototype for user-defined methods
-			extern ASFunction g_movieclip_constructor;
-			extern int g_movieclip_constructor_init;
-			if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL)
-			{
-				ActionVar* method_prop = getPropertyWithPrototype(g_movieclip_constructor.prototype_obj, method_name, method_name_len);
-				if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
-				{
-					ASFunction* func = lookupFunctionFromVar(method_prop);
-					if (func != NULL && func->function_type == 2)
-					{
-						ActionVar* registers = NULL;
-						if (func->register_count > 0)
-							registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-						g_call_depth++;
-						ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) mc);
-						g_call_depth--;
-						if (registers != NULL) FREE(registers);
-						if (args != NULL) FREE(args);
-						pushVar(app_context, &result);
-						return;
-					}
-				}
-			}
+			// Unknown method on MovieClip — push undefined.
+			// Note: can't safely call Object.prototype methods (hasOwnProperty etc.)
+			// because they expect ASObject* but MovieClip has a different layout.
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;

@@ -132,22 +132,26 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		size_t si = ng_find_sprite(char_id);
 
-		// Only track sprites in the display list — non-sprite characters
-		// (shapes, text) don't need timeline tracking and would corrupt
-		// sprite entries during backward goto catch-up replay.
-		if (si == (size_t)-1) return;
-
 		// Check if depth already occupied
 		for (size_t i = 0; i < ng_display_count; i++)
 		{
 			if (ng_display[i].depth == depth)
 			{
+				if (si == (size_t)-1)
+				{
+					// Non-sprite at occupied depth: don't replace sprites
+					// (prevents corruption during backward goto catch-up)
+					if (ng_display[i].sprite_idx != (size_t)-1) return;
+					// Replace other non-sprites (update placed_at_frame)
+					ng_display[i].placed_at_frame = current_frame;
+					return;
+				}
 				if (ng_display[i].sprite_idx == si)
 				{
 					// Same sprite already at this depth - don't re-execute
 					return;
 				}
-				// Different sprite - replace (preserve instance_name)
+				// Different sprite (or replacing non-sprite) - replace
 				ng_display[i].sprite_idx = si;
 				ng_display[i].current_frame = 0;
 				ng_display[i].is_playing = 1;
@@ -173,7 +177,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[ng_display_count].instance_name[0] = '\0';
 			ng_display_count++;
 			// Execute frame 0 for sprites
-			if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
+			if (si != (size_t)-1 && ng_sprites[si].funcs && ng_sprites[si].funcs[0])
 			{
 				ng_nesting_depth++;
 				ng_sprites[si].funcs[0](app_context);
