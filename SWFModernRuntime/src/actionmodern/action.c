@@ -4018,14 +4018,31 @@ void actionGetVariable(SWFAppContext* app_context)
 			{
 				global_object = allocObject(app_context, 16);
 			}
-			// Lazily add valueOf=undefined (heap must be ready for HALLOC)
-			static int global_valueOf_set = 0;
-			if (!global_valueOf_set)
+			// Lazily initialize _global with valueOf and built-in constructors
+			static int global_init_done = 0;
+			if (!global_init_done)
 			{
 				ActionVar undef_val = {0};
 				undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
 				setProperty(app_context, global_object, "valueOf", 7, &undef_val);
-				global_valueOf_set = 1;
+
+				// Register built-in constructor functions on _global
+				// so _global.Object, _global.Array etc. work via NewMethod
+				static ASFunction g_ctors[6];
+				memset(g_ctors, 0, sizeof(g_ctors));
+				const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
+				int ctor_name_lens[] = {6, 5, 6, 6, 7, 8};
+				for (int ci = 0; ci < 6; ci++)
+				{
+					strncpy(g_ctors[ci].name, ctor_names[ci], 255);
+					g_ctors[ci].function_type = 1;
+					ActionVar cv = {0};
+					cv.type = ACTION_STACK_VALUE_FUNCTION;
+					cv.data.numeric_value = (u64)&g_ctors[ci];
+					setProperty(app_context, global_object, ctor_names[ci], ctor_name_lens[ci], &cv);
+				}
+
+				global_init_done = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
 			return;
@@ -7869,8 +7886,17 @@ void actionNewMethod(SWFAppContext* app_context)
 				}
 				else if (method_prop->type == ACTION_STACK_VALUE_FUNCTION)
 				{
-					// Property is a user-defined function - use it as constructor
-					user_ctor_func = (ASFunction*) method_prop->data.numeric_value;
+					ASFunction* mfunc = (ASFunction*) method_prop->data.numeric_value;
+					if (mfunc != NULL && mfunc->name[0] != '\0' && mfunc->simple_func == NULL && mfunc->advanced_func == NULL)
+					{
+						// Built-in constructor stub (registered on _global) — use name for dispatch
+						ctor_name = mfunc->name;
+					}
+					else
+					{
+						// User-defined function - use it as constructor
+						user_ctor_func = mfunc;
+					}
 				}
 			}
 		}
@@ -7933,9 +7959,18 @@ void actionNewMethod(SWFAppContext* app_context)
 	else if (ctor_name != NULL && strcmp(ctor_name, "Object") == 0)
 	{
 		// Handle Object constructor
-		ASObject* obj = allocObject(app_context, 8);
-		new_obj = obj;
-		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		if (num_args > 0 && args[0].type != ACTION_STACK_VALUE_UNDEFINED && args[0].type != ACTION_STACK_VALUE_NULL)
+		{
+			// new Object(value) returns the value coerced to object
+			// For strings/numbers, Flash returns the primitive itself
+			pushVar(app_context, &args[0]);
+		}
+		else
+		{
+			ASObject* obj = allocObject(app_context, 8);
+			new_obj = obj;
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		}
 	}
 	else if (ctor_name != NULL && strcmp(ctor_name, "Date") == 0)
 	{
@@ -9349,9 +9384,24 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Simple functions expect arguments on the stack, not in an array
 				// We need to push arguments back onto stack in correct order
 
-				// Remember stack position BEFORE pushing arguments
-				// After function executes (pops args + pushes return), sp should be sp_before + 24
-				u32 sp_before_args = SP;
+				// Create local scope object for function-local variables
+				ASObject* local_scope = allocObject(app_context, 8);
+
+				// Create arguments array and set on local scope
+				ASArray* arguments_arr = allocArray(app_context, num_args > 0 ? num_args : 1);
+				for (u32 i = 0; i < num_args; i++)
+				{
+					setArrayElement(app_context, arguments_arr, i, &args[i]);
+				}
+				ActionVar args_var = {0};
+				args_var.type = ACTION_STACK_VALUE_ARRAY;
+				args_var.data.numeric_value = (u64) arguments_arr;
+				setProperty(app_context, local_scope, "arguments", 9, &args_var);
+
+				// Push local scope onto scope chain
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_chain[scope_depth++] = local_scope;
+				}
 
 				// Push arguments onto stack in order (first to last)
 				// The function will pop them and bind to parameter names
@@ -9365,6 +9415,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 				// Call the simple function (cast to correct return type — generated functions return ActionVar)
 				ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+				// Pop local scope from scope chain
+				if (scope_depth > 0) {
+					scope_depth--;
+				}
+				releaseObject(app_context, local_scope);
+
 				pushVar(app_context, &func_result);
 			}
 
