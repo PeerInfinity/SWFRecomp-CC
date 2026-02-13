@@ -4138,8 +4138,8 @@ void actionGetVariable(SWFAppContext* app_context)
 				ASObject* security_obj = allocObject(app_context, 4);
 				ActionVar sandbox_val = {0};
 				sandbox_val.type = ACTION_STACK_VALUE_STRING;
-				sandbox_val.str_size = 13;
-				VAL(u64, &sandbox_val.data.numeric_value) = (u64)"localWithFile";
+				sandbox_val.str_size = 16;
+				VAL(u64, &sandbox_val.data.numeric_value) = (u64)"localWithNetwork";
 				setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
 				ActionVar security_var = {0};
 				security_var.type = ACTION_STACK_VALUE_OBJECT;
