@@ -1,30 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a5a14902b8cd` (2026-02-13T03:33:31.841390+00:00)
-**Current:** `e661a6519800` (2026-02-13T04:19:12.343395+00:00)
+**Previous:** `e661a6519800` (2026-02-13T04:19:12.343395+00:00)
+**Current:** `688277072b98` (2026-02-13T04:26:18.252614+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 117 | 122 | +5 |
+| Passing | 122 | 122 | 0 |
 | Total | 616 | 616 | 0 |
-| Pass rate | 19.0% | 19.8% | +0.8% |
-| Mismatched lines | 56406 | 56398 | -8 |
-|   Decreased | | | -8 |
+| Pass rate | 19.8% | 19.8% | 0% |
+| Mismatched lines | 56398 | 56397 | -1 |
+|   Decreased | | | -2 |
+|   Increased | | | +1 |
 
-## Newly Passing (5)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `as_set_prop_flags_version_swf6` | output_mismatch | 0/1 | 1/1 |
-| `as_set_prop_flags_version_swf7` | output_mismatch | 0/1 | 1/1 |
-| `as_set_prop_flags_version_swf8` | output_mismatch | 0/1 | 1/1 |
-| `as_set_prop_flags_version_swf9` | output_mismatch | 0/1 | 1/1 |
-| `swf4_function_calls` | output_mismatch | 5/7 | 7/7 |
+| `sandbox_type_local_network` | output_mismatch | 0/1 | 1/1 |
+
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `sandbox_type_local_file` | output_mismatch | 1/1 | 0/1 |
 
 ## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `as_set_prop_flags_version` | output_mismatch | 16/31 | 18/31 | -2 |
+| `sandbox_type_remote` | output_mismatch | 0/3 | 1/3 | -1 |

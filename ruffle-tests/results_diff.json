@@ -1,124 +1,76 @@
 {
   "metadata": {
-    "old_timestamp": "2026-02-13T03:33:31.841390+00:00",
-    "old_git_sha": "a5a14902b8cdb7b263ac4cd740ff72ab354d6982",
-    "new_timestamp": "2026-02-13T04:19:12.343395+00:00",
-    "new_git_sha": "e661a6519800c98ebd9e558a4734fa18facc14d6",
+    "old_timestamp": "2026-02-13T04:19:12.343395+00:00",
+    "old_git_sha": "e661a6519800c98ebd9e558a4734fa18facc14d6",
+    "new_timestamp": "2026-02-13T04:26:18.252614+00:00",
+    "new_git_sha": "688277072b980528cc82699750010c2d9c7a53d6",
     "partial": false
   },
   "summary": {
-    "old_pass": 117,
+    "old_pass": 122,
     "old_total": 616,
-    "old_pass_rate": 19.0,
+    "old_pass_rate": 19.8,
     "new_pass": 122,
     "new_total": 616,
     "new_pass_rate": 19.8,
-    "old_mismatched_lines": 56406,
-    "new_mismatched_lines": 56398,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 8,
-    "newly_passing": 5,
-    "newly_failing": 0,
-    "status_changed": 5,
-    "unchanged": 610,
+    "old_mismatched_lines": 56398,
+    "new_mismatched_lines": 56397,
+    "increased_mismatches": 1,
+    "decreased_mismatches": 2,
+    "newly_passing": 1,
+    "newly_failing": 1,
+    "status_changed": 2,
+    "unchanged": 613,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "as_set_prop_flags_version",
+      "test": "sandbox_type_local_file",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "sandbox_type_local_network",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "sandbox_type_remote",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 29,
-        "expected_lines": 31,
-        "matching_lines": 16
-      },
-      "new_lines": {
-        "actual_lines": 29,
-        "expected_lines": 31,
-        "matching_lines": 18
-      }
-    },
-    {
-      "test": "as_set_prop_flags_version_swf6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
         "actual_lines": 1,
-        "expected_lines": 1,
+        "expected_lines": 3,
         "matching_lines": 0
       },
       "new_lines": {
         "actual_lines": 1,
-        "expected_lines": 1,
+        "expected_lines": 3,
         "matching_lines": 1
-      }
-    },
-    {
-      "test": "as_set_prop_flags_version_swf7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "as_set_prop_flags_version_swf8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "as_set_prop_flags_version_swf9",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "swf4_function_calls",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 5
-      },
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
       }
     }
   ]
