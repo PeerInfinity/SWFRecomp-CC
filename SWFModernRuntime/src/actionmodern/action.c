@@ -1047,6 +1047,29 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	return mc;
 }
 
+// MovieClip cache: ensures same instance name always returns same pointer
+// so properties (dynamic_props) persist across lookups
+#define MAX_CHILD_MOVIECLIPS 128
+static MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
+static int child_mc_count = 0;
+
+static MovieClip* findOrCreateMovieClip(const char* instance_name, MovieClip* parent) {
+	// Check cache first
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL &&
+		    strcmp(child_mc_cache[i]->name, instance_name) == 0 &&
+		    child_mc_cache[i]->parent == parent) {
+			return child_mc_cache[i];
+		}
+	}
+	// Not in cache - create new and cache it
+	MovieClip* mc = createMovieClip(instance_name, parent);
+	if (mc != NULL && child_mc_count < MAX_CHILD_MOVIECLIPS) {
+		child_mc_cache[child_mc_count++] = mc;
+	}
+	return mc;
+}
+
 /**
  * Construct the target path for a MovieClip
  *
@@ -3974,24 +3997,44 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Not found in scope chain - check global variables
+	// Inside tellTarget (non-root context): use target clip's variable scope
+	// instead of the global variable table (which holds root timeline vars)
 	ActionVar* var = NULL;
-	if (string_id != 0)
+	if (g_current_context != NULL && g_current_context != &root_movieclip)
 	{
-		// Constant string - use array (O(1))
-		var = getVariableById(string_id);
-
-		// Fall back to hashmap if array lookup doesn't find the variable
-		// (This can happen for catch variables that are set by name but have a string ID)
-		if (var == NULL || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
+		// Check target clip's dynamic properties
+		if (g_current_context->dynamic_props != NULL)
 		{
-			var = getVariable(var_name, var_name_len);
+			ASObject* clip_props = (ASObject*) g_current_context->dynamic_props;
+			ActionVar* prop = getProperty(clip_props, var_name, var_name_len);
+			if (prop != NULL)
+			{
+				PUSH_VAR(prop);
+				return;
+			}
 		}
+		// Not found on clip — var stays NULL, falls through to _global/special vars
 	}
 	else
 	{
-		// Dynamic string - use hashmap (O(n))
-		var = getVariable(var_name, var_name_len);
+		// Root context: check global variable table (normal behavior)
+		if (string_id != 0)
+		{
+			// Constant string - use array (O(1))
+			var = getVariableById(string_id);
+
+			// Fall back to hashmap if array lookup doesn't find the variable
+			// (This can happen for catch variables that are set by name but have a string ID)
+			if (var == NULL || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
+			{
+				var = getVariable(var_name, var_name_len);
+			}
+		}
+		else
+		{
+			// Dynamic string - use hashmap (O(n))
+			var = getVariable(var_name, var_name_len);
+		}
 	}
 
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
@@ -4309,7 +4352,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (dobj != NULL)
 			{
 				extern MovieClip root_movieclip;
-				MovieClip* child_mc = createMovieClip(name_buf, &root_movieclip);
+				MovieClip* child_mc = findOrCreateMovieClip(name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
@@ -4321,7 +4364,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (child_depth > 0)
 			{
 				extern MovieClip root_movieclip;
-				MovieClip* child_mc = createMovieClip(name_buf, &root_movieclip);
+				MovieClip* child_mc = findOrCreateMovieClip(name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
@@ -4430,6 +4473,22 @@ void actionSetVariable(SWFAppContext* app_context)
 				return;
 			}
 		}
+	}
+
+	// Inside tellTarget (non-root context): set on target clip's properties
+	if (g_current_context != NULL && g_current_context != &root_movieclip)
+	{
+		// Ensure target clip has dynamic_props
+		if (g_current_context->dynamic_props == NULL)
+		{
+			g_current_context->dynamic_props = (void*) allocObject(app_context, 8);
+		}
+		ASObject* clip_props = (ASObject*) g_current_context->dynamic_props;
+		ActionVar value_var;
+		peekVar(app_context, &value_var);
+		setProperty(app_context, clip_props, var_name, var_name_len, &value_var);
+		POP_2();
+		return;
 	}
 
 	// Check MovieClip built-in properties via variable name (e.g., SetVariable("_x", 100))
@@ -4605,6 +4664,18 @@ void actionDeclareLocal(SWFAppContext* app_context)
 
 void actionSetTarget2(SWFAppContext* app_context)
 {
+	// If top of stack is a MovieClip, use it directly (avoids string round-trip)
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		MovieClip* mc = (MovieClip*) VAL(u64, &STACK_TOP_VALUE);
+		POP();
+		if (mc != NULL)
+			setCurrentContext(mc);
+		else
+			setCurrentContext(&root_movieclip);
+		return;
+	}
+
 	// Convert top of stack to string if needed
 	char str_buffer[17];
 	convertString(app_context, str_buffer);
@@ -8559,7 +8630,39 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	MovieClip* target_mc = getMovieClipByTarget(target_name);
 	if (target_mc) {
 		setCurrentContext(target_mc);
+		return;
 	}
+
+	// Try resolving as a child clip name (strip _level0. prefix if present)
+	const char* child_name = target_name;
+	if (strncmp(target_name, "_level0.", 8) == 0)
+		child_name = target_name + 8;
+	// Also strip leading slash for slash-path format (e.g., "/mc")
+	if (child_name[0] == '/')
+		child_name = child_name + 1;
+
+#ifdef NO_GRAPHICS
+	size_t child_depth = ng_findDisplayEntryByName(child_name);
+	if (child_depth > 0) {
+		MovieClip* child_mc = findOrCreateMovieClip(child_name, &root_movieclip);
+		if (child_mc) {
+			setCurrentContext(child_mc);
+			return;
+		}
+	}
+#else
+	{
+		DisplayObject* dobj = findDisplayObjectByName(child_name);
+		if (dobj != NULL) {
+			MovieClip* child_mc = findOrCreateMovieClip(child_name, &root_movieclip);
+			if (child_mc) {
+				setCurrentContext(child_mc);
+				targeted_sprite = dobj;
+				return;
+			}
+		}
+	}
+#endif
 }
 
 // ==================================================================
@@ -8581,9 +8684,6 @@ void actionWithStart(SWFAppContext* app_context)
 		if (obj != NULL && scope_depth < MAX_SCOPE_DEPTH)
 		{
 			scope_chain[scope_depth++] = obj;
-#ifdef DEBUG
-			printf("[DEBUG] actionWithStart: pushed object %p onto scope chain (depth=%u)\n", (void*)obj, scope_depth);
-#endif
 		}
 		else
 		{
@@ -8591,14 +8691,30 @@ void actionWithStart(SWFAppContext* app_context)
 			{
 				// Push null marker to maintain balance
 				scope_chain[scope_depth++] = NULL;
-#ifdef DEBUG
-				printf("[DEBUG] actionWithStart: object is null, pushed null marker (depth=%u)\n", scope_depth);
-#endif
 			}
 			else
 			{
 				fprintf(stderr, "ERROR: Scope chain overflow (depth=%u, max=%u)\n", scope_depth, MAX_SCOPE_DEPTH);
 			}
+		}
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// MovieClip: push its dynamic_props ASObject onto scope chain
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+		if (mc != NULL && scope_depth < MAX_SCOPE_DEPTH)
+		{
+			// Ensure mc has dynamic_props allocated
+			if (mc->dynamic_props == NULL)
+			{
+				mc->dynamic_props = (void*) allocObject(app_context, 8);
+			}
+			scope_chain[scope_depth++] = (ASObject*) mc->dynamic_props;
+		}
+		else
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH)
+				scope_chain[scope_depth++] = NULL;
 		}
 	}
 	else
@@ -8607,9 +8723,6 @@ void actionWithStart(SWFAppContext* app_context)
 		if (scope_depth < MAX_SCOPE_DEPTH)
 		{
 			scope_chain[scope_depth++] = NULL;
-#ifdef DEBUG
-			printf("[DEBUG] actionWithStart: non-object type %d, pushed null marker (depth=%u)\n", obj_var.type, scope_depth);
-#endif
 		}
 	}
 }
