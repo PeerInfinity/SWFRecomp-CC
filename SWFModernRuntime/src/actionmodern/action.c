@@ -4005,6 +4005,54 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_movieclip_constructor);
 			return;
 		}
+		else if (var_name_len == 6 && strncmp(var_name, "String", 6) == 0)
+		{
+			// Return the built-in String constructor as a function
+			static ASFunction g_string_constructor;
+			static int g_string_constructor_init = 0;
+			if (!g_string_constructor_init)
+			{
+				memset(&g_string_constructor, 0, sizeof(ASFunction));
+				strncpy(g_string_constructor.name, "String", 255);
+				g_string_constructor.function_type = 1;
+				g_string_constructor.param_count = 0;
+				g_string_constructor_init = 1;
+			}
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_string_constructor);
+			return;
+		}
+		else if (var_name_len == 6 && strncmp(var_name, "Number", 6) == 0)
+		{
+			// Return the built-in Number constructor as a function
+			static ASFunction g_number_constructor;
+			static int g_number_constructor_init = 0;
+			if (!g_number_constructor_init)
+			{
+				memset(&g_number_constructor, 0, sizeof(ASFunction));
+				strncpy(g_number_constructor.name, "Number", 255);
+				g_number_constructor.function_type = 1;
+				g_number_constructor.param_count = 0;
+				g_number_constructor_init = 1;
+			}
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_number_constructor);
+			return;
+		}
+		else if (var_name_len == 7 && strncmp(var_name, "Boolean", 7) == 0)
+		{
+			// Return the built-in Boolean constructor as a function
+			static ASFunction g_boolean_constructor;
+			static int g_boolean_constructor_init = 0;
+			if (!g_boolean_constructor_init)
+			{
+				memset(&g_boolean_constructor, 0, sizeof(ASFunction));
+				strncpy(g_boolean_constructor.name, "Boolean", 255);
+				g_boolean_constructor.function_type = 1;
+				g_boolean_constructor.param_count = 0;
+				g_boolean_constructor_init = 1;
+			}
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_boolean_constructor);
+			return;
+		}
 		else if (var_name_len == 5 && strncmp(var_name, "Error", 5) == 0)
 		{
 			// Return the built-in Error constructor as a function
@@ -7101,6 +7149,29 @@ void actionNewObject(SWFAppContext* app_context)
 		// new String() or new String(value)
 		ASObject* str_obj = allocObject(app_context, 4);
 
+		// Set __proto__ to String.prototype for instanceof support
+		PUSH_STR("String", 6);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* ctor = (ASFunction*) STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL)
+			{
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+			}
+			ActionVar proto_var = {0};
+			proto_var.type = ACTION_STACK_VALUE_OBJECT;
+			proto_var.data.numeric_value = (u64) ctor->prototype_obj;
+			setProperty(app_context, str_obj, "__proto__", 9, &proto_var);
+		}
+		else
+		{
+			setObjectProto(app_context, str_obj);
+		}
+		POP();
+
 		// If argument provided, convert to string and store as value property
 		if (num_args > 0)
 		{
@@ -7144,6 +7215,29 @@ void actionNewObject(SWFAppContext* app_context)
 		// new Number() or new Number(value)
 		ASObject* num_obj = allocObject(app_context, 4);
 
+		// Set __proto__ to Number.prototype for instanceof support
+		PUSH_STR("Number", 6);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* ctor = (ASFunction*) STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL)
+			{
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+			}
+			ActionVar proto_var = {0};
+			proto_var.type = ACTION_STACK_VALUE_OBJECT;
+			proto_var.data.numeric_value = (u64) ctor->prototype_obj;
+			setProperty(app_context, num_obj, "__proto__", 9, &proto_var);
+		}
+		else
+		{
+			setObjectProto(app_context, num_obj);
+		}
+		POP();
+
 		// Store numeric value as property
 		ActionVar value_var;
 		if (num_args > 0)
@@ -7186,6 +7280,29 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle Boolean constructor
 		// new Boolean() or new Boolean(value)
 		ASObject* bool_obj = allocObject(app_context, 4);
+
+		// Set __proto__ to Boolean.prototype for instanceof support
+		PUSH_STR("Boolean", 7);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+		{
+			ASFunction* ctor = (ASFunction*) STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL)
+			{
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+			}
+			ActionVar proto_var = {0};
+			proto_var.type = ACTION_STACK_VALUE_OBJECT;
+			proto_var.data.numeric_value = (u64) ctor->prototype_obj;
+			setProperty(app_context, bool_obj, "__proto__", 9, &proto_var);
+		}
+		else
+		{
+			setObjectProto(app_context, bool_obj);
+		}
+		POP();
 
 		// Store boolean value as property
 		ActionVar value_var;

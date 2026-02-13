@@ -1,34 +1,13 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-12, commit 43f1ac6
+Last updated: 2026-02-12, commit bf6dde7
 
 ## Quick Summary
 
 - **Pass rate**: 97/491 filtered (19.8%), 101/616 raw (16.4%)
-- **Main failure type**: output_mismatch (374 filtered)
-- **Regressions**: 6 tests segfault that previously didn't (see below)
-- **Recent trend**: +29 newly passing tests in last run
-
-## Current Regressions to Fix (6 segfaults)
-
-These tests changed from `output_mismatch` to `runtime_segfault` in the last run.
-
-| Test | Notes |
-|------|-------|
-| `clip_constructors` | MovieClip constructor behavior, uses `actionExtends` with MovieClip |
-| `init_object_order` | Object initialization ordering |
-| `loadmovie_registerclass` | Class registration during load |
-| `register_and_init_order` | Was 15% working (35/231 lines), now segfaults |
-| `resolve_different_root` | Root scope resolution, uses `actionExtends` with MovieClip |
-| `timer_run_actions` | Action execution timing |
-
-**Root cause (confirmed via ASAN)**: `actionExtends()` in action.c line ~5561 casts both superclass and subclass `data.numeric_value` to `ASObject*`, but when the type is `ACTION_STACK_VALUE_FUNCTION`, the pointer is actually an `ASFunction*`. These are completely different structs — `ASFunction` has `prototype_obj` and `own_props` fields, while `ASObject` has a `properties` array. Calling `getProperty()` on a miscast `ASFunction*` reads garbage memory and segfaults.
-
-Stack trace: `getProperty (object.c:206)` ← `actionExtends (action.c:5583)` ← `script_1.c` — SEGV at address 0x8 (offset into NULL properties pointer).
-
-**Fix approach**: In `actionExtends()`, when the type is `ACTION_STACK_VALUE_FUNCTION`, use `((ASFunction*)ptr)->prototype_obj` and `((ASFunction*)ptr)->own_props` instead of casting to ASObject. Same fix needed for `setProperty` calls on functions. This likely also affects `actionNewMethod()` and anywhere else that treats functions as objects for property access.
-
-**Note**: These tests previously had `output_mismatch` (not pass), meaning they produced wrong output but didn't crash. The recent commits that added built-in constructors (MovieClip, Object, Error, etc.) as `ASFunction` objects exposed this pre-existing type confusion bug — previously `GetVariable("MovieClip")` would return undefined (no crash), now it returns a function pointer that gets miscast.
+- **Main failure type**: output_mismatch (380 filtered)
+- **Regressions**: None
+- **Recent fixes**: ASFunction/ASObject type confusion — 6 segfaults fixed, 1 compile_fail fixed
 
 ## Top Near-Passing Tests (best ROI to fix)
 
@@ -88,10 +67,9 @@ Variable lookups inside `tellTarget(mc)` blocks should resolve against the targe
 
 ## Recommended Work Order
 
-1. **Fix the 6 segfault regressions** — fix ASFunction/ASObject type confusion in `actionExtends()` (and likely other places that treat functions as objects)
-2. **Fix primitive_instanceof** — set `__proto__` on wrapper objects to `Constructor.prototype`
-3. **Fix array_length negative values** — handle negative length assignment edge cases
-4. **Fix define_function2 parameter issue** — investigate the missing parameter default
-5. **Fix object_constructor** — investigate what `new Object(_root)` should return for quality prop
-6. **Implement flash.geom.Point** — constructor + methods, fixes ~51 lines
-7. **Implement flash.geom.Matrix** — constructor + methods, fixes ~48 lines
+1. **Fix primitive_instanceof** — set `__proto__` on wrapper objects to `Constructor.prototype`
+2. **Fix array_length negative values** — handle negative length assignment edge cases
+3. **Fix define_function2 parameter issue** — investigate the missing parameter default
+4. **Fix object_constructor** — investigate what `new Object(_root)` should return for quality prop
+5. **Implement flash.geom.Point** — constructor + methods, fixes ~51 lines
+6. **Implement flash.geom.Matrix** — constructor + methods, fixes ~48 lines
