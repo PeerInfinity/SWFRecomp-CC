@@ -37,6 +37,9 @@ struct MovieClip {
 	float ymouse;
 	MovieClip* parent;     // Parent MovieClip (_root has NULL parent)
 	void* dynamic_props;   // ASObject* for user-defined properties (lazily allocated)
+#ifdef NO_GRAPHICS
+	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
+#endif
 };
 
 // Global root MovieClip

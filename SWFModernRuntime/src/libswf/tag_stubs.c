@@ -26,10 +26,26 @@ static struct {
 	int is_playing;
 	int needs_init;        // 1 if sprite frame 0 hasn't been executed yet
 	size_t placed_at_frame; // which main timeline frame placed this entry
+	u32 transform_id;     // index into transform_data for _x/_y
+	int is_button;        // 1 if this is a button (for typeof discrimination)
 	char instance_name[64]; // instance name set by tagSetInstanceName
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
 static int ng_nesting_depth = 0;  // >0 when inside sprite frame execution
+static size_t ng_current_display_idx = (size_t)-1;  // display index of currently executing sprite
+
+// Simple button registry for NO_GRAPHICS mode (for typeof discrimination)
+#define MAX_BUTTONS_NG 64
+static size_t ng_button_ids[MAX_BUTTONS_NG];
+static size_t ng_button_count = 0;
+
+static int ng_find_button(size_t char_id)
+{
+	for (size_t i = 0; i < ng_button_count; i++)
+		if (ng_button_ids[i] == char_id)
+			return 1;
+	return 0;
+}
 
 static size_t ng_find_sprite(size_t char_id)
 {
@@ -61,6 +77,10 @@ void ng_display_clear_after(size_t target_frame)
 	}
 }
 
+// Access the generated transform_data from draws.c (linked per-test)
+// Actual type is float[][16] but we access via pointer arithmetic
+extern float transform_data[][16];
+
 // Stub implementations for console-only mode
 // Note: tagInit() is provided by the generated tagMain.c file
 
@@ -86,10 +106,101 @@ static void ng_exec_sprite_frame(SWFAppContext* app_context, size_t display_idx,
 	MovieClip* saved_ctx = g_current_context;
 	MovieClip* sprite_mc = actionFindOrCreateMovieClip(inst_name, &root_movieclip);
 	actionSetCurrentContext(sprite_mc);
+	size_t saved_display_idx = ng_current_display_idx;
+	ng_current_display_idx = display_idx;
 	ng_nesting_depth++;
 	ng_sprites[si].funcs[frame](app_context);
 	ng_nesting_depth--;
+	ng_current_display_idx = saved_display_idx;
 	actionSetCurrentContext(saved_ctx);
+}
+
+// Helpers for action.c to control the currently executing sprite
+int ng_isInsideSprite(void) { return ng_nesting_depth > 0; }
+
+int ng_hasPlayingSprites(void)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		size_t si = ng_display[i].sprite_idx;
+		if (si == (size_t)-1) continue;
+		if (!ng_display[i].is_playing) continue;
+		if (ng_sprites[si].frame_count <= 1) continue;
+		return 1;
+	}
+	return 0;
+}
+
+void ng_stopCurrentSprite(void)
+{
+	if (ng_current_display_idx < ng_display_count)
+		ng_display[ng_current_display_idx].is_playing = 0;
+}
+
+void ng_playCurrentSprite(void)
+{
+	if (ng_current_display_idx < ng_display_count)
+		ng_display[ng_current_display_idx].is_playing = 1;
+}
+
+void ng_gotoFrameCurrentSprite(u16 frame)
+{
+	if (ng_current_display_idx >= ng_display_count) return;
+	size_t si = ng_display[ng_current_display_idx].sprite_idx;
+	if (si == (size_t)-1) return;
+	if (frame < ng_sprites[si].frame_count)
+	{
+		ng_display[ng_current_display_idx].current_frame = frame;
+		ng_display[ng_current_display_idx].is_playing = 0;
+	}
+}
+
+size_t ng_getSpriteFrameCount(void)
+{
+	if (ng_current_display_idx >= ng_display_count) return 0;
+	size_t si = ng_display[ng_current_display_idx].sprite_idx;
+	if (si == (size_t)-1) return 0;
+	return ng_sprites[si].frame_count;
+}
+
+// Advance existing sprite timelines — called from main loop BEFORE frame function
+// so that child scripts execute before parent scripts (matching Flash behavior)
+// Flash advances sprites in reverse depth order (highest depth first)
+void ng_advanceSprites(SWFAppContext* app_context)
+{
+	extern int catch_up_mode;
+	if (catch_up_mode) return;
+
+	// Clear sentinels first (separate pass to avoid ordering issues)
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].needs_init == 2) ng_display[i].needs_init = 0;
+	}
+
+	// Advance in reverse depth order (highest depth first)
+	// Find max depth first, then iterate downward
+	size_t max_depth = 0;
+	for (size_t i = 0; i < ng_display_count; i++)
+		if (ng_display[i].depth > max_depth) max_depth = ng_display[i].depth;
+
+	for (size_t d = max_depth; d >= 1; d--)
+	{
+		for (size_t i = 0; i < ng_display_count; i++)
+		{
+			if (ng_display[i].depth != d) continue;
+			if (ng_display[i].needs_init) continue;
+			size_t si = ng_display[i].sprite_idx;
+			if (si == (size_t)-1) continue;
+			if (!ng_display[i].is_playing) continue;
+
+			size_t fc = ng_sprites[si].frame_count;
+			if (fc <= 1) continue;
+
+			size_t next = (ng_display[i].current_frame + 1) % fc;
+			ng_display[i].current_frame = next;
+			ng_exec_sprite_frame(app_context, i, next);
+		}
+	}
 }
 
 void tagShowFrame(SWFAppContext* app_context)
@@ -102,28 +213,15 @@ void tagShowFrame(SWFAppContext* app_context)
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (!ng_display[i].needs_init) continue;
-		ng_display[i].needs_init = 0;
+		ng_display[i].needs_init = 2;  // sentinel: skip advancement next tick
 		ng_exec_sprite_frame(app_context, i, 0);
 	}
 
-	// During goto catch-up, don't advance existing sprite timelines
-	if (catch_up_mode) return;
-
-	// Advance sprite timelines for NO_GRAPHICS mode
-	for (size_t i = 0; i < ng_display_count; i++)
+	// During goto catch-up, clear sentinels
+	if (catch_up_mode)
 	{
-		size_t si = ng_display[i].sprite_idx;
-		if (si == (size_t)-1) continue;
-		if (!ng_display[i].is_playing) continue;
-
-		size_t fc = ng_sprites[si].frame_count;
-		if (fc <= 1) continue;  // Single-frame sprites don't advance
-
-		size_t next = (ng_display[i].current_frame + 1) % fc;
-		ng_display[i].current_frame = next;
-
-		// Execute the next frame function
-		ng_exec_sprite_frame(app_context, i, next);
+		for (size_t i = 0; i < ng_display_count; i++)
+			if (ng_display[i].needs_init == 2) ng_display[i].needs_init = 0;
 	}
 }
 
@@ -151,59 +249,77 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
-	(void)transform_id; (void)cxform_id; (void)clip_depth;
+	(void)cxform_id; (void)clip_depth;
 	extern size_t current_frame;
 
 	// Ignore placements from inside sprite frame functions — they place
 	// children (shapes etc.) that would corrupt the flat main-timeline display list.
 	if (ng_nesting_depth > 0) return;
 
-	// Check if this is placing a new character (char_id > 0 means new placement)
-	if (char_id > 0)
+	if (char_id == 0)
 	{
-		size_t si = ng_find_sprite(char_id);
-
-		// Check if depth already occupied
+		// Move/update existing entry at this depth (update transform)
 		for (size_t i = 0; i < ng_display_count; i++)
 		{
 			if (ng_display[i].depth == depth)
 			{
-				if (si == (size_t)-1)
-				{
-					// Non-sprite at occupied depth: don't replace sprites
-					// (prevents corruption during backward goto catch-up)
-					if (ng_display[i].sprite_idx != (size_t)-1) return;
-					// Replace other non-sprites (update placed_at_frame)
-					ng_display[i].placed_at_frame = current_frame;
-					return;
-				}
-				if (ng_display[i].sprite_idx == si)
-				{
-					// Same sprite already at this depth - don't re-execute
-					return;
-				}
-				// Different sprite (or replacing non-sprite) - replace
-				ng_display[i].sprite_idx = si;
-				ng_display[i].current_frame = 0;
-				ng_display[i].is_playing = 1;
-				ng_display[i].needs_init = (si != (size_t)-1) ? 1 : 0;
-				ng_display[i].placed_at_frame = current_frame;
+				ng_display[i].transform_id = transform_id;
 				return;
 			}
 		}
+		return;
+	}
 
-		// New entry
-		if (ng_display_count < MAX_DISPLAY_NG)
+	// Placing a new character (char_id > 0)
+	size_t si = ng_find_sprite(char_id);
+	int btn = ng_find_button(char_id);
+
+	// Check if depth already occupied
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth)
 		{
-			ng_display[ng_display_count].depth = depth;
-			ng_display[ng_display_count].sprite_idx = si;
-			ng_display[ng_display_count].current_frame = 0;
-			ng_display[ng_display_count].is_playing = 1;
-			ng_display[ng_display_count].needs_init = (si != (size_t)-1) ? 1 : 0;
-			ng_display[ng_display_count].placed_at_frame = current_frame;
-			ng_display[ng_display_count].instance_name[0] = '\0';
-			ng_display_count++;
+			if (si == (size_t)-1)
+			{
+				// Non-sprite at occupied depth: don't replace sprites
+				// (prevents corruption during backward goto catch-up)
+				if (ng_display[i].sprite_idx != (size_t)-1) return;
+				// Replace other non-sprites (update placed_at_frame)
+				ng_display[i].placed_at_frame = current_frame;
+				ng_display[i].transform_id = transform_id;
+				ng_display[i].is_button = btn;
+				return;
+			}
+			if (ng_display[i].sprite_idx == si)
+			{
+				// Same sprite already at this depth - don't re-execute
+				return;
+			}
+			// Different sprite (or replacing non-sprite) - replace
+			ng_display[i].sprite_idx = si;
+			ng_display[i].current_frame = 0;
+			ng_display[i].is_playing = 1;
+			ng_display[i].needs_init = (si != (size_t)-1) ? 1 : 0;
+			ng_display[i].placed_at_frame = current_frame;
+			ng_display[i].transform_id = transform_id;
+			ng_display[i].is_button = btn;
+			return;
 		}
+	}
+
+	// New entry
+	if (ng_display_count < MAX_DISPLAY_NG)
+	{
+		ng_display[ng_display_count].depth = depth;
+		ng_display[ng_display_count].sprite_idx = si;
+		ng_display[ng_display_count].current_frame = 0;
+		ng_display[ng_display_count].is_playing = 1;
+		ng_display[ng_display_count].needs_init = (si != (size_t)-1) ? 1 : 0;
+		ng_display[ng_display_count].placed_at_frame = current_frame;
+		ng_display[ng_display_count].transform_id = transform_id;
+		ng_display[ng_display_count].is_button = btn;
+		ng_display[ng_display_count].instance_name[0] = '\0';
+		ng_display_count++;
 	}
 }
 
@@ -258,6 +374,54 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 			return;
 		}
 	}
+}
+
+// Check if the display entry at a given depth is a sprite (movieclip)
+int ng_isSpriteAtDepth(size_t depth)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+		if (ng_display[i].depth == depth)
+			return ng_display[i].sprite_idx != (size_t)-1;
+	return 0;
+}
+
+// Check if the display entry at a given depth is a button
+int ng_isButtonAtDepth(size_t depth)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+		if (ng_display[i].depth == depth)
+			return ng_display[i].is_button;
+	return 0;
+}
+
+// Get transform_id for a display entry at a given depth
+int ng_getTransformId(size_t depth, u32* out_id)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth)
+		{
+			*out_id = ng_display[i].transform_id;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Get x/y translation from transform_data for a display entry
+int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth)
+		{
+			u32 tid = ng_display[i].transform_id;
+			*out_x = transform_data[tid][12] / 20.0f;
+			*out_y = transform_data[tid][13] / 20.0f;
+			return 1;
+		}
+	}
+	return 0;
 }
 
 // NO_GRAPHICS child lookup by instance name — returns depth or 0 if not found
@@ -332,8 +496,11 @@ void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* fun
 
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count)
 {
-	(void)app_context; (void)char_id; (void)state_funcs; (void)hit_char_id;
+	(void)app_context; (void)state_funcs; (void)hit_char_id;
 	(void)hit_transform_id; (void)actions; (void)action_count;
+	// Register as button for typeof discrimination
+	if (ng_button_count < MAX_BUTTONS_NG && !ng_find_button(char_id))
+		ng_button_ids[ng_button_count++] = char_id;
 }
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)

@@ -47,3 +47,21 @@ void tagSoundStreamBlock(SWFAppContext* app_context,
     const u8* data, size_t data_size);
 void tagStopAllSounds(SWFAppContext* app_context);
 void tagScriptLimits(u16 max_recursion, u16 timeout);
+
+// NO_GRAPHICS helpers for sprite timeline control from action.c
+#ifdef NO_GRAPHICS
+void ng_advanceSprites(SWFAppContext* app_context);
+int ng_isInsideSprite(void);
+int ng_hasPlayingSprites(void);
+void ng_stopCurrentSprite(void);
+void ng_playCurrentSprite(void);
+void ng_gotoFrameCurrentSprite(u16 frame);
+size_t ng_getSpriteFrameCount(void);
+size_t ng_findDisplayEntryByName(const char* name);
+void ng_renameDisplayEntry(const char* old_name, const char* new_name);
+void ng_display_clear_after(size_t target_frame);
+int ng_isSpriteAtDepth(size_t depth);
+int ng_isButtonAtDepth(size_t depth);
+int ng_getTransformId(size_t depth, u32* out_id);
+int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
+#endif

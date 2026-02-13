@@ -1021,6 +1021,9 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->ymouse = 0.0f;
 	mc->droptarget[0] = '\0';
 	mc->url[0] = '\0';
+#ifdef NO_GRAPHICS
+	mc->last_transform_id = 0;
+#endif
 
 	// Set instance name
 	strncpy(mc->name, instance_name, sizeof(mc->name) - 1);
@@ -3336,6 +3339,8 @@ void actionPlay(SWFAppContext* app_context)
 		targeted_sprite->sprite_is_playing = 1;
 		return;
 	}
+#else
+	if (ng_isInsideSprite()) { ng_playCurrentSprite(); return; }
 #endif
 	is_playing = 1;
 }
@@ -3349,6 +3354,8 @@ void actionStop(SWFAppContext* app_context)
 		targeted_sprite->sprite_is_playing = 0;
 		return;
 	}
+#else
+	if (ng_isInsideSprite()) { ng_stopCurrentSprite(); return; }
 #endif
 	is_playing = 0;
 }
@@ -3559,6 +3566,8 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		targeted_sprite->sprite_is_playing = 0;
 		return;
 	}
+#else
+	if (ng_isInsideSprite()) { ng_gotoFrameCurrentSprite(frame); return; }
 #endif
 
 	extern size_t current_frame;
@@ -3573,8 +3582,6 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	}
 
 #ifdef NO_GRAPHICS
-	// Signal the main loop to perform goto catch-up (replay intermediate
-	// frame tags inline, matching Flash's behavior)
 	extern int goto_from_action;
 	goto_from_action = 1;
 #endif
@@ -3585,6 +3592,13 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 
 	// Update _currentframe immediately so scripts can read the new value
 	root_movieclip.currentframe = frame + 1;  // 1-indexed
+
+#ifdef NO_GRAPHICS
+	// Execute goto catch-up inline so target frame tags are processed
+	// before the calling script continues (Flash's goto is synchronous)
+	extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+	ng_executeGotoCatchUp(app_context);
+#endif
 }
 
 /**
@@ -3667,6 +3681,8 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 #ifdef NO_GRAPHICS
 		extern int goto_from_action;
 		goto_from_action = 1;
+		extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+		ng_executeGotoCatchUp(app_context);
 #endif
 	}
 	// If label not found, ignore (per Flash spec - no action taken)
@@ -3765,6 +3781,10 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	actionGotoFrame(app_context, (u16)(frame_num - 1));
 
 	if (play_flag) {
+#ifdef NO_GRAPHICS
+		if (ng_isInsideSprite()) { ng_playCurrentSprite(); }
+		else
+#endif
 		is_playing = 1;
 	}
 }
@@ -4375,7 +4395,25 @@ void actionGetVariable(SWFAppContext* app_context)
 				MovieClip* child_mc = findOrCreateMovieClip(name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					// Sync x/y when transform_id has changed (PlaceObject2 update)
+					u32 tid;
+					if (ng_getTransformId(child_depth, &tid) && tid != child_mc->last_transform_id)
+					{
+						float tx, ty;
+						if (ng_getTransformXY(child_depth, &tx, &ty))
+						{
+							child_mc->x = tx;
+							child_mc->y = ty;
+						}
+						child_mc->last_transform_id = tid;
+					}
+					// Only sprites push as movieclip; buttons and
+					// other display objects (text fields) push as object
+					if (ng_isSpriteAtDepth(child_depth)) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					} else {
+						PUSH(ACTION_STACK_VALUE_OBJECT, (u64)child_mc);
+					}
 					return;
 				}
 			}

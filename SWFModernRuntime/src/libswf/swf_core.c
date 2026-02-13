@@ -31,6 +31,55 @@ int goto_from_action = 0;
 int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
 size_t catch_up_target = 0;   // target frame for backward goto protection
 
+// Execute goto catch-up inline (called from actionGotoFrame)
+// Processes intermediate frame tags and target frame tags immediately
+void ng_executeGotoCatchUp(SWFAppContext* app_context)
+{
+	if (!goto_from_action || !manual_next_frame) return;
+
+	frame_func* funcs = g_frame_funcs;
+	size_t original_frame = current_frame;
+	size_t target = next_frame;
+	manual_next_frame = 0;
+	goto_from_action = 0;
+
+	ng_display_clear_after(target);
+
+	catch_up_mode = 1;
+	if (target <= original_frame)
+	{
+		catch_up_backward = 1;
+		catch_up_target = target;
+		for (size_t f = 0; f < target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+		catch_up_mode = 0;
+		if (target < g_frame_count)
+		{
+			current_frame = target;
+			if (funcs[target]) funcs[target](app_context);
+		}
+		catch_up_backward = 0;
+	}
+	else
+	{
+		for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+		catch_up_mode = 0;
+		if (target < g_frame_count)
+		{
+			current_frame = target;
+			if (funcs[target]) funcs[target](app_context);
+		}
+	}
+	current_frame = target;
+}
+
 // Console-only swfStart implementation
 void swfStart(SWFAppContext* app_context)
 {
@@ -78,9 +127,6 @@ void swfStart(SWFAppContext* app_context)
 #endif
 	size_t tick_count = 0;
 
-	// Forward declaration for catch-up display list management
-	extern void ng_display_clear_after(size_t target_frame);
-
 	while (!quit_swf && tick_count < max_ticks)
 	{
 		tick_count++;
@@ -91,14 +137,22 @@ void swfStart(SWFAppContext* app_context)
 			printf("Frame %zu out of bounds (max %zu), stopping.\n", current_frame, g_frame_count);
 			break;
 		}
-		if (funcs[current_frame])
+		// Advance child sprite timelines BEFORE running frame tags/scripts
+		// (Flash executes child frame advancement before parent DoAction)
+		ng_advanceSprites(app_context);
+		// Only run the root frame function if the root timeline is playing
+		// (when stopped, sprites still need to advance via ng_advanceSprites above)
+		if (is_playing || manual_next_frame)
 		{
-			funcs[current_frame](app_context);
-		}
-		else
-		{
-			printf("No function for frame %zu, stopping.\n", current_frame);
-			break;
+			if (funcs[current_frame])
+			{
+				funcs[current_frame](app_context);
+			}
+			else
+			{
+				printf("No function for frame %zu, stopping.\n", current_frame);
+				break;
+			}
 		}
 
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
@@ -138,6 +192,7 @@ void swfStart(SWFAppContext* app_context)
 				if (target < g_frame_count)
 				{
 					current_frame = target;
+					ng_advanceSprites(app_context);
 					if (funcs[target]) funcs[target](app_context);
 				}
 				catch_up_backward = 0;
@@ -156,6 +211,7 @@ void swfStart(SWFAppContext* app_context)
 				if (target < g_frame_count)
 				{
 					current_frame = target;
+					ng_advanceSprites(app_context);
 					if (funcs[target]) funcs[target](app_context);
 				}
 			}
@@ -181,7 +237,14 @@ void swfStart(SWFAppContext* app_context)
 		}
 		else
 		{
-			// Stopped and no manual jump - exit loop
+			// Root stopped — but child sprites may still be playing
+			if (ng_hasPlayingSprites())
+			{
+				// Don't re-execute the frame function, just advance sprites
+				// next tick (stay at current_frame)
+				continue;
+			}
+			// Truly stopped — exit loop
 			break;
 		}
 	}
