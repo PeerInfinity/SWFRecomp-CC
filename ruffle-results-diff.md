@@ -1,30 +1,41 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b41374d1cd97` (2026-02-13T00:46:08.114246+00:00)
-**Current:** `48407dff585d` (2026-02-13T00:53:24.475880+00:00)
+**Previous:** `48407dff585d` (2026-02-13T00:53:24.475880+00:00)
+**Current:** `28a85fbf831e` (2026-02-13T01:01:02.041564+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 101 | 102 | +1 |
+| Passing | 102 | 105 | +3 |
 | Total | 616 | 616 | 0 |
-| Pass rate | 16.4% | 16.6% | +0.2% |
-| Mismatched lines | 57003 | 56963 | -40 |
-|   Decreased | | | -40 |
+| Pass rate | 16.6% | 17.0% | +0.4% |
+| Mismatched lines | 56963 | 57088 | +125 |
+|   Decreased | | | -27 |
+|   Increased | | | +152 |
 
-## Newly Passing (1)
+## Newly Passing (3)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `primitive_instanceof` | output_mismatch | 34/37 | 37/37 |
+| `init_array_invalid` | output_mismatch | 0/4 | 4/4 |
+| `init_object_invalid` | output_mismatch | 0/4 | 4/4 |
+| `netstream_play_flv_screen` | segfault | - | 0/0 |
+
+## Status Changed (3)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `as2_oop` | segfault | output_mismatch | - | 0/13 |
+| `extends_chain` | segfault | output_mismatch | - | 0/134 |
+| `issue_2166` | segfault | output_mismatch | - | 4/9 |
 
 ## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `globals_swf5` | output_mismatch | 197/304 | 206/304 | -9 |
-| `globals_swf6` | output_mismatch | 204/304 | 213/304 | -9 |
-| `globals_swf7` | output_mismatch | 201/304 | 210/304 | -9 |
-| `globals_swf8` | output_mismatch | 127/304 | 136/304 | -9 |
-| `primitive_type_globals` | output_mismatch | 319/557 | 320/557 | -1 |
+| `edittext_html_roundtrip` | output_mismatch | 0/17 | 11/17 | -11 |
+| `named_shapes` | output_mismatch | 0/14 | 5/14 | -5 |
+| `watch_textfield` | output_mismatch | 0/12 | 2/12 | -2 |
+| `new_object_wrap` | output_mismatch | 0/4 | 1/4 | -1 |
+| `new_method_wrap` | output_mismatch | 0/4 | 0/4 | 0 |
