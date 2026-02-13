@@ -25,6 +25,12 @@ size_t g_frame_count = 0;
 int is_dragging = 0;
 char* dragged_target = NULL;
 
+// Goto catch-up state
+int catch_up_mode = 0;
+int goto_from_action = 0;
+int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
+size_t catch_up_target = 0;   // target frame for backward goto protection
+
 // Console-only swfStart implementation
 void swfStart(SWFAppContext* app_context)
 {
@@ -66,14 +72,14 @@ void swfStart(SWFAppContext* app_context)
 	frame_func* funcs = app_context->frame_funcs;
 	current_frame = 0;
 #ifdef MAX_FRAMES
-	// MAX_FRAMES is the Ruffle test's num_frames (number of frame advances).
-	// Our tick-based loop may need more iterations because goto jumps consume
-	// ticks without advancing the frame count. Use a generous multiplier.
-	const size_t max_ticks = MAX_FRAMES * 10 + 10;
+	const size_t max_ticks = MAX_FRAMES;
 #else
 	const size_t max_ticks = 10000;
 #endif
 	size_t tick_count = 0;
+
+	// Forward declaration for catch-up display list management
+	extern void ng_display_clear_after(size_t target_frame);
 
 	while (!quit_swf && tick_count < max_ticks)
 	{
@@ -93,6 +99,53 @@ void swfStart(SWFAppContext* app_context)
 		{
 			printf("No function for frame %zu, stopping.\n", current_frame);
 			break;
+		}
+
+		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
+		// a goto, process intermediate frame tags inline to match Flash's behavior.
+		// Flash processes PlaceObject/RemoveObject for intermediate frames within
+		// the same frame advance, but skips DoAction tags (main timeline scripts).
+		// In our model, catch_up_mode=1 causes generated frame functions to skip
+		// their script_N() calls while still executing tag functions.
+		if (goto_from_action && manual_next_frame)
+		{
+			size_t original_frame = current_frame;
+			size_t target = next_frame;
+			manual_next_frame = 0;
+			goto_from_action = 0;
+
+			// Remove display list entries placed after the target frame
+			ng_display_clear_after(target);
+
+			catch_up_mode = 1;
+			if (target <= original_frame)
+			{
+				// Backward goto: replay tags from frame 0 to target.
+				// Protect display list entries placed at or before target from
+				// RemoveObject2 (they're part of the preserved state).
+				catch_up_backward = 1;
+				catch_up_target = target;
+				for (size_t f = 0; f <= target && f < g_frame_count; f++)
+				{
+					current_frame = f;
+					if (funcs[f]) funcs[f](app_context);
+				}
+				catch_up_backward = 0;
+			}
+			else
+			{
+				// Forward goto: process tags for frames between current and target
+				for (size_t f = original_frame + 1; f <= target && f < g_frame_count; f++)
+				{
+					current_frame = f;
+					if (funcs[f]) funcs[f](app_context);
+				}
+			}
+			catch_up_mode = 0;
+			current_frame = target;
+
+			// After catch-up, the goto's advance is consumed; fall through
+			// to the normal advance logic below.
 		}
 
 		// Advance to next frame

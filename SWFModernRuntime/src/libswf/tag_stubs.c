@@ -22,6 +22,7 @@ static struct {
 	size_t sprite_idx;     // index into ng_sprites, or (size_t)-1 for non-sprite
 	size_t current_frame;
 	int is_playing;
+	size_t placed_at_frame; // which main timeline frame placed this entry
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
 
@@ -33,10 +34,26 @@ static size_t ng_find_sprite(size_t char_id)
 	return (size_t)-1;
 }
 
-// Clear the NO_GRAPHICS display list (called on goto-rewind)
-void ng_display_clear(void)
+// Clear NO_GRAPHICS display entries placed after the target frame.
+// For backward gotos: removes characters added after the target.
+// For forward gotos: typically a no-op (target > current entries).
+void ng_display_clear_after(size_t target_frame)
 {
-	ng_display_count = 0;
+	size_t i = 0;
+	while (i < ng_display_count)
+	{
+		if (ng_display[i].placed_at_frame > target_frame)
+		{
+			// Remove by shifting
+			for (size_t j = i; j + 1 < ng_display_count; j++)
+				ng_display[j] = ng_display[j + 1];
+			ng_display_count--;
+		}
+		else
+		{
+			i++;
+		}
+	}
 }
 
 // Stub implementations for console-only mode
@@ -49,6 +66,10 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 
 void tagShowFrame(SWFAppContext* app_context)
 {
+	// During goto catch-up, don't advance sprite timelines
+	extern int catch_up_mode;
+	if (catch_up_mode) return;
+
 	// Advance sprite timelines for NO_GRAPHICS mode
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
@@ -93,6 +114,7 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
 	(void)transform_id; (void)cxform_id; (void)clip_depth;
+	extern size_t current_frame;
 	// Check if this is placing a new sprite (char_id > 0 means new placement)
 	if (char_id > 0)
 	{
@@ -113,6 +135,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 					ng_display[i].sprite_idx = si;
 					ng_display[i].current_frame = 0;
 					ng_display[i].is_playing = 1;
+					ng_display[i].placed_at_frame = current_frame;
 					if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
 						ng_sprites[si].funcs[0](app_context);
 					return;
@@ -123,6 +146,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[ng_display_count].sprite_idx = si;
 			ng_display[ng_display_count].current_frame = 0;
 			ng_display[ng_display_count].is_playing = 1;
+			ng_display[ng_display_count].placed_at_frame = current_frame;
 			ng_display_count++;
 			// Execute frame 0
 			if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
@@ -182,10 +206,18 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
 	(void)app_context;
+
+	// During backward goto catch-up, don't remove entries that were placed
+	// at or before the target frame — they're part of the preserved state.
+	extern int catch_up_backward;
+	extern size_t catch_up_target;
+
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (ng_display[i].depth == depth)
 		{
+			if (catch_up_backward && ng_display[i].placed_at_frame <= catch_up_target)
+				return;  // Protected: don't remove
 			// Remove by shifting
 			for (size_t j = i; j + 1 < ng_display_count; j++)
 				ng_display[j] = ng_display[j + 1];
@@ -198,6 +230,8 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
 {
 	(void)app_context;
+	// Skip if already registered (can happen during goto catch-up replay)
+	if (ng_find_sprite(char_id) != (size_t)-1) return;
 	if (ng_sprite_count < MAX_SPRITES_NG)
 	{
 		ng_sprites[ng_sprite_count].char_id = char_id;

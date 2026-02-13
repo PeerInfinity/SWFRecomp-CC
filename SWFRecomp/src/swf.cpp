@@ -477,7 +477,7 @@ namespace SWFRecomp
 			// Emit any queued script calls
 			while (last_queued_script < next_script_i)
 			{
-				context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(app_context);" << endl;
+				context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 				last_queued_script += 1;
 			}
 
@@ -701,7 +701,7 @@ namespace SWFRecomp
 				// Emit any queued script calls (from DoAction tags not followed by ShowFrame)
 				while (last_queued_script < next_script_i)
 				{
-					context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(app_context);" << endl;
+					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 					last_queued_script += 1;
 				}
 
@@ -736,7 +736,7 @@ namespace SWFRecomp
 			{
 				while (last_queued_script < next_script_i)
 				{
-					context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(app_context);" << endl;
+					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 					last_queued_script += 1;
 				}
 

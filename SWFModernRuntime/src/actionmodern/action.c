@@ -3495,10 +3495,10 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	}
 
 #ifdef NO_GRAPHICS
-	// Clear the NO_GRAPHICS display list so sprites get re-placed
-	// and their frame_0 functions re-execute on the target frame
-	extern void ng_display_clear(void);
-	ng_display_clear();
+	// Signal the main loop to perform goto catch-up (replay intermediate
+	// frame tags inline, matching Flash's behavior)
+	extern int goto_from_action;
+	goto_from_action = 1;
 #endif
 
 	next_frame = frame;
@@ -3586,7 +3586,10 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 		// Stop playback (like gotoAndStop)
 		is_playing = 0;
 
-		// Note: Actual navigation will occur in the frame loop
+#ifdef NO_GRAPHICS
+		extern int goto_from_action;
+		goto_from_action = 1;
+#endif
 	}
 	// If label not found, ignore (per Flash spec - no action taken)
 }

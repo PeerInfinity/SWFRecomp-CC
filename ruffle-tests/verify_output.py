@@ -110,10 +110,14 @@ def get_git_sha():
 
 
 def get_num_frames(test_dir):
-    """Parse num_frames from test.toml, default 1."""
+    """Parse num_frames (or num_ticks) from test.toml, default 1."""
     toml_path = test_dir / "test.toml"
     if toml_path.exists():
-        m = re.search(r"num_frames\s*=\s*(\d+)", toml_path.read_text())
+        text = toml_path.read_text()
+        m = re.search(r"num_frames\s*=\s*(\d+)", text)
+        if m:
+            return int(m.group(1))
+        m = re.search(r"num_ticks\s*=\s*(\d+)", text)
         if m:
             return int(m.group(1))
     return 1
