@@ -3027,6 +3027,16 @@ namespace SWFRecomp
 				// Forward declare the sprite frame_funcs array (written to draws.h)
 				sprite_forward_decls << "extern frame_func " << sp << "_frame_funcs[];" << endl;
 
+				// Flush any pending main timeline scripts before DefineSprite
+				// (main timeline DoAction tags that appeared before this DefineSprite
+				// must execute first, and sprite sub-tag DoActions would skip them
+				// by advancing last_queued_script past them)
+				while (last_queued_script < next_script_i)
+				{
+					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
+					last_queued_script += 1;
+				}
+
 				// Emit tagDefineSprite call in the current main frame
 				context.tag_main << "\t" << "tagDefineSprite(app_context, "
 								 << to_string(sprite_id) << ", "

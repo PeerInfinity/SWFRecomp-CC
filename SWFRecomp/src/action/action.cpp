@@ -1348,21 +1348,48 @@ namespace SWFRecomp
 					next_reg++;
 				}
 
-				if (preload_global)
+				// _parent and _global use runtime register assignment because
+				// Flash Player skips _parent preload when parent is NULL,
+				// causing _global to shift into _parent's register slot
+				if (preload_parent && preload_global)
+				{
+					context.out_script_defs << "\t// Preload '_parent' and '_global' (runtime register assignment)" << endl;
+					context.out_script_defs << "\t{" << endl;
+					context.out_script_defs << "\t\textern MovieClip* g_current_context;" << endl;
+					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
+					context.out_script_defs << "\t\textern ASObject* global_object;" << endl;
+					context.out_script_defs << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
+					context.out_script_defs << "\t\tint _pr = " << next_reg << ";" << endl;
+					context.out_script_defs << "\t\tif (_ctx->parent != NULL) {" << endl;
+					context.out_script_defs << "\t\t\tregs[_pr].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					context.out_script_defs << "\t\t\tregs[_pr].data.numeric_value = (u64)_ctx->parent;" << endl;
+					context.out_script_defs << "\t\t\t_pr++;" << endl;
+					context.out_script_defs << "\t\t}" << endl;
+					context.out_script_defs << "\t\tregs[_pr].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					context.out_script_defs << "\t\tregs[_pr].data.numeric_value = (u64)global_object;" << endl;
+					context.out_script_defs << "\t}" << endl;
+					next_reg += 2;
+				}
+				else if (preload_parent)
+				{
+					context.out_script_defs << "\t// Preload '_parent' into register " << next_reg << endl;
+					context.out_script_defs << "\t{" << endl;
+					context.out_script_defs << "\t\textern MovieClip* g_current_context;" << endl;
+					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
+					context.out_script_defs << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
+					context.out_script_defs << "\t\tif (_ctx->parent != NULL) {" << endl;
+					context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)_ctx->parent;" << endl;
+					context.out_script_defs << "\t\t}" << endl;
+					context.out_script_defs << "\t}" << endl;
+					next_reg++;
+				}
+				else if (preload_global)
 				{
 					context.out_script_defs << "\t// Preload '_global' into register " << next_reg << endl;
 					context.out_script_defs << "\textern ASObject* global_object;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)global_object;" << endl;
-					next_reg++;
-				}
-
-				if (preload_parent)
-				{
-					context.out_script_defs << "\t// Preload '_parent' into register " << next_reg << endl;
-					context.out_script_defs << "\t// At root level, _parent is undefined (no parent MovieClip)" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = 0;" << endl;
 					next_reg++;
 				}
 

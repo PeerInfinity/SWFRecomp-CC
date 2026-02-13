@@ -1070,6 +1070,11 @@ static MovieClip* findOrCreateMovieClip(const char* instance_name, MovieClip* pa
 	return mc;
 }
 
+// Public wrapper for findOrCreateMovieClip (callable from tag_stubs.c and generated code)
+MovieClip* actionFindOrCreateMovieClip(const char* instance_name, MovieClip* parent) {
+	return findOrCreateMovieClip(instance_name, parent);
+}
+
 /**
  * Construct the target path for a MovieClip
  *
@@ -1100,9 +1105,12 @@ static const char* constructPath(MovieClip* mc, char* buffer, size_t buffer_size
 
 // Global variable to track current execution context
 // When NULL, defaults to root_movieclip
-static MovieClip* g_current_context = NULL;
+MovieClip* g_current_context = NULL;
 
 // Set the current execution context
+void actionSetCurrentContext(MovieClip* mc) {
+	g_current_context = mc;
+}
 static void setCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
 }
