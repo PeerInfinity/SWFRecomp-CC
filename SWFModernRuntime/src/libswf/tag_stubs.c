@@ -27,6 +27,7 @@ static struct {
 	char instance_name[64]; // instance name set by tagSetInstanceName
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
+static int ng_nesting_depth = 0;  // >0 when inside sprite frame execution
 
 static size_t ng_find_sprite(size_t char_id)
 {
@@ -87,7 +88,11 @@ void tagShowFrame(SWFAppContext* app_context)
 
 		// Execute the next frame function
 		if (ng_sprites[si].funcs && ng_sprites[si].funcs[next])
+		{
+			ng_nesting_depth++;
 			ng_sprites[si].funcs[next](app_context);
+			ng_nesting_depth--;
+		}
 	}
 }
 
@@ -117,28 +122,42 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 {
 	(void)transform_id; (void)cxform_id; (void)clip_depth;
 	extern size_t current_frame;
+
+	// Ignore placements from inside sprite frame functions — they place
+	// children (shapes etc.) that would corrupt the flat main-timeline display list.
+	if (ng_nesting_depth > 0) return;
+
 	// Check if this is placing a new character (char_id > 0 means new placement)
 	if (char_id > 0)
 	{
 		size_t si = ng_find_sprite(char_id);
+
+		// Only track sprites in the display list — non-sprite characters
+		// (shapes, text) don't need timeline tracking and would corrupt
+		// sprite entries during backward goto catch-up replay.
+		if (si == (size_t)-1) return;
 
 		// Check if depth already occupied
 		for (size_t i = 0; i < ng_display_count; i++)
 		{
 			if (ng_display[i].depth == depth)
 			{
-				if (si != (size_t)-1 && ng_display[i].sprite_idx == si)
+				if (ng_display[i].sprite_idx == si)
 				{
 					// Same sprite already at this depth - don't re-execute
 					return;
 				}
-				// Different character - replace (preserve instance_name)
+				// Different sprite - replace (preserve instance_name)
 				ng_display[i].sprite_idx = si;
 				ng_display[i].current_frame = 0;
 				ng_display[i].is_playing = 1;
 				ng_display[i].placed_at_frame = current_frame;
-				if (si != (size_t)-1 && ng_sprites[si].funcs && ng_sprites[si].funcs[0])
+				if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
+				{
+					ng_nesting_depth++;
 					ng_sprites[si].funcs[0](app_context);
+					ng_nesting_depth--;
+				}
 				return;
 			}
 		}
@@ -154,8 +173,12 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[ng_display_count].instance_name[0] = '\0';
 			ng_display_count++;
 			// Execute frame 0 for sprites
-			if (si != (size_t)-1 && ng_sprites[si].funcs && ng_sprites[si].funcs[0])
+			if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
+			{
+				ng_nesting_depth++;
 				ng_sprites[si].funcs[0](app_context);
+				ng_nesting_depth--;
+			}
 		}
 	}
 }
@@ -223,6 +246,21 @@ size_t ng_findDisplayEntryByName(const char* name)
 			return ng_display[i].depth;
 	}
 	return 0;
+}
+
+// Rename a display list entry's instance name (for _name setter)
+void ng_renameDisplayEntry(const char* old_name, const char* new_name)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, old_name) == 0)
+		{
+			strncpy(ng_display[i].instance_name, new_name, 63);
+			ng_display[i].instance_name[63] = '\0';
+			return;
+		}
+	}
 }
 
 void tagRemoveObject(SWFAppContext* app_context, size_t depth)

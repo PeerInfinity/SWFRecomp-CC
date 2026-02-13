@@ -1333,9 +1333,9 @@ namespace SWFRecomp
 				if (preload_super && !suppress_super)
 				{
 					context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
-					context.out_script_defs << "\t// TODO: Create super reference (requires prototype chain support)" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = 0;" << endl;
+					context.out_script_defs << "\tASObject* super_obj_" << next_reg << " = allocObject(app_context, 0);" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)super_obj_" << next_reg << ";" << endl;
 					next_reg++;
 				}
 

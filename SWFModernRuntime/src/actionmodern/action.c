@@ -38,6 +38,14 @@ static int32_t ecmaToInt32(double d)
 	return (int32_t) n;
 }
 
+static uint32_t ecmaToUint32(double d)
+{
+	if (isnan(d) || isinf(d) || d == 0.0) return 0;
+	double n = fmod(d, 4294967296.0);
+	if (n < 0) n += 4294967296.0;
+	return (uint32_t) n;
+}
+
 // ==================================================================
 // Scope Chain for WITH statement
 // ==================================================================
@@ -6658,24 +6666,43 @@ void actionSetMember(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Try as numeric index
-				// Flash AS2: non-negative integer indices 0..INT_MAX update length
+				// Parse property name as numeric index
 				char* endptr;
+				errno = 0;
 				long long index_ll = strtoll(prop_name, &endptr, 10);
-				int is_valid_index = (*endptr == '\0' && index_ll >= 0 && index_ll <= 2147483647LL);
+				int strtoll_overflow = (errno == ERANGE);
+				int is_standard_index = (*endptr == '\0' && !strtoll_overflow && index_ll >= 0 && index_ll <= 2147483647LL);
 
-				if (is_valid_index)
+				// Determine u32 index via ecmaToUint32 for extended indices
+				u32 idx_u32 = 0;
+				int has_index = 0;
+
+				if (is_standard_index)
 				{
-					u32 idx_u32 = (u32) index_ll;
+					idx_u32 = (u32) index_ll;
+					has_index = 1;
+				}
+				else
+				{
+					// Try as double → ecmaToUint32
+					double d = strtod(prop_name, &endptr);
+					if (*endptr == '\0' && !isnan(d) && !isinf(d))
+					{
+						idx_u32 = ecmaToUint32(d);
+						has_index = 1;
+					}
+				}
 
-					// Small index: store in elements array
+				// Store the value
+				if (is_standard_index)
+				{
+					// Standard index: store in elements array or as string prop
 					if (idx_u32 < 1048576 || idx_u32 < arr->capacity)
 					{
 						setArrayElement(app_context, arr, idx_u32, &value_var);
 					}
 					else
 					{
-						// Large index: store as string prop
 						if (arr->props == NULL)
 						{
 							arr->props = allocObject(app_context, 4);
@@ -6683,21 +6710,42 @@ void actionSetMember(SWFAppContext* app_context)
 						}
 						setProperty(app_context, arr->props, prop_name, prop_name_len, &value_var);
 					}
-
-					// Update length = max(length, index+1) unsigned
-					u32 new_len = idx_u32 + 1;
-					if (new_len > arr->length)
-						arr->length = new_len;
 				}
 				else if (prop_name_len > 0)
 				{
-					// Non-index property (negative, fractional, or string key)
+					// Extended/non-index: always store as string property
 					if (arr->props == NULL)
 					{
 						arr->props = allocObject(app_context, 4);
 						retainObject(arr->props);
 					}
 					setProperty(app_context, arr->props, prop_name, prop_name_len, &value_var);
+				}
+
+				// Update length
+				// Flash AS2 array length semantics:
+				// - When length <= INT_MAX: only standard indices (0..INT_MAX)
+				//   update length, using unsigned comparison
+				// - When length > INT_MAX (overflow region): all numeric indices
+				//   update length, using signed i32 comparison
+				// - When strtoll overflows (ERANGE): use ecmaToUint32 directly
+				//   as new length (not +1), unsigned comparison
+				if (has_index)
+				{
+					u32 new_len = idx_u32 + 1;  // u32 wrapping
+					if (arr->length <= 2147483647u)
+					{
+						if (strtoll_overflow && idx_u32 > arr->length)
+							arr->length = idx_u32;
+						else if (idx_u32 <= 2147483647u && new_len > arr->length)
+							arr->length = new_len;
+					}
+					else
+					{
+						// Overflow region: signed comparison for all indices
+						if ((int32_t)new_len > (int32_t)arr->length)
+							arr->length = new_len;
+					}
 				}
 			}
 		}
@@ -6761,6 +6809,23 @@ void actionSetMember(SWFAppContext* app_context)
 				if (strcasecmp(prop_name, "_highquality") == 0) { mc->highquality = fval; return; }
 				if (strcasecmp(prop_name, "_focusrect") == 0) { mc->focusrect = fval; return; }
 				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
+				if (strcasecmp(prop_name, "_name") == 0)
+				{
+					char new_name[256];
+					int len = varToStringBuf(app_context, &value_var, new_name, sizeof(new_name));
+					if (len > 0)
+					{
+#ifdef NO_GRAPHICS
+						extern void ng_renameDisplayEntry(const char* old_name, const char* new_name);
+						ng_renameDisplayEntry(mc->name, new_name);
+#endif
+						strncpy(mc->name, new_name, sizeof(mc->name) - 1);
+						mc->name[sizeof(mc->name) - 1] = '\0';
+						if (mc->parent != NULL)
+							snprintf(mc->target, sizeof(mc->target), "%s.%s", mc->parent->target, new_name);
+					}
+					return;
+				}
 			}
 			// User-defined property: store in dynamic_props and as global variable
 			if (mc->dynamic_props == NULL)
@@ -10533,6 +10598,116 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 		}
 		return;
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+
+		if (method_name_len == 11 && strncmp(method_name, "gotoAndStop", 11) == 0)
+		{
+			if (num_args >= 1)
+			{
+				s32 frame_num = -1;
+				if (args[0].type == ACTION_STACK_VALUE_F64) {
+					double d; memcpy(&d, &args[0].data.numeric_value, sizeof(double));
+					frame_num = (s32)d;
+				} else if (args[0].type == ACTION_STACK_VALUE_F32) {
+					float f; memcpy(&f, &args[0].data.numeric_value, sizeof(float));
+					frame_num = (s32)f;
+				} else if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const char* frame_str = (const char*)args[0].data.numeric_value;
+					if (frame_str != NULL) {
+						const char* frame_part = frame_str;
+						const char* colon = strchr(frame_str, ':');
+						if (colon != NULL) frame_part = colon + 1;
+						char* endptr;
+						long parsed = strtol(frame_part, &endptr, 10);
+						if (endptr != frame_part && *endptr == '\0') frame_num = (s32)parsed;
+					}
+				}
+				if (frame_num > 0) {
+					actionGotoFrame(app_context, (u16)(frame_num - 1));
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 11 && strncmp(method_name, "gotoAndPlay", 11) == 0)
+		{
+			if (num_args >= 1)
+			{
+				s32 frame_num = -1;
+				if (args[0].type == ACTION_STACK_VALUE_F64) {
+					double d; memcpy(&d, &args[0].data.numeric_value, sizeof(double));
+					frame_num = (s32)d;
+				} else if (args[0].type == ACTION_STACK_VALUE_F32) {
+					float f; memcpy(&f, &args[0].data.numeric_value, sizeof(float));
+					frame_num = (s32)f;
+				} else if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const char* frame_str = (const char*)args[0].data.numeric_value;
+					if (frame_str != NULL) {
+						const char* frame_part = frame_str;
+						const char* colon = strchr(frame_str, ':');
+						if (colon != NULL) frame_part = colon + 1;
+						char* endptr;
+						long parsed = strtol(frame_part, &endptr, 10);
+						if (endptr != frame_part && *endptr == '\0') frame_num = (s32)parsed;
+					}
+				}
+				if (frame_num > 0) {
+					actionGotoFrame(app_context, (u16)(frame_num - 1));
+					is_playing = 1;
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 4 && strncmp(method_name, "play", 4) == 0)
+		{
+			actionPlay(app_context);
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 4 && strncmp(method_name, "stop", 4) == 0)
+		{
+			actionStop(app_context);
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else
+		{
+			// Check MovieClip prototype for user-defined methods
+			extern ASFunction g_movieclip_constructor;
+			extern int g_movieclip_constructor_init;
+			if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL)
+			{
+				ActionVar* method_prop = getPropertyWithPrototype(g_movieclip_constructor.prototype_obj, method_name, method_name_len);
+				if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
+				{
+					ASFunction* func = lookupFunctionFromVar(method_prop);
+					if (func != NULL && func->function_type == 2)
+					{
+						ActionVar* registers = NULL;
+						if (func->register_count > 0)
+							registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+						g_call_depth++;
+						ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) mc);
+						g_call_depth--;
+						if (registers != NULL) FREE(registers);
+						if (args != NULL) FREE(args);
+						pushVar(app_context, &result);
+						return;
+					}
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 	}
 	else
 	{
