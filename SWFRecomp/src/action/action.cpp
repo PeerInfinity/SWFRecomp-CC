@@ -1231,7 +1231,57 @@ namespace SWFRecomp
 				bool preload_parent     = (flags & 0x0080); // Bit 7
 				bool preload_global     = (flags & 0x0100); // Bit 8
 
-				// Calculate actual register count needed (may exceed declared register_count)
+				// Scan function body for maximum register index used
+				int max_body_reg = 0;
+				{
+					char* scan = action_buffer;
+					char* scan_end = action_buffer + code_size;
+					while (scan < scan_end)
+					{
+						u8 op = (u8)*scan;
+						if (op < 0x80)
+						{
+							// No-data action
+							scan++;
+						}
+						else
+						{
+							// Action with length
+							if (scan + 3 > scan_end) break;
+							u16 act_len = VAL(u16, (scan + 1));
+							char* act_data = scan + 3;
+							if (op == 0x87 && act_len >= 1) // StoreRegister
+							{
+								int reg = (u8)act_data[0];
+								if (reg > max_body_reg) max_body_reg = reg;
+							}
+							else if (op == 0x96) // Push
+							{
+								// Scan push data for register type (type byte = 4)
+								char* p = act_data;
+								char* p_end = act_data + act_len;
+								while (p < p_end)
+								{
+									u8 ptype = (u8)*p; p++;
+									if (ptype == 0) { while (p < p_end && *p) p++; p++; } // String
+									else if (ptype == 1) { p += 4; } // Float
+									else if (ptype == 2) { } // Null
+									else if (ptype == 3) { } // Undefined
+									else if (ptype == 4) { if (p < p_end) { int reg = (u8)*p; if (reg > max_body_reg) max_body_reg = reg; } p++; } // Register
+									else if (ptype == 5) { p++; } // Boolean
+									else if (ptype == 6) { p += 8; } // Double
+									else if (ptype == 7) { p += 4; } // Integer
+									else if (ptype == 8) { p++; } // ConstantPool8
+									else if (ptype == 9) { p += 2; } // ConstantPool16
+									else break;
+								}
+							}
+							scan += 3 + act_len;
+						}
+					}
+				}
+
+				// Calculate actual register count needed
 				int next_reg = 1; // Register 0 is reserved
 				if (preload_this && !suppress_this) next_reg++;
 				if (preload_arguments && !suppress_arguments) next_reg++;
@@ -1240,12 +1290,14 @@ namespace SWFRecomp
 				if (preload_parent) next_reg++;
 				if (preload_global) next_reg++;
 				int actual_reg_count = next_reg > (int)register_count ? next_reg : (int)register_count;
+				// Ensure array is large enough for all registers used in the body
+				if (max_body_reg + 1 > actual_reg_count) actual_reg_count = max_body_reg + 1;
 
-				// Initialize local registers
+				// Initialize local registers to undefined
 				if (actual_reg_count > 0)
 				{
 					context.out_script_defs << "\tActionVar regs[" << actual_reg_count << "];" << endl;
-					context.out_script_defs << "\tmemset(regs, 0, sizeof(regs));" << endl;
+					context.out_script_defs << "\tfor (int _ri = 0; _ri < " << actual_reg_count << "; _ri++) { regs[_ri].type = ACTION_STACK_VALUE_UNDEFINED; regs[_ri].data.numeric_value = 0; regs[_ri].str_size = 0; }" << endl;
 				}
 
 				// Preload special variables into registers

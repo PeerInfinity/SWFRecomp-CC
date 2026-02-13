@@ -6964,6 +6964,7 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Fall back to global variable map (timeline variables are accessible as mc properties)
+		if (hasVariable((char*)prop_name, prop_name_len))
 		{
 			ActionVar* var = getVariable((char*)prop_name, prop_name_len);
 			if (var != NULL)
