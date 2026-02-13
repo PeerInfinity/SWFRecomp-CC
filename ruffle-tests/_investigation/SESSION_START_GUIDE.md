@@ -109,7 +109,9 @@ The workflow is manual dispatch only (no auto-trigger). User must go to GitHub A
 
 ## Old Test System (SWFRecomp/tests/)
 
-There is a separate, older test system in `SWFRecomp/tests/`. These are hand-written opcode-level unit tests, currently all passing (115/115 tests, 493/493 sub-tests).
+**NOTE: Ignore the old test suite until we're finished getting all Ruffle tests passing.** Some old tests may have stale expected values that need updating, but that's lower priority than Ruffle test progress.
+
+There is a separate, older test system in `SWFRecomp/tests/`. These are hand-written opcode-level unit tests (115 tests, ~79 currently passing).
 
 ### Key differences from Ruffle tests
 
