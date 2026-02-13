@@ -2045,13 +2045,25 @@ namespace SWFRecomp
 						   << "void script_" << next_script_i << "(SWFAppContext* app_context)" << endl
 						   << "{" << endl;
 				out_script << "\t" << "char str_buffer[17];" << endl << endl;
-				
+
 				next_script_i += 1;
-				
-				action.parseActions(context, cur_pos, out_script);
-				
+
+				// Parse actions using a bounded temp buffer to prevent overrun
+				// when the DoAction tag body omits the trailing END_OF_ACTIONS byte
+				{
+					char* tag_body_start = cur_pos;
+					u32 body_len = tag.length;
+					char* temp_buffer = (char*)malloc(body_len + 1);
+					memcpy(temp_buffer, tag_body_start, body_len);
+					temp_buffer[body_len] = 0x00; // Ensure END_OF_ACTIONS marker
+					char* temp_ptr = temp_buffer;
+					action.parseActions(context, temp_ptr, out_script);
+					free(temp_buffer);
+					cur_pos = tag_body_start + body_len;
+				}
+
 				out_script << "}";
-				
+
 				break;
 			}
 			

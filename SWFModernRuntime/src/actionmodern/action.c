@@ -3302,6 +3302,13 @@ void actionTrace(SWFAppContext* app_context)
 {
 	if (g_execution_halted) { POP(); return; }
 
+	// Stack underflow: treat as undefined (matches Flash Player behavior)
+	if (SP >= INITIAL_STACK_SIZE)
+	{
+		printf("undefined\n");
+		return;
+	}
+
 	ActionStackValueType type = STACK_TOP_TYPE;
 
 	switch (type)
@@ -3872,6 +3879,42 @@ void actionGetVariable(SWFAppContext* app_context)
 					rest_len = 0;
 				}
 			}
+
+			// Fallback: if the path resolved to undefined, try starting from _global.
+			// In Flash, GetVariable("a.b.c") tries each scope for "a" and walks the
+			// remaining path; if the walk fails, it tries the next scope. The _global
+			// object is the last scope checked. This handles cases where a local "a"
+			// exists but doesn't have the full nested path, while _global.a does.
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				extern ASObject* global_object;
+				if (global_object != NULL)
+				{
+					ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, first_len);
+					if (gprop != NULL && gprop->type != ACTION_STACK_VALUE_UNDEFINED)
+					{
+						// Pop the undefined result from the first attempt
+						POP();
+						// Push the _global property value and walk the remaining path
+						pushVar(app_context, gprop);
+						rest = dot + 1;
+						rest_len = var_name_len - first_len - 1;
+						while (rest_len > 0)
+						{
+							char* next_dot2 = (char*) memchr(rest, '.', rest_len);
+							u32 seg_len2 = next_dot2 ? (u32)(next_dot2 - rest) : rest_len;
+							PUSH_STR(rest, seg_len2);
+							actionGetMember(app_context);
+							if (next_dot2) {
+								rest = next_dot2 + 1;
+								rest_len -= seg_len2 + 1;
+							} else {
+								rest_len = 0;
+							}
+						}
+					}
+				}
+			}
 			return;
 		}
 	}
@@ -4165,6 +4208,33 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 		}
 
+		// Check MovieClip built-in properties via variable name (e.g., GetVariable("_x"))
+		// In Flash, timeline variables and MC properties share the same namespace
+		if (var_name_len > 0 && var_name[0] == '_')
+		{
+			extern MovieClip root_movieclip;
+			MovieClip* mc = &root_movieclip;
+			if (strcasecmp(var_name, "_x") == 0) { float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_y") == 0) { float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_visible") == 0) { float v = mc->visible ? 1.0f : 0.0f; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_width") == 0) { float v = mc->width; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_height") == 0) { float v = mc->height; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_totalframes") == 0) { float v = (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
+			if (strcasecmp(var_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
+			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
+			if (strcasecmp(var_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
+			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
+			if (strcasecmp(var_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+		}
+
 		// Variable not found
 #if defined(SWF_VERSION) && SWF_VERSION >= 6
 		// SWF6+: undefined variables return undefined
@@ -4263,6 +4333,43 @@ void actionSetVariable(SWFAppContext* app_context)
 				POP_2();
 				return;
 			}
+		}
+	}
+
+	// Check MovieClip built-in properties via variable name (e.g., SetVariable("_x", 100))
+	// In Flash, timeline variables and MC properties share the same namespace
+	if (var_name_len > 0 && var_name[0] == '_')
+	{
+		extern MovieClip root_movieclip;
+		MovieClip* mc = &root_movieclip;
+		ActionVar value_var;
+		peekVar(app_context, &value_var);
+		double dval = varToDouble(&value_var);
+		float fval = (float)dval;
+		int handled = 0;
+		if (strcasecmp(var_name, "_x") == 0) { mc->x = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_y") == 0) { mc->y = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_xscale") == 0) { mc->xscale = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_yscale") == 0) { mc->yscale = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_rotation") == 0) { mc->rotation = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_alpha") == 0) { mc->alpha = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; handled = 1; }
+		else if (strcasecmp(var_name, "_width") == 0) { mc->width = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_height") == 0) { mc->height = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_quality") == 0)
+		{
+			char buf[16];
+			int len = varToStringBuf(app_context, &value_var, buf, sizeof(buf));
+			if (len > 0) { memcpy(mc->quality, buf, len); mc->quality[len] = '\0'; }
+			handled = 1;
+		}
+		else if (strcasecmp(var_name, "_highquality") == 0) { mc->highquality = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_focusrect") == 0) { mc->focusrect = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; handled = 1; }
+		if (handled)
+		{
+			POP_2();
+			return;
 		}
 	}
 
@@ -9166,6 +9273,31 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	if (!builtin_handled)
 	{
 		ASFunction* func = lookupFunctionByName(func_name, func_name_len);
+
+		// Try slash-path resolution: /:foo -> foo (Flash 4 root variable syntax)
+		if (func == NULL && func_name_len > 2 && func_name[0] == '/' && func_name[1] == ':')
+		{
+			func = lookupFunctionByName(func_name + 2, func_name_len - 2);
+		}
+
+		// Try dot-path resolution: _root.foo -> resolve path to function variable
+		if (func == NULL && memchr(func_name, '.', func_name_len) != NULL)
+		{
+			// Resolve the full path via GetVariable (handles dots recursively)
+			PUSH_STR(func_name, func_name_len);
+			actionGetVariable(app_context);
+			// Check if the result is a function
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+			{
+				ASFunction* resolved = (ASFunction*) STACK_TOP_VALUE;
+				POP();
+				func = resolved;
+			}
+			else
+			{
+				POP();
+			}
+		}
 
 		if (func != NULL && g_call_depth >= g_max_call_depth - 1)
 		{

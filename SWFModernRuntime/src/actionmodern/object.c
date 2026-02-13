@@ -10,6 +10,7 @@
 #endif
 
 #include <actionmodern/object.h>
+#include <actionmodern/action.h>
 #include <heap.h>
 
 // Version-based property hiding masks for ASSetPropFlags
@@ -234,7 +235,7 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 	}
 
 	ASObject* current = obj;
-	int max_depth = 100;  // Prevent infinite loops in circular prototype chains
+	int max_depth = 256;  // Prevent infinite loops in deep prototype chains
 	int depth = 0;
 
 	while (current != NULL && depth < max_depth)
@@ -257,7 +258,22 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 		}
 
 		// Move to next object in prototype chain
-		current = (ASObject*) proto_var->data.numeric_value;
+		ASObject* next = (ASObject*) proto_var->data.numeric_value;
+
+		// Cycle detection: if we'd revisit the original object, it's circular
+		if (next == obj)
+		{
+			g_execution_halted = 1;
+			return NULL;
+		}
+
+		current = next;
+	}
+
+	// Depth limit exceeded — treat as recursion limit error (halt execution)
+	if (depth >= max_depth)
+	{
+		g_execution_halted = 1;
 	}
 
 	return NULL;  // Property not found in entire prototype chain
