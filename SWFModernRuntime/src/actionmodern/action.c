@@ -55,6 +55,18 @@ u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all furth
 static u32 g_call_depth = 0;
 
 // ==================================================================
+// Effective SWF Version (accounts for function context)
+// ==================================================================
+// In Flash, DefineFunction (SWF5 opcode) causes code inside functions
+// to behave as SWF5+ even in a SWF4 file. When inside a function call
+// (g_call_depth > 0) and the SWF version is < 5, we promote to version 5.
+#if defined(SWF_VERSION)
+#define EFFECTIVE_SWF_VERSION() (((SWF_VERSION) < 5 && g_call_depth > 0) ? 5 : (SWF_VERSION))
+#else
+#define EFFECTIVE_SWF_VERSION() 5
+#endif
+
+// ==================================================================
 // Special Recursion Counter (for getter/setter/valueOf/toString)
 // ==================================================================
 // Flash/Ruffle tracks a separate "special" recursion counter for
@@ -1095,11 +1107,10 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			u64 val = STACK_TOP_VALUE;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-			snprintf(var_str, 17, "%s", val ? "1" : "0");
-#else
-			snprintf(var_str, 17, "%s", val ? "true" : "false");
-#endif
+			if (EFFECTIVE_SWF_VERSION() < 5)
+				snprintf(var_str, 17, "%s", val ? "1" : "0");
+			else
+				snprintf(var_str, 17, "%s", val ? "true" : "false");
 			break;
 		}
 		case ACTION_STACK_VALUE_UNDEFINED:
@@ -1292,20 +1303,19 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 				// If no characters were consumed, it's NaN (or 0 in SWF < 5)
 				if (!parsed && end == str)
 				{
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-					temp = 0.0;
-#else
-					temp = NAN;
-#endif
+					if (EFFECTIVE_SWF_VERSION() < 5)
+						temp = 0.0;
+					else
+						temp = NAN;
 				}
 				// If there are trailing non-whitespace characters, it's NaN
 				// Exception: SWF < 5 uses parseFloat semantics (accepts partial parses)
 				else if (!parsed)
 				{
-#if !defined(SWF_VERSION) || SWF_VERSION >= 5
+					if (EFFECTIVE_SWF_VERSION() >= 5) {
 					while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
 					if (*end != '\0') temp = NAN;
-#endif
+					}
 				}
 				else
 				{
@@ -1976,14 +1986,17 @@ void actionDivide(SWFAppContext* app_context)
 
 	if (a_val == 0.0)
 	{
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-		// SWF4: divide by zero returns "#ERROR#"
-		PUSH_STR("#ERROR#", 8);
-#else
-		// SWF5+: divide by zero returns Infinity/-Infinity/NaN
-		double c = b_val / a_val;
-		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
-#endif
+		if (EFFECTIVE_SWF_VERSION() < 5)
+		{
+			// SWF4: divide by zero returns "#ERROR#"
+			PUSH_STR("#ERROR#", 8);
+		}
+		else
+		{
+			// SWF5+: divide by zero returns Infinity/-Infinity/NaN
+			double c = b_val / a_val;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &c));
+		}
 	}
 	else
 	{
@@ -3341,11 +3354,10 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_BOOLEAN:
 		{
-#if defined(SWF_VERSION) && SWF_VERSION < 5
-			printf("%d\n", STACK_TOP_VALUE ? 1 : 0);
-#else
-			printf("%s\n", STACK_TOP_VALUE ? "true" : "false");
-#endif
+			if (EFFECTIVE_SWF_VERSION() < 5)
+				printf("%d\n", STACK_TOP_VALUE ? 1 : 0);
+			else
+				printf("%s\n", STACK_TOP_VALUE ? "true" : "false");
 			break;
 		}
 
@@ -3913,8 +3925,9 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
 	{
-#if !defined(SWF_VERSION) || SWF_VERSION >= 5
 		// Check special variables (SWF5+ only — SWF4 has no built-in constants)
+		// Note: inside functions in SWF4, use SWF5+ behavior (DefineFunction is SWF5 opcode)
+		if (EFFECTIVE_SWF_VERSION() >= 5) {
 		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
 		{
 			// "this" refers to the current object context (root MovieClip)
@@ -4136,7 +4149,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)system_object);
 			return;
 		}
-#endif
+		} // end if (EFFECTIVE_SWF_VERSION() >= 5)
 
 		// Check _global object properties as fallback
 		{
@@ -9058,23 +9071,24 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		builtin_handled = 1;
 	}
 
-	// ASSetPropFlags(obj, props, clearFlags, setFlags)
+	// ASSetPropFlags(obj, props, setFlags, clearFlags)
 	// Modifies property attribute flags for version-based visibility
+	// Args popped from stack: args[0]=obj, args[1]=props, args[2]=setFlags, args[3]=clearFlags
 	else if (func_name_len == 14 && strncmp(func_name, "ASSetPropFlags", 14) == 0)
 	{
-		if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT)
+		if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_OBJECT)
 		{
-			ASObject* obj = (ASObject*)(u64)args[3].data.numeric_value;
-			s32 clear_flags = varToInt32(&args[0]);
-			s32 set_flags = varToInt32(&args[1]);
+			ASObject* obj = (ASObject*)(u64)args[0].data.numeric_value;
+			s32 set_flags = (num_args >= 3) ? varToInt32(&args[2]) : 0;
+			s32 clear_flags = (num_args >= 4) ? varToInt32(&args[3]) : 0;
 
 			// Get property name(s)
 			const char* prop_name = NULL;
 			u32 prop_name_len = 0;
-			if (args[2].type == ACTION_STACK_VALUE_STRING)
+			if (args[1].type == ACTION_STACK_VALUE_STRING)
 			{
-				prop_name = (const char*)args[2].data.numeric_value;
-				prop_name_len = args[2].str_size;
+				prop_name = (const char*)args[1].data.numeric_value;
+				prop_name_len = args[1].str_size;
 			}
 
 			if (obj != NULL && prop_name != NULL)
