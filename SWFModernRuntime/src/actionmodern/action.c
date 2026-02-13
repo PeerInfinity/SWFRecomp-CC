@@ -231,9 +231,9 @@ static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, Actio
 
 		if (prop_name != NULL)
 		{
-			// Use getProperty (NOT getPropertyWithPrototype) for own-property check
-			ActionVar* prop = getProperty(obj, prop_name, prop_name_len);
-			if (prop != NULL)
+			// Use hasPropertyRaw to check existence ignoring flash_flags visibility
+			// (hasOwnProperty returns true even for hidden properties)
+			if (hasPropertyRaw(obj, prop_name, prop_name_len))
 			{
 				ret.data.numeric_value = 1; // true
 			}
@@ -961,6 +961,9 @@ static DisplayObject* targeted_sprite = NULL;
 
 // Forward declaration
 extern DisplayObject* findDisplayObjectByName(const char* name);
+#else
+// NO_GRAPHICS child lookup by instance name — returns depth or 0 if not found
+extern size_t ng_findDisplayEntryByName(const char* name);
 #endif
 
 #ifndef NO_GRAPHICS
@@ -1140,9 +1143,22 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 		}
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
+			MovieClip* mc = (MovieClip*) VAL(u64, &STACK_TOP_VALUE);
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
-			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
-			snprintf(var_str, 17, "_level0");
+			extern MovieClip root_movieclip;
+			if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0')
+			{
+				// Child MovieClip: use dot-path format "_level0.name"
+				static char mc_path_buf[256];
+				snprintf(mc_path_buf, sizeof(mc_path_buf), "_level0.%s", mc->name);
+				VAL(u64, &STACK_TOP_VALUE) = (u64) mc_path_buf;
+				STACK_TOP_N = strlen(mc_path_buf);
+			}
+			else
+			{
+				VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
+				snprintf(var_str, 17, "_level0");
+			}
 			break;
 		}
 		case ACTION_STACK_VALUE_OBJECT:
@@ -3382,9 +3398,13 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			// MovieClip traces as its target path
-			// TODO: use actual target path for non-root MovieClips
-			printf("_level0\n");
+			// MovieClip traces as its dot-path (e.g., "_level0", "_level0.clip")
+			MovieClip* mc = (MovieClip*) STACK_TOP_VALUE;
+			extern MovieClip root_movieclip;
+			if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0')
+				printf("_level0.%s\n", mc->name);
+			else
+				printf("_level0\n");
 			break;
 		}
 
@@ -4011,6 +4031,14 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_NULL, 0);
 			return;
 		}
+		// Flash Player uses "o" as a temporary variable during global initialization
+		// for symbol/class registration. It gets set to null (not deleted) when done,
+		// so in every SWF, the global variable "o" resolves to null.
+		else if (var_name_len == 1 && var_name[0] == 'o')
+		{
+			PUSH(ACTION_STACK_VALUE_NULL, 0);
+			return;
+		}
 		else if (var_name_len == 7 && strncmp(var_name, "_global", 7) == 0)
 		{
 			extern ASObject* global_object;
@@ -4250,6 +4278,49 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
 			if (strcasecmp(var_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+		}
+
+		// Check display list children by instance name (e.g., GetVariable("clip"))
+		// In Flash, child movie clips are accessible as variables by their instance name
+		{
+			// First, check if name needs to be null-terminated
+			char name_buf[64];
+			if (var_name_len < 64)
+			{
+				memcpy(name_buf, var_name, var_name_len);
+				name_buf[var_name_len] = '\0';
+			}
+			else
+			{
+				memcpy(name_buf, var_name, 63);
+				name_buf[63] = '\0';
+			}
+
+#ifndef NO_GRAPHICS
+			DisplayObject* dobj = findDisplayObjectByName(name_buf);
+			if (dobj != NULL)
+			{
+				extern MovieClip root_movieclip;
+				MovieClip* child_mc = createMovieClip(name_buf, &root_movieclip);
+				if (child_mc != NULL)
+				{
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					return;
+				}
+			}
+#else
+			size_t child_depth = ng_findDisplayEntryByName(name_buf);
+			if (child_depth > 0)
+			{
+				extern MovieClip root_movieclip;
+				MovieClip* child_mc = createMovieClip(name_buf, &root_movieclip);
+				if (child_mc != NULL)
+				{
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					return;
+				}
+			}
+#endif
 		}
 
 		// Variable not found
@@ -6801,7 +6872,7 @@ void actionDelete(SWFAppContext* app_context)
 {
 	// Stack layout (from top to bottom):
 	// 1. property_name (string) - name of property to delete
-	// 2. object_name (string) - name of variable containing the object
+	// 2. object (object reference)
 
 	// Pop property name
 	ActionVar prop_name_var;
@@ -6819,72 +6890,47 @@ void actionDelete(SWFAppContext* app_context)
 	}
 	else
 	{
-		// Property name must be a string
-		// Return true (AS2 spec: returns true for invalid operations)
-		float result = 1.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		// Property name must be a string — pop object too and return true
+		POP();
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
 		return;
 	}
 
-	// Pop object name (variable name)
-	ActionVar obj_name_var;
-	popVar(app_context, &obj_name_var);
+	// Pop object reference
+	ActionVar obj_var;
+	popVar(app_context, &obj_var);
 
-	const char* obj_name = NULL;
-	u32 obj_name_len = 0;
+	ASObject* obj = NULL;
 
-	if (obj_name_var.type == ACTION_STACK_VALUE_STRING)
+	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
-		obj_name = obj_name_var.data.string_data.owns_memory ?
-			obj_name_var.data.string_data.heap_ptr :
-			(const char*) obj_name_var.data.numeric_value;
-		obj_name_len = obj_name_var.str_size;
+		obj = (ASObject*) obj_var.data.numeric_value;
 	}
-	else
+	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
 	{
-		// Object name must be a string
-		// Return true (AS2 spec: returns true for invalid operations)
-		float result = 1.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
-		return;
-	}
-
-	// Look up the variable to get the object
-	ActionVar* obj_var = getVariable((char*)obj_name, obj_name_len);
-
-	// If variable doesn't exist, return true (AS2 spec)
-	if (obj_var == NULL)
-	{
-		float result = 1.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
-		return;
+		// Fallback: if a string was pushed, look it up as a variable name
+		const char* obj_name = obj_var.data.string_data.owns_memory ?
+			obj_var.data.string_data.heap_ptr :
+			(const char*) obj_var.data.numeric_value;
+		u32 obj_name_len = obj_var.str_size;
+		ActionVar* looked_up = getVariable((char*)obj_name, obj_name_len);
+		if (looked_up != NULL && looked_up->type == ACTION_STACK_VALUE_OBJECT)
+		{
+			obj = (ASObject*) looked_up->data.numeric_value;
+		}
 	}
 
-	// If variable is not an object, return true (AS2 spec)
-	if (obj_var->type != ACTION_STACK_VALUE_OBJECT)
-	{
-		float result = 1.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
-		return;
-	}
-
-	// Get the object
-	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
-
-	// If object is NULL, return true
 	if (obj == NULL)
 	{
-		float result = 1.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
 		return;
 	}
 
 	// Delete the property
 	bool success = deleteProperty(app_context, obj, prop_name, prop_name_len);
 
-	// Push result (1.0 for success, 0.0 for failure)
-	float result = success ? 1.0f : 0.0f;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+	// Push result (true for success, false for failure)
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 }
 
 void actionGetMember(SWFAppContext* app_context)
@@ -10615,29 +10661,32 @@ void actionStartDrag(SWFAppContext* app_context)
  */
 bool actionWaitForFrame(SWFAppContext* app_context, u16 frame)
 {
-	// Get the current MovieClip (simplified: always use root)
+	// Exceeded maximum number of frames (Flash caps at 16000 for WaitForFrame)
+	if (frame > 16000)
+		return false;
+
+	// Get the current MovieClip
+#ifndef NO_GRAPHICS
+	if (targeted_sprite != NULL)
+	{
+		// Targeting a sprite without its own MovieClip struct:
+		// consider frame as loaded (Ruffle: unwrap_or(true))
+		return true;
+	}
+#endif
 	MovieClip* mc = &root_movieclip;
 
-	if (!mc) {
-		// No MovieClip available - frame not loaded
-		return false;
-	}
+	if (!mc)
+		return true;  // No MovieClip -> consider loaded (Ruffle: unwrap_or(true))
 
-	// Check if frame exists
-	// Note: Frame numbers in WaitForFrame are 0-based in the bytecode,
-	// but MovieClip properties are 1-based. Convert for comparison.
-	u16 frame_1based = frame + 1;
+	// For non-streaming SWFs, frames_loaded == totalframes.
+	// Check: frames_loaded >= min(frame, header_frames)
+	// The frame parameter is 0-based from bytecode.
+	int32_t frames_loaded = (int32_t)mc->totalframes;
+	u16 header_frames = (u16)mc->totalframes;
+	u16 check_frame = frame < header_frames ? frame : header_frames;
 
-	if (frame_1based > mc->totalframes) {
-		// Frame doesn't exist
-		return false;
-	}
-
-	// For non-streaming SWF files, all frames that exist are loaded
-	// In a full streaming implementation, we would check:
-	// if (frame_1based <= mc->frames_loaded) return true;
-	// For now, assume all frames are loaded
-	return true;
+	return frames_loaded >= (int32_t)check_frame;
 }
 
 bool actionWaitForFrame2(SWFAppContext* app_context)
@@ -10646,24 +10695,100 @@ bool actionWaitForFrame2(SWFAppContext* app_context)
 	ActionVar frame_var;
 	popVar(app_context, &frame_var);
 
-	// For simplified implementation: assume all frames are loaded
-	// In a full implementation, this would check if the frame is actually loaded
-	// by examining the MovieClip's frames_loaded count
+	// Convert the popped value to a frame number following Flash/Ruffle semantics.
+	// If the value is a number with no fractional part, use ECMAScript ToInt32 wrapping.
+	// Otherwise, coerce to string and try parsing; non-integer results default to 0.
+	int32_t frame_num = 0;
 
-	// Debug output to show what frame was checked
-#ifdef DEBUG
-	if (frame_var.type == ACTION_STACK_VALUE_F32)
+	if (frame_var.type == ACTION_STACK_VALUE_F64 || frame_var.type == ACTION_STACK_VALUE_F32)
 	{
-		printf("[DEBUG] WaitForFrame2: checking frame %d (assuming loaded)\n", (int)frame_var.value.f32);
+		double n = varToDouble(&frame_var);
+		if (!isnan(n) && !isinf(n) && floor(n) == n)
+		{
+			// Integer number: use ECMAScript ToInt32 wrapping
+			frame_num = (int32_t)varToUint32(&frame_var);
+		}
+		else
+		{
+			// NaN, Infinity, or fractional number: coerce to string and try parsing.
+			// In practice, coercing NaN/Infinity/fractional to string and parsing back
+			// will either fail or still be non-integer, so frame_num = 0 (always loaded).
+			frame_num = 0;
+		}
 	}
-	else if (frame_var.type == ACTION_STACK_VALUE_STRING)
+	else if (frame_var.type == ACTION_STACK_VALUE_STRING ||
+	         frame_var.type == ACTION_STACK_VALUE_STR_LIST)
 	{
-		const char* frame_str = (const char*)frame_var.value.u64;
-		printf("[DEBUG] WaitForFrame2: checking frame '%s' (assuming loaded)\n", frame_str);
+		// Try to parse the string as a number
+		const char* str = (const char*)frame_var.data.numeric_value;
+		if (str)
+		{
+			char* end;
+			double parsed = strtod(str, &end);
+			// Skip trailing whitespace
+			while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
+			if (end != str && *end == '\0' && !isnan(parsed) && !isinf(parsed) && floor(parsed) == parsed)
+			{
+				// Successfully parsed an integer number from string
+				// Use ECMAScript ToUint32 wrapping then cast to i32
+				if (parsed == 0.0) frame_num = 0;
+				else {
+					double posInt = (parsed > 0 ? 1.0 : -1.0) * floor(fabs(parsed));
+					double mod = fmod(posInt, 4294967296.0);
+					if (mod < 0) mod += 4294967296.0;
+					frame_num = (int32_t)(uint32_t)mod;
+				}
+			}
+			else
+			{
+				frame_num = 0;
+			}
+		}
+		else
+		{
+			frame_num = 0;
+		}
+	}
+	else
+	{
+		// null, undefined, boolean, object, etc. -> frame_num = 0 (always loaded)
+		frame_num = 0;
+	}
+
+	// Apply Flash's frame number adjustment:
+	// wrapping_sub(1) then saturating_add(1)
+	// This handles the off-by-one between 0-based and 1-based frame numbering.
+	frame_num = (int32_t)((uint32_t)frame_num - 1u);  // wrapping subtract
+	if (frame_num < INT32_MAX)
+		frame_num = frame_num + 1;  // saturating add (won't overflow past INT32_MAX)
+
+	// Exceeded maximum number of frames (off-by-one at 16001)
+	if (frame_num > 16001)
+		return false;
+
+	// Get the current MovieClip (root or targeted sprite)
+	MovieClip* mc = NULL;
+#ifndef NO_GRAPHICS
+	if (targeted_sprite != NULL)
+	{
+		// When targeting a sprite, if it's a valid MovieClip use it,
+		// otherwise consider frame as loaded (Ruffle: unwrap_or(true))
+		// For now, targeted sprites don't have their own MovieClip struct,
+		// so we return true (all frames loaded for the target).
+		return true;
 	}
 #endif
+	mc = &root_movieclip;
 
-	// Simplified: always return true (frame loaded)
-	// This is appropriate for non-streaming SWF files where all content loads instantly
-	return true;
+	if (!mc)
+		return true;  // No MovieClip -> consider loaded
+
+	// For non-streaming SWFs, frames_loaded == totalframes.
+	// Check: (frames_loaded + 1) >= min(frame_num as u16, header_frames)
+	int32_t frames_loaded = (int32_t)mc->totalframes;
+	uint16_t frame_u16 = (uint16_t)frame_num;
+	uint16_t header_frames = (uint16_t)mc->totalframes;
+	uint16_t check_frame = frame_u16 < header_frames ? frame_u16 : header_frames;
+
+	return (frames_loaded + 1) >= (int32_t)check_frame;
 }

@@ -193,6 +193,11 @@ static ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_len
 	return NULL;
 }
 
+bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length)
+{
+	return findPropertyRaw(obj, name, name_length) != NULL;
+}
+
 ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL)
@@ -313,8 +318,10 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 				free(obj->properties[i].value.data.string_data.heap_ptr);
 			}
 
-			// Set new value
+			// Set new value and clear version-based hiding flags
+			// (In Flash, setting a property via SetMember clears ASSetPropFlags visibility)
 			obj->properties[i].value = *value;
+			obj->properties[i].flash_flags = 0;
 
 			// Retain new value if it's an object
 			if (value->type == ACTION_STACK_VALUE_OBJECT)

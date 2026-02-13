@@ -106,6 +106,9 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 // Handles refcount management if value is an object
 void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value);
 
+// Check if property exists ignoring flash_flags visibility (for hasOwnProperty)
+bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length);
+
 // Delete property by name (returns true if deleted or not found, false if protected)
 // Handles refcount management if value is an object
 bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length);

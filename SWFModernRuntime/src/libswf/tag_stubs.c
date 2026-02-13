@@ -4,6 +4,7 @@
 #include <swf.h>
 #include <common.h>
 #include <action.h>
+#include <string.h>
 
 // Simple sprite registry for NO_GRAPHICS mode
 // Allows sprite frame scripts (e.g. DoAction inside DefineSprite) to execute
@@ -23,6 +24,7 @@ static struct {
 	size_t current_frame;
 	int is_playing;
 	size_t placed_at_frame; // which main timeline frame placed this entry
+	char instance_name[64]; // instance name set by tagSetInstanceName
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
 
@@ -115,41 +117,44 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 {
 	(void)transform_id; (void)cxform_id; (void)clip_depth;
 	extern size_t current_frame;
-	// Check if this is placing a new sprite (char_id > 0 means new placement)
+	// Check if this is placing a new character (char_id > 0 means new placement)
 	if (char_id > 0)
 	{
 		size_t si = ng_find_sprite(char_id);
-		if (si != (size_t)-1 && ng_display_count < MAX_DISPLAY_NG)
+
+		// Check if depth already occupied
+		for (size_t i = 0; i < ng_display_count; i++)
 		{
-			// Check if depth already has the same sprite (skip re-execution)
-			for (size_t i = 0; i < ng_display_count; i++)
+			if (ng_display[i].depth == depth)
 			{
-				if (ng_display[i].depth == depth)
+				if (si != (size_t)-1 && ng_display[i].sprite_idx == si)
 				{
-					if (ng_display[i].sprite_idx == si)
-					{
-						// Same sprite already at this depth - don't re-execute
-						return;
-					}
-					// Different sprite - replace and execute frame 0
-					ng_display[i].sprite_idx = si;
-					ng_display[i].current_frame = 0;
-					ng_display[i].is_playing = 1;
-					ng_display[i].placed_at_frame = current_frame;
-					if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
-						ng_sprites[si].funcs[0](app_context);
+					// Same sprite already at this depth - don't re-execute
 					return;
 				}
+				// Different character - replace (preserve instance_name)
+				ng_display[i].sprite_idx = si;
+				ng_display[i].current_frame = 0;
+				ng_display[i].is_playing = 1;
+				ng_display[i].placed_at_frame = current_frame;
+				if (si != (size_t)-1 && ng_sprites[si].funcs && ng_sprites[si].funcs[0])
+					ng_sprites[si].funcs[0](app_context);
+				return;
 			}
-			// New entry
+		}
+
+		// New entry
+		if (ng_display_count < MAX_DISPLAY_NG)
+		{
 			ng_display[ng_display_count].depth = depth;
 			ng_display[ng_display_count].sprite_idx = si;
 			ng_display[ng_display_count].current_frame = 0;
 			ng_display[ng_display_count].is_playing = 1;
 			ng_display[ng_display_count].placed_at_frame = current_frame;
+			ng_display[ng_display_count].instance_name[0] = '\0';
 			ng_display_count++;
-			// Execute frame 0
-			if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
+			// Execute frame 0 for sprites
+			if (si != (size_t)-1 && ng_sprites[si].funcs && ng_sprites[si].funcs[0])
 				ng_sprites[si].funcs[0](app_context);
 		}
 	}
@@ -195,7 +200,29 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
-	(void)app_context; (void)depth; (void)name;
+	(void)app_context;
+	// Store instance name on the display entry at this depth
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth)
+		{
+			strncpy(ng_display[i].instance_name, name, 63);
+			ng_display[i].instance_name[63] = '\0';
+			return;
+		}
+	}
+}
+
+// NO_GRAPHICS child lookup by instance name — returns depth or 0 if not found
+size_t ng_findDisplayEntryByName(const char* name)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, name) == 0)
+			return ng_display[i].depth;
+	}
+	return 0;
 }
 
 void tagRemoveObject(SWFAppContext* app_context, size_t depth)

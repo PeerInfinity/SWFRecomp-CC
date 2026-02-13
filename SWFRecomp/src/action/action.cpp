@@ -1287,8 +1287,8 @@ namespace SWFRecomp
 				if (preload_arguments && !suppress_arguments) next_reg++;
 				if (preload_super && !suppress_super) next_reg++;
 				if (preload_root) next_reg++;
-				if (preload_parent) next_reg++;
 				if (preload_global) next_reg++;
+				if (preload_parent) next_reg++;
 				int actual_reg_count = next_reg > (int)register_count ? next_reg : (int)register_count;
 				// Ensure array is large enough for all registers used in the body
 				if (max_body_reg + 1 > actual_reg_count) actual_reg_count = max_body_reg + 1;
@@ -1348,22 +1348,21 @@ namespace SWFRecomp
 					next_reg++;
 				}
 
-				if (preload_parent)
-				{
-					context.out_script_defs << "\t// Preload '_parent' into register " << next_reg << endl;
-					context.out_script_defs << "\t// For now, _parent points to _root (no clip hierarchy in NO_GRAPHICS mode)" << endl;
-					context.out_script_defs << "\textern MovieClip root_movieclip;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
-					next_reg++;
-				}
-
 				if (preload_global)
 				{
 					context.out_script_defs << "\t// Preload '_global' into register " << next_reg << endl;
 					context.out_script_defs << "\textern ASObject* global_object;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)global_object;" << endl;
+					next_reg++;
+				}
+
+				if (preload_parent)
+				{
+					context.out_script_defs << "\t// Preload '_parent' into register " << next_reg << endl;
+					context.out_script_defs << "\t// At root level, _parent is undefined (no parent MovieClip)" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = 0;" << endl;
 					next_reg++;
 				}
 
@@ -1788,9 +1787,9 @@ namespace SWFRecomp
 					// Read flags byte
 					u8 flags = VAL(u8, action_buffer);
 
-					u8 send_vars_method = (flags & 0xC0) >> 6;  // Top 2 bits (6-7)
-					u8 load_target_flag = (flags & 0x02) >> 1;   // Bit 1
-					u8 load_variables_flag = (flags & 0x01);     // Bit 0
+					u8 send_vars_method = (flags & 0x03);        // Bits 0-1
+					u8 load_target_flag = (flags & 0x40) >> 6;   // Bit 6
+					u8 load_variables_flag = (flags & 0x80) >> 7; // Bit 7
 
 					const char* method_str = "NONE";
 					if (send_vars_method == 1) method_str = "GET";
