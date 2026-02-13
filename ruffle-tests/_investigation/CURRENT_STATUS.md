@@ -1,13 +1,13 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-13, commit 28a85fb
+Last updated: 2026-02-13, commit d482f82
 
 ## Quick Summary
 
-- **Pass rate**: 100/491 filtered (20.4%), 105/616 raw (17.0%)
-- **Main failure type**: output_mismatch (377 filtered)
+- **Pass rate**: 112/616 raw (18.2%)
+- **Main failure type**: output_mismatch
 - **Regressions**: None
-- **Recent fixes**: init_array/object_invalid (stack overflow checks), stack underflow protection (3 segfaults fixed), DoAction-without-ShowFrame recompiler bug, primitive_instanceof (__proto__ on wrapper objects)
+- **Recent fixes**: Flash goto catch-up semantics (process intermediate frame tags inline, suppress main timeline scripts during catch-up, backward goto display list protection), num_ticks fallback in verify_output.py
 
 ## Top Near-Passing Tests (best ROI to fix)
 
@@ -18,9 +18,7 @@ Last updated: 2026-02-13, commit 28a85fb
 | `object_constructor` | 32/33 (97%) | `new Object(_root)` — quality property read from _root returns undefined instead of 10 |
 | `define_function2` | 7/8 (88%) | A function parameter defaults to undefined instead of expected value 66 |
 | `export_assets` | 2/3 (67%) | Symbol export/linkage |
-| `goto_both_ways2` | 2/3 (67%) | Goto frame logic |
-| `goto_frame_number` | 2/3 (67%) | Goto frame by number |
-| `goto_rewind2` | 2/3 (67%) | Goto rewind logic |
+| `goto_frame_number` | 2/3 (67%) | `test.gotoAndStop(5)` targets sprite but runtime applies to main timeline |
 
 ### Tier 2: 2-3 lines off
 
@@ -69,13 +67,12 @@ Variable lookups inside `tellTarget(mc)` blocks should resolve against the targe
 ### 3. Built-in Flash classes not implemented
 `flash.geom.Matrix`, `Point`, `Rectangle`, `Transform` — these are ActionScript 2.0 built-in classes that need constructor + method implementations. Each one would fix one large test.
 
-### 4. Goto/frame navigation
-Several tests (goto_both_ways2, goto_frame_number, goto_rewind2, goto_advance1, etc.) are 1-2 lines off, likely sharing a common root cause in frame navigation logic.
+### 4. Goto/frame navigation (mostly fixed)
+Goto catch-up semantics now implemented. Remaining: `goto_frame_number` (2/3) — sprite method targeting applies to main timeline instead of sprite.
 
 ## Recommended Work Order
 
-1. **Investigate goto tests** — several 1-line-off tests may share a root cause (goto_both_ways2, goto_frame_number, goto_rewind2)
-2. **Fix object_constructor** — investigate what `new Object(_root)` should return for quality prop
+1. **Fix object_constructor** — investigate what `new Object(_root)` should return for quality prop
 3. **Fix define_function2 parameter issue** — investigate the missing parameter default
 4. **Fix array_length negative values** — handle negative length assignment edge cases
 5. **Implement flash.geom.Point** — constructor + methods, fixes ~51 lines

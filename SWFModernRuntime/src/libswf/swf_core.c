@@ -107,7 +107,7 @@ void swfStart(SWFAppContext* app_context)
 		// the same frame advance, but skips DoAction tags (main timeline scripts).
 		// In our model, catch_up_mode=1 causes generated frame functions to skip
 		// their script_N() calls while still executing tag functions.
-		if (goto_from_action && manual_next_frame)
+		while (goto_from_action && manual_next_frame)
 		{
 			size_t original_frame = current_frame;
 			size_t target = next_frame;
@@ -121,27 +121,44 @@ void swfStart(SWFAppContext* app_context)
 			if (target <= original_frame)
 			{
 				// Backward goto: replay tags from frame 0 to target.
-				// Protect display list entries placed at or before target from
-				// RemoveObject2 (they're part of the preserved state).
+				// Intermediate frames (0..target-1) suppress scripts.
+				// Target frame runs normally (scripts included).
+				// Backward protection stays on through target frame so
+				// RemoveObject2 doesn't remove entries placed during rebuild.
 				catch_up_backward = 1;
 				catch_up_target = target;
-				for (size_t f = 0; f <= target && f < g_frame_count; f++)
+				for (size_t f = 0; f < target && f < g_frame_count; f++)
 				{
 					current_frame = f;
 					if (funcs[f]) funcs[f](app_context);
+				}
+				catch_up_mode = 0;
+				// Execute target frame with scripts enabled but
+				// backward protection still active
+				if (target < g_frame_count)
+				{
+					current_frame = target;
+					if (funcs[target]) funcs[target](app_context);
 				}
 				catch_up_backward = 0;
 			}
 			else
 			{
-				// Forward goto: process tags for frames between current and target
-				for (size_t f = original_frame + 1; f <= target && f < g_frame_count; f++)
+				// Forward goto: process intermediate frames (current+1..target-1)
+				// with scripts suppressed, then target frame normally.
+				for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
 				{
 					current_frame = f;
 					if (funcs[f]) funcs[f](app_context);
 				}
+				catch_up_mode = 0;
+				// Execute target frame with scripts enabled
+				if (target < g_frame_count)
+				{
+					current_frame = target;
+					if (funcs[target]) funcs[target](app_context);
+				}
 			}
-			catch_up_mode = 0;
 			current_frame = target;
 
 			// After catch-up, the goto's advance is consumed; fall through
