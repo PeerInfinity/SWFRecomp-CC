@@ -71,3 +71,6 @@ upstream-reference/
 ruffle-tests/*/
 !ruffle-tests/_shared/
 !ruffle-tests/_investigation/
+
+ruffle-tests/results_current.json
+ruffle-tests/results_previous.json
