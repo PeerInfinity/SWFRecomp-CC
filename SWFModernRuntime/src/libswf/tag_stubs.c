@@ -94,18 +94,20 @@ static void ng_exec_sprite_frame(SWFAppContext* app_context, size_t display_idx,
 
 void tagShowFrame(SWFAppContext* app_context)
 {
-	// During goto catch-up, don't advance sprite timelines
 	extern int catch_up_mode;
-	if (catch_up_mode) return;
 
 	// Execute deferred frame 0 for newly placed sprites
-	// (deferred from tagPlaceObject2 so main timeline scripts run first)
+	// Must run even during catch-up so sprite scripts execute inline
+	// before the next catch-up frame's scripts
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (!ng_display[i].needs_init) continue;
 		ng_display[i].needs_init = 0;
 		ng_exec_sprite_frame(app_context, i, 0);
 	}
+
+	// During goto catch-up, don't advance existing sprite timelines
+	if (catch_up_mode) return;
 
 	// Advance sprite timelines for NO_GRAPHICS mode
 	for (size_t i = 0; i < ng_display_count; i++)
