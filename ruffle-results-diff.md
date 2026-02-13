@@ -1,33 +1,32 @@
 # Ruffle Test Results Diff
 
-**Previous:** `e661a6519800` (2026-02-13T04:19:12.343395+00:00)
-**Current:** `688277072b98` (2026-02-13T04:26:18.252614+00:00)
+**Previous:** `688277072b98` (2026-02-13T04:26:18.252614+00:00)
+**Current:** `e145c7e84966` (2026-02-13T05:32:44.570225+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 122 | 122 | 0 |
+| Passing | 122 | 127 | +5 |
 | Total | 616 | 616 | 0 |
-| Pass rate | 19.8% | 19.8% | 0% |
-| Mismatched lines | 56398 | 56397 | -1 |
-|   Decreased | | | -2 |
+| Pass rate | 19.8% | 20.6% | +0.8% |
+| Mismatched lines | 56397 | 56384 | -13 |
+|   Decreased | | | -14 |
 |   Increased | | | +1 |
 
-## Newly Passing (1)
+## Newly Passing (5)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `sandbox_type_local_network` | output_mismatch | 0/1 | 1/1 |
+| `get_variable_in_scope` | output_mismatch | 26/29 | 29/29 |
+| `issue_710` | output_mismatch | 1/4 | 4/4 |
+| `new_object_wrap` | output_mismatch | 1/4 | 4/4 |
+| `recursive_prototypes` | output_mismatch | 0/0 | 0/0 |
+| `stage_object_properties_get_var` | output_mismatch | 3/5 | 5/5 |
 
-## Newly Failing (1)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `sandbox_type_local_file` | output_mismatch | 1/1 | 0/1 |
-
-## Line Count Changed (1)
+## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `sandbox_type_remote` | output_mismatch | 0/3 | 1/3 | -1 |
+| `new_method_wrap` | output_mismatch | 0/4 | 3/4 | -3 |
+| `with` | output_mismatch | 31/49 | 30/49 | +1 |
