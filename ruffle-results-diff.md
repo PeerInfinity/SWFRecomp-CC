@@ -1,32 +1,30 @@
 # Ruffle Test Results Diff
 
-**Previous:** `688277072b98` (2026-02-13T04:26:18.252614+00:00)
-**Current:** `e145c7e84966` (2026-02-13T05:32:44.570225+00:00)
+**Previous:** `e145c7e84966` (2026-02-13T05:32:44.570225+00:00)
+**Current:** `360cd1250a3d` (2026-02-13T06:42:45.265241+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 122 | 127 | +5 |
+| Passing | 127 | 128 | +1 |
 | Total | 616 | 616 | 0 |
-| Pass rate | 19.8% | 20.6% | +0.8% |
-| Mismatched lines | 56397 | 56384 | -13 |
-|   Decreased | | | -14 |
-|   Increased | | | +1 |
+| Pass rate | 20.6% | 20.8% | +0.2% |
+| Mismatched lines | 56384 | 56369 | -15 |
+|   Decreased | | | -15 |
 
-## Newly Passing (5)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `get_variable_in_scope` | output_mismatch | 26/29 | 29/29 |
-| `issue_710` | output_mismatch | 1/4 | 4/4 |
-| `new_object_wrap` | output_mismatch | 1/4 | 4/4 |
-| `recursive_prototypes` | output_mismatch | 0/0 | 0/0 |
-| `stage_object_properties_get_var` | output_mismatch | 3/5 | 5/5 |
+| `new_method_wrap` | output_mismatch | 3/4 | 4/4 |
 
-## Line Count Changed (2)
+## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `new_method_wrap` | output_mismatch | 0/4 | 3/4 | -3 |
-| `with` | output_mismatch | 31/49 | 30/49 | +1 |
+| `movieclip_default_state` | output_mismatch | 1/69 | 13/69 | -12 |
+| `global_proto_decls` | output_mismatch | 0/4497 | 1/4497 | -1 |
+| `global_proto_decls_delete` | output_mismatch | 0/4158 | 1/4158 | -1 |
+| `parse_int` | output_mismatch | 0/64 | 0/64 | 0 |
+| `variable_args` | output_mismatch | 0/5 | 0/5 | 0 |
