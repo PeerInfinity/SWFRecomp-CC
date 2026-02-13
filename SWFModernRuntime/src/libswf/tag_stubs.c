@@ -24,6 +24,7 @@ static struct {
 	size_t sprite_idx;     // index into ng_sprites, or (size_t)-1 for non-sprite
 	size_t current_frame;
 	int is_playing;
+	int needs_init;        // 1 if sprite frame 0 hasn't been executed yet
 	size_t placed_at_frame; // which main timeline frame placed this entry
 	char instance_name[64]; // instance name set by tagSetInstanceName
 } ng_display[MAX_DISPLAY_NG];
@@ -68,11 +69,43 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 	(void)red; (void)green; (void)blue;
 }
 
+// Helper to execute a sprite frame function with proper context
+static void ng_exec_sprite_frame(SWFAppContext* app_context, size_t display_idx, size_t frame)
+{
+	size_t si = ng_display[display_idx].sprite_idx;
+	if (si == (size_t)-1) return;
+	if (!ng_sprites[si].funcs || !ng_sprites[si].funcs[frame]) return;
+
+	const char* inst_name = ng_display[display_idx].instance_name[0] ? ng_display[display_idx].instance_name : NULL;
+	char mc_name[32];
+	if (!inst_name)
+	{
+		snprintf(mc_name, sizeof(mc_name), "__depth_%zu", ng_display[display_idx].depth);
+		inst_name = mc_name;
+	}
+	MovieClip* saved_ctx = g_current_context;
+	MovieClip* sprite_mc = actionFindOrCreateMovieClip(inst_name, &root_movieclip);
+	actionSetCurrentContext(sprite_mc);
+	ng_nesting_depth++;
+	ng_sprites[si].funcs[frame](app_context);
+	ng_nesting_depth--;
+	actionSetCurrentContext(saved_ctx);
+}
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 	// During goto catch-up, don't advance sprite timelines
 	extern int catch_up_mode;
 	if (catch_up_mode) return;
+
+	// Execute deferred frame 0 for newly placed sprites
+	// (deferred from tagPlaceObject2 so main timeline scripts run first)
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (!ng_display[i].needs_init) continue;
+		ng_display[i].needs_init = 0;
+		ng_exec_sprite_frame(app_context, i, 0);
+	}
 
 	// Advance sprite timelines for NO_GRAPHICS mode
 	for (size_t i = 0; i < ng_display_count; i++)
@@ -88,21 +121,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		ng_display[i].current_frame = next;
 
 		// Execute the next frame function
-		if (ng_sprites[si].funcs && ng_sprites[si].funcs[next])
-		{
-			// Set execution context to sprite's MovieClip so _parent resolves correctly
-			const char* inst_name = ng_display[i].instance_name[0] ? ng_display[i].instance_name : NULL;
-			MovieClip* saved_ctx = g_current_context;
-			if (inst_name)
-			{
-				MovieClip* sprite_mc = actionFindOrCreateMovieClip(inst_name, &root_movieclip);
-				actionSetCurrentContext(sprite_mc);
-			}
-			ng_nesting_depth++;
-			ng_sprites[si].funcs[next](app_context);
-			ng_nesting_depth--;
-			actionSetCurrentContext(saved_ctx);
-		}
+		ng_exec_sprite_frame(app_context, i, next);
 	}
 }
 
@@ -165,21 +184,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				ng_display[i].sprite_idx = si;
 				ng_display[i].current_frame = 0;
 				ng_display[i].is_playing = 1;
+				ng_display[i].needs_init = (si != (size_t)-1) ? 1 : 0;
 				ng_display[i].placed_at_frame = current_frame;
-				if (ng_sprites[si].funcs && ng_sprites[si].funcs[0])
-				{
-					// Set execution context so _parent resolves correctly
-					char mc_name[32];
-					const char* inst = ng_display[i].instance_name[0] ? ng_display[i].instance_name : NULL;
-					if (!inst) { snprintf(mc_name, sizeof(mc_name), "__depth_%zu", depth); inst = mc_name; }
-					MovieClip* saved_ctx = g_current_context;
-					MovieClip* sprite_mc = actionFindOrCreateMovieClip(inst, &root_movieclip);
-					actionSetCurrentContext(sprite_mc);
-					ng_nesting_depth++;
-					ng_sprites[si].funcs[0](app_context);
-					ng_nesting_depth--;
-					actionSetCurrentContext(saved_ctx);
-				}
 				return;
 			}
 		}
@@ -191,23 +197,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[ng_display_count].sprite_idx = si;
 			ng_display[ng_display_count].current_frame = 0;
 			ng_display[ng_display_count].is_playing = 1;
+			ng_display[ng_display_count].needs_init = (si != (size_t)-1) ? 1 : 0;
 			ng_display[ng_display_count].placed_at_frame = current_frame;
 			ng_display[ng_display_count].instance_name[0] = '\0';
 			ng_display_count++;
-			// Execute frame 0 for sprites
-			if (si != (size_t)-1 && ng_sprites[si].funcs && ng_sprites[si].funcs[0])
-			{
-				// Set execution context so _parent resolves correctly
-				char mc_name[32];
-				snprintf(mc_name, sizeof(mc_name), "__depth_%zu", depth);
-				MovieClip* saved_ctx = g_current_context;
-				MovieClip* sprite_mc = actionFindOrCreateMovieClip(mc_name, &root_movieclip);
-				actionSetCurrentContext(sprite_mc);
-				ng_nesting_depth++;
-				ng_sprites[si].funcs[0](app_context);
-				ng_nesting_depth--;
-				actionSetCurrentContext(saved_ctx);
-			}
 		}
 	}
 }

@@ -474,10 +474,11 @@ namespace SWFRecomp
 		// If we exited the tag loop early (cur_pos past end), close the current frame function
 		if (tag.code != 0)
 		{
-			// Emit any queued script calls
+			// Emit any queued script calls (skip sprite/clip/button-owned scripts)
 			while (last_queued_script < next_script_i)
 			{
-				context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
+				if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
+					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 				last_queued_script += 1;
 			}
 
@@ -698,10 +699,11 @@ namespace SWFRecomp
 		{
 			case SWF_TAG_END_TAG:
 			{
-				// Emit any queued script calls (from DoAction tags not followed by ShowFrame)
+				// Emit any queued script calls (skip sprite/clip/button-owned scripts)
 				while (last_queued_script < next_script_i)
 				{
-					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
+					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
+						context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 					last_queued_script += 1;
 				}
 
@@ -736,7 +738,8 @@ namespace SWFRecomp
 			{
 				while (last_queued_script < next_script_i)
 				{
-					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
+					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
+						context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 					last_queued_script += 1;
 				}
 
@@ -3027,15 +3030,11 @@ namespace SWFRecomp
 				// Forward declare the sprite frame_funcs array (written to draws.h)
 				sprite_forward_decls << "extern frame_func " << sp << "_frame_funcs[];" << endl;
 
-				// Flush any pending main timeline scripts before DefineSprite
-				// (main timeline DoAction tags that appeared before this DefineSprite
-				// must execute first, and sprite sub-tag DoActions would skip them
-				// by advancing last_queued_script past them)
-				while (last_queued_script < next_script_i)
-				{
-					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
-					last_queued_script += 1;
-				}
+				// Save main timeline script queue state before processing sprite sub-tags
+				// (sprite sub-tags create scripts with shared indices that should NOT
+				// be emitted in the main timeline frame function at ShowFrame time)
+				size_t saved_last_queued = last_queued_script;
+				size_t scripts_before_sprite = next_script_i;
 
 				// Emit tagDefineSprite call in the current main frame
 				context.tag_main << "\t" << "tagDefineSprite(app_context, "
@@ -3868,6 +3867,13 @@ namespace SWFRecomp
 					sprite_definitions << "\t" << sp << "_frame_" << to_string(i) << "," << endl;
 				}
 				sprite_definitions << "};" << endl << endl;
+
+				// Restore main timeline script queue — sprite-created scripts are
+				// called from sprite frame functions, not from main timeline frames.
+				// Mark all scripts created during DefineSprite as non-timeline.
+				for (size_t si = scripts_before_sprite; si < next_script_i; si++)
+					non_timeline_scripts.insert(si);
+				last_queued_script = saved_last_queued;
 
 				break;
 			}
