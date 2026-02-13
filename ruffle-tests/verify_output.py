@@ -400,6 +400,7 @@ def parse_args():
 examples:
   %(prog)s                          Run all tests
   %(prog)s --test=this_swf7         Run a single test
+  %(prog)s --test=foo --test=bar   Run multiple tests
   %(prog)s --test=this_swf7 --diff  Show diff for a single test
   %(prog)s --recompile              Force SWF recompilation for all tests
   %(prog)s --diff --limit=50        Run first 50 tests, show diffs for failures
@@ -408,8 +409,8 @@ examples:
 """,
     )
     parser.add_argument(
-        "--test", metavar="NAME",
-        help="Run a single test by name (e.g. this_swf7)")
+        "--test", metavar="NAME", action="append",
+        help="Run specific test(s) by name (repeatable, e.g. --test=foo --test=bar)")
     parser.add_argument(
         "-v", "--verbose", action="store_true",
         help="Print status for each test as it runs")
@@ -447,11 +448,13 @@ def main():
 
     # Determine test list
     if args.test:
-        test_dir = SCRIPT_DIR / args.test
-        if not test_dir.is_dir():
-            print(f"Error: test directory not found: {test_dir}")
-            sys.exit(1)
-        tests = [args.test]
+        tests = []
+        for t in args.test:
+            test_dir = SCRIPT_DIR / t
+            if not test_dir.is_dir():
+                print(f"Error: test directory not found: {test_dir}")
+                sys.exit(1)
+            tests.append(t)
     else:
         tests = sorted(
             d.name

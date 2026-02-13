@@ -1515,6 +1515,14 @@ void pushVar(SWFAppContext* app_context, ActionVar* var)
 
 void peekVar(SWFAppContext* app_context, ActionVar* var)
 {
+	if (SP >= INITIAL_STACK_SIZE)
+	{
+		var->type = ACTION_STACK_VALUE_UNDEFINED;
+		var->str_size = 0;
+		var->data.numeric_value = 0;
+		var->string_id = 0;
+		return;
+	}
 	var->type = STACK_TOP_TYPE;
 	var->str_size = STACK_TOP_N;
 
@@ -6257,6 +6265,16 @@ void actionInitArray(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar count_var;
 	popVar(app_context, &count_var);
+
+	// Check raw double value against stack before u32 conversion — Flash pushes undefined on overflow
+	double raw_count = varToDouble(&count_var);
+	u32 stack_entries = (INITIAL_STACK_SIZE - SP) / 24;
+	if (raw_count < 0 || raw_count > (double) stack_entries)
+	{
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		return;
+	}
+
 	u32 num_elements = (u32) varToInt32(&count_var);
 
 	// 2. Allocate array
@@ -6506,6 +6524,17 @@ void actionInitObject(SWFAppContext* app_context)
 	convertFloat(app_context);
 	ActionVar count_var;
 	popVar(app_context, &count_var);
+
+	// Check raw double value against stack before u32 conversion — Flash pushes undefined on overflow
+	// InitObject pops 2 values per property (name + value)
+	double raw_count = varToDouble(&count_var);
+	u32 stack_entries = (INITIAL_STACK_SIZE - SP) / 24;
+	if (raw_count < 0 || raw_count * 2 > (double) stack_entries)
+	{
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		return;
+	}
+
 	u32 num_props = (u32) varToInt32(&count_var);
 
 #ifdef DEBUG

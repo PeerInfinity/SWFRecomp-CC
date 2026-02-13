@@ -474,6 +474,13 @@ namespace SWFRecomp
 		// If we exited the tag loop early (cur_pos past end), close the current frame function
 		if (tag.code != 0)
 		{
+			// Emit any queued script calls
+			while (last_queued_script < next_script_i)
+			{
+				context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(app_context);" << endl;
+				last_queued_script += 1;
+			}
+
 			if (next_frame_i == 1)
 			{
 				context.tag_main << "\t" << "quit_swf = 1;" << endl;
@@ -691,11 +698,18 @@ namespace SWFRecomp
 		{
 			case SWF_TAG_END_TAG:
 			{
+				// Emit any queued script calls (from DoAction tags not followed by ShowFrame)
+				while (last_queued_script < next_script_i)
+				{
+					context.tag_main << "\t" << "script_" << to_string(last_queued_script) << "(app_context);" << endl;
+					last_queued_script += 1;
+				}
+
 				if (next_frame_i == 1)
 				{
 					context.tag_main << "\t" << "quit_swf = 1;" << endl;
 				}
-				
+
 				else
 				{
 					context.tag_main << "\t" << "if (!manual_next_frame && is_playing)" << endl

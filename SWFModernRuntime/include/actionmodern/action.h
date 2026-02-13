@@ -78,7 +78,7 @@ extern MovieClip root_movieclip;
 #define PUSH_VAR(p) pushVar(app_context, p);
 
 #define POP() \
-	SP = VAL(u32, &STACK[SP + 4]);
+	if (SP < INITIAL_STACK_SIZE) SP = VAL(u32, &STACK[SP + 4]);
 
 #define POP_2() \
 	POP(); \
