@@ -163,19 +163,14 @@ size_t ng_getSpriteFrameCount(void)
 	return ng_sprites[si].frame_count;
 }
 
-// Advance existing sprite timelines — called from main loop BEFORE frame function
-// so that child scripts execute before parent scripts (matching Flash behavior)
-// Flash advances sprites in reverse depth order (highest depth first)
+// Advance existing sprite timelines — called from main loop AFTER frame function
+// so that child scripts execute before the next parent frame (matching Flash behavior).
+// Also runs before quit_swf is checked, so single-frame movies still advance sprites.
+// Flash advances sprites in reverse depth order (highest depth first).
 void ng_advanceSprites(SWFAppContext* app_context)
 {
 	extern int catch_up_mode;
 	if (catch_up_mode) return;
-
-	// Clear sentinels first (separate pass to avoid ordering issues)
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].needs_init == 2) ng_display[i].needs_init = 0;
-	}
 
 	// Advance in reverse depth order (highest depth first)
 	// Find max depth first, then iterate downward
@@ -188,6 +183,7 @@ void ng_advanceSprites(SWFAppContext* app_context)
 		for (size_t i = 0; i < ng_display_count; i++)
 		{
 			if (ng_display[i].depth != d) continue;
+			// Skip sprites waiting for init (tagShowFrame will handle them later this tick)
 			if (ng_display[i].needs_init) continue;
 			size_t si = ng_display[i].sprite_idx;
 			if (si == (size_t)-1) continue;
@@ -209,19 +205,16 @@ void tagShowFrame(SWFAppContext* app_context)
 
 	// Execute deferred frame 0 for newly placed sprites
 	// Must run even during catch-up so sprite scripts execute inline
-	// before the next catch-up frame's scripts
+	// before the next catch-up frame's scripts.
+	// With start-of-tick ng_advanceSprites, no sentinel is needed:
+	// ng_advanceSprites already ran before tagShowFrame, and it skips
+	// entries with needs_init>0. Setting needs_init=0 here means the
+	// sprite will be advanced on the NEXT tick's ng_advanceSprites.
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (!ng_display[i].needs_init) continue;
-		ng_display[i].needs_init = 2;  // sentinel: skip advancement next tick
+		ng_display[i].needs_init = 0;
 		ng_exec_sprite_frame(app_context, i, 0);
-	}
-
-	// During goto catch-up, clear sentinels
-	if (catch_up_mode)
-	{
-		for (size_t i = 0; i < ng_display_count; i++)
-			if (ng_display[i].needs_init == 2) ng_display[i].needs_init = 0;
 	}
 }
 
@@ -252,9 +245,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	(void)cxform_id; (void)clip_depth;
 	extern size_t current_frame;
 
-	// Ignore placements from inside sprite frame functions — they place
-	// children (shapes etc.) that would corrupt the flat main-timeline display list.
-	if (ng_nesting_depth > 0) return;
+	// Note: we do NOT skip placements inside sprite frame functions.
+	// Nested sprites/shapes get registered in the flat display list, which
+	// allows them to be found by name (e.g., tellTarget, slash syntax paths).
+	// This matches pre-refactor behavior where nested children were accessible.
 
 	if (char_id == 0)
 	{

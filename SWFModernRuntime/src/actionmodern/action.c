@@ -4395,25 +4395,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				MovieClip* child_mc = findOrCreateMovieClip(name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
-					// Sync x/y when transform_id has changed (PlaceObject2 update)
-					u32 tid;
-					if (ng_getTransformId(child_depth, &tid) && tid != child_mc->last_transform_id)
-					{
-						float tx, ty;
-						if (ng_getTransformXY(child_depth, &tx, &ty))
-						{
-							child_mc->x = tx;
-							child_mc->y = ty;
-						}
-						child_mc->last_transform_id = tid;
-					}
-					// Only sprites push as movieclip; buttons and
-					// other display objects (text fields) push as object
-					if (ng_isSpriteAtDepth(child_depth)) {
-						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
-					} else {
-						PUSH(ACTION_STACK_VALUE_OBJECT, (u64)child_mc);
-					}
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
 					return;
 				}
 			}
@@ -5007,6 +4989,9 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 {
 	// Peek at the type without modifying value
 	u8 type = STACK_TOP_TYPE;
+#ifdef NO_GRAPHICS
+	u64 typeof_val = VAL(u64, &STACK_TOP_VALUE);
+#endif
 
 	// Pop the value
 	POP();
@@ -5039,6 +5024,22 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 			break;
 
 		case ACTION_STACK_VALUE_MOVIECLIP:
+#ifdef NO_GRAPHICS
+			// In Flash, text fields and buttons return "object" for typeof,
+			// only actual sprites/movieclips return "movieclip"
+			{
+				MovieClip* mc = (MovieClip*) typeof_val;
+				if (mc && mc->name[0] != '\0')
+				{
+					size_t d = ng_findDisplayEntryByName(mc->name);
+					if (d > 0 && !ng_isSpriteAtDepth(d))
+					{
+						type_str = "object";
+						break;
+					}
+				}
+			}
+#endif
 			type_str = "movieclip";
 			break;
 

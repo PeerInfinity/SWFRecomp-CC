@@ -141,7 +141,6 @@ void swfStart(SWFAppContext* app_context)
 		// (Flash executes child frame advancement before parent DoAction)
 		ng_advanceSprites(app_context);
 		// Only run the root frame function if the root timeline is playing
-		// (when stopped, sprites still need to advance via ng_advanceSprites above)
 		if (is_playing || manual_next_frame)
 		{
 			if (funcs[current_frame])
@@ -192,7 +191,6 @@ void swfStart(SWFAppContext* app_context)
 				if (target < g_frame_count)
 				{
 					current_frame = target;
-					ng_advanceSprites(app_context);
 					if (funcs[target]) funcs[target](app_context);
 				}
 				catch_up_backward = 0;
@@ -211,7 +209,6 @@ void swfStart(SWFAppContext* app_context)
 				if (target < g_frame_count)
 				{
 					current_frame = target;
-					ng_advanceSprites(app_context);
 					if (funcs[target]) funcs[target](app_context);
 				}
 			}
@@ -240,8 +237,7 @@ void swfStart(SWFAppContext* app_context)
 			// Root stopped — but child sprites may still be playing
 			if (ng_hasPlayingSprites())
 			{
-				// Don't re-execute the frame function, just advance sprites
-				// next tick (stay at current_frame)
+				// Stay at current_frame, sprites advance via ng_advanceSprites above
 				continue;
 			}
 			// Truly stopped — exit loop
