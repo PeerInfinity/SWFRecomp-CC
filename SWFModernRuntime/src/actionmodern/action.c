@@ -964,6 +964,167 @@ ASObject* global_object = NULL;
 ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;
 
+// TextField constructor function and prototype
+static ASFunction g_textfield_constructor;
+static int g_textfield_constructor_init = 0;
+// TextField prototype method stubs (static storage)
+static ASFunction g_tf_getTextFormat_func;
+static ASFunction g_tf_setTextFormat_func;
+static ASFunction g_tf_getNewTextFormat_func;
+static ASFunction g_tf_setNewTextFormat_func;
+static ASFunction g_tf_getDepth_func;
+static ASFunction g_tf_removeTextField_func;
+static ASFunction g_tf_replaceSel_func;
+static ASFunction g_tf_replaceText_func;
+
+// Helper: check if an ASObject is a bare TextField instance (created via new TextField())
+static int isTextFieldInstance(ASObject* obj) {
+	if (!g_textfield_constructor_init || g_textfield_constructor.prototype_obj == NULL) return 0;
+	ActionVar* proto_var = getProperty(obj, "__proto__", 9);
+	if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT) return 0;
+	return (ASObject*)proto_var->data.numeric_value == g_textfield_constructor.prototype_obj;
+}
+
+// Helper: check if a property name is a native TextField property
+// These properties are "virtual" on TextField — setting them on a bare new TextField() has no effect
+// SWF7-: 30 native props (filters/sharpness/thickness/antiAliasType/gridFitType are settable)
+// SWF8+: all 35 data properties are native
+static int isNativeTextFieldProperty(const char* name, u32 len) {
+	static const struct { const char* n; u32 l; } props[] = {
+		{"styleSheet",10}, {"mouseWheelEnabled",17}, {"condenseWhite",13}, {"restrict",8},
+		{"textHeight",10}, {"textWidth",9}, {"bottomScroll",12}, {"length",6},
+		{"selectable",10}, {"multiline",9}, {"password",8}, {"wordWrap",8},
+		{"background",10}, {"border",6}, {"html",4}, {"embedFonts",10},
+		{"maxChars",8}, {"maxhscroll",10}, {"hscroll",7}, {"variable",8},
+		{"htmlText",8}, {"type",4}, {"text",4}, {"autoSize",8},
+		{"tabIndex",8}, {"textColor",9}, {"backgroundColor",15}, {"borderColor",11},
+		{"maxscroll",9}, {"scroll",6},
+		// SWF8+ only: these 5 also become native
+		{"filters",7}, {"sharpness",9}, {"thickness",9}, {"antiAliasType",13}, {"gridFitType",11}
+	};
+#if defined(SWF_VERSION) && SWF_VERSION >= 8
+	int count = 35;
+#else
+	int count = 30;
+#endif
+	for (int i = 0; i < count; i++) {
+		if (props[i].l == len && strncmp(name, props[i].n, len) == 0) return 1;
+	}
+	return 0;
+}
+
+static void initTextFieldPrototype(SWFAppContext* app_context)
+{
+	if (g_textfield_constructor_init) return;
+#if defined(SWF_VERSION) && SWF_VERSION < 6
+	return; // TextField constructor doesn't exist in SWF5
+#endif
+
+	memset(&g_textfield_constructor, 0, sizeof(ASFunction));
+	strncpy(g_textfield_constructor.name, "TextField", 255);
+	g_textfield_constructor.function_type = 1;
+	g_textfield_constructor.param_count = 0;
+
+	// Create prototype with capacity for 35 properties + 8 methods + __proto__ + __constructor__
+	ASObject* proto = allocObject(app_context, 48);
+	retainObject(proto);
+	g_textfield_constructor.prototype_obj = proto;
+
+	// Set __proto__ to Object.prototype
+	setObjectProto(app_context, proto);
+
+	// Add 35 enumerable properties in the exact order Flash enumerates them.
+	// All start as undefined on the prototype; instances shadow them with real values.
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	static const char* tf_prop_names[] = {
+		"styleSheet", "mouseWheelEnabled", "condenseWhite", "restrict",
+		"textHeight", "textWidth", "bottomScroll", "length",
+		"selectable", "multiline", "password", "wordWrap",
+		"background", "border", "html", "embedFonts",
+		"maxChars", "maxhscroll", "hscroll", "variable",
+		"htmlText", "type", "text", "autoSize",
+		"tabIndex", "textColor", "backgroundColor", "borderColor",
+		"maxscroll", "scroll", "filters", "sharpness",
+		"thickness", "antiAliasType", "gridFitType"
+	};
+	static const u32 tf_prop_lens[] = {
+		10, 17, 14, 8,
+		10, 9, 12, 6,
+		10, 9, 8, 8,
+		10, 6, 4, 10,
+		8, 10, 7, 8,
+		8, 4, 4, 8,
+		8, 9, 15, 11,
+		9, 6, 7, 9,
+		9, 13, 11
+	};
+
+	for (int i = 0; i < 35; i++)
+	{
+		setProperty(app_context, proto, tf_prop_names[i], tf_prop_lens[i], &undef_val);
+	}
+
+	// Add 8 method functions (DontEnum — they don't show up in for..in)
+	struct {
+		const char* name;
+		u32 name_len;
+		ASFunction* func;
+	} tf_methods[] = {
+		{"getTextFormat", 13, &g_tf_getTextFormat_func},
+		{"setTextFormat", 13, &g_tf_setTextFormat_func},
+		{"getNewTextFormat", 16, &g_tf_getNewTextFormat_func},
+		{"setNewTextFormat", 16, &g_tf_setNewTextFormat_func},
+		{"getDepth", 8, &g_tf_getDepth_func},
+		{"removeTextField", 15, &g_tf_removeTextField_func},
+		{"replaceSel", 10, &g_tf_replaceSel_func},
+		{"replaceText", 11, &g_tf_replaceText_func},
+	};
+
+	// replaceText (last entry) only exists in SWF7+
+#if defined(SWF_VERSION) && SWF_VERSION < 7
+	int tf_method_count = 7;
+#else
+	int tf_method_count = 8;
+#endif
+	for (int i = 0; i < tf_method_count; i++)
+	{
+		memset(tf_methods[i].func, 0, sizeof(ASFunction));
+		strncpy(tf_methods[i].func->name, tf_methods[i].name, 255);
+		tf_methods[i].func->function_type = 1;
+		tf_methods[i].func->param_count = 0;
+
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = tf_methods[i].func;
+
+		ActionVar func_val = {0};
+		func_val.type = ACTION_STACK_VALUE_FUNCTION;
+		func_val.data.numeric_value = (u64) tf_methods[i].func;
+		setProperty(app_context, proto, tf_methods[i].name, tf_methods[i].name_len, &func_val);
+	}
+
+	// Mark method properties and __proto__ as DontEnum
+	for (u32 i = 0; i < proto->num_used; i++)
+	{
+		const char* pname = proto->properties[i].name;
+		if (strcmp(pname, "__proto__") == 0 ||
+		    strcmp(pname, "getTextFormat") == 0 ||
+		    strcmp(pname, "setTextFormat") == 0 ||
+		    strcmp(pname, "getNewTextFormat") == 0 ||
+		    strcmp(pname, "setNewTextFormat") == 0 ||
+		    strcmp(pname, "getDepth") == 0 ||
+		    strcmp(pname, "removeTextField") == 0 ||
+		    strcmp(pname, "replaceSel") == 0 ||
+		    strcmp(pname, "replaceText") == 0)
+		{
+			proto->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+		}
+	}
+
+	g_textfield_constructor_init = 1;
+}
+
 // _root MovieClip for simplified implementation
 // Note: totalframes is set from SWF_FRAME_COUNT if available, otherwise defaults to 1
 MovieClip root_movieclip = {
@@ -1128,10 +1289,33 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			// Pre-populate TextField default properties
 			if (ng_isTextFieldAtDepth(depth)) {
 				if (mc->dynamic_props == NULL) {
-					mc->dynamic_props = (void*) allocObject(app_context, 16);
+					mc->dynamic_props = (void*) allocObject(app_context, 32);
 					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* props = (ASObject*) mc->dynamic_props;
+
+				// Set __proto__ to TextField.prototype
+				initTextFieldPrototype(app_context);
+				if (g_textfield_constructor.prototype_obj != NULL) {
+					ActionVar proto_val = {0};
+					proto_val.type = ACTION_STACK_VALUE_OBJECT;
+					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+					setProperty(app_context, props, "__proto__", 9, &proto_val);
+					// Mark __proto__ as DontEnum
+					for (u32 pi = 0; pi < props->num_used; pi++) {
+						if (strcmp(props->properties[pi].name, "__proto__") == 0) {
+							props->properties[pi].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+							break;
+						}
+					}
+				}
+
+				int tf_idx = ng_getTextFieldIdx(depth);
+				u16 tf_flags = ng_getTextFieldFlags(tf_idx);
+				// Flag bits: 0x0001=WordWrap, 0x0002=Multiline, 0x0004=Password,
+				//            0x0008=ReadOnly, 0x0010=NoSelect, 0x0020=Border,
+				//            0x0040=HTML, 0x0080=UseOutlines, 0x0100=AutoSize
+
 				// text property (initial text from DefineEditText)
 				const char* init_text = ng_getTextFieldInitialText(depth);
 				ActionVar text_val = {0};
@@ -1139,8 +1323,13 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				text_val.str_size = strlen(init_text);
 				VAL(u64, &text_val.data.numeric_value) = (u64)init_text;
 				setProperty(app_context, props, "text", 4, &text_val);
-				// htmlText (same as text for non-HTML textfields)
-				setProperty(app_context, props, "htmlText", 8, &text_val);
+				// htmlText (raw HTML text if HTML flag set, otherwise same as text)
+				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
+				ActionVar html_text_val = {0};
+				html_text_val.type = ACTION_STACK_VALUE_STRING;
+				html_text_val.str_size = strlen(raw_html);
+				VAL(u64, &html_text_val.data.numeric_value) = (u64)raw_html;
+				setProperty(app_context, props, "htmlText", 8, &html_text_val);
 				// textColor (from DefineEditText)
 				u32 tc = ng_getTextFieldColor(depth);
 				ActionVar color_val = {0};
@@ -1157,39 +1346,137 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				bc_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &bc_val.data.numeric_value) = 0.0;
 				setProperty(app_context, props, "borderColor", 11, &bc_val);
-				// background (default false)
+				// Boolean properties
 				ActionVar false_val = {0};
 				false_val.type = ACTION_STACK_VALUE_BOOLEAN;
 				VAL(u32, &false_val.data.numeric_value) = 0;
+				ActionVar true_val = {0};
+				true_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &true_val.data.numeric_value) = 1;
+				// background (default false)
 				setProperty(app_context, props, "background", 10, &false_val);
-				// border (default false)
-				setProperty(app_context, props, "border", 6, &false_val);
-				// type (default "dynamic")
+				// border (from DefineEditText Border flag)
+				setProperty(app_context, props, "border", 6, (tf_flags & 0x0020) ? &true_val : &false_val);
+				// type ("input" if !ReadOnly, "dynamic" otherwise)
 				ActionVar type_val = {0};
 				type_val.type = ACTION_STACK_VALUE_STRING;
-				type_val.str_size = 7;
-				VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+				if (tf_flags & 0x0008) {  // ReadOnly
+					type_val.str_size = 7;
+					VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+				} else {
+					type_val.str_size = 5;
+					VAL(u64, &type_val.data.numeric_value) = (u64)"input";
+				}
 				setProperty(app_context, props, "type", 4, &type_val);
 				// length (string length of initial text)
 				ActionVar len_val = {0};
 				len_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &len_val.data.numeric_value) = (double)strlen(init_text);
 				setProperty(app_context, props, "length", 6, &len_val);
-				// multiline (default false)
-				setProperty(app_context, props, "multiline", 9, &false_val);
-				// wordWrap (default false)
-				setProperty(app_context, props, "wordWrap", 8, &false_val);
-				// selectable (default true)
-				ActionVar true_val = {0};
-				true_val.type = ACTION_STACK_VALUE_BOOLEAN;
-				VAL(u32, &true_val.data.numeric_value) = 1;
-				setProperty(app_context, props, "selectable", 10, &true_val);
+				// multiline (from DefineEditText Multiline flag)
+				setProperty(app_context, props, "multiline", 9, (tf_flags & 0x0002) ? &true_val : &false_val);
+				// wordWrap (from DefineEditText WordWrap flag)
+				setProperty(app_context, props, "wordWrap", 8, (tf_flags & 0x0001) ? &true_val : &false_val);
+				// password (from DefineEditText Password flag)
+				setProperty(app_context, props, "password", 8, (tf_flags & 0x0004) ? &true_val : &false_val);
+				// selectable (!NoSelect)
+				setProperty(app_context, props, "selectable", 10, (tf_flags & 0x0010) ? &false_val : &true_val);
+				// html (from DefineEditText HTML flag)
+				setProperty(app_context, props, "html", 4, (tf_flags & 0x0040) ? &true_val : &false_val);
+				// embedFonts (from DefineEditText UseOutlines flag)
+				setProperty(app_context, props, "embedFonts", 10, (tf_flags & 0x0080) ? &true_val : &false_val);
 				// condenseWhite (default false)
 				setProperty(app_context, props, "condenseWhite", 13, &false_val);
-				// maxChars (default null = no limit)
+				// maxChars (from DefineEditText MaxLength, null if -1)
+				s16 max_len = ng_getTextFieldMaxLength(tf_idx);
+				if (max_len < 0) {
+					ActionVar null_val = {0};
+					null_val.type = ACTION_STACK_VALUE_NULL;
+					setProperty(app_context, props, "maxChars", 8, &null_val);
+				} else {
+					ActionVar maxc_val = {0};
+					maxc_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &maxc_val.data.numeric_value) = (double)max_len;
+					setProperty(app_context, props, "maxChars", 8, &maxc_val);
+				}
+				// variable (from DefineEditText VariableName)
+				const char* var_name = ng_getTextFieldVariableName(tf_idx);
+				ActionVar var_val = {0};
+				var_val.type = ACTION_STACK_VALUE_STRING;
+				var_val.str_size = strlen(var_name);
+				VAL(u64, &var_val.data.numeric_value) = (u64)var_name;
+				setProperty(app_context, props, "variable", 8, &var_val);
+				// autoSize (from DefineEditText AutoSize flag)
+				ActionVar autosize_val = {0};
+				autosize_val.type = ACTION_STACK_VALUE_STRING;
+				if (tf_flags & 0x0100) {
+					autosize_val.str_size = 4;
+					VAL(u64, &autosize_val.data.numeric_value) = (u64)"left";
+				} else {
+					autosize_val.str_size = 4;
+					VAL(u64, &autosize_val.data.numeric_value) = (u64)"none";
+				}
+				setProperty(app_context, props, "autoSize", 8, &autosize_val);
+				// scroll (default 1)
+				ActionVar one_val = {0};
+				one_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &one_val.data.numeric_value) = 1.0;
+				setProperty(app_context, props, "scroll", 6, &one_val);
+				// maxscroll (default 1)
+				setProperty(app_context, props, "maxscroll", 9, &one_val);
+				// bottomScroll (default 1)
+				setProperty(app_context, props, "bottomScroll", 12, &one_val);
+				// hscroll (default 0)
+				ActionVar zero_val = {0};
+				zero_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &zero_val.data.numeric_value) = 0.0;
+				setProperty(app_context, props, "hscroll", 7, &zero_val);
+				// maxhscroll (default 0)
+				setProperty(app_context, props, "maxhscroll", 10, &zero_val);
+				// mouseWheelEnabled (default true)
+				setProperty(app_context, props, "mouseWheelEnabled", 17, &true_val);
+				// restrict (default null)
 				ActionVar null_val = {0};
 				null_val.type = ACTION_STACK_VALUE_NULL;
-				setProperty(app_context, props, "maxChars", 8, &null_val);
+				setProperty(app_context, props, "restrict", 8, &null_val);
+				// styleSheet (default null)
+				setProperty(app_context, props, "styleSheet", 10, &null_val);
+				// textWidth (default 0)
+				setProperty(app_context, props, "textWidth", 9, &zero_val);
+				// textHeight (default 0)
+				setProperty(app_context, props, "textHeight", 10, &zero_val);
+				// tabIndex (default undefined)
+				ActionVar undef_val = {0};
+				undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, props, "tabIndex", 8, &undef_val);
+				// sharpness (default 0)
+				setProperty(app_context, props, "sharpness", 9, &zero_val);
+				// thickness (default 0)
+				setProperty(app_context, props, "thickness", 9, &zero_val);
+				// antiAliasType (default "normal")
+				ActionVar aat_val = {0};
+				aat_val.type = ACTION_STACK_VALUE_STRING;
+				aat_val.str_size = 6;
+				VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+				setProperty(app_context, props, "antiAliasType", 13, &aat_val);
+				// gridFitType (default "pixel")
+				ActionVar gft_val = {0};
+				gft_val.type = ACTION_STACK_VALUE_STRING;
+				gft_val.str_size = 5;
+				VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+				setProperty(app_context, props, "gridFitType", 11, &gft_val);
+				// filters (default empty array)
+				ASArray* filters_arr = allocArray(app_context, 0);
+				filters_arr->length = 0;
+				ActionVar filters_val = {0};
+				filters_val.type = ACTION_STACK_VALUE_ARRAY;
+				filters_val.data.numeric_value = (u64) filters_arr;
+				setProperty(app_context, props, "filters", 7, &filters_val);
+				// Set _width/_height from bounds
+				s32 bxmin, bxmax, bymin, bymax;
+				ng_getTextFieldBounds(tf_idx, &bxmin, &bxmax, &bymin, &bymax);
+				mc->width = (float)(bxmax - bxmin) / 20.0f;
+				mc->height = (float)(bymax - bymin) / 20.0f;
 			}
 		}
 	}
@@ -2732,8 +3019,9 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 		var = getVariable(var_name, var_name_len);
 	}
 
-	// Step 3: Check if variable exists and is an object
-	if (!var || var->type != ACTION_STACK_VALUE_OBJECT)
+	// Step 3: Check if variable exists and is an object or movieclip
+	if (!var || (var->type != ACTION_STACK_VALUE_OBJECT &&
+	             var->type != ACTION_STACK_VALUE_MOVIECLIP))
 	{
 #ifdef DEBUG
 		if (!var)
@@ -2747,7 +3035,18 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 	}
 
 	// Step 4: Get the object from the variable
-	ASObject* obj = (ASObject*) VAL(u64, &var->data.numeric_value);
+	ASObject* obj = NULL;
+	if (var->type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// MovieClip: enumerate dynamic_props (walks __proto__ chain for TextField prototype)
+		MovieClip* mc = (MovieClip*) VAL(u64, &var->data.numeric_value);
+		if (mc != NULL)
+			obj = (ASObject*) mc->dynamic_props;
+	}
+	else
+	{
+		obj = (ASObject*) VAL(u64, &var->data.numeric_value);
+	}
 	if (obj == NULL)
 	{
 #ifdef DEBUG
@@ -4305,6 +4604,15 @@ void actionGetVariable(SWFAppContext* app_context)
 					setProperty(app_context, global_object, ctor_names[ci], ctor_name_lens[ci], &cv);
 				}
 
+				// Register TextField on _global
+				initTextFieldPrototype(app_context);
+				{
+					ActionVar tf_cv = {0};
+					tf_cv.type = ACTION_STACK_VALUE_FUNCTION;
+					tf_cv.data.numeric_value = (u64)&g_textfield_constructor;
+					setProperty(app_context, global_object, "TextField", 9, &tf_cv);
+				}
+
 				global_init_done = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
@@ -4357,6 +4665,13 @@ void actionGetVariable(SWFAppContext* app_context)
 				g_movieclip_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_movieclip_constructor);
+			return;
+		}
+		else if (var_name_len == 9 && strncmp(var_name, "TextField", 9) == 0)
+		{
+			// Return the built-in TextField constructor as a function
+			initTextFieldPrototype(app_context);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_textfield_constructor);
 			return;
 		}
 		else if (var_name_len == 6 && strncmp(var_name, "String", 6) == 0)
@@ -5793,6 +6108,72 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			arr ? arr->length : 0);
 		#endif
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// MovieClip enumeration — enumerate dynamic_props with prototype chain walk
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+		if (mc != NULL && mc->dynamic_props != NULL)
+		{
+			ASObject* obj = (ASObject*) mc->dynamic_props;
+
+			typedef struct PropList {
+				const char* name;
+				u32 name_length;
+				struct PropList* next;
+			} PropList;
+
+			PropList* prop_head = NULL;
+			EnumeratedName* enumerated_head = NULL;
+
+			ASObject* current_obj = obj;
+			int chain_depth = 0;
+			const int MAX_CHAIN_DEPTH = 100;
+
+			while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
+			{
+				chain_depth++;
+
+				for (u32 i = 0; i < current_obj->num_used; i++)
+				{
+					const char* prop_name = current_obj->properties[i].name;
+					u32 prop_name_len = current_obj->properties[i].name_length;
+					u8 prop_flags = current_obj->properties[i].flags;
+
+					if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
+						continue;
+					if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
+						continue;
+
+					addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
+
+					PropList* node = (PropList*) malloc(sizeof(PropList));
+					if (node != NULL)
+					{
+						node->name = prop_name;
+						node->name_length = prop_name_len;
+						node->next = prop_head;
+						prop_head = node;
+					}
+				}
+
+				ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+				if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+					current_obj = (ASObject*) proto_var->data.numeric_value;
+				else
+					current_obj = NULL;
+			}
+
+			freeEnumeratedNames(enumerated_head);
+
+			while (prop_head != NULL)
+			{
+				PUSH_STR((char*)prop_head->name, prop_head->name_length);
+				PropList* next = prop_head->next;
+				free(prop_head);
+				prop_head = next;
+			}
+		}
+	}
 	else
 	{
 		// Non-object/non-array: just the undefined terminator
@@ -7027,6 +7408,11 @@ void actionSetMember(SWFAppContext* app_context)
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
 		if (obj != NULL)
 		{
+			// Bare TextField instances (from new TextField()) reject sets on native properties
+			if (isTextFieldInstance(obj) && isNativeTextFieldProperty(prop_name, prop_name_len))
+			{
+				return;
+			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
 		}
@@ -7672,10 +8058,10 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 		}
 
-		// Check user-defined dynamic properties
+		// Check user-defined dynamic properties (walks __proto__ chain for TextField prototype)
 		if (mc != NULL && mc->dynamic_props != NULL)
 		{
-			ActionVar* prop = getProperty((ASObject*) mc->dynamic_props, prop_name, prop_name_len);
+			ActionVar* prop = getPropertyWithPrototype((ASObject*) mc->dynamic_props, prop_name, prop_name_len);
 			if (prop != NULL)
 			{
 				pushVar(app_context, prop);
@@ -8175,6 +8561,34 @@ void actionNewObject(SWFAppContext* app_context)
 
 		setProperty(app_context, bool_obj, "value", 5, &value_var);
 		new_obj = bool_obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "TextField") == 0)
+	{
+		// Handle TextField constructor — new TextField()
+		// Creates an empty object with __proto__ set to TextField.prototype
+		ASObject* tf_obj = allocObject(app_context, 4);
+		initTextFieldPrototype(app_context);
+		if (g_textfield_constructor.prototype_obj != NULL)
+		{
+			ActionVar proto_var = {0};
+			proto_var.type = ACTION_STACK_VALUE_OBJECT;
+			proto_var.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+			setProperty(app_context, tf_obj, "__proto__", 9, &proto_var);
+			// Mark __proto__ as DontEnum
+			for (u32 i = 0; i < tf_obj->num_used; i++) {
+				if (strcmp(tf_obj->properties[i].name, "__proto__") == 0) {
+					tf_obj->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+					break;
+				}
+			}
+		}
+		else
+		{
+			setObjectProto(app_context, tf_obj);
+		}
+		new_obj = tf_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
 	}

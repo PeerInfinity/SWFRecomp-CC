@@ -783,10 +783,19 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	dictionary[char_id].cxform_id = cxform_id;
 }
 
-void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id, const char* initial_text, u32 text_color)
+void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
+    const char* plain_text, const char* raw_html_text, u32 text_color,
+    u16 font_id, u16 font_height, s16 max_length,
+    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    const char* variable_name, u16 flags,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
 	// Graphics mode doesn't need separate EditText properties tracking
-	(void)app_context; (void)char_id; (void)initial_text; (void)text_color;
+	(void)app_context; (void)char_id; (void)plain_text; (void)raw_html_text;
+	(void)text_color; (void)font_id; (void)font_height; (void)max_length;
+	(void)align; (void)left_margin; (void)right_margin; (void)indent;
+	(void)leading; (void)variable_name; (void)flags;
+	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
 }
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)

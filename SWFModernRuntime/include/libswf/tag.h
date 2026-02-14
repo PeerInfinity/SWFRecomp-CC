@@ -15,7 +15,12 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count);
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id);
-void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id, const char* initial_text, u32 text_color);
+void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
+    const char* plain_text, const char* raw_html_text, u32 text_color,
+    u16 font_id, u16 font_height, s16 max_length,
+    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    const char* variable_name, u16 flags,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth);
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio);
@@ -66,6 +71,19 @@ int ng_isButtonAtDepth(size_t depth);
 int ng_isTextFieldAtDepth(size_t depth);
 const char* ng_getTextFieldInitialText(size_t depth);
 u32 ng_getTextFieldColor(size_t depth);
+int ng_getTextFieldIdx(size_t depth);
+u16 ng_getTextFieldFlags(int tf_idx);
+u16 ng_getTextFieldFontId(int tf_idx);
+u16 ng_getTextFieldFontHeight(int tf_idx);
+s16 ng_getTextFieldMaxLength(int tf_idx);
+u8 ng_getTextFieldAlign(int tf_idx);
+u16 ng_getTextFieldLeftMargin(int tf_idx);
+u16 ng_getTextFieldRightMargin(int tf_idx);
+u16 ng_getTextFieldIndent(int tf_idx);
+s16 ng_getTextFieldLeading(int tf_idx);
+const char* ng_getTextFieldVariableName(int tf_idx);
+void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* ymax);
+const char* ng_getTextFieldRawHtml(int tf_idx);
 int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
 #endif

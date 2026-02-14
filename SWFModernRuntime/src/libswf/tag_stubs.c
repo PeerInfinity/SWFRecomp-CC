@@ -53,8 +53,23 @@ static int ng_find_button(size_t char_id)
 #define MAX_TEXTFIELDS_NG 64
 static struct {
 	size_t char_id;
-	char initial_text[256];
-	u32 text_color;  // 0xRRGGBB
+	char plain_text[1024];     // plain text (HTML tags stripped)
+	char raw_html_text[1024];  // raw initial text (may contain HTML)
+	u32 text_color;            // 0xRRGGBB
+	u16 font_id;
+	u16 font_height;           // in twips
+	s16 max_length;            // -1 = unlimited
+	u8 align;                  // 0=left,1=right,2=center,3=justify
+	u16 left_margin;           // twips
+	u16 right_margin;          // twips
+	u16 indent;                // twips
+	s16 leading;               // twips
+	char variable_name[256];
+	u16 flags;                 // packed: WordWrap|Multiline|Password|ReadOnly|NoSelect|Border|HTML|UseOutlines|AutoSize
+	s32 bounds_xmin;           // twips
+	s32 bounds_xmax;           // twips
+	s32 bounds_ymin;           // twips
+	s32 bounds_ymax;           // twips
 } ng_textfields[MAX_TEXTFIELDS_NG];
 static size_t ng_textfield_count = 0;
 
@@ -259,14 +274,37 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	(void)transform_start; (void)cxform_id;
 }
 
-void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id, const char* initial_text, u32 text_color)
+void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
+    const char* plain_text, const char* raw_html_text, u32 text_color,
+    u16 font_id, u16 font_height, s16 max_length,
+    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    const char* variable_name, u16 flags,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
 	(void)app_context;
 	if (ng_textfield_count >= MAX_TEXTFIELDS_NG) return;
-	ng_textfields[ng_textfield_count].char_id = char_id;
-	strncpy(ng_textfields[ng_textfield_count].initial_text, initial_text ? initial_text : "", 255);
-	ng_textfields[ng_textfield_count].initial_text[255] = '\0';
-	ng_textfields[ng_textfield_count].text_color = text_color;
+	size_t i = ng_textfield_count;
+	ng_textfields[i].char_id = char_id;
+	strncpy(ng_textfields[i].plain_text, plain_text ? plain_text : "", sizeof(ng_textfields[i].plain_text) - 1);
+	ng_textfields[i].plain_text[sizeof(ng_textfields[i].plain_text) - 1] = '\0';
+	strncpy(ng_textfields[i].raw_html_text, raw_html_text ? raw_html_text : "", sizeof(ng_textfields[i].raw_html_text) - 1);
+	ng_textfields[i].raw_html_text[sizeof(ng_textfields[i].raw_html_text) - 1] = '\0';
+	ng_textfields[i].text_color = text_color;
+	ng_textfields[i].font_id = font_id;
+	ng_textfields[i].font_height = font_height;
+	ng_textfields[i].max_length = max_length;
+	ng_textfields[i].align = align;
+	ng_textfields[i].left_margin = left_margin;
+	ng_textfields[i].right_margin = right_margin;
+	ng_textfields[i].indent = indent;
+	ng_textfields[i].leading = leading;
+	strncpy(ng_textfields[i].variable_name, variable_name ? variable_name : "", sizeof(ng_textfields[i].variable_name) - 1);
+	ng_textfields[i].variable_name[sizeof(ng_textfields[i].variable_name) - 1] = '\0';
+	ng_textfields[i].flags = flags;
+	ng_textfields[i].bounds_xmin = bounds_xmin;
+	ng_textfields[i].bounds_xmax = bounds_xmax;
+	ng_textfields[i].bounds_ymin = bounds_ymin;
+	ng_textfields[i].bounds_ymax = bounds_ymax;
 	ng_textfield_count++;
 }
 
@@ -439,7 +477,7 @@ const char* ng_getTextFieldInitialText(size_t depth)
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (ng_display[i].depth == depth && ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
-			return ng_textfields[ng_display[i].textfield_idx].initial_text;
+			return ng_textfields[ng_display[i].textfield_idx].plain_text;
 	}
 	return "";
 }
@@ -452,6 +490,92 @@ u32 ng_getTextFieldColor(size_t depth)
 			return ng_textfields[ng_display[i].textfield_idx].text_color;
 	}
 	return 0;
+}
+
+int ng_getTextFieldIdx(size_t depth)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+		if (ng_display[i].depth == depth && ng_display[i].is_textfield)
+			return ng_display[i].textfield_idx;
+	return -1;
+}
+
+u16 ng_getTextFieldFlags(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].flags;
+}
+
+u16 ng_getTextFieldFontId(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].font_id;
+}
+
+u16 ng_getTextFieldFontHeight(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].font_height;
+}
+
+s16 ng_getTextFieldMaxLength(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return -1;
+	return ng_textfields[tf_idx].max_length;
+}
+
+u8 ng_getTextFieldAlign(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].align;
+}
+
+u16 ng_getTextFieldLeftMargin(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].left_margin;
+}
+
+u16 ng_getTextFieldRightMargin(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].right_margin;
+}
+
+u16 ng_getTextFieldIndent(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].indent;
+}
+
+s16 ng_getTextFieldLeading(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].leading;
+}
+
+const char* ng_getTextFieldVariableName(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "";
+	return ng_textfields[tf_idx].variable_name;
+}
+
+void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* ymax)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) {
+		*xmin = *xmax = *ymin = *ymax = 0;
+		return;
+	}
+	*xmin = ng_textfields[tf_idx].bounds_xmin;
+	*xmax = ng_textfields[tf_idx].bounds_xmax;
+	*ymin = ng_textfields[tf_idx].bounds_ymin;
+	*ymax = ng_textfields[tf_idx].bounds_ymax;
+}
+
+const char* ng_getTextFieldRawHtml(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "";
+	return ng_textfields[tf_idx].raw_html_text;
 }
 
 // Get transform_id for a display entry at a given depth

@@ -581,15 +581,17 @@ Phase 1 ──→ Phase 2 ──→ Phase 3
 
 ---
 
-## Open Questions
+## Design Decisions
 
-1. **Property storage strategy**: Should TextField properties use `addProperty()` virtual getters/setters, or should we intercept in GetMember/SetMember? Virtual getters would be more correct (they show up in enumeration correctly) but add complexity.
+All features will eventually need full, correct implementations — the goal is to pass all 66 tests. However, we can start with simpler versions where that gets tests passing sooner, then refine later.
 
-2. **Font metrics in trace mode**: Computing textWidth/textHeight requires font metrics (advance table, ascent, descent, leading). The recompiler already parses these from DefineFont2/3 — we need to pass them through to the runtime. This is needed for Phases 3-5. Could be a separate font metrics table passed at init time.
+1. **Property storage strategy**: Use `addProperty()` virtual getters/setters on the TextField prototype. This is the correct approach (properties enumerate properly, setters can validate/coerce values) and avoids special-casing TextField in GetMember/SetMember. We need addProperty for other features anyway (e.g. `Object.prototype.addProperty` test), so implementing it now pays off twice.
 
-3. **HTML parser scope**: The HTML subset is small but implementing a parser is non-trivial. For Phase 5, consider whether a simple state machine suffices or if we need a proper tokenizer. The test expectations are very precise about whitespace and attribute ordering.
+2. **Font metrics in trace mode**: Pass font metrics (advance table, ascent, descent, leading) from the recompiler to the runtime as a font metrics table at init time. Start simple: compute textWidth as sum of advances scaled by fontSize/emSquare, textHeight as ascent+descent+leading. Refine with word-wrap line breaking and kerning in later phases.
 
-4. **createTextField**: Several tests (textfield_properties, movieclip_create_text_field) need `MovieClip.createTextField()`. This is a MovieClip method, not a TextField feature per se, but it's closely related. Priority TBD.
+3. **HTML parser scope**: Start with a simple state-machine tokenizer — the HTML subset is small (10 tags, no nesting ambiguity). The test expectations are precise about attribute ordering in *output* (htmlText getter), but the *input* parser (htmlText setter) just needs to handle the standard tags. Build the generator (htmlText getter) first since more tests depend on reading htmlText than writing it.
+
+4. **createTextField**: Implement alongside Phase 1 since `textfield_properties` needs it. It's a MovieClip method (`MovieClip.prototype.createTextField(name, depth, x, y, w, h)`) that creates a new TextField instance at runtime.
 
 ---
 

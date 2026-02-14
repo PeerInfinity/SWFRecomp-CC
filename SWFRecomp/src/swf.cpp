@@ -1859,6 +1859,11 @@ namespace SWFRecomp
 				tag.configureNextField(SWF_FIELD_SB, 0);
 				tag.parseFields(cur_pos);
 
+				s32 bounds_xmin = (s32) tag.fields[1].value;
+				s32 bounds_xmax = (s32) tag.fields[2].value;
+				s32 bounds_ymin = (s32) tag.fields[3].value;
+				s32 bounds_ymax = (s32) tag.fields[4].value;
+
 				// Flags (UI16, but stored as two UI8s: low byte first)
 				tag.clearFields();
 				tag.setFieldCount(2);
@@ -1878,6 +1883,10 @@ namespace SWFRecomp
 				u16 font_id = 0;
 				u16 font_height = 0;
 				u8 r = 0, g = 0, b = 0, a = 255;
+				s16 max_length = -1;
+				u8 align = 0;
+				u16 left_margin = 0, right_margin = 0, indent = 0;
+				s16 leading = 0;
 
 				if (has_font)
 				{
@@ -1911,7 +1920,7 @@ namespace SWFRecomp
 					tag.setFieldCount(1);
 					tag.configureNextField(SWF_FIELD_UI16);
 					tag.parseFields(cur_pos);
-					// skip MaxLength
+					max_length = (s16) tag.fields[0].value;
 				}
 
 				if (has_layout)
@@ -1924,10 +1933,15 @@ namespace SWFRecomp
 					tag.configureNextField(SWF_FIELD_UI16);  // Indent
 					tag.configureNextField(SWF_FIELD_SI16);  // Leading
 					tag.parseFields(cur_pos);
-					// skip layout fields
+					align = (u8) tag.fields[0].value;
+					left_margin = (u16) tag.fields[1].value;
+					right_margin = (u16) tag.fields[2].value;
+					indent = (u16) tag.fields[3].value;
+					leading = (s16) tag.fields[4].value;
 				}
 
 				// VariableName (null-terminated STRING)
+				std::string variable_name(cur_pos);
 				while (*cur_pos != '\0') cur_pos++;
 				cur_pos++;  // skip null terminator
 
@@ -2058,12 +2072,38 @@ namespace SWFRecomp
 					}
 					// Pack text color as 0xRRGGBB
 					u32 text_color = ((u32)r << 16) | ((u32)g << 8) | (u32)b;
+					// Pack flags: WordWrap|Multiline|Password|ReadOnly|NoSelect|Border|HTML|UseOutlines|AutoSize
+					u16 packed_flags = 0;
+					if (flags_lo & 0x40) packed_flags |= 0x0001;  // WordWrap
+					if (flags_lo & 0x20) packed_flags |= 0x0002;  // Multiline
+					if (flags_lo & 0x10) packed_flags |= 0x0004;  // Password
+					if (flags_lo & 0x08) packed_flags |= 0x0008;  // ReadOnly
+					if (flags_hi & 0x10) packed_flags |= 0x0010;  // NoSelect
+					if (flags_hi & 0x08) packed_flags |= 0x0020;  // Border
+					if (flags_hi & 0x02) packed_flags |= 0x0040;  // HTML
+					if (flags_hi & 0x01) packed_flags |= 0x0080;  // UseOutlines
+					if (flags_hi & 0x40) packed_flags |= 0x0100;  // AutoSize
 					tag_init << endl
 							 << "\t" << "tagDefineEditTextProps("
 							 << "app_context, "
 							 << to_string(char_id) << ", "
 							 << "\"" << escape_for_c(plain_text) << "\", "
-							 << to_string(text_color)
+							 << "\"" << escape_for_c(initial_text) << "\", "
+							 << to_string(text_color) << ", "
+							 << to_string(font_id) << ", "
+							 << to_string(font_height) << ", "
+							 << to_string(max_length) << ", "
+							 << to_string(align) << ", "
+							 << to_string(left_margin) << ", "
+							 << to_string(right_margin) << ", "
+							 << to_string(indent) << ", "
+							 << to_string(leading) << ", "
+							 << "\"" << escape_for_c(variable_name) << "\", "
+							 << to_string(packed_flags) << ", "
+							 << to_string(bounds_xmin) << ", "
+							 << to_string(bounds_xmax) << ", "
+							 << to_string(bounds_ymin) << ", "
+							 << to_string(bounds_ymax)
 							 << ");";
 				}
 
