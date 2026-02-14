@@ -1131,19 +1131,21 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 static ASFunction g_textformat_constructor;
 static int g_textformat_constructor_init = 0;
 
-// TextFormat property names (18 properties)
+// TextFormat property names (19 properties)
 static const char* tf_prop_names[] = {
 	"font", "size", "color", "bold", "italic", "underline",
 	"align", "leftMargin", "rightMargin", "indent", "leading",
 	"blockIndent", "bullet", "kerning", "letterSpacing", "tabStops",
-	"url", "target"
+	"url", "target", "display"
 };
 static const u32 tf_prop_lens[] = {
 	4, 4, 5, 4, 6, 9,
 	5, 10, 11, 6, 7,
 	11, 6, 7, 13, 8,
-	3, 6
+	3, 6, 7
 };
+#define TF_PROP_COUNT 19
+#define TF_FONT_MAX_LENGTH 64
 
 // Coercion type enum
 enum TFCoercionType {
@@ -1156,6 +1158,7 @@ enum TFCoercionType {
 	TF_COERCE_BOOLEAN,    // bold, italic, underline, bullet, kerning
 	TF_COERCE_ALIGN,      // align
 	TF_COERCE_TABSTOPS,   // tabStops
+	TF_COERCE_DISPLAY,    // display
 };
 
 static int getTextFormatCoercionType(const char* name, u32 len) {
@@ -1163,9 +1166,16 @@ static int getTextFormatCoercionType(const char* name, u32 len) {
 	if (len == 3 && strncmp(name, "url", 3) == 0) return TF_COERCE_STRING;
 	if (len == 6 && strncmp(name, "target", 6) == 0) return TF_COERCE_STRING;
 	if (len == 4 && strncmp(name, "size", 4) == 0) return TF_COERCE_INTEGER;
+#if defined(SWF_VERSION) && SWF_VERSION < 8
+	// SWF7 and below: indent/leading/blockIndent clamp negative to 0
+	if (len == 6 && strncmp(name, "indent", 6) == 0) return TF_COERCE_NONNEG_INT;
+	if (len == 7 && strncmp(name, "leading", 7) == 0) return TF_COERCE_NONNEG_INT;
+	if (len == 11 && strncmp(name, "blockIndent", 11) == 0) return TF_COERCE_NONNEG_INT;
+#else
 	if (len == 6 && strncmp(name, "indent", 6) == 0) return TF_COERCE_INTEGER;
 	if (len == 7 && strncmp(name, "leading", 7) == 0) return TF_COERCE_INTEGER;
 	if (len == 11 && strncmp(name, "blockIndent", 11) == 0) return TF_COERCE_INTEGER;
+#endif
 	if (len == 10 && strncmp(name, "leftMargin", 10) == 0) return TF_COERCE_NONNEG_INT;
 	if (len == 11 && strncmp(name, "rightMargin", 11) == 0) return TF_COERCE_NONNEG_INT;
 	if (len == 5 && strncmp(name, "color", 5) == 0) return TF_COERCE_UNSIGNED;
@@ -1177,6 +1187,7 @@ static int getTextFormatCoercionType(const char* name, u32 len) {
 	if (len == 7 && strncmp(name, "kerning", 7) == 0) return TF_COERCE_BOOLEAN;
 	if (len == 5 && strncmp(name, "align", 5) == 0) return TF_COERCE_ALIGN;
 	if (len == 8 && strncmp(name, "tabStops", 8) == 0) return TF_COERCE_TABSTOPS;
+	if (len == 7 && strncmp(name, "display", 7) == 0) return TF_COERCE_DISPLAY;
 	return TF_COERCE_NONE;
 }
 
@@ -1237,7 +1248,13 @@ static ActionVar tfCoerceInteger(SWFAppContext* app_context, ActionVar* value) {
 		result.data.numeric_value = VAL(u64, &v);
 		return result;
 	}
+#if defined(SWF_VERSION) && SWF_VERSION < 8
+	// SWF7 and below: truncate toward zero
+	d = (d >= 0) ? floor(d) : -floor(-d);
+#else
+	// SWF8+: banker's rounding (round half to even)
 	d = bankersRound(d);
+#endif
 	// Out of int32 range → -2147483648
 	if (d > 2147483647.0 || d < -2147483648.0) {
 		result.type = ACTION_STACK_VALUE_F64;
@@ -1298,7 +1315,11 @@ static ActionVar tfCoerceNonNegInt(SWFAppContext* app_context, ActionVar* value)
 		result.data.numeric_value = VAL(u64, &v);
 		return result;
 	}
-	d = bankersRound(d);
+#if defined(SWF_VERSION) && SWF_VERSION < 8
+	d = (d >= 0) ? floor(d) : -floor(-d); // SWF7: truncate toward zero
+#else
+	d = bankersRound(d); // SWF8+: banker's rounding
+#endif
 	// Positive overflow → -2147483648
 	if (d > 2147483647.0) {
 		double v = -2147483648.0;
@@ -1410,24 +1431,8 @@ static ActionVar tfCoerceString(SWFAppContext* app_context, ActionVar* value) {
 		result.type = ACTION_STACK_VALUE_NULL;
 		return result;
 	}
-	// Convert number/bool to string
-	static char tf_str_buf[64];
-	if (value->type == ACTION_STACK_VALUE_F64) {
-		double d = VAL(double, &value->data.numeric_value);
-		snprintf(tf_str_buf, sizeof(tf_str_buf), "%.15g", d);
-	} else if (value->type == ACTION_STACK_VALUE_F32) {
-		float f = VAL(float, &value->data.numeric_value);
-		snprintf(tf_str_buf, sizeof(tf_str_buf), "%g", f);
-	} else if (value->type == ACTION_STACK_VALUE_BOOLEAN) {
-		snprintf(tf_str_buf, sizeof(tf_str_buf), "%s", value->data.numeric_value ? "true" : "false");
-	} else {
-		result.type = ACTION_STACK_VALUE_NULL;
-		return result;
-	}
-	result.type = ACTION_STACK_VALUE_STRING;
-	result.data.numeric_value = (u64) tf_str_buf;
-	result.str_size = strlen(tf_str_buf);
-	return result;
+	// Number/bool → store raw value (Flash keeps original type for font/url/target)
+	return *value;
 }
 
 // Coerce for boolean (bold, italic, underline, bullet, kerning)
@@ -1462,7 +1467,8 @@ static ActionVar tfCoerceBoolean(SWFAppContext* app_context, ActionVar* value) {
 static ActionVar tfCoerceAlign(SWFAppContext* app_context, ActionVar* value, ASObject* obj) {
 	ActionVar result = {0};
 	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
-		result.type = ACTION_STACK_VALUE_NULL;
+		// Setter: null/undefined → keep current (sentinel)
+		result.type = 255;
 		return result;
 	}
 	// Get string value
@@ -1548,6 +1554,25 @@ static ActionVar tfCoerceTabStops(SWFAppContext* app_context, ActionVar* value) 
 	return result;
 }
 
+// Coerce for display enum: "block", "inline", "none" only. Invalid/null/undefined → "block".
+static ActionVar tfCoerceDisplay(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_STRING) {
+		const char* s = (const char*) value->data.numeric_value;
+		u32 slen = value->str_size;
+		if ((slen == 5 && strncmp(s, "block", 5) == 0) ||
+		    (slen == 6 && strncmp(s, "inline", 6) == 0) ||
+		    (slen == 4 && strncmp(s, "none", 4) == 0)) {
+			return *value;
+		}
+	}
+	// null/undefined/invalid → "block"
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.data.numeric_value = (u64) "block";
+	result.str_size = 5;
+	return result;
+}
+
 // Apply TextFormat property coercion and set. Returns 1 if handled, 0 if not a TextFormat property.
 static int textFormatSetProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_len, ActionVar* value) {
 	int coercion = getTextFormatCoercionType(name, name_len);
@@ -1563,10 +1588,22 @@ static int textFormatSetProperty(SWFAppContext* app_context, ASObject* obj, cons
 		case TF_COERCE_BOOLEAN:    coerced = tfCoerceBoolean(app_context, value); break;
 		case TF_COERCE_ALIGN:      coerced = tfCoerceAlign(app_context, value, obj); break;
 		case TF_COERCE_TABSTOPS:   coerced = tfCoerceTabStops(app_context, value); break;
+		case TF_COERCE_DISPLAY:    coerced = tfCoerceDisplay(app_context, value); break;
 		default: return 0;
 	}
-	// Sentinel for align: invalid value → don't change
+	// Sentinel for align/display: invalid value → don't change
 	if (coerced.type == 255) return 1;
+	// Font name truncation to 64 chars
+	if (coercion == TF_COERCE_STRING && name_len == 4 && strncmp(name, "font", 4) == 0 &&
+	    coerced.type == ACTION_STACK_VALUE_STRING) {
+		if (coerced.str_size > TF_FONT_MAX_LENGTH) {
+			char* truncated = (char*) malloc(TF_FONT_MAX_LENGTH + 1);
+			memcpy(truncated, (const char*) coerced.data.numeric_value, TF_FONT_MAX_LENGTH);
+			truncated[TF_FONT_MAX_LENGTH] = '\0';
+			coerced.data.numeric_value = (u64) truncated;
+			coerced.str_size = TF_FONT_MAX_LENGTH;
+		}
+	}
 	setProperty(app_context, obj, name, name_len, &coerced);
 	return 1;
 }
@@ -9104,20 +9141,88 @@ void actionNewObject(SWFAppContext* app_context)
 		} else {
 			setObjectProto(app_context, tf_obj);
 		}
-		// Initialize all 18 properties to null
+		// Initialize all properties to null, except display → "block"
 		ActionVar null_val = {0};
 		null_val.type = ACTION_STACK_VALUE_NULL;
-		for (int i = 0; i < 18; i++) {
+		for (int i = 0; i < TF_PROP_COUNT; i++) {
 			setProperty(app_context, tf_obj, tf_prop_names[i], tf_prop_lens[i], &null_val);
 		}
-		// Apply constructor arguments (0-11 args)
+		{
+			ActionVar display_val = {0};
+			display_val.type = ACTION_STACK_VALUE_STRING;
+			display_val.data.numeric_value = (u64) "block";
+			display_val.str_size = 5;
+			setProperty(app_context, tf_obj, "display", 7, &display_val);
+		}
+		// Apply constructor arguments (0-13 args) with constructor-specific coercion:
+		// Args: font, size, color, bold, italic, underline, url, target, align, leftMargin, rightMargin, indent, leading
+		// - font: store raw value, truncate if string > 64 chars
+		// - url/target: store raw value (no truncation)
+		// - size/indent/leading/leftMargin/rightMargin: truncate toward zero (no banker's rounding, no non-neg clamp)
+		// - color: uint32
+		// - bold/italic/underline: boolean
+		// - align: validate string
 		static const char* ctor_arg_names[] = {
 			"font", "size", "color", "bold", "italic", "underline",
-			"align", "leftMargin", "rightMargin", "indent", "leading"
+			"url", "target", "align", "leftMargin", "rightMargin", "indent", "leading"
 		};
-		static const u32 ctor_arg_lens[] = { 4, 4, 5, 4, 6, 9, 5, 10, 11, 6, 7 };
-		for (u32 i = 0; i < num_args && i < 11; i++) {
-			textFormatSetProperty(app_context, tf_obj, ctor_arg_names[i], ctor_arg_lens[i], &args[i]);
+		static const u32 ctor_arg_lens[] = { 4, 4, 5, 4, 6, 9, 3, 6, 5, 10, 11, 6, 7 };
+		// Constructor coercion: 0=raw+truncate(font), 1=truncInt, 2=uint32, 3=bool, 4=align, 5=raw(url/target)
+		static const int ctor_coerce[] = { 0, 1, 2, 3, 3, 3, 5, 5, 4, 1, 1, 1, 1 };
+		for (u32 i = 0; i < num_args && i < 13; i++) {
+			if (args[i].type == ACTION_STACK_VALUE_NULL || args[i].type == ACTION_STACK_VALUE_UNDEFINED) {
+				// null/undefined → null (keep the initialized null)
+				continue;
+			}
+			ActionVar coerced = args[i]; // default: store raw
+			switch (ctor_coerce[i]) {
+				case 0: // raw (font) — truncate if string and > 64 chars
+					if (coerced.type == ACTION_STACK_VALUE_STRING && coerced.str_size > TF_FONT_MAX_LENGTH) {
+						char* truncated = (char*) malloc(TF_FONT_MAX_LENGTH + 1);
+						memcpy(truncated, (const char*) coerced.data.numeric_value, TF_FONT_MAX_LENGTH);
+						truncated[TF_FONT_MAX_LENGTH] = '\0';
+						coerced.data.numeric_value = (u64) truncated;
+						coerced.str_size = TF_FONT_MAX_LENGTH;
+					}
+					break;
+				case 5: // raw (url/target) — no truncation
+					break;
+				case 1: { // truncate toward zero (size, margins, indent, leading)
+					double d = 0;
+					if (args[i].type == ACTION_STACK_VALUE_F64)
+						d = VAL(double, &args[i].data.numeric_value);
+					else if (args[i].type == ACTION_STACK_VALUE_F32)
+						d = (double) VAL(float, &args[i].data.numeric_value);
+					else if (args[i].type == ACTION_STACK_VALUE_BOOLEAN)
+						d = args[i].data.numeric_value ? 1.0 : 0.0;
+					else if (args[i].type == ACTION_STACK_VALUE_STRING)
+						d = atof((const char*) args[i].data.numeric_value);
+					else break; // non-numeric → store raw
+					// Truncate toward zero
+					if (d != d || d == (1.0/0.0) || d == -(1.0/0.0)) {
+						// NaN/Inf → -2147483648
+						double v = -2147483648.0;
+						coerced.type = ACTION_STACK_VALUE_F64;
+						coerced.data.numeric_value = VAL(u64, &v);
+					} else {
+						double v = (d >= 0) ? floor(d) : -floor(-d);
+						coerced.type = ACTION_STACK_VALUE_F64;
+						coerced.data.numeric_value = VAL(u64, &v);
+					}
+					break;
+				}
+				case 2: // uint32
+					coerced = tfCoerceUnsigned(app_context, &args[i]);
+					break;
+				case 3: // boolean
+					coerced = tfCoerceBoolean(app_context, &args[i]);
+					break;
+				case 4: // align
+					coerced = tfCoerceAlign(app_context, &args[i], tf_obj);
+					if (coerced.type == 255) continue; // invalid → keep null
+					break;
+			}
+			setProperty(app_context, tf_obj, ctor_arg_names[i], ctor_arg_lens[i], &coerced);
 		}
 		new_obj = tf_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
