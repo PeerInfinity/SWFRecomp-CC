@@ -53,6 +53,7 @@ void tagSoundStreamBlock(SWFAppContext* app_context,
     const u8* data, size_t data_size);
 void tagStopAllSounds(SWFAppContext* app_context);
 void tagScriptLimits(u16 max_recursion, u16 timeout);
+void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
 
 // NO_GRAPHICS helpers for sprite timeline control from action.c
 #ifdef NO_GRAPHICS
@@ -71,6 +72,7 @@ int ng_isButtonAtDepth(size_t depth);
 int ng_isTextFieldAtDepth(size_t depth);
 const char* ng_getTextFieldInitialText(size_t depth);
 u32 ng_getTextFieldColor(size_t depth);
+u32 ng_getTextFieldColorByIdx(int idx);
 int ng_getTextFieldIdx(size_t depth);
 u16 ng_getTextFieldFlags(int tf_idx);
 u16 ng_getTextFieldFontId(int tf_idx);
@@ -84,6 +86,9 @@ s16 ng_getTextFieldLeading(int tf_idx);
 const char* ng_getTextFieldVariableName(int tf_idx);
 void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* ymax);
 const char* ng_getTextFieldRawHtml(int tf_idx);
+const char* ng_getFontName(u16 font_id);
+int ng_getFontBold(u16 font_id);
+int ng_getFontItalic(u16 font_id);
 int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
 #endif

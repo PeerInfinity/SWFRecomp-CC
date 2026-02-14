@@ -49,6 +49,16 @@ static int ng_find_button(size_t char_id)
 	return 0;
 }
 
+// Font info registry for NO_GRAPHICS mode (font name, bold, italic)
+#define MAX_FONTS_NG 32
+static struct {
+	u16 font_id;
+	char name[128];
+	int bold;
+	int italic;
+} ng_fonts[MAX_FONTS_NG];
+static size_t ng_font_count = 0;
+
 // Simple textfield registry for NO_GRAPHICS mode
 #define MAX_TEXTFIELDS_NG 64
 static struct {
@@ -274,6 +284,19 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	(void)transform_start; (void)cxform_id;
 }
 
+void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
+{
+	(void)app_context;
+	if (ng_font_count >= MAX_FONTS_NG) return;
+	size_t i = ng_font_count;
+	ng_fonts[i].font_id = font_id;
+	strncpy(ng_fonts[i].name, name ? name : "", sizeof(ng_fonts[i].name) - 1);
+	ng_fonts[i].name[sizeof(ng_fonts[i].name) - 1] = '\0';
+	ng_fonts[i].bold = bold;
+	ng_fonts[i].italic = italic;
+	ng_font_count++;
+}
+
 void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,
@@ -492,6 +515,12 @@ u32 ng_getTextFieldColor(size_t depth)
 	return 0;
 }
 
+u32 ng_getTextFieldColorByIdx(int idx)
+{
+	if (idx < 0 || (size_t)idx >= ng_textfield_count) return 0;
+	return ng_textfields[idx].text_color;
+}
+
 int ng_getTextFieldIdx(size_t depth)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
@@ -578,6 +607,30 @@ const char* ng_getTextFieldRawHtml(int tf_idx)
 	return ng_textfields[tf_idx].raw_html_text;
 }
 
+const char* ng_getFontName(u16 font_id)
+{
+	for (size_t i = 0; i < ng_font_count; i++)
+		if (ng_fonts[i].font_id == font_id)
+			return ng_fonts[i].name;
+	return "";
+}
+
+int ng_getFontBold(u16 font_id)
+{
+	for (size_t i = 0; i < ng_font_count; i++)
+		if (ng_fonts[i].font_id == font_id)
+			return ng_fonts[i].bold;
+	return 0;
+}
+
+int ng_getFontItalic(u16 font_id)
+{
+	for (size_t i = 0; i < ng_font_count; i++)
+		if (ng_fonts[i].font_id == font_id)
+			return ng_fonts[i].italic;
+	return 0;
+}
+
 // Get transform_id for a display entry at a given depth
 int ng_getTransformId(size_t depth, u32* out_id)
 {
@@ -608,17 +661,17 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 	return 0;
 }
 
-// NO_GRAPHICS child lookup by instance name — returns depth or 0 if not found
+// NO_GRAPHICS child lookup by instance name — returns depth or SIZE_MAX if not found
 size_t ng_findDisplayEntryByName(const char* name)
 {
 	// Return the lowest-depth match when multiple entries share a name
-	size_t result = 0;
+	size_t result = SIZE_MAX;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (ng_display[i].instance_name[0] != '\0' &&
 		    strcmp(ng_display[i].instance_name, name) == 0)
 		{
-			if (result == 0 || ng_display[i].depth < result)
+			if (result == SIZE_MAX || ng_display[i].depth < result)
 				result = ng_display[i].depth;
 		}
 	}

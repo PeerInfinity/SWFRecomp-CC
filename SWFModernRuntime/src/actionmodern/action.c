@@ -1608,6 +1608,229 @@ static int textFormatSetProperty(SWFAppContext* app_context, ASObject* obj, cons
 	return 1;
 }
 
+static void initTextFormatPrototype(SWFAppContext* app_context);
+
+#ifdef NO_GRAPHICS
+// Create a TextFormat object populated from a textfield's metadata.
+// If tf_idx < 0, returns a TextFormat with default values (for dynamic/non-EditText fields).
+// If is_new_text_format is true, always populates all properties (getNewTextFormat behavior).
+// If is_new_text_format is false, only populates if field has text (getTextFormat behavior).
+static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_idx, int has_text, int is_new_text_format) {
+	initTextFormatPrototype(app_context);
+	ASObject* tf_obj = allocObject(app_context, 24);
+	if (g_textformat_constructor.prototype_obj != NULL) {
+		ActionVar proto_var = {0};
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.data.numeric_value = (u64) g_textformat_constructor.prototype_obj;
+		setProperty(app_context, tf_obj, "__proto__", 9, &proto_var);
+		for (u32 i = 0; i < tf_obj->num_used; i++) {
+			if (strcmp(tf_obj->properties[i].name, "__proto__") == 0) {
+				tf_obj->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+				break;
+			}
+		}
+	}
+
+	// If getTextFormat on empty field, return all-null TextFormat
+	if (!is_new_text_format && !has_text) {
+		ActionVar null_val = {0};
+		null_val.type = ACTION_STACK_VALUE_NULL;
+		for (int i = 0; i < TF_PROP_COUNT; i++)
+			setProperty(app_context, tf_obj, tf_prop_names[i], tf_prop_lens[i], &null_val);
+		return tf_obj;
+	}
+
+	// Populate properties from textfield metadata
+	ActionVar val = {0};
+
+	// align
+	const char* align_str = "left";
+	if (tf_idx >= 0) {
+		u8 a = ng_getTextFieldAlign(tf_idx);
+		if (a == 1) align_str = "right";
+		else if (a == 2) align_str = "center";
+		else if (a == 3) align_str = "justify";
+	}
+	val.type = ACTION_STACK_VALUE_STRING;
+	val.data.numeric_value = (u64) align_str;
+	val.str_size = strlen(align_str);
+	setProperty(app_context, tf_obj, "align", 5, &val);
+
+	// font
+	const char* font_name = "Times New Roman";
+	if (tf_idx >= 0) {
+		u16 fid = ng_getTextFieldFontId(tf_idx);
+		const char* fn = ng_getFontName(fid);
+		if (fn[0] != '\0') font_name = fn;
+	}
+	val.type = ACTION_STACK_VALUE_STRING;
+	val.data.numeric_value = (u64) font_name;
+	val.str_size = strlen(font_name);
+	setProperty(app_context, tf_obj, "font", 4, &val);
+
+	// size (font_height in twips → pixels: / 20)
+	// Default to 12 when HasFont is false (font_height=0)
+	double font_size = 12.0;
+	if (tf_idx >= 0) {
+		u16 raw_height = ng_getTextFieldFontHeight(tf_idx);
+		if (raw_height > 0)
+			font_size = (double)raw_height / 20.0;
+	}
+	val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &val.data.numeric_value) = font_size;
+	val.str_size = 0;
+	setProperty(app_context, tf_obj, "size", 4, &val);
+
+	// color
+	double color_val_d = 0.0;
+	if (tf_idx >= 0) {
+		// ng_getTextFieldColor returns by depth, but we have tf_idx.
+		// Use the stored text_color from ng_textfields directly.
+		extern u32 ng_getTextFieldColorByIdx(int idx);
+		color_val_d = (double)ng_getTextFieldColorByIdx(tf_idx);
+	}
+	val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &val.data.numeric_value) = color_val_d;
+	setProperty(app_context, tf_obj, "color", 5, &val);
+
+	// bold, italic
+	// For HTML fields: derive from HTML markup, not font flags
+	// If HTML has mixed formatting (e.g., some <b> tagged, some not), return null
+	int bold_is_null = 0, italic_is_null = 0;
+	int is_bold = 0, is_italic = 0;
+	if (tf_idx >= 0) {
+		u16 tf_flags_bi = ng_getTextFieldFlags(tf_idx);
+		if (tf_flags_bi & 0x0040) {
+			// HTML field: check raw HTML for mixed bold/italic
+			const char* raw_html_bi = ng_getTextFieldRawHtml(tf_idx);
+			int has_b_tag = (strstr(raw_html_bi, "<b>") != NULL || strstr(raw_html_bi, "<B>") != NULL);
+			int has_i_tag = (strstr(raw_html_bi, "<i>") != NULL || strstr(raw_html_bi, "<I>") != NULL);
+			// If tag exists but doesn't wrap ALL content → mixed → null
+			if (has_b_tag) {
+				// Check if entire content is wrapped in <b>
+				if (strncmp(raw_html_bi, "<b>", 3) == 0 || strncmp(raw_html_bi, "<B>", 3) == 0) {
+					is_bold = 1;  // all bold
+				} else {
+					bold_is_null = 1;  // mixed
+				}
+			}
+			// else: no <b> tag → is_bold stays 0 (false)
+			if (has_i_tag) {
+				if (strncmp(raw_html_bi, "<i>", 3) == 0 || strncmp(raw_html_bi, "<I>", 3) == 0) {
+					is_italic = 1;  // all italic
+				} else {
+					italic_is_null = 1;  // mixed
+				}
+			}
+		} else {
+			// Non-HTML field: use font flags
+			u16 fid = ng_getTextFieldFontId(tf_idx);
+			is_bold = ng_getFontBold(fid);
+			is_italic = ng_getFontItalic(fid);
+		}
+	}
+	val.str_size = 0;
+	if (bold_is_null) {
+		val.type = ACTION_STACK_VALUE_NULL;
+		val.data.numeric_value = 0;
+	} else {
+		val.type = ACTION_STACK_VALUE_BOOLEAN;
+		val.data.numeric_value = is_bold ? 1 : 0;
+	}
+	setProperty(app_context, tf_obj, "bold", 4, &val);
+	if (italic_is_null) {
+		val.type = ACTION_STACK_VALUE_NULL;
+		val.data.numeric_value = 0;
+	} else {
+		val.type = ACTION_STACK_VALUE_BOOLEAN;
+		val.data.numeric_value = is_italic ? 1 : 0;
+	}
+	setProperty(app_context, tf_obj, "italic", 6, &val);
+
+	// underline (default false)
+	val.type = ACTION_STACK_VALUE_BOOLEAN;
+	val.data.numeric_value = 0;
+	setProperty(app_context, tf_obj, "underline", 9, &val);
+
+	// bullet (default false)
+	setProperty(app_context, tf_obj, "bullet", 6, &val);
+
+	// kerning
+	// getTextFormat returns true for kerning on SWF-derived fields,
+	// getNewTextFormat returns false for kerning
+	if (!is_new_text_format && tf_idx >= 0)
+		val.data.numeric_value = 1;
+	else
+		val.data.numeric_value = 0;
+	setProperty(app_context, tf_obj, "kerning", 7, &val);
+
+	// leading (twips → pixels)
+	double leading_px = 0.0;
+	if (tf_idx >= 0) {
+		leading_px = (double)ng_getTextFieldLeading(tf_idx) / 20.0;
+	}
+	val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &val.data.numeric_value) = leading_px;
+	setProperty(app_context, tf_obj, "leading", 7, &val);
+
+	// leftMargin (twips → pixels)
+	double lm_px = 0.0;
+	if (tf_idx >= 0) {
+		lm_px = (double)ng_getTextFieldLeftMargin(tf_idx) / 20.0;
+	}
+	VAL(double, &val.data.numeric_value) = lm_px;
+	setProperty(app_context, tf_obj, "leftMargin", 10, &val);
+
+	// rightMargin (twips → pixels)
+	double rm_px = 0.0;
+	if (tf_idx >= 0) {
+		rm_px = (double)ng_getTextFieldRightMargin(tf_idx) / 20.0;
+	}
+	VAL(double, &val.data.numeric_value) = rm_px;
+	setProperty(app_context, tf_obj, "rightMargin", 11, &val);
+
+	// indent (twips → pixels)
+	double indent_px = 0.0;
+	if (tf_idx >= 0) {
+		indent_px = (double)ng_getTextFieldIndent(tf_idx) / 20.0;
+	}
+	VAL(double, &val.data.numeric_value) = indent_px;
+	setProperty(app_context, tf_obj, "indent", 6, &val);
+
+	// blockIndent (default 0)
+	VAL(double, &val.data.numeric_value) = 0.0;
+	setProperty(app_context, tf_obj, "blockIndent", 11, &val);
+
+	// letterSpacing (default 0)
+	VAL(double, &val.data.numeric_value) = 0.0;
+	setProperty(app_context, tf_obj, "letterSpacing", 13, &val);
+
+	// tabStops (empty array)
+	ASArray* empty_arr = allocArray(app_context, 0);
+	val.type = ACTION_STACK_VALUE_ARRAY;
+	val.data.numeric_value = (u64) empty_arr;
+	setProperty(app_context, tf_obj, "tabStops", 8, &val);
+
+	// target (empty string)
+	val.type = ACTION_STACK_VALUE_STRING;
+	val.data.numeric_value = (u64) "";
+	val.str_size = 0;
+	setProperty(app_context, tf_obj, "target", 6, &val);
+
+	// url (empty string)
+	val.data.numeric_value = (u64) "";
+	val.str_size = 0;
+	setProperty(app_context, tf_obj, "url", 3, &val);
+
+	// display (default "block")
+	val.data.numeric_value = (u64) "block";
+	val.str_size = 5;
+	setProperty(app_context, tf_obj, "display", 7, &val);
+
+	return tf_obj;
+}
+#endif
+
 static void initTextFormatPrototype(SWFAppContext* app_context) {
 	if (g_textformat_constructor_init) return;
 
@@ -1683,7 +1906,7 @@ static DisplayObject* targeted_sprite = NULL;
 // Forward declaration
 extern DisplayObject* findDisplayObjectByName(const char* name);
 #else
-// NO_GRAPHICS child lookup by instance name — returns depth or 0 if not found
+// NO_GRAPHICS child lookup by instance name — returns depth or SIZE_MAX if not found
 extern size_t ng_findDisplayEntryByName(const char* name);
 #endif
 
@@ -1737,6 +1960,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
 	mc->as_set_flags = 0;
+	mc->ng_textfield_idx = -1;
 #endif
 
 	// Set instance name
@@ -1786,7 +2010,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 	// One-time init: sync x/y from transform_data at creation time
 	if (mc != NULL) {
 		size_t depth = ng_findDisplayEntryByName(instance_name);
-		if (depth > 0) {
+		if (depth != SIZE_MAX) {
 			float init_x, init_y;
 			if (ng_getTransformXY(depth, &init_x, &init_y)) {
 				mc->x = init_x;
@@ -1821,6 +2045,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				}
 
 				int tf_idx = ng_getTextFieldIdx(depth);
+				mc->ng_textfield_idx = tf_idx;
 				u16 tf_flags = ng_getTextFieldFlags(tf_idx);
 				// Flag bits: 0x0001=WordWrap, 0x0002=Multiline, 0x0004=Password,
 				//            0x0008=ReadOnly, 0x0010=NoSelect, 0x0020=Border,
@@ -1833,12 +2058,56 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				text_val.str_size = strlen(init_text);
 				VAL(u64, &text_val.data.numeric_value) = (u64)init_text;
 				setProperty(app_context, props, "text", 4, &text_val);
-				// htmlText (raw HTML text if HTML flag set, otherwise same as text)
+				// htmlText — for HTML fields, wrap with <P ALIGN><FONT> tags
 				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
 				ActionVar html_text_val = {0};
 				html_text_val.type = ACTION_STACK_VALUE_STRING;
-				html_text_val.str_size = strlen(raw_html);
-				VAL(u64, &html_text_val.data.numeric_value) = (u64)raw_html;
+				if (tf_flags & 0x0040) {
+					// HTML field: wrap content with Flash-style markup
+					const char* align_names[] = {"LEFT", "RIGHT", "CENTER", "JUSTIFY"};
+					u8 align_idx = ng_getTextFieldAlign(tf_idx);
+					const char* align_name = (align_idx < 4) ? align_names[align_idx] : "LEFT";
+					u16 fid = ng_getTextFieldFontId(tf_idx);
+					const char* font_name = ng_getFontName(fid);
+					if (font_name[0] == '\0') font_name = "Times New Roman";
+					u16 raw_height = ng_getTextFieldFontHeight(tf_idx);
+					int font_size = (raw_height > 0) ? (raw_height / 20) : 12;
+					u32 text_color = ng_getTextFieldColorByIdx(tf_idx);
+					// Convert inline tags to uppercase (Flash convention)
+					size_t raw_len = strlen(raw_html);
+					char* upper_html = (char*) malloc(raw_len + 1);
+					memcpy(upper_html, raw_html, raw_len + 1);
+					for (size_t ci = 0; ci + 2 < raw_len; ci++) {
+						if (upper_html[ci] == '<') {
+							if (upper_html[ci+1] == 'b' && (upper_html[ci+2] == '>' || upper_html[ci+2] == ' '))
+								upper_html[ci+1] = 'B';
+							else if (upper_html[ci+1] == 'i' && (upper_html[ci+2] == '>' || upper_html[ci+2] == ' '))
+								upper_html[ci+1] = 'I';
+							else if (upper_html[ci+1] == 'u' && (upper_html[ci+2] == '>' || upper_html[ci+2] == ' '))
+								upper_html[ci+1] = 'U';
+							else if (upper_html[ci+1] == '/' && ci + 3 < raw_len) {
+								if (upper_html[ci+2] == 'b' && upper_html[ci+3] == '>')
+									upper_html[ci+2] = 'B';
+								else if (upper_html[ci+2] == 'i' && upper_html[ci+3] == '>')
+									upper_html[ci+2] = 'I';
+								else if (upper_html[ci+2] == 'u' && upper_html[ci+3] == '>')
+									upper_html[ci+2] = 'U';
+							}
+						}
+					}
+					// Build wrapped HTML string
+					size_t buf_size = raw_len + 256;
+					char* wrapped = (char*) malloc(buf_size);
+					snprintf(wrapped, buf_size,
+						"<P ALIGN=\"%s\"><FONT FACE=\"%s\" SIZE=\"%d\" COLOR=\"#%06X\" LETTERSPACING=\"0\" KERNING=\"0\">%s</FONT></P>",
+						align_name, font_name, font_size, text_color, upper_html);
+					free(upper_html);
+					html_text_val.str_size = strlen(wrapped);
+					VAL(u64, &html_text_val.data.numeric_value) = (u64)wrapped;
+				} else {
+					html_text_val.str_size = strlen(raw_html);
+					VAL(u64, &html_text_val.data.numeric_value) = (u64)raw_html;
+				}
 				setProperty(app_context, props, "htmlText", 8, &html_text_val);
 				// textColor (from DefineEditText)
 				u32 tc = ng_getTextFieldColor(depth);
@@ -1987,6 +2256,55 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				ng_getTextFieldBounds(tf_idx, &bxmin, &bxmax, &bymin, &bymax);
 				mc->width = (float)(bxmax - bxmin) / 20.0f;
 				mc->height = (float)(bymax - bymin) / 20.0f;
+
+				// Variable binding initialization
+				if (var_name[0] != '\0') {
+					size_t vlen = strlen(var_name);
+					// Check if variable already has a defined value
+					int var_exists = 0;
+					if (strchr(var_name, '.') == NULL) {
+						// Simple variable: check global var map
+						extern bool hasVariable(char* var_name, size_t key_size);
+						var_exists = hasVariable((char*)var_name, vlen);
+					}
+					if (var_exists) {
+						// Variable exists — use its value as text
+						extern ActionVar* getVariable(char* var_name, size_t key_size);
+						ActionVar* existing = getVariable((char*)var_name, vlen);
+						if (existing != NULL && (existing->type != ACTION_STACK_VALUE_STRING || existing->str_size > 0)) {
+							// Convert to string
+							char conv_buf[512];
+							const char* text_from_var = "";
+							u32 tfv_len = 0;
+							if (existing->type == ACTION_STACK_VALUE_STRING) {
+								text_from_var = (const char*) VAL(u64, &existing->data.numeric_value);
+								tfv_len = existing->str_size;
+							} else {
+								int n = varToStringBuf(app_context, existing, conv_buf, sizeof(conv_buf));
+								if (n > 0) { text_from_var = conv_buf; tfv_len = n; }
+							}
+							// Update text property
+							ActionVar tfv_val = {0};
+							tfv_val.type = ACTION_STACK_VALUE_STRING;
+							tfv_val.str_size = tfv_len;
+							VAL(u64, &tfv_val.data.numeric_value) = (u64)text_from_var;
+							setProperty(app_context, props, "text", 4, &tfv_val);
+							// Update length
+							ActionVar tfv_len_val = {0};
+							tfv_len_val.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &tfv_len_val.data.numeric_value) = (double)tfv_len;
+							setProperty(app_context, props, "length", 6, &tfv_len_val);
+						}
+					} else if (init_text[0] != '\0') {
+						// Variable doesn't exist — create it with initial text
+						ActionVar init_var_val = {0};
+						init_var_val.type = ACTION_STACK_VALUE_STRING;
+						init_var_val.str_size = strlen(init_text);
+						VAL(u64, &init_var_val.data.numeric_value) = (u64)init_text;
+						setVariableByName(var_name, &init_var_val);
+					}
+					// If init_text is empty and variable doesn't exist, don't create variable
+				}
 			}
 		}
 	}
@@ -2003,13 +2321,149 @@ MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* i
 }
 
 #ifdef NO_GRAPHICS
+// ==================================================================
+// TextField Variable Binding
+// ==================================================================
+// Bidirectional binding between a variable name and a text field's "text" property.
+// When the variable changes, all bound text fields update. When text changes, the
+// variable updates and other bound fields sync.
+
+// Sync variable → all text fields bound to var_name
+// Called when a variable is set via SetVariable/DefineLocal/etc.
+static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_name, u32 var_name_len, ActionVar* value)
+{
+	(void)app_context;
+	// Convert value to string for setting text
+	char str_buf[512];
+	const char* text_str = "";
+	u32 text_len = 0;
+	if (value->type == ACTION_STACK_VALUE_STRING) {
+		text_str = (const char*) VAL(u64, &value->data.numeric_value);
+		text_len = value->str_size;
+	} else if (value->type != ACTION_STACK_VALUE_UNDEFINED) {
+		int n = varToStringBuf(app_context, value, str_buf, sizeof(str_buf));
+		if (n > 0) { text_str = str_buf; text_len = n; }
+	} else {
+		return;  // undefined doesn't sync
+	}
+
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->ng_textfield_idx < 0) continue;
+		ASObject* props = (ASObject*) mc->dynamic_props;
+		if (props == NULL) continue;
+		ActionVar* var_prop = getProperty(props, "variable", 8);
+		if (var_prop == NULL || var_prop->type != ACTION_STACK_VALUE_STRING) continue;
+		const char* bound = (const char*) VAL(u64, &var_prop->data.numeric_value);
+		if (bound == NULL || bound[0] == '\0') continue;
+		// Compare (case-insensitive for SWF<=6)
+		int match = 0;
+#if !defined(SWF_VERSION) || SWF_VERSION < 7
+		match = (strcasecmp(bound, var_name) == 0);
+#else
+		match = (strcmp(bound, var_name) == 0);
+#endif
+		if (match) {
+			ActionVar text_val = {0};
+			text_val.type = ACTION_STACK_VALUE_STRING;
+			text_val.str_size = text_len;
+			VAL(u64, &text_val.data.numeric_value) = (u64)text_str;
+			setProperty(app_context, props, "text", 4, &text_val);
+			// Update length
+			ActionVar len_val = {0};
+			len_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &len_val.data.numeric_value) = (double)text_len;
+			setProperty(app_context, props, "length", 6, &len_val);
+		}
+	}
+}
+
+// Sync text → variable, then variable → other bound text fields
+// Called when "text" property is set on a textfield MovieClip.
+static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVar* text_value)
+{
+	if (mc == NULL || mc->ng_textfield_idx < 0) return;
+	ASObject* props = (ASObject*) mc->dynamic_props;
+	if (props == NULL) return;
+	ActionVar* var_prop = getProperty(props, "variable", 8);
+	if (var_prop == NULL || var_prop->type != ACTION_STACK_VALUE_STRING) return;
+	const char* var_name = (const char*) VAL(u64, &var_prop->data.numeric_value);
+	if (var_name == NULL || var_name[0] == '\0') return;
+
+	// Handle dot-path variables (e.g., "obj.theVar")
+	const char* dot = strchr(var_name, '.');
+	if (dot != NULL) {
+		// For path variables, resolve the path and set the property
+		// Push container path, get, push prop name, push value, SetMember
+		u32 container_len = (u32)(dot - var_name);
+		const char* final_prop = dot + 1;
+		// Check for more dots
+		const char* last_dot = dot;
+		for (const char* p = dot + 1; *p; p++) {
+			if (*p == '.') last_dot = p;
+		}
+		container_len = (u32)(last_dot - var_name);
+		final_prop = last_dot + 1;
+		u32 final_prop_len = strlen(final_prop);
+		// Resolve container
+		PUSH_STR(var_name, container_len);
+		actionGetVariable(app_context);
+		ActionVar container_var;
+		peekVar(app_context, &container_var);
+		POP();
+		if (container_var.type == ACTION_STACK_VALUE_MOVIECLIP ||
+		    container_var.type == ACTION_STACK_VALUE_OBJECT) {
+			MovieClip* target_mc = (MovieClip*) VAL(u64, &container_var.data.numeric_value);
+			if (target_mc != NULL) {
+				ASObject* target_props = (ASObject*) target_mc->dynamic_props;
+				if (target_props == NULL) {
+					target_mc->dynamic_props = (void*) allocObject(app_context, 8);
+					target_props = (ASObject*) target_mc->dynamic_props;
+				}
+				setProperty(app_context, target_props, final_prop, final_prop_len, text_value);
+			}
+		}
+		return;
+	}
+
+	// Simple variable name — update global variable
+	setVariableByName(var_name, text_value);
+
+	// Also sync to all other text fields with the same binding
+	u32 var_name_len = strlen(var_name);
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* other = child_mc_cache[i];
+		if (other == mc || other == NULL || other->ng_textfield_idx < 0) continue;
+		ASObject* other_props = (ASObject*) other->dynamic_props;
+		if (other_props == NULL) continue;
+		ActionVar* other_var = getProperty(other_props, "variable", 8);
+		if (other_var == NULL || other_var->type != ACTION_STACK_VALUE_STRING) continue;
+		const char* other_bound = (const char*) VAL(u64, &other_var->data.numeric_value);
+		if (other_bound == NULL || other_bound[0] == '\0') continue;
+		int match = 0;
+#if !defined(SWF_VERSION) || SWF_VERSION < 7
+		match = (strcasecmp(other_bound, var_name) == 0);
+#else
+		match = (strcmp(other_bound, var_name) == 0);
+#endif
+		if (match) {
+			setProperty(app_context, other_props, "text", 4, text_value);
+			ActionVar len_val = {0};
+			len_val.type = ACTION_STACK_VALUE_F64;
+			const char* ts = (const char*) VAL(u64, &text_value->data.numeric_value);
+			VAL(double, &len_val.data.numeric_value) = (double)(ts ? strlen(ts) : 0);
+			setProperty(app_context, other_props, "length", 6, &len_val);
+		}
+	}
+}
+
 // Re-sync x/y from transform_data if the display entry's transform_id has changed
 // since the last sync, but only for properties not explicitly set by ActionScript.
 // This handles PlaceObject2 updates (move operations) without overwriting AS-set values.
 static void syncTransformIfNeeded(MovieClip* mc) {
 	if (mc == NULL || mc->name[0] == '\0') return;
 	size_t depth = ng_findDisplayEntryByName(mc->name);
-	if (depth == 0) return;
+	if (depth == SIZE_MAX) return;
 	u32 tid;
 	if (!ng_getTransformId(depth, &tid)) return;
 	if (tid == mc->last_transform_id) return;
@@ -2148,8 +2602,31 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			}
 			break;
 		}
-		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_ARRAY:
+		{
+			ASArray* arr = (ASArray*) VAL(u64, &STACK_TOP_VALUE);
+			if (arr != NULL && arr->length > 0)
+			{
+				// Join elements with commas (Flash Array.toString behavior)
+				ActionVar comma_arg = {0};
+				comma_arg.type = ACTION_STACK_VALUE_STRING;
+				comma_arg.str_size = 1;
+				VAL(u64, &comma_arg.data.numeric_value) = (u64) ",";
+				// callArrayMethod pushes result; POP the current array entry first
+				POP();
+				callArrayMethod(app_context, arr, "join", 4, &comma_arg, 1);
+				// Result is now on stack top as a string
+			}
+			else
+			{
+				// Empty array → empty string
+				STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+				VAL(u64, &STACK_TOP_VALUE) = (u64) "";
+				STACK_TOP_N = 0;
+			}
+			break;
+		}
+		case ACTION_STACK_VALUE_OBJECT:
 		{
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			VAL(u64, &STACK_TOP_VALUE) = (u64) var_str;
@@ -5478,7 +5955,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 #else
 			size_t child_depth = ng_findDisplayEntryByName(name_buf);
-			if (child_depth > 0)
+			if (child_depth != SIZE_MAX)
 			{
 				extern MovieClip root_movieclip;
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
@@ -5584,6 +6061,9 @@ void actionSetVariable(SWFAppContext* app_context)
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
+#ifdef NO_GRAPHICS
+				ng_syncVarToTextFields(app_context, var_name, var_name_len, &value_var);
+#endif
 
 				// Pop both value and name
 				POP_2();
@@ -5669,6 +6149,15 @@ void actionSetVariable(SWFAppContext* app_context)
 	// Set variable value (uses existing string materialization!)
 	setVariableWithValue(var, STACK, value_sp);
 
+#ifdef NO_GRAPHICS
+	// Sync variable → text fields
+	{
+		ActionVar sync_val;
+		peekVar(app_context, &sync_val);
+		ng_syncVarToTextFields(app_context, var_name, var_name_len, &sync_val);
+	}
+#endif
+
 	// Pop both value and name
 	POP_2();
 }
@@ -5733,6 +6222,15 @@ void actionDefineLocal(SWFAppContext* app_context)
 
 	// Set variable value
 	setVariableWithValue(var, STACK, value_sp);
+
+#ifdef NO_GRAPHICS
+	// Sync variable → text fields
+	{
+		ActionVar sync_val;
+		peekVar(app_context, &sync_val);
+		ng_syncVarToTextFields(app_context, var_name, var_name_len, &sync_val);
+	}
+#endif
 
 	// Pop both value and name
 	POP_2();
@@ -6127,7 +6625,7 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 				if (mc && mc->name[0] != '\0')
 				{
 					size_t d = ng_findDisplayEntryByName(mc->name);
-					if (d > 0 && !ng_isSpriteAtDepth(d))
+					if (d != SIZE_MAX && !ng_isSpriteAtDepth(d))
 					{
 						type_str = "object";
 						break;
@@ -8197,6 +8695,28 @@ void actionSetMember(SWFAppContext* app_context)
 				len_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &len_val.data.numeric_value) = (double)strlen(new_text);
 				setProperty(app_context, props, "length", 6, &len_val);
+#ifdef NO_GRAPHICS
+				// Sync text → variable binding
+				ng_syncTextToVar(app_context, mc, &value_var);
+#endif
+			}
+			// TextField variable: changing binding breaks old, creates new
+			if (strcmp(prop_name, "variable") == 0 && mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
+			{
+#ifdef NO_GRAPHICS
+				// New variable binding: if non-empty, sync text to new variable
+				if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size > 0) {
+					const char* new_var = (const char*) VAL(u64, &value_var.data.numeric_value);
+					if (new_var != NULL && new_var[0] != '\0') {
+						ASObject* tf_props = (ASObject*) mc->dynamic_props;
+						ActionVar* text_prop = getProperty(tf_props, "text", 4);
+						if (text_prop != NULL) {
+							// Variable gets current text value (not the other way around)
+							setVariableByName(new_var, text_prop);
+						}
+					}
+				}
+#endif
 			}
 			// User-defined property: store in dynamic_props and as global variable
 			if (mc->dynamic_props == NULL)
@@ -8205,8 +8725,12 @@ void actionSetMember(SWFAppContext* app_context)
 				retainObject((ASObject*) mc->dynamic_props);
 			}
 			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
-			// Also set as global variable (timeline variables are mc properties and vice versa)
-			setVariableByName(prop_name, &value_var);
+			// Only propagate to global variable table for root movieclip
+			// (timeline variables on root are also accessible as globals)
+			// Child MC properties must NOT leak into global scope.
+			extern MovieClip root_movieclip;
+			if (mc == &root_movieclip)
+				setVariableByName(prop_name, &value_var);
 		}
 	}
 	// If it's not an object, array, function, or movieclip type, we silently ignore the operation
@@ -10152,7 +10676,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 
 #ifdef NO_GRAPHICS
 	size_t child_depth = ng_findDisplayEntryByName(child_name);
-	if (child_depth > 0) {
+	if (child_depth != SIZE_MAX) {
 		MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name, &root_movieclip);
 		if (child_mc) {
 			setCurrentContext(child_mc);
@@ -12307,6 +12831,53 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			actionStop(app_context);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 13 && strncmp(method_name, "getTextFormat", 13) == 0)
+		{
+#ifdef NO_GRAPHICS
+			int tf_idx = mc->ng_textfield_idx;
+			// getTextFormat(beginIndex, endIndex): if range is zero-length, return all-null
+			int force_null = 0;
+			if (num_args >= 2) {
+				double begin_idx = varToDouble(&args[0]);
+				double end_idx = varToDouble(&args[1]);
+				if (begin_idx == end_idx) force_null = 1;
+			}
+			// Check if field has text
+			const char* text = "";
+			if (!force_null && mc->dynamic_props != NULL) {
+				ActionVar* text_prop = getProperty((ASObject*) mc->dynamic_props, "text", 4);
+				if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING)
+					text = (const char*) text_prop->data.numeric_value;
+			}
+			int has_text = force_null ? 0 : (text[0] != '\0');
+			ASObject* tf = createTextFormatFromField(app_context, tf_idx, has_text, 0);
+			if (args != NULL) FREE(args);
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_OBJECT;
+			result.data.numeric_value = (u64) tf;
+			pushVar(app_context, &result);
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
+			return;
+		}
+		else if (method_name_len == 16 && strncmp(method_name, "getNewTextFormat", 16) == 0)
+		{
+#ifdef NO_GRAPHICS
+			int tf_idx = mc->ng_textfield_idx;
+			ASObject* tf = createTextFormatFromField(app_context, tf_idx, 1, 1);
+			if (args != NULL) FREE(args);
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_OBJECT;
+			result.data.numeric_value = (u64) tf;
+			pushVar(app_context, &result);
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
 			return;
 		}
 		else

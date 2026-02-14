@@ -40,6 +40,7 @@ struct MovieClip {
 #ifdef NO_GRAPHICS
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
+	int ng_textfield_idx;  // index into ng_textfields, or -1 if not a textfield
 #endif
 };
 

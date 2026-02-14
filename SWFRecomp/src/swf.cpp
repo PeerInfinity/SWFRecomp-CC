@@ -1460,6 +1460,10 @@ namespace SWFRecomp
 					bool wide_offsets = (flags & 0x08) != 0;
 					wide_codes = (flags & 0x04) != 0;
 
+					// Store bold/italic flags
+					font_bold_flags[font_id] = (flags & 0x01) != 0;
+					font_italic_flags[font_id] = (flags & 0x02) != 0;
+
 					// FontName
 					tag.clearFields();
 					tag.setFieldCount(1);
@@ -1467,6 +1471,11 @@ namespace SWFRecomp
 					tag.parseFields(cur_pos);
 
 					u8 font_name_len = (u8) tag.fields[0].value;
+					// Store font name
+					font_names[font_id] = std::string(cur_pos, font_name_len);
+					// Remove any trailing null bytes from the name
+					while (!font_names[font_id].empty() && font_names[font_id].back() == '\0')
+						font_names[font_id].pop_back();
 					cur_pos += font_name_len;  // skip font name bytes
 
 					// NumGlyphs
@@ -1592,6 +1601,32 @@ namespace SWFRecomp
 
 					// Skip any remaining data (bounds table, kerning, etc.)
 					cur_pos = font_tag_start + font_tag_length;
+				}
+
+				// Emit tagDefineFontInfo for NO_GRAPHICS runtime
+				if (font_names.find(font_id) != font_names.end()) {
+					auto escape_for_c = [](const std::string& s) {
+						std::string out;
+						for (char c : s) {
+							if (c == '\\') out += "\\\\";
+							else if (c == '"') out += "\\\"";
+							else if (c == '\n') out += "\\n";
+							else if (c == '\r') out += "\\r";
+							else if (c == '\t') out += "\\t";
+							else out += c;
+						}
+						return out;
+					};
+					bool is_bold = font_bold_flags.count(font_id) ? font_bold_flags[font_id] : false;
+					bool is_italic = font_italic_flags.count(font_id) ? font_italic_flags[font_id] : false;
+					tag_init << endl
+							 << "\t" << "tagDefineFontInfo("
+							 << "app_context, "
+							 << to_string(font_id) << ", "
+							 << "\"" << escape_for_c(font_names[font_id]) << "\", "
+							 << (is_bold ? "1" : "0") << ", "
+							 << (is_italic ? "1" : "0")
+							 << ");";
 				}
 
 				break;
