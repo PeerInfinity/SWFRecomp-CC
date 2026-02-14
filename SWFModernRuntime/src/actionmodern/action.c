@@ -54,6 +54,34 @@ static uint32_t ecmaToUint32(double d)
 static ASObject* scope_chain[MAX_SCOPE_DEPTH];
 static u32 scope_depth = 0;
 
+// Stored app_context for use by setVariableOnLocalScope (called from variables.c
+// which doesn't have app_context). Set at entry to actionCallFunction/actionCallMethod.
+static SWFAppContext* g_scope_app_context = NULL;
+
+// Expose local scope for parameter binding (used by setVariableByName)
+ASObject* getCurrentLocalScope(void)
+{
+	if (scope_depth > 0 && scope_chain[scope_depth - 1] != NULL)
+		return scope_chain[scope_depth - 1];
+	return NULL;
+}
+
+// Try to set a variable on the current local scope (function scope).
+// Returns true if we're inside a function and the variable was set on local scope.
+// Returns false if no local scope exists (caller should fall through to global).
+bool setVariableOnLocalScope(const char* var_name, ActionVar* value)
+{
+	ASObject* local_scope = getCurrentLocalScope();
+	if (local_scope == NULL)
+		return false;
+
+	u32 name_len = strlen(var_name);
+
+	// Use setProperty which properly allocates with HALLOC (matching releaseObject's FREE)
+	setProperty(g_scope_app_context, local_scope, var_name, name_len, value);
+	return true;
+}
+
 // ==================================================================
 // Recursion Depth Limit
 // ==================================================================
@@ -8300,6 +8328,7 @@ void actionNewObject(SWFAppContext* app_context)
  */
 void actionNewMethod(SWFAppContext* app_context)
 {
+	g_scope_app_context = app_context;
 	// Pop in order: method_name, object, num_args, then args
 
 	// 1. Pop method name (string)
@@ -9429,6 +9458,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
+	g_scope_app_context = app_context;
 
 	// 1. Pop function name (string) from stack
 	char func_name_buffer[17];
@@ -10063,6 +10093,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				for (u32 i = 0; i < num_args; i++)
 				{
 					pushVar(app_context, &args[i]);
+				}
+				// Pad with undefined if fewer args than parameters
+				// (generated code always pops param_count values)
+				for (u32 i = num_args; i < func->param_count; i++)
+				{
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 				}
 
 				// Free args array before calling function
@@ -10828,6 +10864,7 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
+	g_scope_app_context = app_context;
 
 	// 1. Pop method name (string) from stack
 	char method_name_buffer[17];
