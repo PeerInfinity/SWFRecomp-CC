@@ -452,13 +452,26 @@ def main():
 
     # Determine test list
     if args.test:
+        import fnmatch
+        all_dirs = sorted(
+            d.name for d in SCRIPT_DIR.iterdir()
+            if d.is_dir() and d.name not in SKIP
+            and (d / "test.swf").exists() and (d / "output.txt").exists()
+        )
         tests = []
         for t in args.test:
-            test_dir = SCRIPT_DIR / t
-            if not test_dir.is_dir():
-                print(f"Error: test directory not found: {test_dir}")
-                sys.exit(1)
-            tests.append(t)
+            if '*' in t or '?' in t:
+                matched = fnmatch.filter(all_dirs, t)
+                if not matched:
+                    print(f"Warning: no tests match pattern '{t}'")
+                tests.extend(matched)
+            else:
+                test_dir = SCRIPT_DIR / t
+                if not test_dir.is_dir():
+                    print(f"Error: test directory not found: {test_dir}")
+                    sys.exit(1)
+                tests.append(t)
+        tests = sorted(set(tests))
     else:
         tests = sorted(
             d.name

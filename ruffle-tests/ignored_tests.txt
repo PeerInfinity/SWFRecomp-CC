@@ -109,11 +109,16 @@ unloadmovienum
 
 # --- XML networking/sockets ---
 # These tests require network connections or XML HTTP loading.
+xml_getbytes
 xml_load
 xml_socket
 xml_socket_close_in_handler
 xml_socket_on_data
 xml_socket_segmented
+
+# --- External SWF loading (not loadMovie category) ---
+# These tests load external SWFs via other mechanisms.
+swf5_xml_event_handler_context
 
 # --- Sound/audio ---
 # These tests require audio playback or streaming.

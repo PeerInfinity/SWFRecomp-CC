@@ -1859,6 +1859,1129 @@ static void initTextFormatPrototype(SWFAppContext* app_context) {
 	g_textformat_constructor_init = 1;
 }
 
+// ============================================================
+// XML / XMLNode Implementation
+// ============================================================
+
+static ASFunction g_xml_constructor;
+static ASFunction g_xmlnode_constructor;
+static int g_xml_constructor_init = 0;
+
+// Forward declarations
+static void initXMLPrototype(SWFAppContext* app_context);
+
+// Static method ASFunctions for XMLNode.prototype
+static ASFunction g_xml_fn_parseXML;
+static ASFunction g_xml_fn_createElement;
+static ASFunction g_xml_fn_createTextNode;
+static ASFunction g_xml_fn_appendChild;
+static ASFunction g_xml_fn_removeNode;
+static ASFunction g_xml_fn_insertBefore;
+static ASFunction g_xml_fn_hasChildNodes;
+static ASFunction g_xml_fn_cloneNode;
+static ASFunction g_xml_fn_toString;
+static ASFunction g_xml_fn_getNamespaceForPrefix;
+static ASFunction g_xml_fn_getPrefixForNamespace;
+static ASFunction g_xml_fn_getBytesLoaded;
+static ASFunction g_xml_fn_getBytesTotal;
+
+// Check if obj is an XML/XMLNode instance (walks __proto__ chain)
+static int isXMLNodeInstance(ASObject* obj) {
+	if (!g_xml_constructor_init || g_xmlnode_constructor.prototype_obj == NULL) return 0;
+	ActionVar* pv = getProperty(obj, "__proto__", 9);
+	int depth = 0;
+	while (pv != NULL && pv->type == ACTION_STACK_VALUE_OBJECT && depth < 10) {
+		ASObject* proto = (ASObject*) pv->data.numeric_value;
+		if (proto == NULL) break;
+		if (proto == g_xmlnode_constructor.prototype_obj) return 1;
+		pv = getProperty(proto, "__proto__", 9);
+		depth++;
+	}
+	return 0;
+}
+
+// Allocate a persistent string copy
+static char* xml_strdup(SWFAppContext* app_context, const char* s, u32 len) {
+	char* c = (char*) HALLOC(len + 1);
+	memcpy(c, s, len);
+	c[len] = '\0';
+	return c;
+}
+
+// Set a null-valued property
+static void xml_set_null(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen) {
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_NULL;
+	setProperty(ctx, obj, name, nlen, &v);
+}
+
+// Set an object-valued property
+static void xml_set_obj(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen, ASObject* val) {
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_OBJECT;
+	v.data.numeric_value = (u64) val;
+	setProperty(ctx, obj, name, nlen, &v);
+}
+
+// Set a string-valued property (makes a copy of the string)
+static void xml_set_str(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen, const char* val, u32 vlen) {
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_STRING;
+	char* copy = xml_strdup(ctx, val, vlen);
+	v.str_size = vlen;
+	v.data.numeric_value = (u64) copy;
+	setProperty(ctx, obj, name, nlen, &v);
+}
+
+// Create a new XML node
+static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
+                                  const char* nodeName, u32 nameLen,
+                                  const char* nodeValue, u32 valueLen) {
+	initXMLPrototype(app_context);
+	ASObject* node = allocObject(app_context, 20);
+
+	// Set __proto__ to XMLNode.prototype
+	if (g_xmlnode_constructor.prototype_obj != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64) g_xmlnode_constructor.prototype_obj;
+		setProperty(app_context, node, "__proto__", 9, &pv);
+	}
+
+	// nodeType
+	ActionVar nt = {0};
+	nt.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &nt.data.numeric_value) = (double) nodeType;
+	setProperty(app_context, node, "nodeType", 8, &nt);
+
+	// nodeName
+	if (nodeName != NULL) {
+		xml_set_str(app_context, node, "nodeName", 8, nodeName, nameLen);
+	} else {
+		xml_set_null(app_context, node, "nodeName", 8);
+	}
+
+	// nodeValue
+	if (nodeValue != NULL) {
+		xml_set_str(app_context, node, "nodeValue", 9, nodeValue, valueLen);
+	} else {
+		xml_set_null(app_context, node, "nodeValue", 9);
+	}
+
+	// Navigation — all null initially
+	xml_set_null(app_context, node, "parentNode", 10);
+	xml_set_null(app_context, node, "firstChild", 10);
+	xml_set_null(app_context, node, "lastChild", 9);
+	xml_set_null(app_context, node, "previousSibling", 15);
+	xml_set_null(app_context, node, "nextSibling", 11);
+
+	// childNodes — empty array
+	ASArray* children = allocArray(app_context, 0);
+	ActionVar cn = {0};
+	cn.type = ACTION_STACK_VALUE_ARRAY;
+	cn.data.numeric_value = (u64) children;
+	setProperty(app_context, node, "childNodes", 10, &cn);
+
+	// attributes — object for elements, null for text
+	if (nodeType == 1) {
+		ASObject* attrs = allocObject(app_context, 4);
+		xml_set_obj(app_context, node, "attributes", 10, attrs);
+	} else {
+		xml_set_null(app_context, node, "attributes", 10);
+	}
+
+	// Namespace properties — parse prefix:localName from nodeName
+	if (nodeType == 1 && nodeName != NULL) {
+		// Look for ':' separator
+		const char* colon = NULL;
+		for (u32 i = 0; i < nameLen; i++) {
+			if (nodeName[i] == ':') { colon = &nodeName[i]; break; }
+		}
+		if (colon != NULL) {
+			u32 prefix_len = (u32)(colon - nodeName);
+			u32 local_len = nameLen - prefix_len - 1;
+			xml_set_str(app_context, node, "prefix", 6, nodeName, prefix_len);
+			xml_set_str(app_context, node, "localName", 9, colon + 1, local_len);
+		} else {
+			xml_set_str(app_context, node, "prefix", 6, "", 0);
+			xml_set_str(app_context, node, "localName", 9, nodeName, nameLen);
+		}
+		xml_set_null(app_context, node, "namespaceURI", 12);
+	} else {
+		xml_set_null(app_context, node, "prefix", 6);
+		xml_set_null(app_context, node, "localName", 9);
+		xml_set_null(app_context, node, "namespaceURI", 12);
+	}
+
+	return node;
+}
+
+// Sync firstChild/lastChild/sibling links from childNodes array
+static void xml_sync_children(SWFAppContext* app_context, ASObject* parent) {
+	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
+	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
+	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	if (children == NULL) return;
+
+	u32 count = children->length;
+	if (count == 0) {
+		xml_set_null(app_context, parent, "firstChild", 10);
+		xml_set_null(app_context, parent, "lastChild", 9);
+		return;
+	}
+
+	for (u32 i = 0; i < count; i++) {
+		ASObject* child = NULL;
+		if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT)
+			child = (ASObject*) children->elements[i].data.numeric_value;
+		if (child == NULL) continue;
+
+		xml_set_obj(app_context, child, "parentNode", 10, parent);
+
+		if (i == 0)
+			xml_set_null(app_context, child, "previousSibling", 15);
+		else
+			xml_set_obj(app_context, child, "previousSibling", 15,
+				(ASObject*) children->elements[i-1].data.numeric_value);
+
+		if (i == count - 1)
+			xml_set_null(app_context, child, "nextSibling", 11);
+		else
+			xml_set_obj(app_context, child, "nextSibling", 11,
+				(ASObject*) children->elements[i+1].data.numeric_value);
+	}
+
+	xml_set_obj(app_context, parent, "firstChild", 10,
+		(ASObject*) children->elements[0].data.numeric_value);
+	xml_set_obj(app_context, parent, "lastChild", 9,
+		(ASObject*) children->elements[count-1].data.numeric_value);
+}
+
+// Check if 'ancestor' is an ancestor of 'node' (circular reference check)
+static int xml_is_ancestor(ASObject* node, ASObject* ancestor) {
+	ActionVar* pv = getProperty(node, "parentNode", 10);
+	int depth = 0;
+	while (pv != NULL && pv->type == ACTION_STACK_VALUE_OBJECT && depth < 100) {
+		ASObject* p = (ASObject*) pv->data.numeric_value;
+		if (p == NULL) break;
+		if (p == ancestor) return 1;
+		pv = getProperty(p, "parentNode", 10);
+		depth++;
+	}
+	return 0;
+}
+
+// Remove a node from its parent
+static void xml_do_remove(SWFAppContext* app_context, ASObject* node) {
+	ActionVar* pp = getProperty(node, "parentNode", 10);
+	if (pp == NULL || pp->type != ACTION_STACK_VALUE_OBJECT) return;
+	ASObject* parent = (ASObject*) pp->data.numeric_value;
+	if (parent == NULL) return;
+
+	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
+	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
+	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	if (children == NULL) return;
+
+	// Find and remove from array
+	for (u32 i = 0; i < children->length; i++) {
+		if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT &&
+			(ASObject*) children->elements[i].data.numeric_value == node) {
+			// Shift remaining elements
+			for (u32 j = i; j < children->length - 1; j++)
+				children->elements[j] = children->elements[j + 1];
+			children->length--;
+			break;
+		}
+	}
+
+	// Clear this node's links
+	xml_set_null(app_context, node, "parentNode", 10);
+	xml_set_null(app_context, node, "previousSibling", 15);
+	xml_set_null(app_context, node, "nextSibling", 11);
+
+	// Rebuild parent's links
+	xml_sync_children(app_context, parent);
+}
+
+// Append child to parent
+static void xml_do_append(SWFAppContext* app_context, ASObject* parent, ASObject* child) {
+	if (parent == child) return;
+	if (xml_is_ancestor(parent, child)) return;
+
+	// Remove from old parent if needed
+	ActionVar* pp = getProperty(child, "parentNode", 10);
+	if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT && pp->data.numeric_value != 0)
+		xml_do_remove(app_context, child);
+
+	// Add to childNodes array
+	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
+	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
+	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	if (children == NULL) return;
+
+	// Grow array if needed
+	if (children->length >= children->capacity) {
+		u32 new_cap = children->capacity < 4 ? 4 : children->capacity * 2;
+		ActionVar* new_elems = (ActionVar*) HCALLOC(new_cap, sizeof(ActionVar));
+		if (children->elements) {
+			memcpy(new_elems, children->elements, children->length * sizeof(ActionVar));
+			FREE(children->elements);
+		}
+		children->elements = new_elems;
+		children->capacity = new_cap;
+	}
+
+	ActionVar cv = {0};
+	cv.type = ACTION_STACK_VALUE_OBJECT;
+	cv.data.numeric_value = (u64) child;
+	children->elements[children->length++] = cv;
+
+	xml_sync_children(app_context, parent);
+}
+
+// Insert newChild before refChild in parent
+static void xml_do_insert_before(SWFAppContext* app_context, ASObject* parent,
+                                  ASObject* newChild, ASObject* refChild) {
+	if (parent == newChild) return;
+	if (xml_is_ancestor(parent, newChild)) return;
+
+	// Remove from old parent
+	ActionVar* pp = getProperty(newChild, "parentNode", 10);
+	if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT && pp->data.numeric_value != 0)
+		xml_do_remove(app_context, newChild);
+
+	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
+	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
+	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	if (children == NULL) return;
+
+	// Find refChild position
+	u32 pos = children->length; // default: append
+	for (u32 i = 0; i < children->length; i++) {
+		if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT &&
+			(ASObject*) children->elements[i].data.numeric_value == refChild) {
+			pos = i;
+			break;
+		}
+	}
+
+	// Grow if needed
+	if (children->length >= children->capacity) {
+		u32 new_cap = children->capacity < 4 ? 4 : children->capacity * 2;
+		ActionVar* new_elems = (ActionVar*) HCALLOC(new_cap, sizeof(ActionVar));
+		if (children->elements) {
+			memcpy(new_elems, children->elements, children->length * sizeof(ActionVar));
+			FREE(children->elements);
+		}
+		children->elements = new_elems;
+		children->capacity = new_cap;
+	}
+
+	// Shift elements to make room
+	for (u32 i = children->length; i > pos; i--)
+		children->elements[i] = children->elements[i - 1];
+
+	ActionVar cv = {0};
+	cv.type = ACTION_STACK_VALUE_OBJECT;
+	cv.data.numeric_value = (u64) newChild;
+	children->elements[pos] = cv;
+	children->length++;
+
+	xml_sync_children(app_context, parent);
+}
+
+// ---- Entity escaping/unescaping ----
+
+// Unescape XML entities in-place. Returns a new HALLOC'd string.
+static char* xml_unescape(SWFAppContext* app_context, const char* input, u32 len, u32* out_len) {
+	char* buf = (char*) HALLOC(len + 1);
+	u32 wi = 0;
+	for (u32 i = 0; i < len; ) {
+		if (input[i] == '&') {
+			if (i + 4 <= len && strncmp(&input[i], "&amp;", 5) == 0 && i + 5 <= len) {
+				buf[wi++] = '&'; i += 5;
+			} else if (i + 3 <= len && strncmp(&input[i], "&lt;", 4) == 0 && i + 4 <= len) {
+				buf[wi++] = '<'; i += 4;
+			} else if (i + 3 <= len && strncmp(&input[i], "&gt;", 4) == 0 && i + 4 <= len) {
+				buf[wi++] = '>'; i += 4;
+			} else if (i + 5 <= len && strncmp(&input[i], "&apos;", 6) == 0 && i + 6 <= len) {
+				buf[wi++] = '\''; i += 6;
+			} else if (i + 5 <= len && strncmp(&input[i], "&quot;", 6) == 0 && i + 6 <= len) {
+				buf[wi++] = '"'; i += 6;
+			} else {
+				buf[wi++] = input[i++]; // Unknown entity — pass through
+			}
+		} else {
+			buf[wi++] = input[i++];
+		}
+	}
+	buf[wi] = '\0';
+	*out_len = wi;
+	return buf;
+}
+
+// Escape XML special characters. Returns a new HALLOC'd string.
+static char* xml_escape(SWFAppContext* app_context, const char* input, u32 len, u32* out_len) {
+	// Worst case: every char expands to 6 chars (&apos;)
+	char* buf = (char*) HALLOC(len * 6 + 1);
+	u32 wi = 0;
+	for (u32 i = 0; i < len; i++) {
+		switch (input[i]) {
+			case '&':  memcpy(&buf[wi], "&amp;", 5);  wi += 5; break;
+			case '<':  memcpy(&buf[wi], "&lt;", 4);   wi += 4; break;
+			case '>':  memcpy(&buf[wi], "&gt;", 4);   wi += 4; break;
+			case '\'': memcpy(&buf[wi], "&apos;", 6); wi += 6; break;
+			case '"':  memcpy(&buf[wi], "&quot;", 6); wi += 6; break;
+			default:   buf[wi++] = input[i]; break;
+		}
+	}
+	buf[wi] = '\0';
+	*out_len = wi;
+	return buf;
+}
+
+// ---- XML Parser ----
+
+static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char* text, u32 text_len) {
+	// Check ignoreWhite property
+	int ignore_white = 0;
+	ActionVar* iw = getProperty(doc, "ignoreWhite", 11);
+	if (iw != NULL && iw->type == ACTION_STACK_VALUE_BOOLEAN && iw->data.numeric_value)
+		ignore_white = 1;
+	else if (iw != NULL && iw->type == ACTION_STACK_VALUE_F64) {
+		double d = VAL(double, &iw->data.numeric_value);
+		if (d != 0.0) ignore_white = 1;
+	}
+
+	// Stack of parent nodes for nesting
+	#define XML_STACK_MAX 64
+	ASObject* stack[XML_STACK_MAX];
+	int stack_top = 0;
+	stack[0] = doc;
+
+	u32 pos = 0;
+	u32 text_start = pos;
+
+	while (pos < text_len) {
+		if (text[pos] == '<') {
+			// Flush accumulated text
+			if (pos > text_start) {
+				u32 ue_len = 0;
+				char* unescaped = xml_unescape(app_context, &text[text_start], pos - text_start, &ue_len);
+				// Check ignoreWhite
+				int is_whitespace_only = 1;
+				if (ignore_white) {
+					for (u32 k = 0; k < ue_len; k++) {
+						if (unescaped[k] != ' ' && unescaped[k] != '\t' &&
+						    unescaped[k] != '\n' && unescaped[k] != '\r') {
+							is_whitespace_only = 0; break;
+						}
+					}
+				} else {
+					is_whitespace_only = 0;
+				}
+				if (!is_whitespace_only || !ignore_white) {
+					ASObject* tn = xml_create_node(app_context, 3, NULL, 0, unescaped, ue_len);
+					xml_do_append(app_context, stack[stack_top], tn);
+				}
+				FREE(unescaped);
+			}
+
+			pos++; // skip '<'
+			if (pos >= text_len) break;
+
+			if (text[pos] == '/') {
+				// Closing tag </tag>
+				pos++; // skip '/'
+				while (pos < text_len && text[pos] != '>') pos++;
+				if (pos < text_len) pos++; // skip '>'
+				if (stack_top > 0) stack_top--;
+			}
+			else if (pos + 2 < text_len && text[pos] == '!' && text[pos+1] == '-' && text[pos+2] == '-') {
+				// Comment <!-- ... -->
+				pos += 3; // skip !--
+				while (pos + 2 < text_len && !(text[pos] == '-' && text[pos+1] == '-' && text[pos+2] == '>'))
+					pos++;
+				if (pos + 2 < text_len) pos += 3; // skip -->
+			}
+			else if (pos + 7 < text_len && strncmp(&text[pos], "![CDATA[", 8) == 0) {
+				// CDATA <![CDATA[...]]>
+				pos += 8; // skip ![CDATA[
+				u32 cdata_start = pos;
+				while (pos + 2 < text_len && !(text[pos] == ']' && text[pos+1] == ']' && text[pos+2] == '>'))
+					pos++;
+				u32 cdata_len = pos - cdata_start;
+				char* cdata_text = xml_strdup(app_context, &text[cdata_start], cdata_len);
+				ASObject* tn = xml_create_node(app_context, 3, NULL, 0, cdata_text, cdata_len);
+				xml_do_append(app_context, stack[stack_top], tn);
+				FREE(cdata_text);
+				if (pos + 2 < text_len) pos += 3; // skip ]]>
+			}
+			else if (pos + 7 < text_len && strncmp(&text[pos], "!DOCTYPE", 8) == 0) {
+				// DOCTYPE <!DOCTYPE ...>
+				u32 dt_start = pos - 1; // include '<'
+				while (pos < text_len && text[pos] != '>') pos++;
+				if (pos < text_len) pos++; // skip '>'
+				u32 dt_len = pos - dt_start;
+				xml_set_str(app_context, doc, "docTypeDecl", 11, &text[dt_start], dt_len);
+			}
+			else if (text[pos] == '?') {
+				// Processing instruction <?...?>
+				u32 pi_start = pos - 1; // include '<'
+				pos++; // skip '?'
+				while (pos + 1 < text_len && !(text[pos] == '?' && text[pos+1] == '>'))
+					pos++;
+				if (pos + 1 < text_len) pos += 2; // skip ?>
+				u32 pi_len = pos - pi_start;
+				// Check if it's <?xml ...?>
+				if (pi_len > 5 && strncmp(&text[pi_start + 2], "xml ", 4) == 0) {
+					xml_set_str(app_context, doc, "xmlDecl", 7, &text[pi_start], pi_len);
+				}
+			}
+			else {
+				// Opening tag <tag attr="val" ...> or self-closing <tag ... />
+				u32 name_start = pos;
+				while (pos < text_len && text[pos] != ' ' && text[pos] != '\t' &&
+				       text[pos] != '\n' && text[pos] != '\r' &&
+				       text[pos] != '>' && text[pos] != '/') pos++;
+				u32 name_len = pos - name_start;
+
+				ASObject* elem = xml_create_node(app_context, 1,
+					&text[name_start], name_len, NULL, 0);
+
+				// Parse attributes
+				while (pos < text_len && text[pos] != '>' && text[pos] != '/') {
+					// Skip whitespace
+					while (pos < text_len && (text[pos] == ' ' || text[pos] == '\t' ||
+					       text[pos] == '\n' || text[pos] == '\r')) pos++;
+					if (pos >= text_len || text[pos] == '>' || text[pos] == '/') break;
+
+					// Attribute name
+					u32 attr_name_start = pos;
+					while (pos < text_len && text[pos] != '=' && text[pos] != ' ' &&
+					       text[pos] != '>' && text[pos] != '/') pos++;
+					u32 attr_name_len = pos - attr_name_start;
+					if (attr_name_len == 0) break;
+
+					// Skip = and quote
+					if (pos < text_len && text[pos] == '=') pos++;
+					char quote = '"';
+					if (pos < text_len && (text[pos] == '"' || text[pos] == '\'')) {
+						quote = text[pos]; pos++;
+					}
+
+					// Attribute value
+					u32 attr_val_start = pos;
+					while (pos < text_len && text[pos] != quote) pos++;
+					u32 attr_val_len = pos - attr_val_start;
+					if (pos < text_len) pos++; // skip closing quote
+
+					// Unescape and store attribute
+					u32 ue_len = 0;
+					char* ue_val = xml_unescape(app_context, &text[attr_val_start], attr_val_len, &ue_len);
+
+					ActionVar* attrs_prop = getProperty(elem, "attributes", 10);
+					if (attrs_prop != NULL && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
+						if (attrs != NULL) {
+							char* a_name = xml_strdup(app_context, &text[attr_name_start], attr_name_len);
+							xml_set_str(app_context, attrs, a_name, attr_name_len, ue_val, ue_len);
+							FREE(a_name);
+						}
+					}
+					FREE(ue_val);
+				}
+
+				// Check for self-closing />
+				int self_closing = 0;
+				if (pos < text_len && text[pos] == '/') {
+					self_closing = 1;
+					pos++; // skip '/'
+				}
+				if (pos < text_len && text[pos] == '>') pos++; // skip '>'
+
+				xml_do_append(app_context, stack[stack_top], elem);
+
+				if (!self_closing && stack_top < XML_STACK_MAX - 1) {
+					stack[++stack_top] = elem;
+				}
+			}
+
+			text_start = pos;
+		} else {
+			pos++;
+		}
+	}
+
+	// Flush trailing text
+	if (pos > text_start) {
+		u32 ue_len = 0;
+		char* unescaped = xml_unescape(app_context, &text[text_start], pos - text_start, &ue_len);
+		int is_ws = 1;
+		if (ignore_white) {
+			for (u32 k = 0; k < ue_len; k++) {
+				if (unescaped[k] != ' ' && unescaped[k] != '\t' &&
+				    unescaped[k] != '\n' && unescaped[k] != '\r') { is_ws = 0; break; }
+			}
+		} else { is_ws = 0; }
+		if (!is_ws || !ignore_white) {
+			ASObject* tn = xml_create_node(app_context, 3, NULL, 0, unescaped, ue_len);
+			xml_do_append(app_context, stack[stack_top], tn);
+		}
+		FREE(unescaped);
+	}
+	#undef XML_STACK_MAX
+}
+
+// ---- XML toString Serializer ----
+
+// Appends serialized XML to a dynamic buffer
+typedef struct { char* buf; u32 len; u32 cap; } XmlBuf;
+
+static void xb_ensure(SWFAppContext* app_context, XmlBuf* xb, u32 extra) {
+	while (xb->len + extra >= xb->cap) {
+		xb->cap = xb->cap < 256 ? 256 : xb->cap * 2;
+		char* nb = (char*) HALLOC(xb->cap);
+		if (xb->buf) { memcpy(nb, xb->buf, xb->len); FREE(xb->buf); }
+		xb->buf = nb;
+	}
+}
+
+static void xb_append(SWFAppContext* app_context, XmlBuf* xb, const char* s, u32 len) {
+	xb_ensure(app_context, xb, len + 1);
+	memcpy(&xb->buf[xb->len], s, len);
+	xb->len += len;
+	xb->buf[xb->len] = '\0';
+}
+
+static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBuf* xb) {
+	ActionVar* nt_prop = getProperty(node, "nodeType", 8);
+	if (nt_prop == NULL) return;
+	int nodeType = (int) varToDoubleSimple(nt_prop);
+
+	if (nodeType == 3) {
+		// Text node — escape and output nodeValue
+		ActionVar* nv = getProperty(node, "nodeValue", 9);
+		if (nv != NULL && nv->type == ACTION_STACK_VALUE_STRING) {
+			const char* text = (const char*) nv->data.numeric_value;
+			if (text != NULL) {
+				u32 esc_len = 0;
+				char* escaped = xml_escape(app_context, text, nv->str_size ? nv->str_size : strlen(text), &esc_len);
+				xb_append(app_context, xb, escaped, esc_len);
+				FREE(escaped);
+			}
+		}
+		return;
+	}
+
+	if (nodeType != 1) return;
+
+	ActionVar* nn_prop = getProperty(node, "nodeName", 8);
+	const char* nodeName = NULL;
+	u32 name_len = 0;
+	if (nn_prop != NULL && nn_prop->type == ACTION_STACK_VALUE_STRING) {
+		nodeName = (const char*) nn_prop->data.numeric_value;
+		name_len = nn_prop->str_size ? nn_prop->str_size : (nodeName ? strlen(nodeName) : 0);
+	}
+
+	// If nodeName is null (document root), just serialize children
+	if (nodeName == NULL) {
+		ActionVar* cn = getProperty(node, "childNodes", 10);
+		if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
+			ASArray* children = (ASArray*) cn->data.numeric_value;
+			if (children != NULL) {
+				for (u32 i = 0; i < children->length; i++) {
+					if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* child = (ASObject*) children->elements[i].data.numeric_value;
+						if (child != NULL) xml_serialize_node(app_context, child, xb);
+					}
+				}
+			}
+		}
+		return;
+	}
+
+	// Element with name — check for children
+	ActionVar* cn = getProperty(node, "childNodes", 10);
+	ASArray* children = NULL;
+	if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY)
+		children = (ASArray*) cn->data.numeric_value;
+	int has_children = (children != NULL && children->length > 0);
+
+	// Opening tag
+	xb_append(app_context, xb, "<", 1);
+	xb_append(app_context, xb, nodeName, name_len);
+
+	// Attributes
+	ActionVar* attrs_prop = getProperty(node, "attributes", 10);
+	if (attrs_prop != NULL && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
+		if (attrs != NULL) {
+			for (u32 i = 0; i < attrs->num_used; i++) {
+				if (attrs->properties[i].name[0] == '\0') continue;
+				if (strcmp(attrs->properties[i].name, "__proto__") == 0) continue;
+				xb_append(app_context, xb, " ", 1);
+				u32 anl = strlen(attrs->properties[i].name);
+				xb_append(app_context, xb, attrs->properties[i].name, anl);
+				xb_append(app_context, xb, "=\"", 2);
+				if (attrs->properties[i].value.type == ACTION_STACK_VALUE_STRING) {
+					const char* av = (const char*) attrs->properties[i].value.data.numeric_value;
+					if (av != NULL) {
+						u32 avl = attrs->properties[i].value.str_size;
+						if (avl == 0) avl = strlen(av);
+						u32 el = 0;
+						char* ev = xml_escape(app_context, av, avl, &el);
+						xb_append(app_context, xb, ev, el);
+						FREE(ev);
+					}
+				}
+				xb_append(app_context, xb, "\"", 1);
+			}
+		}
+	}
+
+	if (!has_children) {
+		xb_append(app_context, xb, " />", 3);
+	} else {
+		xb_append(app_context, xb, ">", 1);
+		for (u32 i = 0; i < children->length; i++) {
+			if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+				ASObject* child = (ASObject*) children->elements[i].data.numeric_value;
+				if (child != NULL) xml_serialize_node(app_context, child, xb);
+			}
+		}
+		xb_append(app_context, xb, "</", 2);
+		xb_append(app_context, xb, nodeName, name_len);
+		xb_append(app_context, xb, ">", 1);
+	}
+}
+
+// ---- Built-in Method Implementations ----
+
+static ActionVar builtin_xml_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_STRING;
+	if (this_obj == NULL) { ret.data.numeric_value = (u64)""; ret.str_size = 0; return ret; }
+	XmlBuf xb = {0};
+	xml_serialize_node(app_context, (ASObject*) this_obj, &xb);
+	if (xb.buf == NULL) { ret.data.numeric_value = (u64)""; ret.str_size = 0; return ret; }
+	ret.data.numeric_value = (u64) xb.buf;
+	ret.str_size = xb.len;
+	return ret;
+}
+
+static ActionVar builtin_xml_parseXML(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL || arg_count == 0) return ret;
+	ASObject* doc = (ASObject*) this_obj;
+
+	// Get the text argument
+	const char* text = NULL;
+	u32 text_len = 0;
+	if (args[0].type == ACTION_STACK_VALUE_STRING) {
+		text = (const char*) args[0].data.numeric_value;
+		text_len = args[0].str_size ? args[0].str_size : (text ? strlen(text) : 0);
+	}
+	if (text == NULL || text_len == 0) return ret;
+
+	// Orphan existing children
+	ActionVar* cn = getProperty(doc, "childNodes", 10);
+	if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* children = (ASArray*) cn->data.numeric_value;
+		if (children != NULL) {
+			for (u32 i = 0; i < children->length; i++) {
+				if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* child = (ASObject*) children->elements[i].data.numeric_value;
+					if (child != NULL) {
+						xml_set_null(app_context, child, "parentNode", 10);
+						xml_set_null(app_context, child, "previousSibling", 15);
+						xml_set_null(app_context, child, "nextSibling", 11);
+					}
+				}
+			}
+			children->length = 0;
+		}
+	}
+	xml_set_null(app_context, doc, "firstChild", 10);
+	xml_set_null(app_context, doc, "lastChild", 9);
+
+	// Parse
+	xml_parse_into(app_context, doc, text, text_len);
+	return ret;
+}
+
+static ActionVar builtin_xml_createElement(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0};
+	if (arg_count == 0 || args[0].type != ACTION_STACK_VALUE_STRING) {
+		ret.type = ACTION_STACK_VALUE_UNDEFINED; return ret;
+	}
+	const char* name = (const char*) args[0].data.numeric_value;
+	u32 name_len = args[0].str_size ? args[0].str_size : (name ? strlen(name) : 0);
+	ASObject* node = xml_create_node(app_context, 1, name, name_len, NULL, 0);
+	ret.type = ACTION_STACK_VALUE_OBJECT;
+	ret.data.numeric_value = (u64) node;
+	return ret;
+}
+
+static ActionVar builtin_xml_createTextNode(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0};
+	const char* text = "";
+	u32 text_len = 0;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+		text = (const char*) args[0].data.numeric_value;
+		text_len = args[0].str_size ? args[0].str_size : (text ? strlen(text) : 0);
+	}
+	ASObject* node = xml_create_node(app_context, 3, NULL, 0, text, text_len);
+	ret.type = ACTION_STACK_VALUE_OBJECT;
+	ret.data.numeric_value = (u64) node;
+	return ret;
+}
+
+static ActionVar builtin_xml_appendChild(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL || arg_count == 0) return ret;
+	if (args[0].type != ACTION_STACK_VALUE_OBJECT) return ret;
+	ASObject* child = (ASObject*) args[0].data.numeric_value;
+	if (child == NULL) return ret;
+	xml_do_append(app_context, (ASObject*) this_obj, child);
+	return ret;
+}
+
+static ActionVar builtin_xml_removeNode(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	xml_do_remove(app_context, (ASObject*) this_obj);
+	return ret;
+}
+
+static ActionVar builtin_xml_insertBefore(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL || arg_count < 2) return ret;
+	if (args[0].type != ACTION_STACK_VALUE_OBJECT) return ret;
+	ASObject* newChild = (ASObject*) args[0].data.numeric_value;
+	if (newChild == NULL) return ret;
+	ASObject* refChild = NULL;
+	if (args[1].type == ACTION_STACK_VALUE_OBJECT)
+		refChild = (ASObject*) args[1].data.numeric_value;
+	if (refChild == NULL) {
+		xml_do_append(app_context, (ASObject*) this_obj, newChild);
+	} else {
+		xml_do_insert_before(app_context, (ASObject*) this_obj, newChild, refChild);
+	}
+	return ret;
+}
+
+static ActionVar builtin_xml_hasChildNodes(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	if (this_obj == NULL) return ret;
+	ActionVar* cn = getProperty((ASObject*) this_obj, "childNodes", 10);
+	if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* children = (ASArray*) cn->data.numeric_value;
+		if (children != NULL && children->length > 0)
+			ret.data.numeric_value = 1;
+	}
+	return ret;
+}
+
+static ActionVar builtin_xml_cloneNode(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	ASObject* src = (ASObject*) this_obj;
+
+	int deep = 0;
+	if (arg_count > 0) {
+		if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
+			deep = args[0].data.numeric_value ? 1 : 0;
+		else if (args[0].type == ACTION_STACK_VALUE_F64) {
+			double d = VAL(double, &args[0].data.numeric_value);
+			deep = (d != 0.0) ? 1 : 0;
+		}
+	}
+
+	// Get source properties
+	ActionVar* nt = getProperty(src, "nodeType", 8);
+	int nodeType = nt ? (int) varToDoubleSimple(nt) : 1;
+	ActionVar* nn = getProperty(src, "nodeName", 8);
+	const char* nodeName = NULL; u32 nameLen = 0;
+	if (nn && nn->type == ACTION_STACK_VALUE_STRING) {
+		nodeName = (const char*) nn->data.numeric_value;
+		nameLen = nn->str_size ? nn->str_size : (nodeName ? strlen(nodeName) : 0);
+	}
+	ActionVar* nv = getProperty(src, "nodeValue", 9);
+	const char* nodeValue = NULL; u32 valLen = 0;
+	if (nv && nv->type == ACTION_STACK_VALUE_STRING) {
+		nodeValue = (const char*) nv->data.numeric_value;
+		valLen = nv->str_size ? nv->str_size : (nodeValue ? strlen(nodeValue) : 0);
+	}
+
+	ASObject* clone = xml_create_node(app_context, nodeType, nodeName, nameLen, nodeValue, valLen);
+
+	// Copy attributes
+	ActionVar* src_attrs = getProperty(src, "attributes", 10);
+	if (src_attrs && src_attrs->type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* sa = (ASObject*) src_attrs->data.numeric_value;
+		ActionVar* dst_attrs = getProperty(clone, "attributes", 10);
+		if (sa && dst_attrs && dst_attrs->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* da = (ASObject*) dst_attrs->data.numeric_value;
+			if (da) {
+				for (u32 i = 0; i < sa->num_used; i++) {
+					if (sa->properties[i].name[0] == '\0') continue;
+					if (strcmp(sa->properties[i].name, "__proto__") == 0) continue;
+					setProperty(app_context, da, sa->properties[i].name,
+						strlen(sa->properties[i].name), &sa->properties[i].value);
+				}
+			}
+		}
+	}
+
+	// Deep clone: recursively clone children
+	if (deep) {
+		ActionVar* cn = getProperty(src, "childNodes", 10);
+		if (cn && cn->type == ACTION_STACK_VALUE_ARRAY) {
+			ASArray* children = (ASArray*) cn->data.numeric_value;
+			if (children) {
+				for (u32 i = 0; i < children->length; i++) {
+					if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* child_src = (ASObject*) children->elements[i].data.numeric_value;
+						if (child_src) {
+							ActionVar deep_arg = {0};
+							deep_arg.type = ACTION_STACK_VALUE_BOOLEAN;
+							deep_arg.data.numeric_value = 1;
+							ActionVar child_clone = builtin_xml_cloneNode(app_context, &deep_arg, 1, NULL, child_src);
+							if (child_clone.type == ACTION_STACK_VALUE_OBJECT) {
+								xml_do_append(app_context, clone, (ASObject*) child_clone.data.numeric_value);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	ret.type = ACTION_STACK_VALUE_OBJECT;
+	ret.data.numeric_value = (u64) clone;
+	return ret;
+}
+
+static ActionVar builtin_xml_getNamespaceForPrefix(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_NULL;
+	if (this_obj == NULL || arg_count == 0) return ret;
+	// Walk up the tree looking for xmlns:prefix attribute
+	const char* prefix = NULL;
+	u32 prefix_len = 0;
+	if (args[0].type == ACTION_STACK_VALUE_STRING) {
+		prefix = (const char*) args[0].data.numeric_value;
+		prefix_len = args[0].str_size ? args[0].str_size : (prefix ? strlen(prefix) : 0);
+	}
+	if (prefix == NULL) return ret;
+
+	// Build xmlns:prefix attr name
+	char attr_name[256];
+	snprintf(attr_name, sizeof(attr_name), "xmlns:%.*s", prefix_len, prefix);
+	u32 attr_name_len = strlen(attr_name);
+
+	ASObject* cur = (ASObject*) this_obj;
+	int depth = 0;
+	while (cur != NULL && depth < 100) {
+		ActionVar* attrs_prop = getProperty(cur, "attributes", 10);
+		if (attrs_prop && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
+			if (attrs) {
+				ActionVar* ns_val = getProperty(attrs, attr_name, attr_name_len);
+				if (ns_val && ns_val->type == ACTION_STACK_VALUE_STRING) {
+					ret.type = ACTION_STACK_VALUE_STRING;
+					ret.str_size = ns_val->str_size;
+					ret.data.numeric_value = ns_val->data.numeric_value;
+					return ret;
+				}
+			}
+		}
+		ActionVar* pp = getProperty(cur, "parentNode", 10);
+		if (pp == NULL || pp->type != ACTION_STACK_VALUE_OBJECT) break;
+		cur = (ASObject*) pp->data.numeric_value;
+		depth++;
+	}
+	return ret;
+}
+
+static ActionVar builtin_xml_getPrefixForNamespace(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_NULL;
+	if (this_obj == NULL || arg_count == 0) return ret;
+	const char* uri = NULL;
+	u32 uri_len = 0;
+	if (args[0].type == ACTION_STACK_VALUE_STRING) {
+		uri = (const char*) args[0].data.numeric_value;
+		uri_len = args[0].str_size ? args[0].str_size : (uri ? strlen(uri) : 0);
+	}
+	if (uri == NULL) return ret;
+
+	ASObject* cur = (ASObject*) this_obj;
+	int depth = 0;
+	while (cur != NULL && depth < 100) {
+		ActionVar* attrs_prop = getProperty(cur, "attributes", 10);
+		if (attrs_prop && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
+			if (attrs) {
+				for (u32 i = 0; i < attrs->num_used; i++) {
+					if (strncmp(attrs->properties[i].name, "xmlns:", 6) == 0 &&
+					    attrs->properties[i].value.type == ACTION_STACK_VALUE_STRING) {
+						const char* v = (const char*) attrs->properties[i].value.data.numeric_value;
+						u32 vl = attrs->properties[i].value.str_size;
+						if (vl == 0 && v) vl = strlen(v);
+						if (vl == uri_len && v && strncmp(v, uri, uri_len) == 0) {
+							const char* p = &attrs->properties[i].name[6];
+							ret.type = ACTION_STACK_VALUE_STRING;
+							ret.str_size = strlen(p);
+							ret.data.numeric_value = (u64) p;
+							return ret;
+						}
+					}
+				}
+			}
+		}
+		ActionVar* pp = getProperty(cur, "parentNode", 10);
+		if (pp == NULL || pp->type != ACTION_STACK_VALUE_OBJECT) break;
+		cur = (ASObject*) pp->data.numeric_value;
+		depth++;
+	}
+	return ret;
+}
+
+static ActionVar builtin_xml_getBytesLoaded(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	return ret;
+}
+
+static ActionVar builtin_xml_getBytesTotal(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	return ret;
+}
+
+// Helper to init a static method ASFunction
+static void xml_init_method(ASFunction* fn, const char* name, Function2Ptr func) {
+	memset(fn, 0, sizeof(ASFunction));
+	strncpy(fn->name, name, 255);
+	fn->function_type = 2;
+	fn->advanced_func = func;
+	fn->param_count = 0;
+}
+
+static void initXMLPrototype(SWFAppContext* app_context) {
+	if (g_xml_constructor_init) return;
+
+	// Initialize method ASFunctions
+	xml_init_method(&g_xml_fn_parseXML, "parseXML", builtin_xml_parseXML);
+	xml_init_method(&g_xml_fn_createElement, "createElement", builtin_xml_createElement);
+	xml_init_method(&g_xml_fn_createTextNode, "createTextNode", builtin_xml_createTextNode);
+	xml_init_method(&g_xml_fn_appendChild, "appendChild", builtin_xml_appendChild);
+	xml_init_method(&g_xml_fn_removeNode, "removeNode", builtin_xml_removeNode);
+	xml_init_method(&g_xml_fn_insertBefore, "insertBefore", builtin_xml_insertBefore);
+	xml_init_method(&g_xml_fn_hasChildNodes, "hasChildNodes", builtin_xml_hasChildNodes);
+	xml_init_method(&g_xml_fn_cloneNode, "cloneNode", builtin_xml_cloneNode);
+	xml_init_method(&g_xml_fn_toString, "toString", builtin_xml_toString);
+	xml_init_method(&g_xml_fn_getNamespaceForPrefix, "getNamespaceForPrefix", builtin_xml_getNamespaceForPrefix);
+	xml_init_method(&g_xml_fn_getPrefixForNamespace, "getPrefixForNamespace", builtin_xml_getPrefixForNamespace);
+	xml_init_method(&g_xml_fn_getBytesLoaded, "getBytesLoaded", builtin_xml_getBytesLoaded);
+	xml_init_method(&g_xml_fn_getBytesTotal, "getBytesTotal", builtin_xml_getBytesTotal);
+
+	// ---- XMLNode constructor ----
+	memset(&g_xmlnode_constructor, 0, sizeof(ASFunction));
+	strncpy(g_xmlnode_constructor.name, "XMLNode", 255);
+	g_xmlnode_constructor.function_type = 1;
+
+	ASObject* xmlnode_proto = allocObject(app_context, 20);
+	g_xmlnode_constructor.prototype_obj = xmlnode_proto;
+
+	// Set XMLNode.prototype.__proto__ = Object.prototype
+	if (g_object_prototype != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64) g_object_prototype;
+		setProperty(app_context, xmlnode_proto, "__proto__", 9, &pv);
+	}
+
+	// Install methods on XMLNode.prototype
+	#define INSTALL_METHOD(name, nlen, fn_ptr) do { \
+		ActionVar mv = {0}; mv.type = ACTION_STACK_VALUE_FUNCTION; \
+		mv.data.numeric_value = (u64)(fn_ptr); \
+		setProperty(app_context, xmlnode_proto, name, nlen, &mv); \
+	} while(0)
+
+	INSTALL_METHOD("appendChild", 11, &g_xml_fn_appendChild);
+	INSTALL_METHOD("removeNode", 10, &g_xml_fn_removeNode);
+	INSTALL_METHOD("insertBefore", 12, &g_xml_fn_insertBefore);
+	INSTALL_METHOD("hasChildNodes", 13, &g_xml_fn_hasChildNodes);
+	INSTALL_METHOD("cloneNode", 9, &g_xml_fn_cloneNode);
+	INSTALL_METHOD("toString", 8, &g_xml_fn_toString);
+	INSTALL_METHOD("getNamespaceForPrefix", 21, &g_xml_fn_getNamespaceForPrefix);
+	INSTALL_METHOD("getPrefixForNamespace", 21, &g_xml_fn_getPrefixForNamespace);
+	INSTALL_METHOD("getBytesLoaded", 14, &g_xml_fn_getBytesLoaded);
+	INSTALL_METHOD("getBytesTotal", 13, &g_xml_fn_getBytesTotal);
+
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_xmlnode_constructor;
+
+	// ---- XML constructor ----
+	memset(&g_xml_constructor, 0, sizeof(ASFunction));
+	strncpy(g_xml_constructor.name, "XML", 255);
+	g_xml_constructor.function_type = 1;
+
+	ASObject* xml_proto = allocObject(app_context, 16);
+	g_xml_constructor.prototype_obj = xml_proto;
+
+	// XML.prototype.__proto__ = XMLNode.prototype
+	{
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64) xmlnode_proto;
+		setProperty(app_context, xml_proto, "__proto__", 9, &pv);
+	}
+
+	// Install XML-specific methods on XML.prototype
+	INSTALL_METHOD("parseXML", 8, &g_xml_fn_parseXML);
+	INSTALL_METHOD("createElement", 13, &g_xml_fn_createElement);
+	INSTALL_METHOD("createTextNode", 14, &g_xml_fn_createTextNode);
+
+	#undef INSTALL_METHOD
+
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_xml_constructor;
+
+	g_xml_constructor_init = 1;
+}
+
+// Create a new XML document object
+static ASObject* xml_create_document(SWFAppContext* app_context) {
+	initXMLPrototype(app_context);
+	ASObject* doc = xml_create_node(app_context, 1, NULL, 0, NULL, 0);
+
+	// Override __proto__ to XML.prototype (not XMLNode.prototype)
+	if (g_xml_constructor.prototype_obj != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64) g_xml_constructor.prototype_obj;
+		setProperty(app_context, doc, "__proto__", 9, &pv);
+	}
+
+	// XML-specific properties
+	ActionVar false_val = {0}; false_val.type = ACTION_STACK_VALUE_BOOLEAN;
+	setProperty(app_context, doc, "ignoreWhite", 11, &false_val);
+
+	ASObject* idmap = allocObject(app_context, 4);
+	xml_set_obj(app_context, doc, "idMap", 5, idmap);
+
+	xml_set_str(app_context, doc, "contentType", 11,
+		"application/x-www-form-urlencoded", 33);
+
+	ActionVar zero_val = {0}; zero_val.type = ACTION_STACK_VALUE_F64;
+	setProperty(app_context, doc, "status", 6, &zero_val);
+
+	return doc;
+}
+
 // _root MovieClip for simplified implementation
 // Note: totalframes is set from SWF_FRAME_COUNT if available, otherwise defaults to 1
 MovieClip root_movieclip = {
@@ -5781,6 +6904,21 @@ void actionGetVariable(SWFAppContext* app_context)
 					setProperty(app_context, global_object, "TextFormat", 10, &tfmt_cv);
 				}
 
+				// Register XML and XMLNode on _global
+				initXMLPrototype(app_context);
+				{
+					ActionVar xml_cv = {0};
+					xml_cv.type = ACTION_STACK_VALUE_FUNCTION;
+					xml_cv.data.numeric_value = (u64)&g_xml_constructor;
+					setProperty(app_context, global_object, "XML", 3, &xml_cv);
+				}
+				{
+					ActionVar xmln_cv = {0};
+					xmln_cv.type = ACTION_STACK_VALUE_FUNCTION;
+					xmln_cv.data.numeric_value = (u64)&g_xmlnode_constructor;
+					setProperty(app_context, global_object, "XMLNode", 7, &xmln_cv);
+				}
+
 				global_init_done = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
@@ -5940,7 +7078,19 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_error_constructor);
 			return;
 		}
-		else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
+		else if (var_name_len == 3 && strncmp(var_name, "XML", 3) == 0)
+		{
+			initXMLPrototype(app_context);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_xml_constructor);
+			return;
+		}
+		else if (var_name_len == 7 && strncmp(var_name, "XMLNode", 7) == 0)
+		{
+			initXMLPrototype(app_context);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_xmlnode_constructor);
+			return;
+		}
+				else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
 		{
 			// Lazily create System built-in object
 			static ASObject* system_object = NULL;
@@ -9817,7 +10967,7 @@ void actionNewObject(SWFAppContext* app_context)
 			ActionVar value_var;
 			value_var.type = ACTION_STACK_VALUE_STRING;
 			value_var.str_size = strlen(str_value);
-			value_var.data.string_data.heap_ptr = strdup(str_value);
+			value_var.data.string_data.heap_ptr = xml_strdup(app_context, str_value, strlen(str_value));
 			value_var.data.string_data.owns_memory = true;
 			setProperty(app_context, str_obj, "value", 5, &value_var);
 		}
@@ -10093,7 +11243,63 @@ void actionNewObject(SWFAppContext* app_context)
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
 	}
-	else
+	else if (strcmp(ctor_name, "XML") == 0)
+	{
+		// Handle XML constructor — new XML(source?)
+		initXMLPrototype(app_context);
+		ASObject* xml_doc = xml_create_document(app_context);
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			const char* src = (const char*) args[0].data.numeric_value;
+			u32 src_len = args[0].str_size;
+			if (src_len == 0 && src) src_len = (u32)strlen(src);
+			xml_parse_into(app_context, xml_doc, src, src_len);
+		}
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) xml_doc);
+		return;
+	}
+	else if (strcmp(ctor_name, "XMLNode") == 0)
+	{
+		// Handle XMLNode constructor — new XMLNode(type, value)
+		initXMLPrototype(app_context);
+		int nodeType = 1; // default element
+		const char* nodeValue = "";
+		u32 nodeValueLen = 0;
+		if (num_args > 0)
+		{
+			double d = varToDoubleSimple(&args[0]);
+			nodeType = (int)d;
+		}
+		if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_STRING)
+		{
+			nodeValue = (const char*) args[1].data.numeric_value;
+			nodeValueLen = args[1].str_size;
+			if (nodeValueLen == 0 && nodeValue) nodeValueLen = (u32)strlen(nodeValue);
+		}
+		else if (num_args > 1)
+		{
+			// Convert non-string arg to string
+			double d2 = varToDoubleSimple(&args[1]);
+			static char nbuf[64];
+			snprintf(nbuf, sizeof(nbuf), "%g", d2);
+			nodeValue = nbuf;
+			nodeValueLen = (u32)strlen(nbuf);
+		}
+		const char* nodeName = NULL;
+		u32 nodeNameLen = 0;
+		if (nodeType == 1)
+		{
+			// Element node: value is nodeName
+			nodeName = nodeValue;
+			nodeNameLen = nodeValueLen;
+			nodeValue = NULL;
+			nodeValueLen = 0;
+		}
+		ASObject* node = xml_create_node(app_context, nodeType, nodeName, nodeNameLen, nodeValue, nodeValueLen);
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) node);
+		return;
+	}
+		else
 	{
 		// Try to find user-defined constructor function
 		ASFunction* ctor_func = lookupFunctionByName(ctor_name, ctor_name_len);
