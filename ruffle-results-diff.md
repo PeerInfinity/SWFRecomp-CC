@@ -1,45 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `03e795d08e7a` (2026-02-14T01:20:26.847876+00:00)
-**Current:** `2a39d1c32901` (2026-02-14T01:29:43.731335+00:00)
+**Previous:** `2a39d1c32901` (2026-02-14T01:29:43.731335+00:00)
+**Current:** `25cbff52640b` (2026-02-14T01:57:09.550297+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 145 | 149 | +4 |
+| Passing | 149 | 152 | +3 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 23.4% | 24.1% | +0.7% |
-| Mismatched lines | 57227 | 57210 | -17 |
-|   Decreased | | | -30 |
-|   Increased | | | +13 |
+| Pass rate | 24.1% | 24.6% | +0.5% |
+| Mismatched lines | 57210 | 57204 | -6 |
+|   Decreased | | | -6 |
 
-## Newly Passing (4)
+## Newly Passing (3)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `capabilities_resolution` | output_mismatch | 4/8 | 8/8 |
-| `textfield_background_color` | output_mismatch | 8/11 | 11/11 |
-| `textfield_border_color` | output_mismatch | 8/11 | 11/11 |
-| `textfield_text` | output_mismatch | 6/7 | 7/7 |
+| `target_path` | output_mismatch | 11/14 | 14/14 |
+| `uncaught_exception` | runtime_error | 0/1 | 1/1 |
+| `uncaught_exception_bubbled` | runtime_error | 0/1 | 1/1 |
 
-## Line Count Changed (16)
+## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `edittext_default_format_font_style` | output_mismatch | 176/335 | 186/335 | -10 |
-| `textfield_properties` | output_mismatch | 32/44 | 35/44 | -3 |
-| `edittext_html_condensewhite_swf7` | output_mismatch | 93/311 | 94/311 | -1 |
-| `edittext_html_condensewhite_swf8` | output_mismatch | 90/311 | 91/311 | -1 |
-| `globals_swf5` | output_mismatch | 206/304 | 207/304 | -1 |
-| `globals_swf6` | output_mismatch | 213/304 | 214/304 | -1 |
-| `globals_swf7` | output_mismatch | 210/304 | 211/304 | -1 |
-| `globals_swf8` | output_mismatch | 136/304 | 137/304 | -1 |
-| `device_font_spacing` | segfault | 1/91 | 1/91 | 0 |
+| `stage_object_children` | output_mismatch | 67/83 | 68/83 | -1 |
 | `goto_methods` | segfault | 8/40 | 8/40 | 0 |
-| `issue_3522` | output_mismatch | 1/2 | 1/2 | 0 |
-| `edittext_html_swf6` | output_mismatch | 2014/5377 | 2013/5377 | +1 |
-| `edittext_html_swf7` | output_mismatch | 1378/5377 | 1377/5377 | +1 |
-| `edittext_html_swf8` | output_mismatch | 1363/5377 | 1362/5377 | +1 |
-| `textfield_variable` | output_mismatch | 54/81 | 53/81 | +1 |
-| `edittext_newline_stripping` | output_mismatch | 32/64 | 23/64 | +9 |
