@@ -7554,6 +7554,20 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 		}
 
+		// Built-in defaults for non-underscore properties
+		if (mc != NULL && prop_name_len == 13 && strcmp(prop_name, "useHandCursor") == 0)
+		{
+			// useHandCursor defaults to true for both MovieClips and Buttons
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+			return;
+		}
+		if (mc != NULL && prop_name_len == 7 && strcmp(prop_name, "enabled") == 0)
+		{
+			// enabled defaults to true
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+			return;
+		}
+
 		// Fall back to global variable map (timeline variables are accessible as mc properties)
 		if (hasVariable((char*)prop_name, prop_name_len))
 		{
