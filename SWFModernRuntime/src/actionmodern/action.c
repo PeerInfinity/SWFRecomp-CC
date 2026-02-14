@@ -1023,6 +1023,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->url[0] = '\0';
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
+	mc->as_set_flags = 0;
 #endif
 
 	// Set instance name
@@ -1067,6 +1068,23 @@ static MovieClip* findOrCreateMovieClip(const char* instance_name, MovieClip* pa
 	}
 	// Not in cache - create new and cache it
 	MovieClip* mc = createMovieClip(instance_name, parent);
+#ifdef NO_GRAPHICS
+	// One-time init: sync x/y from transform_data at creation time
+	if (mc != NULL) {
+		size_t depth = ng_findDisplayEntryByName(instance_name);
+		if (depth > 0) {
+			float init_x, init_y;
+			if (ng_getTransformXY(depth, &init_x, &init_y)) {
+				mc->x = init_x;
+				mc->y = init_y;
+			}
+			u32 tid;
+			if (ng_getTransformId(depth, &tid)) {
+				mc->last_transform_id = tid;
+			}
+		}
+	}
+#endif
 	if (mc != NULL && child_mc_count < MAX_CHILD_MOVIECLIPS) {
 		child_mc_cache[child_mc_count++] = mc;
 	}
@@ -1077,6 +1095,27 @@ static MovieClip* findOrCreateMovieClip(const char* instance_name, MovieClip* pa
 MovieClip* actionFindOrCreateMovieClip(const char* instance_name, MovieClip* parent) {
 	return findOrCreateMovieClip(instance_name, parent);
 }
+
+#ifdef NO_GRAPHICS
+// Re-sync x/y from transform_data if the display entry's transform_id has changed
+// since the last sync, but only for properties not explicitly set by ActionScript.
+// This handles PlaceObject2 updates (move operations) without overwriting AS-set values.
+static void syncTransformIfNeeded(MovieClip* mc) {
+	if (mc == NULL || mc->name[0] == '\0') return;
+	size_t depth = ng_findDisplayEntryByName(mc->name);
+	if (depth == 0) return;
+	u32 tid;
+	if (!ng_getTransformId(depth, &tid)) return;
+	if (tid == mc->last_transform_id) return;
+	// Transform changed — sync properties that weren't set by AS
+	float tx, ty;
+	if (ng_getTransformXY(depth, &tx, &ty)) {
+		if (!(mc->as_set_flags & 1)) mc->x = tx;
+		if (!(mc->as_set_flags & 2)) mc->y = ty;
+	}
+	mc->last_transform_id = tid;
+}
+#endif
 
 /**
  * Construct the target path for a MovieClip
@@ -4759,9 +4798,15 @@ void actionGetProperty(SWFAppContext* app_context)
 
 	switch (prop_index) {
 		case 0:  // _x
+#ifdef NO_GRAPHICS
+			if (mc) syncTransformIfNeeded(mc);
+#endif
 			value = mc ? mc->x : 0.0f;
 			break;
 		case 1:  // _y
+#ifdef NO_GRAPHICS
+			if (mc) syncTransformIfNeeded(mc);
+#endif
 			value = mc ? mc->y : 0.0f;
 			break;
 		case 2:  // _xscale
@@ -6908,8 +6953,18 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				double dval = varToDouble(&value_var);
 				float fval = (float)dval;
-				if (strcasecmp(prop_name, "_x") == 0) { mc->x = fval; return; }
-				if (strcasecmp(prop_name, "_y") == 0) { mc->y = fval; return; }
+				if (strcasecmp(prop_name, "_x") == 0) {
+#ifdef NO_GRAPHICS
+					mc->as_set_flags |= 1;
+#endif
+					mc->x = fval; return;
+				}
+				if (strcasecmp(prop_name, "_y") == 0) {
+#ifdef NO_GRAPHICS
+					mc->as_set_flags |= 2;
+#endif
+					mc->y = fval; return;
+				}
 				if (strcasecmp(prop_name, "_xscale") == 0) { mc->xscale = fval; return; }
 				if (strcasecmp(prop_name, "_yscale") == 0) { mc->yscale = fval; return; }
 				if (strcasecmp(prop_name, "_rotation") == 0) { mc->rotation = fval; return; }
@@ -7297,6 +7352,12 @@ void actionGetMember(SWFAppContext* app_context)
 		if (mc != NULL && prop_name_len > 0 && prop_name[0] == '_')
 		{
 			// Case-insensitive comparison for built-in MC properties
+#ifdef NO_GRAPHICS
+			// Re-sync x/y from display list if PlaceObject2 updated the transform
+			if (strcasecmp(prop_name, "_x") == 0 || strcasecmp(prop_name, "_y") == 0) {
+				syncTransformIfNeeded(mc);
+			}
+#endif
 			if (strcasecmp(prop_name, "_x") == 0) { float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_y") == 0) { float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -8468,9 +8529,15 @@ void actionSetProperty(SWFAppContext* app_context)
 	switch (prop_index) {
 		case 0:  // _x
 			mc->x = num_value;
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 1;
+#endif
 			break;
 		case 1:  // _y
 			mc->y = num_value;
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 2;
+#endif
 			break;
 		case 2:  // _xscale
 			mc->xscale = num_value;

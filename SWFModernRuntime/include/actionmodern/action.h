@@ -39,6 +39,7 @@ struct MovieClip {
 	void* dynamic_props;   // ASObject* for user-defined properties (lazily allocated)
 #ifdef NO_GRAPHICS
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
+	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
 #endif
 };
 
