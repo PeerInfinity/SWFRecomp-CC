@@ -8951,6 +8951,47 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 #endif
 			}
+			// TextField autoSize setter coercion
+			if (prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0
+				&& mc->ng_textfield_idx >= 0)
+			{
+				// Coerce value to one of: "left", "right", "center", "none"
+				const char* result = "none";
+				if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+				{
+					result = value_var.data.numeric_value ? "left" : "none";
+				}
+				else if (value_var.type == ACTION_STACK_VALUE_STRING)
+				{
+					const char* s = (const char*) VAL(u64, &value_var.data.numeric_value);
+					if (s != NULL)
+					{
+						if (strcasecmp(s, "left") == 0) result = "left";
+						else if (strcasecmp(s, "right") == 0) result = "right";
+						else if (strcasecmp(s, "center") == 0) result = "center";
+					}
+				}
+				else if (value_var.type == ACTION_STACK_VALUE_OBJECT)
+				{
+					// Call toString on the object
+					ActionVar str_result = objectCallToString(app_context, &value_var, NULL);
+					if (str_result.type == ACTION_STACK_VALUE_STRING)
+					{
+						const char* s = (const char*) str_result.data.numeric_value;
+						if (s != NULL)
+						{
+							if (strcasecmp(s, "left") == 0) result = "left";
+							else if (strcasecmp(s, "right") == 0) result = "right";
+							else if (strcasecmp(s, "center") == 0) result = "center";
+						}
+					}
+				}
+				// Replace value_var with the coerced string
+				value_var.type = ACTION_STACK_VALUE_STRING;
+				value_var.str_size = strlen(result);
+				value_var.data.string_data.owns_memory = false;
+				VAL(u64, &value_var.data.numeric_value) = (u64)result;
+			}
 			// User-defined property: store in dynamic_props and as global variable
 			if (mc->dynamic_props == NULL)
 			{
