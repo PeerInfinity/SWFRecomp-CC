@@ -487,13 +487,18 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 // NO_GRAPHICS child lookup by instance name — returns depth or 0 if not found
 size_t ng_findDisplayEntryByName(const char* name)
 {
+	// Return the lowest-depth match when multiple entries share a name
+	size_t result = 0;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (ng_display[i].instance_name[0] != '\0' &&
 		    strcmp(ng_display[i].instance_name, name) == 0)
-			return ng_display[i].depth;
+		{
+			if (result == 0 || ng_display[i].depth < result)
+				result = ng_display[i].depth;
+		}
 	}
-	return 0;
+	return result;
 }
 
 // Rename a display list entry's instance name (for _name setter)

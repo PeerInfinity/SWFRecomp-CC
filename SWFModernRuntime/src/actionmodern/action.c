@@ -414,6 +414,10 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		hop_var.str_size = 0;
 		hop_var.data.numeric_value = (u64) &g_object_hasOwnProperty_func;
 		setProperty(app_context, g_object_prototype, "hasOwnProperty", 14, &hop_var);
+
+		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
+		for (u32 i = 0; i < g_object_prototype->num_used; i++)
+			g_object_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
 	}
 	return g_object_prototype;
 }
@@ -427,6 +431,16 @@ static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
 	proto_var.str_size = 0;
 	proto_var.data.numeric_value = (u64) proto;
 	setProperty(app_context, obj, "__proto__", 9, &proto_var);
+	// Mark __proto__ as non-enumerable
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name_length == 9 &&
+		    strncmp(obj->properties[i].name, "__proto__", 9) == 0)
+		{
+			obj->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+			break;
+		}
+	}
 }
 
 // Helper to look up function by name
@@ -4419,8 +4433,8 @@ void actionGetVariable(SWFAppContext* app_context)
 				ASObject* security_obj = allocObject(app_context, 4);
 				ActionVar sandbox_val = {0};
 				sandbox_val.type = ACTION_STACK_VALUE_STRING;
-				sandbox_val.str_size = 16;
-				VAL(u64, &sandbox_val.data.numeric_value) = (u64)"localWithNetwork";
+				sandbox_val.str_size = 13;
+				VAL(u64, &sandbox_val.data.numeric_value) = (u64)"localWithFile";
 				setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
 				ActionVar security_var = {0};
 				security_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -5630,32 +5644,78 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 	// Handle different types
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
-		// Object enumeration - push property names in reverse order
+		// Object enumeration - walk prototype chain, collect then push property names
+		// Flash enumerates in reverse insertion order: last added property first.
+		// Since stack is LIFO, we collect into a linked list (reversed), then push.
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
 
-		if (obj != NULL && obj->num_used > 0)
+		if (obj != NULL)
 		{
-			// Push properties forward (first to last insertion order)
-			// Stack LIFO means they pop in reverse insertion order (most recent first)
-			// which matches Flash enumeration order
-			for (u32 i = 0; i < obj->num_used; i++)
+			typedef struct PropList {
+				const char* name;
+				u32 name_length;
+				struct PropList* next;
+			} PropList;
+
+			PropList* prop_head = NULL;
+			EnumeratedName* enumerated_head = NULL;
+
+			// Walk the prototype chain
+			ASObject* current_obj = obj;
+			int chain_depth = 0;
+			const int MAX_CHAIN_DEPTH = 100;
+
+			while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
 			{
-				const char* prop_name = obj->properties[i].name;
-				u32 prop_name_len = obj->properties[i].name_length;
+				chain_depth++;
 
-				// Skip __proto__ (not enumerable in Flash)
-				if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0)
-					continue;
+				for (u32 i = 0; i < current_obj->num_used; i++)
+				{
+					const char* prop_name = current_obj->properties[i].name;
+					u32 prop_name_len = current_obj->properties[i].name_length;
+					u8 prop_flags = current_obj->properties[i].flags;
 
-				// Push property name as string
-				PUSH_STR(prop_name, prop_name_len);
+					// Skip non-enumerable properties (DontEnum flag)
+					if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
+						continue;
+
+					// Skip if already enumerated (shadowing)
+					if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
+						continue;
+
+					// Mark as enumerated
+					addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
+
+					// Prepend to linked list (reverses order)
+					PropList* node = (PropList*) malloc(sizeof(PropList));
+					if (node != NULL)
+					{
+						node->name = prop_name;
+						node->name_length = prop_name_len;
+						node->next = prop_head;
+						prop_head = node;
+					}
+				}
+
+				// Move to prototype via __proto__
+				ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+				if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+					current_obj = (ASObject*) proto_var->data.numeric_value;
+				else
+					current_obj = NULL;
+			}
+
+			freeEnumeratedNames(enumerated_head);
+
+			// Push from linked list (already reversed, so this gives correct pop order)
+			while (prop_head != NULL)
+			{
+				PUSH_STR((char*)prop_head->name, prop_head->name_length);
+				PropList* next = prop_head->next;
+				free(prop_head);
+				prop_head = next;
 			}
 		}
-
-		#ifdef DEBUG
-		printf("// Enumerate2: enumerated %u properties from object\n",
-			obj ? obj->num_used : 0);
-		#endif
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
 	{
@@ -7282,16 +7342,27 @@ void actionInitObject(SWFAppContext* app_context)
 		setProperty(app_context, obj, name, name_length, &value);
 	}
 
-	// Set __proto__ to Object.prototype for prototype chain inheritance
-	setObjectProto(app_context, obj);
+	// Set __proto__ to Object.prototype — but only if user didn't already set __proto__
+	ActionVar* existing_proto = getProperty(obj, "__proto__", 9);
+	if (existing_proto == NULL)
+		setObjectProto(app_context, obj);
+	else
+	{
+		// User set __proto__ manually — mark it as non-enumerable
+		for (u32 i = 0; i < obj->num_used; i++)
+		{
+			if (obj->properties[i].name_length == 9 &&
+			    strncmp(obj->properties[i].name, "__proto__", 9) == 0)
+			{
+				obj->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+				break;
+			}
+		}
+	}
 
 	// Step 4: Push object reference to stack
 	// The object has refcount = 1 from allocation
 	PUSH(ACTION_STACK_VALUE_OBJECT, (u64) obj);
-
-#ifdef DEBUG
-	printf("[DEBUG] actionInitObject: pushed object %p to stack\n", (void*)obj);
-#endif
 }
 
 // Helper function to push undefined value
