@@ -2577,13 +2577,21 @@ void actionTargetPath(SWFAppContext* app_context, char* str_buffer)
 		MovieClip* mc = (MovieClip*) val.data.numeric_value;
 
 		if (mc) {
-			// Get the pre-computed target path from the MovieClip
+			// Convert slash notation (mc->target) to dot notation for targetPath()
+			// "/" -> "_level0", "/.clip" -> "_level0.clip"
 			const char* path = mc->target;
-			int len = strlen(path);
-
-			// Copy path to string buffer
-			strncpy(str_buffer, path, 256);  // MovieClip.target is 256 bytes
-			str_buffer[255] = '\0';  // Ensure null termination
+			if (path[0] == '/' && path[1] == '\0') {
+				// Root: "/" -> "_level0"
+				strcpy(str_buffer, "_level0");
+			} else if (path[0] == '/' && path[1] == '.') {
+				// Child: "/.clip" -> "_level0.clip"
+				snprintf(str_buffer, 256, "_level0%s", path + 1);
+			} else {
+				// Fallback: copy as-is
+				strncpy(str_buffer, path, 256);
+				str_buffer[255] = '\0';
+			}
+			int len = strlen(str_buffer);
 
 			// Push the path string
 			PUSH_STR(str_buffer, len);
@@ -5283,8 +5291,7 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 				success = deleteProperty(app_context, scope_chain[i], var_name, var_name_len);
 
 				// Push result and return
-				float result = success ? 1.0f : 0.0f;
-				PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 				return;
 			}
 		}
@@ -5335,8 +5342,7 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 	}
 
 	// Push result
-	float result = success ? 1.0f : 0.0f;
-	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+	PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 }
 
 /**
@@ -9063,8 +9069,8 @@ void actionThrow(SWFAppContext* app_context)
 
 	// Check if we're in a try block
 	if (g_exception_state.handler_depth == 0) {
-		// Uncaught exception - print error message and exit
-		printf("[Uncaught exception: ");
+		// Uncaught exception - print warning and halt execution
+		printf("Warning: Uncaught exception, ");
 
 		if (throw_value.type == ACTION_STACK_VALUE_STRING) {
 			const char* str = (const char*) VAL(u64, &throw_value.data.numeric_value);
@@ -9079,10 +9085,11 @@ void actionThrow(SWFAppContext* app_context)
 			printf("(type %d)", throw_value.type);
 		}
 
-		printf("]\n");
+		printf("\n");
 
-		// Exit to stop script execution
-		exit(1);
+		// Halt all further script execution (without terminating the process)
+		g_execution_halted = 1;
+		return;
 	}
 
 	// Inside a try block - jump to catch handler using longjmp

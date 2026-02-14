@@ -5,7 +5,7 @@ Validation script for throw_swf_7
 Tests the THROW opcode (0x2A).
 Expected output:
 1. "Before throw" - traces before exception
-2. "[Uncaught exception: Error message]" - exception handler output
+2. "Warning: Uncaught exception, Error message" - exception handler output
 3. Should NOT see "After throw"
 
 This test validates that:
@@ -29,7 +29,7 @@ def validate_output(output):
 
     Expected:
     - Line 1: "Before throw"
-    - Line 2: "[Uncaught exception: Error message]"
+    - Line 2: "Warning: Uncaught exception, Error message"
     - Should NOT contain: "After throw"
     """
     lines = parse_output(output)
@@ -45,11 +45,11 @@ def validate_output(output):
     ))
     
     # Check that we see the uncaught exception message
-    exception_ok = len(lines) > 1 and "[Uncaught exception: Error message]" in lines[1]
+    exception_ok = len(lines) > 1 and "Warning: Uncaught exception, Error message" in lines[1]
     results.append(make_result(
         "uncaught_exception",
         exception_ok,
-        "[Uncaught exception: Error message]",
+        "Warning: Uncaught exception, Error message",
         lines[1] if len(lines) > 1 else "(no output)"
     ))
     
