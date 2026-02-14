@@ -52,7 +52,7 @@ extern MovieClip* g_current_context;
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);
 // Create or find a cached MovieClip by instance name
-MovieClip* actionFindOrCreateMovieClip(const char* instance_name, MovieClip* parent);
+MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
 
 // VAL macro must be defined before other macros that use it
 #define VAL(type, x) *((type*) x)

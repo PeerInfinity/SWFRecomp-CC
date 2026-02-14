@@ -1057,7 +1057,8 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 static MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 static int child_mc_count = 0;
 
-static MovieClip* findOrCreateMovieClip(const char* instance_name, MovieClip* parent) {
+static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
+	(void)app_context;  // used only in NO_GRAPHICS for TextField init
 	// Check cache first
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
@@ -1082,6 +1083,72 @@ static MovieClip* findOrCreateMovieClip(const char* instance_name, MovieClip* pa
 			if (ng_getTransformId(depth, &tid)) {
 				mc->last_transform_id = tid;
 			}
+			// Pre-populate TextField default properties
+			if (ng_isTextFieldAtDepth(depth)) {
+				if (mc->dynamic_props == NULL) {
+					mc->dynamic_props = (void*) allocObject(app_context, 16);
+					retainObject((ASObject*) mc->dynamic_props);
+				}
+				ASObject* props = (ASObject*) mc->dynamic_props;
+				// text property (initial text from DefineEditText)
+				const char* init_text = ng_getTextFieldInitialText(depth);
+				ActionVar text_val = {0};
+				text_val.type = ACTION_STACK_VALUE_STRING;
+				text_val.str_size = strlen(init_text);
+				VAL(u64, &text_val.data.numeric_value) = (u64)init_text;
+				setProperty(app_context, props, "text", 4, &text_val);
+				// htmlText (same as text for non-HTML textfields)
+				setProperty(app_context, props, "htmlText", 8, &text_val);
+				// textColor (from DefineEditText)
+				u32 tc = ng_getTextFieldColor(depth);
+				ActionVar color_val = {0};
+				color_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &color_val.data.numeric_value) = (double)tc;
+				setProperty(app_context, props, "textColor", 9, &color_val);
+				// backgroundColor (default white)
+				ActionVar bg_val = {0};
+				bg_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &bg_val.data.numeric_value) = 16777215.0;
+				setProperty(app_context, props, "backgroundColor", 15, &bg_val);
+				// borderColor (default black)
+				ActionVar bc_val = {0};
+				bc_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &bc_val.data.numeric_value) = 0.0;
+				setProperty(app_context, props, "borderColor", 11, &bc_val);
+				// background (default false)
+				ActionVar false_val = {0};
+				false_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &false_val.data.numeric_value) = 0;
+				setProperty(app_context, props, "background", 10, &false_val);
+				// border (default false)
+				setProperty(app_context, props, "border", 6, &false_val);
+				// type (default "dynamic")
+				ActionVar type_val = {0};
+				type_val.type = ACTION_STACK_VALUE_STRING;
+				type_val.str_size = 7;
+				VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+				setProperty(app_context, props, "type", 4, &type_val);
+				// length (string length of initial text)
+				ActionVar len_val = {0};
+				len_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &len_val.data.numeric_value) = (double)strlen(init_text);
+				setProperty(app_context, props, "length", 6, &len_val);
+				// multiline (default false)
+				setProperty(app_context, props, "multiline", 9, &false_val);
+				// wordWrap (default false)
+				setProperty(app_context, props, "wordWrap", 8, &false_val);
+				// selectable (default true)
+				ActionVar true_val = {0};
+				true_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &true_val.data.numeric_value) = 1;
+				setProperty(app_context, props, "selectable", 10, &true_val);
+				// condenseWhite (default false)
+				setProperty(app_context, props, "condenseWhite", 13, &false_val);
+				// maxChars (default null = no limit)
+				ActionVar null_val = {0};
+				null_val.type = ACTION_STACK_VALUE_NULL;
+				setProperty(app_context, props, "maxChars", 8, &null_val);
+			}
 		}
 	}
 #endif
@@ -1092,8 +1159,8 @@ static MovieClip* findOrCreateMovieClip(const char* instance_name, MovieClip* pa
 }
 
 // Public wrapper for findOrCreateMovieClip (callable from tag_stubs.c and generated code)
-MovieClip* actionFindOrCreateMovieClip(const char* instance_name, MovieClip* parent) {
-	return findOrCreateMovieClip(instance_name, parent);
+MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
+	return findOrCreateMovieClip(app_context, instance_name, parent);
 }
 
 #ifdef NO_GRAPHICS
@@ -4351,6 +4418,69 @@ void actionGetVariable(SWFAppContext* app_context)
 				security_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &security_var.data.numeric_value) = (u64)security_obj;
 				setProperty(app_context, system_object, "security", 8, &security_var);
+
+				// System.capabilities object
+				ASObject* caps_obj = allocObject(app_context, 16);
+				ActionVar cap_val = {0};
+				// screenResolutionX (default 1536 to match Ruffle test defaults)
+				cap_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &cap_val.data.numeric_value) = 1536.0;
+				setProperty(app_context, caps_obj, "screenResolutionX", 17, &cap_val);
+				// screenResolutionY
+				VAL(double, &cap_val.data.numeric_value) = 864.0;
+				setProperty(app_context, caps_obj, "screenResolutionY", 17, &cap_val);
+				// pixelAspectRatio
+				VAL(double, &cap_val.data.numeric_value) = 1.0;
+				setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &cap_val);
+				// screenDPI
+				VAL(double, &cap_val.data.numeric_value) = 72.0;
+				setProperty(app_context, caps_obj, "screenDPI", 9, &cap_val);
+				// playerType (StandAlone)
+				ActionVar pt_val = {0};
+				pt_val.type = ACTION_STACK_VALUE_STRING;
+				pt_val.str_size = 10;
+				VAL(u64, &pt_val.data.numeric_value) = (u64)"StandAlone";
+				setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
+				// version
+				ActionVar ver_val = {0};
+				ver_val.type = ACTION_STACK_VALUE_STRING;
+				ver_val.str_size = 13;
+				VAL(u64, &ver_val.data.numeric_value) = (u64)"WIN 32,0,0,0";
+				setProperty(app_context, caps_obj, "version", 7, &ver_val);
+				// os
+				ActionVar os_val = {0};
+				os_val.type = ACTION_STACK_VALUE_STRING;
+				os_val.str_size = 11;
+				VAL(u64, &os_val.data.numeric_value) = (u64)"Windows XP";
+				setProperty(app_context, caps_obj, "os", 2, &os_val);
+				// manufacturer
+				ActionVar mfr_val = {0};
+				mfr_val.type = ACTION_STACK_VALUE_STRING;
+				mfr_val.str_size = 20;
+				VAL(u64, &mfr_val.data.numeric_value) = (u64)"Macromedia Windows";
+				setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
+				// language
+				ActionVar lang_val = {0};
+				lang_val.type = ACTION_STACK_VALUE_STRING;
+				lang_val.str_size = 2;
+				VAL(u64, &lang_val.data.numeric_value) = (u64)"en";
+				setProperty(app_context, caps_obj, "language", 8, &lang_val);
+				// isDebugger
+				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &cap_val.data.numeric_value) = 0;
+				setProperty(app_context, caps_obj, "isDebugger", 10, &cap_val);
+				// hasAudio
+				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &cap_val.data.numeric_value) = 1;
+				setProperty(app_context, caps_obj, "hasAudio", 8, &cap_val);
+				// hasVideoEncoder
+				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &cap_val.data.numeric_value) = 1;
+				setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &cap_val);
+				ActionVar caps_var = {0};
+				caps_var.type = ACTION_STACK_VALUE_OBJECT;
+				VAL(u64, &caps_var.data.numeric_value) = (u64)caps_obj;
+				setProperty(app_context, system_object, "capabilities", 12, &caps_var);
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)system_object);
 			return;
@@ -4419,7 +4549,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (dobj != NULL)
 			{
 				extern MovieClip root_movieclip;
-				MovieClip* child_mc = findOrCreateMovieClip(name_buf, &root_movieclip);
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
@@ -4431,7 +4561,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (child_depth > 0)
 			{
 				extern MovieClip root_movieclip;
-				MovieClip* child_mc = findOrCreateMovieClip(name_buf, &root_movieclip);
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
@@ -7000,6 +7130,34 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
+			// TextField color properties: mask to 24-bit (0xFFFFFF)
+			if (strcmp(prop_name, "backgroundColor") == 0 ||
+				strcmp(prop_name, "borderColor") == 0 ||
+				strcmp(prop_name, "textColor") == 0)
+			{
+				double dval = varToDouble(&value_var);
+				int32_t ival = ecmaToInt32(dval);
+				u32 masked = (u32)ival & 0x00FFFFFF;
+				value_var.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &value_var.data.numeric_value) = (double)masked;
+			}
+			// TextField text: update length when text is set
+			if (strcmp(prop_name, "text") == 0 && mc->dynamic_props != NULL)
+			{
+				// Update length property
+				const char* new_text = "";
+				if (value_var.type == ACTION_STACK_VALUE_STRING)
+				{
+					new_text = value_var.data.string_data.owns_memory ?
+						value_var.data.string_data.heap_ptr :
+						(const char*) value_var.data.numeric_value;
+				}
+				ASObject* props = (ASObject*) mc->dynamic_props;
+				ActionVar len_val = {0};
+				len_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &len_val.data.numeric_value) = (double)strlen(new_text);
+				setProperty(app_context, props, "length", 6, &len_val);
+			}
 			// User-defined property: store in dynamic_props and as global variable
 			if (mc->dynamic_props == NULL)
 			{
@@ -8758,7 +8916,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifdef NO_GRAPHICS
 	size_t child_depth = ng_findDisplayEntryByName(child_name);
 	if (child_depth > 0) {
-		MovieClip* child_mc = findOrCreateMovieClip(child_name, &root_movieclip);
+		MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name, &root_movieclip);
 		if (child_mc) {
 			setCurrentContext(child_mc);
 			return;
@@ -8768,7 +8926,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	{
 		DisplayObject* dobj = findDisplayObjectByName(child_name);
 		if (dobj != NULL) {
-			MovieClip* child_mc = findOrCreateMovieClip(child_name, &root_movieclip);
+			MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name, &root_movieclip);
 			if (child_mc) {
 				setCurrentContext(child_mc);
 				targeted_sprite = dobj;

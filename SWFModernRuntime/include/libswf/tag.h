@@ -15,6 +15,7 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count);
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id);
+void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id, const char* initial_text, u32 text_color);
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth);
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio);
@@ -62,6 +63,9 @@ void ng_renameDisplayEntry(const char* old_name, const char* new_name);
 void ng_display_clear_after(size_t target_frame);
 int ng_isSpriteAtDepth(size_t depth);
 int ng_isButtonAtDepth(size_t depth);
+int ng_isTextFieldAtDepth(size_t depth);
+const char* ng_getTextFieldInitialText(size_t depth);
+u32 ng_getTextFieldColor(size_t depth);
 int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
 #endif

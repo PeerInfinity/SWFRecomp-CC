@@ -2034,6 +2034,39 @@ namespace SWFRecomp
 							 << ");";
 				}
 
+				// Emit tagDefineEditTextProps for NO_GRAPHICS runtime
+				{
+					auto escape_for_c = [](const std::string& s) {
+						std::string out;
+						for (char c : s) {
+							if (c == '\\') out += "\\\\";
+							else if (c == '"') out += "\\\"";
+							else if (c == '\n') out += "\\n";
+							else if (c == '\r') out += "\\r";
+							else if (c == '\t') out += "\\t";
+							else out += c;
+						}
+						return out;
+					};
+					// Strip HTML tags to get plain text
+					std::string plain_text;
+					bool in_tag = false;
+					for (char c : initial_text) {
+						if (c == '<') { in_tag = true; continue; }
+						if (c == '>') { in_tag = false; continue; }
+						if (!in_tag) plain_text += c;
+					}
+					// Pack text color as 0xRRGGBB
+					u32 text_color = ((u32)r << 16) | ((u32)g << 8) | (u32)b;
+					tag_init << endl
+							 << "\t" << "tagDefineEditTextProps("
+							 << "app_context, "
+							 << to_string(char_id) << ", "
+							 << "\"" << escape_for_c(plain_text) << "\", "
+							 << to_string(text_color)
+							 << ");";
+				}
+
 				break;
 			}
 

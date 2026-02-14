@@ -28,6 +28,8 @@ static struct {
 	size_t placed_at_frame; // which main timeline frame placed this entry
 	u32 transform_id;     // index into transform_data for _x/_y
 	int is_button;        // 1 if this is a button (for typeof discrimination)
+	int is_textfield;     // 1 if this is a DefineEditText (for TextField properties)
+	int textfield_idx;    // index into ng_textfields, or -1
 	char instance_name[64]; // instance name set by tagSetInstanceName
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
@@ -45,6 +47,23 @@ static int ng_find_button(size_t char_id)
 		if (ng_button_ids[i] == char_id)
 			return 1;
 	return 0;
+}
+
+// Simple textfield registry for NO_GRAPHICS mode
+#define MAX_TEXTFIELDS_NG 64
+static struct {
+	size_t char_id;
+	char initial_text[256];
+	u32 text_color;  // 0xRRGGBB
+} ng_textfields[MAX_TEXTFIELDS_NG];
+static size_t ng_textfield_count = 0;
+
+static int ng_find_textfield(size_t char_id)
+{
+	for (size_t i = 0; i < ng_textfield_count; i++)
+		if (ng_textfields[i].char_id == char_id)
+			return (int)i;
+	return -1;
 }
 
 static size_t ng_find_sprite(size_t char_id)
@@ -104,7 +123,7 @@ static void ng_exec_sprite_frame(SWFAppContext* app_context, size_t display_idx,
 		inst_name = mc_name;
 	}
 	MovieClip* saved_ctx = g_current_context;
-	MovieClip* sprite_mc = actionFindOrCreateMovieClip(inst_name, &root_movieclip);
+	MovieClip* sprite_mc = actionFindOrCreateMovieClip(app_context, inst_name, &root_movieclip);
 	actionSetCurrentContext(sprite_mc);
 	size_t saved_display_idx = ng_current_display_idx;
 	ng_current_display_idx = display_idx;
@@ -240,6 +259,17 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	(void)transform_start; (void)cxform_id;
 }
 
+void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id, const char* initial_text, u32 text_color)
+{
+	(void)app_context;
+	if (ng_textfield_count >= MAX_TEXTFIELDS_NG) return;
+	ng_textfields[ng_textfield_count].char_id = char_id;
+	strncpy(ng_textfields[ng_textfield_count].initial_text, initial_text ? initial_text : "", 255);
+	ng_textfields[ng_textfield_count].initial_text[255] = '\0';
+	ng_textfields[ng_textfield_count].text_color = text_color;
+	ng_textfield_count++;
+}
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
 	(void)cxform_id; (void)clip_depth;
@@ -267,6 +297,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// Placing a new character (char_id > 0)
 	size_t si = ng_find_sprite(char_id);
 	int btn = ng_find_button(char_id);
+	int tf_idx = ng_find_textfield(char_id);
+	int is_tf = (tf_idx >= 0) ? 1 : 0;
 
 	// Check if depth already occupied
 	for (size_t i = 0; i < ng_display_count; i++)
@@ -282,6 +314,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				ng_display[i].placed_at_frame = current_frame;
 				ng_display[i].transform_id = transform_id;
 				ng_display[i].is_button = btn;
+				ng_display[i].is_textfield = is_tf;
+				ng_display[i].textfield_idx = tf_idx;
 				return;
 			}
 			if (ng_display[i].sprite_idx == si)
@@ -297,6 +331,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[i].placed_at_frame = current_frame;
 			ng_display[i].transform_id = transform_id;
 			ng_display[i].is_button = btn;
+			ng_display[i].is_textfield = is_tf;
+			ng_display[i].textfield_idx = tf_idx;
 			return;
 		}
 	}
@@ -312,6 +348,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		ng_display[ng_display_count].placed_at_frame = current_frame;
 		ng_display[ng_display_count].transform_id = transform_id;
 		ng_display[ng_display_count].is_button = btn;
+		ng_display[ng_display_count].is_textfield = is_tf;
+		ng_display[ng_display_count].textfield_idx = tf_idx;
 		ng_display[ng_display_count].instance_name[0] = '\0';
 		ng_display_count++;
 	}
@@ -385,6 +423,34 @@ int ng_isButtonAtDepth(size_t depth)
 	for (size_t i = 0; i < ng_display_count; i++)
 		if (ng_display[i].depth == depth)
 			return ng_display[i].is_button;
+	return 0;
+}
+
+int ng_isTextFieldAtDepth(size_t depth)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+		if (ng_display[i].depth == depth)
+			return ng_display[i].is_textfield;
+	return 0;
+}
+
+const char* ng_getTextFieldInitialText(size_t depth)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth && ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
+			return ng_textfields[ng_display[i].textfield_idx].initial_text;
+	}
+	return "";
+}
+
+u32 ng_getTextFieldColor(size_t depth)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth && ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
+			return ng_textfields[ng_display[i].textfield_idx].text_color;
+	}
 	return 0;
 }
 
