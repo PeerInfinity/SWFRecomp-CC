@@ -3,10 +3,6 @@
 # or have unclear expected behavior that needs further investigation.
 # One test name per line. Lines starting with # are comments. Blank lines ignored.
 
-# --- Unclear expected behavior ---
-# Expected output (4 traces) doesn't match Ruffle's stated recursion limit (255).
-infinite_recursion_function
-
 # --- Interactive input (mouse, keyboard, drag, focus, text input) ---
 # These tests require user input simulation which our test harness doesn't support.
 button_key_events
@@ -40,13 +36,11 @@ focus_remove
 focus_root_movie
 focus_visibility_change
 focusrect_focuslost
-focusrect_mouse_swf8
-focusrect_mouse_swf9
 focusrect_property_swf5
 focusrect_property_swf6
 focusrect_property_swf7
-focusrect_swf5
 focusrect_swf6
+input_dead_keys_windows
 key_isToggled
 mouse_events
 mouse_events_visible_enabled
@@ -67,7 +61,6 @@ tab_ordering_events
 tab_ordering_events_mouse
 tab_ordering_movieclip_enabled_default
 tab_ordering_properties
-tab_ordering_properties_tab_index_edge_case
 tab_ordering_reverse
 tab_ordering_tabbable
 text_blocks_clicks
@@ -78,6 +71,8 @@ form_loader_encoding_1
 form_loader_encoding_2
 form_loader_encoding_3
 form_loader_encoding_4
+load_vars
+loading_avm2
 loadmovie
 loadmovie_fail
 loadmovie_flashvars
@@ -106,6 +101,8 @@ mcl_target_jpg
 mcl_target_png
 mcl_unloadclip
 mixed_avm_load_into_root
+moviecliploader_flashvars
+stylesheet_load
 unloadmovie
 unloadmovie_method
 unloadmovienum
@@ -119,32 +116,51 @@ xml_socket_on_data
 xml_socket_segmented
 
 # --- Sound/audio ---
-# These tests require audio playback support.
+# These tests require audio playback or streaming.
 sound_duration_position_props
 sound_id3
 sound_id3_prop
 sound_load_start
 sound_multiple_load
-sound_props_swf5
-sound_props_swf6
-sound_start_load
 
 # --- Video streaming (NetStream/NetConnection) ---
-# These tests require video streaming APIs not implemented in the runtime.
+# These tests require video/network streaming APIs.
+netconnection_close
+netconnection_send_remote
 netstream_play_flv
-netstream_play_flv_screen
 netstream_seek_flv
 
+# --- FileReference (OS file picker + network upload/download) ---
+# These tests require native file dialogs and HTTP file transfer.
+file_reference_browse_cancel
+file_reference_download_cancel
+file_reference_download_httperror_dns_error
+file_reference_download_httperror_status_code
+file_reference_download_success
+file_reference_upload_httperror_dns_error
+file_reference_upload_httperror_status_code
+file_reference_upload_success
+
+# --- ExternalInterface (browser JavaScript bridge) ---
+# These tests require ExternalInterface.call()/addCallback() which need a browser JS context.
+external_interface
+external_interface_jsquotestring
+external_interface_toas_basic
+
 # --- Bitmap data operations ---
-# These tests require pixel-level bitmap manipulation.
+# These tests require pixel-level bitmap manipulation not available in trace mode.
 bitmap_data
 bitmap_data_compare
 bitmap_data_copypixels
 bitmap_data_hittest
-bitmap_data_max_size_swf10
-bitmap_data_max_size_swf9
 bitmap_data_noise
 bitmap_data_pixeldissolve
 bitmap_data_threshold
 bitmap_filters
 bitmapdata_channels
+
+# --- Cross-movie / multi-level loading ---
+# These tests require loading separate SWFs into different _level targets.
+cross_movie_root
+swf5_to_6_cross_call
+swf6_to_5_cross_call
