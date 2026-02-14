@@ -13467,14 +13467,19 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			// Check if object has a custom toString (e.g. XML nodes)
-			int ts_found = 0;
-			ActionVar ts = objectCallToString(app_context, v, &ts_found);
-			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
-				const char* s = (const char*) ts.data.numeric_value;
-				if (s) {
-					int len = snprintf(buf, buf_size, "%s", s);
-					return len < buf_size ? len : buf_size - 1;
+			// XML nodes use toString for string coercion
+			if (v->type == ACTION_STACK_VALUE_OBJECT && v->data.numeric_value != 0) {
+				ASObject* obj = (ASObject*) v->data.numeric_value;
+				if (isXMLNodeInstance(obj)) {
+					int ts_found = 0;
+					ActionVar ts = objectCallToString(app_context, v, &ts_found);
+					if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
+						const char* s = (const char*) ts.data.numeric_value;
+						if (s) {
+							int len = snprintf(buf, buf_size, "%s", s);
+							return len < buf_size ? len : buf_size - 1;
+						}
+					}
 				}
 			}
 			return snprintf(buf, buf_size, "[object Object]");
