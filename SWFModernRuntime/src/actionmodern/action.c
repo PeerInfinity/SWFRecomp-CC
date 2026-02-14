@@ -2476,56 +2476,49 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 					}
 				}
 
-				// Resolve namespaceURI based on xmlns: attributes up the tree
+				// Resolve namespaceURI based on xmlns* attributes up the tree.
+				// Flash treats ANY attribute starting with "xmlns" as a namespace declaration.
+				// Derived prefix: if name[5]==':' then everything after ':', otherwise "".
 				{
 					ActionVar* nn = getProperty(elem, "nodeName", 8);
 					if (nn != NULL && nn->type == ACTION_STACK_VALUE_STRING) {
 						const char* full_name = (const char*) nn->data.numeric_value;
 						u32 full_len = nn->str_size ? nn->str_size : (full_name ? (u32)strlen(full_name) : 0);
-						// Determine prefix
-						const char* colon = NULL;
+						// Determine element's prefix
+						const char* elem_prefix = "";
+						u32 elem_prefix_len = 0;
 						for (u32 ci = 0; ci < full_len; ci++) {
-							if (full_name[ci] == ':') { colon = &full_name[ci]; break; }
-						}
-						// Build xmlns:prefix or xmlns attr name to search for
-						char ns_attr[256];
-						if (colon) {
-							u32 plen = (u32)(colon - full_name);
-							snprintf(ns_attr, sizeof(ns_attr), "xmlns:%.*s", plen, full_name);
-						} else {
-							snprintf(ns_attr, sizeof(ns_attr), "xmlns");
-						}
-						u32 ns_attr_len = (u32)strlen(ns_attr);
-
-						// Check element's own attributes first (self-declaring xmlns)
-						int resolved = 0;
-						{
-							ActionVar* ea = getProperty(elem, "attributes", 10);
-							if (ea != NULL && ea->type == ACTION_STACK_VALUE_OBJECT) {
-								ASObject* eao = (ASObject*) ea->data.numeric_value;
-								if (eao != NULL) {
-									ActionVar* nsv = getProperty(eao, ns_attr, ns_attr_len);
-									if (nsv != NULL && nsv->type == ACTION_STACK_VALUE_STRING) {
-										const char* uri = (const char*) nsv->data.numeric_value;
-										u32 uri_len = nsv->str_size;
-										if (uri_len == 0 && uri) uri_len = (u32)strlen(uri);
-										xml_set_str(app_context, elem, "namespaceURI", 12, uri, uri_len);
-										resolved = 1;
-									}
-								}
+							if (full_name[ci] == ':') {
+								elem_prefix = full_name;
+								elem_prefix_len = ci;
+								break;
 							}
 						}
-						// Walk up ancestors (stack contains parents, not current elem)
-						for (int si = stack_top; si >= 0 && !resolved; si--) {
-							ActionVar* sa = getProperty(stack[si], "attributes", 10);
-							if (sa != NULL && sa->type == ACTION_STACK_VALUE_OBJECT) {
-								ASObject* sao = (ASObject*) sa->data.numeric_value;
-								if (sao != NULL) {
-									ActionVar* nsv = getProperty(sao, ns_attr, ns_attr_len);
-									if (nsv != NULL && nsv->type == ACTION_STACK_VALUE_STRING) {
-										const char* uri = (const char*) nsv->data.numeric_value;
-										u32 uri_len = nsv->str_size;
-										if (uri_len == 0 && uri) uri_len = (u32)strlen(uri);
+
+						// Helper: scan an attributes object for matching xmlns* declaration
+						// Returns 1 if found and sets uri/uri_len
+						int resolved = 0;
+						// Check element's own attributes first, then walk up ancestors
+						// Build a list of attribute objects to check: elem first, then stack[stack_top] down to stack[0]
+						for (int check = -1; check <= stack_top && !resolved; check++) {
+							ASObject* check_node = (check == -1) ? elem : stack[stack_top - check];
+							ActionVar* a_prop = getProperty(check_node, "attributes", 10);
+							if (a_prop == NULL || a_prop->type != ACTION_STACK_VALUE_OBJECT) continue;
+							ASObject* aobj = (ASObject*) a_prop->data.numeric_value;
+							if (aobj == NULL) continue;
+							for (u32 i = 0; i < aobj->num_used && !resolved; i++) {
+								const char* aname = aobj->properties[i].name;
+								if (strncmp(aname, "xmlns", 5) != 0) continue;
+								if (aobj->properties[i].value.type != ACTION_STACK_VALUE_STRING) continue;
+								// Derive this attr's prefix
+								const char* ap = (aname[5] == ':') ? &aname[6] : "";
+								u32 ap_len = strlen(ap);
+								if (ap_len == elem_prefix_len &&
+								    (elem_prefix_len == 0 || strncmp(ap, elem_prefix, elem_prefix_len) == 0)) {
+									const char* uri = (const char*) aobj->properties[i].value.data.numeric_value;
+									u32 uri_len = aobj->properties[i].value.str_size;
+									if (uri_len == 0 && uri) uri_len = (u32)strlen(uri);
+									if (uri != NULL) {
 										xml_set_str(app_context, elem, "namespaceURI", 12, uri, uri_len);
 										resolved = 1;
 									}
@@ -2900,7 +2893,6 @@ static ActionVar builtin_xml_cloneNode(SWFAppContext* app_context, ActionVar* ar
 static ActionVar builtin_xml_getNamespaceForPrefix(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_NULL;
 	if (this_obj == NULL || arg_count == 0) return ret;
-	// Walk up the tree looking for xmlns:prefix attribute
 	const char* prefix = NULL;
 	u32 prefix_len = 0;
 	if (args[0].type == ACTION_STACK_VALUE_STRING) {
@@ -2909,11 +2901,8 @@ static ActionVar builtin_xml_getNamespaceForPrefix(SWFAppContext* app_context, A
 	}
 	if (prefix == NULL) return ret;
 
-	// Build xmlns:prefix attr name
-	char attr_name[256];
-	snprintf(attr_name, sizeof(attr_name), "xmlns:%.*s", prefix_len, prefix);
-	u32 attr_name_len = strlen(attr_name);
-
+	// Flash treats ANY attribute starting with "xmlns" as a namespace declaration.
+	// Derived prefix: if name[5]==':' then everything after ':', otherwise "".
 	ASObject* cur = (ASObject*) this_obj;
 	int depth = 0;
 	while (cur != NULL && depth < 100) {
@@ -2921,12 +2910,19 @@ static ActionVar builtin_xml_getNamespaceForPrefix(SWFAppContext* app_context, A
 		if (attrs_prop && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
 			ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
 			if (attrs) {
-				ActionVar* ns_val = getProperty(attrs, attr_name, attr_name_len);
-				if (ns_val && ns_val->type == ACTION_STACK_VALUE_STRING) {
-					ret.type = ACTION_STACK_VALUE_STRING;
-					ret.str_size = ns_val->str_size;
-					ret.data.numeric_value = ns_val->data.numeric_value;
-					return ret;
+				for (u32 i = 0; i < attrs->num_used; i++) {
+					const char* aname = attrs->properties[i].name;
+					if (strncmp(aname, "xmlns", 5) != 0) continue;
+					if (attrs->properties[i].value.type != ACTION_STACK_VALUE_STRING) continue;
+					// Derive this attr's prefix
+					const char* ap = (aname[5] == ':') ? &aname[6] : "";
+					u32 ap_len = strlen(ap);
+					if (ap_len == prefix_len && (prefix_len == 0 || strncmp(ap, prefix, prefix_len) == 0)) {
+						ret.type = ACTION_STACK_VALUE_STRING;
+						ret.str_size = attrs->properties[i].value.str_size;
+						ret.data.numeric_value = attrs->properties[i].value.data.numeric_value;
+						return ret;
+					}
 				}
 			}
 		}
@@ -2949,6 +2945,8 @@ static ActionVar builtin_xml_getPrefixForNamespace(SWFAppContext* app_context, A
 	}
 	if (uri == NULL) return ret;
 
+	// Flash treats ANY attribute starting with "xmlns" as a namespace declaration.
+	// The prefix is: if name[5]==':' then everything after ':', otherwise "".
 	ASObject* cur = (ASObject*) this_obj;
 	int depth = 0;
 	while (cur != NULL && depth < 100) {
@@ -2957,18 +2955,19 @@ static ActionVar builtin_xml_getPrefixForNamespace(SWFAppContext* app_context, A
 			ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
 			if (attrs) {
 				for (u32 i = 0; i < attrs->num_used; i++) {
-					if (strncmp(attrs->properties[i].name, "xmlns:", 6) == 0 &&
-					    attrs->properties[i].value.type == ACTION_STACK_VALUE_STRING) {
-						const char* v = (const char*) attrs->properties[i].value.data.numeric_value;
-						u32 vl = attrs->properties[i].value.str_size;
-						if (vl == 0 && v) vl = strlen(v);
-						if (vl == uri_len && v && strncmp(v, uri, uri_len) == 0) {
-							const char* p = &attrs->properties[i].name[6];
-							ret.type = ACTION_STACK_VALUE_STRING;
-							ret.str_size = strlen(p);
-							ret.data.numeric_value = (u64) p;
-							return ret;
-						}
+					const char* aname = attrs->properties[i].name;
+					if (strncmp(aname, "xmlns", 5) != 0) continue;
+					if (attrs->properties[i].value.type != ACTION_STACK_VALUE_STRING) continue;
+					const char* v = (const char*) attrs->properties[i].value.data.numeric_value;
+					u32 vl = attrs->properties[i].value.str_size;
+					if (vl == 0 && v) vl = strlen(v);
+					if (vl == uri_len && v && strncmp(v, uri, uri_len) == 0) {
+						// Derive prefix: after ':' if present at position 5, else ""
+						const char* p = (aname[5] == ':') ? &aname[6] : "";
+						ret.type = ACTION_STACK_VALUE_STRING;
+						ret.str_size = strlen(p);
+						ret.data.numeric_value = (u64) p;
+						return ret;
 					}
 				}
 			}
@@ -9345,19 +9344,7 @@ void actionPushRegister(SWFAppContext* app_context, u8 register_num)
 	ActionVar* reg = &g_registers[register_num];
 
 	// Push register value to stack
-	if (reg->type == ACTION_STACK_VALUE_F32 || reg->type == ACTION_STACK_VALUE_F64) {
-		PUSH(reg->type, reg->data.numeric_value);
-	} else if (reg->type == ACTION_STACK_VALUE_STRING) {
-		const char* str = (const char*) reg->data.numeric_value;
-		PUSH_STR(str, reg->str_size);
-	} else if (reg->type == ACTION_STACK_VALUE_STR_LIST) {
-		// String list - push reference
-		PUSH_STR_LIST(reg->str_size, 0);
-	} else {
-		// Undefined or unknown type - push 0
-		float undef = 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
-	}
+	pushVar(app_context, reg);
 }
 
 void actionStringLess(SWFAppContext* app_context)
@@ -11459,7 +11446,19 @@ void actionNewObject(SWFAppContext* app_context)
 		else
 	{
 		// Try to find user-defined constructor function
+		// First check function registry, then _global object properties
 		ASFunction* ctor_func = lookupFunctionByName(ctor_name, ctor_name_len);
+		if (ctor_func == NULL)
+		{
+			// Check _global object for constructor (MTASC classes store constructors here)
+			extern ASObject* global_object;
+			if (global_object != NULL)
+			{
+				ActionVar* gvar = getProperty(global_object, ctor_name, ctor_name_len);
+				if (gvar != NULL && gvar->type == ACTION_STACK_VALUE_FUNCTION)
+					ctor_func = (ASFunction*) gvar->data.numeric_value;
+			}
+		}
 
 		if (ctor_func != NULL)
 		{
@@ -14428,10 +14427,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		if (args != NULL) FREE(args);
-
 		if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
 		{
+			if (args != NULL) FREE(args);
 			// Check if toString was overridden on this function's own_props
 			if (func != NULL && func->own_props != NULL)
 			{
@@ -14466,12 +14464,63 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
 		{
+			if (args != NULL) FREE(args);
 			// Function.valueOf() returns the function itself
 			pushVar(app_context, &obj_var);
 		}
 		else
 		{
-			pushUndefined(app_context);
+			// Look up arbitrary method on function's own_props (e.g., MyClass.staticMethod())
+			ActionVar* method_prop = NULL;
+			if (func != NULL && func->own_props != NULL)
+				method_prop = getPropertyWithPrototype(func->own_props, method_name, method_name_len);
+
+			if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				ASFunction* mfunc = lookupFunctionFromVar(method_prop);
+
+				if (mfunc != NULL && g_call_depth >= g_max_call_depth - 1)
+				{
+					if (args != NULL) FREE(args);
+					g_execution_halted = 1;
+					pushUndefined(app_context);
+				}
+				else if (mfunc != NULL && mfunc->function_type == 2)
+				{
+					ActionVar* registers = NULL;
+					if (mfunc->register_count > 0)
+						registers = (ActionVar*) HCALLOC(mfunc->register_count, sizeof(ActionVar));
+
+					g_call_depth++;
+					ActionVar result = mfunc->advanced_func(app_context, args, num_args, registers, (void*) func->own_props);
+					g_call_depth--;
+
+					if (registers != NULL) FREE(registers);
+					if (args != NULL) FREE(args);
+					pushVar(app_context, &result);
+				}
+				else if (mfunc != NULL && mfunc->function_type == 1 && mfunc->simple_func != NULL)
+				{
+					for (u32 i = 0; i < num_args; i++)
+						pushVar(app_context, &args[i]);
+					if (args != NULL) FREE(args);
+
+					g_call_depth++;
+					ActionVar result = ((ActionVar(*)(SWFAppContext*))mfunc->simple_func)(app_context);
+					g_call_depth--;
+					pushVar(app_context, &result);
+				}
+				else
+				{
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+				}
+			}
+			else
+			{
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
 		}
 		return;
 	}
