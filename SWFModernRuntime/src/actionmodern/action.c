@@ -4493,6 +4493,36 @@ void actionGetVariable(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)system_object);
 			return;
 		}
+		// flash package (flash.display, flash.geom, etc.)
+		else if (var_name_len == 5 && strncmp(var_name, "flash", 5) == 0)
+		{
+			static ASObject* flash_object = NULL;
+			if (flash_object == NULL)
+			{
+				flash_object = allocObject(app_context, 4);
+				// flash.display package
+				ASObject* display_obj = allocObject(app_context, 4);
+				// Register BitmapData as a named function stub
+				ASFunction* bitmapdata_func = (ASFunction*) HCALLOC(1, sizeof(ASFunction));
+				strncpy(bitmapdata_func->name, "BitmapData", 255);
+				ActionVar bd_val = {0};
+				bd_val.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &bd_val.data.numeric_value) = (u64)bitmapdata_func;
+				setProperty(app_context, display_obj, "BitmapData", 10, &bd_val);
+				ActionVar disp_val = {0};
+				disp_val.type = ACTION_STACK_VALUE_OBJECT;
+				VAL(u64, &disp_val.data.numeric_value) = (u64)display_obj;
+				setProperty(app_context, flash_object, "display", 7, &disp_val);
+				// flash.geom package (stub)
+				ASObject* geom_obj = allocObject(app_context, 4);
+				ActionVar geom_val = {0};
+				geom_val.type = ACTION_STACK_VALUE_OBJECT;
+				VAL(u64, &geom_val.data.numeric_value) = (u64)geom_obj;
+				setProperty(app_context, flash_object, "geom", 4, &geom_val);
+			}
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)flash_object);
+			return;
+		}
 		} // end if (EFFECTIVE_SWF_VERSION() >= 5)
 
 		// Check _global object properties as fallback
@@ -8577,6 +8607,43 @@ void actionNewMethod(SWFAppContext* app_context)
 
 		new_obj = bool_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
+	}
+	else if (ctor_name != NULL && strcmp(ctor_name, "BitmapData") == 0)
+	{
+		// Handle flash.display.BitmapData constructor
+		// BitmapData(width, height) — validates dimensions, returns object or undefined
+		if (num_args >= 2)
+		{
+			double w = varToDouble(&args[0]);
+			double h = varToDouble(&args[1]);
+			bool valid = false;
+#if defined(SWF_VERSION) && SWF_VERSION >= 10
+			valid = (w >= 1 && w <= 8191 && h >= 1 && h <= 8191 && w * h <= 16777215);
+#else
+			valid = (w >= 1 && w <= 2880 && h >= 1 && h <= 2880);
+#endif
+			if (valid)
+			{
+				ASObject* bmp = allocObject(app_context, 4);
+				setObjectProto(app_context, bmp);
+				// Store width/height as properties
+				ActionVar wv = {0}; wv.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &wv.data.numeric_value) = w;
+				setProperty(app_context, bmp, "width", 5, &wv);
+				VAL(double, &wv.data.numeric_value) = h;
+				setProperty(app_context, bmp, "height", 6, &wv);
+				new_obj = bmp;
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+			}
+			else
+			{
+				pushUndefined(app_context);
+			}
+		}
+		else
+		{
+			pushUndefined(app_context);
+		}
 	}
 	else if (user_ctor_func != NULL)
 	{
