@@ -1,33 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `88113607f20c` (2026-02-14T04:37:59.848113+00:00)
-**Current:** `bce37d63c446` (2026-02-14T05:21:39.257714+00:00)
+**Previous:** `bce37d63c446` (2026-02-14T05:21:39.257714+00:00)
+**Current:** `75322310bcb8` (2026-02-14T05:43:07.865894+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 158 | 159 | +1 |
+| Passing | 159 | 163 | +4 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 25.5% | 25.7% | +0.2% |
-| Mismatched lines | 56048 | 54059 | -1989 |
-|   Decreased | | | -1989 |
+| Pass rate | 25.7% | 26.3% | +0.6% |
+| Mismatched lines | 54059 | 53662 | -397 |
+|   Decreased | | | -397 |
 
-## Newly Passing (1)
+## Newly Passing (4)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `text_format` | output_mismatch | 156/1146 | 1146/1146 |
+| `text_format_display` | output_mismatch | 10/21 | 21/21 |
+| `text_format_font_max_length` | output_mismatch | 0/2 | 2/2 |
+| `text_format_rounding_swf7` | output_mismatch | 609/840 | 840/840 |
+| `text_format_rounding_swf8` | output_mismatch | 687/840 | 840/840 |
 
-## Line Count Changed (8)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `text_format_rounding_swf8` | output_mismatch | 159/840 | 687/840 | -528 |
-| `text_format_rounding_swf7` | output_mismatch | 150/840 | 609/840 | -459 |
-| `globals_swf5` | output_mismatch | 201/304 | 204/304 | -3 |
-| `globals_swf6` | output_mismatch | 208/304 | 211/304 | -3 |
-| `globals_swf7` | output_mismatch | 205/304 | 208/304 | -3 |
-| `globals_swf8` | output_mismatch | 146/304 | 149/304 | -3 |
-| `global_proto_decls` | output_mismatch | 2/4497 | 2/4497 | 0 |
-| `global_proto_decls_delete` | output_mismatch | 0/4158 | 0/4158 | 0 |
+| `goto_methods` | segfault | 8/40 | 8/40 | 0 |
