@@ -1902,7 +1902,8 @@ static int isXMLNodeInstance(ASObject* obj) {
 
 // Allocate a persistent string copy
 static char* xml_strdup(SWFAppContext* app_context, const char* s, u32 len) {
-	char* c = (char*) HALLOC(len + 1);
+	(void)app_context;
+	char* c = (char*) malloc(len + 1);
 	memcpy(c, s, len);
 	c[len] = '\0';
 	return c;
@@ -1982,12 +1983,10 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 	cn.data.numeric_value = (u64) children;
 	setProperty(app_context, node, "childNodes", 10, &cn);
 
-	// attributes — object for elements, null for text
-	if (nodeType == 1) {
+	// attributes — always an object (Flash has attributes defined on text nodes too)
+	{
 		ASObject* attrs = allocObject(app_context, 4);
 		xml_set_obj(app_context, node, "attributes", 10, attrs);
-	} else {
-		xml_set_null(app_context, node, "attributes", 10);
 	}
 
 	// Namespace properties — parse prefix:localName from nodeName
@@ -2109,10 +2108,13 @@ static void xml_do_append(SWFAppContext* app_context, ASObject* parent, ASObject
 	if (parent == child) return;
 	if (xml_is_ancestor(parent, child)) return;
 
-	// Remove from old parent if needed
+	// Check existing parent
 	ActionVar* pp = getProperty(child, "parentNode", 10);
-	if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT && pp->data.numeric_value != 0)
+	if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT && pp->data.numeric_value != 0) {
+		ASObject* old_parent = (ASObject*) pp->data.numeric_value;
+		if (old_parent == parent) return; // Already a child of this parent — no-op (Flash behavior)
 		xml_do_remove(app_context, child);
+	}
 
 	// Add to childNodes array
 	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
@@ -2120,14 +2122,13 @@ static void xml_do_append(SWFAppContext* app_context, ASObject* parent, ASObject
 	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
 	if (children == NULL) return;
 
-	// Grow array if needed
+	// Grow array if needed (allocArray uses malloc, so we must use realloc/free here)
 	if (children->length >= children->capacity) {
 		u32 new_cap = children->capacity < 4 ? 4 : children->capacity * 2;
-		ActionVar* new_elems = (ActionVar*) HCALLOC(new_cap, sizeof(ActionVar));
-		if (children->elements) {
-			memcpy(new_elems, children->elements, children->length * sizeof(ActionVar));
-			FREE(children->elements);
-		}
+		ActionVar* new_elems = (ActionVar*) realloc(children->elements, new_cap * sizeof(ActionVar));
+		if (new_elems == NULL) return;
+		// Zero out the new portion
+		memset(&new_elems[children->capacity], 0, (new_cap - children->capacity) * sizeof(ActionVar));
 		children->elements = new_elems;
 		children->capacity = new_cap;
 	}
@@ -2146,10 +2147,13 @@ static void xml_do_insert_before(SWFAppContext* app_context, ASObject* parent,
 	if (parent == newChild) return;
 	if (xml_is_ancestor(parent, newChild)) return;
 
-	// Remove from old parent
+	// Check existing parent
 	ActionVar* pp = getProperty(newChild, "parentNode", 10);
-	if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT && pp->data.numeric_value != 0)
+	if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT && pp->data.numeric_value != 0) {
+		ASObject* old_parent = (ASObject*) pp->data.numeric_value;
+		if (old_parent == parent) return; // Already a child of this parent — no-op
 		xml_do_remove(app_context, newChild);
+	}
 
 	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
 	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
@@ -2166,14 +2170,12 @@ static void xml_do_insert_before(SWFAppContext* app_context, ASObject* parent,
 		}
 	}
 
-	// Grow if needed
+	// Grow if needed (allocArray uses malloc, so we must use realloc/free here)
 	if (children->length >= children->capacity) {
 		u32 new_cap = children->capacity < 4 ? 4 : children->capacity * 2;
-		ActionVar* new_elems = (ActionVar*) HCALLOC(new_cap, sizeof(ActionVar));
-		if (children->elements) {
-			memcpy(new_elems, children->elements, children->length * sizeof(ActionVar));
-			FREE(children->elements);
-		}
+		ActionVar* new_elems = (ActionVar*) realloc(children->elements, new_cap * sizeof(ActionVar));
+		if (new_elems == NULL) return;
+		memset(&new_elems[children->capacity], 0, (new_cap - children->capacity) * sizeof(ActionVar));
 		children->elements = new_elems;
 		children->capacity = new_cap;
 	}
@@ -2193,24 +2195,71 @@ static void xml_do_insert_before(SWFAppContext* app_context, ASObject* parent,
 
 // ---- Entity escaping/unescaping ----
 
-// Unescape XML entities in-place. Returns a new HALLOC'd string.
+// Unescape XML entities. Returns a new malloc'd string.
 static char* xml_unescape(SWFAppContext* app_context, const char* input, u32 len, u32* out_len) {
-	char* buf = (char*) HALLOC(len + 1);
+	(void)app_context;
+	char* buf = (char*) malloc(len + 1);
 	u32 wi = 0;
 	for (u32 i = 0; i < len; ) {
 		if (input[i] == '&') {
-			if (i + 4 <= len && strncmp(&input[i], "&amp;", 5) == 0 && i + 5 <= len) {
+			if (i + 5 <= len && strncmp(&input[i], "&amp;", 5) == 0) {
 				buf[wi++] = '&'; i += 5;
-			} else if (i + 3 <= len && strncmp(&input[i], "&lt;", 4) == 0 && i + 4 <= len) {
+			} else if (i + 4 <= len && strncmp(&input[i], "&lt;", 4) == 0) {
 				buf[wi++] = '<'; i += 4;
-			} else if (i + 3 <= len && strncmp(&input[i], "&gt;", 4) == 0 && i + 4 <= len) {
+			} else if (i + 4 <= len && strncmp(&input[i], "&gt;", 4) == 0) {
 				buf[wi++] = '>'; i += 4;
-			} else if (i + 5 <= len && strncmp(&input[i], "&apos;", 6) == 0 && i + 6 <= len) {
+			} else if (i + 6 <= len && strncmp(&input[i], "&apos;", 6) == 0) {
 				buf[wi++] = '\''; i += 6;
-			} else if (i + 5 <= len && strncmp(&input[i], "&quot;", 6) == 0 && i + 6 <= len) {
+			} else if (i + 6 <= len && strncmp(&input[i], "&quot;", 6) == 0) {
 				buf[wi++] = '"'; i += 6;
+			} else if (i + 2 < len && input[i+1] == '#') {
+				// Numeric character reference: &#NN; or &#xHH;
+				u32 j = i + 2;
+				int codepoint = 0;
+				if (j < len && input[j] == 'x') {
+					// Hex: &#xHH;
+					j++;
+					while (j < len && input[j] != ';') {
+						char c = input[j];
+						if (c >= '0' && c <= '9') codepoint = codepoint * 16 + (c - '0');
+						else if (c >= 'a' && c <= 'f') codepoint = codepoint * 16 + (c - 'a' + 10);
+						else if (c >= 'A' && c <= 'F') codepoint = codepoint * 16 + (c - 'A' + 10);
+						else break;
+						j++;
+					}
+				} else {
+					// Decimal: &#NN;
+					while (j < len && input[j] != ';') {
+						if (input[j] >= '0' && input[j] <= '9')
+							codepoint = codepoint * 10 + (input[j] - '0');
+						else break;
+						j++;
+					}
+				}
+				if (j < len && input[j] == ';') {
+					j++; // skip ';'
+					// Encode as UTF-8
+					if (codepoint < 0x80) {
+						buf[wi++] = (char)codepoint;
+					} else if (codepoint < 0x800) {
+						buf[wi++] = (char)(0xC0 | (codepoint >> 6));
+						buf[wi++] = (char)(0x80 | (codepoint & 0x3F));
+					} else if (codepoint < 0x10000) {
+						buf[wi++] = (char)(0xE0 | (codepoint >> 12));
+						buf[wi++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+						buf[wi++] = (char)(0x80 | (codepoint & 0x3F));
+					} else {
+						buf[wi++] = (char)(0xF0 | (codepoint >> 18));
+						buf[wi++] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+						buf[wi++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+						buf[wi++] = (char)(0x80 | (codepoint & 0x3F));
+					}
+					i = j;
+				} else {
+					buf[wi++] = input[i++]; // Malformed — pass through '&'
+				}
 			} else {
-				buf[wi++] = input[i++]; // Unknown entity — pass through
+				buf[wi++] = input[i++]; // Unknown entity — pass through '&'
 			}
 		} else {
 			buf[wi++] = input[i++];
@@ -2221,10 +2270,11 @@ static char* xml_unescape(SWFAppContext* app_context, const char* input, u32 len
 	return buf;
 }
 
-// Escape XML special characters. Returns a new HALLOC'd string.
+// Escape XML special characters. Returns a new malloc'd string.
 static char* xml_escape(SWFAppContext* app_context, const char* input, u32 len, u32* out_len) {
+	(void)app_context;
 	// Worst case: every char expands to 6 chars (&apos;)
-	char* buf = (char*) HALLOC(len * 6 + 1);
+	char* buf = (char*) malloc(len * 6 + 1);
 	u32 wi = 0;
 	for (u32 i = 0; i < len; i++) {
 		switch (input[i]) {
@@ -2246,7 +2296,7 @@ static char* xml_escape(SWFAppContext* app_context, const char* input, u32 len, 
 static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char* text, u32 text_len) {
 	// Check ignoreWhite property
 	int ignore_white = 0;
-	ActionVar* iw = getProperty(doc, "ignoreWhite", 11);
+	ActionVar* iw = getPropertyWithPrototype(doc, "ignoreWhite", 11);
 	if (iw != NULL && iw->type == ACTION_STACK_VALUE_BOOLEAN && iw->data.numeric_value)
 		ignore_white = 1;
 	else if (iw != NULL && iw->type == ACTION_STACK_VALUE_F64) {
@@ -2285,7 +2335,7 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 					ASObject* tn = xml_create_node(app_context, 3, NULL, 0, unescaped, ue_len);
 					xml_do_append(app_context, stack[stack_top], tn);
 				}
-				FREE(unescaped);
+				free(unescaped);
 			}
 
 			pos++; // skip '<'
@@ -2315,7 +2365,7 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 				char* cdata_text = xml_strdup(app_context, &text[cdata_start], cdata_len);
 				ASObject* tn = xml_create_node(app_context, 3, NULL, 0, cdata_text, cdata_len);
 				xml_do_append(app_context, stack[stack_top], tn);
-				FREE(cdata_text);
+				free(cdata_text);
 				if (pos + 2 < text_len) pos += 3; // skip ]]>
 			}
 			else if (pos + 7 < text_len && strncmp(&text[pos], "!DOCTYPE", 8) == 0) {
@@ -2387,10 +2437,10 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 						if (attrs != NULL) {
 							char* a_name = xml_strdup(app_context, &text[attr_name_start], attr_name_len);
 							xml_set_str(app_context, attrs, a_name, attr_name_len, ue_val, ue_len);
-							FREE(a_name);
+							free(a_name);
 						}
 					}
-					FREE(ue_val);
+					free(ue_val);
 				}
 
 				// Check for self-closing />
@@ -2402,6 +2452,88 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 				if (pos < text_len && text[pos] == '>') pos++; // skip '>'
 
 				xml_do_append(app_context, stack[stack_top], elem);
+
+				// Populate idMap if element has an 'id' attribute
+				ActionVar* id_attrs = getProperty(elem, "attributes", 10);
+				if (id_attrs != NULL && id_attrs->type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* ia = (ASObject*) id_attrs->data.numeric_value;
+					if (ia != NULL) {
+						ActionVar* id_val = getProperty(ia, "id", 2);
+						if (id_val != NULL && id_val->type == ACTION_STACK_VALUE_STRING) {
+							const char* id_str = (const char*) id_val->data.numeric_value;
+							u32 id_len = id_val->str_size;
+							if (id_len == 0 && id_str) id_len = (u32)strlen(id_str);
+							ActionVar* idmap_prop = getProperty(doc, "idMap", 5);
+							if (idmap_prop != NULL && idmap_prop->type == ACTION_STACK_VALUE_OBJECT) {
+								ASObject* idmap = (ASObject*) idmap_prop->data.numeric_value;
+								if (idmap != NULL) {
+									ActionVar ev = {0}; ev.type = ACTION_STACK_VALUE_OBJECT;
+									ev.data.numeric_value = (u64) elem;
+									setProperty(app_context, idmap, id_str, id_len, &ev);
+								}
+							}
+						}
+					}
+				}
+
+				// Resolve namespaceURI based on xmlns: attributes up the tree
+				{
+					ActionVar* nn = getProperty(elem, "nodeName", 8);
+					if (nn != NULL && nn->type == ACTION_STACK_VALUE_STRING) {
+						const char* full_name = (const char*) nn->data.numeric_value;
+						u32 full_len = nn->str_size ? nn->str_size : (full_name ? (u32)strlen(full_name) : 0);
+						// Determine prefix
+						const char* colon = NULL;
+						for (u32 ci = 0; ci < full_len; ci++) {
+							if (full_name[ci] == ':') { colon = &full_name[ci]; break; }
+						}
+						// Build xmlns:prefix or xmlns attr name to search for
+						char ns_attr[256];
+						if (colon) {
+							u32 plen = (u32)(colon - full_name);
+							snprintf(ns_attr, sizeof(ns_attr), "xmlns:%.*s", plen, full_name);
+						} else {
+							snprintf(ns_attr, sizeof(ns_attr), "xmlns");
+						}
+						u32 ns_attr_len = (u32)strlen(ns_attr);
+
+						// Check element's own attributes first (self-declaring xmlns)
+						int resolved = 0;
+						{
+							ActionVar* ea = getProperty(elem, "attributes", 10);
+							if (ea != NULL && ea->type == ACTION_STACK_VALUE_OBJECT) {
+								ASObject* eao = (ASObject*) ea->data.numeric_value;
+								if (eao != NULL) {
+									ActionVar* nsv = getProperty(eao, ns_attr, ns_attr_len);
+									if (nsv != NULL && nsv->type == ACTION_STACK_VALUE_STRING) {
+										const char* uri = (const char*) nsv->data.numeric_value;
+										u32 uri_len = nsv->str_size;
+										if (uri_len == 0 && uri) uri_len = (u32)strlen(uri);
+										xml_set_str(app_context, elem, "namespaceURI", 12, uri, uri_len);
+										resolved = 1;
+									}
+								}
+							}
+						}
+						// Walk up ancestors (stack contains parents, not current elem)
+						for (int si = stack_top; si >= 0 && !resolved; si--) {
+							ActionVar* sa = getProperty(stack[si], "attributes", 10);
+							if (sa != NULL && sa->type == ACTION_STACK_VALUE_OBJECT) {
+								ASObject* sao = (ASObject*) sa->data.numeric_value;
+								if (sao != NULL) {
+									ActionVar* nsv = getProperty(sao, ns_attr, ns_attr_len);
+									if (nsv != NULL && nsv->type == ACTION_STACK_VALUE_STRING) {
+										const char* uri = (const char*) nsv->data.numeric_value;
+										u32 uri_len = nsv->str_size;
+										if (uri_len == 0 && uri) uri_len = (u32)strlen(uri);
+										xml_set_str(app_context, elem, "namespaceURI", 12, uri, uri_len);
+										resolved = 1;
+									}
+								}
+							}
+						}
+					}
+				}
 
 				if (!self_closing && stack_top < XML_STACK_MAX - 1) {
 					stack[++stack_top] = elem;
@@ -2429,7 +2561,7 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 			ASObject* tn = xml_create_node(app_context, 3, NULL, 0, unescaped, ue_len);
 			xml_do_append(app_context, stack[stack_top], tn);
 		}
-		FREE(unescaped);
+		free(unescaped);
 	}
 	#undef XML_STACK_MAX
 }
@@ -2440,11 +2572,10 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 typedef struct { char* buf; u32 len; u32 cap; } XmlBuf;
 
 static void xb_ensure(SWFAppContext* app_context, XmlBuf* xb, u32 extra) {
+	(void)app_context;
 	while (xb->len + extra >= xb->cap) {
 		xb->cap = xb->cap < 256 ? 256 : xb->cap * 2;
-		char* nb = (char*) HALLOC(xb->cap);
-		if (xb->buf) { memcpy(nb, xb->buf, xb->len); FREE(xb->buf); }
-		xb->buf = nb;
+		xb->buf = (char*) realloc(xb->buf, xb->cap);
 	}
 }
 
@@ -2469,7 +2600,7 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 				u32 esc_len = 0;
 				char* escaped = xml_escape(app_context, text, nv->str_size ? nv->str_size : strlen(text), &esc_len);
 				xb_append(app_context, xb, escaped, esc_len);
-				FREE(escaped);
+				free(escaped);
 			}
 		}
 		return;
@@ -2533,7 +2664,7 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 						u32 el = 0;
 						char* ev = xml_escape(app_context, av, avl, &el);
 						xb_append(app_context, xb, ev, el);
-						FREE(ev);
+						free(ev);
 					}
 				}
 				xb_append(app_context, xb, "\"", 1);
@@ -2945,6 +3076,12 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	INSTALL_METHOD("createElement", 13, &g_xml_fn_createElement);
 	INSTALL_METHOD("createTextNode", 14, &g_xml_fn_createTextNode);
 
+	// Default ignoreWhite = false on XML.prototype (tests override via XML.prototype.ignoreWhite = true)
+	{
+		ActionVar fw = {0}; fw.type = ACTION_STACK_VALUE_BOOLEAN;
+		setProperty(app_context, xml_proto, "ignoreWhite", 11, &fw);
+	}
+
 	#undef INSTALL_METHOD
 
 	if (function_count < MAX_FUNCTIONS)
@@ -2967,8 +3104,8 @@ static ASObject* xml_create_document(SWFAppContext* app_context) {
 	}
 
 	// XML-specific properties
-	ActionVar false_val = {0}; false_val.type = ACTION_STACK_VALUE_BOOLEAN;
-	setProperty(app_context, doc, "ignoreWhite", 11, &false_val);
+	// Note: ignoreWhite is NOT set as own property — it inherits from XML.prototype
+	// (default false). Tests set XML.prototype.ignoreWhite = true to affect all instances.
 
 	ASObject* idmap = allocObject(app_context, 4);
 	xml_set_obj(app_context, doc, "idMap", 5, idmap);
@@ -10403,8 +10540,28 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 		else
 		{
-			// Property not found - push undefined
-			pushUndefined(app_context);
+			// For XML nodes, numeric index accesses childNodes[index]
+			int is_xml = 0;
+			if (prop_name_len > 0 && prop_name[0] >= '0' && prop_name[0] <= '9') {
+				ActionVar* cn = getProperty(obj, "childNodes", 10);
+				if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
+					ActionVar* nt = getProperty(obj, "nodeType", 8);
+					if (nt != NULL) {
+						is_xml = 1;
+						ASArray* children = (ASArray*) cn->data.numeric_value;
+						int idx = atoi(prop_name);
+						if (children != NULL && idx >= 0 && (u32)idx < children->length) {
+							pushVar(app_context, &children->elements[idx]);
+						} else {
+							pushUndefined(app_context);
+						}
+					}
+				}
+			}
+			if (!is_xml) {
+				// Property not found - push undefined
+				pushUndefined(app_context);
+			}
 		}
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
@@ -13309,7 +13466,19 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 		}
 		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_MOVIECLIP:
+		{
+			// Check if object has a custom toString (e.g. XML nodes)
+			int ts_found = 0;
+			ActionVar ts = objectCallToString(app_context, v, &ts_found);
+			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
+				const char* s = (const char*) ts.data.numeric_value;
+				if (s) {
+					int len = snprintf(buf, buf_size, "%s", s);
+					return len < buf_size ? len : buf_size - 1;
+				}
+			}
 			return snprintf(buf, buf_size, "[object Object]");
+		}
 		case ACTION_STACK_VALUE_FUNCTION:
 			return snprintf(buf, buf_size, "[type Function]");
 		default:
