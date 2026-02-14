@@ -17,6 +17,7 @@
 #include <swf.h>
 #include <tag.h>
 #include <heap.h>
+#include <map.h>
 #include <actionmodern/object.h>
 
 // Forward declarations for array helpers (defined later in file)
@@ -1996,18 +1997,39 @@ static int child_mc_count = 0;
 
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	(void)app_context;  // used only in NO_GRAPHICS for TextField init
+	MovieClip* mc = NULL;
+	int is_new = 0;
+
 	// Check cache first
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    strcmp(child_mc_cache[i]->name, instance_name) == 0 &&
 		    child_mc_cache[i]->parent == parent) {
-			return child_mc_cache[i];
+			mc = child_mc_cache[i];
+			break;
 		}
 	}
-	// Not in cache - create new and cache it
-	MovieClip* mc = createMovieClip(instance_name, parent);
+
+	if (mc != NULL) {
 #ifdef NO_GRAPHICS
-	// One-time init: sync x/y from transform_data at creation time
+		// Check if textfield was re-placed with a different char_id
+		size_t cdepth = ng_findDisplayEntryByName(instance_name);
+		if (cdepth != SIZE_MAX && ng_isTextFieldAtDepth(cdepth)) {
+			int new_tf_idx = ng_getTextFieldIdx(cdepth);
+			if (new_tf_idx != mc->ng_textfield_idx) {
+				// Textfield changed — need to re-init properties below
+				is_new = 1;
+			}
+		}
+#endif
+		if (!is_new) return mc;
+	} else {
+		mc = createMovieClip(instance_name, parent);
+		is_new = 1;
+	}
+
+#ifdef NO_GRAPHICS
+	// Init or re-init: sync x/y from transform_data
 	if (mc != NULL) {
 		size_t depth = ng_findDisplayEntryByName(instance_name);
 		if (depth != SIZE_MAX) {
@@ -2257,60 +2279,87 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				mc->width = (float)(bxmax - bxmin) / 20.0f;
 				mc->height = (float)(bymax - bymin) / 20.0f;
 
-				// Variable binding initialization
+				// Variable binding: sync text from current variable value.
+				// The variable was already created at placement time (tagPlaceObject2).
+				// Here we read the variable's current value and use it as the text.
 				if (var_name[0] != '\0') {
-					size_t vlen = strlen(var_name);
-					// Check if variable already has a defined value
-					int var_exists = 0;
+					ActionVar* existing = NULL;
+					char conv_buf[512];
+					const char* text_from_var = NULL;
+					u32 tfv_len = 0;
+
 					if (strchr(var_name, '.') == NULL) {
-						// Simple variable: check global var map
+						// Simple variable
 						extern bool hasVariable(char* var_name, size_t key_size);
-						var_exists = hasVariable((char*)var_name, vlen);
+						size_t vlen = strlen(var_name);
+						if (hasVariable((char*)var_name, vlen)) {
+							extern ActionVar* getVariable(char* var_name, size_t key_size);
+							existing = getVariable((char*)var_name, vlen);
+						}
+					} else {
+						// Path variable (e.g., "_root.mc.theVar") — resolve via GetVariable
+						const char* last_dot = var_name;
+						for (const char* p = var_name; *p; p++) {
+							if (*p == '.') last_dot = p;
+						}
+						u32 container_len = (u32)(last_dot - var_name);
+						const char* final_prop = last_dot + 1;
+						u32 final_prop_len = strlen(final_prop);
+						PUSH_STR(var_name, container_len);
+						actionGetVariable(app_context);
+						ActionVar container_var;
+						peekVar(app_context, &container_var);
+						POP();
+						if (container_var.type == ACTION_STACK_VALUE_MOVIECLIP) {
+							MovieClip* target_mc = (MovieClip*) VAL(u64, &container_var.data.numeric_value);
+							if (target_mc != NULL && target_mc->dynamic_props != NULL) {
+								existing = getProperty((ASObject*)target_mc->dynamic_props, final_prop, final_prop_len);
+							}
+						} else if (container_var.type == ACTION_STACK_VALUE_OBJECT) {
+							ASObject* target_obj = (ASObject*) VAL(u64, &container_var.data.numeric_value);
+							if (target_obj != NULL) {
+								existing = getProperty(target_obj, final_prop, final_prop_len);
+							}
+						}
 					}
-					if (var_exists) {
-						// Variable exists — use its value as text
-						extern ActionVar* getVariable(char* var_name, size_t key_size);
-						ActionVar* existing = getVariable((char*)var_name, vlen);
-						if (existing != NULL && (existing->type != ACTION_STACK_VALUE_STRING || existing->str_size > 0)) {
-							// Convert to string
-							char conv_buf[512];
-							const char* text_from_var = "";
-							u32 tfv_len = 0;
-							if (existing->type == ACTION_STACK_VALUE_STRING) {
+
+					if (existing != NULL && existing->type != ACTION_STACK_VALUE_UNDEFINED) {
+						if (existing->type == ACTION_STACK_VALUE_STRING) {
+							if (existing->str_size > 0) {
 								text_from_var = (const char*) VAL(u64, &existing->data.numeric_value);
 								tfv_len = existing->str_size;
-							} else {
-								int n = varToStringBuf(app_context, existing, conv_buf, sizeof(conv_buf));
-								if (n > 0) { text_from_var = conv_buf; tfv_len = n; }
 							}
-							// Update text property
-							ActionVar tfv_val = {0};
-							tfv_val.type = ACTION_STACK_VALUE_STRING;
-							tfv_val.str_size = tfv_len;
-							VAL(u64, &tfv_val.data.numeric_value) = (u64)text_from_var;
-							setProperty(app_context, props, "text", 4, &tfv_val);
-							// Update length
-							ActionVar tfv_len_val = {0};
-							tfv_len_val.type = ACTION_STACK_VALUE_F64;
-							VAL(double, &tfv_len_val.data.numeric_value) = (double)tfv_len;
-							setProperty(app_context, props, "length", 6, &tfv_len_val);
+						} else {
+							int n = varToStringBuf(app_context, existing, conv_buf, sizeof(conv_buf));
+							if (n > 0) { text_from_var = conv_buf; tfv_len = n; }
 						}
-					} else if (init_text[0] != '\0') {
-						// Variable doesn't exist — create it with initial text
-						ActionVar init_var_val = {0};
-						init_var_val.type = ACTION_STACK_VALUE_STRING;
-						init_var_val.str_size = strlen(init_text);
-						VAL(u64, &init_var_val.data.numeric_value) = (u64)init_text;
-						setVariableByName(var_name, &init_var_val);
 					}
-					// If init_text is empty and variable doesn't exist, don't create variable
+
+					if (text_from_var != NULL) {
+						ActionVar tfv_val = {0};
+						tfv_val.type = ACTION_STACK_VALUE_STRING;
+						tfv_val.str_size = tfv_len;
+						VAL(u64, &tfv_val.data.numeric_value) = (u64)text_from_var;
+						setProperty(app_context, props, "text", 4, &tfv_val);
+						ActionVar tfv_len_val = {0};
+						tfv_len_val.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &tfv_len_val.data.numeric_value) = (double)tfv_len;
+						setProperty(app_context, props, "length", 6, &tfv_len_val);
+					}
 				}
 			}
 		}
 	}
 #endif
-	if (mc != NULL && child_mc_count < MAX_CHILD_MOVIECLIPS) {
-		child_mc_cache[child_mc_count++] = mc;
+	if (is_new && mc != NULL) {
+		// Only add to cache if it's a brand new MC (not a re-init of cached one)
+		int already_cached = 0;
+		for (int i = 0; i < child_mc_count; i++) {
+			if (child_mc_cache[i] == mc) { already_cached = 1; break; }
+		}
+		if (!already_cached && child_mc_count < MAX_CHILD_MOVIECLIPS) {
+			child_mc_cache[child_mc_count++] = mc;
+		}
 	}
 	return mc;
 }
@@ -2320,6 +2369,21 @@ MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* i
 	return findOrCreateMovieClip(app_context, instance_name, parent);
 }
 
+// Invalidate cached MovieClip when a display entry is removed (e.g., tagRemoveObject2).
+// Clears dynamic_props so the MC starts fresh if re-placed with the same name.
+void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL && strcmp(child_mc_cache[i]->name, name) == 0) {
+			// Just clear the pointer — the ASObject will leak but avoids
+			// double-free issues with shared __proto__ references
+			child_mc_cache[i]->dynamic_props = NULL;
+			child_mc_cache[i]->ng_textfield_idx = -1;
+			break;
+		}
+	}
+}
+
 #ifdef NO_GRAPHICS
 // ==================================================================
 // TextField Variable Binding
@@ -2327,6 +2391,82 @@ MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* i
 // Bidirectional binding between a variable name and a text field's "text" property.
 // When the variable changes, all bound text fields update. When text changes, the
 // variable updates and other bound fields sync.
+
+// Called from tag_stubs.c when a textfield is placed on the display list.
+// Creates the variable with init_text if it doesn't exist.
+// If it already exists, does nothing (the MC will pick up the value at creation time).
+void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_name, const char* init_text)
+{
+	(void)app_context;
+	if (var_name == NULL || var_name[0] == '\0') return;
+
+	if (strchr(var_name, '.') != NULL) {
+		// Path variable (e.g., "_root.mc.theVar") — resolve and set
+		// Find the last dot to split container path and property name
+		const char* last_dot = var_name;
+		for (const char* p = var_name; *p; p++) {
+			if (*p == '.') last_dot = p;
+		}
+		u32 container_len = (u32)(last_dot - var_name);
+		const char* final_prop = last_dot + 1;
+		u32 final_prop_len = strlen(final_prop);
+
+		// Resolve container
+		PUSH_STR(var_name, container_len);
+		actionGetVariable(app_context);
+		ActionVar container_var;
+		peekVar(app_context, &container_var);
+		POP();
+
+		if (container_var.type == ACTION_STACK_VALUE_MOVIECLIP) {
+			MovieClip* target_mc = (MovieClip*) VAL(u64, &container_var.data.numeric_value);
+			if (target_mc != NULL) {
+				ASObject* target_props = (ASObject*) target_mc->dynamic_props;
+				if (target_props != NULL) {
+					ActionVar* existing = getProperty(target_props, final_prop, final_prop_len);
+					if (existing != NULL && existing->type != ACTION_STACK_VALUE_UNDEFINED)
+						return;  // Already set, don't overwrite
+				}
+				if (target_props == NULL) {
+					target_mc->dynamic_props = (void*) allocObject(app_context, 8);
+					target_props = (ASObject*) target_mc->dynamic_props;
+				}
+				ActionVar init_val = {0};
+				init_val.type = ACTION_STACK_VALUE_STRING;
+				init_val.str_size = strlen(init_text);
+				VAL(u64, &init_val.data.numeric_value) = (u64)init_text;
+				setProperty(app_context, target_props, final_prop, final_prop_len, &init_val);
+			}
+		} else if (container_var.type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* target_obj = (ASObject*) VAL(u64, &container_var.data.numeric_value);
+			if (target_obj != NULL) {
+				ActionVar* existing = getProperty(target_obj, final_prop, final_prop_len);
+				if (existing != NULL && existing->type != ACTION_STACK_VALUE_UNDEFINED)
+					return;  // Already set, don't overwrite
+				ActionVar init_val = {0};
+				init_val.type = ACTION_STACK_VALUE_STRING;
+				init_val.str_size = strlen(init_text);
+				VAL(u64, &init_val.data.numeric_value) = (u64)init_text;
+				setProperty(app_context, target_obj, final_prop, final_prop_len, &init_val);
+			}
+		}
+		return;
+	}
+
+	// Simple variable — create in global scope if not already defined
+	extern bool hasVariable(char* var_name, size_t key_size);
+	size_t vlen = strlen(var_name);
+	if (!hasVariable((char*)var_name, vlen)) {
+		// Only create if there's initial text (empty textfield doesn't set variable)
+		if (init_text[0] != '\0') {
+			ActionVar init_val = {0};
+			init_val.type = ACTION_STACK_VALUE_STRING;
+			init_val.str_size = strlen(init_text);
+			VAL(u64, &init_val.data.numeric_value) = (u64)init_text;
+			setVariableByName(var_name, &init_val);
+		}
+	}
+}
 
 // Sync variable → all text fields bound to var_name
 // Called when a variable is set via SetVariable/DefineLocal/etc.
@@ -2394,16 +2534,12 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 	const char* dot = strchr(var_name, '.');
 	if (dot != NULL) {
 		// For path variables, resolve the path and set the property
-		// Push container path, get, push prop name, push value, SetMember
-		u32 container_len = (u32)(dot - var_name);
-		const char* final_prop = dot + 1;
-		// Check for more dots
 		const char* last_dot = dot;
 		for (const char* p = dot + 1; *p; p++) {
 			if (*p == '.') last_dot = p;
 		}
-		container_len = (u32)(last_dot - var_name);
-		final_prop = last_dot + 1;
+		u32 container_len = (u32)(last_dot - var_name);
+		const char* final_prop = last_dot + 1;
 		u32 final_prop_len = strlen(final_prop);
 		// Resolve container
 		PUSH_STR(var_name, container_len);
@@ -2411,8 +2547,8 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 		ActionVar container_var;
 		peekVar(app_context, &container_var);
 		POP();
-		if (container_var.type == ACTION_STACK_VALUE_MOVIECLIP ||
-		    container_var.type == ACTION_STACK_VALUE_OBJECT) {
+		int container_resolved = 0;
+		if (container_var.type == ACTION_STACK_VALUE_MOVIECLIP) {
 			MovieClip* target_mc = (MovieClip*) VAL(u64, &container_var.data.numeric_value);
 			if (target_mc != NULL) {
 				ASObject* target_props = (ASObject*) target_mc->dynamic_props;
@@ -2421,6 +2557,42 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 					target_props = (ASObject*) target_mc->dynamic_props;
 				}
 				setProperty(app_context, target_props, final_prop, final_prop_len, text_value);
+				container_resolved = 1;
+			}
+		} else if (container_var.type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* target_obj = (ASObject*) VAL(u64, &container_var.data.numeric_value);
+			if (target_obj != NULL) {
+				setProperty(app_context, target_obj, final_prop, final_prop_len, text_value);
+				container_resolved = 1;
+			}
+		}
+		// Also sync to other text fields with the same path variable binding
+		// (only if the container was successfully resolved)
+		if (!container_resolved) return;
+		u32 full_var_len = strlen(var_name);
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* other = child_mc_cache[i];
+			if (other == mc || other == NULL || other->ng_textfield_idx < 0) continue;
+			ASObject* other_props = (ASObject*) other->dynamic_props;
+			if (other_props == NULL) continue;
+			ActionVar* other_var = getProperty(other_props, "variable", 8);
+			if (other_var == NULL || other_var->type != ACTION_STACK_VALUE_STRING) continue;
+			const char* other_bound = (const char*) VAL(u64, &other_var->data.numeric_value);
+			if (other_bound == NULL || other_bound[0] == '\0') continue;
+			int match = 0;
+#if !defined(SWF_VERSION) || SWF_VERSION < 7
+			match = (strcasecmp(other_bound, var_name) == 0);
+#else
+			match = (strncmp(other_bound, var_name, full_var_len) == 0 && other_bound[full_var_len] == '\0');
+#endif
+			if (match) {
+				setProperty(app_context, other_props, "text", 4, text_value);
+				ActionVar len_val = {0};
+				len_val.type = ACTION_STACK_VALUE_F64;
+				const char* ts = (text_value->type == ACTION_STACK_VALUE_STRING) ?
+					(const char*) VAL(u64, &text_value->data.numeric_value) : "";
+				VAL(double, &len_val.data.numeric_value) = (double)(ts ? strlen(ts) : 0);
+				setProperty(app_context, other_props, "length", 6, &len_val);
 			}
 		}
 		return;
@@ -6149,6 +6321,24 @@ void actionSetVariable(SWFAppContext* app_context)
 	// Set variable value (uses existing string materialization!)
 	setVariableWithValue(var, STACK, value_sp);
 
+	// If we used var_array (string_id path), also sync to hashmap so both
+	// storage systems point to the same ActionVar. This is needed because
+	// textfield variable binding uses the hashmap (setVariableByName/getVariable)
+	// while generated scripts use var_array (getVariableById).
+	if (string_id != 0) {
+		extern hashmap* var_map;
+		ActionVar* old_hash;
+		if (hashmap_get(var_map, var_name, var_name_len, (uintptr_t*)&old_hash)) {
+			if (old_hash != var) {
+				// Free the old hashmap entry being replaced
+				if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
+					free(old_hash->data.string_data.heap_ptr);
+				free(old_hash);
+			}
+		}
+		hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+	}
+
 #ifdef NO_GRAPHICS
 	// Sync variable → text fields
 	{
@@ -6222,6 +6412,21 @@ void actionDefineLocal(SWFAppContext* app_context)
 
 	// Set variable value
 	setVariableWithValue(var, STACK, value_sp);
+
+	// If we used var_array (string_id path), also sync to hashmap so both
+	// storage systems point to the same ActionVar.
+	if (string_id != 0) {
+		extern hashmap* var_map;
+		ActionVar* old_hash;
+		if (hashmap_get(var_map, var_name, var_name_len, (uintptr_t*)&old_hash)) {
+			if (old_hash != var) {
+				if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
+					free(old_hash->data.string_data.heap_ptr);
+				free(old_hash);
+			}
+		}
+		hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+	}
 
 #ifdef NO_GRAPHICS
 	// Sync variable → text fields
@@ -8704,16 +8909,44 @@ void actionSetMember(SWFAppContext* app_context)
 			if (strcmp(prop_name, "variable") == 0 && mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
 			{
 #ifdef NO_GRAPHICS
-				// New variable binding: if non-empty, sync text to new variable
+				// When variable binding changes: read new variable (or use initial text)
+				// and reset the text field, then create the variable if needed.
 				if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size > 0) {
 					const char* new_var = (const char*) VAL(u64, &value_var.data.numeric_value);
 					if (new_var != NULL && new_var[0] != '\0') {
 						ASObject* tf_props = (ASObject*) mc->dynamic_props;
-						ActionVar* text_prop = getProperty(tf_props, "text", 4);
-						if (text_prop != NULL) {
-							// Variable gets current text value (not the other way around)
-							setVariableByName(new_var, text_prop);
+						// Get initial text from DefineEditText definition
+						const char* def_init_text = ng_getTextFieldInitialTextByIdx(mc->ng_textfield_idx);
+						// Check if new variable exists
+						extern bool hasVariable(char* var_name, size_t key_size);
+						size_t nvlen = strlen(new_var);
+						const char* use_text = def_init_text;
+						u32 use_len = strlen(def_init_text);
+						if (hasVariable((char*)new_var, nvlen)) {
+							extern ActionVar* getVariable(char* var_name, size_t key_size);
+							ActionVar* existing = getVariable((char*)new_var, nvlen);
+							if (existing != NULL && existing->type == ACTION_STACK_VALUE_STRING && existing->str_size > 0) {
+								use_text = (const char*) VAL(u64, &existing->data.numeric_value);
+								use_len = existing->str_size;
+							}
+						} else {
+							// Create new variable with initial text
+							ActionVar init_val = {0};
+							init_val.type = ACTION_STACK_VALUE_STRING;
+							init_val.str_size = use_len;
+							VAL(u64, &init_val.data.numeric_value) = (u64)use_text;
+							setVariableByName(new_var, &init_val);
 						}
+						// Update text field to variable value (or initial text)
+						ActionVar text_val = {0};
+						text_val.type = ACTION_STACK_VALUE_STRING;
+						text_val.str_size = use_len;
+						VAL(u64, &text_val.data.numeric_value) = (u64)use_text;
+						setProperty(app_context, tf_props, "text", 4, &text_val);
+						ActionVar len_val = {0};
+						len_val.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &len_val.data.numeric_value) = (double)use_len;
+						setProperty(app_context, tf_props, "length", 6, &len_val);
 					}
 				}
 #endif
@@ -8731,6 +8964,46 @@ void actionSetMember(SWFAppContext* app_context)
 			extern MovieClip root_movieclip;
 			if (mc == &root_movieclip)
 				setVariableByName(prop_name, &value_var);
+#ifdef NO_GRAPHICS
+			// Sync path variable → text fields when setting a property on a MovieClip
+			// E.g., mc.theVar = "Test1" should update textfields bound to "_root.mc.theVar"
+			for (int tfi = 0; tfi < child_mc_count; tfi++) {
+				MovieClip* tf_mc = child_mc_cache[tfi];
+				if (tf_mc == NULL || tf_mc->ng_textfield_idx < 0) continue;
+				ASObject* tf_props = (ASObject*) tf_mc->dynamic_props;
+				if (tf_props == NULL) continue;
+				ActionVar* var_prop = getProperty(tf_props, "variable", 8);
+				if (var_prop == NULL || var_prop->type != ACTION_STACK_VALUE_STRING) continue;
+				const char* bound = (const char*) VAL(u64, &var_prop->data.numeric_value);
+				if (bound == NULL || bound[0] == '\0' || strchr(bound, '.') == NULL) continue;
+				// Check if binding ends with ".prop_name"
+				const char* last_dot = strrchr(bound, '.');
+				if (last_dot == NULL) continue;
+				const char* final_name = last_dot + 1;
+				if (strlen(final_name) != prop_name_len || strncmp(final_name, prop_name, prop_name_len) != 0) continue;
+				// Resolve container of the binding
+				u32 container_len = (u32)(last_dot - bound);
+				PUSH_STR(bound, container_len);
+				actionGetVariable(app_context);
+				ActionVar cvar;
+				peekVar(app_context, &cvar);
+				POP();
+				if (cvar.type == ACTION_STACK_VALUE_MOVIECLIP) {
+					MovieClip* cmc = (MovieClip*) VAL(u64, &cvar.data.numeric_value);
+					if (cmc == mc) {
+						// Match: update this textfield's text
+						setProperty(app_context, tf_props, "text", 4, &value_var);
+						ActionVar len_val = {0};
+						len_val.type = ACTION_STACK_VALUE_F64;
+						if (value_var.type == ACTION_STACK_VALUE_STRING) {
+							const char* ts = (const char*) VAL(u64, &value_var.data.numeric_value);
+							VAL(double, &len_val.data.numeric_value) = (double)(ts ? strlen(ts) : 0);
+						}
+						setProperty(app_context, tf_props, "length", 6, &len_val);
+					}
+				}
+			}
+#endif
 		}
 	}
 	// If it's not an object, array, function, or movieclip type, we silently ignore the operation
@@ -9123,6 +9396,29 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 		}
 
+		// Check child instance names (in Flash, mc.childName resolves to child clips)
+#ifdef NO_GRAPHICS
+		if (mc != NULL)
+		{
+			char child_name_buf[64];
+			if (prop_name_len < 64) {
+				memcpy(child_name_buf, prop_name, prop_name_len);
+				child_name_buf[prop_name_len] = '\0';
+			} else {
+				memcpy(child_name_buf, prop_name, 63);
+				child_name_buf[63] = '\0';
+			}
+			size_t child_depth = ng_findDisplayEntryByName(child_name_buf);
+			if (child_depth != SIZE_MAX) {
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
+				if (child_mc != NULL) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					return;
+				}
+			}
+		}
+#endif
+
 		// Built-in defaults for non-underscore properties
 		if (mc != NULL && prop_name_len == 13 && strcmp(prop_name, "useHandCursor") == 0)
 		{
@@ -9138,13 +9434,17 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Fall back to global variable map (timeline variables are accessible as mc properties)
-		if (hasVariable((char*)prop_name, prop_name_len))
+		// Only for root MovieClip — child MC properties should not leak into global scope
 		{
-			ActionVar* var = getVariable((char*)prop_name, prop_name_len);
-			if (var != NULL)
+			extern MovieClip root_movieclip;
+			if (mc == &root_movieclip && hasVariable((char*)prop_name, prop_name_len))
 			{
-				pushVar(app_context, var);
-				return;
+				ActionVar* var = getVariable((char*)prop_name, prop_name_len);
+				if (var != NULL)
+				{
+					pushVar(app_context, var);
+					return;
+				}
 			}
 		}
 

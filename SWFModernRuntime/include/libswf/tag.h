@@ -86,9 +86,12 @@ s16 ng_getTextFieldLeading(int tf_idx);
 const char* ng_getTextFieldVariableName(int tf_idx);
 void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* ymax);
 const char* ng_getTextFieldRawHtml(int tf_idx);
+const char* ng_getTextFieldInitialTextByIdx(int tf_idx);
 const char* ng_getFontName(u16 font_id);
 int ng_getFontBold(u16 font_id);
 int ng_getFontItalic(u16 font_id);
 int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
+// TextField variable binding — called from tag_stubs.c at placement time
+void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_name, const char* init_text);
 #endif

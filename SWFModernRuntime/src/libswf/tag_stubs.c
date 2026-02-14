@@ -377,7 +377,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				ng_display[i].is_button = btn;
 				ng_display[i].is_textfield = is_tf;
 				ng_display[i].textfield_idx = tf_idx;
-				return;
+				goto placed;
 			}
 			if (ng_display[i].sprite_idx == si)
 			{
@@ -394,7 +394,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[i].is_button = btn;
 			ng_display[i].is_textfield = is_tf;
 			ng_display[i].textfield_idx = tf_idx;
-			return;
+			goto placed;
 		}
 	}
 
@@ -413,6 +413,16 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		ng_display[ng_display_count].textfield_idx = tf_idx;
 		ng_display[ng_display_count].instance_name[0] = '\0';
 		ng_display_count++;
+	}
+
+placed:
+	// Initialize textfield variable binding at placement time
+	if (is_tf && tf_idx >= 0) {
+		const char* var_name = ng_textfields[tf_idx].variable_name;
+		const char* init_text = ng_textfields[tf_idx].plain_text;
+		if (var_name[0] != '\0') {
+			actionInitTextFieldVariable(app_context, var_name, init_text);
+		}
 	}
 }
 
@@ -607,6 +617,12 @@ const char* ng_getTextFieldRawHtml(int tf_idx)
 	return ng_textfields[tf_idx].raw_html_text;
 }
 
+const char* ng_getTextFieldInitialTextByIdx(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "";
+	return ng_textfields[tf_idx].plain_text;
+}
+
 const char* ng_getFontName(u16 font_id)
 {
 	for (size_t i = 0; i < ng_font_count; i++)
@@ -700,8 +716,6 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
-	(void)app_context;
-
 	// During backward goto catch-up, don't remove entries that were placed
 	// at or before the target frame — they're part of the preserved state.
 	extern int catch_up_backward;
@@ -713,6 +727,9 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		{
 			if (catch_up_backward && ng_display[i].placed_at_frame <= catch_up_target)
 				return;  // Protected: don't remove
+			// Invalidate cached MovieClip so re-placement gets fresh properties
+			if (ng_display[i].instance_name[0] != '\0')
+				actionInvalidateCachedMovieClip(app_context, ng_display[i].instance_name);
 			// Remove by shifting
 			for (size_t j = i; j + 1 < ng_display_count; j++)
 				ng_display[j] = ng_display[j + 1];

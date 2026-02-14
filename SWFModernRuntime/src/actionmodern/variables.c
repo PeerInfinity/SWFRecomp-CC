@@ -36,6 +36,11 @@ static int free_variable_callback(const void *key, size_t ksize, uintptr_t value
 {
 	ActionVar* var = (ActionVar*) value;
 
+	// Skip entries that are shared with var_array (will be freed by var_array loop)
+	for (size_t i = 0; i < var_array_size; i++) {
+		if (var_array[i] == var) return 0;
+	}
+
 	// Free heap-allocated strings
 	if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
 	{
