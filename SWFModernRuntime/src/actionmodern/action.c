@@ -1125,6 +1125,479 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 	g_textfield_constructor_init = 1;
 }
 
+// ============================================================
+// TextFormat constructor and property coercion
+// ============================================================
+static ASFunction g_textformat_constructor;
+static int g_textformat_constructor_init = 0;
+
+// TextFormat property names (18 properties)
+static const char* tf_prop_names[] = {
+	"font", "size", "color", "bold", "italic", "underline",
+	"align", "leftMargin", "rightMargin", "indent", "leading",
+	"blockIndent", "bullet", "kerning", "letterSpacing", "tabStops",
+	"url", "target"
+};
+static const u32 tf_prop_lens[] = {
+	4, 4, 5, 4, 6, 9,
+	5, 10, 11, 6, 7,
+	11, 6, 7, 13, 8,
+	3, 6
+};
+
+// Coercion type enum
+enum TFCoercionType {
+	TF_COERCE_NONE = 0,
+	TF_COERCE_STRING,     // font, url, target
+	TF_COERCE_INTEGER,    // size, indent, leading, blockIndent
+	TF_COERCE_NONNEG_INT, // leftMargin, rightMargin
+	TF_COERCE_UNSIGNED,   // color
+	TF_COERCE_FLOAT,      // letterSpacing
+	TF_COERCE_BOOLEAN,    // bold, italic, underline, bullet, kerning
+	TF_COERCE_ALIGN,      // align
+	TF_COERCE_TABSTOPS,   // tabStops
+};
+
+static int getTextFormatCoercionType(const char* name, u32 len) {
+	if (len == 4 && strncmp(name, "font", 4) == 0) return TF_COERCE_STRING;
+	if (len == 3 && strncmp(name, "url", 3) == 0) return TF_COERCE_STRING;
+	if (len == 6 && strncmp(name, "target", 6) == 0) return TF_COERCE_STRING;
+	if (len == 4 && strncmp(name, "size", 4) == 0) return TF_COERCE_INTEGER;
+	if (len == 6 && strncmp(name, "indent", 6) == 0) return TF_COERCE_INTEGER;
+	if (len == 7 && strncmp(name, "leading", 7) == 0) return TF_COERCE_INTEGER;
+	if (len == 11 && strncmp(name, "blockIndent", 11) == 0) return TF_COERCE_INTEGER;
+	if (len == 10 && strncmp(name, "leftMargin", 10) == 0) return TF_COERCE_NONNEG_INT;
+	if (len == 11 && strncmp(name, "rightMargin", 11) == 0) return TF_COERCE_NONNEG_INT;
+	if (len == 5 && strncmp(name, "color", 5) == 0) return TF_COERCE_UNSIGNED;
+	if (len == 13 && strncmp(name, "letterSpacing", 13) == 0) return TF_COERCE_FLOAT;
+	if (len == 4 && strncmp(name, "bold", 4) == 0) return TF_COERCE_BOOLEAN;
+	if (len == 6 && strncmp(name, "italic", 6) == 0) return TF_COERCE_BOOLEAN;
+	if (len == 9 && strncmp(name, "underline", 9) == 0) return TF_COERCE_BOOLEAN;
+	if (len == 6 && strncmp(name, "bullet", 6) == 0) return TF_COERCE_BOOLEAN;
+	if (len == 7 && strncmp(name, "kerning", 7) == 0) return TF_COERCE_BOOLEAN;
+	if (len == 5 && strncmp(name, "align", 5) == 0) return TF_COERCE_ALIGN;
+	if (len == 8 && strncmp(name, "tabStops", 8) == 0) return TF_COERCE_TABSTOPS;
+	return TF_COERCE_NONE;
+}
+
+// Helper: check if an ASObject is a TextFormat instance
+static int isTextFormatInstance(ASObject* obj) {
+	if (!g_textformat_constructor_init || g_textformat_constructor.prototype_obj == NULL) return 0;
+	ActionVar* proto_var = getProperty(obj, "__proto__", 9);
+	if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT) return 0;
+	return (ASObject*)proto_var->data.numeric_value == g_textformat_constructor.prototype_obj;
+}
+
+// Banker's rounding (round half to even)
+static double bankersRound(double x) {
+	if (x != x) return x; // NaN
+	double f = x - floor(x); // fractional part in [0, 1)
+	if (fabs(f - 0.5) < 1e-10) {
+		// Exactly 0.5 — round to even
+		double down = floor(x);
+		double up = down + 1.0;
+		if (fmod(fabs(down), 2.0) < 0.5) return down; // down is even
+		return up;
+	}
+	return round(x);
+}
+
+// Coerce value for TextFormat integer property (size, indent, leading, blockIndent)
+static ActionVar tfCoerceInteger(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	double d = 0;
+	if (value->type == ACTION_STACK_VALUE_F64)
+		d = VAL(double, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_F32)
+		d = (double) VAL(float, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
+		d = value->data.numeric_value ? 1.0 : 0.0;
+	else if (value->type == ACTION_STACK_VALUE_STRING)
+		d = atof((const char*) value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
+		int _vof_found = 0;
+		ActionVar vof = objectCallValueOf(app_context, value, &_vof_found);
+		if (vof.type == ACTION_STACK_VALUE_F64)
+			d = VAL(double, &vof.data.numeric_value);
+		else if (vof.type == ACTION_STACK_VALUE_F32)
+			d = (double) VAL(float, &vof.data.numeric_value);
+		else
+			d = 0.0 / 0.0; // NaN
+	} else {
+		d = 0.0 / 0.0; // NaN
+	}
+	// NaN, ±Infinity → -2147483648
+	if (d != d || d == (1.0/0.0) || d == -(1.0/0.0)) {
+		result.type = ACTION_STACK_VALUE_F64;
+		double v = -2147483648.0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	d = bankersRound(d);
+	// Out of int32 range → -2147483648
+	if (d > 2147483647.0 || d < -2147483648.0) {
+		result.type = ACTION_STACK_VALUE_F64;
+		double v = -2147483648.0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	result.type = ACTION_STACK_VALUE_F64;
+	double v = (double)(s32)d;
+	result.data.numeric_value = VAL(u64, &v);
+	return result;
+}
+
+// Coerce for non-negative integer (leftMargin, rightMargin)
+static ActionVar tfCoerceNonNegInt(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	double d = 0;
+	if (value->type == ACTION_STACK_VALUE_F64)
+		d = VAL(double, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_F32)
+		d = (double) VAL(float, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
+		d = value->data.numeric_value ? 1.0 : 0.0;
+	else if (value->type == ACTION_STACK_VALUE_STRING)
+		d = atof((const char*) value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
+		int _vof_found = 0;
+		ActionVar vof = objectCallValueOf(app_context, value, &_vof_found);
+		if (vof.type == ACTION_STACK_VALUE_F64)
+			d = VAL(double, &vof.data.numeric_value);
+		else if (vof.type == ACTION_STACK_VALUE_F32)
+			d = (double) VAL(float, &vof.data.numeric_value);
+		else
+			d = 0.0 / 0.0;
+	} else {
+		d = 0.0 / 0.0;
+	}
+	result.type = ACTION_STACK_VALUE_F64;
+	// NaN → 0
+	if (d != d) {
+		double v = 0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	// +Infinity → -2147483648 (positive overflow, not clamped)
+	if (d == (1.0/0.0)) {
+		double v = -2147483648.0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	// -Infinity → 0 (negative, clamped)
+	if (d == -(1.0/0.0)) {
+		double v = 0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	d = bankersRound(d);
+	// Positive overflow → -2147483648
+	if (d > 2147483647.0) {
+		double v = -2147483648.0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	// Negative (including large negative overflow) → 0
+	if (d < 0) {
+		double v = 0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	double v = (double)(s32)d;
+	result.data.numeric_value = VAL(u64, &v);
+	return result;
+}
+
+// Coerce for unsigned integer (color)
+static ActionVar tfCoerceUnsigned(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	double d = 0;
+	if (value->type == ACTION_STACK_VALUE_F64)
+		d = VAL(double, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_F32)
+		d = (double) VAL(float, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
+		d = value->data.numeric_value ? 1.0 : 0.0;
+	else if (value->type == ACTION_STACK_VALUE_STRING)
+		d = atof((const char*) value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
+		int _vof_found = 0;
+		ActionVar vof = objectCallValueOf(app_context, value, &_vof_found);
+		if (vof.type == ACTION_STACK_VALUE_F64)
+			d = VAL(double, &vof.data.numeric_value);
+		else if (vof.type == ACTION_STACK_VALUE_F32)
+			d = (double) VAL(float, &vof.data.numeric_value);
+		else
+			d = 0.0 / 0.0;
+	} else {
+		d = 0.0 / 0.0;
+	}
+	// NaN, ±Infinity → 0
+	if (d != d || d == (1.0/0.0) || d == -(1.0/0.0)) {
+		result.type = ACTION_STACK_VALUE_F64;
+		double v = 0;
+		result.data.numeric_value = VAL(u64, &v);
+		return result;
+	}
+	// ECMAScript ToUint32: truncate toward zero, then mod 2^32
+	double truncated = (d >= 0) ? floor(d) : -floor(-d);
+	double mod = fmod(truncated, 4294967296.0);
+	if (mod < 0) mod += 4294967296.0;
+	result.type = ACTION_STACK_VALUE_F64;
+	result.data.numeric_value = VAL(u64, &mod);
+	return result;
+}
+
+// Coerce for float (letterSpacing)
+static ActionVar tfCoerceFloat(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	double d = 0;
+	if (value->type == ACTION_STACK_VALUE_F64)
+		d = VAL(double, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_F32)
+		d = (double) VAL(float, &value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
+		d = value->data.numeric_value ? 1.0 : 0.0;
+	else if (value->type == ACTION_STACK_VALUE_STRING)
+		d = atof((const char*) value->data.numeric_value);
+	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
+		int _vof_found = 0;
+		ActionVar vof = objectCallValueOf(app_context, value, &_vof_found);
+		if (vof.type == ACTION_STACK_VALUE_F64)
+			d = VAL(double, &vof.data.numeric_value);
+		else if (vof.type == ACTION_STACK_VALUE_F32)
+			d = (double) VAL(float, &vof.data.numeric_value);
+		else
+			d = 0.0 / 0.0;
+	} else {
+		d = 0.0 / 0.0;
+	}
+	result.type = ACTION_STACK_VALUE_F64;
+	result.data.numeric_value = VAL(u64, &d);
+	return result;
+}
+
+// Coerce for string (font, url, target)
+static ActionVar tfCoerceString(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	if (value->type == ACTION_STACK_VALUE_STRING) {
+		result = *value;
+		return result;
+	}
+	if (value->type == ACTION_STACK_VALUE_OBJECT) {
+		ActionVar str_result = objectCallToString(app_context, value, NULL);
+		if (str_result.type == ACTION_STACK_VALUE_STRING) return str_result;
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	// Convert number/bool to string
+	static char tf_str_buf[64];
+	if (value->type == ACTION_STACK_VALUE_F64) {
+		double d = VAL(double, &value->data.numeric_value);
+		snprintf(tf_str_buf, sizeof(tf_str_buf), "%.15g", d);
+	} else if (value->type == ACTION_STACK_VALUE_F32) {
+		float f = VAL(float, &value->data.numeric_value);
+		snprintf(tf_str_buf, sizeof(tf_str_buf), "%g", f);
+	} else if (value->type == ACTION_STACK_VALUE_BOOLEAN) {
+		snprintf(tf_str_buf, sizeof(tf_str_buf), "%s", value->data.numeric_value ? "true" : "false");
+	} else {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.data.numeric_value = (u64) tf_str_buf;
+	result.str_size = strlen(tf_str_buf);
+	return result;
+}
+
+// Coerce for boolean (bold, italic, underline, bullet, kerning)
+static ActionVar tfCoerceBoolean(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	// Boolean coercion
+	int b = 0;
+	if (value->type == ACTION_STACK_VALUE_BOOLEAN)
+		b = value->data.numeric_value ? 1 : 0;
+	else if (value->type == ACTION_STACK_VALUE_F64) {
+		double d = VAL(double, &value->data.numeric_value);
+		b = (d != 0 && d == d) ? 1 : 0;
+	} else if (value->type == ACTION_STACK_VALUE_F32) {
+		float f = VAL(float, &value->data.numeric_value);
+		b = (f != 0 && f == f) ? 1 : 0;
+	} else if (value->type == ACTION_STACK_VALUE_STRING) {
+		const char* s = (const char*) value->data.numeric_value;
+		b = (s && s[0] != '\0') ? 1 : 0;
+	} else if (value->type == ACTION_STACK_VALUE_OBJECT || value->type == ACTION_STACK_VALUE_ARRAY || value->type == ACTION_STACK_VALUE_FUNCTION) {
+		b = 1;
+	}
+	result.type = ACTION_STACK_VALUE_BOOLEAN;
+	result.data.numeric_value = b;
+	return result;
+}
+
+// Coerce for align enum
+static ActionVar tfCoerceAlign(SWFAppContext* app_context, ActionVar* value, ASObject* obj) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	// Get string value
+	const char* s = NULL;
+	u32 slen = 0;
+	if (value->type == ACTION_STACK_VALUE_STRING) {
+		s = (const char*) value->data.numeric_value;
+		slen = value->str_size;
+	} else if (value->type == ACTION_STACK_VALUE_OBJECT) {
+		ActionVar str_result = objectCallToString(app_context, value, NULL);
+		if (str_result.type == ACTION_STACK_VALUE_STRING) {
+			s = (const char*) str_result.data.numeric_value;
+			slen = str_result.str_size;
+		}
+	}
+	if (s != NULL) {
+		// Valid values: "left", "center", "right", "justify"
+		if ((slen == 4 && strncmp(s, "left", 4) == 0) ||
+		    (slen == 6 && strncmp(s, "center", 6) == 0) ||
+		    (slen == 5 && strncmp(s, "right", 5) == 0) ||
+		    (slen == 7 && strncmp(s, "justify", 7) == 0)) {
+			result.type = ACTION_STACK_VALUE_STRING;
+			result.data.numeric_value = (u64) s;
+			result.str_size = slen;
+			return result;
+		}
+	}
+	// Invalid value — keep current (return a sentinel to indicate "no change")
+	result.type = 255; // sentinel
+	return result;
+}
+
+// Coerce for tabStops (array)
+static ActionVar tfCoerceTabStops(SWFAppContext* app_context, ActionVar* value) {
+	ActionVar result = {0};
+	if (value->type == ACTION_STACK_VALUE_NULL || value->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	// Get array length and element access
+	u32 len = 0;
+	ASArray* src_arr = NULL;
+	ASObject* src_obj = NULL;
+	if (value->type == ACTION_STACK_VALUE_ARRAY) {
+		src_arr = (ASArray*) value->data.numeric_value;
+		if (src_arr) len = src_arr->length;
+	} else if (value->type == ACTION_STACK_VALUE_OBJECT) {
+		// Array-like object with length property
+		src_obj = (ASObject*) value->data.numeric_value;
+		ActionVar* len_var = getProperty(src_obj, "length", 6);
+		if (len_var && len_var->type == ACTION_STACK_VALUE_F64)
+			len = (u32) VAL(double, &len_var->data.numeric_value);
+		else if (len_var && len_var->type == ACTION_STACK_VALUE_F32)
+			len = (u32) VAL(float, &len_var->data.numeric_value);
+		else {
+			result.type = ACTION_STACK_VALUE_NULL;
+			return result;
+		}
+	} else {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	// Create new array with coerced elements
+	ASArray* new_arr = allocArray(app_context, len);
+	for (u32 i = 0; i < len; i++) {
+		ActionVar elem = {0};
+		elem.type = ACTION_STACK_VALUE_UNDEFINED;
+		if (src_arr) {
+			ActionVar* e = getArrayElement(src_arr, i);
+			if (e) elem = *e;
+		} else if (src_obj) {
+			char idx_buf[12];
+			snprintf(idx_buf, sizeof(idx_buf), "%u", i);
+			ActionVar* e = getProperty(src_obj, idx_buf, strlen(idx_buf));
+			if (e) elem = *e;
+		}
+		// Coerce element to integer (same as tfCoerceInteger)
+		ActionVar coerced = tfCoerceInteger(app_context, &elem);
+		setArrayElement(app_context, new_arr, i, &coerced);
+	}
+	result.type = ACTION_STACK_VALUE_ARRAY;
+	result.data.numeric_value = (u64) new_arr;
+	return result;
+}
+
+// Apply TextFormat property coercion and set. Returns 1 if handled, 0 if not a TextFormat property.
+static int textFormatSetProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_len, ActionVar* value) {
+	int coercion = getTextFormatCoercionType(name, name_len);
+	if (coercion == TF_COERCE_NONE) return 0;
+
+	ActionVar coerced;
+	switch (coercion) {
+		case TF_COERCE_STRING:     coerced = tfCoerceString(app_context, value); break;
+		case TF_COERCE_INTEGER:    coerced = tfCoerceInteger(app_context, value); break;
+		case TF_COERCE_NONNEG_INT: coerced = tfCoerceNonNegInt(app_context, value); break;
+		case TF_COERCE_UNSIGNED:   coerced = tfCoerceUnsigned(app_context, value); break;
+		case TF_COERCE_FLOAT:      coerced = tfCoerceFloat(app_context, value); break;
+		case TF_COERCE_BOOLEAN:    coerced = tfCoerceBoolean(app_context, value); break;
+		case TF_COERCE_ALIGN:      coerced = tfCoerceAlign(app_context, value, obj); break;
+		case TF_COERCE_TABSTOPS:   coerced = tfCoerceTabStops(app_context, value); break;
+		default: return 0;
+	}
+	// Sentinel for align: invalid value → don't change
+	if (coerced.type == 255) return 1;
+	setProperty(app_context, obj, name, name_len, &coerced);
+	return 1;
+}
+
+static void initTextFormatPrototype(SWFAppContext* app_context) {
+	if (g_textformat_constructor_init) return;
+
+	memset(&g_textformat_constructor, 0, sizeof(ASFunction));
+	strncpy(g_textformat_constructor.name, "TextFormat", 255);
+	g_textformat_constructor.function_type = 1;
+	g_textformat_constructor.param_count = 0;
+
+	// Create prototype object
+	ASObject* proto = allocObject(app_context, 12);
+	g_textformat_constructor.prototype_obj = proto;
+
+	// Set __proto__ to Object.prototype
+	extern ASObject* g_object_prototype;
+	if (g_object_prototype != NULL) {
+		ActionVar proto_val = {0};
+		proto_val.type = ACTION_STACK_VALUE_OBJECT;
+		proto_val.data.numeric_value = (u64) g_object_prototype;
+		setProperty(app_context, proto, "__proto__", 9, &proto_val);
+	}
+
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_textformat_constructor;
+
+	g_textformat_constructor_init = 1;
+}
+
 // _root MovieClip for simplified implementation
 // Note: totalframes is set from SWF_FRAME_COUNT if available, otherwise defaults to 1
 MovieClip root_movieclip = {
@@ -4613,6 +5086,15 @@ void actionGetVariable(SWFAppContext* app_context)
 					setProperty(app_context, global_object, "TextField", 9, &tf_cv);
 				}
 
+				// Register TextFormat on _global
+				initTextFormatPrototype(app_context);
+				{
+					ActionVar tfmt_cv = {0};
+					tfmt_cv.type = ACTION_STACK_VALUE_FUNCTION;
+					tfmt_cv.data.numeric_value = (u64)&g_textformat_constructor;
+					setProperty(app_context, global_object, "TextFormat", 10, &tfmt_cv);
+				}
+
 				global_init_done = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
@@ -4672,6 +5154,12 @@ void actionGetVariable(SWFAppContext* app_context)
 			// Return the built-in TextField constructor as a function
 			initTextFieldPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_textfield_constructor);
+			return;
+		}
+		else if (var_name_len == 10 && strncmp(var_name, "TextFormat", 10) == 0)
+		{
+			initTextFormatPrototype(app_context);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_textformat_constructor);
 			return;
 		}
 		else if (var_name_len == 6 && strncmp(var_name, "String", 6) == 0)
@@ -7413,6 +7901,11 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
+			// TextFormat instances apply per-property coercion
+			if (isTextFormatInstance(obj) && textFormatSetProperty(app_context, obj, prop_name, prop_name_len, &value_var))
+			{
+				return;
+			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
 		}
@@ -8587,6 +9080,44 @@ void actionNewObject(SWFAppContext* app_context)
 		else
 		{
 			setObjectProto(app_context, tf_obj);
+		}
+		new_obj = tf_obj;
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "TextFormat") == 0)
+	{
+		// Handle TextFormat constructor — new TextFormat(font?, size?, color?, bold?, italic?, underline?, align?, leftMargin?, rightMargin?, indent?, leading?)
+		initTextFormatPrototype(app_context);
+		ASObject* tf_obj = allocObject(app_context, 24);
+		if (g_textformat_constructor.prototype_obj != NULL) {
+			ActionVar proto_var = {0};
+			proto_var.type = ACTION_STACK_VALUE_OBJECT;
+			proto_var.data.numeric_value = (u64) g_textformat_constructor.prototype_obj;
+			setProperty(app_context, tf_obj, "__proto__", 9, &proto_var);
+			for (u32 i = 0; i < tf_obj->num_used; i++) {
+				if (strcmp(tf_obj->properties[i].name, "__proto__") == 0) {
+					tf_obj->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+					break;
+				}
+			}
+		} else {
+			setObjectProto(app_context, tf_obj);
+		}
+		// Initialize all 18 properties to null
+		ActionVar null_val = {0};
+		null_val.type = ACTION_STACK_VALUE_NULL;
+		for (int i = 0; i < 18; i++) {
+			setProperty(app_context, tf_obj, tf_prop_names[i], tf_prop_lens[i], &null_val);
+		}
+		// Apply constructor arguments (0-11 args)
+		static const char* ctor_arg_names[] = {
+			"font", "size", "color", "bold", "italic", "underline",
+			"align", "leftMargin", "rightMargin", "indent", "leading"
+		};
+		static const u32 ctor_arg_lens[] = { 4, 4, 5, 4, 6, 9, 5, 10, 11, 6, 7 };
+		for (u32 i = 0; i < num_args && i < 11; i++) {
+			textFormatSetProperty(app_context, tf_obj, ctor_arg_names[i], ctor_arg_lens[i], &args[i]);
 		}
 		new_obj = tf_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
