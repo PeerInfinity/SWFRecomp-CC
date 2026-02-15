@@ -326,6 +326,81 @@ static ActionVar builtin_error_toString(SWFAppContext* app_context, ActionVar* a
 
 static ASFunction g_error_toString_func;
 
+// Built-in String.fromCharCode(code1, code2, ...) — static method on String constructor
+// Each argument is coerced to uint16, then converted to the corresponding character.
+// The result is a UTF-8 string of all the characters concatenated.
+static ASFunction g_string_fromCharCode_func;
+static ActionVar builtin_string_fromCharCode(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 0;
+	ret.data.numeric_value = (u64)"";
+
+	if (arg_count == 0)
+	{
+		// No args → empty string
+		return ret;
+	}
+
+	// Worst case: each UTF-16 code unit → 3 UTF-8 bytes
+	char* buf = (char*) heap_alloc(app_context, arg_count * 3 + 1);
+	int pos = 0;
+
+	for (u32 i = 0; i < arg_count; i++)
+	{
+		double d = 0.0;
+		switch (args[i].type)
+		{
+			case ACTION_STACK_VALUE_F32: d = (double) VAL(float, &args[i].data.numeric_value); break;
+			case ACTION_STACK_VALUE_F64: d = VAL(double, &args[i].data.numeric_value); break;
+			case ACTION_STACK_VALUE_BOOLEAN: d = args[i].data.numeric_value ? 1.0 : 0.0; break;
+			default: d = 0.0; break;
+		}
+
+		// ToUint16: mod 65536
+		int code;
+		if (isnan(d) || isinf(d)) code = 0;
+		else
+		{
+			double n = fmod(d, 65536.0);
+			if (n < 0) n += 65536.0;
+			code = (int)n;
+		}
+
+		// NUL byte terminates the string in C, so stop here
+		if (code == 0) break;
+
+		// Lone surrogates (0xD800-0xDFFF) → replacement character U+FFFD
+		if (code >= 0xD800 && code <= 0xDFFF)
+		{
+			buf[pos++] = (char)0xEF;
+			buf[pos++] = (char)0xBF;
+			buf[pos++] = (char)0xBD;
+		}
+		else if (code < 0x80)
+		{
+			buf[pos++] = (char)code;
+		}
+		else if (code < 0x800)
+		{
+			buf[pos++] = (char)(0xC0 | (code >> 6));
+			buf[pos++] = (char)(0x80 | (code & 0x3F));
+		}
+		else
+		{
+			buf[pos++] = (char)(0xE0 | (code >> 12));
+			buf[pos++] = (char)(0x80 | ((code >> 6) & 0x3F));
+			buf[pos++] = (char)(0x80 | (code & 0x3F));
+		}
+	}
+	buf[pos] = '\0';
+
+	ret.str_size = pos;
+	ret.data.numeric_value = (u64)buf;
+	return ret;
+}
+
 // Built-in valueOf for primitive wrapper objects (new Object(5))
 static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -6656,6 +6731,127 @@ static size_t utf8_strlen(const char* str)
 	return count;
 }
 
+/**
+ * Count the number of UTF-16 code units in a UTF-8 string.
+ * Code points >= U+10000 (4-byte UTF-8) count as 2 UTF-16 code units (surrogate pair).
+ */
+static int utf8_utf16_length(const char* s, int byte_len)
+{
+	int count = 0;
+	int i = 0;
+	while (i < byte_len)
+	{
+		unsigned char c = (unsigned char)s[i];
+		if (c < 0x80) { count++; i++; }
+		else if (c < 0xE0) { count++; i += 2; }
+		else if (c < 0xF0) { count++; i += 3; }
+		else { count += 2; i += 4; } // surrogate pair = 2 UTF-16 code units
+	}
+	return count;
+}
+
+/**
+ * Decode one UTF-8 character at position *pos, return the Unicode code point.
+ * Advances *pos past the decoded character.
+ */
+static uint32_t utf8_decode_one(const char* s, int byte_len, int* pos)
+{
+	unsigned char c = (unsigned char)s[*pos];
+	uint32_t cp;
+	if (c < 0x80) { cp = c; *pos += 1; }
+	else if (c < 0xE0 && *pos + 1 < byte_len) {
+		cp = ((uint32_t)(c & 0x1F) << 6) | (s[*pos+1] & 0x3F);
+		*pos += 2;
+	}
+	else if (c < 0xF0 && *pos + 2 < byte_len) {
+		cp = ((uint32_t)(c & 0x0F) << 12) | ((uint32_t)(s[*pos+1] & 0x3F) << 6) | (s[*pos+2] & 0x3F);
+		*pos += 3;
+	}
+	else if (*pos + 3 < byte_len) {
+		cp = ((uint32_t)(c & 0x07) << 18) | ((uint32_t)(s[*pos+1] & 0x3F) << 12) |
+		     ((uint32_t)(s[*pos+2] & 0x3F) << 6) | (s[*pos+3] & 0x3F);
+		*pos += 4;
+	}
+	else { cp = 0xFFFD; *pos += 1; } // invalid
+	return cp;
+}
+
+/**
+ * Build UTF-16 arrays from a UTF-8 string.
+ * utf16_units[i] = the i-th UTF-16 code unit value
+ * utf16_to_byte[i] = byte offset in the UTF-8 string of the i-th UTF-16 code unit
+ * utf16_to_byte[utf16_len] = byte_len (sentinel)
+ * Returns the number of UTF-16 code units.
+ */
+static int utf8_build_utf16_tables(const char* s, int byte_len,
+                                    uint16_t* utf16_units, int* utf16_to_byte)
+{
+	int u = 0;
+	int i = 0;
+	while (i < byte_len)
+	{
+		int start = i;
+		uint32_t cp = utf8_decode_one(s, byte_len, &i);
+		if (cp < 0x10000)
+		{
+			utf16_to_byte[u] = start;
+			utf16_units[u] = (uint16_t)cp;
+			u++;
+		}
+		else
+		{
+			// Surrogate pair
+			uint32_t adj = cp - 0x10000;
+			utf16_to_byte[u] = start;
+			utf16_units[u] = (uint16_t)(0xD800 | (adj >> 10));
+			u++;
+			utf16_to_byte[u] = start; // both surrogates map to same byte offset
+			utf16_units[u] = (uint16_t)(0xDC00 | (adj & 0x3FF));
+			u++;
+		}
+	}
+	utf16_to_byte[u] = byte_len; // sentinel
+	return u;
+}
+
+/**
+ * Convert a byte offset in a UTF-8 string to a UTF-16 index.
+ * Uses the utf16_to_byte array for lookup.
+ */
+static int byte_offset_to_utf16_index(int* utf16_to_byte, int utf16_len, int byte_offset)
+{
+	for (int i = 0; i <= utf16_len; i++)
+	{
+		if (utf16_to_byte[i] >= byte_offset) return i;
+	}
+	return utf16_len;
+}
+
+/**
+ * Encode a single UTF-16 code unit to UTF-8. Returns byte count written.
+ * Lone surrogates (0xD800-0xDFFF) are encoded as U+FFFD (replacement character).
+ */
+static int utf16_unit_to_utf8(uint16_t unit, char* out)
+{
+	if (unit < 0x80) { out[0] = (char)unit; return 1; }
+	if (unit < 0x800) {
+		out[0] = (char)(0xC0 | (unit >> 6));
+		out[1] = (char)(0x80 | (unit & 0x3F));
+		return 2;
+	}
+	// Lone surrogates → U+FFFD replacement character
+	if (unit >= 0xD800 && unit <= 0xDFFF) {
+		out[0] = (char)0xEF;
+		out[1] = (char)0xBF;
+		out[2] = (char)0xBD;
+		return 3;
+	}
+	out[0] = (char)(0xE0 | (unit >> 12));
+	out[1] = (char)(0x80 | ((unit >> 6) & 0x3F));
+	out[2] = (char)(0x80 | (unit & 0x3F));
+	return 3;
+}
+
 void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 {
 	(void)app_context;
@@ -7362,6 +7558,22 @@ void actionGetVariable(SWFAppContext* app_context)
 				strncpy(g_string_constructor.name, "String", 255);
 				g_string_constructor.function_type = 1;
 				g_string_constructor.param_count = 0;
+
+				// Register String.fromCharCode as a static method
+				g_string_constructor.own_props = allocObject(app_context, 4);
+				retainObject(g_string_constructor.own_props);
+				memset(&g_string_fromCharCode_func, 0, sizeof(ASFunction));
+				strncpy(g_string_fromCharCode_func.name, "fromCharCode", 255);
+				g_string_fromCharCode_func.function_type = 2;
+				g_string_fromCharCode_func.param_count = 0;
+				g_string_fromCharCode_func.advanced_func = (Function2Ptr) builtin_string_fromCharCode;
+				if (function_count < MAX_FUNCTIONS)
+					function_registry[function_count++] = &g_string_fromCharCode_func;
+				ActionVar fcc_val = {0};
+				fcc_val.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &fcc_val.data.numeric_value) = (u64) &g_string_fromCharCode_func;
+				setProperty(app_context, g_string_constructor.own_props, "fromCharCode", 12, &fcc_val);
+
 				g_string_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_string_constructor);
@@ -10937,8 +11149,8 @@ void actionGetMember(SWFAppContext* app_context)
 				obj_var.data.string_data.heap_ptr :
 				(const char*) obj_var.data.numeric_value;
 
-			// Push length as float (UTF-8 character count, not byte count)
-			float len = (float) utf8_strlen(str);
+			// Push length as float (UTF-16 code unit count, matching Flash behavior)
+			float len = (float) utf8_utf16_length(str, obj_var.str_size);
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
 		}
 		else
@@ -14588,6 +14800,88 @@ static int callArrayMethod(SWFAppContext* app_context,
 	return 0;
 }
 
+// =====================================================================
+// String method helpers
+// =====================================================================
+
+// Helper: get string pointer from an ActionVar (handles both inline and heap strings)
+static const char* varGetStringPtr(ActionVar* v)
+{
+	if (v->type != ACTION_STACK_VALUE_STRING) return NULL;
+	return v->data.string_data.owns_memory ?
+		v->data.string_data.heap_ptr : (const char*) v->data.numeric_value;
+}
+
+// Helper: coerce an ActionVar argument to a number for string method index args.
+// Handles all types (f32, f64, boolean, null, undefined, string, etc.)
+static double stringArgToNumber(ActionVar* v)
+{
+	switch (v->type)
+	{
+		case ACTION_STACK_VALUE_F32: return (double) VAL(float, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_F64: return VAL(double, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_BOOLEAN: return v->data.numeric_value ? 1.0 : 0.0;
+		case ACTION_STACK_VALUE_NULL: return 0.0;
+		case ACTION_STACK_VALUE_UNDEFINED: return NAN;
+		case ACTION_STACK_VALUE_STRING:
+		{
+			const char* s = varGetStringPtr(v);
+			if (s == NULL || s[0] == '\0') return NAN;
+			char* endptr;
+			double d = strtod(s, &endptr);
+			if (endptr == s) return NAN;
+			return d;
+		}
+		default: return NAN;
+	}
+}
+
+// Helper: coerce arg to int32 for string index (NaN/Inf → 0, then truncate)
+static int32_t stringArgToInt32(ActionVar* v)
+{
+	double d = stringArgToNumber(v);
+	if (isnan(d) || isinf(d)) return 0;
+	// ECMA-262 ToInt32
+	return (int32_t)(int64_t)d;
+}
+
+// Helper: coerce an ActionVar to a string for string method arguments.
+// Returns a pointer to the string and sets *out_len. The pointer may be
+// to static/const memory, the arg's own string data, or the provided buf.
+static const char* stringArgToString(SWFAppContext* app_context, ActionVar* v, int* out_len, char* buf, int buf_size)
+{
+	if (v->type == ACTION_STACK_VALUE_STRING)
+	{
+		const char* s = varGetStringPtr(v);
+		if (s == NULL) { *out_len = 0; return ""; }
+		*out_len = v->str_size;
+		return s;
+	}
+	*out_len = varToStringBuf(app_context, v, buf, buf_size);
+	return buf;
+}
+
+// Helper: push a heap-allocated string result
+static void pushHeapString(SWFAppContext* app_context, char* heap_str, int len)
+{
+	PUSH_STR(heap_str, len);
+}
+
+// Helper: allocate and push a substring of str_value[start..start+length]
+static void pushSubstring(SWFAppContext* app_context, const char* str_value, int start, int length)
+{
+	if (length <= 0)
+	{
+		// Push empty string — use a static empty string
+		PUSH_STR("", 0);
+		return;
+	}
+	char* result = (char*) HALLOC(length + 1);
+	memcpy(result, str_value + start, length);
+	result[length] = '\0';
+	PUSH_STR(result, length);
+}
+
 // Helper function to call built-in string methods
 // Returns 1 if method was handled, 0 if not found
 static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffer,
@@ -14595,47 +14889,49 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
                                       const char* method_name, u32 method_name_len,
                                       ActionVar* args, u32 num_args)
 {
+	// Build UTF-16 tables for Unicode-aware string operations
+	// utf16_len = number of UTF-16 code units (what Flash uses for indices/length)
+	int utf16_len = utf8_utf16_length(str_value, (int)str_len);
+
+	// Use VLA for stack allocation (C99/C11/C17)
+	int u16_size = utf16_len > 0 ? utf16_len : 1;
+	uint16_t utf16_units_arr[u16_size];
+	int utf16_to_byte_arr[utf16_len + 1];
+	uint16_t* utf16_units = utf16_units_arr;
+	int* utf16_to_byte = utf16_to_byte_arr;
+	utf8_build_utf16_tables(str_value, (int)str_len, utf16_units, utf16_to_byte);
+
 	// toUpperCase() - no arguments
 	if (method_name_len == 11 && strncmp(method_name, "toUpperCase", 11) == 0)
 	{
-		// Convert string to uppercase
-		int i;
-		for (i = 0; i < str_len && i < 16; i++)
+		char* result = (char*) HALLOC(str_len + 1);
+		for (u32 i = 0; i < str_len; i++)
 		{
-			char c = str_value[i];
+			unsigned char c = (unsigned char)str_value[i];
 			if (c >= 'a' && c <= 'z')
-			{
-				str_buffer[i] = c - ('a' - 'A');
-			}
+				result[i] = c - ('a' - 'A');
 			else
-			{
-				str_buffer[i] = c;
-			}
+				result[i] = c;
 		}
-		str_buffer[i] = '\0';
-		PUSH_STR(str_buffer, i);
+		result[str_len] = '\0';
+		PUSH_STR(result, str_len);
 		return 1;
 	}
 
 	// toLowerCase() - no arguments
 	if (method_name_len == 11 && strncmp(method_name, "toLowerCase", 11) == 0)
 	{
-		// Convert string to lowercase
-		int i;
-		for (i = 0; i < str_len && i < 16; i++)
+		char* result = (char*) HALLOC(str_len + 1);
+		for (u32 i = 0; i < str_len; i++)
 		{
-			char c = str_value[i];
+			unsigned char c = (unsigned char)str_value[i];
 			if (c >= 'A' && c <= 'Z')
-			{
-				str_buffer[i] = c + ('a' - 'A');
-			}
+				result[i] = c + ('a' - 'A');
 			else
-			{
-				str_buffer[i] = c;
-			}
+				result[i] = c;
 		}
-		str_buffer[i] = '\0';
-		PUSH_STR(str_buffer, i);
+		result[str_len] = '\0';
+		PUSH_STR(result, str_len);
 		return 1;
 	}
 
@@ -14643,94 +14939,171 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 	if (method_name_len == 6 && strncmp(method_name, "charAt", 6) == 0)
 	{
 		int index = 0;
-		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_F32)
-		{
-			index = (int)VAL(float, &args[0].data.numeric_value);
-		}
+		if (num_args > 0)
+			index = stringArgToInt32(&args[0]);
 
-		// Bounds check
-		if (index < 0 || index >= str_len)
+		// Bounds check using UTF-16 length
+		if (index < 0 || index >= utf16_len)
 		{
-			str_buffer[0] = '\0';
-			PUSH_STR(str_buffer, 0);
+			PUSH_STR("", 0);
 		}
 		else
 		{
-			str_buffer[0] = str_value[index];
-			str_buffer[1] = '\0';
-			PUSH_STR(str_buffer, 1);
+			// Encode the UTF-16 code unit at this index back to UTF-8
+			char buf[4];
+			int n = utf16_unit_to_utf8(utf16_units[index], buf);
+			char* ch = (char*) HALLOC(n + 1);
+			memcpy(ch, buf, n);
+			ch[n] = '\0';
+			PUSH_STR(ch, n);
 		}
 		return 1;
 	}
 
-	// substr(start, length) - 2 arguments
+	// charCodeAt(index) - 1 argument
+	if (method_name_len == 10 && strncmp(method_name, "charCodeAt", 10) == 0)
+	{
+		int index = 0;
+		if (num_args > 0)
+			index = stringArgToInt32(&args[0]);
+
+		if (index < 0 || index >= utf16_len)
+		{
+			// SWF5: positive out-of-range returns 0, negative returns NaN
+			// SWF6+: all out-of-range returns NaN
+			if (EFFECTIVE_SWF_VERSION() < 6 && index >= 0)
+			{
+				float zero = 0.0f;
+				PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &zero));
+			}
+			else
+			{
+				float nan_val = NAN;
+				PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
+			}
+		}
+		else
+		{
+			// Return UTF-16 code unit value
+			float code = (float)utf16_units[index];
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &code));
+		}
+		return 1;
+	}
+
+	// substr(start, length) - 0-2 arguments
 	if (method_name_len == 6 && strncmp(method_name, "substr", 6) == 0)
 	{
-		int start = 0;
-		int length = str_len;
+		// No args → return "undefined" (the method name is being called with no args
+		// which means Flash returns undefined, which traces as "undefined")
+		if (num_args == 0)
+		{
+			pushUndefined(app_context);
+			return 1;
+		}
 
-		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_F32)
-		{
-			start = (int)VAL(float, &args[0].data.numeric_value);
-		}
-		if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_F32)
-		{
-			length = (int)VAL(float, &args[1].data.numeric_value);
-		}
+		int slen = utf16_len; // Use UTF-16 length
+		int has_length_arg = (num_args > 1 && args[1].type != ACTION_STACK_VALUE_UNDEFINED);
+		int has_start_arg = (args[0].type != ACTION_STACK_VALUE_UNDEFINED);
+
+		// Parse start
+		int start;
+		if (!has_start_arg || args[0].type == ACTION_STACK_VALUE_NULL)
+			start = 0;
+		else
+			start = stringArgToInt32(&args[0]);
 
 		// Handle negative start (count from end)
 		if (start < 0)
 		{
-			start = str_len + start;
+			start = slen + start;
 			if (start < 0) start = 0;
 		}
 
-		// Bounds check
-		if (start >= str_len || length <= 0)
+		// Parse length
+		int length;
+		if (!has_length_arg)
 		{
-			str_buffer[0] = '\0';
-			PUSH_STR(str_buffer, 0);
+			// No length arg or undefined → rest of string
+			length = slen - start;
+		}
+		else if (args[1].type == ACTION_STACK_VALUE_NULL)
+		{
+			length = 0;
 		}
 		else
 		{
-			if (start + length > str_len)
-			{
-				length = str_len - start;
-			}
+			length = stringArgToInt32(&args[1]);
 
-			int i;
-			for (i = 0; i < length && i < 16; i++)
+			// Handle negative length: Flash semantics
+			// Negative length means "stop |neg_len| chars before end of string"
+			// effective_len = str.length + neg_len
+			// If start + effective_len >= str.length, return ""
+			if (length < 0)
 			{
-				str_buffer[i] = str_value[start + i];
+				int effective_len = slen + length;
+				if (effective_len <= 0 || start + effective_len >= slen)
+				{
+					PUSH_STR("", 0);
+					return 1;
+				}
+				length = effective_len;
 			}
-			str_buffer[i] = '\0';
-			PUSH_STR(str_buffer, i);
+		}
+
+		// Bounds check
+		if (start >= slen || length <= 0)
+		{
+			PUSH_STR("", 0);
+		}
+		else
+		{
+			if (start + length > slen)
+				length = slen - start;
+			// Convert UTF-16 indices to byte offsets for extraction
+			int byte_start = utf16_to_byte[start];
+			int byte_end = utf16_to_byte[start + length];
+			pushSubstring(app_context, str_value, byte_start, byte_end - byte_start);
 		}
 		return 1;
 	}
 
-	// substring(start, end) - 2 arguments (different from substr!)
+	// substring(start, end) - 0-2 arguments (different from substr!)
 	if (method_name_len == 9 && strncmp(method_name, "substring", 9) == 0)
 	{
-		int start = 0;
-		int end = str_len;
+		if (num_args == 0)
+		{
+			pushUndefined(app_context);
+			return 1;
+		}
 
-		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_F32)
-		{
-			start = (int)VAL(float, &args[0].data.numeric_value);
-		}
-		if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_F32)
-		{
-			end = (int)VAL(float, &args[1].data.numeric_value);
-		}
+		int slen = utf16_len; // Use UTF-16 length
+
+		// Parse start - undefined means default to full string
+		int start;
+		if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			start = 0;
+		else if (args[0].type == ACTION_STACK_VALUE_NULL)
+			start = 0;
+		else
+			start = stringArgToInt32(&args[0]);
+
+		// Parse end
+		int end;
+		if (num_args <= 1 || args[1].type == ACTION_STACK_VALUE_UNDEFINED)
+			end = slen;
+		else if (args[1].type == ACTION_STACK_VALUE_NULL)
+			end = 0;
+		else
+			end = stringArgToInt32(&args[1]);
 
 		// Clamp to valid range
 		if (start < 0) start = 0;
 		if (end < 0) end = 0;
-		if (start > str_len) start = str_len;
-		if (end > str_len) end = str_len;
+		if (start > slen) start = slen;
+		if (end > slen) end = slen;
 
-		// Swap if start > end
+		// Swap if start > end (substring swaps, unlike slice)
 		if (start > end)
 		{
 			int temp = start;
@@ -14741,65 +15114,253 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 		int length = end - start;
 		if (length <= 0)
 		{
-			str_buffer[0] = '\0';
-			PUSH_STR(str_buffer, 0);
+			PUSH_STR("", 0);
 		}
 		else
 		{
-			int i;
-			for (i = 0; i < length && i < 16; i++)
-			{
-				str_buffer[i] = str_value[start + i];
-			}
-			str_buffer[i] = '\0';
-			PUSH_STR(str_buffer, i);
+			// Convert UTF-16 indices to byte offsets
+			int byte_start = utf16_to_byte[start];
+			int byte_end = utf16_to_byte[end];
+			pushSubstring(app_context, str_value, byte_start, byte_end - byte_start);
 		}
 		return 1;
 	}
 
-	// indexOf(searchString, startIndex) - 1-2 arguments
+	// slice(start, end) - 0-2 arguments
+	if (method_name_len == 5 && strncmp(method_name, "slice", 5) == 0)
+	{
+		if (num_args == 0)
+		{
+			pushUndefined(app_context);
+			return 1;
+		}
+
+		int slen = utf16_len; // Use UTF-16 length
+
+		// Parse start
+		int start;
+		if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			start = 0;
+		else if (args[0].type == ACTION_STACK_VALUE_NULL)
+			start = 0;
+		else
+			start = stringArgToInt32(&args[0]);
+
+		// Parse end
+		int end;
+		if (num_args <= 1 || args[1].type == ACTION_STACK_VALUE_UNDEFINED)
+			end = slen;
+		else if (args[1].type == ACTION_STACK_VALUE_NULL)
+			end = 0;
+		else
+			end = stringArgToInt32(&args[1]);
+
+		// Handle negative indices (count from end)
+		if (start < 0) start = slen + start;
+		if (end < 0) end = slen + end;
+
+		// Clamp
+		if (start < 0) start = 0;
+		if (end < 0) end = 0;
+		if (start > slen) start = slen;
+		if (end > slen) end = slen;
+
+		// Unlike substring, slice does NOT swap (returns "" if start >= end)
+		int length = end - start;
+		if (length <= 0)
+		{
+			PUSH_STR("", 0);
+		}
+		else
+		{
+			// Convert UTF-16 indices to byte offsets
+			int byte_start = utf16_to_byte[start];
+			int byte_end = utf16_to_byte[end];
+			pushSubstring(app_context, str_value, byte_start, byte_end - byte_start);
+		}
+		return 1;
+	}
+
+	// concat(str1, str2, ...) - variable arguments
+	if (method_name_len == 6 && strncmp(method_name, "concat", 6) == 0)
+	{
+		if (num_args == 0)
+		{
+			// concat() with no args → return copy of this string
+			pushSubstring(app_context, str_value, 0, (int)str_len);
+			return 1;
+		}
+
+		// First pass: compute total length
+		int total_len = (int)str_len;
+		char arg_bufs[16][64]; // temp buffers for non-string arg coercion
+		const char* arg_strs[16];
+		int arg_lens[16];
+		int effective_args = num_args > 16 ? 16 : num_args;
+
+		int swf_ver = EFFECTIVE_SWF_VERSION();
+		for (int i = 0; i < effective_args; i++)
+		{
+			// SWF5: undefined in concat is "" (empty string)
+			if (swf_ver < 6 && args[i].type == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				arg_strs[i] = "";
+				arg_lens[i] = 0;
+			}
+			else
+			{
+				arg_strs[i] = stringArgToString(app_context, &args[i], &arg_lens[i], arg_bufs[i], 64);
+			}
+			total_len += arg_lens[i];
+		}
+
+		// Allocate and build result
+		char* result = (char*) HALLOC(total_len + 1);
+		memcpy(result, str_value, str_len);
+		int pos = (int)str_len;
+		for (int i = 0; i < effective_args; i++)
+		{
+			memcpy(result + pos, arg_strs[i], arg_lens[i]);
+			pos += arg_lens[i];
+		}
+		result[pos] = '\0';
+		PUSH_STR(result, pos);
+		return 1;
+	}
+
+	// indexOf(searchString, startIndex) - 0-2 arguments
 	if (method_name_len == 7 && strncmp(method_name, "indexOf", 7) == 0)
 	{
-		const char* search_str = "";
-		int search_len = 0;
-		int start_index = 0;
-
-		if (num_args > 0)
+		// No args → return undefined
+		if (num_args == 0)
 		{
-			if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				search_str = (const char*)args[0].data.numeric_value;
-				search_len = args[0].str_size;
-			}
+			pushUndefined(app_context);
+			return 1;
 		}
-		if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_F32)
+
+		// Coerce search string from argument
+		char search_buf[256];
+		const char* search_str;
+		int search_len;
+		// SWF5: undefined arg → search for "" (empty string)
+		if (EFFECTIVE_SWF_VERSION() < 6 && args[0].type == ACTION_STACK_VALUE_UNDEFINED)
 		{
-			start_index = (int)VAL(float, &args[1].data.numeric_value);
+			search_str = "";
+			search_len = 0;
+		}
+		else
+		{
+			search_str = stringArgToString(app_context, &args[0], &search_len, search_buf, sizeof(search_buf));
+		}
+
+		// Parse start index (in UTF-16 units)
+		int start_index = 0;
+		if (num_args > 1)
+		{
+			double sv = stringArgToNumber(&args[1]);
+			if (!isnan(sv))
+				start_index = (int32_t)(int64_t)sv;
+			// Flash: negative start → search from beginning
 			if (start_index < 0) start_index = 0;
 		}
 
-		// Search for substring
+		// Search for substring (byte-level search, UTF-16 index result)
+		int found_index = -1;
+		int slen = (int)str_len; // byte length for search
+		if (search_len == 0)
+		{
+			// Empty search string: return start_index if in range (UTF-16)
+			found_index = start_index <= utf16_len ? start_index : -1;
+		}
+		else if (search_len <= slen)
+		{
+			// Convert UTF-16 start_index to byte offset
+			int byte_start = 0;
+			if (start_index > 0 && start_index <= utf16_len)
+				byte_start = utf16_to_byte[start_index];
+			else if (start_index > utf16_len)
+				byte_start = slen; // past end
+
+			for (int i = byte_start; i <= slen - search_len; i++)
+			{
+				if (memcmp(str_value + i, search_str, search_len) == 0)
+				{
+					// Convert byte offset to UTF-16 index
+					found_index = byte_offset_to_utf16_index(utf16_to_byte, utf16_len, i);
+					break;
+				}
+			}
+		}
+
+		float result = (float)found_index;
+		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return 1;
+	}
+
+	// lastIndexOf(searchString, endIndex) - 0-2 arguments
+	if (method_name_len == 11 && strncmp(method_name, "lastIndexOf", 11) == 0)
+	{
+		// No args → return undefined
+		if (num_args == 0)
+		{
+			pushUndefined(app_context);
+			return 1;
+		}
+
+		// Coerce search string from argument
+		char search_buf[256];
+		const char* search_str;
+		int search_len;
+		// SWF5: undefined arg → search for "" (empty string)
+		if (EFFECTIVE_SWF_VERSION() < 6 && args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			search_str = "";
+			search_len = 0;
+		}
+		else
+		{
+			search_str = stringArgToString(app_context, &args[0], &search_len, search_buf, sizeof(search_buf));
+		}
+
+		// Parse end index (position to start searching backwards from, in UTF-16 units)
+		int slen = (int)str_len; // byte length for search
+		int end_index = utf16_len; // default: search from end (UTF-16 units)
+		if (num_args > 1)
+		{
+			double ev = stringArgToNumber(&args[1]);
+			if (!isnan(ev))
+			{
+				end_index = (int32_t)(int64_t)ev;
+			}
+			// else: undefined → search from end (keep default)
+		}
+
+		// Search backwards
 		int found_index = -1;
 		if (search_len == 0)
 		{
-			found_index = start_index <= str_len ? start_index : -1;
+			// Empty search string: return min(end_index, utf16_len) in UTF-16 units
+			if (end_index < 0) found_index = -1;
+			else found_index = end_index <= utf16_len ? end_index : utf16_len;
 		}
-		else if (search_len <= (int)str_len)
+		else if (search_len <= slen)
 		{
-			for (int i = start_index; i <= (int)str_len - search_len; i++)
+			// Convert end_index from UTF-16 to byte offset for limiting search
+			int byte_end = slen;
+			if (end_index >= 0 && end_index <= utf16_len)
+				byte_end = utf16_to_byte[end_index];
+			else if (end_index < 0)
+				byte_end = -1;
+
+			// Start from min(byte_end, str_len - search_len) and go backwards
+			int start_from = slen - search_len;
+			if (byte_end < start_from) start_from = byte_end;
+			for (int i = start_from; i >= 0; i--)
 			{
-				int match = 1;
-				for (int j = 0; j < search_len; j++)
+				if (memcmp(str_value + i, search_str, search_len) == 0)
 				{
-					if (str_value[i + j] != search_str[j])
-					{
-						match = 0;
-						break;
-					}
-				}
-				if (match)
-				{
-					found_index = i;
+					// Convert byte offset to UTF-16 index
+					found_index = byte_offset_to_utf16_index(utf16_to_byte, utf16_len, i);
 					break;
 				}
 			}
@@ -14813,20 +15374,24 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 	// split(delimiter, limit) - 0-2 arguments
 	if (method_name_len == 5 && strncmp(method_name, "split", 5) == 0)
 	{
-		const char* delim = NULL;
-		int delim_len = 0;
-		int limit = -1;  // -1 = no limit
+		int slen = (int)str_len;
 
-		if (num_args > 0)
+		// SWF version affects split behavior
+		int swf_ver = EFFECTIVE_SWF_VERSION();
+
+		// No args or undefined delimiter
+		if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED)
 		{
-			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			if (swf_ver < 6)
 			{
-				delim = (const char*)args[0].data.numeric_value;
-				delim_len = args[0].str_size;
+				// SWF5: split() and split(undefined) use "," as delimiter
+				// Fall through to normal split logic with "," delimiter
+				// by constructing a fake comma arg
+				// (handled below by setting delim/delim_len directly)
 			}
-			else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			else
 			{
-				// undefined delimiter → return array with whole string
+				// SWF6+: split() and split(undefined) return whole string as 1 element
 				ASArray* arr = allocArray(app_context, 1);
 				ActionVar elem = {0};
 				elem.type = ACTION_STACK_VALUE_STRING;
@@ -14837,23 +15402,45 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 				return 1;
 			}
 		}
+
+		// Coerce delimiter to string
+		char delim_buf[256];
+		const char* delim;
+		int delim_len;
+		// SWF5: undefined/no-args fell through here with "," as delimiter
+		if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			delim = ",";
+			delim_len = 1;
+		}
 		else
 		{
-			// No args → return array with whole string
-			ASArray* arr = allocArray(app_context, 1);
-			ActionVar elem = {0};
-			elem.type = ACTION_STACK_VALUE_STRING;
-			elem.str_size = str_len;
-			elem.data.numeric_value = (u64)str_value;
-			setArrayElement(app_context, arr, 0, &elem);
-			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
-			return 1;
+			delim = stringArgToString(app_context, &args[0], &delim_len, delim_buf, sizeof(delim_buf));
 		}
 
+		// Parse limit
+		int limit = -1;
 		if (num_args > 1)
 		{
-			double lv = varToDouble(&args[1]);
-			if (lv >= 0) limit = (int)lv;
+			if (args[1].type == ACTION_STACK_VALUE_UNDEFINED)
+				limit = -1; // no limit
+			else if (args[1].type == ACTION_STACK_VALUE_NULL)
+				limit = 0;
+			else
+			{
+				double lv = stringArgToNumber(&args[1]);
+				if (!isnan(lv))
+				{
+					limit = (int)lv;
+					if (limit < 0) limit = 0;
+				}
+			}
+		}
+
+		if (limit == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)allocArray(app_context, 1));
+			return 1;
 		}
 
 		ASArray* arr = allocArray(app_context, 4);
@@ -14861,24 +15448,38 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 
 		if (delim_len == 0)
 		{
-			// Empty delimiter → split each character
-			for (int i = 0; i < (int)str_len; i++)
+			if (swf_ver < 6)
 			{
-				if (limit >= 0 && (int)count >= limit) break;
-				char* ch = (char*) HALLOC(2);
-				ch[0] = str_value[i];
-				ch[1] = '\0';
+				// SWF5: split("") returns array with whole string as one element
 				ActionVar elem = {0};
 				elem.type = ACTION_STACK_VALUE_STRING;
-				elem.str_size = 1;
-				elem.data.numeric_value = (u64)ch;
-				setArrayElement(app_context, arr, count++, &elem);
+				elem.str_size = str_len;
+				elem.data.numeric_value = (u64)str_value;
+				setArrayElement(app_context, arr, 0, &elem);
+			}
+			else
+			{
+				// SWF6+: split each UTF-16 code unit
+				for (int u = 0; u < utf16_len; u++)
+				{
+					if (limit >= 0 && (int)count >= limit) break;
+					char buf[4];
+					int n = utf16_unit_to_utf8(utf16_units[u], buf);
+					char* ch = (char*) HALLOC(n + 1);
+					memcpy(ch, buf, n);
+					ch[n] = '\0';
+					ActionVar elem = {0};
+					elem.type = ACTION_STACK_VALUE_STRING;
+					elem.str_size = n;
+					elem.data.numeric_value = (u64)ch;
+					setArrayElement(app_context, arr, count++, &elem);
+				}
 			}
 		}
 		else
 		{
 			int start = 0;
-			for (int i = 0; i <= (int)str_len - delim_len; i++)
+			for (int i = 0; i <= slen - delim_len; i++)
 			{
 				if (limit >= 0 && (int)count >= limit) break;
 				if (memcmp(&str_value[i], delim, delim_len) == 0)
@@ -14899,7 +15500,7 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 			// Add remaining segment
 			if (limit < 0 || (int)count < limit)
 			{
-				int seg_len = str_len - start;
+				int seg_len = slen - start;
 				char* seg = (char*) HALLOC(seg_len + 1);
 				memcpy(seg, &str_value[start], seg_len);
 				seg[seg_len] = '\0';
@@ -14912,6 +15513,20 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 		}
 
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
+		return 1;
+	}
+
+	// toString() - return the string itself
+	if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
+	{
+		pushSubstring(app_context, str_value, 0, (int)str_len);
+		return 1;
+	}
+
+	// valueOf() - return the string itself
+	if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
+	{
+		pushSubstring(app_context, str_value, 0, (int)str_len);
 		return 1;
 	}
 
