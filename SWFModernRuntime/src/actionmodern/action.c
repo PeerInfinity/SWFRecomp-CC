@@ -24,6 +24,7 @@
 // Forward declarations for array helpers (defined later in file)
 static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size);
 static double varToDoubleSimple(ActionVar* v);
+static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args);
@@ -633,6 +634,18 @@ static ASFunction g_math_funcs[18];
 static ASObject* g_math_object = NULL;
 static int g_math_init_done = 0;
 
+// ============================================================================
+// Geometry class globals (Point, Matrix, Rectangle)
+// ============================================================================
+static ASObject* g_point_prototype = NULL;
+static ASObject* g_matrix_prototype = NULL;
+static ASObject* g_rect_prototype = NULL;
+static ASFunction g_point_methods[7];   // toString, add, subtract, equals, clone, offset, normalize
+static ASFunction g_point_statics[3];   // distance, interpolate, polar
+static ASFunction g_matrix_methods[12]; // toString, clone, identity, scale, rotate, translate, concat, invert, createBox, createGradientBox, transformPoint, deltaTransformPoint
+static ASFunction g_rect_methods[15];   // toString, clone, equals, isEmpty, setEmpty, contains, containsPoint, containsRectangle, inflate, inflatePoint, intersection, intersects, offset, offsetPoint, union
+static int g_geom_init_done = 0;
+
 // Coerce Math arguments to f64 via the stack (calls valueOf on objects).
 // Flash coerces min(arg_count, max_args) arguments, left to right.
 static void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, u32 max_args)
@@ -1218,6 +1231,1184 @@ static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc
 	setProperty(app_context, transform, "pixelBounds", 11, &pb_val);
 
 	return transform;
+}
+
+// ============================================================================
+// Geometry class implementations (Point, Matrix, Rectangle)
+// ============================================================================
+
+// Helper: convert ActionVar to string in buf, calling toString for objects
+static int varToStringBufFull(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size)
+{
+	if (v == NULL) { buf[0] = '\0'; return 0; }
+	if (v->type == ACTION_STACK_VALUE_OBJECT && v->data.numeric_value != 0)
+	{
+		int ts_found = 0;
+		ActionVar ts = objectCallToString(app_context, v, &ts_found);
+		if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+		{
+			const uint16_t* u16 = varGetU16Ptr(&ts);
+			if (u16 && ts.str_size > 0) return u16_to_utf8(u16, ts.str_size, buf, buf_size);
+		}
+		return snprintf(buf, buf_size, "[object Object]");
+	}
+	// Normalize -0 → 0 for float/double
+	if (v->type == ACTION_STACK_VALUE_F64) {
+		double d = VAL(double, &v->data.numeric_value);
+		if (d == 0.0 && signbit(d)) return snprintf(buf, buf_size, "0");
+	} else if (v->type == ACTION_STACK_VALUE_F32) {
+		float f = VAL(float, &v->data.numeric_value);
+		if (f == 0.0f && signbit(f)) return snprintf(buf, buf_size, "0");
+	}
+	return varToStringBuf(app_context, v, buf, buf_size);
+}
+
+// Helper: read a named property from an object ActionVar (returns NULL if not object)
+static ActionVar* geomGetProp(ActionVar* obj_var, const char* name, u32 len)
+{
+	if (obj_var == NULL) return NULL;
+	if (obj_var->type == ACTION_STACK_VALUE_OBJECT && obj_var->data.numeric_value != 0)
+		return getProperty((ASObject*)obj_var->data.numeric_value, name, len);
+	return NULL;
+}
+
+// Helper: read a property as double, returning NAN if the property is missing
+// (unlike varToDoubleSimple(NULL) which returns 0.0)
+static double propToDouble(ASObject* obj, const char* name, u32 name_len)
+{
+	ActionVar* prop = getProperty(obj, name, name_len);
+	if (prop == NULL) return NAN;
+	return varToDoubleSimple(prop);
+}
+
+// Helper: create a Point object with x and y properties
+static ASObject* createPointObj(SWFAppContext* app_context, ActionVar* x_val, ActionVar* y_val)
+{
+	ASObject* obj = allocObject(app_context, 4);
+	ActionVar proto_var = {0};
+	proto_var.type = ACTION_STACK_VALUE_OBJECT;
+	proto_var.data.numeric_value = (u64) g_point_prototype;
+	setProperty(app_context, obj, "__proto__", 9, &proto_var);
+	if (x_val) setProperty(app_context, obj, "x", 1, x_val);
+	if (y_val) setProperty(app_context, obj, "y", 1, y_val);
+	return obj;
+}
+
+// Helper: create a Point object from two doubles
+static ASObject* createPointObjF64(SWFAppContext* app_context, double x, double y)
+{
+	ActionVar xv = {0}, yv = {0};
+	xv.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &xv.data.numeric_value) = x;
+	yv.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &yv.data.numeric_value) = y;
+	return createPointObj(app_context, &xv, &yv);
+}
+
+// Helper: create a Rectangle object with x, y, width, height properties
+static ASObject* createRectObj(SWFAppContext* app_context, ActionVar* x, ActionVar* y, ActionVar* w, ActionVar* h)
+{
+	ASObject* obj = allocObject(app_context, 6);
+	ActionVar proto_var = {0};
+	proto_var.type = ACTION_STACK_VALUE_OBJECT;
+	proto_var.data.numeric_value = (u64) g_rect_prototype;
+	setProperty(app_context, obj, "__proto__", 9, &proto_var);
+	if (x) setProperty(app_context, obj, "x", 1, x);
+	if (y) setProperty(app_context, obj, "y", 1, y);
+	if (w) setProperty(app_context, obj, "width", 5, w);
+	if (h) setProperty(app_context, obj, "height", 6, h);
+	return obj;
+}
+
+// Helper: make an F64 ActionVar
+static inline ActionVar makeF64(double d)
+{
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &v.data.numeric_value) = d;
+	return v;
+}
+
+// Helper: register a method on a prototype
+static void registerGeomMethod(ASFunction* func, const char* name, Function2Ptr impl, SWFAppContext* app_context, ASObject* proto)
+{
+	memset(func, 0, sizeof(ASFunction));
+	strncpy(func->name, name, 255);
+	func->function_type = 2;
+	func->param_count = 0;
+	func->advanced_func = impl;
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = func;
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	VAL(u64, &fv.data.numeric_value) = (u64)func;
+	setProperty(app_context, proto, name, (u32)strlen(name), &fv);
+}
+
+// --- Point methods ---
+
+static ActionVar pointConstructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	if (arg_count == 0) {
+		ActionVar zero = makeF64(0.0);
+		setProperty(app_context, obj, "x", 1, &zero);
+		setProperty(app_context, obj, "y", 1, &zero);
+	} else if (arg_count == 1) {
+		setProperty(app_context, obj, "x", 1, &args[0]);
+		ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		setProperty(app_context, obj, "y", 1, &undef);
+	} else {
+		setProperty(app_context, obj, "x", 1, &args[0]);
+		setProperty(app_context, obj, "y", 1, &args[1]);
+	}
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar pointToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	char buf[512];
+	char xbuf[128], ybuf[128];
+	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
+	varToStringBufFull(app_context, xv, xbuf, sizeof(xbuf));
+	varToStringBufFull(app_context, yv, ybuf, sizeof(ybuf));
+	int len = snprintf(buf, sizeof(buf), "(x=%s, y=%s)", xbuf, ybuf);
+
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len;
+	uint16_t* u16 = ascii_to_u16(app_context, buf, len, &u16_len);
+	r.str_size = u16_len;
+	r.data.string_data.heap_ptr = u16;
+	r.data.string_data.owns_memory = true;
+	return r;
+}
+
+static ActionVar pointAdd(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar* tx = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* ty = obj ? getProperty(obj, "y", 1) : NULL;
+	double sx = varToDoubleSimple(tx), sy = varToDoubleSimple(ty);
+
+	// Read pt.x and pt.y from argument — non-object → NaN
+	double ox = NAN, oy = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		ox = propToDouble(pt, "x", 1);
+		oy = propToDouble(pt, "y", 1);
+	}
+
+	ASObject* result = createPointObjF64(app_context, sx + ox, sy + oy);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar pointSubtract(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar* tx = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* ty = obj ? getProperty(obj, "y", 1) : NULL;
+	double sx = varToDoubleSimple(tx), sy = varToDoubleSimple(ty);
+
+	// Read pt.x and pt.y from argument — non-object → NaN
+	double ox = NAN, oy = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		ox = propToDouble(pt, "x", 1);
+		oy = propToDouble(pt, "y", 1);
+	}
+
+	ASObject* result = createPointObjF64(app_context, sx - ox, sy - oy);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar pointEquals(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_BOOLEAN;
+	r.data.numeric_value = 0;
+	if (obj == NULL || arg_count == 0) return r;
+
+	ActionVar* tx = getProperty(obj, "x", 1);
+	ActionVar* ty = getProperty(obj, "y", 1);
+	double sx = varToDoubleSimple(tx), sy = varToDoubleSimple(ty);
+
+	if (args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		ActionVar* px = getProperty(pt, "x", 1);
+		ActionVar* py = getProperty(pt, "y", 1);
+		double ox = varToDoubleSimple(px), oy = varToDoubleSimple(py);
+		if (sx == ox && sy == oy) r.data.numeric_value = 1;
+	}
+	return r;
+}
+
+static ActionVar pointClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
+	ASObject* result = createPointObj(app_context, xv, yv);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar pointOffset(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	ActionVar* xv = getProperty(obj, "x", 1);
+	ActionVar* yv = getProperty(obj, "y", 1);
+	double sx = varToDoubleSimple(xv), sy = varToDoubleSimple(yv);
+
+	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+
+	ActionVar nxv = makeF64(sx + dx);
+	ActionVar nyv = makeF64(sy + dy);
+	setProperty(app_context, obj, "x", 1, &nxv);
+	setProperty(app_context, obj, "y", 1, &nyv);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar pointNormalize(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	ActionVar* xv = getProperty(obj, "x", 1);
+	ActionVar* yv = getProperty(obj, "y", 1);
+
+	// If x is undefined or y is null/undefined, special handling per Flash behavior
+	int x_is_non_numeric = (xv == NULL || xv->type == ACTION_STACK_VALUE_UNDEFINED ||
+	                         xv->type == ACTION_STACK_VALUE_OBJECT);
+	int y_is_null = (yv != NULL && yv->type == ACTION_STACK_VALUE_NULL);
+
+	if (x_is_non_numeric || y_is_null) {
+		// Can't normalize — set x/y to NaN if thickness is provided, else leave as-is
+		if (arg_count == 0) {
+			// normalize() with no thickness — set both to NaN only if non-special
+			if (!x_is_non_numeric) {
+				ActionVar nanv = makeF64(NAN);
+				setProperty(app_context, obj, "x", 1, &nanv);
+			}
+			if (!y_is_null) {
+				ActionVar nanv = makeF64(NAN);
+				setProperty(app_context, obj, "y", 1, &nanv);
+			}
+		}
+		// With thickness but non-numeric x or null y — leave unchanged
+		ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+	}
+
+	double sx = varToDoubleSimple(xv);
+	double sy = varToDoubleSimple(yv);
+	double thickness = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double length = sqrt(sx * sx + sy * sy);
+
+	if (length > 0) {
+		double scale = thickness / length;
+		ActionVar nxv = makeF64(sx * scale);
+		ActionVar nyv = makeF64(sy * scale);
+		setProperty(app_context, obj, "x", 1, &nxv);
+		setProperty(app_context, obj, "y", 1, &nyv);
+	}
+	// length == 0: no change
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+// Point static methods
+static ActionVar pointDistance(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar r = {0};
+	if (arg_count < 2) { r.type = ACTION_STACK_VALUE_F64; VAL(double, &r.data.numeric_value) = NAN; return r; }
+
+	// Both args must be Point instances (check __proto__)
+	for (int i = 0; i < 2; i++) {
+		if (args[i].type != ACTION_STACK_VALUE_OBJECT || args[i].data.numeric_value == 0) {
+			r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+		}
+		ActionVar* proto = getProperty((ASObject*)args[i].data.numeric_value, "__proto__", 9);
+		if (proto == NULL || proto->type != ACTION_STACK_VALUE_OBJECT ||
+		    (ASObject*)proto->data.numeric_value != g_point_prototype) {
+			r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+		}
+	}
+
+	ASObject* p1 = (ASObject*)args[0].data.numeric_value;
+	ASObject* p2 = (ASObject*)args[1].data.numeric_value;
+	double x1 = varToDoubleSimple(getProperty(p1, "x", 1));
+	double y1 = varToDoubleSimple(getProperty(p1, "y", 1));
+	double x2 = varToDoubleSimple(getProperty(p2, "x", 1));
+	double y2 = varToDoubleSimple(getProperty(p2, "y", 1));
+	double dx = x2 - x1, dy = y2 - y1;
+
+	r.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &r.data.numeric_value) = sqrt(dx * dx + dy * dy);
+	return r;
+}
+
+static ActionVar pointInterpolate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	// Point.interpolate(pt1, pt2, f) → Point(pt2.x + f*(pt1.x-pt2.x), pt2.y + f*(pt1.y-pt2.y))
+	double x1 = NAN, y1 = NAN, x2 = NAN, y2 = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		x1 = varToDoubleSimple(getProperty((ASObject*)args[0].data.numeric_value, "x", 1));
+		y1 = varToDoubleSimple(getProperty((ASObject*)args[0].data.numeric_value, "y", 1));
+	}
+	if (arg_count > 1 && args[1].type == ACTION_STACK_VALUE_OBJECT && args[1].data.numeric_value != 0) {
+		x2 = varToDoubleSimple(getProperty((ASObject*)args[1].data.numeric_value, "x", 1));
+		y2 = varToDoubleSimple(getProperty((ASObject*)args[1].data.numeric_value, "y", 1));
+	}
+	double f = (arg_count > 2) ? varToDoubleSimple(&args[2]) : NAN;
+
+	ASObject* result = createPointObjF64(app_context, x2 + f * (x1 - x2), y2 + f * (y1 - y2));
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar pointPolar(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	double len = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double angle = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+
+	ASObject* result = createPointObjF64(app_context, len * cos(angle), len * sin(angle));
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+// --- Matrix methods ---
+
+static ActionVar matrixConstructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	static const char* names[] = {"a","b","c","d","tx","ty"};
+	static const u32 lens[] = {1,1,1,1,2,2};
+	static const double defaults[] = {1,0,0,1,0,0};
+
+	if (arg_count == 0) {
+		for (int i = 0; i < 6; i++) {
+			ActionVar v = makeF64(defaults[i]);
+			setProperty(app_context, obj, names[i], lens[i], &v);
+		}
+	} else {
+		u32 count = arg_count < 6 ? arg_count : 6;
+		for (u32 i = 0; i < count; i++)
+			setProperty(app_context, obj, names[i], lens[i], &args[i]);
+		for (u32 i = count; i < 6; i++) {
+			ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			setProperty(app_context, obj, names[i], lens[i], &undef);
+		}
+	}
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixToStringDynamic(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	char buf[1024];
+	static const char* names[] = {"a","b","c","d","tx","ty"};
+	static const u32 lens[] = {1,1,1,1,2,2};
+	char vals[6][128];
+	for (int i = 0; i < 6; i++) {
+		ActionVar* v = obj ? getProperty(obj, names[i], lens[i]) : NULL;
+		varToStringBufFull(app_context, v, vals[i], sizeof(vals[i]));
+	}
+	int len = snprintf(buf, sizeof(buf), "(a=%s, b=%s, c=%s, d=%s, tx=%s, ty=%s)",
+	                   vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
+
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len;
+	uint16_t* u16 = ascii_to_u16(app_context, buf, len, &u16_len);
+	r.str_size = u16_len;
+	r.data.string_data.heap_ptr = u16;
+	r.data.string_data.owns_memory = true;
+	return r;
+}
+
+static ActionVar matrixClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ASObject* result = allocObject(app_context, 8);
+	ActionVar proto_var = {0};
+	proto_var.type = ACTION_STACK_VALUE_OBJECT;
+	proto_var.data.numeric_value = (u64) g_matrix_prototype;
+	setProperty(app_context, result, "__proto__", 9, &proto_var);
+
+	static const char* names[] = {"a","b","c","d","tx","ty"};
+	static const u32 lens[] = {1,1,1,1,2,2};
+	for (int i = 0; i < 6; i++) {
+		ActionVar* v = obj ? getProperty(obj, names[i], lens[i]) : NULL;
+		if (v) setProperty(app_context, result, names[i], lens[i], v);
+	}
+
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar matrixIdentity(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+	static const char* names[] = {"a","b","c","d","tx","ty"};
+	static const u32 lens[] = {1,1,1,1,2,2};
+	static const double vals[] = {1,0,0,1,0,0};
+	for (int i = 0; i < 6; i++) {
+		ActionVar v = makeF64(vals[i]);
+		setProperty(app_context, obj, names[i], lens[i], &v);
+	}
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixScale(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double sx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double sy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+
+	// a*=sx, c*=sx, tx*=sx, b*=sy, d*=sy, ty*=sy
+	double a = varToDoubleSimple(getProperty(obj, "a", 1));
+	double b = varToDoubleSimple(getProperty(obj, "b", 1));
+	double c = varToDoubleSimple(getProperty(obj, "c", 1));
+	double d = varToDoubleSimple(getProperty(obj, "d", 1));
+	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
+	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+
+	ActionVar va = makeF64(a * sx); setProperty(app_context, obj, "a", 1, &va);
+	ActionVar vb = makeF64(b * sy); setProperty(app_context, obj, "b", 1, &vb);
+	ActionVar vc = makeF64(c * sx); setProperty(app_context, obj, "c", 1, &vc);
+	ActionVar vd = makeF64(d * sy); setProperty(app_context, obj, "d", 1, &vd);
+	ActionVar vtx = makeF64(tx * sx); setProperty(app_context, obj, "tx", 2, &vtx);
+	ActionVar vty = makeF64(ty * sy); setProperty(app_context, obj, "ty", 2, &vty);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixRotate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double angle = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double cosA = cos(angle), sinA = sin(angle);
+
+	double a = varToDoubleSimple(getProperty(obj, "a", 1));
+	double b = varToDoubleSimple(getProperty(obj, "b", 1));
+	double c = varToDoubleSimple(getProperty(obj, "c", 1));
+	double d = varToDoubleSimple(getProperty(obj, "d", 1));
+	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
+	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+
+	double na = a * cosA + b * (-sinA);
+	double nb = a * sinA + b * cosA;
+	double nc = c * cosA + d * (-sinA);
+	double nd = c * sinA + d * cosA;
+	double ntx = tx * cosA + ty * (-sinA);
+	double nty = tx * sinA + ty * cosA;
+
+	ActionVar va = makeF64(na); setProperty(app_context, obj, "a", 1, &va);
+	ActionVar vb = makeF64(nb); setProperty(app_context, obj, "b", 1, &vb);
+	ActionVar vc = makeF64(nc); setProperty(app_context, obj, "c", 1, &vc);
+	ActionVar vd = makeF64(nd); setProperty(app_context, obj, "d", 1, &vd);
+	ActionVar vtx = makeF64(ntx); setProperty(app_context, obj, "tx", 2, &vtx);
+	ActionVar vty = makeF64(nty); setProperty(app_context, obj, "ty", 2, &vty);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixTranslate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+
+	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
+	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+
+	ActionVar vtx = makeF64(tx + dx); setProperty(app_context, obj, "tx", 2, &vtx);
+	ActionVar vty = makeF64(ty + dy); setProperty(app_context, obj, "ty", 2, &vty);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixConcat(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double a = varToDoubleSimple(getProperty(obj, "a", 1));
+	double b = varToDoubleSimple(getProperty(obj, "b", 1));
+	double c = varToDoubleSimple(getProperty(obj, "c", 1));
+	double d = varToDoubleSimple(getProperty(obj, "d", 1));
+	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
+	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+
+	double ma = NAN, mb = NAN, mc = NAN, md = NAN, mtx = NAN, mty = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* m = (ASObject*)args[0].data.numeric_value;
+		ma = varToDoubleSimple(getProperty(m, "a", 1));
+		mb = varToDoubleSimple(getProperty(m, "b", 1));
+		mc = varToDoubleSimple(getProperty(m, "c", 1));
+		md = varToDoubleSimple(getProperty(m, "d", 1));
+		mtx = varToDoubleSimple(getProperty(m, "tx", 2));
+		mty = varToDoubleSimple(getProperty(m, "ty", 2));
+	}
+
+	// Right multiply: this = this * m
+	double na  = a * ma + b * mc;
+	double nb  = a * mb + b * md;
+	double nc  = c * ma + d * mc;
+	double nd  = c * mb + d * md;
+	double ntx = tx * ma + ty * mc + mtx;
+	double nty = tx * mb + ty * md + mty;
+
+	ActionVar va = makeF64(na); setProperty(app_context, obj, "a", 1, &va);
+	ActionVar vb = makeF64(nb); setProperty(app_context, obj, "b", 1, &vb);
+	ActionVar vc = makeF64(nc); setProperty(app_context, obj, "c", 1, &vc);
+	ActionVar vd = makeF64(nd); setProperty(app_context, obj, "d", 1, &vd);
+	ActionVar vtx = makeF64(ntx); setProperty(app_context, obj, "tx", 2, &vtx);
+	ActionVar vty = makeF64(nty); setProperty(app_context, obj, "ty", 2, &vty);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixInvert(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double a = varToDoubleSimple(getProperty(obj, "a", 1));
+	double b = varToDoubleSimple(getProperty(obj, "b", 1));
+	double c = varToDoubleSimple(getProperty(obj, "c", 1));
+	double d = varToDoubleSimple(getProperty(obj, "d", 1));
+	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
+	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+
+	double det = a * d - b * c;
+	double inv_det = 1.0 / det;
+
+	double na  =  d * inv_det;
+	double nb  = -b * inv_det;
+	double nc  = -c * inv_det;
+	double nd  =  a * inv_det;
+	double ntx = (c * ty - d * tx) * inv_det;
+	double nty = (b * tx - a * ty) * inv_det;
+
+	ActionVar va = makeF64(na); setProperty(app_context, obj, "a", 1, &va);
+	ActionVar vb = makeF64(nb); setProperty(app_context, obj, "b", 1, &vb);
+	ActionVar vc = makeF64(nc); setProperty(app_context, obj, "c", 1, &vc);
+	ActionVar vd = makeF64(nd); setProperty(app_context, obj, "d", 1, &vd);
+	ActionVar vtx = makeF64(ntx); setProperty(app_context, obj, "tx", 2, &vtx);
+	ActionVar vty = makeF64(nty); setProperty(app_context, obj, "ty", 2, &vty);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixCreateBox(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double sx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double sy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+	double rot = (arg_count > 2) ? varToDoubleSimple(&args[2]) : NAN;
+	double dtx = (arg_count > 3) ? varToDoubleSimple(&args[3]) : 0.0;
+	double dty = (arg_count > 4) ? varToDoubleSimple(&args[4]) : 0.0;
+
+	double cosR = cos(rot), sinR = sin(rot);
+	ActionVar va = makeF64(sx * cosR); setProperty(app_context, obj, "a", 1, &va);
+	ActionVar vb = makeF64(sy * sinR); setProperty(app_context, obj, "b", 1, &vb);
+	ActionVar vc = makeF64(-sx * sinR); setProperty(app_context, obj, "c", 1, &vc);
+	ActionVar vd = makeF64(sy * cosR); setProperty(app_context, obj, "d", 1, &vd);
+	ActionVar vtx = makeF64(dtx); setProperty(app_context, obj, "tx", 2, &vtx);
+	ActionVar vty = makeF64(dty); setProperty(app_context, obj, "ty", 2, &vty);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixCreateGradientBox(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double w = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double h = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+	double rot = (arg_count > 2) ? varToDoubleSimple(&args[2]) : 0.0;
+	double dtx = (arg_count > 3) ? varToDoubleSimple(&args[3]) : 0.0;
+	double dty = (arg_count > 4) ? varToDoubleSimple(&args[4]) : 0.0;
+
+	double scaleX = w / 1638.4;
+	double scaleY = h / 1638.4;
+	double cosR = cos(rot), sinR = sin(rot);
+	ActionVar va = makeF64(scaleX * cosR); setProperty(app_context, obj, "a", 1, &va);
+	ActionVar vb = makeF64(scaleY * sinR); setProperty(app_context, obj, "b", 1, &vb);
+	ActionVar vc = makeF64(-scaleX * sinR); setProperty(app_context, obj, "c", 1, &vc);
+	ActionVar vd = makeF64(scaleY * cosR); setProperty(app_context, obj, "d", 1, &vd);
+	ActionVar vtx = makeF64(dtx + w / 2.0); setProperty(app_context, obj, "tx", 2, &vtx);
+	ActionVar vty = makeF64(dty + h / 2.0); setProperty(app_context, obj, "ty", 2, &vty);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar matrixTransformPoint(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	double a = varToDoubleSimple(obj ? getProperty(obj, "a", 1) : NULL);
+	double b = varToDoubleSimple(obj ? getProperty(obj, "b", 1) : NULL);
+	double c = varToDoubleSimple(obj ? getProperty(obj, "c", 1) : NULL);
+	double d = varToDoubleSimple(obj ? getProperty(obj, "d", 1) : NULL);
+	double tx = varToDoubleSimple(obj ? getProperty(obj, "tx", 2) : NULL);
+	double ty = varToDoubleSimple(obj ? getProperty(obj, "ty", 2) : NULL);
+
+	double px = NAN, py = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		px = propToDouble(pt, "x", 1);
+		py = propToDouble(pt, "y", 1);
+	}
+
+	ASObject* result = createPointObjF64(app_context, a * px + c * py + tx, b * px + d * py + ty);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar matrixDeltaTransformPoint(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	double a = varToDoubleSimple(obj ? getProperty(obj, "a", 1) : NULL);
+	double b = varToDoubleSimple(obj ? getProperty(obj, "b", 1) : NULL);
+	double c = varToDoubleSimple(obj ? getProperty(obj, "c", 1) : NULL);
+	double d = varToDoubleSimple(obj ? getProperty(obj, "d", 1) : NULL);
+
+	double px = NAN, py = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		px = propToDouble(pt, "x", 1);
+		py = propToDouble(pt, "y", 1);
+	}
+
+	ASObject* result = createPointObjF64(app_context, a * px + c * py, b * px + d * py);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+// --- Rectangle methods ---
+
+static ActionVar rectangleConstructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	static const char* names[] = {"x","y","width","height"};
+	static const u32 lens[] = {1,1,5,6};
+
+	if (arg_count == 0) {
+		ActionVar zero = makeF64(0.0);
+		for (int i = 0; i < 4; i++)
+			setProperty(app_context, obj, names[i], lens[i], &zero);
+	} else {
+		u32 count = arg_count < 4 ? arg_count : 4;
+		for (u32 i = 0; i < count; i++)
+			setProperty(app_context, obj, names[i], lens[i], &args[i]);
+		for (u32 i = count; i < 4; i++) {
+			ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			setProperty(app_context, obj, names[i], lens[i], &undef);
+		}
+	}
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar rectToStringDynamic(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	char buf[512];
+	char xb[64], yb[64], wb[64], hb[64];
+	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
+	ActionVar* wv = obj ? getProperty(obj, "width", 5) : NULL;
+	ActionVar* hv = obj ? getProperty(obj, "height", 6) : NULL;
+	varToStringBufFull(app_context, xv, xb, sizeof(xb));
+	varToStringBufFull(app_context, yv, yb, sizeof(yb));
+	varToStringBufFull(app_context, wv, wb, sizeof(wb));
+	varToStringBufFull(app_context, hv, hb, sizeof(hb));
+	int len = snprintf(buf, sizeof(buf), "(x=%s, y=%s, w=%s, h=%s)", xb, yb, wb, hb);
+
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len;
+	uint16_t* u16 = ascii_to_u16(app_context, buf, len, &u16_len);
+	r.str_size = u16_len;
+	r.data.string_data.heap_ptr = u16;
+	r.data.string_data.owns_memory = true;
+	return r;
+}
+
+static ActionVar rectClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
+	ActionVar* wv = obj ? getProperty(obj, "width", 5) : NULL;
+	ActionVar* hv = obj ? getProperty(obj, "height", 6) : NULL;
+	ASObject* result = createRectObj(app_context, xv, yv, wv, hv);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar rectEquals(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_BOOLEAN;
+	r.data.numeric_value = 0;
+	if (obj == NULL || arg_count == 0) return r;
+
+	// Must be a Rectangle instance
+	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return r;
+	ASObject* other = (ASObject*)args[0].data.numeric_value;
+	ActionVar* proto = getProperty(other, "__proto__", 9);
+	if (proto == NULL || proto->type != ACTION_STACK_VALUE_OBJECT ||
+	    (ASObject*)proto->data.numeric_value != g_rect_prototype) return r;
+
+	double sx = varToDoubleSimple(getProperty(obj, "x", 1));
+	double sy = varToDoubleSimple(getProperty(obj, "y", 1));
+	double sw = varToDoubleSimple(getProperty(obj, "width", 5));
+	double sh = varToDoubleSimple(getProperty(obj, "height", 6));
+	double ox = propToDouble(other, "x", 1);
+	double oy = propToDouble(other, "y", 1);
+	double ow = propToDouble(other, "width", 5);
+	double oh = propToDouble(other, "height", 6);
+
+	if (sx == ox && sy == oy && sw == ow && sh == oh)
+		r.data.numeric_value = 1;
+	return r;
+}
+
+static ActionVar rectIsEmpty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_BOOLEAN;
+	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
+	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	// isEmpty: !(width > 0 && height > 0) — NaN/undefined → true
+	r.data.numeric_value = (w > 0 && h > 0) ? 0 : 1;
+	return r;
+}
+
+static ActionVar rectSetEmpty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj) {
+		ActionVar zero = makeF64(0.0);
+		setProperty(app_context, obj, "x", 1, &zero);
+		setProperty(app_context, obj, "y", 1, &zero);
+		setProperty(app_context, obj, "width", 5, &zero);
+		setProperty(app_context, obj, "height", 6, &zero);
+	}
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar rectContains(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar r = {0};
+
+	if (arg_count < 2) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double px = varToDoubleSimple(&args[0]);
+	double py = varToDoubleSimple(&args[1]);
+	if (isnan(px) || isnan(py)) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
+	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
+	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
+	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+
+	r.type = ACTION_STACK_VALUE_BOOLEAN;
+	r.data.numeric_value = (px >= x && px < x + w && py >= y && py < y + h) ? 1 : 0;
+	return r;
+}
+
+static ActionVar rectContainsPoint(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar r = {0};
+
+	if (arg_count == 0) { r.type = ACTION_STACK_VALUE_BOOLEAN; r.data.numeric_value = 0; return r; }
+
+	double px, py;
+	if (args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		px = propToDouble(pt, "x", 1);
+		py = propToDouble(pt, "y", 1);
+	} else {
+		px = NAN; py = NAN;
+	}
+
+	if (isnan(px) || isnan(py)) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
+	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
+	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
+	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+
+	r.type = ACTION_STACK_VALUE_BOOLEAN;
+	r.data.numeric_value = (px >= x && px < x + w && py >= y && py < y + h) ? 1 : 0;
+	return r;
+}
+
+static ActionVar rectContainsRectangle(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar r = {0};
+
+	if (arg_count == 0 || args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) {
+		r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+	}
+
+	ASObject* other = (ASObject*)args[0].data.numeric_value;
+	double ox = propToDouble(other, "x", 1);
+	double oy = propToDouble(other, "y", 1);
+	double ow = propToDouble(other, "width", 5);
+	double oh = propToDouble(other, "height", 6);
+
+	if (isnan(ox) || isnan(oy) || isnan(ow) || isnan(oh)) {
+		r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+	}
+
+	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
+	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
+	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
+	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+
+	double right = x + w, bottom = y + h;
+	double oright = ox + ow, obottom = oy + oh;
+
+	r.type = ACTION_STACK_VALUE_BOOLEAN;
+	r.data.numeric_value = (ox >= x && oy >= y && oright <= right && obottom <= bottom) ? 1 : 0;
+	return r;
+}
+
+static ActionVar rectInflate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+
+	double x = varToDoubleSimple(getProperty(obj, "x", 1));
+	double y = varToDoubleSimple(getProperty(obj, "y", 1));
+	double w = varToDoubleSimple(getProperty(obj, "width", 5));
+	double h = varToDoubleSimple(getProperty(obj, "height", 6));
+
+	ActionVar vx = makeF64(x - dx); setProperty(app_context, obj, "x", 1, &vx);
+	ActionVar vy = makeF64(y - dy); setProperty(app_context, obj, "y", 1, &vy);
+	ActionVar vw = makeF64(w + 2 * dx); setProperty(app_context, obj, "width", 5, &vw);
+	ActionVar vh = makeF64(h + 2 * dy); setProperty(app_context, obj, "height", 6, &vh);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar rectInflatePoint(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double dx = NAN, dy = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		dx = propToDouble(pt, "x", 1);
+		dy = propToDouble(pt, "y", 1);
+	}
+
+	double x = varToDoubleSimple(getProperty(obj, "x", 1));
+	double y = varToDoubleSimple(getProperty(obj, "y", 1));
+	double w = varToDoubleSimple(getProperty(obj, "width", 5));
+	double h = varToDoubleSimple(getProperty(obj, "height", 6));
+
+	ActionVar vx = makeF64(x - dx); setProperty(app_context, obj, "x", 1, &vx);
+	ActionVar vy = makeF64(y - dy); setProperty(app_context, obj, "y", 1, &vy);
+	ActionVar vw = makeF64(w + 2 * dx); setProperty(app_context, obj, "width", 5, &vw);
+	ActionVar vh = makeF64(h + 2 * dy); setProperty(app_context, obj, "height", 6, &vh);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar rectIntersection(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+
+	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
+	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
+	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
+	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+
+	double ox = NAN, oy = NAN, ow = NAN, oh = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* other = (ASObject*)args[0].data.numeric_value;
+		ox = propToDouble(other, "x", 1);
+		oy = propToDouble(other, "y", 1);
+		ow = propToDouble(other, "width", 5);
+		oh = propToDouble(other, "height", 6);
+	}
+
+	double left = (x > ox) ? x : ox;
+	double top = (y > oy) ? y : oy;
+	double right = ((x + w) < (ox + ow)) ? (x + w) : (ox + ow);
+	double bottom = ((y + h) < (oh + oy)) ? (y + h) : (oh + oy);
+
+	ActionVar rx, ry, rw, rh;
+	if (right > left && bottom > top) {
+		rx = makeF64(left); ry = makeF64(top);
+		rw = makeF64(right - left); rh = makeF64(bottom - top);
+	} else {
+		rx = makeF64(0); ry = makeF64(0);
+		rw = makeF64(0); rh = makeF64(0);
+	}
+
+	ASObject* result = createRectObj(app_context, &rx, &ry, &rw, &rh);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+static ActionVar rectIntersects(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	// Calls intersection logic inline
+	ASObject* obj = (ASObject*) this_obj;
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_BOOLEAN;
+	r.data.numeric_value = 0;
+
+	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
+	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
+	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
+	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+
+	double ox = NAN, oy = NAN, ow = NAN, oh = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* other = (ASObject*)args[0].data.numeric_value;
+		ox = propToDouble(other, "x", 1);
+		oy = propToDouble(other, "y", 1);
+		ow = propToDouble(other, "width", 5);
+		oh = propToDouble(other, "height", 6);
+	}
+
+	double left = (x > ox) ? x : ox;
+	double top = (y > oy) ? y : oy;
+	double right_val = ((x + w) < (ox + ow)) ? (x + w) : (ox + ow);
+	double bottom_val = ((y + h) < (oh + oy)) ? (y + h) : (oh + oy);
+
+	if (right_val > left && bottom_val > top)
+		r.data.numeric_value = 1;
+	return r;
+}
+
+static ActionVar rectOffset(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+
+	double x = varToDoubleSimple(getProperty(obj, "x", 1));
+	double y = varToDoubleSimple(getProperty(obj, "y", 1));
+
+	ActionVar vx = makeF64(x + dx); setProperty(app_context, obj, "x", 1, &vx);
+	ActionVar vy = makeF64(y + dy); setProperty(app_context, obj, "y", 1, &vy);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar rectOffsetPoint(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+
+	double dx = NAN, dy = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* pt = (ASObject*)args[0].data.numeric_value;
+		dx = propToDouble(pt, "x", 1);
+		dy = propToDouble(pt, "y", 1);
+	}
+
+	double x = varToDoubleSimple(getProperty(obj, "x", 1));
+	double y = varToDoubleSimple(getProperty(obj, "y", 1));
+
+	ActionVar vx = makeF64(x + dx); setProperty(app_context, obj, "x", 1, &vx);
+	ActionVar vy = makeF64(y + dy); setProperty(app_context, obj, "y", 1, &vy);
+
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+static ActionVar rectUnion(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+
+	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
+	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
+	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
+	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+
+	double ox = NAN, oy = NAN, ow = NAN, oh = NAN;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+		ASObject* other = (ASObject*)args[0].data.numeric_value;
+		ox = propToDouble(other, "x", 1);
+		oy = propToDouble(other, "y", 1);
+		ow = propToDouble(other, "width", 5);
+		oh = propToDouble(other, "height", 6);
+	}
+
+	double left = (x < ox) ? x : ox;
+	double top = (y < oy) ? y : oy;
+	double right_val = ((x + w) > (ox + ow)) ? (x + w) : (ox + ow);
+	double bottom_val = ((y + h) > (oh + oy)) ? (y + h) : (oh + oy);
+
+	ActionVar rx = makeF64(left), ry = makeF64(top);
+	ActionVar rw = makeF64(right_val - left), rh = makeF64(bottom_val - top);
+	ASObject* result = createRectObj(app_context, &rx, &ry, &rw, &rh);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) result;
+	return r;
+}
+
+// --- Geometry initialization ---
+
+static void initGeomPrototypes(SWFAppContext* app_context)
+{
+	if (g_geom_init_done) return;
+	g_geom_init_done = 1;
+
+	// Point prototype
+	g_point_prototype = allocObject(app_context, 12);
+	retainObject(g_point_prototype);
+	setObjectProto(app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[0], "toString",  (Function2Ptr)pointToString,  app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[1], "add",       (Function2Ptr)pointAdd,       app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[2], "subtract",  (Function2Ptr)pointSubtract,  app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[3], "equals",    (Function2Ptr)pointEquals,     app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[4], "clone",     (Function2Ptr)pointClone,      app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[5], "offset",    (Function2Ptr)pointOffset,     app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[6], "normalize", (Function2Ptr)pointNormalize,  app_context, g_point_prototype);
+
+	// Matrix prototype
+	g_matrix_prototype = allocObject(app_context, 16);
+	retainObject(g_matrix_prototype);
+	setObjectProto(app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[0],  "toString",            (Function2Ptr)matrixToStringDynamic,     app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[1],  "clone",               (Function2Ptr)matrixClone,               app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[2],  "identity",            (Function2Ptr)matrixIdentity,            app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[3],  "scale",               (Function2Ptr)matrixScale,               app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[4],  "rotate",              (Function2Ptr)matrixRotate,              app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[5],  "translate",           (Function2Ptr)matrixTranslate,           app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[6],  "concat",              (Function2Ptr)matrixConcat,              app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[7],  "invert",              (Function2Ptr)matrixInvert,              app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[8],  "createBox",           (Function2Ptr)matrixCreateBox,           app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[9],  "createGradientBox",   (Function2Ptr)matrixCreateGradientBox,   app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[10], "transformPoint",      (Function2Ptr)matrixTransformPoint,      app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[11], "deltaTransformPoint", (Function2Ptr)matrixDeltaTransformPoint, app_context, g_matrix_prototype);
+
+	// Rectangle prototype
+	g_rect_prototype = allocObject(app_context, 20);
+	retainObject(g_rect_prototype);
+	setObjectProto(app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[0],  "toString",           (Function2Ptr)rectToStringDynamic,    app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[1],  "clone",              (Function2Ptr)rectClone,              app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[2],  "equals",             (Function2Ptr)rectEquals,             app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[3],  "isEmpty",            (Function2Ptr)rectIsEmpty,            app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[4],  "setEmpty",           (Function2Ptr)rectSetEmpty,           app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[5],  "contains",           (Function2Ptr)rectContains,           app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[6],  "containsPoint",      (Function2Ptr)rectContainsPoint,      app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[7],  "containsRectangle",  (Function2Ptr)rectContainsRectangle,  app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[8],  "inflate",            (Function2Ptr)rectInflate,            app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[9],  "inflatePoint",       (Function2Ptr)rectInflatePoint,       app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[10], "intersection",       (Function2Ptr)rectIntersection,       app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[11], "intersects",         (Function2Ptr)rectIntersects,         app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[12], "offset",             (Function2Ptr)rectOffset,             app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[13], "offsetPoint",        (Function2Ptr)rectOffsetPoint,        app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[14], "union",              (Function2Ptr)rectUnion,              app_context, g_rect_prototype);
 }
 
 // Call just valueOf on an object. Returns the raw result (even if non-primitive).
@@ -8142,11 +9333,46 @@ void actionGetVariable(SWFAppContext* app_context)
 				MAKE_PKG(geom_obj, flash_object, "geom", 4, 8);
 				MAKE_STUB_CTOR(fc_ColorTransform, "ColorTransform");
 				SET_CTOR_PROP(geom_obj, "ColorTransform", 14, fc_ColorTransform);
-				MAKE_STUB_CTOR(fc_Matrix, "Matrix");
-				SET_CTOR_PROP(geom_obj, "Matrix", 6, fc_Matrix);
-				MAKE_STUB_CTOR(fc_Point, "Point");
+				// Initialize geometry prototypes (Point, Matrix, Rectangle)
+				initGeomPrototypes(app_context);
+
+				// Point constructor with prototype and static methods
+				static ASFunction fc_Point;
+				memset(&fc_Point, 0, sizeof(ASFunction));
+				strncpy(fc_Point.name, "Point", 255);
+				fc_Point.function_type = 2;
+				fc_Point.advanced_func = (Function2Ptr)pointConstructor;
+				fc_Point.prototype_obj = g_point_prototype;
+				retainObject(g_point_prototype);
+				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Point;
+				// Static methods on Point constructor (own_props)
+				fc_Point.own_props = allocObject(app_context, 4);
+				retainObject(fc_Point.own_props);
+				registerGeomMethod(&g_point_statics[0], "distance",    (Function2Ptr)pointDistance,    app_context, fc_Point.own_props);
+				registerGeomMethod(&g_point_statics[1], "interpolate", (Function2Ptr)pointInterpolate, app_context, fc_Point.own_props);
+				registerGeomMethod(&g_point_statics[2], "polar",       (Function2Ptr)pointPolar,       app_context, fc_Point.own_props);
 				SET_CTOR_PROP(geom_obj, "Point", 5, fc_Point);
-				MAKE_STUB_CTOR(fc_Rectangle, "Rectangle");
+
+				// Matrix constructor with prototype
+				static ASFunction fc_Matrix;
+				memset(&fc_Matrix, 0, sizeof(ASFunction));
+				strncpy(fc_Matrix.name, "Matrix", 255);
+				fc_Matrix.function_type = 2;
+				fc_Matrix.advanced_func = (Function2Ptr)matrixConstructor;
+				fc_Matrix.prototype_obj = g_matrix_prototype;
+				retainObject(g_matrix_prototype);
+				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Matrix;
+				SET_CTOR_PROP(geom_obj, "Matrix", 6, fc_Matrix);
+
+				// Rectangle constructor with prototype
+				static ASFunction fc_Rectangle;
+				memset(&fc_Rectangle, 0, sizeof(ASFunction));
+				strncpy(fc_Rectangle.name, "Rectangle", 255);
+				fc_Rectangle.function_type = 2;
+				fc_Rectangle.advanced_func = (Function2Ptr)rectangleConstructor;
+				fc_Rectangle.prototype_obj = g_rect_prototype;
+				retainObject(g_rect_prototype);
+				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Rectangle;
 				SET_CTOR_PROP(geom_obj, "Rectangle", 9, fc_Rectangle);
 				MAKE_STUB_CTOR(fc_Transform, "Transform");
 				SET_CTOR_PROP(geom_obj, "Transform", 9, fc_Transform);
@@ -10703,6 +11929,99 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
+			// Rectangle computed property setters
+			if (g_rect_prototype != NULL) {
+				ActionVar* __rp = getProperty(obj, "__proto__", 9);
+				if (__rp && __rp->type == ACTION_STACK_VALUE_OBJECT &&
+				    (ASObject*)__rp->data.numeric_value == g_rect_prototype) {
+					int rect_handled = 0;
+					if (prop_name_len == 4 && memcmp(prop_name, "left", 4) == 0) {
+						// left setter: width = (x + width) - new_left; x = new_left
+						double old_right = varToDoubleSimple(getProperty(obj, "x", 1)) +
+						                   varToDoubleSimple(getProperty(obj, "width", 5));
+						double new_left = varToDoubleSimple(&value_var);
+						ActionVar nw = makeF64(old_right - new_left);
+						setProperty(app_context, obj, "width", 5, &nw);
+						setProperty(app_context, obj, "x", 1, &value_var);
+						rect_handled = 1;
+					} else if (prop_name_len == 3 && memcmp(prop_name, "top", 3) == 0) {
+						double old_bottom = varToDoubleSimple(getProperty(obj, "y", 1)) +
+						                    varToDoubleSimple(getProperty(obj, "height", 6));
+						double new_top = varToDoubleSimple(&value_var);
+						ActionVar nh = makeF64(old_bottom - new_top);
+						setProperty(app_context, obj, "height", 6, &nh);
+						setProperty(app_context, obj, "y", 1, &value_var);
+						rect_handled = 1;
+					} else if (prop_name_len == 5 && memcmp(prop_name, "right", 5) == 0) {
+						double x = varToDoubleSimple(getProperty(obj, "x", 1));
+						double new_right = varToDoubleSimple(&value_var);
+						ActionVar nw = makeF64(new_right - x);
+						setProperty(app_context, obj, "width", 5, &nw);
+						rect_handled = 1;
+					} else if (prop_name_len == 6 && memcmp(prop_name, "bottom", 6) == 0) {
+						double y = varToDoubleSimple(getProperty(obj, "y", 1));
+						double new_bottom = varToDoubleSimple(&value_var);
+						ActionVar nh = makeF64(new_bottom - y);
+						setProperty(app_context, obj, "height", 6, &nh);
+						rect_handled = 1;
+					} else if (prop_name_len == 7 && memcmp(prop_name, "topLeft", 7) == 0) {
+						// topLeft setter: read pt.x, pt.y from value, then set left and top
+						ActionVar* ptx = NULL; ActionVar* pty = NULL;
+						if (value_var.type == ACTION_STACK_VALUE_OBJECT && value_var.data.numeric_value != 0) {
+							ASObject* pt = (ASObject*)value_var.data.numeric_value;
+							ptx = getProperty(pt, "x", 1);
+							pty = getProperty(pt, "y", 1);
+						}
+						// Set left (adjusts width)
+						double old_right = varToDoubleSimple(getProperty(obj, "x", 1)) +
+						                   varToDoubleSimple(getProperty(obj, "width", 5));
+						double new_left = ptx ? varToDoubleSimple(ptx) : NAN;
+						ActionVar nw = makeF64(old_right - new_left);
+						setProperty(app_context, obj, "width", 5, &nw);
+						if (ptx) setProperty(app_context, obj, "x", 1, ptx);
+						else { ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED; setProperty(app_context, obj, "x", 1, &uv); }
+						// Set top (adjusts height)
+						double old_bottom = varToDoubleSimple(getProperty(obj, "y", 1)) +
+						                    varToDoubleSimple(getProperty(obj, "height", 6));
+						double new_top = pty ? varToDoubleSimple(pty) : NAN;
+						ActionVar nh = makeF64(old_bottom - new_top);
+						setProperty(app_context, obj, "height", 6, &nh);
+						if (pty) setProperty(app_context, obj, "y", 1, pty);
+						else { ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED; setProperty(app_context, obj, "y", 1, &uv); }
+						rect_handled = 1;
+					} else if (prop_name_len == 11 && memcmp(prop_name, "bottomRight", 11) == 0) {
+						ActionVar* ptx = NULL; ActionVar* pty = NULL;
+						if (value_var.type == ACTION_STACK_VALUE_OBJECT && value_var.data.numeric_value != 0) {
+							ASObject* pt = (ASObject*)value_var.data.numeric_value;
+							ptx = getProperty(pt, "x", 1);
+							pty = getProperty(pt, "y", 1);
+						}
+						// right = pt.x → width = pt.x - x
+						double x = varToDoubleSimple(getProperty(obj, "x", 1));
+						ActionVar nw = makeF64((ptx ? varToDoubleSimple(ptx) : NAN) - x);
+						setProperty(app_context, obj, "width", 5, &nw);
+						// bottom = pt.y → height = pt.y - y
+						double y = varToDoubleSimple(getProperty(obj, "y", 1));
+						ActionVar nh = makeF64((pty ? varToDoubleSimple(pty) : NAN) - y);
+						setProperty(app_context, obj, "height", 6, &nh);
+						rect_handled = 1;
+					} else if (prop_name_len == 4 && memcmp(prop_name, "size", 4) == 0) {
+						ActionVar* ptx = NULL; ActionVar* pty = NULL;
+						if (value_var.type == ACTION_STACK_VALUE_OBJECT && value_var.data.numeric_value != 0) {
+							ASObject* pt = (ASObject*)value_var.data.numeric_value;
+							ptx = getProperty(pt, "x", 1);
+							pty = getProperty(pt, "y", 1);
+						}
+						// width = pt.x, height = pt.y
+						if (ptx) setProperty(app_context, obj, "width", 5, ptx);
+						else { ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED; setProperty(app_context, obj, "width", 5, &uv); }
+						if (pty) setProperty(app_context, obj, "height", 6, pty);
+						else { ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED; setProperty(app_context, obj, "height", 6, &uv); }
+						rect_handled = 1;
+					}
+					if (rect_handled) return;
+				}
+			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
 		}
@@ -11522,8 +12841,74 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 			if (!is_xml) {
-				// Property not found - push undefined
-				pushUndefined(app_context);
+				// Geometry computed properties
+				int geom_handled = 0;
+				if (g_point_prototype != NULL || g_rect_prototype != NULL) {
+					ActionVar* __proto_v = getProperty(obj, "__proto__", 9);
+					if (__proto_v && __proto_v->type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* proto = (ASObject*) __proto_v->data.numeric_value;
+						if (proto == g_point_prototype && prop_name_len == 6 && memcmp(prop_name, "length", 6) == 0) {
+							// Point.length getter
+							double x = varToDoubleSimple(getProperty(obj, "x", 1));
+							double y = varToDoubleSimple(getProperty(obj, "y", 1));
+							double len = sqrt(x * x + y * y);
+							ActionVar lv = makeF64(len);
+							pushVar(app_context, &lv);
+							geom_handled = 1;
+						} else if (proto == g_rect_prototype) {
+							// Rectangle computed getters
+							double rx = varToDoubleSimple(getProperty(obj, "x", 1));
+							double ry = varToDoubleSimple(getProperty(obj, "y", 1));
+							double rw = varToDoubleSimple(getProperty(obj, "width", 5));
+							double rh = varToDoubleSimple(getProperty(obj, "height", 6));
+							if (prop_name_len == 4 && memcmp(prop_name, "left", 4) == 0) {
+								ActionVar* xv = getProperty(obj, "x", 1);
+								if (xv) pushVar(app_context, xv); else pushUndefined(app_context);
+								geom_handled = 1;
+							} else if (prop_name_len == 3 && memcmp(prop_name, "top", 3) == 0) {
+								ActionVar* yv = getProperty(obj, "y", 1);
+								if (yv) pushVar(app_context, yv); else pushUndefined(app_context);
+								geom_handled = 1;
+							} else if (prop_name_len == 5 && memcmp(prop_name, "right", 5) == 0) {
+								ActionVar v = makeF64(rx + rw);
+								pushVar(app_context, &v);
+								geom_handled = 1;
+							} else if (prop_name_len == 6 && memcmp(prop_name, "bottom", 6) == 0) {
+								ActionVar v = makeF64(ry + rh);
+								pushVar(app_context, &v);
+								geom_handled = 1;
+							} else if (prop_name_len == 7 && memcmp(prop_name, "topLeft", 7) == 0) {
+								ActionVar* xxv = getProperty(obj, "x", 1);
+								ActionVar* yyv = getProperty(obj, "y", 1);
+								ASObject* pt = createPointObj(app_context, xxv, yyv);
+								ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+								pv.data.numeric_value = (u64)pt;
+								pushVar(app_context, &pv);
+								geom_handled = 1;
+							} else if (prop_name_len == 11 && memcmp(prop_name, "bottomRight", 11) == 0) {
+								ActionVar brx = makeF64(rx + rw);
+								ActionVar bry = makeF64(ry + rh);
+								ASObject* pt = createPointObj(app_context, &brx, &bry);
+								ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+								pv.data.numeric_value = (u64)pt;
+								pushVar(app_context, &pv);
+								geom_handled = 1;
+							} else if (prop_name_len == 4 && memcmp(prop_name, "size", 4) == 0) {
+								ActionVar* wv = getProperty(obj, "width", 5);
+								ActionVar* hv = getProperty(obj, "height", 6);
+								ASObject* pt = createPointObj(app_context, wv, hv);
+								ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+								pv.data.numeric_value = (u64)pt;
+								pushVar(app_context, &pv);
+								geom_handled = 1;
+							}
+						}
+					}
+				}
+				if (!geom_handled) {
+					// Property not found - push undefined
+					pushUndefined(app_context);
+				}
 			}
 		}
 	}
@@ -16406,6 +17791,95 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				char buf[17];
 				actionCallFunction(app_context, buf);
+			}
+			else
+			{
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+			return;
+		}
+
+		if (method_name_len == 5 && strncmp(method_name, "apply", 5) == 0)
+		{
+			// Function.apply(thisArg, argsArray)
+			if (func != NULL)
+			{
+				// Extract thisArg
+				void* this_obj = NULL;
+				if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT)
+					this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+
+				// Extract arguments from array
+				ActionVar* apply_args = NULL;
+				u32 apply_arg_count = 0;
+
+				if (num_args >= 2 && args[1].type == ACTION_STACK_VALUE_ARRAY)
+				{
+					ASArray* arr = (ASArray*)(uintptr_t) args[1].data.numeric_value;
+					if (arr != NULL)
+					{
+						apply_arg_count = arr->length;
+						if (apply_arg_count > 0)
+						{
+							apply_args = (ActionVar*) HALLOC(sizeof(ActionVar) * apply_arg_count);
+							for (u32 i = 0; i < apply_arg_count; i++)
+							{
+								ActionVar* elem = getArrayElement(arr, i);
+								if (elem != NULL)
+									apply_args[i] = *elem;
+								else
+								{
+									apply_args[i].type = ACTION_STACK_VALUE_UNDEFINED;
+									apply_args[i].data.numeric_value = 0;
+								}
+							}
+						}
+					}
+				}
+
+				if (g_call_depth >= g_max_call_depth - 1)
+				{
+					if (apply_args != NULL) FREE(apply_args);
+					if (args != NULL) FREE(args);
+					g_execution_halted = 1;
+					pushUndefined(app_context);
+				}
+				else if (func->function_type == 2)
+				{
+					ActionVar* registers = NULL;
+					if (func->register_count > 0)
+						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+					g_call_depth++;
+					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
+					g_call_depth--;
+
+					if (registers != NULL) FREE(registers);
+					if (apply_args != NULL) FREE(apply_args);
+					if (args != NULL) FREE(args);
+					pushVar(app_context, &result);
+				}
+				else if (func->function_type == 1 && func->simple_func != NULL)
+				{
+					// Push args onto stack for simple functions
+					for (u32 i = 0; i < apply_arg_count; i++)
+						pushVar(app_context, &apply_args[i]);
+
+					if (apply_args != NULL) FREE(apply_args);
+					if (args != NULL) FREE(args);
+
+					g_call_depth++;
+					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					g_call_depth--;
+					pushVar(app_context, &result);
+				}
+				else
+				{
+					if (apply_args != NULL) FREE(apply_args);
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+				}
 			}
 			else
 			{
