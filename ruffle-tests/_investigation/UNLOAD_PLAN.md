@@ -1,4 +1,5 @@
 # Unload / UnloadMovie Implementation Plan
+<!-- TESTS: unload_clip_event, unload_nested_child, unload, unloadmovie, unloadmovie_method, unloadmovienum, clip_events, clip_event_propagation_order, movieclip_depth_methods, remove_movie_clip, attach_movie, empty_movieclip_can_attach_movies -->
 
 Last updated: 2026-02-14
 

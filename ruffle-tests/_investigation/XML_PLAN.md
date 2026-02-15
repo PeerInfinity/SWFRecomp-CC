@@ -1,14 +1,65 @@
 # XML/XMLNode Implementation Plan
+<!-- TESTS: xml, xml_append_child, xml_append_child_with_parent, xml_attributes_read, xml_cdata, xml_child_nodes_edge_cases, xml_clone_expandos, xml_first_last_child, xml_has_child_nodes, xml_idmap, xml_ignore_comments, xml_ignore_white, xml_insert_before, xml_inspect_createmethods, xml_inspect_doctype, xml_inspect_parsexml, xml_inspect_xmldecl, xml_namespaces, xml_parent_and_child, xml_remove_node, xml_reparenting, xml_siblings, xml_to_string, xml_to_string_comment, xml_unescaping, xmlnode_proto, xml_load, xml_socket, xml_socket_close_in_handler, xml_socket_on_data, xml_socket_segmented, xml_getbytes, swf5_xml_event_handler_context -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-15
 
-## Overview
+## Status: ALL PHASES COMPLETE
 
-XML/XMLNode is the second largest category of failing Ruffle tests (33 tests). This document plans the implementation across phases, each building on the previous. The goal is to maximize test pass rate with each phase while keeping changes incremental and testable.
+All 7 phases have been implemented. 24 out of 26 active XML tests pass (92%).
 
-**Current state**: There is **zero** XML-related code in the runtime or recompiler. No XML constructor, no XMLNode constructor, no parser, no DOM methods. The `new XML()` call goes through `actionNewObject` which doesn't recognize "XML", so it creates a generic ASObject with no XML-specific behavior.
+### Implementation Commits
+- `c8c38b1` — Implement XML/XMLNode runtime support (phases 1-5) and add glob test filtering
+- `73a7b45` — Fix XML runtime bugs: memory allocator mismatches, reparenting, ignoreWhite, idMap, namespaces
+- `733a70e` — Fix regression: restrict varToStringBuf toString to XML nodes only
+- `0778863` — Fix actionPushRegister, actionNewObject _global lookup, CallMethod own_props, and XML namespace scanning
 
-**Key insight**: Unlike TextField (which needed recompiler changes to pass DefineEditText metadata), XML is entirely a runtime-side feature. The recompiler already correctly emits `actionNewObject(app_context)` for `new XML(...)` and `new XMLNode(...)`. All work is in `action.c` — implementing the constructors, the XML parser, the DOM tree, and the serialization.
+### Current Test Results
+
+| Test | Lines | Status |
+|------|-------|--------|
+| xml | 15/15 | **PASS** |
+| xml_append_child | 28/28 | **PASS** |
+| xml_append_child_with_parent | 20/20 | **PASS** |
+| xml_attributes_read | 4/4 | **PASS** |
+| xml_cdata | 11/11 | **PASS** |
+| xml_child_nodes_edge_cases | 3/4 | output_mismatch (1 line off) |
+| xml_clone_expandos | 19/19 | **PASS** |
+| xml_first_last_child | 8/8 | **PASS** |
+| xml_has_child_nodes | 3/3 | **PASS** |
+| xml_idmap | 21/21 | **PASS** |
+| xml_ignore_comments | 21/21 | **PASS** |
+| xml_ignore_white | 34/34 | **PASS** |
+| xml_insert_before | 20/20 | **PASS** |
+| xml_inspect_createmethods | 15/15 | **PASS** |
+| xml_inspect_doctype | 7/7 | **PASS** |
+| xml_inspect_parsexml | 62/62 | **PASS** |
+| xml_inspect_xmldecl | 7/7 | **PASS** |
+| xml_namespaces | 203/203 | **PASS** |
+| xml_parent_and_child | 5/5 | **PASS** |
+| xml_remove_node | 22/22 | **PASS** |
+| xml_reparenting | 14/14 | **PASS** |
+| xml_siblings | 10/10 | **PASS** |
+| xml_to_string | 11/13 | output_mismatch (2 lines off) |
+| xml_to_string_comment | 1/1 | **PASS** |
+| xml_unescaping | 23/23 | **PASS** |
+| xmlnode_proto | 1/1 | **PASS** |
+| **Total Active** | **587/589** | **24/26 PASS** |
+
+### Remaining Issues (2 tests)
+
+1. **xml_to_string** (11/13) — 2 lines off, likely an entity escaping or whitespace edge case in serialization
+2. **xml_child_nodes_edge_cases** (3/4) — 1 line off, likely a toString or childNodes mutation edge case
+
+### Deferred Tests (7 tests, network-dependent)
+- xml_load, xml_socket, xml_socket_close_in_handler, xml_socket_on_data, xml_socket_segmented — need network
+- xml_getbytes (9/17) — needs XML.load() for getBytesLoaded/getBytesTotal
+- swf5_xml_event_handler_context — needs loadMovie
+
+---
+
+## Original Plan (preserved for reference)
+
+The original plan below is preserved for architectural documentation purposes. All phases were implemented.
 
 ## Test Inventory (33 tests)
 

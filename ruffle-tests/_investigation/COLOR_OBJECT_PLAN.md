@@ -1,4 +1,5 @@
 # Color Object Implementation Plan
+<!-- TESTS: color, color_transform, transform, issue_1906, matrix -->
 
 Last updated: 2026-02-15
 

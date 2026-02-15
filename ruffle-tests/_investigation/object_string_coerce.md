@@ -1,4 +1,5 @@
 # object_string_coerce_swf5 / object_string_coerce_swf6 Investigation
+<!-- TESTS: object_string_coerce_swf5, object_string_coerce_swf6 -->
 
 ## Test Overview
 

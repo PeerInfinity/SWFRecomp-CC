@@ -1,4 +1,5 @@
 # With Statement Scope Implementation Plan
+<!-- TESTS: with, with_variable_scopes, define_local, this_scoping, closure_scope -->
 
 Last updated: 2026-02-15
 

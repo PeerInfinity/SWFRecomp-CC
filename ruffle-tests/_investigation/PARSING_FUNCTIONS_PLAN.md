@@ -1,12 +1,31 @@
 # Parsing Functions (parseInt/parseFloat) Implementation Plan
+<!-- TESTS: parse_int, parse_float, arguments -->
 
 Last updated: 2026-02-15
 
+## Status: PARTIALLY IMPLEMENTED
+
+### Implementation Commits
+- `3048065` — Implement global constructors/objects, rewrite parseInt, fix isFinite/isNaN
+
+### Current Results
+
+| Test | Lines | Status | Notes |
+|------|-------|--------|-------|
+| parse_int | 0/64 | output_mismatch | **Blocked by `arguments` object** — test wrapper function uses `arguments.length` and `arguments[N]` to call parseInt with variable arg counts. parseInt itself is rewritten and correct, but the test produces 0 output because `arguments` is not created for DefineFunction-style functions. |
+| parse_float | 43/74 | output_mismatch | No longer times out (was TIMEOUT). Partially working but edge cases remain. |
+
+### Key Blocker: `arguments` Object
+
+The `parse_int` test defines a `traceParseInt(...)` wrapper function (via `actionDefineFunction`, 0 named params) that reads `arguments.length` and `arguments[0..N]`. The runtime doesn't create an `arguments` local variable for DefineFunction-style calls. This is the reason for 0/64 — the wrapper silently fails before calling parseInt.
+
+**Fix required**: In `actionCallFunction` / `actionCallMethod`, when calling a DefineFunction-style function, create an `arguments` ASArray in the local scope with `length`, numeric indices for all passed args, and `callee` pointing to the function itself.
+
+---
+
 ## Overview
 
-Two tests cover the global `parseInt()` and `parseFloat()` functions. Both are currently failing: `parse_int` produces 0/64 matching lines and `parse_float` times out. Together these are only 2 tests, but both are extensively exercised by other tests that call parseInt/parseFloat indirectly, so getting them right improves overall correctness.
-
-**Current state**: Both functions exist as inline name-matched handlers inside `actionCallFunction()` in `action.c` (lines 13800-14033). parseInt has a reasonably complete implementation but is blocked by the test's dependency on the `arguments` object. parseFloat uses C's `atof()` with `float` precision, which produces wrong results for nearly every edge case.
+Two tests cover the global `parseInt()` and `parseFloat()` functions. Both are currently failing but have been partially fixed: parseInt was rewritten from `atoi()` to proper radix-aware parsing, parseFloat no longer times out.
 
 ## Test Inventory
 

@@ -1,4 +1,5 @@
 # Selection Object Implementation Plan
+<!-- TESTS: selection, selection_handlers, edittext_focus_selection, edittext_programmatic_focus -->
 
 Last updated: 2026-02-15
 

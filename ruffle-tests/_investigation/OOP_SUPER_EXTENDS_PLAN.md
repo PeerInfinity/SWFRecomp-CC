@@ -1,4 +1,5 @@
 # OOP / Super / Extends / Interfaces Implementation Plan
+<!-- TESTS: as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, as2_super_via_manual_prototype, extends_chain, extends_native_type, super_edge_cases, interface_implements_op -->
 
 Last updated: 2026-02-14
 

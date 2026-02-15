@@ -1,4 +1,5 @@
 # Object.watch / Object.unwatch Implementation Plan
+<!-- TESTS: watch, watch_textfield, watch_virtual_property, watch_virtual_property_proto -->
 
 Last updated: 2026-02-15
 

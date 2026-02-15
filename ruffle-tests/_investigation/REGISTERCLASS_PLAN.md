@@ -1,4 +1,5 @@
 # RegisterClass and Export/Registration Implementation Plan
+<!-- TESTS: register_class_return_value, register_class, register_class_swf6, register_class_with_sound, register_and_init_order, register_globals_across_frames, register_underflow, attach_movie, attach_movie_stop, export_assets, clip_constructors, on_construct, movieclip_init_object, empty_movieclip_can_attach_movies, do_init_action_child -->
 
 Last updated: 2026-02-14
 

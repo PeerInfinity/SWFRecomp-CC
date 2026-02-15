@@ -1,4 +1,5 @@
 # string_coercion Test Investigation
+<!-- TESTS: string_coercion -->
 
 ## Test Overview
 

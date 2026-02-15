@@ -1,4 +1,5 @@
 # Enumeration (for-in) Implementation Plan
+<!-- TESTS: enumerate, array_enumerate, new_object_enumerate, prototype_enumerate, stage_object_enumerate, globals_swf5, globals_swf6, globals_swf7, globals_swf8, stage_object_properties, as_set_prop_flags, prototype_properties, object_prototypes, is_prototype_of -->
 
 Last updated: 2026-02-15
 

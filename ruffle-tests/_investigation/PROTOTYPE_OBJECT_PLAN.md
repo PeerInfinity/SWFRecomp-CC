@@ -1,4 +1,5 @@
 # Prototype Chain and Object Properties Implementation Plan
+<!-- TESTS: is_prototype_of, object_prototypes, prototype_enumerate, prototype_properties, add_property, object_properties, as_set_prop_flags, as_set_prop_flags_version, object_resolve, coerce_to_primitive_resolve, boxed_primitives, init_object_order -->
 
 Last updated: 2026-02-14
 

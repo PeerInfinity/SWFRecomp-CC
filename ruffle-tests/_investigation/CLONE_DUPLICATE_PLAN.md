@@ -1,4 +1,5 @@
 # Clone/Duplicate MovieClip Implementation Plan
+<!-- TESTS: duplicate_movie_clip, clone_sprite_types, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, clip_events, clip_event_propagation_order, on_construct -->
 
 Last updated: 2026-02-14
 

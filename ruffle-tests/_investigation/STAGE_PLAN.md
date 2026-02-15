@@ -1,4 +1,5 @@
 # Stage Object Properties Implementation Plan
+<!-- TESTS: stage_object_properties, stage_object_properties_swf6, stage_object_children, stage_object_enumerate, stage_display_state, stage_property_representation, stage_scale_mode -->
 
 Last updated: 2026-02-14
 

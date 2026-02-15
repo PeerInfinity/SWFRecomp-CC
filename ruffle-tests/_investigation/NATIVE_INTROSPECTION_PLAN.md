@@ -1,4 +1,5 @@
 # Native Object/Function Introspection Implementation Plan
+<!-- TESTS: native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, native_double_construct, as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, extends_chain, extends_native_type, super_edge_cases, as2_super_via_manual_prototype, globals_swf5, globals_swf6, globals_swf7, globals_swf8, bitmap_filters -->
 
 Last updated: 2026-02-14
 

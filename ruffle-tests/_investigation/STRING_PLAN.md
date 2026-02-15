@@ -1,4 +1,5 @@
 # String Features Implementation Plan
+<!-- TESTS: string_methods_negative_args, string_methods_swfv5, string_methods, string_ops_swf6, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes -->
 
 Last updated: 2026-02-15 (Phases 1-4 complete)
 

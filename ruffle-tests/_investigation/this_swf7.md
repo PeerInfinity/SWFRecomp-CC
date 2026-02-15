@@ -1,4 +1,5 @@
 # this_swf7 Test Investigation
+<!-- TESTS: this_swf7 -->
 
 ## Test Overview
 

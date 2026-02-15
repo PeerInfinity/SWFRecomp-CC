@@ -1,6 +1,44 @@
 # Global Functions/Objects Implementation Plan
+<!-- TESTS: globals_swf5, globals_swf6, globals_swf7, globals_swf8, global_swf5_6_7_8_9, global_swf6_7_8, global_instance_decls, global_proto_decls, global_proto_decls_delete, swf5_global_funcs, swf6_global_funcs, swf7_global_funcs, math_min_max, parse_int, parse_float, is_finite, is_finite_swf6, primitive_type_globals, printjob_props_swf5, printjob_props_swf6, printjob_props_swf7, context_menu, context_menu_item, localconnection_properties, sound_props_swf5, sound_props_swf6, native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, as_set_prop_flags -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-15
+
+## Status: Phases 1-5 COMPLETE, Phases 6-8 NOT STARTED
+
+### Implementation Commits
+- `3048065` — Implement global constructors/objects, rewrite parseInt, fix isFinite/isNaN (Phases 1, 3-5)
+- `c5804d0` — Implement Math object with 17 methods and 8 constants (Phase 2)
+- `06244c7` — Set Object.prototype on built-in objects for proper toString inheritance
+
+### Current Pass Rates (after implementation)
+
+| Test | Lines | Pass Rate | Status | Notes |
+|------|-------|-----------|--------|-------|
+| globals_swf5 | 290/304 | 95% | output_mismatch | 14 lines off — CustomActions, XMLUI, mx.* |
+| globals_swf6 | 304/304 | 100% | **PASS** | |
+| globals_swf7 | 304/304 | 100% | **PASS** | |
+| globals_swf8 | 304/304 | 100% | **PASS** | flash.* namespace fully registered |
+| math_min_max | 101/101 | 100% | **PASS** | |
+| is_finite | 49/49 | 100% | **PASS** | |
+| is_finite_swf6 | 49/49 | 100% | **PASS** | |
+| parse_float | 43/74 | 58% | output_mismatch | No longer times out; edge cases remain |
+| parse_int | 0/64 | 0% | output_mismatch | Blocked by `arguments` object (see PARSING_FUNCTIONS_PLAN) |
+| primitive_type_globals | 320/557 | 57% | output_mismatch | Needs Phase 6 (Number.toString(radix)) |
+
+### Phase Completion Summary
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Register missing global constructors (stubs) | **DONE** |
+| 2 | Math object methods | **DONE** (see MATH_PLAN) |
+| 3 | Fix parseInt | **DONE** (rewritten, but test blocked by `arguments`) |
+| 4 | Fix parseFloat and isFinite | **DONE** (isFinite passes, parseFloat partially) |
+| 5 | flash.* namespace (SWF8+) | **DONE** |
+| 6 | Primitive type improvements (Number/Boolean/String) | NOT STARTED |
+| 7 | Prototype methods for stub classes | NOT STARTED |
+| 8 | Property flags (DONT_ENUM, DONT_DELETE, READ_ONLY) | NOT STARTED |
+
+---
 
 ## Overview
 
@@ -15,37 +53,6 @@ The "Global Functions/Objects" category covers tests that check which built-in c
 - **isFinite** (2 tests): is_finite, is_finite_swf6
 - **Primitive type globals** (1 test): primitive_type_globals
 - **Stub-only classes** (~12 tests): printjob_props, context_menu, context_menu_item, localconnection_properties, sound_props, stage/selection/etc.
-
-## Current Pass Rates
-
-| Test | Lines | Pass Rate | Category |
-|------|-------|-----------|----------|
-| globals_swf5 | 210/304 | 69% | Core globals |
-| globals_swf6 | 217/304 | 71% | Core globals |
-| globals_swf7 | 214/304 | 70% | Core globals |
-| globals_swf8 | 155/304 | 50% | Core globals |
-| global_swf5_6_7_8_9 | 0/1145 | 0% | Cross-version |
-| global_swf6_7_8 | 0/15 | 0% | Cross-version |
-| global_instance_decls | 1/758 | 0% | Instance props |
-| global_proto_decls | 4/4497 | 0% | Proto props |
-| global_proto_decls_delete | 0/4158 | 0% | Proto delete |
-| swf5_global_funcs | 1/232 | 0% | Global funcs |
-| swf6_global_funcs | 1/232 | 0% | Global funcs |
-| swf7_global_funcs | 1/232 | 0% | Global funcs |
-| math_min_max | 32/101 | 31% | Math |
-| parse_int | 0/64 | 0% | Parsing |
-| parse_float | timeout | 0% | Parsing |
-| is_finite | 24/49 | 48% | isFinite |
-| is_finite_swf6 | 24/49 | 48% | isFinite |
-| primitive_type_globals | 320/557 | 57% | Primitives |
-| printjob_props_swf5 | 0/45 | 0% | Stub class |
-| printjob_props_swf6 | 3/45 | 6% | Stub class |
-| printjob_props_swf7 | 2/45 | 4% | Stub class |
-| context_menu | 2/39 | 5% | Stub class |
-| context_menu_item | 2/41 | 4% | Stub class |
-| localconnection_properties | 4/8 | 50% | Stub class |
-| sound_props_swf5 | 36/68 | 52% | Stub class |
-| sound_props_swf6 | 31/68 | 45% | Stub class |
 
 ## What Tests Expect — Detailed Analysis
 

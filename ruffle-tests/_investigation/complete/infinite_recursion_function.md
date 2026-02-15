@@ -1,4 +1,5 @@
 # infinite_recursion_function Tests Investigation
+<!-- TESTS: infinite_recursion_function, infinite_recursion_function_in_setter, infinite_recursion_virtual_property -->
 
 Three related tests exercise recursion depth limiting in different scenarios.
 

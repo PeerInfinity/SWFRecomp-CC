@@ -12,9 +12,11 @@ Sections:
   3. Near-passing tests table (output_mismatch sorted by match %, "low-hanging fruit")
   4. Failure breakdown: segfaults, runtime errors, timeouts
   5. Full output_mismatch table
+  6. Investigation document reference table
 """
 
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -23,17 +25,86 @@ BASE_DIR = Path(__file__).parent.parent
 RUFFLE_DIR = BASE_DIR / "ruffle-tests"
 INVESTIGATION_DIR = RUFFLE_DIR / "_investigation"
 
+EXCLUDED_DOCS = {
+    "CURRENT_STATUS.md",
+    "FAILING_TESTS_BY_FEATURE_FILTERED.md",
+    "FAILING_TESTS_BY_FEATURE.md",
+    "SESSION_START_GUIDE.md",
+}
+
+_TESTS_RE = re.compile(r'<!--\s*TESTS:\s*(.+?)\s*-->')
+
 
 def load_results(path: Path) -> dict:
     with open(path) as f:
         return json.load(f)
 
 
-def get_investigation_files() -> set[str]:
-    """Return set of test names that have investigation .md files."""
+def build_investigation_index() -> tuple[dict[str, list[tuple[int, str]]], list[tuple[str, str, list[str]]]]:
+    """Parse investigation docs for <!-- TESTS: ... --> comments.
+
+    Scans _investigation/ and _investigation/complete/ for .md files
+    (excluding EXCLUDED_DOCS), parses the TESTS comment from each,
+    and builds a reverse index from test names to document numbers.
+
+    Returns:
+        test_to_docs: mapping test_name -> list of (doc_number, doc_rel_path)
+        doc_list: list of (doc_display_name, doc_rel_path, test_names) indexed by doc_number-1
+    """
     if not INVESTIGATION_DIR.is_dir():
-        return set()
-    return {p.stem for p in INVESTIGATION_DIR.glob("*.md")}
+        return {}, []
+
+    # Collect all candidate docs from both directories
+    candidates = []  # list of (display_name, rel_path, abs_path)
+
+    for p in INVESTIGATION_DIR.glob("*.md"):
+        if p.name in EXCLUDED_DOCS:
+            continue
+        rel = f"ruffle-tests/_investigation/{p.name}"
+        candidates.append((p.name, rel, p))
+
+    complete_dir = INVESTIGATION_DIR / "complete"
+    if complete_dir.is_dir():
+        for p in complete_dir.glob("*.md"):
+            rel = f"ruffle-tests/_investigation/complete/{p.name}"
+            candidates.append((p.name, rel, p))
+
+    # Sort alphabetically by display name (case-insensitive)
+    candidates.sort(key=lambda d: d[0].lower())
+
+    # Parse TESTS comments and build mappings
+    test_to_docs: dict[str, list[tuple[int, str]]] = {}
+    doc_list: list[tuple[str, str, list[str]]] = []
+
+    for display_name, rel_path, abs_path in candidates:
+        with open(abs_path) as f:
+            content = f.read()
+
+        m = _TESTS_RE.search(content)
+        if not m:
+            continue
+
+        test_names = [t.strip() for t in m.group(1).split(",") if t.strip()]
+        if not test_names:
+            continue
+
+        doc_number = len(doc_list) + 1
+        doc_list.append((display_name, rel_path, test_names))
+
+        for test_name in test_names:
+            if test_name not in test_to_docs:
+                test_to_docs[test_name] = []
+            test_to_docs[test_name].append((doc_number, rel_path))
+
+    return test_to_docs, doc_list
+
+
+def format_notes(test_name: str, test_to_docs: dict[str, list[tuple[int, str]]]) -> str:
+    """Format notes column with numbered investigation doc links."""
+    docs = test_to_docs.get(test_name, [])
+    if not docs:
+        return ""
+    return " ".join(f"[{num}]({path})" for num, path in docs)
 
 
 def match_rate(test: dict) -> float | None:
@@ -141,9 +212,8 @@ def generate_summary(data: dict) -> str:
     return "\n".join(md)
 
 
-def generate_passing_tests(data: dict) -> str:
+def generate_passing_tests(data: dict, test_to_docs: dict) -> str:
     md = []
-    investigations = get_investigation_files()
 
     passing = [t for t in data["tests"] if t["status"] == "pass"]
     passing.sort(key=lambda t: t["test"])
@@ -166,19 +236,16 @@ def generate_passing_tests(data: dict) -> str:
         lines = t.get("lines", {})
         line_str = str(lines.get("expected_lines", "")) if lines else ""
         dur = f"{t['duration']:.1f}s" if "duration" in t else ""
-        notes = ""
-        if name in investigations:
-            notes = "[investigation](ruffle-tests/_investigation/{}.md)".format(name)
+        notes = format_notes(name, test_to_docs)
         md.append(f"| {i} | `{name}` | {line_str} | {dur} | {notes} |")
 
     md.append("")
     return "\n".join(md)
 
 
-def generate_near_passing(data: dict) -> str:
+def generate_near_passing(data: dict, test_to_docs: dict) -> str:
     """Output_mismatch tests sorted by match rate descending — low-hanging fruit."""
     md = []
-    investigations = get_investigation_files()
 
     mismatches = [t for t in data["tests"] if t["status"] == "output_mismatch"]
 
@@ -215,18 +282,15 @@ def generate_near_passing(data: dict) -> str:
         matching = lines["matching_lines"]
         total = max(lines["actual_lines"], lines["expected_lines"])
         diff = total - matching
-        notes = ""
-        if name in investigations:
-            notes = "[investigation](ruffle-tests/_investigation/{}.md)".format(name)
+        notes = format_notes(name, test_to_docs)
         md.append(f"| {i} | `{name}` | {rate:.1f}% | {matching} | {total} | {diff} | {notes} |")
 
     md.append("")
     return "\n".join(md)
 
 
-def generate_segfaults(data: dict) -> str:
+def generate_segfaults(data: dict, test_to_docs: dict) -> str:
     md = []
-    investigations = get_investigation_files()
 
     segfaults = [t for t in data["tests"] if t["status"] == "segfault"]
     segfaults.sort(key=lambda t: t["test"])
@@ -247,18 +311,15 @@ def generate_segfaults(data: dict) -> str:
     for i, t in enumerate(segfaults, 1):
         name = t["test"]
         dur = f"{t['duration']:.1f}s" if "duration" in t else ""
-        notes = ""
-        if name in investigations:
-            notes = "[investigation](ruffle-tests/_investigation/{}.md)".format(name)
+        notes = format_notes(name, test_to_docs)
         md.append(f"| {i} | `{name}` | {dur} | {notes} |")
 
     md.append("")
     return "\n".join(md)
 
 
-def generate_runtime_errors(data: dict) -> str:
+def generate_runtime_errors(data: dict, test_to_docs: dict) -> str:
     md = []
-    investigations = get_investigation_files()
 
     errors = [t for t in data["tests"] if t["status"] == "runtime_error"]
     errors.sort(key=lambda t: t["test"])
@@ -280,18 +341,15 @@ def generate_runtime_errors(data: dict) -> str:
         name = t["test"]
         detail = t.get("detail", "")
         dur = f"{t['duration']:.1f}s" if "duration" in t else ""
-        notes = ""
-        if name in investigations:
-            notes = "[investigation](ruffle-tests/_investigation/{}.md)".format(name)
+        notes = format_notes(name, test_to_docs)
         md.append(f"| {i} | `{name}` | {detail} | {dur} | {notes} |")
 
     md.append("")
     return "\n".join(md)
 
 
-def generate_timeouts(data: dict) -> str:
+def generate_timeouts(data: dict, test_to_docs: dict) -> str:
     md = []
-    investigations = get_investigation_files()
 
     timeouts = [t for t in data["tests"] if t["status"] == "timeout"]
     timeouts.sort(key=lambda t: t["test"])
@@ -313,19 +371,16 @@ def generate_timeouts(data: dict) -> str:
         name = t["test"]
         detail = t.get("detail", "")
         dur = f"{t['duration']:.1f}s" if "duration" in t else ""
-        notes = ""
-        if name in investigations:
-            notes = "[investigation](ruffle-tests/_investigation/{}.md)".format(name)
+        notes = format_notes(name, test_to_docs)
         md.append(f"| {i} | `{name}` | {detail} | {dur} | {notes} |")
 
     md.append("")
     return "\n".join(md)
 
 
-def generate_output_mismatches(data: dict) -> str:
+def generate_output_mismatches(data: dict, test_to_docs: dict) -> str:
     """Full output_mismatch table sorted by match rate descending."""
     md = []
-    investigations = get_investigation_files()
 
     mismatches = [t for t in data["tests"] if t["status"] == "output_mismatch"]
 
@@ -365,11 +420,42 @@ def generate_output_mismatches(data: dict) -> str:
             match_str = "-"
             actual_str = "-"
             expected_str = "-"
-        notes = ""
-        if name in investigations:
-            notes = "[investigation](ruffle-tests/_investigation/{}.md)".format(name)
+        notes = format_notes(name, test_to_docs)
         md.append(f"| {i} | `{name}` | {rate_str} | {match_str} | {actual_str} | {expected_str} | {notes} |")
 
+    md.append("")
+    return "\n".join(md)
+
+
+def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], data: dict) -> str:
+    """Generate reference table mapping document numbers to file links with test counts."""
+    if not doc_list:
+        return ""
+
+    passing_tests = {t["test"] for t in data["tests"] if t["status"] == "pass"}
+
+    # Collect all tests referenced by any document
+    documented_tests = set()
+    for _name, _path, test_names in doc_list:
+        documented_tests.update(test_names)
+
+    all_test_names = {t["test"] for t in data["tests"]}
+    undocumented = all_test_names - documented_tests
+    undoc_total = len(undocumented)
+    undoc_passing = sum(1 for t in undocumented if t in passing_tests)
+    undoc_failing = undoc_total - undoc_passing
+
+    md = []
+    md.append("## Investigation Documents")
+    md.append("")
+    md.append("| # | Document | Tests | Passing | Failing |")
+    md.append("|---|----------|-------|---------|---------|")
+    for i, (name, path, test_names) in enumerate(doc_list, 1):
+        total = len(test_names)
+        passing = sum(1 for t in test_names if t in passing_tests)
+        failing = total - passing
+        md.append(f"| {i} | [{name}]({path}) | {total} | {passing} | {failing} |")
+    md.append(f"| | *(tests not in any document)* | {undoc_total} | {undoc_passing} | {undoc_failing} |")
     md.append("")
     return "\n".join(md)
 
@@ -385,15 +471,18 @@ def generate_one(results_path: Path, output_path: Path):
 
     print(f"Generating {output_path.name}...")
 
+    test_to_docs, doc_list = build_investigation_index()
+
     sections = [
         generate_header(data),
         generate_summary(data),
-        generate_passing_tests(data),
-        generate_near_passing(data),
-        generate_segfaults(data),
-        generate_runtime_errors(data),
-        generate_timeouts(data),
-        generate_output_mismatches(data),
+        generate_passing_tests(data, test_to_docs),
+        generate_near_passing(data, test_to_docs),
+        generate_segfaults(data, test_to_docs),
+        generate_runtime_errors(data, test_to_docs),
+        generate_timeouts(data, test_to_docs),
+        generate_output_mismatches(data, test_to_docs),
+        generate_investigation_legend(doc_list, data),
     ]
 
     markdown = "\n".join(s for s in sections if s)

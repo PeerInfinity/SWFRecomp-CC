@@ -1,4 +1,5 @@
 # Timer / setInterval Implementation Plan
+<!-- TESTS: set_interval, timer_run_actions, timeout -->
 
 Last updated: 2026-02-15
 

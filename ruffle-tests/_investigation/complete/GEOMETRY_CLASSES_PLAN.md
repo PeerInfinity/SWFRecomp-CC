@@ -1,4 +1,5 @@
 # Geometry Classes Implementation: Point, Rectangle, Matrix
+<!-- TESTS: point, matrix, rectangle, arguments, bitmap_data_pixeldissolve, bitmap_data_hittest, global_instance_decls -->
 
 Last updated: 2026-02-15
 

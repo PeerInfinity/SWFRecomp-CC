@@ -1,14 +1,62 @@
 # TextField/EditText Implementation Plan
+<!-- TESTS: text_format, text_format_rounding_swf7, text_format_rounding_swf8, edittext_default_format_font_style, edittext_antialiastype, edittext_default_format, edittext_default_format_empty, textfield_variable, textfield_properties, text_format_display, edittext_autosize_setter, textfield_background_color, textfield_border_color, textfield_text, edittext_password, textfield_maxchars, text_format_font_max_length, textfield_props_swf5, textfield_props_swf6, textfield_props_swf7, textfield_props_swf8, edittext_width_height, edittext_html_align_swf7, edittext_html_align_swf8, textfield_cache_as_bitmap, edittext_newline_stripping, edittext_newlines, edittext_programmatic_focus, edittext_autosize, edittext_font_size, edittext_text_height_leading, edittext_scroll, edittext_hscroll, edittext_html_roundtrip, edittext_html_color, edittext_html_condensewhite_swf7, edittext_html_condensewhite_swf8, edittext_html_entity, edittext_html_swf6, edittext_html_swf7, edittext_html_swf8, edittext_align, edittext_align_trailing_spaces_swf7, edittext_align_trailing_spaces_swf8, edittext_leading, edittext_margins, edittext_letter_spacing, edittext_tag_indent, edittext_bullet, edittext_underline, edittext_tab_stops, edittext_stylesheet, textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_props_swf5, textsnapshot_props_swf6, textsnapshot_text_order, edittext_drag_select, edittext_focus_selection, edittext_ime_focus_lost, edittext_input, edittext_input_newlines, edittext_password_copy, edittext_paste_empty, edittext_place_caret, edittext_restrict, edittext_restrict_paste, edittext_tab_focus, movieclip_create_text_field -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-15
+
+## Status: Phases 1-2 COMPLETE, Phase 3 PARTIAL
+
+### Implementation Commits
+- `8811360` — Phase 1: TextField constructor, prototype, and DefineEditText property expansion
+- `bce37d6` — Phase 2: TextFormat constructor and property coercion
+- `7532231` — Fix TextFormat rounding, display, font truncation, and constructor args
+- `bceacde` — Add TextField property support, font info registry, and variable binding
+- `cfa68f7` — Add path variable binding, child instance resolution, and MC cache invalidation
+- `2705024` — Add TextField autoSize setter coercion
+- `711e25a` — Fix TextField properties: createTextField, getTextFormat, kerning, type/sharpness coercion
+
+### Current Test Results (17 passing, many partially passing)
+
+| Test | Lines | Status | Phase |
+|------|-------|--------|-------|
+| text_format | 1146/1146 | **PASS** | 2 |
+| text_format_rounding_swf7 | 840/840 | **PASS** | 2 |
+| text_format_rounding_swf8 | 840/840 | **PASS** | 2 |
+| edittext_default_format_font_style | 335/335 | **PASS** | 2 |
+| edittext_antialiastype | 296/296 | **PASS** | 1 |
+| edittext_default_format | 221/221 | **PASS** | 2 |
+| edittext_default_format_empty | 95/95 | **PASS** | 2 |
+| textfield_variable | 81/81 | **PASS** | 3 |
+| textfield_properties | 44/44 | **PASS** | 1 |
+| text_format_display | 21/21 | **PASS** | 2 |
+| edittext_autosize_setter | 20/20 | **PASS** | 3 |
+| textfield_background_color | 11/11 | **PASS** | 1 |
+| textfield_border_color | 11/11 | **PASS** | 1 |
+| textfield_text | 7/7 | **PASS** | 1 |
+| edittext_password | 5/5 | **PASS** | 1 |
+| textfield_maxchars | 3/3 | **PASS** | 1 |
+| text_format_font_max_length | 2/2 | **PASS** | 2 |
+| textfield_props_swf6/7/8 | 208/210 (99%) | near-pass | 1 |
+| edittext_width_height | 97/103 (94%) | near-pass | 3 |
+| edittext_html_align_swf8 | 45/52 (87%) | near-pass | 5 |
+| edittext_html_align_swf7 | 42/52 (81%) | near-pass | 5 |
+
+### Phase Completion
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | TextField constructor and prototype | **DONE** |
+| 2 | TextFormat class | **DONE** |
+| 3 | Variable binding + width/height/autoSize | **PARTIAL** (variable binding done, autoSize setter done, width/height 94%) |
+| 4 | Scroll properties | NOT STARTED |
+| 5 | HTML text support | NOT STARTED (but htmlText getter partially works) |
+| 6 | Text layout formatting properties | NOT STARTED |
+| 7 | StyleSheet + TextSnapshot | NOT STARTED |
+
+---
 
 ## Overview
 
 TextField/EditText is the largest category of failing Ruffle tests (66 tests). This document plans the implementation across phases, each building on the previous. The goal is to maximize test pass rate with each phase while keeping changes incremental and testable.
-
-**Current state**: TextFields exist as MovieClip-like objects with a few properties stored on `dynamic_props` (text, htmlText, textColor, backgroundColor, borderColor, background, border, type, length, multiline, wordWrap, selectable, condenseWhite, maxChars). There is no TextField constructor/prototype, no TextFormat class, no getTextFormat/setTextFormat, and no variable binding.
-
-**Key insight**: The tests access TextField properties through the prototype chain and the `new TextFormat()` constructor. Currently, properties are stored as flat key/value pairs on each instance's `dynamic_props` ASObject. We need to move to a proper prototype-based approach where TextField is a constructor function with a prototype, and TextFormat is a separate constructor class.
 
 ## SWF Spec Reference
 
