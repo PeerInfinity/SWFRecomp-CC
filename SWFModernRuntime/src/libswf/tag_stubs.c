@@ -80,6 +80,12 @@ static struct {
 	s32 bounds_xmax;           // twips
 	s32 bounds_ymin;           // twips
 	s32 bounds_ymax;           // twips
+	// CSMTextSettings data (from tag 74, applied after DefineEditText)
+	char csm_antiAliasType[16]; // "normal" or "advanced"
+	char csm_gridFitType[16];   // "none", "pixel", or "subpixel"
+	float csm_thickness;        // default 0
+	float csm_sharpness;        // default 0
+	int csm_applied;            // 1 if CSMTextSettings was applied
 } ng_textfields[MAX_TEXTFIELDS_NG];
 static size_t ng_textfield_count = 0;
 
@@ -329,6 +335,21 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
 	ng_textfields[i].bounds_ymin = bounds_ymin;
 	ng_textfields[i].bounds_ymax = bounds_ymax;
 	ng_textfield_count++;
+}
+
+void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char* grid_fit_type, float thickness, float sharpness)
+{
+	// Find the textfield with the given char_id and apply CSMTextSettings
+	int idx = ng_find_textfield(text_id);
+	if (idx >= 0) {
+		strncpy(ng_textfields[idx].csm_antiAliasType, anti_alias_type, sizeof(ng_textfields[idx].csm_antiAliasType) - 1);
+		ng_textfields[idx].csm_antiAliasType[sizeof(ng_textfields[idx].csm_antiAliasType) - 1] = '\0';
+		strncpy(ng_textfields[idx].csm_gridFitType, grid_fit_type, sizeof(ng_textfields[idx].csm_gridFitType) - 1);
+		ng_textfields[idx].csm_gridFitType[sizeof(ng_textfields[idx].csm_gridFitType) - 1] = '\0';
+		ng_textfields[idx].csm_thickness = thickness;
+		ng_textfields[idx].csm_sharpness = sharpness;
+		ng_textfields[idx].csm_applied = 1;
+	}
 }
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
@@ -621,6 +642,36 @@ const char* ng_getTextFieldInitialTextByIdx(int tf_idx)
 {
 	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "";
 	return ng_textfields[tf_idx].plain_text;
+}
+
+int ng_getTextFieldCSMApplied(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].csm_applied;
+}
+
+const char* ng_getTextFieldCSMAntiAliasType(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "normal";
+	return ng_textfields[tf_idx].csm_antiAliasType;
+}
+
+const char* ng_getTextFieldCSMGridFitType(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "pixel";
+	return ng_textfields[tf_idx].csm_gridFitType;
+}
+
+float ng_getTextFieldCSMThickness(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0.0f;
+	return ng_textfields[tf_idx].csm_thickness;
+}
+
+float ng_getTextFieldCSMSharpness(int tf_idx)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0.0f;
+	return ng_textfields[tf_idx].csm_sharpness;
 }
 
 const char* ng_getFontName(u16 font_id)

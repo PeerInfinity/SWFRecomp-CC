@@ -1756,13 +1756,21 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 	// bullet (default false)
 	setProperty(app_context, tf_obj, "bullet", 6, &val);
 
-	// kerning
-	// getTextFormat returns true for kerning on SWF-derived fields,
-	// getNewTextFormat returns false for kerning
-	if (!is_new_text_format && tf_idx >= 0)
-		val.data.numeric_value = 1;
-	else
-		val.data.numeric_value = 0;
+	// kerning: for getTextFormat, parse from HTML kerning="1" attribute; for getNewTextFormat, default false
+	{
+		int kerning_val = 0;
+		if (!is_new_text_format && tf_idx >= 0) {
+			const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
+			if (raw_html != NULL) {
+				const char* kattr = strstr(raw_html, "kerning=\"");
+				if (kattr != NULL) {
+					kattr += 9; // skip past 'kerning="'
+					if (*kattr == '1') kerning_val = 1;
+				}
+			}
+		}
+		val.data.numeric_value = kerning_val;
+	}
 	setProperty(app_context, tf_obj, "kerning", 7, &val);
 
 	// leading (twips → pixels)
@@ -3509,22 +3517,55 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				ActionVar undef_val = {0};
 				undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
 				setProperty(app_context, props, "tabIndex", 8, &undef_val);
-				// sharpness (default 0)
-				setProperty(app_context, props, "sharpness", 9, &zero_val);
-				// thickness (default 0)
-				setProperty(app_context, props, "thickness", 9, &zero_val);
-				// antiAliasType (default "normal")
+				// CSMTextSettings-derived properties (or defaults)
+				extern int ng_getTextFieldCSMApplied(int idx);
+				extern const char* ng_getTextFieldCSMAntiAliasType(int idx);
+				extern const char* ng_getTextFieldCSMGridFitType(int idx);
+				extern float ng_getTextFieldCSMThickness(int idx);
+				extern float ng_getTextFieldCSMSharpness(int idx);
+				int csm_applied = ng_getTextFieldCSMApplied(tf_idx);
+				// antiAliasType
 				ActionVar aat_val = {0};
 				aat_val.type = ACTION_STACK_VALUE_STRING;
-				aat_val.str_size = 6;
-				VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+				if (csm_applied) {
+					const char* aat = ng_getTextFieldCSMAntiAliasType(tf_idx);
+					aat_val.str_size = strlen(aat);
+					VAL(u64, &aat_val.data.numeric_value) = (u64)aat;
+				} else {
+					aat_val.str_size = 6;
+					VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+				}
 				setProperty(app_context, props, "antiAliasType", 13, &aat_val);
-				// gridFitType (default "pixel")
+				// gridFitType
 				ActionVar gft_val = {0};
 				gft_val.type = ACTION_STACK_VALUE_STRING;
-				gft_val.str_size = 5;
-				VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+				if (csm_applied) {
+					const char* gft = ng_getTextFieldCSMGridFitType(tf_idx);
+					gft_val.str_size = strlen(gft);
+					VAL(u64, &gft_val.data.numeric_value) = (u64)gft;
+				} else {
+					gft_val.str_size = 5;
+					VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+				}
 				setProperty(app_context, props, "gridFitType", 11, &gft_val);
+				// thickness
+				if (csm_applied) {
+					ActionVar thick_val = {0};
+					thick_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &thick_val.data.numeric_value) = (double)ng_getTextFieldCSMThickness(tf_idx);
+					setProperty(app_context, props, "thickness", 9, &thick_val);
+				} else {
+					setProperty(app_context, props, "thickness", 9, &zero_val);
+				}
+				// sharpness
+				if (csm_applied) {
+					ActionVar sharp_val = {0};
+					sharp_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &sharp_val.data.numeric_value) = (double)ng_getTextFieldCSMSharpness(tf_idx);
+					setProperty(app_context, props, "sharpness", 9, &sharp_val);
+				} else {
+					setProperty(app_context, props, "sharpness", 9, &zero_val);
+				}
 				// filters (default empty array)
 				ASArray* filters_arr = allocArray(app_context, 0);
 				filters_arr->length = 0;
@@ -10147,6 +10188,94 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
+			// TextField type setter: normalize to lowercase, reject invalid values
+			if (prop_name_len == 4 && strncmp(prop_name, "type", 4) == 0
+				&& mc->ng_textfield_idx >= 0)
+			{
+				if (value_var.type == ACTION_STACK_VALUE_STRING) {
+					const char* s = (const char*) VAL(u64, &value_var.data.numeric_value);
+					if (s != NULL) {
+						if (strcasecmp(s, "dynamic") == 0) {
+							value_var.data.numeric_value = (u64)"dynamic";
+							value_var.str_size = 7;
+						} else if (strcasecmp(s, "input") == 0) {
+							value_var.data.numeric_value = (u64)"input";
+							value_var.str_size = 5;
+						} else {
+							// Invalid value: silently reject (keep previous)
+							return;
+						}
+					}
+				} else {
+					// Non-string: reject
+					return;
+				}
+			}
+			// TextField antiAliasType setter: validate
+			if (prop_name_len == 13 && strncmp(prop_name, "antiAliasType", 13) == 0
+				&& mc->ng_textfield_idx >= 0)
+			{
+				if (value_var.type == ACTION_STACK_VALUE_STRING) {
+					const char* s = (const char*) VAL(u64, &value_var.data.numeric_value);
+					if (s != NULL && (strcmp(s, "normal") == 0 || strcmp(s, "advanced") == 0)) {
+						// valid — allow through
+					} else {
+						return; // invalid: reject
+					}
+				} else {
+					return; // non-string: reject
+				}
+			}
+			// TextField gridFitType setter: validate
+			if (prop_name_len == 11 && strncmp(prop_name, "gridFitType", 11) == 0
+				&& mc->ng_textfield_idx >= 0)
+			{
+				if (value_var.type == ACTION_STACK_VALUE_STRING) {
+					const char* s = (const char*) VAL(u64, &value_var.data.numeric_value);
+					if (s != NULL && (strcmp(s, "none") == 0 || strcmp(s, "pixel") == 0 || strcmp(s, "subpixel") == 0)) {
+						// valid — allow through
+					} else {
+						return; // invalid: reject
+					}
+				} else {
+					return; // non-string: reject
+				}
+			}
+			// TextField sharpness/thickness setter: coerce to F64 with proper type conversion
+			// In Flash, setting these to undefined/null becomes NaN, strings get parsed, etc.
+			if ((prop_name_len == 9 && strncmp(prop_name, "sharpness", 9) == 0) ||
+				(prop_name_len == 9 && strncmp(prop_name, "thickness", 9) == 0))
+			{
+				if (mc->ng_textfield_idx >= 0 || (mc->dynamic_props != NULL &&
+					getPropertyWithPrototype((ASObject*)mc->dynamic_props, prop_name, prop_name_len) != NULL))
+				{
+					double d;
+					switch (value_var.type) {
+						case ACTION_STACK_VALUE_F64:
+							d = VAL(double, &value_var.data.numeric_value); break;
+						case ACTION_STACK_VALUE_F32:
+							d = (double)VAL(float, &value_var.data.numeric_value); break;
+						case ACTION_STACK_VALUE_BOOLEAN:
+							d = value_var.data.numeric_value ? 1.0 : 0.0; break;
+						case ACTION_STACK_VALUE_STRING: {
+							const char* s = (const char*)VAL(u64, &value_var.data.numeric_value);
+							if (s != NULL && s[0] != '\0') {
+								char* end;
+								d = strtod(s, &end);
+								while (*end == ' ' || *end == '\t') end++;
+								if (*end != '\0') d = NAN;
+							} else {
+								d = NAN;
+							}
+							break;
+						}
+						default:
+							d = NAN; break;
+					}
+					value_var.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &value_var.data.numeric_value) = d;
+				}
+			}
 			// TextField color properties: mask to 24-bit (0xFFFFFF)
 			if (strcmp(prop_name, "backgroundColor") == 0 ||
 				strcmp(prop_name, "borderColor") == 0 ||
@@ -13266,6 +13395,189 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		builtin_handled = 1;
 	}
 
+	// createTextField(name, depth, x, y, width, height) — MovieClip method called as CallFunction
+	// In Flash, calling createTextField() as a free function acts on the current MovieClip scope (_root).
+	else if (func_name_len == 15 && strncmp(func_name, "createTextField", 15) == 0)
+	{
+#ifdef NO_GRAPHICS
+		if (num_args >= 6) {
+			extern MovieClip root_movieclip;
+			MovieClip* mc = &root_movieclip;
+			const char* inst_name = "";
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+				inst_name = (const char*) args[0].data.numeric_value;
+			int depth_val = (int) varToDouble(&args[1]);
+			double x = varToDouble(&args[2]);
+			double y = varToDouble(&args[3]);
+			double w = varToDouble(&args[4]);
+			double h = varToDouble(&args[5]);
+			(void)depth_val;
+
+			MovieClip* child = createMovieClip(inst_name, mc);
+			child->x = (float) x;
+			child->y = (float) y;
+			child->width = (float) w;
+			child->height = (float) h;
+			child->ng_textfield_idx = -1;
+
+			if (child->dynamic_props == NULL) {
+				child->dynamic_props = (void*) allocObject(app_context, 32);
+				retainObject((ASObject*) child->dynamic_props);
+			}
+			ASObject* props = (ASObject*) child->dynamic_props;
+
+			initTextFieldPrototype(app_context);
+			if (g_textfield_constructor.prototype_obj != NULL) {
+				ActionVar proto_val = {0};
+				proto_val.type = ACTION_STACK_VALUE_OBJECT;
+				proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+				setProperty(app_context, props, "__proto__", 9, &proto_val);
+				for (u32 pi = 0; pi < props->num_used; pi++) {
+					if (strcmp(props->properties[pi].name, "__proto__") == 0) {
+						props->properties[pi].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+						break;
+					}
+				}
+			}
+
+			// Set default properties for dynamic text fields
+			ActionVar sval = {0};
+			sval.type = ACTION_STACK_VALUE_STRING;
+			sval.str_size = 0;
+			VAL(u64, &sval.data.numeric_value) = (u64)"";
+			setProperty(app_context, props, "text", 4, &sval);
+			setProperty(app_context, props, "htmlText", 8, &sval);
+			setProperty(app_context, props, "variable", 8, &sval);
+
+			ActionVar fval = {0};
+			fval.type = ACTION_STACK_VALUE_BOOLEAN;
+			fval.data.numeric_value = 0;
+			setProperty(app_context, props, "background", 10, &fval);
+			setProperty(app_context, props, "border", 6, &fval);
+			setProperty(app_context, props, "multiline", 9, &fval);
+			setProperty(app_context, props, "wordWrap", 8, &fval);
+			setProperty(app_context, props, "password", 8, &fval);
+			setProperty(app_context, props, "html", 4, &fval);
+			setProperty(app_context, props, "embedFonts", 10, &fval);
+			setProperty(app_context, props, "condenseWhite", 13, &fval);
+
+			ActionVar tval = {0};
+			tval.type = ACTION_STACK_VALUE_BOOLEAN;
+			tval.data.numeric_value = 1;
+			setProperty(app_context, props, "selectable", 10, &tval);
+			setProperty(app_context, props, "mouseWheelEnabled", 17, &tval);
+
+			ActionVar type_val = {0};
+			type_val.type = ACTION_STACK_VALUE_STRING;
+			type_val.str_size = 7;
+			VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+			setProperty(app_context, props, "type", 4, &type_val);
+
+			ActionVar dval = {0};
+			dval.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &dval.data.numeric_value) = 0.0;
+			setProperty(app_context, props, "length", 6, &dval);
+			setProperty(app_context, props, "textWidth", 9, &dval);
+			setProperty(app_context, props, "textHeight", 10, &dval);
+			setProperty(app_context, props, "hscroll", 7, &dval);
+			setProperty(app_context, props, "maxhscroll", 10, &dval);
+			setProperty(app_context, props, "sharpness", 9, &dval);
+			setProperty(app_context, props, "thickness", 9, &dval);
+
+			ActionVar one_val = {0};
+			one_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &one_val.data.numeric_value) = 1.0;
+			setProperty(app_context, props, "scroll", 6, &one_val);
+			setProperty(app_context, props, "maxscroll", 9, &one_val);
+			setProperty(app_context, props, "bottomScroll", 12, &one_val);
+
+			ActionVar null_val = {0};
+			null_val.type = ACTION_STACK_VALUE_NULL;
+			setProperty(app_context, props, "maxChars", 8, &null_val);
+			setProperty(app_context, props, "restrict", 8, &null_val);
+			setProperty(app_context, props, "styleSheet", 10, &null_val);
+
+			ActionVar undef_val = {0};
+			undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+			setProperty(app_context, props, "tabIndex", 8, &undef_val);
+
+			ActionVar tc_val = {0};
+			tc_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &tc_val.data.numeric_value) = 0.0;
+			setProperty(app_context, props, "textColor", 9, &tc_val);
+			VAL(double, &tc_val.data.numeric_value) = 16777215.0;
+			setProperty(app_context, props, "backgroundColor", 15, &tc_val);
+			VAL(double, &tc_val.data.numeric_value) = 0.0;
+			setProperty(app_context, props, "borderColor", 11, &tc_val);
+
+			ActionVar aat_val = {0};
+			aat_val.type = ACTION_STACK_VALUE_STRING;
+			aat_val.str_size = 6;
+			VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+			setProperty(app_context, props, "antiAliasType", 13, &aat_val);
+
+			ActionVar gft_val = {0};
+			gft_val.type = ACTION_STACK_VALUE_STRING;
+			gft_val.str_size = 5;
+			VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+			setProperty(app_context, props, "gridFitType", 11, &gft_val);
+
+			ActionVar as_val = {0};
+			as_val.type = ACTION_STACK_VALUE_STRING;
+			as_val.str_size = 4;
+			VAL(u64, &as_val.data.numeric_value) = (u64)"none";
+			setProperty(app_context, props, "autoSize", 8, &as_val);
+
+			ASArray* filters_arr = allocArray(app_context, 0);
+			filters_arr->length = 0;
+			ActionVar filters_val = {0};
+			filters_val.type = ACTION_STACK_VALUE_ARRAY;
+			filters_val.data.numeric_value = (u64) filters_arr;
+			setProperty(app_context, props, "filters", 7, &filters_val);
+
+			// Register child on parent MC's dynamic_props so mc.childName works via GetMember
+			{
+				if (mc->dynamic_props == NULL) {
+					mc->dynamic_props = (void*) allocObject(app_context, 8);
+					retainObject((ASObject*) mc->dynamic_props);
+				}
+				ActionVar mc_var = {0};
+				mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+				mc_var.data.numeric_value = (u64)child;
+				setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
+				// Also set on global scope for GetVariable access
+				size_t klen = strlen(inst_name);
+				ActionVar* gvar = getVariable((char*)inst_name, klen);
+				if (gvar != NULL) {
+					gvar->type = mc_var.type;
+					gvar->str_size = mc_var.str_size;
+					gvar->data = mc_var.data;
+				}
+			}
+
+			// Add to child_mc_cache so it persists across lookups
+			if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
+				child_mc_cache[child_mc_count++] = child;
+			}
+
+			// Return target path
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_STRING;
+			result.str_size = strlen(child->target);
+			VAL(u64, &result.data.numeric_value) = (u64)child->target;
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &result);
+		} else {
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+#else
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+#endif
+		builtin_handled = 1;
+	}
+
 	// If not a built-in function, look up user-defined functions
 	if (!builtin_handled)
 	{
@@ -14603,6 +14915,239 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
+		else if (method_name_len == 15 && strncmp(method_name, "removeTextField", 15) == 0)
+		{
+			// removeTextField(): remove a dynamically-created text field
+#ifdef NO_GRAPHICS
+			// Remove from child_mc_cache
+			for (int i = 0; i < child_mc_count; i++) {
+				if (child_mc_cache[i] == mc) {
+					child_mc_cache[i] = NULL;
+					break;
+				}
+			}
+			// Set variable to undefined (so GetVariable returns undefined)
+			ActionVar undef_var = {0};
+			undef_var.type = ACTION_STACK_VALUE_UNDEFINED;
+			setVariableByName(mc->name, &undef_var);
+#endif
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 15 && strncmp(method_name, "createTextField", 15) == 0)
+		{
+			// createTextField(instanceName, depth, x, y, width, height)
+			// Creates a new dynamic text field as a child of this movie clip
+#ifdef NO_GRAPHICS
+			if (num_args >= 6) {
+				const char* inst_name = "";
+				if (args[0].type == ACTION_STACK_VALUE_STRING)
+					inst_name = (const char*) args[0].data.numeric_value;
+				int depth_val = (int) varToDouble(&args[1]);
+				double x = varToDouble(&args[2]);
+				double y = varToDouble(&args[3]);
+				double w = varToDouble(&args[4]);
+				double h = varToDouble(&args[5]);
+				(void)depth_val;
+
+				// Create a child MovieClip for the text field
+				MovieClip* child = createMovieClip(inst_name, mc);
+				child->x = (float) x;
+				child->y = (float) y;
+				child->width = (float) w;
+				child->height = (float) h;
+				child->ng_textfield_idx = -1; // dynamically created, no static metadata
+
+				// Set up dynamic_props with TextField defaults
+				if (child->dynamic_props == NULL) {
+					child->dynamic_props = (void*) allocObject(app_context, 32);
+					retainObject((ASObject*) child->dynamic_props);
+				}
+				ASObject* props = (ASObject*) child->dynamic_props;
+
+				// Set __proto__ to TextField.prototype
+				initTextFieldPrototype(app_context);
+				if (g_textfield_constructor.prototype_obj != NULL) {
+					ActionVar proto_val = {0};
+					proto_val.type = ACTION_STACK_VALUE_OBJECT;
+					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+					setProperty(app_context, props, "__proto__", 9, &proto_val);
+					for (u32 pi = 0; pi < props->num_used; pi++) {
+						if (strcmp(props->properties[pi].name, "__proto__") == 0) {
+							props->properties[pi].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+							break;
+						}
+					}
+				}
+
+				// Set default properties for dynamic text fields
+				ActionVar sval = {0};
+				sval.type = ACTION_STACK_VALUE_STRING;
+				sval.str_size = 0;
+				VAL(u64, &sval.data.numeric_value) = (u64)"";
+				setProperty(app_context, props, "text", 4, &sval);
+				setProperty(app_context, props, "htmlText", 8, &sval);
+				setProperty(app_context, props, "variable", 8, &sval);
+
+				ActionVar fval = {0};
+				fval.type = ACTION_STACK_VALUE_BOOLEAN;
+				fval.data.numeric_value = 0;
+				setProperty(app_context, props, "background", 10, &fval);
+				setProperty(app_context, props, "border", 6, &fval);
+				setProperty(app_context, props, "multiline", 9, &fval);
+				setProperty(app_context, props, "wordWrap", 8, &fval);
+				setProperty(app_context, props, "password", 8, &fval);
+				setProperty(app_context, props, "html", 4, &fval);
+				setProperty(app_context, props, "embedFonts", 10, &fval);
+				setProperty(app_context, props, "condenseWhite", 13, &fval);
+
+				ActionVar tval = {0};
+				tval.type = ACTION_STACK_VALUE_BOOLEAN;
+				tval.data.numeric_value = 1;
+				setProperty(app_context, props, "selectable", 10, &tval);
+				setProperty(app_context, props, "mouseWheelEnabled", 17, &tval);
+
+				ActionVar type_val = {0};
+				type_val.type = ACTION_STACK_VALUE_STRING;
+				type_val.str_size = 7;
+				VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+				setProperty(app_context, props, "type", 4, &type_val);
+
+				ActionVar dval = {0};
+				dval.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &dval.data.numeric_value) = 0.0;
+				setProperty(app_context, props, "length", 6, &dval);
+				setProperty(app_context, props, "textColor", 9, &dval);
+				setProperty(app_context, props, "hscroll", 7, &dval);
+				setProperty(app_context, props, "maxhscroll", 10, &dval);
+				setProperty(app_context, props, "textWidth", 9, &dval);
+				setProperty(app_context, props, "textHeight", 10, &dval);
+				setProperty(app_context, props, "sharpness", 9, &dval);
+				setProperty(app_context, props, "thickness", 9, &dval);
+
+				VAL(double, &dval.data.numeric_value) = 16777215.0;
+				setProperty(app_context, props, "backgroundColor", 15, &dval);
+				VAL(double, &dval.data.numeric_value) = 0.0;
+				setProperty(app_context, props, "borderColor", 11, &dval);
+
+				ActionVar one_val = {0};
+				one_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &one_val.data.numeric_value) = 1.0;
+				setProperty(app_context, props, "scroll", 6, &one_val);
+				setProperty(app_context, props, "maxscroll", 9, &one_val);
+				setProperty(app_context, props, "bottomScroll", 12, &one_val);
+
+				ActionVar null_val = {0};
+				null_val.type = ACTION_STACK_VALUE_NULL;
+				setProperty(app_context, props, "maxChars", 8, &null_val);
+				setProperty(app_context, props, "restrict", 8, &null_val);
+				setProperty(app_context, props, "styleSheet", 10, &null_val);
+
+				ActionVar undef_val = {0};
+				undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, props, "tabIndex", 8, &undef_val);
+
+				ActionVar as_val = {0};
+				as_val.type = ACTION_STACK_VALUE_STRING;
+				as_val.str_size = 4;
+				VAL(u64, &as_val.data.numeric_value) = (u64)"none";
+				setProperty(app_context, props, "autoSize", 8, &as_val);
+
+				ActionVar aat_val = {0};
+				aat_val.type = ACTION_STACK_VALUE_STRING;
+				aat_val.str_size = 6;
+				VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+				setProperty(app_context, props, "antiAliasType", 13, &aat_val);
+
+				ActionVar gft_val = {0};
+				gft_val.type = ACTION_STACK_VALUE_STRING;
+				gft_val.str_size = 5;
+				VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+				setProperty(app_context, props, "gridFitType", 11, &gft_val);
+
+				ASArray* filters_arr = allocArray(app_context, 0);
+				filters_arr->length = 0;
+				ActionVar filters_val = {0};
+				filters_val.type = ACTION_STACK_VALUE_ARRAY;
+				filters_val.data.numeric_value = (u64) filters_arr;
+				setProperty(app_context, props, "filters", 7, &filters_val);
+
+				// Register child on parent MC's dynamic_props so mc.childName works via GetMember
+				{
+					if (mc->dynamic_props == NULL) {
+						mc->dynamic_props = (void*) allocObject(app_context, 8);
+						retainObject((ASObject*) mc->dynamic_props);
+					}
+					ActionVar mc_var = {0};
+					mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					mc_var.data.numeric_value = (u64)child;
+					setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
+					// Also set on global scope for GetVariable access
+					size_t klen = strlen(inst_name);
+					ActionVar* gvar = getVariable((char*)inst_name, klen);
+					if (gvar != NULL) {
+						gvar->type = mc_var.type;
+						gvar->str_size = mc_var.str_size;
+						gvar->data = mc_var.data;
+					}
+				}
+
+				// Add to child_mc_cache so it persists across lookups
+				if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
+					child_mc_cache[child_mc_count++] = child;
+				}
+
+				// Return the target path of the new text field
+				if (args != NULL) FREE(args);
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_STRING;
+				result.str_size = strlen(child->target);
+				VAL(u64, &result.data.numeric_value) = (u64)child->target;
+				pushVar(app_context, &result);
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
+			return;
+		}
+		else if (method_name_len == 13 && strncmp(method_name, "setTextFormat", 13) == 0)
+		{
+			// setTextFormat(fmt) / setTextFormat(begin, fmt) / setTextFormat(begin, end, fmt)
+			// In Flash, setTextFormat does NOT change the textColor property
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 16 && strncmp(method_name, "setNewTextFormat", 16) == 0)
+		{
+#ifdef NO_GRAPHICS
+			// setNewTextFormat(fmt): set the default format for newly-typed text
+			// For now, apply color to textColor if the field has no text
+			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+				ASObject* fmt_obj = (ASObject*) args[0].data.numeric_value;
+				ActionVar* color_prop = getProperty(fmt_obj, "color", 5);
+				if (color_prop != NULL && color_prop->type == ACTION_STACK_VALUE_F64 && mc->dynamic_props != NULL) {
+					double c; memcpy(&c, &color_prop->data.numeric_value, sizeof(double));
+					u32 color_u32 = (u32)ecmaToInt32(c) & 0x00FFFFFF;
+					ActionVar cv = {0};
+					cv.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &cv.data.numeric_value) = (double)color_u32;
+					setProperty(app_context, (ASObject*)mc->dynamic_props, "textColor", 9, &cv);
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
+			return;
+		}
 		else if (method_name_len == 13 && strncmp(method_name, "getTextFormat", 13) == 0)
 		{
 #ifdef NO_GRAPHICS
@@ -14623,6 +15168,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			int has_text = force_null ? 0 : (text[0] != '\0');
 			ASObject* tf = createTextFormatFromField(app_context, tf_idx, has_text, 0);
+			// Override color with current textColor from dynamic_props
+			if (has_text && mc->dynamic_props != NULL) {
+				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
+				if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
+					setProperty(app_context, tf, "color", 5, tc_prop);
+				}
+			}
 			if (args != NULL) FREE(args);
 			ActionVar result = {0};
 			result.type = ACTION_STACK_VALUE_OBJECT;
@@ -14639,6 +15191,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #ifdef NO_GRAPHICS
 			int tf_idx = mc->ng_textfield_idx;
 			ASObject* tf = createTextFormatFromField(app_context, tf_idx, 1, 1);
+			// Override color with current textColor from dynamic_props
+			if (mc->dynamic_props != NULL) {
+				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
+				if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
+					setProperty(app_context, tf, "color", 5, tc_prop);
+				}
+			}
 			if (args != NULL) FREE(args);
 			ActionVar result = {0};
 			result.type = ACTION_STACK_VALUE_OBJECT;

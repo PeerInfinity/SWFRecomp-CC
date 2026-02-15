@@ -3110,10 +3110,50 @@ namespace SWFRecomp
 			case SWF_TAG_METADATA:
 			case SWF_TAG_EXPORT_ASSETS:
 			case SWF_TAG_DEBUG_ID:
+			{
+				cur_pos += tag.length;
+				break;
+			}
+
+			case SWF_TAG_CSM_TEXT_SETTINGS:
+			{
+				// Parse CSMTextSettings: TextID(UI16), UseFlashType(UB[2]), GridFit(UB[3]), Reserved(UB[3]), Thickness(F32), Sharpness(F32), Reserved(UI8)
+				char* csm_start = cur_pos;
+				// TextID (UI16, little-endian)
+				u16 csm_text_id = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+				cur_pos += 2;
+				// Read packed byte: UseFlashType(2 bits MSB) | GridFit(3 bits) | Reserved(3 bits LSB)
+				u8 packed = (u8)*cur_pos;
+				cur_pos += 1;
+				int use_flash_type = (packed >> 6) & 0x03; // top 2 bits
+				int grid_fit = (packed >> 3) & 0x07; // next 3 bits
+				// Thickness (F32, little-endian)
+				float thickness;
+				memcpy(&thickness, cur_pos, 4);
+				cur_pos += 4;
+				// Sharpness (F32, little-endian)
+				float sharpness;
+				memcpy(&sharpness, cur_pos, 4);
+				cur_pos += 4;
+
+				const char* aat = (use_flash_type == 1) ? "advanced" : "normal";
+				const char* gft = "none";
+				if (grid_fit == 1) gft = "pixel";
+				else if (grid_fit == 2) gft = "subpixel";
+
+				// Emit runtime call
+				tag_init << "\ttagCSMTextSettings(" << csm_text_id << ", \"" << aat << "\", \"" << gft << "\", ";
+				tag_init << std::fixed << thickness << "f, " << std::fixed << sharpness << "f);\n";
+				tag_init << std::defaultfloat;
+
+				// Ensure cursor is at end
+				cur_pos = csm_start + tag.length;
+				break;
+			}
+
 			case SWF_TAG_DEFINE_FONT_ALIGN_ZONES:
 			case SWF_TAG_DEFINE_FONT_NAME:
 			case SWF_TAG_FREE_CHARACTER:
-			case SWF_TAG_CSM_TEXT_SETTINGS:
 			case SWF_TAG_DEFINE_VIDEO_STREAM:
 			case SWF_TAG_VIDEO_FRAME:
 			{
