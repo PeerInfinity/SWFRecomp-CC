@@ -209,8 +209,12 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 		}
 		else
 		{
+			// Empty string: use a non-NULL sentinel pointer to distinguish
+			// from zero-initialized "unset" variable slots (which have NULL heap_ptr)
+			static const uint16_t empty_u16[] = {0};
 			var->str_size = 0;
-			var->data.numeric_value = 0;
+			var->data.string_data.heap_ptr = (uint16_t*) empty_u16;
+			var->data.string_data.owns_memory = false;
 		}
 	}
 	else

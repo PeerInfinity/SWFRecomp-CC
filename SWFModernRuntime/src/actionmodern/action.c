@@ -20,6 +20,7 @@
 #include <heap.h>
 #include <map.h>
 #include <actionmodern/object.h>
+#include "unicode_case_tables.h"
 
 // Forward declarations for array helpers (defined later in file)
 static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size);
@@ -7816,19 +7817,19 @@ void actionStringLength(SWFAppContext* app_context, char* v_str)
 void actionStringExtract(SWFAppContext* app_context, char* str_buffer)
 {
 	(void)str_buffer;
-	// Pop length
+	// Pop count (number of code units to extract)
 	convertFloat(app_context);
-	ActionVar length_var;
-	popVar(app_context, &length_var);
-	int length = varToInt32(&length_var);
+	ActionVar count_var;
+	popVar(app_context, &count_var);
+	int count = varToInt32(&count_var);
 
-	// Pop index
+	// Pop index (1-based position in Flash)
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
 	int index = varToInt32(&index_var);
 
-	// Pop string (now UTF-16)
+	// Pop string (UTF-16)
 	char src_buffer[17];
 	convertString(app_context, src_buffer);
 	ActionVar src_var;
@@ -7836,19 +7837,31 @@ void actionStringExtract(SWFAppContext* app_context, char* str_buffer)
 	const uint16_t* src = varGetU16Ptr(&src_var);
 	int src_len = (int)src_var.str_size;
 
-	// Handle out-of-bounds
-	if (src == NULL || index < 0) index = 0;
+	if (src == NULL || src_len == 0) {
+		PUSH_U16(u16_empty, 0);
+		return;
+	}
+
+	// Flash substring(): 1-based index, clamp to valid range
+	if (index < 1) index = 1;
+	index--; // convert to 0-based
+
 	if (index >= src_len) {
 		PUSH_U16(u16_empty, 0);
 		return;
 	}
-	if (length < 0) length = 0;
-	if (index + length > src_len) length = src_len - index;
 
-	// Copy UTF-16 sub-array
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, length * sizeof(uint16_t));
-	memcpy(result, src + index, length * sizeof(uint16_t));
-	PUSH_U16(result, (u32)length);
+	// Negative count → rest of string; count 0 → empty
+	if (count < 0) count = src_len - index;
+	if (count == 0) {
+		PUSH_U16(u16_empty, 0);
+		return;
+	}
+	if (index + count > src_len) count = src_len - index;
+
+	uint16_t* result = (uint16_t*)heap_alloc(app_context, count * sizeof(uint16_t));
+	memcpy(result, src + index, count * sizeof(uint16_t));
+	PUSH_U16(result, (u32)count);
 }
 
 void actionMbStringLength(SWFAppContext* app_context, char* v_str)
@@ -7872,13 +7885,13 @@ void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer)
 	popVar(app_context, &count_var);
 	int count = varToInt32(&count_var);
 
-	// Pop index (starting code unit position)
+	// Pop index (1-based position in Flash)
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
 	int index = varToInt32(&index_var);
 
-	// Pop string (now UTF-16)
+	// Pop string (UTF-16)
 	char input_buffer[17];
 	convertString(app_context, input_buffer);
 	ActionVar src_var;
@@ -7886,8 +7899,23 @@ void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer)
 	const uint16_t* src = varGetU16Ptr(&src_var);
 	int src_len = (int)src_var.str_size;
 
-	// Handle invalid args
-	if (src == NULL || index < 0 || count < 0 || index >= src_len) {
+	if (src == NULL || src_len == 0) {
+		PUSH_U16(u16_empty, 0);
+		return;
+	}
+
+	// Flash mbsubstring(): 1-based index, clamp to valid range
+	if (index < 1) index = 1;
+	index--; // convert to 0-based
+
+	if (index >= src_len) {
+		PUSH_U16(u16_empty, 0);
+		return;
+	}
+
+	// Negative count → rest of string; count 0 → empty
+	if (count < 0) count = src_len - index;
+	if (count == 0) {
 		PUSH_U16(u16_empty, 0);
 		return;
 	}
@@ -7920,7 +7948,9 @@ void actionCharToAscii(SWFAppContext* app_context)
 	}
 
 	// Get UTF-16 code unit value of first character
-	float code = (float)str[0];
+	// Flash returns U+FFFD for surrogate code units (supplementary chars)
+	uint16_t unit = str[0];
+	float code = (unit >= 0xD800 && unit <= 0xDFFF) ? 65533.0f : (float)unit;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &code));
 }
 
@@ -8924,7 +8954,9 @@ void actionGetVariable(SWFAppContext* app_context)
 
 			// Fall back to hashmap if array lookup doesn't find the variable
 			// (This can happen for catch variables that are set by name but have a string ID)
-			if (var == NULL || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
+			// Note: uninitialized slots have type=STRING(0), str_size=0, heap_ptr=NULL
+			// Explicitly-set empty strings have heap_ptr=u16_empty (non-NULL)
+			if (var == NULL || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 			{
 				var = getVariable(var_name, var_name_len);
 			}
@@ -8936,7 +8968,7 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
+	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 	{
 		// Check special variables (SWF5+ only — SWF4 has no built-in constants)
 		// Note: inside functions in SWF4, use SWF5+ behavior (DefineFunction is SWF5 opcode)
@@ -9823,9 +9855,7 @@ void actionDeclareLocal(SWFAppContext* app_context)
 		return;
 	}
 
-	// Not in a function - show warning and treat as no-op
-	// (In AS2, DECLARE_LOCAL outside a function is technically invalid)
-	printf("Warning: DECLARE_LOCAL outside function for variable '%s'\n", var_name);
+	// Not in a function — Flash silently ignores DeclareLocal outside functions
 
 	// Pop the name
 	POP();
@@ -10021,15 +10051,29 @@ void actionAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 	ActionVar a;
 	popVar(app_context, &a);
 
-	// Get integer code (truncate decimal)
-	int code = varToInt32(&a);
+	// Get integer code
+	double d = varToDouble(&a);
+	if (isnan(d) || isinf(d) || d == 0.0) {
+		// chr(null), chr(true→1 but NaN from convertFloat? no), chr(NaN) → empty
+		PUSH_U16(u16_empty, 0);
+		return;
+	}
 
-	// Handle out-of-range values (wrap to 0-255 for SWF4 chr)
-	code = code & 0xFF;
+	// SWF6+: chr() uses full UTF-16 code unit range (0-65535), same as mbchr()
+	// Wrap to 16-bit unsigned: & 0xFFFF
+	uint16_t code = (uint16_t)((unsigned int)varToInt32(&a) & 0xFFFF);
 
-	// Create single UTF-16 code unit
+	// Code 0 → empty string
+	if (code == 0) {
+		PUSH_U16(u16_empty, 0);
+		return;
+	}
+
+	// Surrogates → U+FFFD
+	if (code >= 0xD800 && code <= 0xDFFF) code = 0xFFFD;
+
 	uint16_t* result = (uint16_t*)heap_alloc(app_context, sizeof(uint16_t));
-	result[0] = (uint16_t)code;
+	result[0] = code;
 	PUSH_U16(result, 1);
 }
 
@@ -10050,20 +10094,9 @@ void actionMbCharToAscii(SWFAppContext* app_context, char* str_buffer)
 		return;
 	}
 
-	// Decode first character (handle surrogate pairs)
-	unsigned int codepoint;
-	if (str[0] >= 0xD800 && str[0] <= 0xDBFF && str_len >= 2 &&
-	    str[1] >= 0xDC00 && str[1] <= 0xDFFF)
-	{
-		// Surrogate pair → full Unicode code point
-		codepoint = 0x10000 + ((unsigned int)(str[0] - 0xD800) << 10) + (str[1] - 0xDC00);
-	}
-	else
-	{
-		codepoint = str[0];
-	}
-
-	float result = (float)codepoint;
+	// Flash returns U+FFFD for surrogate code units (supplementary chars)
+	uint16_t unit = str[0];
+	float result = (unit >= 0xD800 && unit <= 0xDFFF) ? 65533.0f : (float)unit;
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 }
 
@@ -10085,33 +10118,26 @@ void actionMbAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 	ActionVar a;
 	popVar(app_context, &a);
 
-	// Get integer code point
-	float value = a.type == ACTION_STACK_VALUE_F32 ? VAL(float, &a.data.numeric_value) : (float)VAL(double, &a.data.numeric_value);
-	unsigned int codepoint = (unsigned int)value;
-
-	// Validate code point range
-	if (codepoint > 0x10FFFF) {
+	double d = varToDouble(&a);
+	if (isnan(d) || isinf(d) || d == 0.0) {
 		PUSH_U16(u16_empty, 0);
 		return;
 	}
 
-	// Encode as UTF-16
-	if (codepoint <= 0xFFFF)
-	{
-		// BMP character — single code unit
-		uint16_t* result = (uint16_t*)heap_alloc(app_context, sizeof(uint16_t));
-		result[0] = (uint16_t)codepoint;
-		PUSH_U16(result, 1);
+	// SWF6+: mbchr() wraps to 16-bit code unit range (& 0xFFFF), same as chr()
+	uint16_t code = (uint16_t)((unsigned int)varToInt32(&a) & 0xFFFF);
+
+	if (code == 0) {
+		PUSH_U16(u16_empty, 0);
+		return;
 	}
-	else
-	{
-		// Supplementary character — surrogate pair
-		uint16_t* result = (uint16_t*)heap_alloc(app_context, 2 * sizeof(uint16_t));
-		unsigned int adj = codepoint - 0x10000;
-		result[0] = (uint16_t)(0xD800 | (adj >> 10));
-		result[1] = (uint16_t)(0xDC00 | (adj & 0x3FF));
-		PUSH_U16(result, 2);
-	}
+
+	// Surrogates → U+FFFD
+	if (code >= 0xD800 && code <= 0xDFFF) code = 0xFFFD;
+
+	uint16_t* result = (uint16_t*)heap_alloc(app_context, sizeof(uint16_t));
+	result[0] = code;
+	PUSH_U16(result, 1);
 }
 
 void actionTypeof(SWFAppContext* app_context, char* str_buffer)
@@ -10245,7 +10271,7 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 		if (string_id != 0)
 		{
 			ActionVar* var = getVariableById(string_id);
-			if (var && !(var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0))
+			if (var && !(var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 			{
 				// Variable exists in var_array — set to undefined
 				if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
@@ -16883,10 +16909,21 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 		for (u32 i = 0; i < str_len; i++)
 		{
 			uint16_t c = str_value[i];
-			if (c >= 'a' && c <= 'z')
+			if (c >= 'a' && c <= 'z') {
 				result[i] = c - ('a' - 'A');
-			else
+			} else if (c > 0x7F) {
+				// Binary search in lower-to-upper table
+				int lo = 0, hi = CASE_MAP_LOWER_TO_UPPER_COUNT - 1;
+				uint16_t mapped = c;
+				while (lo <= hi) {
+					int mid = (lo + hi) / 2;
+					if (case_map_lower_to_upper[mid][0] == c) { mapped = case_map_lower_to_upper[mid][1]; break; }
+					if (case_map_lower_to_upper[mid][0] < c) lo = mid + 1; else hi = mid - 1;
+				}
+				result[i] = mapped;
+			} else {
 				result[i] = c;
+			}
 		}
 		result[str_len] = 0;
 		PUSH_U16(result, str_len);
@@ -16900,10 +16937,21 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 		for (u32 i = 0; i < str_len; i++)
 		{
 			uint16_t c = str_value[i];
-			if (c >= 'A' && c <= 'Z')
+			if (c >= 'A' && c <= 'Z') {
 				result[i] = c + ('a' - 'A');
-			else
+			} else if (c > 0x7F) {
+				// Binary search in upper-to-lower table
+				int lo = 0, hi = CASE_MAP_UPPER_TO_LOWER_COUNT - 1;
+				uint16_t mapped = c;
+				while (lo <= hi) {
+					int mid = (lo + hi) / 2;
+					if (case_map_upper_to_lower[mid][0] == c) { mapped = case_map_upper_to_lower[mid][1]; break; }
+					if (case_map_upper_to_lower[mid][0] < c) lo = mid + 1; else hi = mid - 1;
+				}
+				result[i] = mapped;
+			} else {
 				result[i] = c;
+			}
 		}
 		result[str_len] = 0;
 		PUSH_U16(result, str_len);

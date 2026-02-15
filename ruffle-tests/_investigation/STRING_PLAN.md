@@ -1,16 +1,16 @@
 # String Features Implementation Plan
 
-Last updated: 2026-02-15
+Last updated: 2026-02-15 (Phases 1-4 complete)
 
 ## Overview
 
 String-related tests account for 13 failing Ruffle tests, split into two distinct sub-features:
 
-1. **String methods** (4 tests, ~895 expected lines): Methods on String primitives (charAt, indexOf, slice, split, etc.) and the String constructor (fromCharCode). Phases 1-2 are complete (UTF-16 internal storage, all methods working). Remaining: Phase 3 (SWF4/6 string ops have bugs), Phase 4 (Unicode case mapping not implemented).
+1. **String methods** (4 tests, ~895 expected lines): Methods on String primitives (charAt, indexOf, slice, split, etc.) and the String constructor (fromCharCode). All 4 tests now pass 100% (Phases 1-4 complete).
 
 2. **String paths** (9 tests, ~167 expected lines): Flash's path-based variable resolution using slash/dot/colon syntax (e.g., `_root/clip:variable`), `eval()` for dynamic path resolution, and variable aliasing. These are **not String code** -- they depend on MovieClip infrastructure (attachMovie, duplicateMovieClip, eval, setInterval, unloadMovie) that doesn't exist yet.
 
-**Status**: Phases 1-2 complete. Phase 3 partially done (functions exist but have bugs). Phase 4 not started. String paths remain blocked by MovieClip infrastructure.
+**Status**: Phases 1-4 all complete. All 4 string method tests pass 100%. String paths remain blocked by MovieClip infrastructure.
 
 ## Current Pass Rates
 
@@ -18,14 +18,14 @@ String-related tests account for 13 failing Ruffle tests, split into two distinc
 |------|-------|-----------|----------|--------|
 | string_methods_negative_args | 240/240 | 100% | String methods | PASS |
 | string_methods_swfv5 | 275/275 | 100% | String methods | PASS |
-| string_methods | 283/286 | 99% | String methods | 2 lines off (Unicode case mapping on lines 279, 285) |
-| string_ops_swf6 | 0/95 | 0% | SWF4/6 string ops | Functions exist but have bugs (see Phase 3) |
+| string_methods | 286/286 | 100% | String methods | PASS |
+| string_ops_swf6 | 95/95 | 100% | SWF4/6 string ops | PASS |
 | string_paths_* | various | various | String paths | Blocked by MovieClip infra |
 
 ## Implementation Phases
 
 ```
-Phase 1 (ASCII fixes) ──DONE──→ Phase 2 (UTF-16 storage) ──DONE──→ Phase 3 (SWF4/6 ops) ──BUGS──→ Phase 4 (Unicode case mapping) ──TODO
+Phase 1 (ASCII fixes) ──DONE──→ Phase 2 (UTF-16 storage) ──DONE──→ Phase 3 (SWF4/6 ops) ──DONE──→ Phase 4 (Unicode case mapping) ──DONE
 ```
 
 ---
@@ -65,66 +65,38 @@ All planned changes were implemented:
 
 ---
 
-## Phase 3: SWF4/6 String Operations (string_ops_swf6) — PARTIALLY DONE (bugs remain)
+## Phase 3: SWF4/6 String Operations (string_ops_swf6) ✅ DONE
 
 **Goal**: Fix the legacy SWF4 string functions (ord, chr, length, substring as functions) to use UTF-16 semantics in SWF6+ mode.
 
-### Current Status
+### Bugs Fixed
 
-All 8 functions exist in action.c but have bugs. `string_ops_swf6` is 0% pass (line-shifted + content mismatches).
+1. **Spurious warning**: Removed `printf("Warning: DECLARE_LOCAL outside function...")` — Flash silently ignores DeclareLocal outside functions
+2. **length("") = 9**: Root cause was `actionGetVariable` treating empty strings (str_size=0) as "uninitialized variable". Fix: `setVariableWithValue` now sets `heap_ptr = non-NULL sentinel` for empty strings; the "uninitialized" check requires `heap_ptr == NULL`
+3. **ord/mbord surrogates**: Both now return U+FFFD (65533) for surrogate code units (0xD800-0xDFFF)
+4. **chr() range**: Removed `& 0xFF` mask — SWF6+ chr() uses full `& 0xFFFF` range, surrogates → U+FFFD
+5. **mbchr() overflow**: Now wraps to BMP with `& 0xFFFF`, surrogates → U+FFFD (same as chr for SWF6+)
+6. **substring 1-based indexing**: Both `actionStringExtract` and `actionMbStringExtract` now convert 1-based to 0-based (`index--` after clamping)
+7. **substring negative args**: Negative start clamps to 1; negative count → rest of string
+8. **substring overflow**: Uses `varToInt32()` which wraps large values to int32 correctly
 
-### Bugs Found
-
-1. **Spurious warning**: `Warning: DECLARE_LOCAL outside function for variable 's'` printed at line 1, shifting all output by one line. This alone causes 0% match rate.
-
-2. **length("")** returns 9 instead of 0 — suggests the empty string literal `""` is being interpreted as a 9-char string (possibly `"undefined"` contamination)
-
-3. **ord/mbord of supplementary characters**: `ord("😋")` returns 55357 (raw high surrogate) instead of 65533 (U+FFFD). `mbord("😋")` returns 128523 (full codepoint decoded from surrogate pair) instead of 65533. Both should return U+FFFD for chars > U+FFFF.
-
-4. **chr() range handling**: `chr(12345)` masks to `& 0xFF` → returns `9` (ASCII 57) instead of the CJK character at U+3039. SWF6+ chr() should handle full 0-65535 range (same as mbchr). Also `chr(0xd801)` should produce U+FFFD, not empty string.
-
-5. **mbchr() overflow**: `mbchr(65616)` returns a surrogate pair (`U+10010`) instead of wrapping to BMP (`chr(65616 % 65536)` = `P`).
-
-6. **substring 1-based indexing**: `substring(s, 1, 2)` returns wrong characters — treating index as 0-based but Flash substring() is 1-based.
-
-7. **substring negative args**: `substring(s, -5, -100)` returns empty instead of the full string. Flash clamps negative values to 1.
-
-8. **substring overflow**: `substring(s, 4294967303, -4294967294)` returns `es` instead of `te` — needs 32-bit signed clamping.
-
-### Remaining Implementation
-
-With UTF-16 storage, the fixes are straightforward:
-- `actionCharToAscii()` (SWF6+ ord): return `(int)str[0]`, but if `str[0]` is a high surrogate (0xD800-0xDBFF), return 0xFFFD
-- `actionMbCharToAscii()` (SWF6+ mbord): same as above (both return code unit, not codepoint)
-- `actionAsciiToChar()` (SWF6+ chr): create 1-element uint16_t array with `code_value & 0xFFFF`. If result is surrogate range, use 0xFFFD. Remove the `& 0xFF` mask.
-- `actionMbAsciiToChar()` (SWF6+ mbchr): same as chr for SWF6+ (`& 0xFFFF`, surrogates → U+FFFD)
-- `actionStringExtract()` / `actionMbStringExtract()`: convert 1-based to 0-based (subtract 1 from start). Clamp negative start/count to 0. Apply 32-bit signed interpretation for large values.
-- Fix the spurious DECLARE_LOCAL warning
-- Fix length("") returning 9
-
-### Verification
-
-```bash
-python3 ruffle-tests/verify_output.py --test=string_ops_swf6 --diff --verbose
-```
+**Result**: `string_ops_swf6` 95/95 PASS
 
 ---
 
-## Phase 4: Unicode Case Mapping (toUpperCase/toLowerCase) — NOT STARTED
+## Phase 4: Unicode Case Mapping (toUpperCase/toLowerCase) ✅ DONE
 
 **Goal**: Add full Unicode case mapping tables for toUpperCase/toLowerCase.
 
-**Current state**: toLowerCase/toUpperCase in `callStringPrimitiveMethod` are ASCII-only (`a-z` ↔ `A-Z`). Non-ASCII characters pass through unchanged.
+Added `unicode_case_tables.h` with two binary-search tables:
+- `case_map_upper_to_lower[]` — 713 entries (for toLowerCase)
+- `case_map_lower_to_upper[]` — 683 entries (for toUpperCase)
 
-The tests expect full Unicode case mapping including Latin Extended, Cyrillic, Greek, Armenian, Georgian, and more. Flash Player uses Unicode 5.1.0 case mapping (vintage 2008).
+Covers: Latin Extended, Cyrillic, Greek (including polytonic), Armenian, Georgian, Circled Latin, Fullwidth Latin, Roman Numerals, and special cases (Turkish I, Kelvin sign, Long S, etc.). Total ~5.6KB.
 
-With UTF-16 storage, case mapping iterates the uint16_t array and maps each code unit through a lookup table. Only BMP matters (U+0000-U+FFFF).
+Updated `verify_output.py` to copy `unicode_case_tables.h` to build directory.
 
-Implementation: static lookup table, ~1500 entries covering the tested ranges.
-
-### Tests fixed
-
-- **string_methods**: lines 279 and 285 (the only 2 failing lines out of 286)
+**Result**: `string_methods` 286/286 PASS
 
 ---
 
@@ -168,10 +140,12 @@ The 9 `string_paths_*` tests are blocked by MovieClip infrastructure, not String
 
 | File | Changes |
 |------|---------|
-| `SWFModernRuntime/src/actionmodern/action.c` | Phase 2: conversion helpers, UTF-16 constants, extraction points, string method simplification, concat/trace/comparison updates. Phase 3: SWF4/6 ops. Phase 4: case mapping table. |
+| `SWFModernRuntime/src/actionmodern/action.c` | Phase 2: conversion helpers, UTF-16 constants, extraction points, string method simplification. Phase 3: fixed chr/mbchr/ord/mbord/substring/DeclareLocal/empty-string-var bugs. Phase 4: Unicode case mapping via binary search tables. |
+| `SWFModernRuntime/src/actionmodern/unicode_case_tables.h` | Phase 4: 713+683 entry case mapping tables (auto-generated) |
 | `SWFModernRuntime/include/actionmodern/action.h` | Phase 2: PUSH_STR macros → inline functions, PUSH_U16 macro |
 | `SWFModernRuntime/include/actionmodern/variables.h` | Phase 2: ActionVar heap_ptr type change |
 | `SWFModernRuntime/include/libswf/swf.h` | Phase 2: str_cache fields in SWFAppContext |
-| `SWFModernRuntime/src/actionmodern/variables.c` | Phase 2: materializeStringList, empty string init |
+| `SWFModernRuntime/src/actionmodern/variables.c` | Phase 2: materializeStringList. Phase 3: empty string sentinel (non-NULL heap_ptr) |
+| `ruffle-tests/verify_output.py` | Phase 4: copy unicode_case_tables.h to build dir |
 | `SWFModernRuntime/src/actionmodern/object.c` | UNCHANGED |
 | `SWFRecomp/src/action/action.cpp` | UNCHANGED |

@@ -177,6 +177,7 @@ def compile_native(test_dir, num_frames, build_dir):
         "src/actionmodern/action.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
+        "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
         "src/libswf/swf_core.c",
         "src/libswf/tag_stubs.c",
