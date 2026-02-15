@@ -95,4 +95,7 @@ int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
 // TextField variable binding — called from tag_stubs.c at placement time
 void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_name, const char* init_text);
+// Enumerate child instance names for a MovieClip (for for-in enumeration)
+// callback receives (name, name_len, user_data) for each child
+void ng_enumerateChildren(const char* parent_name, void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data);
 #endif

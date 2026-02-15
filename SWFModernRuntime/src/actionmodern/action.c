@@ -7537,186 +7537,184 @@ static void freeEnumeratedNames(EnumeratedName* head)
 	}
 }
 
+// Callback for ng_enumerateChildren — pushes child instance name onto the ActionScript stack
+#ifdef NO_GRAPHICS
+static void enum_child_callback(const char* name, u32 name_len, void* user_data)
+{
+	SWFAppContext* app_context = (SWFAppContext*)user_data;
+	PUSH_STR(name, name_len);
+}
+#endif
+
 void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 {
-	// Step 1: Pop variable name from stack
-	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
-	u32 string_id = VAL(u32, &STACK[SP + 12]);
-	char _en_buf[512];
-	u32 _en_u16_len = VAL(u32, &STACK[SP + 8]);
-	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[SP + 16]), _en_u16_len, _en_buf, sizeof(_en_buf));
-	char* var_name = _en_buf;
-	POP();
+	// Step 1: Pop value from stack — must check type before reading as string
+	u8 top_type = STACK[SP];
 
-#ifdef DEBUG
-	printf("[DEBUG] actionEnumerate: looking up variable '%.*s' (len=%u, id=%u)\n",
-	       var_name_len, var_name, var_name_len, string_id);
-#endif
+	char _en_buf[512];
+	char* var_name = _en_buf;
+	u32 var_name_len = 0;
+	u32 string_id = 0;
+
+	if (top_type == ACTION_STACK_VALUE_STRING)
+	{
+		// Normal case: pop string variable name
+		string_id = VAL(u32, &STACK[SP + 12]);
+		u32 _en_u16_len = VAL(u32, &STACK[SP + 8]);
+		const uint16_t* u16_ptr = (const uint16_t*)VAL(u64, &STACK[SP + 16]);
+		if (u16_ptr != NULL && _en_u16_len > 0)
+			var_name_len = (u32)u16_to_utf8(u16_ptr, _en_u16_len, _en_buf, sizeof(_en_buf));
+		POP();
+	}
+	else
+	{
+		// Non-string on stack: convert to string, then use as variable name
+		// Flash converts the value to a string and looks it up as a variable name
+		convertString(app_context, str_buffer);
+		// Now stack top is a string
+		u32 _en_u16_len = VAL(u32, &STACK[SP + 8]);
+		const uint16_t* u16_ptr = (const uint16_t*)VAL(u64, &STACK[SP + 16]);
+		if (u16_ptr != NULL && _en_u16_len > 0)
+			var_name_len = (u32)u16_to_utf8(u16_ptr, _en_u16_len, _en_buf, sizeof(_en_buf));
+		POP();
+	}
 
 	// Step 2: Look up the variable
 	ActionVar* var = NULL;
 	if (string_id > 0)
-	{
-		// Constant string - use array lookup (O(1))
 		var = getVariableById(string_id);
-	}
-	else
-	{
-		// Dynamic string - use hashmap (O(n))
+	else if (var_name_len > 0)
 		var = getVariable(var_name, var_name_len);
-	}
 
-	// Step 3: Check if variable exists and is an object or movieclip
+	// Step 3: Check if variable exists and is an enumerable type
 	if (!var || (var->type != ACTION_STACK_VALUE_OBJECT &&
-	             var->type != ACTION_STACK_VALUE_MOVIECLIP))
+	             var->type != ACTION_STACK_VALUE_MOVIECLIP &&
+	             var->type != ACTION_STACK_VALUE_ARRAY &&
+	             var->type != ACTION_STACK_VALUE_FUNCTION))
 	{
-#ifdef DEBUG
-		if (!var)
-			printf("[DEBUG] actionEnumerate: variable not found\n");
-		else
-			printf("[DEBUG] actionEnumerate: variable is not an object (type=%d)\n", var->type);
-#endif
-		// Variable not found or not an object - push null terminator only
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}
 
 	// Step 4: Get the object from the variable
 	ASObject* obj = NULL;
+	MovieClip* mc = NULL;
 	if (var->type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
-		// MovieClip: enumerate dynamic_props (walks __proto__ chain for TextField prototype)
-		MovieClip* mc = (MovieClip*) VAL(u64, &var->data.numeric_value);
+		mc = (MovieClip*) VAL(u64, &var->data.numeric_value);
 		if (mc != NULL)
 			obj = (ASObject*) mc->dynamic_props;
 	}
-	else
+	else if (var->type == ACTION_STACK_VALUE_OBJECT)
 	{
 		obj = (ASObject*) VAL(u64, &var->data.numeric_value);
 	}
+	else if (var->type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* func = (ASFunction*) VAL(u64, &var->data.numeric_value);
+		if (func != NULL)
+			obj = func->own_props;
+	}
+	else if (var->type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Array via actionEnumerate — delegate to Enumerate2 logic
+		// Push the array back on stack and call actionEnumerate2
+		ActionVar arr_var = *var;
+		PUSH(arr_var.type, arr_var.data.numeric_value);
+		// Remove the value we just pushed and call enumerate2 manually
+		// Actually, just push undefined terminator and enumerate the array inline
+		ASArray* arr = (ASArray*) VAL(u64, &var->data.numeric_value);
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		if (arr != NULL)
+		{
+			// Push set indices in ascending order
+			int32_t signed_len = (int32_t) arr->length;
+			u32 iter_limit = 0;
+			if (signed_len > 0)
+				iter_limit = (u32)signed_len < arr->capacity ? (u32)signed_len : arr->capacity;
+			for (u32 i = 0; i < iter_limit; i++)
+			{
+				if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
+					continue;
+				char idx_buf[16];
+				snprintf(idx_buf, sizeof(idx_buf), "%u", i);
+				u32 len = strlen(idx_buf);
+				PUSH_STR(idx_buf, len);
+			}
+			// Push non-index properties
+			if (arr->props != NULL && arr->props->num_used > 0)
+			{
+				for (u32 i = 0; i < arr->props->num_used; i++)
+				{
+					const char* pn = arr->props->properties[i].name;
+					u32 pn_len = arr->props->properties[i].name_length;
+					if (pn_len == 9 && strncmp(pn, "__proto__", 9) == 0)
+						continue;
+					if (!(arr->props->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+						continue;
+					PUSH_STR(pn, pn_len);
+				}
+			}
+		}
+		return;
+	}
+
 	if (obj == NULL)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionEnumerate: object pointer is NULL\n");
-#endif
-		// Null object - push null terminator only
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}
 
-	// Step 5: Collect all enumerable properties from the entire prototype chain
-	// We need to collect them first to push in reverse order
+	// Step 5: Push undefined terminator, then push properties directly in forward order.
+	// Walking own object first, then prototype chain.
+	// The LIFO stack naturally reverses: popping gives reverse-insertion-order,
+	// with prototype properties iterated before own properties.
+	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 
-	// Temporary storage for property names (we'll push them to stack after collecting)
-	typedef struct PropList {
-		const char* name;
-		u32 name_length;
-		struct PropList* next;
-	} PropList;
-
-	PropList* prop_head = NULL;
-	u32 total_props = 0;
-
-	// Track which properties we've already seen (to handle shadowing)
 	EnumeratedName* enumerated_head = NULL;
 
 	// Walk the prototype chain
 	ASObject* current_obj = obj;
 	int chain_depth = 0;
-	const int MAX_CHAIN_DEPTH = 100; // Prevent infinite loops
+	const int MAX_CHAIN_DEPTH = 100;
 
 	while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
 	{
 		chain_depth++;
 
-#ifdef DEBUG
-		printf("[DEBUG] actionEnumerate: walking prototype chain depth=%d, num_used=%u\n",
-		       chain_depth, current_obj->num_used);
-#endif
-
-		// Enumerate properties from this level
 		for (u32 i = 0; i < current_obj->num_used; i++)
 		{
 			const char* prop_name = current_obj->properties[i].name;
 			u32 prop_name_len = current_obj->properties[i].name_length;
 			u8 prop_flags = current_obj->properties[i].flags;
 
-			// Skip if property is not enumerable (DontEnum)
 			if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
-			{
-#ifdef DEBUG
-				printf("[DEBUG] actionEnumerate: skipping non-enumerable property '%.*s'\n",
-				       prop_name_len, prop_name);
-#endif
 				continue;
-			}
-
-			// Skip if we've already enumerated this property name (shadowing)
 			if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
-			{
-#ifdef DEBUG
-				printf("[DEBUG] actionEnumerate: skipping shadowed property '%.*s'\n",
-				       prop_name_len, prop_name);
-#endif
 				continue;
-			}
 
-			// Add to enumerated list
 			addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
-
-			// Add to property list (for later pushing to stack)
-			PropList* node = (PropList*) malloc(sizeof(PropList));
-			if (node != NULL)
-			{
-				node->name = prop_name;
-				node->name_length = prop_name_len;
-				node->next = prop_head;
-				prop_head = node;
-				total_props++;
-
-#ifdef DEBUG
-				printf("[DEBUG] actionEnumerate: added enumerable property '%.*s'\n",
-				       prop_name_len, prop_name);
-#endif
-			}
+			PUSH_STR((char*)prop_name, prop_name_len);
 		}
 
-		// Move to prototype via __proto__ property
+		// Move to prototype via __proto__
 		ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
 		if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
-		{
 			current_obj = (ASObject*) proto_var->data.numeric_value;
-#ifdef DEBUG
-			printf("[DEBUG] actionEnumerate: following __proto__ to next level\n");
-#endif
-		}
 		else
-		{
-			// End of prototype chain
 			current_obj = NULL;
-		}
 	}
 
-	// Free the enumerated names list
 	freeEnumeratedNames(enumerated_head);
 
-#ifdef DEBUG
-	printf("[DEBUG] actionEnumerate: collected %u enumerable properties total\n", total_props);
-#endif
-
-	// Step 6: Push null terminator first
-	// This marks the end of the enumeration for for..in loops
-	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-
-	// Step 7: Push property names from the list (they're already in reverse order)
-	while (prop_head != NULL)
+	// Enumerate child MovieClip instance names (pushed after own props = popped before)
+#ifdef NO_GRAPHICS
+	if (mc != NULL)
 	{
-		PUSH_STR((char*)prop_head->name, prop_head->name_length);
-
-		PropList* next = prop_head->next;
-		free(prop_head);
-		prop_head = next;
+		const char* parent_name = (mc == &root_movieclip) ? NULL : mc->name;
+		ng_enumerateChildren(parent_name, enum_child_callback, app_context);
 	}
+#endif
 }
 
 
@@ -10632,29 +10630,22 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
 
-	// Push undefined as terminator
+	// Push undefined as terminator — the for-in loop checks with Equals2 against null,
+	// and undefined == null in Equals2. Test expects "undefined" when traced directly.
 	PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 
 	// Handle different types
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
-		// Object enumeration - walk prototype chain, collect then push property names
-		// Flash enumerates in reverse insertion order: last added property first.
-		// Since stack is LIFO, we collect into a linked list (reversed), then push.
+		// Object enumeration — push properties directly in forward insertion order.
+		// The LIFO stack naturally reverses: for-in pops in reverse insertion order,
+		// with prototype properties iterated before own properties (matching Flash).
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
 
 		if (obj != NULL)
 		{
-			typedef struct PropList {
-				const char* name;
-				u32 name_length;
-				struct PropList* next;
-			} PropList;
-
-			PropList* prop_head = NULL;
 			EnumeratedName* enumerated_head = NULL;
 
-			// Walk the prototype chain
 			ASObject* current_obj = obj;
 			int chain_depth = 0;
 			const int MAX_CHAIN_DEPTH = 100;
@@ -10669,26 +10660,13 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					u32 prop_name_len = current_obj->properties[i].name_length;
 					u8 prop_flags = current_obj->properties[i].flags;
 
-					// Skip non-enumerable properties (DontEnum flag)
 					if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
 						continue;
-
-					// Skip if already enumerated (shadowing)
 					if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
 						continue;
 
-					// Mark as enumerated
 					addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
-
-					// Prepend to linked list (reverses order)
-					PropList* node = (PropList*) malloc(sizeof(PropList));
-					if (node != NULL)
-					{
-						node->name = prop_name;
-						node->name_length = prop_name_len;
-						node->next = prop_head;
-						prop_head = node;
-					}
+					PUSH_STR((char*)prop_name, prop_name_len);
 				}
 
 				// Move to prototype via __proto__
@@ -10700,137 +10678,158 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			}
 
 			freeEnumeratedNames(enumerated_head);
-
-			// Push from linked list (already reversed, so this gives correct pop order)
-			while (prop_head != NULL)
-			{
-				PUSH_STR((char*)prop_head->name, prop_head->name_length);
-				PropList* next = prop_head->next;
-				free(prop_head);
-				prop_head = next;
-			}
 		}
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
 	{
-		// Array enumeration - push set indices and non-index props
+		// Array enumeration — use insertion-ordered enum_keys for Flash-compatible order.
+		// Push in forward insertion order; LIFO stack reversal gives reverse-insertion-order iteration.
 		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
 
 		if (arr != NULL)
 		{
-			// Push in LIFO order: indices ascending first, then props forward
-			// When popped, this gives: props in reverse, then indices descending
-			// Which matches Flash enumeration order
-
-			// Push set array indices in ascending order (skip HOLEs)
-			// Use signed length: if negative, don't iterate any element indices
-			int32_t signed_len = (int32_t) arr->length;
-			u32 iter_limit = 0;
-			if (signed_len > 0)
-				iter_limit = (u32)signed_len < arr->capacity ? (u32)signed_len : arr->capacity;
-			for (u32 i = 0; i < iter_limit; i++)
+			if (arr->enum_keys != NULL && arr->enum_count > 0)
 			{
-				if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
-					continue;
-				char idx_buf[16];
-				snprintf(idx_buf, sizeof(idx_buf), "%u", i);
-				u32 len = strlen(idx_buf);
-				char* idx_str = (char*) HALLOC(len + 1);
-				memcpy(idx_str, idx_buf, len + 1);
-				PUSH_STR(idx_str, len);
-			}
-
-			// Push non-index properties in forward order
-			if (arr->props != NULL && arr->props->num_used > 0)
-			{
-				for (u32 i = 0; i < arr->props->num_used; i++)
+				// Use tracked insertion order
+				for (u32 i = 0; i < arr->enum_count; i++)
 				{
-					const char* pn = arr->props->properties[i].name;
-					u32 pn_len = arr->props->properties[i].name_length;
-					if (pn_len == 9 && strncmp(pn, "__proto__", 9) == 0)
+					const char* key = arr->enum_keys[i];
+					u32 key_len = (u32)strlen(key);
+
+					// Skip __proto__
+					if (key_len == 9 && strncmp(key, "__proto__", 9) == 0)
 						continue;
-					PUSH_STR(pn, pn_len);
+
+					// Verify the key still has a value (not deleted)
+					// Check if it's a numeric index
+					int is_num = 1;
+					u32 idx_val = 0;
+					for (u32 j = 0; j < key_len; j++)
+					{
+						if (key[j] < '0' || key[j] > '9') { is_num = 0; break; }
+						idx_val = idx_val * 10 + (key[j] - '0');
+					}
+					if (is_num && key_len > 0)
+					{
+						if (idx_val < arr->length && idx_val < arr->capacity &&
+						    arr->elements[idx_val].type != ACTION_STACK_VALUE_HOLE)
+							PUSH_STR((char*)key, key_len);
+					}
+					else
+					{
+						// Named property — check if still exists and enumerable in props
+						if (arr->props != NULL)
+						{
+							ActionVar* pv = getProperty(arr->props, key, key_len);
+							if (pv != NULL)
+								PUSH_STR((char*)key, key_len);
+						}
+					}
+				}
+			}
+			else
+			{
+				// Fallback: no insertion tracking (e.g. array created without SetMember)
+				// Push set array indices in ascending order
+				int32_t signed_len = (int32_t) arr->length;
+				u32 iter_limit = 0;
+				if (signed_len > 0)
+					iter_limit = (u32)signed_len < arr->capacity ? (u32)signed_len : arr->capacity;
+				for (u32 i = 0; i < iter_limit; i++)
+				{
+					if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
+						continue;
+					char idx_buf[16];
+					snprintf(idx_buf, sizeof(idx_buf), "%u", i);
+					u32 len = (u32)strlen(idx_buf);
+					PUSH_STR(idx_buf, len);
+				}
+
+				// Push non-index properties
+				if (arr->props != NULL && arr->props->num_used > 0)
+				{
+					for (u32 i = 0; i < arr->props->num_used; i++)
+					{
+						const char* pn = arr->props->properties[i].name;
+						u32 pn_len = arr->props->properties[i].name_length;
+						if (pn_len == 9 && strncmp(pn, "__proto__", 9) == 0)
+							continue;
+						if (!(arr->props->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+							continue;
+						PUSH_STR(pn, pn_len);
+					}
 				}
 			}
 		}
-
-		#ifdef DEBUG
-		printf("// Enumerate2: enumerated array (length=%u)\n",
-			arr ? arr->length : 0);
-		#endif
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
-		// MovieClip enumeration — enumerate dynamic_props with prototype chain walk
+		// MovieClip enumeration — child instance names first (bottom of stack),
+		// then dynamic_props (top of stack). LIFO pop means dynamic_props iterated first.
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
-		if (mc != NULL && mc->dynamic_props != NULL)
+		if (mc != NULL)
 		{
-			ASObject* obj = (ASObject*) mc->dynamic_props;
-
-			typedef struct PropList {
-				const char* name;
-				u32 name_length;
-				struct PropList* next;
-			} PropList;
-
-			PropList* prop_head = NULL;
-			EnumeratedName* enumerated_head = NULL;
-
-			ASObject* current_obj = obj;
-			int chain_depth = 0;
-			const int MAX_CHAIN_DEPTH = 100;
-
-			while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
+			// Enumerate child MovieClip instance names first (pushed early = popped late)
+#ifdef NO_GRAPHICS
 			{
-				chain_depth++;
+				const char* parent_name = (mc == &root_movieclip) ? NULL : mc->name;
+				ng_enumerateChildren(parent_name, enum_child_callback, app_context);
+			}
+#endif
 
-				for (u32 i = 0; i < current_obj->num_used; i++)
+			if (mc->dynamic_props != NULL)
+			{
+				ASObject* obj = (ASObject*) mc->dynamic_props;
+				EnumeratedName* enumerated_head = NULL;
+
+				ASObject* current_obj = obj;
+				int chain_depth = 0;
+				const int MAX_CHAIN_DEPTH = 100;
+
+				while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
 				{
-					const char* prop_name = current_obj->properties[i].name;
-					u32 prop_name_len = current_obj->properties[i].name_length;
-					u8 prop_flags = current_obj->properties[i].flags;
+					chain_depth++;
 
-					if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
-						continue;
-					if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
-						continue;
-
-					addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
-
-					PropList* node = (PropList*) malloc(sizeof(PropList));
-					if (node != NULL)
+					for (u32 i = 0; i < current_obj->num_used; i++)
 					{
-						node->name = prop_name;
-						node->name_length = prop_name_len;
-						node->next = prop_head;
-						prop_head = node;
+						const char* prop_name = current_obj->properties[i].name;
+						u32 prop_name_len = current_obj->properties[i].name_length;
+						u8 prop_flags = current_obj->properties[i].flags;
+
+						if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
+							continue;
+						if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
+							continue;
+
+						addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
+						PUSH_STR((char*)prop_name, prop_name_len);
 					}
+
+					ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+					if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+						current_obj = (ASObject*) proto_var->data.numeric_value;
+					else
+						current_obj = NULL;
 				}
 
-				ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
-				if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
-					current_obj = (ASObject*) proto_var->data.numeric_value;
-				else
-					current_obj = NULL;
-			}
-
-			freeEnumeratedNames(enumerated_head);
-
-			while (prop_head != NULL)
-			{
-				PUSH_STR((char*)prop_head->name, prop_head->name_length);
-				PropList* next = prop_head->next;
-				free(prop_head);
-				prop_head = next;
+				freeEnumeratedNames(enumerated_head);
 			}
 		}
 	}
-	else
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		// Non-object/non-array: just the undefined terminator
-		#ifdef DEBUG
-		printf("// Enumerate2: non-enumerable type, only undefined pushed\n");
-		#endif
+		// Function enumeration — enumerate own_props
+		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+		if (func != NULL && func->own_props != NULL)
+		{
+			ASObject* obj = func->own_props;
+			for (u32 i = 0; i < obj->num_used; i++)
+			{
+				if (!(obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+					continue;
+				PUSH_STR((char*)obj->properties[i].name, obj->properties[i].name_length);
+			}
+		}
 	}
 }
 
@@ -12219,6 +12218,7 @@ void actionSetMember(SWFAppContext* app_context)
 							retainObject(arr->props);
 						}
 						setProperty(app_context, arr->props, prop_name, prop_name_len, &value_var);
+						arrayTrackKey(arr, prop_name, prop_name_len);
 					}
 				}
 				else if (prop_name_len > 0)
@@ -12230,6 +12230,7 @@ void actionSetMember(SWFAppContext* app_context)
 						retainObject(arr->props);
 					}
 					setProperty(app_context, arr->props, prop_name, prop_name_len, &value_var);
+					arrayTrackKey(arr, prop_name, prop_name_len);
 				}
 
 				// Update length
@@ -17887,6 +17888,61 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Null object - push undefined
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
+			return;
+		}
+
+		// Handle addProperty as built-in method
+		if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
+		{
+			float result = 0.0f;
+			if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				char _addprop_buf[512];
+				const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
+				u16_to_utf8(_addprop_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
+				const char* prop_name = _addprop_buf;
+				u32 prop_name_len = (u32)strlen(prop_name);
+
+				ASFunction* getter = NULL;
+				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
+					getter = (ASFunction*) args[1].data.numeric_value;
+
+				ASFunction* setter = NULL;
+				if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
+					setter = (ASFunction*) args[2].data.numeric_value;
+
+				// Register in global virtual property table
+				if (virtual_property_count < MAX_VIRTUAL_PROPERTIES && prop_name_len < 256)
+				{
+					VirtualProperty* existing = findVirtualProperty(prop_name, prop_name_len);
+					if (existing != NULL)
+					{
+						existing->getter = getter;
+						existing->setter = setter;
+					}
+					else
+					{
+						VirtualProperty* vp = &virtual_properties[virtual_property_count++];
+						strncpy(vp->name, prop_name, prop_name_len);
+						vp->name[prop_name_len] = '\0';
+						vp->name_length = prop_name_len;
+						vp->getter = getter;
+						vp->setter = setter;
+					}
+
+					// Also store as a property on the target object so it appears in enumeration.
+					// Use UNDEFINED value — the virtual property getter will intercept reads.
+					ActionVar marker;
+					marker.type = ACTION_STACK_VALUE_UNDEFINED;
+					marker.str_size = 0;
+					marker.data.numeric_value = 0;
+					setProperty(app_context, obj, prop_name, prop_name_len, &marker);
+					result = 1.0f;
+				}
+			}
+
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 			return;
 		}
 

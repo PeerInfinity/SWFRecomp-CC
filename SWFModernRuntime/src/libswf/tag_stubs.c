@@ -31,6 +31,7 @@ static struct {
 	int is_textfield;     // 1 if this is a DefineEditText (for TextField properties)
 	int textfield_idx;    // index into ng_textfields, or -1
 	char instance_name[64]; // instance name set by tagSetInstanceName
+	size_t parent_display_idx; // index of parent sprite in ng_display, or (size_t)-1 for root
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
 static int ng_nesting_depth = 0;  // >0 when inside sprite frame execution
@@ -382,10 +383,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	int tf_idx = ng_find_textfield(char_id);
 	int is_tf = (tf_idx >= 0) ? 1 : 0;
 
-	// Check if depth already occupied
+	// Check if depth already occupied (within the same parent scope)
+	size_t expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == expected_parent)
 		{
 			if (si == (size_t)-1)
 			{
@@ -398,6 +400,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				ng_display[i].is_button = btn;
 				ng_display[i].is_textfield = is_tf;
 				ng_display[i].textfield_idx = tf_idx;
+				ng_display[i].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
 				goto placed;
 			}
 			if (ng_display[i].sprite_idx == si)
@@ -409,12 +412,16 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[i].sprite_idx = si;
 			ng_display[i].current_frame = 0;
 			ng_display[i].is_playing = 1;
-			ng_display[i].needs_init = (si != (size_t)-1) ? 1 : 0;
+			ng_display[i].needs_init = 0;
 			ng_display[i].placed_at_frame = current_frame;
 			ng_display[i].transform_id = transform_id;
 			ng_display[i].is_button = btn;
 			ng_display[i].is_textfield = is_tf;
 			ng_display[i].textfield_idx = tf_idx;
+			ng_display[i].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+			// Execute sprite frame 0 immediately so children exist for scripts
+			if (si != (size_t)-1)
+				ng_exec_sprite_frame(app_context, i, 0);
 			goto placed;
 		}
 	}
@@ -422,18 +429,23 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// New entry
 	if (ng_display_count < MAX_DISPLAY_NG)
 	{
-		ng_display[ng_display_count].depth = depth;
-		ng_display[ng_display_count].sprite_idx = si;
-		ng_display[ng_display_count].current_frame = 0;
-		ng_display[ng_display_count].is_playing = 1;
-		ng_display[ng_display_count].needs_init = (si != (size_t)-1) ? 1 : 0;
-		ng_display[ng_display_count].placed_at_frame = current_frame;
-		ng_display[ng_display_count].transform_id = transform_id;
-		ng_display[ng_display_count].is_button = btn;
-		ng_display[ng_display_count].is_textfield = is_tf;
-		ng_display[ng_display_count].textfield_idx = tf_idx;
-		ng_display[ng_display_count].instance_name[0] = '\0';
+		size_t new_idx = ng_display_count;
+		ng_display[new_idx].depth = depth;
+		ng_display[new_idx].sprite_idx = si;
+		ng_display[new_idx].current_frame = 0;
+		ng_display[new_idx].is_playing = 1;
+		ng_display[new_idx].needs_init = 0;
+		ng_display[new_idx].placed_at_frame = current_frame;
+		ng_display[new_idx].transform_id = transform_id;
+		ng_display[new_idx].is_button = btn;
+		ng_display[new_idx].is_textfield = is_tf;
+		ng_display[new_idx].textfield_idx = tf_idx;
+		ng_display[new_idx].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+		ng_display[new_idx].instance_name[0] = '\0';
 		ng_display_count++;
+		// Execute sprite frame 0 immediately so children exist for scripts
+		if (si != (size_t)-1)
+			ng_exec_sprite_frame(app_context, new_idx, 0);
 	}
 
 placed:
@@ -488,14 +500,48 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
 	(void)app_context;
-	// Store instance name on the display entry at this depth
+	// Store instance name on the display entry at this depth (within current parent scope)
+	size_t expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == expected_parent)
 		{
 			strncpy(ng_display[i].instance_name, name, 63);
 			ng_display[i].instance_name[63] = '\0';
 			return;
+		}
+	}
+}
+
+// Enumerate child instance names for a MovieClip.
+// Finds the parent's display index, then iterates children whose parent_display_idx matches.
+// For _root (parent_name is NULL or empty), finds entries with parent_display_idx == (size_t)-1.
+void ng_enumerateChildren(const char* parent_name, void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data)
+{
+	size_t parent_idx = (size_t)-1;
+	if (parent_name != NULL && parent_name[0] != '\0')
+	{
+		// Find the parent display entry
+		for (size_t i = 0; i < ng_display_count; i++)
+		{
+			if (ng_display[i].instance_name[0] != '\0' &&
+			    strcmp(ng_display[i].instance_name, parent_name) == 0)
+			{
+				parent_idx = i;
+				break;
+			}
+		}
+		if (parent_idx == (size_t)-1)
+			return; // Parent not found
+	}
+
+	// Iterate children in forward order (pushed in forward = popped in reverse)
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].parent_display_idx == parent_idx &&
+		    ng_display[i].instance_name[0] != '\0')
+		{
+			callback(ng_display[i].instance_name, (u32)strlen(ng_display[i].instance_name), user_data);
 		}
 	}
 }
@@ -772,9 +818,10 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 	extern int catch_up_backward;
 	extern size_t catch_up_target;
 
+	size_t expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == expected_parent)
 		{
 			if (catch_up_backward && ng_display[i].placed_at_frame <= catch_up_target)
 				return;  // Protected: don't remove

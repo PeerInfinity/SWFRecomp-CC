@@ -382,6 +382,13 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	// Set default property flags (enumerable, writable, configurable)
 	obj->properties[index].flags = PROPERTY_FLAGS_DEFAULT;
 
+	// __proto__ and constructor are DontEnum (not enumerable in for-in)
+	if ((name_length == 9 && strncmp(name, "__proto__", 9) == 0) ||
+	    (name_length == 11 && strncmp(name, "constructor", 11) == 0))
+	{
+		obj->properties[index].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+	}
+
 	// Set value
 	obj->properties[index].value = *value;
 
@@ -724,6 +731,36 @@ void printArray(ASArray* arr)
  * Array Implementation
  */
 
+// Track key insertion order for Flash-compatible for-in enumeration.
+// Only adds the key if it's not already in the list (first-write wins).
+void arrayTrackKey(ASArray* arr, const char* key, u32 key_len)
+{
+	// Check if already tracked
+	for (u32 i = 0; i < arr->enum_count; i++)
+	{
+		if (strlen(arr->enum_keys[i]) == key_len &&
+		    memcmp(arr->enum_keys[i], key, key_len) == 0)
+			return;  // Already tracked
+	}
+
+	// Grow if needed
+	if (arr->enum_count >= arr->enum_capacity)
+	{
+		u32 new_cap = arr->enum_capacity == 0 ? 8 : arr->enum_capacity * 2;
+		char** new_keys = (char**) realloc(arr->enum_keys, sizeof(char*) * new_cap);
+		if (new_keys == NULL) return;
+		arr->enum_keys = new_keys;
+		arr->enum_capacity = new_cap;
+	}
+
+	// Store copy of key
+	char* key_copy = (char*) malloc(key_len + 1);
+	if (key_copy == NULL) return;
+	memcpy(key_copy, key, key_len);
+	key_copy[key_len] = '\0';
+	arr->enum_keys[arr->enum_count++] = key_copy;
+}
+
 ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 {
 	ASArray* arr = (ASArray*) malloc(sizeof(ASArray));
@@ -755,6 +792,9 @@ ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 	}
 
 	arr->props = NULL;  // Lazily allocated for non-index properties
+	arr->enum_keys = NULL;
+	arr->enum_count = 0;
+	arr->enum_capacity = 0;
 
 #ifdef DEBUG
 	printf("[DEBUG] allocArray: arr=%p, refcount=%u, capacity=%u\n",
@@ -834,6 +874,14 @@ void releaseArray(SWFAppContext* app_context, ASArray* arr)
 			releaseObject(app_context, arr->props);
 		}
 
+		// Free enumeration key tracking
+		if (arr->enum_keys != NULL)
+		{
+			for (u32 i = 0; i < arr->enum_count; i++)
+				free(arr->enum_keys[i]);
+			free(arr->enum_keys);
+		}
+
 		// Free array itself
 		free(arr);
 	}
@@ -903,6 +951,13 @@ void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, Action
 
 	// Set new value
 	arr->elements[index] = *value;
+
+	// Track insertion order for enumeration
+	{
+		char idx_buf[12];
+		int len = snprintf(idx_buf, sizeof(idx_buf), "%u", index);
+		arrayTrackKey(arr, idx_buf, (u32)len);
+	}
 
 	// Update length if needed
 	if (index >= arr->length)

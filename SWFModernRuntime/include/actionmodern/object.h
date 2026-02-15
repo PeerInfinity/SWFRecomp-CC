@@ -147,6 +147,9 @@ typedef struct ASArray
 	u32 capacity;           // Allocated capacity
 	ActionVar* elements;    // Dynamic array of elements
 	ASObject* props;        // Non-index string properties (lazily allocated)
+	char** enum_keys;       // Insertion-ordered key names for enumeration (NULL until first set)
+	u32 enum_count;         // Number of entries in enum_keys
+	u32 enum_capacity;      // Allocated capacity of enum_keys
 } ASArray;
 
 /**
@@ -168,6 +171,9 @@ ActionVar* getArrayElement(ASArray* arr, u32 index);
 
 // Set element at index (grows array if needed)
 void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, ActionVar* value);
+
+// Track key insertion order for Flash-compatible for-in enumeration
+void arrayTrackKey(ASArray* arr, const char* key, u32 key_len);
 
 /**
  * Debug/Testing Functions
