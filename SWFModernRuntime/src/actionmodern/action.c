@@ -5548,8 +5548,8 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 	// 2. Call valueOf on each object operand (right first for Flash evaluation order)
 	// 3. If either raw type or valueOf result is a string → string concatenation
 	//    - Objects with primitive valueOf: convert that primitive to string
-	//    - Objects with non-primitive valueOf: call toString, fallback to "[object Object]"
-	//    - Objects with no valueOf: use convertString → "[object Object]"
+	//    - Objects with non-primitive valueOf: call toString, fallback to "[type Object]"
+	//    - Objects with no valueOf: use convertString → "[type Object]"
 	// 4. Else → numeric addition using original operands (convertFloat calls valueOf again)
 	//    - Objects with primitive valueOf: use that result for numeric conversion
 	//    - Objects with non-primitive valueOf: convertFloat on original (valueOf called again)
@@ -6933,9 +6933,9 @@ void actionTrace(SWFAppContext* app_context)
 		{
 			// Flash's trace() calls toString on objects:
 			// - toString found, returns string → print that string
-			//   (e.g. Object.prototype.toString returns "[object Object]")
-			// - toString found, returns non-string → "[object Object]"
-			// - no toString found → "[object Object]"
+			//   (e.g. Object.prototype.toString returns "[type Object]")
+			// - toString found, returns non-string → "[type Object]"
+			// - no toString found → "[type Object]"
 			ActionVar obj_var;
 			obj_var.type = STACK_TOP_TYPE;
 			obj_var.data.numeric_value = STACK_TOP_VALUE;
@@ -6954,7 +6954,7 @@ void actionTrace(SWFAppContext* app_context)
 			}
 			else
 			{
-				printf("[object Object]\n");
+				printf("[type Object]\n");
 			}
 			break;
 		}
@@ -10662,9 +10662,9 @@ void actionSetMember(SWFAppContext* app_context)
 		}
 		else
 		{
-			// toString didn't return a string - fall back to "[object Object]"
-			prop_name = "[object Object]";
-			prop_name_len = 15;
+			// toString didn't return a string - fall back to "[type Object]"
+			prop_name = "[type Object]";
+			prop_name_len = 13;
 		}
 	}
 	else
@@ -13690,6 +13690,7 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	as_func->register_count = 0;
 	as_func->flags = 0;
 	as_func->prototype_obj = NULL;
+	as_func->own_props = NULL;
 
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
@@ -13732,7 +13733,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	as_func->register_count = register_count;
 	as_func->flags = flags;
 	as_func->prototype_obj = NULL;
-
+	as_func->own_props = NULL;
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
 		function_registry[function_count++] = as_func;
@@ -14937,7 +14938,7 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 					}
 				}
 			}
-			return snprintf(buf, buf_size, "[object Object]");
+			return snprintf(buf, buf_size, "[type Object]");
 		}
 		case ACTION_STACK_VALUE_FUNCTION:
 			return snprintf(buf, buf_size, "[type Function]");
