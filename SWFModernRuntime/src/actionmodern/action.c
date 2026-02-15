@@ -1888,6 +1888,24 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 		}
 	}
 
+	// Register TextField.StyleSheet as a property on the constructor (SWF7+)
+	if (SWF_VERSION >= 7)
+	{
+		static ASFunction g_stylesheet_ctor;
+		memset(&g_stylesheet_ctor, 0, sizeof(ASFunction));
+		strncpy(g_stylesheet_ctor.name, "StyleSheet", 255);
+		g_stylesheet_ctor.function_type = 1;
+		if (g_textfield_constructor.own_props == NULL)
+		{
+			g_textfield_constructor.own_props = allocObject(app_context, 4);
+			retainObject(g_textfield_constructor.own_props);
+		}
+		ActionVar ss_val = {0};
+		ss_val.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &ss_val.data.numeric_value) = (u64)&g_stylesheet_ctor;
+		setProperty(app_context, g_textfield_constructor.own_props, "StyleSheet", 10, &ss_val);
+	}
+
 	g_textfield_constructor_init = 1;
 }
 
@@ -5530,7 +5548,7 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 	// 2. Call valueOf on each object operand (right first for Flash evaluation order)
 	// 3. If either raw type or valueOf result is a string → string concatenation
 	//    - Objects with primitive valueOf: convert that primitive to string
-	//    - Objects with non-primitive valueOf: call toString, fallback to "[type Object]"
+	//    - Objects with non-primitive valueOf: call toString, fallback to "[object Object]"
 	//    - Objects with no valueOf: use convertString → "[object Object]"
 	// 4. Else → numeric addition using original operands (convertFloat calls valueOf again)
 	//    - Objects with primitive valueOf: use that result for numeric conversion
@@ -6916,8 +6934,8 @@ void actionTrace(SWFAppContext* app_context)
 			// Flash's trace() calls toString on objects:
 			// - toString found, returns string → print that string
 			//   (e.g. Object.prototype.toString returns "[object Object]")
-			// - toString found, returns non-string → "[type Object]"
-			// - no toString found → "[type Object]"
+			// - toString found, returns non-string → "[object Object]"
+			// - no toString found → "[object Object]"
 			ActionVar obj_var;
 			obj_var.type = STACK_TOP_TYPE;
 			obj_var.data.numeric_value = STACK_TOP_VALUE;
@@ -6936,7 +6954,7 @@ void actionTrace(SWFAppContext* app_context)
 			}
 			else
 			{
-				printf("[type Object]\n");
+				printf("[object Object]\n");
 			}
 			break;
 		}
@@ -7397,6 +7415,184 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 	// - Security: Check cross-domain policy, validate URL scheme
 }
 
+// ============================================================================
+// Global stub constructors/objects for built-in ActionScript classes
+// ============================================================================
+
+// Stub constructors: classes that need to exist as globals with a prototype
+// Index mapping: 0=AsBroadcaster, 1=Button, 2=Camera, 3=Color,
+// 4=ContextMenu, 5=ContextMenuItem, 6=Date, 7=LoadVars, 8=LocalConnection,
+// 9=Microphone, 10=MovieClipLoader, 11=NetConnection, 12=NetStream,
+// 13=PrintJob, 14=SharedObject, 15=Sound, 16=TextSnapshot, 17=Video, 18=XMLSocket
+#define NUM_STUB_CTORS 19
+static ASFunction g_stub_ctors[NUM_STUB_CTORS];
+
+// Stub static objects (not constructors — typeof returns "object", no prototype)
+static ASObject* g_accessibility_obj = NULL;
+static ASObject* g_key_obj = NULL;
+static ASObject* g_mouse_obj = NULL;
+static ASObject* g_selection_obj = NULL;
+static ASObject* g_stage_obj = NULL;
+
+static int g_global_init_done = 0;
+
+static void ensureGlobalInit(SWFAppContext* app_context)
+{
+	if (g_global_init_done) return;
+
+	if (global_object == NULL)
+	{
+		global_object = allocObject(app_context, 64);
+	}
+
+	// ---- Existing built-in constructors (Object, Array, String, Number, Boolean, Function) ----
+	// Function constructor is SWF6+ only
+	static ASFunction g_ctors[6];
+	memset(g_ctors, 0, sizeof(g_ctors));
+	const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
+	int ctor_name_lens[] = {6, 5, 6, 6, 7, 8};
+	int num_ctors = (SWF_VERSION >= 6) ? 6 : 5;
+	for (int ci = 0; ci < num_ctors; ci++)
+	{
+		strncpy(g_ctors[ci].name, ctor_names[ci], 255);
+		g_ctors[ci].function_type = 1;
+		ActionVar cv = {0};
+		cv.type = ACTION_STACK_VALUE_FUNCTION;
+		cv.data.numeric_value = (u64)&g_ctors[ci];
+		setProperty(app_context, global_object, ctor_names[ci], ctor_name_lens[ci], &cv);
+	}
+
+	// ---- MovieClip ----
+	initMovieClipPrototype(app_context);
+	{
+		ActionVar mc_cv = {0};
+		mc_cv.type = ACTION_STACK_VALUE_FUNCTION;
+		mc_cv.data.numeric_value = (u64)&g_movieclip_constructor;
+		setProperty(app_context, global_object, "MovieClip", 9, &mc_cv);
+	}
+
+	// ---- TextField ----
+	initTextFieldPrototype(app_context);
+	{
+		ActionVar tf_cv = {0};
+		tf_cv.type = ACTION_STACK_VALUE_FUNCTION;
+		tf_cv.data.numeric_value = (u64)&g_textfield_constructor;
+		setProperty(app_context, global_object, "TextField", 9, &tf_cv);
+	}
+
+	// ---- TextFormat ----
+	initTextFormatPrototype(app_context);
+	{
+		ActionVar tfmt_cv = {0};
+		tfmt_cv.type = ACTION_STACK_VALUE_FUNCTION;
+		tfmt_cv.data.numeric_value = (u64)&g_textformat_constructor;
+		setProperty(app_context, global_object, "TextFormat", 10, &tfmt_cv);
+	}
+
+	// ---- XML and XMLNode ----
+	initXMLPrototype(app_context);
+	{
+		ActionVar xml_cv = {0};
+		xml_cv.type = ACTION_STACK_VALUE_FUNCTION;
+		xml_cv.data.numeric_value = (u64)&g_xml_constructor;
+		setProperty(app_context, global_object, "XML", 3, &xml_cv);
+	}
+	{
+		ActionVar xmln_cv = {0};
+		xmln_cv.type = ACTION_STACK_VALUE_FUNCTION;
+		xmln_cv.data.numeric_value = (u64)&g_xmlnode_constructor;
+		setProperty(app_context, global_object, "XMLNode", 7, &xmln_cv);
+	}
+
+	// ---- Math ----
+	initMathObject(app_context);
+	{
+		ActionVar math_cv = {0};
+		math_cv.type = ACTION_STACK_VALUE_OBJECT;
+		math_cv.data.numeric_value = (u64)g_math_object;
+		setProperty(app_context, global_object, "Math", 4, &math_cv);
+	}
+
+	// ---- Error ----
+	{
+		static ASFunction g_error_ctor;
+		static int g_error_init = 0;
+		if (!g_error_init)
+		{
+			memset(&g_error_ctor, 0, sizeof(ASFunction));
+			strncpy(g_error_ctor.name, "Error", 255);
+			g_error_ctor.function_type = 1;
+			g_error_init = 1;
+		}
+		ActionVar ev = {0};
+		ev.type = ACTION_STACK_VALUE_FUNCTION;
+		ev.data.numeric_value = (u64)&g_error_ctor;
+		setProperty(app_context, global_object, "Error", 5, &ev);
+	}
+
+	// ---- Stub constructors (function type with prototype) ----
+	{
+		static const char* stub_names[NUM_STUB_CTORS] = {
+			"AsBroadcaster", "Button", "Camera", "Color",
+			"ContextMenu", "ContextMenuItem", "Date", "LoadVars",
+			"LocalConnection", "Microphone", "MovieClipLoader",
+			"NetConnection", "NetStream", "PrintJob", "SharedObject",
+			"Sound", "TextSnapshot", "Video", "XMLSocket"
+		};
+		static const int stub_name_lens[NUM_STUB_CTORS] = {
+			13, 6, 6, 5,
+			11, 15, 4, 8,
+			15, 10, 15,
+			13, 9, 8, 12,
+			5, 12, 5, 9
+		};
+		for (int i = 0; i < NUM_STUB_CTORS; i++)
+		{
+			memset(&g_stub_ctors[i], 0, sizeof(ASFunction));
+			strncpy(g_stub_ctors[i].name, stub_names[i], 255);
+			g_stub_ctors[i].function_type = 1;
+			// prototype_obj is lazily created on first .prototype access
+			ActionVar sv = {0};
+			sv.type = ACTION_STACK_VALUE_FUNCTION;
+			sv.data.numeric_value = (u64)&g_stub_ctors[i];
+			setProperty(app_context, global_object, stub_names[i], stub_name_lens[i], &sv);
+		}
+	}
+
+	// ---- Static global objects (typeof = "object", no prototype) ----
+	{
+		g_accessibility_obj = allocObject(app_context, 4);
+		g_key_obj = allocObject(app_context, 8);
+		g_mouse_obj = allocObject(app_context, 4);
+		g_selection_obj = allocObject(app_context, 4);
+		g_stage_obj = allocObject(app_context, 8);
+
+		struct { const char* name; int len; ASObject* obj; } objs[] = {
+			{"Accessibility", 13, g_accessibility_obj},
+			{"Key", 3, g_key_obj},
+			{"Mouse", 5, g_mouse_obj},
+			{"Selection", 9, g_selection_obj},
+			{"Stage", 5, g_stage_obj},
+		};
+		for (int i = 0; i < 5; i++)
+		{
+			ActionVar ov = {0};
+			ov.type = ACTION_STACK_VALUE_OBJECT;
+			ov.data.numeric_value = (u64)objs[i].obj;
+			setProperty(app_context, global_object, objs[i].name, objs[i].len, &ov);
+		}
+	}
+
+	// ---- valueOf on _global ----
+	{
+		ActionVar undef_val = {0};
+		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+		setProperty(app_context, global_object, "valueOf", 7, &undef_val);
+	}
+
+	g_global_init_done = 1;
+}
+
 void actionGetVariable(SWFAppContext* app_context)
 {
 	// Read variable name info from stack
@@ -7602,88 +7798,7 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 		else if (var_name_len == 7 && strncmp(var_name, "_global", 7) == 0)
 		{
-			extern ASObject* global_object;
-			if (global_object == NULL)
-			{
-				global_object = allocObject(app_context, 16);
-			}
-			// Lazily initialize _global with valueOf and built-in constructors
-			static int global_init_done = 0;
-			if (!global_init_done)
-			{
-				ActionVar undef_val = {0};
-				undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
-				setProperty(app_context, global_object, "valueOf", 7, &undef_val);
-
-				// Register built-in constructor functions on _global
-				// so _global.Object, _global.Array etc. work via NewMethod
-				static ASFunction g_ctors[6];
-				memset(g_ctors, 0, sizeof(g_ctors));
-				const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
-				int ctor_name_lens[] = {6, 5, 6, 6, 7, 8};
-				for (int ci = 0; ci < 6; ci++)
-				{
-					strncpy(g_ctors[ci].name, ctor_names[ci], 255);
-					g_ctors[ci].function_type = 1;
-					ActionVar cv = {0};
-					cv.type = ACTION_STACK_VALUE_FUNCTION;
-					cv.data.numeric_value = (u64)&g_ctors[ci];
-					setProperty(app_context, global_object, ctor_names[ci], ctor_name_lens[ci], &cv);
-				}
-
-				// Register MovieClip on _global
-				initMovieClipPrototype(app_context);
-				{
-					ActionVar mc_cv = {0};
-					mc_cv.type = ACTION_STACK_VALUE_FUNCTION;
-					mc_cv.data.numeric_value = (u64)&g_movieclip_constructor;
-					setProperty(app_context, global_object, "MovieClip", 9, &mc_cv);
-				}
-
-				// Register TextField on _global
-				initTextFieldPrototype(app_context);
-				{
-					ActionVar tf_cv = {0};
-					tf_cv.type = ACTION_STACK_VALUE_FUNCTION;
-					tf_cv.data.numeric_value = (u64)&g_textfield_constructor;
-					setProperty(app_context, global_object, "TextField", 9, &tf_cv);
-				}
-
-				// Register TextFormat on _global
-				initTextFormatPrototype(app_context);
-				{
-					ActionVar tfmt_cv = {0};
-					tfmt_cv.type = ACTION_STACK_VALUE_FUNCTION;
-					tfmt_cv.data.numeric_value = (u64)&g_textformat_constructor;
-					setProperty(app_context, global_object, "TextFormat", 10, &tfmt_cv);
-				}
-
-				// Register XML and XMLNode on _global
-				initXMLPrototype(app_context);
-				{
-					ActionVar xml_cv = {0};
-					xml_cv.type = ACTION_STACK_VALUE_FUNCTION;
-					xml_cv.data.numeric_value = (u64)&g_xml_constructor;
-					setProperty(app_context, global_object, "XML", 3, &xml_cv);
-				}
-				{
-					ActionVar xmln_cv = {0};
-					xmln_cv.type = ACTION_STACK_VALUE_FUNCTION;
-					xmln_cv.data.numeric_value = (u64)&g_xmlnode_constructor;
-					setProperty(app_context, global_object, "XMLNode", 7, &xmln_cv);
-				}
-
-				// Register Math on _global
-				initMathObject(app_context);
-				{
-					ActionVar math_cv = {0};
-					math_cv.type = ACTION_STACK_VALUE_OBJECT;
-					math_cv.data.numeric_value = (u64)g_math_object;
-					setProperty(app_context, global_object, "Math", 4, &math_cv);
-				}
-
-				global_init_done = 1;
-			}
+			ensureGlobalInit(app_context);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
 			return;
 		}
@@ -7947,36 +8062,102 @@ void actionGetVariable(SWFAppContext* app_context)
 				caps_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &caps_var.data.numeric_value) = (u64)caps_obj;
 				setProperty(app_context, system_object, "capabilities", 12, &caps_var);
+
+				// System.IME (stub object)
+				ASObject* ime_obj = allocObject(app_context, 4);
+				ActionVar ime_var = {0};
+				ime_var.type = ACTION_STACK_VALUE_OBJECT;
+				VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
+				setProperty(app_context, system_object, "IME", 3, &ime_var);
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)system_object);
 			return;
 		}
-		// flash package (flash.display, flash.geom, etc.)
-		else if (var_name_len == 5 && strncmp(var_name, "flash", 5) == 0)
+		// flash package (flash.display, flash.geom, etc.) - SWF8+ only
+		else if (EFFECTIVE_SWF_VERSION() >= 8 && var_name_len == 5 && strncmp(var_name, "flash", 5) == 0)
 		{
 			static ASObject* flash_object = NULL;
 			if (flash_object == NULL)
 			{
-				flash_object = allocObject(app_context, 4);
-				// flash.display package
-				ASObject* display_obj = allocObject(app_context, 4);
-				// Register BitmapData as a named function stub
-				ASFunction* bitmapdata_func = (ASFunction*) HCALLOC(1, sizeof(ASFunction));
-				strncpy(bitmapdata_func->name, "BitmapData", 255);
-				ActionVar bd_val = {0};
-				bd_val.type = ACTION_STACK_VALUE_FUNCTION;
-				VAL(u64, &bd_val.data.numeric_value) = (u64)bitmapdata_func;
-				setProperty(app_context, display_obj, "BitmapData", 10, &bd_val);
-				ActionVar disp_val = {0};
-				disp_val.type = ACTION_STACK_VALUE_OBJECT;
-				VAL(u64, &disp_val.data.numeric_value) = (u64)display_obj;
-				setProperty(app_context, flash_object, "display", 7, &disp_val);
-				// flash.geom package (stub)
-				ASObject* geom_obj = allocObject(app_context, 4);
-				ActionVar geom_val = {0};
-				geom_val.type = ACTION_STACK_VALUE_OBJECT;
-				VAL(u64, &geom_val.data.numeric_value) = (u64)geom_obj;
-				setProperty(app_context, flash_object, "geom", 4, &geom_val);
+				flash_object = allocObject(app_context, 8);
+
+				// Helper: create a stub constructor ASFunction
+				#define MAKE_STUB_CTOR(varname, namestr) \
+					static ASFunction varname; \
+					memset(&varname, 0, sizeof(ASFunction)); \
+					strncpy(varname.name, namestr, 255); \
+					varname.function_type = 1;
+				#define SET_CTOR_PROP(parent, propname, proplen, ctorvar) \
+					{ ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION; \
+					  VAL(u64, &_cv.data.numeric_value) = (u64)&ctorvar; \
+					  setProperty(app_context, parent, propname, proplen, &_cv); }
+				#define MAKE_PKG(varname, parent, propname, proplen, capacity) \
+					ASObject* varname = allocObject(app_context, capacity); \
+					{ ActionVar _pv = {0}; _pv.type = ACTION_STACK_VALUE_OBJECT; \
+					  VAL(u64, &_pv.data.numeric_value) = (u64)varname; \
+					  setProperty(app_context, parent, propname, proplen, &_pv); }
+
+				// flash.display
+				MAKE_PKG(display_obj, flash_object, "display", 7, 4);
+				MAKE_STUB_CTOR(fc_BitmapData, "BitmapData");
+				SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
+
+				// flash.external
+				MAKE_PKG(external_obj, flash_object, "external", 8, 4);
+				MAKE_STUB_CTOR(fc_ExternalInterface, "ExternalInterface");
+				SET_CTOR_PROP(external_obj, "ExternalInterface", 17, fc_ExternalInterface);
+
+				// flash.filters (10 filter classes)
+				MAKE_PKG(filters_obj, flash_object, "filters", 7, 12);
+				MAKE_STUB_CTOR(fc_BevelFilter, "BevelFilter");
+				SET_CTOR_PROP(filters_obj, "BevelFilter", 11, fc_BevelFilter);
+				MAKE_STUB_CTOR(fc_BitmapFilter, "BitmapFilter");
+				SET_CTOR_PROP(filters_obj, "BitmapFilter", 12, fc_BitmapFilter);
+				MAKE_STUB_CTOR(fc_BlurFilter, "BlurFilter");
+				SET_CTOR_PROP(filters_obj, "BlurFilter", 10, fc_BlurFilter);
+				MAKE_STUB_CTOR(fc_ColorMatrixFilter, "ColorMatrixFilter");
+				SET_CTOR_PROP(filters_obj, "ColorMatrixFilter", 17, fc_ColorMatrixFilter);
+				MAKE_STUB_CTOR(fc_ConvolutionFilter, "ConvolutionFilter");
+				SET_CTOR_PROP(filters_obj, "ConvolutionFilter", 17, fc_ConvolutionFilter);
+				MAKE_STUB_CTOR(fc_DisplacementMapFilter, "DisplacementMapFilter");
+				SET_CTOR_PROP(filters_obj, "DisplacementMapFilter", 21, fc_DisplacementMapFilter);
+				MAKE_STUB_CTOR(fc_DropShadowFilter, "DropShadowFilter");
+				SET_CTOR_PROP(filters_obj, "DropShadowFilter", 16, fc_DropShadowFilter);
+				MAKE_STUB_CTOR(fc_GlowFilter, "GlowFilter");
+				SET_CTOR_PROP(filters_obj, "GlowFilter", 10, fc_GlowFilter);
+				MAKE_STUB_CTOR(fc_GradientBevelFilter, "GradientBevelFilter");
+				SET_CTOR_PROP(filters_obj, "GradientBevelFilter", 19, fc_GradientBevelFilter);
+				MAKE_STUB_CTOR(fc_GradientGlowFilter, "GradientGlowFilter");
+				SET_CTOR_PROP(filters_obj, "GradientGlowFilter", 18, fc_GradientGlowFilter);
+
+				// flash.geom (5 classes)
+				MAKE_PKG(geom_obj, flash_object, "geom", 4, 8);
+				MAKE_STUB_CTOR(fc_ColorTransform, "ColorTransform");
+				SET_CTOR_PROP(geom_obj, "ColorTransform", 14, fc_ColorTransform);
+				MAKE_STUB_CTOR(fc_Matrix, "Matrix");
+				SET_CTOR_PROP(geom_obj, "Matrix", 6, fc_Matrix);
+				MAKE_STUB_CTOR(fc_Point, "Point");
+				SET_CTOR_PROP(geom_obj, "Point", 5, fc_Point);
+				MAKE_STUB_CTOR(fc_Rectangle, "Rectangle");
+				SET_CTOR_PROP(geom_obj, "Rectangle", 9, fc_Rectangle);
+				MAKE_STUB_CTOR(fc_Transform, "Transform");
+				SET_CTOR_PROP(geom_obj, "Transform", 9, fc_Transform);
+
+				// flash.net
+				MAKE_PKG(net_obj, flash_object, "net", 3, 4);
+				MAKE_STUB_CTOR(fc_FileReference, "FileReference");
+				SET_CTOR_PROP(net_obj, "FileReference", 13, fc_FileReference);
+				MAKE_STUB_CTOR(fc_FileReferenceList, "FileReferenceList");
+				SET_CTOR_PROP(net_obj, "FileReferenceList", 17, fc_FileReferenceList);
+
+				// flash.text
+				MAKE_PKG(text_obj, flash_object, "text", 4, 4);
+				MAKE_STUB_CTOR(fc_TextRenderer, "TextRenderer");
+				SET_CTOR_PROP(text_obj, "TextRenderer", 12, fc_TextRenderer);
+
+				#undef MAKE_STUB_CTOR
+				#undef SET_CTOR_PROP
+				#undef MAKE_PKG
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)flash_object);
 			return;
@@ -7985,15 +8166,12 @@ void actionGetVariable(SWFAppContext* app_context)
 
 		// Check _global object properties as fallback
 		{
-			extern ASObject* global_object;
-			if (global_object != NULL)
+			ensureGlobalInit(app_context);
+			ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+			if (gprop != NULL)
 			{
-				ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
-				if (gprop != NULL)
-				{
-					PUSH_VAR(gprop);
-					return;
-				}
+				PUSH_VAR(gprop);
+				return;
 			}
 		}
 
@@ -10484,9 +10662,9 @@ void actionSetMember(SWFAppContext* app_context)
 		}
 		else
 		{
-			// toString didn't return a string - fall back to "[type Object]"
-			prop_name = "[type Object]";
-			prop_name_len = 13;
+			// toString didn't return a string - fall back to "[object Object]"
+			prop_name = "[object Object]";
+			prop_name_len = 15;
 		}
 	}
 	else
@@ -13618,54 +13796,186 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// 4. Check for built-in global functions first
 	int builtin_handled = 0;
 
-	// parseInt(string) - Parse string to integer
+	// parseInt(string [, radix]) - Parse string to integer (Flash/ECMA-262 semantics)
 	if (func_name_len == 8 && strncmp(func_name, "parseInt", 8) == 0)
 	{
-		if (num_args > 0)
+		if (num_args == 0)
 		{
-			// Convert first argument to string
-			char arg_buffer[17];
-			const char* str_value = NULL;
-
-			if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				char _parseInt_buf[512];
-				const uint16_t* _parseInt_u16 = varGetU16Ptr(&args[0]);
-				u16_to_utf8(_parseInt_u16, args[0].str_size, _parseInt_buf, sizeof(_parseInt_buf));
-				str_value = _parseInt_buf;
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_F32)
-			{
-				// Convert float to string
-				float fval = VAL(float, &args[0].data.numeric_value);
-				snprintf(arg_buffer, 17, "%.15g", fval);
-				str_value = arg_buffer;
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_F64)
-			{
-				// Convert double to string
-				double dval = VAL(double, &args[0].data.numeric_value);
-				snprintf(arg_buffer, 17, "%.15g", dval);
-				str_value = arg_buffer;
-			}
-			else
-			{
-				// Undefined or other types -> NaN
-				str_value = "NaN";
-			}
-
-			// Parse integer from string
-			float result = (float) atoi(str_value);
+			// ECMA-262 violation: parseInt() returns undefined, not NaN
 			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 			builtin_handled = 1;
 		}
 		else
 		{
-			// No arguments - return NaN
+			// Convert first argument to string
+			char _pi_buf[1024];
+			const char* str_value = NULL;
+
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				const uint16_t* _pi_u16 = varGetU16Ptr(&args[0]);
+				u16_to_utf8(_pi_u16, args[0].str_size, _pi_buf, sizeof(_pi_buf));
+				str_value = _pi_buf;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F32)
+			{
+				float fval = VAL(float, &args[0].data.numeric_value);
+				snprintf(_pi_buf, sizeof(_pi_buf), "%.15g", fval);
+				str_value = _pi_buf;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+			{
+				double dval = VAL(double, &args[0].data.numeric_value);
+				snprintf(_pi_buf, sizeof(_pi_buf), "%.15g", dval);
+				str_value = _pi_buf;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
+			{
+				str_value = args[0].data.numeric_value ? "true" : "false";
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_NULL)
+			{
+				str_value = "null";
+			}
+			else
+			{
+				str_value = "undefined";
+			}
+
+			// Determine radix
+			int has_explicit_radix = (num_args >= 2);
+			int radix = 0; // 0 = auto-detect
+			int radix_valid = 1;
+			if (has_explicit_radix)
+			{
+				double rv = 0.0;
+				if (args[1].type == ACTION_STACK_VALUE_F32)
+					rv = (double)VAL(float, &args[1].data.numeric_value);
+				else if (args[1].type == ACTION_STACK_VALUE_F64)
+					rv = VAL(double, &args[1].data.numeric_value);
+				else if (args[1].type == ACTION_STACK_VALUE_BOOLEAN)
+					rv = args[1].data.numeric_value ? 1.0 : 0.0;
+				else
+					rv = 0.0; // undefined, null, string, object → 0
+				// Truncate to int32 (not round)
+				if (rv != rv || rv == 0.0) // NaN or zero
+					radix = 0;
+				else
+					radix = (int)rv;
+				if (radix < 2 || radix > 36) radix_valid = 0;
+			}
+
+			double result = 0.0 / 0.0; // NaN
+			if (radix_valid)
+			{
+				const char* s = str_value;
+				int slen = (int)strlen(s);
+
+				// Check for sign at position 0
+				int has_sign = (slen > 0 && (s[0] == '+' || s[0] == '-'));
+				int sign_off = has_sign ? 1 : 0;
+
+				// Check for 0x/0X after optional sign
+				int is_hex = 0;
+				if (sign_off < slen && s[sign_off] == '0' &&
+				    sign_off + 1 < slen && (s[sign_off + 1] == 'x' || s[sign_off + 1] == 'X'))
+				{
+					is_hex = 1;
+				}
+
+				int ignore_sign = 0;
+				const char* parse_start = s;
+				int parse_radix = radix ? radix : 10;
+
+				if (is_hex)
+				{
+					if (has_sign)
+					{
+						// Sign before 0x: Flash-specific behavior
+						if (!has_explicit_radix || parse_radix <= 33)
+						{
+							// No radix or radix <= 33 (where x is not a valid digit) → NaN
+							goto parseInt_done;
+						}
+						else
+						{
+							// Radix >= 34: ignore sign, parse full string including 0x chars
+							ignore_sign = 1;
+							parse_start = s; // full string
+						}
+					}
+					else
+					{
+						// No sign: strip 0x prefix
+						parse_start = s + 2;
+						if (!has_explicit_radix) parse_radix = 16;
+					}
+				}
+				else if (!has_explicit_radix && sign_off < slen && s[sign_off] == '0')
+				{
+					// Check for octal: all remaining chars must be 0-7
+					int all_octal = 1;
+					for (int i = sign_off; i < slen; i++)
+					{
+						if (s[i] < '0' || s[i] > '7') { all_octal = 0; break; }
+					}
+					if (all_octal) parse_radix = 8;
+				}
+
+				// Trim leading whitespace from parse_start
+				while (*parse_start == ' ' || *parse_start == '\t' ||
+				       *parse_start == '\n' || *parse_start == '\r')
+					parse_start++;
+
+				// Handle sign at parse_start
+				double sign = 1.0;
+				if (*parse_start == '+' || *parse_start == '-')
+				{
+					if (!ignore_sign)
+						sign = (*parse_start == '-') ? -1.0 : 1.0;
+					parse_start++;
+				}
+
+				// Parse digits in parse_radix
+				int found_digit = 0;
+				result = 0.0;
+				while (*parse_start)
+				{
+					int digit = -1;
+					char c = *parse_start;
+					if (c >= '0' && c <= '9') digit = c - '0';
+					else if (c >= 'a' && c <= 'z') digit = 10 + (c - 'a');
+					else if (c >= 'A' && c <= 'Z') digit = 10 + (c - 'A');
+					if (digit < 0 || digit >= parse_radix) break;
+					result = result * (double)parse_radix + (double)digit;
+					found_digit = 1;
+					parse_start++;
+				}
+
+				if (!found_digit)
+					result = 0.0 / 0.0; // NaN
+				else
+					result = (sign < 0) ? -result : result;
+			}
+
+			parseInt_done:
 			if (args != NULL) FREE(args);
-			float nan_val = 0.0f / 0.0f;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
+			// Push as f64 to handle large values and Infinity
+			if (result != result) // NaN
+			{
+				float nan_val = 0.0f / 0.0f;
+				PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
+			}
+			else if (result == (double)(float)result && result < 1e18)
+			{
+				float fres = (float)result;
+				PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &fres));
+			}
+			else
+			{
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+			}
 			builtin_handled = 1;
 		}
 	}
@@ -13720,79 +14030,117 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			builtin_handled = 1;
 		}
 	}
-	// isNaN(value) - Check if value is NaN
+	// isNaN(value) - Check if value is NaN (returns boolean)
 	else if (func_name_len == 5 && strncmp(func_name, "isNaN", 5) == 0)
 	{
 		if (num_args > 0)
 		{
-			// Convert to number and check if NaN
-			float val = 0.0f;
+			double val = 0.0 / 0.0; // default NaN
 			if (args[0].type == ACTION_STACK_VALUE_F32)
-			{
-				val = VAL(float, &args[0].data.numeric_value);
-			}
+				val = (double)VAL(float, &args[0].data.numeric_value);
 			else if (args[0].type == ACTION_STACK_VALUE_F64)
-			{
-				val = (float) VAL(double, &args[0].data.numeric_value);
-			}
+				val = VAL(double, &args[0].data.numeric_value);
+			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
+				val = args[0].data.numeric_value ? 1.0 : 0.0;
+			else if (args[0].type == ACTION_STACK_VALUE_NULL)
+				val = 0.0 / 0.0;
 			else if (args[0].type == ACTION_STACK_VALUE_STRING)
 			{
-				// Try to parse as number
 				char _isnan_buf[512];
 				const uint16_t* _isnan_u16 = varGetU16Ptr(&args[0]);
-				u16_to_utf8(_isnan_u16, args[0].str_size, _isnan_buf, sizeof(_isnan_buf));
-				val = (float) atof(_isnan_buf);
+				int _isnan_len = u16_to_utf8(_isnan_u16, args[0].str_size, _isnan_buf, sizeof(_isnan_buf) - 1);
+				_isnan_buf[_isnan_len] = '\0';
+				// Flash strict parsing: entire string must be a valid number
+				if (_isnan_len == 0) { val = 0.0 / 0.0; }
+				else {
+					char* endp = NULL;
+					val = strtod(_isnan_buf, &endp);
+					// If not all chars consumed, it's NaN
+					if (endp != _isnan_buf + _isnan_len) val = 0.0 / 0.0;
+				}
 			}
+			else if (args[0].type == ACTION_STACK_VALUE_OBJECT)
+			{
+				// Call valueOf on the object
+				int _vof_f = 0;
+				ActionVar vo = objectCallValueOf(app_context, &args[0], &_vof_f);
+				if (vo.type == ACTION_STACK_VALUE_F32)
+					val = (double)VAL(float, &vo.data.numeric_value);
+				else if (vo.type == ACTION_STACK_VALUE_F64)
+					val = VAL(double, &vo.data.numeric_value);
+				else
+					val = 0.0 / 0.0;
+			}
+			else
+				val = 0.0 / 0.0; // undefined → NaN
 
-			float result = (val != val) ? 1.0f : 0.0f;  // NaN != NaN is true
+			int is_nan = (val != val);
 			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, is_nan ? 1ULL : 0ULL);
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - isNaN(undefined) = true
 			if (args != NULL) FREE(args);
-			float result = 1.0f;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
 			builtin_handled = 1;
 		}
 	}
-	// isFinite(value) - Check if value is finite
+	// isFinite(value) - Check if value is finite (returns boolean)
 	else if (func_name_len == 8 && strncmp(func_name, "isFinite", 8) == 0)
 	{
 		if (num_args > 0)
 		{
-			// Convert to number and check if finite
-			float val = 0.0f;
+			double val = 0.0 / 0.0; // default NaN
 			if (args[0].type == ACTION_STACK_VALUE_F32)
-			{
-				val = VAL(float, &args[0].data.numeric_value);
-			}
+				val = (double)VAL(float, &args[0].data.numeric_value);
 			else if (args[0].type == ACTION_STACK_VALUE_F64)
-			{
-				val = (float) VAL(double, &args[0].data.numeric_value);
-			}
+				val = VAL(double, &args[0].data.numeric_value);
+			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
+				val = args[0].data.numeric_value ? 1.0 : 0.0;
+			else if (args[0].type == ACTION_STACK_VALUE_NULL)
+				val = 0.0 / 0.0;
 			else if (args[0].type == ACTION_STACK_VALUE_STRING)
 			{
-				char _isfinite_buf[512];
-				const uint16_t* _isfinite_u16 = varGetU16Ptr(&args[0]);
-				u16_to_utf8(_isfinite_u16, args[0].str_size, _isfinite_buf, sizeof(_isfinite_buf));
-				val = (float) atof(_isfinite_buf);
+				char _isf_buf[512];
+				const uint16_t* _isf_u16 = varGetU16Ptr(&args[0]);
+				int _isf_len = u16_to_utf8(_isf_u16, args[0].str_size, _isf_buf, sizeof(_isf_buf) - 1);
+				_isf_buf[_isf_len] = '\0';
+				// Flash strict parsing: entire string must be a valid number
+				if (_isf_len == 0) { val = 0.0 / 0.0; }
+				else {
+					char* endp = NULL;
+					val = strtod(_isf_buf, &endp);
+					// If not all chars consumed, it's NaN
+					if (endp != _isf_buf + _isf_len) val = 0.0 / 0.0;
+				}
 			}
+			else if (args[0].type == ACTION_STACK_VALUE_OBJECT)
+			{
+				// Call valueOf on the object
+				int _vof_f = 0;
+				ActionVar vo = objectCallValueOf(app_context, &args[0], &_vof_f);
+				if (vo.type == ACTION_STACK_VALUE_F32)
+					val = (double)VAL(float, &vo.data.numeric_value);
+				else if (vo.type == ACTION_STACK_VALUE_F64)
+					val = VAL(double, &vo.data.numeric_value);
+				else
+					val = 0.0 / 0.0;
+			}
+			else
+				val = 0.0 / 0.0; // undefined → NaN
 
-			// Check if finite (not NaN and not infinity)
-			float result = (val == val && val != INFINITY && val != -INFINITY) ? 1.0f : 0.0f;
+			int is_finite = (val == val && val != INFINITY && val != -INFINITY);
 			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, is_finite ? 1ULL : 0ULL);
 			builtin_handled = 1;
 		}
 		else
 		{
 			// No arguments - isFinite(undefined) = false
 			if (args != NULL) FREE(args);
-			float result = 0.0f;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
 			builtin_handled = 1;
 		}
 	}
