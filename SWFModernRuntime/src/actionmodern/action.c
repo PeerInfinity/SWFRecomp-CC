@@ -6933,7 +6933,7 @@ void actionTrace(SWFAppContext* app_context)
 		{
 			// Flash's trace() calls toString on objects:
 			// - toString found, returns string → print that string
-			//   (e.g. Object.prototype.toString returns "[type Object]")
+			//   (e.g. Object.prototype.toString returns "[object Object]")
 			// - toString found, returns non-string → "[type Object]"
 			// - no toString found → "[type Object]"
 			ActionVar obj_var;
@@ -7506,6 +7506,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// ---- Math ----
 	initMathObject(app_context);
+	setObjectProto(app_context, g_math_object);
 	{
 		ActionVar math_cv = {0};
 		math_cv.type = ACTION_STACK_VALUE_OBJECT;
@@ -7559,7 +7560,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		}
 	}
 
-	// ---- Static global objects (typeof = "object", no prototype) ----
+	// ---- Static global objects (typeof = "object", inherit Object.prototype) ----
 	{
 		g_accessibility_obj = allocObject(app_context, 4);
 		g_key_obj = allocObject(app_context, 8);
@@ -7576,6 +7577,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		};
 		for (int i = 0; i < 5; i++)
 		{
+			setObjectProto(app_context, objs[i].obj);
 			ActionVar ov = {0};
 			ov.type = ACTION_STACK_VALUE_OBJECT;
 			ov.data.numeric_value = (u64)objs[i].obj;
@@ -7989,7 +7991,9 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (system_object == NULL)
 			{
 				system_object = allocObject(app_context, 4);
+				setObjectProto(app_context, system_object);
 				ASObject* security_obj = allocObject(app_context, 4);
+				setObjectProto(app_context, security_obj);
 				ActionVar sandbox_val = {0};
 				sandbox_val.type = ACTION_STACK_VALUE_STRING;
 				sandbox_val.str_size = 13;
@@ -8002,6 +8006,7 @@ void actionGetVariable(SWFAppContext* app_context)
 
 				// System.capabilities object
 				ASObject* caps_obj = allocObject(app_context, 16);
+				setObjectProto(app_context, caps_obj);
 				ActionVar cap_val = {0};
 				// screenResolutionX (default 1536 to match Ruffle test defaults)
 				cap_val.type = ACTION_STACK_VALUE_F64;
@@ -8065,6 +8070,7 @@ void actionGetVariable(SWFAppContext* app_context)
 
 				// System.IME (stub object)
 				ASObject* ime_obj = allocObject(app_context, 4);
+				setObjectProto(app_context, ime_obj);
 				ActionVar ime_var = {0};
 				ime_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
@@ -8080,6 +8086,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (flash_object == NULL)
 			{
 				flash_object = allocObject(app_context, 8);
+				setObjectProto(app_context, flash_object);
 
 				// Helper: create a stub constructor ASFunction
 				#define MAKE_STUB_CTOR(varname, namestr) \
@@ -8093,6 +8100,7 @@ void actionGetVariable(SWFAppContext* app_context)
 					  setProperty(app_context, parent, propname, proplen, &_cv); }
 				#define MAKE_PKG(varname, parent, propname, proplen, capacity) \
 					ASObject* varname = allocObject(app_context, capacity); \
+					setObjectProto(app_context, varname); \
 					{ ActionVar _pv = {0}; _pv.type = ACTION_STACK_VALUE_OBJECT; \
 					  VAL(u64, &_pv.data.numeric_value) = (u64)varname; \
 					  setProperty(app_context, parent, propname, proplen, &_pv); }
@@ -15112,9 +15120,23 @@ static int callArrayMethod(SWFAppContext* app_context,
 				memcpy(buf + buf_len, sep, sep_len);
 				buf_len += sep_len;
 			}
-			char elem_str[64];
 			ActionVar* elem = getArrayElement(arr, i);
-			int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+			char elem_str[256];
+			int elen = 0;
+			// For objects, call toString via prototype chain (produces "[object Object]")
+			if (elem != NULL && elem->type == ACTION_STACK_VALUE_OBJECT && elem->data.numeric_value != 0) {
+				int ts_found = 0;
+				ActionVar ts = objectCallToString(app_context, elem, &ts_found);
+				if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* u16 = varGetU16Ptr(&ts);
+					if (u16)
+						elen = u16_to_utf8(u16, ts.str_size, elem_str, sizeof(elem_str));
+				}
+				if (elen == 0)
+					elen = snprintf(elem_str, sizeof(elem_str), "[type Object]");
+			} else {
+				elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+			}
 			while (buf_len + elen + 1 > buf_cap)
 			{
 				buf_cap *= 2;
