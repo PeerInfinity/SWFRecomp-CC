@@ -80,6 +80,21 @@ static const uint16_t u16_none[] = {'n','o','n','e',0};
 static const uint16_t u16_left[] = {'l','e','f','t',0};
 static const uint16_t u16_right[] = {'r','i','g','h','t',0};
 static const uint16_t u16_center[] = {'c','e','n','t','e','r',0};
+static const uint16_t u16_Error[] = {'E','r','r','o','r',0};
+static const uint16_t u16_block[] = {'b','l','o','c','k',0};
+static const uint16_t u16_normal[] = {'n','o','r','m','a','l',0};
+static const uint16_t u16_pixel[] = {'p','i','x','e','l',0};
+static const uint16_t u16_localWithFile[] = {'l','o','c','a','l','W','i','t','h','F','i','l','e',0};
+static const uint16_t u16_StandAlone[] = {'S','t','a','n','d','A','l','o','n','e',0};
+static const uint16_t u16_WIN_ver[] = {'W','I','N',' ','3','2',',','0',',','0',',','0',0};
+static const uint16_t u16_Windows_XP[] = {'W','i','n','d','o','w','s',' ','X','P',0};
+static const uint16_t u16_Macromedia_Windows[] = {'M','a','c','r','o','m','e','d','i','a',' ','W','i','n','d','o','w','s',0};
+static const uint16_t u16_en[] = {'e','n',0};
+static const uint16_t u16_justify[] = {'j','u','s','t','i','f','y',0};
+static const uint16_t u16_Times_New_Roman[] = {'T','i','m','e','s',' ','N','e','w',' ','R','o','m','a','n',0};
+static const uint16_t u16_default_colortransform[] = {'(','r','e','d','M','u','l','t','i','p','l','i','e','r','=','1',',',' ','g','r','e','e','n','M','u','l','t','i','p','l','i','e','r','=','1',',',' ','b','l','u','e','M','u','l','t','i','p','l','i','e','r','=','1',',',' ','a','l','p','h','a','M','u','l','t','i','p','l','i','e','r','=','1',',',' ','r','e','d','O','f','f','s','e','t','=','0',',',' ','g','r','e','e','n','O','f','f','s','e','t','=','0',',',' ','b','l','u','e','O','f','f','s','e','t','=','0',',',' ','a','l','p','h','a','O','f','f','s','e','t','=','0',')',0};
+static const uint16_t u16_default_matrix[] = {'(','a','=','1',',',' ','b','=','0',',',' ','c','=','0',',',' ','d','=','1',',',' ','t','x','=','0',',',' ','t','y','=','0',')',0};
+static const uint16_t u16_default_rect[] = {'(','x','=','0',',',' ','y','=','0',',',' ','w','=','0',',',' ','h','=','0',')',0};
 
 // Count UTF-16 code units needed for a UTF-8 string
 static int utf8_utf16_length(const char* s, int byte_len)
@@ -531,7 +546,7 @@ static ActionVar builtin_error_toString(SWFAppContext* app_context, ActionVar* a
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_STRING;
 	ret.str_size = 5;
-	ret.data.numeric_value = (u64) "Error";
+	ret.data.numeric_value = (u64) u16_Error;
 
 	if (this_obj != NULL)
 	{
@@ -644,13 +659,15 @@ static ActionVar builtin_prim_wrapper_toString(SWFAppContext* app_context, Actio
 				// Convert primitive to string
 				static char buf[64];
 				int len = varToStringBuf(app_context, prim, buf, sizeof(buf));
-				ret.data.numeric_value = (u64) buf;
-				ret.str_size = len;
+				u32 u16_len;
+				uint16_t* u16_ptr = ascii_to_u16(app_context, buf, len, &u16_len);
+				ret.data.numeric_value = (u64) u16_ptr;
+				ret.str_size = u16_len;
 				return ret;
 			}
 		}
 	}
-	ret.data.numeric_value = (u64) "[object Object]";
+	ret.data.numeric_value = (u64) u16_object_Object;
 	ret.str_size = 15;
 	return ret;
 }
@@ -841,7 +858,7 @@ static ActionVar colorTransformToString(SWFAppContext* app_context, ActionVar* a
 {
 	ActionVar result = {0};
 	result.type = ACTION_STACK_VALUE_STRING;
-	result.data.numeric_value = (u64) "(redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)";
+	result.data.numeric_value = (u64) u16_default_colortransform;
 	result.str_size = 130;
 	return result;
 }
@@ -850,7 +867,7 @@ static ActionVar matrixToString(SWFAppContext* app_context, ActionVar* args, u32
 {
 	ActionVar result = {0};
 	result.type = ACTION_STACK_VALUE_STRING;
-	result.data.numeric_value = (u64) "(a=1, b=0, c=0, d=1, tx=0, ty=0)";
+	result.data.numeric_value = (u64) u16_default_matrix;
 	result.str_size = 32;
 	return result;
 }
@@ -859,7 +876,7 @@ static ActionVar rectangleToString(SWFAppContext* app_context, ActionVar* args, 
 {
 	ActionVar result = {0};
 	result.type = ACTION_STACK_VALUE_STRING;
-	result.data.numeric_value = (u64) "(x=0, y=0, w=0, h=0)";
+	result.data.numeric_value = (u64) u16_default_rect;
 	result.str_size = 20;
 	return result;
 }
@@ -2045,7 +2062,7 @@ static ActionVar tfCoerceDisplay(SWFAppContext* app_context, ActionVar* value) {
 	}
 	// null/undefined/invalid → "block"
 	result.type = ACTION_STACK_VALUE_STRING;
-	result.data.numeric_value = (u64) "block";
+	result.data.numeric_value = (u64) u16_block;
 	result.str_size = 5;
 	return result;
 }
@@ -2122,29 +2139,36 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 	ActionVar val = {0};
 
 	// align
-	const char* align_str = "left";
-	if (tf_idx >= 0) {
-		u8 a = ng_getTextFieldAlign(tf_idx);
-		if (a == 1) align_str = "right";
-		else if (a == 2) align_str = "center";
-		else if (a == 3) align_str = "justify";
+	{
+		const uint16_t* align_u16 = u16_left;
+		u32 align_u16_len = 4;
+		if (tf_idx >= 0) {
+			u8 a = ng_getTextFieldAlign(tf_idx);
+			if (a == 1) { align_u16 = u16_right; align_u16_len = 5; }
+			else if (a == 2) { align_u16 = u16_center; align_u16_len = 6; }
+			else if (a == 3) { align_u16 = u16_justify; align_u16_len = 7; }
+		}
+		val.type = ACTION_STACK_VALUE_STRING;
+		val.data.numeric_value = (u64) align_u16;
+		val.str_size = align_u16_len;
+		setProperty(app_context, tf_obj, "align", 5, &val);
 	}
-	val.type = ACTION_STACK_VALUE_STRING;
-	val.data.numeric_value = (u64) align_str;
-	val.str_size = strlen(align_str);
-	setProperty(app_context, tf_obj, "align", 5, &val);
 
 	// font
-	const char* font_name = "Times New Roman";
-	if (tf_idx >= 0) {
-		u16 fid = ng_getTextFieldFontId(tf_idx);
-		const char* fn = ng_getFontName(fid);
-		if (fn[0] != '\0') font_name = fn;
+	{
+		const char* font_name = "Times New Roman";
+		if (tf_idx >= 0) {
+			u16 fid = ng_getTextFieldFontId(tf_idx);
+			const char* fn = ng_getFontName(fid);
+			if (fn[0] != '\0') font_name = fn;
+		}
+		u32 _fn_u16_len;
+		uint16_t* _fn_u16 = ascii_to_u16(app_context, font_name, (int)strlen(font_name), &_fn_u16_len);
+		val.type = ACTION_STACK_VALUE_STRING;
+		val.data.numeric_value = (u64) _fn_u16;
+		val.str_size = _fn_u16_len;
+		setProperty(app_context, tf_obj, "font", 4, &val);
 	}
-	val.type = ACTION_STACK_VALUE_STRING;
-	val.data.numeric_value = (u64) font_name;
-	val.str_size = strlen(font_name);
-	setProperty(app_context, tf_obj, "font", 4, &val);
 
 	// size (font_height in twips → pixels: / 20)
 	// Default to 12 when HasFont is false (font_height=0)
@@ -2299,17 +2323,17 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 
 	// target (empty string)
 	val.type = ACTION_STACK_VALUE_STRING;
-	val.data.numeric_value = (u64) "";
+	val.data.numeric_value = (u64) u16_empty;
 	val.str_size = 0;
 	setProperty(app_context, tf_obj, "target", 6, &val);
 
 	// url (empty string)
-	val.data.numeric_value = (u64) "";
+	val.data.numeric_value = (u64) u16_empty;
 	val.str_size = 0;
 	setProperty(app_context, tf_obj, "url", 3, &val);
 
 	// display (default "block")
-	val.data.numeric_value = (u64) "block";
+	val.data.numeric_value = (u64) u16_block;
 	val.str_size = 5;
 	setProperty(app_context, tf_obj, "display", 7, &val);
 
@@ -3880,8 +3904,12 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				const char* init_text = ng_getTextFieldInitialText(depth);
 				ActionVar text_val = {0};
 				text_val.type = ACTION_STACK_VALUE_STRING;
-				text_val.str_size = strlen(init_text);
-				VAL(u64, &text_val.data.numeric_value) = (u64)init_text;
+				{
+					u32 _it_u16_len;
+					uint16_t* _it_u16 = utf8_to_u16(app_context, init_text, (u32)strlen(init_text), &_it_u16_len);
+					text_val.str_size = _it_u16_len;
+					VAL(u64, &text_val.data.numeric_value) = (u64)_it_u16;
+				}
 				setProperty(app_context, props, "text", 4, &text_val);
 				// htmlText — for HTML fields, wrap with <P ALIGN><FONT> tags
 				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
@@ -3927,11 +3955,16 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 						"<P ALIGN=\"%s\"><FONT FACE=\"%s\" SIZE=\"%d\" COLOR=\"#%06X\" LETTERSPACING=\"0\" KERNING=\"0\">%s</FONT></P>",
 						align_name, font_name, font_size, text_color, upper_html);
 					free(upper_html);
-					html_text_val.str_size = strlen(wrapped);
-					VAL(u64, &html_text_val.data.numeric_value) = (u64)wrapped;
+					u32 _wr_u16_len;
+					uint16_t* _wr_u16 = utf8_to_u16(app_context, wrapped, (u32)strlen(wrapped), &_wr_u16_len);
+					free(wrapped);
+					html_text_val.str_size = _wr_u16_len;
+					VAL(u64, &html_text_val.data.numeric_value) = (u64)_wr_u16;
 				} else {
-					html_text_val.str_size = strlen(raw_html);
-					VAL(u64, &html_text_val.data.numeric_value) = (u64)raw_html;
+					u32 _rh_u16_len;
+					uint16_t* _rh_u16 = utf8_to_u16(app_context, raw_html, (u32)strlen(raw_html), &_rh_u16_len);
+					html_text_val.str_size = _rh_u16_len;
+					VAL(u64, &html_text_val.data.numeric_value) = (u64)_rh_u16;
 				}
 				setProperty(app_context, props, "htmlText", 8, &html_text_val);
 				// textColor (from DefineEditText)
@@ -3966,10 +3999,10 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				type_val.type = ACTION_STACK_VALUE_STRING;
 				if (tf_flags & 0x0008) {  // ReadOnly
 					type_val.str_size = 7;
-					VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+					VAL(u64, &type_val.data.numeric_value) = (u64)u16_dynamic;
 				} else {
 					type_val.str_size = 5;
-					VAL(u64, &type_val.data.numeric_value) = (u64)"input";
+					VAL(u64, &type_val.data.numeric_value) = (u64)u16_input;
 				}
 				setProperty(app_context, props, "type", 4, &type_val);
 				// length (string length of initial text)
@@ -4007,18 +4040,22 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				const char* var_name = ng_getTextFieldVariableName(tf_idx);
 				ActionVar var_val = {0};
 				var_val.type = ACTION_STACK_VALUE_STRING;
-				var_val.str_size = strlen(var_name);
-				VAL(u64, &var_val.data.numeric_value) = (u64)var_name;
-				setProperty(app_context, props, "variable", 8, &var_val);
+				{
+					u32 _vn_u16_len;
+					uint16_t* _vn_u16 = ascii_to_u16(app_context, var_name, (int)strlen(var_name), &_vn_u16_len);
+					var_val.str_size = _vn_u16_len;
+					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
+					setProperty(app_context, props, "variable", 8, &var_val);
+				}
 				// autoSize (from DefineEditText AutoSize flag)
 				ActionVar autosize_val = {0};
 				autosize_val.type = ACTION_STACK_VALUE_STRING;
 				if (tf_flags & 0x0100) {
 					autosize_val.str_size = 4;
-					VAL(u64, &autosize_val.data.numeric_value) = (u64)"left";
+					VAL(u64, &autosize_val.data.numeric_value) = (u64)u16_left;
 				} else {
 					autosize_val.str_size = 4;
-					VAL(u64, &autosize_val.data.numeric_value) = (u64)"none";
+					VAL(u64, &autosize_val.data.numeric_value) = (u64)u16_none;
 				}
 				setProperty(app_context, props, "autoSize", 8, &autosize_val);
 				// scroll (default 1)
@@ -4065,11 +4102,13 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				aat_val.type = ACTION_STACK_VALUE_STRING;
 				if (csm_applied) {
 					const char* aat = ng_getTextFieldCSMAntiAliasType(tf_idx);
-					aat_val.str_size = strlen(aat);
-					VAL(u64, &aat_val.data.numeric_value) = (u64)aat;
+					u32 _aat_u16_len;
+					uint16_t* _aat_u16 = ascii_to_u16(app_context, aat, (int)strlen(aat), &_aat_u16_len);
+					aat_val.str_size = _aat_u16_len;
+					VAL(u64, &aat_val.data.numeric_value) = (u64)_aat_u16;
 				} else {
 					aat_val.str_size = 6;
-					VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+					VAL(u64, &aat_val.data.numeric_value) = (u64)u16_normal;
 				}
 				setProperty(app_context, props, "antiAliasType", 13, &aat_val);
 				// gridFitType
@@ -4077,11 +4116,13 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				gft_val.type = ACTION_STACK_VALUE_STRING;
 				if (csm_applied) {
 					const char* gft = ng_getTextFieldCSMGridFitType(tf_idx);
-					gft_val.str_size = strlen(gft);
-					VAL(u64, &gft_val.data.numeric_value) = (u64)gft;
+					u32 _gft_u16_len;
+					uint16_t* _gft_u16 = ascii_to_u16(app_context, gft, (int)strlen(gft), &_gft_u16_len);
+					gft_val.str_size = _gft_u16_len;
+					VAL(u64, &gft_val.data.numeric_value) = (u64)_gft_u16;
 				} else {
 					gft_val.str_size = 5;
-					VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+					VAL(u64, &gft_val.data.numeric_value) = (u64)u16_pixel;
 				}
 				setProperty(app_context, props, "gridFitType", 11, &gft_val);
 				// thickness
@@ -4240,6 +4281,10 @@ void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_nam
 	(void)app_context;
 	if (var_name == NULL || var_name[0] == '\0') return;
 
+	// Convert init_text to UTF-16 once for use throughout this function
+	u32 _inittext_u16_len;
+	uint16_t* _inittext_u16 = utf8_to_u16(app_context, init_text, (u32)strlen(init_text), &_inittext_u16_len);
+
 	if (strchr(var_name, '.') != NULL) {
 		// Path variable (e.g., "_root.mc.theVar") — resolve and set
 		// Find the last dot to split container path and property name
@@ -4273,8 +4318,8 @@ void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_nam
 				}
 				ActionVar init_val = {0};
 				init_val.type = ACTION_STACK_VALUE_STRING;
-				init_val.str_size = strlen(init_text);
-				VAL(u64, &init_val.data.numeric_value) = (u64)init_text;
+				init_val.str_size = _inittext_u16_len;
+				VAL(u64, &init_val.data.numeric_value) = (u64)_inittext_u16;
 				setProperty(app_context, target_props, final_prop, final_prop_len, &init_val);
 			}
 		} else if (container_var.type == ACTION_STACK_VALUE_OBJECT) {
@@ -4285,8 +4330,8 @@ void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_nam
 					return;  // Already set, don't overwrite
 				ActionVar init_val = {0};
 				init_val.type = ACTION_STACK_VALUE_STRING;
-				init_val.str_size = strlen(init_text);
-				VAL(u64, &init_val.data.numeric_value) = (u64)init_text;
+				init_val.str_size = _inittext_u16_len;
+				VAL(u64, &init_val.data.numeric_value) = (u64)_inittext_u16;
 				setProperty(app_context, target_obj, final_prop, final_prop_len, &init_val);
 			}
 		}
@@ -4301,8 +4346,8 @@ void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_nam
 		if (init_text[0] != '\0') {
 			ActionVar init_val = {0};
 			init_val.type = ACTION_STACK_VALUE_STRING;
-			init_val.str_size = strlen(init_text);
-			VAL(u64, &init_val.data.numeric_value) = (u64)init_text;
+			init_val.str_size = _inittext_u16_len;
+			VAL(u64, &init_val.data.numeric_value) = (u64)_inittext_u16;
 			setVariableByName(var_name, &init_val);
 		}
 	}
@@ -7473,12 +7518,12 @@ void actionGetVariable(SWFAppContext* app_context)
 				ActionVar name_val = {0};
 				name_val.type = ACTION_STACK_VALUE_STRING;
 				name_val.str_size = 5;
-				VAL(u64, &name_val.data.numeric_value) = (u64)"Error";
+				VAL(u64, &name_val.data.numeric_value) = (u64)u16_Error;
 				setProperty(app_context, g_error_constructor.prototype_obj, "name", 4, &name_val);
 				ActionVar msg_val = {0};
 				msg_val.type = ACTION_STACK_VALUE_STRING;
 				msg_val.str_size = 5;
-				VAL(u64, &msg_val.data.numeric_value) = (u64)"Error";
+				VAL(u64, &msg_val.data.numeric_value) = (u64)u16_Error;
 				setProperty(app_context, g_error_constructor.prototype_obj, "message", 7, &msg_val);
 
 				// Set up toString method on Error.prototype
@@ -7522,7 +7567,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				ActionVar sandbox_val = {0};
 				sandbox_val.type = ACTION_STACK_VALUE_STRING;
 				sandbox_val.str_size = 13;
-				VAL(u64, &sandbox_val.data.numeric_value) = (u64)"localWithFile";
+				VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
 				setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
 				ActionVar security_var = {0};
 				security_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -7549,31 +7594,31 @@ void actionGetVariable(SWFAppContext* app_context)
 				ActionVar pt_val = {0};
 				pt_val.type = ACTION_STACK_VALUE_STRING;
 				pt_val.str_size = 10;
-				VAL(u64, &pt_val.data.numeric_value) = (u64)"StandAlone";
+				VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
 				setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
 				// version
 				ActionVar ver_val = {0};
 				ver_val.type = ACTION_STACK_VALUE_STRING;
 				ver_val.str_size = 13;
-				VAL(u64, &ver_val.data.numeric_value) = (u64)"WIN 32,0,0,0";
+				VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
 				setProperty(app_context, caps_obj, "version", 7, &ver_val);
 				// os
 				ActionVar os_val = {0};
 				os_val.type = ACTION_STACK_VALUE_STRING;
-				os_val.str_size = 11;
-				VAL(u64, &os_val.data.numeric_value) = (u64)"Windows XP";
+				os_val.str_size = 10;
+				VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
 				setProperty(app_context, caps_obj, "os", 2, &os_val);
 				// manufacturer
 				ActionVar mfr_val = {0};
 				mfr_val.type = ACTION_STACK_VALUE_STRING;
-				mfr_val.str_size = 20;
-				VAL(u64, &mfr_val.data.numeric_value) = (u64)"Macromedia Windows";
+				mfr_val.str_size = 18;
+				VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
 				setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
 				// language
 				ActionVar lang_val = {0};
 				lang_val.type = ACTION_STACK_VALUE_STRING;
 				lang_val.str_size = 2;
-				VAL(u64, &lang_val.data.numeric_value) = (u64)"en";
+				VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
 				setProperty(app_context, caps_obj, "language", 8, &lang_val);
 				// isDebugger
 				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
@@ -11759,7 +11804,7 @@ void actionNewObject(SWFAppContext* app_context)
 		{
 			ActionVar display_val = {0};
 			display_val.type = ACTION_STACK_VALUE_STRING;
-			display_val.data.numeric_value = (u64) "block";
+			display_val.data.numeric_value = (u64) u16_block;
 			display_val.str_size = 5;
 			setProperty(app_context, tf_obj, "display", 7, &display_val);
 		}
@@ -12337,7 +12382,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			// new String() with no arguments - store empty string
 			ActionVar empty_str;
 			empty_str.type = ACTION_STACK_VALUE_STRING;
-			empty_str.data.numeric_value = (u64) "";
+			empty_str.data.numeric_value = (u64) u16_empty;
 			setProperty(app_context, str_obj, "valueOf", 7, &empty_str);
 		}
 
@@ -13819,7 +13864,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			ActionVar sval = {0};
 			sval.type = ACTION_STACK_VALUE_STRING;
 			sval.str_size = 0;
-			VAL(u64, &sval.data.numeric_value) = (u64)"";
+			VAL(u64, &sval.data.numeric_value) = (u64)u16_empty;
 			setProperty(app_context, props, "text", 4, &sval);
 			setProperty(app_context, props, "htmlText", 8, &sval);
 			setProperty(app_context, props, "variable", 8, &sval);
@@ -13845,7 +13890,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			ActionVar type_val = {0};
 			type_val.type = ACTION_STACK_VALUE_STRING;
 			type_val.str_size = 7;
-			VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+			VAL(u64, &type_val.data.numeric_value) = (u64)u16_dynamic;
 			setProperty(app_context, props, "type", 4, &type_val);
 
 			ActionVar dval = {0};
@@ -13888,19 +13933,19 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			ActionVar aat_val = {0};
 			aat_val.type = ACTION_STACK_VALUE_STRING;
 			aat_val.str_size = 6;
-			VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+			VAL(u64, &aat_val.data.numeric_value) = (u64)u16_normal;
 			setProperty(app_context, props, "antiAliasType", 13, &aat_val);
 
 			ActionVar gft_val = {0};
 			gft_val.type = ACTION_STACK_VALUE_STRING;
 			gft_val.str_size = 5;
-			VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+			VAL(u64, &gft_val.data.numeric_value) = (u64)u16_pixel;
 			setProperty(app_context, props, "gridFitType", 11, &gft_val);
 
 			ActionVar as_val = {0};
 			as_val.type = ACTION_STACK_VALUE_STRING;
 			as_val.str_size = 4;
-			VAL(u64, &as_val.data.numeric_value) = (u64)"none";
+			VAL(u64, &as_val.data.numeric_value) = (u64)u16_none;
 			setProperty(app_context, props, "autoSize", 8, &as_val);
 
 			ASArray* filters_arr = allocArray(app_context, 0);
@@ -13938,10 +13983,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// Return target path
 			ActionVar result = {0};
 			result.type = ACTION_STACK_VALUE_STRING;
-			result.str_size = strlen(child->target);
-			VAL(u64, &result.data.numeric_value) = (u64)child->target;
-			if (args != NULL) FREE(args);
-			pushVar(app_context, &result);
+			{
+				u32 _tgt_u16_len;
+				uint16_t* _tgt_u16 = ascii_to_u16(app_context, child->target, (int)strlen(child->target), &_tgt_u16_len);
+				result.str_size = _tgt_u16_len;
+				VAL(u64, &result.data.numeric_value) = (u64)_tgt_u16;
+				if (args != NULL) FREE(args);
+				pushVar(app_context, &result);
+			}
 		} else {
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -15705,7 +15754,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar result;
 			result.type = ACTION_STACK_VALUE_STRING;
 			result.str_size = 15;
-			result.data.numeric_value = (u64) "[type Function]";
+			result.data.numeric_value = (u64) u16_type_Function;
 			pushVar(app_context, &result);
 		}
 		else if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
@@ -15925,7 +15974,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar sval = {0};
 				sval.type = ACTION_STACK_VALUE_STRING;
 				sval.str_size = 0;
-				VAL(u64, &sval.data.numeric_value) = (u64)"";
+				VAL(u64, &sval.data.numeric_value) = (u64)u16_empty;
 				setProperty(app_context, props, "text", 4, &sval);
 				setProperty(app_context, props, "htmlText", 8, &sval);
 				setProperty(app_context, props, "variable", 8, &sval);
@@ -15951,7 +16000,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar type_val = {0};
 				type_val.type = ACTION_STACK_VALUE_STRING;
 				type_val.str_size = 7;
-				VAL(u64, &type_val.data.numeric_value) = (u64)"dynamic";
+				VAL(u64, &type_val.data.numeric_value) = (u64)u16_dynamic;
 				setProperty(app_context, props, "type", 4, &type_val);
 
 				ActionVar dval = {0};
@@ -15991,19 +16040,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar as_val = {0};
 				as_val.type = ACTION_STACK_VALUE_STRING;
 				as_val.str_size = 4;
-				VAL(u64, &as_val.data.numeric_value) = (u64)"none";
+				VAL(u64, &as_val.data.numeric_value) = (u64)u16_none;
 				setProperty(app_context, props, "autoSize", 8, &as_val);
 
 				ActionVar aat_val = {0};
 				aat_val.type = ACTION_STACK_VALUE_STRING;
 				aat_val.str_size = 6;
-				VAL(u64, &aat_val.data.numeric_value) = (u64)"normal";
+				VAL(u64, &aat_val.data.numeric_value) = (u64)u16_normal;
 				setProperty(app_context, props, "antiAliasType", 13, &aat_val);
 
 				ActionVar gft_val = {0};
 				gft_val.type = ACTION_STACK_VALUE_STRING;
 				gft_val.str_size = 5;
-				VAL(u64, &gft_val.data.numeric_value) = (u64)"pixel";
+				VAL(u64, &gft_val.data.numeric_value) = (u64)u16_pixel;
 				setProperty(app_context, props, "gridFitType", 11, &gft_val);
 
 				ASArray* filters_arr = allocArray(app_context, 0);
@@ -16042,9 +16091,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				ActionVar result = {0};
 				result.type = ACTION_STACK_VALUE_STRING;
-				result.str_size = strlen(child->target);
-				VAL(u64, &result.data.numeric_value) = (u64)child->target;
-				pushVar(app_context, &result);
+				{
+					u32 _tgt_u16_len;
+					uint16_t* _tgt_u16 = ascii_to_u16(app_context, child->target, (int)strlen(child->target), &_tgt_u16_len);
+					result.str_size = _tgt_u16_len;
+					VAL(u64, &result.data.numeric_value) = (u64)_tgt_u16;
+					pushVar(app_context, &result);
+				}
 			} else {
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
