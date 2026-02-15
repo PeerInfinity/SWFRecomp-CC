@@ -123,10 +123,8 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 		return var;
 	}
 
-	do
-	{
-		var = (ActionVar*) malloc(sizeof(ActionVar));
-	} while (errno != 0);
+	var = (ActionVar*) malloc(sizeof(ActionVar));
+	if (var == NULL) return NULL;
 
 	// Initialize with unset type (empty string, UTF-16 NULL with 0 length)
 	var->type = ACTION_STACK_VALUE_STRING;
