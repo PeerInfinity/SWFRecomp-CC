@@ -37,6 +37,8 @@ struct MovieClip {
 	float ymouse;
 	MovieClip* parent;     // Parent MovieClip (_root has NULL parent)
 	void* dynamic_props;   // ASObject* for user-defined properties (lazily allocated)
+	u8 lockroot;           // _lockroot property (0 = false, 1 = true)
+	u8 blend_mode;         // blendMode as integer (0=default→"normal", 1="normal", 2="layer", ...14="hardlight")
 #ifdef NO_GRAPHICS
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS

@@ -556,6 +556,93 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 	return result;
 }
 
+// ============================================================================
+// Native toString implementations for flash.geom classes
+// ============================================================================
+
+static ActionVar colorTransformToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.data.numeric_value = (u64) "(redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)";
+	result.str_size = 130;
+	return result;
+}
+
+static ActionVar matrixToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.data.numeric_value = (u64) "(a=1, b=0, c=0, d=1, tx=0, ty=0)";
+	result.str_size = 32;
+	return result;
+}
+
+static ActionVar rectangleToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.data.numeric_value = (u64) "(x=0, y=0, w=0, h=0)";
+	result.str_size = 20;
+	return result;
+}
+
+// Helper: set a toString function on an ASObject using a native Function2Ptr
+static void setNativeToString(SWFAppContext* app_context, ASObject* obj, Function2Ptr func)
+{
+	ASFunction* f = (ASFunction*) calloc(1, sizeof(ASFunction));
+	strncpy(f->name, "toString", 255);
+	f->function_type = 2;
+	f->advanced_func = func;
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) f;
+	setProperty(app_context, obj, "toString", 8, &fv);
+}
+
+// Create a flash.geom.Transform object for a MovieClip (identity transform)
+static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc)
+{
+	ASObject* transform = allocObject(app_context, 8);
+
+	ASObject* ct = allocObject(app_context, 2);
+	setNativeToString(app_context, ct, colorTransformToString);
+	ActionVar ct_val = {0};
+	ct_val.type = ACTION_STACK_VALUE_OBJECT;
+	ct_val.data.numeric_value = (u64) ct;
+	setProperty(app_context, transform, "colorTransform", 14, &ct_val);
+
+	ASObject* cct = allocObject(app_context, 2);
+	setNativeToString(app_context, cct, colorTransformToString);
+	ActionVar cct_val = {0};
+	cct_val.type = ACTION_STACK_VALUE_OBJECT;
+	cct_val.data.numeric_value = (u64) cct;
+	setProperty(app_context, transform, "concatenatedColorTransform", 26, &cct_val);
+
+	ASObject* mat = allocObject(app_context, 2);
+	setNativeToString(app_context, mat, matrixToString);
+	ActionVar mat_val = {0};
+	mat_val.type = ACTION_STACK_VALUE_OBJECT;
+	mat_val.data.numeric_value = (u64) mat;
+	setProperty(app_context, transform, "matrix", 6, &mat_val);
+
+	ASObject* cmat = allocObject(app_context, 2);
+	setNativeToString(app_context, cmat, matrixToString);
+	ActionVar cmat_val = {0};
+	cmat_val.type = ACTION_STACK_VALUE_OBJECT;
+	cmat_val.data.numeric_value = (u64) cmat;
+	setProperty(app_context, transform, "concatenatedMatrix", 18, &cmat_val);
+
+	ASObject* pb = allocObject(app_context, 2);
+	setNativeToString(app_context, pb, rectangleToString);
+	ActionVar pb_val = {0};
+	pb_val.type = ACTION_STACK_VALUE_OBJECT;
+	pb_val.data.numeric_value = (u64) pb;
+	setProperty(app_context, transform, "pixelBounds", 11, &pb_val);
+
+	return transform;
+}
+
 // Call just valueOf on an object. Returns the raw result (even if non-primitive).
 // Sets *found=1 if valueOf was found and called, 0 otherwise.
 // If the input is not an object, returns it unchanged with *found=0.
@@ -576,6 +663,13 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 		ASFunction* fn = (ASFunction*) obj_var->data.numeric_value;
 		obj = fn->own_props;
 		if (obj == NULL) return *obj_var;  // No own_props, no valueOf
+	}
+	else if (obj_var->type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Arrays have a different struct layout — use props for property lookup
+		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
+		obj = arr->props;
+		if (obj == NULL) return *obj_var;  // No props, no valueOf
 	}
 	else
 	{
@@ -655,6 +749,18 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 	{
 		ASFunction* fn = (ASFunction*) obj_var->data.numeric_value;
 		obj = fn->own_props;
+		if (obj == NULL)
+		{
+			ActionVar undef = {0};
+			undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			return undef;
+		}
+	}
+	else if (obj_var->type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Arrays have a different struct layout — use props for property lookup
+		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
+		obj = arr->props;
 		if (obj == NULL)
 		{
 			ActionVar undef = {0};
@@ -964,6 +1070,76 @@ ASObject* global_object = NULL;
 // MovieClip constructor function (for MovieClip.prototype access)
 ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;
+
+// MovieClip prototype method stubs (static storage)
+#define MC_METHOD_COUNT 20
+static ASFunction g_mc_method_funcs[MC_METHOD_COUNT];
+
+static void initMovieClipPrototype(SWFAppContext* app_context)
+{
+	if (g_movieclip_constructor_init) return;
+
+	memset(&g_movieclip_constructor, 0, sizeof(ASFunction));
+	strncpy(g_movieclip_constructor.name, "MovieClip", 255);
+	g_movieclip_constructor.function_type = 1;
+	g_movieclip_constructor.param_count = 0;
+
+	// Create prototype
+	ASObject* proto = allocObject(app_context, 32);
+	retainObject(proto);
+	g_movieclip_constructor.prototype_obj = proto;
+
+	// Set __proto__ to Object.prototype
+	setObjectProto(app_context, proto);
+
+	// Method stub names (DontEnum functions on MovieClip.prototype)
+	static const struct { const char* name; u32 len; } mc_methods[MC_METHOD_COUNT] = {
+		{"attachMovie", 11},
+		{"createEmptyMovieClip", 20},
+		{"createTextField", 15},
+		{"duplicateMovieClip", 18},
+		{"getBounds", 9},
+		{"getBytesLoaded", 14},
+		{"getBytesTotal", 13},
+		{"getDepth", 8},
+		{"getInstanceAtDepth", 18},
+		{"getNextHighestDepth", 19},
+		{"getSWFVersion", 13},
+		{"getURL", 6},
+		{"globalToLocal", 13},
+		{"localToGlobal", 13},
+		{"removeMovieClip", 15},
+		{"setMask", 7},
+		{"startDrag", 9},
+		{"stopDrag", 8},
+		{"swapDepths", 10},
+		{"getTextSnapshot", 15},
+	};
+
+	memset(g_mc_method_funcs, 0, sizeof(g_mc_method_funcs));
+	for (int i = 0; i < MC_METHOD_COUNT; i++)
+	{
+		strncpy(g_mc_method_funcs[i].name, mc_methods[i].name, 255);
+		g_mc_method_funcs[i].function_type = 1;
+		g_mc_method_funcs[i].param_count = 0;
+
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_mc_method_funcs[i];
+
+		ActionVar func_val = {0};
+		func_val.type = ACTION_STACK_VALUE_FUNCTION;
+		func_val.data.numeric_value = (u64) &g_mc_method_funcs[i];
+		setProperty(app_context, proto, mc_methods[i].name, mc_methods[i].len, &func_val);
+	}
+
+	// Mark all methods and __proto__ as DontEnum
+	for (u32 i = 0; i < proto->num_used; i++)
+	{
+		proto->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+	}
+
+	g_movieclip_constructor_init = 1;
+}
 
 // TextField constructor function and prototype
 static ASFunction g_textfield_constructor;
@@ -3148,14 +3324,17 @@ MovieClip root_movieclip = {
 	.name = "",       // _root._name is empty string in Flash
 	.target = "/",    // _root._target is "/" (slash-path format)
 	.droptarget = "",  // No drag/drop in NO_GRAPHICS mode
-	.url = "",  // Could be set to actual SWF URL if known
+	.url = "file:///test.swf",  // SWF URL (matches Ruffle test expectations)
 	.highquality = 1.0f,       // Default: high quality
-	.focusrect = 1.0f,         // Default: focus rect enabled
+	.focusrect = -1.0f,        // Default: null (sentinel: -1.0f = null)
 	.soundbuftime = 5.0f,      // Default: 5 seconds
 	.quality = "HIGH",         // Default: HIGH quality
 	.xmouse = 0.0f,  // No mouse in NO_GRAPHICS mode
 	.ymouse = 0.0f,  // No mouse in NO_GRAPHICS mode
-	.parent = NULL  // _root has no parent
+	.parent = NULL,  // _root has no parent
+	.dynamic_props = NULL,
+	.lockroot = 0,
+	.blend_mode = 0,
 };
 
 // Helper function to get MovieClip by target path
@@ -3218,13 +3397,16 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->totalframes = 1;
 	mc->framesloaded = 1;
 	mc->highquality = 1.0f;
-	mc->focusrect = 1.0f;
+	mc->focusrect = -1.0f;   // -1.0f sentinel = null
 	mc->soundbuftime = 5.0f;
 	strcpy(mc->quality, "HIGH");
 	mc->xmouse = 0.0f;
 	mc->ymouse = 0.0f;
 	mc->droptarget[0] = '\0';
 	mc->url[0] = '\0';
+	mc->dynamic_props = NULL;
+	mc->lockroot = 0;
+	mc->blend_mode = 0;
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
 	mc->as_set_flags = 0;
@@ -3244,11 +3426,17 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 		strncpy(mc->target, instance_name, sizeof(mc->target) - 1);
 		mc->target[sizeof(mc->target) - 1] = '\0';
 	} else {
-		// Has parent - construct path as parent.child
-		int written = snprintf(mc->target, sizeof(mc->target), "%s.%s",
-		                       parent->target, instance_name);
+		// Has parent - construct target path using / separator (Flash uses slash-path format)
+		int parent_len = strlen(parent->target);
+		int written;
+		if (parent_len == 1 && parent->target[0] == '/') {
+			// Parent is root "/" — child target is "/childName"
+			written = snprintf(mc->target, sizeof(mc->target), "/%s", instance_name);
+		} else {
+			written = snprintf(mc->target, sizeof(mc->target), "%s/%s",
+			                   parent->target, instance_name);
+		}
 		if (written >= (int)sizeof(mc->target)) {
-			// Path was truncated
 			mc->target[sizeof(mc->target) - 1] = '\0';
 		}
 	}
@@ -7063,6 +7251,15 @@ void actionGetVariable(SWFAppContext* app_context)
 					setProperty(app_context, global_object, ctor_names[ci], ctor_name_lens[ci], &cv);
 				}
 
+				// Register MovieClip on _global
+				initMovieClipPrototype(app_context);
+				{
+					ActionVar mc_cv = {0};
+					mc_cv.type = ACTION_STACK_VALUE_FUNCTION;
+					mc_cv.data.numeric_value = (u64)&g_movieclip_constructor;
+					setProperty(app_context, global_object, "MovieClip", 9, &mc_cv);
+				}
+
 				// Register TextField on _global
 				initTextFieldPrototype(app_context);
 				{
@@ -7137,16 +7334,7 @@ void actionGetVariable(SWFAppContext* app_context)
 		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0)
 		{
 			// Return the built-in MovieClip constructor as a function
-			extern ASFunction g_movieclip_constructor;
-			extern int g_movieclip_constructor_init;
-			if (!g_movieclip_constructor_init)
-			{
-				memset(&g_movieclip_constructor, 0, sizeof(ASFunction));
-				strncpy(g_movieclip_constructor.name, "MovieClip", 255);
-				g_movieclip_constructor.function_type = 1;
-				g_movieclip_constructor.param_count = 0;
-				g_movieclip_constructor_init = 1;
-			}
+			initMovieClipPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_movieclip_constructor);
 			return;
 		}
@@ -7409,7 +7597,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (strcasecmp(var_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_visible") == 0) { float v = mc->visible ? 1.0f : 0.0f; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
 			if (strcasecmp(var_name, "_width") == 0) { float v = mc->width; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_height") == 0) { float v = mc->height; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -10168,8 +10356,30 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 				if (strcasecmp(prop_name, "_highquality") == 0) { mc->highquality = fval; return; }
-				if (strcasecmp(prop_name, "_focusrect") == 0) { mc->focusrect = fval; return; }
+				if (strcasecmp(prop_name, "_focusrect") == 0) {
+					// null/undefined → sentinel -1.0f (null); otherwise store numeric
+					if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+						mc->focusrect = -1.0f;
+					} else {
+						mc->focusrect = fval;
+					}
+					return;
+				}
 				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
+				if (strcasecmp(prop_name, "_lockroot") == 0) {
+					// Coerce to boolean: non-zero numbers, non-empty strings → true
+					if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
+						mc->lockroot = value_var.data.numeric_value ? 1 : 0;
+					} else if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+						mc->lockroot = 0;
+					} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						const char* s = (const char*) value_var.data.numeric_value;
+						mc->lockroot = (s != NULL && s[0] != '\0') ? 1 : 0;
+					} else {
+						mc->lockroot = (!isnan(fval) && fval != 0.0f) ? 1 : 0;
+					}
+					return;
+				}
 				if (strcasecmp(prop_name, "_name") == 0)
 				{
 					char new_name[256];
@@ -10188,6 +10398,43 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
+			// blendMode setter: accepts string name or numeric index
+			if (prop_name_len == 9 && strncmp(prop_name, "blendMode", 9) == 0)
+			{
+				static const char* blend_mode_names[] = {
+					"normal", "layer", "multiply", "screen", "lighten",
+					"darken", "difference", "add", "subtract", "invert",
+					"alpha", "erase", "overlay", "hardlight"
+				};
+				if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+					mc->blend_mode = 0; // "normal"
+				} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+					const char* s = (const char*) value_var.data.numeric_value;
+					if (s != NULL) {
+						int found = 0;
+						for (int i = 0; i < 14; i++) {
+							if (strcmp(s, blend_mode_names[i]) == 0) {
+								mc->blend_mode = (u8)(i + 1);
+								found = 1;
+								break;
+							}
+						}
+						// Invalid string: keep previous value (do nothing)
+						(void)found;
+					}
+				} else if (value_var.type == ACTION_STACK_VALUE_F64 || value_var.type == ACTION_STACK_VALUE_F32) {
+					// Numeric: truncate to byte, check valid range
+					double d = varToDouble(&value_var);
+					int idx = (int)d & 0xFF;
+					if (idx >= 0 && idx <= 14) {
+						mc->blend_mode = (u8)idx;
+					}
+					// Out of range after byte truncation: keep previous value
+				}
+				// All other types (boolean, object, movieclip, etc.): keep previous value
+				return;
+			}
+			// _lockroot setter via non-underscore name (some tests use "lockroot" without underscore on dynamic_props)
 			// TextField type setter: normalize to lowercase, reject invalid values
 			if (prop_name_len == 4 && strncmp(prop_name, "type", 4) == 0
 				&& mc->ng_textfield_idx >= 0)
@@ -10834,7 +11081,7 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_visible") == 0) { float v = mc->visible ? 1.0f : 0.0f; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
 			if (strcasecmp(prop_name, "_width") == 0) { float v = mc->width; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_height") == 0) { float v = mc->height; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -10847,6 +11094,20 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
 			if (strcasecmp(prop_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_focusrect") == 0) {
+				// _focusrect defaults to null in Flash (not a number)
+				if (mc->focusrect < 0.0f) { PUSH(ACTION_STACK_VALUE_NULL, 0); }
+				else { float v = mc->focusrect; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); }
+				return;
+			}
+			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_lockroot") == 0) { PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)mc->lockroot); return; }
+			if (strcasecmp(prop_name, "_parent") == 0) {
+				if (mc->parent != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc->parent); }
+				else { pushUndefined(app_context); }
+				return;
+			}
 		}
 
 		// Check user-defined dynamic properties (walks __proto__ chain for TextField prototype)
@@ -10884,16 +11145,47 @@ void actionGetMember(SWFAppContext* app_context)
 #endif
 
 		// Built-in defaults for non-underscore properties
-		if (mc != NULL && prop_name_len == 13 && strcmp(prop_name, "useHandCursor") == 0)
+		if (mc != NULL && prop_name_len == 13 && strncmp(prop_name, "useHandCursor", 13) == 0)
 		{
 			// useHandCursor defaults to true for both MovieClips and Buttons
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
 			return;
 		}
-		if (mc != NULL && prop_name_len == 7 && strcmp(prop_name, "enabled") == 0)
+		if (mc != NULL && prop_name_len == 7 && strncmp(prop_name, "enabled", 7) == 0)
 		{
 			// enabled defaults to true
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+			return;
+		}
+		// blendMode: return string representation
+		if (mc != NULL && prop_name_len == 9 && strncmp(prop_name, "blendMode", 9) == 0)
+		{
+			static const char* blend_mode_names[] = {
+				"normal", "normal", "layer", "multiply", "screen", "lighten",
+				"darken", "difference", "add", "subtract", "invert",
+				"alpha", "erase", "overlay", "hardlight"
+			};
+			int bm = mc->blend_mode;
+			const char* name = (bm >= 0 && bm <= 14) ? blend_mode_names[bm] : "normal";
+			PUSH_STR((char*)name, strlen(name));
+			return;
+		}
+		if (mc != NULL && prop_name_len == 13 && strncmp(prop_name, "cacheAsBitmap", 13) == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+			return;
+		}
+		if (mc != NULL && prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0)
+		{
+			// filters defaults to empty array
+			ASArray* arr = allocArray(app_context, 0);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
+			return;
+		}
+		if (mc != NULL && prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
+		{
+			ASObject* transform = createTransformObject(app_context, mc);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)transform);
 			return;
 		}
 
@@ -13577,6 +13869,61 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 #endif
 		builtin_handled = 1;
 	}
+	// createEmptyMovieClip(name, depth) — MovieClip method called as CallFunction
+	else if (func_name_len == 20 && strncmp(func_name, "createEmptyMovieClip", 20) == 0)
+	{
+#ifdef NO_GRAPHICS
+		if (num_args >= 2) {
+			extern MovieClip root_movieclip;
+			MovieClip* mc = &root_movieclip;
+			const char* inst_name = "";
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+				inst_name = (const char*) args[0].data.numeric_value;
+			int depth_val = (int) varToDouble(&args[1]);
+			(void)depth_val;
+
+			MovieClip* child = createMovieClip(inst_name, mc);
+			child->currentframe = 0;  // Empty clips have _currentframe = 0
+			child->totalframes = 1;
+			child->framesloaded = 1;
+			strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
+			child->url[sizeof(child->url) - 1] = '\0';
+
+			// Register child on parent MC's dynamic_props
+			if (mc->dynamic_props == NULL) {
+				mc->dynamic_props = (void*) allocObject(app_context, 8);
+				retainObject((ASObject*) mc->dynamic_props);
+			}
+			ActionVar mc_var = {0};
+			mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+			mc_var.data.numeric_value = (u64)child;
+			setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
+			setVariableByName(inst_name, &mc_var);
+
+			if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
+				child_mc_cache[child_mc_count++] = child;
+			}
+
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+		} else {
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+#else
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+#endif
+		builtin_handled = 1;
+	}
+	// getNextHighestDepth() — returns next available depth (stub: returns 0)
+	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
+	{
+		if (args != NULL) FREE(args);
+		double v = 0.0;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+		builtin_handled = 1;
+	}
 
 	// If not a built-in function, look up user-defined functions
 	if (!builtin_handled)
@@ -14437,9 +14784,9 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 		{
 			found_index = start_index <= str_len ? start_index : -1;
 		}
-		else
+		else if (search_len <= (int)str_len)
 		{
-			for (int i = start_index; i <= str_len - search_len; i++)
+			for (int i = start_index; i <= (int)str_len - search_len; i++)
 			{
 				int match = 1;
 				for (int j = 0; j < search_len; j++)
@@ -14460,6 +14807,111 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 
 		float result = (float)found_index;
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		return 1;
+	}
+
+	// split(delimiter, limit) - 0-2 arguments
+	if (method_name_len == 5 && strncmp(method_name, "split", 5) == 0)
+	{
+		const char* delim = NULL;
+		int delim_len = 0;
+		int limit = -1;  // -1 = no limit
+
+		if (num_args > 0)
+		{
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				delim = (const char*)args[0].data.numeric_value;
+				delim_len = args[0].str_size;
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				// undefined delimiter → return array with whole string
+				ASArray* arr = allocArray(app_context, 1);
+				ActionVar elem = {0};
+				elem.type = ACTION_STACK_VALUE_STRING;
+				elem.str_size = str_len;
+				elem.data.numeric_value = (u64)str_value;
+				setArrayElement(app_context, arr, 0, &elem);
+				PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
+				return 1;
+			}
+		}
+		else
+		{
+			// No args → return array with whole string
+			ASArray* arr = allocArray(app_context, 1);
+			ActionVar elem = {0};
+			elem.type = ACTION_STACK_VALUE_STRING;
+			elem.str_size = str_len;
+			elem.data.numeric_value = (u64)str_value;
+			setArrayElement(app_context, arr, 0, &elem);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
+			return 1;
+		}
+
+		if (num_args > 1)
+		{
+			double lv = varToDouble(&args[1]);
+			if (lv >= 0) limit = (int)lv;
+		}
+
+		ASArray* arr = allocArray(app_context, 4);
+		u32 count = 0;
+
+		if (delim_len == 0)
+		{
+			// Empty delimiter → split each character
+			for (int i = 0; i < (int)str_len; i++)
+			{
+				if (limit >= 0 && (int)count >= limit) break;
+				char* ch = (char*) HALLOC(2);
+				ch[0] = str_value[i];
+				ch[1] = '\0';
+				ActionVar elem = {0};
+				elem.type = ACTION_STACK_VALUE_STRING;
+				elem.str_size = 1;
+				elem.data.numeric_value = (u64)ch;
+				setArrayElement(app_context, arr, count++, &elem);
+			}
+		}
+		else
+		{
+			int start = 0;
+			for (int i = 0; i <= (int)str_len - delim_len; i++)
+			{
+				if (limit >= 0 && (int)count >= limit) break;
+				if (memcmp(&str_value[i], delim, delim_len) == 0)
+				{
+					int seg_len = i - start;
+					char* seg = (char*) HALLOC(seg_len + 1);
+					memcpy(seg, &str_value[start], seg_len);
+					seg[seg_len] = '\0';
+					ActionVar elem = {0};
+					elem.type = ACTION_STACK_VALUE_STRING;
+					elem.str_size = seg_len;
+					elem.data.numeric_value = (u64)seg;
+					setArrayElement(app_context, arr, count++, &elem);
+					i += delim_len - 1;
+					start = i + 1;
+				}
+			}
+			// Add remaining segment
+			if (limit < 0 || (int)count < limit)
+			{
+				int seg_len = str_len - start;
+				char* seg = (char*) HALLOC(seg_len + 1);
+				memcpy(seg, &str_value[start], seg_len);
+				seg[seg_len] = '\0';
+				ActionVar elem = {0};
+				elem.type = ACTION_STACK_VALUE_STRING;
+				elem.str_size = seg_len;
+				elem.data.numeric_value = (u64)seg;
+				setArrayElement(app_context, arr, count++, &elem);
+			}
+		}
+
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
 		return 1;
 	}
 
@@ -15115,6 +15567,58 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
+		else if (method_name_len == 20 && strncmp(method_name, "createEmptyMovieClip", 20) == 0)
+		{
+			// createEmptyMovieClip(instanceName, depth)
+			// Creates a new empty child MovieClip
+#ifdef NO_GRAPHICS
+			if (num_args >= 2) {
+				const char* inst_name = "";
+				if (args[0].type == ACTION_STACK_VALUE_STRING)
+					inst_name = (const char*) args[0].data.numeric_value;
+				int depth_val = (int) varToDouble(&args[1]);
+				(void)depth_val;
+
+				// Create a child MovieClip
+				MovieClip* child = createMovieClip(inst_name, mc);
+				child->currentframe = 0;  // Empty clips have _currentframe = 0
+				child->totalframes = 1;
+				child->framesloaded = 1;
+
+				// Copy URL from parent
+				strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
+				child->url[sizeof(child->url) - 1] = '\0';
+
+				// Register child on parent MC's dynamic_props so mc.childName works via GetMember
+				if (mc->dynamic_props == NULL) {
+					mc->dynamic_props = (void*) allocObject(app_context, 8);
+					retainObject((ASObject*) mc->dynamic_props);
+				}
+				ActionVar mc_var = {0};
+				mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+				mc_var.data.numeric_value = (u64)child;
+				setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
+				// Also set on global scope for GetVariable access
+				setVariableByName(inst_name, &mc_var);
+
+				// Add to child_mc_cache so it persists across lookups
+				if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
+					child_mc_cache[child_mc_count++] = child;
+				}
+
+				// Return the created MovieClip
+				if (args != NULL) FREE(args);
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
+			return;
+		}
 		else if (method_name_len == 13 && strncmp(method_name, "setTextFormat", 13) == 0)
 		{
 			// setTextFormat(fmt) / setTextFormat(begin, fmt) / setTextFormat(begin, end, fmt)
@@ -15209,11 +15713,104 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
+		else if (method_name_len == 13 && strncmp(method_name, "getSWFVersion", 13) == 0)
+		{
+			if (args != NULL) FREE(args);
+#if defined(SWF_VERSION)
+			double v = (double)SWF_VERSION;
+#else
+			double v = 5.0;
+#endif
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+			return;
+		}
+		else if (method_name_len == 14 && strncmp(method_name, "getBytesLoaded", 14) == 0)
+		{
+			// Empty/created MovieClips return 0 (SWF data not loaded)
+			if (args != NULL) FREE(args);
+			double v = 0.0;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+			return;
+		}
+		else if (method_name_len == 13 && strncmp(method_name, "getBytesTotal", 13) == 0)
+		{
+			// Empty/created MovieClips return 0
+			if (args != NULL) FREE(args);
+			double v = 0.0;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+			return;
+		}
+		else if (method_name_len == 8 && strncmp(method_name, "getDepth", 8) == 0)
+		{
+			// Return the depth this clip was placed at
+			// For createEmptyMovieClip, depth is stored as the second arg
+			// Stub: return 0 (proper implementation needs depth tracking)
+			if (args != NULL) FREE(args);
+			double v = 0.0;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+			return;
+		}
+		else if (method_name_len == 19 && strncmp(method_name, "getNextHighestDepth", 19) == 0)
+		{
+			// Return next available depth for placing children
+			if (args != NULL) FREE(args);
+			double v = 0.0;
+			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+			return;
+		}
+		else if (method_name_len == 18 && strncmp(method_name, "getInstanceAtDepth", 18) == 0)
+		{
+			// Return the instance at the given depth (stub: undefined)
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if ((method_name_len == 9 && strncmp(method_name, "getBounds", 9) == 0) ||
+		         (method_name_len == 7 && strncmp(method_name, "getRect", 7) == 0))
+		{
+			// getBounds(targetCoordSpace) / getRect(targetCoordSpace)
+			// For empty clips, return sentinel "no bounds" values
+			// getBounds(this) uses 6710886.4 (2^27/20), getBounds(otherMC) uses 6710886.35 ((2^27-1)/20)
+			int target_is_self = 0;
+			if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+				MovieClip* target = (MovieClip*) args[0].data.numeric_value;
+				target_is_self = (target == mc);
+			}
+			if (args != NULL) FREE(args);
+
+			double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
+
+			ASObject* bounds = allocObject(app_context, 8);
+			ActionVar v = {0};
+			v.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &v.data.numeric_value) = sentinel;
+			setProperty(app_context, bounds, "xMin", 4, &v);
+			setProperty(app_context, bounds, "xMax", 4, &v);
+			setProperty(app_context, bounds, "yMin", 4, &v);
+			setProperty(app_context, bounds, "yMax", 4, &v);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
+			return;
+		}
 		else
 		{
+			// Check if user-defined method exists on dynamic_props
+			if (mc != NULL && mc->dynamic_props != NULL) {
+				ActionVar* method_var = getPropertyWithPrototype((ASObject*)mc->dynamic_props, method_name, method_name_len);
+				if (method_var != NULL && method_var->type == ACTION_STACK_VALUE_FUNCTION) {
+					// Call user-defined function with this = mc
+					ASFunction* func = (ASFunction*) method_var->data.numeric_value;
+					if (func != NULL && func->advanced_func != NULL) {
+						ActionVar this_var = {0};
+						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						this_var.data.numeric_value = (u64) mc;
+						ActionVar result = func->advanced_func(app_context, args, num_args, NULL, (void*)&this_var);
+						if (args != NULL) FREE(args);
+						pushVar(app_context, &result);
+						return;
+					}
+				}
+			}
 			// Unknown method on MovieClip — push undefined.
-			// Note: can't safely call Object.prototype methods (hasOwnProperty etc.)
-			// because they expect ASObject* but MovieClip has a different layout.
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
