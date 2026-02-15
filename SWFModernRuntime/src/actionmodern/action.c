@@ -298,17 +298,27 @@ void push_str_id_fn(SWFAppContext* app_context, const char* str, u32 byte_len, u
 
 #define MAX_SCOPE_DEPTH 32
 static ASObject* scope_chain[MAX_SCOPE_DEPTH];
+static u8 scope_is_with[MAX_SCOPE_DEPTH];       // 1 = with scope, 0 = function scope
+static MovieClip* scope_mc[MAX_SCOPE_DEPTH];     // non-NULL if scope entry is a MovieClip
 static u32 scope_depth = 0;
+
+// Forward declarations for MC property helpers (defined in WITH section)
+static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* result);
+static int setMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* value);
 
 // Stored app_context for use by setVariableOnLocalScope (called from variables.c
 // which doesn't have app_context). Set at entry to actionCallFunction/actionCallMethod.
 static SWFAppContext* g_scope_app_context = NULL;
 
 // Expose local scope for parameter binding (used by setVariableByName)
+// Skips 'with' scopes to find the nearest function scope.
 ASObject* getCurrentLocalScope(void)
 {
-	if (scope_depth > 0 && scope_chain[scope_depth - 1] != NULL)
-		return scope_chain[scope_depth - 1];
+	for (int i = scope_depth - 1; i >= 0; i--)
+	{
+		if (!scope_is_with[i] && scope_chain[i] != NULL)
+			return scope_chain[i];
+	}
 	return NULL;
 }
 
@@ -1114,6 +1124,8 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 		ASObject* local_scope = allocObject(app_context, 8);
 		if (scope_depth < MAX_SCOPE_DEPTH)
 		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
 			scope_chain[scope_depth++] = local_scope;
 		}
 
@@ -8915,12 +8927,35 @@ void actionGetVariable(SWFAppContext* app_context)
 	{
 		if (scope_chain[i] != NULL)
 		{
-			// Try to find property in this scope object
-			ActionVar* prop = getProperty(scope_chain[i], var_name, var_name_len);
+			// With scopes walk prototype chain; function scopes check own properties only
+			ActionVar* prop = scope_is_with[i]
+				? getPropertyWithPrototype(scope_chain[i], var_name, var_name_len)
+				: getProperty(scope_chain[i], var_name, var_name_len);
 			if (prop != NULL)
 			{
 				// Found in scope chain - push its value
 				PUSH_VAR(prop);
+				return;
+			}
+		}
+		// If this scope entry is a MovieClip, also check built-in MC properties
+		if (scope_mc[i] != NULL)
+		{
+			ActionVar mc_result = {0};
+			int mc_found = getMCBuiltinProperty(scope_mc[i], var_name, var_name_len, &mc_result);
+			if (mc_found == 1)
+			{
+				pushVar(app_context, &mc_result);
+				return;
+			}
+			else if (mc_found == 2)  // _name
+			{
+				PUSH_STR(scope_mc[i]->name, strlen(scope_mc[i]->name));
+				return;
+			}
+			else if (mc_found == 3)  // _target
+			{
+				PUSH_STR(scope_mc[i]->target, strlen(scope_mc[i]->target));
 				return;
 			}
 		}
@@ -9597,11 +9632,13 @@ void actionSetVariable(SWFAppContext* app_context)
 	{
 		if (scope_chain[i] != NULL)
 		{
-			// Try to find property in this scope object
-			ActionVar* prop = getProperty(scope_chain[i], var_name, var_name_len);
+			// With scopes walk prototype chain; function scopes check own properties only
+			ActionVar* prop = scope_is_with[i]
+				? getPropertyWithPrototype(scope_chain[i], var_name, var_name_len)
+				: getProperty(scope_chain[i], var_name, var_name_len);
 			if (prop != NULL)
 			{
-				// Found in scope chain - set it there
+				// Found in scope chain - set it on the direct scope object
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
@@ -9610,6 +9647,17 @@ void actionSetVariable(SWFAppContext* app_context)
 #endif
 
 				// Pop both value and name
+				POP_2();
+				return;
+			}
+		}
+		// If this scope entry is a MovieClip, also check built-in MC properties
+		if (scope_mc[i] != NULL)
+		{
+			ActionVar value_var;
+			peekVar(app_context, &value_var);
+			if (setMCBuiltinProperty(scope_mc[i], var_name, var_name_len, &value_var))
+			{
 				POP_2();
 				return;
 			}
@@ -9743,29 +9791,41 @@ void actionDefineLocal(SWFAppContext* app_context)
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[var_name_sp + 16]), _dl_u16_len, _dl_buf, sizeof(_dl_buf));
 	char* var_name = _dl_buf;
 
-	// DefineLocal ALWAYS creates/updates in the local scope
-	// If there's a scope object (function context), define it there
-	// Otherwise, fall back to global scope (for testing without full function support)
+	// DefineLocal: walk scope chain from innermost to outermost.
+	// For 'with' scopes: if the object DIRECTLY owns the property, set it there.
+	// For function scopes: always set there (create if needed).
+	// If no scope found, fall back to global.
 
-	if (scope_depth > 0 && scope_chain[scope_depth - 1] != NULL)
+	for (int i = scope_depth - 1; i >= 0; i--)
 	{
-		// We have a local scope object - define variable as a property
-		ASObject* local_scope = scope_chain[scope_depth - 1];
+		if (scope_chain[i] == NULL) continue;
 
-		ActionVar value_var;
-		peekVar(app_context, &value_var);
-
-		// Set property on the local scope object
-		// This will create the property if it doesn't exist, or update if it does
-		setProperty(app_context, local_scope, var_name, var_name_len, &value_var);
-
-		// Pop both value and name
-		POP_2();
-		return;
+		if (scope_is_with[i])
+		{
+			// With scope: only set here if the object directly owns the property
+			ActionVar* existing = getProperty(scope_chain[i], var_name, var_name_len);
+			if (existing != NULL)
+			{
+				ActionVar value_var;
+				peekVar(app_context, &value_var);
+				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
+				POP_2();
+				return;
+			}
+			// Property not directly on with object — continue to next scope
+		}
+		else
+		{
+			// Function scope: always define here
+			ActionVar value_var;
+			peekVar(app_context, &value_var);
+			setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
+			POP_2();
+			return;
+		}
 	}
 
-	// No local scope - fall back to global variable
-	// This allows testing DefineLocal without full function infrastructure
+	// No function scope - fall back to global variable
 	ActionVar* var;
 	if (string_id != 0)
 	{
@@ -9834,25 +9894,37 @@ void actionDeclareLocal(SWFAppContext* app_context)
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[SP + 16]), _dcl_u16_len, _dcl_buf, sizeof(_dcl_buf));
 	char* var_name = _dcl_buf;
 
-	// Check if we're in a local scope (function context)
-	if (scope_depth > 0 && scope_chain[scope_depth - 1] != NULL)
+	// DeclareLocal: same logic as DefineLocal but with undefined value.
+	// For with scopes: set if object directly owns property.
+	// For function scopes: always set.
+	for (int i = scope_depth - 1; i >= 0; i--)
 	{
-		// We have a local scope object - declare variable as undefined property
-		ASObject* local_scope = scope_chain[scope_depth - 1];
+		if (scope_chain[i] == NULL) continue;
 
-		// Create an undefined value
-		ActionVar undefined_var;
-		undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
-		undefined_var.str_size = 0;
-		undefined_var.data.numeric_value = 0;
-
-		// Set property on the local scope object
-		// This will create the property if it doesn't exist
-		setProperty(app_context, local_scope, var_name, var_name_len, &undefined_var);
-
-		// Pop the name
-		POP();
-		return;
+		if (scope_is_with[i])
+		{
+			ActionVar* existing = getProperty(scope_chain[i], var_name, var_name_len);
+			if (existing != NULL)
+			{
+				ActionVar undefined_var;
+				undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
+				undefined_var.str_size = 0;
+				undefined_var.data.numeric_value = 0;
+				setProperty(app_context, scope_chain[i], var_name, var_name_len, &undefined_var);
+				POP();
+				return;
+			}
+		}
+		else
+		{
+			ActionVar undefined_var;
+			undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
+			undefined_var.str_size = 0;
+			undefined_var.data.numeric_value = 0;
+			setProperty(app_context, scope_chain[i], var_name, var_name_len, &undefined_var);
+			POP();
+			return;
+		}
 	}
 
 	// Not in a function — Flash silently ignores DeclareLocal outside functions
@@ -13864,7 +13936,7 @@ void actionNewObject(SWFAppContext* app_context)
 		else
 	{
 		// Try to find user-defined constructor function
-		// First check function registry, then _global object properties
+		// First check function registry, then _global object properties, then global variable table
 		ASFunction* ctor_func = lookupFunctionByName(ctor_name, ctor_name_len);
 		if (ctor_func == NULL)
 		{
@@ -13873,6 +13945,23 @@ void actionNewObject(SWFAppContext* app_context)
 			if (global_object != NULL)
 			{
 				ActionVar* gvar = getProperty(global_object, ctor_name, ctor_name_len);
+				if (gvar != NULL && gvar->type == ACTION_STACK_VALUE_FUNCTION)
+					ctor_func = (ASFunction*) gvar->data.numeric_value;
+			}
+		}
+		if (ctor_func == NULL)
+		{
+			// Check global variable table (for functions stored via DefineLocal/SetVariable)
+			// Try var_array first (O(1) by string_id), then hashmap fallback
+			if (ctor_name_var.string_id != 0)
+			{
+				ActionVar* gvar = getVariableById(ctor_name_var.string_id);
+				if (gvar != NULL && gvar->type == ACTION_STACK_VALUE_FUNCTION)
+					ctor_func = (ASFunction*) gvar->data.numeric_value;
+			}
+			if (ctor_func == NULL)
+			{
+				ActionVar* gvar = getVariable(ctor_name, ctor_name_len);
 				if (gvar != NULL && gvar->type == ACTION_STACK_VALUE_FUNCTION)
 					ctor_func = (ASFunction*) gvar->data.numeric_value;
 			}
@@ -14118,6 +14207,8 @@ void actionNewMethod(SWFAppContext* app_context)
 					// Create local scope for function
 					ASObject* local_scope = allocObject(app_context, 8);
 					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
 						scope_chain[scope_depth++] = local_scope;
 					}
 
@@ -14490,6 +14581,8 @@ void actionNewMethod(SWFAppContext* app_context)
 			// Create local scope for function
 			ASObject* local_scope = allocObject(app_context, 8);
 			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = 0;
+				scope_mc[scope_depth] = NULL;
 				scope_chain[scope_depth++] = local_scope;
 			}
 
@@ -14842,61 +14935,154 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 // WITH Statement Implementation
 // ==================================================================
 
-void actionWithStart(SWFAppContext* app_context)
+// Helper: print a trace-style string directly (for error messages)
+static void actionTrace_str(SWFAppContext* app_context, const char* msg)
+{
+	(void)app_context;
+	fputs(msg, stdout);
+}
+
+// Helper: get a MovieClip built-in property by name into result.
+// Returns 1 if property was found, 0 otherwise.
+static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* result)
+{
+	if (name_len < 2 || name[0] != '_') return 0;
+
+	result->str_size = 0;
+	result->data.numeric_value = 0;
+
+	if (strcasecmp(name, "_x") == 0) { float v = mc->x; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_y") == 0) { float v = mc->y; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_xscale") == 0) { float v = mc->xscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_yscale") == 0) { float v = mc->yscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_rotation") == 0) { float v = mc->rotation; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_alpha") == 0) { float v = mc->alpha; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_visible") == 0) { result->type = ACTION_STACK_VALUE_BOOLEAN; result->data.numeric_value = mc->visible ? 1 : 0; return 1; }
+	if (strcasecmp(name, "_width") == 0) { float v = mc->width; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_height") == 0) { float v = mc->height; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_currentframe") == 0) { float v = (float)mc->currentframe; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_totalframes") == 0) { float v = (float)mc->totalframes; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_name") == 0) { result->type = ACTION_STACK_VALUE_STRING; /* caller must handle string push */ return 2; }
+	if (strcasecmp(name, "_target") == 0) { result->type = ACTION_STACK_VALUE_STRING; return 3; }
+	return 0;
+}
+
+// Helper: set a MovieClip built-in property by name.
+// Returns 1 if property was handled, 0 otherwise.
+static int setMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* value)
+{
+	if (name_len < 2 || name[0] != '_') return 0;
+
+	double dval = varToDoubleSimple(value);
+	float fval = (float)dval;
+
+	if (strcasecmp(name, "_x") == 0) {
+#ifdef NO_GRAPHICS
+		mc->as_set_flags |= 1;
+#endif
+		mc->x = fval; return 1;
+	}
+	if (strcasecmp(name, "_y") == 0) {
+#ifdef NO_GRAPHICS
+		mc->as_set_flags |= 2;
+#endif
+		mc->y = fval; return 1;
+	}
+	if (strcasecmp(name, "_xscale") == 0) { mc->xscale = fval; return 1; }
+	if (strcasecmp(name, "_yscale") == 0) { mc->yscale = fval; return 1; }
+	if (strcasecmp(name, "_rotation") == 0) { mc->rotation = fval; return 1; }
+	if (strcasecmp(name, "_alpha") == 0) { mc->alpha = fval; return 1; }
+	if (strcasecmp(name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; return 1; }
+	if (strcasecmp(name, "_width") == 0) { mc->width = fval; return 1; }
+	if (strcasecmp(name, "_height") == 0) { mc->height = fval; return 1; }
+	return 0;
+}
+
+int actionWithStart(SWFAppContext* app_context)
 {
 	// Pop object from stack
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
 
+	if (scope_depth >= MAX_SCOPE_DEPTH)
+	{
+		fprintf(stderr, "ERROR: Scope chain overflow (depth=%u, max=%u)\n", scope_depth, MAX_SCOPE_DEPTH);
+		return 0;
+	}
+
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
-		// Get the object pointer
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
-
-		// Push onto scope chain (if valid and space available)
-		if (obj != NULL && scope_depth < MAX_SCOPE_DEPTH)
+		if (obj != NULL)
 		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = NULL;
 			scope_chain[scope_depth++] = obj;
+			return 1;
 		}
-		else
-		{
-			if (obj == NULL)
-			{
-				// Push null marker to maintain balance
-				scope_chain[scope_depth++] = NULL;
-			}
-			else
-			{
-				fprintf(stderr, "ERROR: Scope chain overflow (depth=%u, max=%u)\n", scope_depth, MAX_SCOPE_DEPTH);
-			}
-		}
+		// NULL object pointer — skip body
+		scope_is_with[scope_depth] = 1;
+		scope_mc[scope_depth] = NULL;
+		scope_chain[scope_depth++] = NULL;
+		actionTrace_str(app_context, "Error: A 'with' action failed because the specified object did not exist.\n\n");
+		return 0;
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
-		// MovieClip: push its dynamic_props ASObject onto scope chain
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
-		if (mc != NULL && scope_depth < MAX_SCOPE_DEPTH)
+		if (mc != NULL)
 		{
 			// Ensure mc has dynamic_props allocated
 			if (mc->dynamic_props == NULL)
 			{
 				mc->dynamic_props = (void*) allocObject(app_context, 8);
 			}
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = mc;
 			scope_chain[scope_depth++] = (ASObject*) mc->dynamic_props;
+			return 1;
 		}
-		else
+		// NULL MC pointer — skip body
+		scope_is_with[scope_depth] = 1;
+		scope_mc[scope_depth] = NULL;
+		scope_chain[scope_depth++] = NULL;
+		actionTrace_str(app_context, "Error: A 'with' action failed because the specified object did not exist.\n\n");
+		return 0;
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		// Functions are objects in Flash — push onto scope chain
+		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+		if (func != NULL && func->own_props != NULL)
 		{
-			if (scope_depth < MAX_SCOPE_DEPTH)
-				scope_chain[scope_depth++] = NULL;
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = func->own_props;
+			return 1;
 		}
+		scope_is_with[scope_depth] = 1;
+		scope_mc[scope_depth] = NULL;
+		scope_chain[scope_depth++] = NULL;
+		return 0;
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_UNDEFINED || obj_var.type == ACTION_STACK_VALUE_NULL)
+	{
+		// undefined/null — skip body and print error
+		scope_is_with[scope_depth] = 1;
+		scope_mc[scope_depth] = NULL;
+		scope_chain[scope_depth++] = NULL;
+		actionTrace_str(app_context, "Error: A 'with' action failed because the specified object did not exist.\n\n");
+		return 0;
 	}
 	else
 	{
-		// Non-object type - push null marker to maintain balance
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_chain[scope_depth++] = NULL;
-		}
+		// Non-object type (string, number, boolean) — push null marker
+		// TODO: wrap primitives in their wrapper objects (String, Number, Boolean)
+		scope_is_with[scope_depth] = 1;
+		scope_mc[scope_depth] = NULL;
+		scope_chain[scope_depth++] = NULL;
+		return 1;  // body still executes, just no scope object
 	}
 }
 
@@ -16200,6 +16386,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 				// Push local scope onto scope chain
 				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
 					scope_chain[scope_depth++] = local_scope;
 				}
 
@@ -16241,6 +16429,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 				// Push local scope onto scope chain
 				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
 					scope_chain[scope_depth++] = local_scope;
 				}
 

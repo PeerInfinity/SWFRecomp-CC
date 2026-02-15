@@ -2,12 +2,18 @@
 
 Last updated: 2026-02-15
 
+## Status: PHASES 1-3 IMPLEMENTED
+
+### Results
+- **`with_variable_scopes`**: 24/43 → **43/43 (PASS)** — fully passing now
+- **`with`**: 30/49 → still failing, but MC identity (lines 3,6,9) and undefined/null error messages now work. Remaining failures: addProperty in scope chain (Phase 4), `this` binding in with, string primitive wrapping (Phase 5).
+
 ## Overview
 
 The `with` statement pushes an object onto the scope chain for variable lookup within a block. Two Ruffle tests cover this feature:
 
-1. **`with`** — 30/49 lines passing (61%). Tests basic `with(clip)`, `with(string)`, `with(object)`, `this` resolution, addProperty getters, and `with(undefined/null)` error handling.
-2. **`with_variable_scopes`** — 25/44 lines passing (56%). Tests `SetVariable` vs `DefineLocal` scoping inside `with`, nested `with` blocks, and interaction with prototype properties.
+1. **`with`** — was 30/49 lines passing (61%). Tests basic `with(clip)`, `with(string)`, `with(object)`, `this` resolution, addProperty getters, and `with(undefined/null)` error handling.
+2. **`with_variable_scopes`** — was 24/43 (56%), now **PASSING**.
 
 **Root cause**: 6 distinct bugs in the runtime, the most critical being that `DefineLocal` writes to the `with` object instead of the function's local scope. All bugs are in `SWFModernRuntime/src/actionmodern/action.c` (with one recompiler change needed for the null/undefined skip).
 

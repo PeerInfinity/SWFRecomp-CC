@@ -1533,9 +1533,9 @@ namespace SWFRecomp
 					action_buffer += 2;
 
 					// Emit actionWithStart to push object onto scope chain
+					// Returns 1 if body should execute, 0 to skip (null/undefined)
 					out_script << "\t" << "// WITH block (size=" << block_size << ")" << endl;
-					out_script << "\t" << "actionWithStart(app_context);" << endl;
-					out_script << "\t" << "{" << endl; // C scope for clarity
+					out_script << "\t" << "if (actionWithStart(app_context)) {" << endl;
 
 					// Copy the WITH block content and add END marker for parseActions
 					// This is necessary because parseActions parses until it hits END (0x00)
