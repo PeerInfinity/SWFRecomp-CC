@@ -18,7 +18,7 @@ String-related tests account for 13 failing Ruffle tests, split into two distinc
 |------|-------|-----------|----------|--------|
 | string_methods_negative_args | 240/240 | 100% | String methods | PASS |
 | string_methods_swfv5 | 275/275 | 100% | String methods | PASS |
-| string_methods | 286/286 | 100% | String methods | PASS |
+| string_methods | 285/285 | 100% | String methods | PASS (CI confirmed) |
 | string_ops_swf6 | 95/95 | 100% | SWF4/6 string ops | PASS |
 | string_paths_* | various | various | String paths | Blocked by MovieClip infra |
 

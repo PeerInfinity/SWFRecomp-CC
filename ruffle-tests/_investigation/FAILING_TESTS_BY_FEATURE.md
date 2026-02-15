@@ -1,12 +1,18 @@
 # Failing Ruffle Tests by Feature Category
 
-Last updated: 2026-02-14
+Last updated: 2026-02-14 (STALE — see note below)
+
+**NOTE**: This document's pass rates are based on an older CI run (commit c8b084e). As of 2026-02-15, the pass rate is **205/619 (33.1%)** — see `CURRENT_STATUS.md` for current data. Major categories that have been fully or mostly implemented since this document was written:
+- **XML/XMLNode**: 24/26 active tests now PASS (was 0)
+- **TextField Phase 1-2**: 17 tests now PASS (was ~0)
+- **Math object**: 1 test PASS, 3 at 98.5% (was 0)
+- **String methods**: 4 tests + string_ops_swf6 now PASS (was ~0)
+- **Globals**: globals_swf6/7/8 PASS, is_finite PASS (was ~70%)
+- **flash.geom**: point, matrix, rectangle PASS (was ~70%)
 
 **Total tests**: 619
-**Passing**: ~157 (25.4%) — based on last CI run (155) plus local fixes (issue_2166, conflicting_instance_names, sandbox_type_local_file)
-**Failing**: ~462 (454 output_mismatch, 5 segfault, 3 timeout)
-
-**Note**: Pass counts are from the last CI run. Some tests listed here may now pass locally after recent commits not yet in CI. The results.json used as source is from commit c8b084e.
+**Passing**: 205 (33.1%) — based on latest CI run (commit b4d13aa)
+**Failing**: 414 (406 output_mismatch, 7 segfault, 1 timeout)
 
 Tests are sorted by category size (most tests first). Within each category, tests are listed alphabetically.
 
