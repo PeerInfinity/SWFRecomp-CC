@@ -2,16 +2,17 @@
 
 #include <stackvalue.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct
 {
 	ActionStackValueType type;
-	u32 str_size;
-	u32 string_id;  // String ID for constant strings (0 for dynamic strings)
+	u32 str_size;       // For strings: UTF-16 code unit count
+	u32 string_id;      // String ID for constant strings (0 for dynamic strings)
 	union {
 		u64 numeric_value;
 		struct {
-			char* heap_ptr;
+			uint16_t* heap_ptr;   // UTF-16 string data
 			bool owns_memory;
 		} string_data;
 	} data;
@@ -29,5 +30,4 @@ ActionVar* getVariableById(u32 string_id);
 
 ActionVar* getVariable(char* var_name, size_t key_size);
 bool hasVariable(char* var_name, size_t key_size);
-char* materializeStringList(char* stack, u32 sp);
 void setVariableWithValue(ActionVar* var, char* stack, u32 sp);

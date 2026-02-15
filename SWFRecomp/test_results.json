@@ -1,20 +1,20 @@
 {
-  "timestamp": "2026-02-07T21:36:08Z",
+  "timestamp": "2026-02-15T04:33:54Z",
   "summary": {
-    "total_tests": 20,
-    "passed": 20,
+    "total_tests": 0,
+    "passed": 0,
     "failed": 0,
     "skipped": 0,
-    "total_sub_tests": 59,
-    "passed_sub_tests": 59,
+    "total_sub_tests": 0,
+    "passed_sub_tests": 0,
     "failed_sub_tests": 0
   },
   "tests": [
     {
       "name": "add2_swf_5",
       "passed": true,
-      "build_time_ms": 2686,
-      "execution_time_ms": 126,
+      "build_time_ms": 1850,
+      "execution_time_ms": 142,
       "opcodes_tested": [
         "ADD2"
       ],
@@ -42,8 +42,8 @@
     {
       "name": "add_floats_swf_4",
       "passed": true,
-      "build_time_ms": 2657,
-      "execution_time_ms": 129,
+      "build_time_ms": 1880,
+      "execution_time_ms": 131,
       "opcodes_tested": [
         "ADD"
       ],
@@ -59,8 +59,8 @@
     {
       "name": "add_swf_4",
       "passed": true,
-      "build_time_ms": 2292,
-      "execution_time_ms": 100,
+      "build_time_ms": 1966,
+      "execution_time_ms": 137,
       "opcodes_tested": [
         "ADD"
       ],
@@ -136,8 +136,8 @@
     {
       "name": "and_floats_both_0_swf_4",
       "passed": true,
-      "build_time_ms": 2534,
-      "execution_time_ms": 115,
+      "build_time_ms": 2100,
+      "execution_time_ms": 185,
       "opcodes_tested": [
         "AND"
       ],
@@ -152,77 +152,77 @@
     },
     {
       "name": "and_floats_first_1_swf_4",
-      "passed": true,
-      "build_time_ms": 2151,
-      "execution_time_ms": 99,
+      "passed": false,
+      "build_time_ms": 2239,
+      "execution_time_ms": 160,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "first_false",
-          "passed": true,
+          "passed": false,
           "expected": "0",
-          "actual": "0"
+          "actual": "false"
         }
       ]
     },
     {
       "name": "and_floats_nonzero_swf_4",
-      "passed": true,
-      "build_time_ms": 2573,
-      "execution_time_ms": 163,
+      "passed": false,
+      "build_time_ms": 1861,
+      "execution_time_ms": 159,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "nonzero_numbers",
-          "passed": true,
+          "passed": false,
           "expected": "1",
-          "actual": "1"
+          "actual": "true"
         }
       ]
     },
     {
       "name": "and_floats_second_1_swf_4",
-      "passed": true,
-      "build_time_ms": 2285,
-      "execution_time_ms": 102,
+      "passed": false,
+      "build_time_ms": 1851,
+      "execution_time_ms": 122,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "second_false",
-          "passed": true,
+          "passed": false,
           "expected": "0",
-          "actual": "0"
+          "actual": "false"
         }
       ]
     },
     {
       "name": "and_floats_swf_4",
-      "passed": true,
-      "build_time_ms": 2677,
-      "execution_time_ms": 112,
+      "passed": false,
+      "build_time_ms": 1794,
+      "execution_time_ms": 123,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "both_true",
-          "passed": true,
+          "passed": false,
           "expected": "1",
-          "actual": "1"
+          "actual": "true"
         }
       ]
     },
     {
       "name": "ascii_to_char_swf_4",
-      "passed": true,
-      "build_time_ms": 2715,
-      "execution_time_ms": 123,
+      "passed": false,
+      "build_time_ms": 1809,
+      "execution_time_ms": 128,
       "opcodes_tested": [
         "ASCII_TO_CHAR"
       ],
@@ -253,17 +253,17 @@
         },
         {
           "name": "chr_233",
-          "passed": true,
+          "passed": false,
           "expected": "\u00e9",
-          "actual": "\u00e9"
+          "actual": "\u00c3\u00a9"
         }
       ]
     },
     {
       "name": "bit_and_swf_4",
       "passed": true,
-      "build_time_ms": 2571,
-      "execution_time_ms": 118,
+      "build_time_ms": 1848,
+      "execution_time_ms": 137,
       "opcodes_tested": [
         "BIT_AND"
       ],
@@ -279,8 +279,8 @@
     {
       "name": "bit_lshift_swf_4",
       "passed": true,
-      "build_time_ms": 2295,
-      "execution_time_ms": 111,
+      "build_time_ms": 1852,
+      "execution_time_ms": 135,
       "opcodes_tested": [
         "BIT_LSHIFT"
       ],
@@ -320,8 +320,8 @@
     {
       "name": "bit_or_swf_4",
       "passed": true,
-      "build_time_ms": 2680,
-      "execution_time_ms": 112,
+      "build_time_ms": 1826,
+      "execution_time_ms": 145,
       "opcodes_tested": [
         "BIT_OR"
       ],
@@ -361,8 +361,8 @@
     {
       "name": "bit_rshift_swf_4",
       "passed": true,
-      "build_time_ms": 2513,
-      "execution_time_ms": 122,
+      "build_time_ms": 1744,
+      "execution_time_ms": 167,
       "opcodes_tested": [
         "BIT_RSHIFT"
       ],
@@ -396,192 +396,6 @@
           "passed": true,
           "expected": "8",
           "actual": "8"
-        }
-      ]
-    },
-    {
-      "name": "bit_urshift_swf_4",
-      "passed": true,
-      "build_time_ms": 2341,
-      "execution_time_ms": 113,
-      "opcodes_tested": [
-        "BIT_URSHIFT"
-      ],
-      "sub_tests": [
-        {
-          "name": "basic_urshift_8_2",
-          "passed": true,
-          "expected": "2",
-          "actual": "2"
-        },
-        {
-          "name": "negative_urshift_neg8_2",
-          "passed": true,
-          "expected": "1073741824",
-          "actual": "1073741824"
-        },
-        {
-          "name": "zero_shift_42_0",
-          "passed": true,
-          "expected": "42",
-          "actual": "42"
-        },
-        {
-          "name": "shift_all_bits_255_8",
-          "passed": true,
-          "expected": "0",
-          "actual": "0"
-        },
-        {
-          "name": "shift_wrap_16_33",
-          "passed": true,
-          "expected": "8",
-          "actual": "8"
-        }
-      ]
-    },
-    {
-      "name": "bit_xor_swf_4",
-      "passed": true,
-      "build_time_ms": 2561,
-      "execution_time_ms": 116,
-      "opcodes_tested": [
-        "BIT_XOR"
-      ],
-      "sub_tests": [
-        {
-          "name": "basic_xor_12_10",
-          "passed": true,
-          "expected": "6",
-          "actual": "6"
-        },
-        {
-          "name": "identity_42_xor_0",
-          "passed": true,
-          "expected": "42",
-          "actual": "42"
-        },
-        {
-          "name": "self_cancel_15_xor_15",
-          "passed": true,
-          "expected": "0",
-          "actual": "0"
-        },
-        {
-          "name": "bit_flip_170_xor_85",
-          "passed": true,
-          "expected": "255",
-          "actual": "255"
-        },
-        {
-          "name": "self_inverse_double_xor",
-          "passed": true,
-          "expected": "42",
-          "actual": "42"
-        }
-      ]
-    },
-    {
-      "name": "call_function_swf_5",
-      "passed": true,
-      "build_time_ms": 2318,
-      "execution_time_ms": 108,
-      "opcodes_tested": [
-        "CALL_FUNCTION"
-      ],
-      "sub_tests": [
-        {
-          "name": "parseInt_call",
-          "passed": true,
-          "expected": "42",
-          "actual": "42"
-        }
-      ]
-    },
-    {
-      "name": "call_method_empty_name_swf_5",
-      "passed": true,
-      "build_time_ms": 2704,
-      "execution_time_ms": 125,
-      "opcodes_tested": [
-        "CALL_METHOD",
-        "DEFINE_FUNCTION2"
-      ],
-      "sub_tests": [
-        {
-          "name": "empty_method_name_function_call",
-          "passed": true,
-          "expected": "42",
-          "actual": "42"
-        }
-      ]
-    },
-    {
-      "name": "call_method_swf_5",
-      "passed": true,
-      "build_time_ms": 2617,
-      "execution_time_ms": 132,
-      "opcodes_tested": [
-        "CALL_METHOD"
-      ],
-      "sub_tests": [
-        {
-          "name": "toUpperCase_method_call",
-          "passed": true,
-          "expected": "HELLO",
-          "actual": "HELLO"
-        }
-      ]
-    },
-    {
-      "name": "call_swf_4",
-      "passed": true,
-      "build_time_ms": 2846,
-      "execution_time_ms": 121,
-      "opcodes_tested": [
-        "CALL"
-      ],
-      "sub_tests": [
-        {
-          "name": "execution_continued",
-          "passed": true,
-          "expected": "continued",
-          "actual": "continued"
-        }
-      ]
-    },
-    {
-      "name": "cast_op_swf_7",
-      "passed": true,
-      "build_time_ms": 2216,
-      "execution_time_ms": 105,
-      "opcodes_tested": [
-        "CAST_OP"
-      ],
-      "sub_tests": [
-        {
-          "name": "primitive_cast_test",
-          "passed": true,
-          "expected": "primitive_cast_failed",
-          "actual": "primitive_cast_failed"
-        },
-        {
-          "name": "object_cast_no_proto_test",
-          "passed": true,
-          "expected": "object_cast_without_proto_failed",
-          "actual": "object_cast_without_proto_failed"
-        },
-        {
-          "name": "mixed_type_cast_test",
-          "passed": true,
-          "expected": "mixed_type_cast_failed",
-          "actual": "mixed_type_cast_failed"
-        },
-        {
-          "name": "cast_op_completion",
-          "passed": true,
-          "expected": "cast_op_tests_completed",
-          "actual": "cast_op_tests_completed"
         }
       ]
     }

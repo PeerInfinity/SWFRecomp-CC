@@ -71,27 +71,34 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 	VAL(u32, &STACK[SP + 4]) = OLDSP; \
 	VAL(u64, &STACK[SP + 16]) = v;
 
-// Push string with ID (for constant strings from compiler)
-#define PUSH_STR_ID(v, n, id) \
+// Push string with ID: accepts char* from generated code, converts to UTF-16 with caching
+void push_str_id_fn(SWFAppContext* app_context, const char* str, u32 byte_len, u32 id);
+#define PUSH_STR_ID(v, n, id) push_str_id_fn(app_context, (const char*)(v), (u32)(n), (u32)(id))
+
+// Push string without ID (for dynamic strings from runtime code, converts char* to UTF-16)
+#define PUSH_STR(v, n) push_str_id_fn(app_context, (const char*)(v), (u32)(n), 0)
+
+// Push pre-existing UTF-16 string directly (no conversion)
+#define PUSH_U16(v, n) \
 	OLDSP = SP; \
 	SP -= 4 + 4 + 8 + 8; \
 	SP &= ~7; \
 	STACK[SP] = ACTION_STACK_VALUE_STRING; \
 	VAL(u32, &STACK[SP + 4]) = OLDSP; \
-	VAL(u32, &STACK[SP + 8]) = n; \
-	VAL(u32, &STACK[SP + 12]) = id; \
-	VAL(char*, &STACK[SP + 16]) = v;
+	VAL(u32, &STACK[SP + 8]) = (u32)(n); \
+	VAL(u32, &STACK[SP + 12]) = 0; \
+	VAL(u64, &STACK[SP + 16]) = (u64)(v);
 
-// Push string without ID (for dynamic strings, ID = 0)
-#define PUSH_STR(v, n) PUSH_STR_ID(v, n, 0)
-
-#define PUSH_STR_LIST(n, size) \
-	OLDSP = VAL(u32, &STACK[SP_SECOND_TOP + 4]); \
-	SP -= (u32) (4 + 4 + 8 + size); \
+// Push pre-existing UTF-16 string with string ID
+#define PUSH_U16_ID(v, n, id) \
+	OLDSP = SP; \
+	SP -= 4 + 4 + 8 + 8; \
 	SP &= ~7; \
-	STACK[SP] = ACTION_STACK_VALUE_STR_LIST; \
+	STACK[SP] = ACTION_STACK_VALUE_STRING; \
 	VAL(u32, &STACK[SP + 4]) = OLDSP; \
-	VAL(u32, &STACK[SP + 8]) = n;
+	VAL(u32, &STACK[SP + 8]) = (u32)(n); \
+	VAL(u32, &STACK[SP + 12]) = (u32)(id); \
+	VAL(u64, &STACK[SP + 16]) = (u64)(v);
 
 #define PUSH_VAR(p) pushVar(app_context, p);
 

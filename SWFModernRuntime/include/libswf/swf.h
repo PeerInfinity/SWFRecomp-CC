@@ -226,6 +226,10 @@ typedef struct SWFAppContext
 
 	// String ID support (from upstream)
 	size_t max_string_id;
+
+	// UTF-16 string cache (indexed by string_id, lazily populated)
+	uint16_t** str_cache;
+	u32* str_cache_len;
 } SWFAppContext;
 
 extern int quit_swf;
