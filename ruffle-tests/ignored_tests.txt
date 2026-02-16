@@ -169,3 +169,8 @@ bitmapdata_channels
 cross_movie_root
 swf5_to_6_cross_call
 swf6_to_5_cross_call
+
+# --- Ruffle behavior differs from Flash spec ---
+# These tests pass in Ruffle but expect behavior that doesn't match Flash Player.
+# We intentionally follow the Flash spec. See RUFFLE_VS_FLASH_DIFFERENCES.md for details.
+xml_attributes_read
