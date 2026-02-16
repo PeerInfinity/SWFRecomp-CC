@@ -29,6 +29,11 @@ set(RENAME_ZCONF OFF)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/zlib)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/lzma)
 
+if(EMSCRIPTEN)
+    # Bundled lzma has uint64_t*/size_t* mismatch (size_t is 32-bit on wasm32)
+    target_compile_options(lzma PRIVATE -Wno-incompatible-pointer-types)
+endif()
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
     zlibstatic
     lzma
@@ -51,3 +56,20 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/tomlplusplus/include
     ${CMAKE_SOURCE_DIR}/lib/stb
 )
+
+if(EMSCRIPTEN)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        SUFFIX ".js"
+    )
+    target_link_options(${PROJECT_NAME} PRIVATE
+        -sMODULARIZE=1
+        -sEXPORT_NAME=SWFRecompModule
+        -sEXPORTED_RUNTIME_METHODS=callMain,FS
+        -sALLOW_MEMORY_GROWTH=1
+        -sINITIAL_MEMORY=33554432
+        -sENVIRONMENT=node,web
+        -sEXIT_RUNTIME=0
+        -sINVOKE_RUN=0
+        -O2
+    )
+endif()
