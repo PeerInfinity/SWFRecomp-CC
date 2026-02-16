@@ -48,6 +48,27 @@ void vmem_release(char* addr, size_t size)
 	VirtualFree(addr, 0, MEM_RELEASE);
 }
 
+#elif defined(__wasi__)
+// WASI (no mmap, use malloc/free; no POSIX clocks)
+
+#include <stdlib.h>
+
+u32 get_elapsed_ms()
+{
+	return 0;  // Timing not needed for trace-only WASI builds
+}
+
+char* vmem_reserve(size_t size)
+{
+	return (char*)malloc(size);
+}
+
+void vmem_release(char* addr, size_t size)
+{
+	(void)size;
+	free(addr);
+}
+
 #elif defined(__GNUC__)
 // GCC
 

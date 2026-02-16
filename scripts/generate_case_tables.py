@@ -35,7 +35,7 @@ def extract_cstring(filepath, var_name):
     return None
 
 def main():
-    base = '/home/robert/CC/SWFRecomp-CC'
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     output_file = os.path.join(base, 'ruffle-tests/string_methods/output.txt')
     defs_file = os.path.join(base, 'ruffle-tests/string_methods/RecompiledScripts/script_defs.c')
 

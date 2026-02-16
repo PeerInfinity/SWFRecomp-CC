@@ -24,10 +24,14 @@ sup*.swf
 zlib.dll
 *.lib
 *.a
+# Allow pre-compiled runtime files for in-browser recompiler demo
+!docs/recompiler/libswfruntime.a
 
 # Compiled files
 *.spv
 *.o
+# Allow pre-compiled .o files for in-browser recompiler demo
+!docs/recompiler/runtime_src/*.o
 
 # WASM build artifacts (but keep source)
 wasm/examples/*/*.wasm
@@ -39,6 +43,10 @@ wasm/examples/*/*.js
 
 # Emscripten
 emsdk/
+
+# WASI-SDK
+wasi-sdk
+wasi-sdk-*/
 .emscripten_cache/
 .emscripten_ports/
 
