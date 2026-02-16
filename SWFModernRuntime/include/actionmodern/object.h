@@ -51,6 +51,8 @@ struct ASProperty
 	u8 flags;               // Property attribute flags (PROPERTY_FLAG_*)
 	u16 flash_flags;        // Flash property flags (for ASSetPropFlags version visibility)
 	ActionVar value;        // Property value (can be any type)
+	void* getter;           // ASFunction* or NULL (for addProperty virtual properties)
+	void* setter;           // ASFunction* or NULL (for addProperty virtual properties)
 };
 
 /**
@@ -102,9 +104,17 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length);
 // Walks up the __proto__ chain to find inherited properties
 ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_length);
 
+// Find property struct with prototype chain traversal (returns ASProperty* or NULL)
+// Unlike getPropertyWithPrototype which returns just the value, this returns the full
+// property struct including getter/setter for addProperty virtual properties.
+ASProperty* findPropertyStructWithPrototype(ASObject* obj, const char* name, u32 name_length);
+
 // Set property by name (creates if not exists)
 // Handles refcount management if value is an object
 void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value);
+
+// Set property with explicit flags (creates if not exists, sets flags on creation)
+void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value, u8 flags);
 
 // Check if property exists ignoring flash_flags visibility (for hasOwnProperty)
 bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length);

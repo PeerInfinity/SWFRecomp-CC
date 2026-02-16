@@ -285,6 +285,53 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 }
 
 /**
+ * Find Property Struct With Prototype Chain
+ *
+ * Like getPropertyWithPrototype but returns the ASProperty struct instead of just the value.
+ * This is needed to check for getter/setter (addProperty virtual properties).
+ * Does NOT apply flash_flags hiding — that's handled by the caller.
+ */
+ASProperty* findPropertyStructWithPrototype(ASObject* obj, const char* name, u32 name_length)
+{
+	if (obj == NULL || name == NULL) return NULL;
+
+	ASObject* current = obj;
+	int max_depth = 256;
+	int depth = 0;
+
+	while (current != NULL && depth < max_depth)
+	{
+		depth++;
+
+		// Search own properties
+		ASProperty* prop = findPropertyRaw(current, name, name_length);
+		if (prop != NULL)
+		{
+			// Check version-based hiding
+			if (FLASH_HIDE_MASK && (prop->flash_flags & FLASH_HIDE_MASK))
+				return NULL;
+			return prop;
+		}
+
+		// Walk up __proto__
+		ActionVar* proto_var = getProperty(current, "__proto__", 9);
+		if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT)
+			break;
+
+		ASObject* next = (ASObject*) proto_var->data.numeric_value;
+		if (next == obj)
+		{
+			g_execution_halted = 1;
+			return NULL;
+		}
+		current = next;
+	}
+
+	if (depth >= max_depth) g_execution_halted = 1;
+	return NULL;
+}
+
+/**
  * Set Property
  *
  * Sets a property value by name. Creates property if it doesn't exist.
@@ -389,6 +436,10 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 		obj->properties[index].flags &= ~PROPERTY_FLAG_ENUMERABLE;
 	}
 
+	// Initialize getter/setter to NULL (no virtual property)
+	obj->properties[index].getter = NULL;
+	obj->properties[index].setter = NULL;
+
 	// Set value
 	obj->properties[index].value = *value;
 
@@ -403,6 +454,53 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	printf("[DEBUG] setProperty: obj=%p, created property '%.*s', num_used=%u\n",
 		(void*)obj, name_length, name, obj->num_used);
 #endif
+}
+
+/**
+ * Set Property With Flags
+ *
+ * Like setProperty but allows specifying explicit property flags on creation.
+ * If the property already exists, updates the value (does NOT change flags).
+ */
+void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value, u8 flags)
+{
+	if (obj == NULL || name == NULL || value == NULL || name_length == 0) return;
+
+	// If property already exists, just update the value
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name_length == name_length &&
+		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		{
+			// Release old value
+			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
+				releaseObject(app_context, (ASObject*) obj->properties[i].value.data.numeric_value);
+			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
+			         obj->properties[i].value.data.string_data.owns_memory)
+				free(obj->properties[i].value.data.string_data.heap_ptr);
+
+			obj->properties[i].value = *value;
+			obj->properties[i].flash_flags = 0;
+
+			if (value->type == ACTION_STACK_VALUE_OBJECT)
+				retainObject((ASObject*) value->data.numeric_value);
+			return;
+		}
+	}
+
+	// Property doesn't exist — use setProperty to create it, then override flags
+	setProperty(app_context, obj, name, name_length, value);
+
+	// Override flags on the newly created property (last in array)
+	if (obj->num_used > 0)
+	{
+		ASProperty* new_prop = &obj->properties[obj->num_used - 1];
+		if (new_prop->name_length == name_length &&
+		    strncmp(new_prop->name, name, name_length) == 0)
+		{
+			new_prop->flags = flags;
+		}
+	}
 }
 
 /**
@@ -424,6 +522,12 @@ bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name,
 		if (obj->properties[i].name_length == name_length &&
 		    strncmp(obj->properties[i].name, name, name_length) == 0)
 		{
+			// Check if property is configurable (deletable)
+			if (!(obj->properties[i].flags & PROPERTY_FLAG_CONFIGURABLE))
+			{
+				return false;  // Cannot delete non-configurable property
+			}
+
 			// Property found - delete it
 
 			// 1. Release the property value if it's an object/array
@@ -471,13 +575,13 @@ bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name,
 		}
 	}
 
-	// Property not found - Flash behavior is to return true anyway
+	// Property not found - Flash AS2 returns false for non-existent properties
 #ifdef DEBUG
-	printf("[DEBUG] deleteProperty: obj=%p, property '%.*s' not found (returning true)\n",
+	printf("[DEBUG] deleteProperty: obj=%p, property '%.*s' not found (returning false)\n",
 		(void*)obj, name_length, name);
 #endif
 
-	return true;
+	return false;
 }
 
 /**

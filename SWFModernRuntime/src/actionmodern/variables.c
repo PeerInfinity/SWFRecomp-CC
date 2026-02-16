@@ -134,7 +134,14 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 	var->data.string_data.owns_memory = false;
 	var->data.numeric_value = 0;
 
-	hashmap_set(var_map, var_name, key_size, (uintptr_t) var);
+	// The hashmap stores the key pointer directly (not a copy), so we must
+	// heap-allocate the key to ensure it outlives the caller's stack frame.
+	char* key_copy = (char*) malloc(key_size + 1);
+	if (key_copy == NULL) { free(var); return NULL; }
+	memcpy(key_copy, var_name, key_size);
+	key_copy[key_size] = '\0';
+
+	hashmap_set(var_map, key_copy, key_size, (uintptr_t) var);
 
 	return var;
 }

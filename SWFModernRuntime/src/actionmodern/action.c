@@ -368,38 +368,8 @@ static u32 g_call_depth = 0;
 #define MAX_SPECIAL_DEPTH 66
 static u32 g_special_depth = 0;
 
-// ==================================================================
-// Virtual Property Table (addProperty getter/setter support)
-// ==================================================================
-// Stores getter/setter function pairs registered via addProperty().
-// When a variable is accessed/set, this table is checked first.
-
 // Forward declaration (ASFunction is defined below)
 typedef struct ASFunction ASFunction;
-
-typedef struct VirtualProperty {
-	char name[256];
-	u32 name_length;
-	ASFunction* getter;   // NULL = no getter
-	ASFunction* setter;   // NULL = no setter
-} VirtualProperty;
-
-#define MAX_VIRTUAL_PROPERTIES 64
-static VirtualProperty virtual_properties[MAX_VIRTUAL_PROPERTIES];
-static u32 virtual_property_count = 0;
-
-static VirtualProperty* findVirtualProperty(const char* name, u32 name_length)
-{
-	for (u32 i = 0; i < virtual_property_count; i++)
-	{
-		if (virtual_properties[i].name_length == name_length &&
-		    strncmp(virtual_properties[i].name, name, name_length) == 0)
-		{
-			return &virtual_properties[i];
-		}
-	}
-	return NULL;
-}
 
 // ==================================================================
 // Function Storage and Management
@@ -440,6 +410,8 @@ static ASObject* g_object_prototype = NULL;
 static ASFunction g_object_toString_func;
 static ASFunction g_object_valueOf_func;
 static ASFunction g_object_hasOwnProperty_func;
+static ASFunction g_object_isPropertyEnumerable_func;
+static ASFunction g_object_isPrototypeOf_func;
 static ASFunction g_wrapper_toString_func;
 static int g_wrapper_toString_init = 0;
 
@@ -528,6 +500,113 @@ static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, Actio
 			{
 				ret.data.numeric_value = 1; // true
 			}
+		}
+	}
+	return ret;
+}
+
+// Built-in isPropertyEnumerable(name) — checks if OWN property exists and is enumerable
+static ActionVar builtin_object_isPropertyEnumerable(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.str_size = 0;
+	ret.data.numeric_value = 0; // false by default
+
+	if (this_obj != NULL && args != NULL && arg_count >= 1)
+	{
+		ASObject* obj = (ASObject*) this_obj;
+		const char* prop_name = NULL;
+		u32 prop_name_len = 0;
+		char coerced_buf[64];
+
+		if (args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+			prop_name_len = (u32)u16_to_utf8(_u16, args[0].str_size, coerced_buf, sizeof(coerced_buf));
+			prop_name = coerced_buf;
+		}
+		else
+		{
+			int len = varToStringBuf(app_context, &args[0], coerced_buf, sizeof(coerced_buf));
+			prop_name = coerced_buf;
+			prop_name_len = (u32) len;
+		}
+
+		if (prop_name != NULL)
+		{
+			// Check own properties only (not prototype chain)
+			for (u32 i = 0; i < obj->num_used; i++)
+			{
+				if (obj->properties[i].name_length == prop_name_len &&
+				    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0)
+				{
+					// Property exists — check if it's enumerable
+					if (obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE)
+					{
+						ret.data.numeric_value = 1; // true
+					}
+					break;
+				}
+			}
+		}
+	}
+	return ret;
+}
+
+// Built-in isPrototypeOf(obj) — checks if `this` appears in obj's prototype chain
+static ActionVar builtin_object_isPrototypeOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.str_size = 0;
+	ret.data.numeric_value = 0; // false by default
+
+	if (this_obj != NULL && args != NULL && arg_count >= 1)
+	{
+		ASObject* self = (ASObject*) this_obj;
+
+		// Get the object to check
+		ASObject* check_obj = NULL;
+		int is_function_arg = 0;
+		if (args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0)
+		{
+			check_obj = (ASObject*) args[0].data.numeric_value;
+		}
+		else if (args[0].type == ACTION_STACK_VALUE_FUNCTION && args[0].data.numeric_value != 0)
+		{
+			// Functions have own_props that acts as their object
+			ASFunction* func = (ASFunction*) args[0].data.numeric_value;
+			check_obj = func->own_props;
+			is_function_arg = 1;
+		}
+
+		if (check_obj != NULL)
+		{
+			// Walk check_obj's __proto__ chain looking for self
+			ASObject* current = check_obj;
+			int max_depth = 64; // prevent infinite loops
+			while (current != NULL && max_depth-- > 0)
+			{
+				ActionVar* proto_var = getProperty(current, "__proto__", 9);
+				if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT || proto_var->data.numeric_value == 0)
+					break;
+				ASObject* proto = (ASObject*) proto_var->data.numeric_value;
+				if (proto == self)
+				{
+					ret.data.numeric_value = 1; // true
+					break;
+				}
+				current = proto;
+			}
+		}
+
+		// Functions implicitly inherit from Object.prototype (via Function.prototype)
+		// If chain walk didn't find self, check if self is Object.prototype
+		if (ret.data.numeric_value == 0 && is_function_arg)
+		{
+			if (g_object_prototype != NULL && self == g_object_prototype)
+				ret.data.numeric_value = 1;
 		}
 	}
 	return ret;
@@ -1045,6 +1124,40 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		hop_var.data.numeric_value = (u64) &g_object_hasOwnProperty_func;
 		setProperty(app_context, g_object_prototype, "hasOwnProperty", 14, &hop_var);
 
+		// Set up isPropertyEnumerable function (type-2: needs this_obj + args)
+		memset(&g_object_isPropertyEnumerable_func, 0, sizeof(ASFunction));
+		strncpy(g_object_isPropertyEnumerable_func.name, "isPropertyEnumerable", 255);
+		g_object_isPropertyEnumerable_func.function_type = 2;
+		g_object_isPropertyEnumerable_func.param_count = 1;
+		g_object_isPropertyEnumerable_func.register_count = 0;
+		g_object_isPropertyEnumerable_func.advanced_func = (Function2Ptr) builtin_object_isPropertyEnumerable;
+
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_isPropertyEnumerable_func;
+
+		ActionVar ipe_var;
+		ipe_var.type = ACTION_STACK_VALUE_FUNCTION;
+		ipe_var.str_size = 0;
+		ipe_var.data.numeric_value = (u64) &g_object_isPropertyEnumerable_func;
+		setProperty(app_context, g_object_prototype, "isPropertyEnumerable", 20, &ipe_var);
+
+		// Set up isPrototypeOf function (type-2: needs this_obj + args)
+		memset(&g_object_isPrototypeOf_func, 0, sizeof(ASFunction));
+		strncpy(g_object_isPrototypeOf_func.name, "isPrototypeOf", 255);
+		g_object_isPrototypeOf_func.function_type = 2;
+		g_object_isPrototypeOf_func.param_count = 1;
+		g_object_isPrototypeOf_func.register_count = 0;
+		g_object_isPrototypeOf_func.advanced_func = (Function2Ptr) builtin_object_isPrototypeOf;
+
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_isPrototypeOf_func;
+
+		ActionVar ipo_var;
+		ipo_var.type = ACTION_STACK_VALUE_FUNCTION;
+		ipo_var.str_size = 0;
+		ipo_var.data.numeric_value = (u64) &g_object_isPrototypeOf_func;
+		setProperty(app_context, g_object_prototype, "isPrototypeOf", 13, &ipo_var);
+
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
 			g_object_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
@@ -1157,6 +1270,91 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 
 	g_special_depth--;
 	return result;
+}
+
+// Invoke an addProperty getter with a specific this_obj
+static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* func, void* this_obj)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (func == NULL || g_execution_halted) return undef;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH)
+	{
+		g_special_depth--;
+		return undef;
+	}
+
+	ActionVar result;
+	if (func->function_type == 2)
+	{
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		result = func->advanced_func(app_context, NULL, 0, registers, this_obj);
+
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else
+	{
+		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+	}
+
+	g_special_depth--;
+	return result;
+}
+
+// Invoke an addProperty setter with a specific this_obj and value argument
+static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, void* this_obj, ActionVar* value)
+{
+	if (func == NULL || g_execution_halted) return;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH)
+	{
+		g_special_depth--;
+		return;
+	}
+
+	if (func->function_type == 2)
+	{
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		func->advanced_func(app_context, value, 1, registers, this_obj);
+
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else
+	{
+		if (value != NULL) pushVar(app_context, value);
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+	}
+
+	g_special_depth--;
 }
 
 // ============================================================================
@@ -8762,6 +8960,23 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		setProperty(app_context, global_object, "Error", 5, &ev);
 	}
 
+	// ---- ASSetPropFlags (global function) ----
+	{
+		static ASFunction g_aspf_func;
+		static int g_aspf_init = 0;
+		if (!g_aspf_init)
+		{
+			memset(&g_aspf_func, 0, sizeof(ASFunction));
+			strncpy(g_aspf_func.name, "ASSetPropFlags", 255);
+			g_aspf_func.function_type = 1;
+			g_aspf_init = 1;
+		}
+		ActionVar aspf_var = {0};
+		aspf_var.type = ACTION_STACK_VALUE_FUNCTION;
+		aspf_var.data.numeric_value = (u64)&g_aspf_func;
+		setProperty(app_context, global_object, "ASSetPropFlags", 14, &aspf_var);
+	}
+
 	// ---- Stub constructors (function type with prototype) ----
 	{
 		static const char* stub_names[NUM_STUB_CTORS] = {
@@ -8909,30 +9124,39 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Check virtual property table first (addProperty getters)
-	{
-		VirtualProperty* vp = findVirtualProperty(var_name, var_name_len);
-		if (vp != NULL && vp->getter != NULL)
-		{
-			ActionVar result = invokeSpecialFunction(app_context, vp->getter, NULL);
-			pushVar(app_context, &result);
-			return;
-		}
-	}
-
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
 		if (scope_chain[i] != NULL)
 		{
-			// With scopes walk prototype chain; function scopes check own properties only
-			ActionVar* prop = scope_is_with[i]
-				? getPropertyWithPrototype(scope_chain[i], var_name, var_name_len)
-				: getProperty(scope_chain[i], var_name, var_name_len);
-			if (prop != NULL)
+			// Check for addProperty getter in scope chain (with prototype traversal for with-scopes)
+			ASProperty* prop_struct = scope_is_with[i]
+				? findPropertyStructWithPrototype(scope_chain[i], var_name, var_name_len)
+				: NULL;
+			// For non-with scopes, check own properties only
+			if (!scope_is_with[i])
 			{
-				// Found in scope chain - push its value
-				PUSH_VAR(prop);
+				for (u32 pi = 0; pi < scope_chain[i]->num_used; pi++)
+				{
+					if (scope_chain[i]->properties[pi].name_length == var_name_len &&
+					    strncmp(scope_chain[i]->properties[pi].name, var_name, var_name_len) == 0)
+					{
+						prop_struct = &scope_chain[i]->properties[pi];
+						break;
+					}
+				}
+			}
+			if (prop_struct != NULL)
+			{
+				if (prop_struct->getter != NULL)
+				{
+					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)scope_chain[i]);
+					pushVar(app_context, &result);
+				}
+				else
+				{
+					pushVar(app_context, &prop_struct->value);
+				}
 				return;
 			}
 		}
@@ -9088,6 +9312,9 @@ void actionGetVariable(SWFAppContext* app_context)
 				g_object_constructor.function_type = 1;
 				g_object_constructor.param_count = 0;
 				g_object_constructor.simple_func = (SimpleFunctionPtr) builtin_object_toString; // placeholder
+				// Point prototype_obj at the REAL g_object_prototype so that
+				// Object.prototype identity checks (isPrototypeOf etc.) work correctly
+				g_object_constructor.prototype_obj = getObjectPrototype(app_context);
 				g_object_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
@@ -9611,32 +9838,39 @@ void actionSetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Check virtual property table first (addProperty setters)
-	{
-		VirtualProperty* vp = findVirtualProperty(var_name, var_name_len);
-		if (vp != NULL && vp->setter != NULL)
-		{
-			// Pop the value from stack and invoke setter with it
-			ActionVar value_var;
-			peekVar(app_context, &value_var);
-			POP_2();
-			invokeSpecialFunction(app_context, vp->setter, &value_var);
-			return;
-		}
-	}
-
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
 		if (scope_chain[i] != NULL)
 		{
-			// With scopes walk prototype chain; function scopes check own properties only
-			ActionVar* prop = scope_is_with[i]
-				? getPropertyWithPrototype(scope_chain[i], var_name, var_name_len)
-				: getProperty(scope_chain[i], var_name, var_name_len);
-			if (prop != NULL)
+			// Check for addProperty setter in scope chain
+			ASProperty* prop_struct = scope_is_with[i]
+				? findPropertyStructWithPrototype(scope_chain[i], var_name, var_name_len)
+				: NULL;
+			if (!scope_is_with[i])
 			{
-				// Found in scope chain - set it on the direct scope object
+				for (u32 pi = 0; pi < scope_chain[i]->num_used; pi++)
+				{
+					if (scope_chain[i]->properties[pi].name_length == var_name_len &&
+					    strncmp(scope_chain[i]->properties[pi].name, var_name, var_name_len) == 0)
+					{
+						prop_struct = &scope_chain[i]->properties[pi];
+						break;
+					}
+				}
+			}
+			if (prop_struct != NULL)
+			{
+				if (prop_struct->setter != NULL)
+				{
+					// Virtual property — invoke setter
+					ActionVar value_var;
+					peekVar(app_context, &value_var);
+					POP_2();
+					invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, (void*)scope_chain[i], &value_var);
+					return;
+				}
+				// Regular property — set it on the direct scope object
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
@@ -12129,6 +12363,24 @@ void actionSetMember(SWFAppContext* app_context)
 					if (rect_handled) return;
 				}
 			}
+			// Check prototype chain for addProperty setter before creating own property
+			{
+				ASProperty* setter_prop = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
+				if (setter_prop != NULL && setter_prop->setter != NULL)
+				{
+					// Virtual property (addProperty) — invoke setter with this = original obj
+					invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
+					return;
+				}
+			}
+			// Check WRITABLE flag — if property exists on prototype chain but is read-only, skip
+			{
+				ASProperty* wp = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
+				if (wp != NULL && !(wp->flags & PROPERTY_FLAG_WRITABLE))
+				{
+					return;  // Read-only property — silently ignore
+				}
+			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
 		}
@@ -12921,13 +13173,22 @@ void actionGetMember(SWFAppContext* app_context)
 			return;
 		}
 
-		// Look up property with prototype chain support
-		ActionVar* prop = getPropertyWithPrototype(obj, prop_name, prop_name_len);
+		// Look up property with prototype chain support (returns ASProperty* for getter check)
+		ASProperty* prop_struct = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
 
-		if (prop != NULL)
+		if (prop_struct != NULL)
 		{
-			// Property found - push its value
-			pushVar(app_context, prop);
+			if (prop_struct->getter != NULL)
+			{
+				// Virtual property (addProperty) — invoke getter with this = original obj
+				ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)obj);
+				pushVar(app_context, &result);
+			}
+			else
+			{
+				// Regular property — push its value
+				pushVar(app_context, &prop_struct->value);
+			}
 		}
 		else
 		{
@@ -15996,8 +16257,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	}
 
 	// ASSetPropFlags(obj, props, setFlags, clearFlags)
-	// Modifies property attribute flags for version-based visibility
-	// Args popped from stack: args[0]=obj, args[1]=props, args[2]=setFlags, args[3]=clearFlags
+	// Modifies property attribute flags (ECMA flags for enumerable/writable/configurable)
+	// Flash flag bits: DontEnum=1, DontDelete=2, ReadOnly=4
+	// Args: args[0]=obj, args[1]=props (string or null), args[2]=setFlags, args[3]=clearFlags
 	else if (func_name_len == 14 && strncmp(func_name, "ASSetPropFlags", 14) == 0)
 	{
 		if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_OBJECT)
@@ -16006,28 +16268,94 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			s32 set_flags = (num_args >= 3) ? varToInt32(&args[2]) : 0;
 			s32 clear_flags = (num_args >= 4) ? varToInt32(&args[3]) : 0;
 
-			// Get property name(s)
-			char _spf_name_buf[512];
-			const char* prop_name = NULL;
-			u32 prop_name_len = 0;
-			if (args[1].type == ACTION_STACK_VALUE_STRING)
+			if (obj != NULL)
 			{
-				const uint16_t* _spf_name_u16 = varGetU16Ptr(&args[1]);
-				u16_to_utf8(_spf_name_u16, args[1].str_size, _spf_name_buf, sizeof(_spf_name_buf));
-				prop_name = _spf_name_buf;
-				prop_name_len = (u32)strlen(prop_name);
-			}
+				// Convert Flash flags to ECMA flag operations
+				// set_flags = Flash flags to SET (restrict) → clear corresponding ECMA bits
+				// clear_flags = Flash flags to CLEAR (unrestrict) → set corresponding ECMA bits
+				u8 ecma_clear = 0;  // ECMA bits to clear
+				u8 ecma_set = 0;    // ECMA bits to set
+				if (set_flags & 1) ecma_clear |= PROPERTY_FLAG_ENUMERABLE;
+				if (set_flags & 2) ecma_clear |= PROPERTY_FLAG_CONFIGURABLE;
+				if (set_flags & 4) ecma_clear |= PROPERTY_FLAG_WRITABLE;
+				if (clear_flags & 1) ecma_set |= PROPERTY_FLAG_ENUMERABLE;
+				if (clear_flags & 2) ecma_set |= PROPERTY_FLAG_CONFIGURABLE;
+				if (clear_flags & 4) ecma_set |= PROPERTY_FLAG_WRITABLE;
 
-			if (obj != NULL && prop_name != NULL)
-			{
-				// Find property and modify its flash_flags
-				for (u32 i = 0; i < obj->num_used; i++)
+				// Check if props is null → apply to ALL properties
+				int apply_all = (args[1].type == ACTION_STACK_VALUE_NULL);
+
+				if (apply_all)
 				{
-					if (obj->properties[i].name_length == prop_name_len &&
-					    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0)
+					for (u32 i = 0; i < obj->num_used; i++)
 					{
+						obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
 						obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
-						break;
+					}
+				}
+				else
+				{
+					// Coerce props argument to string
+					char _spf_name_buf[512];
+					const char* prop_str = NULL;
+					if (args[1].type == ACTION_STACK_VALUE_STRING)
+					{
+						const uint16_t* _spf_name_u16 = varGetU16Ptr(&args[1]);
+						u16_to_utf8(_spf_name_u16, args[1].str_size, _spf_name_buf, sizeof(_spf_name_buf));
+						prop_str = _spf_name_buf;
+					}
+					else if (args[1].type == ACTION_STACK_VALUE_UNDEFINED)
+					{
+						// undefined coerces to "undefined" — applies to property named "undefined"
+						strncpy(_spf_name_buf, "undefined", sizeof(_spf_name_buf));
+						prop_str = _spf_name_buf;
+					}
+					else if (args[1].type == ACTION_STACK_VALUE_OBJECT || args[1].type == ACTION_STACK_VALUE_FUNCTION)
+					{
+						// Object — call toString to get property names string
+						int len = varToStringBuf(app_context, &args[1], _spf_name_buf, sizeof(_spf_name_buf));
+						if (len > 0) prop_str = _spf_name_buf;
+					}
+					else if (args[1].type == ACTION_STACK_VALUE_F32 || args[1].type == ACTION_STACK_VALUE_F64 || args[1].type == ACTION_STACK_VALUE_BOOLEAN)
+					{
+						int len = varToStringBuf(app_context, &args[1], _spf_name_buf, sizeof(_spf_name_buf));
+						if (len > 0) prop_str = _spf_name_buf;
+					}
+
+					if (prop_str != NULL)
+					{
+						// Support comma-separated property names
+						char* token = _spf_name_buf;
+						while (*token)
+						{
+							// Skip leading whitespace
+							while (*token == ' ' || *token == '\t') token++;
+							if (*token == '\0') break;
+
+							// Find end of token (comma or end)
+							char* end = token;
+							while (*end && *end != ',') end++;
+							u32 tlen = (u32)(end - token);
+							// Trim trailing whitespace
+							while (tlen > 0 && (token[tlen-1] == ' ' || token[tlen-1] == '\t')) tlen--;
+
+							if (tlen > 0)
+							{
+								for (u32 i = 0; i < obj->num_used; i++)
+								{
+									if (obj->properties[i].name_length == tlen &&
+									    strncmp(obj->properties[i].name, token, tlen) == 0)
+									{
+										obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
+										obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+										break;
+									}
+								}
+							}
+
+							if (*end == ',') end++;
+							token = end;
+						}
 					}
 				}
 			}
@@ -16037,12 +16365,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		builtin_handled = 1;
 	}
 
-	// addProperty(name, getter, setter) — registers virtual getter/setter on _root
+	// addProperty(name, getter, setter) — registers virtual getter/setter on global object
 	else if (func_name_len == 11 && strncmp(func_name, "addProperty", 11) == 0)
 	{
-		float result = 0.0f;  // false by default
+		u64 result = 0;  // boolean false
 
-		if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_STRING)
+		if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_STRING && global_object != NULL)
 		{
 			char _addprop_buf[512];
 			const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
@@ -16050,45 +16378,51 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			const char* prop_name = _addprop_buf;
 			u32 prop_name_len = (u32)strlen(prop_name);
 
-			// Get getter function (arg 1)
 			ASFunction* getter = NULL;
 			if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
-			{
 				getter = (ASFunction*) args[1].data.numeric_value;
-			}
 
-			// Get setter function (arg 2, can be null)
 			ASFunction* setter = NULL;
 			if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
-			{
 				setter = (ASFunction*) args[2].data.numeric_value;
-			}
 
-			// Register in virtual property table
-			if (virtual_property_count < MAX_VIRTUAL_PROPERTIES && prop_name_len < 256)
+			// Store getter/setter directly on the global object's property
+			ASObject* target = global_object;
+			ASProperty* prop = NULL;
+			for (u32 i = 0; i < target->num_used; i++)
 			{
-				// Check if already exists — update in place
-				VirtualProperty* existing = findVirtualProperty(prop_name, prop_name_len);
-				if (existing != NULL)
+				if (target->properties[i].name_length == prop_name_len &&
+				    strncmp(target->properties[i].name, prop_name, prop_name_len) == 0)
 				{
-					existing->getter = getter;
-					existing->setter = setter;
+					prop = &target->properties[i];
+					break;
 				}
-				else
+			}
+			if (prop == NULL)
+			{
+				ActionVar marker = {0};
+				marker.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, target, prop_name, prop_name_len, &marker);
+				for (u32 i = 0; i < target->num_used; i++)
 				{
-					VirtualProperty* vp = &virtual_properties[virtual_property_count++];
-					strncpy(vp->name, prop_name, prop_name_len);
-					vp->name[prop_name_len] = '\0';
-					vp->name_length = prop_name_len;
-					vp->getter = getter;
-					vp->setter = setter;
+					if (target->properties[i].name_length == prop_name_len &&
+					    strncmp(target->properties[i].name, prop_name, prop_name_len) == 0)
+					{
+						prop = &target->properties[i];
+						break;
+					}
 				}
-				result = 1.0f;  // true = success
+			}
+			if (prop != NULL)
+			{
+				prop->getter = (void*)getter;
+				prop->setter = (void*)setter;
+				result = 1; // boolean true
 			}
 		}
 
 		if (args != NULL) FREE(args);
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 		builtin_handled = 1;
 	}
 
@@ -16351,6 +16685,22 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		if (func == NULL && func_name_len > 2 && func_name[0] == '/' && func_name[1] == ':')
 		{
 			func = lookupFunctionByName(func_name + 2, func_name_len - 2);
+		}
+
+		// Try scope chain + global variable lookup (for functions stored via DefineLocal)
+		if (func == NULL)
+		{
+			PUSH_STR(func_name, func_name_len);
+			actionGetVariable(app_context);
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+			{
+				func = (ASFunction*) STACK_TOP_VALUE;
+				POP();
+			}
+			else
+			{
+				POP();
+			}
 		}
 
 		// Try dot-path resolution: _root.foo -> resolve path to function variable
@@ -17904,7 +18254,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		// Handle addProperty as built-in method
 		if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
 		{
-			float result = 0.0f;
+			u64 result = 0; // boolean false
 			if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_STRING)
 			{
 				char _addprop_buf[512];
@@ -17921,38 +18271,45 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
 					setter = (ASFunction*) args[2].data.numeric_value;
 
-				// Register in global virtual property table
-				if (virtual_property_count < MAX_VIRTUAL_PROPERTIES && prop_name_len < 256)
+				// Store getter/setter directly on the target object's property
+				// Find or create the property, then set its getter/setter pointers
+				ASProperty* prop = NULL;
+				for (u32 i = 0; i < obj->num_used; i++)
 				{
-					VirtualProperty* existing = findVirtualProperty(prop_name, prop_name_len);
-					if (existing != NULL)
+					if (obj->properties[i].name_length == prop_name_len &&
+					    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0)
 					{
-						existing->getter = getter;
-						existing->setter = setter;
+						prop = &obj->properties[i];
+						break;
 					}
-					else
-					{
-						VirtualProperty* vp = &virtual_properties[virtual_property_count++];
-						strncpy(vp->name, prop_name, prop_name_len);
-						vp->name[prop_name_len] = '\0';
-						vp->name_length = prop_name_len;
-						vp->getter = getter;
-						vp->setter = setter;
-					}
-
-					// Also store as a property on the target object so it appears in enumeration.
-					// Use UNDEFINED value — the virtual property getter will intercept reads.
-					ActionVar marker;
+				}
+				if (prop == NULL)
+				{
+					// Create the property with UNDEFINED value
+					ActionVar marker = {0};
 					marker.type = ACTION_STACK_VALUE_UNDEFINED;
-					marker.str_size = 0;
-					marker.data.numeric_value = 0;
 					setProperty(app_context, obj, prop_name, prop_name_len, &marker);
-					result = 1.0f;
+					// Find it again after setProperty (may have reallocated)
+					for (u32 i = 0; i < obj->num_used; i++)
+					{
+						if (obj->properties[i].name_length == prop_name_len &&
+						    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0)
+						{
+							prop = &obj->properties[i];
+							break;
+						}
+					}
+				}
+				if (prop != NULL)
+				{
+					prop->getter = (void*)getter;
+					prop->setter = (void*)setter;
+					result = 1; // boolean true
 				}
 			}
 
 			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 			return;
 		}
 
