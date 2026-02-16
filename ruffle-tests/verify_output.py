@@ -167,6 +167,17 @@ def recompile_swf(test_dir, force=False):
         return False
 
 
+def get_mock_date_time(test_dir):
+    """Parse mock_date_time from test.toml if present."""
+    toml_path = test_dir / "test.toml"
+    if toml_path.exists():
+        text = toml_path.read_text()
+        m = re.search(r"mock_date_time\s*=\s*(\d+)", text)
+        if m:
+            return int(m.group(1))
+    return None
+
+
 def compile_native(test_dir, num_frames, build_dir):
     """Compile generated C code with runtime into native binary."""
     mem_dir = build_dir / "memory"
@@ -201,6 +212,10 @@ def compile_native(test_dir, num_frames, build_dir):
 
     # Compile
     inc = SWFMODERN / "include"
+    extra_defines = []
+    mock_time = get_mock_date_time(test_dir)
+    if mock_time is not None:
+        extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
     try:
         result = subprocess.run(
             [
@@ -209,6 +224,7 @@ def compile_native(test_dir, num_frames, build_dir):
                 "-DNO_GRAPHICS",
                 f"-DMAX_FRAMES={num_frames}",
                 "-D_POSIX_C_SOURCE=199309L",
+                *extra_defines,
                 f"-I{build_dir}",
                 f"-I{inc}",
                 f"-I{inc}/actionmodern",

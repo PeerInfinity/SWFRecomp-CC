@@ -1001,6 +1001,804 @@ static void initMathObject(SWFAppContext* app_context)
 }
 
 // ============================================================================
+// Date class implementation
+// ============================================================================
+
+// Forward declarations for functions defined later in this file
+static void initDatePrototype(SWFAppContext* app_context);
+static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
+
+static ASFunction g_date_constructor;
+static ASFunction g_date_funcs[40]; // 20 getters + 17 setters + toString + valueOf + UTC
+static ASObject* g_date_prototype = NULL;
+static int g_date_init_done = 0;
+static double g_date_local_tza_ms = 0.0; // local timezone offset in ms (positive = east of UTC)
+static int g_date_tza_init = 0;
+
+#define DATE_MS_PER_DAY 86400000.0
+#define DATE_MS_PER_HOUR 3600000.0
+#define DATE_MS_PER_MINUTE 60000.0
+#define DATE_MS_PER_SECOND 1000.0
+
+// --- Date math utility functions (ECMAScript 3 algorithms) ---
+
+static double date_day(double t) { return floor(t / DATE_MS_PER_DAY); }
+
+static double date_time_within_day(double t) {
+	double r = fmod(t, DATE_MS_PER_DAY);
+	if (r < 0) r += DATE_MS_PER_DAY;
+	return r + 0.0; // eliminate -0
+}
+
+static int date_days_in_year(int y) {
+	if (y % 4 != 0) return 365;
+	if (y % 100 != 0) return 366;
+	if (y % 400 != 0) return 365;
+	return 366;
+}
+
+static double date_day_from_year(double y) {
+	return 365.0 * (y - 1970.0) + floor((y - 1969.0) / 4.0) - floor((y - 1901.0) / 100.0) + floor((y - 1601.0) / 400.0);
+}
+
+static double date_time_from_year(double y) {
+	return DATE_MS_PER_DAY * date_day_from_year(y);
+}
+
+static double date_year_from_time(double t) {
+	// Binary search for the year
+	double day = date_day(t);
+	// Approximate year
+	double y = floor(day / 365.2425) + 1970.0;
+	// Adjust: find the year such that day_from_year(y) <= day < day_from_year(y+1)
+	while (date_day_from_year(y + 1) <= day) y++;
+	while (date_day_from_year(y) > day) y--;
+	return y;
+}
+
+static int date_in_leap_year(double t) {
+	double y = date_year_from_time(t);
+	return date_days_in_year((int)y) == 366 ? 1 : 0;
+}
+
+static int date_day_within_year(double t) {
+	return (int)(date_day(t) - date_day_from_year(date_year_from_time(t)));
+}
+
+static const int date_month_start[2][13] = {
+	{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365}, // non-leap
+	{0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366}, // leap
+};
+
+static int date_month_from_time(double t) {
+	int dwy = date_day_within_year(t);
+	int leap = date_in_leap_year(t);
+	for (int m = 11; m >= 0; m--) {
+		if (dwy >= date_month_start[leap][m]) return m;
+	}
+	return 0;
+}
+
+static int date_date_from_time(double t) {
+	int dwy = date_day_within_year(t);
+	int leap = date_in_leap_year(t);
+	int m = date_month_from_time(t);
+	return dwy - date_month_start[leap][m] + 1;
+}
+
+static int date_week_day(double t) {
+	double d = fmod(date_day(t) + 4.0, 7.0); // Jan 1 1970 = Thursday (4)
+	if (d < 0) d += 7.0;
+	return (int)d;
+}
+
+static double date_hour_from_time(double t) { return fmod(floor(t / DATE_MS_PER_HOUR), 24.0); }
+static double date_min_from_time(double t) { return fmod(floor(t / DATE_MS_PER_MINUTE), 60.0); }
+static double date_sec_from_time(double t) { return fmod(floor(t / DATE_MS_PER_SECOND), 60.0); }
+static double date_ms_from_time(double t) { return floor(fmod(t, DATE_MS_PER_SECOND)); }
+
+// Fix negative modular results and -0 for time components
+static double date_hour_from_time_safe(double t) {
+	double r = date_hour_from_time(t);
+	if (r < 0) r += 24.0;
+	return r + 0.0;
+}
+static double date_min_from_time_safe(double t) {
+	double r = date_min_from_time(t);
+	if (r < 0) r += 60.0;
+	return r + 0.0;
+}
+static double date_sec_from_time_safe(double t) {
+	double r = date_sec_from_time(t);
+	if (r < 0) r += 60.0;
+	return r + 0.0;
+}
+static double date_ms_from_time_safe(double t) {
+	double r = date_ms_from_time(t);
+	if (r < 0) r += 1000.0;
+	return r + 0.0;
+}
+
+static double date_make_time(double hour, double min, double sec, double ms) {
+	if (!isfinite(hour) || !isfinite(min) || !isfinite(sec) || !isfinite(ms)) {
+		// Infinity propagates, NaN propagates
+		return hour * DATE_MS_PER_HOUR + min * DATE_MS_PER_MINUTE + sec * DATE_MS_PER_SECOND + ms;
+	}
+	return trunc(hour) * DATE_MS_PER_HOUR + trunc(min) * DATE_MS_PER_MINUTE + trunc(sec) * DATE_MS_PER_SECOND + trunc(ms);
+}
+
+static double date_make_day(double year, double month, double date_d) {
+	if (!isfinite(year) || !isfinite(month)) return NAN;
+	year = trunc(year);
+	month = trunc(month);
+	if (isfinite(date_d)) date_d = trunc(date_d);
+	double y = year + floor(month / 12.0);
+	double m = fmod(month, 12.0);
+	if (m < 0) m += 12.0;
+	int mi = (int)m;
+	// Find day number for the start of month m in year y
+	int leap = date_days_in_year((int)y) == 366 ? 1 : 0;
+	double day_start = date_day_from_year(y) + (double)date_month_start[leap][mi];
+	return day_start + date_d - 1.0;
+}
+
+static double date_make_date(double day, double time_v) {
+	if (!isfinite(day) || !isfinite(time_v)) return day * DATE_MS_PER_DAY + time_v;
+	return day * DATE_MS_PER_DAY + time_v;
+}
+
+static void date_ensure_tza(void) {
+	if (g_date_tza_init) return;
+	g_date_tza_init = 1;
+	// Compute local timezone offset from system
+	time_t now = time(NULL);
+	struct tm gmt_tm, local_tm;
+	gmtime_r(&now, &gmt_tm);
+	localtime_r(&now, &local_tm);
+	// Difference in seconds
+	time_t gmt_epoch = timegm(&gmt_tm);
+	time_t local_epoch = timegm(&local_tm);
+	double offset_sec = difftime(local_epoch, gmt_epoch);
+	g_date_local_tza_ms = offset_sec * 1000.0;
+}
+
+static double date_utc_to_local(double t) {
+	date_ensure_tza();
+	return t + g_date_local_tza_ms;
+}
+
+static double date_local_to_utc(double t) {
+	date_ensure_tza();
+	return t - g_date_local_tza_ms;
+}
+
+// --- Date internal timestamp access ---
+
+static double date_get_time(ASObject* obj) {
+	ActionVar* v = getProperty(obj, "__date_time__", 13);
+	if (v == NULL) return NAN;
+	if (v->type == ACTION_STACK_VALUE_F64) return VAL(double, &v->data.numeric_value);
+	if (v->type == ACTION_STACK_VALUE_F32) return (double)VAL(float, &v->data.numeric_value);
+	return NAN;
+}
+
+static void date_set_time(SWFAppContext* ctx, ASObject* obj, double t) {
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &v.data.numeric_value) = t;
+	setProperty(ctx, obj, "__date_time__", 13, &v);
+}
+
+// --- Date.prototype.toString ---
+
+static const char* date_day_names[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+static const char* date_month_names[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+static ActionVar date_return_string(SWFAppContext* app_context, const char* str, u32 len) {
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len = 0;
+	uint16_t* u16 = utf8_to_u16(app_context, str, len, &u16_len);
+	ret.str_size = u16_len;
+	ret.data.numeric_value = (u64)u16;
+	return ret;
+}
+
+static ActionVar builtin_date_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)args; (void)arg_count; (void)registers;
+	if (this_obj == NULL) return date_return_string(app_context, "Invalid Date", 12);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+
+	if (isnan(t) || isinf(t)) {
+		return date_return_string(app_context, "Invalid Date", 12);
+	}
+
+	double lt = date_utc_to_local(t);
+	double y = date_year_from_time(lt);
+	int month = date_month_from_time(lt);
+	int day = date_date_from_time(lt);
+	int wday = date_week_day(lt);
+	int hour = (int)date_hour_from_time_safe(lt);
+	int min = (int)date_min_from_time_safe(lt);
+	int sec = (int)date_sec_from_time_safe(lt);
+
+	date_ensure_tza();
+	int offset_min = (int)(g_date_local_tza_ms / DATE_MS_PER_MINUTE);
+	int offset_h = offset_min / 60;
+	int offset_m = offset_min % 60;
+	if (offset_m < 0) offset_m = -offset_m;
+
+	char buf[80];
+	int year_i = (int)y;
+	if (year_i < 0) {
+		snprintf(buf, sizeof(buf), "%s %s %d %02d:%02d:%02d GMT%+03d%02d %d",
+			date_day_names[wday], date_month_names[month], day,
+			hour, min, sec, offset_h, offset_m, year_i);
+	} else {
+		snprintf(buf, sizeof(buf), "%s %s %d %02d:%02d:%02d GMT%+03d%02d %d",
+			date_day_names[wday], date_month_names[month], day,
+			hour, min, sec, offset_h, offset_m, year_i);
+	}
+
+	return date_return_string(app_context, buf, (u32)strlen(buf));
+}
+
+// --- Date.prototype.valueOf ---
+
+static ActionVar builtin_date_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	double t = date_get_time((ASObject*)this_obj);
+	return mathReturnDouble(t);
+}
+
+// --- Date getter helpers ---
+
+static double date_arg_to_double(SWFAppContext* app_context, ActionVar* v) {
+	if (v->type == ACTION_STACK_VALUE_F64) return VAL(double, &v->data.numeric_value);
+	if (v->type == ACTION_STACK_VALUE_F32) return (double)VAL(float, &v->data.numeric_value);
+	if (v->type == ACTION_STACK_VALUE_BOOLEAN) return v->data.numeric_value ? 1.0 : 0.0;
+	if (v->type == ACTION_STACK_VALUE_UNDEFINED) {
+		return (EFFECTIVE_SWF_VERSION() < 7) ? 0.0 : NAN;
+	}
+	if (v->type == ACTION_STACK_VALUE_NULL) return NAN;
+	if (v->type == ACTION_STACK_VALUE_STRING) {
+		return varToDoubleSimple(v);
+	}
+	if (v->type == ACTION_STACK_VALUE_OBJECT) {
+		// Call valueOf
+		ASObject* o = (ASObject*)(u64)v->data.numeric_value;
+		if (o != NULL) {
+			ActionVar* vo = getPropertyWithPrototype(o, "valueOf", 7);
+			if (vo != NULL && vo->type == ACTION_STACK_VALUE_FUNCTION) {
+				ASFunction* func = (ASFunction*)vo->data.numeric_value;
+				if (func != NULL && func->advanced_func != NULL) {
+					ActionVar result = func->advanced_func(app_context, NULL, 0, NULL, (void*)o);
+					return varToDoubleSimple(&result);
+				}
+			}
+		}
+		return NAN;
+	}
+	return NAN;
+}
+
+// Flash's integer conversion for date args: NaN → 0, Inf → propagates through arithmetic
+static double date_to_integer(double x) {
+	if (isnan(x)) return 0.0;
+	if (!isfinite(x)) return x;
+	return trunc(x);
+}
+
+// --- 20 getter methods ---
+
+#define DATE_GETTER(name, expr_local, expr_utc, is_utc) \
+static ActionVar builtin_date_##name(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) { \
+	(void)app_context; (void)args; (void)arg_count; (void)registers; \
+	if (this_obj == NULL) return mathReturnDouble(NAN); \
+	double t = date_get_time((ASObject*)this_obj); \
+	if (isnan(t) || !isfinite(t)) return mathReturnDouble(NAN); \
+	if (is_utc) { return mathReturnDouble(expr_utc); } \
+	else { double lt = date_utc_to_local(t); (void)lt; return mathReturnDouble(expr_local); } \
+}
+
+DATE_GETTER(getFullYear, date_year_from_time(lt), date_year_from_time(t), 0)
+DATE_GETTER(getYear, date_year_from_time(lt) - 1900.0, date_year_from_time(t) - 1900.0, 0)
+DATE_GETTER(getMonth, (double)date_month_from_time(lt), (double)date_month_from_time(t), 0)
+DATE_GETTER(getDate, (double)date_date_from_time(lt), (double)date_date_from_time(t), 0)
+DATE_GETTER(getDay, (double)date_week_day(lt), (double)date_week_day(t), 0)
+DATE_GETTER(getHours, date_hour_from_time_safe(lt), date_hour_from_time_safe(t), 0)
+DATE_GETTER(getMinutes, date_min_from_time_safe(lt), date_min_from_time_safe(t), 0)
+DATE_GETTER(getSeconds, date_sec_from_time_safe(lt), date_sec_from_time_safe(t), 0)
+DATE_GETTER(getMilliseconds, date_ms_from_time_safe(lt), date_ms_from_time_safe(t), 0)
+// getTime returns raw UTC timestamp (even Infinity)
+static ActionVar builtin_date_getTime(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	double t = date_get_time((ASObject*)this_obj);
+	return mathReturnDouble(t);
+}
+DATE_GETTER(getUTCFullYear, 0, date_year_from_time(t), 1)
+DATE_GETTER(getUTCYear, 0, date_year_from_time(t) - 1900.0, 1)
+DATE_GETTER(getUTCMonth, 0, (double)date_month_from_time(t), 1)
+DATE_GETTER(getUTCDate, 0, (double)date_date_from_time(t), 1)
+DATE_GETTER(getUTCDay, 0, (double)date_week_day(t), 1)
+DATE_GETTER(getUTCHours, 0, date_hour_from_time_safe(t), 1)
+DATE_GETTER(getUTCMinutes, 0, date_min_from_time_safe(t), 1)
+DATE_GETTER(getUTCSeconds, 0, date_sec_from_time_safe(t), 1)
+DATE_GETTER(getUTCMilliseconds, 0, date_ms_from_time_safe(t), 1)
+
+// getTimezoneOffset: returns -(offset_ms / 60000)
+static ActionVar builtin_date_getTimezoneOffset(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	double t = date_get_time((ASObject*)this_obj);
+	if (isnan(t) || !isfinite(t)) return mathReturnDouble(NAN);
+	date_ensure_tza();
+	return mathReturnDouble(-(g_date_local_tza_ms / DATE_MS_PER_MINUTE));
+}
+
+// --- 17 setter methods ---
+// TimeClip: clamp result to valid range, otherwise NaN
+static double date_time_clip(double t) {
+	if (!isfinite(t)) return NAN;
+	if (fabs(t) > 8.64e15) return NAN;
+	return t;
+}
+
+// setFullYear(year [, month [, day]])
+static ActionVar builtin_date_setFullYear(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double y = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double m = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : (double)date_month_from_time(lt);
+	double d = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : (double)date_date_from_time(lt);
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_make_day(y, m, d), date_time_within_day(lt))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setMonth(month [, day])
+static ActionVar builtin_date_setMonth(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double m = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	if (isnan(m)) m = 0.0;
+	double d = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : (double)date_date_from_time(lt);
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_make_day(date_year_from_time(lt), m, d), date_time_within_day(lt))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setDate(day)
+static ActionVar builtin_date_setDate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double d = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_make_day(date_year_from_time(lt), (double)date_month_from_time(lt), d), date_time_within_day(lt))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setHours(hour [, min [, sec [, ms]]])
+static ActionVar builtin_date_setHours(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double h  = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double mi = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : date_min_from_time_safe(lt);
+	double s  = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : date_sec_from_time_safe(lt);
+	double ms = (arg_count >= 4) ? date_arg_to_double(app_context, &args[3]) : date_ms_from_time_safe(lt);
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_day(lt), date_make_time(h, mi, s, ms))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setMinutes(min [, sec [, ms]])
+static ActionVar builtin_date_setMinutes(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double mi = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double s  = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : date_sec_from_time_safe(lt);
+	double ms = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : date_ms_from_time_safe(lt);
+	if (!isfinite(mi)) mi = -2147483648.0;
+	if (!isfinite(s))  s  = -2147483648.0;
+	if (!isfinite(ms)) ms = -2147483648.0;
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_day(lt), date_make_time(date_hour_from_time_safe(lt), mi, s, ms))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setSeconds(sec [, ms])
+static ActionVar builtin_date_setSeconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double s  = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double ms = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : date_ms_from_time_safe(lt);
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_day(lt), date_make_time(date_hour_from_time_safe(lt), date_min_from_time_safe(lt), s, ms))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setMilliseconds(ms)
+static ActionVar builtin_date_setMilliseconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double ms = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_day(lt), date_make_time(date_hour_from_time_safe(lt), date_min_from_time_safe(lt), date_sec_from_time_safe(lt), ms))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setTime(ms) — sets the raw UTC timestamp
+static ActionVar builtin_date_setTime(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double ms = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	if (isfinite(ms)) ms = trunc(ms);
+	ms = date_time_clip(ms);
+	date_set_time(app_context, obj, ms);
+	return mathReturnDouble(ms);
+}
+
+// setYear(year [, month [, day]]) — legacy: year 0-99 → 1900+year
+static ActionVar builtin_date_setYear(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double lt = date_utc_to_local(t);
+	double y = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	if (isnan(y) || !isfinite(y)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	y = trunc(y);
+	if (y >= 0 && y <= 99) y = 1900.0 + y;
+	double m = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : (double)date_month_from_time(lt);
+	double d = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : (double)date_date_from_time(lt);
+	double u = date_time_clip(date_local_to_utc(date_make_date(date_make_day(y, m, d), date_time_within_day(lt))));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// --- UTC setter variants ---
+
+// setUTCFullYear(year [, month [, day]])
+static ActionVar builtin_date_setUTCFullYear(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double y = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double m = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : (double)date_month_from_time(t);
+	double d = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : (double)date_date_from_time(t);
+	double u = date_time_clip(date_make_date(date_make_day(y, m, d), date_time_within_day(t)));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setUTCMonth(month [, day])
+static ActionVar builtin_date_setUTCMonth(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double m = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	if (isnan(m)) m = 0.0;
+	double d = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : (double)date_date_from_time(t);
+	double u = date_time_clip(date_make_date(date_make_day(date_year_from_time(t), m, d), date_time_within_day(t)));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setUTCDate(day)
+static ActionVar builtin_date_setUTCDate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double d = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double u = date_time_clip(date_make_date(date_make_day(date_year_from_time(t), (double)date_month_from_time(t), d), date_time_within_day(t)));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setUTCHours(hour [, min [, sec [, ms]]])
+static ActionVar builtin_date_setUTCHours(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double h  = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double mi = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : date_min_from_time_safe(t);
+	double s  = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : date_sec_from_time_safe(t);
+	double ms = (arg_count >= 4) ? date_arg_to_double(app_context, &args[3]) : date_ms_from_time_safe(t);
+	double u = date_time_clip(date_make_date(date_day(t), date_make_time(h, mi, s, ms)));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setUTCMinutes(min [, sec [, ms]])
+static ActionVar builtin_date_setUTCMinutes(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double mi = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double s  = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : date_sec_from_time_safe(t);
+	double ms = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : date_ms_from_time_safe(t);
+	if (!isfinite(mi)) mi = -2147483648.0;
+	if (!isfinite(s))  s  = -2147483648.0;
+	if (!isfinite(ms)) ms = -2147483648.0;
+	double u = date_time_clip(date_make_date(date_day(t), date_make_time(date_hour_from_time_safe(t), mi, s, ms)));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setUTCSeconds(sec [, ms])
+static ActionVar builtin_date_setUTCSeconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double s  = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double ms = (arg_count >= 2) ? date_arg_to_double(app_context, &args[1]) : date_ms_from_time_safe(t);
+	double u = date_time_clip(date_make_date(date_day(t), date_make_time(date_hour_from_time_safe(t), date_min_from_time_safe(t), s, ms)));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// setUTCMilliseconds(ms)
+static ActionVar builtin_date_setUTCMilliseconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	if (this_obj == NULL) return mathReturnDouble(NAN);
+	ASObject* obj = (ASObject*)this_obj;
+	double t = date_get_time(obj);
+	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
+	double ms = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
+	double u = date_time_clip(date_make_date(date_day(t), date_make_time(date_hour_from_time_safe(t), date_min_from_time_safe(t), date_sec_from_time_safe(t), ms)));
+	date_set_time(app_context, obj, u);
+	return mathReturnDouble(u);
+}
+
+// --- Date.UTC() static method ---
+
+static ActionVar builtin_date_UTC(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers; (void)this_obj;
+	// 0-1 args: return undefined
+	if (arg_count < 2) {
+		ActionVar ret = {0};
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
+		return ret;
+	}
+
+	double year_d = date_arg_to_double(app_context, &args[0]);
+	// Year: C-style int32 cast for NaN/Infinity handling (matches Flash)
+	int32_t yi = (int32_t)year_d;
+	double year = (double)yi;
+	if (yi < 100) year = 1900.0 + year;
+
+	double month = date_arg_to_double(app_context, &args[1]);
+	double day   = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : 1.0;
+	double hour  = (arg_count >= 4) ? date_arg_to_double(app_context, &args[3]) : 0.0;
+	double min_v = (arg_count >= 5) ? date_arg_to_double(app_context, &args[4]) : 0.0;
+	double sec   = (arg_count >= 6) ? date_arg_to_double(app_context, &args[5]) : 0.0;
+	double ms    = (arg_count >= 7) ? date_arg_to_double(app_context, &args[6]) : 0.0;
+
+	// Month: NaN → NaN (not integer-converted like in setters)
+	if (isnan(month)) return mathReturnDouble(NAN);
+	month = trunc(month);
+	day = trunc(day); hour = trunc(hour); min_v = trunc(min_v); sec = trunc(sec); ms = trunc(ms);
+
+	double d = date_make_day(year, month, day);
+	double t = date_make_time(hour, min_v, sec, ms);
+	return mathReturnDouble(date_make_date(d, t));
+}
+
+// --- Date constructor ---
+
+static ASObject* date_construct(SWFAppContext* app_context, ActionVar* args, u32 arg_count) {
+	initDatePrototype(app_context);
+	ASObject* date = allocObject(app_context, 4);
+
+	// Set __proto__ to Date.prototype
+	ActionVar proto_var = {0};
+	proto_var.type = ACTION_STACK_VALUE_OBJECT;
+	proto_var.data.numeric_value = (u64)g_date_prototype;
+	setProperty(app_context, date, "__proto__", 9, &proto_var);
+
+	double t;
+	if (arg_count == 0) {
+#ifdef MOCK_DATE_TIME
+		t = (double)(MOCK_DATE_TIME);
+#else
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		t = (double)ts.tv_sec * 1000.0 + (double)(ts.tv_nsec / 1000000);
+#endif
+	} else if (arg_count == 1) {
+		// Single arg: timestamp or valueOf of object
+		t = date_arg_to_double(app_context, &args[0]);
+	} else {
+		// 2-7 args: year, month [, day [, hour [, min [, sec [, ms]]]]]
+		double year_d = date_arg_to_double(app_context, &args[0]);
+		// Year: C-style int32 cast for NaN/Infinity handling (matches Flash)
+		int32_t yi = (int32_t)year_d;
+		double year = (double)yi;
+		if (yi < 100) year = 1900.0 + year;
+
+		double month = date_arg_to_double(app_context, &args[1]);
+		double day   = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : 1.0;
+		double hour  = (arg_count >= 4) ? date_arg_to_double(app_context, &args[3]) : 0.0;
+		double min_v = (arg_count >= 5) ? date_arg_to_double(app_context, &args[4]) : 0.0;
+		double sec   = (arg_count >= 6) ? date_arg_to_double(app_context, &args[5]) : 0.0;
+		double ms    = (arg_count >= 7) ? date_arg_to_double(app_context, &args[6]) : 0.0;
+
+		if (isnan(month)) { month = trunc(month); } else { month = trunc(month); }
+		day = trunc(day); hour = trunc(hour); min_v = trunc(min_v); sec = trunc(sec); ms = trunc(ms);
+
+		double d = date_make_day(year, month, day);
+		double time_v = date_make_time(hour, min_v, sec, ms);
+		t = date_local_to_utc(date_make_date(d, time_v));
+	}
+
+	date_set_time(app_context, date, t);
+	return date;
+}
+
+// Date constructor callback (for advanced_func)
+static ActionVar builtin_date_constructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers; (void)this_obj;
+	// This is called when Date is used as a constructor via the prototype-based path
+	// The actual construction happens in actionNewObject / actionNewMethod
+	// Return undefined — the caller uses 'this' object
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	return ret;
+}
+
+// --- Date prototype initialization ---
+
+static void initDatePrototype(SWFAppContext* app_context) {
+	if (g_date_init_done) return;
+	g_date_init_done = 1;
+
+	memset(&g_date_constructor, 0, sizeof(ASFunction));
+	strncpy(g_date_constructor.name, "Date", 255);
+	g_date_constructor.function_type = 2;
+	g_date_constructor.param_count = 0;
+	g_date_constructor.advanced_func = (Function2Ptr)builtin_date_constructor;
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_date_constructor;
+
+	g_date_prototype = allocObject(app_context, 48);
+	retainObject(g_date_prototype);
+	g_date_constructor.prototype_obj = g_date_prototype;
+
+	// Set __proto__ to Object.prototype
+	setObjectProto(app_context, g_date_prototype);
+
+	// Register all methods
+	struct { const char* name; u32 name_len; Function2Ptr func; } date_methods[] = {
+		{"toString",           8, (Function2Ptr)builtin_date_toString},
+		{"valueOf",            7, (Function2Ptr)builtin_date_valueOf},
+		{"getFullYear",       11, (Function2Ptr)builtin_date_getFullYear},
+		{"getYear",            7, (Function2Ptr)builtin_date_getYear},
+		{"getMonth",           8, (Function2Ptr)builtin_date_getMonth},
+		{"getDate",            7, (Function2Ptr)builtin_date_getDate},
+		{"getDay",             6, (Function2Ptr)builtin_date_getDay},
+		{"getHours",           8, (Function2Ptr)builtin_date_getHours},
+		{"getMinutes",        10, (Function2Ptr)builtin_date_getMinutes},
+		{"getSeconds",        10, (Function2Ptr)builtin_date_getSeconds},
+		{"getMilliseconds",   15, (Function2Ptr)builtin_date_getMilliseconds},
+		{"getTime",            7, (Function2Ptr)builtin_date_getTime},
+		{"getTimezoneOffset", 17, (Function2Ptr)builtin_date_getTimezoneOffset},
+		{"getUTCFullYear",    14, (Function2Ptr)builtin_date_getUTCFullYear},
+		{"getUTCYear",        10, (Function2Ptr)builtin_date_getUTCYear},
+		{"getUTCMonth",       11, (Function2Ptr)builtin_date_getUTCMonth},
+		{"getUTCDate",        10, (Function2Ptr)builtin_date_getUTCDate},
+		{"getUTCDay",          9, (Function2Ptr)builtin_date_getUTCDay},
+		{"getUTCHours",       11, (Function2Ptr)builtin_date_getUTCHours},
+		{"getUTCMinutes",     13, (Function2Ptr)builtin_date_getUTCMinutes},
+		{"getUTCSeconds",     13, (Function2Ptr)builtin_date_getUTCSeconds},
+		{"getUTCMilliseconds",18, (Function2Ptr)builtin_date_getUTCMilliseconds},
+		{"setFullYear",       11, (Function2Ptr)builtin_date_setFullYear},
+		{"setMonth",           8, (Function2Ptr)builtin_date_setMonth},
+		{"setDate",            7, (Function2Ptr)builtin_date_setDate},
+		{"setHours",           8, (Function2Ptr)builtin_date_setHours},
+		{"setMinutes",        10, (Function2Ptr)builtin_date_setMinutes},
+		{"setSeconds",        10, (Function2Ptr)builtin_date_setSeconds},
+		{"setMilliseconds",   15, (Function2Ptr)builtin_date_setMilliseconds},
+		{"setTime",            7, (Function2Ptr)builtin_date_setTime},
+		{"setYear",            7, (Function2Ptr)builtin_date_setYear},
+		{"setUTCFullYear",    14, (Function2Ptr)builtin_date_setUTCFullYear},
+		{"setUTCMonth",       11, (Function2Ptr)builtin_date_setUTCMonth},
+		{"setUTCDate",        10, (Function2Ptr)builtin_date_setUTCDate},
+		{"setUTCHours",       11, (Function2Ptr)builtin_date_setUTCHours},
+		{"setUTCMinutes",     13, (Function2Ptr)builtin_date_setUTCMinutes},
+		{"setUTCSeconds",     13, (Function2Ptr)builtin_date_setUTCSeconds},
+		{"setUTCMilliseconds",18, (Function2Ptr)builtin_date_setUTCMilliseconds},
+	};
+
+	int num_date_methods = 38;
+	for (int i = 0; i < num_date_methods; i++) {
+		memset(&g_date_funcs[i], 0, sizeof(ASFunction));
+		strncpy(g_date_funcs[i].name, date_methods[i].name, 255);
+		g_date_funcs[i].function_type = 2;
+		g_date_funcs[i].param_count = 0;
+		g_date_funcs[i].advanced_func = date_methods[i].func;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_date_funcs[i];
+
+		ActionVar fv = {0};
+		fv.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &fv.data.numeric_value) = (u64)&g_date_funcs[i];
+		setProperty(app_context, g_date_prototype, date_methods[i].name, date_methods[i].name_len, &fv);
+	}
+
+	// Register Date.UTC as a static method on the constructor
+	{
+		static ASFunction g_date_utc_func;
+		memset(&g_date_utc_func, 0, sizeof(ASFunction));
+		strncpy(g_date_utc_func.name, "UTC", 255);
+		g_date_utc_func.function_type = 2;
+		g_date_utc_func.param_count = 0;
+		g_date_utc_func.advanced_func = (Function2Ptr)builtin_date_UTC;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_date_utc_func;
+
+		ActionVar utc_fv = {0};
+		utc_fv.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &utc_fv.data.numeric_value) = (u64)&g_date_utc_func;
+
+		// Set on the constructor's own_props (accessed as Date.UTC)
+		if (g_date_constructor.prototype_obj != NULL) {
+			// We need to set UTC on the constructor function itself, not its prototype
+			// ASFunction has own_props for this
+			if (g_date_constructor.own_props == NULL) {
+				g_date_constructor.own_props = allocObject(app_context, 4);
+				retainObject(g_date_constructor.own_props);
+			}
+			setProperty(app_context, g_date_constructor.own_props, "UTC", 3, &utc_fv);
+		}
+	}
+}
+
+// ============================================================================
 
 // Built-in valueOf for primitive wrapper objects (new Object(5))
 static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -8804,10 +9602,10 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 
 // Stub constructors: classes that need to exist as globals with a prototype
 // Index mapping: 0=AsBroadcaster, 1=Button, 2=Camera, 3=Color,
-// 4=ContextMenu, 5=ContextMenuItem, 6=Date, 7=LoadVars, 8=LocalConnection,
-// 9=Microphone, 10=MovieClipLoader, 11=NetConnection, 12=NetStream,
-// 13=PrintJob, 14=SharedObject, 15=Sound, 16=TextSnapshot, 17=Video, 18=XMLSocket
-#define NUM_STUB_CTORS 19
+// 4=ContextMenu, 5=ContextMenuItem, 6=LoadVars, 7=LocalConnection,
+// 8=Microphone, 9=MovieClipLoader, 10=NetConnection, 11=NetStream,
+// 12=PrintJob, 13=SharedObject, 14=Sound, 15=TextSnapshot, 16=Video, 17=XMLSocket
+#define NUM_STUB_CTORS 18
 static ASFunction g_stub_ctors[NUM_STUB_CTORS];
 
 // Stub static objects (not constructors — typeof returns "object", no prototype)
@@ -8897,6 +9695,15 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		setProperty(app_context, global_object, "Math", 4, &math_cv);
 	}
 
+	// ---- Date ----
+	initDatePrototype(app_context);
+	{
+		ActionVar date_cv = {0};
+		date_cv.type = ACTION_STACK_VALUE_FUNCTION;
+		date_cv.data.numeric_value = (u64)&g_date_constructor;
+		setProperty(app_context, global_object, "Date", 4, &date_cv);
+	}
+
 	// ---- Error ----
 	{
 		static ASFunction g_error_ctor;
@@ -8935,14 +9742,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	{
 		static const char* stub_names[NUM_STUB_CTORS] = {
 			"AsBroadcaster", "Button", "Camera", "Color",
-			"ContextMenu", "ContextMenuItem", "Date", "LoadVars",
+			"ContextMenu", "ContextMenuItem", "LoadVars",
 			"LocalConnection", "Microphone", "MovieClipLoader",
 			"NetConnection", "NetStream", "PrintJob", "SharedObject",
 			"Sound", "TextSnapshot", "Video", "XMLSocket"
 		};
 		static const int stub_name_lens[NUM_STUB_CTORS] = {
 			13, 6, 6, 5,
-			11, 15, 4, 8,
+			11, 15, 8,
 			15, 10, 15,
 			13, 9, 8, 12,
 			5, 12, 5, 9
@@ -13784,18 +14591,7 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 	else if (strcmp(ctor_name, "Date") == 0)
 	{
-		// Handle Date constructor
-		// In a full implementation, this would parse date arguments
-		// For now, create object with basic time property set to current time
-		ASObject* date = allocObject(app_context, 4);
-
-		// Set time property to current milliseconds since epoch
-		ActionVar time_var;
-		time_var.type = ACTION_STACK_VALUE_F64;
-		double current_time = (double)time(NULL) * 1000.0;  // Convert to milliseconds
-		VAL(double, &time_var.data.numeric_value) = current_time;
-		setProperty(app_context, date, "time", 4, &time_var);
-
+		ASObject* date = date_construct(app_context, args, num_args);
 		new_obj = date;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
@@ -14609,8 +15405,7 @@ void actionNewMethod(SWFAppContext* app_context)
 	}
 	else if (ctor_name != NULL && strcmp(ctor_name, "Date") == 0)
 	{
-		// Handle Date constructor (simplified)
-		ASObject* date = allocObject(app_context, 4);
+		ASObject* date = date_construct(app_context, args, num_args);
 		new_obj = date;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 	}
@@ -16168,6 +16963,19 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 		}
+		builtin_handled = 1;
+	}
+
+	// Date() — called as function (without new), returns current date as string
+	else if (func_name_len == 4 && strncmp(func_name, "Date", 4) == 0)
+	{
+		// Date() as function always returns current time as string, ignoring all arguments
+		initDatePrototype(app_context);
+		ASObject* temp_date = date_construct(app_context, NULL, 0);
+		// Call toString on it
+		ActionVar ts_result = builtin_date_toString(app_context, NULL, 0, NULL, (void*)temp_date);
+		if (args != NULL) FREE(args);
+		pushVar(app_context, &ts_result);
 		builtin_handled = 1;
 	}
 
