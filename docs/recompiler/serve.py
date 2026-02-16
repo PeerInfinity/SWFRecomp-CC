@@ -9,8 +9,8 @@ import sys
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 
-# Serve from docs/ directory (two levels up from this script's location in wasm_recompiler_demo/)
-DOCS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs")
+# Serve from docs/ directory (one level up from this script's location in docs/recompiler/)
+DOCS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 DOCS_DIR = os.path.normpath(DOCS_DIR)
 
 class CORSHandler(http.server.SimpleHTTPRequestHandler):

@@ -25,7 +25,20 @@
             padding: 2rem;
         }
         h1 { color: #e94560; margin-bottom: 0.5rem; }
-        .subtitle { color: #888; margin-bottom: 2rem; }
+        .subtitle { color: #888; margin-bottom: 0.5rem; }
+        .chrome-note { color: #e9a045; font-size: 0.85em; margin-bottom: 2rem; }
+        .demo-btn {
+            background: #16213e;
+            color: #4ecca3;
+            border: 1px solid #4ecca3;
+            border-radius: 8px;
+            padding: 0.5rem 1.5rem;
+            font-size: 0.9em;
+            cursor: pointer;
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+        }
+        .demo-btn:hover { background: rgba(78, 204, 163, 0.1); }
         .drop-zone {
             width: 100%;
             max-width: 600px;
@@ -82,12 +95,15 @@
 <body>
     <h1>SWFRecomp</h1>
     <p class="subtitle">In-Browser SWF to WASM Recompiler</p>
+    <p class="chrome-note">Requires Chrome (Firefox not yet supported)</p>
 
     <div class="drop-zone" id="dropZone">
         <p>Drop a .swf file here</p>
         <p style="color: #666; margin-top: 0.5rem; font-size: 0.9em">or click to select</p>
         <input type="file" id="fileInput" accept=".swf">
     </div>
+
+    <button class="demo-btn" id="demoBtn">Try example: add.swf</button>
 
     <div id="status">
         <div class="status-step" id="step-recompile">Recompiling SWF to C...</div>

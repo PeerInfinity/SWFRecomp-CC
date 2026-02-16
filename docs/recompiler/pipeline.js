@@ -336,6 +336,7 @@ async function processSwf(swfBytes) {
     showStatus();
     const steps = ["step-recompile", "step-compile", "step-run"];
     steps.forEach(s => setStep(s, ""));
+    document.getElementById("step-run").style.display = "none";
 
     try {
         // Phase 1: Recompile SWF → C
@@ -360,6 +361,7 @@ async function processSwf(swfBytes) {
             `Compiled to WASM (${(wasmBytes.length / 1024).toFixed(0)} KB)`;
 
         // Phase 3: Run WASM
+        document.getElementById("step-run").style.display = "";
         setStep("step-run", "active");
         console.log(`[PHASE 3] Running WASM (${wasmBytes.length} bytes)`);
         const wasi = createWASI();
@@ -428,3 +430,12 @@ function handleFile(file) {
     reader.onload = () => processSwf(reader.result);
     reader.readAsArrayBuffer(file);
 }
+
+// --- Demo button ---
+
+document.getElementById("demoBtn").addEventListener("click", async () => {
+    dropZone.querySelector("p").textContent = "add.swf";
+    const resp = await fetch("./add.swf");
+    const bytes = await resp.arrayBuffer();
+    processSwf(bytes);
+});
