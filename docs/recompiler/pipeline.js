@@ -5,6 +5,20 @@
 
 import { createWASI } from "./wasi_shim.js";
 
+// Suppress Wasmer SDK internal panics (async cleanup after compilation).
+// These are harmless RuntimeError: unreachable from wasmer_js_bg.wasm
+// that fire after our pipeline completes successfully.
+window.addEventListener("unhandledrejection", (e) => {
+    if (e.reason?.stack?.includes("wasmer_js_bg.wasm")) {
+        e.preventDefault();
+    }
+});
+window.addEventListener("error", (e) => {
+    if (e.error?.stack?.includes("wasmer_js_bg.wasm")) {
+        e.preventDefault();
+    }
+});
+
 // --- UI helpers ---
 
 function setStep(stepId, state) {

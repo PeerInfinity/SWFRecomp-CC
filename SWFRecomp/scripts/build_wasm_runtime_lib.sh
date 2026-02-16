@@ -2,9 +2,9 @@
 # Build libswfruntime.a (wasm32-wasi) for in-browser linking
 # Requires: WASI-SDK installed at PROJECT_ROOT/wasi-sdk
 #
-# Note: action.c and object.c are NOT included because they depend on
-# SWF_VERSION (a per-SWF compile-time constant from constants.h).
-# They must be compiled alongside the generated code per-SWF.
+# Note: action.c and object.c are NOT included because they are too large
+# for in-browser Clang — they are pre-compiled as .o files instead.
+# SWF_VERSION is now a runtime variable (g_swf_version), set in main().
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -47,8 +47,8 @@ CFLAGS=(
     -Wno-unused-variable
 )
 
-# Source files for NO_GRAPHICS runtime (SWF_VERSION-independent only)
-# action.c and object.c are excluded — they use SWF_VERSION at compile time
+# Source files for NO_GRAPHICS runtime
+# action.c and object.c are excluded — too large for in-browser compilation
 SOURCES=(
     "${SWFMODERN_SRC}/actionmodern/variables.c"
     "${SWFMODERN_SRC}/utils.c"

@@ -1,13 +1,13 @@
 #include <recomp.h>
 #include <swf.h>
 #include <out.h>
+#include "constants.h"
 
 #ifndef FRAME_RATE
 #define FRAME_RATE 12
 #endif
 
 #ifndef NO_GRAPHICS
-#include "constants.h"
 #include "draws.h"
 #endif
 
@@ -27,6 +27,9 @@ void runSWF() {
 #endif
 
 int main() {
+    extern int g_swf_version;
+    g_swf_version = SWF_VERSION;
+
     app_context.frame_funcs = frame_funcs;
     app_context.frame_count = FRAME_COUNT;
     app_context.fps = FRAME_RATE;

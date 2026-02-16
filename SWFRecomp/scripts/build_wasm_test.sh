@@ -57,7 +57,7 @@ cp "${TEST_DIR}/RecompiledTags"/*.h "${BUILD_DIR}/" 2>/dev/null || true
 # Copy main.c wrapper
 cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${BUILD_DIR}/"
 
-# Copy runtime source files that need per-SWF compilation (SWF_VERSION dependent)
+# Copy runtime source files (action.c/object.c compiled from source per-SWF)
 cp "${SWFMODERN_SRC}/actionmodern/action.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/object.c" "${BUILD_DIR}/"
 

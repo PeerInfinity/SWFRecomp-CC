@@ -44,7 +44,7 @@ $WASI_SDK/bin/clang \
     -pthread -ftls-model=local-exec \
     -fno-trapping-math \
     -mllvm -wasm-enable-sjlj \
-    -DNO_GRAPHICS -DSWF_VERSION=15 \
+    -DNO_GRAPHICS \
     -include string.h -include strings.h \
     -I$RUNTIME/include -I$RUNTIME/include/actionmodern \
     -I$RUNTIME/include/libswf -I$RUNTIME/include/memory \
@@ -53,7 +53,7 @@ $WASI_SDK/bin/clang \
     $RUNTIME/src/actionmodern/action.c -o action.o
 ```
 
-**Note**: `SWF_VERSION` is a per-SWF compile-time constant. Currently only version 15 is pre-compiled. To support other versions, pre-compile action.o/object.o for each needed version.
+**Note**: `SWF_VERSION` is now a runtime variable (`g_swf_version`), set from `constants.h` in `main()`. A single pre-compiled action.o/object.o works for all SWF versions.
 
 ### Compilation Command (In-Browser)
 

@@ -5,6 +5,8 @@
 #include <stackvalue.h>
 #include <setjmp.h>
 
+// SWF version — set at startup from constants.h, controls runtime behavior
+extern int g_swf_version;
 // Recursion depth limit (set by tagScriptLimits, default 256)
 extern u32 g_max_call_depth;
 // Execution halt flag — set when recursion limit is hit, prevents all further script execution

@@ -45,7 +45,7 @@ cp "${BUILD_DIR}/SWFRecomp.wasm" "${DEMO_DIR}/SWFRecomp.wasm"
 echo "  Copying libswfruntime.a..."
 cp "${BUILD_DIR}/libswfruntime.a" "${DEMO_DIR}/libswfruntime.a"
 
-# Copy runtime source files needed per-SWF (SWF_VERSION dependent)
+# Copy runtime source files (action.c/object.c too large for in-browser Clang)
 echo "  Copying runtime sources..."
 mkdir -p "${DEMO_DIR}/runtime_src"
 cp "${SWFMODERN_SRC}/actionmodern/action.c" "${DEMO_DIR}/runtime_src/"

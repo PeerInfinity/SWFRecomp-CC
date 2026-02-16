@@ -343,6 +343,7 @@ bool setVariableOnLocalScope(const char* var_name, ActionVar* value)
 // Recursion Depth Limit
 // ==================================================================
 
+int g_swf_version = 5;       // SWF version — set at startup from constants.h
 u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
 u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
 static u32 g_call_depth = 0;
@@ -353,11 +354,7 @@ static u32 g_call_depth = 0;
 // In Flash, DefineFunction (SWF5 opcode) causes code inside functions
 // to behave as SWF5+ even in a SWF4 file. When inside a function call
 // (g_call_depth > 0) and the SWF version is < 5, we promote to version 5.
-#if defined(SWF_VERSION)
-#define EFFECTIVE_SWF_VERSION() (((SWF_VERSION) < 5 && g_call_depth > 0) ? 5 : (SWF_VERSION))
-#else
-#define EFFECTIVE_SWF_VERSION() 5
-#endif
+#define EFFECTIVE_SWF_VERSION() ((g_swf_version < 5 && g_call_depth > 0) ? 5 : g_swf_version)
 
 // ==================================================================
 // Special Recursion Counter (for getter/setter/valueOf/toString)
@@ -3171,11 +3168,7 @@ static int isNativeTextFieldProperty(const char* name, u32 len) {
 		// SWF8+ only: these 5 also become native
 		{"filters",7}, {"sharpness",9}, {"thickness",9}, {"antiAliasType",13}, {"gridFitType",11}
 	};
-#if defined(SWF_VERSION) && SWF_VERSION >= 8
-	int count = 35;
-#else
-	int count = 30;
-#endif
+	int count = (g_swf_version >= 8) ? 35 : 30;
 	for (int i = 0; i < count; i++) {
 		if (props[i].l == len && strncmp(name, props[i].n, len) == 0) return 1;
 	}
@@ -3185,9 +3178,7 @@ static int isNativeTextFieldProperty(const char* name, u32 len) {
 static void initTextFieldPrototype(SWFAppContext* app_context)
 {
 	if (g_textfield_constructor_init) return;
-#if defined(SWF_VERSION) && SWF_VERSION < 6
-	return; // TextField constructor doesn't exist in SWF5
-#endif
+	if (g_swf_version < 6) return; // TextField constructor doesn't exist in SWF5
 
 	memset(&g_textfield_constructor, 0, sizeof(ASFunction));
 	strncpy(g_textfield_constructor.name, "TextField", 255);
@@ -3252,11 +3243,7 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 	};
 
 	// replaceText (last entry) only exists in SWF7+
-#if defined(SWF_VERSION) && SWF_VERSION < 7
-	int tf_method_count = 7;
-#else
-	int tf_method_count = 8;
-#endif
+	int tf_method_count = (g_swf_version < 7) ? 7 : 8;
 	for (int i = 0; i < tf_method_count; i++)
 	{
 		memset(tf_methods[i].func, 0, sizeof(ASFunction));
@@ -3292,7 +3279,7 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 	}
 
 	// Register TextField.StyleSheet as a property on the constructor (SWF7+)
-	if (SWF_VERSION >= 7)
+	if (g_swf_version >= 7)
 	{
 		static ASFunction g_stylesheet_ctor;
 		memset(&g_stylesheet_ctor, 0, sizeof(ASFunction));
@@ -3353,16 +3340,11 @@ static int getTextFormatCoercionType(const char* name, u32 len) {
 	if (len == 3 && strncmp(name, "url", 3) == 0) return TF_COERCE_STRING;
 	if (len == 6 && strncmp(name, "target", 6) == 0) return TF_COERCE_STRING;
 	if (len == 4 && strncmp(name, "size", 4) == 0) return TF_COERCE_INTEGER;
-#if defined(SWF_VERSION) && SWF_VERSION < 8
 	// SWF7 and below: indent/leading/blockIndent clamp negative to 0
-	if (len == 6 && strncmp(name, "indent", 6) == 0) return TF_COERCE_NONNEG_INT;
-	if (len == 7 && strncmp(name, "leading", 7) == 0) return TF_COERCE_NONNEG_INT;
-	if (len == 11 && strncmp(name, "blockIndent", 11) == 0) return TF_COERCE_NONNEG_INT;
-#else
-	if (len == 6 && strncmp(name, "indent", 6) == 0) return TF_COERCE_INTEGER;
-	if (len == 7 && strncmp(name, "leading", 7) == 0) return TF_COERCE_INTEGER;
-	if (len == 11 && strncmp(name, "blockIndent", 11) == 0) return TF_COERCE_INTEGER;
-#endif
+	// SWF8+: allow negative values (plain integer coercion)
+	if (len == 6 && strncmp(name, "indent", 6) == 0) return (g_swf_version < 8) ? TF_COERCE_NONNEG_INT : TF_COERCE_INTEGER;
+	if (len == 7 && strncmp(name, "leading", 7) == 0) return (g_swf_version < 8) ? TF_COERCE_NONNEG_INT : TF_COERCE_INTEGER;
+	if (len == 11 && strncmp(name, "blockIndent", 11) == 0) return (g_swf_version < 8) ? TF_COERCE_NONNEG_INT : TF_COERCE_INTEGER;
 	if (len == 10 && strncmp(name, "leftMargin", 10) == 0) return TF_COERCE_NONNEG_INT;
 	if (len == 11 && strncmp(name, "rightMargin", 11) == 0) return TF_COERCE_NONNEG_INT;
 	if (len == 5 && strncmp(name, "color", 5) == 0) return TF_COERCE_UNSIGNED;
@@ -3439,13 +3421,10 @@ static ActionVar tfCoerceInteger(SWFAppContext* app_context, ActionVar* value) {
 		result.data.numeric_value = VAL(u64, &v);
 		return result;
 	}
-#if defined(SWF_VERSION) && SWF_VERSION < 8
-	// SWF7 and below: truncate toward zero
-	d = (d >= 0) ? floor(d) : -floor(-d);
-#else
-	// SWF8+: banker's rounding (round half to even)
-	d = bankersRound(d);
-#endif
+	if (g_swf_version < 8)
+		d = (d >= 0) ? floor(d) : -floor(-d); // SWF7 and below: truncate toward zero
+	else
+		d = bankersRound(d); // SWF8+: banker's rounding (round half to even)
 	// Out of int32 range → -2147483648
 	if (d > 2147483647.0 || d < -2147483648.0) {
 		result.type = ACTION_STACK_VALUE_F64;
@@ -3510,11 +3489,10 @@ static ActionVar tfCoerceNonNegInt(SWFAppContext* app_context, ActionVar* value)
 		result.data.numeric_value = VAL(u64, &v);
 		return result;
 	}
-#if defined(SWF_VERSION) && SWF_VERSION < 8
-	d = (d >= 0) ? floor(d) : -floor(-d); // SWF7: truncate toward zero
-#else
-	d = bankersRound(d); // SWF8+: banker's rounding
-#endif
+	if (g_swf_version < 8)
+		d = (d >= 0) ? floor(d) : -floor(-d); // SWF7: truncate toward zero
+	else
+		d = bankersRound(d); // SWF8+: banker's rounding
 	// Positive overflow → -2147483648
 	if (d > 2147483647.0) {
 		double v = -2147483648.0;
@@ -6108,12 +6086,7 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 		const char* bound = _bound_buf;
 		if (bound[0] == '\0') continue;
 		// Compare (case-insensitive for SWF<=6)
-		int match = 0;
-#if !defined(SWF_VERSION) || SWF_VERSION < 7
-		match = (strcasecmp(bound, var_name) == 0);
-#else
-		match = (strcmp(bound, var_name) == 0);
-#endif
+		int match = (g_swf_version < 7) ? (strcasecmp(bound, var_name) == 0) : (strcmp(bound, var_name) == 0);
 		if (match) {
 			ActionVar text_val = {0};
 			text_val.type = ACTION_STACK_VALUE_STRING;
@@ -6202,12 +6175,9 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 				_ob_buf[0] = '\0';
 			const char* other_bound = _ob_buf;
 			if (other_bound[0] == '\0') continue;
-			int match = 0;
-#if !defined(SWF_VERSION) || SWF_VERSION < 7
-			match = (strcasecmp(other_bound, var_name) == 0);
-#else
-			match = (strncmp(other_bound, var_name, full_var_len) == 0 && other_bound[full_var_len] == '\0');
-#endif
+			int match = (g_swf_version < 7)
+			? (strcasecmp(other_bound, var_name) == 0)
+			: (strncmp(other_bound, var_name, full_var_len) == 0 && other_bound[full_var_len] == '\0');
 			if (match) {
 				setProperty(app_context, other_props, "text", 4, text_value);
 				ActionVar len_val = {0};
@@ -6241,12 +6211,7 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 			_ob2_buf[0] = '\0';
 		const char* other_bound = _ob2_buf;
 		if (other_bound[0] == '\0') continue;
-		int match = 0;
-#if !defined(SWF_VERSION) || SWF_VERSION < 7
-		match = (strcasecmp(other_bound, var_name) == 0);
-#else
-		match = (strcmp(other_bound, var_name) == 0);
-#endif
+		int match = (g_swf_version < 7) ? (strcasecmp(other_bound, var_name) == 0) : (strcmp(other_bound, var_name) == 0);
 		if (match) {
 			setProperty(app_context, other_props, "text", 4, text_value);
 			ActionVar len_val = {0};
@@ -6384,13 +6349,13 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 		case ACTION_STACK_VALUE_UNDEFINED:
 		{
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
-#if defined(SWF_VERSION) && SWF_VERSION >= 7
-			VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
-			STACK_TOP_N = 9;
-#else
-			VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
-			STACK_TOP_N = 0;
-#endif
+			if (g_swf_version >= 7) {
+				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
+				STACK_TOP_N = 9;
+			} else {
+				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
+				STACK_TOP_N = 0;
+			}
 			break;
 		}
 		case ACTION_STACK_VALUE_NULL:
@@ -6562,7 +6527,7 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 				char* end;
 				double temp;
 				int parsed = 0;
-#if defined(SWF_VERSION) && SWF_VERSION >= 6
+				if (g_swf_version >= 6) {
 				// SWF6+ supports hex (0x) and octal (0) prefix in string-to-number
 				const char* s = str;
 				int neg = 0;
@@ -6579,7 +6544,7 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 					long val = strtol(s, &end, 8);
 					if (end != s) { temp = neg ? -(double)val : (double)val; parsed = 1; }
 				}
-#endif
+				}
 				if (!parsed)
 				{
 					// Prevent C strtod from parsing special values that
@@ -6656,11 +6621,7 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 		{
 			// SWF < 7: null converts to 0.0
 			// SWF >= 7: null converts to NaN (ECMA-262)
-#if defined(SWF_VERSION) && SWF_VERSION >= 7
-			double temp = NAN;
-#else
-			double temp = 0.0;
-#endif
+			double temp = (g_swf_version >= 7) ? NAN : 0.0;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
@@ -6670,11 +6631,7 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 		{
 			// SWF < 7: undefined converts to 0.0
 			// SWF >= 7: undefined converts to NaN (ECMA-262)
-#if defined(SWF_VERSION) && SWF_VERSION < 7
-			double temp = 0.0;
-#else
-			double temp = NAN;
-#endif
+			double temp = (g_swf_version < 7) ? 0.0 : NAN;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
@@ -6762,11 +6719,7 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 			// No valueOf or valueOf didn't return a number
 			// SWF < 7: objects convert to 0.0 (Flash 6 and earlier behavior)
 			// SWF >= 7: objects convert to NaN (ECMA-262 compliant)
-#if defined(SWF_VERSION) && SWF_VERSION < 7
-			double temp = 0.0;
-#else
-			double temp = NAN;
-#endif
+			double temp = (g_swf_version < 7) ? 0.0 : NAN;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
@@ -8881,7 +8834,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	memset(g_ctors, 0, sizeof(g_ctors));
 	const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
 	int ctor_name_lens[] = {6, 5, 6, 6, 7, 8};
-	int num_ctors = (SWF_VERSION >= 6) ? 6 : 5;
+	int num_ctors = (g_swf_version >= 6) ? 6 : 5;
 	for (int ci = 0; ci < num_ctors; ci++)
 	{
 		strncpy(g_ctors[ci].name, ctor_names[ci], 255);
@@ -9204,6 +9157,21 @@ void actionGetVariable(SWFAppContext* app_context)
 	}
 	else
 	{
+		// Root context: check global_object for addProperty getter before var table
+		{
+			extern ASObject* global_object;
+			if (global_object != NULL)
+			{
+				ASProperty* gp = findPropertyStructWithPrototype(global_object, var_name, var_name_len);
+				if (gp != NULL && gp->getter != NULL)
+				{
+					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)gp->getter, (void*)global_object);
+					pushVar(app_context, &result);
+					return;
+				}
+			}
+		}
+
 		// Root context: check global variable table (normal behavior)
 		if (string_id != 0)
 		{
@@ -9773,13 +9741,13 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 
 		// Variable not found
-#if defined(SWF_VERSION) && SWF_VERSION >= 6
-		// SWF6+: undefined variables return undefined
-		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-#else
-		// SWF < 6: undefined variables return empty string
-		PUSH_STR("", 0);
-#endif
+		if (g_swf_version >= 6) {
+			// SWF6+: undefined variables return undefined
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		} else {
+			// SWF < 6: undefined variables return empty string
+			PUSH_STR("", 0);
+		}
 		return;
 	}
 
@@ -9950,8 +9918,24 @@ void actionSetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Not found in scope chain - set as global variable
+	// Not found in scope chain - check global_object for addProperty setter
+	{
+		extern ASObject* global_object;
+		if (global_object != NULL)
+		{
+			ASProperty* gp = findPropertyStructWithPrototype(global_object, var_name, var_name_len);
+			if (gp != NULL && gp->setter != NULL)
+			{
+				ActionVar value_var;
+				peekVar(app_context, &value_var);
+				POP_2();
+				invokePropertySetter(app_context, (ASFunction*)gp->setter, (void*)global_object, &value_var);
+				return;
+			}
+		}
+	}
 
+	// Set as global variable
 	ActionVar* var;
 	if (string_id != 0)
 	{
@@ -11172,11 +11156,7 @@ void actionBitURShift(SWFAppContext* app_context)
 	uint32_t value = varToUint32(&value_var);
 	uint32_t shifted = value >> shift_count;
 	// SWF8 treats unsigned right shift result as signed (Flash bug/quirk)
-#if defined(SWF_VERSION) && SWF_VERSION == 8
-	double result = (double)(int32_t)shifted;
-#else
-	double result = (double)shifted;
-#endif
+	double result = (g_swf_version == 8) ? (double)(int32_t)shifted : (double)shifted;
 	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
@@ -11261,32 +11241,32 @@ void actionEquals2(SWFAppContext* app_context)
 
 	if (a_is_obj && b_is_obj)
 	{
-#if !defined(SWF_VERSION) || SWF_VERSION < 6
-		// SWF5 and below: try valueOf on both; if both produce primitives, compare those.
-		// If either fails to produce a primitive, fall back to reference equality.
-		ActionVar a_prim = objectToPrimitive(app_context, &a, NULL);
-		ActionVar b_prim = objectToPrimitive(app_context, &b, NULL);
-		int a_ok = (a_prim.type != ACTION_STACK_VALUE_UNDEFINED);
-		int b_ok = (b_prim.type != ACTION_STACK_VALUE_UNDEFINED);
-		if (a_ok && b_ok)
-		{
-			a = a_prim;
-			b = b_prim;
-			// fall through to primitive comparison
-		}
-		else
-		{
-			// Reference equality
+		if (g_swf_version < 6) {
+			// SWF5 and below: try valueOf on both; if both produce primitives, compare those.
+			// If either fails to produce a primitive, fall back to reference equality.
+			ActionVar a_prim = objectToPrimitive(app_context, &a, NULL);
+			ActionVar b_prim = objectToPrimitive(app_context, &b, NULL);
+			int a_ok = (a_prim.type != ACTION_STACK_VALUE_UNDEFINED);
+			int b_ok = (b_prim.type != ACTION_STACK_VALUE_UNDEFINED);
+			if (a_ok && b_ok)
+			{
+				a = a_prim;
+				b = b_prim;
+				// fall through to primitive comparison
+			}
+			else
+			{
+				// Reference equality
+				u64 bool_val = (a.data.numeric_value == b.data.numeric_value) ? 1 : 0;
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+				return;
+			}
+		} else {
+			// SWF6+: reference equality for object vs object
 			u64 bool_val = (a.data.numeric_value == b.data.numeric_value) ? 1 : 0;
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 			return;
 		}
-#else
-		// SWF6+: reference equality for object vs object
-		u64 bool_val = (a.data.numeric_value == b.data.numeric_value) ? 1 : 0;
-		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
-		return;
-#endif
 	}
 	else if (a_is_obj)
 	{
@@ -14270,15 +14250,13 @@ void actionNewObject(SWFAppContext* app_context)
 			}
 
 			// SWF6 and below: set constructor directly on each instance
-#if !defined(SWF_VERSION) || SWF_VERSION < 7
-			{
+			if (g_swf_version < 7) {
 				ActionVar ctor_inst_var;
 				ctor_inst_var.type = ACTION_STACK_VALUE_FUNCTION;
 				ctor_inst_var.str_size = 0;
 				ctor_inst_var.data.numeric_value = (u64) ctor_func;
 				setProperty(app_context, obj, "constructor", 11, &ctor_inst_var);
 			}
-#endif
 
 			// Call the constructor with 'this' binding
 			if (ctor_func->function_type == 1)
@@ -14456,15 +14434,13 @@ void actionNewMethod(SWFAppContext* app_context)
 					proto_pv.data.numeric_value = (u64) func->prototype_obj;
 					setProperty(app_context, new_obj, "__proto__", 9, &proto_pv);
 				}
-#if !defined(SWF_VERSION) || SWF_VERSION < 7
-				{
+				if (g_swf_version < 7) {
 					ActionVar ctor_iv;
 					ctor_iv.type = ACTION_STACK_VALUE_FUNCTION;
 					ctor_iv.str_size = 0;
 					ctor_iv.data.numeric_value = (u64) func;
 					setProperty(app_context, new_obj, "constructor", 11, &ctor_iv);
 				}
-#endif
 
 				// Call function as constructor with 'this' binding
 				ActionVar return_value;
@@ -14775,11 +14751,10 @@ void actionNewMethod(SWFAppContext* app_context)
 			double w = varToDouble(&args[0]);
 			double h = varToDouble(&args[1]);
 			bool valid = false;
-#if defined(SWF_VERSION) && SWF_VERSION >= 10
-			valid = (w >= 1 && w <= 8191 && h >= 1 && h <= 8191 && w * h <= 16777215);
-#else
-			valid = (w >= 1 && w <= 2880 && h >= 1 && h <= 2880);
-#endif
+			if (g_swf_version >= 10)
+				valid = (w >= 1 && w <= 8191 && h >= 1 && h <= 8191 && w * h <= 16777215);
+			else
+				valid = (w >= 1 && w <= 2880 && h >= 1 && h <= 2880);
 			if (valid)
 			{
 				ASObject* bmp = allocObject(app_context, 4);
@@ -14830,15 +14805,13 @@ void actionNewMethod(SWFAppContext* app_context)
 		}
 
 		// SWF6 and below: set constructor directly on each instance
-#if !defined(SWF_VERSION) || SWF_VERSION < 7
-		{
+		if (g_swf_version < 7) {
 			ActionVar ctor_inst_v;
 			ctor_inst_v.type = ACTION_STACK_VALUE_FUNCTION;
 			ctor_inst_v.str_size = 0;
 			ctor_inst_v.data.numeric_value = (u64) user_ctor_func;
 			setProperty(app_context, new_obj_inst, "constructor", 11, &ctor_inst_v);
 		}
-#endif
 
 		// Call function as constructor with 'this' binding
 		ActionVar return_value;
@@ -16812,16 +16785,29 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Free args array before calling function
 				if (args != NULL) FREE(args);
 
-				// Call the simple function (cast to correct return type — generated functions return ActionVar)
-				ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-
-				// Pop local scope from scope chain
-				if (scope_depth > 0) {
-					scope_depth--;
+				if (func->simple_func == NULL)
+				{
+					// Built-in constructor called as plain function (no implementation) — push undefined
+					// Pop all items we pushed: num_args actual args + padding up to param_count
+					u32 total_pushed = num_args > func->param_count ? num_args : func->param_count;
+					for (u32 i = 0; i < total_pushed; i++) { POP(); }
+					if (scope_depth > 0) { scope_depth--; }
+					releaseObject(app_context, local_scope);
+					pushUndefined(app_context);
 				}
-				releaseObject(app_context, local_scope);
+				else
+				{
+					// Call the simple function (cast to correct return type — generated functions return ActionVar)
+					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 
-				pushVar(app_context, &func_result);
+					// Pop local scope from scope chain
+					if (scope_depth > 0) {
+						scope_depth--;
+					}
+					releaseObject(app_context, local_scope);
+
+					pushVar(app_context, &func_result);
+				}
 			}
 
 			g_call_depth--;
@@ -19092,11 +19078,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 13 && strncmp(method_name, "getSWFVersion", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
-#if defined(SWF_VERSION)
-			double v = (double)SWF_VERSION;
-#else
-			double v = 5.0;
-#endif
+			double v = (double)g_swf_version;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}

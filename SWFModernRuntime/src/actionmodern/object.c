@@ -3,19 +3,12 @@
 #include <stdio.h>
 #include <assert.h>
 
-#ifdef __has_include
-#  if __has_include("constants.h")
-#    include "constants.h"
-#  endif
-#endif
-
 #include <actionmodern/object.h>
 #include <actionmodern/action.h>
 #include <heap.h>
 
 // Version-based property hiding masks for ASSetPropFlags
 // When (property->flash_flags & FLASH_HIDE_MASK) != 0, property is hidden from GetMember
-#if defined(SWF_VERSION)
 static const u16 flash_hide_masks[] = {
 	0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // SWF 0-4
 	0x7480, // SWF 5
@@ -25,10 +18,7 @@ static const u16 flash_hide_masks[] = {
 	0x4000, // SWF 9
 	0x0000, // SWF 10+
 };
-#define FLASH_HIDE_MASK (SWF_VERSION <= 10 ? flash_hide_masks[SWF_VERSION] : 0)
-#else
-#define FLASH_HIDE_MASK 0
-#endif
+#define FLASH_HIDE_MASK (g_swf_version <= 10 ? flash_hide_masks[g_swf_version] : 0)
 
 /**
  * Object Allocation
