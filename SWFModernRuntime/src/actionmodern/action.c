@@ -9204,6 +9204,21 @@ void actionGetVariable(SWFAppContext* app_context)
 	}
 	else
 	{
+		// Root context: check global_object for addProperty getter before var table
+		{
+			extern ASObject* global_object;
+			if (global_object != NULL)
+			{
+				ASProperty* gp = findPropertyStructWithPrototype(global_object, var_name, var_name_len);
+				if (gp != NULL && gp->getter != NULL)
+				{
+					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)gp->getter, (void*)global_object);
+					pushVar(app_context, &result);
+					return;
+				}
+			}
+		}
+
 		// Root context: check global variable table (normal behavior)
 		if (string_id != 0)
 		{
@@ -9950,8 +9965,24 @@ void actionSetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Not found in scope chain - set as global variable
+	// Not found in scope chain - check global_object for addProperty setter
+	{
+		extern ASObject* global_object;
+		if (global_object != NULL)
+		{
+			ASProperty* gp = findPropertyStructWithPrototype(global_object, var_name, var_name_len);
+			if (gp != NULL && gp->setter != NULL)
+			{
+				ActionVar value_var;
+				peekVar(app_context, &value_var);
+				POP_2();
+				invokePropertySetter(app_context, (ASFunction*)gp->setter, (void*)global_object, &value_var);
+				return;
+			}
+		}
+	}
 
+	// Set as global variable
 	ActionVar* var;
 	if (string_id != 0)
 	{
@@ -16812,16 +16843,29 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Free args array before calling function
 				if (args != NULL) FREE(args);
 
-				// Call the simple function (cast to correct return type — generated functions return ActionVar)
-				ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-
-				// Pop local scope from scope chain
-				if (scope_depth > 0) {
-					scope_depth--;
+				if (func->simple_func == NULL)
+				{
+					// Built-in constructor called as plain function (no implementation) — push undefined
+					// Pop all items we pushed: num_args actual args + padding up to param_count
+					u32 total_pushed = num_args > func->param_count ? num_args : func->param_count;
+					for (u32 i = 0; i < total_pushed; i++) { POP(); }
+					if (scope_depth > 0) { scope_depth--; }
+					releaseObject(app_context, local_scope);
+					pushUndefined(app_context);
 				}
-				releaseObject(app_context, local_scope);
+				else
+				{
+					// Call the simple function (cast to correct return type — generated functions return ActionVar)
+					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 
-				pushVar(app_context, &func_result);
+					// Pop local scope from scope chain
+					if (scope_depth > 0) {
+						scope_depth--;
+					}
+					releaseObject(app_context, local_scope);
+
+					pushVar(app_context, &func_result);
+				}
 			}
 
 			g_call_depth--;
