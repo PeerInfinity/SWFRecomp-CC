@@ -412,16 +412,13 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[i].sprite_idx = si;
 			ng_display[i].current_frame = 0;
 			ng_display[i].is_playing = 1;
-			ng_display[i].needs_init = 0;
+			ng_display[i].needs_init = (si != (size_t)-1) ? 1 : 0;
 			ng_display[i].placed_at_frame = current_frame;
 			ng_display[i].transform_id = transform_id;
 			ng_display[i].is_button = btn;
 			ng_display[i].is_textfield = is_tf;
 			ng_display[i].textfield_idx = tf_idx;
 			ng_display[i].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-			// Execute sprite frame 0 immediately so children exist for scripts
-			if (si != (size_t)-1)
-				ng_exec_sprite_frame(app_context, i, 0);
 			goto placed;
 		}
 	}
@@ -429,23 +426,19 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// New entry
 	if (ng_display_count < MAX_DISPLAY_NG)
 	{
-		size_t new_idx = ng_display_count;
-		ng_display[new_idx].depth = depth;
-		ng_display[new_idx].sprite_idx = si;
-		ng_display[new_idx].current_frame = 0;
-		ng_display[new_idx].is_playing = 1;
-		ng_display[new_idx].needs_init = 0;
-		ng_display[new_idx].placed_at_frame = current_frame;
-		ng_display[new_idx].transform_id = transform_id;
-		ng_display[new_idx].is_button = btn;
-		ng_display[new_idx].is_textfield = is_tf;
-		ng_display[new_idx].textfield_idx = tf_idx;
-		ng_display[new_idx].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-		ng_display[new_idx].instance_name[0] = '\0';
+		ng_display[ng_display_count].depth = depth;
+		ng_display[ng_display_count].sprite_idx = si;
+		ng_display[ng_display_count].current_frame = 0;
+		ng_display[ng_display_count].is_playing = 1;
+		ng_display[ng_display_count].needs_init = (si != (size_t)-1) ? 1 : 0;
+		ng_display[ng_display_count].placed_at_frame = current_frame;
+		ng_display[ng_display_count].transform_id = transform_id;
+		ng_display[ng_display_count].is_button = btn;
+		ng_display[ng_display_count].is_textfield = is_tf;
+		ng_display[ng_display_count].textfield_idx = tf_idx;
+		ng_display[ng_display_count].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+		ng_display[ng_display_count].instance_name[0] = '\0';
 		ng_display_count++;
-		// Execute sprite frame 0 immediately so children exist for scripts
-		if (si != (size_t)-1)
-			ng_exec_sprite_frame(app_context, new_idx, 0);
 	}
 
 placed:
@@ -547,10 +540,11 @@ void ng_enumerateChildren(const char* parent_name, void (*callback)(const char* 
 }
 
 // Check if the display entry at a given depth is a sprite (movieclip)
+// Only matches root-level entries (called from action.c for root display object resolution)
 int ng_isSpriteAtDepth(size_t depth)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
 			return ng_display[i].sprite_idx != (size_t)-1;
 	return 0;
 }
@@ -559,7 +553,7 @@ int ng_isSpriteAtDepth(size_t depth)
 int ng_isButtonAtDepth(size_t depth)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
 			return ng_display[i].is_button;
 	return 0;
 }
@@ -567,7 +561,7 @@ int ng_isButtonAtDepth(size_t depth)
 int ng_isTextFieldAtDepth(size_t depth)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
 			return ng_display[i].is_textfield;
 	return 0;
 }
@@ -576,7 +570,8 @@ const char* ng_getTextFieldInitialText(size_t depth)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].depth == depth && ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
 			return ng_textfields[ng_display[i].textfield_idx].plain_text;
 	}
 	return "";
@@ -586,7 +581,8 @@ u32 ng_getTextFieldColor(size_t depth)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].depth == depth && ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
 			return ng_textfields[ng_display[i].textfield_idx].text_color;
 	}
 	return 0;
@@ -601,7 +597,8 @@ u32 ng_getTextFieldColorByIdx(int idx)
 int ng_getTextFieldIdx(size_t depth)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth && ng_display[i].is_textfield)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].is_textfield)
 			return ng_display[i].textfield_idx;
 	return -1;
 }
@@ -749,7 +746,7 @@ int ng_getTransformId(size_t depth, u32* out_id)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
 		{
 			*out_id = ng_display[i].transform_id;
 			return 1;
@@ -763,7 +760,7 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 {
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].depth == depth)
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
 		{
 			u32 tid = ng_display[i].transform_id;
 			*out_x = transform_data[tid][12] / 20.0f;
@@ -775,13 +772,15 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 }
 
 // NO_GRAPHICS child lookup by instance name — returns depth or SIZE_MAX if not found
+// Only matches root-level entries (called from action.c for root display object resolution)
 size_t ng_findDisplayEntryByName(const char* name)
 {
 	// Return the lowest-depth match when multiple entries share a name
 	size_t result = SIZE_MAX;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
-		if (ng_display[i].instance_name[0] != '\0' &&
+		if (ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].instance_name[0] != '\0' &&
 		    strcmp(ng_display[i].instance_name, name) == 0)
 		{
 			if (result == SIZE_MAX || ng_display[i].depth < result)

@@ -4427,7 +4427,12 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 				ASObject* elem = xml_create_node(app_context, 1,
 					&text[name_start], name_len, NULL, 0);
 
-				// Parse attributes
+				// Parse attributes — collect in parse order, then store in reverse
+				// so that reverse-insertion-order enumeration gives forward parse order.
+				typedef struct { char* name; u32 name_len; char* val; u32 val_len; } XmlAttrEntry;
+				XmlAttrEntry xml_attr_buf[64];
+				int xml_attr_count = 0;
+
 				while (pos < text_len && text[pos] != '>' && text[pos] != '/') {
 					// Skip whitespace
 					while (pos < text_len && (text[pos] == ' ' || text[pos] == '\t' ||
@@ -4454,20 +4459,36 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 					u32 attr_val_len = pos - attr_val_start;
 					if (pos < text_len) pos++; // skip closing quote
 
-					// Unescape and store attribute
+					// Unescape and collect
 					u32 ue_len = 0;
 					char* ue_val = xml_unescape(app_context, &text[attr_val_start], attr_val_len, &ue_len);
 
-					ActionVar* attrs_prop = getProperty(elem, "attributes", 10);
-					if (attrs_prop != NULL && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
-						ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
-						if (attrs != NULL) {
-							char* a_name = xml_strdup(app_context, &text[attr_name_start], attr_name_len);
-							xml_set_str(app_context, attrs, a_name, attr_name_len, ue_val, ue_len);
-							free(a_name);
+					if (xml_attr_count < 64) {
+						xml_attr_buf[xml_attr_count].name = xml_strdup(app_context, &text[attr_name_start], attr_name_len);
+						xml_attr_buf[xml_attr_count].name_len = attr_name_len;
+						xml_attr_buf[xml_attr_count].val = ue_val;
+						xml_attr_buf[xml_attr_count].val_len = ue_len;
+						xml_attr_count++;
+					} else {
+						free(ue_val);
+					}
+				}
+
+				// Store collected attributes in reverse parse order
+				// (reverse insertion order → forward parse order during for-in enumeration)
+				ActionVar* attrs_prop = getProperty(elem, "attributes", 10);
+				if (attrs_prop != NULL && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
+					if (attrs != NULL) {
+						for (int ai = xml_attr_count - 1; ai >= 0; ai--) {
+							xml_set_str(app_context, attrs, xml_attr_buf[ai].name,
+								xml_attr_buf[ai].name_len, xml_attr_buf[ai].val, xml_attr_buf[ai].val_len);
 						}
 					}
-					free(ue_val);
+				}
+				for (int ai = 0; ai < xml_attr_count; ai++) {
+					free(xml_attr_buf[ai].name);
+					free(xml_attr_buf[ai].val);
 				}
 
 				// Check for self-closing />
@@ -10700,29 +10721,39 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					if (key_len == 9 && strncmp(key, "__proto__", 9) == 0)
 						continue;
 
-					// Verify the key still has a value (not deleted)
-					// Check if it's a numeric index
-					int is_num = 1;
-					u32 idx_val = 0;
-					for (u32 j = 0; j < key_len; j++)
+					// Verify the key still has a value (not deleted).
+					// Try numeric element first, then fall back to named props.
+					int found = 0;
+
+					// Check if it's a small numeric index in the elements array
+					if (key_len > 0 && key_len <= 10 && key[0] >= '0' && key[0] <= '9')
 					{
-						if (key[j] < '0' || key[j] > '9') { is_num = 0; break; }
-						idx_val = idx_val * 10 + (key[j] - '0');
-					}
-					if (is_num && key_len > 0)
-					{
-						if (idx_val < arr->length && idx_val < arr->capacity &&
-						    arr->elements[idx_val].type != ACTION_STACK_VALUE_HOLE)
-							PUSH_STR((char*)key, key_len);
-					}
-					else
-					{
-						// Named property — check if still exists and enumerable in props
-						if (arr->props != NULL)
+						int is_num = 1;
+						u64 idx_val = 0;
+						for (u32 j = 0; j < key_len; j++)
 						{
-							ActionVar* pv = getProperty(arr->props, key, key_len);
-							if (pv != NULL)
-								PUSH_STR((char*)key, key_len);
+							if (key[j] < '0' || key[j] > '9') { is_num = 0; break; }
+							idx_val = idx_val * 10 + (key[j] - '0');
+						}
+						// Flash treats array length as signed for enumeration:
+						// when bit 31 is set (negative signed), no numeric elements are valid.
+						if (is_num && (int32_t)arr->length > 0 &&
+						    idx_val < arr->length && idx_val < arr->capacity &&
+						    arr->elements[(u32)idx_val].type != ACTION_STACK_VALUE_HOLE)
+						{
+							PUSH_STR((char*)key, key_len);
+							found = 1;
+						}
+					}
+
+					// Fall back to named properties (handles large indices, strings, etc.)
+					if (!found && arr->props != NULL)
+					{
+						ActionVar* pv = getProperty(arr->props, key, key_len);
+						if (pv != NULL)
+						{
+							PUSH_STR((char*)key, key_len);
+							found = 1;
 						}
 					}
 				}
