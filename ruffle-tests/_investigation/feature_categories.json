@@ -1,0 +1,631 @@
+{
+  "categories": [
+    {
+      "name": "TextField/EditText Properties and Formatting",
+      "tests": [
+        "edittext_align", "edittext_align_trailing_spaces_swf7", "edittext_align_trailing_spaces_swf8",
+        "edittext_antialiastype", "edittext_autosize", "edittext_autosize_setter", "edittext_bullet",
+        "edittext_default_format", "edittext_default_format_empty", "edittext_default_format_font_style",
+        "edittext_drag_select", "edittext_focus_selection", "edittext_font_size", "edittext_hscroll",
+        "edittext_html_align_swf7", "edittext_html_align_swf8", "edittext_html_color",
+        "edittext_html_condensewhite_swf7", "edittext_html_condensewhite_swf8", "edittext_html_entity",
+        "edittext_html_roundtrip", "edittext_html_swf6", "edittext_html_swf7", "edittext_html_swf8",
+        "edittext_ime_focus_lost", "edittext_input", "edittext_input_newlines", "edittext_leading",
+        "edittext_letter_spacing", "edittext_margins", "edittext_newline_stripping", "edittext_newlines",
+        "edittext_password", "edittext_password_copy", "edittext_paste_empty", "edittext_place_caret",
+        "edittext_programmatic_focus", "edittext_restrict", "edittext_restrict_paste", "edittext_scroll",
+        "edittext_stylesheet", "edittext_tab_focus", "edittext_tab_stops", "edittext_tag_indent",
+        "edittext_text_height_leading", "edittext_underline", "edittext_width_height",
+        "text_format", "text_format_display", "text_format_font_max_length",
+        "text_format_rounding_swf7", "text_format_rounding_swf8",
+        "textfield_background_color", "textfield_border_color",
+        "textfield_cache_as_bitmap", "textfield_maxchars", "textfield_properties",
+        "textfield_props_swf5", "textfield_props_swf6", "textfield_props_swf7", "textfield_props_swf8",
+        "textfield_text", "textfield_variable",
+        "textsnapshot_available_text", "textsnapshot_findtext", "textsnapshot_gettext",
+        "textsnapshot_props_swf5", "textsnapshot_props_swf6", "textsnapshot_text_order"
+      ],
+      "description": "Needs comprehensive TextField/EditText property support including: TextFormat object (align, font, size, color, bold, italic, underline, leading, margins, indent, tabStops, letterSpacing, bullet), HTML text round-trip (htmlText property with tag parsing/generation), text selection and caret positioning, scroll/hscroll/maxscroll properties, autoSize behavior, input text handling (restrict, password, maxChars), TextSnapshot for read-only text access, and programmatic focus control.",
+      "sub_categories": [
+        {
+          "name": "TextFormat",
+          "tests": ["text_format", "text_format_display", "text_format_font_max_length", "text_format_rounding_swf7", "text_format_rounding_swf8"],
+          "note": "TextFormat object creation and properties"
+        },
+        {
+          "name": "HTML text",
+          "tests": ["edittext_html_align_swf7", "edittext_html_align_swf8", "edittext_html_color", "edittext_html_condensewhite_swf7", "edittext_html_condensewhite_swf8", "edittext_html_entity", "edittext_html_roundtrip", "edittext_html_swf6", "edittext_html_swf7", "edittext_html_swf8"],
+          "note": "Needs HTML parsing/generation in htmlText property"
+        },
+        {
+          "name": "Input/Focus",
+          "tests": ["edittext_input", "edittext_input_newlines", "edittext_focus_selection", "edittext_programmatic_focus", "edittext_tab_focus", "edittext_drag_select", "edittext_ime_focus_lost", "edittext_place_caret", "edittext_paste_empty", "edittext_restrict", "edittext_restrict_paste", "edittext_password", "edittext_password_copy"],
+          "note": "Text input, focus, and selection handling"
+        },
+        {
+          "name": "TextSnapshot",
+          "tests": ["textsnapshot_available_text", "textsnapshot_findtext", "textsnapshot_gettext", "textsnapshot_props_swf5", "textsnapshot_props_swf6", "textsnapshot_text_order"],
+          "note": "TextSnapshot class not implemented"
+        },
+        {
+          "name": "Layout/Formatting",
+          "tests": [],
+          "note": "Autosize, scroll, width/height, font metrics, etc.",
+          "remainder": true
+        }
+      ]
+    },
+    {
+      "name": "XML/XMLNode",
+      "tests": [
+        "xml", "xml_append_child", "xml_append_child_with_parent", "xml_attributes_read", "xml_cdata",
+        "xml_child_nodes_edge_cases", "xml_clone_expandos", "xml_first_last_child", "xml_getbytes",
+        "xml_has_child_nodes", "xml_idmap", "xml_ignore_comments", "xml_ignore_white", "xml_insert_before",
+        "xml_inspect_createmethods", "xml_inspect_doctype", "xml_inspect_parsexml", "xml_inspect_xmldecl",
+        "xml_load", "xml_namespaces", "xml_parent_and_child", "xml_remove_node", "xml_reparenting",
+        "xml_siblings", "xml_socket", "xml_socket_close_in_handler", "xml_socket_on_data",
+        "xml_socket_segmented", "xml_to_string", "xml_to_string_comment", "xml_unescaping",
+        "xmlnode_proto", "swf5_xml_event_handler_context"
+      ],
+      "description": "Needs full XML DOM implementation. The XML class requires: constructor (new XML / new XML(string)), parseXML(), toString(), createElement(), createTextNode(), appendChild(), insertBefore(), removeNode(), cloneNode(), hasChildNodes(). XMLNode properties: childNodes, firstChild, lastChild, previousSibling, nextSibling, parentNode, nodeType, nodeName, nodeValue, attributes. Also needs: ignoreWhite property, idMap, xmlDecl, docTypeDecl, CDATA handling, XML escaping/unescaping.",
+      "sub_categories": [
+        {
+          "name": "XMLSocket",
+          "tests": ["xml_socket", "xml_socket_close_in_handler", "xml_socket_on_data", "xml_socket_segmented"],
+          "note": "Needs network"
+        },
+        {
+          "name": "XML.load",
+          "tests": ["xml_load"],
+          "note": "Needs network"
+        },
+        {
+          "name": "Core XML DOM",
+          "tests": [],
+          "note": "Core XML parsing, manipulation, and serialization",
+          "remainder": true
+        }
+      ]
+    },
+    {
+      "name": "LoadMovie/LoadVariables/MovieClipLoader",
+      "tests": [
+        "loading_avm2", "loadmovie", "loadmovie_fail", "loadmovie_flashvars", "loadmovie_method",
+        "loadmovie_registerclass", "loadmovie_replace_root", "loadmovie_var_persistence", "loadmovienum",
+        "loadmovienum_cross_version_prototype", "loadvariables", "loadvariables2", "loadvariables_method",
+        "loadvariablesnum", "mcl_as_broadcaster", "mcl_events_swf_version", "mcl_getprogress",
+        "mcl_loadclip", "mcl_loadclip_properties", "mcl_loadclip_replace_root", "mcl_mislabeled_target",
+        "mcl_replace_root_swf7_to_swf5", "mcl_replace_root_swf7_to_swf6", "mcl_target_gif87a",
+        "mcl_target_gif89a", "mcl_target_jpg", "mcl_target_png", "mcl_unloadclip",
+        "moviecliploader_flashvars"
+      ],
+      "description": "Needs runtime SWF/image loading capability. loadMovie() loads external SWF files into movie clip targets. loadMovieNum() loads into _levels. loadVariables()/loadVariablesNum() loads URL-encoded variable data. MovieClipLoader is the AS2 event-based loader with onLoadStart/onLoadComplete/onLoadInit/onLoadError callbacks and getProgress(). These all fundamentally require network/file loading which may not be feasible in the recompiler's trace-only mode."
+    },
+    {
+      "name": "MovieClip Methods and Properties",
+      "tests": [
+        "movieclip_blend_mode_property", "movieclip_create_text_field", "movieclip_default_state",
+        "movieclip_depth_methods", "movieclip_focusenabled", "movieclip_get_instance_at_depth",
+        "movieclip_getbounds", "movieclip_gettextsnapshot", "movieclip_hittest",
+        "movieclip_hittest_shapeflag", "movieclip_init_object",
+        "movieclip_invalid_get_bounds_1", "movieclip_invalid_get_bounds_2", "movieclip_invalid_get_bounds_3",
+        "movieclip_invalid_get_bounds_4", "movieclip_invalid_get_bounds_5", "movieclip_invalid_get_bounds_6",
+        "movieclip_invalid_get_bounds_7", "movieclip_invalid_get_bounds_8",
+        "movieclip_library_state_values", "movieclip_lockroot",
+        "movieclip_methods_with_loaded_image", "movieclip_setmask", "movieclip_state_values",
+        "local_to_global"
+      ],
+      "description": "Needs MovieClip method implementations beyond basic timeline control. Key methods: getBounds()/getRect(), hitTest(), createTextField(), getInstanceAtDepth(), depth methods (getDepth, getNextHighestDepth, swapDepths), setMask(), _lockroot, state properties (_currentframe, _totalframes, _framesloaded, _url, _quality, blendMode), focusEnabled, init object in attachMovie."
+    },
+    {
+      "name": "Mouse/Focus/Input Events",
+      "tests": [
+        "focus_keyboard_press", "focus_mouse", "focus_mouse_focusable", "focus_mouse_rollout",
+        "focus_remove", "focus_root_movie", "focus_visibility_change",
+        "focusrect_focuslost", "focusrect_property_swf5", "focusrect_property_swf6",
+        "focusrect_property_swf7", "focusrect_swf6",
+        "mouse_events", "mouse_events_visible_enabled", "mouse_hover_events_while_dragging",
+        "mouse_listeners", "mouse_pos", "mouse_pos_with_scale_factor", "mouse_wheel_enabled"
+      ],
+      "description": "Needs simulated mouse/keyboard event dispatch for trace-only testing. Tests expect synthetic input events (mouse click, move, key press) to trigger onPress, onRelease, onRollOver, onRollOut, onMouseDown, onMouseUp, etc. callbacks. Also needs focus management (Selection.setFocus, moveFocus, focus rectangle drawing), and Mouse.addListener()/Mouse.removeListener() for global mouse events."
+    },
+    {
+      "name": "Button Behavior and Events",
+      "tests": [
+        "button_children", "button_goto", "button_key_events", "button_key_events_special",
+        "button_keypress", "button_keypress_vs_press", "button_keypress_vs_tab",
+        "button_keypress_vs_textinput", "button_order", "button_properties_special_cases",
+        "button_v5", "button_v6", "movieclip_in_removed_button", "root_button_mode"
+      ],
+      "description": "Needs button event handling in trace mode. Tests need: button key events (onKeyDown/onKeyUp on buttons), button_goto (gotoAndStop from button actions), button display ordering, button property access (special cases for _name, _target, etc.), SWF5/SWF6 version-specific button behavior, and handling of buttons after their parent clip is removed."
+    },
+    {
+      "name": "Tab Ordering and Focus Navigation",
+      "tests": [
+        "tab_ordering_automatic_basic", "tab_ordering_automatic_order_grid",
+        "tab_ordering_automatic_order_same_position", "tab_ordering_children",
+        "tab_ordering_custom_basic", "tab_ordering_custom_duplicate_index",
+        "tab_ordering_custom_i32_vs_u32", "tab_ordering_custom_m1",
+        "tab_ordering_events", "tab_ordering_events_mouse",
+        "tab_ordering_movieclip_enabled_default", "tab_ordering_properties",
+        "tab_ordering_reverse", "tab_ordering_tabbable"
+      ],
+      "description": "Needs tab/focus navigation system. Automatic tab ordering sorts by position (top-to-bottom, left-to-right). Custom tab ordering uses tabIndex property. Tests check tabEnabled, tabIndex, tabChildren properties on MovieClips and Buttons. Requires synthetic Tab key press simulation."
+    },
+    {
+      "name": "String Methods and String Paths",
+      "tests": [
+        "string_methods", "string_methods_negative_args", "string_methods_swfv5", "string_ops_swf6",
+        "string_paths_basic", "string_paths_eval", "string_paths_eval2", "string_paths_hidden",
+        "string_paths_other", "string_paths_reference_launder", "string_paths_unload",
+        "string_paths_variable_alias", "string_paths_variable_scopes"
+      ],
+      "description": "Two sub-features: (1) String methods: String.prototype methods like charAt, charCodeAt, indexOf, etc. (2) String paths: Flash's path-based variable resolution using slash syntax (e.g., _root/clip:variable), eval() for dynamic path resolution, and variable aliasing through paths.",
+      "sub_categories": [
+        {
+          "name": "String methods",
+          "tests": ["string_methods", "string_methods_negative_args", "string_methods_swfv5", "string_ops_swf6"],
+          "note": "String.prototype methods"
+        },
+        {
+          "name": "String paths",
+          "tests": ["string_paths_basic", "string_paths_eval", "string_paths_eval2", "string_paths_hidden", "string_paths_other", "string_paths_reference_launder", "string_paths_unload", "string_paths_variable_alias", "string_paths_variable_scopes"],
+          "note": "Path-based variable resolution using slash syntax"
+        }
+      ]
+    },
+    {
+      "name": "Global Built-in Functions and Objects",
+      "tests": [
+        "global_instance_decls", "global_proto_decls", "global_proto_decls_delete",
+        "global_swf5_6_7_8_9", "global_swf6_7_8",
+        "globals_swf5", "globals_swf6", "globals_swf7", "globals_swf8",
+        "swf5_global_funcs", "swf6_global_funcs", "swf7_global_funcs"
+      ],
+      "description": "Tests that enumerate all global variables and check which built-in classes/functions exist per SWF version. Many failures are because built-in classes (XML, Date, Color, Sound, etc.) are not registered as globals. Fixing these tests requires implementing all the other missing features AND registering their constructors on _global."
+    },
+    {
+      "name": "Sound",
+      "tests": [
+        "sound", "sound_duration_position_props", "sound_id3", "sound_id3_prop",
+        "sound_load_start", "sound_multiple_load", "sound_props_swf5", "sound_props_swf6"
+      ],
+      "description": "Needs Sound object implementation for trace mode. Constructor: new Sound(target). Methods: start(), stop(), attachSound(), loadSound(), getVolume(), setVolume(), getPan(), setPan(), getTransform(), setTransform(), getBytesLoaded(), getBytesTotal(). Properties: duration, position, id3."
+    },
+    {
+      "name": "BitmapData",
+      "tests": [
+        "bitmap_data", "bitmap_data_compare", "bitmap_data_copypixels", "bitmap_data_hittest",
+        "bitmap_data_noise", "bitmap_data_pixeldissolve", "bitmap_data_threshold", "bitmapdata_channels"
+      ],
+      "description": "Needs flash.display.BitmapData class implementation. Methods needed: compare(), copyPixels(), hitTest(), threshold(), noise(). The bitmap_data test is the main constructor/property test."
+    },
+    {
+      "name": "FileReference",
+      "tests": [
+        "file_reference_browse_cancel", "file_reference_download_cancel",
+        "file_reference_download_httperror_dns_error", "file_reference_download_httperror_status_code",
+        "file_reference_download_success", "file_reference_upload_httperror_dns_error",
+        "file_reference_upload_httperror_status_code", "file_reference_upload_success"
+      ],
+      "description": "Needs flash.net.FileReference class. Browse, download, and upload operations with event callbacks. Requires file system and network access -- likely not implementable in trace-only mode."
+    },
+    {
+      "name": "OOP / Super / Extends / Interfaces",
+      "tests": [
+        "as2_oop", "as2_super_and_this_v6", "as2_super_and_this_v8", "as2_super_via_manual_prototype",
+        "extends_chain", "extends_native_type", "super_edge_cases", "interface_implements_op"
+      ],
+      "description": "Needs proper super keyword support in AS2 classes and interface/implements support. Tests check: super in constructors, super in methods, super with manual prototype chains, extending native types (Array, String, etc.), and edge cases where super interacts with this binding."
+    },
+    {
+      "name": "RegisterClass and Export/Registration",
+      "tests": [
+        "register_and_init_order", "register_class", "register_class_return_value",
+        "register_class_swf6", "register_class_with_sound", "register_globals_across_frames",
+        "register_underflow"
+      ],
+      "description": "Needs Object.registerClass() implementation for linking AS2 classes to library symbols. When a movie clip with a registered class is instantiated, the class constructor should be called and this should be the clip instance."
+    },
+    {
+      "name": "Stage Object Properties",
+      "tests": [
+        "stage_display_state", "stage_object_children", "stage_object_enumerate",
+        "stage_object_properties", "stage_object_properties_swf6", "stage_property_representation",
+        "stage_scale_mode"
+      ],
+      "description": "Needs Stage object as a special global with properties: width, height, scaleMode, displayState, align, showMenu, quality."
+    },
+    {
+      "name": "SWF Version-Specific Behavior",
+      "tests": [
+        "divide_swf4", "swf4_actions_coercion_order", "swf4_function_calls",
+        "swf5_no_closure", "swf5_to_6_cross_call",
+        "swf6_case_insensitive", "swf6_string_as_bool", "swf6_to_5_cross_call", "swf7_case_sensitive"
+      ],
+      "description": "Tests that verify version-dependent behavior differences: case sensitivity (SWF6 insensitive, SWF7+ sensitive), cross-version function calls between loaded movies, SWF5 closure behavior, string-as-boolean coercion, and SWF4 type coercion."
+    },
+    {
+      "name": "TellTarget / Target Path Resolution",
+      "tests": [
+        "target_clip_removed", "target_clip_swf5", "target_clip_swf6",
+        "target_path", "tell_target", "tell_target_invalid", "tell_target_invalid_swf6"
+      ],
+      "description": "Needs proper tellTarget (ActionSetTarget/ActionSetTarget2) implementation with correct scope resolution. When targeting a clip, variable reads should resolve against target scope, and writes should set properties on the target."
+    },
+    {
+      "name": "Unload / UnloadMovie",
+      "tests": [
+        "unload", "unload_clip_event", "unload_nested_child",
+        "unloadmovie", "unloadmovie_method", "unloadmovienum"
+      ],
+      "description": "Needs proper unload behavior. When a movie clip is unloaded: onUnload event fires, clip becomes inaccessible by name but retains its depth slot, nested children are recursively unloaded."
+    },
+    {
+      "name": "Clone/Duplicate MovieClip",
+      "tests": [
+        "clone_sprite_edittext", "clone_sprite_edittext_dynamic", "clone_sprite_types",
+        "duplicate_movie_clip", "duplicate_movie_clip_drawing"
+      ],
+      "description": "Needs duplicateMovieClip() and MovieClip.duplicateMovieClip() implementation. Cloning should copy the clip's display list, including text fields."
+    },
+    {
+      "name": "Native Object/Function Introspection",
+      "tests": [
+        "native_double_construct", "native_objects_swf6", "native_objects_swf7",
+        "native_objects_swf8", "native_subclasses"
+      ],
+      "description": "Tests that check behavior of native (built-in) objects and functions. Meta-tests that effectively require all built-in classes to be implemented."
+    },
+    {
+      "name": "Prototype Chain and Object Properties",
+      "tests": [
+        "is_prototype_of", "object_prototypes", "prototype_enumerate", "prototype_properties"
+      ],
+      "description": "Needs correct __proto__ chain traversal, isPrototypeOf(), for-in enumeration of prototype properties, and property flags (DontEnum, DontDelete, ReadOnly)."
+    },
+    {
+      "name": "Math Object",
+      "tests": [
+        "math_min_max", "math_swf6", "math_swf7", "math_swf8"
+      ],
+      "description": "Needs Math object with all standard methods. math_swf6/7/8 are comprehensive tests of every Math method."
+    },
+    {
+      "name": "NetConnection/NetStream",
+      "tests": [
+        "netconnection_close", "netconnection_send_remote", "netstream_play_flv", "netstream_seek_flv"
+      ],
+      "description": "Needs NetConnection and NetStream classes for FLV video playback. Requires network and media capabilities -- likely not implementable in trace-only mode."
+    },
+    {
+      "name": "Object.watch",
+      "tests": [
+        "watch", "watch_textfield", "watch_virtual_property", "watch_virtual_property_proto"
+      ],
+      "description": "Needs Object.prototype.watch() and Object.prototype.unwatch() methods. watch() registers a callback that's invoked when a property is set."
+    },
+    {
+      "name": "Color Object",
+      "tests": [
+        "color", "color_transform", "transform"
+      ],
+      "description": "Needs new Color(target) constructor with methods: getRGB(), setRGB(), getTransform(), setTransform(). The Color object controls color transformation on a movie clip target. The transform test needs flash.geom.Transform."
+    },
+    {
+      "name": "Drag and Drop",
+      "tests": [
+        "drag_drop", "drag_over_from_outside", "drag_over_without_startdrag"
+      ],
+      "description": "Needs startDrag()/stopDrag() implementation with simulated mouse movement for trace testing."
+    },
+    {
+      "name": "Enumeration (for-in)",
+      "tests": [
+        "array_enumerate", "enumerate", "new_object_enumerate"
+      ],
+      "description": "Needs correct for-in enumeration order. ActionScript enumerates own properties in reverse insertion order, then walks the prototype chain."
+    },
+    {
+      "name": "ExternalInterface",
+      "tests": [
+        "external_interface", "external_interface_escapexml", "external_interface_jsquotestring",
+        "external_interface_toas_basic", "external_interface_toxml_array",
+        "external_interface_toxml_basic", "external_interface_unescapexml"
+      ],
+      "description": "Needs ExternalInterface class for JavaScript bridge. ExternalInterface.call() invokes JavaScript functions, ExternalInterface.addCallback() registers AS functions callable from JS. Requires browser context -- likely not implementable in trace-only mode."
+    },
+    {
+      "name": "Geometry Classes: Point, Rectangle, Matrix",
+      "tests": [
+        "matrix", "point", "rectangle"
+      ],
+      "description": "Needs flash.geom.Point, flash.geom.Rectangle, and flash.geom.Matrix class implementations. These are pure math/data classes with constructors and methods."
+    },
+    {
+      "name": "PrintJob",
+      "tests": [
+        "printjob_props_swf5", "printjob_props_swf6", "printjob_props_swf7"
+      ],
+      "description": "Needs PrintJob class constructor and properties. Likely just needs the constructor registered; actual printing functionality not needed for trace tests."
+    },
+    {
+      "name": "Timer / setInterval",
+      "tests": [
+        "set_interval", "timeout", "timer_run_actions"
+      ],
+      "description": "Needs setInterval()/clearInterval() and setTimeout()/clearTimeout() implementation. Requires a timer scheduling system in the runtime."
+    },
+    {
+      "name": "StyleSheet",
+      "tests": [
+        "stylesheet", "stylesheet_load", "stylesheet_transform"
+      ],
+      "description": "Needs flash.text.StyleSheet class for CSS-style text formatting. StyleSheet.parseCSS() parses CSS text, StyleSheet.transform() transforms TextFormat objects."
+    },
+    {
+      "name": "Bitmap Filters",
+      "tests": [
+        "bitmap_filters", "displacementmapfilter_mappoint_throw_error"
+      ],
+      "description": "Needs flash.filters package classes: BlurFilter, DropShadowFilter, GlowFilter, BevelFilter, etc."
+    },
+    {
+      "name": "Clip Events (onLoad, onEnterFrame, etc.)",
+      "tests": [
+        "clip_event_propagation_order", "clip_events"
+      ],
+      "description": "Needs proper MovieClip event dispatching: onLoad, onUnload, onEnterFrame, onClipEvent(initialize), onClipEvent(construct), and correct propagation order."
+    },
+    {
+      "name": "ContextMenu",
+      "tests": [
+        "context_menu", "context_menu_item"
+      ],
+      "description": "Needs ContextMenu and ContextMenuItem classes. Likely just needs the class constructors registered."
+    },
+    {
+      "name": "Form Loading / URL Encoding",
+      "tests": [
+        "form_loader_encoding_1", "form_loader_encoding_2", "form_loader_encoding_3", "form_loader_encoding_4"
+      ],
+      "description": "Tests URL-encoded form data loading with various character encodings. Requires network loading -- not implementable in trace-only mode."
+    },
+    {
+      "name": "Key/Input Events",
+      "tests": [
+        "input_dead_keys_windows", "key_isToggled"
+      ],
+      "description": "Needs Key object with isToggled() for checking Caps Lock/Num Lock state, and dead key input handling for international keyboards. Requires keyboard event simulation."
+    },
+    {
+      "name": "LocalConnection",
+      "tests": [
+        "localconnection", "localconnection_properties"
+      ],
+      "description": "Needs LocalConnection class for inter-SWF communication. Constructor, connect(), send(), close(), domain property."
+    },
+    {
+      "name": "Parsing Functions (parseInt/parseFloat)",
+      "tests": [
+        "parse_float", "parse_int"
+      ],
+      "description": "Needs correct parseInt() and parseFloat() global functions with edge case handling."
+    },
+    {
+      "name": "Selection Object",
+      "tests": [
+        "selection", "selection_handlers"
+      ],
+      "description": "Needs Selection object with methods: getBeginIndex(), getEndIndex(), getCaretIndex(), getFocus(), setFocus(), setSelection()."
+    },
+    {
+      "name": "With Statement Scope",
+      "tests": [
+        "with", "with_variable_scopes"
+      ],
+      "description": "Needs correct with statement scope chain behavior."
+    },
+    {
+      "name": "Date Class",
+      "tests": [
+        "date"
+      ],
+      "description": "Needs Date class constructor and all methods. The single test is huge (6335 expected lines) and partially passing, suggesting a Date implementation exists but has edge case bugs."
+    },
+    {
+      "name": "Try/Catch/Finally",
+      "tests": [
+        "catch_references_registers", "try_catch_finally", "try_finally_simple",
+        "uncaught_exception", "uncaught_exception_bubbled"
+      ],
+      "description": "Try/catch/finally exists (try_finally_simple passes). This test likely hits an edge case that causes an infinite loop."
+    },
+    {
+      "name": "MovieClip Dynamic Creation / Lifecycle",
+      "tests": [
+        "attach_movie", "attach_movie_stop", "clip_constructors", "conflicting_instance_names",
+        "create_empty_movie_clip",
+        "empty_movieclip_can_attach_movies", "export_assets", "on_construct", "default_names",
+        "do_init_action_child", "execution_order1", "execution_order2", "execution_order4",
+        "movieclip_name_from_timeline", "place_and_lookup", "placeobject_occupied_depth"
+      ],
+      "description": "Tests for dynamic clip creation (attachMovie, createEmptyMovieClip), symbol export/import, DoInitAction execution, construction events, display list ordering, and PlaceObject depth conflict handling."
+    },
+    {
+      "name": "Function Behavior and Scope",
+      "tests": [
+        "closure_scope", "function_as_function", "function_base_clip", "function_base_clip_readded",
+        "function_base_clip_removed", "function_suppress_and_preload", "funky_function_calls",
+        "constructor_function", "call", "define_function2_preload_order",
+        "infinite_recursion_function", "infinite_recursion_function_in_setter",
+        "infinite_recursion_virtual_property", "variable_args"
+      ],
+      "description": "Tests for function scope chains, closures (SWF6+), Function() constructor, function.apply()/call(), base clip resolution for functions, DefineFunction2 suppress/preload flags, and the Call action (frame call)."
+    },
+    {
+      "name": "Object System",
+      "tests": [
+        "add_property", "as_set_prop_flags", "as_set_prop_flags_version", "boxed_primitives",
+        "init_object_order", "object_properties", "object_resolve", "coerce_to_primitive_resolve"
+      ],
+      "description": "Tests for addProperty (virtual getters/setters), ASSetPropFlags (property flags), boxed primitives (new Number/String/Boolean), InitObject property order, __resolve handler, and valueOf/toString coercion."
+    },
+    {
+      "name": "Clip Removal and Scope After Removal",
+      "tests": [
+        "remove_movie_clip", "removed_base_clip_tell_target", "removed_clip_halts_script",
+        "removed_target_clip_scope", "rewind_depth"
+      ],
+      "description": "Tests for removeMovieClip behavior, script halting when base clip is removed, scope resolution after clip removal, and depth management during timeline rewind."
+    },
+    {
+      "name": "Path Resolution",
+      "tests": [
+        "path_string", "slash_syntax", "named_shapes", "property_invalid_base_clip", "cross_movie_root"
+      ],
+      "description": "Tests for variable path resolution via slash syntax (/clip1/clip2:var), named shape access, property access with invalid base clips, and cross-movie _root resolution."
+    },
+    {
+      "name": "Type Coercion and Global Functions",
+      "tests": [
+        "is_finite", "is_finite_swf6", "mutable_this", "primitive_type_globals", "string_coercion", "coerce_to_object_monkeypatch"
+      ],
+      "description": "Tests for isFinite() function, mutable this binding, primitive type constructors as globals (Number, String, Boolean), and object coercion with monkey-patched constructors."
+    },
+    {
+      "name": "Array Methods",
+      "tests": [
+        "array_call_method", "array_length", "array_prototyping", "array_sort", "array_sort_random"
+      ],
+      "description": "Tests for calling methods stored in arrays, Array prototype modification, and Array.sort() with random comparator."
+    },
+    {
+      "name": "Stage/Frame Properties",
+      "tests": [
+        "frame_size_translated_negative", "frame_size_translated_positive"
+      ],
+      "description": "Tests for frame bounds translation and shape properties (_x, _y, _width, _height) with translated stage coordinates."
+    },
+    {
+      "name": "Issue Regression Tests",
+      "tests": [
+        "issue_768", "issue_1104", "issue_1906", "issue_2030", "issue_2084", "issue_2870",
+        "issue_3169", "issue_3522", "issue_9327", "issue_9885"
+      ],
+      "description": "Bug-specific regression tests from the Ruffle project."
+    },
+    {
+      "name": "AsBroadcaster / ASnative / Miscellaneous Built-ins",
+      "tests": [
+        "as_broadcaster", "as_broadcaster_undef", "asfunction", "asnative", "asnew",
+        "bad_placeobject_clipaction", "click_block", "arguments", "instanceof_coercions",
+        "custom_clip_methods", "nan_scale"
+      ],
+      "description": "AsBroadcaster (addListener/removeListener/broadcastMessage), asfunction HTML link protocol, ASnative/ASnew for native function access, arguments object, instanceof coercions, and miscellaneous built-in behaviors."
+    },
+    {
+      "name": "LoadVars and Network",
+      "tests": [
+        "load_vars", "mixed_avm_load_into_root"
+      ],
+      "description": "LoadVars class (load, send, sendAndLoad methods). Both require network access."
+    },
+    {
+      "name": "Hit Testing",
+      "tests": [
+        "hittest_lockroot", "hittest_morph", "hittest_morph_input", "hittest_winding_rule", "text_blocks_clicks"
+      ],
+      "description": "Hit testing with lockroot, morph shapes, winding rules, and text click blocking."
+    },
+    {
+      "name": "Cross-Movie / Level / Root",
+      "tests": [
+        "lock_root", "resolve_different_root", "root_global_parent", "root_onload"
+      ],
+      "description": "Tests for multi-level movie management (_level0, _level1), _lockroot behavior, _root vs _global vs _parent resolution, and root onLoad event."
+    },
+    {
+      "name": "Sandbox/Security",
+      "tests": [
+        "sandbox_type_local_network", "sandbox_type_remote"
+      ],
+      "description": "System.security.sandboxType returns different values per sandbox mode. Would need per-test sandbox configuration."
+    },
+    {
+      "name": "Frame Navigation",
+      "tests": [
+        "goto_frame", "goto_frame2", "goto_label", "goto_methods"
+      ],
+      "description": "Frame navigation methods beyond basic gotoAndStop/gotoAndPlay. Edge case handling for out-of-range frames, NaN, negative values, and label resolution."
+    },
+    {
+      "name": "Scope and Variable Resolution",
+      "tests": [
+        "define_local", "define_local_with_paths", "get_variable_in_scope"
+      ],
+      "description": "DefineLocal/DefineLocal2 actions for local variable declaration in functions."
+    },
+    {
+      "name": "This Scoping",
+      "tests": [
+        "this_scoping", "this_swf5", "this_swf6", "this_swf7"
+      ],
+      "description": "this binding behavior in different contexts: with blocks, nested clips, and method calls."
+    },
+    {
+      "name": "Miscellaneous Remaining",
+      "tests": [
+        "add2", "get_bytes_total", "geturl", "gettextextent", "device_font_spacing",
+        "object_string_coerce_swf5", "object_string_coerce_swf6", "trace"
+      ],
+      "description": "Various uncategorized tests: getBytesLoaded/getBytesTotal, getURL action, TextFormat.getTextExtent, device font spacing, localToGlobal/globalToLocal, toString/valueOf coercion, Array.sort edge cases."
+    }
+  ],
+  "near_passing_notes": {
+    "swf7_case_sensitive": "Case-sensitive property lookup edge case",
+    "object_prototypes": "Prototype chain traversal edge case",
+    "stage_object_children": "Child clip name resolution",
+    "local_to_global": "MovieClip.localToGlobal/globalToLocal transform math",
+    "target_clip_removed": "Target clip removal edge case",
+    "textfield_properties": "TextField property getters/setters",
+    "movieclip_hittest": "hitTest() edge cases",
+    "xml_first_last_child": "XML firstChild/lastChild null handling",
+    "attach_movie": "attachMovie with init object or invalid IDs",
+    "empty_movieclip_can_attach_movies": "attachMovie on empty clips",
+    "matrix": "Matrix method implementations",
+    "point": "Point method implementations",
+    "prototype_properties": "Prototype property flags",
+    "rectangle": "Rectangle method implementations",
+    "register_underflow": "Register allocation edge case",
+    "swf6_case_insensitive": "Case-insensitive lookup edge case",
+    "array_sort": "Array.sort() comparator edge cases",
+    "as_set_prop_flags_version": "ASSetPropFlags version-specific behavior",
+    "object_string_coerce_swf6": "toString/valueOf coercion ordering",
+    "movieclip_depth_methods": "Depth management edge cases",
+    "is_prototype_of": "isPrototypeOf method",
+    "textfield_variable": "TextField variable binding",
+    "string_paths_hidden": "Hidden string path resolution",
+    "edittext_html_roundtrip": "HTML text round-trip formatting",
+    "movieclip_get_instance_at_depth": "getInstanceAtDepth edge cases",
+    "string_methods_swfv5": "SWF5 string method edge cases",
+    "with": "With statement scope leaking",
+    "edittext_width_height": "EditText dimension calculations",
+    "edittext_scroll": "EditText scroll properties",
+    "arguments": "arguments.callee, arguments.caller, Array prototype",
+    "string_methods": "String method edge cases",
+    "edittext_align": "Text alignment calculations",
+    "mutable_this": "Mutable this binding in nested functions",
+    "date": "Date timezone/edge case handling"
+  },
+  "crash_notes": {
+    "device_font_spacing": "Device font text measurement crash",
+    "duplicate_movie_clip_drawing": "Drawing API on duplicated clip",
+    "goto_methods": "MovieClip.gotoAndStop/gotoAndPlay with extreme values",
+    "path_string": "String path resolution with tellTarget",
+    "swf4_actions_coercion_order": "SWF4 type coercion during action execution",
+    "parse_float": "parseFloat() infinite loop",
+    "timeout": "setTimeout/clearTimeout infinite loop",
+    "try_catch_finally": "Exception handling infinite loop"
+  }
+}
