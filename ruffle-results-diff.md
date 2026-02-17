@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `41811ff06d9f` (2026-02-16T19:32:24.754204+00:00)
-**Current:** `480bce068a20` (2026-02-16T23:32:22.236447+00:00)
+**Previous:** `480bce068a20` (2026-02-16T23:32:22.236447+00:00)
+**Current:** `961ebf322759` (2026-02-17T01:20:28.670292+00:00)
 
 ## Summary
 
@@ -10,24 +10,19 @@
 | Passing | 213 | 213 | 0 |
 | Total | 619 | 619 | 0 |
 | Pass rate | 34.4% | 34.4% | 0% |
-| Mismatched lines | 44458 | 42866 | -1592 |
-|   Decreased | | | -1592 |
+| Mismatched lines | 42866 | 43029 | +163 |
+|   Increased | | | +163 |
 
-## Status Changed (1)
+## Status Changed (2)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `movieclip_hittest_shapeflag` | output_mismatch | compile_fail | 180/338 | - |
+| `movieclip_hittest_shapeflag` | compile_fail | output_mismatch | - | 180/338 |
+| `try_catch_finally` | timeout | output_mismatch | - | 113/118 |
 
-## Line Count Changed (8)
+## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `date` | output_mismatch | 3617/6335 | 5049/6335 | -1432 |
-| `global_proto_decls` | output_mismatch | 6/4497 | 8/4497 | -2 |
 | `global_instance_decls` | output_mismatch | 1/758 | 1/758 | 0 |
-| `global_proto_decls_delete` | output_mismatch | 0/4158 | 0/4158 | 0 |
 | `goto_methods` | segfault | 8/40 | 8/40 | 0 |
-| `native_objects_swf6` | output_mismatch | 0/84 | 0/84 | 0 |
-| `native_objects_swf7` | output_mismatch | 0/84 | 0/84 | 0 |
-| `native_objects_swf8` | output_mismatch | 0/84 | 0/84 | 0 |
