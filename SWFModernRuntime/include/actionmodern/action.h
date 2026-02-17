@@ -243,12 +243,18 @@ void actionWithEnd(SWFAppContext* app_context);
 
 // Exception handling (try-catch-finally)
 void actionThrow(SWFAppContext* app_context);
+void actionThrowPending(SWFAppContext* app_context);
 void actionTryBegin(SWFAppContext* app_context);
-bool actionTryExecute(SWFAppContext* app_context);
 jmp_buf* actionGetExceptionJmpBuf(SWFAppContext* app_context);
+void actionCatchEnter(SWFAppContext* app_context);
 void actionCatchToVariable(SWFAppContext* app_context, const char* var_name);
 void actionCatchToRegister(SWFAppContext* app_context, u8 reg_num);
+void actionCatchGetException(SWFAppContext* app_context, ActionVar* out);
 void actionTryEnd(SWFAppContext* app_context);
+bool actionExceptionPending(SWFAppContext* app_context);
+void actionSetReturnPending(SWFAppContext* app_context, ActionVar* value);
+bool actionReturnPending(SWFAppContext* app_context);
+ActionVar actionGetPendingReturn(SWFAppContext* app_context);
 
 // Macro for inline setjmp in generated code
 #define ACTION_TRY_SETJMP(app_context) setjmp(*actionGetExceptionJmpBuf(app_context))

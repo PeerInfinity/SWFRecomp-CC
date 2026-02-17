@@ -176,6 +176,27 @@ namespace SWFRecomp
 					break;
 				}
 
+			case SWF_ACTION_TRY:
+			{
+				// Register finally_start and after_end as labels for goto targets
+				// NOTE: Must use byte-by-byte reads here because action_buffer+1 etc.
+				// are NOT aligned for u16 reads, and VAL macro's pointer cast causes
+				// incorrect values due to strict aliasing / alignment UB.
+				u8 try_flags = (u8)action_buffer[0];
+				bool try_has_finally = (try_flags & 0x02) != 0;
+				u16 p1_try_size = (u8)action_buffer[1] | ((u8)action_buffer[2] << 8);
+				u16 p1_catch_size = (u8)action_buffer[3] | ((u8)action_buffer[4] << 8);
+				u16 p1_finally_size = (u8)action_buffer[5] | ((u8)action_buffer[6] << 8);
+				char* body_start = action_buffer + length;
+				char* p1_finally_start = body_start + p1_try_size + p1_catch_size;
+				char* p1_after_end = p1_finally_start + p1_finally_size;
+				if (try_has_finally) {
+					labels.insert(p1_finally_start);
+				}
+				labels.insert(p1_after_end);
+				break;
+			}
+
 			case SWF_ACTION_WAIT_FOR_FRAME2:
 			{
 				// Calculate skip target by parsing ahead skip_count actions
@@ -212,6 +233,8 @@ namespace SWFRecomp
 
 		// Stack of active try/catch/finally block boundaries for inline parsing
 		std::vector<TryBlockBoundary> try_boundaries;
+		// Labels pre-emitted by boundary handler (skip in generic label code)
+		std::set<char*> emitted_labels;
 		
 		while (code != SWF_ACTION_END_OF_ACTIONS)
 		{
@@ -224,9 +247,18 @@ namespace SWFRecomp
 					// Transition from try body to catch body
 					out_script << "\t" << "} else {" << endl;
 					out_script << "\t\t" << "// Catch block" << endl;
+					out_script << "\t\t" << "actionCatchEnter(app_context);" << endl;
 					if (tb.catch_in_register)
 					{
-						out_script << "\t\t" << "actionCatchToRegister(app_context, " << (int)tb.catch_register << ");" << endl;
+						if (context.inside_function2)
+						{
+							// DefineFunction2 uses local registers — get exception value directly
+							out_script << "\t\t" << "actionCatchGetException(app_context, &regs[" << (int)tb.catch_register << "]);" << endl;
+						}
+						else
+						{
+							out_script << "\t\t" << "actionCatchToRegister(app_context, " << (int)tb.catch_register << ");" << endl;
+						}
 					}
 					else
 					{
@@ -258,7 +290,20 @@ namespace SWFRecomp
 						// Close the if or else block
 						out_script << "\t" << "}" << endl;
 					}
+					// For try-catch without finally: emit the after_end label BEFORE
+					// actionTryEnd so goto from try body doesn't skip cleanup
+					if (!tb.has_finally && labels.count(tb.after_end))
+					{
+						out_script << "label_" << to_string((s16)(tb.after_end - action_buffer_start)) << ":" << endl;
+						emitted_labels.insert(tb.after_end);
+					}
 					out_script << "\t" << "actionTryEnd(app_context);" << endl;
+					if (tb.has_finally)
+					{
+						out_script << "\t" << "if (actionReturnPending(app_context)) {" << endl;
+						out_script << "\t\t" << "return actionGetPendingReturn(app_context);" << endl;
+						out_script << "\t" << "}" << endl;
+					}
 					tb.state = 3;
 					try_boundaries.pop_back();
 					continue; // Check next boundary in stack
@@ -271,7 +316,7 @@ namespace SWFRecomp
 
 			for (const char* ptr : labels)
 			{
-				if (action_buffer == ptr)
+				if (action_buffer == ptr && emitted_labels.count(const_cast<char*>(ptr)) == 0)
 				{
 					out_script << "label_" << to_string((s16) (ptr - action_buffer_start)) << ":" << endl;
 				}
@@ -576,8 +621,25 @@ namespace SWFRecomp
 
 				case SWF_ACTION_THROW:
 				{
-					out_script << "\t" << "// Throw" << endl
-							   << "\t" << "actionThrow(app_context);" << endl;
+					// Check if inside a catch block with a finally clause
+					bool in_catch_with_finally = false;
+					char* throw_finally_ptr = nullptr;
+					for (int i = (int)try_boundaries.size() - 1; i >= 0; i--) {
+						if (try_boundaries[i].state == 1 && try_boundaries[i].has_finally) {
+							in_catch_with_finally = true;
+							throw_finally_ptr = try_boundaries[i].finally_start;
+							break;
+						}
+					}
+
+					if (in_catch_with_finally && throw_finally_ptr) {
+						out_script << "\t" << "// Throw (deferred to finally)" << endl
+								   << "\t" << "actionThrowPending(app_context);" << endl
+								   << "\t" << "goto label_" << to_string((s16)(throw_finally_ptr - action_buffer_start)) << ";" << endl;
+					} else {
+						out_script << "\t" << "// Throw" << endl
+								   << "\t" << "actionThrow(app_context);" << endl;
+					}
 
 					break;
 				}
@@ -717,12 +779,33 @@ namespace SWFRecomp
 
 				case SWF_ACTION_RETURN:
 				{
-					out_script << "\t" << "// Return" << endl
-							   << "\t" << "{" << endl
-							   << "\t\t" << "ActionVar ret_val;" << endl
-							   << "\t\t" << "popVar(app_context, &ret_val);" << endl
-							   << "\t\t" << "return ret_val;" << endl
-							   << "\t" << "}" << endl;
+					// Check if inside a try/catch block with a finally clause
+					bool in_try_with_finally = false;
+					char* ret_finally_ptr = nullptr;
+					for (int i = (int)try_boundaries.size() - 1; i >= 0; i--) {
+						if (try_boundaries[i].has_finally && try_boundaries[i].state <= 1) {
+							in_try_with_finally = true;
+							ret_finally_ptr = try_boundaries[i].finally_start;
+							break;
+						}
+					}
+
+					if (in_try_with_finally && ret_finally_ptr) {
+						out_script << "\t" << "// Return (deferred to finally)" << endl
+								   << "\t" << "{" << endl
+								   << "\t\t" << "ActionVar ret_val;" << endl
+								   << "\t\t" << "popVar(app_context, &ret_val);" << endl
+								   << "\t\t" << "actionSetReturnPending(app_context, &ret_val);" << endl
+								   << "\t\t" << "goto label_" << to_string((s16)(ret_finally_ptr - action_buffer_start)) << ";" << endl
+								   << "\t" << "}" << endl;
+					} else {
+						out_script << "\t" << "// Return" << endl
+								   << "\t" << "{" << endl
+								   << "\t\t" << "ActionVar ret_val;" << endl
+								   << "\t\t" << "popVar(app_context, &ret_val);" << endl
+								   << "\t\t" << "return ret_val;" << endl
+								   << "\t" << "}" << endl;
+					}
 
 					break;
 				}

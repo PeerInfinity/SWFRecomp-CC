@@ -16147,125 +16147,114 @@ void actionWithEnd(SWFAppContext* app_context)
 // Exception Handling (Try-Catch-Finally)
 // ============================================================================
 
-// Exception state structure
 #include <setjmp.h>
 
-// TODO: Current setjmp/longjmp implementation has a critical flaw!
-// The problem: setjmp is called inside actionTryExecute(), which is called from within
-// the if statement. When longjmp is triggered, it returns to setjmp inside actionTryExecute,
-// which then returns false. However, the C runtime is still executing inside the try block's
-// code body, so execution continues from where longjmp was called rather than jumping to
-// the catch block.
-//
-// Solution needed: Generate code that places setjmp at the script function level, not inside
-// a helper function. The generated code should look like:
-//
-//   if (setjmp(exception_handler) == 0) {
-//       // try block
-//   } else {
-//       // catch block
-//   }
-//
-// This requires modifying the SWFRecomp translator to emit setjmp inline rather than
-// calling actionTryExecute().
+#define MAX_EXCEPTION_DEPTH 16
 
 typedef struct {
+	jmp_buf handler;
+	int has_jmp_buf;
+} ExceptionFrame;
+
+typedef struct {
+	ExceptionFrame frames[MAX_EXCEPTION_DEPTH];
+	int depth;
+
 	bool exception_thrown;
 	ActionVar exception_value;
-	int handler_depth;
-	jmp_buf exception_handler;
-	int has_jmp_buf;
+
+	bool return_pending;
+	ActionVar return_value;
 } ExceptionState;
 
-static ExceptionState g_exception_state = {false, {0}, 0, {0}, 0};
+static ExceptionState g_exception_state = {0};
+
+static void uncaughtException(ActionVar* throw_value)
+{
+	printf("Warning: Uncaught exception, ");
+
+	if (throw_value->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(throw_value);
+		char _thr_buf[512];
+		if (u16 && throw_value->str_size > 0)
+			u16_to_utf8(u16, throw_value->str_size, _thr_buf, sizeof(_thr_buf));
+		else
+			_thr_buf[0] = '\0';
+		printf("%s", _thr_buf);
+	} else if (throw_value->type == ACTION_STACK_VALUE_F32) {
+		float val = VAL(float, &throw_value->data.numeric_value);
+		printf("%g", val);
+	} else if (throw_value->type == ACTION_STACK_VALUE_F64) {
+		double val = VAL(double, &throw_value->data.numeric_value);
+		printf("%g", val);
+	} else {
+		printf("(type %d)", throw_value->type);
+	}
+
+	printf("\n");
+	g_execution_halted = 1;
+}
 
 void actionThrow(SWFAppContext* app_context)
 {
-	// Pop value to throw
 	ActionVar throw_value;
 	popVar(app_context, &throw_value);
 
-	// Set exception state
 	g_exception_state.exception_thrown = true;
 	g_exception_state.exception_value = throw_value;
 
-	// Check if we're in a try block
-	if (g_exception_state.handler_depth == 0) {
-		// Uncaught exception - print warning and halt execution
-		printf("Warning: Uncaught exception, ");
-
-		if (throw_value.type == ACTION_STACK_VALUE_STRING) {
-			const uint16_t* u16 = varGetU16Ptr(&throw_value);
-			char _thr_buf[512];
-			if (u16 && throw_value.str_size > 0)
-				u16_to_utf8(u16, throw_value.str_size, _thr_buf, sizeof(_thr_buf));
-			else
-				_thr_buf[0] = '\0';
-			printf("%s", _thr_buf);
-		} else if (throw_value.type == ACTION_STACK_VALUE_F32) {
-			float val = VAL(float, &throw_value.data.numeric_value);
-			printf("%g", val);
-		} else if (throw_value.type == ACTION_STACK_VALUE_F64) {
-			double val = VAL(double, &throw_value.data.numeric_value);
-			printf("%g", val);
-		} else {
-			printf("(type %d)", throw_value.type);
+	// Search handler stack top-down for an active handler
+	for (int i = g_exception_state.depth - 1; i >= 0; i--) {
+		if (g_exception_state.frames[i].has_jmp_buf) {
+			// Set depth to this frame's level (skip intermediate frames)
+			g_exception_state.depth = i + 1;
+			longjmp(g_exception_state.frames[i].handler, 1);
 		}
-
-		printf("\n");
-
-		// Halt all further script execution (without terminating the process)
-		g_execution_halted = 1;
-		return;
 	}
 
-	// Inside a try block - jump to catch handler using longjmp
-	// NOTE: Due to current implementation flaw (see TODO above), this doesn't
-	// properly skip remaining try block code. Fix requires inline setjmp in generated code.
-	if (g_exception_state.has_jmp_buf) {
-		longjmp(g_exception_state.exception_handler, 1);
-	}
+	// No active handler found — uncaught exception
+	uncaughtException(&throw_value);
+}
+
+void actionThrowPending(SWFAppContext* app_context)
+{
+	// Set exception as pending without longjmp — used for throw inside catch
+	// when there's a finally block that needs to run first
+	ActionVar throw_value;
+	popVar(app_context, &throw_value);
+	g_exception_state.exception_thrown = true;
+	g_exception_state.exception_value = throw_value;
 }
 
 void actionTryBegin(SWFAppContext* app_context)
 {
-	// Push exception handler onto handler stack
-	g_exception_state.handler_depth++;
-
-	// Clear exception flag for new try block
-	g_exception_state.exception_thrown = false;
-	g_exception_state.has_jmp_buf = 0;
-}
-
-bool actionTryExecute(SWFAppContext* app_context)
-{
-	// Set up exception handler using setjmp
-	// This will be called again when longjmp is triggered
-	// WARNING: This function-based approach has a control flow flaw (see TODO above)
-	int exception_occurred = setjmp(g_exception_state.exception_handler);
-	g_exception_state.has_jmp_buf = 1;
-
-	// If exception occurred (longjmp was called), return false to execute catch block
-	if (exception_occurred != 0) {
-		g_exception_state.exception_thrown = true;
-		return false;
+	if (g_exception_state.depth >= MAX_EXCEPTION_DEPTH) {
+		fprintf(stderr, "ERROR: Exception handler stack overflow\n");
+		return;
 	}
-
-	// No exception yet, execute try block
-	return true;
+	g_exception_state.frames[g_exception_state.depth].has_jmp_buf = 0;
+	g_exception_state.depth++;
 }
 
 jmp_buf* actionGetExceptionJmpBuf(SWFAppContext* app_context)
 {
-	// Return pointer to the exception handler jump buffer
-	// This allows setjmp to be called inline in generated code
-	g_exception_state.has_jmp_buf = 1;
-	return &g_exception_state.exception_handler;
+	int idx = g_exception_state.depth - 1;
+	if (idx < 0) idx = 0;
+	g_exception_state.frames[idx].has_jmp_buf = 1;
+	return &g_exception_state.frames[idx].handler;
+}
+
+void actionCatchEnter(SWFAppContext* app_context)
+{
+	// Disable current handler so a throw inside catch propagates to parent
+	int idx = g_exception_state.depth - 1;
+	if (idx >= 0) {
+		g_exception_state.frames[idx].has_jmp_buf = 0;
+	}
 }
 
 void actionCatchToVariable(SWFAppContext* app_context, const char* var_name)
 {
-	// Store caught exception in named variable
 	if (g_exception_state.exception_thrown)
 	{
 		setVariableByName(var_name, &g_exception_state.exception_value);
@@ -16275,44 +16264,70 @@ void actionCatchToVariable(SWFAppContext* app_context, const char* var_name)
 
 void actionCatchToRegister(SWFAppContext* app_context, u8 reg_num)
 {
-	// Store caught exception in register
 	if (g_exception_state.exception_thrown)
 	{
-#ifdef DEBUG
-		printf("[DEBUG] actionCatchToRegister: storing exception in register %d\n", reg_num);
-#endif
-		// Validate register number
 		if (reg_num >= MAX_REGISTERS) {
 			fprintf(stderr, "ERROR: Invalid register number %d for catch\n", reg_num);
 			g_exception_state.exception_thrown = false;
 			return;
 		}
-
-		// Store exception value in the specified register
 		g_registers[reg_num] = g_exception_state.exception_value;
-
-		// Clear the exception flag
 		g_exception_state.exception_thrown = false;
+	}
+}
+
+void actionCatchGetException(SWFAppContext* app_context, ActionVar* out)
+{
+	if (g_exception_state.exception_thrown)
+	{
+		*out = g_exception_state.exception_value;
+		g_exception_state.exception_thrown = false;
+	}
+	else
+	{
+		out->type = ACTION_STACK_VALUE_UNDEFINED;
+		out->data.numeric_value = 0;
 	}
 }
 
 void actionTryEnd(SWFAppContext* app_context)
 {
-	// Pop exception handler from handler stack
-	g_exception_state.handler_depth--;
-
-	// Clear jmp_buf flag
-	g_exception_state.has_jmp_buf = 0;
-
-	if (g_exception_state.handler_depth == 0)
-	{
-		// Clear exception if at top level
-		g_exception_state.exception_thrown = false;
+	if (g_exception_state.depth > 0) {
+		g_exception_state.depth--;
 	}
 
-#ifdef DEBUG
-	printf("[DEBUG] actionTryEnd: handler_depth=%d\n", g_exception_state.handler_depth);
-#endif
+	if (g_exception_state.exception_thrown) {
+		// Exception still pending after finally — re-propagate to parent handler
+		for (int i = g_exception_state.depth - 1; i >= 0; i--) {
+			if (g_exception_state.frames[i].has_jmp_buf) {
+				longjmp(g_exception_state.frames[i].handler, 1);
+			}
+		}
+		// No parent handler — uncaught
+		uncaughtException(&g_exception_state.exception_value);
+	}
+}
+
+bool actionExceptionPending(SWFAppContext* app_context)
+{
+	return g_exception_state.exception_thrown;
+}
+
+void actionSetReturnPending(SWFAppContext* app_context, ActionVar* value)
+{
+	g_exception_state.return_pending = true;
+	g_exception_state.return_value = *value;
+}
+
+bool actionReturnPending(SWFAppContext* app_context)
+{
+	return g_exception_state.return_pending;
+}
+
+ActionVar actionGetPendingReturn(SWFAppContext* app_context)
+{
+	g_exception_state.return_pending = false;
+	return g_exception_state.return_value;
 }
 
 // ============================================================================
