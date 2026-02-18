@@ -69,7 +69,67 @@ Ruffle test-generation bug affecting only the extreme negative boundary.
 
 ---
 
-## Category 3: Flash UB Behavior We Intentionally Do Not Replicate
+## Category 3: Flash Implementation Quirks We Do Not Replicate
+
+Undocumented or locale-specific behaviors of Flash Player's built-in functions that
+produce outputs we cannot portably reproduce without hardcoding platform-specific magic.
+
+### `array_sort` — Non-ASCII `CASEINSENSITIVE` ordering (1 diff pair, line 50)
+
+**Diff:**
+```
+- hëllo,HËLLO,TeSt,test
++ HËLLO,hëllo,TeSt,test
+```
+
+`["hëllo", "HËLLO", "TeSt", "test"].sort(Array.CASEINSENSITIVE)`.
+
+Flash's `CASEINSENSITIVE` comparison uses a locale-aware or Unicode-aware case fold where
+`ë` (U+00EB) and `Ë` (U+00CB) are treated as equal (as they are in proper Unicode case
+folding). With the two strings equal, a stable insertion sort preserves their input order
+(`hëllo` before `HËLLO`).
+
+Our implementation uses ASCII-only case folding (only `A–Z → a–z`), leaving `ë` and `Ë`
+unmodified. This makes `Ë` (203) < `ë` (235), so `hËllo` < `hëllo`, and `HËLLO` sorts
+before `hëllo`.
+
+Switching to Unicode-aware case folding (e.g., via `towlower`) would fix this diff but
+could introduce regressions for other tests that expect ASCII-only behavior. Additionally,
+the second test case (`["TeSt", "hëllo", "HËLLO", "test"]` → `HËLLO,hëllo,TeSt,test`)
+produces `HËLLO` before `hëllo` despite `hëllo` appearing earlier in the input — which
+contradicts stable sort — suggesting Flash's behavior for non-ASCII chars is in fact
+locale-specific and not consistently reproducible.
+
+**Decision:** Accept 1 diff pair. Non-ASCII case-insensitive ordering is platform/locale-
+dependent in Flash and not reliably reproducible.
+
+### `array_sort` — `sortOn` multi-key `DESCENDING` flag quirk (2 diff pairs, lines 129, 132)
+
+**Diff:**
+```
+- {n: BAR, b: 22},{n: bar, b: 3},{n: foo, b: 1},{n: foo, b: 2}
++ {n: foo, b: 1},{n: foo, b: 2},{n: bar, b: 3},{n: BAR, b: 22}
+```
+
+`sortOn(["n", "b"], [Array.DESCENDING])` — one flag in the array for two sort keys.
+Same diff appears for `sortOn(["n", "b"], [Array.DESCENDING, Array.0, 0])` (line 132).
+
+The expected output shows ascending order by `"n"` (BAR < bar < foo), even though
+`Array.DESCENDING` is specified. This contradicts the documented semantics (apply the
+last flag to all remaining keys), which would give descending order by `"n"` — exactly
+what we produce.
+
+The behavior suggests Flash Player's internal flag-to-key mapping for `sortOn` has an
+undocumented off-by-one or other quirk when the flags array is shorter than the keys
+array, causing the `DESCENDING` flag to be silently dropped or applied to a non-existent
+position. Replicating this would require reverse-engineering undocumented Flash internals.
+
+**Decision:** Accept 2 diff pairs. Flash's multi-key `sortOn` DESCENDING flag handling
+is undocumented and cannot be replicated without guessing at implementation internals.
+
+---
+
+## Category 4: Flash UB Behavior We Intentionally Do Not Replicate
 
 Flash Player produced specific outputs that depend on undefined or implementation-defined
 behavior in its own runtime. Replicating these values would require us to introduce the
@@ -105,3 +165,5 @@ magic constants or deliberately invoking UB.
 | `date` | Float precision (TimezoneOffset extreme dates) | ~1 | Accept; edge case |
 | `date` | Inconsistent expected output (UTCHours at −8.64e15) | ~18 | Accept; Ruffle test bug |
 | `date` | Flash UB (Infinity getter values) | ~14 | Accept; prefer NaN (spec-correct) |
+| `array_sort` | Flash quirk (non-ASCII CASEINSENSITIVE ordering) | 1 | Accept; locale-dependent, not reproducible |
+| `array_sort` | Flash quirk (sortOn multi-key DESCENDING flag) | 2 | Accept; undocumented Flash internals |

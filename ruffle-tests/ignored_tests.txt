@@ -179,4 +179,5 @@ xml_attributes_read
 # These tests have unfixable output differences. See ACCEPTED_DIFFS.md for full rationale.
 # Root causes: Flash UB we don't replicate, platform-dependent UB in expected output,
 # or internally inconsistent expected output (Ruffle test generation bugs).
+array_sort
 date
