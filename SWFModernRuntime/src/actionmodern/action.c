@@ -10602,11 +10602,11 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 
 		// Variable not found
-		if (g_swf_version >= 6) {
-			// SWF6+: undefined variables return undefined
+		if (g_swf_version >= 5) {
+			// SWF5+: undefined variables return undefined
 			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		} else {
-			// SWF < 6: undefined variables return empty string
+			// SWF4: undefined variables return empty string
 			PUSH_STR("", 0);
 		}
 		return;
@@ -14306,21 +14306,30 @@ void actionGetMember(SWFAppContext* app_context)
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
 		if (func != NULL && strcmp(prop_name, "prototype") == 0)
 		{
-			// Lazily create prototype object on first access
-			if (func->prototype_obj == NULL)
+			// In SWF5, AsBroadcaster and TextField have no prototype
+			if (func->prototype_obj == NULL && g_swf_version < 6 &&
+			    (func == &g_stub_ctors[0] || func == &g_textfield_constructor))
 			{
-				func->prototype_obj = allocObject(app_context, 4);
-				retainObject(func->prototype_obj);
-				// Set Object.prototype as __proto__ for prototype chain
-				setObjectProto(app_context, func->prototype_obj);
-				// Set constructor property pointing back to the function
-				ActionVar ctor_var;
-				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-				ctor_var.str_size = 0;
-				ctor_var.data.numeric_value = (u64) func;
-				setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
+				pushUndefined(app_context);
 			}
-			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+			else
+			{
+				// Lazily create prototype object on first access
+				if (func->prototype_obj == NULL)
+				{
+					func->prototype_obj = allocObject(app_context, 4);
+					retainObject(func->prototype_obj);
+					// Set Object.prototype as __proto__ for prototype chain
+					setObjectProto(app_context, func->prototype_obj);
+					// Set constructor property pointing back to the function
+					ActionVar ctor_var;
+					ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+					ctor_var.str_size = 0;
+					ctor_var.data.numeric_value = (u64) func;
+					setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
+				}
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+			}
 		}
 		else if (func != NULL)
 		{
