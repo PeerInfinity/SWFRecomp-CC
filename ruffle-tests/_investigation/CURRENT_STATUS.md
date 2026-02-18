@@ -6,16 +6,18 @@ Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
 
 ## Quick Summary
 
-- **Pass rate (estimated local)**: ~223+/619 — ~9 tests gained from commits 229cb53 + 1851972 since last update, plus 1 more from DefineFunction2 fix, plus `arguments` expected to pass from today's fix
+- **Pass rate (estimated local)**: ~226+/619 — ~9 tests gained from commits 229cb53 + 1851972, plus `edittext_width_height` (103/103), `arguments` (127/127), `function_suppress_and_preload` (full pass)
 - **Main failure type**: output_mismatch, timeout (2), compile_fail (1), segfault (1)
 - **New regression (from b815da5)**: `movieclip_hittest_shapeflag` changed from output_mismatch (180/338) to compile_fail — still needs investigation
-- **Recent gains**: All previous Tier 1 near-passing tests now pass; most Tier 2 near-passing tests now pass; DefineFunction2 preload/suppress register fix; arguments object callee/caller/__proto__ fix
+- **Recent gains**: `edittext_width_height` (_xscale/_yscale/_rotation transform accounting); `arguments` (DefineFunction2 preload path now calls swf_setup_arguments_props; ARRAY valueOf/toString fixed to use own-props only); `function_suppress_and_preload` (DefineFunction2 preload/suppress register fix)
 
 ## Major Features Implemented Since Last Update
 
 | Feature | Commits | Impact | Key Tests |
 |---------|---------|--------|-----------|
-| **arguments object: callee/caller/__proto__** | today | arguments.callee, arguments.caller (null or calling function), arguments instanceof Array, arguments.__proto__ === Array.prototype — all now implemented; also fixes Array.prototype initialization and checkInstanceOf for arrays | arguments |
+| **edittext _width/_height transform fix** | 337c212 | Width/height properties now account for _xscale/_yscale/_rotation transforms | edittext_width_height (103/103 ✅) |
+| **arguments object: DefineFunction2 preload path** | 2f007dd | swf_setup_arguments_props() now called from recompiler-generated preload block; fixes callee/caller/__proto__/instanceof for preloaded-arguments functions; ARRAY valueOf/toString fixed to use own-property lookup only (fixes [object Object] bug) | arguments (127/127 ✅) |
+| **arguments object: callee/caller/__proto__** | b9cfc9d | arguments.callee, arguments.caller (null or calling function), arguments instanceof Array, arguments.__proto__ === Array.prototype — all now implemented; also fixes Array.prototype initialization and checkInstanceOf for arrays | arguments |
 | **DefineFunction2 preload/suppress fix** | eff1f85 | `function_suppress_and_preload` now passes; correct register numbering when both preload + suppress bits are set; scope vars (this/super/arguments) set via local_scope in method calls | function_suppress_and_preload |
 | **TextField enumeration + condenseWhite fix** | 229cb53 | textfield_props_swf6/7/8 now pass, xml_to_string, xml_child_nodes_edge_cases, swf4_function_calls pass | textfield_props_swf6/7/8 (+3), xml_to_string (+1), xml_child_nodes_edge_cases (+1) |
 | **SWF5 undefined variable + stub ctors** | 1851972 | try_catch_finally, get_variable_in_scope, swf7_case_sensitive, divide_swf4 now pass | +4 tests |
@@ -46,15 +48,15 @@ These tests were near-passing in the previous update and now pass locally:
 - `textfield_props_swf6`, `textfield_props_swf7`, `textfield_props_swf8` — fixed by 229cb53
 - `xml_to_string`, `xml_child_nodes_edge_cases`, `swf4_function_calls` — fixed by 229cb53
 - `try_catch_finally`, `get_variable_in_scope`, `swf7_case_sensitive`, `divide_swf4` — fixed by 1851972
-- `function_suppress_and_preload` — fixed today (DefineFunction2 preload/suppress)
+- `function_suppress_and_preload` — fixed by eff1f85 + 2f007dd (DefineFunction2 preload/suppress + ARRAY toString fix)
+- `edittext_width_height` (103/103) — fixed by 337c212 (_xscale/_yscale/_rotation transform accounting)
+- `arguments` (127/127) — fixed by b9cfc9d + 2f007dd (callee/caller/__proto__/instanceof Array; preload path fix)
 
 ### Tier 2: 3-15 lines off
 
 | Test | Match | Issue |
 |------|-------|-------|
-| `edittext_width_height` | 97/103 (94%) | Width/height don't account for _xscale/_yscale/_rotation transforms |
 | `object_prototypes` | 62/74 (84%) | watch() not implemented; `__PROTO__`/`__Proto__` case-insensitive lookup missing |
-| `arguments` | 127/127 (100% expected) ✅ | Fixed today: callee/caller/__proto__/instanceof Array |
 
 ### Tier 3: 80-82% match
 
@@ -95,7 +97,7 @@ These tests were near-passing in the previous update and now pass locally:
 | XML_PLAN | **ALL PHASES COMPLETE** | 24/26 active tests pass | xml_to_string (11/13), xml_child_nodes_edge_cases (3/4) |
 | TEXTFIELD_PLAN | **Phases 1-2 DONE** | 17/66 tests pass | Phase 3 (variable binding, width/height), Phase 5 (HTML) |
 | MOVIECLIP_PLAN | **Phase 1 DONE** | 2 MC tests pass | Phase 2 (depth), Phase 3 (createEmptyMC) |
-| PARSING_FUNCTIONS_PLAN | **Partially done** | 0/2 pass | parse_int blocked by `arguments` object |
+| PARSING_FUNCTIONS_PLAN | **Partially done** | 0/2 pass | parse_int may now be unblocked (arguments fixed) |
 | COLOR_OBJECT_PLAN | Not started | 0/4 | - |
 | OOP_SUPER_EXTENDS_PLAN | Not started | 0/8 | - |
 | REGISTERCLASS_PLAN | Not started | 0/7 | - |
@@ -116,19 +118,18 @@ These tests were near-passing in the previous update and now pass locally:
 
 ### High ROI (fix existing near-passing tests)
 1. **Fix `date` test timezone** — set TZ=Asia/Kathmandu in CI, could flip 80% → ~99% (1 test)
-2. **Fix `edittext_width_height`** — 6 lines off (94%); width/height need to account for _xscale/_yscale/_rotation transforms
-3. **Fix `arguments` object** — 21 lines off (83%); add callee/caller properties and set __proto__ = Array.prototype
-4. **Implement watch()/unwatch()** — unblocks `object_prototypes` (12 lines off); also fix case-insensitive `__proto__` lookup
-5. **Investigate movieclip_hittest_shapeflag compile_fail** — regression from b815da5
+2. **Implement watch()/unwatch()** — unblocks `object_prototypes` (12 lines off); also fix case-insensitive `__proto__` lookup
+3. **Investigate movieclip_hittest_shapeflag compile_fail** — regression from b815da5
+4. **Try parse_int** — was blocked by `arguments`; now that arguments is fixed, may pass
 
 ### Medium ROI (new feature phases)
-6. **GLOBALS_PLAN Phase 6** — Number.prototype.toString(radix), improves primitive_type_globals (320/557)
-7. **TEXTFIELD_PLAN Phase 3** — variable binding + width/height (edittext_width_height at 94%)
-8. **TEXTFIELD_PLAN Phase 5** — HTML text (edittext_html_* tests, several at 81-87%)
-9. **Fix GotoFrame inline execution** — needed for target_clip_removed (4/5, 80%)
+5. **GLOBALS_PLAN Phase 6** — Number.prototype.toString(radix), improves primitive_type_globals (320/557)
+6. **TEXTFIELD_PLAN Phase 3** — variable binding + width/height
+7. **TEXTFIELD_PLAN Phase 5** — HTML text (edittext_html_* tests, several at 81-87%)
+8. **Fix GotoFrame inline execution** — needed for target_clip_removed (4/5, 80%)
 
 ### Lower ROI (new features)
-10. **COLOR_OBJECT_PLAN** — 4 tests, requires Color constructor + flash.geom.Transform
-11. **MOVIECLIP_PLAN Phases 2-3** — depth methods, createEmptyMovieClip
-12. **OOP_SUPER_EXTENDS_PLAN** — super keyword, 8 tests
-13. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, property flags, 12 tests
+9. **COLOR_OBJECT_PLAN** — 4 tests, requires Color constructor + flash.geom.Transform
+10. **MOVIECLIP_PLAN Phases 2-3** — depth methods, createEmptyMovieClip
+11. **OOP_SUPER_EXTENDS_PLAN** — super keyword, 8 tests
+12. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, property flags, 12 tests
