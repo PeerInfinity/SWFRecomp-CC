@@ -7128,6 +7128,25 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 }
 #endif
 
+static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
+{
+	double scaled_w = (double)mc->width * mc->xscale / 100.0;
+	double scaled_h = (double)mc->height * mc->yscale / 100.0;
+	double rot = mc->rotation;
+	if (rot == 0.0) {
+		*eff_w = scaled_w;
+		*eff_h = scaled_h;
+	} else {
+		double rot_rad = rot * 3.14159265358979323846 / 180.0;
+		double c = fabs(cos(rot_rad));
+		double s = fabs(sin(rot_rad));
+		double sw_twips = scaled_w * 20.0;
+		double sh_twips = scaled_h * 20.0;
+		*eff_w = (round(sw_twips * c) + round(sh_twips * s)) / 20.0;
+		*eff_h = (round(sw_twips * s) + round(sh_twips * c)) / 20.0;
+	}
+}
+
 /**
  * Construct the target path for a MovieClip
  *
@@ -10612,8 +10631,8 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (strcasecmp(var_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
-			if (strcasecmp(var_name, "_width") == 0) { float v = mc->width; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_height") == 0) { float v = mc->height; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
+			if (strcasecmp(var_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
 			if (strcasecmp(var_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_totalframes") == 0) { float v = (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -11182,10 +11201,10 @@ void actionGetProperty(SWFAppContext* app_context)
 			value = mc ? (mc->visible ? 1.0f : 0.0f) : 1.0f;
 			break;
 		case 8:  // _width
-			value = mc ? mc->width : 0.0f;
+			if (mc) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); value = (float)_ew; } else { value = 0.0f; }
 			break;
 		case 9:  // _height
-			value = mc ? mc->height : 0.0f;
+			if (mc) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); value = (float)_eh; } else { value = 0.0f; }
 			break;
 		case 10: // _rotation
 			value = mc ? mc->rotation : 0.0f;
@@ -14449,8 +14468,8 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
-			if (strcasecmp(prop_name, "_width") == 0) { float v = mc->width; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_height") == 0) { float v = mc->height; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
+			if (strcasecmp(prop_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
 			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -16317,8 +16336,8 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 	if (strcasecmp(name, "_rotation") == 0) { float v = mc->rotation; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_alpha") == 0) { float v = mc->alpha; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_visible") == 0) { result->type = ACTION_STACK_VALUE_BOOLEAN; result->data.numeric_value = mc->visible ? 1 : 0; return 1; }
-	if (strcasecmp(name, "_width") == 0) { float v = mc->width; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_height") == 0) { float v = mc->height; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_ew, 8); return 1; }
+	if (strcasecmp(name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_eh, 8); return 1; }
 	if (strcasecmp(name, "_currentframe") == 0) { float v = (float)mc->currentframe; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_totalframes") == 0) { float v = (float)mc->totalframes; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
