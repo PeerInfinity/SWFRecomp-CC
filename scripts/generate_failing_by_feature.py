@@ -89,6 +89,12 @@ def build_investigation_index() -> dict[str, list[tuple[str, str]]]:
             rel = f"ruffle-tests/_investigation/complete/{p.name}"
             candidates.append((p.name, rel, p))
 
+    incomplete_dir = INVESTIGATION_DIR / "incomplete"
+    if incomplete_dir.is_dir():
+        for p in incomplete_dir.glob("*.md"):
+            rel = f"ruffle-tests/_investigation/incomplete/{p.name}"
+            candidates.append((p.name, rel, p))
+
     for display_name, rel_path, abs_path in candidates:
         with open(abs_path) as f:
             content = f.read()

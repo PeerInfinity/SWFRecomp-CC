@@ -69,6 +69,12 @@ def build_investigation_index() -> tuple[dict[str, list[tuple[int, str]]], list[
             rel = f"ruffle-tests/_investigation/complete/{p.name}"
             candidates.append((p.name, rel, p))
 
+    incomplete_dir = INVESTIGATION_DIR / "incomplete"
+    if incomplete_dir.is_dir():
+        for p in incomplete_dir.glob("*.md"):
+            rel = f"ruffle-tests/_investigation/incomplete/{p.name}"
+            candidates.append((p.name, rel, p))
+
     # Sort alphabetically by display name (case-insensitive)
     candidates.sort(key=lambda d: d[0].lower())
 
