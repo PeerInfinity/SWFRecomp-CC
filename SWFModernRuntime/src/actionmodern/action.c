@@ -26,6 +26,7 @@
 // Forward declarations for array helpers (defined later in file)
 static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size);
 static double varToDoubleSimple(ActionVar* v);
+static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVar* b, int flags);
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
@@ -17992,6 +17993,35 @@ static double varToDoubleSimple(ActionVar* v)
 		case ACTION_STACK_VALUE_NULL: return 0.0;
 		default: return NAN;
 	}
+}
+
+// Helper: compare two ActionVars for sort/sortOn
+// flags: CASEINSENSITIVE=1, DESCENDING=2, NUMERIC=16
+// Returns negative if a < b, 0 if equal, positive if a > b
+static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVar* b, int flags)
+{
+	int result;
+	if (flags & 16) /* NUMERIC */
+	{
+		double da = varToDoubleSimple(a);
+		double db = varToDoubleSimple(b);
+		if (da < db) result = -1;
+		else if (da > db) result = 1;
+		else result = 0;
+	}
+	else
+	{
+		char buf_a[1024], buf_b[1024];
+		varToStringBuf(app_context, a, buf_a, sizeof(buf_a));
+		varToStringBuf(app_context, b, buf_b, sizeof(buf_b));
+		if (flags & 1) /* CASEINSENSITIVE */
+			result = strcasecmp(buf_a, buf_b);
+		else
+			result = strcmp(buf_a, buf_b);
+	}
+	if (flags & 2) /* DESCENDING */
+		result = -result;
+	return result;
 }
 
 // Helper function to call built-in array methods
