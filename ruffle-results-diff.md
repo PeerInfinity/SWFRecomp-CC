@@ -1,21 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `81cf2020fa85` (2026-02-18T03:10:18.342153+00:00)
-**Current:** `c2abd95a342f` (2026-02-18T03:45:00.401788+00:00)
+**Previous:** `c2abd95a342f` (2026-02-18T03:45:00.401788+00:00)
+**Current:** `137cb550ddad` (2026-02-18T03:54:52.610728+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 218 | 218 | 0 |
+| Passing | 218 | 219 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 35.2% | 35.2% | 0% |
-| Mismatched lines | 43004 | 42995 | -9 |
-|   Decreased | | | -9 |
+| Pass rate | 35.2% | 35.4% | +0.2% |
+| Mismatched lines | 42995 | 42992 | -3 |
+|   Decreased | | | -3 |
 
-## Line Count Changed (2)
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `as2_oop` | output_mismatch | 10/13 | 13/13 |
+
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `boxed_primitives` | output_mismatch | 15/24 | 23/24 | -8 |
-| `primitive_type_globals` | output_mismatch | 320/557 | 321/557 | -1 |
+| `goto_methods` | segfault | 8/40 | 8/40 | 0 |

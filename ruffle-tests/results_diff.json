@@ -1,60 +1,60 @@
 {
   "metadata": {
-    "old_timestamp": "2026-02-18T03:10:18.342153+00:00",
-    "old_git_sha": "81cf2020fa85689dfa7cc05598092a9d466fea8b",
-    "new_timestamp": "2026-02-18T03:45:00.401788+00:00",
-    "new_git_sha": "c2abd95a342fe07a13d699ade3e9f4ae4709743c",
+    "old_timestamp": "2026-02-18T03:45:00.401788+00:00",
+    "old_git_sha": "c2abd95a342fe07a13d699ade3e9f4ae4709743c",
+    "new_timestamp": "2026-02-18T03:54:52.610728+00:00",
+    "new_git_sha": "137cb550ddadc4b92040a22bc877c34f5a51f249",
     "partial": false
   },
   "summary": {
     "old_pass": 218,
     "old_total": 619,
     "old_pass_rate": 35.2,
-    "new_pass": 218,
+    "new_pass": 219,
     "new_total": 619,
-    "new_pass_rate": 35.2,
-    "old_mismatched_lines": 43004,
-    "new_mismatched_lines": 42995,
+    "new_pass_rate": 35.4,
+    "old_mismatched_lines": 42995,
+    "new_mismatched_lines": 42992,
     "increased_mismatches": 0,
-    "decreased_mismatches": 9,
-    "newly_passing": 0,
+    "decreased_mismatches": 3,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
+    "status_changed": 1,
     "unchanged": 617,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "boxed_primitives",
+      "test": "as2_oop",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 24,
-        "expected_lines": 24,
-        "matching_lines": 15
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 10
       },
       "new_lines": {
-        "actual_lines": 24,
-        "expected_lines": 24,
-        "matching_lines": 23
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
       }
     },
     {
-      "test": "primitive_type_globals",
+      "test": "goto_methods",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "old_status": "segfault",
+      "new_status": "segfault",
       "old_lines": {
-        "actual_lines": 555,
-        "expected_lines": 557,
-        "matching_lines": 320
+        "actual_lines": 41240,
+        "expected_lines": 40,
+        "matching_lines": 8
       },
       "new_lines": {
-        "actual_lines": 555,
-        "expected_lines": 557,
-        "matching_lines": 321
+        "actual_lines": 41231,
+        "expected_lines": 40,
+        "matching_lines": 8
       }
     }
   ]
