@@ -1413,6 +1413,7 @@ namespace SWFRecomp
 					context.out_script_defs << "\t}" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_ARRAY;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)arguments_array;" << endl;
+					context.out_script_defs << "\tswf_setup_arguments_props(app_context, arguments_array);" << endl;
 					next_reg++;
 				}
 

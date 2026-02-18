@@ -412,6 +412,8 @@ static ASObject* g_array_prototype = NULL;
 
 // Currently executing user-defined function — used to set arguments.caller
 static ASFunction* g_current_executing_func = NULL;
+// Previously executing function — used for arguments.caller in preloaded-arguments functions
+static ASFunction* g_prev_executing_func = NULL;
 static ASFunction g_object_toString_func;
 static ASFunction g_object_valueOf_func;
 static ASFunction g_object_hasOwnProperty_func;
@@ -2041,6 +2043,14 @@ static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
 	}
 }
 
+// Public wrapper for setupArgumentsProps — called from recompiler-generated code
+// when DefineFunction2 has the preload_arguments flag. Uses the global function
+// context (g_current_executing_func = callee, g_prev_executing_func = caller).
+void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr)
+{
+	setupArgumentsProps(app_context, arr, g_current_executing_func, g_prev_executing_func);
+}
+
 // Helper to look up function by name
 static ASFunction* lookupFunctionByName(const char* name, u32 name_len) {
 	for (u32 i = 0; i < function_count; i++) {
@@ -3510,7 +3520,11 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 		obj = (ASObject*) obj_var->data.numeric_value;
 	}
 
-	ActionVar* valueOf_prop = getPropertyWithPrototype(obj, "valueOf", 7);
+	// Arrays only check own properties for valueOf (not inherited from Object.prototype)
+	// This prevents Object.prototype.valueOf from hijacking array-to-primitive conversion.
+	ActionVar* valueOf_prop = (obj_var->type == ACTION_STACK_VALUE_ARRAY)
+	    ? getProperty(obj, "valueOf", 7)
+	    : getPropertyWithPrototype(obj, "valueOf", 7);
 	if (valueOf_prop != NULL)
 	{
 		if (valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
@@ -3607,7 +3621,11 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		obj = (ASObject*) obj_var->data.numeric_value;
 	}
 
-	ActionVar* toString_prop = getPropertyWithPrototype(obj, "toString", 8);
+	// Arrays only check own properties for toString (not inherited from Object.prototype)
+	// This prevents Object.prototype.toString from returning '[object Object]' for arrays.
+	ActionVar* toString_prop = (obj_var->type == ACTION_STACK_VALUE_ARRAY)
+	    ? getProperty(obj, "toString", 8)
+	    : getPropertyWithPrototype(obj, "toString", 8);
 	if (toString_prop != NULL && toString_prop->type == ACTION_STACK_VALUE_FUNCTION)
 	{
 		ASFunction* func = lookupFunctionFromVar(toString_prop);
@@ -17932,6 +17950,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 
+				g_prev_executing_func = prev_executing_func;
 				g_current_executing_func = func;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 				g_current_executing_func = prev_executing_func;
@@ -18010,6 +18029,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				else
 				{
 					// Call the simple function (cast to correct return type — generated functions return ActionVar)
+					g_prev_executing_func = prev_executing_func_t1;
 					g_current_executing_func = func;
 					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					g_current_executing_func = prev_executing_func_t1;
@@ -20076,6 +20096,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 
 				g_call_depth++;
+				g_prev_executing_func = prev_executing_func_am2;
 				g_current_executing_func = func;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
 				g_current_executing_func = prev_executing_func_am2;
@@ -20113,6 +20134,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 
 				g_call_depth++;
+				g_prev_executing_func = prev_executing_func_am1;
 				g_current_executing_func = func;
 				ActionVar result;
 				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
@@ -20275,8 +20297,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (func->register_count > 0)
 						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 
+					ASFunction* prev_executing_func_ap2 = g_current_executing_func;
 					g_call_depth++;
+					g_prev_executing_func = prev_executing_func_ap2;
+					g_current_executing_func = func;
 					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
+					g_current_executing_func = prev_executing_func_ap2;
 					g_call_depth--;
 
 					if (registers != NULL) FREE(registers);
@@ -20310,6 +20336,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (args != NULL) FREE(args);
 
 					g_call_depth++;
+					g_prev_executing_func = prev_executing_func_ap;
 					g_current_executing_func = func;
 					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					g_current_executing_func = prev_executing_func_ap;
