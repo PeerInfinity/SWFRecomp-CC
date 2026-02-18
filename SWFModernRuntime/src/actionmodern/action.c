@@ -14696,9 +14696,18 @@ void actionNewObject(SWFAppContext* app_context)
 			}
 		}
 		// Store as "valueOf_value" (read by builtin_wrapper_valueOf/builtin_prim_wrapper_toString)
-		setProperty(app_context, str_obj, "valueOf_value", 13, &value_var);
+		setPropertyWithFlags(app_context, str_obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
 		// Also store as "value" for backward compatibility
-		setProperty(app_context, str_obj, "value", 5, &value_var);
+		setPropertyWithFlags(app_context, str_obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
+		// Set length property (DontEnum, like native String.length)
+		{
+			u32 slen = (value_var.type == ACTION_STACK_VALUE_STRING) ? value_var.str_size : 0;
+			double slen_d = (double) slen;
+			ActionVar len_var = {0};
+			len_var.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &len_var.data.numeric_value) = slen_d;
+			setPropertyWithFlags(app_context, str_obj, "length", 6, &len_var, PROPERTY_FLAGS_DONTENUM);
+		}
 
 		// Set up valueOf and toString using the wrapper infrastructure
 		if (!g_wrapper_funcs_init)
@@ -14725,12 +14734,12 @@ void actionNewObject(SWFAppContext* app_context)
 		ActionVar vo_val = {0};
 		vo_val.type = ACTION_STACK_VALUE_FUNCTION;
 		VAL(u64, &vo_val.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
-		setProperty(app_context, str_obj, "valueOf", 7, &vo_val);
+		setPropertyWithFlags(app_context, str_obj, "valueOf", 7, &vo_val, PROPERTY_FLAGS_DONTENUM);
 
 		ActionVar ts_val = {0};
 		ts_val.type = ACTION_STACK_VALUE_FUNCTION;
 		VAL(u64, &ts_val.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
-		setProperty(app_context, str_obj, "toString", 8, &ts_val);
+		setPropertyWithFlags(app_context, str_obj, "toString", 8, &ts_val, PROPERTY_FLAGS_DONTENUM);
 
 		new_obj = str_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
@@ -14797,7 +14806,35 @@ void actionNewObject(SWFAppContext* app_context)
 			VAL(float, &value_var.data.numeric_value) = 0.0f;
 		}
 
-		setProperty(app_context, num_obj, "value", 5, &value_var);
+		setPropertyWithFlags(app_context, num_obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, num_obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
+
+		// Set up valueOf and toString using the wrapper infrastructure
+		if (!g_wrapper_funcs_init)
+		{
+			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+			g_wrapper_valueOf_func.function_type = 2;
+			g_wrapper_valueOf_func.param_count = 0;
+			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_wrapper_valueOf_func;
+			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+			strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+			g_prim_wrapper_toString_func.function_type = 2;
+			g_prim_wrapper_toString_func.param_count = 0;
+			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_prim_wrapper_toString_func;
+			g_wrapper_funcs_init = 1;
+		}
+		ActionVar _nvo = {0}; _nvo.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_nvo.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
+		setPropertyWithFlags(app_context, num_obj, "valueOf", 7, &_nvo, PROPERTY_FLAGS_DONTENUM);
+		ActionVar _nts = {0}; _nts.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_nts.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
+		setPropertyWithFlags(app_context, num_obj, "toString", 8, &_nts, PROPERTY_FLAGS_DONTENUM);
+
 		new_obj = num_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
@@ -14831,37 +14868,55 @@ void actionNewObject(SWFAppContext* app_context)
 		}
 		POP();
 
-		// Store boolean value as property
+		// Store boolean value as property (use BOOLEAN type so toString shows "true"/"false")
 		ActionVar value_var;
-		value_var.type = ACTION_STACK_VALUE_F32;
+		value_var.type = ACTION_STACK_VALUE_BOOLEAN;
+		value_var.data.numeric_value = 0;
 
 		if (num_args > 0)
 		{
-			// Convert first argument to boolean (0 or 1)
-			float bool_val = 0.0f;
-
+			// Convert first argument to boolean
+			u64 bool_val = 0;
 			if (args[0].type == ACTION_STACK_VALUE_F32)
-			{
-				bool_val = (VAL(float, &args[0].data.numeric_value) != 0.0f) ? 1.0f : 0.0f;
-			}
+				bool_val = (VAL(float, &args[0].data.numeric_value) != 0.0f) ? 1 : 0;
 			else if (args[0].type == ACTION_STACK_VALUE_F64)
-			{
-				bool_val = (VAL(double, &args[0].data.numeric_value) != 0.0) ? 1.0f : 0.0f;
-			}
+				bool_val = (VAL(double, &args[0].data.numeric_value) != 0.0) ? 1 : 0;
 			else if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				bool_val = (args[0].str_size > 0) ? 1.0f : 0.0f;
-			}
-
-			VAL(float, &value_var.data.numeric_value) = bool_val;
+				bool_val = (args[0].str_size > 0) ? 1 : 0;
+			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
+				bool_val = args[0].data.numeric_value ? 1 : 0;
+			value_var.data.numeric_value = bool_val;
 		}
-		else
+
+		setPropertyWithFlags(app_context, bool_obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, bool_obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
+
+		// Set up valueOf and toString using the wrapper infrastructure
+		if (!g_wrapper_funcs_init)
 		{
-			// No arguments - default to false
-			VAL(float, &value_var.data.numeric_value) = 0.0f;
+			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+			g_wrapper_valueOf_func.function_type = 2;
+			g_wrapper_valueOf_func.param_count = 0;
+			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_wrapper_valueOf_func;
+			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+			strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+			g_prim_wrapper_toString_func.function_type = 2;
+			g_prim_wrapper_toString_func.param_count = 0;
+			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_prim_wrapper_toString_func;
+			g_wrapper_funcs_init = 1;
 		}
+		ActionVar _bvo = {0}; _bvo.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_bvo.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
+		setPropertyWithFlags(app_context, bool_obj, "valueOf", 7, &_bvo, PROPERTY_FLAGS_DONTENUM);
+		ActionVar _bts = {0}; _bts.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_bts.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
+		setPropertyWithFlags(app_context, bool_obj, "toString", 8, &_bts, PROPERTY_FLAGS_DONTENUM);
 
-		setProperty(app_context, bool_obj, "value", 5, &value_var);
 		new_obj = bool_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
