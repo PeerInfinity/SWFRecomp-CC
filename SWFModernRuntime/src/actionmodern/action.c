@@ -12101,23 +12101,29 @@ void actionEquals2(SWFAppContext* app_context)
 	}
 	else if (a_is_obj)
 	{
-		// null/undefined == object → always false (ECMA-262 §11.9.3)
-		if (b.type == ACTION_STACK_VALUE_NULL || b.type == ACTION_STACK_VALUE_UNDEFINED)
+		// Use out_success to distinguish ToPrimitive failure (valueOf returned `this`)
+		// from success returning UNDEFINED (e.g. _global.valueOf = undefined).
+		// In SWF8+, ToPrimitive failure + null/undefined comparison → false (CastOp typed catch).
+		// In SWF5/6/7, failure falls through: UNDEFINED result → null==undefined → true.
+		int a_ok = 1;
+		a = objectToPrimitive(app_context, &a, &a_ok);
+		if (!a_ok && g_swf_version >= 8 &&
+		    (b.type == ACTION_STACK_VALUE_NULL || b.type == ACTION_STACK_VALUE_UNDEFINED))
 		{
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
 			return;
 		}
-		a = objectToPrimitive(app_context, &a, NULL);
 	}
 	else if (b_is_obj)
 	{
-		// null/undefined == object → always false (ECMA-262 §11.9.3)
-		if (a.type == ACTION_STACK_VALUE_NULL || a.type == ACTION_STACK_VALUE_UNDEFINED)
+		int b_ok = 1;
+		b = objectToPrimitive(app_context, &b, &b_ok);
+		if (!b_ok && g_swf_version >= 8 &&
+		    (a.type == ACTION_STACK_VALUE_NULL || a.type == ACTION_STACK_VALUE_UNDEFINED))
 		{
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
 			return;
 		}
-		b = objectToPrimitive(app_context, &b, NULL);
 	}
 
 	float result = 0.0f;
@@ -18258,6 +18264,95 @@ static int callArrayMethod(SWFAppContext* app_context,
 				}
 			}
 		}
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+		return 1;
+	}
+
+	// sortOn(fieldName [, flags]) - sort array of objects by a named property
+	if (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0)
+	{
+		if (num_args == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+			return 1;
+		}
+
+		// Get field name (arg 0)
+		char field_name[128] = {0};
+		ActionVar* field_arg = &args[0];
+		if (field_arg->type == ACTION_STACK_VALUE_STRING)
+		{
+			const uint16_t* u16 = varGetU16Ptr(field_arg);
+			if (u16 != NULL)
+				u16_to_utf8(u16, field_arg->str_size, field_name, sizeof(field_name));
+		}
+		u32 field_len = (u32) strlen(field_name);
+
+		// Get flags (arg 1, optional)
+		double flags_d = 0.0;
+		if (num_args >= 2)
+		{
+			ActionVar* flags_arg = &args[1];
+			if (flags_arg->type == ACTION_STACK_VALUE_F64)
+				flags_d = VAL(double, &flags_arg->data.numeric_value);
+			else if (flags_arg->type == ACTION_STACK_VALUE_F32)
+				flags_d = (double) VAL(float, &flags_arg->data.numeric_value);
+		}
+		int flags = (int) flags_d;
+		int descending = (flags & 2) != 0;  // Array.DESCENDING = 2
+		int numeric    = (flags & 16) != 0; // Array.NUMERIC = 16
+
+		// Bubble sort by named property
+		for (u32 i = 0; i < arr->length; i++)
+		{
+			for (u32 j = i + 1; j < arr->length; j++)
+			{
+				int swap = 0;
+				ActionVar* ai = &arr->elements[i];
+				ActionVar* aj = &arr->elements[j];
+
+				if (numeric)
+				{
+					double va = NAN, vb = NAN;
+					if (ai->type == ACTION_STACK_VALUE_OBJECT && ai->data.numeric_value != 0)
+					{
+						ActionVar* p = getProperty((ASObject*)ai->data.numeric_value, field_name, field_len);
+						if (p) va = varToDouble(p);
+					}
+					if (aj->type == ACTION_STACK_VALUE_OBJECT && aj->data.numeric_value != 0)
+					{
+						ActionVar* p = getProperty((ASObject*)aj->data.numeric_value, field_name, field_len);
+						if (p) vb = varToDouble(p);
+					}
+					if (!isnan(va) && !isnan(vb))
+						swap = descending ? (va < vb) : (va > vb);
+				}
+				else
+				{
+					char a_str[64] = {0}, b_str[64] = {0};
+					if (ai->type == ACTION_STACK_VALUE_OBJECT && ai->data.numeric_value != 0)
+					{
+						ActionVar* p = getProperty((ASObject*)ai->data.numeric_value, field_name, field_len);
+						if (p) varToStringBuf(app_context, p, a_str, sizeof(a_str));
+					}
+					if (aj->type == ACTION_STACK_VALUE_OBJECT && aj->data.numeric_value != 0)
+					{
+						ActionVar* p = getProperty((ASObject*)aj->data.numeric_value, field_name, field_len);
+						if (p) varToStringBuf(app_context, p, b_str, sizeof(b_str));
+					}
+					int cmp = strcmp(a_str, b_str);
+					swap = descending ? (cmp < 0) : (cmp > 0);
+				}
+
+				if (swap)
+				{
+					ActionVar tmp = arr->elements[i];
+					arr->elements[i] = arr->elements[j];
+					arr->elements[j] = tmp;
+				}
+			}
+		}
+
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 		return 1;
 	}
