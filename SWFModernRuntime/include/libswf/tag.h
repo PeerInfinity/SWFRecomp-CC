@@ -66,6 +66,12 @@ void ng_playCurrentSprite(void);
 void ng_gotoFrameCurrentSprite(u16 frame);
 size_t ng_getSpriteFrameCount(void);
 size_t ng_findDisplayEntryByName(const char* name);
+// Find a display entry at the given SWF depth that is a direct child of root.
+// Returns: 0=not found, 1=non-sprite (shape/text), 2=sprite (name written to out_name)
+int ng_findRootChildAtSWFDepth(size_t swf_depth, char* out_name, size_t out_name_size);
+size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name);
+void ng_updateDisplayDepth(const char* name, int new_as_depth);
+void ng_swapDisplayDepths(const char* name1, const char* name2);
 void ng_renameDisplayEntry(const char* old_name, const char* new_name);
 void ng_display_clear_after(size_t target_frame);
 int ng_isSpriteAtDepth(size_t depth);

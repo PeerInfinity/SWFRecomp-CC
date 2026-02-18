@@ -5,6 +5,7 @@
 #include <strings.h>
 #include <time.h>
 #include <ctype.h>
+#include <limits.h>
 
 // constants.h is generated per-test and contains SWF_FRAME_COUNT
 // It's optional - if not present, SWF_FRAME_COUNT defaults are used
@@ -6227,6 +6228,7 @@ MovieClip root_movieclip = {
 	.dynamic_props = NULL,
 	.lockroot = 0,
 	.blend_mode = 0,
+	.depth = -16384,   // _root is at Flash "level 0" depth
 };
 
 // Helper function to get MovieClip by target path
@@ -6247,6 +6249,12 @@ extern DisplayObject* findDisplayObjectByName(const char* name);
 #else
 // NO_GRAPHICS child lookup by instance name — returns depth or SIZE_MAX if not found
 extern size_t ng_findDisplayEntryByName(const char* name);
+// Search for a named child within a named parent's display list
+extern size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name);
+// Update ng_display depth for a named root-level entry (used by swapDepths)
+extern void ng_updateDisplayDepth(const char* name, int new_as_depth);
+// Swap ng_display depths of two named root-level entries (used by swapDepths)
+extern void ng_swapDisplayDepths(const char* name1, const char* name2);
 #endif
 
 #ifndef NO_GRAPHICS
@@ -6299,6 +6307,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->dynamic_props = NULL;
 	mc->lockroot = 0;
 	mc->blend_mode = 0;
+	mc->depth = 0;
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
 	mc->as_set_flags = 0;
@@ -6380,6 +6389,8 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 	if (mc != NULL) {
 		size_t depth = ng_findDisplayEntryByName(instance_name);
 		if (depth != SIZE_MAX) {
+			// Sync ActionScript depth: SWF depth - 16384
+			mc->depth = (int)depth - 16384;
 			float init_x, init_y;
 			if (ng_getTransformXY(depth, &init_x, &init_y)) {
 				mc->x = init_x;
@@ -14427,7 +14438,22 @@ void actionGetMember(SWFAppContext* app_context)
 				memcpy(child_name_buf, prop_name, 63);
 				child_name_buf[63] = '\0';
 			}
-			size_t child_depth = ng_findDisplayEntryByName(child_name_buf);
+			// First try nested child lookup (for mc.childName inside mc's display list)
+			size_t child_depth = SIZE_MAX;
+			if (mc->name[0] != '\0') {
+				child_depth = ng_findChildEntryDepth(mc->name, child_name_buf);
+			}
+			if (child_depth != SIZE_MAX) {
+				// Found as nested child of mc -- create MC with parent=mc and correct depth
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
+				if (child_mc != NULL) {
+					child_mc->depth = (int)child_depth - 16384;
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					return;
+				}
+			}
+			// Fall back to root-level name search
+			child_depth = ng_findDisplayEntryByName(child_name_buf);
 			if (child_depth != SIZE_MAX) {
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
@@ -17680,13 +17706,31 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				u16_to_utf8(_cemc_name_u16, args[0].str_size, _cemc_name_buf, sizeof(_cemc_name_buf));
 				inst_name = _cemc_name_buf;
 			}
-			int depth_val = (int) varToDouble(&args[1]);
-			(void)depth_val;
+			int depth_val = ecmaToInt32(varToDouble(&args[1]));
+
+			// Remove existing clip at same depth (depth conflict resolution)
+			for (int _di = 0; _di < child_mc_count; _di++) {
+				if (child_mc_cache[_di] != NULL && child_mc_cache[_di]->parent == mc &&
+				    child_mc_cache[_di]->depth == depth_val) {
+					// Invalidate old clip
+					child_mc_cache[_di]->depth = INT_MIN; // mark invalid
+					// Remove from parent's dynamic_props if present
+					if (mc->dynamic_props != NULL) {
+						ActionVar undef_var = {0};
+						undef_var.type = ACTION_STACK_VALUE_UNDEFINED;
+						setProperty(app_context, (ASObject*)mc->dynamic_props,
+							child_mc_cache[_di]->name, strlen(child_mc_cache[_di]->name), &undef_var);
+					}
+					child_mc_cache[_di] = NULL;
+					break;
+				}
+			}
 
 			MovieClip* child = createMovieClip(inst_name, mc);
 			child->currentframe = 0;  // Empty clips have _currentframe = 0
 			child->totalframes = 1;
 			child->framesloaded = 1;
+			child->depth = depth_val;
 			strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
 			child->url[sizeof(child->url) - 1] = '\0';
 
@@ -17701,7 +17745,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
 			setVariableByName(inst_name, &mc_var);
 
-			if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
+			// Find a free slot or append
+			int _slot = -1;
+			for (int _di = 0; _di < child_mc_count; _di++) {
+				if (child_mc_cache[_di] == NULL) { _slot = _di; break; }
+			}
+			if (_slot >= 0) {
+				child_mc_cache[_slot] = child;
+			} else if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
 				child_mc_cache[child_mc_count++] = child;
 			}
 
@@ -17717,11 +17768,19 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 #endif
 		builtin_handled = 1;
 	}
-	// getNextHighestDepth() — returns next available depth (stub: returns 0)
+	// getNextHighestDepth() — as a global function, operates on root
 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
 	{
 		if (args != NULL) FREE(args);
-		double v = 0.0;
+		extern MovieClip root_movieclip;
+		MovieClip* parent_mc = &root_movieclip;
+		int max_d = -1;
+		for (int _i = 0; _i < child_mc_count; _i++) {
+			MovieClip* _ch = child_mc_cache[_i];
+			if (_ch != NULL && _ch->parent == parent_mc && _ch->depth > max_d)
+				max_d = _ch->depth;
+		}
+		double v = (max_d < 0) ? 0.0 : (double)(max_d + 1);
 		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 		builtin_handled = 1;
 	}
@@ -20498,18 +20557,34 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					u16_to_utf8(_mcemc_name_u16, args[0].str_size, _mcemc_name_buf, sizeof(_mcemc_name_buf));
 					inst_name = _mcemc_name_buf;
 				}
-				int depth_val = (int) varToDouble(&args[1]);
-				(void)depth_val;
+				int depth_val = ecmaToInt32(varToDouble(&args[1]));
+
+				// Remove existing clip at same depth (depth conflict resolution)
+				for (int _dci = 0; _dci < child_mc_count; _dci++) {
+					if (child_mc_cache[_dci] != NULL && child_mc_cache[_dci]->parent == mc &&
+					    child_mc_cache[_dci]->depth == depth_val) {
+						if (mc->dynamic_props != NULL) {
+							ActionVar _undef = {0};
+							_undef.type = ACTION_STACK_VALUE_UNDEFINED;
+							setProperty(app_context, (ASObject*)mc->dynamic_props,
+								child_mc_cache[_dci]->name, strlen(child_mc_cache[_dci]->name), &_undef);
+						}
+						child_mc_cache[_dci]->depth = INT_MIN;
+						child_mc_cache[_dci] = NULL;
+						break;
+					}
+				}
 
 				// Create a child MovieClip
 				MovieClip* child = createMovieClip(inst_name, mc);
 				child->currentframe = 0;  // Empty clips have _currentframe = 0
 				child->totalframes = 1;
 				child->framesloaded = 1;
+				child->depth = depth_val;
 
 				// Copy URL from parent
 				strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
-				child->url[sizeof(child->url) - 1] = '\0';
+				child->url[sizeof(child->url) - 1] = ' ';
 
 				// Register child on parent MC's dynamic_props so mc.childName works via GetMember
 				if (mc->dynamic_props == NULL) {
@@ -20523,9 +20598,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Also set on global scope for GetVariable access
 				setVariableByName(inst_name, &mc_var);
 
-				// Add to child_mc_cache so it persists across lookups
-				if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
-					child_mc_cache[child_mc_count++] = child;
+				// Find free slot or append in child_mc_cache
+				{
+					int _sl = -1;
+					for (int _di = 0; _di < child_mc_count; _di++) {
+						if (child_mc_cache[_di] == NULL) { _sl = _di; break; }
+					}
+					if (_sl >= 0) child_mc_cache[_sl] = child;
+					else if (child_mc_count < MAX_CHILD_MOVIECLIPS) child_mc_cache[child_mc_count++] = child;
 				}
 
 				// Return the created MovieClip
@@ -20662,27 +20742,168 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 8 && strncmp(method_name, "getDepth", 8) == 0)
 		{
-			// Return the depth this clip was placed at
-			// For createEmptyMovieClip, depth is stored as the second arg
-			// Stub: return 0 (proper implementation needs depth tracking)
+			// Return the ActionScript depth of this clip
 			if (args != NULL) FREE(args);
-			double v = 0.0;
+			double v = (double)mc->depth;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
 		else if (method_name_len == 19 && strncmp(method_name, "getNextHighestDepth", 19) == 0)
 		{
-			// Return next available depth for placing children
+			// Return the next available depth for this clip's children
+			// = max(children's depths) + 1, or 0 if all children are at negative depths
 			if (args != NULL) FREE(args);
-			double v = 0.0;
+			int _max_d = -1;
+			for (int _i = 0; _i < child_mc_count; _i++) {
+				MovieClip* _ch = child_mc_cache[_i];
+				if (_ch != NULL && _ch->parent == mc && _ch->depth > _max_d)
+					_max_d = _ch->depth;
+			}
+			double v = (_max_d < 0) ? 0.0 : (double)(_max_d + 1);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+			return;
+		}
+		else if (method_name_len == 10 && strncmp(method_name, "swapDepths", 10) == 0)
+		{
+			// swapDepths(numericDepth) — move clip to new depth
+			// swapDepths(clipRef) — exchange depths with another clip
+			// swapDepths(pathString) — resolve path then exchange
+			if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
+				// no-op for undefined
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+				// Swap depths with target clip (same-parent only; cross-parent is no-op in Flash)
+				MovieClip* _target = (MovieClip*) args[0].data.numeric_value;
+				if (_target != NULL && _target != mc) {
+					MovieClip* _mc_parent = mc->parent ? mc->parent : &root_movieclip;
+					MovieClip* _tg_parent = _target->parent ? _target->parent : &root_movieclip;
+					if (_mc_parent == _tg_parent) {
+						int _tmp = mc->depth;
+						mc->depth = _target->depth;
+						_target->depth = _tmp;
+#ifdef NO_GRAPHICS
+						if (mc->name[0] && _target->name[0])
+							ng_swapDisplayDepths(mc->name, _target->name);
+#endif
+					}
+					// Cross-parent swap is a no-op (Flash ignores it)
+				}
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			if (args[0].type == ACTION_STACK_VALUE_STRING) {
+				// Resolve path string to MovieClip, then swap depths (same-parent only)
+				char _sd_path[512];
+				const uint16_t* _sd_u16 = varGetU16Ptr(&args[0]);
+				u16_to_utf8(_sd_u16, args[0].str_size, _sd_path, sizeof(_sd_path));
+				if (args != NULL) FREE(args);
+				// Simple path resolver: "../name" = sibling from parent
+				MovieClip* _target_mc = NULL;
+				if (_sd_path[0] == '.' && _sd_path[1] == '.' && _sd_path[2] == '/') {
+					// "../sibling" — find sibling relative to parent
+					const char* _sibling = _sd_path + 3;
+					MovieClip* _parent_mc = mc->parent ? mc->parent : &root_movieclip;
+					for (int _i = 0; _i < child_mc_count && !_target_mc; _i++) {
+						MovieClip* _ch = child_mc_cache[_i];
+						if (_ch != NULL && _ch->parent == _parent_mc &&
+						    strcmp(_ch->name, _sibling) == 0)
+							_target_mc = _ch;
+					}
+				} else if (_sd_path[0] != '\0') {
+					// Plain name — find child of current mc
+					for (int _i = 0; _i < child_mc_count && !_target_mc; _i++) {
+						MovieClip* _ch = child_mc_cache[_i];
+						if (_ch != NULL && _ch->parent == mc &&
+						    strcmp(_ch->name, _sd_path) == 0)
+							_target_mc = _ch;
+					}
+				}
+				if (_target_mc != NULL && _target_mc != mc) {
+					MovieClip* _mc_parent = mc->parent ? mc->parent : &root_movieclip;
+					MovieClip* _tg_parent = _target_mc->parent ? _target_mc->parent : &root_movieclip;
+					if (_mc_parent == _tg_parent) {
+						int _tmp = mc->depth;
+						mc->depth = _target_mc->depth;
+						_target_mc->depth = _tmp;
+#ifdef NO_GRAPHICS
+						if (mc->name[0] && _target_mc->name[0])
+							ng_swapDisplayDepths(mc->name, _target_mc->name);
+#endif
+					}
+				}
+				pushUndefined(app_context);
+				return;
+			}
+			// Numeric depth
+			double _dval = varToDouble(&args[0]);
+			if (args != NULL) FREE(args);
+			int32_t _new_depth;
+			if (isnan(_dval)) {
+				_new_depth = 0;
+			} else {
+				_new_depth = ecmaToInt32(_dval);
+			}
+			// Clamp to valid range [-16384, 2130690044]
+			if (_new_depth < -16384) _new_depth = -16384;
+			if (_new_depth > 2130690044) _new_depth = 2130690044;
+			mc->depth = _new_depth;
+#ifdef NO_GRAPHICS
+			if (mc->name[0])
+				ng_updateDisplayDepth(mc->name, _new_depth);
+#endif
+			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 18 && strncmp(method_name, "getInstanceAtDepth", 18) == 0)
 		{
-			// Return the instance at the given depth (stub: undefined)
+			// Return the MovieClip at the given depth, or the parent MC for non-MC objects,
+			// or undefined if no object at that depth.
+#ifdef NO_GRAPHICS
+			if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
+			    args[0].type == ACTION_STACK_VALUE_NULL) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			int _target_depth = ecmaToInt32(varToDouble(&args[0]));
+			if (args != NULL) FREE(args);
+			// 1. Scan child_mc_cache for matching parent + depth
+			for (int _i = 0; _i < child_mc_count; _i++) {
+				MovieClip* _ch = child_mc_cache[_i];
+				if (_ch != NULL && _ch->parent == mc && _ch->depth == _target_depth) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ch);
+					return;
+				}
+			}
+			// 2. Check display list via ng_findRootChildAtSWFDepth
+			// (only handles root children for now; swf_depth = AS_depth + 16384)
+			if (_target_depth >= -16384) {
+				size_t _swf_depth = (size_t)(_target_depth + 16384);
+				char _inst_name[64] = {0};
+				int _found_type = ng_findRootChildAtSWFDepth(_swf_depth, _inst_name, sizeof(_inst_name));
+				if ((_found_type == 2 || _found_type == 3) && _inst_name[0]) {
+					// Sprite or textfield with auto-name — find or create its MovieClip
+					MovieClip* _sprite_mc = findOrCreateMovieClip(app_context, _inst_name, mc);
+					if (_sprite_mc) {
+						_sprite_mc->depth = _target_depth;
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_sprite_mc);
+						return;
+					}
+				} else if (_found_type == 1) {
+					// Non-sprite, non-textfield (shape, text) — return the parent MC
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+					return;
+				}
+			}
+			pushUndefined(app_context);
+#else
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
+#endif
 			return;
 		}
 		else if ((method_name_len == 9 && strncmp(method_name, "getBounds", 9) == 0) ||

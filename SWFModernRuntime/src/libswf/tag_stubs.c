@@ -36,6 +36,7 @@ static struct {
 static size_t ng_display_count = 0;
 static int ng_nesting_depth = 0;  // >0 when inside sprite frame execution
 static size_t ng_current_display_idx = (size_t)-1;  // display index of currently executing sprite
+static unsigned int ng_auto_instance_counter = 1;  // global auto-name counter ("instance1", "instance2", ...)
 
 // Simple button registry for NO_GRAPHICS mode (for typeof discrimination)
 #define MAX_BUTTONS_NG 64
@@ -442,6 +443,21 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 
 placed:
+	// Auto-assign instance name ("instance1", "instance2", ...) for sprites, textfields, and buttons
+	// that were placed without an explicit name (mirrors Flash Player behavior).
+	if (si != (size_t)-1 || is_tf || btn) {
+		// Find the placed entry and give it an auto-name if still unnamed
+		size_t expected_parent2 = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+		for (size_t _ai = 0; _ai < ng_display_count; _ai++) {
+			if (ng_display[_ai].depth == depth && ng_display[_ai].parent_display_idx == expected_parent2) {
+				if (ng_display[_ai].instance_name[0] == '\0') {
+					snprintf(ng_display[_ai].instance_name, sizeof(ng_display[_ai].instance_name),
+					         "instance%u", ng_auto_instance_counter++);
+				}
+				break;
+			}
+		}
+	}
 	// Initialize textfield variable binding at placement time
 	if (is_tf && tf_idx >= 0) {
 		const char* var_name = ng_textfields[tf_idx].variable_name;
@@ -773,6 +789,100 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 
 // NO_GRAPHICS child lookup by instance name — returns depth or SIZE_MAX if not found
 // Only matches root-level entries (called from action.c for root display object resolution)
+// Find a display entry at the given SWF depth that is a direct child of the root.
+// Returns: 0 = not found, 1 = found non-sprite, 2 = found sprite (name in out_name)
+int ng_findRootChildAtSWFDepth(size_t swf_depth, char* out_name, size_t out_name_size)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth != swf_depth) continue;
+		if (ng_display[i].parent_display_idx != (size_t)-1) continue;
+		if (ng_display[i].sprite_idx != (size_t)-1) {
+			// It's a sprite — copy name (may be empty if unnamed)
+			if (out_name && out_name_size > 0) {
+				strncpy(out_name, ng_display[i].instance_name, out_name_size - 1);
+				out_name[out_name_size - 1] = '\0';
+			}
+			return 2;
+		} else if (ng_display[i].is_textfield) {
+			// It's a textfield — copy name, return 3
+			if (out_name && out_name_size > 0) {
+				strncpy(out_name, ng_display[i].instance_name, out_name_size - 1);
+				out_name[out_name_size - 1] = '\0';
+			}
+			return 3;
+		} else {
+			// Non-sprite, non-textfield (shape, plain text, button)
+			if (out_name && out_name_size > 0) out_name[0] = '\0';
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Search for a named child within a named parent's display list.
+// Returns the child's SWF depth (within-parent depth), or SIZE_MAX if not found.
+size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
+{
+	// Find parent entry index
+	size_t parent_idx = SIZE_MAX;
+	for (size_t i = 0; i < ng_display_count; i++) {
+		if (ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, parent_name) == 0) {
+			parent_idx = i;
+			break;
+		}
+	}
+	if (parent_idx == SIZE_MAX) return SIZE_MAX;
+
+	// Find child entry that is a direct child of parent_idx
+	for (size_t i = 0; i < ng_display_count; i++) {
+		if (ng_display[i].parent_display_idx == parent_idx &&
+		    ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, child_name) == 0) {
+			return ng_display[i].depth;
+		}
+	}
+	return SIZE_MAX;
+}
+
+// Update ng_display depth for a named root-level entry (for swapDepths with numeric arg)
+void ng_updateDisplayDepth(const char* name, int new_as_depth)
+{
+	size_t new_swf_depth = (size_t)(new_as_depth + 16384);
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, name) == 0)
+		{
+			ng_display[i].depth = new_swf_depth;
+			return;
+		}
+	}
+}
+
+// Swap ng_display depths of two named root-level entries (for swapDepths with MC arg)
+void ng_swapDisplayDepths(const char* name1, const char* name2)
+{
+	size_t idx1 = SIZE_MAX, idx2 = SIZE_MAX;
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].instance_name[0] != '\0')
+		{
+			if (strcmp(ng_display[i].instance_name, name1) == 0) idx1 = i;
+			else if (strcmp(ng_display[i].instance_name, name2) == 0) idx2 = i;
+		}
+	}
+	if (idx1 != SIZE_MAX && idx2 != SIZE_MAX)
+	{
+		size_t tmp = ng_display[idx1].depth;
+		ng_display[idx1].depth = ng_display[idx2].depth;
+		ng_display[idx2].depth = tmp;
+	}
+}
+
 size_t ng_findDisplayEntryByName(const char* name)
 {
 	// Return the lowest-depth match when multiple entries share a name
