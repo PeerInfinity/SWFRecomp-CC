@@ -9393,6 +9393,56 @@ void actionTrace(SWFAppContext* app_context)
 			ActionVar obj_var;
 			obj_var.type = STACK_TOP_TYPE;
 			obj_var.data.numeric_value = STACK_TOP_VALUE;
+			// If __proto__ is an ARRAY, use array-like join (own-props only, no getters invoked)
+			ASObject* _tr_obj = (ASObject*) obj_var.data.numeric_value;
+			ActionVar* _tr_proto = (_tr_obj != NULL) ? getProperty(_tr_obj, "__proto__", 9) : NULL;
+			if (_tr_proto != NULL && _tr_proto->type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ActionVar* _tr_len_prop = getProperty(_tr_obj, "length", 6);
+				u32 _tr_len = (_tr_len_prop != NULL) ? (u32)varToDouble(_tr_len_prop) : 0;
+				for (u32 _tr_i = 0; _tr_i < _tr_len; _tr_i++)
+				{
+					if (_tr_i > 0) printf(",");
+					char _tr_idx[32];
+					snprintf(_tr_idx, sizeof(_tr_idx), "%u", _tr_i);
+					ActionVar* _tr_elem = getProperty(_tr_obj, _tr_idx, (u32)strlen(_tr_idx));
+					if (_tr_elem == NULL || _tr_elem->type == ACTION_STACK_VALUE_UNDEFINED ||
+					    _tr_elem->type == ACTION_STACK_VALUE_HOLE)
+						printf("undefined");
+					else if (_tr_elem->type == ACTION_STACK_VALUE_NULL)
+						printf("null");
+					else if (_tr_elem->type == ACTION_STACK_VALUE_F64)
+					{
+						double _tr_d = varToDouble(_tr_elem);
+						if (isnan(_tr_d)) printf("NaN");
+						else if (isinf(_tr_d)) printf("%sInfinity", _tr_d < 0 ? "-" : "");
+						else if (_tr_d == 0.0) printf("0");
+						else printf("%.15g", _tr_d);
+					}
+					else if (_tr_elem->type == ACTION_STACK_VALUE_F32)
+					{
+						double _tr_d = varToDouble(_tr_elem);
+						if (isnan(_tr_d)) printf("NaN");
+						else if (isinf(_tr_d)) printf("%sInfinity", _tr_d < 0 ? "-" : "");
+						else if (_tr_d == 0.0) printf("0");
+						else printf("%.15g", _tr_d);
+					}
+					else if (_tr_elem->type == ACTION_STACK_VALUE_STRING)
+					{
+						const uint16_t* _tr_u16 = varGetU16Ptr(_tr_elem);
+						if (_tr_u16 && _tr_elem->str_size > 0)
+						{
+							char _tr_utf8[4096];
+							int _tr_utf8_len = u16_to_utf8(_tr_u16, _tr_elem->str_size, _tr_utf8, sizeof(_tr_utf8));
+							fwrite(_tr_utf8, 1, _tr_utf8_len, stdout);
+						}
+					}
+					else
+						printf("undefined");
+				}
+				printf("\n");
+				break;
+			}
 			int ts_found = 0;
 			ActionVar ts = objectCallToString(app_context, &obj_var, &ts_found);
 			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
@@ -12470,8 +12520,15 @@ void actionEquals2(SWFAppContext* app_context)
 
 			case ACTION_STACK_VALUE_F64:
 			{
-				// Compare raw bits so NaN == NaN is true (Flash quirk)
-				result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
+				double a_val = VAL(double, &a.data.numeric_value);
+				double b_val = VAL(double, &b.data.numeric_value);
+				if (isnan(a_val) || isnan(b_val)) {
+					// NaN: raw bit comparison (Flash quirk: NaN == NaN if identical bit pattern)
+					result = (a.data.numeric_value == b.data.numeric_value) ? 1.0f : 0.0f;
+				} else {
+					// Use double comparison so -0.0 == +0.0 (IEEE 754)
+					result = (a_val == b_val) ? 1.0f : 0.0f;
+				}
 				break;
 			}
 
@@ -14576,8 +14633,28 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 				if (!geom_handled) {
-					// Property not found - push undefined
-					pushUndefined(app_context);
+					// Check if __proto__ is ARRAY and key is numeric — look in proto array's elements
+					int arr_proto_handled = 0;
+					if (prop_name_len > 0 && prop_name[0] >= '0' && prop_name[0] <= '9') {
+						ActionVar* proto_var = getProperty(obj, "__proto__", 9);
+						if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_ARRAY) {
+							ASArray* proto_arr = (ASArray*) proto_var->data.numeric_value;
+							char* endptr;
+							long long idx = strtoll(prop_name, &endptr, 10);
+							if (*endptr == '\0' && idx >= 0 && idx <= 2147483647LL) {
+								arr_proto_handled = 1;
+								ActionVar* elem = getArrayElement(proto_arr, (u32)idx);
+								if (elem != NULL && elem->type != ACTION_STACK_VALUE_HOLE) {
+									pushVar(app_context, elem);
+								} else {
+									pushUndefined(app_context);
+								}
+							}
+						}
+					}
+					if (!arr_proto_handled) {
+						pushUndefined(app_context);
+					}
 				}
 			}
 		}
@@ -19101,40 +19178,129 @@ static int callArrayMethod(SWFAppContext* app_context,
 			if (_idx == NULL) { PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
 			for (u32 _ii = 0; _ii < n; _ii++) _idx[_ii] = _ii;
 
-			// Stable insertion sort on indices using the same comparator
-			for (u32 _ii = 1; _ii < n; _ii++)
+			// --- RETURNINDEXEDARRAY: Flash QuickSort on index array ---
 			{
-				u32 _key_idx = _idx[_ii];
-				int _jj = (int)_ii - 1;
-				while (_jj >= 0)
+				typedef struct { u32 low; u32 high; } _QI_Range;
+				_QI_Range* _qi_stack = (_QI_Range*) HALLOC(n * sizeof(_QI_Range));
+				if (_qi_stack != NULL)
 				{
-					int _cmp;
-					if (comparator != NULL)
+					int _qi_top = 0;
+					int _qi_flags = flags & ~2;  // strip DESCENDING (reversed after sort)
+					_qi_stack[_qi_top].low = 0;
+					_qi_stack[_qi_top].high = n - 1;
+					_qi_top++;
+
+					while (_qi_top > 0 && !g_execution_halted)
 					{
-						ActionVar _rargs[2] = { arr->elements[_idx[_jj]], arr->elements[_key_idx] };
-						ActionVar _rres;
-						g_call_depth++;
-						if (comparator->function_type == 2)
-							_rres = comparator->advanced_func(app_context, _rargs, 2, NULL, NULL);
-						else {
-							pushVar(app_context, &_rargs[1]);
-							pushVar(app_context, &_rargs[0]);
-							_rres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+						_qi_top--;
+						u32 _ql = _qi_stack[_qi_top].low;
+						u32 _qh = _qi_stack[_qi_top].high;
+						if (_ql >= _qh) continue;
+
+						u32 _qpivot_idx = _idx[_ql];
+						u32 _qleft = _ql + 1;
+						u32 _qright = _qh;
+
+						for (;;)
+						{
+							// Left scan: advance while compare(pivot, elem) > 0
+							while (_qleft < _qright)
+							{
+								int _qcmp;
+								if (comparator != NULL)
+								{
+									ActionVar _qargs[2] = { arr->elements[_qpivot_idx], arr->elements[_idx[_qleft]] };
+									ActionVar _qres;
+									g_call_depth++;
+									if (comparator->function_type == 2)
+										_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
+									else {
+										pushVar(app_context, &_qargs[1]);
+										pushVar(app_context, &_qargs[0]);
+										_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+									}
+									g_call_depth--;
+									if (g_execution_halted) break;
+									double _qd = varToDouble(&_qres);
+									_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
+								}
+								else
+								{
+									_qcmp = _sort_compare_vars(app_context, &arr->elements[_qpivot_idx], &arr->elements[_idx[_qleft]], _qi_flags);
+								}
+								if (_qcmp <= 0) break;
+								_qleft++;
+							}
+							if (g_execution_halted) break;
+							// Right scan: advance while compare(pivot, elem) <= 0
+							while (_qright > _ql)
+							{
+								int _qcmp;
+								if (comparator != NULL)
+								{
+									ActionVar _qargs[2] = { arr->elements[_qpivot_idx], arr->elements[_idx[_qright]] };
+									ActionVar _qres;
+									g_call_depth++;
+									if (comparator->function_type == 2)
+										_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
+									else {
+										pushVar(app_context, &_qargs[1]);
+										pushVar(app_context, &_qargs[0]);
+										_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+									}
+									g_call_depth--;
+									if (g_execution_halted) break;
+									double _qd = varToDouble(&_qres);
+									_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
+								}
+								else
+								{
+									_qcmp = _sort_compare_vars(app_context, &arr->elements[_qpivot_idx], &arr->elements[_idx[_qright]], _qi_flags);
+								}
+								if (_qcmp > 0) break;
+								_qright--;
+							}
+							if (g_execution_halted) break;
+							if (_qleft >= _qright) break;
+							// Swap indices
+							u32 _qtmp_idx = _idx[_qleft];
+							_idx[_qleft] = _idx[_qright];
+							_idx[_qright] = _qtmp_idx;
 						}
-						g_call_depth--;
-						double _rd = varToDouble(&_rres);
-						_cmp = (_rd < 0) ? -1 : (_rd > 0) ? 1 : 0;
-						if (flags & 2) _cmp = -_cmp;
+
+						// Place pivot index at its final position
+						_idx[_ql] = _idx[_qright];
+						_idx[_qright] = _qpivot_idx;
+
+						// Push right subarray first (LIFO -> left processed first)
+						if (_qright + 1 <= _qh && _qi_top < (int)n)
+						{
+							_qi_stack[_qi_top].low = _qright + 1;
+							_qi_stack[_qi_top].high = _qh;
+							_qi_top++;
+						}
+						// Push left subarray second (processed first via LIFO)
+						if (_qright > 0 && _ql < _qright && _qi_top < (int)n)
+						{
+							_qi_stack[_qi_top].low = _ql;
+							_qi_stack[_qi_top].high = _qright - 1;
+							_qi_top++;
+						}
 					}
-					else
-					{
-						_cmp = _sort_compare_vars(app_context, &arr->elements[_idx[_jj]], &arr->elements[_key_idx], flags);
-					}
-					if (_cmp <= 0) break;
-					_idx[_jj + 1] = _idx[_jj];
-					_jj--;
+					FREE(_qi_stack);
 				}
-				_idx[_jj + 1] = _key_idx;
+				// DESCENDING: reverse index array after sort
+				if (flags & 2)
+				{
+					u32 _qlo = 0, _qhi = n - 1;
+					while (_qlo < _qhi)
+					{
+						u32 _qtmp_idx = _idx[_qlo];
+						_idx[_qlo] = _idx[_qhi];
+						_idx[_qhi] = _qtmp_idx;
+						_qlo++; _qhi--;
+					}
+				}
 			}
 
 			// Build index result array
@@ -19152,41 +19318,129 @@ static int callArrayMethod(SWFAppContext* app_context,
 			return 1;
 		}
 
-		// --- Standard sort: stable insertion sort on arr->elements ---
-		for (u32 _si = 1; _si < n; _si++)
+		// --- Standard sort: Flash QuickSort (iterative, leftmost pivot) ---
 		{
-			ActionVar _key_var = arr->elements[_si];
-			int _sj = (int)_si - 1;
-			while (_sj >= 0)
+			typedef struct { u32 low; u32 high; } _QS_Range;
+			_QS_Range* _qs_stack = (_QS_Range*) HALLOC(n * sizeof(_QS_Range));
+			if (_qs_stack != NULL)
 			{
-				int _scmp;
-				if (comparator != NULL)
+				int _qs_top = 0;
+				int _qs_flags = flags & ~2;  // strip DESCENDING (reversed after sort)
+				_qs_stack[_qs_top].low = 0;
+				_qs_stack[_qs_top].high = n - 1;
+				_qs_top++;
+
+				while (_qs_top > 0 && !g_execution_halted)
 				{
-					ActionVar _sargs[2] = { arr->elements[_sj], _key_var };
-					ActionVar _sres;
-					g_call_depth++;
-					if (g_execution_halted) { g_call_depth--; break; }
-					if (comparator->function_type == 2)
-						_sres = comparator->advanced_func(app_context, _sargs, 2, NULL, NULL);
-					else {
-						pushVar(app_context, &_sargs[1]);
-						pushVar(app_context, &_sargs[0]);
-						_sres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+					_qs_top--;
+					u32 _ql = _qs_stack[_qs_top].low;
+					u32 _qh = _qs_stack[_qs_top].high;
+					if (_ql >= _qh) continue;
+
+					ActionVar _qpivot = arr->elements[_ql];
+					u32 _qleft = _ql + 1;
+					u32 _qright = _qh;
+
+					for (;;)
+					{
+						// Left scan: advance while compare(pivot, elem) > 0
+						while (_qleft < _qright)
+						{
+							int _qcmp;
+							if (comparator != NULL)
+							{
+								ActionVar _qargs[2] = { _qpivot, arr->elements[_qleft] };
+								ActionVar _qres;
+								g_call_depth++;
+								if (comparator->function_type == 2)
+									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
+								else {
+									pushVar(app_context, &_qargs[1]);
+									pushVar(app_context, &_qargs[0]);
+									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+								}
+								g_call_depth--;
+								if (g_execution_halted) break;
+								double _qd = varToDouble(&_qres);
+								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
+							}
+							else
+							{
+								_qcmp = _sort_compare_vars(app_context, &_qpivot, &arr->elements[_qleft], _qs_flags);
+							}
+							if (_qcmp <= 0) break;
+							_qleft++;
+						}
+						if (g_execution_halted) break;
+						// Right scan: advance while compare(pivot, elem) <= 0
+						while (_qright > _ql)
+						{
+							int _qcmp;
+							if (comparator != NULL)
+							{
+								ActionVar _qargs[2] = { _qpivot, arr->elements[_qright] };
+								ActionVar _qres;
+								g_call_depth++;
+								if (comparator->function_type == 2)
+									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
+								else {
+									pushVar(app_context, &_qargs[1]);
+									pushVar(app_context, &_qargs[0]);
+									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+								}
+								g_call_depth--;
+								if (g_execution_halted) break;
+								double _qd = varToDouble(&_qres);
+								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
+							}
+							else
+							{
+								_qcmp = _sort_compare_vars(app_context, &_qpivot, &arr->elements[_qright], _qs_flags);
+							}
+							if (_qcmp > 0) break;
+							_qright--;
+						}
+						if (g_execution_halted) break;
+						if (_qleft >= _qright) break;
+						// Swap elements[_qleft] and elements[_qright]
+						ActionVar _qtmp = arr->elements[_qleft];
+						arr->elements[_qleft] = arr->elements[_qright];
+						arr->elements[_qright] = _qtmp;
 					}
-					g_call_depth--;
-					double _sd = varToDouble(&_sres);
-					_scmp = (_sd < 0) ? -1 : (_sd > 0) ? 1 : 0;
-					if (flags & 2) _scmp = -_scmp;
+
+					// Place pivot at its final position
+					arr->elements[_ql] = arr->elements[_qright];
+					arr->elements[_qright] = _qpivot;
+
+					// Push right subarray first (LIFO -> left processed first)
+					if (_qright + 1 <= _qh && _qs_top < (int)n)
+					{
+						_qs_stack[_qs_top].low = _qright + 1;
+						_qs_stack[_qs_top].high = _qh;
+						_qs_top++;
+					}
+					// Push left subarray second (processed first via LIFO)
+					if (_qright > 0 && _ql < _qright && _qs_top < (int)n)
+					{
+						_qs_stack[_qs_top].low = _ql;
+						_qs_stack[_qs_top].high = _qright - 1;
+						_qs_top++;
+					}
 				}
-				else
-				{
-					_scmp = _sort_compare_vars(app_context, &arr->elements[_sj], &_key_var, flags);
-				}
-				if (_scmp <= 0) break;
-				arr->elements[_sj + 1] = arr->elements[_sj];
-				_sj--;
+				FREE(_qs_stack);
 			}
-			arr->elements[_sj + 1] = _key_var;
+			// DESCENDING: reverse array after sort (same as Ruffle)
+			if (flags & 2)
+			{
+				u32 _qlo = 0, _qhi = n - 1;
+				while (_qlo < _qhi)
+				{
+					ActionVar _qtmp = arr->elements[_qlo];
+					arr->elements[_qlo] = arr->elements[_qhi];
+					arr->elements[_qhi] = _qtmp;
+					_qlo++; _qhi--;
+				}
+			}
 		}
 
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
@@ -20315,13 +20569,31 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
 		{
 			u64 result = 0; // boolean false
-			if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_STRING)
+			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
+			                      args[0].type == ACTION_STACK_VALUE_F64 ||
+			                      args[0].type == ACTION_STACK_VALUE_F32))
 			{
 				char _addprop_buf[512];
-				const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
-				u16_to_utf8(_addprop_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
-				const char* prop_name = _addprop_buf;
-				u32 prop_name_len = (u32)strlen(prop_name);
+				const char* prop_name;
+				u32 prop_name_len;
+				if (args[0].type == ACTION_STACK_VALUE_STRING)
+				{
+					const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
+					u16_to_utf8(_addprop_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
+					prop_name = _addprop_buf;
+					prop_name_len = (u32)strlen(prop_name);
+				}
+				else
+				{
+					double d = varToDouble(&args[0]);
+					s64 as_int = (s64)d;
+					if ((double)as_int == d)
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%lld", (long long)as_int);
+					else
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%.15g", d);
+					prop_name = _addprop_buf;
+					prop_name_len = (u32)strlen(_addprop_buf);
+				}
 
 				ASFunction* getter = NULL;
 				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
