@@ -61,6 +61,8 @@ jobs:
           fi
 
       - name: Verify runtime output
+        env:
+          TZ: Asia/Kathmandu
         run: |
           ARGS="-v --json=ruffle-tests/results.json"
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
@@ -274,6 +276,8 @@ jobs:
           path: ruffle-tests/
 
       - name: Verify runtime output (shard ${{ matrix.shard }}/10)
+        env:
+          TZ: Asia/Kathmandu
         run: |
           ARGS="-v --json=ruffle-tests/results-shard-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/10"
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
