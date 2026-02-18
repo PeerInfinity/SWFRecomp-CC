@@ -1,17 +1,38 @@
 # Enumeration (for-in) Implementation Plan
 <!-- TESTS: enumerate, array_enumerate, new_object_enumerate, prototype_enumerate, stage_object_enumerate, globals_swf5, globals_swf6, globals_swf7, globals_swf8, stage_object_properties, as_set_prop_flags, prototype_properties, object_prototypes, is_prototype_of -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-18 — **COMPLETE** (all 5 direct tests passing, commit b899e90)
 
-## Overview
+## Status: COMPLETE
 
-Enumeration (`for-in`) is broken in multiple ways, affecting 5 directly-related tests and likely contributing to failures in many other tests that use property enumeration (e.g., `globals_swf5/6/7/8`, `stage_object_*`, `as_set_prop_flags`, `prototype_properties`, etc.).
+All 5 directly-affected tests now pass:
 
-**Current state**: `actionEnumerate` segfaults on non-string stack values. `actionEnumerate2` runs but produces wrong property order, leaks non-enumerable properties (`__proto__`, `constructor`), doesn't enumerate `addProperty` virtual properties, and doesn't enumerate MovieClip child instance names.
+| Test | Status | Commit |
+|------|--------|--------|
+| `enumerate` | **PASS** | b899e90 (+ prior work) |
+| `array_enumerate` | **PASS** | prior work |
+| `new_object_enumerate` | **PASS** | prior work |
+| `prototype_enumerate` | **PASS** | prior work |
+| `stage_object_enumerate` | **PASS** | prior work |
 
-**Directly affected tests** (5 tests):
+**What was already done before this session**: Phases 1-6 of the plan had been implemented (segfault fix, enum order, array order, DontEnum, addProperty, MC children). Tests array_enumerate, new_object_enumerate, prototype_enumerate, stage_object_enumerate were all already passing.
 
-| Test | Status | Lines | Core Issues |
+**What was done in this session** (commit b899e90): Fixed two remaining `enumerate` test failures:
+1. **SWF4 colon-path syntax** ("this:obj"): parse the colon separator, resolve the target MC ("this"/_root/_level0), then get the named property from its dynamic_props.
+2. **Dot-path syntax** ("this.obj"): delegate to `actionGetVariable` which handles dot-separated path traversal.
+3. **SetMember assignments**: after failing global variable table lookup, fall back to checking the current MC's `dynamic_props`.
+
+---
+
+## Overview (Historical)
+
+Enumeration (`for-in`) was broken in multiple ways, affecting 5 directly-related tests and likely contributing to failures in many other tests that use property enumeration (e.g., `globals_swf5/6/7/8`, `stage_object_*`, `as_set_prop_flags`, `prototype_properties`, etc.).
+
+**Original state**: `actionEnumerate` segfaulted on non-string stack values. `actionEnumerate2` ran but produced wrong property order, leaked non-enumerable properties (`__proto__`, `constructor`), didn't enumerate `addProperty` virtual properties, and didn't enumerate MovieClip child instance names.
+
+**Original directly affected tests** (5 tests):
+
+| Test | Original Status | Original Lines | Core Issues |
 |------|--------|-------|-------------|
 | `enumerate` | **SEGFAULT** | 0/65 | `actionEnumerate` reads stack as string without type check; crashes on non-string values |
 | `array_enumerate` | mismatch | 0/5 | Array enumeration order wrong (indices vs named props ordering) |
