@@ -18001,15 +18001,28 @@ static double varToDoubleSimple(ActionVar* v)
 static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVar* b, int flags)
 {
 	int result;
-	if (flags & 16) /* NUMERIC */
+
+	/* NUMERIC: only when BOTH values are F64/F32 type */
+	if ((flags & 16) &&
+	    (a->type == ACTION_STACK_VALUE_F64 || a->type == ACTION_STACK_VALUE_F32) &&
+	    (b->type == ACTION_STACK_VALUE_F64 || b->type == ACTION_STACK_VALUE_F32))
 	{
 		double da = varToDoubleSimple(a);
 		double db = varToDoubleSimple(b);
-		if (da < db) result = -1;
+		/* NaN always goes to end of sorted sequence (appears last in ascending) */
+		int a_nan = isnan(da), b_nan = isnan(db);
+		if (a_nan && b_nan) result = 0;
+		else if (a_nan) result = 1;   /* a is NaN, put after b */
+		else if (b_nan) result = -1;  /* b is NaN, put after a */
+		else if (da < db) result = -1;
 		else if (da > db) result = 1;
 		else result = 0;
+		/* DESCENDING flips everything (NaN ends up at start) */
+		if (flags & 2) result = -result;
+		return result;
 	}
-	else
+
+	/* String comparison: convert to UTF-8 then compare */
 	{
 		char buf_a[1024], buf_b[1024];
 		varToStringBuf(app_context, a, buf_a, sizeof(buf_a));
@@ -18019,6 +18032,7 @@ static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVa
 		else
 			result = strcmp(buf_a, buf_b);
 	}
+
 	if (flags & 2) /* DESCENDING */
 		result = -result;
 	return result;
@@ -18491,9 +18505,15 @@ static int callArrayMethod(SWFAppContext* app_context,
 					}
 				}
 			}
+			else if (a0->type == ACTION_STACK_VALUE_OBJECT || a0->type == ACTION_STACK_VALUE_ARRAY)
+			{
+				// OBJECT/ARRAY as first arg: return array unchanged (not sorted)
+				PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+				return 1;
+			}
 			else
 			{
-				// BOOLEAN, NULL, UNDEFINED, OBJECT, ARRAY etc. → invalid arg
+				// BOOLEAN, NULL, UNDEFINED etc. → return undefined
 				return_undefined = 1;
 			}
 		}
@@ -18582,6 +18602,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 						g_call_depth--;
 						double _rd = varToDouble(&_rres);
 						_cmp = (_rd < 0) ? -1 : (_rd > 0) ? 1 : 0;
+						if (flags & 2) _cmp = -_cmp;
 					}
 					else
 					{
@@ -18597,6 +18618,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 			// Build index result array
 			ASArray* _ridx_arr = allocArray(app_context, n);
 			if (_ridx_arr == NULL) { FREE(_idx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+			_ridx_arr->length = n;
 			for (u32 _ii = 0; _ii < n; _ii++)
 			{
 				_ridx_arr->elements[_ii].type = ACTION_STACK_VALUE_F64;
@@ -18632,6 +18654,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 					g_call_depth--;
 					double _sd = varToDouble(&_sres);
 					_scmp = (_sd < 0) ? -1 : (_sd > 0) ? 1 : 0;
+					if (flags & 2) _scmp = -_scmp;
 				}
 				else
 				{
@@ -18753,17 +18776,24 @@ static int callArrayMethod(SWFAppContext* app_context,
 			u32 _fnl = (u32)strlen(_fn); \
 			if ((_elem)->type == ACTION_STACK_VALUE_OBJECT && (_elem)->data.numeric_value != 0) { \
 				ASObject* _o = (ASObject*)(_elem)->data.numeric_value; \
-				ASProperty* _ps = findPropertyStructWithPrototype(_o, _fn, _fnl); \
-				if (_ps != NULL) { \
-					if (_ps->getter != NULL) \
-						(_out_var) = invokePropertyGetter(app_context, (ASFunction*)_ps->getter, (void*)_o); \
-					else \
-						(_out_var) = _ps->value; \
+				/* Only own properties (no prototype chain), no getter invocation */ \
+				for (u32 _sopi = 0; _sopi < _o->num_used; _sopi++) { \
+					if (_o->properties[_sopi].name_length == _fnl && \
+					    strncmp(_o->properties[_sopi].name, _fn, _fnl) == 0) { \
+						if (_o->properties[_sopi].getter == NULL) \
+							(_out_var) = _o->properties[_sopi].value; \
+						break; \
+					} \
 				} \
-			} else if ((_elem)->type == ACTION_STACK_VALUE_STRING && _fnl == 6 && memcmp(_fn, "length", 6) == 0) { \
-				(_out_var).type = ACTION_STACK_VALUE_F64; \
-				double _slen = (double)(_elem)->str_size; \
-				VAL(double, &(_out_var).data.numeric_value) = _slen; \
+			} else if ((_elem)->type != ACTION_STACK_VALUE_OBJECT) { \
+				/* Non-object primitive: special-case "length" on strings, else compare element itself */ \
+				if ((_elem)->type == ACTION_STACK_VALUE_STRING && _fnl == 6 && memcmp(_fn, "length", 6) == 0) { \
+					(_out_var).type = ACTION_STACK_VALUE_F64; \
+					double _slen = (double)(_elem)->str_size; \
+					VAL(double, &(_out_var).data.numeric_value) = _slen; \
+				} else { \
+					(_out_var) = *(_elem); \
+				} \
 			} \
 		} while(0)
 
@@ -18778,13 +18808,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 			} \
 		} while(0)
 
-		// Check if any flag across all keys sets UNIQUESORT or RETURNINDEXEDARRAY
-		int _so_any_unique = 0, _so_any_retidx = 0;
-		for (int _ki = 0; _ki < _so_nkeys; _ki++)
-		{
-			if (_so_flags[_ki] & 4) _so_any_unique = 1;
-			if (_so_flags[_ki] & 8) _so_any_retidx = 1;
-		}
+		// Only the FIRST key's flags determine UNIQUESORT/RETURNINDEXEDARRAY behavior
+		int _so_any_unique = (_so_flags[0] & 4) != 0;
+		int _so_any_retidx = (_so_flags[0] & 8) != 0;
 
 		// UNIQUESORT: check for duplicates first
 		if (_so_any_unique)
@@ -18804,32 +18830,32 @@ static int callArrayMethod(SWFAppContext* app_context,
 			}
 		}
 
-		// Sort indices (always, for stable sort)
+		// Sort indices
 		u32* _sidx = (u32*) HALLOC(n * sizeof(u32));
 		if (_sidx == NULL) { PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
 		for (u32 _ii = 0; _ii < n; _ii++) _sidx[_ii] = _ii;
 
-		// Stable insertion sort on indices
-		for (u32 _ii = 1; _ii < n; _ii++)
-		{
-			u32 _key_sidx = _sidx[_ii];
-			int _jj = (int)_ii - 1;
-			while (_jj >= 0)
-			{
-				int _scmp;
-				SORTON_COMPARE(&arr->elements[_sidx[_jj]], &arr->elements[_key_sidx], _scmp);
-				if (_scmp <= 0) break;
-				_sidx[_jj + 1] = _sidx[_jj];
-				_jj--;
-			}
-			_sidx[_jj + 1] = _key_sidx;
-		}
-
-		// RETURNINDEXEDARRAY or UNIQUESORT (success) → return index array
 		if (_so_any_retidx || _so_any_unique)
 		{
+			// Stable insertion sort (preserve equal-element order for index arrays)
+			for (u32 _ii = 1; _ii < n; _ii++)
+			{
+				u32 _key_sidx = _sidx[_ii];
+				int _jj = (int)_ii - 1;
+				while (_jj >= 0)
+				{
+					int _scmp;
+					SORTON_COMPARE(&arr->elements[_sidx[_jj]], &arr->elements[_key_sidx], _scmp);
+					if (_scmp <= 0) break;
+					_sidx[_jj + 1] = _sidx[_jj];
+					_jj--;
+				}
+				_sidx[_jj + 1] = _key_sidx;
+			}
+			// Build and return index array
 			ASArray* _ridx_arr = allocArray(app_context, n);
 			if (_ridx_arr == NULL) { FREE(_sidx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+			_ridx_arr->length = n;
 			for (u32 _ii = 0; _ii < n; _ii++)
 			{
 				_ridx_arr->elements[_ii].type = ACTION_STACK_VALUE_F64;
@@ -18840,16 +18866,33 @@ static int callArrayMethod(SWFAppContext* app_context,
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) _ridx_arr);
 			return 1;
 		}
-
-		// Apply sort: rearrange arr->elements according to sorted index order
-		ActionVar* _tmp_elems = (ActionVar*) HALLOC(n * sizeof(ActionVar));
-		if (_tmp_elems == NULL) { FREE(_sidx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
-		for (u32 _ii = 0; _ii < n; _ii++)
-			_tmp_elems[_ii] = arr->elements[_sidx[_ii]];
-		for (u32 _ii = 0; _ii < n; _ii++)
-			arr->elements[_ii] = _tmp_elems[_ii];
-		FREE(_tmp_elems);
-		FREE(_sidx);
+		else
+		{
+			// Stable insertion sort for plain sortOn
+			for (u32 _ii = 1; _ii < n; _ii++)
+			{
+				u32 _key_sidx = _sidx[_ii];
+				int _jj = (int)_ii - 1;
+				while (_jj >= 0)
+				{
+					int _scmp;
+					SORTON_COMPARE(&arr->elements[_sidx[_jj]], &arr->elements[_key_sidx], _scmp);
+					if (_scmp <= 0) break;
+					_sidx[_jj + 1] = _sidx[_jj];
+					_jj--;
+				}
+				_sidx[_jj + 1] = _key_sidx;
+			}
+			// Apply sort: rearrange arr->elements in sorted order
+			ActionVar* _tmp_elems = (ActionVar*) HALLOC(n * sizeof(ActionVar));
+			if (_tmp_elems == NULL) { FREE(_sidx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+			for (u32 _ii = 0; _ii < n; _ii++)
+				_tmp_elems[_ii] = arr->elements[_sidx[_ii]];
+			for (u32 _ii = 0; _ii < n; _ii++)
+				arr->elements[_ii] = _tmp_elems[_ii];
+			FREE(_tmp_elems);
+			FREE(_sidx);
+		}
 
 		#undef SORTON_MAX_KEYS
 		#undef SORTON_GET_FIELD
