@@ -102,7 +102,7 @@ These tests were near-passing in the previous update and now pass locally:
 | OOP_SUPER_EXTENDS_PLAN | Not started | 0/8 | - |
 | REGISTERCLASS_PLAN | Not started | 0/7 | - |
 | PROTOTYPE_OBJECT_PLAN | Not started | 0/12 | - |
-| ENUMERATION_PLAN | Not started | 0/5 | Segfault fix, enum order, DontEnum flags |
+| ENUMERATION_PLAN | **FULLY COMPLETE** (moved to complete/) | 5/5 pass | All done: colon-path, dot-path, MC dynamic props lookup |
 | WITH_SCOPE_PLAN | Not started | 0/2 | DefineLocal scoping, MC identity, null skip |
 | TIMER_PLAN | Not started | 0/3 | setInterval, setTimeout |
 | STAGE_PLAN | Not started | 0/7 | Stage object, MC precision, child enum |
