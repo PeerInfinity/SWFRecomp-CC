@@ -5124,6 +5124,31 @@ static void xml_do_append(SWFAppContext* app_context, ASObject* parent, ASObject
 	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
 	if (children == NULL) return;
 
+	// Purge elements that were added directly via Array.push() without going through
+	// DOM APIs. Such elements have no parentNode set (or a wrong parentNode).
+	// Flash rebuilds childNodes from actual DOM children when appendChild is called.
+	{
+		u32 write = 0;
+		for (u32 i = 0; i < children->length; i++) {
+			int keep = 1;
+			if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+				ASObject* elem = (ASObject*) children->elements[i].data.numeric_value;
+				if (elem != NULL) {
+					ActionVar* elem_pp = getProperty(elem, "parentNode", 10);
+					// Keep only elements whose parentNode points to this parent
+					if (elem_pp == NULL ||
+					    elem_pp->type != ACTION_STACK_VALUE_OBJECT ||
+					    (ASObject*)elem_pp->data.numeric_value != parent) {
+						keep = 0;
+					}
+				}
+			}
+			if (keep)
+				children->elements[write++] = children->elements[i];
+		}
+		children->length = write;
+	}
+
 	// Grow array if needed (allocArray uses malloc, so we must use realloc/free here)
 	if (children->length >= children->capacity) {
 		u32 new_cap = children->capacity < 4 ? 4 : children->capacity * 2;
@@ -7986,7 +8011,7 @@ void actionDivide(SWFAppContext* app_context)
 		if (EFFECTIVE_SWF_VERSION() < 5)
 		{
 			// SWF4: divide by zero returns "#ERROR#"
-			PUSH_STR("#ERROR#", 8);
+			PUSH_STR("#ERROR#", 7);
 		}
 		else
 		{
@@ -8015,7 +8040,7 @@ void actionModulo(SWFAppContext* app_context)
 	if (varToDouble(&a) == 0.0)
 	{
 		// SWF 4: Division by zero returns error string
-		PUSH_STR("#ERROR#", 8);
+		PUSH_STR("#ERROR#", 7);
 	}
 	else
 	{
@@ -11497,7 +11522,6 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 		if (current_proto_var->type == ACTION_STACK_VALUE_OBJECT)
 		{
 			ASObject* current_proto = (ASObject*) current_proto_var->data.numeric_value;
-
 			if (current_proto == ctor_proto)
 			{
 				// Found a match!
@@ -12077,10 +12101,22 @@ void actionEquals2(SWFAppContext* app_context)
 	}
 	else if (a_is_obj)
 	{
+		// null/undefined == object → always false (ECMA-262 §11.9.3)
+		if (b.type == ACTION_STACK_VALUE_NULL || b.type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
+		}
 		a = objectToPrimitive(app_context, &a, NULL);
 	}
 	else if (b_is_obj)
 	{
+		// null/undefined == object → always false (ECMA-262 §11.9.3)
+		if (a.type == ACTION_STACK_VALUE_NULL || a.type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+			return;
+		}
 		b = objectToPrimitive(app_context, &b, NULL);
 	}
 
@@ -13168,6 +13204,14 @@ void actionSetMember(SWFAppContext* app_context)
 				{
 					return;  // Read-only property — silently ignore
 				}
+			}
+			// XML nodeName: setting to non-string is a no-op (Flash behavior)
+			if (prop_name_len == 8 && memcmp(prop_name, "nodeName", 8) == 0 &&
+			    value_var.type != ACTION_STACK_VALUE_STRING)
+			{
+				ActionVar* nt = getProperty(obj, "nodeType", 8);
+				if (nt != NULL)
+					return;
 			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
@@ -14600,7 +14644,7 @@ void actionNewObject(SWFAppContext* app_context)
 	{
 		// Handle String constructor
 		// new String() or new String(value)
-		ASObject* str_obj = allocObject(app_context, 4);
+		ASObject* str_obj = allocObject(app_context, 8);
 
 		// Set __proto__ to String.prototype for instanceof support
 		PUSH_STR("String", 6);
@@ -14625,12 +14669,11 @@ void actionNewObject(SWFAppContext* app_context)
 		}
 		POP();
 
-		// If argument provided, convert to string and store as value property
+		// Store the string value for valueOf/toString support
+		ActionVar value_var = {0};
+		value_var.type = ACTION_STACK_VALUE_STRING;
 		if (num_args > 0)
 		{
-			ActionVar value_var = {0};
-			value_var.type = ACTION_STACK_VALUE_STRING;
-
 			if (args[0].type == ACTION_STACK_VALUE_STRING)
 			{
 				value_var = args[0];
@@ -14645,8 +14688,43 @@ void actionNewObject(SWFAppContext* app_context)
 				value_var.data.string_data.heap_ptr = u16;
 				value_var.data.string_data.owns_memory = true;
 			}
-			setProperty(app_context, str_obj, "value", 5, &value_var);
 		}
+		// Store as "valueOf_value" (read by builtin_wrapper_valueOf/builtin_prim_wrapper_toString)
+		setProperty(app_context, str_obj, "valueOf_value", 13, &value_var);
+		// Also store as "value" for backward compatibility
+		setProperty(app_context, str_obj, "value", 5, &value_var);
+
+		// Set up valueOf and toString using the wrapper infrastructure
+		if (!g_wrapper_funcs_init)
+		{
+			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+			g_wrapper_valueOf_func.function_type = 2;
+			g_wrapper_valueOf_func.param_count = 0;
+			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_wrapper_valueOf_func;
+
+			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+			strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+			g_prim_wrapper_toString_func.function_type = 2;
+			g_prim_wrapper_toString_func.param_count = 0;
+			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_prim_wrapper_toString_func;
+
+			g_wrapper_funcs_init = 1;
+		}
+
+		ActionVar vo_val = {0};
+		vo_val.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &vo_val.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
+		setProperty(app_context, str_obj, "valueOf", 7, &vo_val);
+
+		ActionVar ts_val = {0};
+		ts_val.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &ts_val.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
+		setProperty(app_context, str_obj, "toString", 8, &ts_val);
 
 		new_obj = str_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
@@ -16154,6 +16232,7 @@ void actionWithEnd(SWFAppContext* app_context)
 typedef struct {
 	jmp_buf handler;
 	int has_jmp_buf;
+	u32 saved_scope_depth;
 } ExceptionFrame;
 
 typedef struct {
@@ -16233,6 +16312,7 @@ void actionTryBegin(SWFAppContext* app_context)
 		return;
 	}
 	g_exception_state.frames[g_exception_state.depth].has_jmp_buf = 0;
+	g_exception_state.frames[g_exception_state.depth].saved_scope_depth = scope_depth;
 	g_exception_state.depth++;
 }
 
@@ -16250,6 +16330,12 @@ void actionCatchEnter(SWFAppContext* app_context)
 	int idx = g_exception_state.depth - 1;
 	if (idx >= 0) {
 		g_exception_state.frames[idx].has_jmp_buf = 0;
+		// Restore scope_depth to what it was when the try block started.
+		// longjmp() does not restore C global state, so any scope_chain pushes
+		// that happened between setjmp and throw (e.g. from actionCallFunction
+		// for a function that threw) leave scope_depth incorrect. Restoring here
+		// prevents use-after-free when searching stale scope_chain entries.
+		scope_depth = g_exception_state.frames[idx].saved_scope_depth;
 	}
 }
 
