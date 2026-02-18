@@ -10886,6 +10886,11 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (child_depth != SIZE_MAX)
 			{
 				extern MovieClip root_movieclip;
+				if (!ng_isScriptableAtDepth(child_depth)) {
+					// Non-scriptable type (shape, statictext, morphshape, image) — resolves to parent MC
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+					return;
+				}
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
@@ -16535,7 +16540,7 @@ void actionCloneSprite(SWFAppContext* app_context)
 	ActionVar depth;
 	popVar(app_context, &depth);
 
-	// Pop source sprite name
+	// Pop source sprite name (2nd pop = new clone's instance name)
 	ActionVar source;
 	popVar(app_context, &source);
 	char _clone_src_buf[512];
@@ -16544,6 +16549,15 @@ void actionCloneSprite(SWFAppContext* app_context)
 		const uint16_t* _clone_src_u16 = varGetU16Ptr(&source);
 		u16_to_utf8(_clone_src_u16, source.str_size, _clone_src_buf, sizeof(_clone_src_buf));
 		source_name = _clone_src_buf;
+	} else if ((source.type == ACTION_STACK_VALUE_OBJECT ||
+	            source.type == ACTION_STACK_VALUE_FUNCTION) && source.data.numeric_value != 0) {
+		// Object with toString method — call it to get the clone name
+		ActionVar ts = objectCallToString(app_context, &source, NULL);
+		if (ts.type == ACTION_STACK_VALUE_STRING && ts.str_size > 0) {
+			const uint16_t* _ts_u16 = varGetU16Ptr(&ts);
+			u16_to_utf8(_ts_u16, ts.str_size, _clone_src_buf, sizeof(_clone_src_buf));
+			source_name = _clone_src_buf;
+		}
 	}
 
 	// Pop target sprite name
@@ -16565,12 +16579,27 @@ void actionCloneSprite(SWFAppContext* app_context)
 	// 4. Assign new name
 	cloneMovieClip(source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
 	#else
-	// NO_GRAPHICS mode: Parameters are validated and popped
-	// In full graphics mode, this would clone the MovieClip
-	#ifdef DEBUG
-	printf("[CloneSprite] source='%s' -> target='%s' (depth=%d)\n",
-	       source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
-	#endif
+	{
+		int depth_int = ecmaToInt32(VAL(double, &depth.data.numeric_value));
+		// AVM1 stack naming is inverted from the SWF spec naming:
+		//   source ActionVar (2nd pop) = new clone name (e.g., "clip1")
+		//   target ActionVar (3rd pop) = existing clip to clone from (src MC or path string)
+		const char* new_name = source_name;  // new clone's instance name
+		// Strip path prefix from new name
+		if (strncmp(new_name, "_root.", 6) == 0) new_name += 6;
+		else if (strncmp(new_name, "_level0.", 8) == 0) new_name += 8;
+		if (target.type == ACTION_STACK_VALUE_MOVIECLIP && target.data.numeric_value != 0) {
+			// Source clip already resolved as MovieClip
+			MovieClip* src_mc = (MovieClip*)(uintptr_t)target.data.numeric_value;
+			ng_cloneSpriteFromMC(app_context, src_mc, new_name, depth_int);
+		} else {
+			// Source is a string path — look up in ng_display
+			const char* src_path = target_name;
+			if (strncmp(src_path, "_root.", 6) == 0) src_path += 6;
+			else if (strncmp(src_path, "_level0.", 8) == 0) src_path += 8;
+			ng_cloneSprite(app_context, src_path, new_name, depth_int);
+		}
+	}
 	#endif
 }
 
@@ -21440,6 +21469,82 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Return the created MovieClip
 				if (args != NULL) FREE(args);
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
+			return;
+		}
+		else if (method_name_len == 18 && strncmp(method_name, "duplicateMovieClip", 18) == 0)
+		{
+			// duplicateMovieClip(target, depth [, initObject])
+			// Clones this MC to a new name/depth, optionally applying initObject properties.
+			// Returns the new MovieClip.
+#ifdef NO_GRAPHICS
+			if (num_args >= 2) {
+				// Convert args[0] (target name) to string — may require toString() call on objects
+				char _dmc_tgt_buf[512];
+				const char* tgt_name = "";
+				if (args[0].type == ACTION_STACK_VALUE_STRING && args[0].str_size > 0) {
+					const uint16_t* _dmc_u16 = varGetU16Ptr(&args[0]);
+					u16_to_utf8(_dmc_u16, args[0].str_size, _dmc_tgt_buf, sizeof(_dmc_tgt_buf));
+					tgt_name = _dmc_tgt_buf;
+				} else if ((args[0].type == ACTION_STACK_VALUE_OBJECT ||
+				            args[0].type == ACTION_STACK_VALUE_FUNCTION) && args[0].data.numeric_value != 0) {
+					ActionVar _dmc_ts = objectCallToString(app_context, &args[0], NULL);
+					if (_dmc_ts.type == ACTION_STACK_VALUE_STRING && _dmc_ts.str_size > 0) {
+						const uint16_t* _dmc_ts_u16 = varGetU16Ptr(&_dmc_ts);
+						u16_to_utf8(_dmc_ts_u16, _dmc_ts.str_size, _dmc_tgt_buf, sizeof(_dmc_tgt_buf));
+						tgt_name = _dmc_tgt_buf;
+					}
+				}
+
+				// Convert args[1] (depth) to number — may require valueOf() call on objects
+				double _dmc_depth_dbl;
+				if ((args[1].type == ACTION_STACK_VALUE_OBJECT ||
+				     args[1].type == ACTION_STACK_VALUE_FUNCTION) && args[1].data.numeric_value != 0) {
+					int _dmc_vo_found = 0;
+					ActionVar _dmc_vo = objectCallValueOf(app_context, &args[1], &_dmc_vo_found);
+					_dmc_depth_dbl = _dmc_vo_found ? varToDouble(&_dmc_vo) : 0.0;
+				} else {
+					_dmc_depth_dbl = varToDouble(&args[1]);
+				}
+				int depth_val = ecmaToInt32(_dmc_depth_dbl);
+
+				// Use ng_duplicateMovieClip: stores at SWF depth (depth+16384), no variable registration
+				MovieClip* clone_mc = ng_duplicateMovieClip(app_context, mc->name, tgt_name, depth_val);
+				if (clone_mc == NULL) {
+					// Source not in ng_display (script-created MC): direct clone via MC
+					clone_mc = ng_cloneSpriteFromMC(app_context, mc, tgt_name, depth_val);
+				}
+
+				// Apply initObject properties (args[2]) to the clone
+				if (clone_mc != NULL && num_args >= 3 &&
+				    args[2].type == ACTION_STACK_VALUE_OBJECT && args[2].data.numeric_value != 0) {
+					ASObject* init_obj = (ASObject*)(uintptr_t)args[2].data.numeric_value;
+					if (clone_mc->dynamic_props == NULL) {
+						clone_mc->dynamic_props = (void*)allocObject(app_context, 8);
+						retainObject((ASObject*)clone_mc->dynamic_props);
+					}
+					for (u32 _ip = 0; _ip < init_obj->num_used; _ip++) {
+						ASProperty* _prop = &init_obj->properties[_ip];
+						if (_prop->name && (_prop->flags & PROPERTY_FLAG_ENUMERABLE)) {
+							setProperty(app_context, (ASObject*)clone_mc->dynamic_props,
+							    _prop->name, _prop->name_length, &_prop->value);
+						}
+					}
+				}
+
+				if (args != NULL) FREE(args);
+				if (clone_mc != NULL) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)clone_mc);
+				} else {
+					pushUndefined(app_context);
+				}
 			} else {
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);

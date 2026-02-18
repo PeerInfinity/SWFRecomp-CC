@@ -42,6 +42,8 @@ static struct {
 	int textfield_idx;    // index into ng_textfields, or -1
 	char instance_name[64]; // instance name set by tagSetInstanceName
 	size_t parent_display_idx; // index of parent sprite in ng_display, or (size_t)-1 for root
+	ClipAction* clip_actions;   // pointer to clip_actions array (from tagMain.c), or NULL
+	size_t clip_action_count;   // number of clip actions
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
 static int ng_nesting_depth = 0;  // >0 when inside sprite frame execution
@@ -57,6 +59,19 @@ static int ng_find_button(size_t char_id)
 {
 	for (size_t i = 0; i < ng_button_count; i++)
 		if (ng_button_ids[i] == char_id)
+			return 1;
+	return 0;
+}
+
+// Video stream char_id registry for NO_GRAPHICS mode (scriptable like sprites)
+#define MAX_VIDEOS_NG 32
+static size_t ng_video_ids[MAX_VIDEOS_NG];
+static size_t ng_video_count = 0;
+
+static int ng_find_video(size_t char_id)
+{
+	for (size_t i = 0; i < ng_video_count; i++)
+		if (ng_video_ids[i] == char_id)
 			return 1;
 	return 0;
 }
@@ -277,6 +292,21 @@ void tagShowFrame(SWFAppContext* app_context)
 		if (!ng_display[i].needs_init) continue;
 		ng_display[i].needs_init = 0;
 		ng_exec_sprite_frame(app_context, i, 0);
+		// Fire onLoad clip actions for newly initialized sprites
+		if (ng_display[i].clip_actions && ng_display[i].clip_action_count > 0) {
+			const char* inst_name = ng_display[i].instance_name[0] ? ng_display[i].instance_name : NULL;
+			if (inst_name) {
+				for (size_t j = 0; j < ng_display[i].clip_action_count; j++) {
+					if (ng_display[i].clip_actions[j].event_flags & 0x1) { // CLIP_EVENT_LOAD
+						MovieClip* saved_ctx = g_current_context;
+						MovieClip* clip_mc = actionFindOrCreateMovieClip(app_context, inst_name, &root_movieclip);
+						actionSetCurrentContext(clip_mc);
+						ng_display[i].clip_actions[j].action(app_context);
+						actionSetCurrentContext(saved_ctx);
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -322,6 +352,13 @@ void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name
 	ng_fonts[i].bold = bold;
 	ng_fonts[i].italic = italic;
 	ng_font_count++;
+}
+
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
+{
+	(void)app_context;
+	if (ng_video_count < MAX_VIDEOS_NG)
+		ng_video_ids[ng_video_count++] = (size_t)char_id;
 }
 
 void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
@@ -422,6 +459,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				ng_display[i].is_textfield = is_tf;
 				ng_display[i].textfield_idx = tf_idx;
 				ng_display[i].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+				ng_display[i].clip_actions = NULL;
+				ng_display[i].clip_action_count = 0;
 				goto placed;
 			}
 			if (ng_display[i].sprite_idx == si)
@@ -441,6 +480,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_display[i].is_textfield = is_tf;
 			ng_display[i].textfield_idx = tf_idx;
 			ng_display[i].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+			ng_display[i].clip_actions = NULL;
+			ng_display[i].clip_action_count = 0;
 			goto placed;
 		}
 	}
@@ -461,6 +502,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		ng_display[ng_display_count].textfield_idx = tf_idx;
 		ng_display[ng_display_count].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
 		ng_display[ng_display_count].instance_name[0] = '\0';
+		ng_display[ng_display_count].clip_actions = NULL;
+		ng_display[ng_display_count].clip_action_count = 0;
 		ng_display_count++;
 	}
 
@@ -526,8 +569,16 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
 	u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
 {
-	(void)app_context; (void)depth; (void)char_id; (void)transform_id;
-	(void)cxform_id; (void)clip_depth; (void)clip_actions; (void)clip_action_count;
+	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
+	// Store clip actions on the placed entry
+	size_t _ca_expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+	for (size_t i = 0; i < ng_display_count; i++) {
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == _ca_expected_parent) {
+			ng_display[i].clip_actions = clip_actions;
+			ng_display[i].clip_action_count = clip_action_count;
+			break;
+		}
+	}
 }
 
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
@@ -634,6 +685,219 @@ int ng_isTextFieldAtDepth(size_t depth)
 		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
 			return ng_display[i].is_textfield;
 	return 0;
+}
+
+int ng_isScriptableAtDepth(size_t depth)
+{
+	for (size_t i = 0; i < ng_display_count; i++) {
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1) {
+			return ng_display[i].is_button ||
+			       ng_display[i].is_textfield ||
+			       (ng_display[i].sprite_idx != (size_t)-1) ||
+			       ng_find_video(ng_display[i].char_id);
+		}
+	}
+	return 0;
+}
+
+// Clone a tag-placed sprite: source_name -> target_name at depth.
+// Only creates a MovieClip for scriptable sources (sprite/button/textfield).
+// Returns clone MovieClip, or NULL if source not found/non-scriptable.
+MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
+                           const char* target_name, int depth)
+{
+	if (!source_name || !target_name) return NULL;
+	// Flash valid depth range for CloneSprite: max 2130706428
+	if (depth > 2130706428) return NULL;
+
+	// Find source in ng_display by instance name (root-level only)
+	size_t src_idx = (size_t)-1;
+	for (size_t i = 0; i < ng_display_count; i++) {
+		if (ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, source_name) == 0) {
+			src_idx = i;
+			break;
+		}
+	}
+
+	// If source found in ng_display, check if it's scriptable
+	if (src_idx != (size_t)-1) {
+		int scriptable = ng_display[src_idx].is_button ||
+		                 ng_display[src_idx].is_textfield ||
+		                 (ng_display[src_idx].sprite_idx != (size_t)-1);
+		if (!scriptable) return NULL;  // Non-scriptable: clone is undefined
+
+		// Remove existing entry at target depth
+		for (size_t i = 0; i < ng_display_count; i++) {
+			if (ng_display[i].depth == (size_t)depth && ng_display[i].parent_display_idx == (size_t)-1) {
+				for (size_t j = i; j + 1 < ng_display_count; j++)
+					ng_display[j] = ng_display[j + 1];
+				ng_display_count--;
+				if (src_idx > i) src_idx--;
+				break;
+			}
+		}
+
+		// Create new ng_display entry for clone
+		if (ng_display_count < MAX_DISPLAY_NG) {
+			size_t clone_idx = ng_display_count++;
+			ng_display[clone_idx] = ng_display[src_idx];
+			ng_display[clone_idx].depth = (size_t)depth;
+			ng_display[clone_idx].parent_display_idx = (size_t)-1;
+			strncpy(ng_display[clone_idx].instance_name, target_name, 63);
+			ng_display[clone_idx].instance_name[63] = '\0';
+			ng_display[clone_idx].current_frame = 0;
+			ng_display[clone_idx].needs_init = (ng_display[src_idx].sprite_idx != (size_t)-1) ? 1 : 0;
+			// clip_actions inherited from source
+		}
+	}
+
+	// Find source MC (may have been created by prior GetVariable access)
+	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
+
+	// Create clone MC
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	if (clone_mc == NULL) return NULL;
+
+	// Copy transform properties from source
+	if (src_mc != NULL) {
+		clone_mc->x = src_mc->x;
+		clone_mc->y = src_mc->y;
+		clone_mc->xscale = src_mc->xscale;
+		clone_mc->yscale = src_mc->yscale;
+		clone_mc->rotation = src_mc->rotation;
+		clone_mc->alpha = src_mc->alpha;
+		clone_mc->visible = src_mc->visible;
+		clone_mc->totalframes = src_mc->totalframes;
+		clone_mc->framesloaded = src_mc->framesloaded;
+		clone_mc->as_set_flags = src_mc->as_set_flags;
+	}
+	clone_mc->currentframe = 1;
+	clone_mc->depth = depth;
+
+	// Register as global variable so GetVariable finds the clone
+	extern void setVariableByName(const char* name, ActionVar* var);
+	ActionVar _clone_mc_var = {0};
+	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_clone_mc_var.data.numeric_value = (u64)clone_mc;
+	setVariableByName(target_name, &_clone_mc_var);
+
+	return clone_mc;
+}
+
+// Clone a script-created MovieClip (not in ng_display)
+MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
+                                  const char* target_name, int depth)
+{
+	if (!src_mc || !target_name) return NULL;
+	// Cannot clone root MovieClip — source was a non-scriptable display object (shape, statictext, etc.)
+	if (src_mc->parent == NULL) return NULL;
+
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	if (clone_mc == NULL) return NULL;
+
+	clone_mc->x = src_mc->x;
+	clone_mc->y = src_mc->y;
+	clone_mc->xscale = src_mc->xscale;
+	clone_mc->yscale = src_mc->yscale;
+	clone_mc->rotation = src_mc->rotation;
+	clone_mc->alpha = src_mc->alpha;
+	clone_mc->visible = src_mc->visible;
+	clone_mc->totalframes = src_mc->totalframes;
+	clone_mc->framesloaded = src_mc->framesloaded;
+	clone_mc->as_set_flags = src_mc->as_set_flags;
+	clone_mc->currentframe = 1;
+	clone_mc->depth = depth;
+
+	extern void setVariableByName(const char* name, ActionVar* var);
+	ActionVar _clone_mc_var = {0};
+	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_clone_mc_var.data.numeric_value = (u64)clone_mc;
+	setVariableByName(target_name, &_clone_mc_var);
+
+	return clone_mc;
+}
+
+// duplicateMovieClip clone: stored at SWF depth (as_depth + 16384) in ng_display.
+// Does NOT register as a global variable (accessible via path resolution only).
+// Does NOT copy clip_actions (duplicateMovieClip does not fire onLoad events).
+MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name,
+                                  const char* target_name, int as_depth)
+{
+	if (!source_name || !target_name) return NULL;
+
+	// Map AS depth to internal SWF depth (Flash uses +16384 offset for script-created clips)
+	int swf_depth = as_depth + 16384;
+
+	// Find source in ng_display by instance name (root-level only)
+	size_t src_idx = (size_t)-1;
+	for (size_t i = 0; i < ng_display_count; i++) {
+		if (ng_display[i].parent_display_idx == (size_t)-1 &&
+		    ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, source_name) == 0) {
+			src_idx = i;
+			break;
+		}
+	}
+
+	if (src_idx != (size_t)-1) {
+		int scriptable = ng_display[src_idx].is_button ||
+		                 ng_display[src_idx].is_textfield ||
+		                 (ng_display[src_idx].sprite_idx != (size_t)-1);
+		if (!scriptable) return NULL;
+
+		// Remove existing entry at the target SWF depth
+		for (size_t i = 0; i < ng_display_count; i++) {
+			if (ng_display[i].depth == (size_t)swf_depth && ng_display[i].parent_display_idx == (size_t)-1) {
+				for (size_t j = i; j + 1 < ng_display_count; j++)
+					ng_display[j] = ng_display[j + 1];
+				ng_display_count--;
+				if (src_idx > i) src_idx--;
+				break;
+			}
+		}
+
+		// Create ng_display entry — inherits sprite_idx but NO clip_actions (no onLoad)
+		if (ng_display_count < MAX_DISPLAY_NG) {
+			size_t clone_idx = ng_display_count++;
+			ng_display[clone_idx] = ng_display[src_idx];
+			ng_display[clone_idx].depth = (size_t)swf_depth;
+			ng_display[clone_idx].parent_display_idx = (size_t)-1;
+			strncpy(ng_display[clone_idx].instance_name, target_name, 63);
+			ng_display[clone_idx].instance_name[63] = '\0';
+			ng_display[clone_idx].current_frame = 0;
+			ng_display[clone_idx].needs_init = 0;     // duplicateMovieClip: no onLoad
+			ng_display[clone_idx].clip_actions = NULL;
+			ng_display[clone_idx].clip_action_count = 0;
+		}
+	}
+
+	// Find/create source MC and clone MC
+	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	if (clone_mc == NULL) return NULL;
+
+	// Copy transform and AS-set-flags from source
+	if (src_mc != NULL) {
+		clone_mc->x = src_mc->x;
+		clone_mc->y = src_mc->y;
+		clone_mc->xscale = src_mc->xscale;
+		clone_mc->yscale = src_mc->yscale;
+		clone_mc->rotation = src_mc->rotation;
+		clone_mc->alpha = src_mc->alpha;
+		clone_mc->visible = src_mc->visible;
+		clone_mc->totalframes = src_mc->totalframes;
+		clone_mc->framesloaded = src_mc->framesloaded;
+		clone_mc->as_set_flags = src_mc->as_set_flags;
+	}
+	clone_mc->currentframe = 1;
+	clone_mc->depth = swf_depth;
+
+	// Do NOT call setVariableByName: duplicateMovieClip clones are accessible via
+	// path resolution (_root.name) but not as bare script-scope variables.
+
+	return clone_mc;
 }
 
 const char* ng_getTextFieldInitialText(size_t depth)

@@ -3154,11 +3154,27 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_FONT_ALIGN_ZONES:
 			case SWF_TAG_DEFINE_FONT_NAME:
 			case SWF_TAG_FREE_CHARACTER:
-			case SWF_TAG_DEFINE_VIDEO_STREAM:
 			case SWF_TAG_VIDEO_FRAME:
 			{
 				cur_pos += tag.length;
 
+				break;
+			}
+
+			case SWF_TAG_DEFINE_VIDEO_STREAM:
+			{
+				// DefineVideoStream: CharacterID (UI16) is first field (bytes 0-1 of tag data)
+				// Use a temp pointer so parseFields doesn't advance the real cur_pos
+				char* tmp = cur_pos;
+				tag.clearFields();
+				tag.setFieldCount(1);
+				tag.configureNextField(SWF_FIELD_UI16); // CharacterID
+				tag.parseFields(tmp); // advances tmp, not cur_pos
+
+				u16 video_char_id = (u16) tag.fields[0].value;
+				tag_init << endl << "\ttagDefineVideoStream(app_context, " << to_string(video_char_id) << ");";
+
+				cur_pos += tag.length;
 				break;
 			}
 

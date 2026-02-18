@@ -1,12 +1,12 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-18 (CI TZ fix applied; next CI run will show improved date test results)
+Last updated: 2026-02-18 (clone/duplicate plan: duplicate_movie_clip + clone_sprite_types now passing)
 
 Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
 
 ## Quick Summary
 
-- **Pass rate (estimated local)**: ~226+/619 — ~9 tests gained from commits 229cb53 + 1851972, plus `edittext_width_height` (103/103), `arguments` (127/127), `function_suppress_and_preload` (full pass)
+- **Pass rate (estimated local)**: ~228+/619 — adds `duplicate_movie_clip` + `clone_sprite_types` (+2 tests)
 - **Main failure type**: output_mismatch, timeout (2), compile_fail (1), segfault (1)
 - **New regression (from b815da5)**: `movieclip_hittest_shapeflag` changed from output_mismatch (180/338) to compile_fail — still needs investigation
 - **Recent gains**: `edittext_width_height` (_xscale/_yscale/_rotation transform accounting); `arguments` (DefineFunction2 preload path now calls swf_setup_arguments_props; ARRAY valueOf/toString fixed to use own-props only); `function_suppress_and_preload` (DefineFunction2 preload/suppress register fix)
@@ -51,6 +51,8 @@ These tests were near-passing in the previous update and now pass locally:
 - `function_suppress_and_preload` — fixed by eff1f85 + 2f007dd (DefineFunction2 preload/suppress + ARRAY toString fix)
 - `edittext_width_height` (103/103) — fixed by 337c212 (_xscale/_yscale/_rotation transform accounting)
 - `arguments` (127/127) — fixed by b9cfc9d + 2f007dd (callee/caller/__proto__/instanceof Array; preload path fix)
+- `duplicate_movie_clip` (21/21) ✅ — clone/duplicate plan (this branch): as_set_flags copy, ng_duplicateMovieClip, toString/valueOf for object args, depth+16384 semantic
+- `clone_sprite_types` (25/25) ✅ — clone/duplicate plan (this branch): ng_isScriptableAtDepth for non-scriptable types (shape/statictext/morphshape/image return parent MC), tagDefineVideoStream for video scriptability
 
 ### Tier 2: 3-15 lines off
 
@@ -110,7 +112,7 @@ These tests were near-passing in the previous update and now pass locally:
 | OBJECT_WATCH_PLAN | Not started | 0/4 | watch/unwatch property callbacks |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/2 | ASnative, ASSetPropFlags |
 | TELLTARGET_PLAN | Not started | 0/3 | tellTarget scope |
-| CLONE_DUPLICATE_PLAN | Not started | 0/5 | duplicateMovieClip, attachMovie |
+| CLONE_DUPLICATE_PLAN | **Phase 1 DONE** | 2/5 pass | clone_sprite_edittext (needs TF clone), clone_sprite_edittext_dynamic (needs TF clone) |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
 | All others | Not started | - | - |
 
