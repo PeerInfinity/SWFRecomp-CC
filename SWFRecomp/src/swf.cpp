@@ -3196,6 +3196,10 @@ namespace SWFRecomp
 				// Parse sprite sub-tags and generate sprite frame functions
 				size_t sprite_frame_i = 0;
 				bool sprite_another_frame = false;
+				// Buffer for DoAction (script) calls in current sprite frame.
+				// These are emitted AFTER all placement tags to match Flash Player
+				// execution order (PlaceObject always runs before DoAction in a frame).
+				std::ostringstream sprite_frame_scripts;
 
 				sprite_definitions << "void " << sp << "_frame_" << to_string(sprite_frame_i)
 								   << "(SWFAppContext* app_context)" << endl
@@ -3217,6 +3221,8 @@ namespace SWFRecomp
 					// Open new frame function if previous was closed by ShowFrame
 					if (sprite_another_frame && sub_tag.code != SWF_TAG_END_TAG)
 					{
+						sprite_frame_scripts.str("");
+						sprite_frame_scripts.clear();
 						sprite_definitions << "void " << sp << "_frame_" << to_string(sprite_frame_i)
 										   << "(SWFAppContext* app_context)" << endl
 										   << "{" << endl;
@@ -3228,6 +3234,10 @@ namespace SWFRecomp
 					{
 						case SWF_TAG_SHOW_FRAME:
 						{
+							// Emit buffered script calls AFTER placements (Flash exec order)
+							sprite_definitions << sprite_frame_scripts.str();
+							sprite_frame_scripts.str("");
+							sprite_frame_scripts.clear();
 							sprite_definitions << "}" << endl << endl;
 							sprite_another_frame = true;
 							break;
@@ -3950,6 +3960,9 @@ namespace SWFRecomp
 							if (!sprite_another_frame)
 							{
 								// Close the last frame function if ShowFrame didn't close it
+								sprite_definitions << sprite_frame_scripts.str();
+								sprite_frame_scripts.str("");
+								sprite_frame_scripts.clear();
 								sprite_definitions << "}" << endl << endl;
 							}
 							break;
@@ -3982,8 +3995,10 @@ namespace SWFRecomp
 
 							sprite_out_script << "}";
 
-							// Emit the script call into the current sprite frame function
-							sprite_definitions << "\t" << script_name << "(app_context);" << endl;
+							// Emit the script call into the deferred scripts buffer.
+							// It will be written after all placement tags at ShowFrame.
+							// Guard with !catch_up_mode so placement-only passes skip scripts.
+							sprite_frame_scripts << "\t" << "if (!catch_up_mode) " << script_name << "(app_context);" << endl;
 
 							// Mark this sprite script as non-timeline
 							non_timeline_scripts.insert(next_script_i - 1);
@@ -5166,6 +5181,8 @@ namespace SWFRecomp
 				std::vector<LineStyle*> all_line_styles;
 				size_t morph_color_start_saved = current_color;
 				size_t morph_end_color_before = current_morph_end_color;
+				s32 shape_bounds_xmin = 0, shape_bounds_xmax = 0;
+				s32 shape_bounds_ymin = 0, shape_bounds_ymax = 0;
 				
 				// Save position at start of tag body for morph EndEdges skip
 				char* morph_tag_start = cur_pos;
@@ -5185,6 +5202,10 @@ namespace SWFRecomp
 					shape_tag.parseFields(cur_pos);
 
 					shape_id = (u16) shape_tag.fields[0].value;
+					shape_bounds_xmin = (s32) shape_tag.fields[2].value;
+					shape_bounds_xmax = (s32) shape_tag.fields[3].value;
+					shape_bounds_ymin = (s32) shape_tag.fields[4].value;
+					shape_bounds_ymax = (s32) shape_tag.fields[5].value;
 
 					if (shape_is_v4)
 					{
@@ -6225,7 +6246,7 @@ namespace SWFRecomp
 					}
 					else
 					{
-						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ");" << endl;
+						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ", " << std::dec << to_string(shape_bounds_xmin) << ", " << to_string(shape_bounds_xmax) << ", " << to_string(shape_bounds_ymin) << ", " << to_string(shape_bounds_ymax) << ");" << endl;
 					}
 				}
 

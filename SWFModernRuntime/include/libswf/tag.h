@@ -10,7 +10,8 @@ void tagShowFrame(SWFAppContext* app_context);
 
 // Tag functions needed by both graphics and trace (NO_GRAPHICS) builds.
 // In NO_GRAPHICS mode, tag_stubs.c provides no-op implementations.
-void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size);
+void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count);
@@ -99,8 +100,19 @@ int ng_getFontBold(u16 font_id);
 int ng_getFontItalic(u16 font_id);
 int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
+int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y);
+int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation);
+int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
+// Compute content bounds (union of child bounds in pixels) for a display entry.
+// entry_idx = (size_t)-1 for root-level children. Returns 1 if any bounds found, 0 if empty.
+int ng_getDisplayEntryBounds(size_t entry_idx,
+    float* out_xmin_px, float* out_xmax_px, float* out_ymin_px, float* out_ymax_px);
+// Find display entry index by instance name. Returns (size_t)-1 if not found.
+size_t ng_findDisplayEntryIdx(const char* name);
 // TextField variable binding — called from tag_stubs.c at placement time
 void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_name, const char* init_text);
+// Rename a cached MovieClip when tagSetInstanceName updates a sprite's display entry
+void actionRenameMovieClip(const char* old_name, const char* new_name);
 // Enumerate child instance names for a MovieClip (for for-in enumeration)
 // callback receives (name, name_len, user_data) for each child
 void ng_enumerateChildren(const char* parent_name, void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data);

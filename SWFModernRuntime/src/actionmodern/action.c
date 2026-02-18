@@ -307,7 +307,7 @@ static u32 scope_depth = 0;
 
 // Forward declarations for MC property helpers (defined in WITH section)
 static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* result);
-static int setMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* value);
+static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const char* name, u32 name_len, ActionVar* value);
 
 // Stored app_context for use by setVariableOnLocalScope (called from variables.c
 // which doesn't have app_context). Set at entry to actionCallFunction/actionCallMethod.
@@ -6280,8 +6280,8 @@ MovieClip root_movieclip = {
 	.yscale = 100.0f,
 	.rotation = 0.0f,
 	.alpha = 100.0f,
-	.width = 550.0f,
-	.height = 400.0f,
+	.width = 0.0f,    // Computed dynamically from content bounds in mcGetEffectiveSize
+	.height = 0.0f,
 	.visible = 1,
 	.currentframe = 1,
 #ifdef SWF_FRAME_COUNT
@@ -6310,7 +6310,16 @@ MovieClip root_movieclip = {
 // Helper function to get MovieClip by target path
 // Simplified: only supports "_root" or empty string
 static MovieClip* getMovieClipByTarget(const char* target) {
-	if (!target || strlen(target) == 0 || strcmp(target, "_root") == 0 || strcmp(target, "/") == 0) {
+	if (!target || strlen(target) == 0) {
+		// Empty target = "this clip" = current execution context (not necessarily root).
+		// When running inside a sprite frame, g_current_context points to the sprite's MC.
+#ifdef NO_GRAPHICS
+		return g_current_context ? g_current_context : &root_movieclip;
+#else
+		return &root_movieclip;
+#endif
+	}
+	if (strcmp(target, "_root") == 0 || strcmp(target, "/") == 0) {
 		return &root_movieclip;
 	}
 	return NULL;  // Other paths not supported yet
@@ -6471,6 +6480,12 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			if (ng_getTransformXY(depth, &init_x, &init_y)) {
 				mc->x = init_x;
 				mc->y = init_y;
+			}
+			float init_xs, init_ys, init_rot;
+			if (ng_getTransformScaleRotation(depth, &init_xs, &init_ys, &init_rot)) {
+				mc->xscale = init_xs;
+				mc->yscale = init_ys;
+				mc->rotation = init_rot;
 			}
 			u32 tid;
 			if (ng_getTransformId(depth, &tid)) {
@@ -6873,6 +6888,35 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 }
 
 #ifdef NO_GRAPHICS
+// Rename a MovieClip in the cache (called after tagSetInstanceName updates ng_display).
+// Updates the MC's name and target path to reflect the new name.
+void actionRenameMovieClip(const char* old_name, const char* new_name)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] == NULL) continue;
+		if (strcmp(child_mc_cache[i]->name, old_name) != 0) continue;
+		MovieClip* mc = child_mc_cache[i];
+		MovieClip* parent = mc->parent;
+		strncpy(mc->name, new_name, sizeof(mc->name) - 1);
+		mc->name[sizeof(mc->name) - 1] = '\0';
+		// Rebuild target path
+		if (parent == NULL) {
+			strncpy(mc->target, new_name, sizeof(mc->target) - 1);
+		} else {
+			int parent_len = strlen(parent->target);
+			if (parent_len == 1 && parent->target[0] == '/') {
+				snprintf(mc->target, sizeof(mc->target), "/%s", new_name);
+			} else {
+				snprintf(mc->target, sizeof(mc->target), "%s/%s", parent->target, new_name);
+			}
+		}
+		mc->target[sizeof(mc->target) - 1] = '\0';
+		return;
+	}
+}
+#endif
+
+#ifdef NO_GRAPHICS
 // ==================================================================
 // TextField Variable Binding
 // ==================================================================
@@ -7137,9 +7181,18 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 	}
 }
 
-// Re-sync x/y from transform_data if the display entry's transform_id has changed
-// since the last sync, but only for properties not explicitly set by ActionScript.
-// This handles PlaceObject2 updates (move operations) without overwriting AS-set values.
+// Flash normalizes _rotation to the range (-180, 180].
+static float normalizeRotation(float r) {
+	r = fmodf(r, 360.0f);
+	if (r > 180.0f) r -= 360.0f;
+	else if (r < -180.0f) r += 360.0f;
+	return r;
+}
+
+// Re-sync x/y/xscale/yscale/rotation from transform_data if the display entry's transform_id
+// has changed since the last sync, but only for properties not explicitly set by ActionScript.
+// This handles PlaceObject2 updates (move/rotate/scale operations) without overwriting AS-set values.
+// as_set_flags bits: 1=_x, 2=_y, 4=_xscale, 8=_yscale, 16=_rotation
 static void syncTransformIfNeeded(MovieClip* mc) {
 	if (mc == NULL || mc->name[0] == '\0') return;
 	size_t depth = ng_findDisplayEntryByName(mc->name);
@@ -7153,6 +7206,12 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 		if (!(mc->as_set_flags & 1)) mc->x = tx;
 		if (!(mc->as_set_flags & 2)) mc->y = ty;
 	}
+	float xscale, yscale, rotation;
+	if (ng_getTransformScaleRotation(depth, &xscale, &yscale, &rotation)) {
+		if (!(mc->as_set_flags & 4))  mc->xscale = xscale;
+		if (!(mc->as_set_flags & 8))  mc->yscale = yscale;
+		if (!(mc->as_set_flags & 16)) mc->rotation = normalizeRotation(rotation);
+	}
 	mc->last_transform_id = tid;
 }
 #endif
@@ -7161,19 +7220,89 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 {
 	double scaled_w = (double)mc->width * mc->xscale / 100.0;
 	double scaled_h = (double)mc->height * mc->yscale / 100.0;
+
+#ifdef NO_GRAPHICS
+	// If width/height not explicitly set, compute from display hierarchy bounds
+	if (scaled_w == 0.0 && scaled_h == 0.0) {
+		float gxmin, gxmax, gymin, gymax;
+		size_t entry_idx;
+		if (mc == &root_movieclip) {
+			entry_idx = (size_t)-1;
+		} else {
+			entry_idx = ng_findDisplayEntryIdx(mc->name);
+		}
+		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+			double nat_w = (double)(gxmax - gxmin);
+			double nat_h = (double)(gymax - gymin);
+			scaled_w = nat_w * mc->xscale / 100.0;
+			scaled_h = nat_h * mc->yscale / 100.0;
+		}
+	}
+#endif
+
 	double rot = mc->rotation;
+	// _width/_height are always positive bounding-box dimensions (Flash convention)
+	double abs_sw = fabs(scaled_w);
+	double abs_sh = fabs(scaled_h);
 	if (rot == 0.0) {
-		*eff_w = scaled_w;
-		*eff_h = scaled_h;
+		*eff_w = abs_sw;
+		*eff_h = abs_sh;
 	} else {
 		double rot_rad = rot * 3.14159265358979323846 / 180.0;
 		double c = fabs(cos(rot_rad));
 		double s = fabs(sin(rot_rad));
-		double sw_twips = scaled_w * 20.0;
-		double sh_twips = scaled_h * 20.0;
+		double sw_twips = abs_sw * 20.0;
+		double sh_twips = abs_sh * 20.0;
 		*eff_w = (round(sw_twips * c) + round(sh_twips * s)) / 20.0;
 		*eff_h = (round(sw_twips * s) + round(sh_twips * c)) / 20.0;
 	}
+}
+
+// Set _width on a MovieClip by adjusting xscale to achieve the desired bounding width.
+// In Flash, setting _width adjusts xscale; mc->width is not a persistent field.
+static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, double v)
+{
+#ifdef NO_GRAPHICS
+	if (mc != NULL && v >= 0.0) {
+		size_t entry_idx = (mc == &root_movieclip) ? (size_t)-1 : ng_findDisplayEntryIdx(mc->name);
+		float gxmin, gxmax, gymin, gymax;
+		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+			double nat_w = (double)(gxmax - gxmin);
+			if (nat_w > 0.01) {
+				float sign = mc->xscale < 0.0f ? -1.0f : 1.0f;
+				mc->xscale = (float)(v / nat_w * 100.0 * sign);
+				mc->width = 0.0f;
+				mc->as_set_flags |= 4;  // mark _xscale as AS-set
+				return;
+			}
+		}
+	}
+#endif
+	(void)app_context;
+	if (mc) mc->width = (float)v;
+}
+
+// Set _height on a MovieClip by adjusting yscale to achieve the desired bounding height.
+static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, double v)
+{
+#ifdef NO_GRAPHICS
+	if (mc != NULL && v >= 0.0) {
+		size_t entry_idx = (mc == &root_movieclip) ? (size_t)-1 : ng_findDisplayEntryIdx(mc->name);
+		float gxmin, gxmax, gymin, gymax;
+		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+			double nat_h = (double)(gymax - gymin);
+			if (nat_h > 0.01) {
+				float sign = mc->yscale < 0.0f ? -1.0f : 1.0f;
+				mc->yscale = (float)(v / nat_h * 100.0 * sign);
+				mc->height = 0.0f;
+				mc->as_set_flags |= 8;  // mark _yscale as AS-set
+				return;
+			}
+		}
+	}
+#endif
+	(void)app_context;
+	if (mc) mc->height = (float)v;
 }
 
 /**
@@ -10834,7 +10963,7 @@ void actionSetVariable(SWFAppContext* app_context)
 		{
 			ActionVar value_var;
 			peekVar(app_context, &value_var);
-			if (setMCBuiltinProperty(scope_mc[i], var_name, var_name_len, &value_var))
+			if (setMCBuiltinProperty(app_context, scope_mc[i], var_name, var_name_len, &value_var))
 			{
 				POP_2();
 				return;
@@ -10871,13 +11000,25 @@ void actionSetVariable(SWFAppContext* app_context)
 		int handled = 0;
 		if (strcasecmp(var_name, "_x") == 0) { mc->x = fval; handled = 1; }
 		else if (strcasecmp(var_name, "_y") == 0) { mc->y = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_xscale") == 0) { mc->xscale = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_yscale") == 0) { mc->yscale = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_rotation") == 0) { mc->rotation = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_xscale") == 0) { mc->xscale = fval;
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 4;
+#endif
+			handled = 1; }
+		else if (strcasecmp(var_name, "_yscale") == 0) { mc->yscale = fval;
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 8;
+#endif
+			handled = 1; }
+		else if (strcasecmp(var_name, "_rotation") == 0) { mc->rotation = normalizeRotation(fval);
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 16;
+#endif
+			handled = 1; }
 		else if (strcasecmp(var_name, "_alpha") == 0) { mc->alpha = fval; handled = 1; }
 		else if (strcasecmp(var_name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; handled = 1; }
-		else if (strcasecmp(var_name, "_width") == 0) { mc->width = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_height") == 0) { mc->height = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); handled = 1; }
+		else if (strcasecmp(var_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); handled = 1; }
 		else if (strcasecmp(var_name, "_quality") == 0)
 		{
 			char buf[16];
@@ -11202,19 +11343,45 @@ void actionGetProperty(SWFAppContext* app_context)
 		case 0:  // _x
 #ifdef NO_GRAPHICS
 			if (mc) syncTransformIfNeeded(mc);
+			if (mc && !(mc->as_set_flags & 1)) {
+				size_t _dep = ng_findDisplayEntryByName(mc->name);
+				if (_dep != SIZE_MAX) {
+					double _dx;
+					if (ng_getTransformXY_d(_dep, &_dx, NULL)) {
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
+						return;
+					}
+				}
+			}
 #endif
 			value = mc ? mc->x : 0.0f;
 			break;
 		case 1:  // _y
 #ifdef NO_GRAPHICS
 			if (mc) syncTransformIfNeeded(mc);
+			if (mc && !(mc->as_set_flags & 2)) {
+				size_t _dep = ng_findDisplayEntryByName(mc->name);
+				if (_dep != SIZE_MAX) {
+					double _dy;
+					if (ng_getTransformXY_d(_dep, NULL, &_dy)) {
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
+						return;
+					}
+				}
+			}
 #endif
 			value = mc ? mc->y : 0.0f;
 			break;
 		case 2:  // _xscale
+#ifdef NO_GRAPHICS
+			if (mc) syncTransformIfNeeded(mc);
+#endif
 			value = mc ? mc->xscale : 100.0f;
 			break;
 		case 3:  // _yscale
+#ifdef NO_GRAPHICS
+			if (mc) syncTransformIfNeeded(mc);
+#endif
 			value = mc ? mc->yscale : 100.0f;
 			break;
 		case 4:  // _currentframe
@@ -11226,9 +11393,9 @@ void actionGetProperty(SWFAppContext* app_context)
 		case 6:  // _alpha
 			value = mc ? mc->alpha : 100.0f;
 			break;
-		case 7:  // _visible
-			value = mc ? (mc->visible ? 1.0f : 0.0f) : 1.0f;
-			break;
+		case 7:  // _visible — returns boolean, not float
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, mc ? (mc->visible ? 1ULL : 0ULL) : 1ULL);
+			return;
 		case 8:  // _width
 			if (mc) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); value = (float)_ew; } else { value = 0.0f; }
 			break;
@@ -11236,6 +11403,9 @@ void actionGetProperty(SWFAppContext* app_context)
 			if (mc) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); value = (float)_eh; } else { value = 0.0f; }
 			break;
 		case 10: // _rotation
+#ifdef NO_GRAPHICS
+			if (mc) syncTransformIfNeeded(mc);
+#endif
 			value = mc ? mc->rotation : 0.0f;
 			break;
 		case 11: // _target
@@ -13617,27 +13787,101 @@ void actionSetMember(SWFAppContext* app_context)
 			// Handle built-in writable properties
 			if (prop_name_len > 0 && prop_name[0] == '_')
 			{
-				double dval = varToDouble(&value_var);
+				// Use proper numeric conversion (varToDoubleSimple handles string/boolean/null/undefined)
+				double dval = varToDoubleSimple(&value_var);
 				float fval = (float)dval;
+				// For numeric MC properties: undefined/null/NaN → no-op (Flash ignores invalid values)
+				int dval_invalid = isnan(dval) ||
+				    value_var.type == ACTION_STACK_VALUE_NULL ||
+				    value_var.type == ACTION_STACK_VALUE_UNDEFINED;
 				if (strcasecmp(prop_name, "_x") == 0) {
+					if (dval_invalid) return;
 #ifdef NO_GRAPHICS
 					mc->as_set_flags |= 1;
 #endif
 					mc->x = fval; return;
 				}
 				if (strcasecmp(prop_name, "_y") == 0) {
+					if (dval_invalid) return;
 #ifdef NO_GRAPHICS
 					mc->as_set_flags |= 2;
 #endif
 					mc->y = fval; return;
 				}
-				if (strcasecmp(prop_name, "_xscale") == 0) { mc->xscale = fval; return; }
-				if (strcasecmp(prop_name, "_yscale") == 0) { mc->yscale = fval; return; }
-				if (strcasecmp(prop_name, "_rotation") == 0) { mc->rotation = fval; return; }
-				if (strcasecmp(prop_name, "_alpha") == 0) { mc->alpha = fval; return; }
-				if (strcasecmp(prop_name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; return; }
-				if (strcasecmp(prop_name, "_width") == 0) { mc->width = fval; return; }
-				if (strcasecmp(prop_name, "_height") == 0) { mc->height = fval; return; }
+				if (strcasecmp(prop_name, "_xscale") == 0) {
+					if (dval_invalid) return;
+#ifdef NO_GRAPHICS
+					mc->as_set_flags |= 4;
+#endif
+					mc->xscale = fval; return;
+				}
+				if (strcasecmp(prop_name, "_yscale") == 0) {
+					if (dval_invalid) return;
+#ifdef NO_GRAPHICS
+					mc->as_set_flags |= 8;
+#endif
+					mc->yscale = fval; return;
+				}
+				if (strcasecmp(prop_name, "_rotation") == 0) {
+					if (dval_invalid) return;
+#ifdef NO_GRAPHICS
+					mc->as_set_flags |= 16;
+#endif
+					mc->rotation = normalizeRotation(fval); return;
+				}
+				if (strcasecmp(prop_name, "_alpha") == 0) {
+					if (dval_invalid) return;
+					mc->alpha = fval; return;
+				}
+				if (strcasecmp(prop_name, "_visible") == 0) {
+					// _visible conversion: use convertFloat (SWF-version-aware for null/undefined).
+					// For objects: try valueOf; if valueOf returns OBJECT (not primitive) → treat as 0 (false).
+					// This matches Flash Player AVM1 behavior.
+					double vis_d;
+					if (value_var.type == ACTION_STACK_VALUE_OBJECT ||
+					    value_var.type == ACTION_STACK_VALUE_ARRAY) {
+						ASObject* obj2 = (ASObject*)value_var.data.numeric_value;
+						vis_d = 0.0;  // default: object with no primitive valueOf → false
+						if (obj2 != NULL) {
+							ActionVar* vof2 = getPropertyWithPrototype(obj2, "valueOf", 7);
+							if (vof2 != NULL && vof2->type == ACTION_STACK_VALUE_FUNCTION) {
+								ASFunction* func2 = lookupFunctionFromVar(vof2);
+								if (func2 != NULL) {
+									ActionVar* regs2 = (func2->register_count > 0) ?
+									    (ActionVar*)HCALLOC(func2->register_count, sizeof(ActionVar)) : NULL;
+									ActionVar vr;
+									if (func2->function_type == 2 && func2->advanced_func != NULL)
+										vr = func2->advanced_func(app_context, NULL, 0, regs2, obj2);
+									else if (func2->function_type == 1 && func2->simple_func != NULL)
+										vr = ((ActionVar(*)(SWFAppContext*))func2->simple_func)(app_context);
+									else { vr.type = ACTION_STACK_VALUE_UNDEFINED; vr.data.numeric_value = 0; }
+									if (regs2 != NULL) FREE(regs2);
+									// If valueOf returned a non-object primitive → convert to number
+									if (vr.type != ACTION_STACK_VALUE_OBJECT &&
+									    vr.type != ACTION_STACK_VALUE_ARRAY &&
+									    vr.type != ACTION_STACK_VALUE_FUNCTION) {
+										pushVar(app_context, &vr);
+										convertFloat(app_context);
+										ActionVar cv; popVar(app_context, &cv);
+										vis_d = VAL(double, &cv.data.numeric_value);
+									}
+									// else: valueOf returned OBJECT → vis_d stays 0.0 (false)
+								}
+							}
+						}
+					} else {
+						// For all other types (undefined/null/NaN/string/boolean/F32/F64):
+						// use convertFloat which is SWF-version-aware (null/undefined → NaN in SWF>=7)
+						pushVar(app_context, &value_var);
+						convertFloat(app_context);
+						ActionVar cv; popVar(app_context, &cv);
+						vis_d = VAL(double, &cv.data.numeric_value);
+					}
+					mc->visible = (vis_d != 0.0) ? 1 : 0;
+					return;
+				}
+				if (strcasecmp(prop_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); return; }
+				if (strcasecmp(prop_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); return; }
 				if (strcasecmp(prop_name, "_quality") == 0)
 				{
 					char buf[16];
@@ -14485,13 +14729,35 @@ void actionGetMember(SWFAppContext* app_context)
 		{
 			// Case-insensitive comparison for built-in MC properties
 #ifdef NO_GRAPHICS
-			// Re-sync x/y from display list if PlaceObject2 updated the transform
-			if (strcasecmp(prop_name, "_x") == 0 || strcasecmp(prop_name, "_y") == 0) {
+			// Re-sync x/y/xscale/yscale/rotation from display list if PlaceObject2 updated the transform
+			if (strcasecmp(prop_name, "_x") == 0 || strcasecmp(prop_name, "_y") == 0 ||
+			    strcasecmp(prop_name, "_xscale") == 0 || strcasecmp(prop_name, "_yscale") == 0 ||
+			    strcasecmp(prop_name, "_rotation") == 0) {
 				syncTransformIfNeeded(mc);
 			}
 #endif
-			if (strcasecmp(prop_name, "_x") == 0) { float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_y") == 0) { float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_x") == 0) {
+#ifdef NO_GRAPHICS
+				if (!(mc->as_set_flags & 1)) {
+					size_t _dep = ng_findDisplayEntryByName(mc->name);
+					if (_dep != SIZE_MAX) {
+						double _dx;
+						if (ng_getTransformXY_d(_dep, &_dx, NULL)) { PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx)); return; }
+					}
+				}
+#endif
+				float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_y") == 0) {
+#ifdef NO_GRAPHICS
+				if (!(mc->as_set_flags & 2)) {
+					size_t _dep = ng_findDisplayEntryByName(mc->name);
+					if (_dep != SIZE_MAX) {
+						double _dy;
+						if (ng_getTransformXY_d(_dep, NULL, &_dy)) { PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
+					}
+				}
+#endif
+				float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -16074,8 +16340,12 @@ void actionSetProperty(SWFAppContext* app_context)
 	// Convert value to float for numeric properties
 	float num_value = 0.0f;
 
-	if (value_var.type == ACTION_STACK_VALUE_F32 || value_var.type == ACTION_STACK_VALUE_F64) {
-		num_value = (float) VAL(float, &value_var.data.numeric_value);
+	if (value_var.type == ACTION_STACK_VALUE_F32) {
+		num_value = VAL(float, &value_var.data.numeric_value);
+	} else if (value_var.type == ACTION_STACK_VALUE_F64) {
+		num_value = (float) VAL(double, &value_var.data.numeric_value);
+	} else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
+		num_value = value_var.data.numeric_value ? 1.0f : 0.0f;
 	} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _u16 = varGetU16Ptr(&value_var);
 		char _sp_val_buf[256];
@@ -16101,9 +16371,15 @@ void actionSetProperty(SWFAppContext* app_context)
 			break;
 		case 2:  // _xscale
 			mc->xscale = num_value;
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 4;
+#endif
 			break;
 		case 3:  // _yscale
 			mc->yscale = num_value;
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 8;
+#endif
 			break;
 		case 6:  // _alpha
 			mc->alpha = num_value;
@@ -16112,13 +16388,16 @@ void actionSetProperty(SWFAppContext* app_context)
 			mc->visible = (num_value != 0.0f);
 			break;
 		case 8:  // _width
-			mc->width = num_value;
+			mcSetEffectiveWidth(app_context, mc, (double)num_value);
 			break;
 		case 9:  // _height
-			mc->height = num_value;
+			mcSetEffectiveHeight(app_context, mc, (double)num_value);
 			break;
 		case 10: // _rotation
-			mc->rotation = num_value;
+			mc->rotation = normalizeRotation(num_value);
+#ifdef NO_GRAPHICS
+			mc->as_set_flags |= 16;
+#endif
 			break;
 		case 13: // _name
 			if (value_var.type == ACTION_STACK_VALUE_STRING) {
@@ -16392,7 +16671,7 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 
 // Helper: set a MovieClip built-in property by name.
 // Returns 1 if property was handled, 0 otherwise.
-static int setMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* value)
+static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const char* name, u32 name_len, ActionVar* value)
 {
 	if (name_len < 2 || name[0] != '_') return 0;
 
@@ -16411,13 +16690,28 @@ static int setMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 #endif
 		mc->y = fval; return 1;
 	}
-	if (strcasecmp(name, "_xscale") == 0) { mc->xscale = fval; return 1; }
-	if (strcasecmp(name, "_yscale") == 0) { mc->yscale = fval; return 1; }
-	if (strcasecmp(name, "_rotation") == 0) { mc->rotation = fval; return 1; }
+	if (strcasecmp(name, "_xscale") == 0) {
+#ifdef NO_GRAPHICS
+		mc->as_set_flags |= 4;
+#endif
+		mc->xscale = fval; return 1;
+	}
+	if (strcasecmp(name, "_yscale") == 0) {
+#ifdef NO_GRAPHICS
+		mc->as_set_flags |= 8;
+#endif
+		mc->yscale = fval; return 1;
+	}
+	if (strcasecmp(name, "_rotation") == 0) {
+#ifdef NO_GRAPHICS
+		mc->as_set_flags |= 16;
+#endif
+		mc->rotation = normalizeRotation(fval); return 1;
+	}
 	if (strcasecmp(name, "_alpha") == 0) { mc->alpha = fval; return 1; }
 	if (strcasecmp(name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; return 1; }
-	if (strcasecmp(name, "_width") == 0) { mc->width = fval; return 1; }
-	if (strcasecmp(name, "_height") == 0) { mc->height = fval; return 1; }
+	if (strcasecmp(name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); return 1; }
+	if (strcasecmp(name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); return 1; }
 	return 0;
 }
 

@@ -6,6 +6,7 @@
 #include <action.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 // Simple sprite registry for NO_GRAPHICS mode
 // Allows sprite frame scripts (e.g. DoAction inside DefineSprite) to execute
@@ -17,10 +18,19 @@ static struct {
 } ng_sprites[MAX_SPRITES_NG];
 static size_t ng_sprite_count = 0;
 
+// Character bounds table for NO_GRAPHICS mode (stores shape bounds in twips)
+#define MAX_CHAR_BOUNDS_NG 256
+static struct {
+	size_t char_id;
+	s32 xmin, xmax, ymin, ymax;  // twips
+} ng_char_bounds[MAX_CHAR_BOUNDS_NG];
+static size_t ng_char_bounds_count = 0;
+
 // Simple display list for NO_GRAPHICS mode
 #define MAX_DISPLAY_NG 64
 static struct {
 	size_t depth;
+	size_t char_id;        // character ID placed at this depth
 	size_t sprite_idx;     // index into ng_sprites, or (size_t)-1 for non-sprite
 	size_t current_frame;
 	int is_playing;
@@ -273,9 +283,18 @@ void tagShowFrame(SWFAppContext* app_context)
 // No-op stubs for all tag functions so trace tests that happen to
 // define shapes, sprites, buttons, sounds, etc. still compile and link.
 
-void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size)
+void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
-	(void)app_context; (void)type; (void)char_id; (void)shape_offset; (void)shape_size;
+	(void)app_context; (void)type; (void)shape_offset; (void)shape_size;
+	if (ng_char_bounds_count >= MAX_CHAR_BOUNDS_NG) return;
+	size_t i = ng_char_bounds_count;
+	ng_char_bounds[i].char_id = char_id;
+	ng_char_bounds[i].xmin = bounds_xmin;
+	ng_char_bounds[i].xmax = bounds_xmax;
+	ng_char_bounds[i].ymin = bounds_ymin;
+	ng_char_bounds[i].ymax = bounds_ymax;
+	ng_char_bounds_count++;
 }
 
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
@@ -396,6 +415,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				// (prevents corruption during backward goto catch-up)
 				if (ng_display[i].sprite_idx != (size_t)-1) return;
 				// Replace other non-sprites (update placed_at_frame)
+				ng_display[i].char_id = char_id;
 				ng_display[i].placed_at_frame = current_frame;
 				ng_display[i].transform_id = transform_id;
 				ng_display[i].is_button = btn;
@@ -410,6 +430,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				return;
 			}
 			// Different sprite (or replacing non-sprite) - replace
+			ng_display[i].char_id = char_id;
 			ng_display[i].sprite_idx = si;
 			ng_display[i].current_frame = 0;
 			ng_display[i].is_playing = 1;
@@ -428,6 +449,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	if (ng_display_count < MAX_DISPLAY_NG)
 	{
 		ng_display[ng_display_count].depth = depth;
+		ng_display[ng_display_count].char_id = char_id;
 		ng_display[ng_display_count].sprite_idx = si;
 		ng_display[ng_display_count].current_frame = 0;
 		ng_display[ng_display_count].is_playing = 1;
@@ -465,6 +487,31 @@ placed:
 		if (var_name[0] != '\0') {
 			actionInitTextFieldVariable(app_context, var_name, init_text);
 		}
+	}
+	// Run sprite frame_0 in "placement-only" mode (catch_up_mode=1) to populate
+	// the sprite's display list immediately. This allows parent-frame scripts to
+	// read _width/_height/_rotation etc. from the sprite's content bounds.
+	// The DoAction (script) calls in the sprite frame are guarded by !catch_up_mode
+	// and will be skipped during this pass. They execute at tagShowFrame time
+	// (via the needs_init=1 path) after all parent-frame scripts have run.
+	if (si != (size_t)-1) {
+		extern int catch_up_mode;
+		int saved_catch_up = catch_up_mode;
+		catch_up_mode = 1;  // suppress scripts in sprite frame
+
+		size_t expected_parent3 = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+		for (size_t _ii = 0; _ii < ng_display_count; _ii++) {
+			if (ng_display[_ii].depth == depth &&
+			    ng_display[_ii].parent_display_idx == expected_parent3 &&
+			    ng_display[_ii].needs_init)
+			{
+				ng_exec_sprite_frame(app_context, _ii, 0);
+				break;
+			}
+		}
+
+		catch_up_mode = saved_catch_up;
+		// needs_init stays 1 so tagShowFrame will run the full frame (with scripts)
 	}
 }
 
@@ -508,15 +555,22 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
-	(void)app_context;
-	// Store instance name on the display entry at this depth (within current parent scope)
+	// Store instance name on the display entry at this depth (within current parent scope).
+	// Also rename the cached MovieClip if one was already created (eager sprite init may
+	// have created it under an auto-assigned name before tagSetInstanceName was called).
 	size_t expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == expected_parent)
 		{
+			char old_name[64];
+			strncpy(old_name, ng_display[i].instance_name, sizeof(old_name) - 1);
+			old_name[sizeof(old_name) - 1] = '\0';
 			strncpy(ng_display[i].instance_name, name, 63);
 			ng_display[i].instance_name[63] = '\0';
+			// Rename cached MC if it exists under the old name
+			if (old_name[0] != '\0' && strcmp(old_name, name) != 0)
+				actionRenameMovieClip(old_name, name);
 			return;
 		}
 	}
@@ -787,6 +841,155 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 	return 0;
 }
 
+// Get x/y translation as double (avoids float32 precision loss for traces like 125.2)
+int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
+		{
+			u32 tid = ng_display[i].transform_id;
+			if (out_x) *out_x = (double)transform_data[tid][12] / 20.0;
+			if (out_y) *out_y = (double)transform_data[tid][13] / 20.0;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Get scale/rotation from transform_data for a display entry at a given depth.
+// Only matches root-level entries (parent_display_idx == (size_t)-1).
+// out_xscale and out_yscale are percentages (100=100%). out_rotation is degrees.
+// Returns 1 if found, 0 if not.
+int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
+		{
+			u32 tid = ng_display[i].transform_id;
+			float m00 = transform_data[tid][0];   // ScaleX * cos(rot)
+			float m10 = transform_data[tid][1];   // ScaleX * sin(rot)
+			float m01 = transform_data[tid][4];   // -ScaleY * sin(rot) (SkewY)
+			float m11 = transform_data[tid][5];   // ScaleY * cos(rot)
+			if (out_xscale) *out_xscale = sqrtf(m00*m00 + m10*m10) * 100.0f;
+			if (out_yscale) *out_yscale = sqrtf(m01*m01 + m11*m11) * 100.0f;
+			if (out_rotation) *out_rotation = atan2f(m10, m00) * 180.0f / 3.14159265358979323846f;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Look up character bounds by char_id. Returns 1 if found, 0 if not.
+int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax)
+{
+	for (size_t i = 0; i < ng_char_bounds_count; i++)
+	{
+		if (ng_char_bounds[i].char_id == char_id)
+		{
+			if (out_xmin) *out_xmin = ng_char_bounds[i].xmin;
+			if (out_xmax) *out_xmax = ng_char_bounds[i].xmax;
+			if (out_ymin) *out_ymin = ng_char_bounds[i].ymin;
+			if (out_ymax) *out_ymax = ng_char_bounds[i].ymax;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Compute content bounds in pixels for children of a display entry.
+// entry_idx = (size_t)-1 means root-level children.
+// Bounds are in the parent's local pixel space (translate+scale applied, ignoring rotation for now).
+// Returns 1 if any bounds found, 0 if no children or no bounds data.
+int ng_getDisplayEntryBounds(size_t entry_idx,
+    float* out_xmin_px, float* out_xmax_px,
+    float* out_ymin_px, float* out_ymax_px)
+{
+	int found = 0;
+	float gxmin = 1e30f, gxmax = -1e30f;
+	float gymin = 1e30f, gymax = -1e30f;
+
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].parent_display_idx != entry_idx) continue;
+
+		u32 tid = ng_display[i].transform_id;
+		float tx = transform_data[tid][12] / 20.0f;  // twips→pixels
+		float ty = transform_data[tid][13] / 20.0f;
+		// Extract scale from matrix diagonal (column-major): [0]=cos*sx, [5]=cos*sy (approx)
+		float sx = transform_data[tid][0];
+		float sy = transform_data[tid][5];
+
+		float bxmin_px, bxmax_px, bymin_px, bymax_px;
+		int child_found = 0;
+
+		if (ng_display[i].sprite_idx != (size_t)-1)
+		{
+			// Sprite: recursively get its local bounds, then apply this sprite's transform
+			float lxmin, lxmax, lymin, lymax;
+			if (ng_getDisplayEntryBounds(i, &lxmin, &lxmax, &lymin, &lymax))
+			{
+				bxmin_px = lxmin * sx + tx;
+				bxmax_px = lxmax * sx + tx;
+				bymin_px = lymin * sy + ty;
+				bymax_px = lymax * sy + ty;
+				if (bxmin_px > bxmax_px) { float tmp = bxmin_px; bxmin_px = bxmax_px; bxmax_px = tmp; }
+				if (bymin_px > bymax_px) { float tmp = bymin_px; bymin_px = bymax_px; bymax_px = tmp; }
+				child_found = 1;
+			}
+		}
+		else if (ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
+		{
+			int tf_idx = ng_display[i].textfield_idx;
+			float bxf = ng_textfields[tf_idx].bounds_xmin / 20.0f;
+			float bxf2 = ng_textfields[tf_idx].bounds_xmax / 20.0f;
+			float byf = ng_textfields[tf_idx].bounds_ymin / 20.0f;
+			float byf2 = ng_textfields[tf_idx].bounds_ymax / 20.0f;
+			bxmin_px = bxf * sx + tx;
+			bxmax_px = bxf2 * sx + tx;
+			bymin_px = byf * sy + ty;
+			bymax_px = byf2 * sy + ty;
+			if (bxmin_px > bxmax_px) { float tmp = bxmin_px; bxmin_px = bxmax_px; bxmax_px = tmp; }
+			if (bymin_px > bymax_px) { float tmp = bymin_px; bymin_px = bymax_px; bymax_px = tmp; }
+			child_found = 1;
+		}
+		else if (!ng_display[i].is_button)
+		{
+			// Shape: look up char bounds
+			s32 bxmin, bxmax, bymin, bymax;
+			if (ng_getCharBounds(ng_display[i].char_id, &bxmin, &bxmax, &bymin, &bymax))
+			{
+				bxmin_px = bxmin / 20.0f * sx + tx;
+				bxmax_px = bxmax / 20.0f * sx + tx;
+				bymin_px = bymin / 20.0f * sy + ty;
+				bymax_px = bymax / 20.0f * sy + ty;
+				if (bxmin_px > bxmax_px) { float tmp = bxmin_px; bxmin_px = bxmax_px; bxmax_px = tmp; }
+				if (bymin_px > bymax_px) { float tmp = bymin_px; bymin_px = bymax_px; bymax_px = tmp; }
+				child_found = 1;
+			}
+		}
+
+		if (child_found)
+		{
+			if (!found || bxmin_px < gxmin) gxmin = bxmin_px;
+			if (!found || bxmax_px > gxmax) gxmax = bxmax_px;
+			if (!found || bymin_px < gymin) gymin = bymin_px;
+			if (!found || bymax_px > gymax) gymax = bymax_px;
+			found = 1;
+		}
+	}
+
+	if (found)
+	{
+		if (out_xmin_px) *out_xmin_px = gxmin;
+		if (out_xmax_px) *out_xmax_px = gxmax;
+		if (out_ymin_px) *out_ymin_px = gymin;
+		if (out_ymax_px) *out_ymax_px = gymax;
+	}
+	return found;
+}
+
 // NO_GRAPHICS child lookup by instance name — returns depth or SIZE_MAX if not found
 // Only matches root-level entries (called from action.c for root display object resolution)
 // Find a display entry at the given SWF depth that is a direct child of the root.
@@ -898,6 +1101,19 @@ size_t ng_findDisplayEntryByName(const char* name)
 		}
 	}
 	return result;
+}
+
+// Find display entry INDEX (not depth) by instance name. Returns (size_t)-1 if not found.
+size_t ng_findDisplayEntryIdx(const char* name)
+{
+	if (!name || name[0] == '\0') return (size_t)-1;
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, name) == 0)
+			return i;
+	}
+	return (size_t)-1;
 }
 
 // Rename a display list entry's instance name (for _name setter)

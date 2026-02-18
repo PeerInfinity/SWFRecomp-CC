@@ -525,14 +525,24 @@ fetch_all_branches() {
     echo -e "${GREEN}Fetch complete: $fetched succeeded, $failed failed.${NC}"
 }
 
+# Function to get local investigation/* worktree branches, sorted by most recent commit
+# Output format: branch_name|date_short|date_relative
+get_worktree_branches() {
+    echo -e "${BLUE}Loading worktree branches...${NC}" >&2
+    git for-each-ref --sort=-committerdate \
+        --format='%(refname:short)|%(committerdate:short)|%(committerdate:relative)' \
+        'refs/heads/investigation/'
+}
+
 # Function to select mode
-# Returns: fetch, merge, fetch_all, or abort
+# Returns: fetch, merge, fetch_all, worktree, or abort
 select_mode() {
     echo -e "${BLUE}=== Select Mode ===${NC}" >&2
     echo "1. Fetch and merge unfetched branches (default)" >&2
     echo "2. Merge existing local branches" >&2
     echo "3. Fetch all remote branches (no merge)" >&2
     echo "4. Abort current merge" >&2
+    echo "5. Merge worktree branches (investigation/*)" >&2
     echo >&2
 
     read -p "Select mode [1]: " mode_choice >&2
@@ -553,6 +563,9 @@ select_mode() {
             ;;
         4)
             echo "abort"
+            ;;
+        5)
+            echo "worktree"
             ;;
         *)
             # Default to option 1
@@ -670,6 +683,49 @@ main() {
             echo
 
             # Perform merge (no fetch needed)
+            perform_merge "$selected_branch" "$merge_type"
+            echo
+
+            # Ask if user wants to continue
+            read -p "Continue with another branch? [Y/n]: " continue_choice
+
+            if [[ "$continue_choice" =~ ^[Nn]$ ]]; then
+                break
+            fi
+
+            echo
+            echo -e "${BLUE}========================================${NC}"
+            echo
+        done
+    fi
+
+    if [ "$mode_type" = "worktree" ]; then
+        # Merge local investigation/* worktree branches
+        echo -e "${BLUE}=== Merge Worktree Branches Mode ===${NC}"
+        echo
+
+        while true; do
+            mapfile -t worktree_branches < <(get_worktree_branches)
+
+            if [ "${#worktree_branches[@]}" -eq 0 ]; then
+                echo -e "${GREEN}No investigation/* branches found.${NC}"
+                break
+            fi
+
+            # Reuse existing paginated selector (same branch|date_short|date_relative format)
+            selected_branch=$(select_existing_branch "${worktree_branches[@]}")
+            if [ $? -ne 0 ]; then
+                break
+            fi
+
+            echo -e "${GREEN}Selected branch: $selected_branch${NC}"
+            echo
+
+            # Select merge type
+            merge_type=$(select_merge_type)
+            echo
+
+            # Perform merge (local only, no fetch)
             perform_merge "$selected_branch" "$merge_type"
             echo
 

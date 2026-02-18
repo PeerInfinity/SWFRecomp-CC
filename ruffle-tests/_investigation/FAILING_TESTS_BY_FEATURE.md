@@ -164,7 +164,7 @@ Tests: stage_display_state, stage_object_children, stage_object_enumerate, stage
 
 Description: Needs Stage object as a special global with properties: width, height, scaleMode, displayState, align, showMenu, quality.
 
-Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/incomplete/ENUMERATION_PLAN.md), [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md), [STAGE_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md)
+Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/incomplete/ENUMERATION_PLAN.md), [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md), [STAGE_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md), [STAGE_FRAME_PROPS_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md)
 
 ---
 
@@ -511,6 +511,8 @@ Investigation docs: [ARRAY_METHODS_PLAN.md](ruffle-tests/_investigation/incomple
 Tests: frame_size_translated_negative, frame_size_translated_positive
 
 Description: Tests for frame bounds translation and shape properties (_x, _y, _width, _height) with translated stage coordinates.
+
+Investigation docs: [STAGE_FRAME_PROPS_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md)
 
 ---
 
