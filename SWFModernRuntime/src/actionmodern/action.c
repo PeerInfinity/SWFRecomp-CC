@@ -7243,9 +7243,19 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 		}
 		case ACTION_STACK_VALUE_OBJECT:
 		{
+			ActionVar _cs_obj;
+			_cs_obj.type = ACTION_STACK_VALUE_OBJECT;
+			_cs_obj.data.numeric_value = STACK_TOP_VALUE;
+			int _cs_found = 0;
+			ActionVar _cs_ts = objectCallToString(app_context, &_cs_obj, &_cs_found);
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
-			VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
-			STACK_TOP_N = 15;
+			if (_cs_found && _cs_ts.type == ACTION_STACK_VALUE_STRING) {
+				VAL(u64, &STACK_TOP_VALUE) = _cs_ts.data.numeric_value;
+				STACK_TOP_N = _cs_ts.str_size;
+			} else {
+				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
+				STACK_TOP_N = 15;
+			}
 			break;
 		}
 		default:
@@ -10097,6 +10107,24 @@ void actionGetVariable(SWFAppContext* app_context)
 				g_array_constructor.function_type = 1;
 				g_array_constructor.param_count = 0;
 				g_array_constructor_init = 1;
+				// Register Array sort-flag constants on own_props
+				g_array_constructor.own_props = allocObject(app_context, 8);
+				if (g_array_constructor.own_props != NULL) {
+					retainObject(g_array_constructor.own_props);
+					static const char* const_names[] = {
+						"CASEINSENSITIVE", "DESCENDING", "UNIQUESORT",
+						"RETURNINDEXEDARRAY", "NUMERIC"
+					};
+					static const int const_values[] = { 1, 2, 4, 8, 16 };
+					for (int _ci = 0; _ci < 5; _ci++) {
+						ActionVar _cv = {0};
+						_cv.type = ACTION_STACK_VALUE_F64;
+						double _cvd = (double) const_values[_ci];
+						VAL(double, &_cv.data.numeric_value) = _cvd;
+						setProperty(app_context, g_array_constructor.own_props,
+						            const_names[_ci], strlen(const_names[_ci]), &_cv);
+					}
+				}
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_array_constructor);
 			return;
@@ -13113,6 +13141,26 @@ void actionSetMember(SWFAppContext* app_context)
 			prop_name_len = 13;
 		}
 	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_BOOLEAN)
+	{
+		prop_name = prop_name_var.data.numeric_value ? "true" : "false";
+		prop_name_len = prop_name_var.data.numeric_value ? 4 : 5;
+	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_NULL)
+	{
+		prop_name = "null";
+		prop_name_len = 4;
+	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_UNDEFINED)
+	{
+		if (EFFECTIVE_SWF_VERSION() >= 7) {
+			prop_name = "undefined";
+			prop_name_len = 9;
+		} else {
+			prop_name = "";
+			prop_name_len = 0;
+		}
+	}
 	else
 	{
 		// Unknown type for property name - error case
@@ -13237,10 +13285,15 @@ void actionSetMember(SWFAppContext* app_context)
 			// Check prototype chain for addProperty setter before creating own property
 			{
 				ASProperty* setter_prop = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
-				if (setter_prop != NULL && setter_prop->setter != NULL)
+				if (setter_prop != NULL && (setter_prop->getter != NULL || setter_prop->setter != NULL))
 				{
-					// Virtual property (addProperty) — invoke setter with this = original obj
-					invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
+					// Virtual property (addProperty): has getter and/or setter
+					if (setter_prop->setter != NULL)
+					{
+						// Invoke setter with this = original obj
+						invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
+					}
+					// If no setter (read-only virtual property) — silently ignore the assignment
 					return;
 				}
 			}
@@ -18340,118 +18393,443 @@ static int callArrayMethod(SWFAppContext* app_context,
 		return 1;
 	}
 
-	// sort() - sort array (simplified: lexicographic by default)
+	// -----------------------------------------------------------------------
+	// Array sort flags (matching Flash AS2 constants)
+	// -----------------------------------------------------------------------
+	// CASEINSENSITIVE    = 1
+	// DESCENDING         = 2
+	// UNIQUESORT         = 4
+	// RETURNINDEXEDARRAY = 8
+	// NUMERIC            = 16
+
+	// -----------------------------------------------------------------------
+	// Helper: compare two ActionVars for sort (string or numeric)
+	// Returns negative/zero/positive like strcmp.
+	// flags: CASEINSENSITIVE=1, DESCENDING=2, NUMERIC=16
+	// -----------------------------------------------------------------------
+	#define SORT_COMPARE_VARS(_ctx_ac, _a, _b, _fl) _sort_compare_vars((_ctx_ac), (_a), (_b), (_fl))
+
+	// -----------------------------------------------------------------------
+	// Helper: stable merge-sort on ActionVar array
+	// -----------------------------------------------------------------------
+	// (Defined inline as macros/lambdas are not available in C89.
+	// We use a file-scope helper declared static ahead of callArrayMethod.)
+
+	// sort() - sort array with flags and optional custom comparator
 	if (method_name_len == 4 && strncmp(method_name, "sort", 4) == 0)
 	{
-		// Simple bubble sort with string comparison (Flash default)
-		// TODO: support sort flags and custom comparators
-		for (u32 i = 0; i < arr->length; i++)
+		// --- Parse arguments ---
+		int flags = 0;
+		ASFunction* comparator = NULL;
+		int return_undefined = 0;
+
+		if (num_args == 0)
 		{
-			for (u32 j = i + 1; j < arr->length; j++)
+			flags = 0;
+		}
+		else
+		{
+			ActionVar* a0 = &args[0];
+
+			if (a0->type == ACTION_STACK_VALUE_FUNCTION)
 			{
-				char a_str[64], b_str[64];
-				varToStringBuf(app_context, &arr->elements[i], a_str, sizeof(a_str));
-				varToStringBuf(app_context, &arr->elements[j], b_str, sizeof(b_str));
-				if (strcmp(a_str, b_str) > 0)
+				// sort(compareFn [, flags])
+				comparator = lookupFunctionFromVar(a0);
+				if (num_args >= 2)
 				{
-					ActionVar tmp = arr->elements[i];
-					arr->elements[i] = arr->elements[j];
-					arr->elements[j] = tmp;
+					ActionVar* a1 = &args[1];
+					if (a1->type == ACTION_STACK_VALUE_F32 || a1->type == ACTION_STACK_VALUE_F64)
+					{
+						double d1 = varToDouble(a1);
+						if (!isnan(d1)) flags = (int)d1;
+					}
 				}
 			}
+			else if (a0->type == ACTION_STACK_VALUE_F32 || a0->type == ACTION_STACK_VALUE_F64)
+			{
+				double d0 = varToDouble(a0);
+				if (isnan(d0)) d0 = 0.0;
+				flags = (int)d0;
+				// Two-number case: sort(flags1, flags2) → second numeric arg wins
+				if (num_args >= 2)
+				{
+					ActionVar* a1 = &args[1];
+					if (a1->type == ACTION_STACK_VALUE_F32 || a1->type == ACTION_STACK_VALUE_F64)
+					{
+						double d1 = varToDouble(a1);
+						if (!isnan(d1)) flags = (int)d1;
+					}
+				}
+			}
+			else
+			{
+				// BOOLEAN, NULL, UNDEFINED, OBJECT, ARRAY etc. → invalid arg
+				return_undefined = 1;
+			}
 		}
-		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
-		return 1;
-	}
 
-	// sortOn(fieldName [, flags]) - sort array of objects by a named property
-	if (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0)
-	{
-		if (num_args == 0)
+		if (return_undefined)
+		{
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return 1;
+		}
+
+		u32 n = arr->length;
+		if (n <= 1)
 		{
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 			return 1;
 		}
 
-		// Get field name (arg 0)
-		char field_name[128] = {0};
-		ActionVar* field_arg = &args[0];
-		if (field_arg->type == ACTION_STACK_VALUE_STRING)
+		// --- UNIQUESORT: check for duplicates before sorting ---
+		if (flags & 4)
 		{
-			const uint16_t* u16 = varGetU16Ptr(field_arg);
-			if (u16 != NULL)
-				u16_to_utf8(u16, field_arg->str_size, field_name, sizeof(field_name));
-		}
-		u32 field_len = (u32) strlen(field_name);
-
-		// Get flags (arg 1, optional)
-		double flags_d = 0.0;
-		if (num_args >= 2)
-		{
-			ActionVar* flags_arg = &args[1];
-			if (flags_arg->type == ACTION_STACK_VALUE_F64)
-				flags_d = VAL(double, &flags_arg->data.numeric_value);
-			else if (flags_arg->type == ACTION_STACK_VALUE_F32)
-				flags_d = (double) VAL(float, &flags_arg->data.numeric_value);
-		}
-		int flags = (int) flags_d;
-		int descending = (flags & 2) != 0;  // Array.DESCENDING = 2
-		int numeric    = (flags & 16) != 0; // Array.NUMERIC = 16
-
-		// Bubble sort by named property
-		for (u32 i = 0; i < arr->length; i++)
-		{
-			for (u32 j = i + 1; j < arr->length; j++)
+			for (u32 _ui = 0; _ui < n && !(flags & 4); _ui++) {}
+			// Run the duplicate check using the same comparison method
+			for (u32 _ui = 0; _ui < n; _ui++)
 			{
-				int swap = 0;
-				ActionVar* ai = &arr->elements[i];
-				ActionVar* aj = &arr->elements[j];
-
-				if (numeric)
+				for (u32 _uj = _ui + 1; _uj < n; _uj++)
 				{
-					double va = NAN, vb = NAN;
-					if (ai->type == ACTION_STACK_VALUE_OBJECT && ai->data.numeric_value != 0)
+					int _ucmp = 0;
+					if (comparator != NULL)
 					{
-						ActionVar* p = getProperty((ASObject*)ai->data.numeric_value, field_name, field_len);
-						if (p) va = varToDouble(p);
+						ActionVar _uargs[2] = { arr->elements[_ui], arr->elements[_uj] };
+						ActionVar _ures;
+						g_call_depth++;
+						if (comparator->function_type == 2)
+							_ures = comparator->advanced_func(app_context, _uargs, 2, NULL, NULL);
+						else
+						{
+							pushVar(app_context, &_uargs[1]);
+							pushVar(app_context, &_uargs[0]);
+							_ures = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+						}
+						g_call_depth--;
+						double _ud = varToDouble(&_ures);
+						_ucmp = (_ud < 0) ? -1 : (_ud > 0) ? 1 : 0;
 					}
-					if (aj->type == ACTION_STACK_VALUE_OBJECT && aj->data.numeric_value != 0)
+					else
 					{
-						ActionVar* p = getProperty((ASObject*)aj->data.numeric_value, field_name, field_len);
-						if (p) vb = varToDouble(p);
+						_ucmp = _sort_compare_vars(app_context, &arr->elements[_ui], &arr->elements[_uj], flags & ~2);
 					}
-					if (!isnan(va) && !isnan(vb))
-						swap = descending ? (va < vb) : (va > vb);
+					if (_ucmp == 0)
+					{
+						double _zero = 0.0;
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_zero));
+						return 1;
+					}
+				}
+			}
+		}
+
+		// --- RETURNINDEXEDARRAY: sort a copy of indices, return index array ---
+		if (flags & 8)
+		{
+			u32* _idx = (u32*) HALLOC(n * sizeof(u32));
+			if (_idx == NULL) { PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+			for (u32 _ii = 0; _ii < n; _ii++) _idx[_ii] = _ii;
+
+			// Stable insertion sort on indices using the same comparator
+			for (u32 _ii = 1; _ii < n; _ii++)
+			{
+				u32 _key_idx = _idx[_ii];
+				int _jj = (int)_ii - 1;
+				while (_jj >= 0)
+				{
+					int _cmp;
+					if (comparator != NULL)
+					{
+						ActionVar _rargs[2] = { arr->elements[_idx[_jj]], arr->elements[_key_idx] };
+						ActionVar _rres;
+						g_call_depth++;
+						if (comparator->function_type == 2)
+							_rres = comparator->advanced_func(app_context, _rargs, 2, NULL, NULL);
+						else {
+							pushVar(app_context, &_rargs[1]);
+							pushVar(app_context, &_rargs[0]);
+							_rres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+						}
+						g_call_depth--;
+						double _rd = varToDouble(&_rres);
+						_cmp = (_rd < 0) ? -1 : (_rd > 0) ? 1 : 0;
+					}
+					else
+					{
+						_cmp = _sort_compare_vars(app_context, &arr->elements[_idx[_jj]], &arr->elements[_key_idx], flags);
+					}
+					if (_cmp <= 0) break;
+					_idx[_jj + 1] = _idx[_jj];
+					_jj--;
+				}
+				_idx[_jj + 1] = _key_idx;
+			}
+
+			// Build index result array
+			ASArray* _ridx_arr = allocArray(app_context, n);
+			if (_ridx_arr == NULL) { FREE(_idx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+			for (u32 _ii = 0; _ii < n; _ii++)
+			{
+				_ridx_arr->elements[_ii].type = ACTION_STACK_VALUE_F64;
+				double _dv = (double) _idx[_ii];
+				VAL(double, &_ridx_arr->elements[_ii].data.numeric_value) = _dv;
+			}
+			FREE(_idx);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) _ridx_arr);
+			return 1;
+		}
+
+		// --- Standard sort: stable insertion sort on arr->elements ---
+		for (u32 _si = 1; _si < n; _si++)
+		{
+			ActionVar _key_var = arr->elements[_si];
+			int _sj = (int)_si - 1;
+			while (_sj >= 0)
+			{
+				int _scmp;
+				if (comparator != NULL)
+				{
+					ActionVar _sargs[2] = { arr->elements[_sj], _key_var };
+					ActionVar _sres;
+					g_call_depth++;
+					if (g_execution_halted) { g_call_depth--; break; }
+					if (comparator->function_type == 2)
+						_sres = comparator->advanced_func(app_context, _sargs, 2, NULL, NULL);
+					else {
+						pushVar(app_context, &_sargs[1]);
+						pushVar(app_context, &_sargs[0]);
+						_sres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+					}
+					g_call_depth--;
+					double _sd = varToDouble(&_sres);
+					_scmp = (_sd < 0) ? -1 : (_sd > 0) ? 1 : 0;
 				}
 				else
 				{
-					char a_str[64] = {0}, b_str[64] = {0};
-					if (ai->type == ACTION_STACK_VALUE_OBJECT && ai->data.numeric_value != 0)
-					{
-						ActionVar* p = getProperty((ASObject*)ai->data.numeric_value, field_name, field_len);
-						if (p) varToStringBuf(app_context, p, a_str, sizeof(a_str));
-					}
-					if (aj->type == ACTION_STACK_VALUE_OBJECT && aj->data.numeric_value != 0)
-					{
-						ActionVar* p = getProperty((ASObject*)aj->data.numeric_value, field_name, field_len);
-						if (p) varToStringBuf(app_context, p, b_str, sizeof(b_str));
-					}
-					int cmp = strcmp(a_str, b_str);
-					swap = descending ? (cmp < 0) : (cmp > 0);
+					_scmp = _sort_compare_vars(app_context, &arr->elements[_sj], &_key_var, flags);
 				}
-
-				if (swap)
-				{
-					ActionVar tmp = arr->elements[i];
-					arr->elements[i] = arr->elements[j];
-					arr->elements[j] = tmp;
-				}
+				if (_scmp <= 0) break;
+				arr->elements[_sj + 1] = arr->elements[_sj];
+				_sj--;
 			}
+			arr->elements[_sj + 1] = _key_var;
 		}
 
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 		return 1;
 	}
+
+	// sortOn(fieldName|[fieldNames] [, flags|[perKeyFlags]])
+	if (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0)
+	{
+		// 0 args → undefined
+		if (num_args == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return 1;
+		}
+
+		// Extract field names (string or array of strings)
+		#define SORTON_MAX_KEYS 8
+		char _so_fields[SORTON_MAX_KEYS][128];
+		int  _so_flags[SORTON_MAX_KEYS];
+		int  _so_nkeys = 0;
+		memset(_so_fields, 0, sizeof(_so_fields));
+		memset(_so_flags, 0, sizeof(_so_flags));
+
+		ActionVar* field_arg = &args[0];
+		if (field_arg->type == ACTION_STACK_VALUE_ARRAY)
+		{
+			ASArray* _fnarr = (ASArray*) field_arg->data.numeric_value;
+			if (_fnarr != NULL)
+			{
+				_so_nkeys = (int)_fnarr->length;
+				if (_so_nkeys > SORTON_MAX_KEYS) _so_nkeys = SORTON_MAX_KEYS;
+				for (int _ki = 0; _ki < _so_nkeys; _ki++)
+				{
+					ActionVar* _fe = &_fnarr->elements[_ki];
+					if (_fe->type == ACTION_STACK_VALUE_STRING)
+					{
+						const uint16_t* _fu16 = varGetU16Ptr(_fe);
+						if (_fu16) u16_to_utf8(_fu16, _fe->str_size, _so_fields[_ki], 128);
+					}
+				}
+			}
+		}
+		else if (field_arg->type == ACTION_STACK_VALUE_STRING)
+		{
+			const uint16_t* _fu16 = varGetU16Ptr(field_arg);
+			if (_fu16) u16_to_utf8(_fu16, field_arg->str_size, _so_fields[0], 128);
+			_so_nkeys = 1;
+		}
+		else if (field_arg->type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			// undefined field name → just return array unchanged
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+			return 1;
+		}
+		else
+		{
+			// null, boolean, etc. — use empty field name
+			_so_nkeys = 1;
+		}
+
+		// Extract flags (number or array of per-key numbers)
+		if (num_args >= 2)
+		{
+			ActionVar* flags_arg = &args[1];
+			if (flags_arg->type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ASArray* _flarr = (ASArray*) flags_arg->data.numeric_value;
+				if (_flarr != NULL)
+				{
+					for (int _ki = 0; _ki < _so_nkeys; _ki++)
+					{
+						if ((u32)_ki < _flarr->length)
+						{
+							ActionVar* _fe = &_flarr->elements[_ki];
+							if (_fe->type == ACTION_STACK_VALUE_F64 || _fe->type == ACTION_STACK_VALUE_F32)
+							{
+								double _fv = varToDouble(_fe);
+								if (!isnan(_fv)) _so_flags[_ki] = (int)_fv;
+							}
+						}
+						// else _so_flags[_ki] = 0 (already zeroed)
+					}
+				}
+			}
+			else if (flags_arg->type == ACTION_STACK_VALUE_F64 || flags_arg->type == ACTION_STACK_VALUE_F32)
+			{
+				double _fv = varToDouble(flags_arg);
+				int _fi = isnan(_fv) ? 0 : (int)_fv;
+				for (int _ki = 0; _ki < _so_nkeys; _ki++)
+					_so_flags[_ki] = _fi;
+			}
+			// else: invalid flags type → all flags remain 0
+		}
+
+		u32 n = arr->length;
+		if (n <= 1 || _so_nkeys == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+			return 1;
+		}
+
+		// Helper: get the value of field _fi from element _elem
+		// Returns a copy of the property value (or UNDEFINED if not found)
+		#define SORTON_GET_FIELD(_elem, _ki, _out_var) do { \
+			(_out_var).type = ACTION_STACK_VALUE_UNDEFINED; \
+			(_out_var).data.numeric_value = 0; \
+			const char* _fn = _so_fields[(_ki)]; \
+			u32 _fnl = (u32)strlen(_fn); \
+			if ((_elem)->type == ACTION_STACK_VALUE_OBJECT && (_elem)->data.numeric_value != 0) { \
+				ASObject* _o = (ASObject*)(_elem)->data.numeric_value; \
+				ASProperty* _ps = findPropertyStructWithPrototype(_o, _fn, _fnl); \
+				if (_ps != NULL) { \
+					if (_ps->getter != NULL) \
+						(_out_var) = invokePropertyGetter(app_context, (ASFunction*)_ps->getter, (void*)_o); \
+					else \
+						(_out_var) = _ps->value; \
+				} \
+			} else if ((_elem)->type == ACTION_STACK_VALUE_STRING && _fnl == 6 && memcmp(_fn, "length", 6) == 0) { \
+				(_out_var).type = ACTION_STACK_VALUE_F64; \
+				double _slen = (double)(_elem)->str_size; \
+				VAL(double, &(_out_var).data.numeric_value) = _slen; \
+			} \
+		} while(0)
+
+		// Compare two elements across all keys; returns negative/zero/positive
+		#define SORTON_COMPARE(_ea, _eb, _result) do { \
+			(_result) = 0; \
+			for (int _ki2 = 0; _ki2 < _so_nkeys && (_result) == 0; _ki2++) { \
+				ActionVar _va2, _vb2; \
+				SORTON_GET_FIELD((_ea), _ki2, _va2); \
+				SORTON_GET_FIELD((_eb), _ki2, _vb2); \
+				(_result) = _sort_compare_vars(app_context, &_va2, &_vb2, _so_flags[_ki2]); \
+			} \
+		} while(0)
+
+		// Check if any flag across all keys sets UNIQUESORT or RETURNINDEXEDARRAY
+		int _so_any_unique = 0, _so_any_retidx = 0;
+		for (int _ki = 0; _ki < _so_nkeys; _ki++)
+		{
+			if (_so_flags[_ki] & 4) _so_any_unique = 1;
+			if (_so_flags[_ki] & 8) _so_any_retidx = 1;
+		}
+
+		// UNIQUESORT: check for duplicates first
+		if (_so_any_unique)
+		{
+			for (u32 _ui = 0; _ui < n; _ui++)
+			{
+				for (u32 _uj = _ui + 1; _uj < n; _uj++)
+				{
+					int _ucmp; SORTON_COMPARE(&arr->elements[_ui], &arr->elements[_uj], _ucmp);
+					if (_ucmp == 0)
+					{
+						double _zero = 0.0;
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_zero));
+						return 1;
+					}
+				}
+			}
+		}
+
+		// Sort indices (always, for stable sort)
+		u32* _sidx = (u32*) HALLOC(n * sizeof(u32));
+		if (_sidx == NULL) { PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+		for (u32 _ii = 0; _ii < n; _ii++) _sidx[_ii] = _ii;
+
+		// Stable insertion sort on indices
+		for (u32 _ii = 1; _ii < n; _ii++)
+		{
+			u32 _key_sidx = _sidx[_ii];
+			int _jj = (int)_ii - 1;
+			while (_jj >= 0)
+			{
+				int _scmp;
+				SORTON_COMPARE(&arr->elements[_sidx[_jj]], &arr->elements[_key_sidx], _scmp);
+				if (_scmp <= 0) break;
+				_sidx[_jj + 1] = _sidx[_jj];
+				_jj--;
+			}
+			_sidx[_jj + 1] = _key_sidx;
+		}
+
+		// RETURNINDEXEDARRAY or UNIQUESORT (success) → return index array
+		if (_so_any_retidx || _so_any_unique)
+		{
+			ASArray* _ridx_arr = allocArray(app_context, n);
+			if (_ridx_arr == NULL) { FREE(_sidx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+			for (u32 _ii = 0; _ii < n; _ii++)
+			{
+				_ridx_arr->elements[_ii].type = ACTION_STACK_VALUE_F64;
+				double _dv = (double) _sidx[_ii];
+				VAL(double, &_ridx_arr->elements[_ii].data.numeric_value) = _dv;
+			}
+			FREE(_sidx);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) _ridx_arr);
+			return 1;
+		}
+
+		// Apply sort: rearrange arr->elements according to sorted index order
+		ActionVar* _tmp_elems = (ActionVar*) HALLOC(n * sizeof(ActionVar));
+		if (_tmp_elems == NULL) { FREE(_sidx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+		for (u32 _ii = 0; _ii < n; _ii++)
+			_tmp_elems[_ii] = arr->elements[_sidx[_ii]];
+		for (u32 _ii = 0; _ii < n; _ii++)
+			arr->elements[_ii] = _tmp_elems[_ii];
+		FREE(_tmp_elems);
+		FREE(_sidx);
+
+		#undef SORTON_MAX_KEYS
+		#undef SORTON_GET_FIELD
+		#undef SORTON_COMPARE
+
+		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+		return 1;
+	}
+
+	#undef SORT_COMPARE_VARS
 
 	return 0;
 }
@@ -19212,11 +19590,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	g_scope_app_context = app_context;
 
 	// 1. Pop method name from stack
-	// Check for undefined/null BEFORE convertString — SWF >= 7 converts
-	// undefined to the string "undefined" which would prevent the empty-name
-	// path from triggering (needed for CallMethod on a function reference).
-	int method_is_empty = (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED ||
-	                       STACK_TOP_TYPE == ACTION_STACK_VALUE_NULL);
+	// Check for undefined BEFORE convertString — SWF >= 7 converts undefined
+	// to the string "undefined" which would prevent the empty-name path from
+	// triggering (needed for CallMethod on a function reference).
+	// NULL is NOT included here: test[null]() should look up "null" property.
+	int method_is_empty = (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED);
 	char method_name_buffer[17];
 	convertString(app_context, method_name_buffer);
 	char _cm_buf[512];
