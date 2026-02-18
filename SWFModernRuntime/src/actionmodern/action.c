@@ -4009,7 +4009,7 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 		"thickness", "antiAliasType", "gridFitType"
 	};
 	static const u32 tf_prop_lens[] = {
-		10, 17, 14, 8,
+		10, 17, 13, 8,
 		10, 9, 12, 6,
 		10, 9, 8, 8,
 		10, 6, 4, 10,
@@ -4020,7 +4020,9 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 		9, 13, 11
 	};
 
-	for (int i = 0; i < 35; i++)
+	// Register in REVERSE order so that for-in enumeration (LIFO stack) yields forward order.
+	// Flash enumerates TextField props as: styleSheet first, gridFitType last.
+	for (int i = 34; i >= 0; i--)
 	{
 		setProperty(app_context, proto, tf_prop_names[i], tf_prop_lens[i], &undef_val);
 	}
