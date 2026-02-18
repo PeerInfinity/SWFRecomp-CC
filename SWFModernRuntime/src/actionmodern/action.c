@@ -8804,10 +8804,70 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 
 	// Step 2: Look up the variable
 	ActionVar* var = NULL;
-	if (string_id > 0)
-		var = getVariableById(string_id);
-	else if (var_name_len > 0)
-		var = getVariable(var_name, var_name_len);
+	ActionVar _en_dot_var;  // storage for dot-path or colon-path resolved value
+
+	// Handle SWF4 colon-path syntax "target:variable" (e.g., "this:obj" means _root.obj)
+	char* _en_colon = (var_name_len > 1) ? (char*)memchr(var_name, ':', var_name_len) : NULL;
+	if (_en_colon != NULL)
+	{
+		u32 _en_target_len = (u32)(_en_colon - var_name);
+		const char* _en_prop = _en_colon + 1;
+		u32 _en_prop_len = var_name_len - _en_target_len - 1;
+		if (_en_prop_len > 0)
+		{
+			extern MovieClip root_movieclip;
+			MovieClip* _en_mc = NULL;
+			if ((_en_target_len == 4 && strncmp(var_name, "this", 4) == 0) ||
+			    (_en_target_len == 5 && strncmp(var_name, "_root", 5) == 0) ||
+			    (_en_target_len == 7 && strncmp(var_name, "_level0", 7) == 0))
+			{
+				_en_mc = g_current_context ? g_current_context : &root_movieclip;
+			}
+			if (_en_mc != NULL && _en_mc->dynamic_props != NULL)
+				var = getProperty((ASObject*)_en_mc->dynamic_props, _en_prop, _en_prop_len);
+		}
+	}
+
+	// Handle dot-path syntax (e.g., "this.obj") — resolve via actionGetVariable
+	// which already knows how to walk dot-separated paths
+	if (var == NULL && var_name_len > 1 &&
+	    memchr(var_name, '.', var_name_len) != NULL)
+	{
+		PUSH_STR(var_name, var_name_len);
+		actionGetVariable(app_context);
+		popVar(app_context, &_en_dot_var);
+		if (_en_dot_var.type == ACTION_STACK_VALUE_OBJECT ||
+		    _en_dot_var.type == ACTION_STACK_VALUE_ARRAY ||
+		    _en_dot_var.type == ACTION_STACK_VALUE_MOVIECLIP ||
+		    _en_dot_var.type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			var = &_en_dot_var;
+		}
+	}
+
+	if (var == NULL)
+	{
+		if (string_id > 0)
+			var = getVariableById(string_id);
+		else if (var_name_len > 0)
+			var = getVariable(var_name, var_name_len);
+	}
+
+	// Step 2b: If global variable lookup returned uninitialized slot, also check
+	// the current MC's dynamic properties (handles SetMember assignments on MC)
+	if (var_name_len > 0 &&
+	    (var == NULL || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 &&
+	                     var->data.string_data.heap_ptr == NULL)))
+	{
+		extern MovieClip root_movieclip;
+		MovieClip* _en_ctx = g_current_context ? g_current_context : &root_movieclip;
+		if (_en_ctx->dynamic_props != NULL)
+		{
+			ActionVar* _en_mc_prop = getProperty((ASObject*)_en_ctx->dynamic_props, var_name, var_name_len);
+			if (_en_mc_prop != NULL)
+				var = _en_mc_prop;
+		}
+	}
 
 	// Step 3: Check if variable exists and is an enumerable type
 	if (!var || (var->type != ACTION_STACK_VALUE_OBJECT &&
