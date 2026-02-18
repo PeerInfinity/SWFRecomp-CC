@@ -406,6 +406,12 @@ static u32 function_count = 0;
 
 // Global Object.prototype with built-in toString and valueOf
 static ASObject* g_object_prototype = NULL;
+
+// Global Array.prototype — shared by all arrays for instanceof and arguments.__proto__
+static ASObject* g_array_prototype = NULL;
+
+// Currently executing user-defined function — used to set arguments.caller
+static ASFunction* g_current_executing_func = NULL;
 static ASFunction g_object_toString_func;
 static ASFunction g_object_valueOf_func;
 static ASFunction g_object_hasOwnProperty_func;
@@ -1980,6 +1986,58 @@ static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
 			obj->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
 			break;
 		}
+	}
+}
+
+// Set up arguments object properties: __proto__ = Array.prototype, callee, caller.
+// Called after creating the arguments ASArray for any user-defined function call.
+static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
+                                 ASFunction* callee_func, ASFunction* caller_func)
+{
+	// Lazily create Array.prototype (shared singleton)
+	if (g_array_prototype == NULL)
+	{
+		g_array_prototype = allocObject(app_context, 4);
+		retainObject(g_array_prototype);
+		setObjectProto(app_context, g_array_prototype);
+	}
+
+	// Allocate props object on the array for non-index properties
+	if (arr->props == NULL)
+	{
+		arr->props = allocObject(app_context, 4);
+		retainObject(arr->props);
+	}
+
+	// __proto__ = Array.prototype (non-enumerable)
+	{
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64)g_array_prototype;
+		setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	// callee = the function being called (non-enumerable)
+	{
+		ActionVar cv = {0};
+		cv.type = ACTION_STACK_VALUE_FUNCTION;
+		cv.data.numeric_value = (u64)callee_func;
+		setPropertyWithFlags(app_context, arr->props, "callee", 6, &cv, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	// caller = the function that initiated this call, or null (non-enumerable)
+	{
+		ActionVar cr = {0};
+		if (caller_func != NULL)
+		{
+			cr.type = ACTION_STACK_VALUE_FUNCTION;
+			cr.data.numeric_value = (u64)caller_func;
+		}
+		else
+		{
+			cr.type = ACTION_STACK_VALUE_NULL;
+		}
+		setPropertyWithFlags(app_context, arr->props, "caller", 6, &cr, PROPERTY_FLAGS_DONTENUM);
 	}
 }
 
@@ -10110,6 +10168,14 @@ void actionGetVariable(SWFAppContext* app_context)
 				g_array_constructor.function_type = 1;
 				g_array_constructor.param_count = 0;
 				g_array_constructor_init = 1;
+				// Initialize Array.prototype (shared singleton used by instanceof and arguments.__proto__)
+				if (g_array_prototype == NULL)
+				{
+					g_array_prototype = allocObject(app_context, 4);
+					retainObject(g_array_prototype);
+					setObjectProto(app_context, g_array_prototype);
+				}
+				g_array_constructor.prototype_obj = g_array_prototype;
 				// Register Array sort-flag constants on own_props
 				g_array_constructor.own_props = allocObject(app_context, 8);
 				if (g_array_constructor.own_props != NULL) {
@@ -11524,13 +11590,20 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 		return 0;
 	}
 
-	// Get the object for __proto__ chain walk — handle ASFunction vs ASObject
+	// Get the object for __proto__ chain walk — handle ASFunction vs ASObject vs ASArray
 	ASObject* obj;
 	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
 	{
 		ASFunction* obj_func = (ASFunction*) obj_var->data.numeric_value;
 		obj = obj_func->own_props;
 		if (obj == NULL) return 0;
+	}
+	else if (obj_var->type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// ASArray has a different memory layout from ASObject — use arr->props
+		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
+		if (arr == NULL || arr->props == NULL) return 0;
+		obj = arr->props;
 	}
 	else
 	{
@@ -17802,6 +17875,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					scope_chain[scope_depth++] = local_scope;
 				}
 
+				// Track calling function for arguments.caller
+				ASFunction* prev_executing_func = g_current_executing_func;
+
 				// Populate scope with this/super/arguments when neither preload nor suppress is set
 				{
 					u16 f2flags = func->flags;
@@ -17822,6 +17898,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						ASArray* arguments_arr = allocArray(app_context, num_args);
 						for (u32 i = 0; i < num_args; i++)
 							setArrayElement(app_context, arguments_arr, i, &args[i]);
+						setupArgumentsProps(app_context, arguments_arr, func, prev_executing_func);
 						ActionVar args_var = {0};
 						args_var.type = ACTION_STACK_VALUE_ARRAY;
 						args_var.data.numeric_value = (u64)arguments_arr;
@@ -17836,7 +17913,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 
+				g_current_executing_func = func;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+				g_current_executing_func = prev_executing_func;
 
 				// Pop local scope from scope chain
 				if (scope_depth > 0) {
@@ -17861,12 +17940,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Create local scope object for function-local variables
 				ASObject* local_scope = allocObject(app_context, 8);
 
+				// Track calling function for arguments.caller
+				ASFunction* prev_executing_func_t1 = g_current_executing_func;
+
 				// Create arguments array and set on local scope
 				ASArray* arguments_arr = allocArray(app_context, num_args > 0 ? num_args : 1);
 				for (u32 i = 0; i < num_args; i++)
 				{
 					setArrayElement(app_context, arguments_arr, i, &args[i]);
 				}
+				setupArgumentsProps(app_context, arguments_arr, func, prev_executing_func_t1);
 				ActionVar args_var = {0};
 				args_var.type = ACTION_STACK_VALUE_ARRAY;
 				args_var.data.numeric_value = (u64) arguments_arr;
@@ -17908,7 +17991,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				else
 				{
 					// Call the simple function (cast to correct return type — generated functions return ActionVar)
+					g_current_executing_func = func;
 					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					g_current_executing_func = prev_executing_func_t1;
 
 					// Pop local scope from scope chain
 					if (scope_depth > 0) {
@@ -19945,10 +20030,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 					setProperty(app_context, local_scope, "this", 4, &this_var);
 				}
+				// Track calling function for arguments.caller
+				ASFunction* prev_executing_func_am2 = g_current_executing_func;
+
 				if (!f2_preload_args && !f2_suppress_args) {
 					ASArray* arguments_arr = allocArray(app_context, num_args);
 					for (u32 i = 0; i < num_args; i++)
 						setArrayElement(app_context, arguments_arr, i, &args[i]);
+					setupArgumentsProps(app_context, arguments_arr, func, prev_executing_func_am2);
 					ActionVar args_var = {0};
 					args_var.type = ACTION_STACK_VALUE_ARRAY;
 					args_var.data.numeric_value = (u64)arguments_arr;
@@ -19968,7 +20057,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 
 				g_call_depth++;
+				g_current_executing_func = func;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
+				g_current_executing_func = prev_executing_func_am2;
 				g_call_depth--;
 
 				if (scope_depth > 0) scope_depth--;
@@ -19981,16 +20072,36 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
 			{
 				// Invoke simple function (DefineFunction type 1) as method
+				// Create local scope with arguments object for proper arguments.callee/caller
+				ASFunction* prev_executing_func_am1 = g_current_executing_func;
+				ASObject* local_scope_am1 = allocObject(app_context, 8);
+				ASArray* arguments_arr_am1 = allocArray(app_context, num_args > 0 ? num_args : 1);
 				for (u32 i = 0; i < num_args; i++)
 				{
+					setArrayElement(app_context, arguments_arr_am1, i, &args[i]);
 					pushVar(app_context, &args[i]);
+				}
+				setupArgumentsProps(app_context, arguments_arr_am1, func, prev_executing_func_am1);
+				ActionVar args_var_am1 = {0};
+				args_var_am1.type = ACTION_STACK_VALUE_ARRAY;
+				args_var_am1.data.numeric_value = (u64)arguments_arr_am1;
+				setProperty(app_context, local_scope_am1, "arguments", 9, &args_var_am1);
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
+					scope_chain[scope_depth++] = local_scope_am1;
 				}
 				if (args != NULL) FREE(args);
 
 				g_call_depth++;
+				g_current_executing_func = func;
 				ActionVar result;
 				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				g_current_executing_func = prev_executing_func_am1;
 				g_call_depth--;
+
+				if (scope_depth > 0) scope_depth--;
+				releaseObject(app_context, local_scope_am1);
 
 				pushVar(app_context, &result);
 			}
@@ -20156,16 +20267,38 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				else if (func->function_type == 1 && func->simple_func != NULL)
 				{
-					// Push args onto stack for simple functions
+					// Create local scope + arguments object for apply() on simple functions
+					ASFunction* prev_executing_func_ap = g_current_executing_func;
+					ASObject* local_scope_ap = allocObject(app_context, 8);
+					ASArray* arguments_arr_ap = allocArray(app_context, apply_arg_count > 0 ? apply_arg_count : 1);
 					for (u32 i = 0; i < apply_arg_count; i++)
+					{
+						setArrayElement(app_context, arguments_arr_ap, i, &apply_args[i]);
 						pushVar(app_context, &apply_args[i]);
+					}
+					setupArgumentsProps(app_context, arguments_arr_ap, func, prev_executing_func_ap);
+					ActionVar args_var_ap = {0};
+					args_var_ap.type = ACTION_STACK_VALUE_ARRAY;
+					args_var_ap.data.numeric_value = (u64)arguments_arr_ap;
+					setProperty(app_context, local_scope_ap, "arguments", 9, &args_var_ap);
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = local_scope_ap;
+					}
 
 					if (apply_args != NULL) FREE(apply_args);
 					if (args != NULL) FREE(args);
 
 					g_call_depth++;
+					g_current_executing_func = func;
 					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					g_current_executing_func = prev_executing_func_ap;
 					g_call_depth--;
+
+					if (scope_depth > 0) scope_depth--;
+					releaseObject(app_context, local_scope_ap);
+
 					pushVar(app_context, &result);
 				}
 				else

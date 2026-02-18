@@ -6,16 +6,17 @@ Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
 
 ## Quick Summary
 
-- **Pass rate (estimated local)**: ~222+/619 — ~9 tests gained from commits 229cb53 + 1851972 since last update, plus 1 more from today's DefineFunction2 fix
+- **Pass rate (estimated local)**: ~223+/619 — ~9 tests gained from commits 229cb53 + 1851972 since last update, plus 1 more from DefineFunction2 fix, plus `arguments` expected to pass from today's fix
 - **Main failure type**: output_mismatch, timeout (2), compile_fail (1), segfault (1)
 - **New regression (from b815da5)**: `movieclip_hittest_shapeflag` changed from output_mismatch (180/338) to compile_fail — still needs investigation
-- **Recent gains**: All previous Tier 1 near-passing tests now pass; most Tier 2 near-passing tests now pass; DefineFunction2 preload/suppress register fix
+- **Recent gains**: All previous Tier 1 near-passing tests now pass; most Tier 2 near-passing tests now pass; DefineFunction2 preload/suppress register fix; arguments object callee/caller/__proto__ fix
 
 ## Major Features Implemented Since Last Update
 
 | Feature | Commits | Impact | Key Tests |
 |---------|---------|--------|-----------|
-| **DefineFunction2 preload/suppress fix** | today | `function_suppress_and_preload` now passes; correct register numbering when both preload + suppress bits are set; scope vars (this/super/arguments) set via local_scope in method calls | function_suppress_and_preload |
+| **arguments object: callee/caller/__proto__** | today | arguments.callee, arguments.caller (null or calling function), arguments instanceof Array, arguments.__proto__ === Array.prototype — all now implemented; also fixes Array.prototype initialization and checkInstanceOf for arrays | arguments |
+| **DefineFunction2 preload/suppress fix** | eff1f85 | `function_suppress_and_preload` now passes; correct register numbering when both preload + suppress bits are set; scope vars (this/super/arguments) set via local_scope in method calls | function_suppress_and_preload |
 | **TextField enumeration + condenseWhite fix** | 229cb53 | textfield_props_swf6/7/8 now pass, xml_to_string, xml_child_nodes_edge_cases, swf4_function_calls pass | textfield_props_swf6/7/8 (+3), xml_to_string (+1), xml_child_nodes_edge_cases (+1) |
 | **SWF5 undefined variable + stub ctors** | 1851972 | try_catch_finally, get_variable_in_scope, swf7_case_sensitive, divide_swf4 now pass | +4 tests |
 | **Date class** | 480bce0 | 8 new passing tests, +1432 matching lines in `date` test (5049/6335 on CI) | date (80% match — remaining diffs are timezone-dependent) |
@@ -53,7 +54,7 @@ These tests were near-passing in the previous update and now pass locally:
 |------|-------|-------|
 | `edittext_width_height` | 97/103 (94%) | Width/height don't account for _xscale/_yscale/_rotation transforms |
 | `object_prototypes` | 62/74 (84%) | watch() not implemented; `__PROTO__`/`__Proto__` case-insensitive lookup missing |
-| `arguments` | 106/127 (83%) | arguments.callee, arguments.caller, Array prototype |
+| `arguments` | 127/127 (100% expected) ✅ | Fixed today: callee/caller/__proto__/instanceof Array |
 
 ### Tier 3: 80-82% match
 
