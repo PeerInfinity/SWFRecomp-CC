@@ -4,9 +4,12 @@
 # Usage:
 #   ./scripts/setup_investigation_worktree.sh PLAN_NAME
 #   ./scripts/setup_investigation_worktree.sh all
+#   ./scripts/setup_investigation_worktree.sh --first N
 #
 # PLAN_NAME is the basename of the .md file without extension, e.g.:
 #   ARRAY_METHODS_PLAN  or  array_methods_plan  (case-insensitive)
+#
+# --first N sets up the first N plans in alphabetical order.
 #
 # Worktrees are created at:  CC/SWFRecomp-CC-<plan-slug>/
 # Branches are named:        investigation/<plan-slug>
@@ -19,7 +22,7 @@ INCOMPLETE_DIR="$REPO_ROOT/ruffle-tests/_investigation/incomplete"
 WORKTREE_PARENT="$(dirname "$REPO_ROOT")"
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 PLAN_NAME | all"
+    echo "Usage: $0 PLAN_NAME | all | --first N"
     echo ""
     echo "Available plans:"
     for f in "$INCOMPLETE_DIR"/*.md; do
@@ -35,6 +38,18 @@ declare -a PLAN_FILES=()
 if [[ "$ARG" == "all" ]]; then
     for f in "$INCOMPLETE_DIR"/*.md; do
         PLAN_FILES+=("$f")
+    done
+elif [[ "$ARG" == "--first" ]]; then
+    if [[ $# -lt 2 || ! "${2:-}" =~ ^[0-9]+$ ]]; then
+        echo "Error: --first requires a numeric argument"
+        exit 1
+    fi
+    N="$2"
+    count=0
+    for f in "$INCOMPLETE_DIR"/*.md; do
+        PLAN_FILES+=("$f")
+        count=$(( count + 1 ))
+        [[ "$count" -ge "$N" ]] && break
     done
 else
     # Normalise to uppercase for lookup

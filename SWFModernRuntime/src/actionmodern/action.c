@@ -7263,8 +7263,23 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, double v)
 {
 #ifdef NO_GRAPHICS
+	// TextFields store _width as a direct bounding-box dimension, not via xscale.
+	if (mc != NULL && mc->ng_textfield_idx >= 0) {
+		mc->width = (float)v;
+		return;
+	}
 	if (mc != NULL && v >= 0.0) {
-		size_t entry_idx = (mc == &root_movieclip) ? (size_t)-1 : ng_findDisplayEntryIdx(mc->name);
+		size_t entry_idx;
+		if (mc == &root_movieclip) {
+			entry_idx = (size_t)-1;
+		} else {
+			entry_idx = ng_findDisplayEntryIdx(mc->name);
+			if (entry_idx == (size_t)-1) {
+				// MC not in the display list (e.g. programmatic createTextField).
+				// Fall through to direct mc->width assignment.
+				goto set_width_direct;
+			}
+		}
 		float gxmin, gxmax, gymin, gymax;
 		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
 			double nat_w = (double)(gxmax - gxmin);
@@ -7277,6 +7292,7 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 			}
 		}
 	}
+	set_width_direct:;
 #endif
 	(void)app_context;
 	if (mc) mc->width = (float)v;
@@ -7286,8 +7302,23 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, double v)
 {
 #ifdef NO_GRAPHICS
+	// TextFields store _height as a direct bounding-box dimension, not via yscale.
+	if (mc != NULL && mc->ng_textfield_idx >= 0) {
+		mc->height = (float)v;
+		return;
+	}
 	if (mc != NULL && v >= 0.0) {
-		size_t entry_idx = (mc == &root_movieclip) ? (size_t)-1 : ng_findDisplayEntryIdx(mc->name);
+		size_t entry_idx;
+		if (mc == &root_movieclip) {
+			entry_idx = (size_t)-1;
+		} else {
+			entry_idx = ng_findDisplayEntryIdx(mc->name);
+			if (entry_idx == (size_t)-1) {
+				// MC not in the display list (e.g. programmatic createTextField).
+				// Fall through to direct mc->height assignment.
+				goto set_height_direct;
+			}
+		}
 		float gxmin, gxmax, gymin, gymax;
 		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
 			double nat_h = (double)(gymax - gymin);
@@ -7300,6 +7331,7 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 			}
 		}
 	}
+	set_height_direct:;
 #endif
 	(void)app_context;
 	if (mc) mc->height = (float)v;

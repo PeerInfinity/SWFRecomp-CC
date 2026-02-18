@@ -265,19 +265,23 @@ void tagShowFrame(SWFAppContext* app_context)
 {
 	extern int catch_up_mode;
 
-	// Execute deferred frame 0 for newly placed sprites
-	// Must run even during catch-up so sprite scripts execute inline
-	// before the next catch-up frame's scripts.
-	// With start-of-tick ng_advanceSprites, no sentinel is needed:
-	// ng_advanceSprites already ran before tagShowFrame, and it skips
-	// entries with needs_init>0. Setting needs_init=0 here means the
-	// sprite will be advanced on the NEXT tick's ng_advanceSprites.
+	// Execute deferred frame 0 for newly placed sprites.
+	// Run even during catch-up so sprite init scripts execute at the correct
+	// frame (matching Flash's execution order where newly-placed sprites' frame_0
+	// scripts run before the parent frame's DoAction).
+	// Temporarily clear catch_up_mode so the sprite frame functions' !catch_up_mode
+	// guards allow scripts to run. (The initial bounds-populating run in
+	// tagPlaceObject2 already used a forced catch_up_mode=1, so scripts were
+	// suppressed there; this is the intended script-executing pass.)
+	int saved_catch_up = catch_up_mode;
+	catch_up_mode = 0;
 	for (size_t i = 0; i < ng_display_count; i++)
 	{
 		if (!ng_display[i].needs_init) continue;
 		ng_display[i].needs_init = 0;
 		ng_exec_sprite_frame(app_context, i, 0);
 	}
+	catch_up_mode = saved_catch_up;
 }
 
 // No-op stubs for all tag functions so trace tests that happen to
