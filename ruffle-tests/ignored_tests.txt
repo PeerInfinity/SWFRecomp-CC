@@ -174,3 +174,9 @@ swf6_to_5_cross_call
 # These tests pass in Ruffle but expect behavior that doesn't match Flash Player.
 # We intentionally follow the Flash spec. See RUFFLE_VS_FLASH_DIFFERENCES.md for details.
 xml_attributes_read
+
+# --- Permanently accepted diffs ---
+# These tests have unfixable output differences. See ACCEPTED_DIFFS.md for full rationale.
+# Root causes: Flash UB we don't replicate, platform-dependent UB in expected output,
+# or internally inconsistent expected output (Ruffle test generation bugs).
+date

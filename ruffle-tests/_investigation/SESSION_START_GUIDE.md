@@ -11,6 +11,14 @@ For current test results, regressions, and recommended work order, see `CURRENT_
 4. Read `ruffle-results-filtered.md` — comprehensive report (filtered = ignoring interactive/network/audio tests)
 5. Read `ruffle-tests/results_filtered.json` — filtered results as JSON
 
+### Key reference documents (read when relevant)
+
+| Document | Purpose |
+|----------|---------|
+| `ruffle-tests/_investigation/ACCEPTED_DIFFS.md` | Tests with permanently unfixable diffs, categorised by root cause (Flash UB, platform UB, Ruffle test bugs). Check here before spending time on a diff that can never be fixed. |
+| `ruffle-tests/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` | Tests where Ruffle's expected output disagrees with Flash Player's spec. We follow Flash. |
+| `ruffle-tests/ignored_tests.txt` | All tests excluded from filtered results. Sections: interactive input, networking, audio/video, ExternalInterface, bitmaps, Ruffle-vs-Flash spec divergences, permanently accepted diffs. |
+
 ## How to Run Tests
 
 ### Single test locally (fast iteration)
