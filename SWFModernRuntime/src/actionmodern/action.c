@@ -9264,6 +9264,56 @@ void actionTrace(SWFAppContext* app_context)
 			ActionVar obj_var;
 			obj_var.type = STACK_TOP_TYPE;
 			obj_var.data.numeric_value = STACK_TOP_VALUE;
+			// If __proto__ is an ARRAY, use array-like join (own-props only, no getters invoked)
+			ASObject* _tr_obj = (ASObject*) obj_var.data.numeric_value;
+			ActionVar* _tr_proto = (_tr_obj != NULL) ? getProperty(_tr_obj, "__proto__", 9) : NULL;
+			if (_tr_proto != NULL && _tr_proto->type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ActionVar* _tr_len_prop = getProperty(_tr_obj, "length", 6);
+				u32 _tr_len = (_tr_len_prop != NULL) ? (u32)varToDouble(_tr_len_prop) : 0;
+				for (u32 _tr_i = 0; _tr_i < _tr_len; _tr_i++)
+				{
+					if (_tr_i > 0) printf(",");
+					char _tr_idx[32];
+					snprintf(_tr_idx, sizeof(_tr_idx), "%u", _tr_i);
+					ActionVar* _tr_elem = getProperty(_tr_obj, _tr_idx, (u32)strlen(_tr_idx));
+					if (_tr_elem == NULL || _tr_elem->type == ACTION_STACK_VALUE_UNDEFINED ||
+					    _tr_elem->type == ACTION_STACK_VALUE_HOLE)
+						printf("undefined");
+					else if (_tr_elem->type == ACTION_STACK_VALUE_NULL)
+						printf("null");
+					else if (_tr_elem->type == ACTION_STACK_VALUE_F64)
+					{
+						double _tr_d = varToDouble(_tr_elem);
+						if (isnan(_tr_d)) printf("NaN");
+						else if (isinf(_tr_d)) printf("%sInfinity", _tr_d < 0 ? "-" : "");
+						else if (_tr_d == 0.0) printf("0");
+						else printf("%.15g", _tr_d);
+					}
+					else if (_tr_elem->type == ACTION_STACK_VALUE_F32)
+					{
+						double _tr_d = varToDouble(_tr_elem);
+						if (isnan(_tr_d)) printf("NaN");
+						else if (isinf(_tr_d)) printf("%sInfinity", _tr_d < 0 ? "-" : "");
+						else if (_tr_d == 0.0) printf("0");
+						else printf("%.15g", _tr_d);
+					}
+					else if (_tr_elem->type == ACTION_STACK_VALUE_STRING)
+					{
+						const uint16_t* _tr_u16 = varGetU16Ptr(_tr_elem);
+						if (_tr_u16 && _tr_elem->str_size > 0)
+						{
+							char _tr_utf8[4096];
+							int _tr_utf8_len = u16_to_utf8(_tr_u16, _tr_elem->str_size, _tr_utf8, sizeof(_tr_utf8));
+							fwrite(_tr_utf8, 1, _tr_utf8_len, stdout);
+						}
+					}
+					else
+						printf("undefined");
+				}
+				printf("\n");
+				break;
+			}
 			int ts_found = 0;
 			ActionVar ts = objectCallToString(app_context, &obj_var, &ts_found);
 			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
@@ -14332,8 +14382,28 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 				if (!geom_handled) {
-					// Property not found - push undefined
-					pushUndefined(app_context);
+					// Check if __proto__ is ARRAY and key is numeric — look in proto array's elements
+					int arr_proto_handled = 0;
+					if (prop_name_len > 0 && prop_name[0] >= '0' && prop_name[0] <= '9') {
+						ActionVar* proto_var = getProperty(obj, "__proto__", 9);
+						if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_ARRAY) {
+							ASArray* proto_arr = (ASArray*) proto_var->data.numeric_value;
+							char* endptr;
+							long long idx = strtoll(prop_name, &endptr, 10);
+							if (*endptr == '\0' && idx >= 0 && idx <= 2147483647LL) {
+								arr_proto_handled = 1;
+								ActionVar* elem = getArrayElement(proto_arr, (u32)idx);
+								if (elem != NULL && elem->type != ACTION_STACK_VALUE_HOLE) {
+									pushVar(app_context, elem);
+								} else {
+									pushUndefined(app_context);
+								}
+							}
+						}
+					}
+					if (!arr_proto_handled) {
+						pushUndefined(app_context);
+					}
 				}
 			}
 		}
@@ -20021,13 +20091,31 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
 		{
 			u64 result = 0; // boolean false
-			if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_STRING)
+			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
+			                      args[0].type == ACTION_STACK_VALUE_F64 ||
+			                      args[0].type == ACTION_STACK_VALUE_F32))
 			{
 				char _addprop_buf[512];
-				const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
-				u16_to_utf8(_addprop_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
-				const char* prop_name = _addprop_buf;
-				u32 prop_name_len = (u32)strlen(prop_name);
+				const char* prop_name;
+				u32 prop_name_len;
+				if (args[0].type == ACTION_STACK_VALUE_STRING)
+				{
+					const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
+					u16_to_utf8(_addprop_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
+					prop_name = _addprop_buf;
+					prop_name_len = (u32)strlen(prop_name);
+				}
+				else
+				{
+					double d = varToDouble(&args[0]);
+					s64 as_int = (s64)d;
+					if ((double)as_int == d)
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%lld", (long long)as_int);
+					else
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%.15g", d);
+					prop_name = _addprop_buf;
+					prop_name_len = (u32)strlen(_addprop_buf);
+				}
 
 				ASFunction* getter = NULL;
 				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
