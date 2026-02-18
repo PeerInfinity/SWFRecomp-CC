@@ -1366,9 +1366,9 @@ namespace SWFRecomp
 
 				// Calculate actual register count needed
 				int next_reg = 1; // Register 0 is reserved
-				if (preload_this && !suppress_this) next_reg++;
-				if (preload_arguments && !suppress_arguments) next_reg++;
-				if (preload_super && !suppress_super) next_reg++;
+				if (preload_this) next_reg++;
+				if (preload_arguments) next_reg++;
+				if (preload_super) next_reg++;
 				if (preload_root) next_reg++;
 				if (preload_global) next_reg++;
 				if (preload_parent) next_reg++;
@@ -1386,21 +1386,24 @@ namespace SWFRecomp
 				// Preload special variables into registers
 				next_reg = 1; // Reset for actual emission
 
-				if (preload_this && !suppress_this)
+				if (preload_this)
 				{
-					context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
-					context.out_script_defs << "\tif (this_obj != NULL) {" << endl;
-					context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-					context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
-					context.out_script_defs << "\t} else {" << endl;
-					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
-					context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-					context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
-					context.out_script_defs << "\t}" << endl;
+					if (!suppress_this)
+					{
+						context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
+						context.out_script_defs << "\tif (this_obj != NULL) {" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
+						context.out_script_defs << "\t} else {" << endl;
+						context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+						context.out_script_defs << "\t}" << endl;
+					}
 					next_reg++;
 				}
 
-				if (preload_arguments && !suppress_arguments)
+				if (preload_arguments)
 				{
 					context.out_script_defs << "\t// Preload 'arguments' into register " << next_reg << endl;
 					context.out_script_defs << "\t// Create arguments array object" << endl;
@@ -1410,15 +1413,19 @@ namespace SWFRecomp
 					context.out_script_defs << "\t}" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_ARRAY;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)arguments_array;" << endl;
+					context.out_script_defs << "\tswf_setup_arguments_props(app_context, arguments_array);" << endl;
 					next_reg++;
 				}
 
-				if (preload_super && !suppress_super)
+				if (preload_super)
 				{
-					context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
-					context.out_script_defs << "\tASObject* super_obj_" << next_reg << " = allocObject(app_context, 0);" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)super_obj_" << next_reg << ";" << endl;
+					if (!suppress_super)
+					{
+						context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
+						context.out_script_defs << "\tASObject* super_obj_" << next_reg << " = allocObject(app_context, 0);" << endl;
+						context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+						context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)super_obj_" << next_reg << ";" << endl;
+					}
 					next_reg++;
 				}
 

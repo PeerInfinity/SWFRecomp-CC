@@ -264,3 +264,11 @@ ActionVar actionGetPendingReturn(SWFAppContext* app_context);
 int evaluateCondition(SWFAppContext* app_context);
 bool actionWaitForFrame(SWFAppContext* app_context, u16 frame);
 bool actionWaitForFrame2(SWFAppContext* app_context);
+
+// Forward declaration (defined in object.h)
+typedef struct ASArray ASArray;
+
+// Public helper called from recompiler-generated code when DefineFunction2 has
+// the preload_arguments flag. Sets up callee/caller/__proto__ on the preloaded
+// arguments array, using the global g_current_executing_func / g_prev_executing_func.
+void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr);
