@@ -56,6 +56,10 @@ void tagSoundStreamBlock(SWFAppContext* app_context,
 void tagStopAllSounds(SWFAppContext* app_context);
 void tagScriptLimits(u16 max_recursion, u16 timeout);
 void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id);
+
+// Forward declaration (defined in actionmodern/action.h)
+typedef struct MovieClip MovieClip;
 
 // NO_GRAPHICS helpers for sprite timeline control from action.c
 #ifdef NO_GRAPHICS
@@ -116,4 +120,12 @@ void actionRenameMovieClip(const char* old_name, const char* new_name);
 // Enumerate child instance names for a MovieClip (for for-in enumeration)
 // callback receives (name, name_len, user_data) for each child
 void ng_enumerateChildren(const char* parent_name, void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data);
+// Check if a tag-placed display entry at the given root depth is scriptable (sprite/button/textfield)
+int ng_isScriptableAtDepth(size_t depth);
+// Clone a tag-placed sprite to target_name at AS depth. Returns clone MC, or NULL if non-scriptable/not found.
+MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name, const char* target_name, int depth);
+// Clone a script-created MovieClip (not in ng_display) to target_name at AS depth.
+MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc, const char* target_name, int depth);
+// duplicateMovieClip clone: stores at SWF depth (as_depth+16384), no variable registration, no onLoad.
+MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name, const char* target_name, int as_depth);
 #endif
