@@ -17802,6 +17802,40 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					scope_chain[scope_depth++] = local_scope;
 				}
 
+				// Populate scope with this/super/arguments when neither preload nor suppress is set
+				{
+					u16 f2flags = func->flags;
+					int f2_preload_this  = (f2flags & 0x0001);
+					int f2_suppress_this = (f2flags & 0x0002);
+					int f2_preload_args  = (f2flags & 0x0004);
+					int f2_suppress_args = (f2flags & 0x0008);
+					int f2_preload_super = (f2flags & 0x0010);
+					int f2_suppress_super= (f2flags & 0x0020);
+					if (!f2_preload_this && !f2_suppress_this) {
+						extern MovieClip root_movieclip;
+						ActionVar this_var = {0};
+						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						this_var.data.numeric_value = (u64)&root_movieclip;
+						setProperty(app_context, local_scope, "this", 4, &this_var);
+					}
+					if (!f2_preload_args && !f2_suppress_args) {
+						ASArray* arguments_arr = allocArray(app_context, num_args);
+						for (u32 i = 0; i < num_args; i++)
+							setArrayElement(app_context, arguments_arr, i, &args[i]);
+						ActionVar args_var = {0};
+						args_var.type = ACTION_STACK_VALUE_ARRAY;
+						args_var.data.numeric_value = (u64)arguments_arr;
+						setProperty(app_context, local_scope, "arguments", 9, &args_var);
+					}
+					if (!f2_preload_super && !f2_suppress_super) {
+						ASObject* super_obj = allocObject(app_context, 0);
+						ActionVar super_var = {0};
+						super_var.type = ACTION_STACK_VALUE_OBJECT;
+						super_var.data.numeric_value = (u64)super_obj;
+						setProperty(app_context, local_scope, "super", 5, &super_var);
+					}
+				}
+
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 
 				// Pop local scope from scope chain
@@ -19879,7 +19913,55 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			else if (func != NULL && func->function_type == 2)
 			{
-				// Invoke DefineFunction2 with 'this' binding
+				// Invoke DefineFunction2 with 'this' binding.
+				// Push a local scope so GetVariable("this"/"super"/"arguments") can
+				// resolve them when neither preload nor suppress is set (flags == 0 bits).
+				ASObject* local_scope = allocObject(app_context, 8);
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
+					scope_chain[scope_depth++] = local_scope;
+				}
+
+				u16 f2flags = func->flags;
+				int f2_preload_this  = (f2flags & 0x0001);
+				int f2_suppress_this = (f2flags & 0x0002);
+				int f2_preload_args  = (f2flags & 0x0004);
+				int f2_suppress_args = (f2flags & 0x0008);
+				int f2_preload_super = (f2flags & 0x0010);
+				int f2_suppress_super= (f2flags & 0x0020);
+
+				// When neither preload nor suppress is set, the variable is accessible
+				// by name inside the function body (scope-chain lookup).
+				if (!f2_preload_this && !f2_suppress_this) {
+					ActionVar this_var = {0};
+					if (obj != NULL) {
+						this_var.type = ACTION_STACK_VALUE_OBJECT;
+						this_var.data.numeric_value = (u64)obj;
+					} else {
+						extern MovieClip root_movieclip;
+						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						this_var.data.numeric_value = (u64)&root_movieclip;
+					}
+					setProperty(app_context, local_scope, "this", 4, &this_var);
+				}
+				if (!f2_preload_args && !f2_suppress_args) {
+					ASArray* arguments_arr = allocArray(app_context, num_args);
+					for (u32 i = 0; i < num_args; i++)
+						setArrayElement(app_context, arguments_arr, i, &args[i]);
+					ActionVar args_var = {0};
+					args_var.type = ACTION_STACK_VALUE_ARRAY;
+					args_var.data.numeric_value = (u64)arguments_arr;
+					setProperty(app_context, local_scope, "arguments", 9, &args_var);
+				}
+				if (!f2_preload_super && !f2_suppress_super) {
+					ASObject* super_obj = allocObject(app_context, 0);
+					ActionVar super_var = {0};
+					super_var.type = ACTION_STACK_VALUE_OBJECT;
+					super_var.data.numeric_value = (u64)super_obj;
+					setProperty(app_context, local_scope, "super", 5, &super_var);
+				}
+
 				ActionVar* registers = NULL;
 				if (func->register_count > 0) {
 					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
@@ -19889,6 +19971,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
 				g_call_depth--;
 
+				if (scope_depth > 0) scope_depth--;
+				releaseObject(app_context, local_scope);
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
 

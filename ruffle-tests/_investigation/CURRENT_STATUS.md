@@ -1,19 +1,23 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-16, commit b815da5 (latest CI: 480bce0)
+Last updated: 2026-02-18 (local verification; full CI run pending)
+
+Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
 
 ## Quick Summary
 
-- **Pass rate**: 213/619 (34.4%), filtered 211/481 (43.9%) — up from 205/619 (33.1%) at last update
-- **Main failure type**: output_mismatch (402), timeout (2), compile_fail (1), segfault (1)
-- **Crash improvements**: Previous 7 segfaults reduced to 1 (goto_methods). try_catch_finally now runs (was segfault, now output_mismatch with only 11 diff lines after exception handler stack implementation)
-- **New regression**: `movieclip_hittest_shapeflag` changed from output_mismatch (180/338) to compile_fail — needs investigation
-- **Recent gains**: Date class implementation (+8 tests passing), try/catch/finally exception handler stack, 1592 fewer mismatched lines overall
+- **Pass rate (estimated local)**: ~222+/619 — ~9 tests gained from commits 229cb53 + 1851972 since last update, plus 1 more from today's DefineFunction2 fix
+- **Main failure type**: output_mismatch, timeout (2), compile_fail (1), segfault (1)
+- **New regression (from b815da5)**: `movieclip_hittest_shapeflag` changed from output_mismatch (180/338) to compile_fail — still needs investigation
+- **Recent gains**: All previous Tier 1 near-passing tests now pass; most Tier 2 near-passing tests now pass; DefineFunction2 preload/suppress register fix
 
 ## Major Features Implemented Since Last Update
 
 | Feature | Commits | Impact | Key Tests |
 |---------|---------|--------|-----------|
+| **DefineFunction2 preload/suppress fix** | today | `function_suppress_and_preload` now passes; correct register numbering when both preload + suppress bits are set; scope vars (this/super/arguments) set via local_scope in method calls | function_suppress_and_preload |
+| **TextField enumeration + condenseWhite fix** | 229cb53 | textfield_props_swf6/7/8 now pass, xml_to_string, xml_child_nodes_edge_cases, swf4_function_calls pass | textfield_props_swf6/7/8 (+3), xml_to_string (+1), xml_child_nodes_edge_cases (+1) |
+| **SWF5 undefined variable + stub ctors** | 1851972 | try_catch_finally, get_variable_in_scope, swf7_case_sensitive, divide_swf4 now pass | +4 tests |
 | **Date class** | 480bce0 | 8 new passing tests, +1432 matching lines in `date` test (5049/6335 on CI) | date (80% match — remaining diffs are timezone-dependent) |
 | **Try/catch/finally** | b815da5 | Exception handler stack with typed catch blocks, finally support | try_catch_finally (107/118, 91% match — was segfault) |
 | **XML/XMLNode** (Phases 1-7) | c8c38b1, 73a7b45, 733a70e, 0778863 | 24 XML tests passing | xml_namespaces (203 lines), xml_inspect_parsexml (62 lines) |
@@ -33,40 +37,33 @@ The `date` test (6335 lines) matches 5049 lines on CI (79.7%). Remaining 1286 di
 
 ## Top Near-Passing Tests (best ROI to fix)
 
-### Tier 1: 1-2 lines off
+Tests marked ✅ have started passing since last CI run and are expected to pass in the next CI run.
 
-| Test | Match | Issue |
-|------|-------|-------|
-| `textfield_props_swf6` | 208/210 (99%) | 2 lines off — likely method or property enumeration edge case |
-| `textfield_props_swf7` | 208/210 (99%) | Same as swf6 |
-| `textfield_props_swf8` | 208/210 (99%) | Same |
-| `xml_child_nodes_edge_cases` | 3/4 (75%) | 1 line off — likely toString or childNodes mutation |
-| `swf4_function_calls` | 6/7 (86%) | 1 line off — SWF4 calling convention edge case |
+### Tier 1: Now Passing ✅
+
+These tests were near-passing in the previous update and now pass locally:
+- `textfield_props_swf6`, `textfield_props_swf7`, `textfield_props_swf8` — fixed by 229cb53
+- `xml_to_string`, `xml_child_nodes_edge_cases`, `swf4_function_calls` — fixed by 229cb53
+- `try_catch_finally`, `get_variable_in_scope`, `swf7_case_sensitive`, `divide_swf4` — fixed by 1851972
+- `function_suppress_and_preload` — fixed today (DefineFunction2 preload/suppress)
 
 ### Tier 2: 3-15 lines off
 
 | Test | Match | Issue |
 |------|-------|-------|
-| `try_catch_finally` | 107/118 (91%) | **NEW** — typed catch block matching (catches "other" instead of typed) |
-| `edittext_width_height` | 97/103 (94%) | Width/height calculation edge cases |
-| `get_variable_in_scope` | 27/29 (93%) | 2 lines — global/root path resolution |
-| `swf7_case_sensitive` | 40/44 (91%) | Case-sensitive property lookup edge cases |
-| `divide_swf4` | 95/107 (89%) | SWF4 division edge cases |
-| `edittext_html_align_swf8` | 45/52 (87%) | HTML align attribute handling |
-| `function_suppress_and_preload` | 24/28 (86%) | DefineFunction2 register preload flags |
-| `xml_to_string` | 11/13 (85%) | XML serialization edge case |
-| `object_prototypes` | 62/74 (84%) | Prototype chain traversal edge case |
+| `edittext_width_height` | 97/103 (94%) | Width/height don't account for _xscale/_yscale/_rotation transforms |
+| `object_prototypes` | 62/74 (84%) | watch() not implemented; `__PROTO__`/`__Proto__` case-insensitive lookup missing |
 | `arguments` | 106/127 (83%) | arguments.callee, arguments.caller, Array prototype |
 
 ### Tier 3: 80-82% match
 
 | Test | Match | Issue |
 |------|-------|-------|
-| `local_to_global` | 40/49 (82%) | MovieClip.localToGlobal/globalToLocal |
-| `edittext_html_align_swf7` | 42/52 (81%) | HTML align |
-| `stage_object_children` | 67/83 (81%) | Child clip enumeration |
+| `local_to_global` | 40/49 (82%) | MovieClip.localToGlobal/globalToLocal coordinate transforms |
+| `edittext_html_align_swf7` | 42/52 (81%) | HTML align attribute handling |
+| `stage_object_children` | 67/83 (81%) | Child clip enumeration order |
 | `date` | 5049/6335 (80%) | Timezone mismatch (CI=UTC, expected=Nepal +5:45) |
-| `target_clip_removed` | 4/5 (80%) | tellTarget with removed clip |
+| `target_clip_removed` | 4/5 (80%) | GotoFrame inline execution not triggering root frame 2 |
 
 ## Crashes and Timeouts (4 tests)
 
@@ -118,20 +115,19 @@ The `date` test (6335 lines) matches 5049 lines on CI (79.7%). Remaining 1286 di
 
 ### High ROI (fix existing near-passing tests)
 1. **Fix `date` test timezone** — set TZ=Asia/Kathmandu in CI, could flip 80% → ~99% (1 test)
-2. **Fix `try_catch_finally` typed catch** — 11 lines off, add instanceof-style type matching for catch blocks
-3. **Fix textfield_props_swf6/7/8** — 2 lines off each, 3 tests at 99%
-4. **Fix xml_to_string** — 2 lines off, 85% passing
-5. **Fix xml_child_nodes_edge_cases** — 1 line off
-6. **Investigate movieclip_hittest_shapeflag compile_fail** — regression from previous run
+2. **Fix `edittext_width_height`** — 6 lines off (94%); width/height need to account for _xscale/_yscale/_rotation transforms
+3. **Fix `arguments` object** — 21 lines off (83%); add callee/caller properties and set __proto__ = Array.prototype
+4. **Implement watch()/unwatch()** — unblocks `object_prototypes` (12 lines off); also fix case-insensitive `__proto__` lookup
+5. **Investigate movieclip_hittest_shapeflag compile_fail** — regression from b815da5
 
 ### Medium ROI (new feature phases)
-7. **GLOBALS_PLAN Phase 6** — Number.prototype.toString(radix), improves primitive_type_globals (320/557)
-8. **TEXTFIELD_PLAN Phase 3** — variable binding + width/height (edittext_width_height at 94%)
-9. **TEXTFIELD_PLAN Phase 5** — HTML text (edittext_html_* tests, several at 81-87%)
-10. **Fix `arguments` object** — unblocks parse_int (0/64) and improves arguments test (83%)
+6. **GLOBALS_PLAN Phase 6** — Number.prototype.toString(radix), improves primitive_type_globals (320/557)
+7. **TEXTFIELD_PLAN Phase 3** — variable binding + width/height (edittext_width_height at 94%)
+8. **TEXTFIELD_PLAN Phase 5** — HTML text (edittext_html_* tests, several at 81-87%)
+9. **Fix GotoFrame inline execution** — needed for target_clip_removed (4/5, 80%)
 
 ### Lower ROI (new features)
-11. **COLOR_OBJECT_PLAN** — 4 tests, requires Color constructor + flash.geom.Transform
-12. **MOVIECLIP_PLAN Phases 2-3** — depth methods, createEmptyMovieClip
-13. **OOP_SUPER_EXTENDS_PLAN** — super keyword, 8 tests
-14. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, property flags, 12 tests
+10. **COLOR_OBJECT_PLAN** — 4 tests, requires Color constructor + flash.geom.Transform
+11. **MOVIECLIP_PLAN Phases 2-3** — depth methods, createEmptyMovieClip
+12. **OOP_SUPER_EXTENDS_PLAN** — super keyword, 8 tests
+13. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, property flags, 12 tests
