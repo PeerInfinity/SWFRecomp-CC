@@ -140,13 +140,18 @@ def diff_results(old, new, partial=False):
             elif d < 0:
                 decreased_mismatches += -d
 
+    old_sha = old_meta.get("git_sha")
+    new_sha = new_meta.get("git_sha")
+    same_commit = bool(old_sha and new_sha and old_sha == new_sha)
+
     report = {
         "metadata": {
             "old_timestamp": old_meta.get("timestamp"),
-            "old_git_sha": old_meta.get("git_sha"),
+            "old_git_sha": old_sha,
             "new_timestamp": new_meta.get("timestamp"),
-            "new_git_sha": new_meta.get("git_sha"),
+            "new_git_sha": new_sha,
             "partial": partial,
+            "same_commit": same_commit,
         },
         "summary": {
             "old_pass": old.get("pass", 0),
@@ -226,6 +231,8 @@ def generate_markdown(diff):
 
     lines.append(f"**Previous:** `{old_sha[:12]}` ({old_ts})")
     lines.append(f"**Current:** `{new_sha[:12]}` ({new_ts})")
+    if meta.get("same_commit"):
+        lines.append(f"*Re-run on same commit — no comparison available.*")
     if meta.get("partial"):
         lines.append(f"*Partial run: {s['new_total']} of {s['old_total']} tests completed*")
     lines.append("")
@@ -250,6 +257,9 @@ def generate_markdown(diff):
     if s["increased_mismatches"] > 0:
         lines.append(f"| \u2003\u2003Increased | | | +{s['increased_mismatches']} |")
     lines.append("")
+
+    if meta.get("same_commit"):
+        return "\n".join(lines)
 
     if s["newly_passing"] == 0 and s["newly_failing"] == 0 and s["status_changed"] == 0 and s["added"] == 0 and s["removed"] == 0:
         # Check if only line count changes
