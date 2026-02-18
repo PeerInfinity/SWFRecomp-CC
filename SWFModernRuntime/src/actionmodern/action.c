@@ -11528,6 +11528,15 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 				return 1;
 			}
 
+			// Check AS2 interface implementation (ImplementsOp stores interface prototypes here).
+			// When MyObject implements MyInterface, MyObject.prototype->interfaces[] holds
+			// MyInterface.prototype. If ctor_proto == MyInterface.prototype → match.
+			for (u32 _iif = 0; _iif < current_proto->interface_count; _iif++)
+			{
+				if (current_proto->interfaces[_iif] == ctor_proto)
+					return 1;
+			}
+
 			// Continue up the chain
 			current_proto_var = getProperty(current_proto, "__proto__", 9);
 		}
@@ -11535,17 +11544,6 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 		{
 			// Non-object in prototype chain, stop
 			break;
-		}
-	}
-
-	// Check interface implementation (ActionScript 2.0 implements keyword)
-	// Only applicable when both are actual ASObject types (not ASFunction)
-	if (obj_var->type != ACTION_STACK_VALUE_FUNCTION &&
-	    ctor_var->type != ACTION_STACK_VALUE_FUNCTION)
-	{
-		if (implementsInterface(obj, (ASObject*) ctor_var->data.numeric_value))
-		{
-			return 1;
 		}
 	}
 
@@ -12599,14 +12597,36 @@ void actionImplementsOp(SWFAppContext* app_context)
 	ActionVar constructor_var;
 	popVar(app_context, &constructor_var);
 
-	// Validate that it's an object
-	if (constructor_var.type != ACTION_STACK_VALUE_OBJECT)
+	// Get the constructor's prototype where the interface list will be stored.
+	// The constructor is typically a FUNCTION (ASFunction); we store interfaces on its
+	// prototype_obj so that instanceof can find them when walking the __proto__ chain.
+	ASObject* constructor_proto = NULL;
+	if (constructor_var.type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		fprintf(stderr, "ERROR: actionImplementsOp - constructor is not an object\n");
+		ASFunction* ctor_func = (ASFunction*) constructor_var.data.numeric_value;
+		if (ctor_func != NULL)
+		{
+			if (ctor_func->prototype_obj == NULL)
+			{
+				ctor_func->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor_func->prototype_obj);
+				setObjectProto(app_context, ctor_func->prototype_obj);
+			}
+			constructor_proto = ctor_func->prototype_obj;
+		}
+	}
+	else if (constructor_var.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* ctor_obj = (ASObject*) constructor_var.data.numeric_value;
+		ActionVar* proto_var = getProperty(ctor_obj, "prototype", 9);
+		if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+			constructor_proto = (ASObject*) proto_var->data.numeric_value;
+	}
+	else
+	{
+		fprintf(stderr, "ERROR: actionImplementsOp - constructor is not a function or object\n");
 		return;
 	}
-
-	ASObject* constructor = (ASObject*) constructor_var.data.numeric_value;
 
 	// Step 2: Pop count of interfaces from stack
 	ActionVar count_var;
@@ -12639,37 +12659,58 @@ void actionImplementsOp(SWFAppContext* app_context)
 			return;
 		}
 
-		// Pop each interface constructor from stack
-		// Note: Interfaces are pushed in order, so we pop them in reverse
+		// Pop each interface constructor from stack and extract its prototype.
+		// Interfaces are pushed in order, so we pop them in reverse.
+		// We store prototype objects (not constructors) so instanceof can match by proto.
 		for (u32 i = 0; i < interface_count; i++)
 		{
 			ActionVar iface_var;
 			popVar(app_context, &iface_var);
 
-			if (iface_var.type != ACTION_STACK_VALUE_OBJECT)
+			ASObject* iface_proto = NULL;
+			if (iface_var.type == ACTION_STACK_VALUE_FUNCTION)
 			{
-				fprintf(stderr, "ERROR: actionImplementsOp - interface %u is not an object\n", i);
-				// Clean up allocated interfaces
-				for (u32 j = 0; j < i; j++)
+				ASFunction* iface_func = (ASFunction*) iface_var.data.numeric_value;
+				if (iface_func != NULL)
 				{
-					releaseObject(app_context, interfaces[j]);
+					if (iface_func->prototype_obj == NULL)
+					{
+						iface_func->prototype_obj = allocObject(app_context, 4);
+						retainObject(iface_func->prototype_obj);
+						setObjectProto(app_context, iface_func->prototype_obj);
+					}
+					iface_proto = iface_func->prototype_obj;
 				}
+			}
+			else if (iface_var.type == ACTION_STACK_VALUE_OBJECT)
+			{
+				ASObject* iface_obj = (ASObject*) iface_var.data.numeric_value;
+				ActionVar* proto_var = getProperty(iface_obj, "prototype", 9);
+				if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+					iface_proto = (ASObject*) proto_var->data.numeric_value;
+			}
+
+			if (iface_proto == NULL)
+			{
+				fprintf(stderr, "ERROR: actionImplementsOp - interface %u has no prototype\n", i);
+				for (u32 j = 0; j < i; j++)
+					releaseObject(app_context, interfaces[j]);
 				free(interfaces);
 				return;
 			}
 
 			// Store in reverse order (last popped goes first)
-			interfaces[interface_count - 1 - i] = (ASObject*) iface_var.data.numeric_value;
+			interfaces[interface_count - 1 - i] = iface_proto;
 		}
 	}
 
-	// Step 4: Set the interface list on the constructor
-	// This transfers ownership of the interfaces array
-	setInterfaceList(app_context, constructor, interfaces, interface_count);
+	// Step 4: Store interface prototype list on the constructor's prototype.
+	// When instanceof walks obj.__proto__ chain, it finds this prototype and checks interfaces[].
+	setInterfaceList(app_context, constructor_proto, interfaces, interface_count);
 
 #ifdef DEBUG
-	printf("[DEBUG] actionImplementsOp: constructor=%p, interface_count=%u\n",
-		(void*)constructor, interface_count);
+	printf("[DEBUG] actionImplementsOp: constructor_proto=%p, interface_count=%u\n",
+		(void*)constructor_proto, interface_count);
 #endif
 
 	// Note: No values pushed back on stack (ImplementsOp has no return value)
