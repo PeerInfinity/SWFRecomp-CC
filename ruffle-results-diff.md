@@ -1,38 +1,34 @@
 # Ruffle Test Results Diff
 
-**Previous:** `64db84cffa42` (2026-02-18T23:38:13.406288+00:00)
-**Current:** `724bae7f65e8` (2026-02-19T03:02:39.305825+00:00)
+**Previous:** `724bae7f65e8` (2026-02-19T03:02:39.305825+00:00)
+**Current:** `1ce1d3956efe` (2026-02-19T22:50:09.298438+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 236 | 237 | +1 |
+| Passing | 237 | 242 | +5 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 38.1% | 38.3% | +0.2% |
-| Mismatched lines | 40065 | 39984 | -81 |
-|   Decreased | | | -85 |
-|   Increased | | | +4 |
+| Pass rate | 38.3% | 39.1% | +0.8% |
+| Mismatched lines | 39984 | 39381 | -603 |
+|   Decreased | | | -603 |
 
-## Newly Passing (3)
+## Newly Passing (5)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `color` | output_mismatch | 35/57 | 57/57 |
-| `color_transform` | output_mismatch | 7/48 | 48/48 |
-| `transform` | output_mismatch | 50/70 | 70/70 |
+| `object_prototypes` | output_mismatch | 63/74 | 74/74 |
+| `parse_int` | output_mismatch | 1/64 | 64/64 |
+| `primitive_type_globals` | output_mismatch | 321/557 | 557/557 |
+| `watch` | output_mismatch | 18/117 | 117/117 |
+| `watch_virtual_property_proto` | output_mismatch | 0/2 | 2/2 |
 
-## Newly Failing (2)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `movieclip_default_state` | output_mismatch | 69/69 | 68/69 |
-| `textfield_variable` | output_mismatch | 81/81 | 78/81 |
-
-## Line Count Changed (3)
+## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `extends_native_type` | output_mismatch | 8/11 | 10/11 | -2 |
+| `swf7_global_funcs` | output_mismatch | 1/232 | 76/232 | -75 |
+| `swf6_global_funcs` | output_mismatch | 1/232 | 60/232 | -59 |
+| `swf5_global_funcs` | output_mismatch | 1/232 | 57/232 | -56 |
+| `closure_scope` | output_mismatch | 0/7 | 2/7 | -2 |
 | `goto_methods` | segfault | 8/40 | 8/40 | 0 |
-| `native_objects_swf8` | output_mismatch | 0/84 | 0/84 | 0 |
