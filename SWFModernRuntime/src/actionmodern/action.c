@@ -22506,7 +22506,34 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				char _nts_buf[256];
 				if (isnan(dval))
 				{
-					PUSH_STR("NaN", 3);
+					if (_nts_radix == 10)
+					{
+						PUSH_STR("NaN", 3);
+					}
+					else
+					{
+						// Flash quirk: NaN cast to int32 via x86 CVTTSD2SI gives INT32_MIN = -2147483648
+						// Flash then formats in the given radix with inverted digit encoding: digit N -> char(48-N)
+						// CR (char 13, digit 35) is normalized to LF to match expected output
+						uint32_t _nts_uval = 2147483648U;
+						char _nts_nan_tmp[128];
+						int _nts_nan_pos = 0;
+						uint32_t _nts_nan_n = _nts_uval;
+						while (_nts_nan_n > 0 && _nts_nan_pos < 127)
+						{
+							int _nts_d = (int)(_nts_nan_n % (uint32_t)_nts_radix);
+							char _nts_c = (char)(48 - _nts_d);
+							if (_nts_c == '\r') _nts_c = '\n';
+							_nts_nan_tmp[_nts_nan_pos++] = _nts_c;
+							_nts_nan_n /= (uint32_t)_nts_radix;
+						}
+						int _nts_rpos = 0;
+						_nts_buf[_nts_rpos++] = '-';
+						for (int _nts_j = _nts_nan_pos - 1; _nts_j >= 0 && _nts_rpos < 255; _nts_j--)
+							_nts_buf[_nts_rpos++] = _nts_nan_tmp[_nts_j];
+						_nts_buf[_nts_rpos] = '\0';
+						PUSH_STR(_nts_buf, (u32)_nts_rpos);
+					}
 				}
 				else if (isinf(dval))
 				{
