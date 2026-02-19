@@ -13982,37 +13982,6 @@ void actionSetMember(SWFAppContext* app_context)
 					if (rect_handled) return;
 				}
 			}
-			// Check prototype chain for addProperty setter before creating own property
-			{
-				ASProperty* setter_prop = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
-				if (setter_prop != NULL && (setter_prop->getter != NULL || setter_prop->setter != NULL))
-				{
-					// Virtual property (addProperty): has getter and/or setter
-					if (setter_prop->setter != NULL)
-					{
-						// Invoke setter with this = original obj
-						invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
-					}
-					// If no setter (read-only virtual property) — silently ignore the assignment
-					return;
-				}
-			}
-			// Check WRITABLE flag — if property exists on prototype chain but is read-only, skip
-			{
-				ASProperty* wp = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
-				if (wp != NULL && !(wp->flags & PROPERTY_FLAG_WRITABLE))
-				{
-					return;  // Read-only property — silently ignore
-				}
-			}
-			// XML nodeName: setting to non-string is a no-op (Flash behavior)
-			if (prop_name_len == 8 && memcmp(prop_name, "nodeName", 8) == 0 &&
-			    value_var.type != ACTION_STACK_VALUE_STRING)
-			{
-				ActionVar* nt = getProperty(obj, "nodeType", 8);
-				if (nt != NULL)
-					return;
-			}
 			// Check watcher table before setting the property
 			// IMPORTANT: prop_name points to a static buffer (_sm_buf) that recursive
 			// actionSetMember calls (from inside the watcher callback) will clobber.
@@ -14087,6 +14056,37 @@ void actionSetMember(SWFAppContext* app_context)
 						break;
 					}
 				}
+			}
+			// Check prototype chain for addProperty setter before creating own property
+			{
+				ASProperty* setter_prop = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
+				if (setter_prop != NULL && (setter_prop->getter != NULL || setter_prop->setter != NULL))
+				{
+					// Virtual property (addProperty): has getter and/or setter
+					if (setter_prop->setter != NULL)
+					{
+						// Invoke setter with this = original obj
+						invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
+					}
+					// If no setter (read-only virtual property) — silently ignore the assignment
+					return;
+				}
+			}
+			// Check WRITABLE flag — if property exists on prototype chain but is read-only, skip
+			{
+				ASProperty* wp = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
+				if (wp != NULL && !(wp->flags & PROPERTY_FLAG_WRITABLE))
+				{
+					return;  // Read-only property — silently ignore
+				}
+			}
+			// XML nodeName: setting to non-string is a no-op (Flash behavior)
+			if (prop_name_len == 8 && memcmp(prop_name, "nodeName", 8) == 0 &&
+			    value_var.type != ACTION_STACK_VALUE_STRING)
+			{
+				ActionVar* nt = getProperty(obj, "nodeType", 8);
+				if (nt != NULL)
+					return;
 			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
