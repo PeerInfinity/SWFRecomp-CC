@@ -44,6 +44,8 @@ static struct {
 	size_t parent_display_idx; // index of parent sprite in ng_display, or (size_t)-1 for root
 	ClipAction* clip_actions;   // pointer to clip_actions array (from tagMain.c), or NULL
 	size_t clip_action_count;   // number of clip actions
+	double cx_ra, cx_ga, cx_ba, cx_aa;  // color multipliers: percentage (100.0 = 100%)
+	double cx_rb, cx_gb, cx_bb, cx_ab;  // color addends: signed pixel values
 } ng_display[MAX_DISPLAY_NG];
 static size_t ng_display_count = 0;
 static int ng_nesting_depth = 0;  // >0 when inside sprite frame execution
@@ -157,6 +159,9 @@ void ng_display_clear_after(size_t target_frame)
 // Access the generated transform_data from draws.c (linked per-test)
 // Actual type is float[][16] but we access via pointer arithmetic
 extern float transform_data[][16];
+// Access the generated cxform_data from draws.c (linked per-test)
+// 20 floats per entry: [0]=R mult, [5]=G mult, [10]=B mult, [15]=A mult, [16..19]=R/G/B/A add
+extern float cxform_data[];
 
 // Stub implementations for console-only mode
 // Note: tagInit() is provided by the generated tagMain.c file
@@ -414,9 +419,25 @@ void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char*
 	}
 }
 
+// Initialize cxform fields for a display entry from cxform_data[cxform_id * 20 + ...]
+// Multipliers: stored as ratio (1.0 = 100%), addends: stored as ratio (1.0 = 255).
+// Quantizes through int16 to match Flash's fixed-point representation.
+static void ng_init_cxform_entry(size_t idx, u32 cxform_id)
+{
+	float* cx = &cxform_data[cxform_id * 20];
+	ng_display[idx].cx_ra = (double)(int16_t)roundf(cx[0]  * 256.0f) * 100.0 / 256.0;
+	ng_display[idx].cx_ga = (double)(int16_t)roundf(cx[5]  * 256.0f) * 100.0 / 256.0;
+	ng_display[idx].cx_ba = (double)(int16_t)roundf(cx[10] * 256.0f) * 100.0 / 256.0;
+	ng_display[idx].cx_aa = (double)(int16_t)roundf(cx[15] * 256.0f) * 100.0 / 256.0;
+	ng_display[idx].cx_rb = (double)(int16_t)roundf(cx[16] * 255.0f);
+	ng_display[idx].cx_gb = (double)(int16_t)roundf(cx[17] * 255.0f);
+	ng_display[idx].cx_bb = (double)(int16_t)roundf(cx[18] * 255.0f);
+	ng_display[idx].cx_ab = (double)(int16_t)roundf(cx[19] * 255.0f);
+}
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
-	(void)cxform_id; (void)clip_depth;
+	(void)clip_depth;
 	extern size_t current_frame;
 
 	// Note: we do NOT skip placements inside sprite frame functions.
@@ -523,6 +544,16 @@ placed:
 					snprintf(ng_display[_ai].instance_name, sizeof(ng_display[_ai].instance_name),
 					         "instance%u", ng_auto_instance_counter++);
 				}
+				break;
+			}
+		}
+	}
+	// Initialize cxform values from cxform_data for any newly placed character
+	{
+		size_t _cx_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
+		for (size_t _ci = 0; _ci < ng_display_count; _ci++) {
+			if (ng_display[_ci].depth == depth && ng_display[_ci].parent_display_idx == _cx_parent) {
+				ng_init_cxform_entry(_ci, cxform_id);
 				break;
 			}
 		}
@@ -1149,6 +1180,46 @@ int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_ysc
 	return 0;
 }
 
+// Get color transform values for a display entry by instance name.
+// Values are in AVM1 format: multipliers as percentage (100.0 = 100%), addends as signed pixel values.
+// Returns 1 if found, 0 if not found.
+int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, double* aa,
+                          double* rb, double* gb, double* bb, double* ab)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (strcmp(ng_display[i].instance_name, name) == 0)
+		{
+			*ra = ng_display[i].cx_ra; *ga = ng_display[i].cx_ga;
+			*ba = ng_display[i].cx_ba; *aa = ng_display[i].cx_aa;
+			*rb = ng_display[i].cx_rb; *gb = ng_display[i].cx_gb;
+			*bb = ng_display[i].cx_bb; *ab = ng_display[i].cx_ab;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Set color transform values for a display entry by instance name.
+// Values are in AVM1 format: multipliers as percentage (100.0 = 100%), addends as signed pixel values.
+// Returns 1 if found and updated, 0 if not found.
+int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
+                          double rb, double gb, double bb, double ab)
+{
+	for (size_t i = 0; i < ng_display_count; i++)
+	{
+		if (strcmp(ng_display[i].instance_name, name) == 0)
+		{
+			ng_display[i].cx_ra = ra; ng_display[i].cx_ga = ga;
+			ng_display[i].cx_ba = ba; ng_display[i].cx_aa = aa;
+			ng_display[i].cx_rb = rb; ng_display[i].cx_gb = gb;
+			ng_display[i].cx_bb = bb; ng_display[i].cx_ab = ab;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 // Look up character bounds by char_id. Returns 1 if found, 0 if not.
 int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax)
 {
@@ -1382,6 +1453,75 @@ size_t ng_findDisplayEntryIdx(const char* name)
 			return i;
 	}
 	return (size_t)-1;
+}
+
+// Find display entry INDEX by name AND parent display index.
+// parent_idx = (size_t)-1 for root-level entries.
+// Returns (size_t)-1 if not found.
+size_t ng_findDisplayEntryIdxWithParent(const char* name, size_t parent_idx)
+{
+	if (!name || name[0] == '\0') return (size_t)-1;
+	for (size_t i = 0; i < ng_display_count; i++) {
+		if (ng_display[i].parent_display_idx == parent_idx &&
+		    ng_display[i].instance_name[0] != '\0' &&
+		    strcmp(ng_display[i].instance_name, name) == 0)
+			return i;
+	}
+	return (size_t)-1;
+}
+
+// Get matrix components from a display entry (by index).
+// Column-major SWF matrix: [0]=a, [1]=b, [4]=c, [5]=d, [12]=tx_twips, [13]=ty_twips.
+// Returns 1 if found, 0 if not (idx out of range).
+int ng_getMatrixFromEntry(size_t entry_idx,
+    double* out_a, double* out_b, double* out_c, double* out_d,
+    double* out_tx, double* out_ty)
+{
+	if (entry_idx >= ng_display_count) return 0;
+	u32 tid = ng_display[entry_idx].transform_id;
+	if (out_a)  *out_a  = (double)transform_data[tid][0];
+	if (out_b)  *out_b  = (double)transform_data[tid][1];
+	if (out_c)  *out_c  = (double)transform_data[tid][4];
+	if (out_d)  *out_d  = (double)transform_data[tid][5];
+	if (out_tx) *out_tx = (double)transform_data[tid][12] / 20.0;
+	if (out_ty) *out_ty = (double)transform_data[tid][13] / 20.0;
+	return 1;
+}
+
+// Get color transform components from a display entry (by index).
+// Returns 1 if found, 0 if not.
+int ng_getCTFromEntry(size_t entry_idx,
+    double* ra, double* ga, double* ba, double* aa,
+    double* rb, double* gb, double* bb, double* ab)
+{
+	if (entry_idx >= ng_display_count) return 0;
+	if (ra) *ra = ng_display[entry_idx].cx_ra;
+	if (ga) *ga = ng_display[entry_idx].cx_ga;
+	if (ba) *ba = ng_display[entry_idx].cx_ba;
+	if (aa) *aa = ng_display[entry_idx].cx_aa;
+	if (rb) *rb = ng_display[entry_idx].cx_rb;
+	if (gb) *gb = ng_display[entry_idx].cx_gb;
+	if (bb) *bb = ng_display[entry_idx].cx_bb;
+	if (ab) *ab = ng_display[entry_idx].cx_ab;
+	return 1;
+}
+
+// Set color transform components on a display entry (by index).
+// Returns 1 if found and set, 0 if not.
+int ng_setCTOnEntry(size_t entry_idx,
+    double ra, double ga, double ba, double aa,
+    double rb, double gb, double bb, double ab)
+{
+	if (entry_idx >= ng_display_count) return 0;
+	ng_display[entry_idx].cx_ra = ra;
+	ng_display[entry_idx].cx_ga = ga;
+	ng_display[entry_idx].cx_ba = ba;
+	ng_display[entry_idx].cx_aa = aa;
+	ng_display[entry_idx].cx_rb = rb;
+	ng_display[entry_idx].cx_gb = gb;
+	ng_display[entry_idx].cx_bb = bb;
+	ng_display[entry_idx].cx_ab = ab;
+	return 1;
 }
 
 // Rename a display list entry's instance name (for _name setter)
