@@ -744,6 +744,22 @@ static ASFunction g_matrix_methods[12]; // toString, clone, identity, scale, rot
 static ASFunction g_rect_methods[15];   // toString, clone, equals, isEmpty, setEmpty, contains, containsPoint, containsRectangle, inflate, inflatePoint, intersection, intersects, offset, offsetPoint, union
 static int g_geom_init_done = 0;
 
+// ============================================================================
+// Color class globals (AVM1 Color object)
+// ============================================================================
+static ASObject* g_color_prototype = NULL;
+static ASFunction g_color_methods[4];  // getTransform, setTransform, getRGB, setRGB
+static int g_color_init_done = 0;
+
+// ============================================================================
+// flash.geom.ColorTransform globals
+// ============================================================================
+static ASObject* g_color_transform_prototype = NULL;
+static ASFunction g_ct_methods[2];    // concat, toString
+static ASFunction g_ct_rgb_getter;
+static ASFunction g_ct_rgb_setter;
+static int g_color_transform_init_done = 0;
+
 // Coerce Math arguments to f64 via the stack (calls valueOf on objects).
 // Flash coerces min(arg_count, max_args) arguments, left to right.
 static void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, u32 max_args)
@@ -2236,22 +2252,78 @@ static ActionVar colorTransformToString(SWFAppContext* app_context, ActionVar* a
 	return result;
 }
 
+// Forward declarations needed by matrixToString/rectangleToString/createTransformObject
+static int varToStringBufFull(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size);
+// getPropertyWithPrototype is non-static (declared in object.h / defined in object.c)
+static inline ActionVar makeF64(double d);
+static ActionVar ctToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+// Forward declarations for functions used by transform helpers/getters before their definitions
+static double propToDouble(ASObject* obj, const char* name, u32 name_len);
+static ASObject* createRectObj(SWFAppContext* app_context, ActionVar* x, ActionVar* y, ActionVar* w, ActionVar* h);
+static float normalizeRotation(float r);
+static void setAddProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen, ASFunction* getter, ASFunction* setter);
+static void initGeomPrototypes(SWFAppContext* app_context);
+static void initColorTransformPrototype(SWFAppContext* app_context);
+
 static ActionVar matrixToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	ActionVar result = {0};
-	result.type = ACTION_STACK_VALUE_STRING;
-	result.data.numeric_value = (u64) u16_default_matrix;
-	result.str_size = 32;
-	return result;
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	double a=1, b=0, c=0, d=1, tx=0, ty=0;
+	ActionVar* av;
+	av = obj ? getPropertyWithPrototype(obj, "a", 1) : NULL;  if (av) a  = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "b", 1) : NULL;  if (av) b  = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "c", 1) : NULL;  if (av) c  = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "d", 1) : NULL;  if (av) d  = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "tx", 2) : NULL; if (av) tx = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "ty", 2) : NULL; if (av) ty = varToDoubleSimple(av);
+	char sa[64], sb[64], sc[64], sd[64], stx[64], sty[64];
+	ActionVar fa = makeF64(a), fb = makeF64(b), fc = makeF64(c), fd = makeF64(d);
+	ActionVar ftx = makeF64(tx), fty = makeF64(ty);
+	varToStringBufFull(app_context, &fa, sa, sizeof(sa));
+	varToStringBufFull(app_context, &fb, sb, sizeof(sb));
+	varToStringBufFull(app_context, &fc, sc, sizeof(sc));
+	varToStringBufFull(app_context, &fd, sd, sizeof(sd));
+	varToStringBufFull(app_context, &ftx, stx, sizeof(stx));
+	varToStringBufFull(app_context, &fty, sty, sizeof(sty));
+	char buf[512];
+	int len = snprintf(buf, sizeof(buf), "(a=%s, b=%s, c=%s, d=%s, tx=%s, ty=%s)", sa, sb, sc, sd, stx, sty);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len;
+	uint16_t* u16 = ascii_to_u16(app_context, buf, len, &u16_len);
+	r.str_size = u16_len;
+	r.data.string_data.heap_ptr = u16;
+	r.data.string_data.owns_memory = true;
+	return r;
 }
 
 static ActionVar rectangleToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	ActionVar result = {0};
-	result.type = ACTION_STACK_VALUE_STRING;
-	result.data.numeric_value = (u64) u16_default_rect;
-	result.str_size = 20;
-	return result;
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	double x=0, y=0, w=0, h=0;
+	ActionVar* av;
+	av = obj ? getPropertyWithPrototype(obj, "x", 1) : NULL;      if (av) x = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "y", 1) : NULL;      if (av) y = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "width", 5) : NULL;  if (av) w = varToDoubleSimple(av);
+	av = obj ? getPropertyWithPrototype(obj, "height", 6) : NULL; if (av) h = varToDoubleSimple(av);
+	char sx[64], sy[64], sw[64], sh[64];
+	ActionVar fx = makeF64(x), fy = makeF64(y), fw = makeF64(w), fh = makeF64(h);
+	varToStringBufFull(app_context, &fx, sx, sizeof(sx));
+	varToStringBufFull(app_context, &fy, sy, sizeof(sy));
+	varToStringBufFull(app_context, &fw, sw, sizeof(sw));
+	varToStringBufFull(app_context, &fh, sh, sizeof(sh));
+	char buf[256];
+	int len = snprintf(buf, sizeof(buf), "(x=%s, y=%s, w=%s, h=%s)", sx, sy, sw, sh);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len;
+	uint16_t* u16 = ascii_to_u16(app_context, buf, len, &u16_len);
+	r.str_size = u16_len;
+	r.data.string_data.heap_ptr = u16;
+	r.data.string_data.owns_memory = true;
+	return r;
 }
 
 // Helper: set a toString function on an ASObject using a native Function2Ptr
@@ -2267,45 +2339,64 @@ static void setNativeToString(SWFAppContext* app_context, ASObject* obj, Functio
 	setProperty(app_context, obj, "toString", 8, &fv);
 }
 
-// Create a flash.geom.Transform object for a MovieClip (identity transform)
+// Forward declarations for Transform getter/setter functions (defined after varToStringBufFull)
+static ActionVar transformMatrixGetter(SWFAppContext*, ActionVar*, u32, ActionVar*, void*);
+static ActionVar transformMatrixSetter(SWFAppContext*, ActionVar*, u32, ActionVar*, void*);
+static ActionVar transformCTGetter(SWFAppContext*, ActionVar*, u32, ActionVar*, void*);
+static ActionVar transformCTSetter(SWFAppContext*, ActionVar*, u32, ActionVar*, void*);
+static ActionVar transformConcatMatrixGetter(SWFAppContext*, ActionVar*, u32, ActionVar*, void*);
+static ActionVar transformConcatCTGetter(SWFAppContext*, ActionVar*, u32, ActionVar*, void*);
+static ActionVar transformPixelBoundsGetter(SWFAppContext*, ActionVar*, u32, ActionVar*, void*);
+
+// Global ASFunctions for Transform addProperty getters/setters (lazy initialized)
+static int g_transform_funcs_init = 0;
+static ASFunction g_transform_matrix_getter_func;
+static ASFunction g_transform_matrix_setter_func;
+static ASFunction g_transform_ct_getter_func;
+static ASFunction g_transform_ct_setter_func;
+static ASFunction g_transform_concat_mat_getter_func;
+static ASFunction g_transform_concat_ct_getter_func;
+static ASFunction g_transform_pix_bounds_getter_func;
+
+static void initTransformFuncs(void)
+{
+	if (g_transform_funcs_init) return;
+	g_transform_funcs_init = 1;
+#define INIT_TRANSFORM_FUNC(var, func_ptr, fname) \
+	memset(&(var), 0, sizeof(ASFunction)); \
+	strncpy((var).name, fname, 255); \
+	(var).function_type = 2; \
+	(var).advanced_func = (Function2Ptr)(func_ptr);
+	INIT_TRANSFORM_FUNC(g_transform_matrix_getter_func,      transformMatrixGetter,       "get matrix")
+	INIT_TRANSFORM_FUNC(g_transform_matrix_setter_func,      transformMatrixSetter,       "set matrix")
+	INIT_TRANSFORM_FUNC(g_transform_ct_getter_func,          transformCTGetter,           "get colorTransform")
+	INIT_TRANSFORM_FUNC(g_transform_ct_setter_func,          transformCTSetter,           "set colorTransform")
+	INIT_TRANSFORM_FUNC(g_transform_concat_mat_getter_func,  transformConcatMatrixGetter, "get concatenatedMatrix")
+	INIT_TRANSFORM_FUNC(g_transform_concat_ct_getter_func,   transformConcatCTGetter,     "get concatenatedColorTransform")
+	INIT_TRANSFORM_FUNC(g_transform_pix_bounds_getter_func,  transformPixelBoundsGetter,  "get pixelBounds")
+#undef INIT_TRANSFORM_FUNC
+}
+
+// Create a flash.geom.Transform object for a MovieClip with live data via addProperty getters.
 static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc)
 {
+	initTransformFuncs();
+
 	ASObject* transform = allocObject(app_context, 8);
+	setObjectProto(app_context, transform);
 
-	ASObject* ct = allocObject(app_context, 2);
-	setNativeToString(app_context, ct, colorTransformToString);
-	ActionVar ct_val = {0};
-	ct_val.type = ACTION_STACK_VALUE_OBJECT;
-	ct_val.data.numeric_value = (u64) ct;
-	setProperty(app_context, transform, "colorTransform", 14, &ct_val);
+	// Store MC reference as "__mc__" property (MOVIECLIP type)
+	ActionVar mc_val = {0};
+	mc_val.type = ACTION_STACK_VALUE_MOVIECLIP;
+	mc_val.data.numeric_value = (u64) mc;
+	setProperty(app_context, transform, "__mc__", 6, &mc_val);
 
-	ASObject* cct = allocObject(app_context, 2);
-	setNativeToString(app_context, cct, colorTransformToString);
-	ActionVar cct_val = {0};
-	cct_val.type = ACTION_STACK_VALUE_OBJECT;
-	cct_val.data.numeric_value = (u64) cct;
-	setProperty(app_context, transform, "concatenatedColorTransform", 26, &cct_val);
-
-	ASObject* mat = allocObject(app_context, 2);
-	setNativeToString(app_context, mat, matrixToString);
-	ActionVar mat_val = {0};
-	mat_val.type = ACTION_STACK_VALUE_OBJECT;
-	mat_val.data.numeric_value = (u64) mat;
-	setProperty(app_context, transform, "matrix", 6, &mat_val);
-
-	ASObject* cmat = allocObject(app_context, 2);
-	setNativeToString(app_context, cmat, matrixToString);
-	ActionVar cmat_val = {0};
-	cmat_val.type = ACTION_STACK_VALUE_OBJECT;
-	cmat_val.data.numeric_value = (u64) cmat;
-	setProperty(app_context, transform, "concatenatedMatrix", 18, &cmat_val);
-
-	ASObject* pb = allocObject(app_context, 2);
-	setNativeToString(app_context, pb, rectangleToString);
-	ActionVar pb_val = {0};
-	pb_val.type = ACTION_STACK_VALUE_OBJECT;
-	pb_val.data.numeric_value = (u64) pb;
-	setProperty(app_context, transform, "pixelBounds", 11, &pb_val);
+	// Set up addProperty virtual getters/setters for each property
+	setAddProperty(app_context, transform, "matrix",                    6,  &g_transform_matrix_getter_func,      &g_transform_matrix_setter_func);
+	setAddProperty(app_context, transform, "colorTransform",           14,  &g_transform_ct_getter_func,          &g_transform_ct_setter_func);
+	setAddProperty(app_context, transform, "concatenatedMatrix",       18,  &g_transform_concat_mat_getter_func,  NULL);
+	setAddProperty(app_context, transform, "concatenatedColorTransform", 26, &g_transform_concat_ct_getter_func,  NULL);
+	setAddProperty(app_context, transform, "pixelBounds",              11,  &g_transform_pix_bounds_getter_func,  NULL);
 
 	return transform;
 }
@@ -2338,6 +2429,454 @@ static int varToStringBufFull(SWFAppContext* app_context, ActionVar* v, char* bu
 		if (f == 0.0f && signbit(f)) return snprintf(buf, buf_size, "0");
 	}
 	return varToStringBuf(app_context, v, buf, buf_size);
+}
+
+// ============================================================================
+// Transform helper functions (NO_GRAPHICS only) and getter/setter implementations
+// ============================================================================
+
+#ifdef NO_GRAPHICS
+// Root MovieClip CT globals (root has no ng_display entry)
+static double g_root_cx_ra = 100.0, g_root_cx_ga = 100.0;
+static double g_root_cx_ba = 100.0, g_root_cx_aa = 100.0;
+static double g_root_cx_rb = 0.0,   g_root_cx_gb = 0.0;
+static double g_root_cx_bb = 0.0,   g_root_cx_ab = 0.0;
+
+// Get ng_display entry index for a MC. Returns (size_t)-1 for root or not found.
+static size_t getDisplayEntryIdxForMC(MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	if (mc == NULL || mc == &root_movieclip) return (size_t)-1;
+	size_t parent_idx = getDisplayEntryIdxForMC(mc->parent);
+	return ng_findDisplayEntryIdxWithParent(mc->name, parent_idx);
+}
+
+// Get local matrix (in pixels) for a MC.
+// Uses ng_getMatrixFromEntry as the base (from transform_data), then overlays any
+// AS-set fields (xscale/yscale/rotation via as_set_flags bits 4/8/16, tx/ty via bits 1/2).
+static void getLocalMatrixForMC(MovieClip* mc,
+	double* a, double* b, double* c, double* d, double* tx, double* ty)
+{
+	// Try to get base matrix from ng_display (transform_data)
+	size_t idx = getDisplayEntryIdxForMC(mc);
+	double ba = 1.0, bb = 0.0, bc = 0.0, bd = 1.0, btx = 0.0, bty = 0.0;
+	int has_base = (idx != (size_t)-1) && ng_getMatrixFromEntry(idx, &ba, &bb, &bc, &bd, &btx, &bty);
+	if (!has_base) {
+		// Fall back to AS-set values (or defaults)
+		double xs = (double)mc->xscale / 100.0;
+		double ys = (double)mc->yscale / 100.0;
+		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
+		double cr = cos(rot), sr = sin(rot);
+		ba = xs*cr; bb = xs*sr; bc = -(ys*sr); bd = ys*cr;
+		btx = (double)mc->x; bty = (double)mc->y;
+	}
+	// Apply AS overrides for scale/rotation (bits 4|8|16) and translation (bits 1|2)
+	if (mc->as_set_flags & (4|8|16)) {
+		double xs = (double)mc->xscale / 100.0;
+		double ys = (double)mc->yscale / 100.0;
+		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
+		double cr = cos(rot), sr = sin(rot);
+		ba = xs*cr; bb = xs*sr; bc = -(ys*sr); bd = ys*cr;
+	}
+	if (mc->as_set_flags & 1) btx = (double)mc->x;
+	if (mc->as_set_flags & 2) bty = (double)mc->y;
+	*a = ba; *b = bb; *c = bc; *d = bd; *tx = btx; *ty = bty;
+}
+
+// Get local CT as raw Fixed8 int16 values.
+static void getLocalCTRaw(MovieClip* mc,
+	s16* ra, s16* ga, s16* ba, s16* aa,
+	s16* rb, s16* gb, s16* bb, s16* ab)
+{
+	extern MovieClip root_movieclip;
+	if (mc == &root_movieclip) {
+		*ra = (s16)lround(g_root_cx_ra * 256.0 / 100.0);
+		*ga = (s16)lround(g_root_cx_ga * 256.0 / 100.0);
+		*ba = (s16)lround(g_root_cx_ba * 256.0 / 100.0);
+		*aa = (s16)lround(g_root_cx_aa * 256.0 / 100.0);
+		*rb = (s16)lround(g_root_cx_rb);
+		*gb = (s16)lround(g_root_cx_gb);
+		*bb = (s16)lround(g_root_cx_bb);
+		*ab = (s16)lround(g_root_cx_ab);
+		return;
+	}
+	size_t idx = getDisplayEntryIdxForMC(mc);
+	if (idx == (size_t)-1) {
+		*ra = 256; *ga = 256; *ba = 256; *aa = 256;
+		*rb = 0;   *gb = 0;   *bb = 0;   *ab = 0;
+		return;
+	}
+	double dra, dga, dba, daa, drb, dgb, dbb, dab;
+	ng_getCTFromEntry(idx, &dra, &dga, &dba, &daa, &drb, &dgb, &dbb, &dab);
+	*ra = (s16)lround(dra * 256.0 / 100.0);
+	*ga = (s16)lround(dga * 256.0 / 100.0);
+	*ba = (s16)lround(dba * 256.0 / 100.0);
+	*aa = (s16)lround(daa * 256.0 / 100.0);
+	*rb = (s16)lround(drb);
+	*gb = (s16)lround(dgb);
+	*bb = (s16)lround(dbb);
+	*ab = (s16)lround(dab);
+}
+
+// Set local CT from raw Fixed8 int16 values.
+static void setLocalCTRaw(MovieClip* mc,
+	s16 ra, s16 ga, s16 ba, s16 aa,
+	s16 rb, s16 gb, s16 bb, s16 ab)
+{
+	extern MovieClip root_movieclip;
+	if (mc == &root_movieclip) {
+		g_root_cx_ra = (double)ra * 100.0 / 256.0;
+		g_root_cx_ga = (double)ga * 100.0 / 256.0;
+		g_root_cx_ba = (double)ba * 100.0 / 256.0;
+		g_root_cx_aa = (double)aa * 100.0 / 256.0;
+		g_root_cx_rb = (double)rb;
+		g_root_cx_gb = (double)gb;
+		g_root_cx_bb = (double)bb;
+		g_root_cx_ab = (double)ab;
+		return;
+	}
+	size_t idx = getDisplayEntryIdxForMC(mc);
+	if (idx == (size_t)-1) return;
+	ng_setCTOnEntry(idx,
+		(double)ra * 100.0 / 256.0,
+		(double)ga * 100.0 / 256.0,
+		(double)ba * 100.0 / 256.0,
+		(double)aa * 100.0 / 256.0,
+		(double)rb, (double)gb, (double)bb, (double)ab);
+}
+
+// Extract CT raw Fixed8 values from a ColorTransform ASObject.
+static void ctObjToRaw(ASObject* ct_obj,
+	s16* ra, s16* ga, s16* ba, s16* aa,
+	s16* rb, s16* gb, s16* bb, s16* ab)
+{
+	double rm = propToDouble(ct_obj, "redMultiplier",   13);
+	double gm = propToDouble(ct_obj, "greenMultiplier", 15);
+	double bm = propToDouble(ct_obj, "blueMultiplier",  14);
+	double am = propToDouble(ct_obj, "alphaMultiplier", 15);
+	double ro = propToDouble(ct_obj, "redOffset",        9);
+	double go = propToDouble(ct_obj, "greenOffset",     11);
+	double bo = propToDouble(ct_obj, "blueOffset",      10);
+	double ao = propToDouble(ct_obj, "alphaOffset",     11);
+	*ra = isnan(rm) ? 256 : (s16)lround(rm * 256.0);
+	*ga = isnan(gm) ? 256 : (s16)lround(gm * 256.0);
+	*ba = isnan(bm) ? 256 : (s16)lround(bm * 256.0);
+	*aa = isnan(am) ? 256 : (s16)lround(am * 256.0);
+	*rb = isnan(ro) ? 0 : (s16)lround(ro);
+	*gb = isnan(go) ? 0 : (s16)lround(go);
+	*bb = isnan(bo) ? 0 : (s16)lround(bo);
+	*ab = isnan(ao) ? 0 : (s16)lround(ao);
+}
+
+// 2D affine composition: result = outer * inner (outer applied after inner).
+static void composeMat2D(
+	double oa, double ob, double oc, double od, double otx, double oty,
+	double ia, double ib, double ic, double id, double itx, double ity,
+	double* ra, double* rb, double* rc, double* rd, double* rtx, double* rty)
+{
+	*ra  = oa*ia + oc*ib;
+	*rb  = ob*ia + od*ib;
+	*rc  = oa*ic + oc*id;
+	*rd  = ob*ic + od*id;
+	*rtx = oa*itx + oc*ity + otx;
+	*rty = ob*itx + od*ity + oty;
+}
+
+// Get concatenated matrix for a MC (from root down to MC).
+static void getConcatMatrixForMC(MovieClip* mc,
+	double* a, double* b, double* c, double* d, double* tx, double* ty)
+{
+	MovieClip* chain[32];
+	int depth = 0;
+	MovieClip* cur = mc;
+	while (cur != NULL && depth < 32) {
+		chain[depth++] = cur;
+		cur = cur->parent;
+	}
+	getLocalMatrixForMC(chain[0], a, b, c, d, tx, ty);
+	for (int i = 1; i < depth; i++) {
+		double oa, ob, oc, od, otx, oty;
+		getLocalMatrixForMC(chain[i], &oa, &ob, &oc, &od, &otx, &oty);
+		double ra, rb, rc, rd, rtx, rty;
+		composeMat2D(oa, ob, oc, od, otx, oty, *a, *b, *c, *d, *tx, *ty,
+		             &ra, &rb, &rc, &rd, &rtx, &rty);
+		*a = ra; *b = rb; *c = rc; *d = rd; *tx = rtx; *ty = rty;
+	}
+}
+
+// Compose two CTs in raw Fixed8 (outer applied after inner).
+static void composeCTRaw(
+	s16 o_ra, s16 o_ga, s16 o_ba, s16 o_aa, s16 o_rb, s16 o_gb, s16 o_bb, s16 o_ab,
+	s16 i_ra, s16 i_ga, s16 i_ba, s16 i_aa, s16 i_rb, s16 i_gb, s16 i_bb, s16 i_ab,
+	s16* r_ra, s16* r_ga, s16* r_ba, s16* r_aa,
+	s16* r_rb, s16* r_gb, s16* r_bb, s16* r_ab)
+{
+	*r_ra = (s16)(((s32)o_ra * (s32)i_ra) >> 8);
+	*r_ga = (s16)(((s32)o_ga * (s32)i_ga) >> 8);
+	*r_ba = (s16)(((s32)o_ba * (s32)i_ba) >> 8);
+	*r_aa = (s16)(((s32)o_aa * (s32)i_aa) >> 8);
+	*r_rb = (s16)(o_rb + (((s32)o_ra * (s32)i_rb) >> 8));
+	*r_gb = (s16)(o_gb + (((s32)o_ga * (s32)i_gb) >> 8));
+	*r_bb = (s16)(o_bb + (((s32)o_ba * (s32)i_bb) >> 8));
+	*r_ab = (s16)(o_ab + (((s32)o_aa * (s32)i_ab) >> 8));
+}
+
+// Get concatenated CT for a MC (innermost first, compose outward).
+static void getConcatCTForMC(MovieClip* mc,
+	s16* ra, s16* ga, s16* ba, s16* aa,
+	s16* rb, s16* gb, s16* bb, s16* ab)
+{
+	MovieClip* chain[32];
+	int depth = 0;
+	MovieClip* cur = mc;
+	while (cur != NULL && depth < 32) {
+		chain[depth++] = cur;
+		cur = cur->parent;
+	}
+	getLocalCTRaw(chain[0], ra, ga, ba, aa, rb, gb, bb, ab);
+	for (int i = 1; i < depth; i++) {
+		s16 ora, oga, oba, oaa, orb, ogb, obb, oab;
+		getLocalCTRaw(chain[i], &ora, &oga, &oba, &oaa, &orb, &ogb, &obb, &oab);
+		s16 rra, rga, rba, raa, rrb, rgb, rbb, rab;
+		composeCTRaw(ora, oga, oba, oaa, orb, ogb, obb, oab,
+		             *ra, *ga, *ba, *aa, *rb, *gb, *bb, *ab,
+		             &rra, &rga, &rba, &raa, &rrb, &rgb, &rbb, &rab);
+		*ra = rra; *ga = rga; *ba = rba; *aa = raa;
+		*rb = rrb; *gb = rgb; *bb = rbb; *ab = rab;
+	}
+}
+
+// Create a Matrix ASObject from 2D affine components.
+static ASObject* makeMatrixObject(SWFAppContext* app_context,
+	double a, double b, double c, double d, double tx, double ty)
+{
+	initGeomPrototypes(app_context);
+	ASObject* obj = allocObject(app_context, 8);
+	if (g_matrix_prototype != NULL) {
+		ActionVar proto_var = {0};
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.data.numeric_value = (u64) g_matrix_prototype;
+		setProperty(app_context, obj, "__proto__", 9, &proto_var);
+	}
+	ActionVar v;
+	v = makeF64(a);  setProperty(app_context, obj, "a",  1, &v);
+	v = makeF64(b);  setProperty(app_context, obj, "b",  1, &v);
+	v = makeF64(c);  setProperty(app_context, obj, "c",  1, &v);
+	v = makeF64(d);  setProperty(app_context, obj, "d",  1, &v);
+	v = makeF64(tx); setProperty(app_context, obj, "tx", 2, &v);
+	v = makeF64(ty); setProperty(app_context, obj, "ty", 2, &v);
+	return obj;
+}
+
+// Create a CT ASObject from raw Fixed8 values.
+static ASObject* makeCTObject(SWFAppContext* app_context,
+	s16 ra, s16 ga, s16 ba, s16 aa,
+	s16 rb, s16 gb, s16 bb, s16 ab)
+{
+	initColorTransformPrototype(app_context);
+	ASObject* obj = allocObject(app_context, 10);
+	if (g_color_transform_prototype != NULL) {
+		ActionVar proto_var = {0};
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.data.numeric_value = (u64) g_color_transform_prototype;
+		setProperty(app_context, obj, "__proto__", 9, &proto_var);
+	}
+	ActionVar v;
+	v = makeF64((double)ra / 256.0); setProperty(app_context, obj, "redMultiplier",   13, &v);
+	v = makeF64((double)ga / 256.0); setProperty(app_context, obj, "greenMultiplier", 15, &v);
+	v = makeF64((double)ba / 256.0); setProperty(app_context, obj, "blueMultiplier",  14, &v);
+	v = makeF64((double)aa / 256.0); setProperty(app_context, obj, "alphaMultiplier", 15, &v);
+	v = makeF64((double)rb);         setProperty(app_context, obj, "redOffset",        9, &v);
+	v = makeF64((double)gb);         setProperty(app_context, obj, "greenOffset",     11, &v);
+	v = makeF64((double)bb);         setProperty(app_context, obj, "blueOffset",      10, &v);
+	v = makeF64((double)ab);         setProperty(app_context, obj, "alphaOffset",     11, &v);
+	return obj;
+}
+#endif // NO_GRAPHICS
+
+static ActionVar transformMatrixGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* tobj = (ASObject*) this_obj;
+	if (!tobj) return r;
+	ActionVar* mc_ref = getProperty(tobj, "__mc__", 6);
+	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
+	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
+	if (!mc) return r;
+#ifdef NO_GRAPHICS
+	double a, b, c, d, tx, ty;
+	getLocalMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
+	ASObject* mat = makeMatrixObject(app_context, a, b, c, d, tx, ty);
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) mat;
+#else
+	(void)app_context;
+#endif
+	return r;
+}
+
+static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* tobj = (ASObject*) this_obj;
+	if (!tobj || arg_count < 1) return undef;
+	ActionVar* mc_ref = getProperty(tobj, "__mc__", 6);
+	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return undef;
+	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
+	if (!mc) return undef;
+	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
+	ASObject* mat_obj = (ASObject*) args[0].data.numeric_value;
+	if (!getProperty(mat_obj, "a", 1)) return undef;
+#ifdef NO_GRAPHICS
+	double a  = propToDouble(mat_obj, "a",  1);
+	double b  = propToDouble(mat_obj, "b",  1);
+	double c  = propToDouble(mat_obj, "c",  1);
+	double d  = propToDouble(mat_obj, "d",  1);
+	double tx = propToDouble(mat_obj, "tx", 2);
+	double ty = propToDouble(mat_obj, "ty", 2);
+	if (isnan(a))  a  = 0.0; if (isnan(b))  b  = 0.0;
+	if (isnan(c))  c  = 0.0; if (isnan(d))  d  = 0.0;
+	if (isnan(tx)) tx = 0.0; if (isnan(ty)) ty = 0.0;
+	mc->x = (float)tx;
+	mc->y = (float)ty;
+	double xs = sqrt(a*a + b*b);
+	double ys = sqrt(c*c + d*d);
+	double rot_deg = atan2(b, a) * 180.0 / 3.14159265358979323846;
+	mc->xscale = (float)(xs * 100.0);
+	mc->yscale = (float)(ys * 100.0);
+	mc->rotation = normalizeRotation((float)rot_deg);
+	mc->as_set_flags |= (1|2|4|8|16);
+#endif
+	return undef;
+}
+
+static ActionVar transformCTGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* tobj = (ASObject*) this_obj;
+	if (!tobj) return r;
+	ActionVar* mc_ref = getProperty(tobj, "__mc__", 6);
+	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
+	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
+	if (!mc) return r;
+#ifdef NO_GRAPHICS
+	s16 ra, ga, ba, aa, rb, gb, bb, ab;
+	getLocalCTRaw(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
+	ASObject* ct = makeCTObject(app_context, ra, ga, ba, aa, rb, gb, bb, ab);
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) ct;
+#else
+	(void)app_context;
+#endif
+	return r;
+}
+
+static ActionVar transformCTSetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* tobj = (ASObject*) this_obj;
+	if (!tobj || arg_count < 1) return undef;
+	ActionVar* mc_ref = getProperty(tobj, "__mc__", 6);
+	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return undef;
+	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
+	if (!mc) return undef;
+	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
+	ASObject* ct_obj = (ASObject*) args[0].data.numeric_value;
+	if (!getProperty(ct_obj, "redMultiplier", 13)) return undef;
+#ifdef NO_GRAPHICS
+	s16 ra, ga, ba, aa, rb, gb, bb, ab;
+	ctObjToRaw(ct_obj, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
+	setLocalCTRaw(mc, ra, ga, ba, aa, rb, gb, bb, ab);
+#endif
+	return undef;
+}
+
+static ActionVar transformConcatMatrixGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* tobj = (ASObject*) this_obj;
+	if (!tobj) return r;
+	ActionVar* mc_ref = getProperty(tobj, "__mc__", 6);
+	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
+	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
+	if (!mc) return r;
+#ifdef NO_GRAPHICS
+	double a, b, c, d, tx, ty;
+	getConcatMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
+	ASObject* mat = makeMatrixObject(app_context, a, b, c, d, tx, ty);
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) mat;
+#else
+	(void)app_context;
+#endif
+	return r;
+}
+
+static ActionVar transformConcatCTGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* tobj = (ASObject*) this_obj;
+	if (!tobj) return r;
+	ActionVar* mc_ref = getProperty(tobj, "__mc__", 6);
+	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
+	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
+	if (!mc) return r;
+#ifdef NO_GRAPHICS
+	s16 ra, ga, ba, aa, rb, gb, bb, ab;
+	getConcatCTForMC(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
+	ASObject* ct = makeCTObject(app_context, ra, ga, ba, aa, rb, gb, bb, ab);
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) ct;
+#else
+	(void)app_context;
+#endif
+	return r;
+}
+
+static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* tobj = (ASObject*) this_obj;
+	if (!tobj) return r;
+	ActionVar* mc_ref = getProperty(tobj, "__mc__", 6);
+	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
+	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
+	if (!mc) return r;
+#ifdef NO_GRAPHICS
+	size_t entry_idx = getDisplayEntryIdxForMC(mc);
+	float lxmin, lxmax, lymin, lymax;
+	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax)) return r;
+	double ca, cb, cc, cd, ctx, cty;
+	getConcatMatrixForMC(mc, &ca, &cb, &cc, &cd, &ctx, &cty);
+	double lx0 = (double)lxmin, lx1 = (double)lxmax;
+	double ly0 = (double)lymin, ly1 = (double)lymax;
+	double cx0 = ca*lx0 + cc*ly0 + ctx, cy0 = cb*lx0 + cd*ly0 + cty;
+	double cx1 = ca*lx1 + cc*ly0 + ctx, cy1 = cb*lx1 + cd*ly0 + cty;
+	double cx2 = ca*lx0 + cc*ly1 + ctx, cy2 = cb*lx0 + cd*ly1 + cty;
+	double cx3 = ca*lx1 + cc*ly1 + ctx, cy3 = cb*lx1 + cd*ly1 + cty;
+	double pxmin = cx0, pxmax = cx0, pymin = cy0, pymax = cy0;
+	if (cx1 < pxmin) pxmin = cx1; if (cx1 > pxmax) pxmax = cx1;
+	if (cx2 < pxmin) pxmin = cx2; if (cx2 > pxmax) pxmax = cx2;
+	if (cx3 < pxmin) pxmin = cx3; if (cx3 > pxmax) pxmax = cx3;
+	if (cy1 < pymin) pymin = cy1; if (cy1 > pymax) pymax = cy1;
+	if (cy2 < pymin) pymin = cy2; if (cy2 > pymax) pymax = cy2;
+	if (cy3 < pymin) pymin = cy3; if (cy3 > pymax) pymax = cy3;
+	ActionVar rx = makeF64(pxmin), ry = makeF64(pymin);
+	ActionVar rw = makeF64(pxmax - pxmin), rh = makeF64(pymax - pymin);
+	ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64) rect;
+#else
+	(void)app_context;
+#endif
+	return r;
 }
 
 // Helper: read a named property from an object ActionVar (returns NULL if not object)
@@ -2385,6 +2924,7 @@ static ASObject* createPointObjF64(SWFAppContext* app_context, double x, double 
 // Helper: create a Rectangle object with x, y, width, height properties
 static ASObject* createRectObj(SWFAppContext* app_context, ActionVar* x, ActionVar* y, ActionVar* w, ActionVar* h)
 {
+	initGeomPrototypes(app_context);
 	ASObject* obj = allocObject(app_context, 6);
 	ActionVar proto_var = {0};
 	proto_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -3486,6 +4026,450 @@ static void initGeomPrototypes(SWFAppContext* app_context)
 	registerGeomMethod(&g_rect_methods[12], "offset",             (Function2Ptr)rectOffset,             app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[13], "offsetPoint",        (Function2Ptr)rectOffsetPoint,        app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[14], "union",              (Function2Ptr)rectUnion,              app_context, g_rect_prototype);
+}
+
+// ============================================================================
+// AVM1 Color object implementation
+// ============================================================================
+
+// ECMA-262 ToInt32: NaN/Inf/zero -> 0; otherwise truncate and wrap to int32 range.
+static int32_t ecmaToInt32Color(double d)
+{
+	if (!isfinite(d) || d == 0.0) return 0;
+	double t = d < 0.0 ? ceil(d) : floor(d);
+	double m = fmod(t, 4294967296.0);
+	if (m < 0.0) m += 4294967296.0;
+	if (m >= 2147483648.0) m -= 4294967296.0;
+	return (int32_t)m;
+}
+
+// Quantize a Color setTransform multiplier value (percentage units) through int16 fixed-point.
+// Input d is in percentage units (100.0 = 100%). Output is in same units.
+// Formula: int16 = (int32(d) * 256) / 100 (integer division), then stored as int16*100/256.
+static double quantifyColorMult(double d)
+{
+	int32_t i32 = ecmaToInt32Color(d);
+	int32_t scaled = (int32_t)((int64_t)i32 * 256 / 100);
+	return (double)(int16_t)scaled * 100.0 / 256.0;
+}
+
+// Quantize a Color setTransform addend value through int16.
+// Input d is in pixel units. Output is the int16-truncated value.
+static double quantifyColorAdd(double d)
+{
+	int32_t i32 = ecmaToInt32Color(d);
+	return (double)(int16_t)i32;
+}
+
+// Helper: get the MC instance name stored on a Color object (as UTF-8 in out_buf).
+// Returns 1 if found and valid, 0 otherwise.
+static int colorGetMCName(ASObject* obj, char* out_buf, size_t buf_size)
+{
+	if (!obj) return 0;
+	ActionVar* nv = getProperty(obj, "__mc_name__", 11);
+	if (!nv || nv->type != ACTION_STACK_VALUE_STRING) return 0;
+	const uint16_t* u16 = varGetU16Ptr(nv);
+	if (!u16 || nv->str_size == 0) return 0;
+	u16_to_utf8(u16, nv->str_size, out_buf, (u32)buf_size);
+	return out_buf[0] != '\0';
+}
+
+// Color.getTransform() -> Object{ra,ga,ba,aa,rb,gb,bb,ab}
+static ActionVar colorGetTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	char name[256] = {0};
+	double ra = 100.0, ga = 100.0, ba = 100.0, aa = 100.0;
+	double rb = 0.0,   gb = 0.0,   bb = 0.0,   ab = 0.0;
+
+#ifdef NO_GRAPHICS
+	if (colorGetMCName(obj, name, sizeof(name)))
+		ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
+#endif
+
+	ASObject* result = allocObject(app_context, 8);
+	ActionVar v;
+	v = makeF64(ra); setProperty(app_context, result, "ra", 2, &v);
+	v = makeF64(ga); setProperty(app_context, result, "ga", 2, &v);
+	v = makeF64(ba); setProperty(app_context, result, "ba", 2, &v);
+	v = makeF64(aa); setProperty(app_context, result, "aa", 2, &v);
+	v = makeF64(rb); setProperty(app_context, result, "rb", 2, &v);
+	v = makeF64(gb); setProperty(app_context, result, "gb", 2, &v);
+	v = makeF64(bb); setProperty(app_context, result, "bb", 2, &v);
+	v = makeF64(ab); setProperty(app_context, result, "ab", 2, &v);
+
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_OBJECT;
+	r.data.numeric_value = (u64)result;
+	return r;
+}
+
+// Color.setTransform(obj) - reads ra/ga/ba/aa/rb/gb/bb/ab from obj (own-properties only).
+// Each value is quantized through int16 fixed-point.
+static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* self = (ASObject*)this_obj;
+	if (arg_count == 0) return undef;
+
+	// Argument must be an object
+	ASObject* param = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0)
+		param = (ASObject*)args[0].data.numeric_value;
+	if (!param) return undef;
+
+	char name[256] = {0};
+#ifdef NO_GRAPHICS
+	if (!colorGetMCName(self, name, sizeof(name))) return undef;
+
+	// Read current transform
+	double ra, ga, ba, aa, rb, gb, bb, ab;
+	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) return undef;
+
+	// Apply only own-properties from param (not inherited via __proto__)
+	ActionVar* pv;
+	pv = getProperty(param, "ra", 2); if (pv) ra = quantifyColorMult(varToDoubleSimple(pv));
+	pv = getProperty(param, "ga", 2); if (pv) ga = quantifyColorMult(varToDoubleSimple(pv));
+	pv = getProperty(param, "ba", 2); if (pv) ba = quantifyColorMult(varToDoubleSimple(pv));
+	pv = getProperty(param, "aa", 2); if (pv) aa = quantifyColorMult(varToDoubleSimple(pv));
+	pv = getProperty(param, "rb", 2); if (pv) rb = quantifyColorAdd(varToDoubleSimple(pv));
+	pv = getProperty(param, "gb", 2); if (pv) gb = quantifyColorAdd(varToDoubleSimple(pv));
+	pv = getProperty(param, "bb", 2); if (pv) bb = quantifyColorAdd(varToDoubleSimple(pv));
+	pv = getProperty(param, "ab", 2); if (pv) ab = quantifyColorAdd(varToDoubleSimple(pv));
+
+	ng_setColorTransform(name, ra, ga, ba, aa, rb, gb, bb, ab);
+#endif
+	return undef;
+}
+
+// Color.getRGB() -> int32 color value from addend components, or undefined if target invalid.
+static ActionVar colorGetRGB(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = (ASObject*)this_obj;
+	char name[256] = {0};
+
+#ifdef NO_GRAPHICS
+	if (!colorGetMCName(obj, name, sizeof(name))) return undef;
+	double ra, ga, ba, aa, rb, gb, bb, ab;
+	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) return undef;
+
+	uint32_t color_u = ((uint32_t)(int32_t)rb << 16) |
+	                   ((uint32_t)(int32_t)gb << 8) |
+	                   (uint32_t)(int32_t)bb;
+	return makeF64((double)(int32_t)color_u);
+#else
+	return undef;
+#endif
+}
+
+// Color.setRGB(n) - sets ra=ga=ba=0, rb/gb/bb from n's bytes; aa and ab unchanged.
+static ActionVar colorSetRGB(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = (ASObject*)this_obj;
+	if (arg_count == 0) return undef;
+	char name[256] = {0};
+
+#ifdef NO_GRAPHICS
+	if (!colorGetMCName(obj, name, sizeof(name))) return undef;
+	double ra_cur, ga_cur, ba_cur, aa_cur, rb_cur, gb_cur, bb_cur, ab_cur;
+	if (!ng_getColorTransform(name, &ra_cur, &ga_cur, &ba_cur, &aa_cur, &rb_cur, &gb_cur, &bb_cur, &ab_cur))
+		return undef;
+
+	// Decompose n into R, G, B bytes (0-255 each); zero the multipliers ra/ga/ba
+	int32_t n = ecmaToInt32Color(varToDoubleSimple(&args[0]));
+	double new_rb = (double)((n >> 16) & 0xFF);
+	double new_gb = (double)((n >> 8)  & 0xFF);
+	double new_bb = (double)(n & 0xFF);
+
+	ng_setColorTransform(name, 0.0, 0.0, 0.0, aa_cur, new_rb, new_gb, new_bb, ab_cur);
+#endif
+	return undef;
+}
+
+static void initColorPrototype(SWFAppContext* app_context)
+{
+	if (g_color_init_done) return;
+	g_color_init_done = 1;
+	g_color_prototype = allocObject(app_context, 4);
+	retainObject(g_color_prototype);
+	setObjectProto(app_context, g_color_prototype);
+	registerGeomMethod(&g_color_methods[0], "getTransform", (Function2Ptr)colorGetTransform, app_context, g_color_prototype);
+	registerGeomMethod(&g_color_methods[1], "setTransform", (Function2Ptr)colorSetTransform, app_context, g_color_prototype);
+	registerGeomMethod(&g_color_methods[2], "getRGB",       (Function2Ptr)colorGetRGB,       app_context, g_color_prototype);
+	registerGeomMethod(&g_color_methods[3], "setRGB",       (Function2Ptr)colorSetRGB,       app_context, g_color_prototype);
+}
+
+// Color constructor: new Color(mc) where mc is a MovieClip or button reference.
+static ActionVar colorConstructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (!obj) return undef;
+
+	if (arg_count >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		MovieClip* mc = (MovieClip*) VAL(u64, &args[0].data.numeric_value);
+		if (mc && mc->name[0] != '\0')
+		{
+			// Store target as "_level0.name" string property
+			char target_str[512];
+			int tlen = snprintf(target_str, sizeof(target_str), "_level0.%s", mc->name);
+			u32 t_u16_len;
+			uint16_t* t_u16 = ascii_to_u16(app_context, target_str, tlen, &t_u16_len);
+			ActionVar tvar = {0};
+			tvar.type = ACTION_STACK_VALUE_STRING;
+			tvar.str_size = t_u16_len;
+			tvar.data.string_data.heap_ptr = t_u16;
+			tvar.data.string_data.owns_memory = true;
+			setProperty(app_context, obj, "target", 6, &tvar);
+
+			// Store MC instance name as hidden __mc_name__ property (DONTENUM)
+			u32 n_u16_len;
+			int nlen = (int)strlen(mc->name);
+			uint16_t* n_u16 = ascii_to_u16(app_context, mc->name, nlen, &n_u16_len);
+			ActionVar nvar = {0};
+			nvar.type = ACTION_STACK_VALUE_STRING;
+			nvar.str_size = n_u16_len;
+			nvar.data.string_data.heap_ptr = n_u16;
+			nvar.data.string_data.owns_memory = true;
+			setPropertyWithFlags(app_context, obj, "__mc_name__", 11, &nvar, PROPERTY_FLAGS_DONTENUM);
+		}
+	}
+	return undef;
+}
+
+// ============================================================================
+// flash.geom.ColorTransform implementation
+// ============================================================================
+
+// Helper: read a CT instance property as double via prototype chain.
+static inline double ctPropToDouble(ASObject* obj, const char* name, u32 nlen)
+{
+	ActionVar* v = obj ? getPropertyWithPrototype(obj, name, nlen) : NULL;
+	if (!v) return 0.0;
+	return varToDoubleSimple(v);
+}
+
+// Helper: read a CT property, convert to F64, format as string (matches Flash toString behavior).
+static void ctFormatProp(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen, char* buf, int bufsz)
+{
+	ActionVar* v = obj ? getPropertyWithPrototype(obj, name, nlen) : NULL;
+	double d = v ? varToDoubleSimple(v) : 0.0;
+	ActionVar fv = makeF64(d);
+	varToStringBufFull(app_context, &fv, buf, bufsz);
+}
+
+// ColorTransform.toString()
+// Returns "(redMultiplier=V, greenMultiplier=V, ...)"
+static ActionVar ctToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	char rm[64], gm[64], bm[64], am[64], ro[64], go_[64], bo[64], ao[64];
+	ctFormatProp(app_context, obj, "redMultiplier",   13, rm,  sizeof(rm));
+	ctFormatProp(app_context, obj, "greenMultiplier", 15, gm,  sizeof(gm));
+	ctFormatProp(app_context, obj, "blueMultiplier",  14, bm,  sizeof(bm));
+	ctFormatProp(app_context, obj, "alphaMultiplier", 15, am,  sizeof(am));
+	ctFormatProp(app_context, obj, "redOffset",        9, ro,  sizeof(ro));
+	ctFormatProp(app_context, obj, "greenOffset",     11, go_, sizeof(go_));
+	ctFormatProp(app_context, obj, "blueOffset",      10, bo,  sizeof(bo));
+	ctFormatProp(app_context, obj, "alphaOffset",     11, ao,  sizeof(ao));
+	char buf[1024];
+	int len = snprintf(buf, sizeof(buf),
+		"(redMultiplier=%s, greenMultiplier=%s, blueMultiplier=%s, alphaMultiplier=%s, "
+		"redOffset=%s, greenOffset=%s, blueOffset=%s, alphaOffset=%s)",
+		rm, gm, bm, am, ro, go_, bo, ao);
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len;
+	uint16_t* u16 = ascii_to_u16(app_context, buf, len, &u16_len);
+	r.str_size = u16_len;
+	r.data.string_data.heap_ptr = u16;
+	r.data.string_data.owns_memory = true;
+	return r;
+}
+
+// ColorTransform.concat(other): mutates this in place.
+// Formula: this.mult = this.mult * other.mult
+//          this.offset = this_orig.mult * other.offset + this.offset
+static ActionVar ctConcat(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = (ASObject*)this_obj;
+	if (!obj) return undef;
+	if (arg_count == 0) return undef;
+	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
+	ASObject* other = (ASObject*)args[0].data.numeric_value;
+
+	// Read this
+	double rm = ctPropToDouble(obj, "redMultiplier",   13);
+	double gm = ctPropToDouble(obj, "greenMultiplier", 15);
+	double bm = ctPropToDouble(obj, "blueMultiplier",  14);
+	double am = ctPropToDouble(obj, "alphaMultiplier", 15);
+	double ro = ctPropToDouble(obj, "redOffset",        9);
+	double go = ctPropToDouble(obj, "greenOffset",     11);
+	double bo = ctPropToDouble(obj, "blueOffset",      10);
+	double ao = ctPropToDouble(obj, "alphaOffset",     11);
+
+	// Read other
+	double orm = ctPropToDouble(other, "redMultiplier",   13);
+	double ogm = ctPropToDouble(other, "greenMultiplier", 15);
+	double obm = ctPropToDouble(other, "blueMultiplier",  14);
+	double oam = ctPropToDouble(other, "alphaMultiplier", 15);
+	double oro = ctPropToDouble(other, "redOffset",        9);
+	double ogo = ctPropToDouble(other, "greenOffset",     11);
+	double obo = ctPropToDouble(other, "blueOffset",      10);
+	double oao = ctPropToDouble(other, "alphaOffset",     11);
+
+	// Write new values: mult = this.mult * other.mult
+	//                   offset = this.mult_orig * other.offset + this.offset
+	ActionVar v;
+	v = makeF64(rm * orm); setProperty(app_context, obj, "redMultiplier",   13, &v);
+	v = makeF64(gm * ogm); setProperty(app_context, obj, "greenMultiplier", 15, &v);
+	v = makeF64(bm * obm); setProperty(app_context, obj, "blueMultiplier",  14, &v);
+	v = makeF64(am * oam); setProperty(app_context, obj, "alphaMultiplier", 15, &v);
+	v = makeF64(rm * oro + ro); setProperty(app_context, obj, "redOffset",    9, &v);
+	v = makeF64(gm * ogo + go); setProperty(app_context, obj, "greenOffset", 11, &v);
+	v = makeF64(bm * obo + bo); setProperty(app_context, obj, "blueOffset",  10, &v);
+	v = makeF64(am * oao + ao); setProperty(app_context, obj, "alphaOffset", 11, &v);
+	return undef;
+}
+
+// ColorTransform rgb getter: returns (rOff & 0xFF)<<16 | (gOff & 0xFF)<<8 | (bOff & 0xFF)
+static ActionVar ctRgbGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar* rv = obj ? getPropertyWithPrototype(obj, "redOffset",    9) : NULL;
+	ActionVar* gv = obj ? getPropertyWithPrototype(obj, "greenOffset", 11) : NULL;
+	ActionVar* bv = obj ? getPropertyWithPrototype(obj, "blueOffset",  10) : NULL;
+	int32_t r = rv ? (int32_t)varToDoubleSimple(rv) : 0;
+	int32_t g = gv ? (int32_t)varToDoubleSimple(gv) : 0;
+	int32_t b = bv ? (int32_t)varToDoubleSimple(bv) : 0;
+	uint32_t packed = ((uint32_t)(r & 0xFF) << 16) | ((uint32_t)(g & 0xFF) << 8) | (uint32_t)(b & 0xFF);
+	return makeF64((double)(int32_t)packed);
+}
+
+// ColorTransform rgb setter: n=ToInt32(value); rOff=(n>>16)&0xFF; gOff=(n>>8)&0xFF; bOff=n&0xFF;
+//   rMult=gMult=bMult=0; aMult and aOff unchanged.
+static ActionVar ctRgbSetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = (ASObject*)this_obj;
+	if (!obj || arg_count == 0) return undef;
+	double d = varToDoubleSimple(&args[0]);
+	int32_t n = ecmaToInt32Color(d);
+	double r = (double)((n >> 16) & 0xFF);
+	double g = (double)((n >> 8)  & 0xFF);
+	double b = (double)(n & 0xFF);
+	ActionVar zero = makeF64(0.0);
+	setProperty(app_context, obj, "redMultiplier",   13, &zero);
+	setProperty(app_context, obj, "greenMultiplier", 15, &zero);
+	setProperty(app_context, obj, "blueMultiplier",  14, &zero);
+	ActionVar rv = makeF64(r); setProperty(app_context, obj, "redOffset",    9, &rv);
+	ActionVar gv = makeF64(g); setProperty(app_context, obj, "greenOffset", 11, &gv);
+	ActionVar bv = makeF64(b); setProperty(app_context, obj, "blueOffset",  10, &bv);
+	return undef;
+}
+
+// Helper: set up an addProperty virtual getter/setter on an object.
+static void setAddProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen,
+                           ASFunction* getter, ASFunction* setter)
+{
+	ActionVar marker = {0};
+	marker.type = ACTION_STACK_VALUE_UNDEFINED;
+	setProperty(app_context, obj, name, nlen, &marker);
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name_length == nlen &&
+		    strncmp(obj->properties[i].name, name, nlen) == 0)
+		{
+			obj->properties[i].getter = (void*)getter;
+			obj->properties[i].setter = (void*)setter;
+			break;
+		}
+	}
+}
+
+static void initColorTransformPrototype(SWFAppContext* app_context)
+{
+	if (g_color_transform_init_done) return;
+	g_color_transform_init_done = 1;
+
+	g_color_transform_prototype = allocObject(app_context, 14);
+	retainObject(g_color_transform_prototype);
+	setObjectProto(app_context, g_color_transform_prototype);
+
+	// Insert properties in REVERSE of desired enumeration order (Enumerate2 uses LIFO).
+	// Desired enum order: toString, concat, rgb, blueOffset, greenOffset, redOffset,
+	//   alphaOffset, blueMultiplier, greenMultiplier, redMultiplier, alphaMultiplier
+	// Insert order (first = last enumerated):
+	//   alphaMultiplier, redMultiplier, greenMultiplier, blueMultiplier,
+	//   alphaOffset, redOffset, greenOffset, blueOffset, rgb, concat, toString
+	ActionVar one  = makeF64(1.0);
+	ActionVar zero = makeF64(0.0);
+	setProperty(app_context, g_color_transform_prototype, "alphaMultiplier", 15, &one);
+	setProperty(app_context, g_color_transform_prototype, "redMultiplier",   13, &one);
+	setProperty(app_context, g_color_transform_prototype, "greenMultiplier", 15, &one);
+	setProperty(app_context, g_color_transform_prototype, "blueMultiplier",  14, &one);
+	setProperty(app_context, g_color_transform_prototype, "alphaOffset",     11, &zero);
+	setProperty(app_context, g_color_transform_prototype, "redOffset",        9, &zero);
+	setProperty(app_context, g_color_transform_prototype, "greenOffset",     11, &zero);
+	setProperty(app_context, g_color_transform_prototype, "blueOffset",      10, &zero);
+
+	// rgb virtual property (addProperty getter/setter)
+	memset(&g_ct_rgb_getter, 0, sizeof(ASFunction));
+	g_ct_rgb_getter.function_type = 2;
+	g_ct_rgb_getter.advanced_func = (Function2Ptr)ctRgbGetter;
+	memset(&g_ct_rgb_setter, 0, sizeof(ASFunction));
+	g_ct_rgb_setter.function_type = 2;
+	g_ct_rgb_setter.advanced_func = (Function2Ptr)ctRgbSetter;
+	setAddProperty(app_context, g_color_transform_prototype, "rgb", 3, &g_ct_rgb_getter, &g_ct_rgb_setter);
+
+	// concat method (before toString so toString is last-inserted = first-enumerated)
+	registerGeomMethod(&g_ct_methods[0], "concat",   (Function2Ptr)ctConcat,   app_context, g_color_transform_prototype);
+	// toString method
+	registerGeomMethod(&g_ct_methods[1], "toString", (Function2Ptr)ctToString, app_context, g_color_transform_prototype);
+}
+
+// flash.geom.ColorTransform constructor
+// new ColorTransform(rMult, gMult, bMult, aMult, rOff, gOff, bOff, aOff)
+// Defaults: 1, 1, 1, 1, 0, 0, 0, 0
+static ActionVar colorTransformConstructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (!obj) return undef;
+
+	double rMult = (arg_count > 0) ? varToDoubleSimple(&args[0]) : 1.0;
+	double gMult = (arg_count > 1) ? varToDoubleSimple(&args[1]) : 1.0;
+	double bMult = (arg_count > 2) ? varToDoubleSimple(&args[2]) : 1.0;
+	double aMult = (arg_count > 3) ? varToDoubleSimple(&args[3]) : 1.0;
+	double rOff  = (arg_count > 4) ? varToDoubleSimple(&args[4]) : 0.0;
+	double gOff  = (arg_count > 5) ? varToDoubleSimple(&args[5]) : 0.0;
+	double bOff  = (arg_count > 6) ? varToDoubleSimple(&args[6]) : 0.0;
+	double aOff  = (arg_count > 7) ? varToDoubleSimple(&args[7]) : 0.0;
+
+	ActionVar v;
+	v = makeF64(rMult); setProperty(app_context, obj, "redMultiplier",   13, &v);
+	v = makeF64(gMult); setProperty(app_context, obj, "greenMultiplier", 15, &v);
+	v = makeF64(bMult); setProperty(app_context, obj, "blueMultiplier",  14, &v);
+	v = makeF64(aMult); setProperty(app_context, obj, "alphaMultiplier", 15, &v);
+	v = makeF64(rOff);  setProperty(app_context, obj, "redOffset",        9, &v);
+	v = makeF64(gOff);  setProperty(app_context, obj, "greenOffset",     11, &v);
+	v = makeF64(bOff);  setProperty(app_context, obj, "blueOffset",      10, &v);
+	v = makeF64(aOff);  setProperty(app_context, obj, "alphaOffset",     11, &v);
+	return undef;
 }
 
 // Call just valueOf on an object. Returns the raw result (even if non-primitive).
@@ -10264,6 +11248,12 @@ void actionGetVariable(SWFAppContext* app_context)
 				PUSH_STR(scope_mc[i]->target, strlen(scope_mc[i]->target));
 				return;
 			}
+			else if (var_name_len == 9 && strncmp(var_name, "transform", 9) == 0)
+			{
+				ASObject* tobj = createTransformObject(app_context, scope_mc[i]);
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)tobj);
+				return;
+			}
 		}
 	}
 
@@ -10343,6 +11333,17 @@ void actionGetVariable(SWFAppContext* app_context)
 		{
 			extern MovieClip root_movieclip;
 			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+			return;
+		}
+
+		// "transform" — built-in MovieClip property for the current clip context
+		// (scope_mc[i] is only set inside WITH blocks; root-frame scripts need this path)
+		if (var_name_len == 9 && strncmp(var_name, "transform", 9) == 0)
+		{
+			extern MovieClip root_movieclip;
+			MovieClip* mc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+			ASObject* tobj = createTransformObject(app_context, mc);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)tobj);
 			return;
 		}
 
@@ -10748,7 +11749,16 @@ void actionGetVariable(SWFAppContext* app_context)
 
 				// flash.geom (5 classes)
 				MAKE_PKG(geom_obj, flash_object, "geom", 4, 8);
-				MAKE_STUB_CTOR(fc_ColorTransform, "ColorTransform");
+				// ColorTransform constructor with prototype
+				initColorTransformPrototype(app_context);
+				static ASFunction fc_ColorTransform;
+				memset(&fc_ColorTransform, 0, sizeof(ASFunction));
+				strncpy(fc_ColorTransform.name, "ColorTransform", 255);
+				fc_ColorTransform.function_type = 2;
+				fc_ColorTransform.advanced_func = (Function2Ptr)colorTransformConstructor;
+				fc_ColorTransform.prototype_obj = g_color_transform_prototype;
+				retainObject(g_color_transform_prototype);
+				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_ColorTransform;
 				SET_CTOR_PROP(geom_obj, "ColorTransform", 14, fc_ColorTransform);
 				// Initialize geometry prototypes (Point, Matrix, Rectangle)
 				initGeomPrototypes(app_context);
@@ -14275,6 +15285,32 @@ void actionSetMember(SWFAppContext* app_context)
 				value_var.data.string_data.owns_memory = false;
 				VAL(u64, &value_var.data.numeric_value) = (u64)_as_result;
 			}
+			// transform property: copy transform state from src MC to this MC
+			if (prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
+			{
+				if (value_var.type == ACTION_STACK_VALUE_OBJECT && value_var.data.numeric_value != 0)
+				{
+					ASObject* src_tobj = (ASObject*) value_var.data.numeric_value;
+					ActionVar* mc_ref = getProperty(src_tobj, "__mc__", 6);
+					if (mc_ref && mc_ref->type == ACTION_STACK_VALUE_MOVIECLIP)
+					{
+						MovieClip* src_mc = (MovieClip*) mc_ref->data.numeric_value;
+						if (src_mc)
+						{
+							mc->x = src_mc->x; mc->y = src_mc->y;
+							mc->xscale = src_mc->xscale; mc->yscale = src_mc->yscale;
+							mc->rotation = src_mc->rotation;
+#ifdef NO_GRAPHICS
+							mc->as_set_flags |= (1|2|4|8|16);
+							s16 sra, sga, sba, saa, srb, sgb, sbb, sab;
+							getLocalCTRaw(src_mc, &sra, &sga, &sba, &saa, &srb, &sgb, &sbb, &sab);
+							setLocalCTRaw(mc, sra, sga, sba, saa, srb, sgb, sbb, sab);
+#endif
+						}
+					}
+				}
+				return;
+			}
 			// User-defined property: store in dynamic_props and as global variable
 			if (mc->dynamic_props == NULL)
 			{
@@ -15706,6 +16742,32 @@ void actionNewObject(SWFAppContext* app_context)
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) node);
 		return;
 	}
+	else if (strcmp(ctor_name, "Color") == 0)
+	{
+		// AVM1 Color object: new Color(mc)
+		initColorPrototype(app_context);
+		ASObject* color_obj = allocObject(app_context, 4);
+		// Set __proto__ to Color.prototype
+		ActionVar proto_var = {0};
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.data.numeric_value = (u64)g_color_prototype;
+		setProperty(app_context, color_obj, "__proto__", 9, &proto_var);
+		// Mark __proto__ as non-enumerable
+		for (u32 _pi = 0; _pi < color_obj->num_used; _pi++)
+		{
+			if (color_obj->properties[_pi].name_length == 9 &&
+			    strncmp(color_obj->properties[_pi].name, "__proto__", 9) == 0)
+			{
+				color_obj->properties[_pi].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+				break;
+			}
+		}
+		retainObject(g_color_prototype);
+		// Call constructor to initialize properties
+		colorConstructor(app_context, args, num_args, NULL, color_obj);
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)color_obj);
+		return;
+	}
 		else
 	{
 		// Try to find user-defined constructor function
@@ -16291,6 +17353,20 @@ void actionNewMethod(SWFAppContext* app_context)
 			{
 				pushUndefined(app_context);
 			}
+		}
+		else
+		{
+			pushUndefined(app_context);
+		}
+	}
+	else if (ctor_name != NULL && strcmp(ctor_name, "Transform") == 0)
+	{
+		// new flash.geom.Transform(mc): wraps a MovieClip in a Transform object
+		if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP)
+		{
+			MovieClip* mc = (MovieClip*) args[0].data.numeric_value;
+			ASObject* tobj = createTransformObject(app_context, mc);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)tobj);
 		}
 		else
 		{

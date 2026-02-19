@@ -102,6 +102,10 @@ int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
 int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y);
 int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation);
+int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, double* aa,
+                          double* rb, double* gb, double* bb, double* ab);
+int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
+                          double rb, double gb, double bb, double ab);
 int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
 // Compute content bounds (union of child bounds in pixels) for a display entry.
 // entry_idx = (size_t)-1 for root-level children. Returns 1 if any bounds found, 0 if empty.
@@ -109,6 +113,13 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
     float* out_xmin_px, float* out_xmax_px, float* out_ymin_px, float* out_ymax_px);
 // Find display entry index by instance name. Returns (size_t)-1 if not found.
 size_t ng_findDisplayEntryIdx(const char* name);
+// Find display entry index by name AND parent display index. parent_idx=(size_t)-1 for root-level.
+size_t ng_findDisplayEntryIdxWithParent(const char* name, size_t parent_idx);
+// Get matrix components from a display entry (column-major SWF format). Returns 1 if found, 0 if not.
+int ng_getMatrixFromEntry(size_t entry_idx, double* out_a, double* out_b, double* out_c, double* out_d, double* out_tx, double* out_ty);
+// Get/set color transform on a display entry by index. Returns 1 if found, 0 if not.
+int ng_getCTFromEntry(size_t entry_idx, double* ra, double* ga, double* ba, double* aa, double* rb, double* gb, double* bb, double* ab);
+int ng_setCTOnEntry(size_t entry_idx, double ra, double ga, double ba, double aa, double rb, double gb, double bb, double ab);
 // TextField variable binding — called from tag_stubs.c at placement time
 void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_name, const char* init_text);
 // Rename a cached MovieClip when tagSetInstanceName updates a sprite's display entry
