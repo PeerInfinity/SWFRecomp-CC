@@ -11446,7 +11446,7 @@ void actionSetVariable(SWFAppContext* app_context)
 					if (scope_depth > 0) scope_depth--;
 					releaseObject(app_context, _wscope);
 					if (_wregs != NULL) FREE(_wregs);
-					free(_pname_u16);
+					FREE(_pname_u16);
 					// If watcher returned non-undefined, use it; else use the intended new value
 					ActionVar _actual_new = (_wret.type != ACTION_STACK_VALUE_UNDEFINED) ? _wret : _new_val;
 					*var = _actual_new;
@@ -14014,6 +14014,17 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 			}
 			// Check watcher table before setting the property
+			// IMPORTANT: prop_name points to a static buffer (_sm_buf) that recursive
+			// actionSetMember calls (from inside the watcher callback) will clobber.
+			// Copy it to a local stack buffer so the watcher invocation can't corrupt it.
+			char _prop_copy[256];
+			{
+				u32 _prop_copy_len = prop_name_len < (u32)(sizeof(_prop_copy)-1) ? prop_name_len : (u32)(sizeof(_prop_copy)-1);
+				memcpy(_prop_copy, prop_name, _prop_copy_len);
+				_prop_copy[_prop_copy_len] = '\0';
+				prop_name = _prop_copy;
+				prop_name_len = _prop_copy_len;
+			}
 			if (g_watch_count > 0 && !g_execution_halted)
 			{
 				for (int _wi = 0; _wi < g_watch_count; _wi++)
@@ -14059,7 +14070,7 @@ void actionSetMember(SWFAppContext* app_context)
 								releaseObject(app_context, _wscope);
 								if (_wregs != NULL) FREE(_wregs);
 								if (_pname_arg.data.string_data.owns_memory)
-									free(_pname_arg.data.string_data.heap_ptr);
+									FREE(_pname_arg.data.string_data.heap_ptr);
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
