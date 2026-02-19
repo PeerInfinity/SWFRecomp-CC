@@ -1,20 +1,22 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-18 (clone/duplicate plan: duplicate_movie_clip + clone_sprite_types now passing)
+Last updated: 2026-02-19 (globals-plan: watch/unwatch, object_prototypes, parse_int, watch_virtual_property_proto, primitive_type_globals)
 
 Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
 
 ## Quick Summary
 
-- **Pass rate (estimated local)**: ~228+/619 — adds `duplicate_movie_clip` + `clone_sprite_types` (+2 tests)
-- **Main failure type**: output_mismatch, timeout (2), compile_fail (1), segfault (1)
-- **New regression (from b815da5)**: `movieclip_hittest_shapeflag` changed from output_mismatch (180/338) to compile_fail — still needs investigation
-- **Recent gains**: `edittext_width_height` (_xscale/_yscale/_rotation transform accounting); `arguments` (DefineFunction2 preload path now calls swf_setup_arguments_props; ARRAY valueOf/toString fixed to use own-props only); `function_suppress_and_preload` (DefineFunction2 preload/suppress register fix)
+- **Pass rate (estimated local)**: ~234+/619 — adds `watch`, `watch_virtual_property_proto`, `object_prototypes`, `parse_int`, `primitive_type_globals` (+5 tests from this session)
+- **Main failure type**: output_mismatch, timeout (2), segfault (1) — compile_fail regression resolved
+- **Resolved regression**: `movieclip_hittest_shapeflag` compile_fail fixed, back to MISMATCH (180/338)
+- **Recent gains**: `watch`/`unwatch` implemented; `object_prototypes` now fully passes; `parse_int` unblocked; `watch_virtual_property_proto` passes; static buffer reentrancy bug in actionSetMember fixed
 
 ## Major Features Implemented Since Last Update
 
 | Feature | Commits | Impact | Key Tests |
 |---------|---------|--------|-----------|
+| **Object.prototype.watch/unwatch** | 0a9e034, 85c676f | Property change callbacks; watcher fires before addProperty setter; static buffer reentrancy fix | `watch` ✅, `watch_virtual_property_proto` ✅, `object_prototypes` ✅, `parse_int` ✅ |
+| **Number.prototype.toString(NaN, radix)** | 743325f | NaN encoded as INT32_MIN via x86 CVTTSD2SI, then inverted digit encoding char(48-N); \r→\n normalization | `primitive_type_globals` ✅ (557/557) |
 | **edittext _width/_height transform fix** | 337c212 | Width/height properties now account for _xscale/_yscale/_rotation transforms | edittext_width_height (103/103 ✅) |
 | **arguments object: DefineFunction2 preload path** | 2f007dd | swf_setup_arguments_props() now called from recompiler-generated preload block; fixes callee/caller/__proto__/instanceof for preloaded-arguments functions; ARRAY valueOf/toString fixed to use own-property lookup only (fixes [object Object] bug) | arguments (127/127 ✅) |
 | **arguments object: callee/caller/__proto__** | b9cfc9d | arguments.callee, arguments.caller (null or calling function), arguments instanceof Array, arguments.__proto__ === Array.prototype — all now implemented; also fixes Array.prototype initialization and checkInstanceOf for arrays | arguments |
@@ -58,7 +60,7 @@ These tests were near-passing in the previous update and now pass locally:
 
 | Test | Match | Issue |
 |------|-------|-------|
-| `object_prototypes` | 62/74 (84%) | watch() not implemented; `__PROTO__`/`__Proto__` case-insensitive lookup missing |
+| ~~`object_prototypes`~~ | 74/74 ✅ | watch/unwatch implemented + case-insensitive __proto__ lookup |
 
 ### Tier 3: 80-82% match
 
@@ -95,7 +97,7 @@ These tests were near-passing in the previous update and now pass locally:
 | TRY_CATCH_PLAN | **Phase 1 DONE** | 0 pass (91% match) | Typed catch block matching (String/Object/etc.) |
 | MATH_PLAN | **COMPLETE** | 1/4 pass, 3 at 98.5% | ASnative(200,50), throwing valueOf |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
-| GLOBALS_PLAN | **Phases 1-5 DONE** | globals_swf6/7/8 PASS | Phase 6 (Number.toString(radix)), Phase 7-8 (prototype methods) |
+| GLOBALS_PLAN | **Phase 6 DONE** | globals_swf6/7/8, primitive_type_globals PASS | Phase 7-8 (prototype methods, property flags) |
 | XML_PLAN | **ALL PHASES COMPLETE** | 24/26 active tests pass | xml_to_string (11/13), xml_child_nodes_edge_cases (3/4) |
 | TEXTFIELD_PLAN | **Phases 1-2 DONE** | 17/66 tests pass | Phase 3 (variable binding, width/height), Phase 5 (HTML) |
 | MOVIECLIP_PLAN | **Phase 1 DONE** | 2 MC tests pass | Phase 2 (depth), Phase 3 (createEmptyMC) |
@@ -109,7 +111,7 @@ These tests were near-passing in the previous update and now pass locally:
 | TIMER_PLAN | Not started | 0/3 | setInterval, setTimeout |
 | STAGE_PLAN | Not started | 0/7 | Stage object, MC precision, child enum |
 | SELECTION_PLAN | Not started | 0/2 | Focus tracking, replaceSel |
-| OBJECT_WATCH_PLAN | Not started | 0/4 | watch/unwatch property callbacks |
+| OBJECT_WATCH_PLAN | **Phase 1 DONE** | 3/4 pass (`watch`, `watch_virtual_property_proto`, `object_prototypes`) | `watch_textfield` — MC dispatch + MC watcher in SetMember needed |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/2 | ASnative, ASSetPropFlags |
 | TELLTARGET_PLAN | Not started | 0/3 | tellTarget scope |
 | CLONE_DUPLICATE_PLAN | **Phase 1 DONE** | 2/5 pass | clone_sprite_edittext (needs TF clone), clone_sprite_edittext_dynamic (needs TF clone) |
@@ -120,12 +122,12 @@ These tests were near-passing in the previous update and now pass locally:
 
 ### High ROI (fix existing near-passing tests)
 1. ~~**Fix `date` test timezone**~~ — **DONE**: TZ=Asia/Kathmandu added to CI workflow (2026-02-18); date now at ~99.2%
-2. **Implement watch()/unwatch()** — unblocks `object_prototypes` (12 lines off); also fix case-insensitive `__proto__` lookup
-3. **Investigate movieclip_hittest_shapeflag compile_fail** — regression from b815da5
-4. **Try parse_int** — was blocked by `arguments`; now that arguments is fixed, may pass
+2. ~~**Implement watch()/unwatch()**~~ — **DONE**: `watch`, `watch_virtual_property_proto`, `object_prototypes` now pass
+3. ~~**Investigate movieclip_hittest_shapeflag compile_fail**~~ — **FIXED**: now back to MISMATCH (180/338)
+4. ~~**Try parse_int**~~ — **DONE**: passes now
 
 ### Medium ROI (new feature phases)
-5. **GLOBALS_PLAN Phase 6** — Number.prototype.toString(radix), improves primitive_type_globals (320/557)
+5. ~~**GLOBALS_PLAN Phase 6**~~ — **DONE**: Number.prototype.toString(NaN,radix) implemented; primitive_type_globals now 557/557
 6. **TEXTFIELD_PLAN Phase 3** — variable binding + width/height
 7. **TEXTFIELD_PLAN Phase 5** — HTML text (edittext_html_* tests, several at 81-87%)
 8. **Fix GotoFrame inline execution** — needed for target_clip_removed (4/5, 80%)

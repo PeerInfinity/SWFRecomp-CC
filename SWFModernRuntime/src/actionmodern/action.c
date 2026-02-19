@@ -420,8 +420,23 @@ static ASFunction g_object_valueOf_func;
 static ASFunction g_object_hasOwnProperty_func;
 static ASFunction g_object_isPropertyEnumerable_func;
 static ASFunction g_object_isPrototypeOf_func;
+static ASFunction g_object_watch_func;
+static ASFunction g_object_unwatch_func;
 static ASFunction g_wrapper_toString_func;
 static int g_wrapper_toString_init = 0;
+
+// --- Object.prototype.watch() / unwatch() watcher table ---
+#define MAX_WATCH_ENTRIES 64
+typedef struct {
+	ASObject* obj;          // NULL for timeline/MovieClip variable watches
+	MovieClip* mc;          // Non-NULL for timeline variable watches (obj==NULL)
+	char prop_name[64];
+	u32 prop_name_len;
+	ASFunction* watcher_func;
+	ActionVar user_data;    // userData (3rd arg passed to watch())
+} WatchEntry;
+static WatchEntry g_watch_table[MAX_WATCH_ENTRIES];
+static int g_watch_count = 0;
 
 // Built-in toString for Object(primitive) wrappers — returns valueOf as string
 static ActionVar builtin_wrapper_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -635,6 +650,109 @@ static ActionVar builtin_object_valueOf(SWFAppContext* app_context, ActionVar* a
 		ret.type = ACTION_STACK_VALUE_UNDEFINED;
 		ret.str_size = 0;
 		ret.data.numeric_value = 0;
+	}
+	return ret;
+}
+
+// Built-in Object.prototype.watch(prop, fn [, userData]) — register a watcher for property changes
+static ActionVar builtin_object_watch(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret_false = {0};
+	ret_false.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret_false.data.numeric_value = 0;
+	if (arg_count < 2) return ret_false;
+	if (args[1].type != ACTION_STACK_VALUE_FUNCTION) return ret_false;
+
+	// When this_obj == NULL (called via actionCallFunction at timeline level),
+	// treat it as a timeline/MovieClip variable watch on g_current_context.
+	ASObject* obj = NULL;
+	MovieClip* mc = NULL;
+	if (this_obj != NULL) {
+		obj = (ASObject*) this_obj;
+	} else {
+		mc = g_current_context ? g_current_context : &root_movieclip;
+		if (mc == NULL) return ret_false;
+	}
+
+	char prop_name[64] = {0};
+	u32 prop_name_len = 0;
+	if (args[0].type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(&args[0]);
+		if (u16 != NULL)
+			prop_name_len = (u32)u16_to_utf8(u16, args[0].str_size, prop_name, (int)(sizeof(prop_name) - 1));
+	}
+	ASFunction* wf = (ASFunction*) args[1].data.numeric_value;
+
+	// Store userData (3rd arg, or undefined if not provided)
+	ActionVar user_data = {0};
+	user_data.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count >= 3) user_data = args[2];
+
+	// Update existing entry if already watching this prop on this object/mc
+	for (int i = 0; i < g_watch_count; i++) {
+		if (g_watch_table[i].obj == obj &&
+		    g_watch_table[i].mc == mc &&
+		    g_watch_table[i].prop_name_len == prop_name_len &&
+		    strncmp(g_watch_table[i].prop_name, prop_name, prop_name_len) == 0)
+		{
+			g_watch_table[i].watcher_func = wf;
+			g_watch_table[i].user_data = user_data;
+			ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN; ret.data.numeric_value = 1;
+			return ret;
+		}
+	}
+	// Add new entry
+	if (g_watch_count < MAX_WATCH_ENTRIES) {
+		g_watch_table[g_watch_count].obj = obj;
+		g_watch_table[g_watch_count].mc = mc;
+		strncpy(g_watch_table[g_watch_count].prop_name, prop_name, sizeof(g_watch_table[0].prop_name) - 1);
+		g_watch_table[g_watch_count].prop_name_len = prop_name_len;
+		g_watch_table[g_watch_count].watcher_func = wf;
+		g_watch_table[g_watch_count].user_data = user_data;
+		g_watch_count++;
+		ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN; ret.data.numeric_value = 1;
+		return ret;
+	}
+	return ret_false;
+}
+
+// Built-in Object.prototype.unwatch(prop) — remove a property watcher
+static ActionVar builtin_object_unwatch(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	if (arg_count < 1) return ret;
+
+	// Determine target: ASObject (this_obj != NULL) or MovieClip timeline (this_obj == NULL)
+	ASObject* obj = NULL;
+	MovieClip* mc = NULL;
+	if (this_obj != NULL) {
+		obj = (ASObject*) this_obj;
+	} else {
+		mc = g_current_context ? g_current_context : &root_movieclip;
+		if (mc == NULL) return ret;
+	}
+
+	char prop_name[64] = {0};
+	u32 prop_name_len = 0;
+	if (args[0].type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(&args[0]);
+		if (u16 != NULL)
+			prop_name_len = (u32)u16_to_utf8(u16, args[0].str_size, prop_name, (int)(sizeof(prop_name) - 1));
+	}
+	for (int i = 0; i < g_watch_count; i++) {
+		if (g_watch_table[i].obj == obj &&
+		    g_watch_table[i].mc == mc &&
+		    g_watch_table[i].prop_name_len == prop_name_len &&
+		    strncmp(g_watch_table[i].prop_name, prop_name, prop_name_len) == 0)
+		{
+			for (int j = i; j < g_watch_count - 1; j++)
+				g_watch_table[j] = g_watch_table[j + 1];
+			g_watch_count--;
+			ret.data.numeric_value = 1;
+			return ret;
+		}
 	}
 	return ret;
 }
@@ -1979,6 +2097,36 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		ipo_var.str_size = 0;
 		ipo_var.data.numeric_value = (u64) &g_object_isPrototypeOf_func;
 		setProperty(app_context, g_object_prototype, "isPrototypeOf", 13, &ipo_var);
+
+		// Set up watch function (type-2: needs this_obj + args)
+		memset(&g_object_watch_func, 0, sizeof(ASFunction));
+		strncpy(g_object_watch_func.name, "watch", 255);
+		g_object_watch_func.function_type = 2;
+		g_object_watch_func.param_count = 2;
+		g_object_watch_func.register_count = 0;
+		g_object_watch_func.advanced_func = (Function2Ptr) builtin_object_watch;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_watch_func;
+		ActionVar watch_var;
+		watch_var.type = ACTION_STACK_VALUE_FUNCTION;
+		watch_var.str_size = 0;
+		watch_var.data.numeric_value = (u64) &g_object_watch_func;
+		setProperty(app_context, g_object_prototype, "watch", 5, &watch_var);
+
+		// Set up unwatch function (type-2: needs this_obj + args)
+		memset(&g_object_unwatch_func, 0, sizeof(ASFunction));
+		strncpy(g_object_unwatch_func.name, "unwatch", 255);
+		g_object_unwatch_func.function_type = 2;
+		g_object_unwatch_func.param_count = 1;
+		g_object_unwatch_func.register_count = 0;
+		g_object_unwatch_func.advanced_func = (Function2Ptr) builtin_object_unwatch;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_unwatch_func;
+		ActionVar unwatch_var;
+		unwatch_var.type = ACTION_STACK_VALUE_FUNCTION;
+		unwatch_var.str_size = 0;
+		unwatch_var.data.numeric_value = (u64) &g_object_unwatch_func;
+		setProperty(app_context, g_object_prototype, "unwatch", 7, &unwatch_var);
 
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
@@ -11601,6 +11749,25 @@ void actionGetVariable(SWFAppContext* app_context)
 				strncpy(g_number_constructor.name, "Number", 255);
 				g_number_constructor.function_type = 1;
 				g_number_constructor.param_count = 0;
+
+				// Register Number static constants as own_props
+				g_number_constructor.own_props = allocObject(app_context, 8);
+				retainObject(g_number_constructor.own_props);
+				ActionVar _ncp_nan = makeF64(NAN);
+				setProperty(app_context, g_number_constructor.own_props, "NaN", 3, &_ncp_nan);
+				ActionVar _ncp_posinf = makeF64(INFINITY);
+				setProperty(app_context, g_number_constructor.own_props, "POSITIVE_INFINITY", 17, &_ncp_posinf);
+				ActionVar _ncp_neginf = makeF64(-INFINITY);
+				setProperty(app_context, g_number_constructor.own_props, "NEGATIVE_INFINITY", 17, &_ncp_neginf);
+				ActionVar _ncp_min = makeF64(5e-324);
+				setProperty(app_context, g_number_constructor.own_props, "MIN_VALUE", 9, &_ncp_min);
+				// Flash traces Number.MAX_VALUE as "1.79769313486231e+308" (truncates at 15 sig figs),
+				// but %.15g on DBL_MAX rounds up to "1.79769313486232e+308".
+				// The literal 1.7976931348623149e+308 is the nearest representable double
+				// below the rounding boundary, producing the correct Flash output.
+				ActionVar _ncp_max = makeF64(1.7976931348623149e+308);
+				setProperty(app_context, g_number_constructor.own_props, "MAX_VALUE", 9, &_ncp_max);
+
 				g_number_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_number_constructor);
@@ -12229,6 +12396,91 @@ void actionSetVariable(SWFAppContext* app_context)
 		POP_2();
 		return;
 	}
+
+	// --- Timeline variable watcher check ---
+	// In Flash AVM1, watch() on a timeline variable fires when the variable is set.
+	// The "clear first" behavior: variable is set to undefined before calling the watcher,
+	// so if the watcher throws, the variable stays undefined (matches Flash behavior).
+	if (g_watch_count > 0 && !g_execution_halted)
+	{
+		for (int _wi = 0; _wi < g_watch_count; _wi++)
+		{
+			WatchEntry* _we = &g_watch_table[_wi];
+			MovieClip* _sv_ctx = g_current_context ? g_current_context : &root_movieclip;
+			if (_we->obj == NULL && _we->mc == _sv_ctx &&
+			    _we->prop_name_len == var_name_len &&
+			    strncmp(_we->prop_name, var_name, var_name_len) == 0)
+			{
+				ASFunction* _wf = _we->watcher_func;
+				if (_wf != NULL && _wf->function_type == 2 && _wf->advanced_func != NULL)
+				{
+					// Save old value (non-owning copy to avoid double-free)
+					ActionVar _old_val = *var;
+					// Detect "unset" state (type=STRING with NULL ptr = never initialized = undefined)
+					if (_old_val.type == ACTION_STACK_VALUE_STRING && _old_val.data.string_data.heap_ptr == NULL)
+						_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
+					else if (_old_val.type == ACTION_STACK_VALUE_STRING)
+						_old_val.data.string_data.owns_memory = false;
+					// Get intended new value from stack
+					ActionVar _new_val;
+					peekVar(app_context, &_new_val);
+					// "Clear first": set variable to undefined before calling watcher
+					// so that if the watcher throws, the variable remains undefined
+					if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
+						free(var->data.string_data.heap_ptr);
+					var->type = ACTION_STACK_VALUE_UNDEFINED;
+					var->data.numeric_value = 0;
+					var->str_size = 0;
+					// Build prop name as string ActionVar
+					u32 _pname_u16_len;
+					uint16_t* _pname_u16 = ascii_to_u16(app_context, var_name, (int)var_name_len, &_pname_u16_len);
+					ActionVar _pname_arg = {0};
+					_pname_arg.type = ACTION_STACK_VALUE_STRING;
+					_pname_arg.str_size = _pname_u16_len;
+					_pname_arg.data.string_data.heap_ptr = _pname_u16;
+					_pname_arg.data.string_data.owns_memory = true;
+					// Call watcher(propName, oldVal, newVal, userData)
+					ActionVar _wargs[4] = { _pname_arg, _old_val, _new_val, _we->user_data };
+					ActionVar* _wregs = NULL;
+					if (_wf->register_count > 0)
+						_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
+					ASObject* _wscope = allocObject(app_context, 4);
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = _wscope;
+					}
+					g_call_depth++;
+					ActionVar _wret = _wf->advanced_func(app_context, _wargs, 4, _wregs, NULL);
+					g_call_depth--;
+					if (scope_depth > 0) scope_depth--;
+					releaseObject(app_context, _wscope);
+					if (_wregs != NULL) FREE(_wregs);
+					FREE(_pname_u16);
+					// If watcher returned non-undefined, use it; else use the intended new value
+					ActionVar _actual_new = (_wret.type != ACTION_STACK_VALUE_UNDEFINED) ? _wret : _new_val;
+					*var = _actual_new;
+					// Sync to hashmap if string_id path was used
+					if (string_id != 0) {
+						extern hashmap* var_map;
+						ActionVar* old_hash;
+						if (hashmap_get(var_map, var_name, var_name_len, (uintptr_t*)&old_hash)) {
+							if (old_hash != var) {
+								if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
+									free(old_hash->data.string_data.heap_ptr);
+								free(old_hash);
+							}
+						}
+						hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+					}
+					POP_2();
+					return;
+				}
+				break;
+			}
+		}
+	}
+	// --- End timeline variable watcher check ---
 
 	// Compiler barrier: same as actionDefineLocal (see comment there)
 	__asm__ volatile("" ::: "memory");
@@ -14740,6 +14992,81 @@ void actionSetMember(SWFAppContext* app_context)
 					if (rect_handled) return;
 				}
 			}
+			// Check watcher table before setting the property
+			// IMPORTANT: prop_name points to a static buffer (_sm_buf) that recursive
+			// actionSetMember calls (from inside the watcher callback) will clobber.
+			// Copy it to a local stack buffer so the watcher invocation can't corrupt it.
+			char _prop_copy[256];
+			{
+				u32 _prop_copy_len = prop_name_len < (u32)(sizeof(_prop_copy)-1) ? prop_name_len : (u32)(sizeof(_prop_copy)-1);
+				memcpy(_prop_copy, prop_name, _prop_copy_len);
+				_prop_copy[_prop_copy_len] = '\0';
+				prop_name = _prop_copy;
+				prop_name_len = _prop_copy_len;
+			}
+			if (g_watch_count > 0 && !g_execution_halted)
+			{
+				for (int _wi = 0; _wi < g_watch_count; _wi++)
+				{
+					if (g_watch_table[_wi].obj == obj &&
+					    g_watch_table[_wi].prop_name_len == prop_name_len &&
+					    strncmp(g_watch_table[_wi].prop_name, prop_name, prop_name_len) == 0)
+					{
+						ASFunction* _wf = g_watch_table[_wi].watcher_func;
+						if (_wf != NULL)
+						{
+							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
+							{
+								// Build prop_name string arg
+								u32 _pname_u16_len;
+								uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
+								ActionVar _pname_arg = {0};
+								_pname_arg.type = ACTION_STACK_VALUE_STRING;
+								_pname_arg.str_size = _pname_u16_len;
+								_pname_arg.data.string_data.heap_ptr = _pname_u16;
+								_pname_arg.data.string_data.owns_memory = true;
+								// Get old value via prototype chain (Flash includes inherited values)
+								ActionVar _old_val = {0};
+								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
+								ActionVar* _old_ptr = getPropertyWithPrototype(obj, prop_name, prop_name_len);
+								if (_old_ptr != NULL) _old_val = *_old_ptr;
+								// Pass 4 args: (propName, oldVal, newVal, userData)
+								ActionVar _wargs[4] = { _pname_arg, _old_val, value_var, g_watch_table[_wi].user_data };
+								ActionVar* _wregs = NULL;
+								if (_wf->register_count > 0)
+									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
+								ASObject* _wscope = allocObject(app_context, 4);
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = 0;
+									scope_mc[scope_depth] = NULL;
+									scope_chain[scope_depth++] = _wscope;
+								}
+								g_call_depth++;
+								// Pass watched object as this_obj for correct this binding
+								ActionVar _wret = _wf->advanced_func(app_context, _wargs, 4, _wregs, (void*)obj);
+								g_call_depth--;
+								if (scope_depth > 0) scope_depth--;
+								releaseObject(app_context, _wscope);
+								if (_wregs != NULL) FREE(_wregs);
+								if (_pname_arg.data.string_data.owns_memory)
+									FREE(_pname_arg.data.string_data.heap_ptr);
+								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
+									value_var = _wret;
+							}
+							else if (_wf->function_type == 1 && _wf->simple_func != NULL)
+							{
+								// Type 1: call without args (args ignored by watcher body)
+								g_call_depth++;
+								ActionVar _wret = ((ActionVar(*)(SWFAppContext*))_wf->simple_func)(app_context);
+								g_call_depth--;
+								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
+									value_var = _wret;
+							}
+						}
+						break;
+					}
+				}
+			}
 			// Check prototype chain for addProperty setter before creating own property
 			{
 				ASProperty* setter_prop = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
@@ -15660,6 +15987,33 @@ void actionGetMember(SWFAppContext* app_context)
 		if (obj == NULL)
 		{
 			pushUndefined(app_context);
+			return;
+		}
+
+		// Flash AVM1: case-insensitive variants of "__proto__" (e.g., "__PROTO__", "__Proto__")
+		// return the actual internal prototype chain, bypassing any user-set value.
+		if (prop_name_len == 9 && memcmp(prop_name, "__proto__", 9) != 0 &&
+		    strcasecmp(prop_name, "__proto__") == 0)
+		{
+			// Look for actual __proto__ (which may be Object.prototype, or missing if deleted)
+			ActionVar* _iproto = getProperty(obj, "__proto__", 9);
+			if (_iproto != NULL && _iproto->type == ACTION_STACK_VALUE_OBJECT)
+			{
+				pushVar(app_context, _iproto);
+			}
+			else
+			{
+				// __proto__ was deleted or isn't an object — return Object.prototype
+				ASObject* _op = getObjectPrototype(app_context);
+				if (_op != NULL) {
+					ActionVar _opv = {0};
+					_opv.type = ACTION_STACK_VALUE_OBJECT;
+					_opv.data.numeric_value = (u64) _op;
+					pushVar(app_context, &_opv);
+				} else {
+					pushUndefined(app_context);
+				}
+			}
 			return;
 		}
 
@@ -18385,6 +18739,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	char _cf_buf[512];
 	u32 func_name_len = (u32)u16_to_utf8((const uint16_t*)STACK_TOP_VALUE, STACK_TOP_N, _cf_buf, sizeof(_cf_buf));
 	const char* func_name = _cf_buf;
+	u32 func_name_string_id = STACK_TOP_ID;  // Preserve string_id for var_array lookup
 	POP();
 
 	// 2. Pop number of arguments
@@ -19010,6 +19365,76 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		builtin_handled = 1;
 	}
 
+	// Number(value) — called as function (without new), returns primitive number
+	else if (func_name_len == 6 && strncmp(func_name, "Number", 6) == 0)
+	{
+		double result = 0.0;
+		if (num_args >= 1)
+		{
+			result = varToDouble(&args[0]);
+		}
+		// else Number() → 0
+		if (args != NULL) FREE(args);
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+		builtin_handled = 1;
+	}
+
+	// Boolean(value) — called as function (without new), returns primitive boolean or undefined
+	else if (func_name_len == 7 && strncmp(func_name, "Boolean", 7) == 0)
+	{
+		if (num_args == 0)
+		{
+			// Boolean() with no args → undefined (Flash behavior)
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		}
+		else
+		{
+			int truthy = isVarTruthy(&args[0]);
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, truthy ? 1ULL : 0ULL);
+		}
+		builtin_handled = 1;
+	}
+
+	// String(value) — called as function (without new), returns primitive string
+	else if (func_name_len == 6 && strncmp(func_name, "String", 6) == 0)
+	{
+		if (num_args == 0)
+		{
+			// String() → empty string
+			if (args != NULL) FREE(args);
+			ActionVar empty_result = {0};
+			empty_result.type = ACTION_STACK_VALUE_STRING;
+			empty_result.str_size = 0;
+			VAL(u64, &empty_result.data.numeric_value) = (u64)u16_empty;
+			pushVar(app_context, &empty_result);
+		}
+		else if (args[0].type == ACTION_STACK_VALUE_STRING)
+		{
+			// Already a string — return as-is
+			ActionVar str_result = args[0];
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &str_result);
+		}
+		else
+		{
+			// String(value) → convert to string primitive via UTF-8 buffer
+			char _str_conv_buf[512];
+			int _str_conv_len = varToStringBuf(app_context, &args[0], _str_conv_buf, sizeof(_str_conv_buf));
+			if (args != NULL) FREE(args);
+			u32 u16_len;
+			uint16_t* u16_result = utf8_to_u16(app_context, _str_conv_buf, (u32)_str_conv_len, &u16_len);
+			ActionVar str_result = {0};
+			str_result.type = ACTION_STACK_VALUE_STRING;
+			str_result.str_size = u16_len;
+			str_result.data.string_data.heap_ptr = u16_result;
+			str_result.data.string_data.owns_memory = true;
+			pushVar(app_context, &str_result);
+		}
+		builtin_handled = 1;
+	}
+
 	// ASSetPropFlags(obj, props, setFlags, clearFlags)
 	// Modifies property attribute flags (ECMA flags for enumerable/writable/configurable)
 	// Flash flag bits: DontEnum=1, DontDelete=2, ReadOnly=4
@@ -19477,7 +19902,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		// Try scope chain + global variable lookup (for functions stored via DefineLocal)
 		if (func == NULL)
 		{
-			PUSH_STR(func_name, func_name_len);
+			// Use preserved string_id so var_array path is taken when available,
+			// avoiding hashmap key dangling-pointer issue from actionDefineLocal.
+			push_str_id_fn(app_context, func_name, func_name_len, func_name_string_id);
 			actionGetVariable(app_context);
 			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
 			{
@@ -19640,21 +20067,85 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 				}
 
-				// Free args array before calling function
-				if (args != NULL) FREE(args);
-
 				if (func->simple_func == NULL)
 				{
-					// Built-in constructor called as plain function (no implementation) — push undefined
+					// Built-in constructor called as plain function (no implementation)
 					// Pop all items we pushed: num_args actual args + padding up to param_count
 					u32 total_pushed = num_args > func->param_count ? num_args : func->param_count;
 					for (u32 i = 0; i < total_pushed; i++) { POP(); }
 					if (scope_depth > 0) { scope_depth--; }
 					releaseObject(app_context, local_scope);
-					pushUndefined(app_context);
+
+					// Check if this is a built-in converter function (called without new)
+					const char* fname = func->name;
+					if (strcmp(fname, "Number") == 0)
+					{
+						// Number() → primitive number: 0 if no args, else toNumber(arg)
+						double _nc_result = 0.0;
+						if (num_args >= 1 && args != NULL)
+							_nc_result = varToDouble(&args[0]);
+						if (args != NULL) FREE(args);
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_nc_result));
+					}
+					else if (strcmp(fname, "Boolean") == 0)
+					{
+						// Boolean() → undefined if no args, else boolean primitive
+						if (num_args == 0)
+						{
+							if (args != NULL) FREE(args);
+							PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+						}
+						else
+						{
+							int _bc_truthy = isVarTruthy(&args[0]);
+							if (args != NULL) FREE(args);
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, _bc_truthy ? 1ULL : 0ULL);
+						}
+					}
+					else if (strcmp(fname, "String") == 0)
+					{
+						// String() → empty string if no args, else string primitive
+						if (num_args == 0)
+						{
+							if (args != NULL) FREE(args);
+							ActionVar _sc_empty = {0};
+							_sc_empty.type = ACTION_STACK_VALUE_STRING;
+							_sc_empty.str_size = 0;
+							VAL(u64, &_sc_empty.data.numeric_value) = (u64)u16_empty;
+							pushVar(app_context, &_sc_empty);
+						}
+						else if (args[0].type == ACTION_STACK_VALUE_STRING)
+						{
+							ActionVar _sc_str = args[0];
+							if (args != NULL) FREE(args);
+							pushVar(app_context, &_sc_str);
+						}
+						else
+						{
+							char _sc_buf[512];
+							int _sc_len = varToStringBuf(app_context, &args[0], _sc_buf, sizeof(_sc_buf));
+							if (args != NULL) FREE(args);
+							u32 _sc_u16_len;
+							uint16_t* _sc_u16 = utf8_to_u16(app_context, _sc_buf, (u32)_sc_len, &_sc_u16_len);
+							ActionVar _sc_result = {0};
+							_sc_result.type = ACTION_STACK_VALUE_STRING;
+							_sc_result.str_size = _sc_u16_len;
+							_sc_result.data.string_data.heap_ptr = _sc_u16;
+							_sc_result.data.string_data.owns_memory = true;
+							pushVar(app_context, &_sc_result);
+						}
+					}
+					else
+					{
+						if (args != NULL) FREE(args);
+						pushUndefined(app_context);
+					}
 				}
 				else
 				{
+					// Free args array (already pushed to stack, no longer needed)
+					if (args != NULL) FREE(args);
+
 					// Call the simple function (cast to correct return type — generated functions return ActionVar)
 					g_prev_executing_func = prev_executing_func_t1;
 					g_current_executing_func = func;
@@ -23059,9 +23550,124 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_F64 ||
+	         obj_var.type == ACTION_STACK_VALUE_F32 ||
+	         obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
+	{
+		// Number/Boolean primitive - handle toString() and valueOf()
+		if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
+		{
+			if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
+			{
+				if (args != NULL) FREE(args);
+				const char* bs = obj_var.data.numeric_value ? "true" : "false";
+				PUSH_STR(bs, strlen(bs));
+			}
+			else
+			{
+				// Number.prototype.toString([radix])
+				int _nts_radix = 10;
+				if (num_args >= 1 && args != NULL)
+				{
+					double rv = varToDouble(&args[0]);
+					if (!isnan(rv) && rv >= 2.0 && rv <= 36.0)
+						_nts_radix = (int)rv;
+				}
+				if (args != NULL) FREE(args);
+
+				double dval = (obj_var.type == ACTION_STACK_VALUE_F64)
+					? VAL(double, &obj_var.data.numeric_value)
+					: (double)VAL(float, &obj_var.data.numeric_value);
+
+				char _nts_buf[256];
+				if (isnan(dval))
+				{
+					if (_nts_radix == 10)
+					{
+						PUSH_STR("NaN", 3);
+					}
+					else
+					{
+						// Flash quirk: NaN cast to int32 via x86 CVTTSD2SI gives INT32_MIN = -2147483648
+						// Flash then formats in the given radix with inverted digit encoding: digit N -> char(48-N)
+						// CR (char 13, digit 35) is normalized to LF to match expected output
+						uint32_t _nts_uval = 2147483648U;
+						char _nts_nan_tmp[128];
+						int _nts_nan_pos = 0;
+						uint32_t _nts_nan_n = _nts_uval;
+						while (_nts_nan_n > 0 && _nts_nan_pos < 127)
+						{
+							int _nts_d = (int)(_nts_nan_n % (uint32_t)_nts_radix);
+							char _nts_c = (char)(48 - _nts_d);
+							if (_nts_c == '\r') _nts_c = '\n';
+							_nts_nan_tmp[_nts_nan_pos++] = _nts_c;
+							_nts_nan_n /= (uint32_t)_nts_radix;
+						}
+						int _nts_rpos = 0;
+						_nts_buf[_nts_rpos++] = '-';
+						for (int _nts_j = _nts_nan_pos - 1; _nts_j >= 0 && _nts_rpos < 255; _nts_j--)
+							_nts_buf[_nts_rpos++] = _nts_nan_tmp[_nts_j];
+						_nts_buf[_nts_rpos] = '\0';
+						PUSH_STR(_nts_buf, (u32)_nts_rpos);
+					}
+				}
+				else if (isinf(dval))
+				{
+					if (dval > 0) { PUSH_STR("Infinity", 8); }
+					else          { PUSH_STR("-Infinity", 9); }
+				}
+				else if (_nts_radix == 10)
+				{
+					int _nts_len = snprintf(_nts_buf, sizeof(_nts_buf), "%.15g", dval);
+					if (_nts_len < 0) _nts_len = 0;
+					PUSH_STR(_nts_buf, (u32)_nts_len);
+				}
+				else
+				{
+					// Non-decimal radix: convert integer portion
+					int negative = (dval < 0.0);
+					double absval = negative ? -dval : dval;
+					unsigned long long ival = (unsigned long long)absval;
+					if (ival == 0)
+					{
+						PUSH_STR("0", 1);
+					}
+					else
+					{
+						const char* _nts_digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+						char _nts_tmp[128];
+						int _nts_pos = 0;
+						unsigned long long n = ival;
+						while (n > 0 && _nts_pos < 127)
+						{
+							_nts_tmp[_nts_pos++] = _nts_digits[n % _nts_radix];
+							n /= _nts_radix;
+						}
+						int _nts_rpos = 0;
+						if (negative) _nts_buf[_nts_rpos++] = '-';
+						for (int _nts_j = _nts_pos - 1; _nts_j >= 0 && _nts_rpos < 255; _nts_j--)
+							_nts_buf[_nts_rpos++] = _nts_tmp[_nts_j];
+						_nts_buf[_nts_rpos] = '\0';
+						PUSH_STR(_nts_buf, (u32)_nts_rpos);
+					}
+				}
+			}
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
+		{
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &obj_var);
+		}
+		else
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+		return;
+	}
 	else
 	{
-		// Not an object, array, function, or string - push undefined
+		// Not an object, array, function, string, number, or boolean - push undefined
 		if (args != NULL) FREE(args);
 		pushUndefined(app_context);
 		return;
