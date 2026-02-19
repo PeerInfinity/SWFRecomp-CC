@@ -1,12 +1,12 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-19 (globals-plan: watch/unwatch, object_prototypes, parse_int, watch_virtual_property_proto)
+Last updated: 2026-02-19 (globals-plan: watch/unwatch, object_prototypes, parse_int, watch_virtual_property_proto, primitive_type_globals)
 
 Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
 
 ## Quick Summary
 
-- **Pass rate (estimated local)**: ~233+/619 — adds `watch`, `watch_virtual_property_proto`, `object_prototypes`, `parse_int` (+4 tests from this session)
+- **Pass rate (estimated local)**: ~234+/619 — adds `watch`, `watch_virtual_property_proto`, `object_prototypes`, `parse_int`, `primitive_type_globals` (+5 tests from this session)
 - **Main failure type**: output_mismatch, timeout (2), segfault (1) — compile_fail regression resolved
 - **Resolved regression**: `movieclip_hittest_shapeflag` compile_fail fixed, back to MISMATCH (180/338)
 - **Recent gains**: `watch`/`unwatch` implemented; `object_prototypes` now fully passes; `parse_int` unblocked; `watch_virtual_property_proto` passes; static buffer reentrancy bug in actionSetMember fixed
@@ -16,6 +16,7 @@ Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
 | Feature | Commits | Impact | Key Tests |
 |---------|---------|--------|-----------|
 | **Object.prototype.watch/unwatch** | 0a9e034, 85c676f | Property change callbacks; watcher fires before addProperty setter; static buffer reentrancy fix | `watch` ✅, `watch_virtual_property_proto` ✅, `object_prototypes` ✅, `parse_int` ✅ |
+| **Number.prototype.toString(NaN, radix)** | 743325f | NaN encoded as INT32_MIN via x86 CVTTSD2SI, then inverted digit encoding char(48-N); \r→\n normalization | `primitive_type_globals` ✅ (557/557) |
 | **edittext _width/_height transform fix** | 337c212 | Width/height properties now account for _xscale/_yscale/_rotation transforms | edittext_width_height (103/103 ✅) |
 | **arguments object: DefineFunction2 preload path** | 2f007dd | swf_setup_arguments_props() now called from recompiler-generated preload block; fixes callee/caller/__proto__/instanceof for preloaded-arguments functions; ARRAY valueOf/toString fixed to use own-property lookup only (fixes [object Object] bug) | arguments (127/127 ✅) |
 | **arguments object: callee/caller/__proto__** | b9cfc9d | arguments.callee, arguments.caller (null or calling function), arguments instanceof Array, arguments.__proto__ === Array.prototype — all now implemented; also fixes Array.prototype initialization and checkInstanceOf for arrays | arguments |
@@ -96,7 +97,7 @@ These tests were near-passing in the previous update and now pass locally:
 | TRY_CATCH_PLAN | **Phase 1 DONE** | 0 pass (91% match) | Typed catch block matching (String/Object/etc.) |
 | MATH_PLAN | **COMPLETE** | 1/4 pass, 3 at 98.5% | ASnative(200,50), throwing valueOf |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
-| GLOBALS_PLAN | **Phases 1-5 DONE** | globals_swf6/7/8 PASS | Phase 6 (Number.toString(radix)), Phase 7-8 (prototype methods) |
+| GLOBALS_PLAN | **Phase 6 DONE** | globals_swf6/7/8, primitive_type_globals PASS | Phase 7-8 (prototype methods, property flags) |
 | XML_PLAN | **ALL PHASES COMPLETE** | 24/26 active tests pass | xml_to_string (11/13), xml_child_nodes_edge_cases (3/4) |
 | TEXTFIELD_PLAN | **Phases 1-2 DONE** | 17/66 tests pass | Phase 3 (variable binding, width/height), Phase 5 (HTML) |
 | MOVIECLIP_PLAN | **Phase 1 DONE** | 2 MC tests pass | Phase 2 (depth), Phase 3 (createEmptyMC) |
@@ -126,7 +127,7 @@ These tests were near-passing in the previous update and now pass locally:
 4. ~~**Try parse_int**~~ — **DONE**: passes now
 
 ### Medium ROI (new feature phases)
-5. **GLOBALS_PLAN Phase 6** — Number.prototype.toString(radix), improves primitive_type_globals (320/557)
+5. ~~**GLOBALS_PLAN Phase 6**~~ — **DONE**: Number.prototype.toString(NaN,radix) implemented; primitive_type_globals now 557/557
 6. **TEXTFIELD_PLAN Phase 3** — variable binding + width/height
 7. **TEXTFIELD_PLAN Phase 5** — HTML text (edittext_html_* tests, several at 81-87%)
 8. **Fix GotoFrame inline execution** — needed for target_clip_removed (4/5, 80%)
