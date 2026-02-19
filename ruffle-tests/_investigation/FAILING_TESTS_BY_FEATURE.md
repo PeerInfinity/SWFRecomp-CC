@@ -4,9 +4,9 @@
 <!-- Do not edit manually — edit feature_categories.json instead -->
 
 - **Total tests**: 619
-- **Passing**: 225 (36.3%)
-- **Failing**: 394 (392 output mismatch, 1 runtime segfault, 1 timeout)
-- **Based on**: CI run at commit `229cb534e3`
+- **Passing**: 237 (38.3%)
+- **Failing**: 382 (379 output mismatch, 2 runtime segfault, 1 timeout)
+- **Based on**: CI run at commit `724bae7f65`
 
 Tests are sorted by category (ordered by priority). Within each category, tests are listed alphabetically.
 
@@ -14,7 +14,7 @@ Tests are sorted by category (ordered by priority). Within each category, tests 
 
 ## 1. TextField/EditText Properties and Formatting (49 failing / 69 total)
 
-Tests: edittext_align, edittext_align_trailing_spaces_swf7, edittext_align_trailing_spaces_swf8, edittext_antialiastype (PASS), edittext_autosize, edittext_autosize_setter (PASS), edittext_bullet, edittext_default_format (PASS), edittext_default_format_empty (PASS), edittext_default_format_font_style (PASS), edittext_drag_select, edittext_focus_selection, edittext_font_size, edittext_hscroll, edittext_html_align_swf7, edittext_html_align_swf8, edittext_html_color, edittext_html_condensewhite_swf7, edittext_html_condensewhite_swf8, edittext_html_entity, edittext_html_roundtrip, edittext_html_swf6, edittext_html_swf7, edittext_html_swf8, edittext_ime_focus_lost, edittext_input, edittext_input_newlines, edittext_leading, edittext_letter_spacing, edittext_margins, edittext_newline_stripping, edittext_newlines, edittext_password (PASS), edittext_password_copy, edittext_paste_empty, edittext_place_caret, edittext_programmatic_focus, edittext_restrict, edittext_restrict_paste, edittext_scroll, edittext_stylesheet, edittext_tab_focus, edittext_tab_stops, edittext_tag_indent, edittext_text_height_leading, edittext_underline, edittext_width_height, text_format (PASS), text_format_display (PASS), text_format_font_max_length (PASS), text_format_rounding_swf7 (PASS), text_format_rounding_swf8 (PASS), textfield_background_color (PASS), textfield_border_color (PASS), textfield_cache_as_bitmap, textfield_maxchars (PASS), textfield_properties (PASS), textfield_props_swf5, textfield_props_swf6 (PASS), textfield_props_swf7 (PASS), textfield_props_swf8 (PASS), textfield_text (PASS), textfield_variable (PASS), textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_props_swf5, textsnapshot_props_swf6, textsnapshot_text_order
+Tests: edittext_align, edittext_align_trailing_spaces_swf7, edittext_align_trailing_spaces_swf8, edittext_antialiastype (PASS), edittext_autosize, edittext_autosize_setter (PASS), edittext_bullet, edittext_default_format (PASS), edittext_default_format_empty (PASS), edittext_default_format_font_style (PASS), edittext_drag_select, edittext_focus_selection, edittext_font_size, edittext_hscroll, edittext_html_align_swf7, edittext_html_align_swf8, edittext_html_color, edittext_html_condensewhite_swf7, edittext_html_condensewhite_swf8, edittext_html_entity, edittext_html_roundtrip, edittext_html_swf6, edittext_html_swf7, edittext_html_swf8, edittext_ime_focus_lost, edittext_input, edittext_input_newlines, edittext_leading, edittext_letter_spacing, edittext_margins, edittext_newline_stripping, edittext_newlines, edittext_password (PASS), edittext_password_copy, edittext_paste_empty, edittext_place_caret, edittext_programmatic_focus, edittext_restrict, edittext_restrict_paste, edittext_scroll, edittext_stylesheet, edittext_tab_focus, edittext_tab_stops, edittext_tag_indent, edittext_text_height_leading, edittext_underline, edittext_width_height (PASS), text_format (PASS), text_format_display (PASS), text_format_font_max_length (PASS), text_format_rounding_swf7 (PASS), text_format_rounding_swf8 (PASS), textfield_background_color (PASS), textfield_border_color (PASS), textfield_cache_as_bitmap, textfield_maxchars (PASS), textfield_properties (PASS), textfield_props_swf5, textfield_props_swf6 (PASS), textfield_props_swf7 (PASS), textfield_props_swf8 (PASS), textfield_text (PASS), textfield_variable, textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_props_swf5, textsnapshot_props_swf6, textsnapshot_text_order
 
 Description: Needs comprehensive TextField/EditText property support including: TextFormat object (align, font, size, color, bold, italic, underline, leading, margins, indent, tabStops, letterSpacing, bullet), HTML text round-trip (htmlText property with tag parsing/generation), text selection and caret positioning, scroll/hscroll/maxscroll properties, autoSize behavior, input text handling (restrict, password, maxChars), TextSnapshot for read-only text access, and programmatic focus control.
 
@@ -54,11 +54,11 @@ Description: Needs runtime SWF/image loading capability. loadMovie() loads exter
 
 ## 4. MovieClip Methods and Properties (23 failing / 25 total)
 
-Tests: local_to_global, movieclip_blend_mode_property (PASS), movieclip_create_text_field, movieclip_default_state (PASS), movieclip_depth_methods, movieclip_focusenabled, movieclip_get_instance_at_depth, movieclip_getbounds, movieclip_gettextsnapshot, movieclip_hittest, movieclip_hittest_shapeflag, movieclip_init_object, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8, movieclip_library_state_values, movieclip_lockroot, movieclip_methods_with_loaded_image, movieclip_setmask, movieclip_state_values
+Tests: local_to_global, movieclip_blend_mode_property (PASS), movieclip_create_text_field, movieclip_default_state, movieclip_depth_methods, movieclip_focusenabled, movieclip_get_instance_at_depth (PASS), movieclip_getbounds, movieclip_gettextsnapshot, movieclip_hittest, movieclip_hittest_shapeflag, movieclip_init_object, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8, movieclip_library_state_values, movieclip_lockroot, movieclip_methods_with_loaded_image, movieclip_setmask, movieclip_state_values
 
 Description: Needs MovieClip method implementations beyond basic timeline control. Key methods: getBounds()/getRect(), hitTest(), createTextField(), getInstanceAtDepth(), depth methods (getDepth, getNextHighestDepth, swapDepths), setMask(), _lockroot, state properties (_currentframe, _totalframes, _framesloaded, _url, _quality, blendMode), focusEnabled, init object in attachMovie.
 
-Investigation docs: [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md), [REGISTERCLASS_PLAN.md](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md), [TEXTFIELD_PLAN.md](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md), [UNLOAD_PLAN.md](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md)
+Investigation docs: [HIT_TESTING_PLAN.md](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md), [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md), [REGISTERCLASS_PLAN.md](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md), [TEXTFIELD_PLAN.md](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md), [UNLOAD_PLAN.md](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md)
 
 ---
 
@@ -106,7 +106,7 @@ Tests: global_instance_decls, global_proto_decls, global_proto_decls_delete, glo
 
 Description: Tests that enumerate all global variables and check which built-in classes/functions exist per SWF version. Many failures are because built-in classes (XML, Date, Color, Sound, etc.) are not registered as globals. Fixing these tests requires implementing all the other missing features AND registering their constructors on _global.
 
-Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/incomplete/ENUMERATION_PLAN.md), [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md), [GLOBALS_PLAN.md](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md), [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md)
+Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md), [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md), [GLOBALS_PLAN.md](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md), [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md)
 
 ---
 
@@ -158,13 +158,13 @@ Investigation docs: [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/M
 
 ---
 
-## 15. Stage Object Properties (7 failing / 7 total)
+## 15. Stage Object Properties (5 failing / 7 total)
 
-Tests: stage_display_state, stage_object_children, stage_object_enumerate, stage_object_properties, stage_object_properties_swf6, stage_property_representation, stage_scale_mode
+Tests: stage_display_state, stage_object_children, stage_object_enumerate (PASS), stage_object_properties, stage_object_properties_swf6, stage_property_representation (PASS), stage_scale_mode
 
 Description: Needs Stage object as a special global with properties: width, height, scaleMode, displayState, align, showMenu, quality.
 
-Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/incomplete/ENUMERATION_PLAN.md), [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md), [STAGE_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md), [STAGE_FRAME_PROPS_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md)
+Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md), [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md), [STAGE_FRAME_PROPS_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md), [STAGE_PLAN.md](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md)
 
 ---
 
@@ -198,9 +198,9 @@ Investigation docs: [MOVIECLIP_PLAN.md](ruffle-tests/_investigation/incomplete/M
 
 ---
 
-## 19. Clone/Duplicate MovieClip (5 failing / 5 total)
+## 19. Clone/Duplicate MovieClip (3 failing / 5 total)
 
-Tests: clone_sprite_edittext, clone_sprite_edittext_dynamic, clone_sprite_types, duplicate_movie_clip, duplicate_movie_clip_drawing
+Tests: clone_sprite_edittext, clone_sprite_edittext_dynamic, clone_sprite_types (PASS), duplicate_movie_clip (PASS), duplicate_movie_clip_drawing
 
 Description: Needs duplicateMovieClip() and MovieClip.duplicateMovieClip() implementation. Cloning should copy the clip's display list, including text fields.
 
@@ -224,7 +224,7 @@ Tests: is_prototype_of (PASS), object_prototypes, prototype_enumerate (PASS), pr
 
 Description: Needs correct __proto__ chain traversal, isPrototypeOf(), for-in enumeration of prototype properties, and property flags (DontEnum, DontDelete, ReadOnly).
 
-Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/incomplete/ENUMERATION_PLAN.md), [PROTOTYPE_OBJECT_PLAN.md](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md)
+Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md), [PROTOTYPE_OBJECT_PLAN.md](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md)
 
 ---
 
@@ -256,9 +256,9 @@ Investigation docs: [OBJECT_WATCH_PLAN.md](ruffle-tests/_investigation/incomplet
 
 ---
 
-## 25. Color Object (3 failing / 3 total)
+## 25. Color Object (0 failing / 3 total)
 
-Tests: color, color_transform, transform
+Tests: color (PASS), color_transform (PASS), transform (PASS)
 
 Description: Needs new Color(target) constructor with methods: getRGB(), setRGB(), getTransform(), setTransform(). The Color object controls color transformation on a movie clip target. The transform test needs flash.geom.Transform.
 
@@ -274,13 +274,13 @@ Description: Needs startDrag()/stopDrag() implementation with simulated mouse mo
 
 ---
 
-## 27. Enumeration (for-in) (1 failing / 3 total)
+## 27. Enumeration (for-in) (0 failing / 3 total)
 
-Tests: array_enumerate (PASS), enumerate, new_object_enumerate (PASS)
+Tests: array_enumerate (PASS), enumerate (PASS), new_object_enumerate (PASS)
 
 Description: Needs correct for-in enumeration order. ActionScript enumerates own properties in reverse insertion order, then walks the prototype chain.
 
-Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/incomplete/ENUMERATION_PLAN.md)
+Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md)
 
 ---
 
@@ -342,7 +342,7 @@ Investigation docs: [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/_investigation/i
 
 ## 34. Clip Events (onLoad, onEnterFrame, etc.) (2 failing / 2 total)
 
-Tests: clip_event_propagation_order, clip_events
+Tests: clip_event_propagation_order, clip_events (SEGFAULT)
 
 Description: Needs proper MovieClip event dispatching: onLoad, onUnload, onEnterFrame, onClipEvent(initialize), onClipEvent(construct), and correct propagation order.
 
@@ -446,9 +446,9 @@ Investigation docs: [CLONE_DUPLICATE_PLAN.md](ruffle-tests/_investigation/incomp
 
 ---
 
-## 45. Function Behavior and Scope (9 failing / 14 total)
+## 45. Function Behavior and Scope (8 failing / 14 total)
 
-Tests: call, closure_scope, constructor_function, define_function2_preload_order (PASS), function_as_function, function_base_clip, function_base_clip_readded, function_base_clip_removed, function_suppress_and_preload, funky_function_calls, infinite_recursion_function (PASS), infinite_recursion_function_in_setter (PASS), infinite_recursion_virtual_property (PASS), variable_args (PASS)
+Tests: call, closure_scope, constructor_function, define_function2_preload_order (PASS), function_as_function, function_base_clip, function_base_clip_readded, function_base_clip_removed, function_suppress_and_preload (PASS), funky_function_calls, infinite_recursion_function (PASS), infinite_recursion_function_in_setter (PASS), infinite_recursion_virtual_property (PASS), variable_args (PASS)
 
 Description: Tests for function scope chains, closures (SWF6+), Function() constructor, function.apply()/call(), base clip resolution for functions, DefineFunction2 suppress/preload flags, and the Call action (frame call).
 
@@ -462,7 +462,7 @@ Tests: add_property, as_set_prop_flags, as_set_prop_flags_version (PASS), boxed_
 
 Description: Tests for addProperty (virtual getters/setters), ASSetPropFlags (property flags), boxed primitives (new Number/String/Boolean), InitObject property order, __resolve handler, and valueOf/toString coercion.
 
-Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/incomplete/ENUMERATION_PLAN.md), [GLOBALS_PLAN.md](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md), [PROTOTYPE_OBJECT_PLAN.md](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md)
+Investigation docs: [ENUMERATION_PLAN.md](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md), [GLOBALS_PLAN.md](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md), [PROTOTYPE_OBJECT_PLAN.md](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md)
 
 ---
 
@@ -496,13 +496,13 @@ Investigation docs: [GLOBALS_PLAN.md](ruffle-tests/_investigation/incomplete/GLO
 
 ---
 
-## 50. Array Methods (3 failing / 5 total)
+## 50. Array Methods (1 failing / 5 total)
 
-Tests: array_call_method (PASS), array_length (PASS), array_prototyping, array_sort, array_sort_random
+Tests: array_call_method (PASS), array_length (PASS), array_prototyping (PASS), array_sort, array_sort_random (PASS)
 
 Description: Tests for calling methods stored in arrays, Array prototype modification, and Array.sort() with random comparator.
 
-Investigation docs: [ARRAY_METHODS_PLAN.md](ruffle-tests/_investigation/incomplete/ARRAY_METHODS_PLAN.md)
+Investigation docs: [ARRAY_METHODS_PLAN.md](ruffle-tests/_investigation/complete/ARRAY_METHODS_PLAN.md)
 
 ---
 
@@ -526,9 +526,9 @@ Investigation docs: [COLOR_OBJECT_PLAN.md](ruffle-tests/_investigation/incomplet
 
 ---
 
-## 53. AsBroadcaster / ASnative / Miscellaneous Built-ins (11 failing / 11 total)
+## 53. AsBroadcaster / ASnative / Miscellaneous Built-ins (10 failing / 11 total)
 
-Tests: arguments, as_broadcaster, as_broadcaster_undef, asfunction, asnative, asnew, bad_placeobject_clipaction, click_block, custom_clip_methods, instanceof_coercions, nan_scale
+Tests: arguments (PASS), as_broadcaster, as_broadcaster_undef, asfunction, asnative, asnew, bad_placeobject_clipaction, click_block, custom_clip_methods, instanceof_coercions, nan_scale
 
 Description: AsBroadcaster (addListener/removeListener/broadcastMessage), asfunction HTML link protocol, ASnative/ASnew for native function access, arguments object, instanceof coercions, and miscellaneous built-in behaviors.
 
@@ -549,6 +549,8 @@ Description: LoadVars class (load, send, sendAndLoad methods). Both require netw
 Tests: hittest_lockroot, hittest_morph, hittest_morph_input, hittest_winding_rule, text_blocks_clicks
 
 Description: Hit testing with lockroot, morph shapes, winding rules, and text click blocking.
+
+Investigation docs: [HIT_TESTING_PLAN.md](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md)
 
 ---
 
@@ -620,55 +622,52 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 
 | Test | Match Rate | Likely Issue |
 |------|-----------|-------------|
+| date | 6284/6335 (99%) | Date timezone/edge case handling |
+| movieclip_default_state | 68/69 (99%) |  |
 | math_swf6 | 522/530 (98%) |  |
 | math_swf7 | 522/530 (98%) |  |
 | math_swf8 | 522/530 (98%) |  |
 | array_sort | 158/161 (98%) | Array.sort() comparator edge cases |
+| textfield_variable | 78/81 (96%) | TextField variable binding |
+| movieclip_depth_methods | 94/98 (96%) | Depth management edge cases |
 | boxed_primitives | 23/24 (96%) |  |
-| edittext_width_height | 97/103 (94%) | EditText dimension calculations |
+| frame_size_translated_negative | 20/21 (95%) |  |
+| frame_size_translated_positive | 20/21 (95%) |  |
 | with | 46/49 (94%) | With statement scope leaking |
+| stage_object_properties | 225/241 (93%) |  |
+| stage_object_properties_swf6 | 212/231 (92%) |  |
+| extends_native_type | 10/11 (91%) |  |
+| rewind_depth | 26/30 (87%) |  |
 | edittext_html_align_swf8 | 45/52 (87%) |  |
-| function_suppress_and_preload | 24/28 (86%) |  |
 | object_prototypes | 63/74 (85%) | Prototype chain traversal edge case |
 | local_to_global | 41/49 (84%) | MovieClip.localToGlobal/globalToLocal transform math |
-| arguments | 106/127 (83%) | arguments.callee, arguments.caller, Array prototype |
 | stage_object_children | 68/83 (82%) | Child clip name resolution |
 | edittext_html_align_swf7 | 42/52 (81%) |  |
+| this_scoping | 42/52 (81%) |  |
 | target_clip_removed | 4/5 (80%) | Target clip removal edge case |
-| date | 5049/6335 (80%) | Date timezone/edge case handling |
 | target_path | 11/14 (79%) |  |
 | as_set_prop_flags | 62/79 (78%) |  |
-| movieclip_depth_methods | 76/98 (78%) | Depth management edge cases |
 | movieclip_hittest | 71/92 (77%) | hitTest() edge cases |
 | edittext_html_entity | 3/4 (75%) |  |
 | add_property | 11/15 (73%) |  |
 | attach_movie | 43/59 (73%) | attachMovie with init object or invalid IDs |
 | empty_movieclip_can_attach_movies | 8/11 (73%) | attachMovie on empty clips |
-| extends_native_type | 8/11 (73%) |  |
+| remove_movie_clip | 21/29 (72%) |  |
 | sound_props_swf5 | 49/68 (72%) |  |
-| stage_object_properties_swf6 | 166/231 (72%) |  |
-| stage_object_properties | 173/241 (72%) |  |
 | movieclip_focusenabled | 71/99 (72%) |  |
-| transform | 50/70 (71%) |  |
 | register_underflow | 18/26 (69%) | Register allocation edge case |
 | object_string_coerce_swf6 | 46/68 (68%) | toString/valueOf coercion ordering |
-| array_prototyping | 8/12 (67%) |  |
 | create_empty_movie_clip | 2/3 (67%) |  |
 | export_assets | 2/3 (67%) |  |
-| frame_size_translated_negative | 14/21 (67%) |  |
-| frame_size_translated_positive | 14/21 (67%) |  |
 | mutable_this | 12/18 (67%) | Mutable this binding in nested functions |
+| string_paths_hidden | 36/54 (67%) | Hidden string path resolution |
 | mouse_listeners | 45/68 (66%) |  |
-| remove_movie_clip | 19/29 (66%) |  |
 | edittext_scroll | 35/54 (65%) | EditText scroll properties |
 | edittext_html_roundtrip | 11/17 (65%) | HTML text round-trip formatting |
-| movieclip_get_instance_at_depth | 18/28 (64%) | getInstanceAtDepth edge cases |
 | named_shapes | 9/14 (64%) |  |
 | swf6_case_insensitive | 28/44 (64%) | Case-insensitive lookup edge case |
 | edittext_hscroll | 17/27 (63%) |  |
-| string_paths_hidden | 34/54 (63%) | Hidden string path resolution |
 | edittext_autosize | 44/71 (62%) |  |
-| color | 35/57 (61%) |  |
 | this_swf5 | 25/41 (61%) |  |
 | edittext_align | 36/60 (60%) | Text alignment calculations |
 | edittext_bullet | 18/30 (60%) |  |
@@ -678,10 +677,11 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | edittext_tab_stops | 36/60 (60%) |  |
 | edittext_underline | 24/40 (60%) |  |
 
-## Crashes and Timeouts (2 tests)
+## Crashes and Timeouts (3 tests)
 
 | Test | Status | Likely Cause |
 |------|--------|-------------|
+| clip_events | segfault |  |
 | goto_methods | segfault | MovieClip.gotoAndStop/gotoAndPlay with extreme values |
 | timeout | timeout | setTimeout/clearTimeout infinite loop |
 
@@ -694,7 +694,7 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | 1 | TextField/EditText Properties and Formatting | 49 | 69 | avg 34% match |
 | 2 | XML/XMLNode | 8 | 33 | avg 14% match |
 | 3 | LoadMovie/LoadVariables/MovieClipLoader | 29 | 29 | avg 10% match |
-| 4 | MovieClip Methods and Properties | 23 | 25 | avg 25% match |
+| 4 | MovieClip Methods and Properties | 23 | 25 | avg 27% match |
 | 5 | Mouse/Focus/Input Events | 18 | 19 | avg 12% match |
 | 6 | Button Behavior and Events | 14 | 14 | avg 1% match |
 | 7 | Tab Ordering and Focus Navigation | 14 | 14 | avg 4% match |
@@ -703,28 +703,28 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | 10 | Sound | 8 | 8 | avg 19% match |
 | 11 | BitmapData | 8 | 8 | avg 38% match |
 | 12 | FileReference | 8 | 8 | avg 8% match |
-| 13 | OOP / Super / Extends / Interfaces | 7 | 8 | avg 20% match |
+| 13 | OOP / Super / Extends / Interfaces | 7 | 8 | avg 22% match |
 | 14 | RegisterClass and Export/Registration | 7 | 7 | avg 25% match |
-| 15 | Stage Object Properties | 7 | 7 | avg 44% match |
+| 15 | Stage Object Properties | 5 | 7 | avg 65% match |
 | 16 | SWF Version-Specific Behavior | 6 | 9 | avg 19% match |
 | 17 | TellTarget / Target Path Resolution | 7 | 7 | avg 23% match |
-| 18 | Unload / UnloadMovie | 6 | 6 | avg 20% match |
-| 19 | Clone/Duplicate MovieClip | 5 | 5 | avg 17% match |
+| 18 | Unload / UnloadMovie | 6 | 6 | avg 22% match |
+| 19 | Clone/Duplicate MovieClip | 3 | 5 | avg 28% match |
 | 20 | Native Object/Function Introspection | 5 | 5 | avg 9% match |
 | 21 | Prototype Chain and Object Properties | 1 | 4 | avg 85% match |
 | 22 | Math Object | 3 | 4 | avg 98% match |
 | 23 | NetConnection/NetStream | 4 | 4 | avg 2% match |
 | 24 | Object.watch | 4 | 4 | avg 11% match |
-| 25 | Color Object | 3 | 3 | avg 49% match |
+| 25 | Color Object | 0 | 3 |  |
 | 26 | Drag and Drop | 3 | 3 | avg 0% match |
-| 27 | Enumeration (for-in) | 1 | 3 | avg 30% match |
+| 27 | Enumeration (for-in) | 0 | 3 |  |
 | 28 | ExternalInterface | 7 | 7 | avg 8% match |
 | 29 | Geometry Classes: Point, Rectangle, Matrix | 0 | 3 |  |
 | 30 | PrintJob | 3 | 3 | avg 13% match |
 | 31 | Timer / setInterval | 3 | 3 | avg 12% match |
 | 32 | StyleSheet | 3 | 3 | avg 19% match |
 | 33 | Bitmap Filters | 2 | 2 | avg 0% match |
-| 34 | Clip Events (onLoad, onEnterFrame, etc.) | 2 | 2 | avg 3% match |
+| 34 | Clip Events (onLoad, onEnterFrame, etc.) | 2 | 2 | avg 0% match |
 | 35 | ContextMenu | 2 | 2 | avg 5% match |
 | 36 | Form Loading / URL Encoding | 4 | 4 | avg 0% match |
 | 37 | Key/Input Events | 2 | 2 | avg 0% match |
@@ -732,25 +732,25 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | 39 | Parsing Functions (parseInt/parseFloat) | 2 | 2 | avg 30% match |
 | 40 | Selection Object | 2 | 2 | avg 6% match |
 | 41 | With Statement Scope | 1 | 2 | avg 94% match |
-| 42 | Date Class | 1 | 1 | avg 80% match |
+| 42 | Date Class | 1 | 1 | avg 99% match |
 | 43 | Try/Catch/Finally | 0 | 5 |  |
-| 44 | MovieClip Dynamic Creation / Lifecycle | 12 | 16 | avg 31% match |
-| 45 | Function Behavior and Scope | 9 | 14 | avg 17% match |
+| 44 | MovieClip Dynamic Creation / Lifecycle | 12 | 16 | avg 32% match |
+| 45 | Function Behavior and Scope | 8 | 14 | avg 8% match |
 | 46 | Object System | 6 | 8 | avg 54% match |
-| 47 | Clip Removal and Scope After Removal | 5 | 5 | avg 20% match |
+| 47 | Clip Removal and Scope After Removal | 5 | 5 | avg 33% match |
 | 48 | Path Resolution | 5 | 5 | avg 22% match |
 | 49 | Type Coercion and Global Functions | 3 | 6 | avg 44% match |
-| 50 | Array Methods | 3 | 5 | avg 55% match |
-| 51 | Stage/Frame Properties | 2 | 2 | avg 67% match |
-| 52 | Issue Regression Tests | 9 | 10 | avg 22% match |
-| 53 | AsBroadcaster / ASnative / Miscellaneous Built-ins | 11 | 11 | avg 27% match |
+| 50 | Array Methods | 1 | 5 | avg 98% match |
+| 51 | Stage/Frame Properties | 2 | 2 | avg 95% match |
+| 52 | Issue Regression Tests | 9 | 10 | avg 26% match |
+| 53 | AsBroadcaster / ASnative / Miscellaneous Built-ins | 10 | 11 | avg 21% match |
 | 54 | LoadVars and Network | 2 | 2 | avg 19% match |
 | 55 | Hit Testing | 5 | 5 | avg 22% match |
 | 56 | Cross-Movie / Level / Root | 4 | 4 | avg 4% match |
 | 57 | Sandbox/Security | 2 | 2 | avg 0% match |
 | 58 | Frame Navigation | 4 | 4 | avg 18% match |
 | 59 | Scope and Variable Resolution | 2 | 3 | avg 21% match |
-| 60 | This Scoping | 3 | 4 | avg 55% match |
+| 60 | This Scoping | 3 | 4 | avg 62% match |
 | 61 | Miscellaneous Remaining | 6 | 8 | avg 23% match |
 | -- | *(Uncategorized)* | 0 | 129 | |
-| | **Total** | **394** | **619** | |
+| | **Total** | **382** | **619** | |
