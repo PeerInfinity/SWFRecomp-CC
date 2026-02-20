@@ -7452,7 +7452,6 @@ MovieClip root_movieclip = {
 	.dynamic_props = NULL,
 	.lockroot = 0,
 	.blend_mode = 0,
-	.is_button_mc = 0,
 	.depth = -16384,   // _root is at Flash "level 0" depth
 };
 
@@ -7541,7 +7540,6 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->dynamic_props = NULL;
 	mc->lockroot = 0;
 	mc->blend_mode = 0;
-	mc->is_button_mc = 0;
 	mc->depth = 0;
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
@@ -8465,21 +8463,6 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 			double nat_h = (double)(gymax - gymin);
 			scaled_w = nat_w * mc->xscale / 100.0;
 			scaled_h = nat_h * mc->yscale / 100.0;
-		} else if (entry_idx != (size_t)-1) {
-			// Bounds not found via display hierarchy (e.g. button, excluded from bounds).
-			// For buttons, use the hit-test shape bounds from the Character dictionary.
-			size_t cid = display_list[entry_idx].char_id;
-			if (cid > 0 && cid < INITIAL_DICTIONARY_CAPACITY &&
-			    dictionary[cid].type == CHAR_TYPE_BUTTON) {
-				size_t hit_cid = dictionary[cid].button_hit_char_id;
-				s32 hxmin, hxmax, hymin, hymax;
-				if (hit_cid > 0 && ng_getCharBounds(hit_cid, &hxmin, &hxmax, &hymin, &hymax)) {
-					double nat_w = (double)(hxmax - hxmin) / 20.0;
-					double nat_h = (double)(hymax - hymin) / 20.0;
-					scaled_w = nat_w * mc->xscale / 100.0;
-					scaled_h = nat_h * mc->yscale / 100.0;
-				}
-			}
 		}
 	}
 #endif
@@ -10709,41 +10692,30 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			// MovieClip traces as its full dot-path (e.g., "_level0", "_level0.a.b")
-			// Convert slash-path target (e.g. "/a/b") to dot notation ("_level0.a.b")
+			// MovieClip traces as its full dot-path ("_level0", "_level0.a", "_level0.a.b")
+			// mc->target holds slash-notation: "/", "/a", "/a/b" — convert to dot notation.
+			MovieClip* mc = (MovieClip*) STACK_TOP_VALUE;
+			extern MovieClip root_movieclip;
+			if (mc == NULL || mc == &root_movieclip || mc->target[0] == '\0' ||
+			    (mc->target[0] == '/' && mc->target[1] == '\0'))
 			{
-				MovieClip* mc = (MovieClip*) STACK_TOP_VALUE;
-				extern MovieClip root_movieclip;
-				if (mc == NULL || mc == &root_movieclip || mc->name[0] == '\0')
+				printf("_level0\n");
+			}
+			else
+			{
+				// Convert "/a/b/c" → "_level0.a.b.c":
+				// 1. Emit "_level0."
+				// 2. Walk target+1, replacing '/' with '.'
+				char dot_path[512];
+				int pos = snprintf(dot_path, sizeof(dot_path), "_level0.");
+				const char* p = mc->target + 1;  // skip leading '/'
+				while (*p && pos < (int)sizeof(dot_path) - 1)
 				{
-					printf("_level0\n");
+					dot_path[pos++] = (*p == '/') ? '.' : *p;
+					p++;
 				}
-				else
-				{
-					const char* path = mc->target;
-					if (path[0] == '/' && path[1] == '\0')
-					{
-						printf("_level0\n");
-					}
-					else
-					{
-						// Convert "/a/b/c" to "_level0.a.b.c"
-						char dot_path[512];
-						int pos = 0;
-						pos += snprintf(dot_path + pos, sizeof(dot_path) - pos, "_level0");
-						const char* p = path + 1;  // skip leading '/'
-						while (*p && pos < (int)sizeof(dot_path) - 2)
-						{
-							if (*p == '/')
-								dot_path[pos++] = '.';
-							else
-								dot_path[pos++] = *p;
-							p++;
-						}
-						dot_path[pos] = '\0';
-						printf("%s\n", dot_path);
-					}
-				}
+				dot_path[pos] = '\0';
+				printf("%s\n", dot_path);
 			}
 			break;
 		}
@@ -11585,14 +11557,41 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
     setProperty(app_context, key_obj, "isToggled", 9, &fv);
 }
 
-// Dispatch onKeyDown/onKeyUp to all Key listeners.
-// Called from swf_core.c after delivering a key event.
 // Dispatch AS2 mc.onEnterFrame property handlers for all cached MovieClips.
 // Called from tagShowFrame after sprite/button initialization. Iterates the
 // MC cache in reverse creation order (most recently created = highest depth = front)
 // to match Flash's front-to-back dispatch order.
 void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 {
+	// Dispatch to root MovieClip first (it's not in child_mc_cache)
+	{
+		extern MovieClip root_movieclip;
+		ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
+		if (root_props != NULL) {
+			ActionVar* ef_prop = getProperty(root_props, "onEnterFrame", 12);
+			if (ef_prop != NULL && ef_prop->type == ACTION_STACK_VALUE_FUNCTION) {
+				ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
+				if (func != NULL) {
+					MovieClip* saved_ctx = g_current_context;
+					// Dispatch with root as this
+					ActionVar this_av = {0};
+					this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_av.data.numeric_value = (u64)&root_movieclip;
+					if (func->function_type == 2 && func->advanced_func != NULL) {
+						ActionVar* regs = NULL;
+						if (func->register_count > 0)
+							regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+						func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
+						if (regs != NULL) FREE(regs);
+					} else if (func->function_type == 1 && func->simple_func != NULL) {
+						((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					}
+					actionSetCurrentContext(saved_ctx);
+				}
+			}
+		}
+	}
+
 	for (int i = child_mc_count - 1; i >= 0; i--)
 	{
 		MovieClip* mc = child_mc_cache[i];
@@ -11609,12 +11608,18 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		MovieClip* saved_ctx = g_current_context;
 		actionSetCurrentContext(mc);
 
+		// Pass ActionVar* with MOVIECLIP type as this_obj so generated
+		// functions preload register 1 (this) as a MovieClip correctly.
+		ActionVar this_av = {0};
+		this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_av.data.numeric_value = (u64)mc;
+
 		if (func->function_type == 2 && func->advanced_func != NULL)
 		{
 			ActionVar* regs = NULL;
 			if (func->register_count > 0)
 				regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-			func->advanced_func(app_context, NULL, 0, regs, (void*)props);
+			func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
 			if (regs != NULL) FREE(regs);
 		}
 		else if (func->function_type == 1 && func->simple_func != NULL)
@@ -11626,6 +11631,8 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 	}
 }
 
+// Dispatch onKeyDown/onKeyUp to all Key listeners.
+// Called from swf_core.c after delivering a key event.
 void actionDispatchKeyDown(SWFAppContext* app_context)
 {
     if (!g_key_obj) return;
@@ -16934,15 +16941,7 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_lockroot") == 0) { PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)mc->lockroot); return; }
 			if (strcasecmp(prop_name, "_parent") == 0) {
-				if (mc->parent != NULL)
-				{
-					MovieClip* par = mc->parent;
-					// SWF5: buttons are not real MovieClips - skip the button layer
-					// and return the button's parent (grandparent of mc) instead.
-					if (par->is_button_mc && g_swf_version <= 5 && par->parent != NULL)
-						par = par->parent;
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)par);
-				}
+				if (mc->parent != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc->parent); }
 				else { pushUndefined(app_context); }
 				return;
 			}
