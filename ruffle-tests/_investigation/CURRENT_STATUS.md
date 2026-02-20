@@ -59,8 +59,8 @@ These tests were near-passing in the previous update and now pass locally:
 - `function_suppress_and_preload` — fixed by eff1f85 + 2f007dd (DefineFunction2 preload/suppress + ARRAY toString fix)
 - `edittext_width_height` (103/103) — fixed by 337c212 (_xscale/_yscale/_rotation transform accounting)
 - `arguments` (127/127) — fixed by b9cfc9d + 2f007dd (callee/caller/__proto__/instanceof Array; preload path fix)
-- `duplicate_movie_clip` (21/21) ✅ — clone/duplicate plan (this branch): as_set_flags copy, ng_duplicateMovieClip, toString/valueOf for object args, depth+16384 semantic
-- `clone_sprite_types` (25/25) ✅ — clone/duplicate plan (this branch): ng_isScriptableAtDepth for non-scriptable types (shape/statictext/morphshape/image return parent MC), tagDefineVideoStream for video scriptability
+- `duplicate_movie_clip` (21/21) ✅ — clone/duplicate plan: as_set_flags copy, ng_duplicateMovieClip, toString/valueOf for object args, depth+16384 semantic, **depth table** for clone replacement semantics (mc==clip identity fix)
+- `clone_sprite_types` (25/25) ✅ — clone/duplicate plan: ng_isScriptableAtDepth for non-scriptable types (shape/statictext/morphshape/image return parent MC), tagDefineVideoStream for video scriptability
 - `textfield_props_swf5` (87/87) ✅ — d649861: SWF5 TextField properties 0-29 now non-writable (setPropertyWithFlags)
 - `edittext_newline_stripping` (46/46) ✅ — 51acce6: multiline text fields without variable bindings get trailing '\n' appended to initial text
 - `edittext_html_align_swf7` (52/52) ✅ — 235fd38: HTML-aware alignment in getNewTextFormat/getTextFormat
@@ -124,7 +124,7 @@ These tests were near-passing in the previous update and now pass locally:
 | OBJECT_WATCH_PLAN | **Phase 1 DONE** | 3/4 pass (`watch`, `watch_virtual_property_proto`, `object_prototypes`) | `watch_textfield` — MC dispatch + MC watcher in SetMember needed |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/2 | ASnative, ASSetPropFlags |
 | TELLTARGET_PLAN | Not started | 0/3 | tellTarget scope |
-| CLONE_DUPLICATE_PLAN | **Phase 1 DONE** | 2/5 pass | clone_sprite_edittext (needs TF clone), clone_sprite_edittext_dynamic (needs TF clone) |
+| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** | 2/5 pass (21/21 + 25/25) | clone_sprite_edittext (needs TF clone), clone_sprite_edittext_dynamic (needs TF clone) |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
 | **MOUSE_EVENTS_PLAN** | **Not started** | 0/5 | `_xmouse`/`_ymouse`, clip mouse event dispatch |
 | **FOCUS_SYSTEM_PLAN** | **Not started** | 0/6 | Mouse-triggered focus, onSetFocus/onKillFocus, key-to-focused dispatch |

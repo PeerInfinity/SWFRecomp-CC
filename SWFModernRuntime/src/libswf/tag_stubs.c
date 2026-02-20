@@ -107,6 +107,60 @@ static int ng_find_textfield(size_t char_id)
 static unsigned int ng_auto_instance_counter = 1;
 
 // ---------------------------------------------------------------------------
+// Clone depth table — tracks which variable name occupies each SWF depth for
+// script-created clones (CloneSprite / duplicateMovieClip). When a new clone
+// takes an occupied SWF depth, the old variable is set to undefined so that
+// GetVariable(old_name) returns undefined after the replacement.
+// ---------------------------------------------------------------------------
+#define MAX_CLONE_DEPTH_ENTRIES 128
+typedef struct { int swf_depth; char name[64]; } CloneDepthEntry;
+static CloneDepthEntry g_clone_depth_table[MAX_CLONE_DEPTH_ENTRIES];
+static size_t g_clone_depth_count = 0;
+
+// Evict any clone registered at swf_depth: clear its global variable to undefined.
+static void clone_depth_evict(int swf_depth)
+{
+	for (size_t i = 0; i < g_clone_depth_count; i++)
+	{
+		if (g_clone_depth_table[i].swf_depth == swf_depth)
+		{
+			// Set global variable to undefined so GetVariable returns undefined
+			size_t name_len = strlen(g_clone_depth_table[i].name);
+			ActionVar* old_var = getVariable((char*)g_clone_depth_table[i].name, name_len);
+			if (old_var != NULL)
+			{
+				if (old_var->type == ACTION_STACK_VALUE_STRING &&
+				    old_var->data.string_data.owns_memory &&
+				    old_var->data.string_data.heap_ptr != NULL)
+				{
+					free(old_var->data.string_data.heap_ptr);
+					old_var->data.string_data.heap_ptr = NULL;
+					old_var->data.string_data.owns_memory = false;
+				}
+				old_var->type = ACTION_STACK_VALUE_UNDEFINED;
+				old_var->data.numeric_value = 0;
+			}
+			// Remove entry by swapping with last
+			g_clone_depth_table[i] = g_clone_depth_table[--g_clone_depth_count];
+			return;
+		}
+	}
+}
+
+// Register a clone variable name at a SWF depth (evicts old entry first).
+static void clone_depth_register(int swf_depth, const char* name)
+{
+	clone_depth_evict(swf_depth);
+	if (g_clone_depth_count < MAX_CLONE_DEPTH_ENTRIES)
+	{
+		g_clone_depth_table[g_clone_depth_count].swf_depth = swf_depth;
+		strncpy(g_clone_depth_table[g_clone_depth_count].name, name, 63);
+		g_clone_depth_table[g_clone_depth_count].name[63] = '\0';
+		g_clone_depth_count++;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // entry_idx encoding for ng_* query functions
 // ---------------------------------------------------------------------------
 // Root-level: entry_idx = depth (1..max_depth), upper bits == 0
@@ -1194,6 +1248,9 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
 
+	// Evict any old clone registered at this SWF depth, then register new one
+	clone_depth_register(depth, target_name);
+
 	// Register as global variable
 	ActionVar _clone_mc_var = {0};
 	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -1238,6 +1295,10 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 			pl->clip_action_count = display_list[src_depth].clip_action_count;
 		}
 	}
+
+	// Evict any old clone at this SWF depth (from duplicateMovieClip, depth+16384 convention).
+	// ng_cloneSpriteFromMC is called from the duplicateMovieClip fallback path only.
+	clone_depth_register(depth + 16384, target_name);
 
 	ActionVar _clone_mc_var = {0};
 	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -1284,7 +1345,15 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 	clone_mc->currentframe = 1;
 	clone_mc->depth = swf_depth;
 
-	// Do NOT register as global variable (accessible via path only)
+	// Evict any old clone at this SWF depth, then register this one
+	clone_depth_register(swf_depth, target_name);
+
+	// Register as global variable so GetVariable(target_name) finds the clone
+	ActionVar _dup_mc_var = {0};
+	_dup_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_dup_mc_var.data.numeric_value = (u64)clone_mc;
+	setVariableByName(target_name, &_dup_mc_var);
+
 	return clone_mc;
 }
 

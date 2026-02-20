@@ -1,13 +1,26 @@
 # Clone/Duplicate MovieClip Implementation Plan
 <!-- TESTS: duplicate_movie_clip, clone_sprite_types, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, clip_events, clip_event_propagation_order, on_construct -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-19
 
 ## Overview
 
 Clone/Duplicate MovieClip covers 5 failing Ruffle tests. The core feature is `ActionCloneSprite` (opcode 0x24), which duplicates an existing display list object, giving the copy a new name and depth. The AS2 method wrapper is `MovieClip.duplicateMovieClip(name, depth, initObj)`.
 
-**Current state**: The recompiler correctly emits `actionCloneSprite()` calls. In NO_GRAPHICS mode, the runtime pops three stack arguments (target name, source name, depth) but does nothing — it's a debug-logging stub. The `duplicateMovieClip` method exists on MovieClip.prototype as a registered stub but has no body. Additionally, `tagPlaceObject2WithClipActions()` is a complete no-op in tag_stubs.c — it doesn't even forward to `tagPlaceObject2`. This prevents tests like `duplicate_movie_clip` from working at all (the source sprite never enters the display list).
+**Current state (as of 2026-02-19)**:
+- `duplicate_movie_clip` (21/21) ✅ — DONE
+- `clone_sprite_types` (25/25) ✅ — DONE
+- `clone_sprite_edittext` (~0/95) — BLOCKED: needs TEXTFIELD_PLAN Phase 1+2
+- `clone_sprite_edittext_dynamic` (~0/87) — BLOCKED: needs TEXTFIELD_PLAN Phase 1+2
+- `duplicate_movie_clip_drawing` — DEFERRED: needs Drawing API
+
+Phase 1 is fully complete. Phase 2 is blocked on TextField/TextFormat infrastructure.
+
+**Key implementation notes discovered during Phase 1**:
+- `duplicateMovieClip` registers clones via `setVariableByName` so `GetVariable("clip")` works
+- A `clone_depth_table` tracks which variable name occupies each SWF depth. When a new clone takes an occupied SWF depth, the old variable is cleared to undefined. This is needed because `duplicateMovieClip(name, 0)` uses SWF depth `0+16384=16384`, and a subsequent `CloneSprite(src, clip1, 16384)` at the same SWF depth must evict "clip" → undefined.
+- `tagPlaceObject2WithClipActions` is implemented in `tag.c` (already done, forwards to `tagPlaceObject2` and stores clip_actions)
+- onLoad fires for CloneSprite clones via the pending load queue, not for duplicateMovieClip clones
 
 **Key insight**: This is entirely a runtime problem — the recompiler already emits the correct code. The core implementation is in `tag_stubs.c` (NO_GRAPHICS display list) and `action.c` (CloneSprite + duplicateMovieClip method).
 
