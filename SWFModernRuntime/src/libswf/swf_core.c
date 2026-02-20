@@ -43,7 +43,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	manual_next_frame = 0;
 	goto_from_action = 0;
 
-	ng_display_clear_after(target);
+	ng_display_clear_after(app_context, target);
 
 	catch_up_mode = 1;
 	if (target <= original_frame)
@@ -116,8 +116,9 @@ void swfStart(SWFAppContext* app_context)
 	}
 
 	// Allocate display state (in GRAPHICS mode these come from swf.c)
-	dictionary = calloc(INITIAL_DICTIONARY_CAPACITY, sizeof(Character));
-	display_list = calloc(INITIAL_DISPLAYLIST_CAPACITY, sizeof(DisplayObject));
+	// Must use HCALLOC (heap allocator) so grow_ptr can FREE them without SIGABRT
+	dictionary = HCALLOC(INITIAL_DICTIONARY_CAPACITY, sizeof(Character));
+	display_list = HCALLOC(INITIAL_DISPLAYLIST_CAPACITY, sizeof(DisplayObject));
 	if (!dictionary || !display_list) {
 		fprintf(stderr, "Failed to allocate display state\n");
 		return;
@@ -176,7 +177,7 @@ void swfStart(SWFAppContext* app_context)
 			goto_from_action = 0;
 
 			// Remove display list entries placed after the target frame
-			ng_display_clear_after(target);
+			ng_display_clear_after(app_context, target);
 
 			catch_up_mode = 1;
 			if (target <= original_frame)
@@ -255,11 +256,9 @@ void swfStart(SWFAppContext* app_context)
 
 	printf("\n=== SWF Execution Completed ===\n");
 
-	// Cleanup
+	// Cleanup (dictionary/display_list freed by heap_shutdown; stack uses system malloc)
 	heap_shutdown(app_context);
 	freeMap();
-	free(dictionary);
-	free(display_list);
 	free(app_context->stack);
 }
 

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <utils.h>
+#include <heap.h>
 
 #ifndef NO_GRAPHICS
 #include <hit_test.h>
@@ -73,7 +74,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		if (obj->sprite_display_list == NULL)
 		{
 			obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-			obj->sprite_display_list = calloc(obj->sprite_dl_capacity, sizeof(DisplayObject));
+			obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 			obj->sprite_max_depth = 0;
 			obj->sprite_current_frame = 0;
 			// Don't override sprite_is_playing — tagPlaceObject2 already set it to 1,
@@ -104,7 +105,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					{
 						if (display_list[j].sprite_display_list != NULL)
 						{
-							free(display_list[j].sprite_display_list);
+							FREE(display_list[j].sprite_display_list);
 							display_list[j].sprite_display_list = NULL;
 						}
 						display_list[j].char_id = 0;
@@ -472,7 +473,10 @@ void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
 	// --- Run initial frame 0 with scripts for newly placed sprites ---
-	// (sprite_needs_init=1 was set by ng_on_place_object2 after the bounds-only pre-run)
+	// sprite_needs_init=1 is set by ng_on_place_object2 when a sprite is placed.
+	// We run frame 0 here (in the same tick as placement) to match Flash behavior.
+	// After running, advance sprite_current_frame so advance_sprite_frames picks
+	// up at frame 1 next tick (avoids re-running frame 0 as a "loop back").
 	{
 		int saved_catch_up = catch_up_mode;
 		catch_up_mode = 0;
@@ -497,6 +501,10 @@ void tagShowFrame(SWFAppContext* app_context)
 			// Run frame 0 WITH scripts (catch_up_mode=0)
 			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
 				CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+
+			// Advance frame counter so advance_sprite_frames picks up at frame 1
+			// (for 1-frame sprites, 1 % 1 = 0, which correctly loops back each tick)
+			obj->sprite_current_frame = 1 % ch->sprite_frame_count;
 
 			// Save back (pointer may change from realloc)
 			obj->sprite_display_list = display_list;
@@ -1032,15 +1040,15 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 #endif
 }
 
-static void clear_display_entry(size_t depth)
+static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 {
 	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
 	{
-		free(display_list[depth].instance_name);
+		free(display_list[depth].instance_name);  // system free: strdup'd string
 	}
 	if (display_list[depth].sprite_display_list != NULL)
 	{
-		free(display_list[depth].sprite_display_list);
+		FREE(display_list[depth].sprite_display_list);  // heap free: HCALLOC'd buffer
 		display_list[depth].sprite_display_list = NULL;
 	}
 	display_list[depth].char_id = 0;
@@ -1070,7 +1078,7 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 #ifdef NO_GRAPHICS
 		ng_on_remove_object(app_context, depth);
 #endif
-		clear_display_entry(depth);
+		clear_display_entry(app_context, depth);
 	}
 #ifndef NO_GRAPHICS
 	(void)app_context;
@@ -1101,7 +1109,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 #ifdef NO_GRAPHICS
 		ng_on_remove_object(app_context, depth);
 #endif
-		clear_display_entry(depth);
+		clear_display_entry(app_context, depth);
 	}
 #ifndef NO_GRAPHICS
 	(void)app_context;
@@ -1247,7 +1255,7 @@ int hasPlayingSprites(void)
 
 // Clear display entries whose placed_at_frame is after target_frame.
 // Used by swf_core.c when seeking backward on the main timeline.
-void ng_display_clear_after(size_t target_frame)
+void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 {
 	for (size_t i = 1; i <= max_depth; i++)
 	{
@@ -1256,7 +1264,7 @@ void ng_display_clear_after(size_t target_frame)
 		{
 			if (display_list[i].sprite_display_list != NULL)
 			{
-				free(display_list[i].sprite_display_list);
+				FREE(display_list[i].sprite_display_list);
 				display_list[i].sprite_display_list = NULL;
 			}
 			display_list[i].char_id = 0;

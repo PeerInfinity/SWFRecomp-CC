@@ -4,6 +4,7 @@
 #include <swf.h>
 #include <common.h>
 #include <action.h>
+#include <heap.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -305,56 +306,20 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 			actionInitTextFieldVariable(app_context, var_name, init_text);
 	}
 
-	// Pre-run sprite frame 0 with catch_up_mode=1:
-	// - Suppresses scripts (catch_up=1) so only placement/removal happens
-	// - Populates sprite_display_list so parent-frame scripts can read _width/_height/_rotation
-	// Frame 0 WITH scripts will run at tagShowFrame time (sprite_needs_init=1)
+	// Allocate sprite display list and mark for frame-0 execution at tagShowFrame.
+	// tagShowFrame's sprite_needs_init block runs frame 0 WITH scripts in the same
+	// tick as placement, matching Flash's "first frame construction" behavior.
 	if (is_sprite)
 	{
 		Character* ch = &dictionary[char_id];
 		if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs != NULL)
 		{
-			// Allocate sprite display list
 			if (obj->sprite_display_list == NULL)
 			{
 				obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-				obj->sprite_display_list = calloc(obj->sprite_dl_capacity, sizeof(DisplayObject));
+				obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 				obj->sprite_max_depth = 0;
 			}
-
-			// Context swap to sprite's display list
-			DisplayObject* saved_dl = display_list;
-			size_t saved_max = max_depth;
-			size_t saved_cap = display_list_capacity;
-
-			display_list = obj->sprite_display_list;
-			max_depth = obj->sprite_max_depth;
-			display_list_capacity = obj->sprite_dl_capacity;
-
-			int saved_catch_up = catch_up_mode;
-			catch_up_mode = 1;
-
-			// Set g_current_sprite_obj so ng_isInsideSprite() works correctly
-			DisplayObject* saved_sprite_obj = g_current_sprite_obj;
-			g_current_sprite_obj = obj;
-
-			// Direct frame call (scripts suppressed by catch_up=1, no MC context needed)
-			if (ch->sprite_frame_funcs[0] != NULL)
-				ch->sprite_frame_funcs[0](app_context);
-
-			g_current_sprite_obj = saved_sprite_obj;
-			catch_up_mode = saved_catch_up;
-
-			// Save back (pointer may change from realloc)
-			obj->sprite_display_list = display_list;
-			obj->sprite_max_depth = max_depth;
-			obj->sprite_dl_capacity = display_list_capacity;
-
-			display_list = saved_dl;
-			max_depth = saved_max;
-			display_list_capacity = saved_cap;
-
-			// Mark for full-scripts run at tagShowFrame
 			obj->sprite_needs_init = 1;
 		}
 	}

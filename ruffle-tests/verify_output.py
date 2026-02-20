@@ -224,7 +224,7 @@ def compile_native(test_dir, num_frames, build_dir):
                 *[str(f) for f in sorted(build_dir.glob("*.c"))],
                 "-DNO_GRAPHICS",
                 f"-DMAX_FRAMES={num_frames}",
-                "-D_POSIX_C_SOURCE=199309L",
+                "-D_POSIX_C_SOURCE=200809L",
                 *extra_defines,
                 f"-I{build_dir}",
                 f"-I{inc}",

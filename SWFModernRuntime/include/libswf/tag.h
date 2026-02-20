@@ -82,7 +82,7 @@ size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name);
 void ng_updateDisplayDepth(const char* name, int new_as_depth);
 void ng_swapDisplayDepths(const char* name1, const char* name2);
 void ng_renameDisplayEntry(const char* old_name, const char* new_name);
-void ng_display_clear_after(size_t target_frame);
+void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame);
 int ng_isSpriteAtDepth(size_t depth);
 int ng_isButtonAtDepth(size_t depth);
 int ng_isTextFieldAtDepth(size_t depth);
