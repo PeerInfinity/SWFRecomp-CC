@@ -7667,7 +7667,20 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				//            0x0040=HTML, 0x0080=UseOutlines, 0x0100=AutoSize
 
 				// text property (initial text from DefineEditText)
+				// Flash multiline fields have a trailing '\n' in their initial text,
+				// but only when there is no variable binding (variable-bound fields
+				// derive their text from the variable, not from the tag default).
 				const char* init_text = ng_getTextFieldInitialText(depth);
+				char* init_text_ml = NULL;
+				if ((tf_flags & 0x0002) && ng_getTextFieldVariableName(tf_idx)[0] == '\0') {
+					// Multiline with no variable binding: append trailing newline
+					size_t _ml_len = strlen(init_text);
+					init_text_ml = (char*) malloc(_ml_len + 2);
+					memcpy(init_text_ml, init_text, _ml_len);
+					init_text_ml[_ml_len]     = '\n';
+					init_text_ml[_ml_len + 1] = '\0';
+					init_text = init_text_ml;
+				}
 				ActionVar text_val = {0};
 				text_val.type = ACTION_STACK_VALUE_STRING;
 				{
@@ -7676,6 +7689,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					text_val.str_size = _it_u16_len;
 					VAL(u64, &text_val.data.numeric_value) = (u64)_it_u16;
 				}
+				if (init_text_ml) free(init_text_ml);
 				setProperty(app_context, props, "text", 4, &text_val);
 				// htmlText — for HTML fields, wrap with <P ALIGN><FONT> tags
 				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
