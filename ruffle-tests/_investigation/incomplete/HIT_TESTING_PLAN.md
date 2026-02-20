@@ -18,9 +18,14 @@ The tests cluster into three groups by complexity:
    per-character shape bounds emitted by the recompiler
 3. **Shape tests** (`hitTest` with shapeFlag=true, winding rules) — need actual vertex data at runtime
 
-Two tests require **mouse simulation** (deferred indefinitely):
-- `hittest_morph_input` — mouse move event fires "hovering"
-- `text_blocks_clicks` — mouse down/up fire onMouseDown/onPress
+Two tests require **mouse simulation** — previously deferred, now **unblocked** by
+input-event-injection.md Phases 0–7 (complete as of 2026-02-20):
+- `hittest_morph_input` — mouse move event fires "hovering": needs Phase 3 (clip bounds) +
+  MOUSE_EVENTS_PLAN.md Phase B (clip event dispatch). Expected output: 1 line `"hovering"`.
+- `text_blocks_clicks` — mouse down/up fire onMouseDown/onPress: needs Phase 3 (text bounds) +
+  MOUSE_EVENTS_PLAN.md Phase B. Expected output: 4 lines with click positions.
+
+See **MOUSE_EVENTS_PLAN.md** for the clip event dispatch infrastructure needed by these tests.
 
 ---
 
@@ -36,8 +41,8 @@ Two tests require **mouse simulation** (deferred indefinitely):
 | hittest_morph | 70 | ~0/70 | 3+4 | getBounds/getRect on morph shapes |
 | movieclip_hittest_shapeflag | 338 | 180/338 (53%) | 5 | hitTest(x, y, true) — shape hit |
 | hittest_winding_rule | 12 | 0/12 (0%) | 5 | Even-odd vs non-zero winding in hitTest |
-| hittest_morph_input | 1 | 0/1 | DEFERRED | Mouse simulation |
-| text_blocks_clicks | 4 | 0/4 | DEFERRED | Mouse simulation |
+| hittest_morph_input | 1 | 0/1 | Phase 3+MOUSE_EVENTS | Clip bounds + mouse move dispatch |
+| text_blocks_clicks | 4 | 0/4 | Phase 3+MOUSE_EVENTS | Text bounds + mouse down/up dispatch |
 
 ---
 

@@ -1,20 +1,25 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-20 (input-event-injection phases 0.3-5 + as_broadcaster_initialize regression fix)
+Last updated: 2026-02-20 (Phase 7 Key Events: Key object, broadcastMessage, key dispatch, frame-first loop)
 
 Previous CI baseline: 227/619 (36.7%), commit d71ead7
 
 ## Quick Summary
 
-- **Pass rate (CI)**: 227/619 (36.7%)
+- **Pass rate (CI)**: 227/619 (36.7%) — pending CI run for Phase 7 (no regressions expected)
 - **Main failure type**: output_mismatch, timeout (2), segfault (1)
-- **Recent gains**: `mouse_listeners` now passes (Phase 5: Mouse AsBroadcaster); `as_broadcaster_initialize` regression fixed (back to 10/10)
-- **Active plan**: input-event-injection.md — Phases 0-5 done; Phase 6+ (per-clip hit test dispatch, key events, focus) remaining
+- **Recent gains**: `button_goto` and `key_isToggled` now pass (Phase 7: Key AsBroadcaster, broadcastMessage, frame-first event loop)
+- **Active plans**: input-event-injection.md Phases 0–7 COMPLETE; Phases 8+9 are now separate plans:
+  - **MOUSE_EVENTS_PLAN.md** — `_xmouse`/`_ymouse`, clip mouse event dispatch (5 tests)
+  - **FOCUS_SYSTEM_PLAN.md** — mouse-triggered focus, onSetFocus/onKillFocus (6 tests)
+  - **TAB_ORDERING_PLAN.md** — Tab key focus navigation, tabIndex/tabEnabled (16 tests)
+  - **DRAG_DROP_PLAN.md** — startDrag/stopDrag, _droptarget (4 tests)
 
 ## Major Features Implemented Since Last Update
 
 | Feature | Commits | Impact | Key Tests |
 |---------|---------|--------|-----------|
+| **Phase 7: Key Events + frame-first loop** | 0183209 | Key object (isDown/getCode/getAscii/isToggled), broadcastMessage impl, Key AsBroadcaster, button key conditions, frame-first event ordering, quit_swf loop continuation | `button_goto` ✅, `key_isToggled` ✅ |
 | **Input event injection (Phases 0.3-5)** | a58b421, d71ead7 | shape_data/hit_test in NO_GRAPHICS; event pump; Mouse AsBroadcaster; AsBroadcaster regression fix | `mouse_listeners` ✅, `as_broadcaster_initialize` ✅ |
 | **Object.prototype.watch/unwatch** | 0a9e034, 85c676f | Property change callbacks; watcher fires before addProperty setter; static buffer reentrancy fix | `watch` ✅, `watch_virtual_property_proto` ✅, `object_prototypes` ✅, `parse_int` ✅ |
 | **Number.prototype.toString(NaN, radix)** | 743325f | NaN encoded as INT32_MIN via x86 CVTTSD2SI, then inverted digit encoding char(48-N); \r→\n normalization | `primitive_type_globals` ✅ (557/557) |
@@ -117,6 +122,10 @@ These tests were near-passing in the previous update and now pass locally:
 | TELLTARGET_PLAN | Not started | 0/3 | tellTarget scope |
 | CLONE_DUPLICATE_PLAN | **Phase 1 DONE** | 2/5 pass | clone_sprite_edittext (needs TF clone), clone_sprite_edittext_dynamic (needs TF clone) |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
+| **MOUSE_EVENTS_PLAN** | **Not started** | 0/5 | `_xmouse`/`_ymouse`, clip mouse event dispatch |
+| **FOCUS_SYSTEM_PLAN** | **Not started** | 0/6 | Mouse-triggered focus, onSetFocus/onKillFocus, key-to-focused dispatch |
+| **TAB_ORDERING_PLAN** | **Not started** | 0/16 | Tab key focus navigation, tabIndex/tabEnabled/tabChildren |
+| **DRAG_DROP_PLAN** | **Not started** | 0/4 | startDrag/stopDrag, _droptarget |
 | All others | Not started | - | - |
 
 ## Recommended Work Order
