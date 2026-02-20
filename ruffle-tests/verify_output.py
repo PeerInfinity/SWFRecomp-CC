@@ -184,7 +184,7 @@ def get_git_sha():
     return None
 
 
-def get_num_frames(test_dir, wait_count=0):
+def get_num_frames(test_dir, wait_count=0, has_input=False):
     """Parse num_frames (or num_ticks) from test.toml, default 1."""
     toml_path = test_dir / "test.toml"
     declared = 1
@@ -197,7 +197,12 @@ def get_num_frames(test_dir, wait_count=0):
             m = re.search(r"num_ticks\s*=\s*(\d+)", text)
             if m:
                 declared = int(m.group(1))
-    return max(declared, wait_count + 1)
+    # With frame-first event delivery, the frame runs before events are pumped.
+    # After the last Wait group's events fire, one more frame tick is needed to
+    # process the resulting state changes (e.g. button transitions). So use +2
+    # instead of +1 when input events are present.
+    min_ticks = (wait_count + 2) if has_input else (wait_count + 1)
+    return max(declared, min_ticks)
 
 
 def filter_output(raw_output):
@@ -652,7 +657,7 @@ def main():
                 event_file_path = build_dir / "input_events.txt"
                 wait_count = preprocess_input_json(input_json, event_file_path, scale_factor)
                 event_file = event_file_path
-            num_frames = get_num_frames(test_dir, wait_count)
+            num_frames = get_num_frames(test_dir, wait_count, has_input=input_json.exists())
             entry["num_frames"] = num_frames
             ok, err = compile_native(test_dir, num_frames, build_dir)
             if not ok:

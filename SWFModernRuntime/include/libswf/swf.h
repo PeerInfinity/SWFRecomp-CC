@@ -115,8 +115,10 @@ typedef struct DisplayObject
 	u32 has_cxform;
 	u16 clip_depth;
 	u16 ratio;
-	u8 button_state;       // 0=up, 1=over, 2=down (used for CHAR_TYPE_BUTTON)
+	u8 button_state;       // 0=idle, 1=over, 2=down, 3=outDown (CHAR_TYPE_BUTTON)
 	u8 button_prev_state;  // previous frame's state (for transition detection)
+	u8 sticky_button_state; // preserved state across remove+re-place (same char)
+	size_t sticky_char_id;  // char_id that sticky_button_state belongs to
 	u8 blend_mode;         // 0=normal (default), see SWF spec blend modes
 	// Per-sprite persistent display list (for multi-frame sprites)
 	struct DisplayObject* sprite_display_list;
@@ -159,8 +161,10 @@ typedef struct DisplayObject
 } DisplayObject;
 
 typedef struct KeyState {
-	uint8_t down[256];  // 1 if key currently held (indexed by ASCII/keyCode)
-	int last_key_down;  // keyCode of most recently pressed key (-1 if none)
+	uint8_t down[256];     // 1 if key currently held (indexed by ASCII/keyCode)
+	uint8_t toggled[256];  // toggle state for lock keys (CapsLock=20, NumLock=144, ScrollLock=145)
+	int last_key_down;     // keyCode of most recently pressed key (-1 if none)
+	int last_key_ascii;    // ASCII value of last key press (for Key.getAscii())
 } KeyState;
 
 typedef struct MouseState {

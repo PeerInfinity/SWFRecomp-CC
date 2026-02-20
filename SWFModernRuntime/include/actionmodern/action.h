@@ -272,3 +272,8 @@ typedef struct ASArray ASArray;
 // the preload_arguments flag. Sets up callee/caller/__proto__ on the preloaded
 // arguments array, using the global g_current_executing_func / g_prev_executing_func.
 void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr);
+
+// Key event dispatch — called from swf_core.c after delivering EV_KEY_DOWN/EV_KEY_UP.
+// Broadcasts onKeyDown/onKeyUp to all registered Key listeners.
+void actionDispatchKeyDown(SWFAppContext* app_context);
+void actionDispatchKeyUp(SWFAppContext* app_context);

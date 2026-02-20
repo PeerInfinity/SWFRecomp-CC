@@ -171,6 +171,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ms->stage_y = ev->y * 20.0f;
         ms->button_down = 1;
         ms->clicked = 1;
+        // Key code 1 = VK_LBUTTON: toggle on mouse down
+        app_context->keys.toggled[1] ^= 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
         break;
@@ -183,13 +185,23 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         root_movieclip.ymouse = ev->y;
         break;
     case EV_KEY_DOWN:
-        if (ev->code >= 0 && ev->code < 256)
+        if (ev->code >= 0 && ev->code < 256) {
             app_context->keys.down[ev->code] = 1;
+            // Toggle state for all keys on key-down (isToggled tracks press count parity)
+            app_context->keys.toggled[ev->code] ^= 1;
+        }
         app_context->keys.last_key_down = ev->code;
+        // ASCII value: printable ASCII range (32-126)
+        app_context->keys.last_key_ascii = (ev->code >= 32 && ev->code <= 126) ? ev->code : 0;
+        // Broadcast onKeyDown to Key listeners, then check button key conditions
+        actionDispatchKeyDown(app_context);
+        dispatch_button_key_actions(app_context, ev->code);
         break;
     case EV_KEY_UP:
         if (ev->code >= 0 && ev->code < 256)
             app_context->keys.down[ev->code] = 0;
+        // Broadcast onKeyUp to Key listeners
+        actionDispatchKeyUp(app_context);
         break;
     default:
         break;
@@ -265,42 +277,45 @@ void swfStart(SWFAppContext* app_context)
 #endif
 	size_t tick_count = 0;
 
-	while (!quit_swf && tick_count < max_ticks)
+	// Continue as long as quit_swf is clear, OR there are still input events to deliver
+	// (allows single-frame SWFs with quit_swf=1 to still process multi-tick input files).
+	while ((!quit_swf || (g_events && g_event_pos < g_event_count)) && tick_count < max_ticks)
 	{
 		tick_count++;
-		printf("[Frame %zu]\n", current_frame);
-
-		if (current_frame >= g_frame_count)
-		{
-			printf("Frame %zu out of bounds (max %zu), stopping.\n", current_frame, g_frame_count);
-			break;
-		}
 
 		// Reset per-tick edge flags
 		app_context->mouse.moved = 0;
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
 		app_context->keys.last_key_down = -1;
-		// Deliver queued input events for this tick
-		if (g_events) {
-			input_events_pump_tick(app_context);
+
+		// Frame-first: advance sprites and run frame scripts before delivering events.
+		// This ensures that listeners registered in frame scripts receive events from
+		// the same tick (matching Flash/Ruffle's frame-then-event execution order).
+		if (current_frame < g_frame_count)
+		{
+			printf("[Frame %zu]\n", current_frame);
+			// Advance child sprite timelines BEFORE running frame tags/scripts
+			// (Flash executes child frame advancement before parent DoAction)
+			advance_sprite_frames(app_context);
+			// Only run the root frame function if the root timeline is playing
+			if (is_playing || manual_next_frame)
+			{
+				if (funcs[current_frame])
+				{
+					funcs[current_frame](app_context);
+				}
+				else
+				{
+					printf("No function for frame %zu, stopping.\n", current_frame);
+					break;
+				}
+			}
 		}
 
-		// Advance child sprite timelines BEFORE running frame tags/scripts
-		// (Flash executes child frame advancement before parent DoAction)
-		advance_sprite_frames(app_context);
-		// Only run the root frame function if the root timeline is playing
-		if (is_playing || manual_next_frame)
-		{
-			if (funcs[current_frame])
-			{
-				funcs[current_frame](app_context);
-			}
-			else
-			{
-				printf("No function for frame %zu, stopping.\n", current_frame);
-				break;
-			}
+		// Deliver queued input events for this tick (after frame scripts ran)
+		if (g_events) {
+			input_events_pump_tick(app_context);
 		}
 
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
@@ -371,7 +386,13 @@ void swfStart(SWFAppContext* app_context)
 		// IMPORTANT: Process manual_next_frame BEFORE checking is_playing
 		// This ensures that gotoFrame/gotoAndStop commands execute the target frame
 		// even when they stop playback
-		if (manual_next_frame)
+		if (current_frame >= g_frame_count)
+		{
+			// Past the end of the frame list — only continue if events remain
+			if (!g_events || g_event_pos >= g_event_count) break;
+			// Otherwise loop with current_frame staying OOB; events were already pumped above
+		}
+		else if (manual_next_frame)
 		{
 			current_frame = next_frame;
 			manual_next_frame = 0;
@@ -386,10 +407,11 @@ void swfStart(SWFAppContext* app_context)
 			// Root stopped — but child sprites may still be playing
 			if (hasPlayingSprites())
 			{
-				// Stay at current_frame, sprites advance via ng_advanceSprites above
+				// Stay at current_frame, sprites advance via advance_sprite_frames above
 				continue;
 			}
-			// Truly stopped — exit loop
+			// Truly stopped — but continue if events remain
+			if (g_events && g_event_pos < g_event_count) continue;
 			break;
 		}
 	}

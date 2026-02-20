@@ -559,7 +559,11 @@ void tagShowFrame(SWFAppContext* app_context)
 	// Must run BEFORE transform composition so the pre-render pass
 	// composes transforms for the correct (updated) button state.
 	// Iterate front-to-back (highest depth first). The first button that hits
-	// gets the over/down state; all others stay in up state.
+	// gets the over/down state; all others use OutDown or Idle.
+	//
+	// States: 0=Idle, 1=OverUp, 2=OverDown, 3=OutDown
+	// OutDown: mouse was pressed while over this button and has since moved outside.
+	// It is reset when the mouse is released or when the mouse returns over the button.
 	if (app_context->shape_data != NULL)
 	{
 		int found_hover = 0;
@@ -572,6 +576,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			if (ch->type != CHAR_TYPE_BUTTON) continue;
 
 			u8 old_state = obj->button_state;
+			u8 new_state = old_state;
 
 			if (!found_hover)
 			{
@@ -595,33 +600,51 @@ void tagShowFrame(SWFAppContext* app_context)
 					{
 						found_hover = 1;
 						if (app_context->mouse.button_down)
-							obj->button_state = 2;  // down (OverDown)
+							new_state = 2;  // OverDown
 						else
-							obj->button_state = 1;  // over (OverUp)
+							new_state = 1;  // OverUp
 					}
 					else
 					{
-						obj->button_state = 0;  // up (Idle)
+						// Not over button
+						if (app_context->mouse.button_down &&
+						    (old_state == 2 || old_state == 3))
+							new_state = 3;  // OutDown: pressed while over, dragged outside
+						else
+							new_state = 0;  // Idle
 					}
 				}
 			}
 			else
 			{
-				obj->button_state = 0;  // up (another button is hovered)
+				// Another button already has hover; this button is outside
+				if (app_context->mouse.button_down &&
+				    (old_state == 2 || old_state == 3))
+					new_state = 3;  // OutDown
+				else
+					new_state = 0;  // Idle
 			}
 
+			obj->button_state = new_state;
+			// Keep sticky state in sync so re-placements restore the latest state
+			obj->sticky_char_id = obj->char_id;
+			obj->sticky_button_state = new_state;
+
 			// Dispatch actions on state transitions
-			u8 new_state = obj->button_state;
 			if (old_state != new_state && ch->button_action_count > 0)
 			{
 				// Encode transition as BUTTONCONDACTION bitmask
 				u16 transition = 0;
-				if (old_state == 0 && new_state == 1)      transition = 0x0001; // IdleToOverUp
-				else if (old_state == 1 && new_state == 0)  transition = 0x0002; // OverUpToIdle
-				else if (old_state == 1 && new_state == 2)  transition = 0x0004; // OverUpToOverDown
-				else if (old_state == 2 && new_state == 1)  transition = 0x0008; // OverDownToOverUp
-				else if (old_state == 2 && new_state == 0)  transition = 0x0100; // OverDownToIdle
-				else if (old_state == 0 && new_state == 2)  transition = 0x0080; // IdleToOverDown
+				if      (old_state == 0 && new_state == 1) transition = 0x0001; // IdleToOverUp
+				else if (old_state == 1 && new_state == 0) transition = 0x0002; // OverUpToIdle
+				else if (old_state == 1 && new_state == 2) transition = 0x0004; // OverUpToOverDown
+				else if (old_state == 2 && new_state == 1) transition = 0x0008; // OverDownToOverUp
+				else if (old_state == 2 && new_state == 3) transition = 0x0010; // OverDownToOutDown
+				else if (old_state == 3 && new_state == 2) transition = 0x0020; // OutDownToOverDown
+				else if (old_state == 3 && new_state == 0) transition = 0x0040; // OutDownToIdle
+				else if (old_state == 0 && new_state == 2) transition = 0x0080; // IdleToOverDown
+				else if (old_state == 2 && new_state == 0) transition = 0x0100; // OverDownToIdle
+				else if (old_state == 3 && new_state == 1) transition = 0x0040; // OutDownToIdle (closest match)
 
 				if (transition != 0)
 				{
@@ -968,8 +991,20 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
-	display_list[depth].button_state = 0;
-	display_list[depth].button_prev_state = 0;
+	// Restore persistent button state if the same character is being re-placed
+	// (e.g. a looping movie that removes+replaces a button each frame cycle).
+	if (display_list[depth].sticky_char_id == char_id && char_id != 0)
+	{
+		display_list[depth].button_state = display_list[depth].sticky_button_state;
+		display_list[depth].button_prev_state = display_list[depth].sticky_button_state;
+	}
+	else
+	{
+		display_list[depth].button_state = 0;
+		display_list[depth].button_prev_state = 0;
+		display_list[depth].sticky_button_state = 0;
+		display_list[depth].sticky_char_id = 0;
+	}
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	init_cx_fields(&display_list[depth]);
@@ -1019,8 +1054,20 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
-	display_list[depth].button_state = 0;
-	display_list[depth].button_prev_state = 0;
+	// Restore persistent button state if the same character is being re-placed
+	// (e.g. a looping movie that removes+replaces a button each frame cycle).
+	if (display_list[depth].sticky_char_id == char_id && char_id != 0)
+	{
+		display_list[depth].button_state = display_list[depth].sticky_button_state;
+		display_list[depth].button_prev_state = display_list[depth].sticky_button_state;
+	}
+	else
+	{
+		display_list[depth].button_state = 0;
+		display_list[depth].button_prev_state = 0;
+		display_list[depth].sticky_button_state = 0;
+		display_list[depth].sticky_char_id = 0;
+	}
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	init_cx_fields(&display_list[depth]);
@@ -1047,6 +1094,13 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	{
 		FREE(display_list[depth].sprite_display_list);  // heap free: HCALLOC'd buffer
 		display_list[depth].sprite_display_list = NULL;
+	}
+	// Preserve button state so it can be restored if the same char is re-placed
+	// (handles looping movies that remove+replace a button each frame cycle).
+	if (display_list[depth].char_id != 0)
+	{
+		display_list[depth].sticky_char_id = display_list[depth].char_id;
+		display_list[depth].sticky_button_state = display_list[depth].button_state;
 	}
 	display_list[depth].char_id = 0;
 	display_list[depth].transform_id = 0;
@@ -1138,6 +1192,28 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 #ifdef NO_GRAPHICS
 	ng_record_button(char_id);
 #endif
+}
+
+// Dispatch button key-press BUTTONCONDACTION conditions for a given Flash key code.
+// For each button in the display list, check if any action has a key-press condition
+// matching the given key code (stored in condition bits 9-15) and fire the action.
+void dispatch_button_key_actions(SWFAppContext* app_context, int key_code)
+{
+	if (key_code <= 0 || key_code > 127) return;
+	for (size_t i = 1; i <= max_depth; i++)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_BUTTON) continue;
+		if (ch->button_action_count == 0) continue;
+		for (size_t a = 0; a < ch->button_action_count; a++)
+		{
+			int cond_key = (ch->button_actions[a].condition >> 9) & 0x7F;
+			if (cond_key != 0 && cond_key == key_code)
+				ch->button_actions[a].action(app_context);
+		}
+	}
 }
 
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,

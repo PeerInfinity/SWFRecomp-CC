@@ -11258,11 +11258,74 @@ static ActionVar builtin_broadcaster_removeListener(SWFAppContext* app_context, 
 static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
-    // Stub: broadcastMessage is complex to implement correctly; return undefined
-    (void)app_context; (void)args; (void)arg_count; (void)this_obj;
-    ActionVar result = {0};
-    result.type = ACTION_STACK_VALUE_UNDEFINED;
-    return result;
+    ActionVar undef = {0};
+    undef.type = ACTION_STACK_VALUE_UNDEFINED;
+
+    ASObject* receiver = (ASObject*) this_obj;
+    if (!receiver) receiver = g_c_function_this_obj;
+    if (!receiver || arg_count < 1) return undef;
+
+    // Convert method name (args[0]) from UTF-16 to UTF-8
+    char method_name[256];
+    method_name[0] = '\0';
+    if (args[0].type == ACTION_STACK_VALUE_STRING) {
+        const uint16_t* u16 = (const uint16_t*)(uintptr_t)args[0].data.numeric_value;
+        u16_to_utf8(u16, args[0].str_size, method_name, sizeof(method_name));
+    } else {
+        return undef;  // method name must be a string
+    }
+    int method_name_len = (int)strlen(method_name);
+    if (method_name_len == 0) return undef;
+
+    // Get the _listeners array
+    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
+    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) return undef;
+    ASArray* arr = (ASArray*)(uintptr_t)listeners_prop->data.numeric_value;
+    if (!arr || arr->length == 0) return undef;
+
+    // Extra args to pass to the method (args[1..])
+    u32 extra_count = arg_count > 1 ? arg_count - 1 : 0;
+    ActionVar* extra_args = extra_count > 0 ? &args[1] : NULL;
+
+    // Call method on each listener
+    for (u32 i = 0; i < arr->length; i++) {
+        ActionVar* elem = getArrayElement(arr, i);
+        if (!elem) continue;
+
+        ASObject* listener_obj = NULL;
+        if (elem->type == ACTION_STACK_VALUE_OBJECT) {
+            listener_obj = (ASObject*)(uintptr_t)elem->data.numeric_value;
+        } else if (elem->type == ACTION_STACK_VALUE_MOVIECLIP) {
+            MovieClip* mc = (MovieClip*)(uintptr_t)elem->data.numeric_value;
+            if (mc && mc->dynamic_props)
+                listener_obj = (ASObject*) mc->dynamic_props;
+        } else if (elem->type == ACTION_STACK_VALUE_FUNCTION) {
+            // Function used as listener — look up method on its own_props
+            ASFunction* f = lookupFunctionFromVar(elem);
+            if (f && f->own_props)
+                listener_obj = f->own_props;
+        }
+        if (!listener_obj) continue;
+
+        ActionVar* method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
+        if (!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
+        ASFunction* func = lookupFunctionFromVar(method_prop);
+        if (!func) continue;
+
+        if (func->function_type == 2 && func->advanced_func != NULL) {
+            ActionVar* regs = NULL;
+            if (func->register_count > 0)
+                regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+            func->advanced_func(app_context, extra_args, extra_count, regs, listener_obj);
+            if (regs) FREE(regs);
+        } else if (func->function_type == 1 && func->simple_func != NULL) {
+            for (u32 j = 0; j < extra_count; j++)
+                pushVar(app_context, &extra_args[j]);
+            ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+        }
+    }
+
+    return undef;
 }
 
 // Static function objects for AsBroadcaster methods
@@ -11291,6 +11354,132 @@ static void initAsBroadcasterFuncs(SWFAppContext* app_context)
 
     g_ab_funcs_init = 1;
     (void)app_context;
+}
+
+// Forward declaration (defined later in ensureGlobalInit block)
+static ASObject* g_key_obj;
+
+// ============================================================================
+// Key object methods: isDown, getCode, getAscii, isToggled
+// ============================================================================
+
+static ActionVar builtin_key_isDown(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers; (void)this_obj;
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_BOOLEAN;
+    if (arg_count < 1) { VAL(u64, &result.data.numeric_value) = 0; return result; }
+    int code = (int)varToDoubleSimple(&args[0]);
+    int down = (code >= 0 && code < 256) ? app_context->keys.down[code] : 0;
+    VAL(u64, &result.data.numeric_value) = down ? 1 : 0;
+    return result;
+}
+
+static ActionVar builtin_key_getCode(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)args; (void)arg_count; (void)registers; (void)this_obj;
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_F64;
+    VAL(double, &result.data.numeric_value) = (double)app_context->keys.last_key_down;
+    return result;
+}
+
+static ActionVar builtin_key_getAscii(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)args; (void)arg_count; (void)registers; (void)this_obj;
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_F64;
+    VAL(double, &result.data.numeric_value) = (double)app_context->keys.last_key_ascii;
+    return result;
+}
+
+static ActionVar builtin_key_isToggled(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers; (void)this_obj;
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_BOOLEAN;
+    if (arg_count < 1) { VAL(u64, &result.data.numeric_value) = 0; return result; }
+    int code = (int)varToDoubleSimple(&args[0]);
+    int toggled = (code >= 0 && code < 256) ? app_context->keys.toggled[code] : 0;
+    VAL(u64, &result.data.numeric_value) = toggled ? 1 : 0;
+    return result;
+}
+
+static ASFunction g_key_isDown_func;
+static ASFunction g_key_getCode_func;
+static ASFunction g_key_getAscii_func;
+static ASFunction g_key_isToggled_func;
+static int g_key_methods_init = 0;
+
+static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
+{
+    if (!g_key_methods_init) {
+        memset(&g_key_isDown_func, 0, sizeof(ASFunction));
+        strncpy(g_key_isDown_func.name, "isDown", 255);
+        g_key_isDown_func.function_type = 2;
+        g_key_isDown_func.advanced_func = (Function2Ptr)builtin_key_isDown;
+
+        memset(&g_key_getCode_func, 0, sizeof(ASFunction));
+        strncpy(g_key_getCode_func.name, "getCode", 255);
+        g_key_getCode_func.function_type = 2;
+        g_key_getCode_func.advanced_func = (Function2Ptr)builtin_key_getCode;
+
+        memset(&g_key_getAscii_func, 0, sizeof(ASFunction));
+        strncpy(g_key_getAscii_func.name, "getAscii", 255);
+        g_key_getAscii_func.function_type = 2;
+        g_key_getAscii_func.advanced_func = (Function2Ptr)builtin_key_getAscii;
+
+        memset(&g_key_isToggled_func, 0, sizeof(ASFunction));
+        strncpy(g_key_isToggled_func.name, "isToggled", 255);
+        g_key_isToggled_func.function_type = 2;
+        g_key_isToggled_func.advanced_func = (Function2Ptr)builtin_key_isToggled;
+
+        g_key_methods_init = 1;
+    }
+    ActionVar fv = {0};
+    fv.type = ACTION_STACK_VALUE_FUNCTION;
+
+    fv.data.numeric_value = (u64)&g_key_isDown_func;
+    setProperty(app_context, key_obj, "isDown", 6, &fv);
+
+    fv.data.numeric_value = (u64)&g_key_getCode_func;
+    setProperty(app_context, key_obj, "getCode", 7, &fv);
+
+    fv.data.numeric_value = (u64)&g_key_getAscii_func;
+    setProperty(app_context, key_obj, "getAscii", 8, &fv);
+
+    fv.data.numeric_value = (u64)&g_key_isToggled_func;
+    setProperty(app_context, key_obj, "isToggled", 9, &fv);
+}
+
+// Dispatch onKeyDown/onKeyUp to all Key listeners.
+// Called from swf_core.c after delivering a key event.
+void actionDispatchKeyDown(SWFAppContext* app_context)
+{
+    if (!g_key_obj) return;
+    // Call Key.broadcastMessage("onKeyDown")
+    // Build args: [string "onKeyDown"]
+    static const uint16_t onKeyDown_u16[] = {
+        'o','n','K','e','y','D','o','w','n'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onKeyDown_u16;
+    method_name.str_size = 9;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_key_obj);
+}
+
+void actionDispatchKeyUp(SWFAppContext* app_context)
+{
+    if (!g_key_obj) return;
+    static const uint16_t onKeyUp_u16[] = {
+        'o','n','K','e','y','U','p'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onKeyUp_u16;
+    method_name.str_size = 7;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_key_obj);
 }
 
 static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
@@ -11512,6 +11701,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
 		installAsBroadcaster(app_context, g_mouse_obj);
 		installAsBroadcaster(app_context, g_key_obj);
+		installKeyMethods(app_context, g_key_obj);
 		installAsBroadcaster(app_context, g_stage_obj);
 		installAsBroadcaster(app_context, g_selection_obj);
 

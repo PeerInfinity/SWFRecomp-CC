@@ -5,6 +5,9 @@
 
 // Core tag functions - always available
 void tagInit(SWFAppContext* app_context);
+// Dispatch button key-press conditions for a given key code.
+// Called from swf_core.c after delivering EV_KEY_DOWN.
+void dispatch_button_key_actions(SWFAppContext* app_context, int key_code);
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
 
