@@ -1,6 +1,6 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-20 (Phase 7 Key Events: Key object, broadcastMessage, key dispatch, frame-first loop)
+Last updated: 2026-02-19 (Clone/Duplicate Phase 1: depth table fix; duplicate_movie_clip now 21/21)
 
 Previous CI baseline: 227/619 (36.7%), commit d71ead7
 
@@ -59,8 +59,8 @@ These tests were near-passing in the previous update and now pass locally:
 - `function_suppress_and_preload` — fixed by eff1f85 + 2f007dd (DefineFunction2 preload/suppress + ARRAY toString fix)
 - `edittext_width_height` (103/103) — fixed by 337c212 (_xscale/_yscale/_rotation transform accounting)
 - `arguments` (127/127) — fixed by b9cfc9d + 2f007dd (callee/caller/__proto__/instanceof Array; preload path fix)
-- `duplicate_movie_clip` (21/21) ✅ — clone/duplicate plan (this branch): as_set_flags copy, ng_duplicateMovieClip, toString/valueOf for object args, depth+16384 semantic
-- `clone_sprite_types` (25/25) ✅ — clone/duplicate plan (this branch): ng_isScriptableAtDepth for non-scriptable types (shape/statictext/morphshape/image return parent MC), tagDefineVideoStream for video scriptability
+- `duplicate_movie_clip` (21/21) ✅ — clone/duplicate plan: as_set_flags copy, ng_duplicateMovieClip, toString/valueOf for object args, depth+16384 semantic, **depth table** for clone replacement semantics (mc==clip identity fix)
+- `clone_sprite_types` (25/25) ✅ — clone/duplicate plan: ng_isScriptableAtDepth for non-scriptable types (shape/statictext/morphshape/image return parent MC), tagDefineVideoStream for video scriptability
 
 ### Tier 2: 3-15 lines off
 
@@ -120,7 +120,7 @@ These tests were near-passing in the previous update and now pass locally:
 | OBJECT_WATCH_PLAN | **Phase 1 DONE** | 3/4 pass (`watch`, `watch_virtual_property_proto`, `object_prototypes`) | `watch_textfield` — MC dispatch + MC watcher in SetMember needed |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/2 | ASnative, ASSetPropFlags |
 | TELLTARGET_PLAN | Not started | 0/3 | tellTarget scope |
-| CLONE_DUPLICATE_PLAN | **Phase 1 DONE** | 2/5 pass | clone_sprite_edittext (needs TF clone), clone_sprite_edittext_dynamic (needs TF clone) |
+| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** | 2/5 pass (21/21 + 25/25) | clone_sprite_edittext (needs TF clone), clone_sprite_edittext_dynamic (needs TF clone) |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
 | **MOUSE_EVENTS_PLAN** | **Not started** | 0/5 | `_xmouse`/`_ymouse`, clip mouse event dispatch |
 | **FOCUS_SYSTEM_PLAN** | **Not started** | 0/6 | Mouse-triggered focus, onSetFocus/onKillFocus, key-to-focused dispatch |
