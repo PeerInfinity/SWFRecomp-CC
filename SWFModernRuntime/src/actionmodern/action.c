@@ -474,8 +474,15 @@ static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_STRING;
-	ret.str_size = 15;
-	ret.data.numeric_value = (u64) u16_object_Object;
+	if (g_swf_version < 6) {
+		// SWF5 uses "[type Object]" format
+		ret.str_size = 13;
+		ret.data.numeric_value = (u64) u16_type_Object;
+	} else {
+		// SWF6+ uses "[object Object]" format
+		ret.str_size = 15;
+		ret.data.numeric_value = (u64) u16_object_Object;
+	}
 	return ret;
 }
 
@@ -7806,6 +7813,37 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
 					setProperty(app_context, props, "variable", 8, &var_val);
 				}
+				// If the bound variable already has a value (e.g., textfield placed after
+				// the variable was set), initialize text from that current value.
+				if (var_name[0] != '\0') {
+					const char* _fi_dot = strchr(var_name, '.');
+					if (_fi_dot != NULL) {
+						// Path variable (e.g., "obj.theVar"): resolve container then read property
+						const char* _fi_last_dot = _fi_dot;
+						for (const char* _fi_p = _fi_dot + 1; *_fi_p; _fi_p++)
+							if (*_fi_p == '.') _fi_last_dot = _fi_p;
+						u32 _fi_clen = (u32)(_fi_last_dot - var_name);
+						const char* _fi_prop = _fi_last_dot + 1;
+						u32 _fi_plen = (u32)strlen(_fi_prop);
+						PUSH_STR(var_name, _fi_clen);
+						actionGetVariable(app_context);
+						ActionVar _fi_cvar;
+						peekVar(app_context, &_fi_cvar);
+						POP();
+						ASObject* _fi_obj = NULL;
+						if (_fi_cvar.type == ACTION_STACK_VALUE_OBJECT)
+							_fi_obj = (ASObject*) VAL(u64, &_fi_cvar.data.numeric_value);
+						else if (_fi_cvar.type == ACTION_STACK_VALUE_MOVIECLIP) {
+							MovieClip* _fi_mc = (MovieClip*) VAL(u64, &_fi_cvar.data.numeric_value);
+							if (_fi_mc != NULL) _fi_obj = (ASObject*) _fi_mc->dynamic_props;
+						}
+						if (_fi_obj != NULL) {
+							ActionVar* _fi_val = getProperty(_fi_obj, _fi_prop, _fi_plen);
+							if (_fi_val != NULL && _fi_val->type != ACTION_STACK_VALUE_UNDEFINED)
+								setProperty(app_context, props, "text", 4, _fi_val);
+						}
+					}
+				}
 				// autoSize (from DefineEditText AutoSize flag)
 				ActionVar autosize_val = {0};
 				autosize_val.type = ACTION_STACK_VALUE_STRING;
@@ -13016,8 +13054,19 @@ void actionDefineLocal(SWFAppContext* app_context)
 					free(old_hash->data.string_data.heap_ptr);
 				free(old_hash);
 			}
+			// Existing entry has a stable heap-allocated key — just update the value.
+			hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+		} else {
+			// New entry: var_name points to a stack buffer (_dl_buf) that becomes
+			// a dangling pointer after this function returns. Heap-allocate a copy
+			// so the hashmap key remains valid for future lookups.
+			char* hm_key = (char*) malloc(var_name_len + 1);
+			if (hm_key) {
+				memcpy(hm_key, var_name, var_name_len);
+				hm_key[var_name_len] = '\0';
+				hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
+			}
 		}
-		hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
 	}
 
 #ifdef NO_GRAPHICS
@@ -17427,7 +17476,45 @@ void actionNewObject(SWFAppContext* app_context)
 		}
 		else
 		{
+			// SWF5: no TextField.prototype; use Object.prototype as __proto__
 			setObjectProto(app_context, tf_obj);
+			// In SWF5, new TextField() populates 35 properties as own enumerable
+			// properties (since there's no TextField.prototype to inherit from).
+			// Add in REVERSE insertion order so actionEnumerate2 (LIFO) yields
+			// them in forward order: styleSheet first, gridFitType last.
+			ActionVar undef_val = {0};
+			undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+			static const char* swf5_tf_prop_names[] = {
+				"styleSheet", "mouseWheelEnabled", "condenseWhite", "restrict",
+				"textHeight", "textWidth", "bottomScroll", "length",
+				"selectable", "multiline", "password", "wordWrap",
+				"background", "border", "html", "embedFonts",
+				"maxChars", "maxhscroll", "hscroll", "variable",
+				"htmlText", "type", "text", "autoSize",
+				"tabIndex", "textColor", "backgroundColor", "borderColor",
+				"maxscroll", "scroll", "filters", "sharpness",
+				"thickness", "antiAliasType", "gridFitType"
+			};
+			static const u32 swf5_tf_prop_lens[] = {
+				10, 17, 13, 8,
+				10, 9, 12, 6,
+				10, 9, 8, 8,
+				10, 6, 4, 10,
+				8, 10, 7, 8,
+				8, 4, 4, 8,
+				8, 9, 15, 11,
+				9, 6, 7, 9,
+				9, 13, 11
+			};
+			for (int i = 34; i >= 0; i--)
+			{
+				// Properties 0-29 (styleSheet through scroll) are NOT writable in SWF5
+				// (they are internal AVM1 properties that ignore SetMember).
+				// Properties 30-34 (filters through gridFitType) ARE writable.
+				u8 flags = (i >= 30) ? PROPERTY_FLAGS_DEFAULT :
+				                       (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+				setPropertyWithFlags(app_context, tf_obj, swf5_tf_prop_names[i], swf5_tf_prop_lens[i], &undef_val, flags);
+			}
 		}
 		new_obj = tf_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
