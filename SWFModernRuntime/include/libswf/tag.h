@@ -8,6 +8,18 @@ void tagInit(SWFAppContext* app_context);
 // Dispatch button key-press conditions for a given key code.
 // Called from swf_core.c after delivering EV_KEY_DOWN.
 void dispatch_button_key_actions(SWFAppContext* app_context, int key_code);
+#ifdef NO_GRAPHICS
+// Dispatch CLIP_EVENT_PRESS for all sprites whose hit area contains the mouse.
+// Called from swf_core.c on EV_MOUSE_DOWN_LEFT.
+void dispatch_clip_event_press(SWFAppContext* app_context);
+// Dispatch CLIP_EVENT_RELEASE for sprites that had PRESS fired (clip_mc_pressed=1).
+// Called from swf_core.c on EV_MOUSE_UP_LEFT.
+void dispatch_clip_event_release(SWFAppContext* app_context);
+// Compute the _droptarget slash-path for a point (in stage twips), skipping skip_name.
+// Writes result to out_path (at most out_size-1 chars + NUL). Returns 1 if found, 0 if not.
+int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
+    const char* skip_name, char* out_path, size_t out_size);
+#endif
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
 
