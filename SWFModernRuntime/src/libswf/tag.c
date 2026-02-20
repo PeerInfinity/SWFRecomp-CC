@@ -5,9 +5,9 @@
 #include <math.h>
 #include <utils.h>
 #include <heap.h>
+#include <hit_test.h>
 
 #ifndef NO_GRAPHICS
-#include <hit_test.h>
 #include <renderer.h>
 extern RenderContext* context;
 #else
@@ -558,9 +558,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Button hit testing + state machine + action dispatch ---
 	// Must run BEFORE transform composition so the pre-render pass
 	// composes transforms for the correct (updated) button state.
-#ifndef NO_GRAPHICS
 	// Iterate front-to-back (highest depth first). The first button that hits
 	// gets the over/down state; all others stay in up state.
+	if (app_context->shape_data != NULL)
 	{
 		int found_hover = 0;
 		for (size_t i = max_depth; i >= 1; i--)
@@ -637,6 +637,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 	}
 
+#ifndef NO_GRAPHICS
 	// Compose transforms recursively BEFORE the render pass.
 	// For sprites/buttons: compose_children handles all nesting levels,
 	// passing the composed parent transform down so nested text/sprite/button

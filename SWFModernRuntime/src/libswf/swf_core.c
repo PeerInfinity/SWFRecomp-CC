@@ -1,6 +1,8 @@
 #ifdef NO_GRAPHICS
 
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 #include <swf.h>
 #include <tag.h>
 #include <action.h>
@@ -80,6 +82,133 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	current_frame = target;
 }
 
+// ---------------------------------------------------------------------------
+// Input Event Pump (Phase 3)
+// Loads a pre-processed event file and delivers events at tick boundaries.
+// ---------------------------------------------------------------------------
+
+typedef enum {
+    EV_WAIT,
+    EV_MOUSE_MOVE,
+    EV_MOUSE_DOWN_LEFT,  EV_MOUSE_UP_LEFT,
+    EV_MOUSE_DOWN_RIGHT, EV_MOUSE_UP_RIGHT,
+    EV_MOUSE_WHEEL,
+    EV_KEY_DOWN, EV_KEY_UP,
+    EV_TEXT_INPUT,
+    EV_TEXT_CONTROL,
+    EV_FOCUS_GAINED, EV_FOCUS_LOST,
+} InputEventType;
+
+typedef struct {
+    InputEventType type;
+    float x, y;    // for mouse events (stage pixels)
+    int code;      // for key events, text codepoint
+    char ctrl[32]; // for TEXT_CONTROL
+} InputEvent;
+
+static InputEvent* g_events = NULL;
+static size_t g_event_count = 0;
+static size_t g_event_pos = 0;
+
+void input_events_load(const char* path)
+{
+    FILE* f = fopen(path, "r");
+    if (!f) return;
+    char line[256];
+    size_t count = 0;
+    while (fgets(line, sizeof(line), f)) count++;
+    rewind(f);
+    g_events = malloc(count * sizeof(InputEvent));
+    if (!g_events) { fclose(f); return; }
+    g_event_count = 0;
+    while (fgets(line, sizeof(line), f)) {
+        InputEvent ev = {0};
+        if (strncmp(line, "WAIT", 4) == 0)
+            ev.type = EV_WAIT;
+        else if (strncmp(line, "MOUSE_MOVE ", 11) == 0)
+            { sscanf(line + 11, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_MOVE; }
+        else if (strncmp(line, "MOUSE_DOWN_LEFT ", 16) == 0)
+            { sscanf(line + 16, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_DOWN_LEFT; }
+        else if (strncmp(line, "MOUSE_UP_LEFT ", 14) == 0)
+            { sscanf(line + 14, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_UP_LEFT; }
+        else if (strncmp(line, "MOUSE_DOWN_RIGHT ", 17) == 0)
+            { sscanf(line + 17, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_DOWN_RIGHT; }
+        else if (strncmp(line, "MOUSE_UP_RIGHT ", 15) == 0)
+            { sscanf(line + 15, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_UP_RIGHT; }
+        else if (strncmp(line, "MOUSE_WHEEL ", 12) == 0)
+            { sscanf(line + 12, "%d", &ev.code); ev.type = EV_MOUSE_WHEEL; }
+        else if (strncmp(line, "KEY_DOWN ", 9) == 0)
+            { sscanf(line + 9, "%d", &ev.code); ev.type = EV_KEY_DOWN; }
+        else if (strncmp(line, "KEY_UP ", 7) == 0)
+            { sscanf(line + 7, "%d", &ev.code); ev.type = EV_KEY_UP; }
+        else if (strncmp(line, "TEXT_INPUT ", 11) == 0)
+            { sscanf(line + 11, "%d", &ev.code); ev.type = EV_TEXT_INPUT; }
+        else if (strncmp(line, "TEXT_CONTROL ", 13) == 0)
+            { sscanf(line + 13, "%31s", ev.ctrl); ev.type = EV_TEXT_CONTROL; }
+        else if (strncmp(line, "FOCUSGAINED", 11) == 0)
+            ev.type = EV_FOCUS_GAINED;
+        else if (strncmp(line, "FOCUSLOST", 9) == 0)
+            ev.type = EV_FOCUS_LOST;
+        else continue;
+        g_events[g_event_count++] = ev;
+    }
+    fclose(f);
+}
+
+static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
+{
+    MouseState* ms = &app_context->mouse;
+    switch (ev->type) {
+    case EV_MOUSE_MOVE:
+        ms->stage_x = ev->x * 20.0f;
+        ms->stage_y = ev->y * 20.0f;
+        ms->moved = 1;
+        root_movieclip.xmouse = ev->x;
+        root_movieclip.ymouse = ev->y;
+        break;
+    case EV_MOUSE_DOWN_LEFT:
+        ms->stage_x = ev->x * 20.0f;
+        ms->stage_y = ev->y * 20.0f;
+        ms->button_down = 1;
+        ms->clicked = 1;
+        root_movieclip.xmouse = ev->x;
+        root_movieclip.ymouse = ev->y;
+        break;
+    case EV_MOUSE_UP_LEFT:
+        ms->stage_x = ev->x * 20.0f;
+        ms->stage_y = ev->y * 20.0f;
+        ms->button_down = 0;
+        ms->released = 1;
+        root_movieclip.xmouse = ev->x;
+        root_movieclip.ymouse = ev->y;
+        break;
+    case EV_KEY_DOWN:
+        if (ev->code >= 0 && ev->code < 256)
+            app_context->keys.down[ev->code] = 1;
+        app_context->keys.last_key_down = ev->code;
+        break;
+    case EV_KEY_UP:
+        if (ev->code >= 0 && ev->code < 256)
+            app_context->keys.down[ev->code] = 0;
+        break;
+    default:
+        break;
+    }
+}
+
+static void input_events_pump_tick(SWFAppContext* app_context)
+{
+    while (g_event_pos < g_event_count) {
+        InputEvent* ev = &g_events[g_event_pos];
+        if (ev->type == EV_WAIT) {
+            g_event_pos++;
+            return;
+        }
+        input_events_deliver(app_context, ev);
+        g_event_pos++;
+    }
+}
+
 // Console-only swfStart implementation
 void swfStart(SWFAppContext* app_context)
 {
@@ -146,6 +275,17 @@ void swfStart(SWFAppContext* app_context)
 			printf("Frame %zu out of bounds (max %zu), stopping.\n", current_frame, g_frame_count);
 			break;
 		}
+
+		// Reset per-tick edge flags
+		app_context->mouse.moved = 0;
+		app_context->mouse.clicked = 0;
+		app_context->mouse.released = 0;
+		app_context->keys.last_key_down = -1;
+		// Deliver queued input events for this tick
+		if (g_events) {
+			input_events_pump_tick(app_context);
+		}
+
 		// Advance child sprite timelines BEFORE running frame tags/scripts
 		// (Flash executes child frame advancement before parent DoAction)
 		advance_sprite_frames(app_context);

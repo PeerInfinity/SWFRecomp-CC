@@ -169,6 +169,7 @@ typedef struct MouseState {
 	int button_down;    // 1 if left mouse button is held
 	int clicked;        // 1 if button was pressed this frame (edge)
 	int released;       // 1 if button was released this frame (edge)
+	int moved;          // 1 if mouse moved this frame (edge)
 } MouseState;
 
 // Macros for stack access via app_context
@@ -187,6 +188,12 @@ typedef struct SWFAppContext
 	size_t frame_count;  // Local addition - kept for compatibility
 	u16 fps;
 
+	// Shape/transform data (available in all modes for hit testing)
+	char* shape_data;
+	size_t shape_data_size;
+	char* transform_data;
+	size_t transform_data_size;
+
 #ifndef NO_GRAPHICS
 	int width;
 	int height;
@@ -197,10 +204,6 @@ typedef struct SWFAppContext
 	size_t bitmap_highest_w;
 	size_t bitmap_highest_h;
 
-	char* shape_data;
-	size_t shape_data_size;
-	char* transform_data;
-	size_t transform_data_size;
 	char* color_data;
 	size_t color_data_size;
 	char* uninv_mat_data;

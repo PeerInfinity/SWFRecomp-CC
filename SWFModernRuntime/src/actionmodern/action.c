@@ -313,6 +313,11 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 // which doesn't have app_context). Set at entry to actionCallFunction/actionCallMethod.
 static SWFAppContext* g_scope_app_context = NULL;
 
+// Set to the receiver ASObject whenever a C function (advanced_func) is called
+// as an object method via actionCallMethod. Used by AsBroadcaster methods to
+// identify which object they are operating on.
+static ASObject* g_c_function_this_obj = NULL;
+
 // Expose local scope for parameter binding (used by setVariableByName)
 // Skips 'with' scopes to find the nearest function scope.
 ASObject* getCurrentLocalScope(void)
@@ -11147,6 +11152,172 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 // Global stub constructors/objects for built-in ActionScript classes
 // ============================================================================
 
+// ============================================================================
+// AsBroadcaster: addListener / removeListener / broadcastMessage
+// These are installed on Mouse, Key, Stage, and Selection static objects.
+// They use g_c_function_this_obj (set by actionCallMethod before the call)
+// to identify which broadcaster object they operate on.
+// ============================================================================
+
+static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* receiver = (ASObject*) this_obj;
+    if (!receiver) receiver = g_c_function_this_obj;
+    if (!receiver || arg_count < 1) {
+        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
+        return r;
+    }
+
+    // Get or create _listeners array on receiver
+    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
+    ASArray* arr = NULL;
+    if (listeners_prop && listeners_prop->type == ACTION_STACK_VALUE_ARRAY) {
+        arr = (ASArray*) listeners_prop->data.numeric_value;
+    }
+    if (!arr) {
+        arr = allocArray(app_context, 4);
+        ActionVar av = {0};
+        av.type = ACTION_STACK_VALUE_ARRAY;
+        av.data.numeric_value = (u64)arr;
+        setProperty(app_context, receiver, "_listeners", 10, &av);
+    }
+
+    // For non-null/undefined listeners, check for duplicates first
+    ActionVar* new_listener = &args[0];
+    if (new_listener->type != ACTION_STACK_VALUE_NULL &&
+        new_listener->type != ACTION_STACK_VALUE_UNDEFINED) {
+        for (u32 i = 0; i < arr->length; i++) {
+            ActionVar* elem = getArrayElement(arr, i);
+            if (elem && elem->type == new_listener->type &&
+                elem->data.numeric_value == new_listener->data.numeric_value) {
+                // Duplicate found - return true without re-adding
+                ActionVar result = {0};
+                result.type = ACTION_STACK_VALUE_BOOLEAN;
+                VAL(u64, &result.data.numeric_value) = 1;
+                return result;
+            }
+        }
+    }
+
+    // Add listener (null/undefined are added without duplicate check)
+    u32 len = arr->length;
+    setArrayElement(app_context, arr, len, new_listener);
+
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_BOOLEAN;
+    VAL(u64, &result.data.numeric_value) = 1;
+    return result;
+}
+
+
+static ActionVar builtin_broadcaster_removeListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* receiver = (ASObject*) this_obj;
+    if (!receiver) receiver = g_c_function_this_obj;
+    if (!receiver || arg_count < 1) {
+        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 0;
+        return r;
+    }
+
+    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
+    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) {
+        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 0;
+        return r;
+    }
+    ASArray* arr = (ASArray*) listeners_prop->data.numeric_value;
+    if (!arr) {
+        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 0;
+        return r;
+    }
+
+    // Find and remove listener (shift remaining elements)
+    u64 target_addr = args[0].data.numeric_value;
+    int found = 0;
+    for (u32 i = 0; i < arr->length; i++) {
+        ActionVar* elem = getArrayElement(arr, i);
+        if (elem && elem->type == args[0].type && elem->data.numeric_value == target_addr) {
+            // Shift elements down
+            for (u32 j = i; j + 1 < arr->length; j++) {
+                ActionVar* next = getArrayElement(arr, j + 1);
+                if (next) setArrayElement(app_context, arr, j, next);
+            }
+            arr->length--;
+            found = 1;
+            break;
+        }
+    }
+
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_BOOLEAN;
+    VAL(u64, &result.data.numeric_value) = found ? 1 : 0;
+    return result;
+}
+
+static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    // Stub: broadcastMessage is complex to implement correctly; return undefined
+    (void)app_context; (void)args; (void)arg_count; (void)this_obj;
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_UNDEFINED;
+    return result;
+}
+
+// Static function objects for AsBroadcaster methods
+static ASFunction g_ab_addListener_func;
+static ASFunction g_ab_removeListener_func;
+static ASFunction g_ab_broadcastMessage_func;
+static int g_ab_funcs_init = 0;
+
+static void initAsBroadcasterFuncs(SWFAppContext* app_context)
+{
+    if (g_ab_funcs_init) return;
+    memset(&g_ab_addListener_func, 0, sizeof(ASFunction));
+    strncpy(g_ab_addListener_func.name, "addListener", 255);
+    g_ab_addListener_func.function_type = 2;
+    g_ab_addListener_func.advanced_func = (Function2Ptr)builtin_broadcaster_addListener;
+
+    memset(&g_ab_removeListener_func, 0, sizeof(ASFunction));
+    strncpy(g_ab_removeListener_func.name, "removeListener", 255);
+    g_ab_removeListener_func.function_type = 2;
+    g_ab_removeListener_func.advanced_func = (Function2Ptr)builtin_broadcaster_removeListener;
+
+    memset(&g_ab_broadcastMessage_func, 0, sizeof(ASFunction));
+    strncpy(g_ab_broadcastMessage_func.name, "broadcastMessage", 255);
+    g_ab_broadcastMessage_func.function_type = 2;
+    g_ab_broadcastMessage_func.advanced_func = (Function2Ptr)builtin_broadcaster_broadcastMessage;
+
+    g_ab_funcs_init = 1;
+    (void)app_context;
+}
+
+static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
+{
+    initAsBroadcasterFuncs(app_context);
+
+    // Install _listeners array
+    ASArray* listeners = allocArray(app_context, 4);
+    ActionVar lv = {0};
+    lv.type = ACTION_STACK_VALUE_ARRAY;
+    lv.data.numeric_value = (u64)listeners;
+    setProperty(app_context, obj, "_listeners", 10, &lv);
+
+    // Install methods
+    ActionVar fv = {0};
+    fv.type = ACTION_STACK_VALUE_FUNCTION;
+
+    fv.data.numeric_value = (u64)&g_ab_addListener_func;
+    setProperty(app_context, obj, "addListener", 11, &fv);
+
+    fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+    setProperty(app_context, obj, "removeListener", 14, &fv);
+
+    fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+    setProperty(app_context, obj, "broadcastMessage", 16, &fv);
+}
+
 // Stub constructors: classes that need to exist as globals with a prototype
 // Index mapping: 0=AsBroadcaster, 1=Button, 2=Camera, 3=Color,
 // 4=ContextMenu, 5=ContextMenuItem, 6=LoadVars, 7=LocalConnection,
@@ -11317,10 +11488,10 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// ---- Static global objects (typeof = "object", inherit Object.prototype) ----
 	{
 		g_accessibility_obj = allocObject(app_context, 4);
-		g_key_obj = allocObject(app_context, 8);
-		g_mouse_obj = allocObject(app_context, 4);
-		g_selection_obj = allocObject(app_context, 4);
-		g_stage_obj = allocObject(app_context, 8);
+		g_key_obj = allocObject(app_context, 16);
+		g_mouse_obj = allocObject(app_context, 16);
+		g_selection_obj = allocObject(app_context, 16);
+		g_stage_obj = allocObject(app_context, 16);
 
 		struct { const char* name; int len; ASObject* obj; } objs[] = {
 			{"Accessibility", 13, g_accessibility_obj},
@@ -11337,6 +11508,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			ov.data.numeric_value = (u64)objs[i].obj;
 			setProperty(app_context, global_object, objs[i].name, objs[i].len, &ov);
 		}
+
+		// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
+		installAsBroadcaster(app_context, g_mouse_obj);
+		installAsBroadcaster(app_context, g_key_obj);
+		installAsBroadcaster(app_context, g_stage_obj);
+		installAsBroadcaster(app_context, g_selection_obj);
 	}
 
 	// ---- valueOf on _global ----
@@ -22411,7 +22588,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_call_depth++;
 				g_prev_executing_func = prev_executing_func_am2;
 				g_current_executing_func = func;
+				g_c_function_this_obj = obj;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
+				g_c_function_this_obj = NULL;
 				g_current_executing_func = prev_executing_func_am2;
 				g_call_depth--;
 

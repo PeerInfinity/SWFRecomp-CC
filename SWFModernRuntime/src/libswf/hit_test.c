@@ -1,5 +1,3 @@
-#ifndef NO_GRAPHICS
-
 #include <hit_test.h>
 
 // ---------------------------------------------------------------------------
@@ -98,5 +96,3 @@ void hit_test_mat4_multiply(float* out, const float* A, const float* B)
 		}
 	}
 }
-
-#endif // NO_GRAPHICS

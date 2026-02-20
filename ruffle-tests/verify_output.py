@@ -22,6 +22,81 @@ from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
 
+RUFFLE_KEY_TO_FLASH = {
+    "Backspace": 8, "Tab": 9, "Enter": 13, "Return": 13, "Shift": 16,
+    "Control": 17, "Alt": 18, "Pause": 19, "CapsLock": 20,
+    "Escape": 27, "Space": 32, "PageUp": 33, "PageDown": 34,
+    "End": 35, "Home": 36, "Left": 37, "Up": 38, "Right": 39, "Down": 40,
+    "Insert": 45, "Delete": 46,
+    "F1": 112, "F2": 113, "F3": 114, "F4": 115, "F5": 116,
+    "F6": 117, "F7": 118, "F8": 119, "F9": 120, "F10": 121,
+    "F11": 122, "F12": 123, "NumLock": 144, "ScrollLock": 145,
+}
+
+
+def ruffle_key_to_flash_code(key):
+    if isinstance(key, str):
+        return RUFFLE_KEY_TO_FLASH.get(key, 0)
+    elif isinstance(key, dict) and "Char" in key:
+        c = key["Char"]
+        return ord(c.upper()) if c.isalpha() else ord(c)
+    return 0
+
+
+def get_scale_factor(test_dir):
+    """Parse scale_factor from test.toml viewport_dimensions, default 1.0."""
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return 1.0
+    text = toml_path.read_text()
+    m = re.search(r"scale_factor\s*=\s*([\d.]+)", text)
+    return float(m.group(1)) if m else 1.0
+
+
+def preprocess_input_json(src, dst, scale_factor=1.0):
+    """Convert input.json to simple line-based event format. Returns wait_count."""
+    with open(src) as f:
+        events = json.load(f)
+    lines = []
+    for evt in events:
+        t = evt.get("type", "")
+        if t == "Wait":
+            lines.append("WAIT")
+        elif t == "MouseMove":
+            x, y = evt["pos"]
+            lines.append(f"MOUSE_MOVE {x / scale_factor:.6f} {y / scale_factor:.6f}")
+        elif t == "MouseDown":
+            x, y = evt["pos"]
+            btn = evt.get("btn", "Left")
+            lines.append(f"MOUSE_DOWN_{btn.upper()} {x / scale_factor:.6f} {y / scale_factor:.6f}")
+        elif t == "MouseUp":
+            x, y = evt["pos"]
+            btn = evt.get("btn", "Left")
+            lines.append(f"MOUSE_UP_{btn.upper()} {x / scale_factor:.6f} {y / scale_factor:.6f}")
+        elif t == "MouseWheel":
+            lines.append(f"MOUSE_WHEEL {evt.get('lines', evt.get('delta', 0))}")
+        elif t == "KeyDown":
+            code = ruffle_key_to_flash_code(evt.get("key", 0))
+            lines.append(f"KEY_DOWN {code}")
+        elif t == "KeyUp":
+            code = ruffle_key_to_flash_code(evt.get("key", 0))
+            lines.append(f"KEY_UP {code}")
+        elif t == "TextInput":
+            cp_raw = evt.get("codepoint", "")
+            cp = ord(cp_raw[0]) if cp_raw else 0
+            lines.append(f"TEXT_INPUT {cp}")
+        elif t == "TextControl":
+            lines.append(f"TEXT_CONTROL {evt.get('code', 'Backspace')}")
+        elif t == "FocusGained":
+            lines.append("FOCUSGAINED")
+        elif t == "FocusLost":
+            lines.append("FOCUSLOST")
+        # Skip ImePreedit, ImeCommit for now
+    with open(dst, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return sum(1 for l in lines if l == "WAIT")
+
+
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 RECOMP_BIN = PROJECT_ROOT / "SWFRecomp" / "build" / "SWFRecomp"
@@ -109,18 +184,20 @@ def get_git_sha():
     return None
 
 
-def get_num_frames(test_dir):
+def get_num_frames(test_dir, wait_count=0):
     """Parse num_frames (or num_ticks) from test.toml, default 1."""
     toml_path = test_dir / "test.toml"
+    declared = 1
     if toml_path.exists():
         text = toml_path.read_text()
         m = re.search(r"num_frames\s*=\s*(\d+)", text)
         if m:
-            return int(m.group(1))
-        m = re.search(r"num_ticks\s*=\s*(\d+)", text)
-        if m:
-            return int(m.group(1))
-    return 1
+            declared = int(m.group(1))
+        else:
+            m = re.search(r"num_ticks\s*=\s*(\d+)", text)
+            if m:
+                declared = int(m.group(1))
+    return max(declared, wait_count + 1)
 
 
 def filter_output(raw_output):
@@ -193,6 +270,7 @@ def compile_native(test_dir, num_frames, build_dir):
         "src/libswf/swf_core.c",
         "src/libswf/tag.c",
         "src/libswf/tag_stubs.c",
+        "src/libswf/hit_test.c",
         "src/memory/heap.c",
     ]:
         shutil.copy2(SWFMODERN / src, build_dir)
@@ -248,11 +326,14 @@ def compile_native(test_dir, num_frames, build_dir):
         return False, "compilation timed out after 60 seconds"
 
 
-def run_binary(build_dir):
+def run_binary(build_dir, event_file=None):
     """Run the compiled binary and capture output."""
+    cmd = [str(build_dir / "test_run")]
+    if event_file is not None:
+        cmd.append(str(event_file))
     try:
         result = subprocess.run(
-            [str(build_dir / "test_run")],
+            cmd,
             capture_output=True,
             timeout=10,
         )
@@ -545,8 +626,7 @@ def main():
             print(f"[{i+1}/{len(tests)}] {name}...", end=" ", flush=True)
 
         test_start = time.monotonic()
-        num_frames = get_num_frames(test_dir)
-        entry = {"test": name, "num_frames": num_frames}
+        entry = {"test": name}
 
         # Step 1: Recompile SWF
         if not recompile_swf(test_dir, force=args.recompile):
@@ -564,6 +644,16 @@ def main():
         # Step 2: Compile native
         with tempfile.TemporaryDirectory(prefix="swf_verify_") as tmpdir:
             build_dir = Path(tmpdir)
+            input_json = test_dir / "input.json"
+            event_file = None
+            wait_count = 0
+            if input_json.exists():
+                scale_factor = get_scale_factor(test_dir)
+                event_file_path = build_dir / "input_events.txt"
+                wait_count = preprocess_input_json(input_json, event_file_path, scale_factor)
+                event_file = event_file_path
+            num_frames = get_num_frames(test_dir, wait_count)
+            entry["num_frames"] = num_frames
             ok, err = compile_native(test_dir, num_frames, build_dir)
             if not ok:
                 stats["compile_fail"] += 1
@@ -586,7 +676,7 @@ def main():
                 continue
 
             # Step 3: Run binary
-            raw_output, rc = run_binary(build_dir)
+            raw_output, rc = run_binary(build_dir, event_file=event_file)
             if raw_output is None:
                 stats["timeout"] += 1
                 fail_list.append(name)

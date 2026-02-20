@@ -1,7 +1,5 @@
 #pragma once
 
-#ifndef NO_GRAPHICS
-
 #include <common.h>
 
 // Test whether a point (stage_x, stage_y) in stage twips hits a triangulated shape.
@@ -22,5 +20,3 @@ int hit_test_shape(const char* shape_data, size_t shape_offset, size_t shape_siz
 // Multiply two 4x4 column-major matrices: out = A * B
 // Used to compose parent + child transforms for hit testing.
 void hit_test_mat4_multiply(float* out, const float* A, const float* B);
-
-#endif
