@@ -474,12 +474,12 @@ static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_STRING;
-	if (g_swf_version < 6) {
-		// SWF5 uses "[type Object]" format
+	if (g_swf_version < 7) {
+		// SWF5/6 uses "[type Object]" format for user-created objects
 		ret.str_size = 13;
 		ret.data.numeric_value = (u64) u16_type_Object;
 	} else {
-		// SWF6+ uses "[object Object]" format
+		// SWF7+ uses "[object Object]" format
 		ret.str_size = 15;
 		ret.data.numeric_value = (u64) u16_object_Object;
 	}
