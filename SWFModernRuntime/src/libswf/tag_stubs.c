@@ -106,6 +106,16 @@ static int ng_find_textfield(size_t char_id)
 // Auto-naming counter ("instance1", "instance2", ...)
 static unsigned int ng_auto_instance_counter = 1;
 
+// If auto_name was the last auto-assigned name (e.g. "instance2" when counter==3),
+// decrement the counter so the next auto-name reuses that slot.
+void ng_try_reclaim_auto_instance_name(const char* auto_name)
+{
+	if (auto_name == NULL) return;
+	unsigned int n = 0;
+	if (sscanf(auto_name, "instance%u", &n) == 1 && n == ng_auto_instance_counter - 1)
+		ng_auto_instance_counter--;
+}
+
 // ---------------------------------------------------------------------------
 // entry_idx encoding for ng_* query functions
 // ---------------------------------------------------------------------------
@@ -354,6 +364,19 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 			}
 			obj->sprite_needs_init = 1;
 		}
+	}
+
+	// Buttons also get a display list for their child sprites (up-state children).
+	// tagShowFrame will initialize the button's up-state by running button_state_funcs[0].
+	if (is_button)
+	{
+		if (obj->sprite_display_list == NULL)
+		{
+			obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
+			obj->sprite_max_depth = 0;
+		}
+		obj->sprite_needs_init = 1;
 	}
 }
 
