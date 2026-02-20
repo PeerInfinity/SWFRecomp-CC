@@ -115,6 +115,14 @@ void swfStart(SWFAppContext* app_context)
 		return;
 	}
 
+	// Allocate display state (in GRAPHICS mode these come from swf.c)
+	dictionary = calloc(INITIAL_DICTIONARY_CAPACITY, sizeof(Character));
+	display_list = calloc(INITIAL_DISPLAYLIST_CAPACITY, sizeof(DisplayObject));
+	if (!dictionary || !display_list) {
+		fprintf(stderr, "Failed to allocate display state\n");
+		return;
+	}
+
 	tagInit(app_context);
 
 	// Run frames in console mode
@@ -139,7 +147,7 @@ void swfStart(SWFAppContext* app_context)
 		}
 		// Advance child sprite timelines BEFORE running frame tags/scripts
 		// (Flash executes child frame advancement before parent DoAction)
-		ng_advanceSprites(app_context);
+		advance_sprite_frames(app_context);
 		// Only run the root frame function if the root timeline is playing
 		if (is_playing || manual_next_frame)
 		{
@@ -235,7 +243,7 @@ void swfStart(SWFAppContext* app_context)
 		else
 		{
 			// Root stopped — but child sprites may still be playing
-			if (ng_hasPlayingSprites())
+			if (hasPlayingSprites())
 			{
 				// Stay at current_frame, sprites advance via ng_advanceSprites above
 				continue;
@@ -250,6 +258,8 @@ void swfStart(SWFAppContext* app_context)
 	// Cleanup
 	heap_shutdown(app_context);
 	freeMap();
+	free(dictionary);
+	free(display_list);
 	free(app_context->stack);
 }
 

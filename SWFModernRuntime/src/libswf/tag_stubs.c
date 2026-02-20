@@ -7,18 +7,28 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
-// Simple sprite registry for NO_GRAPHICS mode
-// Allows sprite frame scripts (e.g. DoAction inside DefineSprite) to execute
-#define MAX_SPRITES_NG 64
-static struct {
-	size_t char_id;
-	frame_func* funcs;
-	size_t frame_count;
-} ng_sprites[MAX_SPRITES_NG];
-static size_t ng_sprite_count = 0;
+// ---------------------------------------------------------------------------
+// Global display state — defined here in NO_GRAPHICS (swf.c provides in GRAPHICS)
+// ---------------------------------------------------------------------------
+Character* dictionary = NULL;
+DisplayObject* display_list = NULL;
+size_t max_depth = 0;
 
-// Character bounds table for NO_GRAPHICS mode (stores shape bounds in twips)
+// ---------------------------------------------------------------------------
+// Access generated data arrays (from draws.c / tagMain.c, linked per-test)
+// ---------------------------------------------------------------------------
+extern float transform_data[][16];
+extern float cxform_data[];
+extern int catch_up_mode;
+extern size_t display_list_capacity;
+
+// ---------------------------------------------------------------------------
+// Supplemental registries (keyed by char_id, supplement dictionary[])
+// ---------------------------------------------------------------------------
+
+// Character bounds (shapes/morph shapes without renderer)
 #define MAX_CHAR_BOUNDS_NG 256
 static struct {
 	size_t char_id;
@@ -26,33 +36,7 @@ static struct {
 } ng_char_bounds[MAX_CHAR_BOUNDS_NG];
 static size_t ng_char_bounds_count = 0;
 
-// Simple display list for NO_GRAPHICS mode
-#define MAX_DISPLAY_NG 64
-static struct {
-	size_t depth;
-	size_t char_id;        // character ID placed at this depth
-	size_t sprite_idx;     // index into ng_sprites, or (size_t)-1 for non-sprite
-	size_t current_frame;
-	int is_playing;
-	int needs_init;        // 1 if sprite frame 0 hasn't been executed yet
-	size_t placed_at_frame; // which main timeline frame placed this entry
-	u32 transform_id;     // index into transform_data for _x/_y
-	int is_button;        // 1 if this is a button (for typeof discrimination)
-	int is_textfield;     // 1 if this is a DefineEditText (for TextField properties)
-	int textfield_idx;    // index into ng_textfields, or -1
-	char instance_name[64]; // instance name set by tagSetInstanceName
-	size_t parent_display_idx; // index of parent sprite in ng_display, or (size_t)-1 for root
-	ClipAction* clip_actions;   // pointer to clip_actions array (from tagMain.c), or NULL
-	size_t clip_action_count;   // number of clip actions
-	double cx_ra, cx_ga, cx_ba, cx_aa;  // color multipliers: percentage (100.0 = 100%)
-	double cx_rb, cx_gb, cx_bb, cx_ab;  // color addends: signed pixel values
-} ng_display[MAX_DISPLAY_NG];
-static size_t ng_display_count = 0;
-static int ng_nesting_depth = 0;  // >0 when inside sprite frame execution
-static size_t ng_current_display_idx = (size_t)-1;  // display index of currently executing sprite
-static unsigned int ng_auto_instance_counter = 1;  // global auto-name counter ("instance1", "instance2", ...)
-
-// Simple button registry for NO_GRAPHICS mode (for typeof discrimination)
+// Button char_id registry (for typeof discrimination)
 #define MAX_BUTTONS_NG 64
 static size_t ng_button_ids[MAX_BUTTONS_NG];
 static size_t ng_button_count = 0;
@@ -60,12 +44,11 @@ static size_t ng_button_count = 0;
 static int ng_find_button(size_t char_id)
 {
 	for (size_t i = 0; i < ng_button_count; i++)
-		if (ng_button_ids[i] == char_id)
-			return 1;
+		if (ng_button_ids[i] == char_id) return 1;
 	return 0;
 }
 
-// Video stream char_id registry for NO_GRAPHICS mode (scriptable like sprites)
+// Video stream char_id registry (scriptable like sprites)
 #define MAX_VIDEOS_NG 32
 static size_t ng_video_ids[MAX_VIDEOS_NG];
 static size_t ng_video_count = 0;
@@ -73,12 +56,11 @@ static size_t ng_video_count = 0;
 static int ng_find_video(size_t char_id)
 {
 	for (size_t i = 0; i < ng_video_count; i++)
-		if (ng_video_ids[i] == char_id)
-			return 1;
+		if (ng_video_ids[i] == char_id) return 1;
 	return 0;
 }
 
-// Font info registry for NO_GRAPHICS mode (font name, bold, italic)
+// Font info registry (font name, bold, italic)
 #define MAX_FONTS_NG 32
 static struct {
 	u16 font_id;
@@ -88,289 +70,91 @@ static struct {
 } ng_fonts[MAX_FONTS_NG];
 static size_t ng_font_count = 0;
 
-// Simple textfield registry for NO_GRAPHICS mode
+// TextField property registry (properties of DefineEditText characters)
 #define MAX_TEXTFIELDS_NG 64
 static struct {
 	size_t char_id;
-	char plain_text[1024];     // plain text (HTML tags stripped)
-	char raw_html_text[1024];  // raw initial text (may contain HTML)
-	u32 text_color;            // 0xRRGGBB
+	char plain_text[1024];
+	char raw_html_text[1024];
+	u32 text_color;
 	u16 font_id;
-	u16 font_height;           // in twips
-	s16 max_length;            // -1 = unlimited
-	u8 align;                  // 0=left,1=right,2=center,3=justify
-	u16 left_margin;           // twips
-	u16 right_margin;          // twips
-	u16 indent;                // twips
-	s16 leading;               // twips
+	u16 font_height;
+	s16 max_length;
+	u8 align;
+	u16 left_margin, right_margin, indent;
+	s16 leading;
 	char variable_name[256];
-	u16 flags;                 // packed: WordWrap|Multiline|Password|ReadOnly|NoSelect|Border|HTML|UseOutlines|AutoSize
-	s32 bounds_xmin;           // twips
-	s32 bounds_xmax;           // twips
-	s32 bounds_ymin;           // twips
-	s32 bounds_ymax;           // twips
-	// CSMTextSettings data (from tag 74, applied after DefineEditText)
-	char csm_antiAliasType[16]; // "normal" or "advanced"
-	char csm_gridFitType[16];   // "none", "pixel", or "subpixel"
-	float csm_thickness;        // default 0
-	float csm_sharpness;        // default 0
-	int csm_applied;            // 1 if CSMTextSettings was applied
+	u16 flags;
+	s32 bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax;
+	// CSMTextSettings
+	char csm_antiAliasType[16];
+	char csm_gridFitType[16];
+	float csm_thickness;
+	float csm_sharpness;
+	int csm_applied;
 } ng_textfields[MAX_TEXTFIELDS_NG];
 static size_t ng_textfield_count = 0;
 
 static int ng_find_textfield(size_t char_id)
 {
 	for (size_t i = 0; i < ng_textfield_count; i++)
-		if (ng_textfields[i].char_id == char_id)
-			return (int)i;
+		if (ng_textfields[i].char_id == char_id) return (int)i;
 	return -1;
 }
 
-static size_t ng_find_sprite(size_t char_id)
-{
-	for (size_t i = 0; i < ng_sprite_count; i++)
-		if (ng_sprites[i].char_id == char_id)
-			return i;
-	return (size_t)-1;
-}
+// Auto-naming counter ("instance1", "instance2", ...)
+static unsigned int ng_auto_instance_counter = 1;
 
-// Clear NO_GRAPHICS display entries placed after the target frame.
-// For backward gotos: removes characters added after the target.
-// For forward gotos: typically a no-op (target > current entries).
-void ng_display_clear_after(size_t target_frame)
+// ---------------------------------------------------------------------------
+// entry_idx encoding for ng_* query functions
+// ---------------------------------------------------------------------------
+// Root-level: entry_idx = depth (1..max_depth), upper bits == 0
+// Level-1 nested: entry_idx = (parent_root_depth << 20) | child_depth
+// Level-2+ nested: not supported (returns (size_t)-1)
+
+static DisplayObject* ng_entry_to_obj(size_t entry_idx)
 {
-	size_t i = 0;
-	while (i < ng_display_count)
-	{
-		if (ng_display[i].placed_at_frame > target_frame)
-		{
-			// Remove by shifting
-			for (size_t j = i; j + 1 < ng_display_count; j++)
-				ng_display[j] = ng_display[j + 1];
-			ng_display_count--;
-		}
-		else
-		{
-			i++;
-		}
+	if (entry_idx == (size_t)-1) return NULL;
+	size_t parent_depth = entry_idx >> 20;
+	size_t child_depth  = entry_idx & 0xFFFFF;
+	if (parent_depth == 0) {
+		// Root level
+		if (child_depth < 1 || child_depth > max_depth) return NULL;
+		if (display_list[child_depth].char_id == 0) return NULL;
+		return &display_list[child_depth];
+	} else {
+		// Level-1 nested: parent is at display_list[parent_depth]
+		if (parent_depth > max_depth) return NULL;
+		DisplayObject* parent = &display_list[parent_depth];
+		if (parent->sprite_display_list == NULL) return NULL;
+		if (child_depth < 1 || child_depth > parent->sprite_max_depth) return NULL;
+		if (parent->sprite_display_list[child_depth].char_id == 0) return NULL;
+		return &parent->sprite_display_list[child_depth];
 	}
 }
 
-// Access the generated transform_data from draws.c (linked per-test)
-// Actual type is float[][16] but we access via pointer arithmetic
-extern float transform_data[][16];
-// Access the generated cxform_data from draws.c (linked per-test)
-// 20 floats per entry: [0]=R mult, [5]=G mult, [10]=B mult, [15]=A mult, [16..19]=R/G/B/A add
-extern float cxform_data[];
+// ---------------------------------------------------------------------------
+// Record callbacks (called from tag.c for each define-tag in NO_GRAPHICS mode)
+// ---------------------------------------------------------------------------
 
-// Stub implementations for console-only mode
-// Note: tagInit() is provided by the generated tagMain.c file
-
-void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
+void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax)
 {
-	(void)red; (void)green; (void)blue;
-}
-
-// Helper to execute a sprite frame function with proper context
-static void ng_exec_sprite_frame(SWFAppContext* app_context, size_t display_idx, size_t frame)
-{
-	size_t si = ng_display[display_idx].sprite_idx;
-	if (si == (size_t)-1) return;
-	if (!ng_sprites[si].funcs || !ng_sprites[si].funcs[frame]) return;
-
-	const char* inst_name = ng_display[display_idx].instance_name[0] ? ng_display[display_idx].instance_name : NULL;
-	char mc_name[32];
-	if (!inst_name)
-	{
-		snprintf(mc_name, sizeof(mc_name), "__depth_%zu", ng_display[display_idx].depth);
-		inst_name = mc_name;
-	}
-	MovieClip* saved_ctx = g_current_context;
-	MovieClip* sprite_mc = actionFindOrCreateMovieClip(app_context, inst_name, &root_movieclip);
-	actionSetCurrentContext(sprite_mc);
-	size_t saved_display_idx = ng_current_display_idx;
-	ng_current_display_idx = display_idx;
-	ng_nesting_depth++;
-	ng_sprites[si].funcs[frame](app_context);
-	ng_nesting_depth--;
-	ng_current_display_idx = saved_display_idx;
-	actionSetCurrentContext(saved_ctx);
-}
-
-// Helpers for action.c to control the currently executing sprite
-int ng_isInsideSprite(void) { return ng_nesting_depth > 0; }
-
-int ng_hasPlayingSprites(void)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		size_t si = ng_display[i].sprite_idx;
-		if (si == (size_t)-1) continue;
-		if (!ng_display[i].is_playing) continue;
-		if (ng_sprites[si].frame_count <= 1) continue;
-		return 1;
-	}
-	return 0;
-}
-
-void ng_stopCurrentSprite(void)
-{
-	if (ng_current_display_idx < ng_display_count)
-		ng_display[ng_current_display_idx].is_playing = 0;
-}
-
-void ng_playCurrentSprite(void)
-{
-	if (ng_current_display_idx < ng_display_count)
-		ng_display[ng_current_display_idx].is_playing = 1;
-}
-
-void ng_gotoFrameCurrentSprite(u16 frame)
-{
-	if (ng_current_display_idx >= ng_display_count) return;
-	size_t si = ng_display[ng_current_display_idx].sprite_idx;
-	if (si == (size_t)-1) return;
-	if (frame < ng_sprites[si].frame_count)
-	{
-		ng_display[ng_current_display_idx].current_frame = frame;
-		ng_display[ng_current_display_idx].is_playing = 0;
-	}
-}
-
-size_t ng_getSpriteFrameCount(void)
-{
-	if (ng_current_display_idx >= ng_display_count) return 0;
-	size_t si = ng_display[ng_current_display_idx].sprite_idx;
-	if (si == (size_t)-1) return 0;
-	return ng_sprites[si].frame_count;
-}
-
-// Advance existing sprite timelines — called from main loop AFTER frame function
-// so that child scripts execute before the next parent frame (matching Flash behavior).
-// Also runs before quit_swf is checked, so single-frame movies still advance sprites.
-// Flash advances sprites in reverse depth order (highest depth first).
-void ng_advanceSprites(SWFAppContext* app_context)
-{
-	extern int catch_up_mode;
-	if (catch_up_mode) return;
-
-	// Advance in reverse depth order (highest depth first)
-	// Find max depth first, then iterate downward
-	size_t max_depth = 0;
-	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth > max_depth) max_depth = ng_display[i].depth;
-
-	for (size_t d = max_depth; d >= 1; d--)
-	{
-		for (size_t i = 0; i < ng_display_count; i++)
-		{
-			if (ng_display[i].depth != d) continue;
-			// Skip sprites waiting for init (tagShowFrame will handle them later this tick)
-			if (ng_display[i].needs_init) continue;
-			size_t si = ng_display[i].sprite_idx;
-			if (si == (size_t)-1) continue;
-			if (!ng_display[i].is_playing) continue;
-
-			size_t fc = ng_sprites[si].frame_count;
-			if (fc <= 1) continue;
-
-			size_t next = (ng_display[i].current_frame + 1) % fc;
-			ng_display[i].current_frame = next;
-			ng_exec_sprite_frame(app_context, i, next);
-		}
-	}
-}
-
-void tagShowFrame(SWFAppContext* app_context)
-{
-	extern int catch_up_mode;
-
-	// Execute deferred frame 0 for newly placed sprites.
-	// Run even during catch-up so sprite init scripts execute at the correct
-	// frame (matching Flash's execution order where newly-placed sprites' frame_0
-	// scripts run before the parent frame's DoAction).
-	// Temporarily clear catch_up_mode so the sprite frame functions' !catch_up_mode
-	// guards allow scripts to run. (The initial bounds-populating run in
-	// tagPlaceObject2 already used a forced catch_up_mode=1, so scripts were
-	// suppressed there; this is the intended script-executing pass.)
-	int saved_catch_up = catch_up_mode;
-	catch_up_mode = 0;
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (!ng_display[i].needs_init) continue;
-		ng_display[i].needs_init = 0;
-		ng_exec_sprite_frame(app_context, i, 0);
-		// Fire onLoad clip actions for newly initialized sprites
-		if (ng_display[i].clip_actions && ng_display[i].clip_action_count > 0) {
-			const char* inst_name = ng_display[i].instance_name[0] ? ng_display[i].instance_name : NULL;
-			if (inst_name) {
-				for (size_t j = 0; j < ng_display[i].clip_action_count; j++) {
-					if (ng_display[i].clip_actions[j].event_flags & 0x1) { // CLIP_EVENT_LOAD
-						MovieClip* saved_ctx = g_current_context;
-						MovieClip* clip_mc = actionFindOrCreateMovieClip(app_context, inst_name, &root_movieclip);
-						actionSetCurrentContext(clip_mc);
-						ng_display[i].clip_actions[j].action(app_context);
-						actionSetCurrentContext(saved_ctx);
-					}
-				}
-			}
-		}
-	}
-	catch_up_mode = saved_catch_up;
-}
-
-// No-op stubs for all tag functions so trace tests that happen to
-// define shapes, sprites, buttons, sounds, etc. still compile and link.
-
-void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size,
-    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
-{
-	(void)app_context; (void)type; (void)shape_offset; (void)shape_size;
 	if (ng_char_bounds_count >= MAX_CHAR_BOUNDS_NG) return;
-	size_t i = ng_char_bounds_count;
-	ng_char_bounds[i].char_id = char_id;
-	ng_char_bounds[i].xmin = bounds_xmin;
-	ng_char_bounds[i].xmax = bounds_xmax;
-	ng_char_bounds[i].ymin = bounds_ymin;
-	ng_char_bounds[i].ymax = bounds_ymax;
+	ng_char_bounds[ng_char_bounds_count].char_id = char_id;
+	ng_char_bounds[ng_char_bounds_count].xmin = xmin;
+	ng_char_bounds[ng_char_bounds_count].xmax = xmax;
+	ng_char_bounds[ng_char_bounds_count].ymin = ymin;
+	ng_char_bounds[ng_char_bounds_count].ymax = ymax;
 	ng_char_bounds_count++;
 }
 
-void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
-	size_t shape_offset, size_t shape_size,
-	size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count)
+void ng_record_button(size_t char_id)
 {
-	(void)app_context; (void)char_id; (void)shape_offset; (void)shape_size;
-	(void)morph_end_offset; (void)morph_color_start; (void)morph_color_count;
+	if (ng_button_count < MAX_BUTTONS_NG && !ng_find_button(char_id))
+		ng_button_ids[ng_button_count++] = char_id;
 }
 
-void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id)
-{
-	(void)app_context; (void)char_id; (void)text_start; (void)text_size;
-	(void)transform_start; (void)cxform_id;
-}
-
-void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
-{
-	(void)app_context;
-	if (ng_font_count >= MAX_FONTS_NG) return;
-	size_t i = ng_font_count;
-	ng_fonts[i].font_id = font_id;
-	strncpy(ng_fonts[i].name, name ? name : "", sizeof(ng_fonts[i].name) - 1);
-	ng_fonts[i].name[sizeof(ng_fonts[i].name) - 1] = '\0';
-	ng_fonts[i].bold = bold;
-	ng_fonts[i].italic = italic;
-	ng_font_count++;
-}
-
-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
-{
-	(void)app_context;
-	if (ng_video_count < MAX_VIDEOS_NG)
-		ng_video_ids[ng_video_count++] = (size_t)char_id;
-}
-
-void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
+void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,
     u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
@@ -401,560 +185,799 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
 	ng_textfields[i].bounds_xmax = bounds_xmax;
 	ng_textfields[i].bounds_ymin = bounds_ymin;
 	ng_textfields[i].bounds_ymax = bounds_ymax;
+	ng_textfields[i].csm_applied = 0;
 	ng_textfield_count++;
 }
 
-void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char* grid_fit_type, float thickness, float sharpness)
+void ng_record_csm(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
+    float thickness, float sharpness)
 {
-	// Find the textfield with the given char_id and apply CSMTextSettings
 	int idx = ng_find_textfield(text_id);
-	if (idx >= 0) {
-		strncpy(ng_textfields[idx].csm_antiAliasType, anti_alias_type, sizeof(ng_textfields[idx].csm_antiAliasType) - 1);
-		ng_textfields[idx].csm_antiAliasType[sizeof(ng_textfields[idx].csm_antiAliasType) - 1] = '\0';
-		strncpy(ng_textfields[idx].csm_gridFitType, grid_fit_type, sizeof(ng_textfields[idx].csm_gridFitType) - 1);
-		ng_textfields[idx].csm_gridFitType[sizeof(ng_textfields[idx].csm_gridFitType) - 1] = '\0';
-		ng_textfields[idx].csm_thickness = thickness;
-		ng_textfields[idx].csm_sharpness = sharpness;
-		ng_textfields[idx].csm_applied = 1;
-	}
+	if (idx < 0) return;
+	strncpy(ng_textfields[idx].csm_antiAliasType, anti_alias_type ? anti_alias_type : "normal",
+	        sizeof(ng_textfields[idx].csm_antiAliasType) - 1);
+	ng_textfields[idx].csm_antiAliasType[sizeof(ng_textfields[idx].csm_antiAliasType) - 1] = '\0';
+	strncpy(ng_textfields[idx].csm_gridFitType, grid_fit_type ? grid_fit_type : "pixel",
+	        sizeof(ng_textfields[idx].csm_gridFitType) - 1);
+	ng_textfields[idx].csm_gridFitType[sizeof(ng_textfields[idx].csm_gridFitType) - 1] = '\0';
+	ng_textfields[idx].csm_thickness = thickness;
+	ng_textfields[idx].csm_sharpness = sharpness;
+	ng_textfields[idx].csm_applied = 1;
 }
 
-// Initialize cxform fields for a display entry from cxform_data[cxform_id * 20 + ...]
-// Multipliers: stored as ratio (1.0 = 100%), addends: stored as ratio (1.0 = 255).
-// Quantizes through int16 to match Flash's fixed-point representation.
-static void ng_init_cxform_entry(size_t idx, u32 cxform_id)
+int ng_getTextFieldCSMApplied(int idx)
+{
+	if (idx < 0 || (size_t)idx >= ng_textfield_count) return 0;
+	return ng_textfields[idx].csm_applied;
+}
+const char* ng_getTextFieldCSMAntiAliasType(int idx)
+{
+	if (idx < 0 || (size_t)idx >= ng_textfield_count) return "normal";
+	return ng_textfields[idx].csm_antiAliasType;
+}
+const char* ng_getTextFieldCSMGridFitType(int idx)
+{
+	if (idx < 0 || (size_t)idx >= ng_textfield_count) return "pixel";
+	return ng_textfields[idx].csm_gridFitType;
+}
+float ng_getTextFieldCSMThickness(int idx)
+{
+	if (idx < 0 || (size_t)idx >= ng_textfield_count) return 0.0f;
+	return ng_textfields[idx].csm_thickness;
+}
+float ng_getTextFieldCSMSharpness(int idx)
+{
+	if (idx < 0 || (size_t)idx >= ng_textfield_count) return 0.0f;
+	return ng_textfields[idx].csm_sharpness;
+}
+
+void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
+{
+	(void)app_context;
+	if (ng_font_count >= MAX_FONTS_NG) return;
+	ng_fonts[ng_font_count].font_id = font_id;
+	strncpy(ng_fonts[ng_font_count].name, name ? name : "", sizeof(ng_fonts[ng_font_count].name) - 1);
+	ng_fonts[ng_font_count].name[sizeof(ng_fonts[ng_font_count].name) - 1] = '\0';
+	ng_fonts[ng_font_count].bold = bold;
+	ng_fonts[ng_font_count].italic = italic;
+	ng_font_count++;
+}
+
+void ng_record_video(SWFAppContext* app_context, u16 char_id)
+{
+	(void)app_context;
+	if (ng_video_count < MAX_VIDEOS_NG)
+		ng_video_ids[ng_video_count++] = (size_t)char_id;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: initialize cx_* from cxform_data (percentage format: 100.0 = normal)
+// ---------------------------------------------------------------------------
+static void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id)
 {
 	float* cx = &cxform_data[cxform_id * 20];
-	ng_display[idx].cx_ra = (double)(int16_t)roundf(cx[0]  * 256.0f) * 100.0 / 256.0;
-	ng_display[idx].cx_ga = (double)(int16_t)roundf(cx[5]  * 256.0f) * 100.0 / 256.0;
-	ng_display[idx].cx_ba = (double)(int16_t)roundf(cx[10] * 256.0f) * 100.0 / 256.0;
-	ng_display[idx].cx_aa = (double)(int16_t)roundf(cx[15] * 256.0f) * 100.0 / 256.0;
-	ng_display[idx].cx_rb = (double)(int16_t)roundf(cx[16] * 255.0f);
-	ng_display[idx].cx_gb = (double)(int16_t)roundf(cx[17] * 255.0f);
-	ng_display[idx].cx_bb = (double)(int16_t)roundf(cx[18] * 255.0f);
-	ng_display[idx].cx_ab = (double)(int16_t)roundf(cx[19] * 255.0f);
+	obj->cx_ra = (double)(int16_t)roundf(cx[0]  * 256.0f) * 100.0 / 256.0;
+	obj->cx_ga = (double)(int16_t)roundf(cx[5]  * 256.0f) * 100.0 / 256.0;
+	obj->cx_ba = (double)(int16_t)roundf(cx[10] * 256.0f) * 100.0 / 256.0;
+	obj->cx_aa = (double)(int16_t)roundf(cx[15] * 256.0f) * 100.0 / 256.0;
+	obj->cx_rb = (double)(int16_t)roundf(cx[16] * 255.0f);
+	obj->cx_gb = (double)(int16_t)roundf(cx[17] * 255.0f);
+	obj->cx_bb = (double)(int16_t)roundf(cx[18] * 255.0f);
+	obj->cx_ab = (double)(int16_t)roundf(cx[19] * 255.0f);
 }
 
-void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
+// ---------------------------------------------------------------------------
+// Placement/removal callbacks (called from tag.c after display_list update)
+// ---------------------------------------------------------------------------
+
+void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id)
 {
-	(void)clip_depth;
-	extern size_t current_frame;
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return;
+	DisplayObject* obj = &display_list[depth];
 
-	// Note: we do NOT skip placements inside sprite frame functions.
-	// Nested sprites/shapes get registered in the flat display list, which
-	// allows them to be found by name (e.g., tellTarget, slash syntax paths).
-	// This matches pre-refactor behavior where nested children were accessible.
+	// Initialize cx_* from cxform_data if there's a cxform applied
+	if (obj->has_cxform && obj->cxform_id != 0)
+		ng_init_cxform_from_data(obj, obj->cxform_id);
 
-	if (char_id == 0)
+	// Determine character type
+	int is_sprite = (char_id < INITIAL_DICTIONARY_CAPACITY && dictionary[char_id].type == CHAR_TYPE_SPRITE);
+	int is_button = ng_find_button(char_id);
+	int tf_idx    = ng_find_textfield(char_id);
+	int is_tf     = (tf_idx >= 0);
+	int is_video  = ng_find_video(char_id);
+
+	// Auto-assign instance name for scriptable characters if not already named
+	// (mirrors Flash Player behavior: sprites/buttons/textfields get "instance1", "instance2", etc.)
+	if ((is_sprite || is_button || is_tf || is_video) && obj->instance_name == NULL)
 	{
-		// Move/update existing entry at this depth (update transform)
-		for (size_t i = 0; i < ng_display_count; i++)
-		{
-			if (ng_display[i].depth == depth)
-			{
-				ng_display[i].transform_id = transform_id;
-				return;
-			}
-		}
-		return;
+		char auto_name[32];
+		snprintf(auto_name, sizeof(auto_name), "instance%u", ng_auto_instance_counter++);
+		obj->instance_name = strdup(auto_name);
+		obj->instance_name_owned = 1;
 	}
 
-	// Placing a new character (char_id > 0)
-	size_t si = ng_find_sprite(char_id);
-	int btn = ng_find_button(char_id);
-	int tf_idx = ng_find_textfield(char_id);
-	int is_tf = (tf_idx >= 0) ? 1 : 0;
-
-	// Check if depth already occupied (within the same parent scope)
-	size_t expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++)
+	// Initialize textfield variable binding
+	if (is_tf && tf_idx >= 0)
 	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == expected_parent)
-		{
-			if (si == (size_t)-1)
-			{
-				// Non-sprite at occupied depth: don't replace sprites
-				// (prevents corruption during backward goto catch-up)
-				if (ng_display[i].sprite_idx != (size_t)-1) return;
-				// Replace other non-sprites (update placed_at_frame)
-				ng_display[i].char_id = char_id;
-				ng_display[i].placed_at_frame = current_frame;
-				ng_display[i].transform_id = transform_id;
-				ng_display[i].is_button = btn;
-				ng_display[i].is_textfield = is_tf;
-				ng_display[i].textfield_idx = tf_idx;
-				ng_display[i].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-				ng_display[i].clip_actions = NULL;
-				ng_display[i].clip_action_count = 0;
-				goto placed;
-			}
-			if (ng_display[i].sprite_idx == si)
-			{
-				// Same sprite already at this depth - don't re-execute
-				return;
-			}
-			// Different sprite (or replacing non-sprite) - replace
-			ng_display[i].char_id = char_id;
-			ng_display[i].sprite_idx = si;
-			ng_display[i].current_frame = 0;
-			ng_display[i].is_playing = 1;
-			ng_display[i].needs_init = (si != (size_t)-1) ? 1 : 0;
-			ng_display[i].placed_at_frame = current_frame;
-			ng_display[i].transform_id = transform_id;
-			ng_display[i].is_button = btn;
-			ng_display[i].is_textfield = is_tf;
-			ng_display[i].textfield_idx = tf_idx;
-			ng_display[i].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-			ng_display[i].clip_actions = NULL;
-			ng_display[i].clip_action_count = 0;
-			goto placed;
-		}
-	}
-
-	// New entry
-	if (ng_display_count < MAX_DISPLAY_NG)
-	{
-		ng_display[ng_display_count].depth = depth;
-		ng_display[ng_display_count].char_id = char_id;
-		ng_display[ng_display_count].sprite_idx = si;
-		ng_display[ng_display_count].current_frame = 0;
-		ng_display[ng_display_count].is_playing = 1;
-		ng_display[ng_display_count].needs_init = (si != (size_t)-1) ? 1 : 0;
-		ng_display[ng_display_count].placed_at_frame = current_frame;
-		ng_display[ng_display_count].transform_id = transform_id;
-		ng_display[ng_display_count].is_button = btn;
-		ng_display[ng_display_count].is_textfield = is_tf;
-		ng_display[ng_display_count].textfield_idx = tf_idx;
-		ng_display[ng_display_count].parent_display_idx = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-		ng_display[ng_display_count].instance_name[0] = '\0';
-		ng_display[ng_display_count].clip_actions = NULL;
-		ng_display[ng_display_count].clip_action_count = 0;
-		ng_display_count++;
-	}
-
-placed:
-	// Auto-assign instance name ("instance1", "instance2", ...) for sprites, textfields, and buttons
-	// that were placed without an explicit name (mirrors Flash Player behavior).
-	if (si != (size_t)-1 || is_tf || btn) {
-		// Find the placed entry and give it an auto-name if still unnamed
-		size_t expected_parent2 = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-		for (size_t _ai = 0; _ai < ng_display_count; _ai++) {
-			if (ng_display[_ai].depth == depth && ng_display[_ai].parent_display_idx == expected_parent2) {
-				if (ng_display[_ai].instance_name[0] == '\0') {
-					snprintf(ng_display[_ai].instance_name, sizeof(ng_display[_ai].instance_name),
-					         "instance%u", ng_auto_instance_counter++);
-				}
-				break;
-			}
-		}
-	}
-	// Initialize cxform values from cxform_data for any newly placed character
-	{
-		size_t _cx_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-		for (size_t _ci = 0; _ci < ng_display_count; _ci++) {
-			if (ng_display[_ci].depth == depth && ng_display[_ci].parent_display_idx == _cx_parent) {
-				ng_init_cxform_entry(_ci, cxform_id);
-				break;
-			}
-		}
-	}
-	// Initialize textfield variable binding at placement time
-	if (is_tf && tf_idx >= 0) {
-		const char* var_name = ng_textfields[tf_idx].variable_name;
+		const char* var_name  = ng_textfields[tf_idx].variable_name;
 		const char* init_text = ng_textfields[tf_idx].plain_text;
-		if (var_name[0] != '\0') {
+		if (var_name[0] != '\0')
 			actionInitTextFieldVariable(app_context, var_name, init_text);
+	}
+
+	// Pre-run sprite frame 0 with catch_up_mode=1:
+	// - Suppresses scripts (catch_up=1) so only placement/removal happens
+	// - Populates sprite_display_list so parent-frame scripts can read _width/_height/_rotation
+	// Frame 0 WITH scripts will run at tagShowFrame time (sprite_needs_init=1)
+	if (is_sprite)
+	{
+		Character* ch = &dictionary[char_id];
+		if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs != NULL)
+		{
+			// Allocate sprite display list
+			if (obj->sprite_display_list == NULL)
+			{
+				obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				obj->sprite_display_list = calloc(obj->sprite_dl_capacity, sizeof(DisplayObject));
+				obj->sprite_max_depth = 0;
+			}
+
+			// Context swap to sprite's display list
+			DisplayObject* saved_dl = display_list;
+			size_t saved_max = max_depth;
+			size_t saved_cap = display_list_capacity;
+
+			display_list = obj->sprite_display_list;
+			max_depth = obj->sprite_max_depth;
+			display_list_capacity = obj->sprite_dl_capacity;
+
+			int saved_catch_up = catch_up_mode;
+			catch_up_mode = 1;
+
+			// Set g_current_sprite_obj so ng_isInsideSprite() works correctly
+			DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+			g_current_sprite_obj = obj;
+
+			// Direct frame call (scripts suppressed by catch_up=1, no MC context needed)
+			if (ch->sprite_frame_funcs[0] != NULL)
+				ch->sprite_frame_funcs[0](app_context);
+
+			g_current_sprite_obj = saved_sprite_obj;
+			catch_up_mode = saved_catch_up;
+
+			// Save back (pointer may change from realloc)
+			obj->sprite_display_list = display_list;
+			obj->sprite_max_depth = max_depth;
+			obj->sprite_dl_capacity = display_list_capacity;
+
+			display_list = saved_dl;
+			max_depth = saved_max;
+			display_list_capacity = saved_cap;
+
+			// Mark for full-scripts run at tagShowFrame
+			obj->sprite_needs_init = 1;
 		}
 	}
-	// Run sprite frame_0 in "placement-only" mode (catch_up_mode=1) to populate
-	// the sprite's display list immediately. This allows parent-frame scripts to
-	// read _width/_height/_rotation etc. from the sprite's content bounds.
-	// The DoAction (script) calls in the sprite frame are guarded by !catch_up_mode
-	// and will be skipped during this pass. They execute at tagShowFrame time
-	// (via the needs_init=1 path) after all parent-frame scripts have run.
-	if (si != (size_t)-1) {
-		extern int catch_up_mode;
-		int saved_catch_up = catch_up_mode;
-		catch_up_mode = 1;  // suppress scripts in sprite frame
+}
 
-		size_t expected_parent3 = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-		for (size_t _ii = 0; _ii < ng_display_count; _ii++) {
-			if (ng_display[_ii].depth == depth &&
-			    ng_display[_ii].parent_display_idx == expected_parent3 &&
-			    ng_display[_ii].needs_init)
+void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return;
+	// Invalidate cached MovieClip so re-placement gets fresh properties
+	if (display_list[depth].instance_name != NULL)
+		actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name);
+}
+
+// ---------------------------------------------------------------------------
+// Sprite control helpers (use g_current_sprite_obj set by exec_sprite_frame)
+// ---------------------------------------------------------------------------
+
+int ng_isInsideSprite(void) { return g_current_sprite_obj != NULL; }
+
+void ng_stopCurrentSprite(void)
+{
+	if (g_current_sprite_obj != NULL)
+		g_current_sprite_obj->sprite_is_playing = 0;
+}
+
+void ng_playCurrentSprite(void)
+{
+	if (g_current_sprite_obj != NULL)
+		g_current_sprite_obj->sprite_is_playing = 1;
+}
+
+void ng_gotoFrameCurrentSprite(u16 frame)
+{
+	DisplayObject* obj = g_current_sprite_obj;
+	if (obj == NULL || obj->char_id == 0) return;
+	Character* ch = &dictionary[obj->char_id];
+	if (ch->type != CHAR_TYPE_SPRITE) return;
+	if (frame < ch->sprite_frame_count)
+	{
+		obj->sprite_manual_next_frame = 1;
+		obj->sprite_next_frame = frame;
+		obj->sprite_is_playing = 0;
+	}
+}
+
+size_t ng_getSpriteFrameCount(void)
+{
+	DisplayObject* obj = g_current_sprite_obj;
+	if (obj == NULL || obj->char_id == 0) return 0;
+	Character* ch = &dictionary[obj->char_id];
+	if (ch->type != CHAR_TYPE_SPRITE) return 0;
+	return ch->sprite_frame_count;
+}
+
+// ---------------------------------------------------------------------------
+// Character type queries (root-level display_list lookup)
+// ---------------------------------------------------------------------------
+
+int ng_isSpriteAtDepth(size_t depth)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	size_t cid = display_list[depth].char_id;
+	return (dictionary[cid].type == CHAR_TYPE_SPRITE);
+}
+
+int ng_isButtonAtDepth(size_t depth)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	return ng_find_button(display_list[depth].char_id);
+}
+
+int ng_isTextFieldAtDepth(size_t depth)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	return (ng_find_textfield(display_list[depth].char_id) >= 0);
+}
+
+int ng_isScriptableAtDepth(size_t depth)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	size_t cid = display_list[depth].char_id;
+	return (dictionary[cid].type == CHAR_TYPE_SPRITE) ||
+	       ng_find_button(cid) ||
+	       (ng_find_textfield(cid) >= 0) ||
+	       ng_find_video(cid);
+}
+
+// ---------------------------------------------------------------------------
+// Display entry lookup (returns entry_idx = encoded depth)
+// ---------------------------------------------------------------------------
+
+// Find root-level display entry by name.  Returns SWF depth (entry_idx encoding: upper bits=0).
+size_t ng_findDisplayEntryByName(const char* name)
+{
+	size_t result = SIZE_MAX;
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name == NULL) continue;
+		if (strcmp(display_list[d].instance_name, name) == 0)
+		{
+			if (result == SIZE_MAX || d < result)
+				result = d;
+		}
+	}
+	return result;
+}
+
+// Find display entry index by instance name (root-level only).
+// Returns entry_idx = depth, or (size_t)-1 if not found.
+size_t ng_findDisplayEntryIdx(const char* name)
+{
+	if (!name || name[0] == '\0') return (size_t)-1;
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name != NULL &&
+		    strcmp(display_list[d].instance_name, name) == 0)
+			return d;  // entry_idx = root depth (upper bits = 0)
+	}
+	return (size_t)-1;
+}
+
+// Find display entry by name within a parent.
+// parent_idx = (size_t)-1: root level (same as ng_findDisplayEntryIdx).
+// parent_idx = root depth: search that sprite's sprite_display_list.
+// Returns encoded entry_idx, or (size_t)-1 if not found.
+size_t ng_findDisplayEntryIdxWithParent(const char* name, size_t parent_idx)
+{
+	if (!name || name[0] == '\0') return (size_t)-1;
+
+	if (parent_idx == (size_t)-1)
+	{
+		// Root level
+		return ng_findDisplayEntryIdx(name);
+	}
+
+	// Nested: parent_idx encodes the parent's entry (root depth for level-1 nesting)
+	size_t parent_root_depth = parent_idx & 0xFFFFF;  // lower 20 bits = root depth for level-1
+	if (parent_root_depth < 1 || parent_root_depth > max_depth) return (size_t)-1;
+	DisplayObject* parent_obj = &display_list[parent_root_depth];
+	if (parent_obj->char_id == 0 || parent_obj->sprite_display_list == NULL) return (size_t)-1;
+
+	for (size_t d = 1; d <= parent_obj->sprite_max_depth; d++)
+	{
+		DisplayObject* child = &parent_obj->sprite_display_list[d];
+		if (child->char_id == 0) continue;
+		if (child->instance_name != NULL && strcmp(child->instance_name, name) == 0)
+			return (parent_root_depth << 20) | d;  // encoded nested entry_idx
+	}
+	return (size_t)-1;
+}
+
+// Find root-level SWF depth by entry name (returns depth, SIZE_MAX if not found).
+// Alias used by action.c for timeline targeting.
+size_t ng_findDisplayEntryByName_depth(const char* name)
+{
+	return ng_findDisplayEntryByName(name);
+}
+
+// ---------------------------------------------------------------------------
+// Root-level depth queries used by action.c for SWF depth targeting
+// ---------------------------------------------------------------------------
+
+int ng_findRootChildAtSWFDepth(size_t swf_depth, char* out_name, size_t out_name_size)
+{
+	if (swf_depth < 1 || swf_depth > max_depth || display_list[swf_depth].char_id == 0)
+		return 0;
+
+	size_t cid = display_list[swf_depth].char_id;
+
+	if (dictionary[cid].type == CHAR_TYPE_SPRITE)
+	{
+		if (out_name && out_name_size > 0)
+		{
+			const char* n = display_list[swf_depth].instance_name;
+			strncpy(out_name, n ? n : "", out_name_size - 1);
+			out_name[out_name_size - 1] = '\0';
+		}
+		return 2;
+	}
+	else if (ng_find_textfield(cid) >= 0)
+	{
+		if (out_name && out_name_size > 0)
+		{
+			const char* n = display_list[swf_depth].instance_name;
+			strncpy(out_name, n ? n : "", out_name_size - 1);
+			out_name[out_name_size - 1] = '\0';
+		}
+		return 3;
+	}
+	else
+	{
+		if (out_name && out_name_size > 0) out_name[0] = '\0';
+		return 1;
+	}
+}
+
+// Search for a named child within a named parent's display list.
+// Returns child's SWF depth within the parent, or SIZE_MAX if not found.
+size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
+{
+	// Find parent at root level
+	size_t parent_depth = ng_findDisplayEntryByName(parent_name);
+	if (parent_depth == SIZE_MAX) return SIZE_MAX;
+
+	DisplayObject* parent_obj = &display_list[parent_depth];
+	if (parent_obj->sprite_display_list == NULL) return SIZE_MAX;
+
+	for (size_t d = 1; d <= parent_obj->sprite_max_depth; d++)
+	{
+		DisplayObject* child = &parent_obj->sprite_display_list[d];
+		if (child->char_id == 0) continue;
+		if (child->instance_name != NULL && strcmp(child->instance_name, child_name) == 0)
+			return d;
+	}
+	return SIZE_MAX;
+}
+
+// ---------------------------------------------------------------------------
+// Transform queries (root-level)
+// ---------------------------------------------------------------------------
+
+int ng_getTransformId(size_t depth, u32* out_id)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	*out_id = display_list[depth].transform_id;
+	return 1;
+}
+
+int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	u32 tid = display_list[depth].transform_id;
+	*out_x = transform_data[tid][12] / 20.0f;
+	*out_y = transform_data[tid][13] / 20.0f;
+	return 1;
+}
+
+int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	u32 tid = display_list[depth].transform_id;
+	if (out_x) *out_x = (double)transform_data[tid][12] / 20.0;
+	if (out_y) *out_y = (double)transform_data[tid][13] / 20.0;
+	return 1;
+}
+
+int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation)
+{
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	u32 tid = display_list[depth].transform_id;
+	float m00 = transform_data[tid][0];
+	float m10 = transform_data[tid][1];
+	float m01 = transform_data[tid][4];
+	float m11 = transform_data[tid][5];
+	if (out_xscale)  *out_xscale  = sqrtf(m00*m00 + m10*m10) * 100.0f;
+	if (out_yscale)  *out_yscale  = sqrtf(m01*m01 + m11*m11) * 100.0f;
+	if (out_rotation) *out_rotation = atan2f(m10, m00) * 180.0f / 3.14159265358979323846f;
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Matrix and color transform queries by entry_idx
+// ---------------------------------------------------------------------------
+
+int ng_getMatrixFromEntry(size_t entry_idx,
+    double* out_a, double* out_b, double* out_c, double* out_d,
+    double* out_tx, double* out_ty)
+{
+	DisplayObject* obj = ng_entry_to_obj(entry_idx);
+	if (!obj) return 0;
+	u32 tid = obj->transform_id;
+	if (out_a)  *out_a  = (double)transform_data[tid][0];
+	if (out_b)  *out_b  = (double)transform_data[tid][1];
+	if (out_c)  *out_c  = (double)transform_data[tid][4];
+	if (out_d)  *out_d  = (double)transform_data[tid][5];
+	if (out_tx) *out_tx = (double)transform_data[tid][12] / 20.0;
+	if (out_ty) *out_ty = (double)transform_data[tid][13] / 20.0;
+	return 1;
+}
+
+int ng_getCTFromEntry(size_t entry_idx,
+    double* ra, double* ga, double* ba, double* aa,
+    double* rb, double* gb, double* bb, double* ab)
+{
+	DisplayObject* obj = ng_entry_to_obj(entry_idx);
+	if (!obj) return 0;
+	if (ra) *ra = obj->cx_ra; if (ga) *ga = obj->cx_ga;
+	if (ba) *ba = obj->cx_ba; if (aa) *aa = obj->cx_aa;
+	if (rb) *rb = obj->cx_rb; if (gb) *gb = obj->cx_gb;
+	if (bb) *bb = obj->cx_bb; if (ab) *ab = obj->cx_ab;
+	return 1;
+}
+
+int ng_setCTOnEntry(size_t entry_idx,
+    double ra, double ga, double ba, double aa,
+    double rb, double gb, double bb, double ab)
+{
+	DisplayObject* obj = ng_entry_to_obj(entry_idx);
+	if (!obj) return 0;
+	obj->cx_ra = ra; obj->cx_ga = ga; obj->cx_ba = ba; obj->cx_aa = aa;
+	obj->cx_rb = rb; obj->cx_gb = gb; obj->cx_bb = bb; obj->cx_ab = ab;
+	obj->cx_overridden = 1;
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Color transform by name (root-level display_list scan)
+// ---------------------------------------------------------------------------
+
+int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, double* aa,
+                          double* rb, double* gb, double* bb, double* ab)
+{
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name != NULL &&
+		    strcmp(display_list[d].instance_name, name) == 0)
+		{
+			*ra = display_list[d].cx_ra; *ga = display_list[d].cx_ga;
+			*ba = display_list[d].cx_ba; *aa = display_list[d].cx_aa;
+			*rb = display_list[d].cx_rb; *gb = display_list[d].cx_gb;
+			*bb = display_list[d].cx_bb; *ab = display_list[d].cx_ab;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
+                          double rb, double gb, double bb, double ab)
+{
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name != NULL &&
+		    strcmp(display_list[d].instance_name, name) == 0)
+		{
+			display_list[d].cx_ra = ra; display_list[d].cx_ga = ga;
+			display_list[d].cx_ba = ba; display_list[d].cx_aa = aa;
+			display_list[d].cx_rb = rb; display_list[d].cx_gb = gb;
+			display_list[d].cx_bb = bb; display_list[d].cx_ab = ab;
+			display_list[d].cx_overridden = 1;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Character bounds lookup
+// ---------------------------------------------------------------------------
+
+int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax)
+{
+	for (size_t i = 0; i < ng_char_bounds_count; i++)
+	{
+		if (ng_char_bounds[i].char_id == char_id)
+		{
+			if (out_xmin) *out_xmin = ng_char_bounds[i].xmin;
+			if (out_xmax) *out_xmax = ng_char_bounds[i].xmax;
+			if (out_ymin) *out_ymin = ng_char_bounds[i].ymin;
+			if (out_ymax) *out_ymax = ng_char_bounds[i].ymax;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Composite bounds computation (union of child content bounds in pixels)
+// entry_idx == (size_t)-1: root-level children
+// entry_idx is a root depth: children are sprite_display_list of that entry
+// ---------------------------------------------------------------------------
+
+int ng_getDisplayEntryBounds(size_t entry_idx,
+    float* out_xmin_px, float* out_xmax_px,
+    float* out_ymin_px, float* out_ymax_px)
+{
+	int found = 0;
+	float gxmin = 1e30f, gxmax = -1e30f;
+	float gymin = 1e30f, gymax = -1e30f;
+
+	// Determine which display list to iterate
+	DisplayObject* dl;
+	size_t dl_max;
+
+	if (entry_idx == (size_t)-1)
+	{
+		// Root level
+		dl = display_list;
+		dl_max = max_depth;
+	}
+	else
+	{
+		// Must be a root-depth entry (level-0 nesting only for bounds)
+		size_t parent_d = entry_idx >> 20;
+		size_t child_d  = entry_idx & 0xFFFFF;
+		if (parent_d == 0)
+		{
+			// Root-depth sprite: iterate its sprite_display_list
+			if (child_d < 1 || child_d > max_depth || display_list[child_d].char_id == 0) return 0;
+			if (display_list[child_d].sprite_display_list == NULL) return 0;
+			dl     = display_list[child_d].sprite_display_list;
+			dl_max = display_list[child_d].sprite_max_depth;
+		}
+		else
+		{
+			// Level-1 nested sprite bounds not supported (return empty)
+			return 0;
+		}
+	}
+
+	for (size_t i = 1; i <= dl_max; i++)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		u32 tid = obj->transform_id;
+		float tx = transform_data[tid][12] / 20.0f;
+		float ty = transform_data[tid][13] / 20.0f;
+		float sx = transform_data[tid][0];
+		float sy = transform_data[tid][5];
+
+		float bxmin, bxmax, bymin, bymax;
+		int child_found = 0;
+
+		size_t cid = obj->char_id;
+
+		if (dictionary[cid].type == CHAR_TYPE_SPRITE && obj->sprite_display_list != NULL)
+		{
+			// Recursively get sprite's local bounds
+			float lxmin, lxmax, lymin, lymax;
+			size_t child_entry = (entry_idx == (size_t)-1)
+				? (i)                         // root sprite: entry_idx = depth
+				: (((entry_idx & 0xFFFFF) << 20) | i);  // nested: encode (but bounds are simplified)
+			(void)child_entry;
+			// Simplified: use sprite's own sprite_display_list directly
+			if (ng_getDisplayEntryBounds(i, &lxmin, &lxmax, &lymin, &lymax))
 			{
-				ng_exec_sprite_frame(app_context, _ii, 0);
-				break;
+				bxmin = lxmin * sx + tx;
+				bxmax = lxmax * sx + tx;
+				bymin = lymin * sy + ty;
+				bymax = lymax * sy + ty;
+				if (bxmin > bxmax) { float t = bxmin; bxmin = bxmax; bxmax = t; }
+				if (bymin > bymax) { float t = bymin; bymin = bymax; bymax = t; }
+				child_found = 1;
+			}
+		}
+		else if (ng_find_textfield(cid) >= 0)
+		{
+			int tf_idx = ng_find_textfield(cid);
+			float bxf  = ng_textfields[tf_idx].bounds_xmin / 20.0f;
+			float bxf2 = ng_textfields[tf_idx].bounds_xmax / 20.0f;
+			float byf  = ng_textfields[tf_idx].bounds_ymin / 20.0f;
+			float byf2 = ng_textfields[tf_idx].bounds_ymax / 20.0f;
+			bxmin = bxf  * sx + tx;
+			bxmax = bxf2 * sx + tx;
+			bymin = byf  * sy + ty;
+			bymax = byf2 * sy + ty;
+			if (bxmin > bxmax) { float t = bxmin; bxmin = bxmax; bxmax = t; }
+			if (bymin > bymax) { float t = bymin; bymin = bymax; bymax = t; }
+			child_found = 1;
+		}
+		else if (!ng_find_button(cid))
+		{
+			// Shape: look up char bounds
+			s32 cbxmin, cbxmax, cbymin, cbymax;
+			if (ng_getCharBounds(cid, &cbxmin, &cbxmax, &cbymin, &cbymax))
+			{
+				bxmin = cbxmin / 20.0f * sx + tx;
+				bxmax = cbxmax / 20.0f * sx + tx;
+				bymin = cbymin / 20.0f * sy + ty;
+				bymax = cbymax / 20.0f * sy + ty;
+				if (bxmin > bxmax) { float t = bxmin; bxmin = bxmax; bxmax = t; }
+				if (bymin > bymax) { float t = bymin; bymin = bymax; bymax = t; }
+				child_found = 1;
 			}
 		}
 
-		catch_up_mode = saved_catch_up;
-		// needs_init stays 1 so tagShowFrame will run the full frame (with scripts)
-	}
-}
-
-void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
-	u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
-{
-	(void)ratio;
-	// Delegate to tagPlaceObject2 for sprite execution
-	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
-}
-
-void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
-	u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
-{
-	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
-	// Store clip actions on the placed entry
-	size_t _ca_expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++) {
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == _ca_expected_parent) {
-			ng_display[i].clip_actions = clip_actions;
-			ng_display[i].clip_action_count = clip_action_count;
-			break;
+		if (child_found)
+		{
+			if (!found || bxmin < gxmin) gxmin = bxmin;
+			if (!found || bxmax > gxmax) gxmax = bxmax;
+			if (!found || bymin < gymin) gymin = bymin;
+			if (!found || bymax > gymax) gymax = bymax;
+			found = 1;
 		}
 	}
-}
 
-void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
-	u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode)
-{
-	(void)app_context; (void)depth; (void)char_id; (void)transform_id;
-	(void)cxform_id; (void)clip_depth; (void)blend_mode;
-}
-
-void tagSetFilter(SWFAppContext* app_context, size_t depth,
-	u8 type, float blur_x, float blur_y, u8 quality, u8 flags,
-	float r, float g, float b, float a, float strength,
-	float angle, float distance)
-{
-	(void)app_context; (void)depth; (void)type; (void)blur_x; (void)blur_y;
-	(void)quality; (void)flags; (void)r; (void)g; (void)b; (void)a;
-	(void)strength; (void)angle; (void)distance;
-}
-
-void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
-	float r, float g, float b, float a)
-{
-	(void)app_context; (void)depth; (void)r; (void)g; (void)b; (void)a;
-}
-
-void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
-{
-	// Store instance name on the display entry at this depth (within current parent scope).
-	// Also rename the cached MovieClip if one was already created (eager sprite init may
-	// have created it under an auto-assigned name before tagSetInstanceName was called).
-	size_t expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++)
+	if (found)
 	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == expected_parent)
+		if (out_xmin_px) *out_xmin_px = gxmin;
+		if (out_xmax_px) *out_xmax_px = gxmax;
+		if (out_ymin_px) *out_ymin_px = gymin;
+		if (out_ymax_px) *out_ymax_px = gymax;
+	}
+	return found;
+}
+
+// ---------------------------------------------------------------------------
+// Depth manipulation (swapDepths, updateDepth)
+// ---------------------------------------------------------------------------
+
+void ng_updateDisplayDepth(const char* name, int new_as_depth)
+{
+	size_t new_swf_depth = (size_t)(new_as_depth + 16384);
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name != NULL &&
+		    strcmp(display_list[d].instance_name, name) == 0)
 		{
-			char old_name[64];
-			strncpy(old_name, ng_display[i].instance_name, sizeof(old_name) - 1);
-			old_name[sizeof(old_name) - 1] = '\0';
-			strncpy(ng_display[i].instance_name, name, 63);
-			ng_display[i].instance_name[63] = '\0';
-			// Rename cached MC if it exists under the old name
-			if (old_name[0] != '\0' && strcmp(old_name, name) != 0)
-				actionRenameMovieClip(old_name, name);
+			// We can't actually move entries in display_list[] by depth easily.
+			// For now, update transform_id to the new depth slot (no-op if same).
+			// TODO: implement proper depth remapping if needed.
+			(void)new_swf_depth;
 			return;
 		}
 	}
 }
 
-// Enumerate child instance names for a MovieClip.
-// Finds the parent's display index, then iterates children whose parent_display_idx matches.
-// For _root (parent_name is NULL or empty), finds entries with parent_display_idx == (size_t)-1.
-void ng_enumerateChildren(const char* parent_name, void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data)
+void ng_swapDisplayDepths(const char* name1, const char* name2)
 {
-	size_t parent_idx = (size_t)-1;
+	size_t d1 = SIZE_MAX, d2 = SIZE_MAX;
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name != NULL)
+		{
+			if (strcmp(display_list[d].instance_name, name1) == 0) d1 = d;
+			else if (strcmp(display_list[d].instance_name, name2) == 0) d2 = d;
+		}
+	}
+	if (d1 != SIZE_MAX && d2 != SIZE_MAX)
+	{
+		// Swap the entire display entries (including their transform_ids etc.)
+		DisplayObject tmp = display_list[d1];
+		display_list[d1] = display_list[d2];
+		display_list[d2] = tmp;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Instance name management
+// ---------------------------------------------------------------------------
+
+void ng_renameDisplayEntry(const char* old_name, const char* new_name)
+{
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name != NULL &&
+		    strcmp(display_list[d].instance_name, old_name) == 0)
+		{
+			// If we own the old name, free it
+			if (display_list[d].instance_name_owned)
+			{
+				free(display_list[d].instance_name);
+				display_list[d].instance_name_owned = 0;
+			}
+			display_list[d].instance_name = (char*)new_name;
+			return;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Child enumeration (for for-in over MovieClip children)
+// ---------------------------------------------------------------------------
+
+void ng_enumerateChildren(const char* parent_name,
+    void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data)
+{
 	if (parent_name != NULL && parent_name[0] != '\0')
 	{
-		// Find the parent display entry
-		for (size_t i = 0; i < ng_display_count; i++)
-		{
-			if (ng_display[i].instance_name[0] != '\0' &&
-			    strcmp(ng_display[i].instance_name, parent_name) == 0)
-			{
-				parent_idx = i;
-				break;
-			}
-		}
-		if (parent_idx == (size_t)-1)
-			return; // Parent not found
-	}
+		// Find parent at root level
+		size_t parent_depth = ng_findDisplayEntryByName(parent_name);
+		if (parent_depth == SIZE_MAX) return;
 
-	// Iterate children in forward order (pushed in forward = popped in reverse)
-	for (size_t i = 0; i < ng_display_count; i++)
+		DisplayObject* parent_obj = &display_list[parent_depth];
+		if (parent_obj->sprite_display_list == NULL) return;
+
+		// Enumerate children of the sprite
+		for (size_t d = 1; d <= parent_obj->sprite_max_depth; d++)
+		{
+			DisplayObject* child = &parent_obj->sprite_display_list[d];
+			if (child->char_id == 0) continue;
+			if (child->instance_name != NULL && child->instance_name[0] != '\0')
+				callback(child->instance_name, (u32)strlen(child->instance_name), user_data);
+		}
+	}
+	else
 	{
-		if (ng_display[i].parent_display_idx == parent_idx &&
-		    ng_display[i].instance_name[0] != '\0')
+		// Enumerate root-level children
+		for (size_t d = 1; d <= max_depth; d++)
 		{
-			callback(ng_display[i].instance_name, (u32)strlen(ng_display[i].instance_name), user_data);
+			if (display_list[d].char_id == 0) continue;
+			if (display_list[d].instance_name != NULL && display_list[d].instance_name[0] != '\0')
+				callback(display_list[d].instance_name, (u32)strlen(display_list[d].instance_name), user_data);
 		}
 	}
 }
 
-// Check if the display entry at a given depth is a sprite (movieclip)
-// Only matches root-level entries (called from action.c for root display object resolution)
-int ng_isSpriteAtDepth(size_t depth)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
-			return ng_display[i].sprite_idx != (size_t)-1;
-	return 0;
-}
-
-// Check if the display entry at a given depth is a button
-int ng_isButtonAtDepth(size_t depth)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
-			return ng_display[i].is_button;
-	return 0;
-}
-
-int ng_isTextFieldAtDepth(size_t depth)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
-			return ng_display[i].is_textfield;
-	return 0;
-}
-
-int ng_isScriptableAtDepth(size_t depth)
-{
-	for (size_t i = 0; i < ng_display_count; i++) {
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1) {
-			return ng_display[i].is_button ||
-			       ng_display[i].is_textfield ||
-			       (ng_display[i].sprite_idx != (size_t)-1) ||
-			       ng_find_video(ng_display[i].char_id);
-		}
-	}
-	return 0;
-}
-
-// Clone a tag-placed sprite: source_name -> target_name at depth.
-// Only creates a MovieClip for scriptable sources (sprite/button/textfield).
-// Returns clone MovieClip, or NULL if source not found/non-scriptable.
-MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
-                           const char* target_name, int depth)
-{
-	if (!source_name || !target_name) return NULL;
-	// Flash valid depth range for CloneSprite: max 2130706428
-	if (depth > 2130706428) return NULL;
-
-	// Find source in ng_display by instance name (root-level only)
-	size_t src_idx = (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++) {
-		if (ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, source_name) == 0) {
-			src_idx = i;
-			break;
-		}
-	}
-
-	// If source found in ng_display, check if it's scriptable
-	if (src_idx != (size_t)-1) {
-		int scriptable = ng_display[src_idx].is_button ||
-		                 ng_display[src_idx].is_textfield ||
-		                 (ng_display[src_idx].sprite_idx != (size_t)-1);
-		if (!scriptable) return NULL;  // Non-scriptable: clone is undefined
-
-		// Remove existing entry at target depth
-		for (size_t i = 0; i < ng_display_count; i++) {
-			if (ng_display[i].depth == (size_t)depth && ng_display[i].parent_display_idx == (size_t)-1) {
-				for (size_t j = i; j + 1 < ng_display_count; j++)
-					ng_display[j] = ng_display[j + 1];
-				ng_display_count--;
-				if (src_idx > i) src_idx--;
-				break;
-			}
-		}
-
-		// Create new ng_display entry for clone
-		if (ng_display_count < MAX_DISPLAY_NG) {
-			size_t clone_idx = ng_display_count++;
-			ng_display[clone_idx] = ng_display[src_idx];
-			ng_display[clone_idx].depth = (size_t)depth;
-			ng_display[clone_idx].parent_display_idx = (size_t)-1;
-			strncpy(ng_display[clone_idx].instance_name, target_name, 63);
-			ng_display[clone_idx].instance_name[63] = '\0';
-			ng_display[clone_idx].current_frame = 0;
-			ng_display[clone_idx].needs_init = (ng_display[src_idx].sprite_idx != (size_t)-1) ? 1 : 0;
-			// clip_actions inherited from source
-		}
-	}
-
-	// Find source MC (may have been created by prior GetVariable access)
-	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
-
-	// Create clone MC
-	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
-	if (clone_mc == NULL) return NULL;
-
-	// Copy transform properties from source
-	if (src_mc != NULL) {
-		clone_mc->x = src_mc->x;
-		clone_mc->y = src_mc->y;
-		clone_mc->xscale = src_mc->xscale;
-		clone_mc->yscale = src_mc->yscale;
-		clone_mc->rotation = src_mc->rotation;
-		clone_mc->alpha = src_mc->alpha;
-		clone_mc->visible = src_mc->visible;
-		clone_mc->totalframes = src_mc->totalframes;
-		clone_mc->framesloaded = src_mc->framesloaded;
-		clone_mc->as_set_flags = src_mc->as_set_flags;
-	}
-	clone_mc->currentframe = 1;
-	clone_mc->depth = depth;
-
-	// Register as global variable so GetVariable finds the clone
-	extern void setVariableByName(const char* name, ActionVar* var);
-	ActionVar _clone_mc_var = {0};
-	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-	_clone_mc_var.data.numeric_value = (u64)clone_mc;
-	setVariableByName(target_name, &_clone_mc_var);
-
-	return clone_mc;
-}
-
-// Clone a script-created MovieClip (not in ng_display)
-MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
-                                  const char* target_name, int depth)
-{
-	if (!src_mc || !target_name) return NULL;
-	// Cannot clone root MovieClip — source was a non-scriptable display object (shape, statictext, etc.)
-	if (src_mc->parent == NULL) return NULL;
-
-	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
-	if (clone_mc == NULL) return NULL;
-
-	clone_mc->x = src_mc->x;
-	clone_mc->y = src_mc->y;
-	clone_mc->xscale = src_mc->xscale;
-	clone_mc->yscale = src_mc->yscale;
-	clone_mc->rotation = src_mc->rotation;
-	clone_mc->alpha = src_mc->alpha;
-	clone_mc->visible = src_mc->visible;
-	clone_mc->totalframes = src_mc->totalframes;
-	clone_mc->framesloaded = src_mc->framesloaded;
-	clone_mc->as_set_flags = src_mc->as_set_flags;
-	clone_mc->currentframe = 1;
-	clone_mc->depth = depth;
-
-	extern void setVariableByName(const char* name, ActionVar* var);
-	ActionVar _clone_mc_var = {0};
-	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-	_clone_mc_var.data.numeric_value = (u64)clone_mc;
-	setVariableByName(target_name, &_clone_mc_var);
-
-	return clone_mc;
-}
-
-// duplicateMovieClip clone: stored at SWF depth (as_depth + 16384) in ng_display.
-// Does NOT register as a global variable (accessible via path resolution only).
-// Does NOT copy clip_actions (duplicateMovieClip does not fire onLoad events).
-MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name,
-                                  const char* target_name, int as_depth)
-{
-	if (!source_name || !target_name) return NULL;
-
-	// Map AS depth to internal SWF depth (Flash uses +16384 offset for script-created clips)
-	int swf_depth = as_depth + 16384;
-
-	// Find source in ng_display by instance name (root-level only)
-	size_t src_idx = (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++) {
-		if (ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, source_name) == 0) {
-			src_idx = i;
-			break;
-		}
-	}
-
-	if (src_idx != (size_t)-1) {
-		int scriptable = ng_display[src_idx].is_button ||
-		                 ng_display[src_idx].is_textfield ||
-		                 (ng_display[src_idx].sprite_idx != (size_t)-1);
-		if (!scriptable) return NULL;
-
-		// Remove existing entry at the target SWF depth
-		for (size_t i = 0; i < ng_display_count; i++) {
-			if (ng_display[i].depth == (size_t)swf_depth && ng_display[i].parent_display_idx == (size_t)-1) {
-				for (size_t j = i; j + 1 < ng_display_count; j++)
-					ng_display[j] = ng_display[j + 1];
-				ng_display_count--;
-				if (src_idx > i) src_idx--;
-				break;
-			}
-		}
-
-		// Create ng_display entry — inherits sprite_idx but NO clip_actions (no onLoad)
-		if (ng_display_count < MAX_DISPLAY_NG) {
-			size_t clone_idx = ng_display_count++;
-			ng_display[clone_idx] = ng_display[src_idx];
-			ng_display[clone_idx].depth = (size_t)swf_depth;
-			ng_display[clone_idx].parent_display_idx = (size_t)-1;
-			strncpy(ng_display[clone_idx].instance_name, target_name, 63);
-			ng_display[clone_idx].instance_name[63] = '\0';
-			ng_display[clone_idx].current_frame = 0;
-			ng_display[clone_idx].needs_init = 0;     // duplicateMovieClip: no onLoad
-			ng_display[clone_idx].clip_actions = NULL;
-			ng_display[clone_idx].clip_action_count = 0;
-		}
-	}
-
-	// Find/create source MC and clone MC
-	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
-	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
-	if (clone_mc == NULL) return NULL;
-
-	// Copy transform and AS-set-flags from source
-	if (src_mc != NULL) {
-		clone_mc->x = src_mc->x;
-		clone_mc->y = src_mc->y;
-		clone_mc->xscale = src_mc->xscale;
-		clone_mc->yscale = src_mc->yscale;
-		clone_mc->rotation = src_mc->rotation;
-		clone_mc->alpha = src_mc->alpha;
-		clone_mc->visible = src_mc->visible;
-		clone_mc->totalframes = src_mc->totalframes;
-		clone_mc->framesloaded = src_mc->framesloaded;
-		clone_mc->as_set_flags = src_mc->as_set_flags;
-	}
-	clone_mc->currentframe = 1;
-	clone_mc->depth = swf_depth;
-
-	// Do NOT call setVariableByName: duplicateMovieClip clones are accessible via
-	// path resolution (_root.name) but not as bare script-scope variables.
-
-	return clone_mc;
-}
+// ---------------------------------------------------------------------------
+// TextField property accessors
+// ---------------------------------------------------------------------------
 
 const char* ng_getTextFieldInitialText(size_t depth)
 {
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
-			return ng_textfields[ng_display[i].textfield_idx].plain_text;
-	}
-	return "";
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return "";
+	int tf_idx = ng_find_textfield(display_list[depth].char_id);
+	if (tf_idx < 0) return "";
+	return ng_textfields[tf_idx].plain_text;
 }
 
 u32 ng_getTextFieldColor(size_t depth)
 {
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
-			return ng_textfields[ng_display[i].textfield_idx].text_color;
-	}
-	return 0;
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	int tf_idx = ng_find_textfield(display_list[depth].char_id);
+	if (tf_idx < 0) return 0;
+	return ng_textfields[tf_idx].text_color;
 }
 
 u32 ng_getTextFieldColorByIdx(int idx)
@@ -965,11 +988,8 @@ u32 ng_getTextFieldColorByIdx(int idx)
 
 int ng_getTextFieldIdx(size_t depth)
 {
-	for (size_t i = 0; i < ng_display_count; i++)
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].is_textfield)
-			return ng_display[i].textfield_idx;
-	return -1;
+	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return -1;
+	return ng_find_textfield(display_list[depth].char_id);
 }
 
 u16 ng_getTextFieldFlags(int tf_idx)
@@ -1056,549 +1076,228 @@ const char* ng_getTextFieldInitialTextByIdx(int tf_idx)
 	return ng_textfields[tf_idx].plain_text;
 }
 
-int ng_getTextFieldCSMApplied(int tf_idx)
-{
-	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
-	return ng_textfields[tf_idx].csm_applied;
-}
-
-const char* ng_getTextFieldCSMAntiAliasType(int tf_idx)
-{
-	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "normal";
-	return ng_textfields[tf_idx].csm_antiAliasType;
-}
-
-const char* ng_getTextFieldCSMGridFitType(int tf_idx)
-{
-	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return "pixel";
-	return ng_textfields[tf_idx].csm_gridFitType;
-}
-
-float ng_getTextFieldCSMThickness(int tf_idx)
-{
-	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0.0f;
-	return ng_textfields[tf_idx].csm_thickness;
-}
-
-float ng_getTextFieldCSMSharpness(int tf_idx)
-{
-	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0.0f;
-	return ng_textfields[tf_idx].csm_sharpness;
-}
+// ---------------------------------------------------------------------------
+// Font accessors
+// ---------------------------------------------------------------------------
 
 const char* ng_getFontName(u16 font_id)
 {
 	for (size_t i = 0; i < ng_font_count; i++)
-		if (ng_fonts[i].font_id == font_id)
-			return ng_fonts[i].name;
+		if (ng_fonts[i].font_id == font_id) return ng_fonts[i].name;
 	return "";
 }
 
 int ng_getFontBold(u16 font_id)
 {
 	for (size_t i = 0; i < ng_font_count; i++)
-		if (ng_fonts[i].font_id == font_id)
-			return ng_fonts[i].bold;
+		if (ng_fonts[i].font_id == font_id) return ng_fonts[i].bold;
 	return 0;
 }
 
 int ng_getFontItalic(u16 font_id)
 {
 	for (size_t i = 0; i < ng_font_count; i++)
-		if (ng_fonts[i].font_id == font_id)
-			return ng_fonts[i].italic;
+		if (ng_fonts[i].font_id == font_id) return ng_fonts[i].italic;
 	return 0;
 }
 
-// Get transform_id for a display entry at a given depth
-int ng_getTransformId(size_t depth, u32* out_id)
+// ---------------------------------------------------------------------------
+// Clone/duplicate sprite helpers
+// ---------------------------------------------------------------------------
+
+MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
+                           const char* target_name, int depth)
 {
-	for (size_t i = 0; i < ng_display_count; i++)
+	if (!source_name || !target_name) return NULL;
+	if (depth > 2130706428) return NULL;
+
+	// Find source by instance name at root level
+	size_t src_depth = ng_findDisplayEntryByName(source_name);
+
+	if (src_depth != SIZE_MAX)
 	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
+		size_t cid = display_list[src_depth].char_id;
+		int scriptable = (dictionary[cid].type == CHAR_TYPE_SPRITE) ||
+		                 ng_find_button(cid) || (ng_find_textfield(cid) >= 0);
+		if (!scriptable) return NULL;
+
+		// Place clone at target depth (AS depth → SWF depth = depth itself for CloneSprite)
+		size_t target_swf_depth = (size_t)depth;
+		// Pre-clear target depth if occupied
+		if (target_swf_depth >= 1 && target_swf_depth <= max_depth &&
+		    display_list[target_swf_depth].char_id != 0)
 		{
-			*out_id = ng_display[i].transform_id;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// Get x/y translation from transform_data for a display entry
-int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
-		{
-			u32 tid = ng_display[i].transform_id;
-			*out_x = transform_data[tid][12] / 20.0f;
-			*out_y = transform_data[tid][13] / 20.0f;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// Get x/y translation as double (avoids float32 precision loss for traces like 125.2)
-int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
-		{
-			u32 tid = ng_display[i].transform_id;
-			if (out_x) *out_x = (double)transform_data[tid][12] / 20.0;
-			if (out_y) *out_y = (double)transform_data[tid][13] / 20.0;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// Get scale/rotation from transform_data for a display entry at a given depth.
-// Only matches root-level entries (parent_display_idx == (size_t)-1).
-// out_xscale and out_yscale are percentages (100=100%). out_rotation is degrees.
-// Returns 1 if found, 0 if not.
-int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == (size_t)-1)
-		{
-			u32 tid = ng_display[i].transform_id;
-			float m00 = transform_data[tid][0];   // ScaleX * cos(rot)
-			float m10 = transform_data[tid][1];   // ScaleX * sin(rot)
-			float m01 = transform_data[tid][4];   // -ScaleY * sin(rot) (SkewY)
-			float m11 = transform_data[tid][5];   // ScaleY * cos(rot)
-			if (out_xscale) *out_xscale = sqrtf(m00*m00 + m10*m10) * 100.0f;
-			if (out_yscale) *out_yscale = sqrtf(m01*m01 + m11*m11) * 100.0f;
-			if (out_rotation) *out_rotation = atan2f(m10, m00) * 180.0f / 3.14159265358979323846f;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// Get color transform values for a display entry by instance name.
-// Values are in AVM1 format: multipliers as percentage (100.0 = 100%), addends as signed pixel values.
-// Returns 1 if found, 0 if not found.
-int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, double* aa,
-                          double* rb, double* gb, double* bb, double* ab)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (strcmp(ng_display[i].instance_name, name) == 0)
-		{
-			*ra = ng_display[i].cx_ra; *ga = ng_display[i].cx_ga;
-			*ba = ng_display[i].cx_ba; *aa = ng_display[i].cx_aa;
-			*rb = ng_display[i].cx_rb; *gb = ng_display[i].cx_gb;
-			*bb = ng_display[i].cx_bb; *ab = ng_display[i].cx_ab;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// Set color transform values for a display entry by instance name.
-// Values are in AVM1 format: multipliers as percentage (100.0 = 100%), addends as signed pixel values.
-// Returns 1 if found and updated, 0 if not found.
-int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
-                          double rb, double gb, double bb, double ab)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (strcmp(ng_display[i].instance_name, name) == 0)
-		{
-			ng_display[i].cx_ra = ra; ng_display[i].cx_ga = ga;
-			ng_display[i].cx_ba = ba; ng_display[i].cx_aa = aa;
-			ng_display[i].cx_rb = rb; ng_display[i].cx_gb = gb;
-			ng_display[i].cx_bb = bb; ng_display[i].cx_ab = ab;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// Look up character bounds by char_id. Returns 1 if found, 0 if not.
-int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax)
-{
-	for (size_t i = 0; i < ng_char_bounds_count; i++)
-	{
-		if (ng_char_bounds[i].char_id == char_id)
-		{
-			if (out_xmin) *out_xmin = ng_char_bounds[i].xmin;
-			if (out_xmax) *out_xmax = ng_char_bounds[i].xmax;
-			if (out_ymin) *out_ymin = ng_char_bounds[i].ymin;
-			if (out_ymax) *out_ymax = ng_char_bounds[i].ymax;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// Compute content bounds in pixels for children of a display entry.
-// entry_idx = (size_t)-1 means root-level children.
-// Bounds are in the parent's local pixel space (translate+scale applied, ignoring rotation for now).
-// Returns 1 if any bounds found, 0 if no children or no bounds data.
-int ng_getDisplayEntryBounds(size_t entry_idx,
-    float* out_xmin_px, float* out_xmax_px,
-    float* out_ymin_px, float* out_ymax_px)
-{
-	int found = 0;
-	float gxmin = 1e30f, gxmax = -1e30f;
-	float gymin = 1e30f, gymax = -1e30f;
-
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].parent_display_idx != entry_idx) continue;
-
-		u32 tid = ng_display[i].transform_id;
-		float tx = transform_data[tid][12] / 20.0f;  // twips→pixels
-		float ty = transform_data[tid][13] / 20.0f;
-		// Extract scale from matrix diagonal (column-major): [0]=cos*sx, [5]=cos*sy (approx)
-		float sx = transform_data[tid][0];
-		float sy = transform_data[tid][5];
-
-		float bxmin_px, bxmax_px, bymin_px, bymax_px;
-		int child_found = 0;
-
-		if (ng_display[i].sprite_idx != (size_t)-1)
-		{
-			// Sprite: recursively get its local bounds, then apply this sprite's transform
-			float lxmin, lxmax, lymin, lymax;
-			if (ng_getDisplayEntryBounds(i, &lxmin, &lxmax, &lymin, &lymax))
+			ng_on_remove_object(app_context, target_swf_depth);
+			// clear_display_entry handled by tagRemoveObject2 caller — do minimal cleanup
+			if (display_list[target_swf_depth].instance_name_owned &&
+			    display_list[target_swf_depth].instance_name != NULL)
 			{
-				bxmin_px = lxmin * sx + tx;
-				bxmax_px = lxmax * sx + tx;
-				bymin_px = lymin * sy + ty;
-				bymax_px = lymax * sy + ty;
-				if (bxmin_px > bxmax_px) { float tmp = bxmin_px; bxmin_px = bxmax_px; bxmax_px = tmp; }
-				if (bymin_px > bymax_px) { float tmp = bymin_px; bymin_px = bymax_px; bymax_px = tmp; }
-				child_found = 1;
+				free(display_list[target_swf_depth].instance_name);
+				display_list[target_swf_depth].instance_name_owned = 0;
+				display_list[target_swf_depth].instance_name = NULL;
 			}
 		}
-		else if (ng_display[i].is_textfield && ng_display[i].textfield_idx >= 0)
+
+		// Copy display entry to clone depth
+		if (target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)
 		{
-			int tf_idx = ng_display[i].textfield_idx;
-			float bxf = ng_textfields[tf_idx].bounds_xmin / 20.0f;
-			float bxf2 = ng_textfields[tf_idx].bounds_xmax / 20.0f;
-			float byf = ng_textfields[tf_idx].bounds_ymin / 20.0f;
-			float byf2 = ng_textfields[tf_idx].bounds_ymax / 20.0f;
-			bxmin_px = bxf * sx + tx;
-			bxmax_px = bxf2 * sx + tx;
-			bymin_px = byf * sy + ty;
-			bymax_px = byf2 * sy + ty;
-			if (bxmin_px > bxmax_px) { float tmp = bxmin_px; bxmin_px = bxmax_px; bxmax_px = tmp; }
-			if (bymin_px > bymax_px) { float tmp = bymin_px; bymin_px = bymax_px; bymax_px = tmp; }
-			child_found = 1;
-		}
-		else if (!ng_display[i].is_button)
-		{
-			// Shape: look up char bounds
-			s32 bxmin, bxmax, bymin, bymax;
-			if (ng_getCharBounds(ng_display[i].char_id, &bxmin, &bxmax, &bymin, &bymax))
+			// Ensure capacity
+			if (target_swf_depth >= display_list_capacity)
 			{
-				bxmin_px = bxmin / 20.0f * sx + tx;
-				bxmax_px = bxmax / 20.0f * sx + tx;
-				bymin_px = bymin / 20.0f * sy + ty;
-				bymax_px = bymax / 20.0f * sy + ty;
-				if (bxmin_px > bxmax_px) { float tmp = bxmin_px; bxmin_px = bxmax_px; bxmax_px = tmp; }
-				if (bymin_px > bymax_px) { float tmp = bymin_px; bymin_px = bymax_px; bymax_px = tmp; }
-				child_found = 1;
+				size_t new_cap = target_swf_depth + 64;
+				display_list = realloc(display_list, new_cap * sizeof(DisplayObject));
+				memset(&display_list[display_list_capacity], 0,
+				       (new_cap - display_list_capacity) * sizeof(DisplayObject));
+				display_list_capacity = new_cap;
 			}
-		}
-
-		if (child_found)
-		{
-			if (!found || bxmin_px < gxmin) gxmin = bxmin_px;
-			if (!found || bxmax_px > gxmax) gxmax = bxmax_px;
-			if (!found || bymin_px < gymin) gymin = bymin_px;
-			if (!found || bymax_px > gymax) gymax = bymax_px;
-			found = 1;
+			display_list[target_swf_depth] = display_list[src_depth];
+			// Give clone its own strdup'd name
+			display_list[target_swf_depth].instance_name = strdup(target_name);
+			display_list[target_swf_depth].instance_name_owned = 1;
+			display_list[target_swf_depth].sprite_display_list = NULL;
+			display_list[target_swf_depth].sprite_max_depth = 0;
+			display_list[target_swf_depth].sprite_dl_capacity = 0;
+			display_list[target_swf_depth].sprite_needs_init = 0;
+			display_list[target_swf_depth].clip_actions = NULL;
+			display_list[target_swf_depth].clip_action_count = 0;
+			if (target_swf_depth > max_depth) max_depth = target_swf_depth;
 		}
 	}
 
-	if (found)
+	// Find source MC and create clone MC
+	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	if (clone_mc == NULL) return NULL;
+
+	if (src_mc != NULL)
 	{
-		if (out_xmin_px) *out_xmin_px = gxmin;
-		if (out_xmax_px) *out_xmax_px = gxmax;
-		if (out_ymin_px) *out_ymin_px = gymin;
-		if (out_ymax_px) *out_ymax_px = gymax;
+		clone_mc->x       = src_mc->x;
+		clone_mc->y       = src_mc->y;
+		clone_mc->xscale  = src_mc->xscale;
+		clone_mc->yscale  = src_mc->yscale;
+		clone_mc->rotation = src_mc->rotation;
+		clone_mc->alpha   = src_mc->alpha;
+		clone_mc->visible = src_mc->visible;
+		clone_mc->totalframes   = src_mc->totalframes;
+		clone_mc->framesloaded  = src_mc->framesloaded;
+		clone_mc->as_set_flags  = src_mc->as_set_flags;
 	}
-	return found;
+	clone_mc->currentframe = 1;
+	clone_mc->depth = depth;
+
+	// Register as global variable
+	ActionVar _clone_mc_var = {0};
+	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_clone_mc_var.data.numeric_value = (u64)clone_mc;
+	setVariableByName(target_name, &_clone_mc_var);
+
+	return clone_mc;
 }
 
-// NO_GRAPHICS child lookup by instance name — returns depth or SIZE_MAX if not found
-// Only matches root-level entries (called from action.c for root display object resolution)
-// Find a display entry at the given SWF depth that is a direct child of the root.
-// Returns: 0 = not found, 1 = found non-sprite, 2 = found sprite (name in out_name)
-int ng_findRootChildAtSWFDepth(size_t swf_depth, char* out_name, size_t out_name_size)
+MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
+                                  const char* target_name, int depth)
 {
-	for (size_t i = 0; i < ng_display_count; i++)
+	if (!src_mc || !target_name) return NULL;
+	if (src_mc->parent == NULL) return NULL;  // cannot clone root
+
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	if (clone_mc == NULL) return NULL;
+
+	clone_mc->x       = src_mc->x;
+	clone_mc->y       = src_mc->y;
+	clone_mc->xscale  = src_mc->xscale;
+	clone_mc->yscale  = src_mc->yscale;
+	clone_mc->rotation = src_mc->rotation;
+	clone_mc->alpha   = src_mc->alpha;
+	clone_mc->visible = src_mc->visible;
+	clone_mc->totalframes   = src_mc->totalframes;
+	clone_mc->framesloaded  = src_mc->framesloaded;
+	clone_mc->as_set_flags  = src_mc->as_set_flags;
+	clone_mc->currentframe = 1;
+	clone_mc->depth = depth;
+
+	ActionVar _clone_mc_var = {0};
+	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_clone_mc_var.data.numeric_value = (u64)clone_mc;
+	setVariableByName(target_name, &_clone_mc_var);
+
+	return clone_mc;
+}
+
+MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name,
+                                  const char* target_name, int as_depth)
+{
+	if (!source_name || !target_name) return NULL;
+
+	int swf_depth = as_depth + 16384;
+
+	size_t src_depth = ng_findDisplayEntryByName(source_name);
+	if (src_depth != SIZE_MAX)
 	{
-		if (ng_display[i].depth != swf_depth) continue;
-		if (ng_display[i].parent_display_idx != (size_t)-1) continue;
-		if (ng_display[i].sprite_idx != (size_t)-1) {
-			// It's a sprite — copy name (may be empty if unnamed)
-			if (out_name && out_name_size > 0) {
-				strncpy(out_name, ng_display[i].instance_name, out_name_size - 1);
-				out_name[out_name_size - 1] = '\0';
+		size_t cid = display_list[src_depth].char_id;
+		int scriptable = (dictionary[cid].type == CHAR_TYPE_SPRITE) ||
+		                 ng_find_button(cid) || (ng_find_textfield(cid) >= 0);
+		if (!scriptable) return NULL;
+
+		size_t target_swf_depth = (size_t)swf_depth;
+		if (target_swf_depth >= 1 && target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)
+		{
+			extern size_t display_list_capacity;
+			if (target_swf_depth >= display_list_capacity)
+			{
+				size_t new_cap = target_swf_depth + 64;
+				display_list = realloc(display_list, new_cap * sizeof(DisplayObject));
+				memset(&display_list[display_list_capacity], 0,
+				       (new_cap - display_list_capacity) * sizeof(DisplayObject));
+				display_list_capacity = new_cap;
 			}
-			return 2;
-		} else if (ng_display[i].is_textfield) {
-			// It's a textfield — copy name, return 3
-			if (out_name && out_name_size > 0) {
-				strncpy(out_name, ng_display[i].instance_name, out_name_size - 1);
-				out_name[out_name_size - 1] = '\0';
-			}
-			return 3;
-		} else {
-			// Non-sprite, non-textfield (shape, plain text, button)
-			if (out_name && out_name_size > 0) out_name[0] = '\0';
-			return 1;
+			display_list[target_swf_depth] = display_list[src_depth];
+			display_list[target_swf_depth].instance_name = strdup(target_name);
+			display_list[target_swf_depth].instance_name_owned = 1;
+			display_list[target_swf_depth].sprite_display_list = NULL;
+			display_list[target_swf_depth].sprite_max_depth = 0;
+			display_list[target_swf_depth].sprite_dl_capacity = 0;
+			display_list[target_swf_depth].sprite_needs_init = 0;
+			display_list[target_swf_depth].clip_actions = NULL;
+			display_list[target_swf_depth].clip_action_count = 0;
+			if (target_swf_depth > max_depth) max_depth = target_swf_depth;
 		}
 	}
-	return 0;
-}
 
-// Search for a named child within a named parent's display list.
-// Returns the child's SWF depth (within-parent depth), or SIZE_MAX if not found.
-size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
-{
-	// Find parent entry index
-	size_t parent_idx = SIZE_MAX;
-	for (size_t i = 0; i < ng_display_count; i++) {
-		if (ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, parent_name) == 0) {
-			parent_idx = i;
-			break;
-		}
-	}
-	if (parent_idx == SIZE_MAX) return SIZE_MAX;
+	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	if (clone_mc == NULL) return NULL;
 
-	// Find child entry that is a direct child of parent_idx
-	for (size_t i = 0; i < ng_display_count; i++) {
-		if (ng_display[i].parent_display_idx == parent_idx &&
-		    ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, child_name) == 0) {
-			return ng_display[i].depth;
-		}
-	}
-	return SIZE_MAX;
-}
-
-// Update ng_display depth for a named root-level entry (for swapDepths with numeric arg)
-void ng_updateDisplayDepth(const char* name, int new_as_depth)
-{
-	size_t new_swf_depth = (size_t)(new_as_depth + 16384);
-	for (size_t i = 0; i < ng_display_count; i++)
+	if (src_mc != NULL)
 	{
-		if (ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, name) == 0)
-		{
-			ng_display[i].depth = new_swf_depth;
-			return;
-		}
+		clone_mc->x       = src_mc->x;
+		clone_mc->y       = src_mc->y;
+		clone_mc->xscale  = src_mc->xscale;
+		clone_mc->yscale  = src_mc->yscale;
+		clone_mc->rotation = src_mc->rotation;
+		clone_mc->alpha   = src_mc->alpha;
+		clone_mc->visible = src_mc->visible;
+		clone_mc->totalframes   = src_mc->totalframes;
+		clone_mc->framesloaded  = src_mc->framesloaded;
+		clone_mc->as_set_flags  = src_mc->as_set_flags;
 	}
+	clone_mc->currentframe = 1;
+	clone_mc->depth = swf_depth;
+
+	// Do NOT register as global variable (accessible via path only)
+	return clone_mc;
 }
 
-// Swap ng_display depths of two named root-level entries (for swapDepths with MC arg)
-void ng_swapDisplayDepths(const char* name1, const char* name2)
-{
-	size_t idx1 = SIZE_MAX, idx2 = SIZE_MAX;
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].instance_name[0] != '\0')
-		{
-			if (strcmp(ng_display[i].instance_name, name1) == 0) idx1 = i;
-			else if (strcmp(ng_display[i].instance_name, name2) == 0) idx2 = i;
-		}
-	}
-	if (idx1 != SIZE_MAX && idx2 != SIZE_MAX)
-	{
-		size_t tmp = ng_display[idx1].depth;
-		ng_display[idx1].depth = ng_display[idx2].depth;
-		ng_display[idx2].depth = tmp;
-	}
-}
-
-size_t ng_findDisplayEntryByName(const char* name)
-{
-	// Return the lowest-depth match when multiple entries share a name
-	size_t result = SIZE_MAX;
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].parent_display_idx == (size_t)-1 &&
-		    ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, name) == 0)
-		{
-			if (result == SIZE_MAX || ng_display[i].depth < result)
-				result = ng_display[i].depth;
-		}
-	}
-	return result;
-}
-
-// Find display entry INDEX (not depth) by instance name. Returns (size_t)-1 if not found.
-size_t ng_findDisplayEntryIdx(const char* name)
-{
-	if (!name || name[0] == '\0') return (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, name) == 0)
-			return i;
-	}
-	return (size_t)-1;
-}
-
-// Find display entry INDEX by name AND parent display index.
-// parent_idx = (size_t)-1 for root-level entries.
-// Returns (size_t)-1 if not found.
-size_t ng_findDisplayEntryIdxWithParent(const char* name, size_t parent_idx)
-{
-	if (!name || name[0] == '\0') return (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++) {
-		if (ng_display[i].parent_display_idx == parent_idx &&
-		    ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, name) == 0)
-			return i;
-	}
-	return (size_t)-1;
-}
-
-// Get matrix components from a display entry (by index).
-// Column-major SWF matrix: [0]=a, [1]=b, [4]=c, [5]=d, [12]=tx_twips, [13]=ty_twips.
-// Returns 1 if found, 0 if not (idx out of range).
-int ng_getMatrixFromEntry(size_t entry_idx,
-    double* out_a, double* out_b, double* out_c, double* out_d,
-    double* out_tx, double* out_ty)
-{
-	if (entry_idx >= ng_display_count) return 0;
-	u32 tid = ng_display[entry_idx].transform_id;
-	if (out_a)  *out_a  = (double)transform_data[tid][0];
-	if (out_b)  *out_b  = (double)transform_data[tid][1];
-	if (out_c)  *out_c  = (double)transform_data[tid][4];
-	if (out_d)  *out_d  = (double)transform_data[tid][5];
-	if (out_tx) *out_tx = (double)transform_data[tid][12] / 20.0;
-	if (out_ty) *out_ty = (double)transform_data[tid][13] / 20.0;
-	return 1;
-}
-
-// Get color transform components from a display entry (by index).
-// Returns 1 if found, 0 if not.
-int ng_getCTFromEntry(size_t entry_idx,
-    double* ra, double* ga, double* ba, double* aa,
-    double* rb, double* gb, double* bb, double* ab)
-{
-	if (entry_idx >= ng_display_count) return 0;
-	if (ra) *ra = ng_display[entry_idx].cx_ra;
-	if (ga) *ga = ng_display[entry_idx].cx_ga;
-	if (ba) *ba = ng_display[entry_idx].cx_ba;
-	if (aa) *aa = ng_display[entry_idx].cx_aa;
-	if (rb) *rb = ng_display[entry_idx].cx_rb;
-	if (gb) *gb = ng_display[entry_idx].cx_gb;
-	if (bb) *bb = ng_display[entry_idx].cx_bb;
-	if (ab) *ab = ng_display[entry_idx].cx_ab;
-	return 1;
-}
-
-// Set color transform components on a display entry (by index).
-// Returns 1 if found and set, 0 if not.
-int ng_setCTOnEntry(size_t entry_idx,
-    double ra, double ga, double ba, double aa,
-    double rb, double gb, double bb, double ab)
-{
-	if (entry_idx >= ng_display_count) return 0;
-	ng_display[entry_idx].cx_ra = ra;
-	ng_display[entry_idx].cx_ga = ga;
-	ng_display[entry_idx].cx_ba = ba;
-	ng_display[entry_idx].cx_aa = aa;
-	ng_display[entry_idx].cx_rb = rb;
-	ng_display[entry_idx].cx_gb = gb;
-	ng_display[entry_idx].cx_bb = bb;
-	ng_display[entry_idx].cx_ab = ab;
-	return 1;
-}
-
-// Rename a display list entry's instance name (for _name setter)
-void ng_renameDisplayEntry(const char* old_name, const char* new_name)
-{
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].instance_name[0] != '\0' &&
-		    strcmp(ng_display[i].instance_name, old_name) == 0)
-		{
-			strncpy(ng_display[i].instance_name, new_name, 63);
-			ng_display[i].instance_name[63] = '\0';
-			return;
-		}
-	}
-}
-
-void tagRemoveObject(SWFAppContext* app_context, size_t depth)
-{
-	(void)app_context; (void)depth;
-}
-
-void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
-{
-	// During backward goto catch-up, don't remove entries that were placed
-	// at or before the target frame — they're part of the preserved state.
-	extern int catch_up_backward;
-	extern size_t catch_up_target;
-
-	size_t expected_parent = ng_nesting_depth > 0 ? ng_current_display_idx : (size_t)-1;
-	for (size_t i = 0; i < ng_display_count; i++)
-	{
-		if (ng_display[i].depth == depth && ng_display[i].parent_display_idx == expected_parent)
-		{
-			if (catch_up_backward && ng_display[i].placed_at_frame <= catch_up_target)
-				return;  // Protected: don't remove
-			// Invalidate cached MovieClip so re-placement gets fresh properties
-			if (ng_display[i].instance_name[0] != '\0')
-				actionInvalidateCachedMovieClip(app_context, ng_display[i].instance_name);
-			// Remove by shifting
-			for (size_t j = i; j + 1 < ng_display_count; j++)
-				ng_display[j] = ng_display[j + 1];
-			ng_display_count--;
-			return;
-		}
-	}
-}
-
-void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
-{
-	(void)app_context;
-	// Skip if already registered (can happen during goto catch-up replay)
-	if (ng_find_sprite(char_id) != (size_t)-1) return;
-	if (ng_sprite_count < MAX_SPRITES_NG)
-	{
-		ng_sprites[ng_sprite_count].char_id = char_id;
-		ng_sprites[ng_sprite_count].funcs = funcs;
-		ng_sprites[ng_sprite_count].frame_count = frame_count;
-		ng_sprite_count++;
-	}
-}
-
-void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count)
-{
-	(void)app_context; (void)state_funcs; (void)hit_char_id;
-	(void)hit_transform_id; (void)actions; (void)action_count;
-	// Register as button for typeof discrimination
-	if (ng_button_count < MAX_BUTTONS_NG && !ng_find_button(char_id))
-		ng_button_ids[ng_button_count++] = char_id;
-}
+// ---------------------------------------------------------------------------
+// No-op stubs for functions not needed in NO_GRAPHICS mode
+// ---------------------------------------------------------------------------
 
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
 {
 	(void)offset; (void)size; (void)width; (void)height;
 }
 
-void finalizeBitmaps()
+void finalizeBitmaps(void)
 {
 }
 

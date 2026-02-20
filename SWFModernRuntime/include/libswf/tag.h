@@ -9,7 +9,6 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
 
 // Tag functions needed by both graphics and trace (NO_GRAPHICS) builds.
-// In NO_GRAPHICS mode, tag_stubs.c provides no-op implementations.
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
@@ -63,9 +62,14 @@ typedef struct MovieClip MovieClip;
 
 // NO_GRAPHICS helpers for sprite timeline control from action.c
 #ifdef NO_GRAPHICS
-void ng_advanceSprites(SWFAppContext* app_context);
+// Advance sprite timelines (replaces old ng_advanceSprites; called by swf_core.c)
+void advance_sprite_frames(SWFAppContext* app_context);
+// Returns 1 if any multi-frame sprite at root level is still playing
+int hasPlayingSprites(void);
+// Currently-executing sprite DisplayObject (set by advance_sprite_frames)
+extern DisplayObject* g_current_sprite_obj;
+
 int ng_isInsideSprite(void);
-int ng_hasPlayingSprites(void);
 void ng_stopCurrentSprite(void);
 void ng_playCurrentSprite(void);
 void ng_gotoFrameCurrentSprite(u16 frame);
@@ -139,4 +143,22 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name, c
 MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc, const char* target_name, int depth);
 // duplicateMovieClip clone: stores at SWF depth (as_depth+16384), no variable registration, no onLoad.
 MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name, const char* target_name, int as_depth);
+
+// Callbacks from tag.c → tag_stubs.c supplemental registries (NO_GRAPHICS builds)
+void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
+void ng_record_button(size_t char_id);
+void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
+    const char* plain_text, const char* raw_html_text, u32 text_color,
+    u16 font_id, u16 font_height, s16 max_length,
+    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    const char* variable_name, u16 flags,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
+void ng_record_csm(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
+    float thickness, float sharpness);
+void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
+void ng_record_video(SWFAppContext* app_context, u16 char_id);
+// Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)
+void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
+// Called before tagRemoveObject clears an object (handles MC invalidation, cleanup)
+void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
 #endif

@@ -37,7 +37,6 @@ typedef enum
 	CHAR_TYPE_BUTTON,
 } CharacterType;
 
-#ifndef NO_GRAPHICS
 #define INITIAL_DICTIONARY_CAPACITY 1024
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
 
@@ -128,6 +127,7 @@ typedef struct DisplayObject
 	int sprite_manual_next_frame;  // pending manual frame nav
 	size_t sprite_next_frame;      // target frame
 	char* instance_name;           // from PlaceObject2 HasName (or NULL)
+	u8 instance_name_owned;        // 1 if instance_name was malloc'd (auto-assigned), 0 if pointer to static string
 	// Clip actions (PlaceObject2 HasClipActions)
 	ClipAction* clip_actions;
 	size_t clip_action_count;
@@ -149,7 +149,19 @@ typedef struct DisplayObject
 	float filter_highlight_g;
 	float filter_highlight_b;
 	float filter_highlight_a;
+	// Scriptable color transform override (mutable at runtime by ActionScript)
+	double cx_ra, cx_ga, cx_ba, cx_aa;  // multipliers (percentage: 100.0 = normal)
+	double cx_rb, cx_gb, cx_bb, cx_ab;  // addends (0..255 range, 0 = normal)
+	int cx_overridden;                   // 1 if cx_* fields override cxform_data[]
+	// Timeline tracking
+	u8 sprite_needs_init;   // 1 if frame_0 needs to run this tick (NO_GRAPHICS)
+	size_t placed_at_frame; // frame index when this object was placed
 } DisplayObject;
+
+typedef struct KeyState {
+	uint8_t down[256];  // 1 if key currently held (indexed by ASCII/keyCode)
+	int last_key_down;  // keyCode of most recently pressed key (-1 if none)
+} KeyState;
 
 typedef struct MouseState {
 	float stage_x;      // Mouse X in twips (stage coordinates)
@@ -158,7 +170,6 @@ typedef struct MouseState {
 	int clicked;        // 1 if button was pressed this frame (edge)
 	int released;       // 1 if button was released this frame (edge)
 } MouseState;
-#endif
 
 // Macros for stack access via app_context
 #define STACK (app_context->stack)
@@ -211,10 +222,12 @@ typedef struct SWFAppContext
 	char* morph_end_color_data;
 	size_t morph_end_color_data_size;
 
-	MouseState mouse;
-
 	void* audio_ctx;  // AudioContext* (opaque to avoid header dependency)
 #endif
+
+	// Input state (works in both graphics and NO_GRAPHICS modes)
+	MouseState mouse;
+	KeyState keys;
 
 	// Heap management fields
 	O1HeapInstance* heap_instance;
@@ -246,11 +259,9 @@ extern size_t g_frame_count;
 extern int is_dragging;         // 1 if a sprite is being dragged, 0 otherwise
 extern char* dragged_target;    // Name of the target being dragged (or NULL)
 
-#ifndef NO_GRAPHICS
 extern Character* dictionary;
 
 extern DisplayObject* display_list;
 extern size_t max_depth;
-#endif
 
 void swfStart(SWFAppContext* app_context);

@@ -1,19 +1,54 @@
-#ifndef NO_GRAPHICS
-
 #include <swf.h>
 #include <tag.h>
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+#include <utils.h>
+
+#ifndef NO_GRAPHICS
 #include <hit_test.h>
 #include <renderer.h>
-#include <utils.h>
-#include <string.h>
-#include <math.h>
-
 extern RenderContext* context;
+#else
+// NO_GRAPHICS: extern data arrays from generated code
+extern float transform_data[][16];
+extern float cxform_data[];
+extern int catch_up_mode;
+#include <action.h>
+#endif
 
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
 size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 
 // Note: tagInit() is provided by the generated tagMain.c file
+
+#ifdef NO_GRAPHICS
+// Tracks the currently-executing sprite's DisplayObject.
+// Set by advance_sprite_frames before each sprite frame function call.
+DisplayObject* g_current_sprite_obj = NULL;
+
+// Execute a sprite frame function with correct MC context and g_current_sprite_obj.
+static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
+{
+	DisplayObject* saved = g_current_sprite_obj;
+	g_current_sprite_obj = obj;
+
+	MovieClip* saved_ctx = g_current_context;
+	if (obj->instance_name != NULL)
+	{
+		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
+		if (mc) actionSetCurrentContext(mc);
+	}
+
+	f(app_context);
+
+	actionSetCurrentContext(saved_ctx);
+	g_current_sprite_obj = saved;
+}
+#define CALL_FRAME(app, obj, f) exec_sprite_frame(app, obj, f)
+#else
+#define CALL_FRAME(app, obj, f) (f)(app)
+#endif
 
 // ---------------------------------------------------------------------------
 // Helper 1: Advance sprite timelines recursively
@@ -21,8 +56,12 @@ size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
-static void advance_sprite_frames(SWFAppContext* app_context)
+void advance_sprite_frames(SWFAppContext* app_context)
 {
+#ifdef NO_GRAPHICS
+	if (catch_up_mode) return;
+#endif
+
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		DisplayObject* obj = &display_list[i];
@@ -76,7 +115,7 @@ static void advance_sprite_frames(SWFAppContext* app_context)
 					for (size_t f = 0; f <= target; f++)
 					{
 						if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
-							ch->sprite_frame_funcs[f](app_context);
+							CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
 					}
 
 					// Recurse nested sprites
@@ -104,7 +143,7 @@ static void advance_sprite_frames(SWFAppContext* app_context)
 					for (size_t f = frame + 1; f <= target; f++)
 					{
 						if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
-							ch->sprite_frame_funcs[f](app_context);
+							CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
 					}
 
 					advance_sprite_frames(app_context);
@@ -152,7 +191,7 @@ static void advance_sprite_frames(SWFAppContext* app_context)
 		// Execute current frame function
 		if (frame < ch->sprite_frame_count && ch->sprite_frame_funcs[frame] != NULL)
 		{
-			ch->sprite_frame_funcs[frame](app_context);
+			CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[frame]);
 		}
 
 		// Recurse: advance nested sprites within this sprite's display list
@@ -173,6 +212,7 @@ static void advance_sprite_frames(SWFAppContext* app_context)
 	}
 }
 
+#ifndef NO_GRAPHICS
 // ---------------------------------------------------------------------------
 // Helper 2: Recursive transform composition for sprite/button children
 // ---------------------------------------------------------------------------
@@ -417,16 +457,76 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		}
 	}
 }
+#endif // NO_GRAPHICS
 
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 {
+#ifndef NO_GRAPHICS
 	renderer_set_background(context, red, green, blue);
+#else
+	(void)red; (void)green; (void)blue;
+#endif
 }
 
 void tagShowFrame(SWFAppContext* app_context)
 {
+#ifdef NO_GRAPHICS
+	// --- Run initial frame 0 with scripts for newly placed sprites ---
+	// (sprite_needs_init=1 was set by ng_on_place_object2 after the bounds-only pre-run)
+	{
+		int saved_catch_up = catch_up_mode;
+		catch_up_mode = 0;
+		for (size_t i = 1; i <= max_depth; i++)
+		{
+			DisplayObject* obj = &display_list[i];
+			if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
+			Character* ch = &dictionary[obj->char_id];
+			if (ch->type != CHAR_TYPE_SPRITE) continue;
+
+			obj->sprite_needs_init = 0;
+
+			// Context swap to sprite's display list
+			DisplayObject* saved_dl = display_list;
+			size_t saved_max = max_depth;
+			size_t saved_cap = display_list_capacity;
+
+			display_list = obj->sprite_display_list;
+			max_depth = obj->sprite_max_depth;
+			display_list_capacity = obj->sprite_dl_capacity;
+
+			// Run frame 0 WITH scripts (catch_up_mode=0)
+			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+				CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+
+			// Save back (pointer may change from realloc)
+			obj->sprite_display_list = display_list;
+			obj->sprite_max_depth = max_depth;
+			obj->sprite_dl_capacity = display_list_capacity;
+
+			display_list = saved_dl;
+			max_depth = saved_max;
+			display_list_capacity = saved_cap;
+
+			// Fire onLoad clip actions for newly initialized sprites
+			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
+			{
+				MovieClip* saved_ctx = g_current_context;
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
+				if (mc) actionSetCurrentContext(mc);
+				for (size_t a = 0; a < obj->clip_action_count; a++)
+				{
+					if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
+						obj->clip_actions[a].action(app_context);
+				}
+				actionSetCurrentContext(saved_ctx);
+			}
+		}
+		catch_up_mode = saved_catch_up;
+	}
+#else
 	// --- Advance sprite timelines (recursive) ---
 	advance_sprite_frames(app_context);
+#endif
 
 	// --- Dispatch onEnterFrame clip actions ---
 	for (size_t i = 1; i <= max_depth; ++i)
@@ -446,15 +546,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Button hit testing + state machine + action dispatch ---
 	// Must run BEFORE transform composition so the pre-render pass
 	// composes transforms for the correct (updated) button state.
+#ifndef NO_GRAPHICS
 	// Iterate front-to-back (highest depth first). The first button that hits
 	// gets the over/down state; all others stay in up state.
-	//
-	// BUTTONCONDACTION condition bits:
-	//   Bit 0: IdleToOverDown       Bit 4: OverDownToOverUp (click/release)
-	//   Bit 1: OutDownToIdle        Bit 5: OverUpToOverDown (press)
-	//   Bit 2: OutDownToOverDown    Bit 6: OverUpToIdle (mouse leave)
-	//   Bit 3: OverDownToOutDown    Bit 7: IdleToOverUp (mouse enter)
-	//   Bit 8: OverDownToIdle
 	{
 		int found_hover = 0;
 		for (size_t i = max_depth; i >= 1; i--)
@@ -747,21 +841,32 @@ void tagShowFrame(SWFAppContext* app_context)
 	}
 
 	renderer_close_pass(context);
+#endif // NO_GRAPHICS
 }
 
-void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size)
+void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id,
+    size_t shape_offset, size_t shape_size,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
+	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = type;
 	dictionary[char_id].shape_offset = shape_offset;
 	dictionary[char_id].size = shape_size;
+
+#ifdef NO_GRAPHICS
+	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
+#else
+	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
+#endif
 }
 
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count)
 {
+	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = CHAR_TYPE_MORPH_SHAPE;
@@ -774,6 +879,7 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id)
 {
+	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = CHAR_TYPE_TEXT;
@@ -790,12 +896,40 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
+#ifdef NO_GRAPHICS
+	ng_record_textfield_props(app_context, char_id, plain_text, raw_html_text, text_color,
+		font_id, font_height, max_length,
+		align, left_margin, right_margin, indent, leading,
+		variable_name, flags,
+		bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
+#else
 	// Graphics mode doesn't need separate EditText properties tracking
 	(void)app_context; (void)char_id; (void)plain_text; (void)raw_html_text;
 	(void)text_color; (void)font_id; (void)font_height; (void)max_length;
 	(void)align; (void)left_margin; (void)right_margin; (void)indent;
 	(void)leading; (void)variable_name; (void)flags;
 	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
+#endif
+}
+
+void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
+    float thickness, float sharpness)
+{
+#ifdef NO_GRAPHICS
+	ng_record_csm(text_id, anti_alias_type, grid_fit_type, thickness, sharpness);
+#else
+	(void)text_id; (void)anti_alias_type; (void)grid_fit_type;
+	(void)thickness; (void)sharpness;
+#endif
+}
+
+// Initialize cx_* fields of a display object to identity color transform.
+// Multipliers are in percentage format (100.0 = 100% = identity).
+static void init_cx_fields(DisplayObject* obj)
+{
+	obj->cx_ra = obj->cx_ga = obj->cx_ba = obj->cx_aa = 100.0;
+	obj->cx_rb = obj->cx_gb = obj->cx_bb = obj->cx_ab = 0.0;
+	obj->cx_overridden = 0;
 }
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
@@ -807,6 +941,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
+	display_list[depth].ratio = 0;
 	display_list[depth].blend_mode = 0;
 	display_list[depth].sprite_display_list = NULL;
 	display_list[depth].sprite_max_depth = 0;
@@ -816,14 +951,26 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].sprite_manual_next_frame = 0;
 	display_list[depth].sprite_next_frame = 0;
 	display_list[depth].instance_name = NULL;
+	display_list[depth].instance_name_owned = 0;
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
+	display_list[depth].button_state = 0;
+	display_list[depth].button_prev_state = 0;
+	display_list[depth].sprite_needs_init = 0;
+	display_list[depth].placed_at_frame = current_frame;
+	init_cx_fields(&display_list[depth]);
 
 	if (depth > max_depth)
 	{
 		max_depth = depth;
 	}
+
+#ifdef NO_GRAPHICS
+	ng_on_place_object2(app_context, depth, char_id);
+#else
+	(void)app_context;
+#endif
 }
 
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
@@ -863,19 +1010,53 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].sprite_manual_next_frame = 0;
 	display_list[depth].sprite_next_frame = 0;
 	display_list[depth].instance_name = NULL;
+	display_list[depth].instance_name_owned = 0;
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
+	display_list[depth].button_state = 0;
+	display_list[depth].button_prev_state = 0;
+	display_list[depth].sprite_needs_init = 0;
+	display_list[depth].placed_at_frame = current_frame;
+	init_cx_fields(&display_list[depth]);
 
 	if (depth > max_depth)
 	{
 		max_depth = depth;
 	}
+
+#ifdef NO_GRAPHICS
+	ng_on_place_object2(app_context, depth, char_id);
+#else
+	(void)app_context;
+#endif
+}
+
+static void clear_display_entry(size_t depth)
+{
+	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
+	{
+		free(display_list[depth].instance_name);
+	}
+	if (display_list[depth].sprite_display_list != NULL)
+	{
+		free(display_list[depth].sprite_display_list);
+		display_list[depth].sprite_display_list = NULL;
+	}
+	display_list[depth].char_id = 0;
+	display_list[depth].transform_id = 0;
+	display_list[depth].cxform_id = 0;
+	display_list[depth].has_cxform = 0;
+	display_list[depth].clip_depth = 0;
+	display_list[depth].instance_name = NULL;
+	display_list[depth].instance_name_owned = 0;
+	display_list[depth].clip_actions = NULL;
+	display_list[depth].clip_action_count = 0;
 }
 
 void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
-	if (depth <= max_depth)
+	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
 		// Dispatch onUnload clip actions before clearing
 		if (display_list[depth].clip_action_count > 0)
@@ -886,25 +1067,28 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 					display_list[depth].clip_actions[a].action(app_context);
 			}
 		}
-		if (display_list[depth].sprite_display_list != NULL)
-		{
-			free(display_list[depth].sprite_display_list);
-			display_list[depth].sprite_display_list = NULL;
-		}
-		display_list[depth].char_id = 0;
-		display_list[depth].transform_id = 0;
-		display_list[depth].cxform_id = 0;
-		display_list[depth].has_cxform = 0;
-		display_list[depth].clip_depth = 0;
-		display_list[depth].clip_actions = NULL;
-		display_list[depth].clip_action_count = 0;
+#ifdef NO_GRAPHICS
+		ng_on_remove_object(app_context, depth);
+#endif
+		clear_display_entry(depth);
 	}
+#ifndef NO_GRAPHICS
+	(void)app_context;
+#endif
 }
 
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
-	if (depth <= max_depth)
+	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
+#ifdef NO_GRAPHICS
+		// During backward catch-up, protect entries placed at or before the target frame.
+		// They're part of the preserved state and will be re-established by replay.
+		extern int catch_up_backward;
+		extern size_t catch_up_target;
+		if (catch_up_backward && display_list[depth].placed_at_frame <= catch_up_target)
+			return;
+#endif
 		// Dispatch onUnload clip actions before clearing
 		if (display_list[depth].clip_action_count > 0)
 		{
@@ -914,23 +1098,19 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 					display_list[depth].clip_actions[a].action(app_context);
 			}
 		}
-		if (display_list[depth].sprite_display_list != NULL)
-		{
-			free(display_list[depth].sprite_display_list);
-			display_list[depth].sprite_display_list = NULL;
-		}
-		display_list[depth].char_id = 0;
-		display_list[depth].transform_id = 0;
-		display_list[depth].cxform_id = 0;
-		display_list[depth].has_cxform = 0;
-		display_list[depth].clip_depth = 0;
-		display_list[depth].clip_actions = NULL;
-		display_list[depth].clip_action_count = 0;
+#ifdef NO_GRAPHICS
+		ng_on_remove_object(app_context, depth);
+#endif
+		clear_display_entry(depth);
 	}
+#ifndef NO_GRAPHICS
+	(void)app_context;
+#endif
 }
 
 void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
 {
+	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = CHAR_TYPE_SPRITE;
@@ -940,6 +1120,7 @@ void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* fun
 
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count)
 {
+	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = CHAR_TYPE_BUTTON;
@@ -948,6 +1129,10 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 	dictionary[char_id].button_hit_transform_id = hit_transform_id;
 	dictionary[char_id].button_actions = actions;
 	dictionary[char_id].button_action_count = action_count;
+
+#ifdef NO_GRAPHICS
+	ng_record_button(char_id);
+#endif
 }
 
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
@@ -998,7 +1183,19 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 	(void)app_context;
 	if (depth <= max_depth)
 	{
+		char* old_name = display_list[depth].instance_name;
+		// Rename cached MC if it was previously given a different name (e.g. auto-assigned)
+#ifdef NO_GRAPHICS
+		if (old_name != NULL && strcmp(old_name, name) != 0)
+			actionRenameMovieClip(old_name, name);
+#endif
+		// Free auto-assigned name if we own it
+		if (display_list[depth].instance_name_owned && old_name != NULL)
+		{
+			free(old_name);
+		}
 		display_list[depth].instance_name = (char*)name;
+		display_list[depth].instance_name_owned = 0;
 	}
 }
 
@@ -1014,6 +1211,61 @@ DisplayObject* findDisplayObjectByName(const char* name)
 	return NULL;
 }
 
+void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
+{
+#ifdef NO_GRAPHICS
+	ng_record_font(app_context, font_id, name, bold, italic);
+#else
+	(void)app_context; (void)font_id; (void)name; (void)bold; (void)italic;
+#endif
+}
+
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
+{
+#ifdef NO_GRAPHICS
+	ng_record_video(app_context, char_id);
+#else
+	(void)app_context; (void)char_id;
+#endif
+}
+
+#ifdef NO_GRAPHICS
+// Returns 1 if any multi-frame sprite at root level is playing.
+int hasPlayingSprites(void)
+{
+	for (size_t i = 1; i <= max_depth; i++)
+	{
+		if (display_list[i].char_id == 0) continue;
+		Character* ch = &dictionary[display_list[i].char_id];
+		if (ch->type == CHAR_TYPE_SPRITE &&
+		    ch->sprite_frame_count > 1 &&
+		    display_list[i].sprite_is_playing)
+			return 1;
+	}
+	return 0;
+}
+
+// Clear display entries whose placed_at_frame is after target_frame.
+// Used by swf_core.c when seeking backward on the main timeline.
+void ng_display_clear_after(size_t target_frame)
+{
+	for (size_t i = 1; i <= max_depth; i++)
+	{
+		if (display_list[i].char_id != 0 &&
+		    display_list[i].placed_at_frame > target_frame)
+		{
+			if (display_list[i].sprite_display_list != NULL)
+			{
+				free(display_list[i].sprite_display_list);
+				display_list[i].sprite_display_list = NULL;
+			}
+			display_list[i].char_id = 0;
+		}
+	}
+}
+#endif // NO_GRAPHICS
+
+#ifndef NO_GRAPHICS
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
 {
 	renderer_upload_bitmap(context, offset, size, width, height);
@@ -1023,5 +1275,4 @@ void finalizeBitmaps()
 {
 	renderer_finalize_bitmaps(context);
 }
-
 #endif // NO_GRAPHICS
