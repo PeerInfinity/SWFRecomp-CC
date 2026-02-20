@@ -11514,6 +11514,47 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		installAsBroadcaster(app_context, g_key_obj);
 		installAsBroadcaster(app_context, g_stage_obj);
 		installAsBroadcaster(app_context, g_selection_obj);
+
+		// Also install addListener/removeListener/broadcastMessage on AsBroadcaster itself
+		// and on MovieClipLoader.prototype (both are AsBroadcaster-initialized in Flash).
+		// This ensures AsBroadcaster.addListener === Mouse.addListener (same func pointer).
+		// Note: the test compares mcl.addListener (instance) vs ab.addListener (AsBroadcaster
+		// constructor), so MCL methods go on prototype_obj while AB methods go on own_props.
+		initAsBroadcasterFuncs(app_context);
+		{
+			ActionVar fv = {0};
+			fv.type = ACTION_STACK_VALUE_FUNCTION;
+
+			// AsBroadcaster (stub_ctors[0]) — install on own_props so AsBroadcaster.addListener works
+			if (g_stub_ctors[0].own_props == NULL) {
+				g_stub_ctors[0].own_props = allocObject(app_context, 4);
+				retainObject(g_stub_ctors[0].own_props);
+			}
+			fv.data.numeric_value = (u64)&g_ab_addListener_func;
+			setProperty(app_context, g_stub_ctors[0].own_props, "addListener", 11, &fv);
+			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+			setProperty(app_context, g_stub_ctors[0].own_props, "removeListener", 14, &fv);
+			fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+			setProperty(app_context, g_stub_ctors[0].own_props, "broadcastMessage", 16, &fv);
+
+			// MovieClipLoader (stub_ctors[9]) — pre-create prototype and install methods there
+			// so that MCL instances (var mcl = new MovieClipLoader()) inherit them.
+			if (g_stub_ctors[9].prototype_obj == NULL) {
+				g_stub_ctors[9].prototype_obj = allocObject(app_context, 8);
+				retainObject(g_stub_ctors[9].prototype_obj);
+				setObjectProto(app_context, g_stub_ctors[9].prototype_obj);
+				ActionVar ctor_var = {0};
+				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+				ctor_var.data.numeric_value = (u64)&g_stub_ctors[9];
+				setProperty(app_context, g_stub_ctors[9].prototype_obj, "constructor", 11, &ctor_var);
+			}
+			fv.data.numeric_value = (u64)&g_ab_addListener_func;
+			setProperty(app_context, g_stub_ctors[9].prototype_obj, "addListener", 11, &fv);
+			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+			setProperty(app_context, g_stub_ctors[9].prototype_obj, "removeListener", 14, &fv);
+			fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+			setProperty(app_context, g_stub_ctors[9].prototype_obj, "broadcastMessage", 16, &fv);
+		}
 	}
 
 	// ---- valueOf on _global ----
@@ -12113,9 +12154,10 @@ void actionGetVariable(SWFAppContext* app_context)
 				VAL(u64, &caps_var.data.numeric_value) = (u64)caps_obj;
 				setProperty(app_context, system_object, "capabilities", 12, &caps_var);
 
-				// System.IME (stub object)
+				// System.IME (AsBroadcaster-initialized object)
 				ASObject* ime_obj = allocObject(app_context, 4);
 				setObjectProto(app_context, ime_obj);
+				installAsBroadcaster(app_context, ime_obj);
 				ActionVar ime_var = {0};
 				ime_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
@@ -16665,6 +16707,9 @@ void actionGetMember(SWFAppContext* app_context)
 
 void actionNewObject(SWFAppContext* app_context)
 {
+	// Ensure globals (Object, Array, stub ctors, etc.) are initialized before any new X() call
+	ensureGlobalInit(app_context);
+
 	// 1. Pop constructor name (string)
 	ActionVar ctor_name_var;
 	popVar(app_context, &ctor_name_var);
