@@ -437,9 +437,12 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return;
-	// Invalidate cached MovieClip so re-placement gets fresh properties
-	if (display_list[depth].instance_name != NULL)
+	if (display_list[depth].instance_name != NULL) {
+		// Fire AS-set onUnload handler BEFORE invalidating the MC's dynamic_props
+		actionFireOnUnload(app_context, display_list[depth].instance_name);
+		// Invalidate cached MovieClip so re-placement gets fresh properties
 		actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name);
+	}
 }
 
 // ---------------------------------------------------------------------------

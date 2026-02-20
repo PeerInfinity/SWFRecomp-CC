@@ -133,6 +133,10 @@ typedef struct DisplayObject
 	// Clip actions (PlaceObject2 HasClipActions)
 	ClipAction* clip_actions;
 	size_t clip_action_count;
+	// Accumulated clip actions from a prior Remove that was immediately followed by a Re-place
+	// at the same depth in the same frame. Fired before clip_actions on the next removal.
+	ClipAction* accumulated_clip_actions;
+	size_t accumulated_clip_action_count;
 	// Visual filter (PlaceObject3 FilterList)
 	u8 filter_type;       // 0=none, 1=blur, 2=drop_shadow, 3=glow, 4=bevel
 	u8 filter_quality;    // blur passes (1-3)

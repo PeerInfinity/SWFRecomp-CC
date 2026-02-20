@@ -40,6 +40,12 @@ void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char*
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth);
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio);
+void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count);
+void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio,
+    ClipAction* old_clip_actions, size_t old_clip_action_count,
+    ClipAction* new_clip_actions, size_t new_clip_action_count);
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count);
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,

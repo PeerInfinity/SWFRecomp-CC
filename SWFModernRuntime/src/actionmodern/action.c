@@ -8084,6 +8084,71 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 	}
 }
 
+// Fire the AS-set onUnload handler on a MovieClip being removed from the display list.
+// Called by ng_on_remove_object (tag_stubs.c) BEFORE actionInvalidateCachedMovieClip,
+// so that dynamic_props is still intact when we look up the handler.
+// This is SYNCHRONOUS — used for timeline clips removed by tagRemoveObject2.
+void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name)
+{
+	if (instance_name == NULL || instance_name[0] == '\0') return;
+	if (g_execution_halted) return;
+
+	// Find the MC by name in the cache
+	MovieClip* target_mc = NULL;
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL && strcmp(child_mc_cache[i]->name, instance_name) == 0) {
+			target_mc = child_mc_cache[i];
+			break;
+		}
+	}
+	if (target_mc == NULL || target_mc->dynamic_props == NULL) return;
+
+	// Look up "onUnload" property on the MC's dynamic_props
+	ActionVar* handler = getProperty((ASObject*)target_mc->dynamic_props, "onUnload", 8);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+
+	ASFunction* func = (ASFunction*) handler->data.numeric_value;
+	if (func == NULL) return;
+
+	// Set context to the MC and invoke the handler with no arguments
+	MovieClip* saved_context = g_current_context;
+	actionSetCurrentContext(target_mc);
+	invokeSpecialFunction(app_context, func, NULL);
+	actionSetCurrentContext(saved_context);
+}
+
+// --- Deferred onUnload queue ---
+// When removeMovieClip/actionRemoveSprite removes a dynamic clip, the AS-set onUnload
+// handler is queued here and fired at ShowFrame time (between frames), matching Flash.
+#define MAX_PENDING_UNLOADS 64
+typedef struct { ASFunction* func; MovieClip* mc; } PendingUnload;
+static PendingUnload g_pending_unloads[MAX_PENDING_UNLOADS];
+static int g_pending_unload_count = 0;
+
+// Enqueue an onUnload handler to fire at next ShowFrame.
+static void queueOnUnload(ASFunction* func, MovieClip* mc)
+{
+	if (g_pending_unload_count < MAX_PENDING_UNLOADS) {
+		g_pending_unloads[g_pending_unload_count].func = func;
+		g_pending_unloads[g_pending_unload_count].mc   = mc;
+		g_pending_unload_count++;
+	}
+}
+
+// Fire all queued onUnload handlers (called from tagShowFrame in tag.c).
+void actionFirePendingUnloads(SWFAppContext* app_context)
+{
+	int count = g_pending_unload_count;
+	g_pending_unload_count = 0;  // reset first (handlers may queue more)
+	for (int i = 0; i < count; i++) {
+		if (g_execution_halted) break;
+		MovieClip* saved = g_current_context;
+		actionSetCurrentContext(g_pending_unloads[i].mc);
+		invokeSpecialFunction(app_context, g_pending_unloads[i].func, NULL);
+		actionSetCurrentContext(saved);
+	}
+}
+
 #ifdef NO_GRAPHICS
 // Rename a MovieClip in the cache (called after tagSetInstanceName updates ng_display).
 // Updates the MC's name and target path to reflect the new name.
@@ -18817,11 +18882,50 @@ void actionRemoveSprite(SWFAppContext* app_context)
 	printf("[RemoveSprite] Graphics mode stub: would remove %s\n", target_name);
 	#endif
 	#else
-	// NO_GRAPHICS mode: This is a complete no-op
-	// There's no display list to remove from
-	#ifdef DEBUG
-	printf("[RemoveSprite] %s\n", target_name);
-	#endif
+	// NO_GRAPHICS mode: find the clip by name and remove it if dynamically created
+	{
+		MovieClip* _rs_mc = NULL;
+		for (int _rs_i = 0; _rs_i < child_mc_count; _rs_i++) {
+			if (child_mc_cache[_rs_i] != NULL &&
+			    strcmp(child_mc_cache[_rs_i]->name, target_name) == 0) {
+				_rs_mc = child_mc_cache[_rs_i];
+				break;
+			}
+		}
+		if (_rs_mc != NULL && _rs_mc->depth >= 0) {
+			// Queue AS-set onUnload handler for deferred firing at ShowFrame
+			if (_rs_mc->dynamic_props != NULL) {
+				ActionVar* _rs_handler = getProperty((ASObject*)_rs_mc->dynamic_props, "onUnload", 8);
+				if (_rs_handler != NULL && _rs_handler->type == ACTION_STACK_VALUE_FUNCTION) {
+					ASFunction* _rs_func = (ASFunction*) _rs_handler->data.numeric_value;
+					if (_rs_func != NULL)
+						queueOnUnload(_rs_func, _rs_mc);
+				}
+			}
+			// Clear from parent's dynamic_props
+			MovieClip* _rs_parent = _rs_mc->parent ? _rs_mc->parent : &root_movieclip;
+			if (_rs_parent->dynamic_props != NULL && _rs_mc->name[0]) {
+				ActionVar _rs_undef = {0};
+				_rs_undef.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, (ASObject*)_rs_parent->dynamic_props,
+				            _rs_mc->name, strlen(_rs_mc->name), &_rs_undef);
+			}
+			// Also clear from root-level variable table (set by createEmptyMovieClip)
+			if (_rs_mc->name[0]) {
+				ActionVar _rs_undef = {0};
+				_rs_undef.type = ACTION_STACK_VALUE_UNDEFINED;
+				setVariableByName(_rs_mc->name, &_rs_undef);
+			}
+			// Mark as removed — keep dynamic_props intact until pending unload fires
+			_rs_mc->depth = INT_MIN;
+			for (int _rs_j = 0; _rs_j < child_mc_count; _rs_j++) {
+				if (child_mc_cache[_rs_j] == _rs_mc) {
+					child_mc_cache[_rs_j] = NULL;
+					break;
+				}
+			}
+		}
+	}
 	#endif
 }
 
@@ -24251,6 +24355,50 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 7 && strncmp(method_name, "endFill", 7) == 0)
 		{
 			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 15 && strncmp(method_name, "removeMovieClip", 15) == 0)
+		{
+			if (args != NULL) FREE(args);
+#ifdef NO_GRAPHICS
+			// Only dynamically-created clips (AS depth >= 0) can be removed.
+			// Timeline-placed clips (negative depth) are immune to removeMovieClip.
+			if (mc != NULL && mc->depth >= 0) {
+				// Queue onUnload handler for deferred firing at ShowFrame (matches Flash behavior)
+				if (mc->dynamic_props != NULL) {
+					ActionVar* _rmc_handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+					if (_rmc_handler != NULL && _rmc_handler->type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* _rmc_func = (ASFunction*) _rmc_handler->data.numeric_value;
+						if (_rmc_func != NULL)
+							queueOnUnload(_rmc_func, mc);
+					}
+				}
+				// Clear the variable from parent's dynamic_props
+				MovieClip* _rmc_parent = mc->parent ? mc->parent : &root_movieclip;
+				if (_rmc_parent->dynamic_props != NULL && mc->name[0]) {
+					ActionVar _rmc_undef = {0};
+					_rmc_undef.type = ACTION_STACK_VALUE_UNDEFINED;
+					setProperty(app_context, (ASObject*)_rmc_parent->dynamic_props,
+					            mc->name, strlen(mc->name), &_rmc_undef);
+				}
+				// Also clear from root-level variable table (set by createEmptyMovieClip)
+				if (mc->name[0]) {
+					ActionVar _rmc_undef = {0};
+					_rmc_undef.type = ACTION_STACK_VALUE_UNDEFINED;
+					setVariableByName(mc->name, &_rmc_undef);
+				}
+				// Mark as removed — keep dynamic_props intact until pending unload fires
+				mc->depth = INT_MIN;
+				// Remove from child_mc_cache
+				for (int _rmc_i = 0; _rmc_i < child_mc_count; _rmc_i++) {
+					if (child_mc_cache[_rmc_i] == mc) {
+						child_mc_cache[_rmc_i] = NULL;
+						break;
+					}
+				}
+			}
+#endif
 			pushUndefined(app_context);
 			return;
 		}
