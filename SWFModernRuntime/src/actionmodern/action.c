@@ -11631,6 +11631,48 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 	}
 }
 
+// Dispatch root-timeline onEnterFrame stored in the global var_map
+// (set via DefineFunction or SetVariable, NOT via SetMember on dynamic_props).
+// Called from swf_core.c's past-frame-list else_if branch.
+void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context)
+{
+	extern MovieClip root_movieclip;
+	ActionVar* ef_var = getVariable("onEnterFrame", 12);
+	if (ef_var == NULL || ef_var->type != ACTION_STACK_VALUE_FUNCTION)
+		return;
+
+	// Avoid double-firing when dynamic_props also has an onEnterFrame handler
+	// (that case is already handled by actionDispatchEnterFrameHandlers).
+	if (root_movieclip.dynamic_props != NULL)
+	{
+		ASObject* rp = (ASObject*) root_movieclip.dynamic_props;
+		ActionVar* dp_ef = getProperty(rp, "onEnterFrame", 12);
+		if (dp_ef != NULL && dp_ef->type == ACTION_STACK_VALUE_FUNCTION)
+			return;
+	}
+
+	ASFunction* func = (ASFunction*) ef_var->data.numeric_value;
+	if (func == NULL) return;
+
+	MovieClip* saved_ctx = g_current_context;
+	if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		ActionVar this_av = {0};
+		this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_av.data.numeric_value = (u64)&root_movieclip;
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+		func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
+		if (regs != NULL) FREE(regs);
+	}
+	else if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+	}
+	actionSetCurrentContext(saved_ctx);
+}
+
 // Dispatch onKeyDown/onKeyUp to all Key listeners.
 // Called from swf_core.c after delivering a key event.
 void actionDispatchKeyDown(SWFAppContext* app_context)

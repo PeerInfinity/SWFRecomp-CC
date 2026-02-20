@@ -289,6 +289,8 @@ void actionDispatchKeyUp(SWFAppContext* app_context);
 // for any MovieClip that has the property set. Iterates cache in reverse creation order
 // (front-to-back: higher depth fires first) to match Flash's dispatch order.
 void actionDispatchEnterFrameHandlers(SWFAppContext* app_context);
+// Dispatch root timeline onEnterFrame stored in var_map (DefineFunction/SetVariable path).
+void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context);
 
 #ifdef NO_GRAPHICS
 // AS2 MC event dispatch — called from swf_core.c on mouse events.

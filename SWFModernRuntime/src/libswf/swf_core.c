@@ -173,6 +173,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             g_drag_virt_x = ms->stage_x;
             g_drag_virt_y = ms->stage_y;
         }
+        // Run per-event button state machine (before MC mouse move dispatch)
+        ng_update_button_states(app_context);
         // Dispatch AS2 roll/drag over/out events to dynamic MCs
         actionDispatchMCMouseMove(app_context);
         break;
@@ -185,6 +187,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         app_context->keys.toggled[1] ^= 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
+        // Run per-event button state machine (processes OverUpToOverDown = press)
+        ng_update_button_states(app_context);
         dispatch_clip_event_press(app_context);
         // Dispatch AS2 onPress to dynamic MCs
         actionDispatchMCPress(app_context);
@@ -196,6 +200,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ms->released = 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
+        // Run per-event button state machine (processes OverDownToOverUp = release)
+        ng_update_button_states(app_context);
         dispatch_clip_event_release(app_context);
         // Dispatch AS2 onRelease/onReleaseOutside to dynamic MCs
         actionDispatchMCRelease(app_context);
@@ -325,6 +331,29 @@ void swfStart(SWFAppContext* app_context)
 				{
 					printf("No function for frame %zu, stopping.\n", current_frame);
 					break;
+				}
+			}
+		}
+		else if (g_events && g_event_pos < g_event_count)
+		{
+			// Past the last frame but input events remain (e.g. single-frame SWF with
+			// quit_swf=1 and 75 input ticks).  Keep dispatching per-tick AS handlers
+			// so that onEnterFrame, sprite timelines, and clip ENTER_FRAME events
+			// continue to fire on every tick while events are being consumed.
+			advance_sprite_frames(app_context);
+			actionDispatchEnterFrameHandlers(app_context);
+			// Also dispatch root onEnterFrame set via DefineFunction/SetVariable
+			// (stored in var_map, not dynamic_props — not reached by the function above).
+			actionDispatchRootVarMapEnterFrame(app_context);
+			// Dispatch onClipEvent(enterFrame) clip actions
+			for (size_t _fi = 1; _fi <= max_depth; _fi++)
+			{
+				DisplayObject* _obj = &display_list[_fi];
+				if (_obj->char_id == 0 || _obj->clip_action_count == 0) continue;
+				for (size_t _a = 0; _a < _obj->clip_action_count; _a++)
+				{
+					if (_obj->clip_actions[_a].event_flags & CLIP_EVENT_ENTER_FRAME)
+						_obj->clip_actions[_a].action(app_context);
 				}
 			}
 		}

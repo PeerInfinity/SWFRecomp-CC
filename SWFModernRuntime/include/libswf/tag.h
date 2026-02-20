@@ -8,6 +8,9 @@ void tagInit(SWFAppContext* app_context);
 // Dispatch button key-press conditions for a given key code.
 // Called from swf_core.c after delivering EV_KEY_DOWN.
 void dispatch_button_key_actions(SWFAppContext* app_context, int key_code);
+// Run button hit-test + state machine + action dispatch for current mouse state.
+// In NO_GRAPHICS mode called per mouse event; in graphics mode called from tagShowFrame.
+void ng_update_button_states(SWFAppContext* app_context);
 #ifdef NO_GRAPHICS
 // Dispatch CLIP_EVENT_PRESS for all sprites whose hit area contains the mouse.
 // Called from swf_core.c on EV_MOUSE_DOWN_LEFT.
