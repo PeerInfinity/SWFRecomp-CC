@@ -33,6 +33,11 @@ DisplayObject* g_current_sprite_obj = NULL;
 // without disturbing the display list already set up in Phase 1 (eager init).
 static int g_script_only_mode = 0;
 
+// g_settarget_explicit_root: set by actionSetTarget("_root"/"") to distinguish
+// "goto root" from "goto unnamed sprite with inherited root context".
+// Declared in action.c; saved/cleared/restored here per sprite-frame invocation.
+extern int g_settarget_explicit_root;
+
 // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
 static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
 {
@@ -46,8 +51,13 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 		if (mc) actionSetCurrentContext(mc);
 	}
 
+	// Each sprite frame starts with a fresh SetTarget state (no explicit root target)
+	int saved_settarget = g_settarget_explicit_root;
+	g_settarget_explicit_root = 0;
+
 	f(app_context);
 
+	g_settarget_explicit_root = saved_settarget;
 	actionSetCurrentContext(saved_ctx);
 	g_current_sprite_obj = saved;
 }

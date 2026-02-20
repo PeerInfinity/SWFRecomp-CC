@@ -8673,6 +8673,14 @@ static void setCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
 }
 
+#ifdef NO_GRAPHICS
+// Set when actionSetTarget() explicitly redirects to root ("_root" or "").
+// Allows actionGotoFrame() to distinguish "goto root" (deferred) vs
+// "goto sprite that has no instance name" (apply to sprite immediately).
+// Reset by exec_sprite_frame() at sprite-frame entry so each sprite starts fresh.
+int g_settarget_explicit_root = 0;
+#endif
+
 // Get the current execution context
 static MovieClip* getCurrentContext(void) {
 	return g_current_context ? g_current_context : &root_movieclip;
@@ -10969,7 +10977,28 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		return;
 	}
 #else
-	if (ng_isInsideSprite()) { ng_gotoFrameCurrentSprite(frame); return; }
+	extern int g_settarget_explicit_root;
+	if (ng_isInsideSprite()) {
+		if (g_settarget_explicit_root) {
+			// SetTarget("_root") was called — target is root.
+			// Defer root frame navigation; don't execute inline while inside sprite script.
+			extern size_t next_frame;
+			extern int manual_next_frame;
+			extern int is_playing;
+			extern size_t g_frame_count;
+			extern int goto_from_action;
+			if (frame < g_frame_count) {
+				goto_from_action = 1;
+				next_frame = frame;
+				manual_next_frame = 1;
+				is_playing = 0;
+				root_movieclip.currentframe = frame + 1;
+			}
+			return;
+		}
+		ng_gotoFrameCurrentSprite(frame);
+		return;
+	}
 #endif
 
 	extern size_t current_frame;
@@ -19023,9 +19052,15 @@ void actionRemoveSprite(SWFAppContext* app_context)
 
 void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
+#ifdef NO_GRAPHICS
+	extern int g_settarget_explicit_root;
+#endif
 	// Empty string or NULL means return to main timeline
 	if (!target_name || strlen(target_name) == 0) {
 		setCurrentContext(&root_movieclip);
+#ifdef NO_GRAPHICS
+		g_settarget_explicit_root = 1;
+#endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
 #endif
@@ -19035,6 +19070,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// Check for _root
 	if (strcmp(target_name, "_root") == 0 || strcmp(target_name, "/") == 0) {
 		setCurrentContext(&root_movieclip);
+#ifdef NO_GRAPHICS
+		g_settarget_explicit_root = 1;
+#endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
 #endif
@@ -19054,6 +19092,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	MovieClip* target_mc = getMovieClipByTarget(target_name);
 	if (target_mc) {
 		setCurrentContext(target_mc);
+#ifdef NO_GRAPHICS
+		g_settarget_explicit_root = 0;
+#endif
 		return;
 	}
 
@@ -19071,6 +19112,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name, &root_movieclip);
 		if (child_mc) {
 			setCurrentContext(child_mc);
+			g_settarget_explicit_root = 0;
 			return;
 		}
 	}
