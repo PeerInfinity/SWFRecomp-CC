@@ -5826,7 +5826,8 @@ static void initTextFormatPrototype(SWFAppContext* app_context);
 // If tf_idx < 0, returns a TextFormat with default values (for dynamic/non-EditText fields).
 // If is_new_text_format is true, always populates all properties (getNewTextFormat behavior).
 // If is_new_text_format is false, only populates if field has text (getTextFormat behavior).
-static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_idx, int has_text, int is_new_text_format) {
+// override_align: -1 = use tag-defined alignment; 0-3 = force left/right/center/justify.
+static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_idx, int has_text, int is_new_text_format, int override_align) {
 	initTextFormatPrototype(app_context);
 	ASObject* tf_obj = allocObject(app_context, 24);
 	if (g_textformat_constructor.prototype_obj != NULL) {
@@ -5858,12 +5859,15 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 	{
 		const uint16_t* align_u16 = u16_left;
 		u32 align_u16_len = 4;
-		if (tf_idx >= 0) {
-			u8 a = ng_getTextFieldAlign(tf_idx);
-			if (a == 1) { align_u16 = u16_right; align_u16_len = 5; }
-			else if (a == 2) { align_u16 = u16_center; align_u16_len = 6; }
-			else if (a == 3) { align_u16 = u16_justify; align_u16_len = 7; }
+		int a = 0; // default: left
+		if (override_align >= 0) {
+			a = override_align; // caller-computed HTML-aware alignment
+		} else if (tf_idx >= 0) {
+			a = (int) ng_getTextFieldAlign(tf_idx); // tag-defined alignment
 		}
+		if (a == 1) { align_u16 = u16_right; align_u16_len = 5; }
+		else if (a == 2) { align_u16 = u16_center; align_u16_len = 6; }
+		else if (a == 3) { align_u16 = u16_justify; align_u16_len = 7; }
 		val.type = ACTION_STACK_VALUE_STRING;
 		val.data.numeric_value = (u64) align_u16;
 		val.str_size = align_u16_len;
@@ -23783,7 +23787,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 			int has_text = force_null ? 0 : (text[0] != '\0');
-			ASObject* tf = createTextFormatFromField(app_context, tf_idx, has_text, 0);
+			// Compute HTML-aware alignment override (SWF7/SWF8 behavior differ)
+			int html_align_override = -1; // default: use tag-defined align
+			if (tf_idx >= 0) {
+				u16 tag_flags = ng_getTextFieldFlags(tf_idx);
+				int tag_html = (tag_flags & 0x0040) != 0;
+				int cur_html = tag_html; // default to tag init value
+				if (mc->dynamic_props != NULL) {
+					ActionVar* html_prop = getProperty((ASObject*) mc->dynamic_props, "html", 4);
+					if (html_prop != NULL && html_prop->type == ACTION_STACK_VALUE_BOOLEAN)
+						cur_html = html_prop->data.numeric_value ? 1 : 0;
+				}
+				if (g_swf_version <= 7) {
+					// SWF7: HTML mode active (from tag or script) → left alignment
+					if (cur_html || tag_html) html_align_override = 0; // left
+				} else {
+					// SWF8: only left when tag was HTML but script explicitly turned it off
+					if (tag_html && !cur_html) html_align_override = 0; // left
+				}
+			}
+			ASObject* tf = createTextFormatFromField(app_context, tf_idx, has_text, 0, html_align_override);
 			// Override color with current textColor from dynamic_props
 			if (has_text && mc->dynamic_props != NULL) {
 				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
@@ -23806,7 +23829,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 #ifdef NO_GRAPHICS
 			int tf_idx = mc->ng_textfield_idx;
-			ASObject* tf = createTextFormatFromField(app_context, tf_idx, 1, 1);
+			// Compute HTML-aware alignment override (SWF7/SWF8 behavior differ)
+			int html_align_override_ntf = -1; // default: use tag-defined align
+			if (tf_idx >= 0) {
+				u16 tag_flags_ntf = ng_getTextFieldFlags(tf_idx);
+				int tag_html_ntf = (tag_flags_ntf & 0x0040) != 0;
+				int cur_html_ntf = tag_html_ntf;
+				if (mc->dynamic_props != NULL) {
+					ActionVar* html_prop_ntf = getProperty((ASObject*) mc->dynamic_props, "html", 4);
+					if (html_prop_ntf != NULL && html_prop_ntf->type == ACTION_STACK_VALUE_BOOLEAN)
+						cur_html_ntf = html_prop_ntf->data.numeric_value ? 1 : 0;
+				}
+				if (g_swf_version <= 7) {
+					if (cur_html_ntf || tag_html_ntf) html_align_override_ntf = 0; // left
+				} else {
+					if (tag_html_ntf && !cur_html_ntf) html_align_override_ntf = 0; // left
+				}
+			}
+			ASObject* tf = createTextFormatFromField(app_context, tf_idx, 1, 1, html_align_override_ntf);
 			// Override color with current textColor from dynamic_props
 			if (mc->dynamic_props != NULL) {
 				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
