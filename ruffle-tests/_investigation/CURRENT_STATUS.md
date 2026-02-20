@@ -1,20 +1,21 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-19 (globals-plan: watch/unwatch, object_prototypes, parse_int, watch_virtual_property_proto, primitive_type_globals)
+Last updated: 2026-02-20 (input-event-injection phases 0.3-5 + as_broadcaster_initialize regression fix)
 
-Previous CI baseline: 213/619 (34.4%), commit b815da5 / CI run 480bce0
+Previous CI baseline: 227/619 (36.7%), commit d71ead7
 
 ## Quick Summary
 
-- **Pass rate (estimated local)**: ~234+/619 — adds `watch`, `watch_virtual_property_proto`, `object_prototypes`, `parse_int`, `primitive_type_globals` (+5 tests from this session)
-- **Main failure type**: output_mismatch, timeout (2), segfault (1) — compile_fail regression resolved
-- **Resolved regression**: `movieclip_hittest_shapeflag` compile_fail fixed, back to MISMATCH (180/338)
-- **Recent gains**: `watch`/`unwatch` implemented; `object_prototypes` now fully passes; `parse_int` unblocked; `watch_virtual_property_proto` passes; static buffer reentrancy bug in actionSetMember fixed
+- **Pass rate (CI)**: 227/619 (36.7%)
+- **Main failure type**: output_mismatch, timeout (2), segfault (1)
+- **Recent gains**: `mouse_listeners` now passes (Phase 5: Mouse AsBroadcaster); `as_broadcaster_initialize` regression fixed (back to 10/10)
+- **Active plan**: input-event-injection.md — Phases 0-5 done; Phase 6+ (per-clip hit test dispatch, key events, focus) remaining
 
 ## Major Features Implemented Since Last Update
 
 | Feature | Commits | Impact | Key Tests |
 |---------|---------|--------|-----------|
+| **Input event injection (Phases 0.3-5)** | a58b421, d71ead7 | shape_data/hit_test in NO_GRAPHICS; event pump; Mouse AsBroadcaster; AsBroadcaster regression fix | `mouse_listeners` ✅, `as_broadcaster_initialize` ✅ |
 | **Object.prototype.watch/unwatch** | 0a9e034, 85c676f | Property change callbacks; watcher fires before addProperty setter; static buffer reentrancy fix | `watch` ✅, `watch_virtual_property_proto` ✅, `object_prototypes` ✅, `parse_int` ✅ |
 | **Number.prototype.toString(NaN, radix)** | 743325f | NaN encoded as INT32_MIN via x86 CVTTSD2SI, then inverted digit encoding char(48-N); \r→\n normalization | `primitive_type_globals` ✅ (557/557) |
 | **edittext _width/_height transform fix** | 337c212 | Width/height properties now account for _xscale/_yscale/_rotation transforms | edittext_width_height (103/103 ✅) |
