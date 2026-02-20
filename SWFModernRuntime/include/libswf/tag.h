@@ -42,6 +42,8 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio);
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count);
+// Attach clip actions to a display entry that was already placed (e.g. by tagPlaceObject2Ratio).
+void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* clip_actions, size_t clip_action_count);
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode);
 void tagSetFilter(SWFAppContext* app_context, size_t depth,

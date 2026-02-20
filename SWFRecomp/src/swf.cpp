@@ -2965,6 +2965,11 @@ namespace SWFRecomp
 				else if (has_ratio)
 				{
 					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ");" << endl;
+					// Also attach clip actions if both ratio and clip actions are present
+					if (clip_action_count > 0)
+					{
+						context.tag_main << "\t" << "tagSetClipActions(app_context, " << to_string(depth) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
+					}
 				}
 				else if (clip_action_count > 0)
 				{
@@ -3842,15 +3847,16 @@ namespace SWFRecomp
 								{
 									clip_actions_var = "clip_actions_" + to_string(num_finished_tags);
 
-									sprite_forward_decls << "extern ClipAction " << clip_actions_var << "[];" << endl;
-									sprite_definitions << "ClipAction " << clip_actions_var << "[] =" << endl
+									// Use static local so the pointer survives after the frame function returns.
+									// No extern forward decl needed — static locals have internal linkage.
+									sprite_definitions << "static ClipAction " << clip_actions_var << "[] =" << endl
 													   << "{" << endl;
 									for (auto& ca : clip_entries)
 									{
 										sprite_definitions << "\t" << "{ 0x" << std::hex << ca.event_flags << std::dec
 														   << ", " << ca.func_name << " }," << endl;
 									}
-									sprite_definitions << "};" << endl << endl;
+									sprite_definitions << "};" << endl;
 
 									clip_action_count = clip_entries.size();
 								}
@@ -3876,6 +3882,14 @@ namespace SWFRecomp
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
 												   << to_string(ratio_val) << ");" << endl;
+								// Also attach clip actions if both ratio and clip actions are present
+								if (clip_action_count > 0)
+								{
+									sprite_definitions << "\t" << "tagSetClipActions(app_context, "
+													   << to_string(depth) << ", "
+													   << clip_actions_var << ", "
+													   << to_string(clip_action_count) << ");" << endl;
+								}
 							}
 							else if (clip_action_count > 0)
 							{
