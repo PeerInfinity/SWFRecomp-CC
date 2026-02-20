@@ -1,29 +1,42 @@
 # Global Functions/Objects Implementation Plan
 <!-- TESTS: globals_swf5, globals_swf6, globals_swf7, globals_swf8, global_swf5_6_7_8_9, global_swf6_7_8, global_instance_decls, global_proto_decls, global_proto_decls_delete, swf5_global_funcs, swf6_global_funcs, swf7_global_funcs, math_min_max, parse_int, parse_float, is_finite, is_finite_swf6, primitive_type_globals, printjob_props_swf5, printjob_props_swf6, printjob_props_swf7, context_menu, context_menu_item, localconnection_properties, sound_props_swf5, sound_props_swf6, native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, as_set_prop_flags -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-20
 
-## Status: Phases 1-5 COMPLETE, Phases 6-8 NOT STARTED
+## Status: Phases 1-6 COMPLETE, Phase 7 IN PROGRESS, Phase 8 NOT STARTED
 
 ### Implementation Commits
 - `3048065` — Implement global constructors/objects, rewrite parseInt, fix isFinite/isNaN (Phases 1, 3-5)
 - `c5804d0` — Implement Math object with 17 methods and 8 constants (Phase 2)
 - `06244c7` — Set Object.prototype on built-in objects for proper toString inheritance
+- (later) — Phase 6: Number.prototype.toString(radix), Number constants, Boolean/String primitives
+- (later) — Phase 7 (partial): native toString for static objects, PrintJob/Sound/LocalConnection prototypes
 
-### Current Pass Rates (after implementation)
+### Current Pass Rates (after Phase 6 implementation, before Phase 7)
 
 | Test | Lines | Pass Rate | Status | Notes |
 |------|-------|-----------|--------|-------|
-| globals_swf5 | 290/304 | 95% | output_mismatch | 14 lines off — CustomActions, XMLUI, mx.* |
+| globals_swf5 | 293/304 | 96% | output_mismatch | 11 lines off — native static objects return `[type Object]` instead of `[object Object]` |
 | globals_swf6 | 304/304 | 100% | **PASS** | |
 | globals_swf7 | 304/304 | 100% | **PASS** | |
 | globals_swf8 | 304/304 | 100% | **PASS** | flash.* namespace fully registered |
 | math_min_max | 101/101 | 100% | **PASS** | |
 | is_finite | 49/49 | 100% | **PASS** | |
 | is_finite_swf6 | 49/49 | 100% | **PASS** | |
-| parse_float | 43/74 | 58% | output_mismatch | No longer times out; edge cases remain |
-| parse_int | 0/64 | 0% | output_mismatch | Blocked by `arguments` object (see PARSING_FUNCTIONS_PLAN) |
-| primitive_type_globals | 320/557 | 57% | output_mismatch | Needs Phase 6 (Number.toString(radix)) |
+| parse_float | ~43/74 | 58% | output_mismatch | Edge cases: Infinity handling, precision, no-args |
+| parse_int | 64/64 | 100% | **PASS** | (was blocked by `arguments`, now passes) |
+| primitive_type_globals | 557/557 | 100% | **PASS** | Phase 6 complete |
+
+### Phase 7 Target Tests (all failing before this session)
+
+| Test | Status | Notes |
+|------|--------|-------|
+| printjob_props_swf5 | FAIL | Needs PrintJob prototype numeric props; trace([type Object]) vs expected [type Object] - 2 lines off |
+| printjob_props_swf6 | FAIL | Same as swf5 |
+| printjob_props_swf7 | FAIL | Needs PrintJob prototype numeric props + SWF7 method stubs |
+| sound_props_swf5 | FAIL | Needs Sound.prototype toString + 9 methods |
+| sound_props_swf6 | FAIL | Needs Sound.prototype toString + 16 methods |
+| localconnection_properties | FAIL | Needs LocalConnection.prototype: domain/connect/close/send |
 
 ### Phase Completion Summary
 
@@ -31,12 +44,23 @@ Last updated: 2026-02-15
 |-------|-------------|--------|
 | 1 | Register missing global constructors (stubs) | **DONE** |
 | 2 | Math object methods | **DONE** (see MATH_PLAN) |
-| 3 | Fix parseInt | **DONE** (rewritten, but test blocked by `arguments`) |
+| 3 | Fix parseInt | **DONE** (rewritten and passing) |
 | 4 | Fix parseFloat and isFinite | **DONE** (isFinite passes, parseFloat partially) |
 | 5 | flash.* namespace (SWF8+) | **DONE** |
-| 6 | Primitive type improvements (Number/Boolean/String) | NOT STARTED |
-| 7 | Prototype methods for stub classes | NOT STARTED |
+| 6 | Primitive type improvements (Number/Boolean/String) | **DONE** |
+| 7 | Prototype methods for stub classes | IN PROGRESS |
 | 8 | Property flags (DONT_ENUM, DONT_DELETE, READ_ONLY) | NOT STARTED |
+
+### globals_swf5 Issue Analysis
+
+The 11 failing lines are all native static objects returning `[type Object]` instead of `[object Object]`:
+- Accessibility, Key, Math, Mouse, Selection, Stage trace as `[type Object]` in SWF5
+- Expected: `[object Object]` (native objects always use this format regardless of SWF version)
+- Fix: Add `installNativeToString()` helper to set own toString on each native static object
+
+Note: User-created objects in SWF5 correctly return `[type Object]` via Object.prototype.toString.
+The distinction is: Object.prototype.toString checks `g_swf_version < 6` (returns `[type Object]` for SWF5),
+but native objects need to bypass this with their own toString that always returns `[object Object]`.
 
 ---
 
