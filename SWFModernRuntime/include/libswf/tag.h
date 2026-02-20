@@ -164,6 +164,8 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id);
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 // Called before tagRemoveObject clears an object (handles MC invalidation, cleanup)
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
+// Reclaim auto-instance counter slot if auto_name was the last assigned name
+void ng_try_reclaim_auto_instance_name(const char* auto_name);
 // Fire queued onLoad events for duplicated clips (called from tagShowFrame)
 void ng_fire_pending_loads(SWFAppContext* app_context);
 #endif

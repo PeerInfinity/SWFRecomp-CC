@@ -47,6 +47,123 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	g_current_sprite_obj = saved;
 }
 #define CALL_FRAME(app, obj, f) exec_sprite_frame(app, obj, f)
+
+// ---------------------------------------------------------------------------
+// Helper: Recursive sprite/button initialization for newly placed objects.
+// Called from tagShowFrame to run frame 0 for each sprite/button that was
+// placed since the last ShowFrame and has sprite_needs_init=1.
+//
+// parent_mc: the MovieClip that "owns" the current display_list (used as
+//            parent when creating child MCs, so _parent is set correctly).
+// ---------------------------------------------------------------------------
+static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* parent_mc)
+{
+	for (size_t i = 1; i <= max_depth; i++)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
+
+		Character* ch = &dictionary[obj->char_id];
+
+		if (ch->type == CHAR_TYPE_SPRITE)
+		{
+			// Pre-create/sync the child MC while still in the parent's display_list
+			// context so x/y are synced from the correct transform entry.
+			MovieClip* child_mc = NULL;
+			if (obj->instance_name != NULL)
+				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+
+			obj->sprite_needs_init = 0;
+
+			// Context swap to sprite's display list
+			DisplayObject* saved_dl    = display_list;
+			size_t         saved_max   = max_depth;
+			size_t         saved_cap   = display_list_capacity;
+			display_list          = obj->sprite_display_list;
+			max_depth             = obj->sprite_max_depth;
+			display_list_capacity = obj->sprite_dl_capacity;
+
+			// Run frame 0 with correct MC context
+			MovieClip*    saved_ctx        = g_current_context;
+			DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+			g_current_sprite_obj = obj;
+			if (child_mc) actionSetCurrentContext(child_mc);
+
+			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+				ch->sprite_frame_funcs[0](app_context);
+
+			actionSetCurrentContext(saved_ctx);
+			g_current_sprite_obj = saved_sprite_obj;
+
+			// Advance frame counter so advance_sprite_frames picks up at frame 1
+			obj->sprite_current_frame = 1 % ch->sprite_frame_count;
+
+			// Recursively initialize any children placed by the frame function
+			process_sprite_needs_init(app_context, child_mc);
+
+			// Save back (pointer may change from realloc)
+			obj->sprite_display_list  = display_list;
+			obj->sprite_max_depth     = max_depth;
+			obj->sprite_dl_capacity   = display_list_capacity;
+
+			display_list          = saved_dl;
+			max_depth             = saved_max;
+			display_list_capacity = saved_cap;
+
+			// Fire onLoad clip actions for newly initialized sprites
+			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
+			{
+				MovieClip* saved_ctx2 = g_current_context;
+				MovieClip* mc2 = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (mc2) actionSetCurrentContext(mc2);
+				for (size_t a = 0; a < obj->clip_action_count; a++)
+				{
+					if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
+						obj->clip_actions[a].action(app_context);
+				}
+				actionSetCurrentContext(saved_ctx2);
+			}
+		}
+		else if (ch->type == CHAR_TYPE_BUTTON && ch->button_state_funcs != NULL)
+		{
+			// Pre-create the button MC while still in the parent's display_list context
+			MovieClip* button_mc = NULL;
+			if (obj->instance_name != NULL)
+			{
+				button_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (button_mc) button_mc->is_button_mc = 1;
+			}
+
+			obj->sprite_needs_init = 0;
+
+			// Context swap to button's display list
+			DisplayObject* saved_dl    = display_list;
+			size_t         saved_max   = max_depth;
+			size_t         saved_cap   = display_list_capacity;
+			display_list          = obj->sprite_display_list;
+			max_depth             = obj->sprite_max_depth;
+			display_list_capacity = obj->sprite_dl_capacity;
+
+			// Run up-state (button_state_funcs[0]) to place button's children.
+			// Do NOT change g_current_context — button state funcs don't run AS2 scripts.
+			ch->button_state_funcs[0](app_context);
+
+			// Recursively initialize sprites placed by the up-state func,
+			// using button_mc as their parent.
+			process_sprite_needs_init(app_context, button_mc);
+
+			// Save back
+			obj->sprite_display_list  = display_list;
+			obj->sprite_max_depth     = max_depth;
+			obj->sprite_dl_capacity   = display_list_capacity;
+
+			display_list          = saved_dl;
+			max_depth             = saved_max;
+			display_list_capacity = saved_cap;
+		}
+	}
+}
+
 #else
 #define CALL_FRAME(app, obj, f) (f)(app)
 #endif
@@ -473,73 +590,22 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
-	// --- Run initial frame 0 with scripts for newly placed sprites ---
-	// sprite_needs_init=1 is set by ng_on_place_object2 when a sprite is placed.
+	// --- Run initial frame 0 with scripts for newly placed sprites/buttons ---
+	// sprite_needs_init=1 is set by ng_on_place_object2 when a sprite or button is placed.
 	// We run frame 0 here (in the same tick as placement) to match Flash behavior.
-	// After running, advance sprite_current_frame so advance_sprite_frames picks
-	// up at frame 1 next tick (avoids re-running frame 0 as a "loop back").
+	// process_sprite_needs_init handles CHAR_TYPE_SPRITE and CHAR_TYPE_BUTTON recursively.
 	{
 		int saved_catch_up = catch_up_mode;
 		catch_up_mode = 0;
-		for (size_t i = 1; i <= max_depth; i++)
-		{
-			DisplayObject* obj = &display_list[i];
-			if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
-			Character* ch = &dictionary[obj->char_id];
-			if (ch->type != CHAR_TYPE_SPRITE) continue;
-
-			// sprite_needs_init == 2: frame_0 already ran eagerly in tagPlaceObject2;
-			// only need to fire onLoad. sprite_needs_init == 1: normal deferred path.
-			int was_eager = (obj->sprite_needs_init == 2);
-			obj->sprite_needs_init = 0;
-
-			if (!was_eager)
-			{
-				// Context swap to sprite's display list
-				DisplayObject* saved_dl = display_list;
-				size_t saved_max = max_depth;
-				size_t saved_cap = display_list_capacity;
-
-				display_list = obj->sprite_display_list;
-				max_depth = obj->sprite_max_depth;
-				display_list_capacity = obj->sprite_dl_capacity;
-
-				// Run frame 0 WITH scripts (catch_up_mode=0)
-				if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
-					CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
-
-				// Advance frame counter so advance_sprite_frames picks up at frame 1
-				// (for 1-frame sprites, 1 % 1 = 0, which correctly loops back each tick)
-				obj->sprite_current_frame = 1 % ch->sprite_frame_count;
-
-				// Save back (pointer may change from realloc)
-				obj->sprite_display_list = display_list;
-				obj->sprite_max_depth = max_depth;
-				obj->sprite_dl_capacity = display_list_capacity;
-
-				display_list = saved_dl;
-				max_depth = saved_max;
-				display_list_capacity = saved_cap;
-			}
-
-			// Fire onLoad clip actions for newly initialized sprites (both paths)
-			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
-			{
-				MovieClip* saved_ctx = g_current_context;
-				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
-				if (mc) actionSetCurrentContext(mc);
-				for (size_t a = 0; a < obj->clip_action_count; a++)
-				{
-					if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
-						obj->clip_actions[a].action(app_context);
-				}
-				actionSetCurrentContext(saved_ctx);
-			}
-		}
+		process_sprite_needs_init(app_context, &root_movieclip);
 		catch_up_mode = saved_catch_up;
 
 		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
 		ng_fire_pending_loads(app_context);
+
+		// Dispatch AS2 mc.onEnterFrame property handlers for all initialized MCs.
+		// This fires in reverse-creation order (front-to-back) matching Flash behavior.
+		actionDispatchEnterFrameHandlers(app_context);
 	}
 #else
 	// --- Advance sprite timelines (recursive) ---
@@ -1332,9 +1398,12 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		if (old_name != NULL && strcmp(old_name, name) != 0)
 			actionRenameMovieClip(old_name, name);
 #endif
-		// Free auto-assigned name if we own it
+		// Free auto-assigned name if we own it; reclaim counter slot if it was the last one
 		if (display_list[depth].instance_name_owned && old_name != NULL)
 		{
+#ifdef NO_GRAPHICS
+			ng_try_reclaim_auto_instance_name(old_name);
+#endif
 			free(old_name);
 		}
 		display_list[depth].instance_name = (char*)name;

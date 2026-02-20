@@ -41,6 +41,7 @@ struct MovieClip {
 	void* dynamic_props;   // ASObject* for user-defined properties (lazily allocated)
 	u8 lockroot;           // _lockroot property (0 = false, 1 = true)
 	u8 blend_mode;         // blendMode as integer (0=default→"normal", 1="normal", 2="layer", ...14="hardlight")
+	u8 is_button_mc;       // 1 if this MC represents a SWF button (affects _parent resolution in SWF5)
 	int depth;             // ActionScript display depth (-16384 for _root, SWF_depth-16384 for timeline clips, AS-space for dynamic clips)
 #ifdef NO_GRAPHICS
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
@@ -277,3 +278,8 @@ void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr);
 // Broadcasts onKeyDown/onKeyUp to all registered Key listeners.
 void actionDispatchKeyDown(SWFAppContext* app_context);
 void actionDispatchKeyUp(SWFAppContext* app_context);
+
+// AS2 onEnterFrame dispatch — call after sprite initialization to fire mc.onEnterFrame
+// for any MovieClip that has the property set. Iterates cache in reverse creation order
+// (front-to-back: higher depth fires first) to match Flash's dispatch order.
+void actionDispatchEnterFrameHandlers(SWFAppContext* app_context);
