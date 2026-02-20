@@ -856,6 +856,8 @@ static ActionStackValueType convertFloat(SWFAppContext* app_context);
 
 // builtin_math_random is defined later (after TRandomFast/RNG definitions)
 static ActionVar builtin_math_random(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+// initMathObject is defined later (after all Math builtins)
+static void initMathObject(SWFAppContext* app_context);
 
 // Static ASFunction objects for Math methods (18 methods)
 static ASFunction g_math_funcs[18];
@@ -1083,6 +1085,61 @@ static ActionVar builtin_math_max(SWFAppContext* app_context, ActionVar* args, u
 	if (b > a) return mathReturnDouble(b);
 	// a == b: return the one that is NOT -0
 	return mathReturnDouble(signbit(a) ? b : a);
+}
+
+// --- ASnative (class 200 = Math) ---
+
+// NaN stub: coerces args (calling valueOf on first two) but always returns NaN.
+// Returned by ASnative(200, invalid_index).
+static ActionVar builtin_math_nan_stub(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	coerceMathArgs(app_context, args, arg_count, 2);
+	return mathReturnDouble(NAN);
+}
+
+// ASnative(class_id, method_index) — returns a native method by numeric address.
+// Currently handles class 200 (Math): returns the Math function at the given index,
+// or a NaN stub (with valueOf coercion side-effects) for out-of-range indices.
+static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 2) return undef;
+
+	int class_id     = (int)mathArgToDouble(&args[0]);
+	int method_index = (int)mathArgToDouble(&args[1]);
+
+	if (class_id == 200) {
+		// Math class: ensure the Math object and its function table are ready
+		initMathObject(app_context);
+		// Valid indices 0–17 map directly to g_math_funcs[]
+		if (method_index >= 0 && method_index < 18) {
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_FUNCTION;
+			VAL(u64, &result.data.numeric_value) = (u64)&g_math_funcs[method_index];
+			return result;
+		}
+		// Out-of-range index → NaN stub (still coerces its args via valueOf)
+		static ASFunction g_nan_stub;
+		static int g_nan_stub_init = 0;
+		if (!g_nan_stub_init) {
+			memset(&g_nan_stub, 0, sizeof(ASFunction));
+			strncpy(g_nan_stub.name, "stub", 255);
+			g_nan_stub.function_type = 2;
+			g_nan_stub.advanced_func = (Function2Ptr)builtin_math_nan_stub;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_nan_stub;
+			g_nan_stub_init = 1;
+		}
+		ActionVar result = {0};
+		result.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &result.data.numeric_value) = (u64)&g_nan_stub;
+		return result;
+	}
+
+	return undef;
 }
 
 // --- Math object initialization ---
@@ -11822,6 +11879,26 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		aspf_var.type = ACTION_STACK_VALUE_FUNCTION;
 		aspf_var.data.numeric_value = (u64)&g_aspf_func;
 		setProperty(app_context, global_object, "ASSetPropFlags", 14, &aspf_var);
+	}
+
+	// ---- ASnative (global function) ----
+	{
+		static ASFunction g_asnative_func;
+		static int g_asnative_init = 0;
+		if (!g_asnative_init)
+		{
+			memset(&g_asnative_func, 0, sizeof(ASFunction));
+			strncpy(g_asnative_func.name, "ASnative", 255);
+			g_asnative_func.function_type = 2;
+			g_asnative_func.advanced_func = (Function2Ptr)builtin_asnative;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_asnative_func;
+			g_asnative_init = 1;
+		}
+		ActionVar an_var = {0};
+		an_var.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &an_var.data.numeric_value) = (u64)&g_asnative_func;
+		setProperty(app_context, global_object, "ASnative", 8, &an_var);
 	}
 
 	// ---- Stub constructors (function type with prototype) ----
