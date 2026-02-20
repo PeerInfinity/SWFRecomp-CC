@@ -28,6 +28,11 @@ size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 // Set by advance_sprite_frames before each sprite frame function call.
 DisplayObject* g_current_sprite_obj = NULL;
 
+// When 1, tagPlaceObject2 and tagSetInstanceName are no-ops.
+// Used by tagShowFrame to re-run sprite frame_0 for scripts only (Phase 2),
+// without disturbing the display list already set up in Phase 1 (eager init).
+static int g_script_only_mode = 0;
+
 // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
 static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
 {
@@ -73,6 +78,9 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			if (obj->instance_name != NULL)
 				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
 
+			// sprite_needs_init == 2: Phase 1 (placement) ran eagerly; run Phase 2
+			// (scripts only) now. sprite_needs_init == 1: normal deferred path.
+			int was_eager = (obj->sprite_needs_init == 2);
 			obj->sprite_needs_init = 0;
 
 			// Context swap to sprite's display list
@@ -90,7 +98,19 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			if (child_mc) actionSetCurrentContext(child_mc);
 
 			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
-				ch->sprite_frame_funcs[0](app_context);
+			{
+				if (was_eager)
+				{
+					// Phase 2: run scripts only; placement tags are no-ops via g_script_only_mode.
+					g_script_only_mode = 1;
+					CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+					g_script_only_mode = 0;
+				}
+				else
+				{
+					CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+				}
+			}
 
 			actionSetCurrentContext(saved_ctx);
 			g_current_sprite_obj = saved_sprite_obj;
@@ -1044,6 +1064,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 {
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
+#ifdef NO_GRAPHICS
+	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
+	if (g_script_only_mode) return;
+#endif
+
 	if (char_id == 0)
 	{
 		// Modify operation (HasCharacter=0): update transform/cxform only, preserve identity.
@@ -1126,14 +1151,19 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			Character* sp_ch = &dictionary[char_id];
 			if (sp_ch->sprite_frame_count > 0 && sp_ch->sprite_frame_funcs[0] != NULL)
 			{
-				display_list[depth].sprite_needs_init = 2; // mark: frame_0 done, onLoad pending
+				display_list[depth].sprite_needs_init = 2; // mark: frame_0 done, scripts deferred
 				DisplayObject* saved_dl = display_list;
 				size_t saved_max = max_depth;
 				size_t saved_cap = display_list_capacity;
 				display_list = saved_dl[depth].sprite_display_list;
 				max_depth = saved_dl[depth].sprite_max_depth;
 				display_list_capacity = saved_dl[depth].sprite_dl_capacity;
+				// Phase 1: run with catch_up_mode=1 so only placement tags execute;
+				// DoAction scripts are deferred to tagShowFrame Phase 2.
+				int saved_catch_up = catch_up_mode;
+				catch_up_mode = 1;
 				CALL_FRAME(app_context, &saved_dl[depth], sp_ch->sprite_frame_funcs[0]);
+				catch_up_mode = saved_catch_up;
 				saved_dl[depth].sprite_display_list = display_list;
 				saved_dl[depth].sprite_max_depth = max_depth;
 				saved_dl[depth].sprite_dl_capacity = display_list_capacity;
@@ -1390,6 +1420,10 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
 	(void)app_context;
+#ifdef NO_GRAPHICS
+	// In script_only_mode (Phase 2), display list is already set up from Phase 1 — skip.
+	if (g_script_only_mode) return;
+#endif
 	if (depth <= max_depth)
 	{
 		char* old_name = display_list[depth].instance_name;

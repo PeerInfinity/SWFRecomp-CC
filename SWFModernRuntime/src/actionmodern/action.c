@@ -8106,6 +8106,36 @@ void actionRenameMovieClip(const char* old_name, const char* new_name)
 			}
 		}
 		mc->target[sizeof(mc->target) - 1] = '\0';
+		// Re-sync position from the display list. The display entry still has old_name
+		// at this call point (tagSetInstanceName updates it after calling us), so
+		// ng_findDisplayEntryByName(old_name) finds the correct entry.
+		// This fixes MCs that were created during eager init while the display_list
+		// was swapped (giving x=0), ensuring they get the correct SWF transform.
+		{
+			size_t depth = ng_findDisplayEntryByName(old_name);
+			if (depth != SIZE_MAX) {
+				mc->depth = (int)depth - 16384;
+				if (!(mc->as_set_flags & 1) || !(mc->as_set_flags & 2)) {
+					float init_x, init_y;
+					if (ng_getTransformXY(depth, &init_x, &init_y)) {
+						if (!(mc->as_set_flags & 1)) mc->x = init_x;
+						if (!(mc->as_set_flags & 2)) mc->y = init_y;
+					}
+				}
+				if (!(mc->as_set_flags & (4|8|16))) {
+					float init_xs, init_ys, init_rot;
+					if (ng_getTransformScaleRotation(depth, &init_xs, &init_ys, &init_rot)) {
+						mc->xscale = init_xs;
+						mc->yscale = init_ys;
+						mc->rotation = init_rot;
+					}
+				}
+				u32 tid;
+				if (ng_getTransformId(depth, &tid)) {
+					mc->last_transform_id = tid;
+				}
+			}
+		}
 		return;
 	}
 }
