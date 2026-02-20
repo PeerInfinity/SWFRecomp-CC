@@ -9,12 +9,14 @@ on:
         default: '0'
         type: string
       parallel:
-        description: 'Number of parallel runners (1 or 10)'
+        description: 'Number of parallel runners (1, 10, 20, or 30)'
         required: true
         type: choice
         options:
           - '1'
           - '10'
+          - '20'
+          - '30'
         default: '10'
 
 permissions:
@@ -192,10 +194,21 @@ jobs:
   # --- Parallel runner path: shared setup ---
   setup-parallel:
     name: Setup (Build + Download + Recompile)
-    if: inputs.parallel == '10'
+    if: inputs.parallel != '1'
     runs-on: ubuntu-latest
 
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      total: ${{ steps.matrix.outputs.total }}
+
     steps:
+      - name: Generate shard matrix
+        id: matrix
+        run: |
+          N=${{ inputs.parallel }}
+          echo "matrix=$(seq 1 $N | jq -cs '{shard: .}')" >> "$GITHUB_OUTPUT"
+          echo "total=$N" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -238,15 +251,14 @@ jobs:
 
   # --- Parallel runner path: shards ---
   ruffle-tests-shard:
-    name: Shard ${{ matrix.shard }}/10
-    if: inputs.parallel == '10'
+    name: Shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}
+    if: inputs.parallel != '1'
     needs: setup-parallel
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      matrix: ${{ fromJson(needs.setup-parallel.outputs.matrix) }}
 
     steps:
       - name: Checkout repository
@@ -275,11 +287,11 @@ jobs:
           name: setup-tests
           path: ruffle-tests/
 
-      - name: Verify runtime output (shard ${{ matrix.shard }}/10)
+      - name: Verify runtime output (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
         env:
           TZ: Asia/Kathmandu
         run: |
-          ARGS="-v --json=ruffle-tests/results-shard-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/10"
+          ARGS="-v --json=ruffle-tests/results-shard-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
             ARGS="$ARGS --limit=${{ inputs.limit }}"
           fi
@@ -296,7 +308,7 @@ jobs:
   # --- Combine shard results ---
   combine-results:
     name: Combine Results
-    if: inputs.parallel == '10' && !cancelled()
+    if: inputs.parallel != '1' && !cancelled()
     needs: ruffle-tests-shard
     runs-on: ubuntu-latest
 

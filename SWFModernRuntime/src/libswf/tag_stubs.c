@@ -252,6 +252,38 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id)
 }
 
 // ---------------------------------------------------------------------------
+// Pending onLoad queue for duplicated clips (fired at end of tagShowFrame)
+// Duplicate clips live at SWF depths 16384+ — too large for display_list.
+// Instead, enqueue their onLoad callbacks here and fire them in tagShowFrame.
+// ---------------------------------------------------------------------------
+#define MAX_PENDING_LOADS 64
+typedef struct {
+	char instance_name[64];
+	ClipAction* clip_actions;
+	size_t clip_action_count;
+} PendingLoad;
+static PendingLoad g_pending_loads[MAX_PENDING_LOADS];
+static size_t g_pending_load_count = 0;
+
+void ng_fire_pending_loads(SWFAppContext* app_context)
+{
+	for (size_t p = 0; p < g_pending_load_count; p++)
+	{
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* mc = actionFindOrCreateMovieClip(
+			app_context, g_pending_loads[p].instance_name, &root_movieclip);
+		if (mc) actionSetCurrentContext(mc);
+		for (size_t a = 0; a < g_pending_loads[p].clip_action_count; a++)
+		{
+			if (g_pending_loads[p].clip_actions[a].event_flags & CLIP_EVENT_LOAD)
+				g_pending_loads[p].clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+	}
+	g_pending_load_count = 0;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: initialize cx_* from cxform_data (percentage format: 100.0 = normal)
 // ---------------------------------------------------------------------------
 static void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id)
@@ -1127,6 +1159,18 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 			display_list[target_swf_depth].clip_action_count = 0;
 			if (target_swf_depth > max_depth) max_depth = target_swf_depth;
 		}
+
+		// CloneSprite fires onLoad for the clone (unlike duplicateMovieClip).
+		// Clone depths are often too large for display_list[], so use pending queue.
+		if (display_list[src_depth].clip_action_count > 0 &&
+		    g_pending_load_count < MAX_PENDING_LOADS)
+		{
+			PendingLoad* pl = &g_pending_loads[g_pending_load_count++];
+			strncpy(pl->instance_name, target_name, sizeof(pl->instance_name) - 1);
+			pl->instance_name[sizeof(pl->instance_name) - 1] = '\0';
+			pl->clip_actions = display_list[src_depth].clip_actions;
+			pl->clip_action_count = display_list[src_depth].clip_action_count;
+		}
 	}
 
 	// Find source MC and create clone MC
@@ -1181,6 +1225,20 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
 
+	// CloneSprite fires onLoad for the clone — look up source's clip_actions by name
+	if (src_mc->name && g_pending_load_count < MAX_PENDING_LOADS)
+	{
+		size_t src_depth = ng_findDisplayEntryByName(src_mc->name);
+		if (src_depth != SIZE_MAX && display_list[src_depth].clip_action_count > 0)
+		{
+			PendingLoad* pl = &g_pending_loads[g_pending_load_count++];
+			strncpy(pl->instance_name, target_name, sizeof(pl->instance_name) - 1);
+			pl->instance_name[sizeof(pl->instance_name) - 1] = '\0';
+			pl->clip_actions = display_list[src_depth].clip_actions;
+			pl->clip_action_count = display_list[src_depth].clip_action_count;
+		}
+	}
+
 	ActionVar _clone_mc_var = {0};
 	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 	_clone_mc_var.data.numeric_value = (u64)clone_mc;
@@ -1203,30 +1261,7 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 		int scriptable = (dictionary[cid].type == CHAR_TYPE_SPRITE) ||
 		                 ng_find_button(cid) || (ng_find_textfield(cid) >= 0);
 		if (!scriptable) return NULL;
-
-		size_t target_swf_depth = (size_t)swf_depth;
-		if (target_swf_depth >= 1 && target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)
-		{
-			extern size_t display_list_capacity;
-			if (target_swf_depth >= display_list_capacity)
-			{
-				size_t new_cap = target_swf_depth + 64;
-				display_list = realloc(display_list, new_cap * sizeof(DisplayObject));
-				memset(&display_list[display_list_capacity], 0,
-				       (new_cap - display_list_capacity) * sizeof(DisplayObject));
-				display_list_capacity = new_cap;
-			}
-			display_list[target_swf_depth] = display_list[src_depth];
-			display_list[target_swf_depth].instance_name = strdup(target_name);
-			display_list[target_swf_depth].instance_name_owned = 1;
-			display_list[target_swf_depth].sprite_display_list = NULL;
-			display_list[target_swf_depth].sprite_max_depth = 0;
-			display_list[target_swf_depth].sprite_dl_capacity = 0;
-			display_list[target_swf_depth].sprite_needs_init = 0;
-			display_list[target_swf_depth].clip_actions = NULL;
-			display_list[target_swf_depth].clip_action_count = 0;
-			if (target_swf_depth > max_depth) max_depth = target_swf_depth;
-		}
+		// Note: duplicateMovieClip does NOT fire onLoad for the clone (unlike CloneSprite).
 	}
 
 	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);

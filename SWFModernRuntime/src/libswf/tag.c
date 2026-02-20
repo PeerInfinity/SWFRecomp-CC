@@ -181,7 +181,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			{
 				if (display_list[j].sprite_display_list != NULL)
 				{
-					free(display_list[j].sprite_display_list);
+					FREE(display_list[j].sprite_display_list);
 					display_list[j].sprite_display_list = NULL;
 				}
 				display_list[j].char_id = 0;
@@ -208,8 +208,9 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
 
-		// Advance frame (loop back to 0)
-		obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
+		// Advance frame (loop back to 0); guard against 0-frame sprites
+		if (ch->sprite_frame_count > 0)
+			obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
 	}
 }
 
@@ -530,6 +531,9 @@ void tagShowFrame(SWFAppContext* app_context)
 			}
 		}
 		catch_up_mode = saved_catch_up;
+
+		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
+		ng_fire_pending_loads(app_context);
 	}
 #else
 	// --- Advance sprite timelines (recursive) ---
@@ -987,15 +991,7 @@ void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, si
 	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
 	display_list[depth].clip_actions = clip_actions;
 	display_list[depth].clip_action_count = clip_action_count;
-
-	// Dispatch onLoad immediately
-	for (size_t i = 0; i < clip_action_count; i++)
-	{
-		if (clip_actions[i].event_flags & CLIP_EVENT_LOAD)
-		{
-			clip_actions[i].action(app_context);
-		}
-	}
+	// onLoad fires deferred in tagShowFrame's sprite_needs_init block (after frame scripts run)
 }
 
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
