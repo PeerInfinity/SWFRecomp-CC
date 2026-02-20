@@ -305,7 +305,7 @@ static void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id)
 
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return;
+	if (depth > max_depth || display_list[depth].char_id == 0) return;
 	DisplayObject* obj = &display_list[depth];
 
 	// Initialize cx_* from cxform_data if there's a cxform applied
@@ -359,7 +359,7 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return;
+	if (depth > max_depth || display_list[depth].char_id == 0) return;
 	// Invalidate cached MovieClip so re-placement gets fresh properties
 	if (display_list[depth].instance_name != NULL)
 		actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name);
@@ -412,26 +412,26 @@ size_t ng_getSpriteFrameCount(void)
 
 int ng_isSpriteAtDepth(size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	size_t cid = display_list[depth].char_id;
 	return (dictionary[cid].type == CHAR_TYPE_SPRITE);
 }
 
 int ng_isButtonAtDepth(size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	return ng_find_button(display_list[depth].char_id);
 }
 
 int ng_isTextFieldAtDepth(size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	return (ng_find_textfield(display_list[depth].char_id) >= 0);
 }
 
 int ng_isScriptableAtDepth(size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	size_t cid = display_list[depth].char_id;
 	return (dictionary[cid].type == CHAR_TYPE_SPRITE) ||
 	       ng_find_button(cid) ||
@@ -447,7 +447,7 @@ int ng_isScriptableAtDepth(size_t depth)
 size_t ng_findDisplayEntryByName(const char* name)
 {
 	size_t result = SIZE_MAX;
-	for (size_t d = 1; d <= max_depth; d++)
+	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name == NULL) continue;
@@ -465,7 +465,7 @@ size_t ng_findDisplayEntryByName(const char* name)
 size_t ng_findDisplayEntryIdx(const char* name)
 {
 	if (!name || name[0] == '\0') return (size_t)-1;
-	for (size_t d = 1; d <= max_depth; d++)
+	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL &&
@@ -577,14 +577,14 @@ size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
 
 int ng_getTransformId(size_t depth, u32* out_id)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	*out_id = display_list[depth].transform_id;
 	return 1;
 }
 
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	u32 tid = display_list[depth].transform_id;
 	*out_x = transform_data[tid][12] / 20.0f;
 	*out_y = transform_data[tid][13] / 20.0f;
@@ -593,7 +593,7 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 
 int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	u32 tid = display_list[depth].transform_id;
 	if (out_x) *out_x = (double)transform_data[tid][12] / 20.0;
 	if (out_y) *out_y = (double)transform_data[tid][13] / 20.0;
@@ -602,7 +602,7 @@ int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y)
 
 int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	u32 tid = display_list[depth].transform_id;
 	float m00 = transform_data[tid][0];
 	float m10 = transform_data[tid][1];
@@ -666,7 +666,7 @@ int ng_setCTOnEntry(size_t entry_idx,
 int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, double* aa,
                           double* rb, double* gb, double* bb, double* ab)
 {
-	for (size_t d = 1; d <= max_depth; d++)
+	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL &&
@@ -685,7 +685,7 @@ int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, d
 int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
                           double rb, double gb, double bb, double ab)
 {
-	for (size_t d = 1; d <= max_depth; d++)
+	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL &&
@@ -860,7 +860,7 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 void ng_updateDisplayDepth(const char* name, int new_as_depth)
 {
 	size_t new_swf_depth = (size_t)(new_as_depth + 16384);
-	for (size_t d = 1; d <= max_depth; d++)
+	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL &&
@@ -878,7 +878,7 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 void ng_swapDisplayDepths(const char* name1, const char* name2)
 {
 	size_t d1 = SIZE_MAX, d2 = SIZE_MAX;
-	for (size_t d = 1; d <= max_depth; d++)
+	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL)
@@ -902,7 +902,7 @@ void ng_swapDisplayDepths(const char* name1, const char* name2)
 
 void ng_renameDisplayEntry(const char* old_name, const char* new_name)
 {
-	for (size_t d = 1; d <= max_depth; d++)
+	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL &&
@@ -948,7 +948,7 @@ void ng_enumerateChildren(const char* parent_name,
 	else
 	{
 		// Enumerate root-level children
-		for (size_t d = 1; d <= max_depth; d++)
+		for (size_t d = 0; d <= max_depth; d++)
 		{
 			if (display_list[d].char_id == 0) continue;
 			if (display_list[d].instance_name != NULL && display_list[d].instance_name[0] != '\0')
@@ -963,7 +963,7 @@ void ng_enumerateChildren(const char* parent_name,
 
 const char* ng_getTextFieldInitialText(size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return "";
+	if (depth > max_depth || display_list[depth].char_id == 0) return "";
 	int tf_idx = ng_find_textfield(display_list[depth].char_id);
 	if (tf_idx < 0) return "";
 	return ng_textfields[tf_idx].plain_text;
@@ -971,7 +971,7 @@ const char* ng_getTextFieldInitialText(size_t depth)
 
 u32 ng_getTextFieldColor(size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	int tf_idx = ng_find_textfield(display_list[depth].char_id);
 	if (tf_idx < 0) return 0;
 	return ng_textfields[tf_idx].text_color;
@@ -985,7 +985,7 @@ u32 ng_getTextFieldColorByIdx(int idx)
 
 int ng_getTextFieldIdx(size_t depth)
 {
-	if (depth < 1 || depth > max_depth || display_list[depth].char_id == 0) return -1;
+	if (depth > max_depth || display_list[depth].char_id == 0) return -1;
 	return ng_find_textfield(display_list[depth].char_id);
 }
 

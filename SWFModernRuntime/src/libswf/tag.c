@@ -1282,7 +1282,7 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 
 DisplayObject* findDisplayObjectByName(const char* name)
 {
-	for (size_t i = 1; i <= max_depth; ++i)
+	for (size_t i = 0; i <= max_depth; ++i)
 	{
 		if (display_list[i].char_id == 0) continue;
 		if (display_list[i].instance_name != NULL &&

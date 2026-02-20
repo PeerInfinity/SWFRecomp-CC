@@ -1,9 +1,9 @@
 # TextField/EditText Implementation Plan
 <!-- TESTS: text_format, text_format_rounding_swf7, text_format_rounding_swf8, edittext_default_format_font_style, edittext_antialiastype, edittext_default_format, edittext_default_format_empty, textfield_variable, textfield_properties, text_format_display, edittext_autosize_setter, textfield_background_color, textfield_border_color, textfield_text, edittext_password, textfield_maxchars, text_format_font_max_length, textfield_props_swf5, textfield_props_swf6, textfield_props_swf7, textfield_props_swf8, edittext_width_height, edittext_html_align_swf7, edittext_html_align_swf8, textfield_cache_as_bitmap, edittext_newline_stripping, edittext_newlines, edittext_programmatic_focus, edittext_autosize, edittext_font_size, edittext_text_height_leading, edittext_scroll, edittext_hscroll, edittext_html_roundtrip, edittext_html_color, edittext_html_condensewhite_swf7, edittext_html_condensewhite_swf8, edittext_html_entity, edittext_html_swf6, edittext_html_swf7, edittext_html_swf8, edittext_align, edittext_align_trailing_spaces_swf7, edittext_align_trailing_spaces_swf8, edittext_leading, edittext_margins, edittext_letter_spacing, edittext_tag_indent, edittext_bullet, edittext_underline, edittext_tab_stops, edittext_stylesheet, textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_props_swf5, textsnapshot_props_swf6, textsnapshot_text_order, edittext_drag_select, edittext_focus_selection, edittext_ime_focus_lost, edittext_input, edittext_input_newlines, edittext_password_copy, edittext_paste_empty, edittext_place_caret, edittext_restrict, edittext_restrict_paste, edittext_tab_focus, movieclip_create_text_field -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-20
 
-## Status: Phases 1-2 COMPLETE, Phase 3 PARTIAL
+## Status: Phases 1-2 COMPLETE, Phase 3 COMPLETE, Phase 5 PARTIAL
 
 ### Implementation Commits
 - `8811360` — Phase 1: TextField constructor, prototype, and DefineEditText property expansion
@@ -13,8 +13,11 @@ Last updated: 2026-02-15
 - `cfa68f7` — Add path variable binding, child instance resolution, and MC cache invalidation
 - `2705024` — Add TextField autoSize setter coercion
 - `711e25a` — Fix TextField properties: createTextField, getTextFormat, kerning, type/sharpness coercion
+- `d649861` — Fix textfield_variable (depth=0, path var binding), textfield_props_swf5 (non-writable SWF5 props)
+- `51acce6` — Fix edittext_newline_stripping: multiline fields get trailing '\n' (no variable binding)
+- `235fd38` — Fix edittext_html_align_swf7/swf8: HTML-aware alignment in getNewTextFormat/getTextFormat
 
-### Current Test Results (17 passing, many partially passing)
+### Current Test Results (23 passing, many partially passing)
 
 | Test | Lines | Status | Phase |
 |------|-------|--------|-------|
@@ -24,8 +27,12 @@ Last updated: 2026-02-15
 | edittext_default_format_font_style | 335/335 | **PASS** | 2 |
 | edittext_antialiastype | 296/296 | **PASS** | 1 |
 | edittext_default_format | 221/221 | **PASS** | 2 |
+| textfield_props_swf8 | 247/247 | **PASS** | 1 |
+| textfield_props_swf7 | 211/211 | **PASS** | 1 |
 | edittext_default_format_empty | 95/95 | **PASS** | 2 |
+| textfield_props_swf6 | 119/119 | **PASS** | 1 |
 | textfield_variable | 81/81 | **PASS** | 3 |
+| textfield_props_swf5 | 87/87 | **PASS** | 1 |
 | textfield_properties | 44/44 | **PASS** | 1 |
 | text_format_display | 21/21 | **PASS** | 2 |
 | edittext_autosize_setter | 20/20 | **PASS** | 3 |
@@ -35,10 +42,10 @@ Last updated: 2026-02-15
 | edittext_password | 5/5 | **PASS** | 1 |
 | textfield_maxchars | 3/3 | **PASS** | 1 |
 | text_format_font_max_length | 2/2 | **PASS** | 2 |
-| textfield_props_swf6/7/8 | 208/210 (99%) | near-pass | 1 |
-| edittext_width_height | 97/103 (94%) | near-pass | 3 |
-| edittext_html_align_swf8 | 45/52 (87%) | near-pass | 5 |
-| edittext_html_align_swf7 | 42/52 (81%) | near-pass | 5 |
+| edittext_html_align_swf7 | 52/52 | **PASS** | 5 |
+| edittext_html_align_swf8 | 52/52 | **PASS** | 5 |
+| edittext_newline_stripping | 46/46 | **PASS** | 3 |
+| edittext_width_height | 103/103 | **PASS** | 3 |
 
 ### Phase Completion
 
@@ -46,9 +53,9 @@ Last updated: 2026-02-15
 |-------|-------------|--------|
 | 1 | TextField constructor and prototype | **DONE** |
 | 2 | TextFormat class | **DONE** |
-| 3 | Variable binding + width/height/autoSize | **PARTIAL** (variable binding done, autoSize setter done, width/height 94%) |
+| 3 | Variable binding + width/height/autoSize | **DONE** (variable binding, width/height, newline stripping) |
 | 4 | Scroll properties | NOT STARTED |
-| 5 | HTML text support | NOT STARTED (but htmlText getter partially works) |
+| 5 | HTML text support | **PARTIAL** (align fixed; htmlText roundtrip, color, condenseWhite pending) |
 | 6 | Text layout formatting properties | NOT STARTED |
 | 7 | StyleSheet + TextSnapshot | NOT STARTED |
 

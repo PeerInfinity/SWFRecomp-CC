@@ -3,9 +3,21 @@
 
 Last updated: 2026-02-19
 
-## Status: NOT STARTED
+## Status: NOT STARTED — prerequisites in progress
 
-All 14 tests are currently failing with avg 1% match. The button handling in NO_GRAPHICS mode (`tag_stubs.c`) currently:
+All 14 tests are currently failing with avg 1% match. Progress is blocked on the following
+prerequisites from `SWFRecompDocs/plans/input-event-injection.md`:
+
+- **Phase 0** (struct unification): Delete `tag_stubs.c`, merge into `tag.c`; make
+  `Character`/`DisplayObject`/`MouseState` unconditional in `swf.h`; include
+  `shape_data`/`transform_data` + `hit_test.c` in trace builds. All button-specific
+  work below targets `tag.c` after this is complete.
+- **Phases 1–4** of input-event-injection.md: `verify_output.py` input.json processing
+  → text-file event pump in `swf_core.c` → mouse/key state in `SWFAppContext`.
+  Phase 2 of this plan (formerly "events.c generation") is **superseded** by those
+  phases; see the redirect in Phase 2 below.
+
+Current state of `tag_stubs.c` (before Phase 0 merges it away):
 - Registers button char_ids for `typeof` discrimination (returns "object" in SWF6+)
 - Does NOT store state frame functions → button children never initialize
 - Does NOT dispatch events (no input.json support exists)
@@ -100,113 +112,83 @@ The button_children test expects `button._width = 200`. The button's hit area is
 (a shape with bounds xmin=-2000, xmax=2000 → 4000 twips → 200 pixels). The button's visible
 bounds come from its hit shape, not from child clip bounds.
 
-Currently `tagDefineShape` in tag_stubs.c does NOT store shape bounds — it only stores shape
-draw data for graphics mode. For trace mode, we need to store the bounding rect (xmin, xmax,
-ymin, ymax in twips) per shape, then look up the hit shape's bounds in `tagDefineButton`.
+After input-event-injection.md Phase 0, `tag.c` is the single implementation. `tagDefineShape`
+already receives xmin/xmax/ymin/ymax but the `Character` struct's shape variant doesn't store
+them yet. We add those fields (see section 1a below) and look up the hit shape in `tagDefineButton`
+to compute `width_twips`/`height_twips` (see section 1b).
 
-Shape bounds are already passed as arguments to `tagDefineShape`:
+### Implementation: tag.c changes (after input-event-injection.md Phase 0)
+
+**Note:** After Phase 0 of input-event-injection.md, `tag_stubs.c` is deleted and
+`tag.c` is used for both trace and graphics builds. All implementation below targets
+`tag.c` and the shared `Character`/`DisplayObject` structs in `swf.h`.
+
+#### 1a. Shape bounds in Character struct
+
+`tagDefineShape` receives xmin/xmax/ymin/ymax but the `Character` struct's shape
+variant currently only stores `draw_start`/`draw_count`. Add bounds fields:
+
 ```c
-tagDefineShape(app_context, CHAR_TYPE_SHAPE, char_id, draw_start, draw_count,
-               xmin, xmax, ymin, ymax);
+// In swf.h, Character.shape variant:
+struct {
+    size_t draw_start, draw_count;
+    s32 xmin, xmax, ymin, ymax;   // ADD: bounding rect in twips
+} shape;
 ```
-We just need a `ng_shape_bounds[char_id]` registry in tag_stubs.c and a lookup in
-`tagDefineButton`/`tagPlaceObject2` when computing `_width`/`_height`.
-
-### Implementation: tag_stubs.c changes
-
-#### 1a. Shape bounds registry
 
 ```c
-// In tag_stubs.c static data:
-typedef struct { s32 xmin, xmax, ymin, ymax; } ShapeBounds;
-static ShapeBounds ng_shape_bounds[256];  // indexed by char_id
-static size_t ng_shape_bounds_count = 256;
+// In tag.c tagDefineShape (unconditional section):
+ch->shape.xmin = xmin;  ch->shape.xmax = xmax;
+ch->shape.ymin = ymin;  ch->shape.ymax = ymax;
+```
 
-// In tagDefineShape:
-void tagDefineShape(SWFAppContext* app_context, int type, size_t char_id,
-                    size_t draw_start, size_t draw_count,
-                    s32 xmin, s32 xmax, s32 ymin, s32 ymax)
-{
-    if (char_id < 256) {
-        ng_shape_bounds[char_id].xmin = xmin; ng_shape_bounds[char_id].xmax = xmax;
-        ng_shape_bounds[char_id].ymin = ymin; ng_shape_bounds[char_id].ymax = ymax;
-    }
-    // ... existing code ...
+#### 1b. Button width/height from hit shape bounds
+
+The `Character` struct's button variant already stores `state_funcs`, `actions`,
+`action_count`, and `hit_char_id` (after Phase 0 unification). Add hit bounds:
+
+```c
+// In tagDefineButton, compute and cache hit bounds on the Character:
+Character* hit_ch = (hit_char_id < dictionary_count) ? &dictionary[hit_char_id] : NULL;
+if (hit_ch && hit_ch->type == CHAR_TYPE_SHAPE) {
+    ch->button.width_twips  = hit_ch->shape.xmax - hit_ch->shape.xmin;
+    ch->button.height_twips = hit_ch->shape.ymax - hit_ch->shape.ymin;
 }
 ```
 
-#### 1b. Button state function registry
-
-Extend button registry to store state_funcs and hit shape bounds:
-
-```c
-typedef struct {
-    size_t char_id;
-    frame_func* state_funcs;  // [0]=up, [1]=over, [2]=down
-    size_t hit_char_id;       // hit shape char_id for bounds lookup
-    ButtonAction* actions;
-    size_t action_count;
-    s32 width_twips, height_twips;  // computed from hit shape bounds
-} NgButtonDef;
-
-static NgButtonDef ng_button_defs[MAX_BUTTONS_NG];
-
-// In tagDefineButton:
-void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs,
-                     size_t hit_char_id, u32 hit_transform_id,
-                     ButtonAction* actions, size_t action_count)
-{
-    NgButtonDef* def = &ng_button_defs[ng_button_count++];
-    def->char_id = char_id;
-    def->state_funcs = state_funcs;
-    def->hit_char_id = hit_char_id;
-    def->actions = actions;
-    def->action_count = action_count;
-    // Compute bounds from hit shape
-    if (hit_char_id < 256) {
-        def->width_twips = ng_shape_bounds[hit_char_id].xmax - ng_shape_bounds[hit_char_id].xmin;
-        def->height_twips = ng_shape_bounds[hit_char_id].ymax - ng_shape_bounds[hit_char_id].ymin;
-    }
-}
-```
+(`width_twips`/`height_twips` are new fields in the `Character.button` variant.)
 
 #### 1c. Button children initialization on placement
 
-When `tagPlaceObject2` detects a button char_id (btn != NULL), call its up-state frame
-function with nesting to initialize button children:
+When `tagPlaceObject2` places a `CHAR_TYPE_BUTTON` character, call its up-state frame
+function using the same context-swap pattern already used for sprite initialization:
 
 ```c
-// After the entry is created/updated in tagPlaceObject2, for button chars:
-if (btn_def != NULL && btn_def->state_funcs != NULL) {
-    // Push button's display index as current nesting context
-    size_t saved_nesting = ng_nesting_depth;
-    size_t saved_current = ng_current_display_idx;
-    ng_nesting_depth++;
-    ng_current_display_idx = /* new button's ng_display index */;
-    // Call up-state frame func (index 0)
-    btn_def->state_funcs[0](app_context);
-    ng_nesting_depth = saved_nesting;
-    ng_current_display_idx = saved_current;
+// In tag.c tagPlaceObject2, for CHAR_TYPE_BUTTON:
+if (ch->type == CHAR_TYPE_BUTTON && ch->button.state_funcs != NULL) {
+    // Context swap: push button's sprite display list (same as sprite init)
+    // ... same save/restore of display_list/max_depth/display_list_capacity ...
+    ch->button.state_funcs[0](app_context);  // up-state frame func
+    // ... restore context ...
 }
 ```
 
-This mirrors how sprite frame 0 is called (the `needs_init` path for sprites).
+This mirrors the sprite `needs_init` path already in `tag.c`.
 
 #### 1d. `_parent` resolution for button children
 
-In `getDisplayObjectProperty` / `actionGetVariable` for `_parent`:
-- Look at the display entry's `parent_display_idx`
-- If the parent display entry `is_button`, apply SWF version logic:
-  - SWF ≤ 5: return GRANDPARENT (skip the button)
-  - SWF ≥ 6: return the button (as `type = "object"`)
+In `actionGetVariable`/`actionGetProperty` for `_parent`, when the parent
+`DisplayObject` has `type == CHAR_TYPE_BUTTON`:
+- **SWF ≤ 5**: return GRANDPARENT (skip the button, return parent of button)
+- **SWF ≥ 6**: return the button itself (as `type = "object"`)
 
-This requires `g_swf_version` (already available in action.c) to be consulted during `_parent` resolution in tag_stubs.c. Simplest approach: tag_stubs.c declares `extern int g_swf_version;`.
+`g_swf_version` is already available in `action.c` and readable from `tag.c` via `extern`.
 
 #### 1e. `_width`/`_height` from button bounds
 
 `actionGetProperty` / GetMember `_width` for a button:
-- Retrieve the button's `width_twips` from `ng_button_defs` via char_id lookup
-- Convert: `_width = width_twips / 20.0`
+- Look up the Character in `dictionary[]` by char_id
+- Return `character.button.width_twips / 20.0f`
 
 #### 1f. `onEnterFrame` dispatch order (button_order)
 
@@ -242,124 +224,26 @@ python3 ruffle-tests/verify_output.py --test=movieclip_in_removed_button --diff 
 
 ## Phase 2: Input Event Simulation Infrastructure
 
-### Problem
-
-`verify_output.py` currently ignores `input.json`. The Ruffle test framework interleaves
-input events between frame ticks. We need to:
-1. Parse `input.json` in `verify_output.py`
-2. Generate a `events.c` file with a compiled-in events array
-3. `main.c` processes events BETWEEN frames (before each frame tick)
-
-### input.json format
-
-Event types seen across all button tests:
-```json
-{ "type": "MouseMove", "pos": [x, y] }
-{ "type": "MouseDown", "pos": [x, y], "btn": "Left" }
-{ "type": "MouseUp",   "pos": [x, y], "btn": "Left" }
-{ "type": "KeyDown",   "key": "Enter" }       // named key
-{ "type": "KeyDown",   "key": { "Char": "a" } } // character key
-{ "type": "KeyUp",     "key": "..." }
-{ "type": "TextInput", "codepoint": "a" }     // character sent to focused text field
-{ "type": "TextControl", "code": "Enter" }    // control input to text field
-{ "type": "Wait" }                            // advance one frame
-```
-
-`Wait` = process the pending frame (run `tagShowFrame`). Events without `Wait` between them
-happen "instantly" within the same frame transition. Events with multiple `Wait`s in sequence
-means multiple empty frames advance.
-
-For `num_ticks = 1` tests: all events fire before/during the single frame. No `Wait` entries
-are present in input.json for these tests.
-
-### Implementation: events.c generation
-
-`verify_output.py` reads `input.json` and generates `events.c`:
-
-```c
-// events.c (generated by verify_output.py)
-#include "events.h"
-
-SWFInputEvent g_swf_events[] = {
-    { EVENT_MOUSE_MOVE, .x = 160.0f, .y = 160.0f },
-    { EVENT_WAIT },
-    { EVENT_MOUSE_DOWN, .x = 160.0f, .y = 160.0f },
-    { EVENT_KEY_DOWN, .key_code = 65 },  // 'a'
-    // ...
-};
-int g_swf_event_count = N;
-```
-
-And `events.h`:
-```c
-typedef enum {
-    EVENT_NONE, EVENT_WAIT, EVENT_MOUSE_MOVE, EVENT_MOUSE_DOWN, EVENT_MOUSE_UP,
-    EVENT_KEY_DOWN, EVENT_KEY_UP, EVENT_TEXT_INPUT, EVENT_TEXT_CONTROL,
-} SWFInputEventType;
-
-typedef struct {
-    SWFInputEventType type;
-    float x, y;        // for mouse events
-    int key_code;      // for key events (Flash key code)
-    int char_code;     // for text input (Unicode codepoint)
-} SWFInputEvent;
-
-extern SWFInputEvent g_swf_events[];
-extern int g_swf_event_count;
-```
-
-If no `input.json` exists, generate an empty events array.
-
-### main.c integration
-
-```c
-// In main.c frame loop:
-extern SWFInputEvent g_swf_events[];
-extern int g_swf_event_count;
-static int event_idx = 0;
-
-// Before each frame:
-void process_events_until_wait() {
-    while (event_idx < g_swf_event_count) {
-        SWFInputEvent* e = &g_swf_events[event_idx++];
-        if (e->type == EVENT_WAIT) return;  // Stop at Wait
-        dispatch_event(e);
-    }
-}
-```
-
-For `num_ticks = 1` tests: drain ALL events (no Waits), THEN run the single frame tick.
-
-### Key code mapping
-
-Flash key codes differ from modern key codes. The recompiler already knows them (used in
-button conditions). We need a mapping from JSON key names to Flash key codes:
-
-| JSON key name | Flash key code | Notes |
-|---------------|---------------|-------|
-| `"Enter"` | 13 | |
-| `"Space"` | 32 | |
-| `"Tab"` | 9 | |
-| `"Escape"` | 27 | |
-| `"ArrowLeft"` | 37 | |
-| `"ArrowRight"` | 39 | |
-| `"ArrowUp"` | 38 | |
-| `"ArrowDown"` | 40 | |
-| `"Home"` | 36 | |
-| `"End"` | 35 | |
-| `"Insert"` | 45 | |
-| `"Delete"` | 46 | |
-| `"Backspace"` | 8 | |
-| `"PageUp"` | 33 | |
-| `"PageDown"` | 34 | |
-| `{ "Char": "a" }` | 65 | A-Z: 65-90 |
-
-### Files to add/modify for Phase 2
-
-- `verify_output.py`: Read `input.json`, generate `events.c` + `events.h` in build dir
-- `SWFRecomp/wasm_wrappers/main.c`: Consume events in frame loop
-- New `SWFModernRuntime/include/libswf/events.h`: Event struct definition
-- tag_stubs.c: `void swf_dispatch_event(SWFInputEvent* e)` implementation
+> **SUPERSEDED** — This phase is now fully covered by `SWFRecompDocs/plans/input-event-injection.md`
+> (Phases 0–4 of that plan). See that document for the authoritative design. Summary of what
+> it provides for phases 3–5 of this plan:
+>
+> - **Phase 0**: `tag_stubs.c` deleted; `tag.c` unified; `Character`/`DisplayObject`/
+>   `MouseState` unconditional in `swf.h`; `shape_data`/`transform_data` + `hit_test.c`
+>   included in trace builds. Button `Character` variant and display list fully available.
+> - **Phase 1**: `verify_output.py` reads `input.json`, pre-processes to a line-based text
+>   file (one event per line), passes as `argv[1]` to the test binary. Key mapping:
+>   Ruffle key names → Flash key codes.
+> - **Phase 2**: Event file format (`WAIT`, `MOUSE_MOVE x y`, `MOUSE_DOWN_LEFT x y`,
+>   `KEY_DOWN code`, etc.). Coordinates are Ruffle viewport pixels ÷ `scale_factor` from
+>   `test.toml` → logical Flash stage pixels. C multiplies by 20 for twips.
+> - **Phase 3**: `input_events_load(argv[1])` in `swf_core.c`; per-tick pump delivers
+>   events before `ng_advanceSprites`; `Wait` tokens map to tick boundaries.
+> - **Phase 4**: `KeyState keys` in `SWFAppContext` (`uint8_t down[256]`,
+>   `last_key_down`); per-tick edge-flag reset; `_xmouse`/`_ymouse` read from
+>   `mouse.stage_x / 20.0f`.
+>
+> No tests pass from infrastructure alone — it unlocks Phases 3–5 of this plan.
 
 ---
 
@@ -388,33 +272,25 @@ BUTTONCONDACTION condition bits (UI16 LE, from SWF spec):
 0x0100 OverDownToIdle    → (also part of dragOut conditions)
 ```
 
-Per-button state machine: `ng_button_state[i]` (0=idle, 1=over, 2=down, 3=outdown)
+Per-button state machine: `button_state` field on `DisplayObject` (0=idle, 1=over, 2=down, 3=outdown) — already defined in `tag.c`'s graphics-mode implementation.
 
 ### Hit testing
 
-For each MouseMove/MouseDown event: check if `(x, y)` is inside any button's hit area.
-Button hit area = the button's `hit_char_id` shape bounds + the button's current transform.
+After input-event-injection.md Phase 0, `hit_test.c` is compiled into trace builds and
+`shape_data`/`transform_data` from `draws.h` are available in `SWFAppContext`. The
+existing `hit_test_shape()` infrastructure does full triangle-level hit testing, identical
+to graphics mode — no AABB approximation is needed.
 
-Mouse coordinates in `input.json` are in pixels (already scaled to SWF coordinate space?
-Or in screen pixels that need conversion from stage size). For now assume the input.json
-coordinates are in the SWF's coordinate space (same as shape bounds / 20).
+Mouse coordinates: Ruffle's `input.json` positions are in viewport pixels.
+`verify_output.py` (input-event-injection.md Phase 1) divides by `scale_factor` from
+`test.toml` (defaults to 1.0). C stores `mouse.stage_x/y` in twips (× 20). `_xmouse`/
+`_ymouse` return `stage_x / 20.0f`. Only `mouse_pos_with_scale_factor` uses a non-1.0
+scale factor; all button tests use the default.
 
-Simple AABB hit test against button's hit shape bounds:
-```c
-int button_hit_test(NgButtonDef* def, float mouse_x, float mouse_y) {
-    // Bounds in pixels (twips/20)
-    float xmin = def->xpos + ng_shape_bounds[def->hit_char_id].xmin / 20.0f;
-    float xmax = def->xpos + ng_shape_bounds[def->hit_char_id].xmax / 20.0f;
-    float ymin = def->ypos + ng_shape_bounds[def->hit_char_id].ymin / 20.0f;
-    float ymax = def->ypos + ng_shape_bounds[def->hit_char_id].ymax / 20.0f;
-    return (mouse_x >= xmin && mouse_x <= xmax && mouse_y >= ymin && mouse_y <= ymax);
-}
-```
-
-Button position needs to be tracked when the button is placed (from transform_id). Since
-NO_GRAPHICS mode doesn't use the transform matrix, we need to track x/y offset from
-`tagPlaceObject2` coordinates. Currently x/y are always 0 for button tests (buttons placed
-at origin), so a simple x=0, y=0 placeholder works for Phase 3.
+The button state machine already implemented in `tag.c` for graphics mode (hit-test →
+state transition → `onPress`/`onRelease`/etc. dispatch) is unconditionally available in
+trace builds after Phase 0, since the button logic is not guarded by `#ifndef NO_GRAPHICS`
+— only the render calls are.
 
 ### AS2 event handlers
 
@@ -424,10 +300,9 @@ When a button transitions:
 
 AS2 handlers are stored as properties on the button's MovieClip instance:
 ```c
-// Dispatch AS2 handler for button at ng_display index i:
-void dispatch_button_event(SWFAppContext* app_context, size_t di, const char* handler_name) {
-    // Get button's MC object
-    // Look up handler_name property
+// Dispatch AS2 handler for button DisplayObject at display_list[depth]:
+void dispatch_button_event(SWFAppContext* app_context, DisplayObject* obj, const char* handler_name) {
+    // Look up handler_name property on obj's AS object
     // If it's a function, call it
 }
 ```
@@ -617,41 +492,49 @@ Phase 2 ──→ Phase 3 ──→ Phase 4 ──→ Phase 5
 
 ## Files to Modify
 
-### Phase 1 (tag_stubs.c only)
+### Prerequisite (input-event-injection.md Phases 0–4)
+
+See `SWFRecompDocs/plans/input-event-injection.md` for full details. Summary:
+
+| File | Change |
+|------|--------|
+| `SWFModernRuntime/include/libswf/swf.h` | Remove `NO_GRAPHICS` guards from `Character`/`DisplayObject`/`MouseState`; add `KeyState` |
+| `SWFModernRuntime/src/libswf/tag_stubs.c` | **DELETED** — merged into `tag.c` |
+| `SWFModernRuntime/src/libswf/tag.c` | Unconditional tag logic; `#ifndef NO_GRAPHICS` around render calls only |
+| `SWFModernRuntime/src/libswf/swf_core.c` | Event pump: load, tick pump, deliver; per-tick edge-flag reset |
+| `ruffle-tests/verify_output.py` | `preprocess_input_json()`, pass event file as `argv[1]`, copy `hit_test.c`/`.h` |
+
+### Phase 1 (tag.c + swf.h)
 
 | File | Changes |
 |------|---------|
-| `SWFModernRuntime/src/libswf/tag_stubs.c` | Shape bounds registry; button def registry with state_funcs; call up-state on placement; button children nested in display list; `_parent` SWF5 vs SWF6 resolution; `_width`/`_height` from hit bounds |
+| `SWFModernRuntime/include/libswf/swf.h` | Add `xmin`/`xmax`/`ymin`/`ymax` to `Character.shape` variant; add `width_twips`/`height_twips` to `Character.button` variant |
+| `SWFModernRuntime/src/libswf/tag.c` | Store shape bounds in `tagDefineShape`; compute button hit bounds in `tagDefineButton`; call up-state frame func on button placement; `_parent` SWF5 vs SWF6 resolution; `_width`/`_height` from button hit bounds |
 
 ### Phase 2 (infrastructure)
 
-| File | Changes |
-|------|---------|
-| `ruffle-tests/verify_output.py` | Read input.json; generate events.c + events.h in build dir; key name → Flash key code mapping |
-| `SWFRecomp/wasm_wrappers/main.c` | Process events between frames; handle Wait = frame advance |
-| New: `SWFModernRuntime/include/libswf/events.h` | SWFInputEvent struct, type enum |
-| `SWFModernRuntime/src/libswf/tag_stubs.c` | `swf_dispatch_event()` implementation (mouse state tracking, placeholder for handlers) |
+> Superseded. See `SWFRecompDocs/plans/input-event-injection.md`.
 
 ### Phase 3 (mouse events)
 
 | File | Changes |
 |------|---------|
-| `SWFModernRuntime/src/libswf/tag_stubs.c` | Button state machine per displayed button; hit test; ButtonAction condition dispatch |
+| `SWFModernRuntime/src/libswf/tag.c` | Confirm button state machine + hit testing runs in NO_GRAPHICS trace builds after Phase 0; ButtonAction condition dispatch |
 | `SWFModernRuntime/src/actionmodern/action.c` | `MovieClip.prototype.enabled = true` default; AS2 handler dispatch (call onPress etc from C) |
 
 ### Phase 4 (key events)
 
 | File | Changes |
 |------|---------|
-| `SWFModernRuntime/src/libswf/tag_stubs.c` | Key state tracking; global key listener list dispatch |
 | `SWFModernRuntime/src/actionmodern/action.c` | `Key` global object: addListener, removeListener, isDown, getCode, getAscii |
+| `SWFModernRuntime/src/libswf/swf_core.c` | Key listener dispatch; button key-press condition dispatch |
 
 ### Phase 5 (focus)
 
 | File | Changes |
 |------|---------|
 | `SWFModernRuntime/src/actionmodern/action.c` | `Selection` global object; focus state; Tab focus cycle |
-| `SWFModernRuntime/src/libswf/tag_stubs.c` | Per-display-object `has_focus` flag; focus traversal |
+| `SWFModernRuntime/src/libswf/tag.c` | Per-display-object `has_focus` flag; focus traversal |
 
 ---
 
@@ -661,10 +544,10 @@ Phase 2 ──→ Phase 3 ──→ Phase 4 ──→ Phase 5
    nesting mechanism (already used for sprites). Button state 0 (up) is always initialized on
    placement; if state changes later (Phase 3), swap display children.
 
-2. **events.c generation**: Generate a simple C file per test. This avoids needing stdin
-   parsing or file I/O in the runtime — events are baked in at compile time, consistent with
-   how the runtime currently handles all test-specific data (frame count, frame rate, SWF
-   version, string tables).
+2. **Event delivery via argv[1]** (from input-event-injection.md): `verify_output.py`
+   pre-processes `input.json` to a line-based text file and passes its path as `argv[1]`.
+   The binary loads it at runtime with `fgets`/`sscanf`. This replaces the earlier
+   `events.c` compile-time generation approach.
 
 3. **Button _width from hit shape**: Use the hit shape's AABB (not the visible shape's bounds).
    This matches Flash behavior. Phase 1 uses a simple AABB lookup; Phase 3 refines with
@@ -674,9 +557,11 @@ Phase 2 ──→ Phase 3 ──→ Phase 4 ──→ Phase 5
    `onKeyDown`/`onKeyUp` handlers. `Key.addListener` subscribers fire after the focused object.
    This ordering must be exact for `button_key_events` to pass.
 
-5. **mouse_x/mouse_y for hit testing**: input.json coordinates are in SWF coordinate space
-   (screen pixels matching the stage dimensions from constants.h, e.g. FRAME_WIDTH=550).
-   No scaling needed for hit tests.
+5. **Mouse coordinate system** (resolved in input-event-injection.md): `input.json`
+   coordinates are Ruffle viewport pixels. `verify_output.py` divides by `scale_factor`
+   (from `test.toml`, default 1.0) → logical Flash stage pixels. C stores in twips (× 20)
+   for `hit_test.c`. `_xmouse`/`_ymouse` return `stage_x / 20.0f`. Only
+   `mouse_pos_with_scale_factor` has `scale_factor ≠ 1.0`; all button tests use 1.0.
 
 6. **`root_button_mode` deferred**: This test needs `createEmptyMovieClip` + `loadMovie` +
    `_lockroot` to work correctly. It will only become fixable once those features are implemented

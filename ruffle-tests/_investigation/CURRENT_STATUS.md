@@ -1,14 +1,14 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-20 (Phase 7 Key Events: Key object, broadcastMessage, key dispatch, frame-first loop)
+Last updated: 2026-02-20 (TextField Phase 3+5: textfield_props_swf5, edittext_newline_stripping, edittext_html_align_swf7/swf8)
 
 Previous CI baseline: 227/619 (36.7%), commit d71ead7
 
 ## Quick Summary
 
-- **Pass rate (CI)**: 227/619 (36.7%) — pending CI run for Phase 7 (no regressions expected)
+- **Pass rate (CI)**: 227/619 (36.7%) — pending CI run for TextField phase (no regressions expected)
 - **Main failure type**: output_mismatch, timeout (2), segfault (1)
-- **Recent gains**: `button_goto` and `key_isToggled` now pass (Phase 7: Key AsBroadcaster, broadcastMessage, frame-first event loop)
+- **Recent gains**: `textfield_props_swf5`, `edittext_newline_stripping`, `edittext_html_align_swf7`, `edittext_html_align_swf8` now pass
 - **Active plans**: input-event-injection.md Phases 0–7 COMPLETE; Phases 8+9 are now separate plans:
   - **MOUSE_EVENTS_PLAN.md** — `_xmouse`/`_ymouse`, clip mouse event dispatch (5 tests)
   - **FOCUS_SYSTEM_PLAN.md** — mouse-triggered focus, onSetFocus/onKillFocus (6 tests)
@@ -61,6 +61,10 @@ These tests were near-passing in the previous update and now pass locally:
 - `arguments` (127/127) — fixed by b9cfc9d + 2f007dd (callee/caller/__proto__/instanceof Array; preload path fix)
 - `duplicate_movie_clip` (21/21) ✅ — clone/duplicate plan (this branch): as_set_flags copy, ng_duplicateMovieClip, toString/valueOf for object args, depth+16384 semantic
 - `clone_sprite_types` (25/25) ✅ — clone/duplicate plan (this branch): ng_isScriptableAtDepth for non-scriptable types (shape/statictext/morphshape/image return parent MC), tagDefineVideoStream for video scriptability
+- `textfield_props_swf5` (87/87) ✅ — d649861: SWF5 TextField properties 0-29 now non-writable (setPropertyWithFlags)
+- `edittext_newline_stripping` (46/46) ✅ — 51acce6: multiline text fields without variable bindings get trailing '\n' appended to initial text
+- `edittext_html_align_swf7` (52/52) ✅ — 235fd38: HTML-aware alignment in getNewTextFormat/getTextFormat
+- `edittext_html_align_swf8` (52/52) ✅ — 235fd38: HTML-aware alignment (SWF8: left when tag-HTML but script set html=false)
 
 ### Tier 2: 3-15 lines off
 
@@ -105,7 +109,7 @@ These tests were near-passing in the previous update and now pass locally:
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | GLOBALS_PLAN | **Phase 6 DONE** | globals_swf6/7/8, primitive_type_globals PASS | Phase 7-8 (prototype methods, property flags) |
 | XML_PLAN | **ALL PHASES COMPLETE** | 24/26 active tests pass | xml_to_string (11/13), xml_child_nodes_edge_cases (3/4) |
-| TEXTFIELD_PLAN | **Phases 1-2 DONE** | 17/66 tests pass | Phase 3 (variable binding, width/height), Phase 5 (HTML) |
+| TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25/66 tests pass | Phase 4 (scroll), Phase 5 (htmlText roundtrip, color, condenseWhite), Phase 6 (layout) |
 | MOVIECLIP_PLAN | **Phase 1 DONE** | 2 MC tests pass | Phase 2 (depth), Phase 3 (createEmptyMC) |
 | PARSING_FUNCTIONS_PLAN | **Partially done** | 0/2 pass | parse_int may now be unblocked (arguments fixed) |
 | COLOR_OBJECT_PLAN | Not started | 0/4 | - |

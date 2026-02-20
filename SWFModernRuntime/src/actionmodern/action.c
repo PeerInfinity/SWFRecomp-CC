@@ -474,8 +474,15 @@ static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_STRING;
-	ret.str_size = 15;
-	ret.data.numeric_value = (u64) u16_object_Object;
+	if (g_swf_version < 6) {
+		// SWF5 uses "[type Object]" format
+		ret.str_size = 13;
+		ret.data.numeric_value = (u64) u16_type_Object;
+	} else {
+		// SWF6+ uses "[object Object]" format
+		ret.str_size = 15;
+		ret.data.numeric_value = (u64) u16_object_Object;
+	}
 	return ret;
 }
 
@@ -5819,7 +5826,8 @@ static void initTextFormatPrototype(SWFAppContext* app_context);
 // If tf_idx < 0, returns a TextFormat with default values (for dynamic/non-EditText fields).
 // If is_new_text_format is true, always populates all properties (getNewTextFormat behavior).
 // If is_new_text_format is false, only populates if field has text (getTextFormat behavior).
-static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_idx, int has_text, int is_new_text_format) {
+// override_align: -1 = use tag-defined alignment; 0-3 = force left/right/center/justify.
+static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_idx, int has_text, int is_new_text_format, int override_align) {
 	initTextFormatPrototype(app_context);
 	ASObject* tf_obj = allocObject(app_context, 24);
 	if (g_textformat_constructor.prototype_obj != NULL) {
@@ -5851,12 +5859,15 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 	{
 		const uint16_t* align_u16 = u16_left;
 		u32 align_u16_len = 4;
-		if (tf_idx >= 0) {
-			u8 a = ng_getTextFieldAlign(tf_idx);
-			if (a == 1) { align_u16 = u16_right; align_u16_len = 5; }
-			else if (a == 2) { align_u16 = u16_center; align_u16_len = 6; }
-			else if (a == 3) { align_u16 = u16_justify; align_u16_len = 7; }
+		int a = 0; // default: left
+		if (override_align >= 0) {
+			a = override_align; // caller-computed HTML-aware alignment
+		} else if (tf_idx >= 0) {
+			a = (int) ng_getTextFieldAlign(tf_idx); // tag-defined alignment
 		}
+		if (a == 1) { align_u16 = u16_right; align_u16_len = 5; }
+		else if (a == 2) { align_u16 = u16_center; align_u16_len = 6; }
+		else if (a == 3) { align_u16 = u16_justify; align_u16_len = 7; }
 		val.type = ACTION_STACK_VALUE_STRING;
 		val.data.numeric_value = (u64) align_u16;
 		val.str_size = align_u16_len;
@@ -7660,7 +7671,20 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				//            0x0040=HTML, 0x0080=UseOutlines, 0x0100=AutoSize
 
 				// text property (initial text from DefineEditText)
+				// Flash multiline fields have a trailing '\n' in their initial text,
+				// but only when there is no variable binding (variable-bound fields
+				// derive their text from the variable, not from the tag default).
 				const char* init_text = ng_getTextFieldInitialText(depth);
+				char* init_text_ml = NULL;
+				if ((tf_flags & 0x0002) && ng_getTextFieldVariableName(tf_idx)[0] == '\0') {
+					// Multiline with no variable binding: append trailing newline
+					size_t _ml_len = strlen(init_text);
+					init_text_ml = (char*) malloc(_ml_len + 2);
+					memcpy(init_text_ml, init_text, _ml_len);
+					init_text_ml[_ml_len]     = '\n';
+					init_text_ml[_ml_len + 1] = '\0';
+					init_text = init_text_ml;
+				}
 				ActionVar text_val = {0};
 				text_val.type = ACTION_STACK_VALUE_STRING;
 				{
@@ -7669,6 +7693,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					text_val.str_size = _it_u16_len;
 					VAL(u64, &text_val.data.numeric_value) = (u64)_it_u16;
 				}
+				if (init_text_ml) free(init_text_ml);
 				setProperty(app_context, props, "text", 4, &text_val);
 				// htmlText — for HTML fields, wrap with <P ALIGN><FONT> tags
 				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
@@ -7805,6 +7830,37 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					var_val.str_size = _vn_u16_len;
 					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
 					setProperty(app_context, props, "variable", 8, &var_val);
+				}
+				// If the bound variable already has a value (e.g., textfield placed after
+				// the variable was set), initialize text from that current value.
+				if (var_name[0] != '\0') {
+					const char* _fi_dot = strchr(var_name, '.');
+					if (_fi_dot != NULL) {
+						// Path variable (e.g., "obj.theVar"): resolve container then read property
+						const char* _fi_last_dot = _fi_dot;
+						for (const char* _fi_p = _fi_dot + 1; *_fi_p; _fi_p++)
+							if (*_fi_p == '.') _fi_last_dot = _fi_p;
+						u32 _fi_clen = (u32)(_fi_last_dot - var_name);
+						const char* _fi_prop = _fi_last_dot + 1;
+						u32 _fi_plen = (u32)strlen(_fi_prop);
+						PUSH_STR(var_name, _fi_clen);
+						actionGetVariable(app_context);
+						ActionVar _fi_cvar;
+						peekVar(app_context, &_fi_cvar);
+						POP();
+						ASObject* _fi_obj = NULL;
+						if (_fi_cvar.type == ACTION_STACK_VALUE_OBJECT)
+							_fi_obj = (ASObject*) VAL(u64, &_fi_cvar.data.numeric_value);
+						else if (_fi_cvar.type == ACTION_STACK_VALUE_MOVIECLIP) {
+							MovieClip* _fi_mc = (MovieClip*) VAL(u64, &_fi_cvar.data.numeric_value);
+							if (_fi_mc != NULL) _fi_obj = (ASObject*) _fi_mc->dynamic_props;
+						}
+						if (_fi_obj != NULL) {
+							ActionVar* _fi_val = getProperty(_fi_obj, _fi_prop, _fi_plen);
+							if (_fi_val != NULL && _fi_val->type != ACTION_STACK_VALUE_UNDEFINED)
+								setProperty(app_context, props, "text", 4, _fi_val);
+						}
+					}
 				}
 				// autoSize (from DefineEditText AutoSize flag)
 				ActionVar autosize_val = {0};
@@ -13016,8 +13072,19 @@ void actionDefineLocal(SWFAppContext* app_context)
 					free(old_hash->data.string_data.heap_ptr);
 				free(old_hash);
 			}
+			// Existing entry has a stable heap-allocated key — just update the value.
+			hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+		} else {
+			// New entry: var_name points to a stack buffer (_dl_buf) that becomes
+			// a dangling pointer after this function returns. Heap-allocate a copy
+			// so the hashmap key remains valid for future lookups.
+			char* hm_key = (char*) malloc(var_name_len + 1);
+			if (hm_key) {
+				memcpy(hm_key, var_name, var_name_len);
+				hm_key[var_name_len] = '\0';
+				hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
+			}
 		}
-		hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
 	}
 
 #ifdef NO_GRAPHICS
@@ -17427,7 +17494,45 @@ void actionNewObject(SWFAppContext* app_context)
 		}
 		else
 		{
+			// SWF5: no TextField.prototype; use Object.prototype as __proto__
 			setObjectProto(app_context, tf_obj);
+			// In SWF5, new TextField() populates 35 properties as own enumerable
+			// properties (since there's no TextField.prototype to inherit from).
+			// Add in REVERSE insertion order so actionEnumerate2 (LIFO) yields
+			// them in forward order: styleSheet first, gridFitType last.
+			ActionVar undef_val = {0};
+			undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+			static const char* swf5_tf_prop_names[] = {
+				"styleSheet", "mouseWheelEnabled", "condenseWhite", "restrict",
+				"textHeight", "textWidth", "bottomScroll", "length",
+				"selectable", "multiline", "password", "wordWrap",
+				"background", "border", "html", "embedFonts",
+				"maxChars", "maxhscroll", "hscroll", "variable",
+				"htmlText", "type", "text", "autoSize",
+				"tabIndex", "textColor", "backgroundColor", "borderColor",
+				"maxscroll", "scroll", "filters", "sharpness",
+				"thickness", "antiAliasType", "gridFitType"
+			};
+			static const u32 swf5_tf_prop_lens[] = {
+				10, 17, 13, 8,
+				10, 9, 12, 6,
+				10, 9, 8, 8,
+				10, 6, 4, 10,
+				8, 10, 7, 8,
+				8, 4, 4, 8,
+				8, 9, 15, 11,
+				9, 6, 7, 9,
+				9, 13, 11
+			};
+			for (int i = 34; i >= 0; i--)
+			{
+				// Properties 0-29 (styleSheet through scroll) are NOT writable in SWF5
+				// (they are internal AVM1 properties that ignore SetMember).
+				// Properties 30-34 (filters through gridFitType) ARE writable.
+				u8 flags = (i >= 30) ? PROPERTY_FLAGS_DEFAULT :
+				                       (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+				setPropertyWithFlags(app_context, tf_obj, swf5_tf_prop_names[i], swf5_tf_prop_lens[i], &undef_val, flags);
+			}
 		}
 		new_obj = tf_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
@@ -23682,7 +23787,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 			int has_text = force_null ? 0 : (text[0] != '\0');
-			ASObject* tf = createTextFormatFromField(app_context, tf_idx, has_text, 0);
+			// Compute HTML-aware alignment override (SWF7/SWF8 behavior differ)
+			int html_align_override = -1; // default: use tag-defined align
+			if (tf_idx >= 0) {
+				u16 tag_flags = ng_getTextFieldFlags(tf_idx);
+				int tag_html = (tag_flags & 0x0040) != 0;
+				int cur_html = tag_html; // default to tag init value
+				if (mc->dynamic_props != NULL) {
+					ActionVar* html_prop = getProperty((ASObject*) mc->dynamic_props, "html", 4);
+					if (html_prop != NULL && html_prop->type == ACTION_STACK_VALUE_BOOLEAN)
+						cur_html = html_prop->data.numeric_value ? 1 : 0;
+				}
+				if (g_swf_version <= 7) {
+					// SWF7: HTML mode active (from tag or script) → left alignment
+					if (cur_html || tag_html) html_align_override = 0; // left
+				} else {
+					// SWF8: only left when tag was HTML but script explicitly turned it off
+					if (tag_html && !cur_html) html_align_override = 0; // left
+				}
+			}
+			ASObject* tf = createTextFormatFromField(app_context, tf_idx, has_text, 0, html_align_override);
 			// Override color with current textColor from dynamic_props
 			if (has_text && mc->dynamic_props != NULL) {
 				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
@@ -23705,7 +23829,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 #ifdef NO_GRAPHICS
 			int tf_idx = mc->ng_textfield_idx;
-			ASObject* tf = createTextFormatFromField(app_context, tf_idx, 1, 1);
+			// Compute HTML-aware alignment override (SWF7/SWF8 behavior differ)
+			int html_align_override_ntf = -1; // default: use tag-defined align
+			if (tf_idx >= 0) {
+				u16 tag_flags_ntf = ng_getTextFieldFlags(tf_idx);
+				int tag_html_ntf = (tag_flags_ntf & 0x0040) != 0;
+				int cur_html_ntf = tag_html_ntf;
+				if (mc->dynamic_props != NULL) {
+					ActionVar* html_prop_ntf = getProperty((ASObject*) mc->dynamic_props, "html", 4);
+					if (html_prop_ntf != NULL && html_prop_ntf->type == ACTION_STACK_VALUE_BOOLEAN)
+						cur_html_ntf = html_prop_ntf->data.numeric_value ? 1 : 0;
+				}
+				if (g_swf_version <= 7) {
+					if (cur_html_ntf || tag_html_ntf) html_align_override_ntf = 0; // left
+				} else {
+					if (tag_html_ntf && !cur_html_ntf) html_align_override_ntf = 0; // left
+				}
+			}
+			ASObject* tf = createTextFormatFromField(app_context, tf_idx, 1, 1, html_align_override_ntf);
 			// Override color with current textColor from dynamic_props
 			if (mc->dynamic_props != NULL) {
 				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
