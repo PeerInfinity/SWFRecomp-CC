@@ -26,6 +26,9 @@ size_t g_frame_count = 0;
 // Drag state tracking
 int is_dragging = 0;
 char* dragged_target = NULL;
+float g_drag_virt_x = 0.0f;   // virtual stage X of dragged clip (twips)
+float g_drag_virt_y = 0.0f;   // virtual stage Y of dragged clip (twips)
+char g_drag_target_name[256] = "";  // name of most-recently dragged clip (persists after stopDrag)
 
 // Goto catch-up state
 int catch_up_mode = 0;
@@ -165,6 +168,13 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ms->moved = 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
+        // Update virtual drag position while dragging
+        if (is_dragging) {
+            g_drag_virt_x = ms->stage_x;
+            g_drag_virt_y = ms->stage_y;
+        }
+        // Dispatch AS2 roll/drag over/out events to dynamic MCs
+        actionDispatchMCMouseMove(app_context);
         break;
     case EV_MOUSE_DOWN_LEFT:
         ms->stage_x = ev->x * 20.0f;
@@ -175,6 +185,9 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         app_context->keys.toggled[1] ^= 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
+        dispatch_clip_event_press(app_context);
+        // Dispatch AS2 onPress to dynamic MCs
+        actionDispatchMCPress(app_context);
         break;
     case EV_MOUSE_UP_LEFT:
         ms->stage_x = ev->x * 20.0f;
@@ -183,6 +196,9 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ms->released = 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
+        dispatch_clip_event_release(app_context);
+        // Dispatch AS2 onRelease/onReleaseOutside to dynamic MCs
+        actionDispatchMCRelease(app_context);
         break;
     case EV_KEY_DOWN:
         if (ev->code >= 0 && ev->code < 256) {

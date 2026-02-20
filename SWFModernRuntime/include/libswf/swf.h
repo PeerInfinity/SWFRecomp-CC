@@ -158,6 +158,8 @@ typedef struct DisplayObject
 	// Timeline tracking
 	u8 sprite_needs_init;   // 1 if frame_0 needs to run this tick (NO_GRAPHICS)
 	size_t placed_at_frame; // frame index when this object was placed
+	// Clip event interaction state
+	u8 clip_mc_pressed;     // 1 if CLIP_EVENT_PRESS was fired for this clip (awaiting RELEASE/RELEASE_OUTSIDE)
 } DisplayObject;
 
 typedef struct KeyState {
@@ -265,6 +267,12 @@ extern size_t g_frame_count;
 // Drag state tracking (works in both graphics and NO_GRAPHICS modes)
 extern int is_dragging;         // 1 if a sprite is being dragged, 0 otherwise
 extern char* dragged_target;    // Name of the target being dragged (or NULL)
+// Virtual drag position: registration point of dragged/last-dragged clip (twips).
+// Updated on mouse move while dragging; persists after stopDrag for PRESS hit-testing.
+extern float g_drag_virt_x;
+extern float g_drag_virt_y;
+// Name of the most recently dragged clip (persists after stopDrag for PRESS hit-testing).
+extern char g_drag_target_name[256];
 
 extern Character* dictionary;
 

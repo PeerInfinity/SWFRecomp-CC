@@ -461,6 +461,66 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 }
 #endif // NO_GRAPHICS
 
+#ifdef NO_GRAPHICS
+// ---------------------------------------------------------------------------
+// Recursive sprite_needs_init processor
+// ---------------------------------------------------------------------------
+// Processes ALL sprite_needs_init entries in the CURRENT display_list
+// (which may be a root-level or nested list), then recursively processes
+// any sprite_needs_init entries placed by those frame-0 functions.
+// Must be called with the target display_list already swapped in.
+static void run_sprite_needs_init(SWFAppContext* app_context)
+{
+	for (size_t i = 1; i <= max_depth; i++)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+
+		obj->sprite_needs_init = 0;
+
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+
+		display_list = obj->sprite_display_list;
+		max_depth = obj->sprite_max_depth;
+		display_list_capacity = obj->sprite_dl_capacity;
+
+		if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+			CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+
+		// Recursively initialize any nested sprites placed by this frame function
+		run_sprite_needs_init(app_context);
+
+		obj->sprite_current_frame = 1 % ch->sprite_frame_count;
+
+		obj->sprite_display_list = display_list;
+		obj->sprite_max_depth = max_depth;
+		obj->sprite_dl_capacity = display_list_capacity;
+
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+
+		// Fire onLoad clip actions for newly initialized sprites
+		if (obj->clip_action_count > 0 && obj->instance_name != NULL)
+		{
+			MovieClip* saved_ctx = g_current_context;
+			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
+			if (mc) actionSetCurrentContext(mc);
+			for (size_t a = 0; a < obj->clip_action_count; a++)
+			{
+				if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
+					obj->clip_actions[a].action(app_context);
+			}
+			actionSetCurrentContext(saved_ctx);
+		}
+	}
+}
+#endif // NO_GRAPHICS
+
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 {
 #ifndef NO_GRAPHICS
@@ -481,55 +541,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	{
 		int saved_catch_up = catch_up_mode;
 		catch_up_mode = 0;
-		for (size_t i = 1; i <= max_depth; i++)
-		{
-			DisplayObject* obj = &display_list[i];
-			if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
-			Character* ch = &dictionary[obj->char_id];
-			if (ch->type != CHAR_TYPE_SPRITE) continue;
-
-			obj->sprite_needs_init = 0;
-
-			// Context swap to sprite's display list
-			DisplayObject* saved_dl = display_list;
-			size_t saved_max = max_depth;
-			size_t saved_cap = display_list_capacity;
-
-			display_list = obj->sprite_display_list;
-			max_depth = obj->sprite_max_depth;
-			display_list_capacity = obj->sprite_dl_capacity;
-
-			// Run frame 0 WITH scripts (catch_up_mode=0)
-			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
-				CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
-
-			// Advance frame counter so advance_sprite_frames picks up at frame 1
-			// (for 1-frame sprites, 1 % 1 = 0, which correctly loops back each tick)
-			obj->sprite_current_frame = 1 % ch->sprite_frame_count;
-
-			// Save back (pointer may change from realloc)
-			obj->sprite_display_list = display_list;
-			obj->sprite_max_depth = max_depth;
-			obj->sprite_dl_capacity = display_list_capacity;
-
-			display_list = saved_dl;
-			max_depth = saved_max;
-			display_list_capacity = saved_cap;
-
-			// Fire onLoad clip actions for newly initialized sprites
-			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
-			{
-				MovieClip* saved_ctx = g_current_context;
-				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
-				if (mc) actionSetCurrentContext(mc);
-				for (size_t a = 0; a < obj->clip_action_count; a++)
-				{
-					if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
-						obj->clip_actions[a].action(app_context);
-				}
-				actionSetCurrentContext(saved_ctx);
-			}
-		}
+		// Process sprite_needs_init recursively so nested sprites (e.g. drop3 inside drop2)
+		// also run their frame_0 in the same tick as their parent, matching Flash behavior.
+		run_sprite_needs_init(app_context);
 		catch_up_mode = saved_catch_up;
 
 		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
@@ -879,6 +893,307 @@ void tagShowFrame(SWFAppContext* app_context)
 	renderer_close_pass(context);
 #endif // NO_GRAPHICS
 }
+
+#ifdef NO_GRAPHICS
+// ---------------------------------------------------------------------------
+// Sprite content bounds helper (in LOCAL twips of the sprite's own space)
+// ---------------------------------------------------------------------------
+// Returns 1 if any bounds were found. Bounds are relative to the sprite's
+// registration point (i.e., the sprite's coordinate system origin).
+static int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
+    float* xmin_out, float* xmax_out, float* ymin_out, float* ymax_out)
+{
+	float xmin = 1e30f, xmax = -1e30f, ymin = 1e30f, ymax = -1e30f;
+	int found = 0;
+
+	for (size_t i = 1; i <= dl_max; i++)
+	{
+		DisplayObject* child = &dl[i];
+		if (child->char_id == 0) continue;
+		Character* ch = &dictionary[child->char_id];
+
+		float tx = transform_data[child->transform_id][12];
+		float ty = transform_data[child->transform_id][13];
+		float sx = transform_data[child->transform_id][0];
+		float sy = transform_data[child->transform_id][5];
+
+		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
+		{
+			s32 cxmin, cxmax, cymin, cymax;
+			if (ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax))
+			{
+				float x0 = tx + sx * (float)cxmin;
+				float x1 = tx + sx * (float)cxmax;
+				float y0 = ty + sy * (float)cymin;
+				float y1 = ty + sy * (float)cymax;
+				if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
+				if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
+				if (x0 < xmin) xmin = x0;
+				if (x1 > xmax) xmax = x1;
+				if (y0 < ymin) ymin = y0;
+				if (y1 > ymax) ymax = y1;
+				found = 1;
+			}
+		}
+		else if (ch->type == CHAR_TYPE_SPRITE &&
+		         child->sprite_display_list != NULL && child->sprite_max_depth > 0)
+		{
+			float cxmin, cxmax, cymin, cymax;
+			if (sprite_content_bounds_twips(child->sprite_display_list, child->sprite_max_depth,
+			        &cxmin, &cxmax, &cymin, &cymax))
+			{
+				float x0 = tx + sx * cxmin;
+				float x1 = tx + sx * cxmax;
+				float y0 = ty + sy * cymin;
+				float y1 = ty + sy * cymax;
+				if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
+				if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
+				if (x0 < xmin) xmin = x0;
+				if (x1 > xmax) xmax = x1;
+				if (y0 < ymin) ymin = y0;
+				if (y1 > ymax) ymax = y1;
+				found = 1;
+			}
+		}
+	}
+
+	if (found)
+	{
+		*xmin_out = xmin; *xmax_out = xmax;
+		*ymin_out = ymin; *ymax_out = ymax;
+	}
+	return found;
+}
+
+// ---------------------------------------------------------------------------
+// _droptarget computation: Z-order front-to-back traversal
+// ---------------------------------------------------------------------------
+// Iterates dl front-to-back (highest depth first).
+// Named sprites: recurse into children; if children miss, return this sprite's path.
+// Unnamed objects: absorb the hit and return parent_path.
+// parent_stage_x/y: stage origin of the parent (twips), so entry stage origin =
+//   parent_stage + transform_data[entry.transform_id][12/13].
+static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
+    float parent_stage_x, float parent_stage_y,
+    float mouse_x, float mouse_y,
+    const char* skip_name,
+    const char* parent_path, char* out_path, size_t out_size)
+{
+	// Iterate front-to-back (highest depth first)
+	for (size_t i = dl_max; i >= 1; i--)
+	{
+		DisplayObject* entry = &dl[i];
+		if (entry->char_id == 0) continue;
+
+		// Skip the dragged clip itself
+		if (skip_name && entry->instance_name &&
+		    strcmp(entry->instance_name, skip_name) == 0) continue;
+
+		Character* ch = &dictionary[entry->char_id];
+
+		float entry_stage_x = parent_stage_x + transform_data[entry->transform_id][12];
+		float entry_stage_y = parent_stage_y + transform_data[entry->transform_id][13];
+		float sx = transform_data[entry->transform_id][0];
+		float sy = transform_data[entry->transform_id][5];
+
+		// Compute AABB in stage twips
+		float aabb_xmin, aabb_xmax, aabb_ymin, aabb_ymax;
+		int has_aabb = 0;
+
+		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
+		{
+			s32 cxmin, cxmax, cymin, cymax;
+			if (ng_getCharBounds(entry->char_id, &cxmin, &cxmax, &cymin, &cymax))
+			{
+				float x0 = entry_stage_x + sx * (float)cxmin;
+				float x1 = entry_stage_x + sx * (float)cxmax;
+				float y0 = entry_stage_y + sy * (float)cymin;
+				float y1 = entry_stage_y + sy * (float)cymax;
+				if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
+				if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
+				aabb_xmin = x0; aabb_xmax = x1;
+				aabb_ymin = y0; aabb_ymax = y1;
+				has_aabb = 1;
+			}
+		}
+		else if (ch->type == CHAR_TYPE_SPRITE)
+		{
+			if (entry->sprite_display_list != NULL && entry->sprite_max_depth > 0)
+			{
+				float lxmin, lxmax, lymin, lymax;
+				if (sprite_content_bounds_twips(entry->sprite_display_list,
+				        entry->sprite_max_depth, &lxmin, &lxmax, &lymin, &lymax))
+				{
+					float x0 = entry_stage_x + sx * lxmin;
+					float x1 = entry_stage_x + sx * lxmax;
+					float y0 = entry_stage_y + sy * lymin;
+					float y1 = entry_stage_y + sy * lymax;
+					if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
+					if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
+					aabb_xmin = x0; aabb_xmax = x1;
+					aabb_ymin = y0; aabb_ymax = y1;
+					has_aabb = 1;
+				}
+			}
+		}
+
+		if (!has_aabb) continue;
+
+		// Point-in-AABB test
+		if (mouse_x < aabb_xmin || mouse_x > aabb_xmax ||
+		    mouse_y < aabb_ymin || mouse_y > aabb_ymax) continue;
+
+		// Hit!
+		if (entry->instance_name != NULL)
+		{
+			// Named entry: compute its path
+			char entry_path[512];
+			if (parent_path[0] == '\0')
+				snprintf(entry_path, sizeof(entry_path), "/%s", entry->instance_name);
+			else
+				snprintf(entry_path, sizeof(entry_path), "%s/%s", parent_path, entry->instance_name);
+
+			// If named sprite with children, recurse
+			if (ch->type == CHAR_TYPE_SPRITE &&
+			    entry->sprite_display_list != NULL && entry->sprite_max_depth > 0)
+			{
+				if (find_drop_target_in_dl(entry->sprite_display_list,
+				        entry->sprite_max_depth,
+				        entry_stage_x, entry_stage_y,
+				        mouse_x, mouse_y,
+				        skip_name, entry_path, out_path, out_size))
+					return 1;
+			}
+
+			// Named but no child matched (or not a sprite): return this path
+			snprintf(out_path, out_size, "%s", entry_path);
+			return 1;
+		}
+		else
+		{
+			// Unnamed: absorb hit, return parent path
+			snprintf(out_path, out_size, "%s", parent_path);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
+    const char* skip_name, char* out_path, size_t out_size)
+{
+	if (out_size == 0) return 0;
+	out_path[0] = '\0';
+	return find_drop_target_in_dl(display_list, max_depth,
+	    0.0f, 0.0f, stage_x_twips, stage_y_twips,
+	    skip_name, "", out_path, out_size);
+}
+
+// ---------------------------------------------------------------------------
+// CLIP_EVENT_PRESS / CLIP_EVENT_RELEASE dispatch
+// ---------------------------------------------------------------------------
+// Called from swf_core.c's input_events_deliver on EV_MOUSE_DOWN_LEFT / UP_LEFT.
+
+void dispatch_clip_event_press(SWFAppContext* app_context)
+{
+	float mx = app_context->mouse.stage_x;  // twips
+	float my = app_context->mouse.stage_y;  // twips
+
+	for (size_t i = 1; i <= max_depth; i++)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0 || obj->clip_action_count == 0) continue;
+
+		int has_press = 0;
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_PRESS) { has_press = 1; break; }
+		}
+		if (!has_press) continue;
+
+		// Determine the stage origin for this sprite.
+		// Use the persisted virtual position if this is the most-recently dragged clip.
+		float orig_x, orig_y;
+		if (g_drag_target_name[0] != '\0' && obj->instance_name &&
+		    strcmp(obj->instance_name, g_drag_target_name) == 0)
+		{
+			orig_x = g_drag_virt_x;
+			orig_y = g_drag_virt_y;
+		}
+		else
+		{
+			orig_x = transform_data[obj->transform_id][12];
+			orig_y = transform_data[obj->transform_id][13];
+		}
+
+		// Compute sprite content AABB in stage twips
+		int hit = 0;
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+		{
+			float lxmin, lxmax, lymin, lymax;
+			if (sprite_content_bounds_twips(obj->sprite_display_list, obj->sprite_max_depth,
+			        &lxmin, &lxmax, &lymin, &lymax))
+			{
+				float sx = transform_data[obj->transform_id][0];
+				float sy = transform_data[obj->transform_id][5];
+				float stage_xmin = orig_x + sx * lxmin;
+				float stage_xmax = orig_x + sx * lxmax;
+				float stage_ymin = orig_y + sy * lymin;
+				float stage_ymax = orig_y + sy * lymax;
+				if (stage_xmin > stage_xmax) { float t = stage_xmin; stage_xmin = stage_xmax; stage_xmax = t; }
+				if (stage_ymin > stage_ymax) { float t = stage_ymin; stage_ymin = stage_ymax; stage_ymax = t; }
+				hit = (mx >= stage_xmin && mx <= stage_xmax &&
+				       my >= stage_ymin && my <= stage_ymax);
+			}
+		}
+		if (!hit) continue;
+
+		obj->clip_mc_pressed = 1;
+		MovieClip* saved_ctx = g_current_context;
+		if (obj->instance_name)
+		{
+			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
+			if (mc) actionSetCurrentContext(mc);
+		}
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_PRESS)
+				obj->clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+
+		// If startDrag was called by the action, ensure g_drag_target_name matches this
+		// sprite's actual instance name.  GetVariable("this") currently returns root_movieclip
+		// so the target passed to actionStartDrag may be wrong ("_level0"); we correct it here.
+		if (is_dragging && obj->instance_name && obj->instance_name[0] != '\0')
+			snprintf(g_drag_target_name, sizeof(g_drag_target_name), "%s", obj->instance_name);
+	}
+}
+
+void dispatch_clip_event_release(SWFAppContext* app_context)
+{
+	for (size_t i = 1; i <= max_depth; i++)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0 || !obj->clip_mc_pressed) continue;
+		if (obj->clip_action_count == 0) { obj->clip_mc_pressed = 0; continue; }
+
+		obj->clip_mc_pressed = 0;
+		MovieClip* saved_ctx = g_current_context;
+		if (obj->instance_name)
+		{
+			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
+			if (mc) actionSetCurrentContext(mc);
+		}
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_RELEASE)
+				obj->clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+	}
+}
+#endif // NO_GRAPHICS
 
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id,
     size_t shape_offset, size_t shape_size,

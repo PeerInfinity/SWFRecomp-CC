@@ -46,6 +46,12 @@ struct MovieClip {
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
 	int ng_textfield_idx;  // index into ng_textfields, or -1 if not a textfield
+	// Drawing API bounds tracking (updated by moveTo/lineTo calls)
+	float draw_xmin, draw_xmax, draw_ymin, draw_ymax;
+	int draw_has_bounds;   // 1 if any moveTo/lineTo was called
+	// AS2 event dispatch state
+	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
+	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
 #endif
 };
 
@@ -277,3 +283,11 @@ void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr);
 // Broadcasts onKeyDown/onKeyUp to all registered Key listeners.
 void actionDispatchKeyDown(SWFAppContext* app_context);
 void actionDispatchKeyUp(SWFAppContext* app_context);
+
+#ifdef NO_GRAPHICS
+// AS2 MC event dispatch — called from swf_core.c on mouse events.
+// Iterates child_mc_cache, checks hit area, and calls onPress/onDragOver etc.
+void actionDispatchMCPress(SWFAppContext* app_context);
+void actionDispatchMCRelease(SWFAppContext* app_context);
+void actionDispatchMCMouseMove(SWFAppContext* app_context);
+#endif

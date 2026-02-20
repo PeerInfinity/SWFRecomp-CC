@@ -7534,6 +7534,10 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->last_transform_id = 0;
 	mc->as_set_flags = 0;
 	mc->ng_textfield_idx = -1;
+	mc->draw_xmin = mc->draw_xmax = mc->draw_ymin = mc->draw_ymax = 0.0f;
+	mc->draw_has_bounds = 0;
+	mc->mc_mouse_inside = 0;
+	mc->mc_as_pressed = 0;
 #endif
 
 	// Set instance name
@@ -11034,35 +11038,32 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
  */
 void actionEndDrag(SWFAppContext* app_context)
 {
-	// Clear drag state
 	if (is_dragging) {
-		#ifdef DEBUG
-		printf("[EndDrag] Stopping drag of '%s'\n",
-			   dragged_target ? dragged_target : "(null)");
-		#endif
-
 		is_dragging = 0;
 
-		// Free the dragged target name if it was allocated
+#ifdef NO_GRAPHICS
+		// Compute _droptarget: find the clip under the dragged hotspot (g_drag_virt_x/y),
+		// skipping the dragged clip itself.  Use g_drag_target_name because dragged_target
+		// may be wrong (GetVariable("this") returns root, not the clip's own name).
+		char path[256];
+		ng_compute_droptarget(g_drag_virt_x, g_drag_virt_y,
+		    g_drag_target_name[0] ? g_drag_target_name : dragged_target,
+		    path, sizeof(path));
+
+		// Set droptarget on the current context MC (the dragged clip's MC,
+		// set by dispatch_clip_event_release before calling this action).
+		if (g_current_context)
+			snprintf(g_current_context->droptarget, sizeof(g_current_context->droptarget),
+			    "%s", path);
+#endif
+
 		if (dragged_target) {
 			free(dragged_target);
 			dragged_target = NULL;
 		}
-
-		#ifndef NO_GRAPHICS
-		// In graphics mode, additional cleanup would happen here:
-		// - Stop updating sprite position with mouse
-		// - Re-enable normal sprite behavior
-		// - Update display list
-		#endif
-	} else {
-		#ifdef DEBUG
-		printf("[EndDrag] No drag in progress\n");
-		#endif
 	}
 
-	// No stack operations - END_DRAG has no parameters
-	(void)app_context;  // Suppress unused parameter warning
+	(void)app_context;
 }
 
 /**
@@ -15101,6 +15102,22 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 	const char* method = "NONE";
 	if (send_vars_method == 1) method = "GET";
 	else if (send_vars_method == 2) method = "POST";
+
+	// Handle FSCommand: protocol (e.g. fscommand("quit", ""))
+	// The URL is "FSCommand:<command>"; handle silently without printing.
+	if (url_var.type == ACTION_STACK_VALUE_STRING && url_var.str_size >= 10) {
+		char url_utf8[512];
+		const uint16_t* url_u16 = varGetU16Ptr(&url_var);
+		u16_to_utf8(url_u16, url_var.str_size, url_utf8, sizeof(url_utf8));
+		if (strncasecmp(url_utf8, "FSCommand:", 10) == 0) {
+			const char* cmd = url_utf8 + 10;
+			if (strcasecmp(cmd, "quit") == 0) {
+				extern int quit_swf;
+				quit_swf = 1;
+			}
+			return;
+		}
+	}
 
 	// Determine operation type
 	bool is_sprite = (load_target_flag == 1);
@@ -23939,6 +23956,64 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
 			return;
 		}
+		else if (method_name_len == 6 && strncmp(method_name, "moveTo", 6) == 0)
+		{
+			// moveTo(x, y) — update drawing bounds for hit-testing
+#ifdef NO_GRAPHICS
+			if (num_args >= 2 && mc != NULL) {
+				float x = (float)varToDouble(&args[0]);
+				float y = (float)varToDouble(&args[1]);
+				if (!mc->draw_has_bounds) {
+					mc->draw_xmin = mc->draw_xmax = x;
+					mc->draw_ymin = mc->draw_ymax = y;
+					mc->draw_has_bounds = 1;
+				} else {
+					if (x < mc->draw_xmin) mc->draw_xmin = x;
+					if (x > mc->draw_xmax) mc->draw_xmax = x;
+					if (y < mc->draw_ymin) mc->draw_ymin = y;
+					if (y > mc->draw_ymax) mc->draw_ymax = y;
+				}
+			}
+#endif
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 6 && strncmp(method_name, "lineTo", 6) == 0)
+		{
+			// lineTo(x, y) — update drawing bounds for hit-testing
+#ifdef NO_GRAPHICS
+			if (num_args >= 2 && mc != NULL) {
+				float x = (float)varToDouble(&args[0]);
+				float y = (float)varToDouble(&args[1]);
+				if (!mc->draw_has_bounds) {
+					mc->draw_xmin = mc->draw_xmax = x;
+					mc->draw_ymin = mc->draw_ymax = y;
+					mc->draw_has_bounds = 1;
+				} else {
+					if (x < mc->draw_xmin) mc->draw_xmin = x;
+					if (x > mc->draw_xmax) mc->draw_xmax = x;
+					if (y < mc->draw_ymin) mc->draw_ymin = y;
+					if (y > mc->draw_ymax) mc->draw_ymax = y;
+				}
+			}
+#endif
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 9 && strncmp(method_name, "beginFill", 9) == 0)
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "endFill", 7) == 0)
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 		else
 		{
 			// Check if user-defined method exists on dynamic_props
@@ -24159,39 +24234,31 @@ void actionStartDrag(SWFAppContext* app_context)
 		lock_flag = ((int)VAL(double, &lock_center.data.numeric_value) != 0);
 	}
 
-	// Set drag state
-	// First, clear any existing drag (Flash only allows one sprite to be dragged at a time)
+	// Clear any existing drag (Flash only allows one sprite to be dragged at a time)
 	if (is_dragging && dragged_target) {
 		free(dragged_target);
 	}
 
 	is_dragging = 1;
-	// Duplicate the target name (manual strdup for portability)
 	if (target_name && *target_name) {
 		size_t len = strlen(target_name);
 		dragged_target = (char*) malloc(len + 1);
-		if (dragged_target) {
-			strcpy(dragged_target, target_name);
-		}
+		if (dragged_target) strcpy(dragged_target, target_name);
 	} else {
 		dragged_target = NULL;
 	}
 
-	#ifdef DEBUG
-	printf("[StartDrag] %s (lock:%d, constrain:%d)\n",
-		   target_name ? target_name : "(null)", lock_flag, has_constraint);
-	if (has_constraint) {
-		printf("  Bounds: (%.1f,%.1f)-(%.1f,%.1f)\n", x1, y1, x2, y2);
-	}
-	#endif
+#ifdef NO_GRAPHICS
+	// Initialize virtual drag position to current mouse position.
+	// For lock_center=true, the clip center tracks the mouse exactly.
+	g_drag_virt_x = app_context->mouse.stage_x;
+	g_drag_virt_y = app_context->mouse.stage_y;
 
-	#ifndef NO_GRAPHICS
-	// Full implementation would also:
-	// 1. Find target MovieClip in display list
-	// 2. Store drag parameters (lock_flag, constraints)
-	// 3. Update position each frame based on mouse input
-	// startDragMovieClip(target_name, lock_flag, has_constraint, x1, y1, x2, y2);
-	#endif
+	// Remember which clip is being dragged (persists after stopDrag for PRESS hit-testing)
+	if (target_name && *target_name)
+		snprintf(g_drag_target_name, sizeof(g_drag_target_name), "%s", target_name);
+#endif
+	(void)lock_flag; (void)has_constraint; (void)x1; (void)y1; (void)x2; (void)y2;
 }
 
 // ==================================================================
@@ -24350,3 +24417,197 @@ bool actionWaitForFrame2(SWFAppContext* app_context)
 
 	return (frames_loaded + 1) >= (int32_t)check_frame;
 }
+
+// ===========================================================================
+// AS2 MovieClip event dispatch (NO_GRAPHICS build)
+// Handles onPress/onRelease/onReleaseOutside/onRollOver/onRollOut/onDragOver/onDragOut
+// for dynamically-created MovieClips whose bounds come from Drawing API calls.
+// ===========================================================================
+
+#ifdef NO_GRAPHICS
+
+// Compute pixel AABB for a dynamic MC using its drawing-API bounds.
+// Returns 1 if bounds are available, 0 if not.
+static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, float* y2)
+{
+	if (mc == NULL || !mc->draw_has_bounds) return 0;
+	float sx = mc->xscale / 100.0f;
+	float sy = mc->yscale / 100.0f;
+	*x1 = mc->x + mc->draw_xmin * sx;
+	*y1 = mc->y + mc->draw_ymin * sy;
+	*x2 = mc->x + mc->draw_xmax * sx;
+	*y2 = mc->y + mc->draw_ymax * sy;
+	if (*x1 > *x2) { float t = *x1; *x1 = *x2; *x2 = t; }
+	if (*y1 > *y2) { float t = *y1; *y1 = *y2; *y2 = t; }
+	return 1;
+}
+
+// Read the trackAsMenu property from mc->dynamic_props.
+static int mc_get_track_as_menu_ng(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 0;
+	ActionVar* v = getProperty((ASObject*)mc->dynamic_props, "trackAsMenu", 11);
+	if (v == NULL) return 0;
+	if (v->type == ACTION_STACK_VALUE_BOOLEAN)
+		return (int)(v->data.numeric_value != 0);
+	if (v->type == ACTION_STACK_VALUE_F32) {
+		float f; memcpy(&f, &v->data.numeric_value, sizeof(float));
+		return (f != 0.0f);
+	}
+	if (v->type == ACTION_STACK_VALUE_F64) {
+		double d; memcpy(&d, &v->data.numeric_value, sizeof(double));
+		return (d != 0.0);
+	}
+	return 0;
+}
+
+// Invoke a named AS2 event handler (onPress, onRelease, onDragOver, ...) stored
+// in mc->dynamic_props, with `this` bound to mc.
+static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
+                                    const char* name, u32 name_len)
+{
+	if (mc == NULL || mc->dynamic_props == NULL || g_execution_halted) return;
+	ActionVar* handler_var = getProperty((ASObject*)mc->dynamic_props, name, name_len);
+	if (handler_var == NULL || handler_var->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)handler_var->data.numeric_value;
+	if (func == NULL) return;
+
+	if (g_call_depth >= g_max_call_depth - 1) {
+		g_execution_halted = 1;
+		return;
+	}
+
+	// Build this_var (MOVIECLIP) so actionCallMethod/GetVariable resolve "this" correctly.
+	// NOTE: We intentionally do NOT call actionSetCurrentContext(mc) here.
+	// Unqualified variable access (actionSetVariable/actionGetVariable) in AS2 MC event
+	// handlers should use the root variable table so that variables set in one MC's handler
+	// (e.g. left.onPress sets "isDown") are visible in another MC's handler (right.onDragOver).
+	// The "this" binding is maintained via the local_scope entry in the scope chain below.
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	this_var.data.numeric_value = (u64)(uintptr_t)mc;
+
+	if (func->function_type == 2)
+	{
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		// Expose "this" = mc so GetVariable("this") resolves inside the handler
+		setProperty(app_context, local_scope, "this", 4, &this_var);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = mc;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		ASFunction* prev_func = g_current_executing_func;
+		g_call_depth++;
+		g_prev_executing_func = prev_func;
+		g_current_executing_func = func;
+		ActionVar result = func->advanced_func(app_context, NULL, 0, registers, (void*)&this_var);
+		(void)result;
+		g_current_executing_func = prev_func;
+		g_call_depth--;
+
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		g_call_depth++;
+		ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		(void)result;
+		g_call_depth--;
+	}
+}
+
+// Dispatch AS2 onPress to all dynamic MCs whose hit area contains the mouse.
+// Called from swf_core.c on EV_MOUSE_DOWN_LEFT (after dispatch_clip_event_press).
+void actionDispatchMCPress(SWFAppContext* app_context)
+{
+	float mx = app_context->mouse.stage_x / 20.0f;  // stage_x is in twips; convert to pixels
+	float my = app_context->mouse.stage_y / 20.0f;
+
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL) continue;
+
+		float x1, y1, x2, y2;
+		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+
+		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+
+		mc->mc_as_pressed = 1;
+		mc->mc_mouse_inside = 1;
+		mc_call_as2_handler_ng(app_context, mc, "onPress", 7);
+	}
+}
+
+// Dispatch AS2 onRelease / onReleaseOutside to pressed MCs on mouse-up.
+// Called from swf_core.c on EV_MOUSE_UP_LEFT (after dispatch_clip_event_release).
+void actionDispatchMCRelease(SWFAppContext* app_context)
+{
+	float mx = app_context->mouse.stage_x / 20.0f;
+	float my = app_context->mouse.stage_y / 20.0f;
+
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || !mc->mc_as_pressed) continue;
+
+		float x1, y1, x2, y2;
+		int have_bounds = mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2);
+		int inside = have_bounds && (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
+
+		mc->mc_as_pressed = 0;
+
+		if (inside)
+			mc_call_as2_handler_ng(app_context, mc, "onRelease", 9);
+		else
+			mc_call_as2_handler_ng(app_context, mc, "onReleaseOutside", 16);
+	}
+}
+
+// Dispatch AS2 onRollOver/onRollOut/onDragOver/onDragOut on mouse-move.
+// Called from swf_core.c on EV_MOUSE_MOVE (after updating mouse state).
+void actionDispatchMCMouseMove(SWFAppContext* app_context)
+{
+	float mx = app_context->mouse.stage_x / 20.0f;
+	float my = app_context->mouse.stage_y / 20.0f;
+	int btn_down = app_context->mouse.button_down;
+
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL) continue;
+
+		float x1, y1, x2, y2;
+		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+
+		int was_inside = mc->mc_mouse_inside;
+		int now_inside = (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
+		mc->mc_mouse_inside = (u8)now_inside;
+
+		if (!was_inside && now_inside) {
+			// Mouse entered this MC's hit area
+			if (btn_down) {
+				// onDragOver fires if trackAsMenu=true OR button was pressed inside this MC
+				if (mc_get_track_as_menu_ng(mc) || mc->mc_as_pressed)
+					mc_call_as2_handler_ng(app_context, mc, "onDragOver", 10);
+			} else {
+				mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10);
+			}
+		} else if (was_inside && !now_inside) {
+			// Mouse exited this MC's hit area
+			if (btn_down) {
+				if (mc_get_track_as_menu_ng(mc) || mc->mc_as_pressed)
+					mc_call_as2_handler_ng(app_context, mc, "onDragOut", 9);
+			} else {
+				mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9);
+			}
+		}
+	}
+}
+
+#endif // NO_GRAPHICS (AS2 MC event dispatch)
