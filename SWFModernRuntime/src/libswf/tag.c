@@ -488,35 +488,41 @@ void tagShowFrame(SWFAppContext* app_context)
 			Character* ch = &dictionary[obj->char_id];
 			if (ch->type != CHAR_TYPE_SPRITE) continue;
 
+			// sprite_needs_init == 2: frame_0 already ran eagerly in tagPlaceObject2;
+			// only need to fire onLoad. sprite_needs_init == 1: normal deferred path.
+			int was_eager = (obj->sprite_needs_init == 2);
 			obj->sprite_needs_init = 0;
 
-			// Context swap to sprite's display list
-			DisplayObject* saved_dl = display_list;
-			size_t saved_max = max_depth;
-			size_t saved_cap = display_list_capacity;
+			if (!was_eager)
+			{
+				// Context swap to sprite's display list
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
 
-			display_list = obj->sprite_display_list;
-			max_depth = obj->sprite_max_depth;
-			display_list_capacity = obj->sprite_dl_capacity;
+				display_list = obj->sprite_display_list;
+				max_depth = obj->sprite_max_depth;
+				display_list_capacity = obj->sprite_dl_capacity;
 
-			// Run frame 0 WITH scripts (catch_up_mode=0)
-			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
-				CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+				// Run frame 0 WITH scripts (catch_up_mode=0)
+				if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+					CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
 
-			// Advance frame counter so advance_sprite_frames picks up at frame 1
-			// (for 1-frame sprites, 1 % 1 = 0, which correctly loops back each tick)
-			obj->sprite_current_frame = 1 % ch->sprite_frame_count;
+				// Advance frame counter so advance_sprite_frames picks up at frame 1
+				// (for 1-frame sprites, 1 % 1 = 0, which correctly loops back each tick)
+				obj->sprite_current_frame = 1 % ch->sprite_frame_count;
 
-			// Save back (pointer may change from realloc)
-			obj->sprite_display_list = display_list;
-			obj->sprite_max_depth = max_depth;
-			obj->sprite_dl_capacity = display_list_capacity;
+				// Save back (pointer may change from realloc)
+				obj->sprite_display_list = display_list;
+				obj->sprite_max_depth = max_depth;
+				obj->sprite_dl_capacity = display_list_capacity;
 
-			display_list = saved_dl;
-			max_depth = saved_max;
-			display_list_capacity = saved_cap;
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
 
-			// Fire onLoad clip actions for newly initialized sprites
+			// Fire onLoad clip actions for newly initialized sprites (both paths)
 			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
 			{
 				MovieClip* saved_ctx = g_current_context;
@@ -972,6 +978,28 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 {
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
+	if (char_id == 0)
+	{
+		// Modify operation (HasCharacter=0): update transform/cxform only, preserve identity.
+		display_list[depth].transform_id = transform_id;
+		display_list[depth].cxform_id = cxform_id;
+		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+		display_list[depth].placed_at_frame = current_frame;
+		init_cx_fields(&display_list[depth]);
+		if (depth > max_depth) max_depth = depth;
+#ifdef NO_GRAPHICS
+		// Re-init cxform via ng_on_place_object2 (handles ng_init_cxform_from_data internally).
+		// Pass actual char_id so type detection works; reset sprite_needs_init after.
+		size_t actual_char_id = display_list[depth].char_id;
+		ng_on_place_object2(app_context, depth, actual_char_id);
+		display_list[depth].sprite_needs_init = 0;
+#else
+		(void)app_context;
+#endif
+		return;
+	}
+
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
 	display_list[depth].cxform_id = cxform_id;
@@ -986,6 +1014,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].sprite_is_playing = 1;
 	display_list[depth].sprite_manual_next_frame = 0;
 	display_list[depth].sprite_next_frame = 0;
+	// Free old instance name if we own it
+	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
+	{
+		free(display_list[depth].instance_name);
+	}
 	display_list[depth].instance_name = NULL;
 	display_list[depth].instance_name_owned = 0;
 	display_list[depth].clip_actions = NULL;
@@ -1016,6 +1049,35 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 #ifdef NO_GRAPHICS
 	ng_on_place_object2(app_context, depth, char_id);
+	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
+	// internal display list is populated BEFORE the parent frame's ActionScript runs.
+	// This matches Flash AVM1 behavior: sprites placed via PlaceObject2 are
+	// "constructed" (frame 0 executed) before the parent's DoAction scripts.
+	if (display_list[depth].sprite_needs_init)
+	{
+		if (dictionary[char_id].type == CHAR_TYPE_SPRITE)
+		{
+			Character* sp_ch = &dictionary[char_id];
+			if (sp_ch->sprite_frame_count > 0 && sp_ch->sprite_frame_funcs[0] != NULL)
+			{
+				display_list[depth].sprite_needs_init = 2; // mark: frame_0 done, onLoad pending
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
+				display_list = saved_dl[depth].sprite_display_list;
+				max_depth = saved_dl[depth].sprite_max_depth;
+				display_list_capacity = saved_dl[depth].sprite_dl_capacity;
+				CALL_FRAME(app_context, &saved_dl[depth], sp_ch->sprite_frame_funcs[0]);
+				saved_dl[depth].sprite_display_list = display_list;
+				saved_dl[depth].sprite_max_depth = max_depth;
+				saved_dl[depth].sprite_dl_capacity = display_list_capacity;
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+				saved_dl[depth].sprite_current_frame = 1 % sp_ch->sprite_frame_count;
+			}
+		}
+	}
 #else
 	(void)app_context;
 #endif

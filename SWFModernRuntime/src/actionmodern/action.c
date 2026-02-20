@@ -16768,35 +16768,12 @@ void actionGetMember(SWFAppContext* app_context)
 		if (mc != NULL && prop_name_len > 0 && prop_name[0] == '_')
 		{
 			// Case-insensitive comparison for built-in MC properties
-#ifdef NO_GRAPHICS
-			// Re-sync x/y/xscale/yscale/rotation from display list if PlaceObject2 updated the transform
-			if (strcasecmp(prop_name, "_x") == 0 || strcasecmp(prop_name, "_y") == 0 ||
-			    strcasecmp(prop_name, "_xscale") == 0 || strcasecmp(prop_name, "_yscale") == 0 ||
-			    strcasecmp(prop_name, "_rotation") == 0) {
-				syncTransformIfNeeded(mc);
-			}
-#endif
 			if (strcasecmp(prop_name, "_x") == 0) {
-#ifdef NO_GRAPHICS
-				if (!(mc->as_set_flags & 1)) {
-					size_t _dep = ng_findDisplayEntryByName(mc->name);
-					if (_dep != SIZE_MAX) {
-						double _dx;
-						if (ng_getTransformXY_d(_dep, &_dx, NULL)) { PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx)); return; }
-					}
-				}
-#endif
+				// Return AS-tracked position. Initial placement syncs mc->x via findOrCreateMovieClip.
+				// PlaceObject2 Modify does NOT update _x (Flash AVM1 behavior: _x tracks
+				// the script-controlled position, not the display list timeline position).
 				float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_y") == 0) {
-#ifdef NO_GRAPHICS
-				if (!(mc->as_set_flags & 2)) {
-					size_t _dep = ng_findDisplayEntryByName(mc->name);
-					if (_dep != SIZE_MAX) {
-						double _dy;
-						if (ng_getTransformXY_d(_dep, NULL, &_dy)) { PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
-					}
-				}
-#endif
 				float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
