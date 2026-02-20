@@ -8699,9 +8699,20 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			extern MovieClip root_movieclip;
 			if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0')
 			{
-				// Child MovieClip: use dot-path format "_level0.name"
+				// Child MovieClip: use full dot-path "_level0.parent.child" from mc->target
 				static char mc_path_buf[256];
-				snprintf(mc_path_buf, sizeof(mc_path_buf), "_level0.%s", mc->name);
+				const char* tgt = mc->target;
+				if (tgt[0] == '/' && tgt[1] == '\0') {
+					strncpy(mc_path_buf, "_level0", sizeof(mc_path_buf));
+				} else if (tgt[0] == '/') {
+					char tmp[200];
+					strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
+					tmp[sizeof(tmp) - 1] = '\0';
+					for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
+					snprintf(mc_path_buf, sizeof(mc_path_buf), "_level0.%s", tmp);
+				} else {
+					snprintf(mc_path_buf, sizeof(mc_path_buf), "_level0.%s", mc->name);
+				}
 				u32 u16_len;
 				uint16_t* u16 = ascii_to_u16(app_context, mc_path_buf, (int)strlen(mc_path_buf), &u16_len);
 				VAL(u64, &STACK_TOP_VALUE) = (u64) u16;
@@ -11701,6 +11712,18 @@ static ASObject* g_mouse_obj = NULL;
 static ASObject* g_selection_obj = NULL;
 static ASObject* g_stage_obj = NULL;
 
+// Currently focused MovieClip (NULL = no focus)
+static MovieClip* g_focused_mc = NULL;
+
+// Static function objects for Selection.setFocus / Selection.getFocus
+static ASFunction g_selection_setFocus_func;
+static ASFunction g_selection_getFocus_func;
+#ifdef NO_GRAPHICS
+// Forward declarations — implementations are in the NO_GRAPHICS block at end of file
+static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+#endif
+
 static int g_global_init_done = 0;
 
 static void ensureGlobalInit(SWFAppContext* app_context)
@@ -11883,6 +11906,30 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		installKeyMethods(app_context, g_key_obj);
 		installAsBroadcaster(app_context, g_stage_obj);
 		installAsBroadcaster(app_context, g_selection_obj);
+
+		// Install Selection.setFocus and Selection.getFocus
+#ifdef NO_GRAPHICS
+		{
+			static int sel_funcs_init = 0;
+			if (!sel_funcs_init) {
+				memset(&g_selection_setFocus_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_setFocus_func.name, "setFocus", 255);
+				g_selection_setFocus_func.function_type = 2;
+				g_selection_setFocus_func.advanced_func = (Function2Ptr)builtin_selection_setFocus;
+				memset(&g_selection_getFocus_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_getFocus_func.name, "getFocus", 255);
+				g_selection_getFocus_func.function_type = 2;
+				g_selection_getFocus_func.advanced_func = (Function2Ptr)builtin_selection_getFocus;
+				sel_funcs_init = 1;
+			}
+			ActionVar fv = {0};
+			fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64)&g_selection_setFocus_func;
+			setProperty(app_context, g_selection_obj, "setFocus", 8, &fv);
+			fv.data.numeric_value = (u64)&g_selection_getFocus_func;
+			setProperty(app_context, g_selection_obj, "getFocus", 8, &fv);
+		}
+#endif
 
 		// Also install addListener/removeListener/broadcastMessage on AsBroadcaster itself
 		// and on MovieClipLoader.prototype (both are AsBroadcaster-initialized in Flash).
@@ -24848,6 +24895,451 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 			}
 		}
 	}
+}
+
+// ====== Focus and Tab Navigation System ======
+
+// Convert mc->target (Flash slash-path) to ActionScript dot-path format.
+// "/" -> "_level0"
+// "/clip1" -> "_level0.clip1"
+// "/clip1/text" -> "_level0.clip1.text"
+static void mc_get_dot_path(MovieClip* mc, char* buf, size_t buf_size)
+{
+	extern MovieClip root_movieclip;
+	if (mc == NULL || mc == &root_movieclip) {
+		snprintf(buf, buf_size, "_level0");
+		return;
+	}
+	const char* path = mc->target;
+	if (path[0] == '/' && path[1] == '\0') {
+		snprintf(buf, buf_size, "_level0");
+	} else if (path[0] == '/') {
+		// "/clip1" -> "_level0.clip1"  or  "/clip1/text" -> "_level0.clip1.text"
+		char tmp[256];
+		strncpy(tmp, path + 1, sizeof(tmp) - 1);
+		tmp[sizeof(tmp) - 1] = '\0';
+		for (char* p = tmp; *p; p++) {
+			if (*p == '/') *p = '.';
+		}
+		snprintf(buf, buf_size, "_level0.%s", tmp);
+	} else {
+		snprintf(buf, buf_size, "_level0.%s", mc->name);
+	}
+}
+
+// Check if an MC can receive focus via Selection.setFocus().
+// Text fields and buttons are always focusable.
+// MovieClips are focusable only if they have an onSetFocus handler or focusEnabled == true.
+static int mc_is_focusable_by_setfocus(MovieClip* mc)
+{
+	if (mc == NULL) return 0;
+	if (mc->ng_textfield_idx >= 0) return 1;   // text field: always focusable
+	if (mc->is_button_mc) return 1;             // button: always focusable
+	if (mc->dynamic_props == NULL) return 0;
+	// MC with onSetFocus handler: focusable
+	ActionVar* h = getProperty((ASObject*)mc->dynamic_props, "onSetFocus", 10);
+	if (h != NULL && h->type == ACTION_STACK_VALUE_FUNCTION) return 1;
+	// MC with focusEnabled = true: focusable
+	ActionVar* fe = getProperty((ASObject*)mc->dynamic_props, "focusEnabled", 12);
+	if (fe != NULL) {
+		if (fe->type == ACTION_STACK_VALUE_BOOLEAN) return (int)fe->data.numeric_value;
+		if (fe->type == ACTION_STACK_VALUE_F64) {
+			double d; memcpy(&d, &fe->data.numeric_value, 8);
+			return (d != 0.0);
+		}
+	}
+	return 0;
+}
+
+// Check if an MC is tabbable (appears in Tab key navigation order).
+static int mc_is_tabbable(MovieClip* mc)
+{
+	if (mc == NULL || !mc->visible) return 0;
+	// Check explicit tabEnabled override in dynamic_props
+	if (mc->dynamic_props != NULL) {
+		ActionVar* te = getProperty((ASObject*)mc->dynamic_props, "tabEnabled", 10);
+		if (te != NULL && te->type != ACTION_STACK_VALUE_UNDEFINED) {
+			if (te->type == ACTION_STACK_VALUE_BOOLEAN) return (int)te->data.numeric_value;
+			if (te->type == ACTION_STACK_VALUE_NULL) return 0;
+			if (te->type == ACTION_STACK_VALUE_F64) {
+				double d; memcpy(&d, &te->data.numeric_value, 8);
+				return (d != 0.0 && d == d);
+			}
+			return 0;
+		}
+	}
+	// Default: buttons are tabbable
+	if (mc->is_button_mc) return 1;
+	// Default: input text fields (not ReadOnly flag 0x0008) are tabbable
+	if (mc->ng_textfield_idx >= 0) {
+		u16 flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+		if (!(flags & 0x0008)) return 1;
+	}
+	return 0;
+}
+
+// Get explicit tabIndex for an MC. Returns INT_MIN if tabIndex is not set or is -1 (excluded).
+// Flash stores tabIndex as a Number (double); to handle large values like 4294967293
+// correctly as -3 (i32_vs_u32 test), we convert double→u32→int32 (signed wrapping).
+// tabIndex=-1 means "excluded from tab order" (like HTML tabindex=-1): returns INT_MIN.
+static int mc_get_explicit_tab_index(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return INT_MIN;
+	ActionVar* ti = getProperty((ASObject*)mc->dynamic_props, "tabIndex", 8);
+	if (ti == NULL || ti->type == ACTION_STACK_VALUE_UNDEFINED) return INT_MIN;
+	int idx = INT_MIN;
+	if (ti->type == ACTION_STACK_VALUE_F64) {
+		double d; memcpy(&d, &ti->data.numeric_value, 8);
+		if (d != d) return INT_MIN;  // NaN → not set
+		// Convert via u32 to get correct signed wrapping (e.g. 4294967293 → -3)
+		u32 u = (u32)d;
+		idx = (int)u;
+	} else if (ti->type == ACTION_STACK_VALUE_F32) {
+		float f; memcpy(&f, &ti->data.numeric_value, 4);
+		u32 u = (u32)f;
+		idx = (int)u;
+	} else if (ti->type == ACTION_STACK_VALUE_BOOLEAN) {
+		idx = (int)(u32)ti->data.numeric_value;
+	} else {
+		return INT_MIN;
+	}
+	// tabIndex=-1 means excluded from tab order
+	if (idx == -1) return INT_MIN;
+	return idx;
+}
+
+// Fire focus change events and update g_focused_mc.
+// Fires: old_mc.onKillFocus(), new_mc.onSetFocus(), Selection.broadcastMessage("onSetFocus").
+static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc)
+{
+	if (old_mc == new_mc) return;
+	// 1. onKillFocus on old MC (no-op if handler not defined)
+	mc_call_as2_handler_ng(app_context, old_mc, "onKillFocus", 11);
+	// 2. onSetFocus on new MC (no-op if handler not defined)
+	mc_call_as2_handler_ng(app_context, new_mc, "onSetFocus", 10);
+	// 3. Update focused MC before broadcasting
+	g_focused_mc = new_mc;
+	// 4. Selection.broadcastMessage("onSetFocus", old_path, new_path)
+	if (!g_selection_obj) return;
+	static const uint16_t s_onSetFocus_u16[] = {
+		'o','n','S','e','t','F','o','c','u','s'
+	};
+	ActionVar bcast_args[3];
+	memset(bcast_args, 0, sizeof(bcast_args));
+	bcast_args[0].type = ACTION_STACK_VALUE_STRING;
+	bcast_args[0].data.numeric_value = (u64)(uintptr_t)s_onSetFocus_u16;
+	bcast_args[0].str_size = 10;
+	if (old_mc == NULL) {
+		bcast_args[1].type = ACTION_STACK_VALUE_NULL;
+	} else {
+		bcast_args[1].type = ACTION_STACK_VALUE_MOVIECLIP;
+		bcast_args[1].data.numeric_value = (u64)(uintptr_t)old_mc;
+	}
+	if (new_mc == NULL) {
+		bcast_args[2].type = ACTION_STACK_VALUE_NULL;
+	} else {
+		bcast_args[2].type = ACTION_STACK_VALUE_MOVIECLIP;
+		bcast_args[2].data.numeric_value = (u64)(uintptr_t)new_mc;
+	}
+	builtin_broadcaster_broadcastMessage(app_context, bcast_args, 3, NULL, (void*)g_selection_obj);
+}
+
+// Selection.setFocus(target) — move keyboard focus to a specific object.
+static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 1) return undef;
+	ActionVar* arg = &args[0];
+	// setFocus(null or undefined) — clear focus
+	if (arg->type == ACTION_STACK_VALUE_NULL || arg->type == ACTION_STACK_VALUE_UNDEFINED) {
+		if (g_focused_mc != NULL)
+			selection_do_focus_change(app_context, g_focused_mc, NULL);
+		return undef;
+	}
+	MovieClip* new_mc = NULL;
+	if (arg->type == ACTION_STACK_VALUE_MOVIECLIP)
+		new_mc = (MovieClip*)(uintptr_t)arg->data.numeric_value;
+	if (new_mc == NULL) return undef;
+	if (!mc_is_focusable_by_setfocus(new_mc)) return undef;
+	if (new_mc == g_focused_mc) return undef;
+	selection_do_focus_change(app_context, g_focused_mc, new_mc);
+	return undef;
+}
+
+// Selection.getFocus() — returns dot-path string of focused object, or null.
+static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar result = {0};
+	if (g_focused_mc == NULL) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	char path_buf[320];
+	mc_get_dot_path(g_focused_mc, path_buf, sizeof(path_buf));
+	int plen = (int)strlen(path_buf);
+	u32 u16_len;
+	uint16_t* u16 = ascii_to_u16(app_context, path_buf, plen, &u16_len);
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.data.numeric_value = (u64)(uintptr_t)u16;
+	result.str_size = u16_len;
+	return result;
+}
+
+// Check tabChildren property of an MC (default: true = recurse into children).
+static int mc_get_tab_children(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 1;
+	ActionVar* tc = getProperty((ASObject*)mc->dynamic_props, "tabChildren", 11);
+	if (tc == NULL || tc->type == ACTION_STACK_VALUE_UNDEFINED) return 1;
+	if (tc->type == ACTION_STACK_VALUE_BOOLEAN) return (int)tc->data.numeric_value;
+	if (tc->type == ACTION_STACK_VALUE_NULL) return 0;
+	if (tc->type == ACTION_STACK_VALUE_F64) {
+		double d; memcpy(&d, &tc->data.numeric_value, 8);
+		return (d != 0.0 && d == d) ? 1 : 0;
+	}
+	return 1;
+}
+
+// Compute the minimum visual position (y, x) of non-sprite items within a display list.
+// This is used as the sort key for tabbable sprites in automatic tab order mode.
+// Ruffle's automatic tab order sorts by the top-left corner of the highlight bounds
+// (visual bounding box), using the formula 6*min_y + min_x.
+// For sprites (containers), the highlight bounds come from their visual children
+// recursively, not from the registration point.
+static void compute_min_visual_pos(
+	DisplayObject* dl, size_t dl_max,
+	float parent_gx, float parent_gy,
+	float* min_x, float* min_y)
+{
+	extern float transform_data[][16];
+	for (size_t d = 1; d <= dl_max; d++) {
+		if (dl[d].char_id == 0) continue;
+		size_t cid = dl[d].char_id;
+		float lx = transform_data[dl[d].transform_id][12] / 20.0f;
+		float ly = transform_data[dl[d].transform_id][13] / 20.0f;
+		float gx = parent_gx + lx;
+		float gy = parent_gy + ly;
+		if (dictionary[cid].type == CHAR_TYPE_SPRITE) {
+			// Recurse into sprite children to find visual bounds
+			if (dl[d].sprite_display_list != NULL && dl[d].sprite_max_depth > 0)
+				compute_min_visual_pos(dl[d].sprite_display_list,
+				    dl[d].sprite_max_depth, gx, gy, min_x, min_y);
+		} else {
+			// Text field, button, or shape — use its global position
+			if (gy < *min_y || (gy == *min_y && gx < *min_x)) {
+				*min_y = gy;
+				*min_x = gx;
+			}
+		}
+	}
+}
+
+// Recursive depth-first collection of tabbable MCs.
+// Scans dl[1..dl_max] (a display list) in ascending depth order (natural iteration),
+// creates MCs as needed, and collects tabbable ones.
+// For each child, computes its sort position (for automatic mode):
+//   - Text fields/buttons: global registration point
+//   - Tabbable sprites: minimum visual position from compute_min_visual_pos
+// Stores the sort position in mc->x/mc->y for the final sort step.
+// tabChildren=true (default) means recurse into a sprite's children.
+static void tab_collect_recursive(
+	SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max,
+	MovieClip* parent_mc,
+	float parent_global_x, float parent_global_y,
+	MovieClip** out, int* count, int max)
+{
+	extern float transform_data[][16];
+
+	// Iterate in natural ascending depth order (d=1..dl_max)
+	for (size_t d = 1; d <= dl_max; d++) {
+		if (dl[d].char_id == 0) continue;
+		size_t cid = dl[d].char_id;
+
+		// Only process sprites, buttons, and text fields
+		int is_sprite = (dictionary[cid].type == CHAR_TYPE_SPRITE);
+		int is_button = (dictionary[cid].type == CHAR_TYPE_BUTTON);
+		int is_tf    = (ng_getCharTextfieldIdx(cid) >= 0);
+		if (!is_sprite && !is_button && !is_tf) continue;
+
+		const char* name = dl[d].instance_name;
+		if (!name || !name[0]) continue;
+
+		// Compute GLOBAL position = parent global + local transform
+		u32 tid = dl[d].transform_id;
+		float local_x = transform_data[tid][12] / 20.0f;
+		float local_y = transform_data[tid][13] / 20.0f;
+		float global_x = parent_global_x + local_x;
+		float global_y = parent_global_y + local_y;
+
+		// Find or create the child MC
+		MovieClip* mc = findOrCreateMovieClip(app_context, name, parent_mc);
+		if (mc == NULL) continue;
+
+		// Compute the SORT POSITION for this item:
+		// - Text fields/buttons: their global registration point (top-left of bounds)
+		// - Sprites: minimum visual position from their children (not registration point),
+		//   because the focus highlight bounds come from visual content, not the sprite origin.
+		//   This matches Ruffle's automatic tab ordering: sort by highlight bounds top-left.
+		float sort_x = global_x;
+		float sort_y = global_y;
+		if (is_sprite && !is_button) {
+			// Use visual bounding box min, not registration point
+			float vis_min_x = 1e30f, vis_min_y = 1e30f;
+			if (dl[d].sprite_display_list != NULL && dl[d].sprite_max_depth > 0) {
+				compute_min_visual_pos(dl[d].sprite_display_list,
+				    dl[d].sprite_max_depth,
+				    global_x, global_y,
+				    &vis_min_x, &vis_min_y);
+			}
+			if (vis_min_y < 1e29f) { sort_x = vis_min_x; sort_y = vis_min_y; }
+		}
+		mc->x = sort_x;
+		mc->y = sort_y;
+
+		// For nested text fields: set ng_textfield_idx if not already set
+		if (mc->ng_textfield_idx < 0) {
+			int tf_idx = ng_getCharTextfieldIdx(cid);
+			if (tf_idx >= 0) mc->ng_textfield_idx = tf_idx;
+		}
+
+		// For nested buttons: mark is_button_mc if not already set
+		if (!mc->is_button_mc && dictionary[cid].type == CHAR_TYPE_BUTTON) {
+			mc->is_button_mc = 1;
+		}
+
+		// If tabbable, add to output (in natural depth-first depth order)
+		if (mc_is_tabbable(mc) && *count < max)
+			out[(*count)++] = mc;
+
+		// Recurse into sprite children if tabChildren=true
+		if (is_sprite &&
+		    dl[d].sprite_display_list != NULL && dl[d].sprite_max_depth > 0) {
+			if (mc_get_tab_children(mc)) {
+				tab_collect_recursive(app_context,
+				    dl[d].sprite_display_list, dl[d].sprite_max_depth,
+				    mc, global_x, global_y, out, count, max);
+			}
+		}
+	}
+}
+
+// Advance keyboard focus to the next tabbable MovieClip (called on Tab key press).
+// reversed=1 for Shift+Tab (previous element), 0 for Tab (next element).
+void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern MovieClip root_movieclip;
+
+	// If _root.tabChildren is false, Tab key does nothing at all
+	if (!mc_get_tab_children(&root_movieclip)) return;
+
+	// Pre-scan child_mc_cache to determine if any MC has explicit tabIndex.
+	// MCs that have had tabIndex set by script will already be in child_mc_cache.
+	int any_has_explicit = 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL &&
+		    mc_get_explicit_tab_index(child_mc_cache[i]) != INT_MIN) {
+			any_has_explicit = 1;
+			break;
+		}
+	}
+
+	// Build flat list via depth-first hierarchical traversal in natural depth order.
+	// Each MC's mc->x/mc->y is set to its GLOBAL pixel position during traversal.
+	MovieClip* natural_order[MAX_CHILD_MOVIECLIPS];
+	int natural_count = 0;
+	tab_collect_recursive(app_context, display_list, max_depth,
+	    &root_movieclip, 0.0f, 0.0f,
+	    natural_order, &natural_count, MAX_CHILD_MOVIECLIPS);
+
+	if (natural_count == 0) return;
+
+	// Flash tab ordering rules:
+	// EXPLICIT mode (any element has tabIndex): only elements with explicit tabIndex
+	//   participate; natural depth-first-depth order is the tiebreaker for equal values;
+	//   stable-sort by tabIndex.
+	// AUTOMATIC mode (no explicit tabIndex): sort all collected elements by GLOBAL
+	//   pixel position (y then x).
+
+	MovieClip* tab_order[MAX_CHILD_MOVIECLIPS];
+	int tab_count = 0;
+
+	if (any_has_explicit) {
+		// Filter: only elements with explicit tabIndex (tabIndex=-1 → INT_MIN → excluded)
+		for (int i = 0; i < natural_count; i++) {
+			if (mc_get_explicit_tab_index(natural_order[i]) != INT_MIN)
+				tab_order[tab_count++] = natural_order[i];
+		}
+		// Stable insertion sort by tabIndex.
+		// Tiebreaker (equal tabIndex): natural depth-first-depth order is preserved
+		// because this is a stable sort and natural_order is already in depth order.
+		for (int i = 1; i < tab_count; i++) {
+			MovieClip* key = tab_order[i];
+			int key_idx = mc_get_explicit_tab_index(key);
+			int j = i - 1;
+			while (j >= 0 && mc_get_explicit_tab_index(tab_order[j]) > key_idx) {
+				tab_order[j+1] = tab_order[j];
+				j--;
+			}
+			tab_order[j+1] = key;
+		}
+	} else {
+		// Automatic mode: sort by Ruffle's highlight-bounds formula: 6*min_y + min_x
+		// mc->x and mc->y were set to the sort position during traversal:
+		//   - text fields/buttons: global registration point
+		//   - sprites: minimum visual position of their children (highlight bounds)
+		// For equal keys, the traversal order (natural depth-first ascending-depth) is
+		// preserved (stable sort), with duplicates removed (first-found wins).
+		for (int i = 0; i < natural_count; i++)
+			tab_order[tab_count++] = natural_order[i];
+		// Stable insertion sort by 6*y + x (ascending)
+		for (int i = 1; i < tab_count; i++) {
+			MovieClip* key = tab_order[i];
+			float key_sort = 6.0f * key->y + key->x;
+			int j = i - 1;
+			while (j >= 0 && 6.0f * tab_order[j]->y + tab_order[j]->x > key_sort) {
+				tab_order[j+1] = tab_order[j]; j--;
+			}
+			tab_order[j+1] = key;
+		}
+		// Remove duplicates: when two items have the same 6y+x, keep only the first
+		// (which is the first found in depth-first-depth-order traversal).
+		int dedup_count = 0;
+		for (int i = 0; i < tab_count; i++) {
+			if (dedup_count > 0) {
+				float prev_sort = 6.0f * tab_order[dedup_count-1]->y + tab_order[dedup_count-1]->x;
+				float this_sort = 6.0f * tab_order[i]->y + tab_order[i]->x;
+				if (this_sort == prev_sort) continue; // Skip duplicate
+			}
+			tab_order[dedup_count++] = tab_order[i];
+		}
+		tab_count = dedup_count;
+	}
+
+	if (tab_count == 0) return;
+
+	// Find current focused MC in tab order
+	int cur_pos = -1;
+	for (int i = 0; i < tab_count; i++) {
+		if (tab_order[i] == g_focused_mc) { cur_pos = i; break; }
+	}
+
+	// Advance to next or previous (wrap around); no-op if only one element
+	int next_pos;
+	if (reversed) {
+		// Shift+Tab: go backward; if not in list (cur_pos==-1), go to last element
+		next_pos = (cur_pos <= 0) ? tab_count - 1 : cur_pos - 1;
+	} else {
+		// Tab: go forward; wraps from last to first
+		next_pos = (cur_pos + 1) % tab_count;
+	}
+	MovieClip* new_mc = tab_order[next_pos];
+	if (new_mc == g_focused_mc) return;
+	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 }
 
 #endif // NO_GRAPHICS (AS2 MC event dispatch)

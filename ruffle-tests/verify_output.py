@@ -23,8 +23,11 @@ from pathlib import Path
 from collections import Counter
 
 RUFFLE_KEY_TO_FLASH = {
-    "Backspace": 8, "Tab": 9, "Enter": 13, "Return": 13, "Shift": 16,
-    "Control": 17, "Alt": 18, "Pause": 19, "CapsLock": 20,
+    "Backspace": 8, "Tab": 9, "Enter": 13, "Return": 13,
+    "Shift": 16, "LeftShift": 16, "RightShift": 16,
+    "Control": 17, "LeftControl": 17, "RightControl": 17,
+    "Alt": 18, "LeftAlt": 18, "RightAlt": 18,
+    "Pause": 19, "CapsLock": 20,
     "Escape": 27, "Space": 32, "PageUp": 33, "PageDown": 34,
     "End": 35, "Home": 36, "Left": 37, "Up": 38, "Right": 39, "Down": 40,
     "Insert": 45, "Delete": 46,
