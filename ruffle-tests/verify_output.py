@@ -23,26 +23,57 @@ from pathlib import Path
 from collections import Counter
 
 RUFFLE_KEY_TO_FLASH = {
+    # Control keys
     "Backspace": 8, "Tab": 9, "Enter": 13, "Return": 13,
+    "Command": 15,
     "Shift": 16, "LeftShift": 16, "RightShift": 16,
     "Control": 17, "LeftControl": 17, "RightControl": 17,
     "Alt": 18, "LeftAlt": 18, "RightAlt": 18,
-    "Pause": 19, "CapsLock": 20,
-    "Escape": 27, "Space": 32, "PageUp": 33, "PageDown": 34,
-    "End": 35, "Home": 36, "Left": 37, "Up": 38, "Right": 39, "Down": 40,
+    "Pause": 19, "CapsLock": 20, "Escape": 27,
+    # Navigation
+    "Space": 32, "PageUp": 33, "PageDown": 34,
+    "End": 35, "Home": 36,
+    "Left": 37, "ArrowLeft": 37,
+    "Up": 38, "ArrowUp": 38,
+    "Right": 39, "ArrowRight": 39,
+    "Down": 40, "ArrowDown": 40,
     "Insert": 45, "Delete": 46,
+    # Numpad navigation (NumLock off) — logical key determines Flash code
+    "NumpadLeft": 37, "NumpadUp": 38, "NumpadRight": 39, "NumpadDown": 40,
+    "NumpadPageUp": 33, "NumpadPageDown": 34,
+    "NumpadEnd": 35, "NumpadHome": 36,
+    "NumpadInsert": 45, "NumpadDelete": 46,
+    # Function keys (Ruffle AutomatedKey only defines F1-F9)
     "F1": 112, "F2": 113, "F3": 114, "F4": 115, "F5": 116,
-    "F6": 117, "F7": 118, "F8": 119, "F9": 120, "F10": 121,
-    "F11": 122, "F12": 123, "NumLock": 144, "ScrollLock": 145,
+    "F6": 117, "F7": 118, "F8": 119, "F9": 120,
+    # Lock keys
+    "NumLock": 144, "ScrollLock": 145,
+    # Punctuation / symbols
+    "Semicolon": 186, "Equal": 187, "Comma": 188, "Minus": 189,
+    "Period": 190, "Slash": 191, "Backquote": 192,
+    "LeftBracket": 219, "Backslash": 220, "RightBracket": 221,
+    "Quote": 222,
+}
+
+
+# Numpad digit/operator chars → Flash numpad key codes
+# Ruffle serializes Numpad(ch) as {"Numpad": "ch"} in input.json
+NUMPAD_CHAR_TO_FLASH = {
+    '0': 96, '1': 97, '2': 98, '3': 99, '4': 100,
+    '5': 101, '6': 102, '7': 103, '8': 104, '9': 105,
+    '*': 106, '+': 107, '-': 109, '.': 110, '/': 111,
 }
 
 
 def ruffle_key_to_flash_code(key):
     if isinstance(key, str):
         return RUFFLE_KEY_TO_FLASH.get(key, 0)
-    elif isinstance(key, dict) and "Char" in key:
-        c = key["Char"]
-        return ord(c.upper()) if c.isalpha() else ord(c)
+    elif isinstance(key, dict):
+        if "Char" in key:
+            c = key["Char"]
+            return ord(c.upper()) if c.isalpha() else ord(c)
+        if "Numpad" in key:
+            return NUMPAD_CHAR_TO_FLASH.get(key["Numpad"], 0)
     return 0
 
 
@@ -77,7 +108,9 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
             btn = evt.get("btn", "Left")
             lines.append(f"MOUSE_UP_{btn.upper()} {x / scale_factor:.6f} {y / scale_factor:.6f}")
         elif t == "MouseWheel":
-            lines.append(f"MOUSE_WHEEL {evt.get('lines', evt.get('delta', 0))}")
+            # Ruffle uses exactly one of 'lines' or 'pixels'
+            delta = evt.get('lines') or evt.get('pixels') or 0
+            lines.append(f"MOUSE_WHEEL {delta}")
         elif t == "KeyDown":
             code = ruffle_key_to_flash_code(evt.get("key", 0))
             lines.append(f"KEY_DOWN {code}")
