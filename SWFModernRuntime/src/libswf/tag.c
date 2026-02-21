@@ -618,6 +618,110 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 #endif
 }
 
+// Button hit testing + state machine + action dispatch.
+// Runs on every mouse event (in NO_GRAPHICS mode) so that transitions fire
+// on the correct per-event boundary (e.g. MOUSE_MOVE → OverUp, then
+// MOUSE_DOWN → OverDown fires the press action in the same tick).
+//
+// States: 0=Idle, 1=OverUp, 2=OverDown, 3=OutDown
+void ng_update_button_states(SWFAppContext* app_context)
+{
+	if (app_context->shape_data == NULL) return;
+
+	int found_hover = 0;
+	for (size_t i = max_depth; i >= 1; i--)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
+
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_BUTTON) continue;
+
+		u8 old_state = obj->button_state;
+		u8 new_state = old_state;
+
+		if (!found_hover)
+		{
+			// Look up the hit-test shape
+			Character* hit_ch = &dictionary[ch->button_hit_char_id];
+			if (hit_ch->type == CHAR_TYPE_SHAPE)
+			{
+				// Compose PlaceObject2 transform with hit-record transform
+				const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
+				const float* hit_xf = (const float*)(app_context->transform_data) + ch->button_hit_transform_id * 16;
+				float composed[16];
+				hit_test_mat4_multiply(composed, place_xf, hit_xf);
+
+				int hit = hit_test_shape(app_context->shape_data,
+					hit_ch->shape_offset, hit_ch->size,
+					composed,
+					app_context->mouse.stage_x,
+					app_context->mouse.stage_y);
+
+				if (hit)
+				{
+					found_hover = 1;
+					if (app_context->mouse.button_down)
+						new_state = 2;  // OverDown
+					else
+						new_state = 1;  // OverUp
+				}
+				else
+				{
+					// Not over button
+					if (app_context->mouse.button_down &&
+					    (old_state == 2 || old_state == 3))
+						new_state = 3;  // OutDown: pressed while over, dragged outside
+					else
+						new_state = 0;  // Idle
+				}
+			}
+		}
+		else
+		{
+			// Another button already has hover; this button is outside
+			if (app_context->mouse.button_down &&
+			    (old_state == 2 || old_state == 3))
+				new_state = 3;  // OutDown
+			else
+				new_state = 0;  // Idle
+		}
+
+		obj->button_state = new_state;
+		// Keep sticky state in sync so re-placements restore the latest state
+		obj->sticky_char_id = obj->char_id;
+		obj->sticky_button_state = new_state;
+
+		// Dispatch actions on state transitions
+		if (old_state != new_state && ch->button_action_count > 0)
+		{
+			// Encode transition as BUTTONCONDACTION bitmask
+			u16 transition = 0;
+			if      (old_state == 0 && new_state == 1) transition = 0x0001; // IdleToOverUp
+			else if (old_state == 1 && new_state == 0) transition = 0x0002; // OverUpToIdle
+			else if (old_state == 1 && new_state == 2) transition = 0x0004; // OverUpToOverDown
+			else if (old_state == 2 && new_state == 1) transition = 0x0008; // OverDownToOverUp
+			else if (old_state == 2 && new_state == 3) transition = 0x0010; // OverDownToOutDown
+			else if (old_state == 3 && new_state == 2) transition = 0x0020; // OutDownToOverDown
+			else if (old_state == 3 && new_state == 0) transition = 0x0040; // OutDownToIdle
+			else if (old_state == 0 && new_state == 2) transition = 0x0080; // IdleToOverDown
+			else if (old_state == 2 && new_state == 0) transition = 0x0100; // OverDownToIdle
+			else if (old_state == 3 && new_state == 1) transition = 0x0040; // OutDownToIdle (closest match)
+
+			if (transition != 0)
+			{
+				for (size_t a = 0; a < ch->button_action_count; a++)
+				{
+					if (ch->button_actions[a].condition & transition)
+						ch->button_actions[a].action(app_context);
+				}
+			}
+		}
+
+		obj->button_prev_state = old_state;
+	}
+}
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
@@ -663,109 +767,11 @@ void tagShowFrame(SWFAppContext* app_context)
 	}
 
 	// --- Button hit testing + state machine + action dispatch ---
-	// Must run BEFORE transform composition so the pre-render pass
-	// composes transforms for the correct (updated) button state.
-	// Iterate front-to-back (highest depth first). The first button that hits
-	// gets the over/down state; all others use OutDown or Idle.
-	//
-	// States: 0=Idle, 1=OverUp, 2=OverDown, 3=OutDown
-	// OutDown: mouse was pressed while over this button and has since moved outside.
-	// It is reset when the mouse is released or when the mouse returns over the button.
-	if (app_context->shape_data != NULL)
-	{
-		int found_hover = 0;
-		for (size_t i = max_depth; i >= 1; i--)
-		{
-			DisplayObject* obj = &display_list[i];
-			if (obj->char_id == 0) continue;
-
-			Character* ch = &dictionary[obj->char_id];
-			if (ch->type != CHAR_TYPE_BUTTON) continue;
-
-			u8 old_state = obj->button_state;
-			u8 new_state = old_state;
-
-			if (!found_hover)
-			{
-				// Look up the hit-test shape
-				Character* hit_ch = &dictionary[ch->button_hit_char_id];
-				if (hit_ch->type == CHAR_TYPE_SHAPE)
-				{
-					// Compose PlaceObject2 transform with hit-record transform
-					const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
-					const float* hit_xf = (const float*)(app_context->transform_data) + ch->button_hit_transform_id * 16;
-					float composed[16];
-					hit_test_mat4_multiply(composed, place_xf, hit_xf);
-
-					int hit = hit_test_shape(app_context->shape_data,
-						hit_ch->shape_offset, hit_ch->size,
-						composed,
-						app_context->mouse.stage_x,
-						app_context->mouse.stage_y);
-
-					if (hit)
-					{
-						found_hover = 1;
-						if (app_context->mouse.button_down)
-							new_state = 2;  // OverDown
-						else
-							new_state = 1;  // OverUp
-					}
-					else
-					{
-						// Not over button
-						if (app_context->mouse.button_down &&
-						    (old_state == 2 || old_state == 3))
-							new_state = 3;  // OutDown: pressed while over, dragged outside
-						else
-							new_state = 0;  // Idle
-					}
-				}
-			}
-			else
-			{
-				// Another button already has hover; this button is outside
-				if (app_context->mouse.button_down &&
-				    (old_state == 2 || old_state == 3))
-					new_state = 3;  // OutDown
-				else
-					new_state = 0;  // Idle
-			}
-
-			obj->button_state = new_state;
-			// Keep sticky state in sync so re-placements restore the latest state
-			obj->sticky_char_id = obj->char_id;
-			obj->sticky_button_state = new_state;
-
-			// Dispatch actions on state transitions
-			if (old_state != new_state && ch->button_action_count > 0)
-			{
-				// Encode transition as BUTTONCONDACTION bitmask
-				u16 transition = 0;
-				if      (old_state == 0 && new_state == 1) transition = 0x0001; // IdleToOverUp
-				else if (old_state == 1 && new_state == 0) transition = 0x0002; // OverUpToIdle
-				else if (old_state == 1 && new_state == 2) transition = 0x0004; // OverUpToOverDown
-				else if (old_state == 2 && new_state == 1) transition = 0x0008; // OverDownToOverUp
-				else if (old_state == 2 && new_state == 3) transition = 0x0010; // OverDownToOutDown
-				else if (old_state == 3 && new_state == 2) transition = 0x0020; // OutDownToOverDown
-				else if (old_state == 3 && new_state == 0) transition = 0x0040; // OutDownToIdle
-				else if (old_state == 0 && new_state == 2) transition = 0x0080; // IdleToOverDown
-				else if (old_state == 2 && new_state == 0) transition = 0x0100; // OverDownToIdle
-				else if (old_state == 3 && new_state == 1) transition = 0x0040; // OutDownToIdle (closest match)
-
-				if (transition != 0)
-				{
-					for (size_t a = 0; a < ch->button_action_count; a++)
-					{
-						if (ch->button_actions[a].condition & transition)
-							ch->button_actions[a].action(app_context);
-					}
-				}
-			}
-
-			obj->button_prev_state = old_state;
-		}
-	}
+	// In NO_GRAPHICS mode, ng_update_button_states() is called from input_events_deliver()
+	// on each mouse event for correct per-event timing. Skip here to avoid double-firing.
+#ifndef NO_GRAPHICS
+	ng_update_button_states(app_context);
+#endif
 
 #ifndef NO_GRAPHICS
 	// Compose transforms recursively BEFORE the render pass.
