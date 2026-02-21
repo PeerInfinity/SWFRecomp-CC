@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-02-21T17:48:46.699973+00:00",
-    "old_git_sha": "937b361e7c3237abfabcfa3424885b8d46073616",
-    "new_timestamp": "2026-02-21T17:59:31.642580+00:00",
-    "new_git_sha": "b62d298099562eebff829d0be6c9a96a381e324e",
+    "old_timestamp": "2026-02-21T17:59:31.642580+00:00",
+    "old_git_sha": "b62d298099562eebff829d0be6c9a96a381e324e",
+    "new_timestamp": "2026-02-21T18:39:47.295862+00:00",
+    "new_git_sha": "92ed03014a88003ad7842de93584e280bc05ca21",
     "partial": false,
     "same_commit": false
   },
@@ -32,12 +32,12 @@
       "old_status": "segfault",
       "new_status": "segfault",
       "old_lines": {
-        "actual_lines": 32535,
+        "actual_lines": 32531,
         "expected_lines": 40,
         "matching_lines": 8
       },
       "new_lines": {
-        "actual_lines": 32531,
+        "actual_lines": 32540,
         "expected_lines": 40,
         "matching_lines": 8
       }
