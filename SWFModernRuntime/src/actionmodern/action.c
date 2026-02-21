@@ -474,16 +474,82 @@ static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_STRING;
-	if (g_swf_version < 6) {
-		// SWF5 uses "[type Object]" format
+	if (g_swf_version < 7) {
+		// SWF5/6 uses "[type Object]" format for user-created objects
 		ret.str_size = 13;
 		ret.data.numeric_value = (u64) u16_type_Object;
 	} else {
-		// SWF6+ uses "[object Object]" format
+		// SWF7+ uses "[object Object]" format
 		ret.str_size = 15;
 		ret.data.numeric_value = (u64) u16_object_Object;
 	}
 	return ret;
+}
+
+// --- Native object toString (always "[object Object]" regardless of SWF version) ---
+// Used for static native objects (Math, Key, Mouse, Stage, etc.) which always trace
+// as "[object Object]" even in SWF5, unlike user-created objects.
+static ActionVar builtin_native_object_toString(SWFAppContext* app_context)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 15;
+	ret.data.numeric_value = (u64) u16_object_Object;
+	return ret;
+}
+
+static ASFunction g_native_toString_func;
+static int g_native_toString_init = 0;
+
+// Install a toString method that always returns "[object Object]" on a native ASObject.
+// This bypasses Object.prototype.toString's SWF version check.
+static void installNativeToString(SWFAppContext* app_context, ASObject* obj)
+{
+	if (!g_native_toString_init) {
+		memset(&g_native_toString_func, 0, sizeof(ASFunction));
+		strncpy(g_native_toString_func.name, "toString", 255);
+		g_native_toString_func.function_type = 1;
+		g_native_toString_func.simple_func = (SimpleFunctionPtr) builtin_native_object_toString;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_native_toString_func;
+		g_native_toString_init = 1;
+	}
+	ActionVar ts_var = {0};
+	ts_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ts_var.data.numeric_value = (u64) &g_native_toString_func;
+	setPropertyWithFlags(app_context, obj, "toString", 8, &ts_var, PROPERTY_FLAGS_DONTENUM);
+}
+
+// --- Generic stub method (returns undefined) ---
+// Used as a no-op placeholder for prototype method stubs.
+static ActionVar builtin_stub_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	return ret;
+}
+
+#define MAX_PROTO_STUB_FUNCS 64
+static ASFunction g_proto_stub_funcs[MAX_PROTO_STUB_FUNCS];
+static int g_proto_stub_func_count = 0;
+
+// Add a stub function property to a prototype object.
+// flags controls ENUMERABLE/WRITABLE/CONFIGURABLE behavior.
+static void addStubMethodToProto(SWFAppContext* app_context, ASObject* proto, const char* name, u32 name_len, u8 flags)
+{
+	if (g_proto_stub_func_count >= MAX_PROTO_STUB_FUNCS) return;
+	ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(fn, 0, sizeof(ASFunction));
+	strncpy(fn->name, name, 255);
+	fn->function_type = 2;
+	fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = fn;
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) fn;
+	setPropertyWithFlags(app_context, proto, name, name_len, &fv, flags);
 }
 
 // Built-in hasOwnProperty checks if a property exists directly on the object
@@ -1152,6 +1218,9 @@ static void initMathObject(SWFAppContext* app_context)
 		VAL(u64, &fv.data.numeric_value) = (u64)&g_math_funcs[i];
 		setProperty(app_context, g_math_object, math_methods[i].name, math_methods[i].name_len, &fv);
 	}
+
+	// Math is a native static object — always returns "[object Object]" regardless of SWF version
+	installNativeToString(app_context, g_math_object);
 
 	g_math_init_done = 1;
 }
@@ -8604,6 +8673,14 @@ static void setCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
 }
 
+#ifdef NO_GRAPHICS
+// Set when actionSetTarget() explicitly redirects to root ("_root" or "").
+// Allows actionGotoFrame() to distinguish "goto root" (deferred) vs
+// "goto sprite that has no instance name" (apply to sprite immediately).
+// Reset by exec_sprite_frame() at sprite-frame entry so each sprite starts fresh.
+int g_settarget_explicit_root = 0;
+#endif
+
 // Get the current execution context
 static MovieClip* getCurrentContext(void) {
 	return g_current_context ? g_current_context : &root_movieclip;
@@ -10900,7 +10977,28 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		return;
 	}
 #else
-	if (ng_isInsideSprite()) { ng_gotoFrameCurrentSprite(frame); return; }
+	extern int g_settarget_explicit_root;
+	if (ng_isInsideSprite()) {
+		if (g_settarget_explicit_root) {
+			// SetTarget("_root") was called — target is root.
+			// Defer root frame navigation; don't execute inline while inside sprite script.
+			extern size_t next_frame;
+			extern int manual_next_frame;
+			extern int is_playing;
+			extern size_t g_frame_count;
+			extern int goto_from_action;
+			if (frame < g_frame_count) {
+				goto_from_action = 1;
+				next_frame = frame;
+				manual_next_frame = 1;
+				is_playing = 0;
+				root_movieclip.currentframe = frame + 1;
+			}
+			return;
+		}
+		ng_gotoFrameCurrentSprite(frame);
+		return;
+	}
 #endif
 
 	extern size_t current_frame;
@@ -11703,6 +11801,112 @@ static ASObject* g_stage_obj = NULL;
 
 static int g_global_init_done = 0;
 
+// ---- Prototype initializers for stub classes ----
+
+// PrintJob.prototype:
+//   Numeric properties (ENUMERABLE, READ_ONLY, DONT_DELETE): orientation, pageWidth, pageHeight, paperWidth, paperHeight
+//   Method stubs (DONT_ENUM, WRITABLE, DONT_DELETE) only on SWF7+: start, addPage, send
+//
+// Note: actionEnumerate2 uses LIFO stack, so properties are yielded in REVERSE insertion order.
+// We insert numeric props in reverse of the desired for-in order to get correct enumeration.
+static void initPrintJobPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 8);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor back-reference (DONT_ENUM — not enumerable in Flash)
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+
+	// Numeric properties: ENUMERABLE only (READ_ONLY + DONT_DELETE = no WRITABLE, no CONFIGURABLE)
+	// Inserted in REVERSE of desired for-in order (LIFO enumeration reverses insertion order):
+	// Desired: orientation, pageWidth, pageHeight, paperWidth, paperHeight
+	// Insert:  paperHeight, paperWidth, pageHeight, pageWidth, orientation
+	ActionVar num_val = {0};
+	num_val.type = ACTION_STACK_VALUE_F64;
+	num_val.data.numeric_value = 0; // 0.0 as double
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "paperHeight", 11, &num_val, PROPERTY_FLAG_ENUMERABLE);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "paperWidth", 10, &num_val, PROPERTY_FLAG_ENUMERABLE);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "pageHeight", 10, &num_val, PROPERTY_FLAG_ENUMERABLE);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "pageWidth", 9, &num_val, PROPERTY_FLAG_ENUMERABLE);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "orientation", 11, &num_val, PROPERTY_FLAG_ENUMERABLE);
+
+	// Method stubs: SWF7+ only (DONT_ENUM + DONT_DELETE = WRITABLE only)
+	if (g_swf_version >= 7) {
+		addStubMethodToProto(app_context, ctor->prototype_obj, "start", 5, PROPERTY_FLAG_WRITABLE);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "addPage", 7, PROPERTY_FLAG_WRITABLE);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, PROPERTY_FLAG_WRITABLE);
+	}
+}
+
+// Sound.prototype:
+//   toString (always "[object Object]", DONT_ENUM + DONT_DELETE)
+//   9 methods in SWF5+: getPan, getTransform, getVolume, setPan, setTransform, setVolume, stop, attachSound, start
+//   7 additional in SWF6+: getDuration, setDuration, getPosition, setPosition, loadSound, getBytesLoaded, getBytesTotal
+//   All methods: DONT_ENUM + DONT_DELETE (PROPERTY_FLAG_WRITABLE only)
+static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 24);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor back-reference (DONT_ENUM)
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+
+	// toString: always "[object Object]" (native object behavior)
+	installNativeToString(app_context, ctor->prototype_obj);
+
+	// Core methods (SWF5+)
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getPan", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getTransform", 12, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getVolume", 9, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setPan", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setTransform", 12, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setVolume", 9, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "stop", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "attachSound", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "start", 5, mflags);
+
+	// Extended methods (SWF6+)
+	if (g_swf_version >= 6) {
+		addStubMethodToProto(app_context, ctor->prototype_obj, "getDuration", 11, mflags);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "setDuration", 11, mflags);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "getPosition", 11, mflags);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "setPosition", 11, mflags);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "loadSound", 9, mflags);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesLoaded", 14, mflags);
+		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesTotal", 13, mflags);
+	}
+}
+
+// LocalConnection.prototype:
+//   domain, connect, close, send — DONT_ENUM + DONT_DELETE (PROPERTY_FLAG_WRITABLE only)
+static void initLocalConnectionPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 8);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor back-reference (DONT_ENUM)
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "domain", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
+}
+
 static void ensureGlobalInit(SWFAppContext* app_context)
 {
 	if (g_global_init_done) return;
@@ -11877,6 +12081,13 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setProperty(app_context, global_object, objs[i].name, objs[i].len, &ov);
 		}
 
+		// Native static objects always trace as "[object Object]" regardless of SWF version
+		installNativeToString(app_context, g_accessibility_obj);
+		installNativeToString(app_context, g_key_obj);
+		installNativeToString(app_context, g_mouse_obj);
+		installNativeToString(app_context, g_selection_obj);
+		installNativeToString(app_context, g_stage_obj);
+
 		// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
 		installAsBroadcaster(app_context, g_mouse_obj);
 		installAsBroadcaster(app_context, g_key_obj);
@@ -11925,6 +12136,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setProperty(app_context, g_stub_ctors[9].prototype_obj, "broadcastMessage", 16, &fv);
 		}
 	}
+
+	// ---- Prototype setup for stub classes ----
+	// LocalConnection (stub_ctors[7]): domain, connect, close, send
+	initLocalConnectionPrototype(app_context, &g_stub_ctors[7]);
+	// PrintJob (stub_ctors[12]): numeric properties + SWF7 method stubs
+	initPrintJobPrototype(app_context, &g_stub_ctors[12]);
+	// Sound (stub_ctors[14]): toString + SWF5/6 method stubs
+	initSoundPrototype(app_context, &g_stub_ctors[14]);
 
 	// ---- valueOf on _global ----
 	{
@@ -12531,6 +12750,12 @@ void actionGetVariable(SWFAppContext* app_context)
 				ime_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
 				setProperty(app_context, system_object, "IME", 3, &ime_var);
+
+				// All System sub-objects are native — always trace as "[object Object]"
+				installNativeToString(app_context, system_object);
+				installNativeToString(app_context, security_obj);
+				installNativeToString(app_context, caps_obj);
+				installNativeToString(app_context, ime_obj);
 			}
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)system_object);
 			return;
@@ -18827,9 +19052,15 @@ void actionRemoveSprite(SWFAppContext* app_context)
 
 void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
+#ifdef NO_GRAPHICS
+	extern int g_settarget_explicit_root;
+#endif
 	// Empty string or NULL means return to main timeline
 	if (!target_name || strlen(target_name) == 0) {
 		setCurrentContext(&root_movieclip);
+#ifdef NO_GRAPHICS
+		g_settarget_explicit_root = 1;
+#endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
 #endif
@@ -18839,6 +19070,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// Check for _root
 	if (strcmp(target_name, "_root") == 0 || strcmp(target_name, "/") == 0) {
 		setCurrentContext(&root_movieclip);
+#ifdef NO_GRAPHICS
+		g_settarget_explicit_root = 1;
+#endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
 #endif
@@ -18858,6 +19092,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	MovieClip* target_mc = getMovieClipByTarget(target_name);
 	if (target_mc) {
 		setCurrentContext(target_mc);
+#ifdef NO_GRAPHICS
+		g_settarget_explicit_root = 0;
+#endif
 		return;
 	}
 
@@ -18875,6 +19112,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name, &root_movieclip);
 		if (child_mc) {
 			setCurrentContext(child_mc);
+			g_settarget_explicit_root = 0;
 			return;
 		}
 	}

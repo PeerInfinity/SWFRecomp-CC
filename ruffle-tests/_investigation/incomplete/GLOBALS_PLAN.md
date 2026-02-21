@@ -1,29 +1,53 @@
 # Global Functions/Objects Implementation Plan
 <!-- TESTS: globals_swf5, globals_swf6, globals_swf7, globals_swf8, global_swf5_6_7_8_9, global_swf6_7_8, global_instance_decls, global_proto_decls, global_proto_decls_delete, swf5_global_funcs, swf6_global_funcs, swf7_global_funcs, math_min_max, parse_int, parse_float, is_finite, is_finite_swf6, primitive_type_globals, printjob_props_swf5, printjob_props_swf6, printjob_props_swf7, context_menu, context_menu_item, localconnection_properties, sound_props_swf5, sound_props_swf6, native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, as_set_prop_flags -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-20
 
-## Status: Phases 1-5 COMPLETE, Phases 6-8 NOT STARTED
+## Status: Phases 1-7 (partial) COMPLETE, Phase 8 NOT STARTED
 
 ### Implementation Commits
 - `3048065` — Implement global constructors/objects, rewrite parseInt, fix isFinite/isNaN (Phases 1, 3-5)
 - `c5804d0` — Implement Math object with 17 methods and 8 constants (Phase 2)
 - `06244c7` — Set Object.prototype on built-in objects for proper toString inheritance
+- (prior) — Phase 6: Number.prototype.toString(radix), Number constants, Boolean/String primitives
+- `788d36e` — Phase 7 (partial): native toString for static objects, PrintJob/Sound/LocalConnection prototypes
+- `78e5e4e` — Fix Object.prototype.toString threshold: SWF5/6 user objects → [type Object]
 
-### Current Pass Rates (after implementation)
+### Current Pass Rates (after all implementations as of 2026-02-20)
 
 | Test | Lines | Pass Rate | Status | Notes |
 |------|-------|-----------|--------|-------|
-| globals_swf5 | 290/304 | 95% | output_mismatch | 14 lines off — CustomActions, XMLUI, mx.* |
+| globals_swf5 | 304/304 | 100% | **PASS** | native toString fixed |
 | globals_swf6 | 304/304 | 100% | **PASS** | |
 | globals_swf7 | 304/304 | 100% | **PASS** | |
 | globals_swf8 | 304/304 | 100% | **PASS** | flash.* namespace fully registered |
 | math_min_max | 101/101 | 100% | **PASS** | |
 | is_finite | 49/49 | 100% | **PASS** | |
 | is_finite_swf6 | 49/49 | 100% | **PASS** | |
-| parse_float | 43/74 | 58% | output_mismatch | No longer times out; edge cases remain |
-| parse_int | 0/64 | 0% | output_mismatch | Blocked by `arguments` object (see PARSING_FUNCTIONS_PLAN) |
-| primitive_type_globals | 320/557 | 57% | output_mismatch | Needs Phase 6 (Number.toString(radix)) |
+| parse_float | ~43/74 | 58% | output_mismatch | Edge cases: Infinity handling, precision, no-args |
+| parse_int | 64/64 | 100% | **PASS** | (was blocked by `arguments`, now passes) |
+| primitive_type_globals | 557/557 | 100% | **PASS** | Phase 6 complete |
+| printjob_props_swf5 | PASS | 100% | **PASS** | |
+| printjob_props_swf6 | PASS | 100% | **PASS** | fixed by threshold change |
+| printjob_props_swf7 | PASS | 100% | **PASS** | |
+| sound_props_swf5 | PASS | 100% | **PASS** | |
+| sound_props_swf6 | PASS | 100% | **PASS** | |
+| localconnection_properties | PASS | 100% | **PASS** | |
+
+### Remaining Failing Tests
+
+| Test | Status | Notes |
+|------|--------|-------|
+| parse_float | ~58% | Edge cases: Infinity, no-args=undefined, precision diffs |
+| global_proto_decls | ~0% | Needs prototype methods for ALL 20+ stub classes |
+| global_proto_decls_delete | ~0% | Same as global_proto_decls |
+| global_instance_decls | ~0% | Same + instance property defaults |
+| swf5/6/7_global_funcs | ~0% | Needs behavior impl, not just existence |
+| context_menu | ~0% | ContextMenu/ContextMenuItem need constructor + prototype |
+| context_menu_item | ~0% | Same |
+| native_objects_swf6/7/8 | ~0% | Requires many built-ins fully functional |
+| native_subclasses | ~0% | Same |
+| as_set_prop_flags | ~0% | Property flags enforcement |
 
 ### Phase Completion Summary
 
@@ -31,12 +55,59 @@ Last updated: 2026-02-15
 |-------|-------------|--------|
 | 1 | Register missing global constructors (stubs) | **DONE** |
 | 2 | Math object methods | **DONE** (see MATH_PLAN) |
-| 3 | Fix parseInt | **DONE** (rewritten, but test blocked by `arguments`) |
+| 3 | Fix parseInt | **DONE** (rewritten and passing) |
 | 4 | Fix parseFloat and isFinite | **DONE** (isFinite passes, parseFloat partially) |
 | 5 | flash.* namespace (SWF8+) | **DONE** |
-| 6 | Primitive type improvements (Number/Boolean/String) | NOT STARTED |
-| 7 | Prototype methods for stub classes | NOT STARTED |
+| 6 | Primitive type improvements (Number/Boolean/String) | **DONE** |
+| 7 | Prototype methods for stub classes | PARTIAL (PrintJob/Sound/LocalConnection done; need 15+ more classes) |
 | 8 | Property flags (DONT_ENUM, DONT_DELETE, READ_ONLY) | NOT STARTED |
+
+### Phase 7 Remaining Work
+
+The remaining Phase 7 work is implementing prototype methods for all other stub classes.
+See the "Method lists by class" section below. Each class needs its prototype_obj created
+and methods installed using `addStubMethodToProto()` (already implemented in action.c).
+
+Pattern (from initLocalConnectionPrototype/initSoundPrototype/initPrintJobPrototype):
+```c
+static void initXxxPrototype(SWFAppContext* app_context, ASFunction* ctor) {
+    if (ctor->prototype_obj != NULL) return;
+    ctor->prototype_obj = allocObject(app_context, N);
+    retainObject(ctor->prototype_obj);
+    setObjectProto(app_context, ctor->prototype_obj);
+    ActionVar ctor_var = {0};
+    ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+    ctor_var.data.numeric_value = (u64) ctor;
+    setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+    addStubMethodToProto(app_context, ctor->prototype_obj, "methodName", LEN, PROPERTY_FLAG_WRITABLE);
+    // ... more methods
+}
+// Called from ensureGlobalInit: initXxxPrototype(app_context, &g_stub_ctors[INDEX]);
+```
+
+Stub ctor indices: AsBroadcaster=0, Button=1, Camera=2, Color=3, ContextMenu=4, ContextMenuItem=5,
+LoadVars=6, LocalConnection=7(done), Microphone=8, MovieClipLoader=9, NetConnection=10, NetStream=11,
+PrintJob=12(done), SharedObject=13, Sound=14(done), TextSnapshot=15, Video=16, XMLSocket=17
+
+### Blocker: global_proto_decls tests
+
+The `global_proto_decls` (4497 lines), `global_proto_decls_delete` (4158 lines), and
+`global_instance_decls` (758 lines) tests require prototype methods for ALL ~20 stub classes.
+Each class can be added incrementally. The work is formulaic (just needs the method lists from
+the test output.txt files and the INDEX from the stub_ctors table).
+
+### globals_swf5 Fix Summary
+
+The 11 failing lines were all native static objects returning `[type Object]` instead of `[object Object]`:
+- Fix: `installNativeToString()` helper sets own `toString` on each native ASObject
+- Applied to: Math, Accessibility, Key, Mouse, Selection, Stage, System, System.security,
+  System.capabilities, System.IME
+
+### toString Threshold Fix
+
+User-created objects should return `[type Object]` in BOTH SWF5 and SWF6 (not just SWF5).
+Only SWF7+ user objects return `[object Object]`. Changed `g_swf_version < 6` → `< 7`.
+Native objects bypass this via `installNativeToString()` which always returns `[object Object]`.
 
 ---
 
