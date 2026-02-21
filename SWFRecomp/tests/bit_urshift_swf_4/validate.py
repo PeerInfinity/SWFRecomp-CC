@@ -5,7 +5,7 @@ Validation script for bit_urshift_swf_4
 Tests the BIT_URSHIFT opcode (0x65) - unsigned/logical right shift.
 Expected outputs for 5 test cases:
   1. 8 >>> 2 = 2
-  2. -8 >>> 2 = 1073741824 (float precision)
+  2. -8 >>> 2 = 1073741822
   3. 42 >>> 0 = 42
   4. 255 >>> 8 = 0
   5. 16 >>> 33 = 8 (33 & 0x1F = 1, so 16 >>> 1 = 8)
@@ -26,7 +26,7 @@ def validate_output(output):
 
     Expected outputs (5 test cases):
       1. 8 >>> 2 = 2
-      2. -8 >>> 2 = 1073741824 (float precision)
+      2. -8 >>> 2 = 1073741822
       3. 42 >>> 0 = 42
       4. 255 >>> 8 = 0
       5. 16 >>> 33 = 8
@@ -34,7 +34,7 @@ def validate_output(output):
     lines = parse_output(output)
 
     # Expected outputs for each test case
-    expected_values = ["2", "1073741824", "42", "0", "8"]
+    expected_values = ["2", "1073741822", "42", "0", "8"]
     test_names = [
         "basic_urshift_8_2",
         "negative_urshift_neg8_2",

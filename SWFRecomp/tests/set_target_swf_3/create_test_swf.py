@@ -1,54 +1,62 @@
 #!/usr/bin/env python3
 import struct
 
-# Create a comprehensive SWF3 file with SetTarget actions testing edge cases
+# Create a SWF3 file that tests SetTarget (0x8B) with trace output
+# In NO_GRAPHICS mode, SetTarget to any sprite name silently fails (no sprites exist).
+# This test verifies:
+# 1. trace("test1") works on main timeline
+# 2. SetTarget("nonexistent") silently does nothing
+# 3. trace("test2") still works (main timeline context preserved)
+# 4. SetTarget("") resets to main timeline
+# 5. trace("Done") confirms we're back on main timeline
+
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
 version = 3  # SetTarget is available in SWF 3+
 
 # Frame size (RECT): 0-8000 twips (0-400 pixels)
-# Simple RECT with all zeros for minimal size
 rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
 
 frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
-# Comprehensive test sequence for SetTarget:
-# 1. SetTarget "mySprite" (non-existent sprite)
-# 2. SetTarget "" (return to main)
-# 3. SetTarget "_root" (explicit root)
-# 4. SetTarget "/" (root via slash)
-# 5. SetTarget "invalidTarget" (another invalid target)
-# 6. SetTarget "" (return to main again)
+
+# Helper function to create a PUSH action for a string value
+def push_string(s):
+    s_bytes = s.encode('ascii') + b'\x00'  # Null-terminated string
+    length = len(s_bytes) + 1  # +1 for the type byte
+    return struct.pack('<BHB', 0x96, length, 0) + s_bytes
+
+
+# Helper function to create a SetTarget action (0x8B)
+# Format: 0x8B + UI16 length + null-terminated target string
+def set_target(target):
+    target_bytes = target.encode('ascii') + b'\x00'
+    return struct.pack('<BH', 0x8B, len(target_bytes)) + target_bytes
+
 
 actions = b''
 
-# Test 1: SetTarget to non-existent sprite
-target_1 = b'mySprite\x00'
-actions += struct.pack('<BH', 0x8B, len(target_1)) + target_1
+# Step 1: trace("test1") - on main timeline
+actions += push_string("test1")
+actions += bytes([0x26])  # TRACE
 
-# Test 2: SetTarget to empty string (return to main)
-target_2 = b'\x00'
-actions += struct.pack('<BH', 0x8B, len(target_2)) + target_2
+# Step 2: SetTarget("nonexistent") - silently fails in NO_GRAPHICS mode
+actions += set_target("nonexistent")
 
-# Test 3: SetTarget to "_root"
-target_3 = b'_root\x00'
-actions += struct.pack('<BH', 0x8B, len(target_3)) + target_3
+# Step 3: trace("test2") - still works from main timeline
+actions += push_string("test2")
+actions += bytes([0x26])  # TRACE
 
-# Test 4: SetTarget to "/" (root via slash)
-target_4 = b'/\x00'
-actions += struct.pack('<BH', 0x8B, len(target_4)) + target_4
+# Step 4: SetTarget("") - reset to main timeline
+actions += set_target("")
 
-# Test 5: SetTarget to invalid nested path
-target_5 = b'invalid/nested/path\x00'
-actions += struct.pack('<BH', 0x8B, len(target_5)) + target_5
-
-# Test 6: SetTarget to empty string (return to main)
-target_6 = b'\x00'
-actions += struct.pack('<BH', 0x8B, len(target_6)) + target_6
+# Step 5: trace("Done") - confirm main timeline context
+actions += push_string("Done")
+actions += bytes([0x26])  # TRACE
 
 # End action
-actions += bytes([0x00])  # END action
+actions += bytes([0x00])
 
 # DoAction tag
 do_action_header = struct.pack('<H', (12 << 6) | 0x3F)  # Tag type 12, long form
@@ -73,3 +81,9 @@ with open('test.swf', 'wb') as f:
     f.write(swf_data)
 
 print(f"Created test.swf ({len(swf_data)} bytes)")
+print("Test cases:")
+print("  1. trace('test1') -> test1")
+print("  2. SetTarget('nonexistent') -> silently ignored")
+print("  3. trace('test2') -> test2")
+print("  4. SetTarget('') -> reset to main")
+print("  5. trace('Done') -> Done")

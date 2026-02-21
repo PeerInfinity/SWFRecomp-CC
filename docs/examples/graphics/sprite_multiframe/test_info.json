@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "sprite_multiframe",
+    "description": "Multi-frame DefineSprite that cycles through 3 frames",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["DEFINE_SPRITE", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

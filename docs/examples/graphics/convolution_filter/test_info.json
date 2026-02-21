@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "convolution_filter",
+    "description": "ConvolutionFilter (filter ID 5) with 5x5 box blur kernel",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["CONVOLUTION_FILTER", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

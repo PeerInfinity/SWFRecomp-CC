@@ -31,7 +31,11 @@
  * incremental expansion. The OS handles lazy physical allocation better than we can.
  */
 
+#ifdef __wasi__
+#define DEFAULT_FULL_HEAP_SIZE (64ULL * 1024 * 1024)  // 64 MB for WASI (no virtual memory)
+#else
 #define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB virtual space
+#endif
 
 bool heap_init(SWFAppContext* app_context, size_t initial_size)
 {

@@ -7,18 +7,18 @@ Tests the DELETE opcode (0x3A).
 Test Case 1: Delete existing property
   var obj = {a: 1, b: 2, c: 3};
   var result = delete obj.b;
-  trace(result);  // Expected: 1 (true)
+  trace(result);  // Expected: true (SWF5+ boolean coercion)
   trace(obj.b);   // Expected: undefined
 
 Test Case 2: Delete non-existent property
   var obj2 = {x: 10};
   var result2 = delete obj2.xyz;
-  trace(result2); // Expected: 1 (true)
+  trace(result2); // Expected: true (SWF5+ boolean coercion)
 
 Expected output:
-  1
+  true
   undefined
-  1
+  true
 """
 import sys
 import json
@@ -35,23 +35,23 @@ def validate_output(output):
     Validate test output.
 
     Expected:
-      Line 1: "1" (delete existing property returns true)
+      Line 1: "true" (delete existing property returns true; SWF5+ boolean coercion)
       Line 2: "undefined" (accessing deleted property)
-      Line 3: "1" (delete non-existent property returns true)
+      Line 3: "true" (delete non-existent property returns true)
     """
     lines = parse_output(output)
 
     results = []
 
-    # Test 1: Delete existing property should return 1
-    expected_1 = "1"
+    # Test 1: Delete existing property should return true (SWF5 boolean)
+    expected_1 = "true"
     actual_1 = lines[0] if len(lines) > 0 else ""
     results.append(make_result(
         "delete_existing_property",
         actual_1 == expected_1,
         expected_1,
         actual_1,
-        "DELETE should return 1 (true) when deleting existing property"
+        "DELETE should return true when deleting existing property"
     ))
 
     # Test 2: Accessing deleted property should return "undefined"
@@ -65,15 +65,15 @@ def validate_output(output):
         "Accessing deleted property should return 'undefined'"
     ))
 
-    # Test 3: Delete non-existent property should return 1 (AS2 spec)
-    expected_3 = "1"
+    # Test 3: Delete non-existent property should return true (SWF5 boolean)
+    expected_3 = "true"
     actual_3 = lines[2] if len(lines) > 2 else ""
     results.append(make_result(
         "delete_nonexistent_property",
         actual_3 == expected_3,
         expected_3,
         actual_3,
-        "DELETE should return 1 (true) even for non-existent properties"
+        "DELETE should return true even for non-existent properties"
     ))
 
     return make_validation_result(results)

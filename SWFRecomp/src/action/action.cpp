@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <set>
 
 #include <action.hpp>
 
@@ -14,22 +15,117 @@ using std::endl;
 
 namespace SWFRecomp
 {
-	SWFAction::SWFAction() : next_str_i(0)
+	// Struct for tracking try/catch/finally block boundaries during inline parsing
+	struct TryBlockBoundary {
+		char* catch_start;      // Start of catch body (nullptr if no catch)
+		char* finally_start;    // Start of finally body (nullptr if no finally)
+		char* after_end;        // First byte after the entire try-catch-finally construct
+		bool has_catch;
+		bool has_finally;
+		bool catch_in_register;
+		std::string catch_name;
+		u8 catch_register;
+		// State: 0=in try, 1=in catch, 2=in finally, 3=done
+		int state;
+	};
+
+	// Escape a raw string for use inside C string literals
+	// For SWF < 6 (Latin-1/Win-1252 encoding), convert bytes 0x80-0xFF to UTF-8
+	static std::string escape_c_string(const char* str, int swf_version = 6)
 	{
-		
+		std::string result;
+		for (const char* p = str; *p; ++p)
+		{
+			unsigned char c = (unsigned char)*p;
+			switch (c)
+			{
+				case '"':  result += "\\\""; break;
+				case '\\': result += "\\\\"; break;
+				case '\n': result += "\\n"; break;
+				case '\r': result += "\\r"; break;
+				case '\t': result += "\\t"; break;
+				case '\0': result += "\\0"; break;
+				default:
+					if (c < 0x20 || c == 0x7f)
+					{
+						char buf[5];
+						snprintf(buf, sizeof(buf), "\\x%02x", c);
+						result += buf;
+					}
+					else if (c >= 0x80 && swf_version < 6)
+					{
+						// Latin-1/Win-1252 byte → UTF-8
+						// For 0x80-0x9F (Win-1252 specific), use the standard mapping
+						// For 0xA0-0xFF (shared Latin-1), direct conversion
+						static const unsigned short win1252_map[32] = {
+							0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+							0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+							0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+							0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178
+						};
+						unsigned int codepoint;
+						if (c >= 0x80 && c <= 0x9F)
+							codepoint = win1252_map[c - 0x80];
+						else
+							codepoint = c; // Latin-1: codepoint == byte value
+
+						char buf[13];
+						if (codepoint < 0x80) {
+							snprintf(buf, sizeof(buf), "%c", (char)codepoint);
+						} else if (codepoint < 0x800) {
+							snprintf(buf, sizeof(buf), "\\x%02x\\x%02x",
+								0xC0 | (codepoint >> 6),
+								0x80 | (codepoint & 0x3F));
+						} else {
+							snprintf(buf, sizeof(buf), "\\x%02x\\x%02x\\x%02x",
+								0xE0 | (codepoint >> 12),
+								0x80 | ((codepoint >> 6) & 0x3F),
+								0x80 | (codepoint & 0x3F));
+						}
+						result += buf;
+					}
+					else
+					{
+						result += (char)c;
+					}
+					break;
+			}
+		}
+		return result;
+	}
+
+	// Sanitize a string to be a valid C identifier (replace non-alnum with '_')
+	static std::string sanitize_identifier(const std::string& name)
+	{
+		std::string result;
+		result.reserve(name.size());
+		for (char c : name)
+		{
+			result += (isalnum(c) || c == '_') ? c : '_';
+		}
+		return result;
+	}
+
+	SWFAction::SWFAction() : next_str_i(0), parse_depth(0)
+	{
+
 	}
 	
 	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
 	{
-		// Clear constant pool at script boundary (per SWF spec)
-		constant_pool.clear();
+		parse_depth++;
+
+		// Save and clear constant pool at script boundary.
+		// Nested parseActions calls (DefineFunction2, Try, With) will inherit the
+		// parent's pool since we save it here and restore it after the call returns.
+		std::vector<size_t> saved_pool = constant_pool;
 
 		SWFActionType code = SWF_ACTION_CONSTANT_POOL;
 		u16 length;
 
 		char* action_buffer_start = action_buffer;
 
-		std::vector<char*> labels;
+		std::set<char*> labels;
 
 		// Parse action bytes once to mark labels
 		while (code != SWF_ACTION_END_OF_ACTIONS)
@@ -50,7 +146,7 @@ namespace SWFRecomp
 				case SWF_ACTION_IF:
 				{
 					s16 offset = VAL(s16, action_buffer);
-					labels.push_back(action_buffer + length + ((s64) offset));
+					labels.insert(action_buffer + length + ((s64) offset));
 					break;
 				}
 
@@ -76,9 +172,30 @@ namespace SWFRecomp
 					}
 
 					// Add skip target as a label
-					labels.push_back(skip_ptr);
+					labels.insert(skip_ptr);
 					break;
 				}
+
+			case SWF_ACTION_TRY:
+			{
+				// Register finally_start and after_end as labels for goto targets
+				// NOTE: Must use byte-by-byte reads here because action_buffer+1 etc.
+				// are NOT aligned for u16 reads, and VAL macro's pointer cast causes
+				// incorrect values due to strict aliasing / alignment UB.
+				u8 try_flags = (u8)action_buffer[0];
+				bool try_has_finally = (try_flags & 0x02) != 0;
+				u16 p1_try_size = (u8)action_buffer[1] | ((u8)action_buffer[2] << 8);
+				u16 p1_catch_size = (u8)action_buffer[3] | ((u8)action_buffer[4] << 8);
+				u16 p1_finally_size = (u8)action_buffer[5] | ((u8)action_buffer[6] << 8);
+				char* body_start = action_buffer + length;
+				char* p1_finally_start = body_start + p1_try_size + p1_catch_size;
+				char* p1_after_end = p1_finally_start + p1_finally_size;
+				if (try_has_finally) {
+					labels.insert(p1_finally_start);
+				}
+				labels.insert(p1_after_end);
+				break;
+			}
 
 			case SWF_ACTION_WAIT_FOR_FRAME2:
 			{
@@ -103,7 +220,7 @@ namespace SWFRecomp
 				}
 
 				// Mark the skip target as a label
-				labels.push_back(skip_ptr);
+				labels.insert(skip_ptr);
 				break;
 			}
 			}
@@ -113,12 +230,93 @@ namespace SWFRecomp
 		
 		action_buffer = action_buffer_start;
 		code = SWF_ACTION_CONSTANT_POOL;
+
+		// Stack of active try/catch/finally block boundaries for inline parsing
+		std::vector<TryBlockBoundary> try_boundaries;
+		// Labels pre-emitted by boundary handler (skip in generic label code)
+		std::set<char*> emitted_labels;
 		
 		while (code != SWF_ACTION_END_OF_ACTIONS)
 		{
+			// Check try/catch/finally block boundaries before processing next action
+			while (!try_boundaries.empty())
+			{
+				TryBlockBoundary& tb = try_boundaries.back();
+				if (tb.state == 0 && tb.has_catch && action_buffer >= tb.catch_start)
+				{
+					// Transition from try body to catch body
+					out_script << "\t" << "} else {" << endl;
+					out_script << "\t\t" << "// Catch block" << endl;
+					out_script << "\t\t" << "actionCatchEnter(app_context);" << endl;
+					if (tb.catch_in_register)
+					{
+						if (context.inside_function2)
+						{
+							// DefineFunction2 uses local registers — get exception value directly
+							out_script << "\t\t" << "actionCatchGetException(app_context, &regs[" << (int)tb.catch_register << "]);" << endl;
+						}
+						else
+						{
+							out_script << "\t\t" << "actionCatchToRegister(app_context, " << (int)tb.catch_register << ");" << endl;
+						}
+					}
+					else
+					{
+						out_script << "\t\t" << "actionCatchToVariable(app_context, \"" << tb.catch_name << "\");" << endl;
+					}
+					tb.state = 1;
+				}
+				else if ((tb.state == 0 || tb.state == 1) && tb.has_finally && action_buffer >= tb.finally_start)
+				{
+					// Transition to finally body
+					if (tb.state == 0)
+					{
+						// try-only -> finally (no catch block)
+						out_script << "\t" << "}" << endl;
+					}
+					else
+					{
+						// catch -> finally
+						out_script << "\t" << "}" << endl;
+					}
+					out_script << "\t" << "// Finally block" << endl;
+					tb.state = 2;
+				}
+				else if (tb.state <= 2 && action_buffer >= tb.after_end)
+				{
+					// End of entire try-catch-finally construct
+					if (tb.state == 0 || tb.state == 1)
+					{
+						// Close the if or else block
+						out_script << "\t" << "}" << endl;
+					}
+					// For try-catch without finally: emit the after_end label BEFORE
+					// actionTryEnd so goto from try body doesn't skip cleanup
+					if (!tb.has_finally && labels.count(tb.after_end))
+					{
+						out_script << "label_" << to_string((s16)(tb.after_end - action_buffer_start)) << ":" << endl;
+						emitted_labels.insert(tb.after_end);
+					}
+					out_script << "\t" << "actionTryEnd(app_context);" << endl;
+					if (tb.has_finally)
+					{
+						out_script << "\t" << "if (actionReturnPending(app_context)) {" << endl;
+						out_script << "\t\t" << "return actionGetPendingReturn(app_context);" << endl;
+						out_script << "\t" << "}" << endl;
+					}
+					tb.state = 3;
+					try_boundaries.pop_back();
+					continue; // Check next boundary in stack
+				}
+				else
+				{
+					break; // No boundary reached
+				}
+			}
+
 			for (const char* ptr : labels)
 			{
-				if (action_buffer == ptr)
+				if (action_buffer == ptr && emitted_labels.count(const_cast<char*>(ptr)) == 0)
 				{
 					out_script << "label_" << to_string((s16) (ptr - action_buffer_start)) << ":" << endl;
 				}
@@ -168,7 +366,7 @@ namespace SWFRecomp
 				case SWF_ACTION_STOP:
 				{
 					out_script << "\t" << "// Stop" << endl
-							   << "\t" << "is_playing = 0;" << endl;
+							   << "\t" << "actionStop(app_context);" << endl;
 
 					break;
 				}
@@ -423,8 +621,25 @@ namespace SWFRecomp
 
 				case SWF_ACTION_THROW:
 				{
-					out_script << "\t" << "// Throw" << endl
-							   << "\t" << "actionThrow(app_context);" << endl;
+					// Check if inside a catch block with a finally clause
+					bool in_catch_with_finally = false;
+					char* throw_finally_ptr = nullptr;
+					for (int i = (int)try_boundaries.size() - 1; i >= 0; i--) {
+						if (try_boundaries[i].state == 1 && try_boundaries[i].has_finally) {
+							in_catch_with_finally = true;
+							throw_finally_ptr = try_boundaries[i].finally_start;
+							break;
+						}
+					}
+
+					if (in_catch_with_finally && throw_finally_ptr) {
+						out_script << "\t" << "// Throw (deferred to finally)" << endl
+								   << "\t" << "actionThrowPending(app_context);" << endl
+								   << "\t" << "goto label_" << to_string((s16)(throw_finally_ptr - action_buffer_start)) << ";" << endl;
+					} else {
+						out_script << "\t" << "// Throw" << endl
+								   << "\t" << "actionThrow(app_context);" << endl;
+					}
 
 					break;
 				}
@@ -564,12 +779,33 @@ namespace SWFRecomp
 
 				case SWF_ACTION_RETURN:
 				{
-					out_script << "\t" << "// Return" << endl
-							   << "\t" << "{" << endl
-							   << "\t\t" << "ActionVar ret_val;" << endl
-							   << "\t\t" << "popVar(app_context, &ret_val);" << endl
-							   << "\t\t" << "return ret_val;" << endl
-							   << "\t" << "}" << endl;
+					// Check if inside a try/catch block with a finally clause
+					bool in_try_with_finally = false;
+					char* ret_finally_ptr = nullptr;
+					for (int i = (int)try_boundaries.size() - 1; i >= 0; i--) {
+						if (try_boundaries[i].has_finally && try_boundaries[i].state <= 1) {
+							in_try_with_finally = true;
+							ret_finally_ptr = try_boundaries[i].finally_start;
+							break;
+						}
+					}
+
+					if (in_try_with_finally && ret_finally_ptr) {
+						out_script << "\t" << "// Return (deferred to finally)" << endl
+								   << "\t" << "{" << endl
+								   << "\t\t" << "ActionVar ret_val;" << endl
+								   << "\t\t" << "popVar(app_context, &ret_val);" << endl
+								   << "\t\t" << "actionSetReturnPending(app_context, &ret_val);" << endl
+								   << "\t\t" << "goto label_" << to_string((s16)(ret_finally_ptr - action_buffer_start)) << ";" << endl
+								   << "\t" << "}" << endl;
+					} else {
+						out_script << "\t" << "// Return" << endl
+								   << "\t" << "{" << endl
+								   << "\t\t" << "ActionVar ret_val;" << endl
+								   << "\t\t" << "popVar(app_context, &ret_val);" << endl
+								   << "\t\t" << "return ret_val;" << endl
+								   << "\t" << "}" << endl;
+					}
 
 					break;
 				}
@@ -1056,7 +1292,7 @@ namespace SWFRecomp
 
 				// Generate unique function ID
 				static int func2_counter = 0;
-				std::string func_id = std::string("func2_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func2_counter++);
+				std::string func_id = std::string("func2_") + (name_len > 0 ? sanitize_identifier(func_name) : "anonymous") + "_" + std::to_string(func2_counter++);
 
 			// Add function declaration to header (uses app_context)
 			context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);" << endl;
@@ -1064,56 +1300,132 @@ namespace SWFRecomp
 				context.out_script_defs << endl << endl
 					<< "// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl
 					<< "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)" << endl
-					<< "{" << endl;
+					<< "{" << endl
+					<< "\tchar str_buffer[17];" << endl;
 
-				// Initialize local registers
-				if (register_count > 0)
+				// Parse flags (SWF spec bit layout)
+				bool preload_this       = (flags & 0x0001); // Bit 0
+				bool suppress_this      = (flags & 0x0002); // Bit 1
+				bool preload_arguments  = (flags & 0x0004); // Bit 2
+				bool suppress_arguments = (flags & 0x0008); // Bit 3
+				bool preload_super      = (flags & 0x0010); // Bit 4
+				bool suppress_super     = (flags & 0x0020); // Bit 5
+				bool preload_root       = (flags & 0x0040); // Bit 6
+				bool preload_parent     = (flags & 0x0080); // Bit 7
+				bool preload_global     = (flags & 0x0100); // Bit 8
+
+				// Scan function body for maximum register index used
+				int max_body_reg = 0;
 				{
-					context.out_script_defs << "\tActionVar regs[" << (int)register_count << "];" << endl;
-					context.out_script_defs << "\tmemset(regs, 0, sizeof(regs));" << endl;
+					char* scan = action_buffer;
+					char* scan_end = action_buffer + code_size;
+					while (scan < scan_end)
+					{
+						u8 op = (u8)*scan;
+						if (op < 0x80)
+						{
+							// No-data action
+							scan++;
+						}
+						else
+						{
+							// Action with length
+							if (scan + 3 > scan_end) break;
+							u16 act_len = VAL(u16, (scan + 1));
+							char* act_data = scan + 3;
+							if (op == 0x87 && act_len >= 1) // StoreRegister
+							{
+								int reg = (u8)act_data[0];
+								if (reg > max_body_reg) max_body_reg = reg;
+							}
+							else if (op == 0x96) // Push
+							{
+								// Scan push data for register type (type byte = 4)
+								char* p = act_data;
+								char* p_end = act_data + act_len;
+								while (p < p_end)
+								{
+									u8 ptype = (u8)*p; p++;
+									if (ptype == 0) { while (p < p_end && *p) p++; p++; } // String
+									else if (ptype == 1) { p += 4; } // Float
+									else if (ptype == 2) { } // Null
+									else if (ptype == 3) { } // Undefined
+									else if (ptype == 4) { if (p < p_end) { int reg = (u8)*p; if (reg > max_body_reg) max_body_reg = reg; } p++; } // Register
+									else if (ptype == 5) { p++; } // Boolean
+									else if (ptype == 6) { p += 8; } // Double
+									else if (ptype == 7) { p += 4; } // Integer
+									else if (ptype == 8) { p++; } // ConstantPool8
+									else if (ptype == 9) { p += 2; } // ConstantPool16
+									else break;
+								}
+							}
+							scan += 3 + act_len;
+						}
+					}
 				}
 
-				// Parse flags
-				bool preload_this = (flags & 0x0001);
-				bool preload_arguments = (flags & 0x0002);
-				bool preload_super = (flags & 0x0004);
-				bool preload_root = (flags & 0x0008);
-				bool preload_parent = (flags & 0x0010);
-				bool preload_global = (flags & 0x0020);
-				bool suppress_this = (flags & 0x0080);
-				bool suppress_arguments = (flags & 0x0100);
-				bool suppress_super = (flags & 0x0200);
+				// Calculate actual register count needed
+				int next_reg = 1; // Register 0 is reserved
+				if (preload_this) next_reg++;
+				if (preload_arguments) next_reg++;
+				if (preload_super) next_reg++;
+				if (preload_root) next_reg++;
+				if (preload_global) next_reg++;
+				if (preload_parent) next_reg++;
+				int actual_reg_count = next_reg > (int)register_count ? next_reg : (int)register_count;
+				// Ensure array is large enough for all registers used in the body
+				if (max_body_reg + 1 > actual_reg_count) actual_reg_count = max_body_reg + 1;
+
+				// Initialize local registers to undefined
+				if (actual_reg_count > 0)
+				{
+					context.out_script_defs << "\tActionVar regs[" << actual_reg_count << "];" << endl;
+					context.out_script_defs << "\tfor (int _ri = 0; _ri < " << actual_reg_count << "; _ri++) { regs[_ri].type = ACTION_STACK_VALUE_UNDEFINED; regs[_ri].data.numeric_value = 0; regs[_ri].str_size = 0; }" << endl;
+				}
 
 				// Preload special variables into registers
-				int next_reg = 1; // Register 0 is reserved
+				next_reg = 1; // Reset for actual emission
 
-				if (preload_this && !suppress_this)
+				if (preload_this)
 				{
-					context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
+					if (!suppress_this)
+					{
+						context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
+						context.out_script_defs << "\tif (this_obj != NULL) {" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
+						context.out_script_defs << "\t} else {" << endl;
+						context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+						context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+						context.out_script_defs << "\t}" << endl;
+					}
 					next_reg++;
 				}
 
-				if (preload_arguments && !suppress_arguments)
+				if (preload_arguments)
 				{
 					context.out_script_defs << "\t// Preload 'arguments' into register " << next_reg << endl;
 					context.out_script_defs << "\t// Create arguments array object" << endl;
-					context.out_script_defs << "\tASArray* arguments_array = allocArray(arg_count);" << endl;
+					context.out_script_defs << "\tASArray* arguments_array = allocArray(app_context, arg_count);" << endl;
 					context.out_script_defs << "\tfor (u32 i = 0; i < arg_count; i++) {" << endl;
-					context.out_script_defs << "\t\tsetArrayElement(arguments_array, i, &args[i]);" << endl;
+					context.out_script_defs << "\t\tsetArrayElement(app_context, arguments_array, i, &args[i]);" << endl;
 					context.out_script_defs << "\t}" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_ARRAY;" << endl;
 					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)arguments_array;" << endl;
+					context.out_script_defs << "\tswf_setup_arguments_props(app_context, arguments_array);" << endl;
 					next_reg++;
 				}
 
-				if (preload_super && !suppress_super)
+				if (preload_super)
 				{
-					context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
-					context.out_script_defs << "\t// TODO: Create super reference (requires prototype chain support)" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = 0;" << endl;
+					if (!suppress_super)
+					{
+						context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
+						context.out_script_defs << "\tASObject* super_obj_" << next_reg << " = allocObject(app_context, 0);" << endl;
+						context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+						context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)super_obj_" << next_reg << ";" << endl;
+					}
 					next_reg++;
 				}
 
@@ -1126,17 +1438,43 @@ namespace SWFRecomp
 					next_reg++;
 				}
 
-				if (preload_parent)
+				// _parent and _global use runtime register assignment because
+				// Flash Player skips _parent preload when parent is NULL,
+				// causing _global to shift into _parent's register slot
+				if (preload_parent && preload_global)
+				{
+					context.out_script_defs << "\t// Preload '_parent' and '_global' (runtime register assignment)" << endl;
+					context.out_script_defs << "\t{" << endl;
+					context.out_script_defs << "\t\textern MovieClip* g_current_context;" << endl;
+					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
+					context.out_script_defs << "\t\textern ASObject* global_object;" << endl;
+					context.out_script_defs << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
+					context.out_script_defs << "\t\tint _pr = " << next_reg << ";" << endl;
+					context.out_script_defs << "\t\tif (_ctx->parent != NULL) {" << endl;
+					context.out_script_defs << "\t\t\tregs[_pr].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					context.out_script_defs << "\t\t\tregs[_pr].data.numeric_value = (u64)_ctx->parent;" << endl;
+					context.out_script_defs << "\t\t\t_pr++;" << endl;
+					context.out_script_defs << "\t\t}" << endl;
+					context.out_script_defs << "\t\tregs[_pr].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					context.out_script_defs << "\t\tregs[_pr].data.numeric_value = (u64)global_object;" << endl;
+					context.out_script_defs << "\t}" << endl;
+					next_reg += 2;
+				}
+				else if (preload_parent)
 				{
 					context.out_script_defs << "\t// Preload '_parent' into register " << next_reg << endl;
-					context.out_script_defs << "\t// For now, _parent points to _root (no clip hierarchy in NO_GRAPHICS mode)" << endl;
-					context.out_script_defs << "\textern MovieClip root_movieclip;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+					context.out_script_defs << "\t{" << endl;
+					context.out_script_defs << "\t\textern MovieClip* g_current_context;" << endl;
+					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
+					context.out_script_defs << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
+					context.out_script_defs << "\t\tif (_ctx->parent != NULL) {" << endl;
+					context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)_ctx->parent;" << endl;
+					context.out_script_defs << "\t\t}" << endl;
+					context.out_script_defs << "\t}" << endl;
 					next_reg++;
 				}
-
-				if (preload_global)
+				else if (preload_global)
 				{
 					context.out_script_defs << "\t// Preload '_global' into register " << next_reg << endl;
 					context.out_script_defs << "\textern ASObject* global_object;" << endl;
@@ -1225,98 +1563,48 @@ namespace SWFRecomp
 				u16 finally_size = VAL(u16, action_buffer);
 				action_buffer += 2;
 
-				// Read catch name or register
+				// Always read catch name or register (field is present regardless of has_catch)
 				std::string catch_name;
 				u8 catch_register = 0;
-				if (has_catch)
+				if (catch_in_register)
 				{
-					if (catch_in_register)
-					{
-						catch_register = VAL(u8, action_buffer);
-						action_buffer += 1;
-					}
-					else
-					{
-						catch_name = std::string(action_buffer);
-						action_buffer += catch_name.length() + 1; // +1 for null terminator
-					}
+					catch_register = VAL(u8, action_buffer);
+					action_buffer += 1;
+				}
+				else
+				{
+					catch_name = std::string(action_buffer);
+					action_buffer += catch_name.length() + 1; // +1 for null terminator
 				}
 
-				// Store positions for each block
+				// Compute block boundary addresses
 				char* try_body = action_buffer;
 				char* catch_body = try_body + try_size;
 				char* finally_body = catch_body + catch_size;
 				char* after_try = finally_body + finally_size;
 
-				// Generate try-catch-finally structure
+				// Push boundary info for inline parsing (no temp buffers)
+				TryBlockBoundary boundary;
+				boundary.catch_start = has_catch ? catch_body : nullptr;
+				boundary.finally_start = has_finally ? finally_body : nullptr;
+				boundary.after_end = after_try;
+				boundary.has_catch = has_catch;
+				boundary.has_finally = has_finally;
+				boundary.catch_in_register = catch_in_register;
+				boundary.catch_name = catch_name;
+				boundary.catch_register = catch_register;
+				boundary.state = 0; // Starting in try body
+				try_boundaries.push_back(boundary);
+
+				// Emit try block header
 				out_script << "\t" << "// Try-Catch-Finally" << endl;
 				out_script << "\t" << "actionTryBegin(app_context);" << endl;
 				out_script << "\t" << "if (ACTION_TRY_SETJMP(app_context) == 0) {" << endl;
-
-				// Translate try block
 				out_script << "\t\t" << "// Try block" << endl;
-				if (try_size > 0)
-				{
-					char* temp_buffer = (char*)malloc(try_size + 1);
-					memcpy(temp_buffer, try_body, try_size);
-					temp_buffer[try_size] = 0x00; // Add END_OF_ACTIONS marker
-					char* temp_ptr = temp_buffer;
 
-					// Temporarily increase indentation for nested block
-					std::string indent_backup = "\t";
-					parseActions(context, temp_ptr, out_script);
-					free(temp_buffer);
-				}
-
-				if (has_catch)
-				{
-					out_script << "\t" << "} else {" << endl;
-					out_script << "\t\t" << "// Catch block" << endl;
-
-					if (catch_in_register)
-					{
-						out_script << "\t\t" << "actionCatchToRegister(app_context, " << (int)catch_register << ");" << endl;
-					}
-					else
-					{
-						out_script << "\t\t" << "actionCatchToVariable(app_context, \"" << catch_name << "\");" << endl;
-					}
-
-					// Translate catch block
-					if (catch_size > 0)
-					{
-						char* temp_buffer = (char*)malloc(catch_size + 1);
-						memcpy(temp_buffer, catch_body, catch_size);
-						temp_buffer[catch_size] = 0x00; // Add END_OF_ACTIONS marker
-						char* temp_ptr = temp_buffer;
-						parseActions(context, temp_ptr, out_script);
-						free(temp_buffer);
-					}
-				}
-
-				out_script << "\t" << "}" << endl;
-
-				if (has_finally)
-				{
-					out_script << "\t" << "// Finally block" << endl;
-
-					// Translate finally block
-					if (finally_size > 0)
-					{
-						char* temp_buffer = (char*)malloc(finally_size + 1);
-						memcpy(temp_buffer, finally_body, finally_size);
-						temp_buffer[finally_size] = 0x00; // Add END_OF_ACTIONS marker
-						char* temp_ptr = temp_buffer;
-						parseActions(context, temp_ptr, out_script);
-						free(temp_buffer);
-					}
-				}
-
-				out_script << "\t" << "actionTryEnd(app_context);" << endl;
-
-				// Advance action_buffer past all try-catch-finally blocks
-				action_buffer = after_try;
-
+				// action_buffer now points to try_body start
+				// The main loop will continue parsing try body actions inline
+				// Boundary transitions (catch/finally/end) are handled at the top of the loop
 				break;
 			}
 
@@ -1335,9 +1623,9 @@ namespace SWFRecomp
 					action_buffer += 2;
 
 					// Emit actionWithStart to push object onto scope chain
+					// Returns 1 if body should execute, 0 to skip (null/undefined)
 					out_script << "\t" << "// WITH block (size=" << block_size << ")" << endl;
-					out_script << "\t" << "actionWithStart(app_context);" << endl;
-					out_script << "\t" << "{" << endl; // C scope for clarity
+					out_script << "\t" << "if (actionWithStart(app_context)) {" << endl;
 
 					// Copy the WITH block content and add END marker for parseActions
 					// This is necessary because parseActions parses until it hits END (0x00)
@@ -1353,7 +1641,8 @@ namespace SWFRecomp
 					out_script << "\t" << "}" << endl;
 					out_script << "\t" << "actionWithEnd(app_context);" << endl;
 
-					// Move action_buffer to the end of the block
+					// Move action_buffer past the entire WITH record body
+					// block_end already points past (block_size field + body)
 					action_buffer = block_end;
 
 					break;
@@ -1386,7 +1675,7 @@ namespace SWFRecomp
 								size_t str_id = getStringId((char*) push_value);
 
 								out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
-								           << push_str_len << ", " << str_id << ");" << endl;
+								           << "strlen(str_" << to_string(str_id) << "), " << str_id << ");" << endl;
 
 								break;
 							}
@@ -1402,10 +1691,50 @@ namespace SWFRecomp
 								snprintf(hex_float, 11, "0x%08X", (u32) push_value);
 								
 								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F32, " << hex_float << ");" << endl;
-								
+
 								break;
 							}
-							
+
+							case ACTION_STACK_VALUE_F64:
+							{
+								out_script << "(double)" << endl;
+
+								// SWF stores doubles in middle-endian (word-swapped) format:
+								// the two 32-bit halves are stored high-word first, then low-word
+								u64 raw = VAL(u64, &action_buffer[push_length]);
+								push_length += 8;
+								// Swap the two 32-bit halves to get correct IEEE 754 double
+								u32 lo = (u32)(raw & 0xFFFFFFFF);
+								u32 hi = (u32)((raw >> 32) & 0xFFFFFFFF);
+								raw = ((u64)lo << 32) | (u64)hi;
+
+								char hex_double[19];
+								snprintf(hex_double, 19, "0x%016llX", (unsigned long long) raw);
+
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, " << hex_double << "ULL);" << endl;
+
+								break;
+							}
+
+							case ACTION_STACK_VALUE_I32:
+							{
+								s32 int_value = VAL(s32, &action_buffer[push_length]);
+								push_length += 4;
+
+								out_script << "(integer: " << int_value << ")" << endl;
+
+								// Push as F64 via bit-cast of the double value
+								double d = (double) int_value;
+								u64 raw;
+								memcpy(&raw, &d, sizeof(raw));
+
+								char hex_double[19];
+								snprintf(hex_double, 19, "0x%016llX", (unsigned long long) raw);
+
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, " << hex_double << "ULL);" << endl;
+
+								break;
+							}
 
 						case ACTION_STACK_VALUE_REGISTER:
 						{
@@ -1499,7 +1828,11 @@ namespace SWFRecomp
 
 							default:
 							{
-								EXC_ARG("Undefined push type: %d\n", push_type);
+								fprintf(stderr, "Undefined push type: %d\n", push_type);
+								out_script << "\t" << "// Undefined push type: " << (int)push_type << endl;
+								// Skip remaining push data since we don't know the size
+								push_length = length;
+								break;
 							}
 						}
 					}
@@ -1572,9 +1905,9 @@ namespace SWFRecomp
 					// Read flags byte
 					u8 flags = VAL(u8, action_buffer);
 
-					u8 send_vars_method = (flags & 0xC0) >> 6;  // Top 2 bits (6-7)
-					u8 load_target_flag = (flags & 0x02) >> 1;   // Bit 1
-					u8 load_variables_flag = (flags & 0x01);     // Bit 0
+					u8 send_vars_method = (flags & 0x03);        // Bits 0-1
+					u8 load_target_flag = (flags & 0x40) >> 6;   // Bit 6
+					u8 load_variables_flag = (flags & 0x80) >> 7; // Bit 7
 
 					const char* method_str = "NONE";
 					if (send_vars_method == 1) method_str = "GET";
@@ -1618,21 +1951,32 @@ namespace SWFRecomp
 
 				// Generate unique function ID
 				static int func_counter = 0;
-				std::string func_id = std::string("func_") + (name_len > 0 ? std::string(func_name) : "anonymous") + "_" + std::to_string(func_counter++);
+				std::string func_id = std::string("func_") + (name_len > 0 ? sanitize_identifier(func_name) : "anonymous") + "_" + std::to_string(func_counter++);
 
 				// Add function declaration to header (uses app_context)
-				context.out_script_decls << endl << "void " << func_id << "(SWFAppContext* app_context);" << endl;
+				context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context);" << endl;
 
-				// Generate function definition
+				// Generate function definition (returns ActionVar for consistency with DefineFunction2)
 				context.out_script_defs << endl << endl
 					<< "// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl
-					<< "void " << func_id << "(SWFAppContext* app_context)" << endl
-					<< "{" << endl;
+					<< "ActionVar " << func_id << "(SWFAppContext* app_context)" << endl
+					<< "{" << endl
+					<< "\tchar str_buffer[17];" << endl;
 
 				// Bind parameters (simple DefineFunction uses variables, not registers)
-				for (size_t i = 0; i < params.size(); i++)
+				// Parameters are pushed onto the stack by actionCallFunction in order
+				// Pop them in reverse order and set as local variables
+				if (params.size() > 0)
 				{
-					context.out_script_defs << "\t// TODO: Bind parameter '" << params[i] << "' from arguments" << endl;
+					context.out_script_defs << "\t// Bind " << params.size() << " parameter(s) from stack" << endl;
+					context.out_script_defs << "\t{" << endl;
+					for (int i = (int)params.size() - 1; i >= 0; i--)
+					{
+						context.out_script_defs << "\t\tActionVar _param_" << i << ";" << endl;
+						context.out_script_defs << "\t\tpopVar(app_context, &_param_" << i << ");" << endl;
+						context.out_script_defs << "\t\tsetVariableByName(\"" << params[i] << "\", &_param_" << i << ");" << endl;
+					}
+					context.out_script_defs << "\t}" << endl;
 				}
 
 				// Parse function body recursively
@@ -1652,12 +1996,16 @@ namespace SWFRecomp
 
 				action_buffer = func_body_end;
 
+				// Default return for functions without explicit Return action
+				context.out_script_defs << "\tActionVar _default_ret = {0};" << endl;
+				context.out_script_defs << "\t_default_ret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+				context.out_script_defs << "\treturn _default_ret;" << endl;
 				context.out_script_defs << "}" << endl;
 
 				// Generate runtime call to register function
 				out_script << "\t// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl;
 				out_script << "\tactionDefineFunction(app_context, \"" << (name_len > 0 ? func_name : "") << "\", "
-						   << func_id << ", " << num_params << ");" << endl;
+						   << "(void(*)(SWFAppContext*))" << func_id << ", " << num_params << ");" << endl;
 
 				break;
 			}
@@ -1680,19 +2028,41 @@ namespace SWFRecomp
 
 				default:
 				{
-					EXC_ARG("Unimplemented action 0x%02X\n", code);
+					fprintf(stderr, "Unimplemented action 0x%02X\n", code);
+					out_script << "\t" << "// Unimplemented action 0x"
+							   << std::hex << (int)code << std::dec << endl;
 
 					break;
 				}
 			}
 		}
 
-		// Generate MAX_STRING_ID constant for runtime initialization
-		context.out_script_defs << endl << endl
-		                        << "// Maximum string ID for variable array allocation" << endl
-		                        << "#define MAX_STRING_ID " << next_str_i << endl;
-		context.out_script_decls << endl
-		                         << "#define MAX_STRING_ID " << next_str_i << endl;
+		parse_depth--;
+
+		// Only emit string definitions and MAX_STRING_ID at the outermost level
+		// (not inside recursive calls from DefineFunction/DefineFunction2/Try)
+		if (parse_depth == 0)
+		{
+			// Flush pending string definitions at file scope
+			std::string defs = pending_string_defs.str();
+			if (!defs.empty())
+			{
+				context.out_script_defs << defs;
+				pending_string_defs.str("");
+				pending_string_defs.clear();
+			}
+
+			// Generate MAX_STRING_ID constant for runtime initialization
+			context.out_script_defs << endl << endl
+			                        << "// Maximum string ID for variable array allocation" << endl
+			                        << "#define MAX_STRING_ID " << next_str_i << endl;
+			context.out_script_decls << endl
+			                         << "#define MAX_STRING_ID " << next_str_i << endl;
+		}
+
+		// Restore parent's constant pool (so recursive calls from
+		// DefineFunction2/Try/With don't destroy the caller's pool)
+		constant_pool = saved_pool;
 	}
 
 	void SWFAction::declareVariable(Context& context, char* var_name)
@@ -1717,14 +2087,14 @@ namespace SWFRecomp
 
 		// New string - assign ID and declare
 		string_to_id[str] = next_str_i;
-		context.out_script_defs << endl << "char* str_" << next_str_i << " = \"" << str << "\";";
+		pending_string_defs << endl << "char* str_" << next_str_i << " = \"" << escape_c_string(str, context.swf_version) << "\";";
 		context.out_script_decls << endl << "extern char* str_" << next_str_i << ";";
 		next_str_i += 1;
 	}
 	
 	void SWFAction::declareEmptyString(Context& context, size_t size)
 	{
-		context.out_script_defs << endl << "char str_" << next_str_i << "[" << to_string(size) << "];";
+		pending_string_defs << endl << "char str_" << next_str_i << "[" << to_string(size) << "];";
 		context.out_script_decls << endl << "extern char str_" << next_str_i << "[];";
 		next_str_i += 1;
 	}

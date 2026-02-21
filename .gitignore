@@ -19,15 +19,21 @@ RecompiledScripts/
 sup*.swf
 # Allow deployed test SWFs (needed for Ruffle comparison on GitHub Pages)
 !docs/examples/**/test.swf
+# Allow demo SWFs for in-browser recompiler
+!docs/recompiler/*.swf
 
 # Libraries
 zlib.dll
 *.lib
 *.a
+# Allow pre-compiled runtime files for in-browser recompiler demo
+!docs/recompiler/libswfruntime.a
 
 # Compiled files
 *.spv
 *.o
+# Allow pre-compiled .o files for in-browser recompiler demo
+!docs/recompiler/runtime_src/*.o
 
 # WASM build artifacts (but keep source)
 wasm/examples/*/*.wasm
@@ -39,6 +45,10 @@ wasm/examples/*/*.js
 
 # Emscripten
 emsdk/
+
+# WASI-SDK
+wasi-sdk
+wasi-sdk-*/
 .emscripten_cache/
 .emscripten_ports/
 
@@ -66,3 +76,11 @@ test-run.log
 upstream/
 # Upstream reference files for merge comparison
 upstream-reference/
+
+# Ruffle tests: ignore test subdirectories (downloaded data), keep top-level files
+ruffle-tests/*/
+!ruffle-tests/_shared/
+!ruffle-tests/_investigation/
+
+ruffle-tests/results_current.json
+ruffle-tests/results_previous.json

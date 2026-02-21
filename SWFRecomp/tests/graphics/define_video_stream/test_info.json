@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "name": "define_video_stream",
+    "description": "WebGPU rendering test with DefineVideoStream (tag 60) and VideoFrame (tag 61) stub parsing",
+    "swf_version": 7,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": ["DEFINE_VIDEO_STREAM", "VIDEO_FRAME"],
+    "supporting": ["DEFINE_SHAPE", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

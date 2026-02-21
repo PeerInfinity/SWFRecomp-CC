@@ -636,22 +636,40 @@ void flashbang_init(SWFAppContext* app_context, FlashbangContext* context)
 	SDL_ReleaseGPUTransferBuffer(context->device, dummy_transfer_buffer);
 }
 
-int flashbang_poll()
+int flashbang_poll(SWFAppContext* app_context)
 {
 	SDL_Event evt;
-	
+
 	if (SDL_PollEvent(&evt))
 	{
 		switch (evt.type)
 		{
 			case SDL_EVENT_QUIT:
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-			{
 				return 1;
-			}
+			case SDL_EVENT_MOUSE_MOTION:
+				app_context->mouse.stage_x = evt.motion.x * 20.0f;
+				app_context->mouse.stage_y = evt.motion.y * 20.0f;
+				break;
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+				if (evt.button.button == SDL_BUTTON_LEFT) {
+					app_context->mouse.button_down = 1;
+					app_context->mouse.clicked = 1;
+					app_context->mouse.stage_x = evt.button.x * 20.0f;
+					app_context->mouse.stage_y = evt.button.y * 20.0f;
+				}
+				break;
+			case SDL_EVENT_MOUSE_BUTTON_UP:
+				if (evt.button.button == SDL_BUTTON_LEFT) {
+					app_context->mouse.button_down = 0;
+					app_context->mouse.released = 1;
+					app_context->mouse.stage_x = evt.button.x * 20.0f;
+					app_context->mouse.stage_y = evt.button.y * 20.0f;
+				}
+				break;
 		}
 	}
-	
+
 	return 0;
 }
 

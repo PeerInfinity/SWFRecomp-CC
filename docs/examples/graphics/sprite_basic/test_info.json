@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "sprite_basic",
+    "description": "WebGPU rendering test with a DefineSprite containing a red square",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SPRITE"
+    ]
+  }
+}

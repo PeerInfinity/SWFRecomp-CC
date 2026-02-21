@@ -15,25 +15,25 @@ frame_rate = struct.pack('<H', 24 << 8)  # 24 fps (8.8 fixed point)
 frame_count = struct.pack('<H', 1)  # 1 frame
 
 # ActionScript bytecode to test ENUMERATE2
-# Stack order for InitObject: value1, name1, value2, name2, value3, name3, count
+# Stack order for InitObject: name1, value1, name2, value2, name3, value3, count
 
 actions = b''
 
-# Push property values and names for InitObject (in correct order: value, name pairs)
+# Push property names and values for InitObject (name first, then value)
 # Property 1: a: 1
-actions += struct.pack('<BHB', 0x96, 4 + 1, 1) + struct.pack('<f', 1.0)  # PUSH float 1.0 (value)
 actions += struct.pack('<BHB', 0x96, 1 + 1, 0)  # PUSH string "a" (name)
 actions += b'a\x00'
+actions += struct.pack('<BHB', 0x96, 4 + 1, 1) + struct.pack('<f', 1.0)  # PUSH float 1.0 (value)
 
 # Property 2: b: 2
-actions += struct.pack('<BHB', 0x96, 4 + 1, 1) + struct.pack('<f', 2.0)  # PUSH float 2.0 (value)
 actions += struct.pack('<BHB', 0x96, 1 + 1, 0)  # PUSH string "b" (name)
 actions += b'b\x00'
+actions += struct.pack('<BHB', 0x96, 4 + 1, 1) + struct.pack('<f', 2.0)  # PUSH float 2.0 (value)
 
 # Property 3: c: 3
-actions += struct.pack('<BHB', 0x96, 4 + 1, 1) + struct.pack('<f', 3.0)  # PUSH float 3.0 (value)
 actions += struct.pack('<BHB', 0x96, 1 + 1, 0)  # PUSH string "c" (name)
 actions += b'c\x00'
+actions += struct.pack('<BHB', 0x96, 4 + 1, 1) + struct.pack('<f', 3.0)  # PUSH float 3.0 (value)
 
 # Push number of properties (3)
 actions += struct.pack('<BHB', 0x96, 4 + 1, 1) + struct.pack('<f', 3.0)  # PUSH float 3.0

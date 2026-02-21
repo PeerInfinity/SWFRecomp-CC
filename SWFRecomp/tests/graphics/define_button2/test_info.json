@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "define_button2",
+    "description": "DefineButton2 (tag 34) with up/over/down state shapes and hit-test area",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["DEFINE_BUTTON2", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

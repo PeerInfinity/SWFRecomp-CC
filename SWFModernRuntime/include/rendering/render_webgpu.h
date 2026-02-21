@@ -78,8 +78,17 @@ typedef struct WebGPURenderContext
 	WGPUTexture msaa_texture;
 	WGPUTextureView msaa_view;
 
+	WGPUTexture depth_stencil_texture;
+	WGPUTextureView depth_stencil_view;
+
 	// --- Pipelines ---
-	WGPURenderPipeline render_pipeline;
+	WGPURenderPipeline render_pipeline;         // normal: no stencil test
+	WGPURenderPipeline stencil_write_pipeline;  // writes stencil, no color output
+	WGPURenderPipeline stencil_test_pipeline;   // tests stencil, normal color output
+	WGPURenderPipeline blend_add_pipeline;      // blend mode 8: additive
+	WGPURenderPipeline blend_lighten_pipeline;  // blend mode 5: lighten (max)
+	WGPURenderPipeline blend_darken_pipeline;   // blend mode 6: darken (min)
+	WGPURenderPipeline blend_subtract_pipeline; // blend mode 9: subtract
 	WGPUComputePipeline compute_pipeline;
 
 	// --- Bind group layouts ---
@@ -105,6 +114,24 @@ typedef struct WebGPURenderContext
 	WGPURenderPassEncoder render_pass;
 	WGPUTextureView surface_view;      // current frame's surface texture view
 
+	// --- Filter resources (lazy-initialized on first filtered object) ---
+	int filter_resources_created;
+	WGPUTexture filter_tex_a;          // canvas-sized RGBA8 non-MSAA ping-pong A
+	WGPUTexture filter_tex_b;          // canvas-sized RGBA8 non-MSAA ping-pong B
+	WGPUTextureView filter_view_a;
+	WGPUTextureView filter_view_b;
+	WGPUTexture filter_msaa_texture;   // separate MSAA 4x texture for offscreen rendering
+	WGPUTextureView filter_msaa_view;
+	WGPUSampler filter_sampler;        // linear, clamp-to-edge
+	WGPUBuffer filter_quad_buffer;     // 6-vertex fullscreen NDC quad
+	WGPUBuffer blur_params_buf;        // uniform: direction(vec2f), texel_size(vec2f), radius(f32), strength(f32), color(vec4f) = 48 bytes padded to 64
+	WGPURenderPipeline blur_pipeline;
+	WGPUBindGroupLayout blur_bgl;
+	WGPUPipelineLayout blur_pipeline_layout;
+	WGPURenderPipeline composite_pipeline;  // draws filtered result into MSAA main pass
+	WGPUBindGroupLayout composite_bgl;
+	WGPUPipelineLayout composite_pipeline_layout;
+
 	// --- SDL window (native only) ---
 #ifndef __EMSCRIPTEN__
 	struct SDL_Window* window;
@@ -120,7 +147,7 @@ typedef struct WebGPURenderContext
 
 WebGPURenderContext* render_webgpu_new(void);
 void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* context);
-int render_webgpu_poll(void);
+int render_webgpu_poll(SWFAppContext* app_context);
 void render_webgpu_set_background(WebGPURenderContext* context, u8 r, u8 g, u8 b);
 void render_webgpu_upload_bitmap(WebGPURenderContext* context, size_t offset, size_t size, u32 width, u32 height);
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* context);
@@ -130,5 +157,21 @@ void render_webgpu_upload_extra_transform(WebGPURenderContext* context, float* t
 void render_webgpu_upload_cxform_id(WebGPURenderContext* context, u32 cxform_id);
 void render_webgpu_upload_cxform(WebGPURenderContext* context, float* cxform);
 void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_t num_verts, u32 transform_id, u32 cxform_id);
+void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
+void render_webgpu_end_clip_mask(WebGPURenderContext* context);
+void render_webgpu_end_clip(WebGPURenderContext* context);
 void render_webgpu_close_pass(WebGPURenderContext* context);
+void render_webgpu_compose_text_transforms(WebGPURenderContext* context, const char* transform_data, u32 place_transform_id, u32 glyph_start, size_t count);
+void render_webgpu_compose_sprite_transform(WebGPURenderContext* context, const char* transform_data, u32 parent_transform_id, u32 child_transform_id);
+void render_webgpu_write_transform(WebGPURenderContext* context, u32 transform_id, const float composed[16]);
+void render_webgpu_update_vertices(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
+void render_webgpu_update_colors(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
+void render_webgpu_set_blend_mode(WebGPURenderContext* context, u8 blend_mode);
+void render_webgpu_suspend_pass(WebGPURenderContext* context);
+void render_webgpu_resume_pass(WebGPURenderContext* context);
+void render_webgpu_begin_offscreen_pass(WebGPURenderContext* context);
+void render_webgpu_end_offscreen_pass(WebGPURenderContext* context);
+void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float blur_y, u8 quality, float strength, float r, float g, float b, float a, int colorize);
+void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
+void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "do_init_action_swf_5",
+    "description": "DoInitAction (tag 59) runs once when sprite is defined",
+    "swf_version": 5,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": ["ActionTrace"],
+    "supporting": ["ActionPush"]
+  },
+  "execution": {
+    "type": "deterministic"
+  }
+}

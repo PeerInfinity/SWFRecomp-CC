@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "movieclip_control",
+    "description": "MovieClip timeline control via setTarget/gotoAndStop",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["PLACE_OBJECT2", "DEFINE_SPRITE", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

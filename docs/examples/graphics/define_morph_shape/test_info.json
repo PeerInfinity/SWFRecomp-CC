@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "define_morph_shape",
+    "description": "DefineMorphShape (tag 46) rendered at ratio=0 (start shape)",
+    "swf_version": 7,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["DEFINE_MORPH_SHAPE", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

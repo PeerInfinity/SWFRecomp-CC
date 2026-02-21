@@ -1,6 +1,6 @@
 #include <string>
-#include <filesystem>
 #include <fstream>
+#include <sys/stat.h>
 
 #include <common.h>
 #include <swf.hpp>
@@ -12,26 +12,17 @@ using std::ofstream;
 using std::ios_base;
 using std::endl;
 
-namespace fs = std::filesystem;
-
 namespace SWFRecomp
 {
 	void recompile(Context& context)
 	{
 		printf("\n");
-		
-		if (!fs::exists(context.output_tags_folder))
-		{
-			fs::create_directory(context.output_tags_folder);
-		}
-		
-		if (!fs::exists(context.output_scripts_folder))
-		{
-			fs::create_directory(context.output_scripts_folder);
-		}
-		
-		context.output_tags_folder = string("") + context.output_tags_folder + ((char) fs::path::preferred_separator);
-		context.output_scripts_folder = string("") + context.output_scripts_folder + ((char) fs::path::preferred_separator);
+
+		mkdir(context.output_tags_folder.c_str(), 0755);
+		mkdir(context.output_scripts_folder.c_str(), 0755);
+
+		context.output_tags_folder += '/';
+		context.output_scripts_folder += '/';
 		
 		context.tag_main = ofstream(string("") + context.output_tags_folder + "tagMain.c", ios_base::out);
 		
@@ -48,9 +39,20 @@ namespace SWFRecomp
 		context.out_draws_header << "#pragma once" << endl;
 		
 		SWF swf = SWF(context);
-		
-		swf.parseAllTags(context);
-		
+
+		try
+		{
+			swf.parseAllTags(context);
+		}
+		catch (const std::exception& e)
+		{
+			fprintf(stderr, "Caught exception in parseAllTags: %s\n", e.what());
+		}
+		catch (...)
+		{
+			fprintf(stderr, "Caught unknown exception in parseAllTags\n");
+		}
+
 		context.tag_main.close();
 		context.constants.close();
 		context.constants_header.close();

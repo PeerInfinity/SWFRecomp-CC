@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "nonsmoothed_repeating_bitmap",
+    "description": "WebGPU rendering test with NonSmoothedRepeatingBitmap fill type (0x42)",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_LOSSLESS",
+      "NON_SMOOTHED_REPEATING_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

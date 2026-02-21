@@ -27,7 +27,8 @@ frame_count = struct.pack('<H', 1)  # 1 frame
 actions = b''
 
 # Create object with three properties {a: 1, b: 2, c: 3}
-# Stack order for InitObject: [value1, name1, value2, name2, value3, name3, count]
+# Stack order for InitObject: [..., name1, value1, name2, value2, name3, value3, count]
+# (name pushed first, then value — value ends up on top per LIFO)
 
 # First, push the variable name for SetVariable (this will stay at bottom of stack)
 string_obj = b'obj\x00'
@@ -35,22 +36,17 @@ action_push_obj_name = struct.pack('<BHB', 0x96, len(string_obj) + 1, 0)  # PUSH
 action_push_obj_name += string_obj
 actions += action_push_obj_name
 
-# Now push all the properties
-# Push property "a": value
-action_push_1 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
-action_push_1 += struct.pack('<f', 1.0)
-actions += action_push_1
-
+# Now push all the properties (name first, then value)
 # Push property "a": name
 string_a = b'a\x00'
 action_push_a = struct.pack('<BHB', 0x96, len(string_a) + 1, 0)  # PUSH string
 action_push_a += string_a
 actions += action_push_a
 
-# Push property "b": value
-action_push_2 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
-action_push_2 += struct.pack('<f', 2.0)
-actions += action_push_2
+# Push property "a": value
+action_push_1 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
+action_push_1 += struct.pack('<f', 1.0)
+actions += action_push_1
 
 # Push property "b": name
 string_b = b'b\x00'
@@ -58,10 +54,10 @@ action_push_b = struct.pack('<BHB', 0x96, len(string_b) + 1, 0)  # PUSH string
 action_push_b += string_b
 actions += action_push_b
 
-# Push property "c": value
-action_push_3 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
-action_push_3 += struct.pack('<f', 3.0)
-actions += action_push_3
+# Push property "b": value
+action_push_2 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
+action_push_2 += struct.pack('<f', 2.0)
+actions += action_push_2
 
 # Push property "c": name
 string_c = b'c\x00'
@@ -69,13 +65,18 @@ action_push_c = struct.pack('<BHB', 0x96, len(string_c) + 1, 0)  # PUSH string
 action_push_c += string_c
 actions += action_push_c
 
+# Push property "c": value
+action_push_3 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
+action_push_3 += struct.pack('<f', 3.0)
+actions += action_push_3
+
 # Push count (3 properties)
 action_push_count = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
 action_push_count += struct.pack('<f', 3.0)
 actions += action_push_count
 
 # InitObject - pops all properties and count, creates object, pushes it to stack
-# Stack before: ["obj", 1.0, "a", 2.0, "b", 3.0, "c", 3.0]
+# Stack before: ["obj", "a", 1.0, "b", 2.0, "c", 3.0, 3.0]
 # Stack after:  ["obj", object]
 action_init_object = bytes([0x43])  # INIT_OBJECT (0x43)
 actions += action_init_object

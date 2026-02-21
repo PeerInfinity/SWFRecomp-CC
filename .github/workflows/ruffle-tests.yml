@@ -1,0 +1,514 @@
+name: Ruffle AVM1 Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max number of tests to run (0 = all)'
+        required: false
+        default: '0'
+        type: string
+      parallel:
+        description: 'Number of parallel runners (1, 10, 20, or 30)'
+        required: true
+        type: choice
+        options:
+          - '1'
+          - '10'
+          - '20'
+          - '30'
+        default: '10'
+  workflow_call:
+    inputs:
+      limit:
+        description: 'Max number of tests to run (0 = all)'
+        required: false
+        default: '0'
+        type: string
+      parallel:
+        description: 'Number of parallel runners'
+        required: false
+        default: '10'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  # --- Single runner path ---
+  ruffle-tests:
+    name: Run Tests
+    if: inputs.parallel == '1'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+
+      - name: Build SWFRecomp
+        run: |
+          mkdir -p SWFRecomp/build
+          cd SWFRecomp/build
+          cmake ..
+          make -j$(nproc)
+
+      - name: Download Ruffle test SWFs
+        run: |
+          cd ruffle-tests
+          bash download_tests.sh
+
+      - name: Run recompiler on test SWFs
+        run: python3 ruffle-tests/run_tests.py
+
+      - name: Fetch previous results
+        run: |
+          if git fetch origin ruffle-test-results 2>/dev/null; then
+            git show origin/ruffle-test-results:ruffle-tests/results.json > ruffle-tests/results_previous.json 2>/dev/null || true
+          fi
+
+      - name: Verify runtime output
+        env:
+          TZ: Asia/Kathmandu
+        run: |
+          ARGS="-v --json=ruffle-tests/results.json"
+          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
+            ARGS="$ARGS --limit=${{ inputs.limit }}"
+          fi
+          python3 ruffle-tests/verify_output.py $ARGS
+
+      - name: Generate filtered results
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 ruffle-tests/filter_results.py ruffle-tests/results.json ruffle-tests/results_filtered.json
+          fi
+
+      - name: Generate diff report
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ] && [ -f ruffle-tests/results_previous.json ]; then
+            python3 scripts/diff_ruffle_results.py ruffle-tests/results_previous.json ruffle-tests/results.json
+          fi
+
+      - name: Generate markdown reports
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 scripts/generate_ruffle_results_markdown.py
+          fi
+
+      - name: Generate step summary
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          with open("ruffle-tests/results.json") as f:
+              r = json.load(f)
+          m = r.get("metadata", {})
+          print("## Ruffle AVM1 Test Results")
+          # Show filtered results prominently if available
+          try:
+              with open("ruffle-tests/results_filtered.json") as f:
+                  rf = json.load(f)
+              ignored = rf["metadata"].get("ignored_count", 0)
+              print(f"**{rf['pass']}/{rf['total']}** tests passing ({rf['pass_rate']}%) — filtered")
+              print(f"({r['pass']}/{r['total']} raw, {ignored} tests ignored)\n")
+          except FileNotFoundError:
+              print(f"**{r['pass']}/{r['total']}** tests passing ({r['pass_rate']}%)\n")
+          if m.get("git_sha"):
+              print(f"Commit: `{m['git_sha'][:12]}`")
+          if m.get("duration_seconds"):
+              print(f"Duration: {m['duration_seconds']:.0f}s")
+          if m.get("total_available") and m["total_available"] != r["total"]:
+              print(f"Ran {r['total']} of {m['total_available']} available tests")
+          print()
+          if r.get("breakdown"):
+              print("| Category | Count |")
+              print("|----------|------:|")
+              print(f"| Pass | {r['pass']} |")
+              for k, v in r["breakdown"].items():
+                  print(f"| {k} | {v} |")
+          EOF
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruffle-test-results
+          path: |
+            ruffle-tests/results.json
+            ruffle-tests/results_filtered.json
+            ruffle-tests/results_diff.json
+            ruffle-results.md
+            ruffle-results-filtered.md
+            ruffle-results-diff.md
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Commit results to ruffle-test-results branch
+        if: always()
+        run: |
+          if [ ! -f ruffle-tests/results.json ]; then
+            echo "No results file to commit"
+            exit 0
+          fi
+
+          cp ruffle-tests/results.json /tmp/results.json
+          cp ruffle-tests/results_filtered.json /tmp/results_filtered.json 2>/dev/null || true
+          cp ruffle-tests/results_diff.json /tmp/results_diff.json 2>/dev/null || true
+          cp ruffle-results.md /tmp/ruffle-results.md 2>/dev/null || true
+          cp ruffle-results-filtered.md /tmp/ruffle-results-filtered.md 2>/dev/null || true
+          cp ruffle-results-diff.md /tmp/ruffle-results-diff.md 2>/dev/null || true
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin
+
+          git checkout -b ruffle-test-results
+
+          mkdir -p ruffle-tests
+          cp /tmp/results.json ruffle-tests/results.json
+          cp /tmp/results_filtered.json ruffle-tests/results_filtered.json 2>/dev/null || true
+          cp /tmp/results_diff.json ruffle-tests/results_diff.json 2>/dev/null || true
+          cp /tmp/ruffle-results.md ruffle-results.md 2>/dev/null || true
+          cp /tmp/ruffle-results-filtered.md ruffle-results-filtered.md 2>/dev/null || true
+          cp /tmp/ruffle-results-diff.md ruffle-results-diff.md 2>/dev/null || true
+          git add -f ruffle-tests/results.json ruffle-tests/results_filtered.json 2>/dev/null
+          git add -f ruffle-tests/results.json
+          git add -f ruffle-tests/results_diff.json 2>/dev/null || true
+          git add -f ruffle-results.md ruffle-results-filtered.md ruffle-results-diff.md 2>/dev/null || true
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          LIMIT_MSG=""
+          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
+            LIMIT_MSG=" (limit=${{ inputs.limit }})"
+          fi
+
+          git commit -m "Update Ruffle test results${LIMIT_MSG}" \
+            -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          git push -f origin ruffle-test-results
+
+  # --- Parallel runner path: shared setup ---
+  setup-parallel:
+    name: Setup (Build + Download + Recompile)
+    if: inputs.parallel != '1'
+    runs-on: ubuntu-latest
+
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      total: ${{ steps.matrix.outputs.total }}
+
+    steps:
+      - name: Generate shard matrix
+        id: matrix
+        run: |
+          N=${{ inputs.parallel }}
+          echo "matrix=$(seq 1 $N | jq -cs '{shard: .}')" >> "$GITHUB_OUTPUT"
+          echo "total=$N" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+
+      - name: Build SWFRecomp
+        run: |
+          mkdir -p SWFRecomp/build
+          cd SWFRecomp/build
+          cmake ..
+          make -j$(nproc)
+
+      - name: Download Ruffle test SWFs
+        run: |
+          cd ruffle-tests
+          bash download_tests.sh
+
+      - name: Run recompiler on test SWFs
+        run: python3 ruffle-tests/run_tests.py
+
+      - name: Upload SWFRecomp binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-binary
+          path: SWFRecomp/build/SWFRecomp
+          retention-days: 1
+
+      - name: Upload recompiled test data
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-tests
+          path: ruffle-tests/
+          retention-days: 1
+
+  # --- Parallel runner path: shards ---
+  ruffle-tests-shard:
+    name: Shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}
+    if: inputs.parallel != '1'
+    needs: setup-parallel
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup-parallel.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Download SWFRecomp binary
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-binary
+          path: SWFRecomp/build/
+
+      - name: Make SWFRecomp binary executable
+        run: chmod +x SWFRecomp/build/SWFRecomp
+
+      - name: Download recompiled test data
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-tests
+          path: ruffle-tests/
+
+      - name: Verify runtime output (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
+        env:
+          TZ: Asia/Kathmandu
+        run: |
+          ARGS="-v --json=ruffle-tests/results-shard-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
+            ARGS="$ARGS --limit=${{ inputs.limit }}"
+          fi
+          python3 ruffle-tests/verify_output.py $ARGS
+
+      - name: Upload shard results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-shard-${{ matrix.shard }}
+          path: ruffle-tests/results-shard-${{ matrix.shard }}.json
+          retention-days: 7
+
+  # --- Combine shard results ---
+  combine-results:
+    name: Combine Results
+    if: inputs.parallel != '1' && !cancelled()
+    needs: ruffle-tests-shard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch previous results
+        run: |
+          if git fetch origin ruffle-test-results 2>/dev/null; then
+            git show origin/ruffle-test-results:ruffle-tests/results.json > ruffle-tests/results_previous.json 2>/dev/null || true
+          fi
+
+      - name: Download all shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-shard-*
+          path: artifacts
+
+      - name: Combine shard results
+        run: |
+          python3 << 'EOF'
+          import json, glob, os
+          from datetime import datetime, timezone
+
+          files = sorted(glob.glob("artifacts/results-shard-*/results-shard-*.json"))
+          print(f"Found {len(files)} shard result files")
+
+          combined_tests = []
+          total_duration = 0
+          total_available = 0
+          git_sha = None
+          breakdown = {}
+          pass_count = 0
+
+          for f in files:
+              with open(f) as fp:
+                  data = json.load(fp)
+              combined_tests.extend(data.get("tests", []))
+              m = data.get("metadata", {})
+              total_duration += m.get("duration_seconds", 0)
+              total_available = max(total_available, m.get("total_available", 0))
+              if not git_sha:
+                  git_sha = m.get("git_sha")
+              pass_count += data.get("pass", 0)
+              for k, v in data.get("breakdown", {}).items():
+                  breakdown[k] = breakdown.get(k, 0) + v
+
+          total = len(combined_tests)
+          report = {
+              "metadata": {
+                  "timestamp": datetime.now(timezone.utc).isoformat(),
+                  "git_sha": git_sha,
+                  "duration_seconds": round(total_duration, 2),
+                  "total_available": total_available,
+                  "shards": len(files),
+              },
+              "total": total,
+              "pass": pass_count,
+              "fail": total - pass_count,
+              "pass_rate": round(100 * pass_count / total, 1) if total else 0,
+              "breakdown": {k: v for k, v in breakdown.items() if v},
+              "tests": sorted(combined_tests, key=lambda t: t["test"]),
+          }
+
+          os.makedirs("ruffle-tests", exist_ok=True)
+          with open("ruffle-tests/results.json", "w") as fp:
+              json.dump(report, fp, indent=2)
+
+          print(f"Combined: {pass_count}/{total} passing ({report['pass_rate']}%)")
+          EOF
+
+      - name: Generate filtered results
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 ruffle-tests/filter_results.py ruffle-tests/results.json ruffle-tests/results_filtered.json
+          fi
+
+      - name: Generate diff report
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ] && [ -f ruffle-tests/results_previous.json ]; then
+            python3 scripts/diff_ruffle_results.py ruffle-tests/results_previous.json ruffle-tests/results.json
+          fi
+
+      - name: Generate markdown reports
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 scripts/generate_ruffle_results_markdown.py
+          fi
+
+      - name: Generate step summary
+        if: always()
+        run: |
+          if [ -f ruffle-tests/results.json ]; then
+            python3 << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          with open("ruffle-tests/results.json") as f:
+              r = json.load(f)
+          m = r.get("metadata", {})
+          print("## Ruffle AVM1 Test Results")
+          try:
+              with open("ruffle-tests/results_filtered.json") as f:
+                  rf = json.load(f)
+              ignored = rf["metadata"].get("ignored_count", 0)
+              print(f"**{rf['pass']}/{rf['total']}** tests passing ({rf['pass_rate']}%) — filtered")
+              print(f"({r['pass']}/{r['total']} raw, {ignored} tests ignored)\n")
+          except FileNotFoundError:
+              print(f"**{r['pass']}/{r['total']}** tests passing ({r['pass_rate']}%)\n")
+          if m.get("git_sha"):
+              print(f"Commit: `{m['git_sha'][:12]}`")
+          if m.get("duration_seconds"):
+              dur = m['duration_seconds']
+              shards = m.get('shards', 1)
+              print(f"Duration: {dur:.0f}s total across {shards} shards")
+          if m.get("total_available") and m["total_available"] != r["total"]:
+              print(f"Ran {r['total']} of {m['total_available']} available tests")
+          print()
+          if r.get("breakdown"):
+              print("| Category | Count |")
+              print("|----------|------:|")
+              print(f"| Pass | {r['pass']} |")
+              for k, v in r["breakdown"].items():
+                  print(f"| {k} | {v} |")
+          EOF
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruffle-test-results
+          path: |
+            ruffle-tests/results.json
+            ruffle-tests/results_filtered.json
+            ruffle-tests/results_diff.json
+            ruffle-results.md
+            ruffle-results-filtered.md
+            ruffle-results-diff.md
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Commit results to ruffle-test-results branch
+        if: always()
+        run: |
+          if [ ! -f ruffle-tests/results.json ]; then
+            echo "No results file to commit"
+            exit 0
+          fi
+
+          cp ruffle-tests/results.json /tmp/results.json
+          cp ruffle-tests/results_filtered.json /tmp/results_filtered.json 2>/dev/null || true
+          cp ruffle-tests/results_diff.json /tmp/results_diff.json 2>/dev/null || true
+          cp ruffle-results.md /tmp/ruffle-results.md 2>/dev/null || true
+          cp ruffle-results-filtered.md /tmp/ruffle-results-filtered.md 2>/dev/null || true
+          cp ruffle-results-diff.md /tmp/ruffle-results-diff.md 2>/dev/null || true
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin
+
+          git checkout -b ruffle-test-results
+
+          mkdir -p ruffle-tests
+          cp /tmp/results.json ruffle-tests/results.json
+          cp /tmp/results_filtered.json ruffle-tests/results_filtered.json 2>/dev/null || true
+          cp /tmp/results_diff.json ruffle-tests/results_diff.json 2>/dev/null || true
+          cp /tmp/ruffle-results.md ruffle-results.md 2>/dev/null || true
+          cp /tmp/ruffle-results-filtered.md ruffle-results-filtered.md 2>/dev/null || true
+          cp /tmp/ruffle-results-diff.md ruffle-results-diff.md 2>/dev/null || true
+          git add -f ruffle-tests/results.json ruffle-tests/results_filtered.json 2>/dev/null
+          git add -f ruffle-tests/results.json
+          git add -f ruffle-tests/results_diff.json 2>/dev/null || true
+          git add -f ruffle-results.md ruffle-results-filtered.md ruffle-results-diff.md 2>/dev/null || true
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          LIMIT_MSG=""
+          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
+            LIMIT_MSG=" (limit=${{ inputs.limit }})"
+          fi
+
+          git commit -m "Update Ruffle test results${LIMIT_MSG}" \
+            -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          git push -f origin ruffle-test-results

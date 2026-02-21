@@ -36,6 +36,11 @@ static int free_variable_callback(const void *key, size_t ksize, uintptr_t value
 {
 	ActionVar* var = (ActionVar*) value;
 
+	// Skip entries that are shared with var_array (will be freed by var_array loop)
+	for (size_t i = 0; i < var_array_size; i++) {
+		if (var_array[i] == var) return 0;
+	}
+
 	// Free heap-allocated strings
 	if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
 	{
@@ -95,15 +100,13 @@ ActionVar* getVariableById(u32 string_id)
 			return NULL;
 		}
 
-		// Initialize with unset type (empty string)
+		// Initialize with unset type (empty string, UTF-16 NULL with 0 length)
 		var->type = ACTION_STACK_VALUE_STRING;
 		var->str_size = 0;
 		var->string_id = 0;
 		var->data.string_data.heap_ptr = NULL;
 		var->data.string_data.owns_memory = false;
-		// Initialize numeric_value to point to empty string to avoid segfault
-		// when pushVar tries to use it as a string pointer
-		var->data.numeric_value = (u64) "";
+		var->data.numeric_value = 0;
 
 		var_array[string_id] = var;
 	}
@@ -120,22 +123,25 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 		return var;
 	}
 
-	do
-	{
-		var = (ActionVar*) malloc(sizeof(ActionVar));
-	} while (errno != 0);
+	var = (ActionVar*) malloc(sizeof(ActionVar));
+	if (var == NULL) return NULL;
 
-	// Initialize with unset type (empty string)
+	// Initialize with unset type (empty string, UTF-16 NULL with 0 length)
 	var->type = ACTION_STACK_VALUE_STRING;
 	var->str_size = 0;
 	var->string_id = 0;
 	var->data.string_data.heap_ptr = NULL;
 	var->data.string_data.owns_memory = false;
-	// Initialize numeric_value to point to empty string to avoid segfault
-	// when pushVar tries to use it as a string pointer
-	var->data.numeric_value = (u64) "";
+	var->data.numeric_value = 0;
 
-	hashmap_set(var_map, var_name, key_size, (uintptr_t) var);
+	// The hashmap stores the key pointer directly (not a copy), so we must
+	// heap-allocate the key to ensure it outlives the caller's stack frame.
+	char* key_copy = (char*) malloc(key_size + 1);
+	if (key_copy == NULL) { free(var); return NULL; }
+	memcpy(key_copy, var_name, key_size);
+	key_copy[key_size] = '\0';
+
+	hashmap_set(var_map, key_copy, key_size, (uintptr_t) var);
 
 	return var;
 }
@@ -148,6 +154,12 @@ bool hasVariable(char* var_name, size_t key_size)
 
 void setVariableByName(const char* var_name, ActionVar* value)
 {
+	// If inside a function scope, define on local scope (not global)
+	// This prevents DefineFunction parameter binding from leaking to root scope
+	extern bool setVariableOnLocalScope(const char* var_name, ActionVar* value);
+	if (setVariableOnLocalScope(var_name, value))
+		return;
+
 	size_t key_size = strlen(var_name);
 	ActionVar* var = getVariable((char*)var_name, key_size);
 
@@ -168,49 +180,6 @@ void setVariableByName(const char* var_name, ActionVar* value)
 	var->data = value->data;
 }
 
-char* materializeStringList(char* stack, u32 sp)
-{
-	ActionStackValueType type = stack[sp];
-
-	if (type == ACTION_STACK_VALUE_STR_LIST)
-	{
-		// Get the string list
-		u64* str_list = (u64*) &stack[sp + 16];
-		u64 num_strings = str_list[0];
-		u32 total_size = VAL(u32, &stack[sp + 8]);
-
-		// Allocate heap memory for concatenated result
-		char* result = (char*) malloc(total_size + 1);
-		if (!result)
-		{
-			EXC("Failed to allocate memory for string variable\n");
-			return NULL;
-		}
-
-		// Concatenate all strings
-		char* dest = result;
-		for (u64 i = 0; i < num_strings; i++)
-		{
-			char* src = (char*) str_list[i + 1];
-			size_t len = strlen(src);
-			memcpy(dest, src, len);
-			dest += len;
-		}
-		*dest = '\0';
-
-		return result;
-	}
-	else if (type == ACTION_STACK_VALUE_STRING)
-	{
-		// Single string - duplicate it
-		char* src = (char*) VAL(u64, &stack[sp + 16]);
-		return strdup(src);
-	}
-
-	// Not a string type
-	return NULL;
-}
-
 void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 {
 	// Free old string if variable owns memory
@@ -222,23 +191,38 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 
 	ActionStackValueType type = stack[sp];
 
-	if (type == ACTION_STACK_VALUE_STRING || type == ACTION_STACK_VALUE_STR_LIST)
+	if (type == ACTION_STACK_VALUE_STRING)
 	{
-		// Materialize string to heap
-		char* heap_str = materializeStringList(stack, sp);
-		if (!heap_str)
-		{
-			// Allocation failed, variable becomes unset
-			var->type = ACTION_STACK_VALUE_STRING;
-			var->str_size = 0;
-			var->data.numeric_value = 0;
-			return;
-		}
+		// Copy UTF-16 string data to heap (stack data is transient)
+		u32 u16_len = VAL(u32, &stack[sp + 8]);  // code unit count
+		const uint16_t* src = (const uint16_t*) VAL(u64, &stack[sp + 16]);
 
 		var->type = ACTION_STACK_VALUE_STRING;
-		var->str_size = strlen(heap_str);
-		var->data.string_data.heap_ptr = heap_str;
-		var->data.string_data.owns_memory = true;
+		var->string_id = VAL(u32, &stack[sp + 12]);
+
+		if (u16_len > 0 && src != NULL)
+		{
+			uint16_t* heap_copy = (uint16_t*) malloc(u16_len * sizeof(uint16_t));
+			if (!heap_copy)
+			{
+				var->str_size = 0;
+				var->data.numeric_value = 0;
+				return;
+			}
+			memcpy(heap_copy, src, u16_len * sizeof(uint16_t));
+			var->str_size = u16_len;
+			var->data.string_data.heap_ptr = heap_copy;
+			var->data.string_data.owns_memory = true;
+		}
+		else
+		{
+			// Empty string: use a non-NULL sentinel pointer to distinguish
+			// from zero-initialized "unset" variable slots (which have NULL heap_ptr)
+			static const uint16_t empty_u16[] = {0};
+			var->str_size = 0;
+			var->data.string_data.heap_ptr = (uint16_t*) empty_u16;
+			var->data.string_data.owns_memory = false;
+		}
 	}
 	else
 	{

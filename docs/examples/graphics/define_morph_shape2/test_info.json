@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "name": "define_morph_shape2",
+    "description": "DefineMorphShape2 (tag 84) with solid fill at 50% morph ratio",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "graphics": {
+    "tested": ["DEFINE_MORPH_SHAPE2", "SOLID_FILL", "STRAIGHT_EDGE"]
+  }
+}

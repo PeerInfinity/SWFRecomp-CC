@@ -59,7 +59,8 @@ static const char* vertex_wgsl =
 "  let cxform_id = instance_id >> 16u;\n"
 "  let transform = transforms[transform_id];\n"
 "  let pos = vec4f(in.position, 0.0, 1.0);\n"
-"  out.v_style_type = in.style.x;\n"
+"  let spread_mode = (in.style.x >> 8u) & 0x3u;\n"
+"  out.v_style_type = in.style.x & 0xFFu;\n"
 "  out.v_style_id = in.style.y & 0xFFFFu;\n"
 "  let style_upper = (in.style.y >> 16u) & 0xFFFFu;\n"
 "  out.position = stage_transform.matrix * transform * pos;\n"
@@ -67,11 +68,17 @@ static const char* vertex_wgsl =
 "    out.v_args = colors[out.v_style_id];\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x10u) {\n"
 "    let inv_pos = inv_mats[out.v_style_id] * pos;\n"
-"    out.v_args = vec4f(inv_pos.xy, 0.0, 0.0);\n"
+"    var focal_z = 0.0;\n"
+"    if (out.v_style_type == 0x13u) {\n"
+"      focal_z = (f32(style_upper) - 32768.0) / 16384.0;\n"
+"    }\n"
+"    out.v_args = vec4f(inv_pos.xy, focal_z, f32(spread_mode));\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x40u) {\n"
 "    let inv_pos = inv_mats[style_upper] * pos;\n"
 "    let sizes = bitmap_sizes[out.v_style_id];\n"
-"    out.v_args = vec4f(inv_pos.x / f32(sizes.x), inv_pos.y / f32(sizes.y), 0.0, 0.0);\n"
+"    let padded = vec2f(f32(sizes.x), f32(sizes.y));\n"
+"    let actual = padded - vec2f(1.0);\n"
+"    out.v_args = vec4f(inv_pos.x / padded.x, inv_pos.y / padded.y, actual.x / padded.x, actual.y / padded.y);\n"
 "  } else {\n"
 "    out.v_args = vec4f(0.0);\n"
 "  }\n"
@@ -94,8 +101,36 @@ static const char* fragment_wgsl =
 "  @location(3) @interpolate(flat) v_cxform_id: u32,\n"
 "};\n"
 "\n"
-"fn linear_t(v_args: vec4f) -> f32 { return (v_args.x + 16384.0) / 32768.0; }\n"
-"fn radial_t(v_args: vec4f) -> f32 { return distance(v_args.xy, vec2f(0.0)) / 16384.0; }\n"
+"fn apply_spread(t: f32, mode: f32) -> f32 {\n"
+"  let m = u32(mode + 0.5);\n"
+"  if (m == 1u) {\n"
+"    // Reflect: triangle wave\n"
+"    let p = t - 2.0 * floor(t / 2.0);\n"
+"    return select(2.0 - p, p, p <= 1.0);\n"
+"  } else if (m == 2u) {\n"
+"    // Repeat: fract\n"
+"    return t - floor(t);\n"
+"  }\n"
+"  // Pad: clamp 0-1\n"
+"  return clamp(t, 0.0, 1.0);\n"
+"}\n"
+"\n"
+"fn linear_t(v_args: vec4f) -> f32 { return apply_spread((v_args.x + 16384.0) / 32768.0, v_args.w); }\n"
+"fn radial_t(v_args: vec4f) -> f32 { return apply_spread(distance(v_args.xy, vec2f(0.0)) / 16384.0, v_args.w); }\n"
+"fn focal_radial_t(v_args: vec4f) -> f32 {\n"
+"  let f = v_args.z;\n"
+"  let R = 16384.0;\n"
+"  let fx = f * R;\n"
+"  let dx = v_args.x - fx;\n"
+"  let dy = v_args.y;\n"
+"  let A = dx * dx + dy * dy;\n"
+"  let B = 2.0 * fx * dx;\n"
+"  let C = fx * fx - R * R;\n"
+"  let disc = B * B - 4.0 * A * C;\n"
+"  let s_denom = -B + sqrt(max(disc, 0.0));\n"
+"  if (s_denom < 0.001) { return 0.0; }\n"
+"  return apply_spread(2.0 * A / s_denom, v_args.w);\n"
+"}\n"
 "\n"
 "fn apply_cxform(color: vec4f, cxform_id: u32) -> vec4f {\n"
 "  let ci = cxform_id * 5u;\n"
@@ -106,10 +141,20 @@ static const char* fragment_wgsl =
 "\n"
 "@fragment\n"
 "fn fs_main(in: FragmentInput) -> @location(0) vec4f {\n"
-"  // Sample all textures unconditionally (uniform control flow required by Chrome/Dawn)\n"
-"  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), 0.5), i32(in.v_style_id));\n"
-"  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), 0.5), i32(in.v_style_id));\n"
-"  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id));\n"
+"  // Sample all textures unconditionally (uniform control flow required by Chrome/Dawn).\n"
+"  // Use select() for array layer indices: only use v_style_id when the fill type\n"
+"  // actually uses that texture, otherwise use 0 to avoid out-of-bounds access\n"
+"  // on 1-layer dummy textures (Chrome/Dawn and Firefox handle OOB differently).\n"
+"  let is_gradient = (in.v_style_type & 0xF0u) == 0x10u;\n"
+"  let is_bitmap = (in.v_style_type & 0xF0u) == 0x40u;\n"
+"  let grad_layer = select(0, i32(in.v_style_id), is_gradient);\n"
+"  let bmp_layer = select(0, i32(in.v_style_id), is_bitmap);\n"
+"  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), 0.5), grad_layer);\n"
+"  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), 0.5), grad_layer);\n"
+"  let focal_sample = textureSample(gradient_tex, gradient_samp, vec2f(focal_radial_t(in.v_args), 0.5), grad_layer);\n"
+"  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, bmp_layer);\n"
+"  let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
+"  let bitmap_repeat_sample = textureSample(bitmap_tex, bitmap_samp, fract(in.v_args.xy / bm_ratio) * bm_ratio, bmp_layer);\n"
 "  var color: vec4f;\n"
 "  if (in.v_style_type == 0x00u) {\n"
 "    color = in.v_args;\n"
@@ -117,7 +162,11 @@ static const char* fragment_wgsl =
 "    color = linear_sample;\n"
 "  } else if (in.v_style_type == 0x12u) {\n"
 "    color = radial_sample;\n"
-"  } else if (in.v_style_type == 0x41u) {\n"
+"  } else if (in.v_style_type == 0x13u) {\n"
+"    color = focal_sample;\n"
+"  } else if (in.v_style_type == 0x40u || in.v_style_type == 0x42u) {\n"
+"    color = bitmap_repeat_sample;\n"
+"  } else if (in.v_style_type == 0x41u || in.v_style_type == 0x43u) {\n"
 "    color = bitmap_sample;\n"
 "  } else {\n"
 "    color = vec4f(0.0);\n"
@@ -350,6 +399,44 @@ static void create_bind_groups(WebGPURenderContext* ctx);
 static void run_compute_pass(WebGPURenderContext* ctx);
 
 // ---------------------------------------------------------------------------
+// WASM mouse input callbacks (registered in render_webgpu_init)
+// ---------------------------------------------------------------------------
+#ifdef __EMSCRIPTEN__
+static SWFAppContext* g_mouse_app_context = NULL;
+
+static EM_BOOL on_mouse_move(int type, const EmscriptenMouseEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context) {
+		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
+		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+	}
+	return EM_TRUE;
+}
+
+static EM_BOOL on_mouse_down(int type, const EmscriptenMouseEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context && evt->button == 0) {
+		g_mouse_app_context->mouse.button_down = 1;
+		g_mouse_app_context->mouse.clicked = 1;
+		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
+		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+	}
+	return EM_TRUE;
+}
+
+static EM_BOOL on_mouse_up(int type, const EmscriptenMouseEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context && evt->button == 0) {
+		g_mouse_app_context->mouse.button_down = 0;
+		g_mouse_app_context->mouse.released = 1;
+		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
+		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+	}
+	return EM_TRUE;
+}
+#endif
+
+// ---------------------------------------------------------------------------
 // render_webgpu_new
 // ---------------------------------------------------------------------------
 WebGPURenderContext* render_webgpu_new(void)
@@ -445,6 +532,14 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		// Actually the buffer is the same, just the contents changed, so
 		// the bind group remains valid.
 	}
+
+	// --- Register mouse input callbacks (WASM only) ---
+#ifdef __EMSCRIPTEN__
+	g_mouse_app_context = app_context;
+	emscripten_set_mousemove_callback("#canvas", NULL, 0, on_mouse_move);
+	emscripten_set_mousedown_callback("#canvas", NULL, 0, on_mouse_down);
+	emscripten_set_mouseup_callback("#canvas", NULL, 0, on_mouse_up);
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +608,7 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 static void create_textures(WebGPURenderContext* ctx)
 {
-	size_t sizeof_gradient = 256 * 4 * sizeof(float);
+	size_t sizeof_gradient = 256 * 4; // 256 RGBA8 entries per gradient = 1024 bytes
 	size_t num_gradients = ctx->gradient_data_size / sizeof_gradient;
 
 	// --- Gradient texture array ---
@@ -535,19 +630,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		view_desc.mipLevelCount = 1;
 		ctx->gradient_tex_view = wgpuTextureCreateView(ctx->gradient_tex, &view_desc);
 
-		// Upload gradient data (each gradient = 256 RGBA pixels = 1024 bytes)
-		// Note: gradient_data is stored as float RGBA (256 * 4 * sizeof(float) per gradient)
-		// but the texture is RGBA8Unorm, so the data is actually u8 per channel.
-		// Actually in flashbang.c, gradient_data_size / sizeof_gradient gives count,
-		// and sizeof_gradient = 256*4*sizeof(float). But the texture is RGBA8.
-		// The upstream stores gradient pixels as floats but uploads them to an
-		// R8G8B8A8 texture. So the data is actually packed u8 RGBA, and
-		// sizeof_gradient is just used for counting.
-		// Let's check: 256 pixels * 4 bytes/pixel = 1024 bytes per gradient as RGBA8.
-		// But sizeof_gradient = 256*4*4 = 4096. So the data is float per channel.
-		// flashbang.c uploads it directly to RGBA8 texture... this suggests
-		// the data is actually u8 despite sizeof_gradient being calculated with sizeof(float).
-		// Let's match flashbang: upload gradient_data directly.
+		// Upload gradient data: each gradient = 256 RGBA8 pixels = 1024 bytes
 		WGPUTexelCopyTextureInfo dest = {0};
 		dest.texture = ctx->gradient_tex;
 		WGPUTexelCopyBufferLayout layout = {0};
@@ -596,8 +679,8 @@ static void create_textures(WebGPURenderContext* ctx)
 		samp_desc.label = WGPU_LABEL("bitmap_sampler");
 		samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
 		samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
-		samp_desc.magFilter = WGPUFilterMode_Linear;
-		samp_desc.minFilter = WGPUFilterMode_Linear;
+		samp_desc.magFilter = WGPUFilterMode_Nearest;
+		samp_desc.minFilter = WGPUFilterMode_Nearest;
 		samp_desc.maxAnisotropy = 1;
 		ctx->bitmap_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
@@ -618,6 +701,24 @@ static void create_textures(WebGPURenderContext* ctx)
 		view_desc.mipLevelCount = 1;
 		view_desc.arrayLayerCount = 1;
 		ctx->msaa_view = wgpuTextureCreateView(ctx->msaa_texture, &view_desc);
+	}
+
+	// --- Depth-stencil MSAA texture (for clip masks) ---
+	{
+		WGPUTextureDescriptor tex_desc = {0};
+		tex_desc.label = WGPU_LABEL("depth_stencil_texture");
+		tex_desc.dimension = WGPUTextureDimension_2D;
+		tex_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
+		tex_desc.format = WGPUTextureFormat_Depth24PlusStencil8;
+		tex_desc.mipLevelCount = 1;
+		tex_desc.sampleCount = 4;
+		tex_desc.usage = WGPUTextureUsage_RenderAttachment;
+		ctx->depth_stencil_texture = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
+
+		WGPUTextureViewDescriptor view_desc = {0};
+		view_desc.mipLevelCount = 1;
+		view_desc.arrayLayerCount = 1;
+		ctx->depth_stencil_view = wgpuTextureCreateView(ctx->depth_stencil_texture, &view_desc);
 	}
 }
 
@@ -737,6 +838,23 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	frag_state.targetCount = 1;
 	frag_state.targets = &color_target;
 
+	// --- Depth-stencil state (shared base for all pipelines) ---
+	// All pipelines must have depth-stencil state since the render pass
+	// always has a depth-stencil attachment (needed for clip masks).
+
+	// Normal pipeline: stencil always passes, never written (no-op)
+	WGPUDepthStencilState ds_normal = {0};
+	ds_normal.format = WGPUTextureFormat_Depth24PlusStencil8;
+	ds_normal.depthWriteEnabled = false;
+	ds_normal.depthCompare = WGPUCompareFunction_Always;
+	ds_normal.stencilFront.compare = WGPUCompareFunction_Always;
+	ds_normal.stencilFront.passOp = WGPUStencilOperation_Keep;
+	ds_normal.stencilFront.failOp = WGPUStencilOperation_Keep;
+	ds_normal.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+	ds_normal.stencilBack = ds_normal.stencilFront;
+	ds_normal.stencilReadMask = 0xFF;
+	ds_normal.stencilWriteMask = 0x00;
+
 	WGPURenderPipelineDescriptor rp_desc = {0};
 	rp_desc.label = WGPU_LABEL("render_pipeline");
 	rp_desc.layout = ctx->render_pipeline_layout;
@@ -749,9 +867,132 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	rp_desc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
 	rp_desc.multisample.count = 4;
 	rp_desc.multisample.mask = ~0u;
+	rp_desc.depthStencil = &ds_normal;
 
 	ctx->render_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
 	assert(ctx->render_pipeline != NULL);
+
+	// --- Stencil write pipeline: writes to stencil, no color output ---
+	// Used for clip mask shapes. The mask's geometry defines the clipping region.
+	WGPUDepthStencilState ds_write = ds_normal;
+	ds_write.stencilFront.compare = WGPUCompareFunction_Always;
+	ds_write.stencilFront.passOp = WGPUStencilOperation_Replace;
+	ds_write.stencilWriteMask = 0xFF;
+	ds_write.stencilBack = ds_write.stencilFront;
+
+	WGPUColorTargetState color_target_masked = color_target;
+	color_target_masked.writeMask = WGPUColorWriteMask_None;
+	WGPUFragmentState frag_state_masked = frag_state;
+	frag_state_masked.targets = &color_target_masked;
+
+	rp_desc.label = WGPU_LABEL("stencil_write_pipeline");
+	rp_desc.depthStencil = &ds_write;
+	rp_desc.fragment = &frag_state_masked;
+
+	ctx->stencil_write_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+	assert(ctx->stencil_write_pipeline != NULL);
+
+	// --- Stencil test pipeline: only draws where stencil == ref ---
+	// Used for objects clipped by a mask.
+	WGPUDepthStencilState ds_test = ds_normal;
+	ds_test.stencilFront.compare = WGPUCompareFunction_Equal;
+	ds_test.stencilBack = ds_test.stencilFront;
+
+	rp_desc.label = WGPU_LABEL("stencil_test_pipeline");
+	rp_desc.depthStencil = &ds_test;
+	rp_desc.fragment = &frag_state;  // normal color output
+
+	ctx->stencil_test_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+	assert(ctx->stencil_test_pipeline != NULL);
+
+	// --- Blend mode pipelines ---
+	// Reset to normal depth-stencil state and normal color output
+	rp_desc.depthStencil = &ds_normal;
+	rp_desc.fragment = &frag_state;
+
+	// Add (blend mode 8): SrcAlpha / One / Add
+	{
+		WGPUBlendState blend_add = {0};
+		blend_add.color.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_add.color.dstFactor = WGPUBlendFactor_One;
+		blend_add.color.operation = WGPUBlendOperation_Add;
+		blend_add.alpha.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_add.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_add.alpha.operation = WGPUBlendOperation_Add;
+
+		WGPUColorTargetState ct_add = color_target;
+		ct_add.blend = &blend_add;
+		WGPUFragmentState fs_add = frag_state;
+		fs_add.targets = &ct_add;
+
+		rp_desc.label = WGPU_LABEL("blend_add_pipeline");
+		rp_desc.fragment = &fs_add;
+		ctx->blend_add_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_add_pipeline != NULL);
+	}
+
+	// Lighten (blend mode 5): One / One / Max
+	{
+		WGPUBlendState blend_lighten = {0};
+		blend_lighten.color.srcFactor = WGPUBlendFactor_One;
+		blend_lighten.color.dstFactor = WGPUBlendFactor_One;
+		blend_lighten.color.operation = WGPUBlendOperation_Max;
+		blend_lighten.alpha.srcFactor = WGPUBlendFactor_One;
+		blend_lighten.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_lighten.alpha.operation = WGPUBlendOperation_Max;
+
+		WGPUColorTargetState ct_lighten = color_target;
+		ct_lighten.blend = &blend_lighten;
+		WGPUFragmentState fs_lighten = frag_state;
+		fs_lighten.targets = &ct_lighten;
+
+		rp_desc.label = WGPU_LABEL("blend_lighten_pipeline");
+		rp_desc.fragment = &fs_lighten;
+		ctx->blend_lighten_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_lighten_pipeline != NULL);
+	}
+
+	// Darken (blend mode 6): One / One / Min
+	{
+		WGPUBlendState blend_darken = {0};
+		blend_darken.color.srcFactor = WGPUBlendFactor_One;
+		blend_darken.color.dstFactor = WGPUBlendFactor_One;
+		blend_darken.color.operation = WGPUBlendOperation_Min;
+		blend_darken.alpha.srcFactor = WGPUBlendFactor_One;
+		blend_darken.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_darken.alpha.operation = WGPUBlendOperation_Min;
+
+		WGPUColorTargetState ct_darken = color_target;
+		ct_darken.blend = &blend_darken;
+		WGPUFragmentState fs_darken = frag_state;
+		fs_darken.targets = &ct_darken;
+
+		rp_desc.label = WGPU_LABEL("blend_darken_pipeline");
+		rp_desc.fragment = &fs_darken;
+		ctx->blend_darken_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_darken_pipeline != NULL);
+	}
+
+	// Subtract (blend mode 9): SrcAlpha / One / ReverseSubtract
+	{
+		WGPUBlendState blend_sub = {0};
+		blend_sub.color.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_sub.color.dstFactor = WGPUBlendFactor_One;
+		blend_sub.color.operation = WGPUBlendOperation_ReverseSubtract;
+		blend_sub.alpha.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_sub.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_sub.alpha.operation = WGPUBlendOperation_ReverseSubtract;
+
+		WGPUColorTargetState ct_sub = color_target;
+		ct_sub.blend = &blend_sub;
+		WGPUFragmentState fs_sub = frag_state;
+		fs_sub.targets = &ct_sub;
+
+		rp_desc.label = WGPU_LABEL("blend_subtract_pipeline");
+		rp_desc.fragment = &fs_sub;
+		ctx->blend_subtract_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_subtract_pipeline != NULL);
+	}
 
 	wgpuShaderModuleRelease(vs_module);
 	wgpuShaderModuleRelease(fs_module);
@@ -940,12 +1181,12 @@ static void run_compute_pass(WebGPURenderContext* ctx)
 }
 
 // ---------------------------------------------------------------------------
-// render_webgpu_poll: check for quit events
+// render_webgpu_poll: check for quit/mouse events
 // ---------------------------------------------------------------------------
-int render_webgpu_poll(void)
+int render_webgpu_poll(SWFAppContext* app_context)
 {
 #ifdef __EMSCRIPTEN__
-	// In WASM, the browser handles events. Return 0 (keep running).
+	// In WASM, mouse events are handled by callbacks registered in init.
 	return 0;
 #else
 	SDL_Event event;
@@ -955,6 +1196,25 @@ int render_webgpu_poll(void)
 			return 1;
 		if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)
 			return 1;
+		if (event.type == SDL_EVENT_MOUSE_MOTION)
+		{
+			app_context->mouse.stage_x = event.motion.x * 20.0f;
+			app_context->mouse.stage_y = event.motion.y * 20.0f;
+		}
+		else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT)
+		{
+			app_context->mouse.button_down = 1;
+			app_context->mouse.clicked = 1;
+			app_context->mouse.stage_x = event.button.x * 20.0f;
+			app_context->mouse.stage_y = event.button.y * 20.0f;
+		}
+		else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT)
+		{
+			app_context->mouse.button_down = 0;
+			app_context->mouse.released = 1;
+			app_context->mouse.stage_x = event.button.x * 20.0f;
+			app_context->mouse.stage_y = event.button.y * 20.0f;
+		}
 	}
 	return 0;
 #endif
@@ -998,15 +1258,25 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	color_att.view = ctx->msaa_view;
 	color_att.resolveTarget = ctx->surface_view;
 	color_att.loadOp = WGPULoadOp_Clear;
-	color_att.storeOp = WGPUStoreOp_Discard; // MSAA texture discarded after resolve
+	color_att.storeOp = WGPUStoreOp_Store; // Store so filters can suspend/resume pass
 	color_att.clearValue = (WGPUColor){
 		ctx->red / 255.0, ctx->green / 255.0, ctx->blue / 255.0, 1.0
 	};
+
+	WGPURenderPassDepthStencilAttachment ds_att = {0};
+	ds_att.view = ctx->depth_stencil_view;
+	ds_att.depthLoadOp = WGPULoadOp_Clear;
+	ds_att.depthStoreOp = WGPUStoreOp_Discard;
+	ds_att.depthClearValue = 1.0f;
+	ds_att.stencilLoadOp = WGPULoadOp_Clear;
+	ds_att.stencilStoreOp = WGPUStoreOp_Store; // Store for filter suspend/resume
+	ds_att.stencilClearValue = 0;
 
 	WGPURenderPassDescriptor rp_desc = {0};
 	rp_desc.label = WGPU_LABEL("render_pass");
 	rp_desc.colorAttachmentCount = 1;
 	rp_desc.colorAttachments = &color_att;
+	rp_desc.depthStencilAttachment = &ds_att;
 
 	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
 
@@ -1062,6 +1332,43 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 	// effect until the next queue submit.
 	u32 packed_id = transform_id | (cxform_id << 16);
 	wgpuRenderPassEncoderDraw(ctx->render_pass, (u32)num_verts, 1, 0, packed_id);
+}
+
+// ---------------------------------------------------------------------------
+// Clip mask control: stencil-based clipping for PlaceObject2 clipDepth
+// ---------------------------------------------------------------------------
+void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)
+{
+	// Switch to stencil-write pipeline: draws to stencil buffer only (no color)
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
+}
+
+void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
+{
+	// Switch to stencil-test pipeline: only draws where stencil == 1 (inside mask)
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
+}
+
+void render_webgpu_end_clip(WebGPURenderContext* ctx)
+{
+	// Switch back to normal pipeline (no stencil testing)
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+}
+
+void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
+{
+	WGPURenderPipeline pipeline;
+	switch (blend_mode)
+	{
+		case 5: pipeline = ctx->blend_lighten_pipeline; break;
+		case 6: pipeline = ctx->blend_darken_pipeline; break;
+		case 8: pipeline = ctx->blend_add_pipeline; break;
+		case 9: pipeline = ctx->blend_subtract_pipeline; break;
+		default: pipeline = ctx->render_pipeline; break; // Normal or unsupported
+	}
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, pipeline);
 }
 
 // ---------------------------------------------------------------------------
@@ -1129,9 +1436,11 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, size_t offset,
 	WGPUExtent3D extent = {bw, bh, 1};
 	wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
 
-	// Store bitmap dimensions
-	ctx->bitmap_sizes[2 * ctx->current_bitmap] = width;
-	ctx->bitmap_sizes[2 * ctx->current_bitmap + 1] = height;
+	// Store padded texture dimensions (not raw bitmap size) so that the
+	// vertex shader UV computation (texel_pos / size) maps correctly to the
+	// actual texture layer, which includes a +1 edge-clamp padding column/row.
+	ctx->bitmap_sizes[2 * ctx->current_bitmap] = bw;
+	ctx->bitmap_sizes[2 * ctx->current_bitmap + 1] = bh;
 	ctx->current_bitmap++;
 
 	free(temp);
@@ -1183,6 +1492,615 @@ void render_webgpu_upload_cxform(WebGPURenderContext* ctx, float* cxform)
 }
 
 // ---------------------------------------------------------------------------
+// mat4_multiply: C = A * B (column-major 4x4)
+// ---------------------------------------------------------------------------
+static void mat4_multiply(float* out, const float* A, const float* B)
+{
+	for (int col = 0; col < 4; col++)
+	{
+		for (int row = 0; row < 4; row++)
+		{
+			out[col * 4 + row] =
+				A[0 * 4 + row] * B[col * 4 + 0] +
+				A[1 * 4 + row] * B[col * 4 + 1] +
+				A[2 * 4 + row] * B[col * 4 + 2] +
+				A[3 * 4 + row] * B[col * 4 + 3];
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_compose_text_transforms: compose PlaceObject2 transform with
+// each glyph transform and write composed results to GPU xform_buffer.
+// Called before renderer_open_pass so all writes happen before the render pass.
+// Does NOT modify CPU-side transform_data (safe for multi-frame rendering).
+// ---------------------------------------------------------------------------
+void render_webgpu_compose_text_transforms(WebGPURenderContext* ctx,
+                                            const char* transform_data,
+                                            u32 place_transform_id,
+                                            u32 glyph_start,
+                                            size_t count)
+{
+	const float* transforms = (const float*)transform_data;
+	const float* place_xform = &transforms[place_transform_id * 16];
+
+	for (size_t i = 0; i < count; i++)
+	{
+		u32 glyph_xform_id = glyph_start + (u32)i;
+		const float* glyph_xform = &transforms[glyph_xform_id * 16];
+
+		float composed[16];
+		mat4_multiply(composed, place_xform, glyph_xform);
+
+		// Write composed transform to the GPU buffer at the glyph's slot
+		uint64_t offset = (uint64_t)glyph_xform_id * 16 * sizeof(float);
+		wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
+		                     composed, 16 * sizeof(float));
+	}
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_compose_sprite_transform: compose parent PlaceObject2 transform
+// with a single child transform and write the result to the child's xform slot
+// in the GPU buffer.  Called before renderer_open_pass.
+// ---------------------------------------------------------------------------
+void render_webgpu_compose_sprite_transform(WebGPURenderContext* ctx,
+                                            const char* transform_data,
+                                            u32 parent_transform_id,
+                                            u32 child_transform_id)
+{
+	const float* transforms = (const float*)transform_data;
+	const float* parent_xform = &transforms[parent_transform_id * 16];
+	const float* child_xform  = &transforms[child_transform_id * 16];
+
+	float composed[16];
+	mat4_multiply(composed, parent_xform, child_xform);
+
+	uint64_t offset = (uint64_t)child_transform_id * 16 * sizeof(float);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
+	                     composed, 16 * sizeof(float));
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_write_transform: write a pre-computed composed transform to the
+// GPU xform_buffer at the given slot.  Used by tag.c's recursive composition.
+// ---------------------------------------------------------------------------
+void render_webgpu_write_transform(WebGPURenderContext* ctx,
+                                   u32 transform_id, const float composed[16])
+{
+	uint64_t offset = (uint64_t)transform_id * 16 * sizeof(float);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
+	                     composed, 16 * sizeof(float));
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_update_vertices / render_webgpu_update_colors
+// Write interpolated morph data into GPU buffers before the render pass.
+// ---------------------------------------------------------------------------
+void render_webgpu_update_vertices(WebGPURenderContext* ctx,
+	size_t byte_offset, const void* data, size_t byte_size)
+{
+	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer, byte_offset, data, byte_size);
+}
+
+void render_webgpu_update_colors(WebGPURenderContext* ctx,
+	size_t byte_offset, const void* data, size_t byte_size)
+{
+	wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer, byte_offset, data, byte_size);
+}
+
+// ---------------------------------------------------------------------------
+// Filter support: WGSL shaders, resource creation, blur + composite passes
+// ---------------------------------------------------------------------------
+
+static const char* blur_wgsl =
+	"struct Params {\n"
+	"  direction: vec2f,\n"     // (1,0) for H, (0,1) for V
+	"  texel_size: vec2f,\n"    // 1/width, 1/height
+	"  radius: f32,\n"
+	"  strength: f32,\n"
+	"  color: vec4f,\n"         // for colorize (glow/shadow)
+	"  colorize: f32,\n"        // 0=blur, 1=colorize alpha
+	"  pad1: f32,\n"
+	"  pad2: f32,\n"
+	"  pad3: f32,\n"
+	"}\n"
+	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(1) var in_samp: sampler;\n"
+	"@group(0) @binding(2) var<uniform> params: Params;\n"
+	"\n"
+	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+	"\n"
+	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+	"  var positions = array<vec2f, 6>(\n"
+	"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+	"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+	"  );\n"
+	"  var uvs = array<vec2f, 6>(\n"
+	"    vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),\n"
+	"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
+	"  );\n"
+	"  var out: VSOut;\n"
+	"  out.pos = vec4f(positions[vi], 0.0, 1.0);\n"
+	"  out.uv = uvs[vi];\n"
+	"  return out;\n"
+	"}\n"
+	"\n"
+	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"  let r = i32(params.radius);\n"
+	"  let sigma = max(params.radius * 0.5, 0.001);\n"
+	"  var total = vec4f(0.0);\n"
+	"  var weight_sum = 0.0;\n"
+	"  for (var i = -r; i <= r; i++) {\n"
+	"    let offset = vec2f(f32(i)) * params.direction * params.texel_size;\n"
+	"    let w = exp(-f32(i*i) / (2.0 * sigma * sigma));\n"
+	"    total += textureSample(in_tex, in_samp, uv + offset) * w;\n"
+	"    weight_sum += w;\n"
+	"  }\n"
+	"  var result = total / weight_sum;\n"
+	"  result = clamp(result * params.strength, vec4f(0.0), vec4f(1.0));\n"
+	"  if (params.colorize > 0.5) {\n"
+	"    let a2 = result.a * params.color.a;\n"
+	"    result = vec4f(params.color.rgb * a2, a2);\n"  // pre-multiplied alpha
+	"  }\n"
+	"  return result;\n"
+	"}\n";
+
+static const char* composite_wgsl =
+	"struct Params {\n"
+	"  offset_and_mode: vec4f,\n"  // xy=NDC offset, z=tint_mode (0=passthrough, 1=tint), w=unused
+	"  tint: vec4f,\n"             // RGBA tint color (used when tint_mode > 0.5)
+	"}\n"
+	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(1) var in_samp: sampler;\n"
+	"@group(0) @binding(2) var<uniform> params: Params;\n"
+	"\n"
+	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+	"\n"
+	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+	"  var positions = array<vec2f, 6>(\n"
+	"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+	"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+	"  );\n"
+	"  var uvs = array<vec2f, 6>(\n"
+	"    vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),\n"
+	"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
+	"  );\n"
+	"  var out: VSOut;\n"
+	"  out.pos = vec4f(positions[vi] + params.offset_and_mode.xy, 0.0, 1.0);\n"
+	"  out.uv = uvs[vi];\n"
+	"  return out;\n"
+	"}\n"
+	"\n"
+	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"  let c = textureSample(in_tex, in_samp, uv);\n"
+	"  let a_tinted = c.a * params.tint.a;\n"
+	"  let tinted = vec4f(params.tint.rgb * a_tinted, a_tinted);\n"
+	"  return select(c, tinted, params.offset_and_mode.z > 0.5);\n"
+	"}\n";
+
+void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
+{
+	if (ctx->filter_resources_created) return;
+	ctx->filter_resources_created = 1;
+
+	// --- Filter textures (non-MSAA, RGBA8) ---
+	WGPUTextureDescriptor ftex_desc = {0};
+	ftex_desc.label = WGPU_LABEL("filter_tex_a");
+	ftex_desc.dimension = WGPUTextureDimension_2D;
+	ftex_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
+	ftex_desc.format = ctx->surface_format;
+	ftex_desc.mipLevelCount = 1;
+	ftex_desc.sampleCount = 1;
+	ftex_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding;
+	ctx->filter_tex_a = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
+	ftex_desc.label = WGPU_LABEL("filter_tex_b");
+	ctx->filter_tex_b = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
+
+	WGPUTextureViewDescriptor fview_desc = {0};
+	fview_desc.mipLevelCount = 1;
+	fview_desc.arrayLayerCount = 1;
+	ctx->filter_view_a = wgpuTextureCreateView(ctx->filter_tex_a, &fview_desc);
+	ctx->filter_view_b = wgpuTextureCreateView(ctx->filter_tex_b, &fview_desc);
+
+	// --- Separate MSAA 4x texture for offscreen rendering ---
+	{
+		WGPUTextureDescriptor msaa_desc = {0};
+		msaa_desc.label = WGPU_LABEL("filter_msaa");
+		msaa_desc.dimension = WGPUTextureDimension_2D;
+		msaa_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
+		msaa_desc.format = ctx->surface_format;
+		msaa_desc.mipLevelCount = 1;
+		msaa_desc.sampleCount = 4;
+		msaa_desc.usage = WGPUTextureUsage_RenderAttachment;
+		ctx->filter_msaa_texture = wgpuDeviceCreateTexture(ctx->device, &msaa_desc);
+		ctx->filter_msaa_view = wgpuTextureCreateView(ctx->filter_msaa_texture, NULL);
+	}
+
+	// --- Filter sampler ---
+	WGPUSamplerDescriptor samp_desc = {0};
+	samp_desc.label = WGPU_LABEL("filter_sampler");
+	samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
+	samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
+	samp_desc.magFilter = WGPUFilterMode_Linear;
+	samp_desc.minFilter = WGPUFilterMode_Linear;
+	samp_desc.maxAnisotropy = 1;
+	ctx->filter_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
+
+	// --- Blur params uniform buffer (64 bytes) ---
+	{
+		WGPUBufferDescriptor buf_desc = {0};
+		buf_desc.label = WGPU_LABEL("blur_params");
+		buf_desc.size = 64;
+		buf_desc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
+		ctx->blur_params_buf = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
+	}
+
+	// --- Blur pipeline ---
+	{
+		WGPUBindGroupLayoutEntry entries[3] = {0};
+		entries[0].binding = 0;
+		entries[0].visibility = WGPUShaderStage_Fragment;
+		entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+		entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+		entries[1].binding = 1;
+		entries[1].visibility = WGPUShaderStage_Fragment;
+		entries[1].sampler.type = WGPUSamplerBindingType_Filtering;
+		entries[2].binding = 2;
+		entries[2].visibility = WGPUShaderStage_Fragment;
+		entries[2].buffer.type = WGPUBufferBindingType_Uniform;
+		entries[2].buffer.minBindingSize = 64;
+
+		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+		bgl_desc.entryCount = 3;
+		bgl_desc.entries = entries;
+		ctx->blur_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
+
+		WGPUPipelineLayoutDescriptor pl_desc = {0};
+		pl_desc.bindGroupLayoutCount = 1;
+		pl_desc.bindGroupLayouts = &ctx->blur_bgl;
+		ctx->blur_pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &pl_desc);
+
+		WGPUShaderModule blur_sm = create_shader(ctx->device, blur_wgsl, "blur_shader");
+
+		WGPUColorTargetState ct = {0};
+		ct.format = ctx->surface_format;
+		ct.writeMask = WGPUColorWriteMask_All;
+		// Pre-multiplied alpha blending for blur output
+		WGPUBlendState blend = {0};
+		blend.color.srcFactor = WGPUBlendFactor_One;
+		blend.color.dstFactor = WGPUBlendFactor_Zero;
+		blend.color.operation = WGPUBlendOperation_Add;
+		blend.alpha.srcFactor = WGPUBlendFactor_One;
+		blend.alpha.dstFactor = WGPUBlendFactor_Zero;
+		blend.alpha.operation = WGPUBlendOperation_Add;
+		ct.blend = &blend;
+
+		WGPUFragmentState fs = {0};
+		fs.module = blur_sm;
+		fs.entryPoint = WGPU_LABEL("fs_main");
+		fs.targetCount = 1;
+		fs.targets = &ct;
+
+		WGPURenderPipelineDescriptor rpd = {0};
+		rpd.label = WGPU_LABEL("blur_pipeline");
+		rpd.layout = ctx->blur_pipeline_layout;
+		rpd.vertex.module = blur_sm;
+		rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+		rpd.fragment = &fs;
+		rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+		rpd.multisample.count = 1;
+		rpd.multisample.mask = 0xFFFFFFFF;
+		ctx->blur_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		wgpuShaderModuleRelease(blur_sm);
+	}
+
+	// --- Composite pipeline (draws into MSAA 4x main pass) ---
+	{
+		WGPUBindGroupLayoutEntry entries[3] = {0};
+		entries[0].binding = 0;
+		entries[0].visibility = WGPUShaderStage_Fragment;
+		entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+		entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+		entries[1].binding = 1;
+		entries[1].visibility = WGPUShaderStage_Fragment;
+		entries[1].sampler.type = WGPUSamplerBindingType_Filtering;
+		entries[2].binding = 2;
+		entries[2].visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
+		entries[2].buffer.type = WGPUBufferBindingType_Uniform;
+		entries[2].buffer.minBindingSize = 32;
+
+		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+		bgl_desc.entryCount = 3;
+		bgl_desc.entries = entries;
+		ctx->composite_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
+
+		WGPUPipelineLayoutDescriptor pl_desc = {0};
+		pl_desc.bindGroupLayoutCount = 1;
+		pl_desc.bindGroupLayouts = &ctx->composite_bgl;
+		ctx->composite_pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &pl_desc);
+
+		WGPUShaderModule comp_sm = create_shader(ctx->device, composite_wgsl, "composite_shader");
+
+		WGPUColorTargetState ct = {0};
+		ct.format = ctx->surface_format;
+		ct.writeMask = WGPUColorWriteMask_All;
+		// Pre-multiplied alpha blending (over operator)
+		WGPUBlendState blend = {0};
+		blend.color.srcFactor = WGPUBlendFactor_One;
+		blend.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend.color.operation = WGPUBlendOperation_Add;
+		blend.alpha.srcFactor = WGPUBlendFactor_One;
+		blend.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend.alpha.operation = WGPUBlendOperation_Add;
+		ct.blend = &blend;
+
+		WGPUFragmentState fs = {0};
+		fs.module = comp_sm;
+		fs.entryPoint = WGPU_LABEL("fs_main");
+		fs.targetCount = 1;
+		fs.targets = &ct;
+
+		// Depth-stencil: test stencil (so clip masks work) but don't write
+		WGPUDepthStencilState ds = {0};
+		ds.format = WGPUTextureFormat_Depth24PlusStencil8;
+		ds.depthWriteEnabled = 0;
+		ds.depthCompare = WGPUCompareFunction_Always;
+		ds.stencilFront.compare = WGPUCompareFunction_Equal;
+		ds.stencilFront.failOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.passOp = WGPUStencilOperation_Keep;
+		ds.stencilBack = ds.stencilFront;
+		ds.stencilReadMask = 0xFF;
+		ds.stencilWriteMask = 0x00;
+
+		WGPURenderPipelineDescriptor rpd = {0};
+		rpd.label = WGPU_LABEL("composite_pipeline");
+		rpd.layout = ctx->composite_pipeline_layout;
+		rpd.vertex.module = comp_sm;
+		rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+		rpd.fragment = &fs;
+		rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+		rpd.multisample.count = 4;
+		rpd.multisample.mask = 0xFFFFFFFF;
+		rpd.depthStencil = &ds;
+		ctx->composite_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		wgpuShaderModuleRelease(comp_sm);
+	}
+
+	// --- Composite params uniform buffer (32 bytes: offset+mode vec4f + tint vec4f) ---
+	{
+		WGPUBufferDescriptor buf_desc = {0};
+		buf_desc.label = WGPU_LABEL("composite_params");
+		buf_desc.size = 32;
+		buf_desc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
+		ctx->filter_quad_buffer = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
+	}
+}
+
+void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
+{
+	if (ctx->render_pass)
+	{
+		wgpuRenderPassEncoderEnd(ctx->render_pass);
+		wgpuRenderPassEncoderRelease(ctx->render_pass);
+		ctx->render_pass = NULL;
+	}
+}
+
+void render_webgpu_resume_pass(WebGPURenderContext* ctx)
+{
+	// Resume the main render pass with loadOp=Load to preserve existing content + stencil
+	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	color_att.view = ctx->msaa_view;
+	color_att.resolveTarget = ctx->surface_view;
+	color_att.loadOp = WGPULoadOp_Load;
+	color_att.storeOp = WGPUStoreOp_Store;
+
+	WGPURenderPassDepthStencilAttachment ds_att = {0};
+	ds_att.view = ctx->depth_stencil_view;
+	ds_att.depthLoadOp = WGPULoadOp_Load;
+	ds_att.depthStoreOp = WGPUStoreOp_Discard;
+	ds_att.stencilLoadOp = WGPULoadOp_Load;
+	ds_att.stencilStoreOp = WGPUStoreOp_Store;
+
+	WGPURenderPassDescriptor rp_desc = {0};
+	rp_desc.label = WGPU_LABEL("resume_pass");
+	rp_desc.colorAttachmentCount = 1;
+	rp_desc.colorAttachments = &color_att;
+	rp_desc.depthStencilAttachment = &ds_att;
+
+	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+
+	// Re-bind everything
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+}
+
+void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
+{
+	render_webgpu_ensure_filter_resources(ctx);
+
+	// Use a SEPARATE MSAA texture (filter_msaa_view) so we don't clobber
+	// the main pass content stored in ctx->msaa_view during suspend.
+	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	color_att.view = ctx->filter_msaa_view;
+	color_att.resolveTarget = ctx->filter_view_a;
+	color_att.loadOp = WGPULoadOp_Clear;
+	color_att.storeOp = WGPUStoreOp_Store;
+	color_att.clearValue = (WGPUColor){0.0, 0.0, 0.0, 0.0};
+
+	// Depth-stencil required because render_pipeline was created with it
+	WGPURenderPassDepthStencilAttachment ds_att = {0};
+	ds_att.view = ctx->depth_stencil_view;
+	ds_att.depthLoadOp = WGPULoadOp_Clear;
+	ds_att.depthStoreOp = WGPUStoreOp_Discard;
+	ds_att.depthClearValue = 1.0f;
+	ds_att.stencilLoadOp = WGPULoadOp_Clear;
+	ds_att.stencilStoreOp = WGPUStoreOp_Discard;
+	ds_att.stencilClearValue = 0;
+
+	WGPURenderPassDescriptor rp_desc = {0};
+	rp_desc.label = WGPU_LABEL("offscreen_pass");
+	rp_desc.colorAttachmentCount = 1;
+	rp_desc.colorAttachments = &color_att;
+	rp_desc.depthStencilAttachment = &ds_att;
+
+	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+
+	// Bind the main pipeline (MSAA 4x compatible)
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+}
+
+void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
+{
+	if (ctx->render_pass)
+	{
+		wgpuRenderPassEncoderEnd(ctx->render_pass);
+		wgpuRenderPassEncoderRelease(ctx->render_pass);
+		ctx->render_pass = NULL;
+	}
+}
+
+void render_webgpu_run_blur(WebGPURenderContext* ctx,
+	float blur_x, float blur_y, u8 quality,
+	float strength, float r, float g, float b, float a, int colorize)
+{
+	float texel_w = 1.0f / (float)ctx->width;
+	float texel_h = 1.0f / (float)ctx->height;
+
+	// Convert blur (in pixels) to radius (half-width of kernel, capped at 31)
+	float radius_x = blur_x * 0.5f;
+	float radius_y = blur_y * 0.5f;
+	if (radius_x > 31.0f) radius_x = 31.0f;
+	if (radius_y > 31.0f) radius_y = 31.0f;
+	if (radius_x < 1.0f) radius_x = 1.0f;
+	if (radius_y < 1.0f) radius_y = 1.0f;
+
+	// Params layout (64 bytes):
+	// vec2f direction (8), vec2f texel_size (8), f32 radius (4), f32 strength (4),
+	// vec4f color (16), f32 colorize (4), f32 pad1 (4), f32 pad2 (4), f32 pad3 (4) = 56 bytes padded to 64
+	float params[16]; // 64 bytes
+
+	for (u8 q = 0; q < quality; q++)
+	{
+		// Horizontal blur: filter_tex_a -> filter_tex_b
+		params[0] = 1.0f; params[1] = 0.0f;   // direction
+		params[2] = texel_w; params[3] = texel_h; // texel_size
+		params[4] = radius_x;                    // radius
+		params[5] = (q == quality - 1) ? strength : 1.0f; // strength (only on last pass)
+		params[6] = r; params[7] = g; params[8] = b; params[9] = a; // color
+		params[10] = (q == quality - 1 && colorize) ? 1.0f : 0.0f; // colorize (only on last pass)
+		params[11] = 0; params[12] = 0; params[13] = 0;
+
+		wgpuQueueWriteBuffer(ctx->queue, ctx->blur_params_buf, 0, params, 64);
+
+		// Create bind group for H-blur: read filter_tex_a
+		WGPUBindGroupEntry bg_entries[3] = {0};
+		bg_entries[0].binding = 0;
+		bg_entries[0].textureView = ctx->filter_view_a;
+		bg_entries[1].binding = 1;
+		bg_entries[1].sampler = ctx->filter_sampler;
+		bg_entries[2].binding = 2;
+		bg_entries[2].buffer = ctx->blur_params_buf;
+		bg_entries[2].size = 64;
+
+		WGPUBindGroupDescriptor bg_desc = {0};
+		bg_desc.layout = ctx->blur_bgl;
+		bg_desc.entryCount = 3;
+		bg_desc.entries = bg_entries;
+		WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+
+		// Render to filter_tex_b
+		WGPURenderPassColorAttachment color_att = {0};
+		color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+		color_att.view = ctx->filter_view_b;
+		color_att.loadOp = WGPULoadOp_Clear;
+		color_att.storeOp = WGPUStoreOp_Store;
+		color_att.clearValue = (WGPUColor){0, 0, 0, 0};
+
+		WGPURenderPassDescriptor rp_desc = {0};
+		rp_desc.label = WGPU_LABEL("blur_h");
+		rp_desc.colorAttachmentCount = 1;
+		rp_desc.colorAttachments = &color_att;
+
+		WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+		wgpuRenderPassEncoderSetPipeline(pass, ctx->blur_pipeline);
+		wgpuRenderPassEncoderSetBindGroup(pass, 0, bg, 0, NULL);
+		wgpuRenderPassEncoderDraw(pass, 6, 1, 0, 0);
+		wgpuRenderPassEncoderEnd(pass);
+		wgpuRenderPassEncoderRelease(pass);
+		wgpuBindGroupRelease(bg);
+
+		// Vertical blur: filter_tex_b -> filter_tex_a
+		params[0] = 0.0f; params[1] = 1.0f; // direction = vertical
+		params[4] = radius_y;
+
+		wgpuQueueWriteBuffer(ctx->queue, ctx->blur_params_buf, 0, params, 64);
+
+		bg_entries[0].textureView = ctx->filter_view_b;
+		bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+
+		color_att.view = ctx->filter_view_a;
+		rp_desc.label = WGPU_LABEL("blur_v");
+
+		pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+		wgpuRenderPassEncoderSetPipeline(pass, ctx->blur_pipeline);
+		wgpuRenderPassEncoderSetBindGroup(pass, 0, bg, 0, NULL);
+		wgpuRenderPassEncoderDraw(pass, 6, 1, 0, 0);
+		wgpuRenderPassEncoderEnd(pass);
+		wgpuRenderPassEncoderRelease(pass);
+		wgpuBindGroupRelease(bg);
+	}
+}
+
+void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
+	float offset_x, float offset_y,
+	float tint_r, float tint_g, float tint_b, float tint_a)
+{
+	// offset_x/y are in NDC space; tint rgba = 0 means passthrough
+	float has_tint = (tint_r != 0 || tint_g != 0 || tint_b != 0 || tint_a != 0) ? 1.0f : 0.0f;
+	float params[8] = {offset_x, offset_y, has_tint, 0, tint_r, tint_g, tint_b, tint_a};
+	wgpuQueueWriteBuffer(ctx->queue, ctx->filter_quad_buffer, 0, params, 32);
+
+	// Create bind group for composite: read filter_tex_a
+	WGPUBindGroupEntry bg_entries[3] = {0};
+	bg_entries[0].binding = 0;
+	bg_entries[0].textureView = ctx->filter_view_a;
+	bg_entries[1].binding = 1;
+	bg_entries[1].sampler = ctx->filter_sampler;
+	bg_entries[2].binding = 2;
+	bg_entries[2].buffer = ctx->filter_quad_buffer;
+	bg_entries[2].size = 32;
+
+	WGPUBindGroupDescriptor bg_desc = {0};
+	bg_desc.layout = ctx->composite_bgl;
+	bg_desc.entryCount = 3;
+	bg_desc.entries = bg_entries;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->composite_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 0);
+	wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
+
+	// Restore normal pipeline
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+
+	wgpuBindGroupRelease(bg);
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_free: release all GPU resources
 // ---------------------------------------------------------------------------
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
@@ -1192,6 +2110,10 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	// Release pipelines
 	if (ctx->render_pipeline)
 		wgpuRenderPipelineRelease(ctx->render_pipeline);
+	if (ctx->stencil_write_pipeline)
+		wgpuRenderPipelineRelease(ctx->stencil_write_pipeline);
+	if (ctx->stencil_test_pipeline)
+		wgpuRenderPipelineRelease(ctx->stencil_test_pipeline);
 	if (ctx->compute_pipeline)
 		wgpuComputePipelineRelease(ctx->compute_pipeline);
 
@@ -1240,6 +2162,25 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->dummy_sampler) wgpuSamplerRelease(ctx->dummy_sampler);
 	if (ctx->msaa_view) wgpuTextureViewRelease(ctx->msaa_view);
 	if (ctx->msaa_texture) wgpuTextureRelease(ctx->msaa_texture);
+	if (ctx->depth_stencil_view) wgpuTextureViewRelease(ctx->depth_stencil_view);
+	if (ctx->depth_stencil_texture) wgpuTextureRelease(ctx->depth_stencil_texture);
+
+	// Release filter resources
+	if (ctx->filter_msaa_view) wgpuTextureViewRelease(ctx->filter_msaa_view);
+	if (ctx->filter_msaa_texture) wgpuTextureRelease(ctx->filter_msaa_texture);
+	if (ctx->filter_view_a) wgpuTextureViewRelease(ctx->filter_view_a);
+	if (ctx->filter_tex_a) wgpuTextureRelease(ctx->filter_tex_a);
+	if (ctx->filter_view_b) wgpuTextureViewRelease(ctx->filter_view_b);
+	if (ctx->filter_tex_b) wgpuTextureRelease(ctx->filter_tex_b);
+	if (ctx->filter_sampler) wgpuSamplerRelease(ctx->filter_sampler);
+	if (ctx->blur_params_buf) wgpuBufferRelease(ctx->blur_params_buf);
+	if (ctx->filter_quad_buffer) wgpuBufferRelease(ctx->filter_quad_buffer);
+	if (ctx->blur_pipeline) wgpuRenderPipelineRelease(ctx->blur_pipeline);
+	if (ctx->blur_bgl) wgpuBindGroupLayoutRelease(ctx->blur_bgl);
+	if (ctx->blur_pipeline_layout) wgpuPipelineLayoutRelease(ctx->blur_pipeline_layout);
+	if (ctx->composite_pipeline) wgpuRenderPipelineRelease(ctx->composite_pipeline);
+	if (ctx->composite_bgl) wgpuBindGroupLayoutRelease(ctx->composite_bgl);
+	if (ctx->composite_pipeline_layout) wgpuPipelineLayoutRelease(ctx->composite_pipeline_layout);
 
 	// Release surface
 	if (ctx->surface) wgpuSurfaceRelease(ctx->surface);

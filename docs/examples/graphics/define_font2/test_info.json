@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "define_font2",
+    "description": "WebGPU rendering test for DefineFont2 (tag 48) with DefineText",
+    "swf_version": 6,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_FONT2",
+      "DEFINE_TEXT",
+      "SOLID_FILL",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

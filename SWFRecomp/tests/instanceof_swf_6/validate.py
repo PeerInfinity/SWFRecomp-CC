@@ -5,13 +5,7 @@ Validation script for instanceof_swf_6
 Tests the INSTANCEOF opcode (0x54) - ActionScript instanceof operator.
 
 Current implementation is simplified and always returns false.
-Expected output: 0 (false - primitives are not instances)
-
-Test: trace(5 instanceof Number)
-Expected: 0
-
-Note: Full prototype chain traversal requires extending ASObject structure
-with prototype field. This test validates the simplified implementation.
+Expected output: "false" (primitives are not instances; SWF6+ traces booleans as "true"/"false")
 """
 import sys
 import json
@@ -27,15 +21,15 @@ def validate_output(output):
     """
     Validate test output for INSTANCEOF opcode.
 
-    Expected: 0 (false - primitives are not instances)
+    Expected: "false" (SWF6 boolean coercion)
     """
     lines = parse_output(output)
 
     results = []
 
-    # Test: 5 instanceof Number should return 0 (false)
+    # Test: 5 instanceof Number should return false
     # Primitives are never instances in ActionScript
-    expected = "0"
+    expected = "false"
     actual = lines[0] if lines else ""
 
     results.append(make_result(

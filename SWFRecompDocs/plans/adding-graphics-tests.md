@@ -305,6 +305,11 @@ When filling in `graphics.tested` in `test_info.json`, use these feature IDs. On
 | `STRAIGHT_EDGE` | Straight edges (LineTo) |
 | `CURVED_EDGE` | Quadratic Bezier curves (CurveTo) |
 
+### Gradient Features
+| ID | Description |
+|----|-------------|
+| `GRADIENT_SPREAD` | Gradient spread modes (pad, reflect, repeat) |
+
 ### Style Features
 | ID | Description |
 |----|-------------|
@@ -339,6 +344,7 @@ When filling in `graphics.tested` in `test_info.json`, use these feature IDs. On
 | `PLACE_SKEW` | Skew transform in PlaceObject2 |
 | `COLOR_TRANSFORM` | Color transform (CXFORM) |
 | `CLIP_DEPTH` | Clipping mask via ClipDepth |
+| `CLIP_ACTIONS` | CLIPACTIONS event handlers on PlaceObject2 |
 
 ### Morph Shape Tags
 | ID | Description |
@@ -438,6 +444,79 @@ Features that currently need to be added to `swfmill_helpers.py`:
 - Color transforms (CXFORM)
 - Clipping masks (ClipDepth)
 - Morph shapes, text, sprites, buttons (more complex features)
+
+## Building and Deploying a Single Test
+
+After creating a new graphics test (or merging one from a branch), follow these steps to build it as WASM and deploy it to the docs site.
+
+### Prerequisites
+
+Make sure the build environment is set up:
+
+```bash
+# One-time setup (installs emsdk, swfmill, builds SWFRecomp)
+source scripts/setup_build_env.sh
+
+# Or if emsdk is already installed, just activate it:
+source emsdk/emsdk_env.sh
+```
+
+### Step 1: Generate the SWF
+
+```bash
+cd SWFRecomp/tests/graphics/my_test_name
+python3 create_test_swf.py
+cd -
+```
+
+### Step 2: Rebuild SWFRecomp (if recompiler/runtime code changed)
+
+If the merge included changes to `SWFRecomp/src/` or `SWFModernRuntime/`, rebuild:
+
+```bash
+cd SWFRecomp/build
+cmake .. && make -j$(nproc)
+cd -
+```
+
+### Step 3: Build WASM
+
+```bash
+SWFRecomp/scripts/build_test.sh graphics/my_test_name wasm --graphics
+```
+
+This runs SWFRecomp on the test SWF, generates C code, and compiles it to WASM with the graphics runtime (WebGPU).
+
+### Step 4: Deploy to docs
+
+```bash
+SWFRecomp/scripts/deploy_example.sh graphics/my_test_name --graphics
+```
+
+This copies the WASM build to `docs/examples/graphics/my_test_name/` and regenerates the examples index page.
+
+### All-in-one
+
+For a quick copy-paste workflow (replace `my_test_name`):
+
+```bash
+# Generate SWF, rebuild recompiler, build WASM, deploy
+cd SWFRecomp/tests/graphics/my_test_name && python3 create_test_swf.py && cd -
+cd SWFRecomp/build && cmake .. && make -j$(nproc) && cd -
+source emsdk/emsdk_env.sh
+SWFRecomp/scripts/build_test.sh graphics/my_test_name wasm --graphics
+SWFRecomp/scripts/deploy_example.sh graphics/my_test_name --graphics
+```
+
+### Rebuilding all examples
+
+To rebuild every test (trace and graphics) and regenerate the full docs site:
+
+```bash
+SWFRecomp/scripts/build_all_examples.sh
+```
+
+This is also what the CI workflow does. It handles SWF generation, recompilation, WASM builds, deployment, and index regeneration for all tests.
 
 ## Build System Integration
 

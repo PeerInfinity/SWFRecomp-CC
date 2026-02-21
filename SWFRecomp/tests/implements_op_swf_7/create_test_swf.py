@@ -8,27 +8,59 @@ This test covers:
 3. Zero interfaces (edge case)
 4. Verifies that ImplementsOp executes without crashing
 
-Note: Full verification with instanceof will be added when instanceof is fully implemented.
-For now, we verify that ImplementsOp completes successfully for various scenarios.
+Uses DefineFunction2 (opcode 0x8E) to create proper constructor functions
+that have prototype objects, as required by the runtime's actionImplementsOp.
 """
 import struct
+
 
 def create_push_int(value):
     """Create PUSH action for an integer value."""
     return struct.pack('<BHB', 0x96, 5, 7) + struct.pack('<I', value)
 
+
 def create_push_float(value):
     """Create PUSH action for a float value."""
     return struct.pack('<BHB', 0x96, 5, 1) + struct.pack('<f', value)
+
 
 def create_push_string(string):
     """Create PUSH action for a string value."""
     string_bytes = string.encode('utf-8') + b'\x00'
     return struct.pack('<BHB', 0x96, len(string_bytes) + 1, 0) + string_bytes
 
+
 def create_trace(message):
     """Create a trace statement."""
     return create_push_string(message) + bytes([0x26])  # Trace opcode
+
+
+def create_define_function2():
+    """Create an anonymous DefineFunction2 that pushes a function value onto the stack.
+
+    DefineFunction2 format:
+    - Opcode: 0x8E
+    - Length: UI16 (of everything after the length field)
+    - FunctionName: null-terminated string (empty = anonymous, pushed to stack)
+    - NumParams: UI16 (0)
+    - RegisterCount: UI8 (1)
+    - Flags: UI16 (0x0000)
+    - CodeSize: UI16 (size of body)
+    - Body: the function body actions
+
+    An anonymous function (empty name) gets pushed onto the stack.
+    Body is just ActionEnd (0x00) for an empty constructor.
+    """
+    func_name = b'\x00'    # empty name = anonymous, result pushed to stack
+    num_params = struct.pack('<H', 0)
+    register_count = struct.pack('B', 1)
+    flags = struct.pack('<H', 0x0000)
+    body = bytes([0x00])   # ActionEnd - empty function body
+    code_size = struct.pack('<H', len(body))
+
+    payload = func_name + num_params + register_count + flags + code_size + body
+    return struct.pack('<BH', 0x8E, len(payload)) + payload
+
 
 # Create SWF7 file (ActionScript 2.0 support)
 signature = b'FWS'  # Uncompressed SWF
@@ -45,19 +77,17 @@ actions = b''
 
 # TEST 1: Single interface
 # ========================
-# Create interface object
-actions += create_push_float(0.0)  # No properties
-actions += bytes([0x43])  # InitObject
-# Stack: [interface1]
+# Create interface constructor function (has prototype automatically)
+actions += create_define_function2()
+# Stack: [interface1_func]
 
 # Push interface count (1)
 actions += create_push_float(1.0)
-# Stack: [interface1, 1]
+# Stack: [interface1_func, 1]
 
-# Create constructor object
-actions += create_push_float(0.0)  # No properties
-actions += bytes([0x43])  # InitObject
-# Stack: [interface1, 1, constructor]
+# Create constructor function
+actions += create_define_function2()
+# Stack: [interface1_func, 1, constructor_func]
 
 # Call ImplementsOp
 actions += bytes([0x2C])  # ImplementsOp
@@ -68,23 +98,19 @@ actions += create_trace("Test 1: Single interface - OK")
 
 # TEST 2: Multiple interfaces (3 interfaces)
 # ===========================================
-# Create interface objects
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # interface1
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # interface2
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # interface3
-# Stack: [interface1, interface2, interface3]
+# Create interface constructor functions
+actions += create_define_function2()  # interface1
+actions += create_define_function2()  # interface2
+actions += create_define_function2()  # interface3
+# Stack: [iface1_func, iface2_func, iface3_func]
 
 # Push interface count (3)
 actions += create_push_float(3.0)
-# Stack: [interface1, interface2, interface3, 3]
+# Stack: [iface1_func, iface2_func, iface3_func, 3]
 
-# Create constructor object
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # InitObject
-# Stack: [interface1, interface2, interface3, 3, constructor]
+# Create constructor function
+actions += create_define_function2()
+# Stack: [iface1_func, iface2_func, iface3_func, 3, constructor_func]
 
 # Call ImplementsOp
 actions += bytes([0x2C])  # ImplementsOp
@@ -99,10 +125,9 @@ actions += create_trace("Test 2: Multiple interfaces - OK")
 actions += create_push_float(0.0)
 # Stack: [0]
 
-# Create constructor object
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # InitObject
-# Stack: [0, constructor]
+# Create constructor function
+actions += create_define_function2()
+# Stack: [0, constructor_func]
 
 # Call ImplementsOp
 actions += bytes([0x2C])  # ImplementsOp
@@ -113,21 +138,18 @@ actions += create_trace("Test 3: Zero interfaces - OK")
 
 # TEST 4: Two interfaces (different count)
 # =========================================
-# Create interface objects
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # interface1
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # interface2
-# Stack: [interface1, interface2]
+# Create interface constructor functions
+actions += create_define_function2()  # interface1
+actions += create_define_function2()  # interface2
+# Stack: [iface1_func, iface2_func]
 
 # Push interface count (2)
 actions += create_push_float(2.0)
-# Stack: [interface1, interface2, 2]
+# Stack: [iface1_func, iface2_func, 2]
 
-# Create constructor object
-actions += create_push_float(0.0)
-actions += bytes([0x43])  # InitObject
-# Stack: [interface1, interface2, 2, constructor]
+# Create constructor function
+actions += create_define_function2()
+# Stack: [iface1_func, iface2_func, 2, constructor_func]
 
 # Call ImplementsOp
 actions += bytes([0x2C])  # ImplementsOp

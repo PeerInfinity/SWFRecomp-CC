@@ -8,12 +8,14 @@
 #include <renderer.h>
 #include <utils.h>
 #include <heap.h>
+#include <audio/audio.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 
 int quit_swf;
+int is_playing = 1;
 int bad_poll;
 size_t current_frame;
 size_t next_frame;
@@ -38,19 +40,27 @@ RenderContext* context;
 void tagMain(SWFAppContext* app_context)
 {
 	frame_func* frame_funcs = app_context->frame_funcs;
+	u32 frame_ms = app_context->fps > 0 ? 1000 / app_context->fps : 83;
 
 	while (!quit_swf)
 	{
+#ifdef __EMSCRIPTEN__
+		double frame_start = emscripten_get_now();
+#endif
 		current_frame = next_frame;
+		app_context->mouse.clicked = 0;
+		app_context->mouse.released = 0;
 		frame_funcs[next_frame](app_context);
 		if (!manual_next_frame)
 		{
 			next_frame += 1;
 		}
 		manual_next_frame = 0;
-		bad_poll |= renderer_poll();
+		bad_poll |= renderer_poll(app_context);
 #ifdef __EMSCRIPTEN__
-		emscripten_sleep(0);
+		double elapsed = emscripten_get_now() - frame_start;
+		u32 sleep_ms = (elapsed < (double)frame_ms) ? (u32)((double)frame_ms - elapsed) : 0;
+		emscripten_sleep(sleep_ms);
 #endif
 		quit_swf |= bad_poll;
 	}
@@ -60,7 +70,7 @@ void tagMain(SWFAppContext* app_context)
 		return;
 	}
 
-	while (!renderer_poll())
+	while (!renderer_poll(app_context))
 	{
 		tagShowFrame(app_context);
 #ifdef __EMSCRIPTEN__
@@ -122,11 +132,19 @@ void swfStart(SWFAppContext* app_context)
 		return;
 	}
 
+	// audio_output_init MUST run before renderer_init so the Web Audio
+	// AudioContext is created while the user gesture (click) is still active.
+	// renderer_init calls emscripten_sleep() which consumes the gesture.
+	audio_output_init(app_context);
+
 	renderer_init(app_context, context);
 
-	tagInit();
+	tagInit(app_context);
 
 	tagMain(app_context);
+
+	audio_output_shutdown();
+	audio_shutdown(app_context);
 
 	renderer_free(app_context, context);
 

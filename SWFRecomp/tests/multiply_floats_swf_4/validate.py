@@ -74,11 +74,11 @@ def validate_output(output):
         lines[3]
     ))
 
-    # Test 5: 1e38 * 1e38 = inf
+    # Test 5: 1e38 * 1e38 = Infinity
     results.append(make_result(
         "multiply_overflow",
-        lines[4] == "inf",
-        "inf",
+        lines[4] == "Infinity",
+        "Infinity",
         lines[4]
     ))
 

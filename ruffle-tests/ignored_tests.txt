@@ -1,0 +1,183 @@
+# Tests ignored from filtered results.
+# These require runtime features unavailable in NO_GRAPHICS trace-only mode,
+# or have unclear expected behavior that needs further investigation.
+# One test name per line. Lines starting with # are comments. Blank lines ignored.
+
+# --- Interactive input (mouse, keyboard, drag, focus, text input) ---
+# These tests require user input simulation which our test harness doesn't support.
+button_key_events
+button_key_events_special
+button_keypress
+button_keypress_vs_press
+button_keypress_vs_tab
+button_keypress_vs_textinput
+click_block
+drag_drop
+drag_over_from_outside
+drag_over_without_startdrag
+edittext_drag_select
+edittext_focus_selection
+edittext_ime_focus_lost
+edittext_input
+edittext_input_newlines
+edittext_password
+edittext_password_copy
+edittext_paste_empty
+edittext_place_caret
+edittext_restrict
+edittext_restrict_paste
+edittext_tab_focus
+edittext_tab_stops
+focus_keyboard_press
+focus_mouse
+focus_mouse_focusable
+focus_mouse_rollout
+focus_remove
+focus_root_movie
+focus_visibility_change
+focusrect_focuslost
+focusrect_property_swf5
+focusrect_property_swf6
+focusrect_property_swf7
+focusrect_swf6
+input_dead_keys_windows
+key_isToggled
+mouse_events
+mouse_events_visible_enabled
+mouse_hover_events_while_dragging
+mouse_listeners
+mouse_pos
+mouse_pos_with_scale_factor
+mouse_wheel_enabled
+tab_ordering_automatic_basic
+tab_ordering_automatic_order_grid
+tab_ordering_automatic_order_same_position
+tab_ordering_children
+tab_ordering_custom_basic
+tab_ordering_custom_duplicate_index
+tab_ordering_custom_i32_vs_u32
+tab_ordering_custom_m1
+tab_ordering_events
+tab_ordering_events_mouse
+tab_ordering_movieclip_enabled_default
+tab_ordering_properties
+tab_ordering_reverse
+tab_ordering_tabbable
+text_blocks_clicks
+
+# --- External resource loading (loadMovie, loadVariables, MCL, form posts) ---
+# These tests load external SWFs, images, or data over network/filesystem.
+form_loader_encoding_1
+form_loader_encoding_2
+form_loader_encoding_3
+form_loader_encoding_4
+load_vars
+loading_avm2
+loadmovie
+loadmovie_fail
+loadmovie_flashvars
+loadmovie_method
+loadmovie_registerclass
+loadmovie_replace_root
+loadmovie_var_persistence
+loadmovienum
+loadmovienum_cross_version_prototype
+loadvariables
+loadvariables2
+loadvariables_method
+loadvariablesnum
+mcl_as_broadcaster
+mcl_events_swf_version
+mcl_getprogress
+mcl_loadclip
+mcl_loadclip_properties
+mcl_loadclip_replace_root
+mcl_mislabeled_target
+mcl_replace_root_swf7_to_swf5
+mcl_replace_root_swf7_to_swf6
+mcl_target_gif87a
+mcl_target_gif89a
+mcl_target_jpg
+mcl_target_png
+mcl_unloadclip
+mixed_avm_load_into_root
+moviecliploader_flashvars
+stylesheet_load
+unloadmovie
+unloadmovie_method
+unloadmovienum
+
+# --- XML networking/sockets ---
+# These tests require network connections or XML HTTP loading.
+xml_getbytes
+xml_load
+xml_socket
+xml_socket_close_in_handler
+xml_socket_on_data
+xml_socket_segmented
+
+# --- External SWF loading (not loadMovie category) ---
+# These tests load external SWFs via other mechanisms.
+swf5_xml_event_handler_context
+
+# --- Sound/audio ---
+# These tests require audio playback or streaming.
+sound_duration_position_props
+sound_id3
+sound_id3_prop
+sound_load_start
+sound_multiple_load
+
+# --- Video streaming (NetStream/NetConnection) ---
+# These tests require video/network streaming APIs.
+netconnection_close
+netconnection_send_remote
+netstream_play_flv
+netstream_seek_flv
+
+# --- FileReference (OS file picker + network upload/download) ---
+# These tests require native file dialogs and HTTP file transfer.
+file_reference_browse_cancel
+file_reference_download_cancel
+file_reference_download_httperror_dns_error
+file_reference_download_httperror_status_code
+file_reference_download_success
+file_reference_upload_httperror_dns_error
+file_reference_upload_httperror_status_code
+file_reference_upload_success
+
+# --- ExternalInterface (browser JavaScript bridge) ---
+# These tests require ExternalInterface.call()/addCallback() which need a browser JS context.
+external_interface
+external_interface_jsquotestring
+external_interface_toas_basic
+
+# --- Bitmap data operations ---
+# These tests require pixel-level bitmap manipulation not available in trace mode.
+bitmap_data
+bitmap_data_compare
+bitmap_data_copypixels
+bitmap_data_hittest
+bitmap_data_noise
+bitmap_data_pixeldissolve
+bitmap_data_threshold
+bitmap_filters
+bitmapdata_channels
+
+# --- Cross-movie / multi-level loading ---
+# These tests require loading separate SWFs into different _level targets.
+cross_movie_root
+swf5_to_6_cross_call
+swf6_to_5_cross_call
+
+# --- Ruffle behavior differs from Flash spec ---
+# These tests pass in Ruffle but expect behavior that doesn't match Flash Player.
+# We intentionally follow the Flash spec. See RUFFLE_VS_FLASH_DIFFERENCES.md for details.
+xml_attributes_read
+
+# --- Permanently accepted diffs ---
+# These tests have unfixable output differences. See ACCEPTED_DIFFS.md for full rationale.
+# Root causes: Flash UB we don't replicate, platform-dependent UB in expected output,
+# or internally inconsistent expected output (Ruffle test generation bugs).
+array_sort
+date

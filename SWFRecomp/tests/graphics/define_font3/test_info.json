@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "define_font3",
+    "description": "WebGPU rendering test for DefineFont3 (tag 75) with geometric glyphs rendered via DefineText",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_FONT3",
+      "DEFINE_TEXT",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -35,6 +36,7 @@ namespace SWFRecomp
 	{
 		s32 x;
 		s32 y;
+		s32 morph_index = -1;
 	};
 	
 	struct Tri
@@ -161,6 +163,7 @@ namespace SWFRecomp
 		bool another_frame;
 		size_t next_script_i;
 		size_t last_queued_script;
+		std::set<size_t> non_timeline_scripts;
 		
 		std::stringstream tag_init;
 		
@@ -184,11 +187,31 @@ namespace SWFRecomp
 		std::stringstream cxform_data;
 		size_t current_cxform;
 
+		std::stringstream morph_end_shape_data;
+		size_t current_morph_end_vertex;
+		std::stringstream morph_end_color_data;
+		size_t current_morph_end_color;
+
+		std::stringstream sound_data;
+		size_t current_sound_byte;
+		size_t current_sound_id;
+		bool has_streaming_sound;
+
+		std::stringstream sprite_definitions;
+		std::stringstream sprite_forward_decls;
+
 		u8* jpeg_tables;
 		size_t jpeg_tables_size;
 		
 		std::unordered_map<u16, size_t> char_id_to_bitmap_id;
 		std::vector<Vertex> bitmap_sizes;
+
+		std::unordered_map<u16, float> font_em_square;  // font_id → EM square size
+		std::unordered_map<u16, std::vector<u16>> font_code_tables;  // font_id → code table (index=glyph, value=char code)
+		std::unordered_map<u16, std::vector<s16>> font_advance_tables;  // font_id → per-glyph advance widths
+		std::unordered_map<u16, std::string> font_names;  // font_id → font name string
+		std::unordered_map<u16, bool> font_bold_flags;    // font_id → bold flag
+		std::unordered_map<u16, bool> font_italic_flags;  // font_id → italic flag
 
 		// Frame label storage: label name -> frame number
 		std::unordered_map<std::string, size_t> frame_labels;
@@ -198,6 +221,8 @@ namespace SWFRecomp
 		SWFTag RGB;
 		SWFTag RGBA;
 		bool shape_has_alpha;
+		bool shape_is_v4;
+		bool shape_is_morph2;
 
 		SWF();
 		SWF(Context& context);
@@ -207,10 +232,13 @@ namespace SWFRecomp
 		void interpretTag(Context& context, SWFTag& tag);
 		void recompileMatrix(MATRIX matrix, std::stringstream& out);
 		FillStyle* parseFillStyles(u16 fill_style_count);
+		FillStyle* parseMorphFillStyles(u16 fill_style_count);
 		LineStyle* parseLineStyles(u16 line_style_count);
+		LineStyle* parseMorphLineStyles(u16 line_style_count);
+		LineStyle* parseLineStyles2(u16 line_style_count);
 		void interpretShape(Context& context, SWFTag& shape_tag);
 		bool isInShape(const Vertex& v, const Shape* shape);
-		void addCurvedEdge(Path* path, Vertex current, Vertex control, Vertex anchor, u32 passes);
+		void addCurvedEdge(Path* path, Vertex current, Vertex control, Vertex anchor, u32 passes, s32* morph_counter = nullptr);
 		void processShape(Shape& shape, u32* fill_styles);
 		void constructEdges(std::vector<Path>& paths, std::vector<Node>& nodes);
 		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths);

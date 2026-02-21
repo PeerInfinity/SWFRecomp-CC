@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "define_edit_text",
+    "description": "WebGPU rendering test for DefineEditText (tag 37) with DefineFont2",
+    "swf_version": 6,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_EDIT_TEXT",
+      "DEFINE_FONT2",
+      "SOLID_FILL",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

@@ -8,15 +8,11 @@ Expected outputs:
   - chr(97)  -> "a"
   - chr(33)  -> "!"
   - chr(32)  -> " " (space)
-  - chr(233) -> "é" (Latin-1/ISO-8859-1 encoding)
-
-Note: ASCII_TO_CHAR outputs raw bytes (Latin-1), not UTF-8.
-      MB_ASCII_TO_CHAR (0x37) is for UTF-8 output.
+  - chr(233) -> "é" (U+00E9, output as UTF-8 by the runtime)
 """
 import sys
 import json
 import os
-import io
 
 # Import common utilities
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -63,11 +59,8 @@ def validate_output(output):
 
 
 if __name__ == "__main__":
-    # Read stdin in binary mode and decode as Latin-1
-    # This is necessary because ASCII_TO_CHAR outputs raw bytes (0-255)
-    # which correspond to Latin-1/ISO-8859-1 encoding
-    stdin_binary = sys.stdin.buffer.read()
-    output = stdin_binary.decode('latin-1')
+    # Read stdin as UTF-8 (the runtime outputs UTF-8 encoded text)
+    output = sys.stdin.read()
 
     result = validate_output(output)
     print(json.dumps(result, indent=2))

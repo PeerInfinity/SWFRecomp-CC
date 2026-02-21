@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-07",
+    "generated_date": "2026-02-09",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
-    "total_entries": 287,
-    "total_graphics_features": 60,
-    "graphics_features_with_tests": 16
+    "total_entries": 288,
+    "total_graphics_features": 62,
+    "graphics_features_with_tests": 59
   },
   "entries": [
     {
@@ -323,6 +323,41 @@
       "notes": "C++ enum value for opcode"
     },
     {
+      "hex": "0X07",
+      "name": "actionStop",
+      "source": "action.h",
+      "type": "function",
+      "function_declaration": "void actionStop(SWFAppContext* app_context);",
+      "function_implementation": "SWFModernRuntime/src/actionmodern/action.c",
+      "tests_primary": [
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/stop_multiframe_swf_4",
+        "SWFRecomp/tests/stop_swf_4"
+      ],
+      "tests_secondary": [
+        "SWFRecomp/tests/next_frame_swf_4",
+        "SWFRecomp/tests/play_swf_4",
+        "SWFRecomp/tests/prev_frame_swf_4"
+      ],
+      "tests_primary_passing": [
+        "SWFRecomp/tests/play_stop_swf_4",
+        "SWFRecomp/tests/stop_multiframe_swf_4",
+        "SWFRecomp/tests/stop_swf_4"
+      ],
+      "tests_primary_no_results": [],
+      "tests_secondary_passing": [
+        "SWFRecomp/tests/next_frame_swf_4",
+        "SWFRecomp/tests/play_swf_4",
+        "SWFRecomp/tests/prev_frame_swf_4"
+      ],
+      "tests_secondary_no_results": [],
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-stop-0x07.md",
+      "fully_implemented": true,
+      "fully_implemented_no_graphics": false,
+      "missing_features": {},
+      "notes": "Runtime function (action.h line 161)"
+    },
+    {
       "hex": "0X08",
       "name": "ActionToggleQuality",
       "source": "SWF Specification v19",
@@ -470,7 +505,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 165)"
+      "notes": "Runtime function (action.h line 166)"
     },
     {
       "hex": "0X0A",
@@ -3021,7 +3056,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 162)"
+      "notes": "Runtime function (action.h line 163)"
     },
     {
       "hex": "0X27",
@@ -3102,7 +3137,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 163)"
+      "notes": "Runtime function (action.h line 164)"
     },
     {
       "hex": "0X28",
@@ -3189,7 +3224,7 @@
           "Display list integration: finding and updating sprites in the display list"
         ]
       },
-      "notes": "Runtime function (action.h line 164)"
+      "notes": "Runtime function (action.h line 165)"
     },
     {
       "hex": "0X29",
@@ -3360,7 +3395,7 @@
           "Only tested uncaught exceptions (requires ActionTry 0x8F for full testing)"
         ]
       },
-      "notes": "Runtime function (action.h line 212)"
+      "notes": "Runtime function (action.h line 213)"
     },
     {
       "hex": "0X2B",
@@ -3429,7 +3464,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 173)"
+      "notes": "Runtime function (action.h line 174)"
     },
     {
       "hex": "0X2C",
@@ -3567,7 +3602,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 167)"
+      "notes": "Runtime function (action.h line 168)"
     },
     {
       "hex": "0X31",
@@ -3774,7 +3809,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 168)"
+      "notes": "Runtime function (action.h line 169)"
     },
     {
       "hex": "0X34",
@@ -3843,7 +3878,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 170)"
+      "notes": "Runtime function (action.h line 171)"
     },
     {
       "hex": "0X35",
@@ -3981,7 +4016,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 169)"
+      "notes": "Runtime function (action.h line 170)"
     },
     {
       "hex": "0X37",
@@ -4062,7 +4097,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 171)"
+      "notes": "Runtime function (action.h line 172)"
     },
     {
       "hex": "0X3A",
@@ -4131,7 +4166,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 182)"
+      "notes": "Runtime function (action.h line 183)"
     },
     {
       "hex": "0X3B",
@@ -4200,7 +4235,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 183)"
+      "notes": "Runtime function (action.h line 184)"
     },
     {
       "hex": "0X3C",
@@ -4449,7 +4484,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 175)"
+      "notes": "Runtime function (action.h line 176)"
     },
     {
       "hex": "0X3F",
@@ -4587,7 +4622,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 201)"
+      "notes": "Runtime function (action.h line 202)"
     },
     {
       "hex": "0X41",
@@ -4725,7 +4760,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 176)"
+      "notes": "Runtime function (action.h line 177)"
     },
     {
       "hex": "0X43",
@@ -4854,7 +4889,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 177)"
+      "notes": "Runtime function (action.h line 178)"
     },
     {
       "hex": "0X44",
@@ -4941,7 +4976,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 172)"
+      "notes": "Runtime function (action.h line 173)"
     },
     {
       "hex": "0X45",
@@ -5167,7 +5202,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5190,7 +5225,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5213,7 +5248,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5814,7 +5849,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 200)"
+      "notes": "Runtime function (action.h line 201)"
     },
     {
       "hex": "0X50",
@@ -5883,7 +5918,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 178)"
+      "notes": "Runtime function (action.h line 179)"
     },
     {
       "hex": "0X51",
@@ -5952,7 +5987,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 179)"
+      "notes": "Runtime function (action.h line 180)"
     },
     {
       "hex": "0X52",
@@ -6027,7 +6062,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 198)"
+      "notes": "Runtime function (action.h line 199)"
     },
     {
       "hex": "0X53",
@@ -6096,7 +6131,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 202)"
+      "notes": "Runtime function (action.h line 203)"
     },
     {
       "hex": "0X54",
@@ -6165,7 +6200,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 180)"
+      "notes": "Runtime function (action.h line 181)"
     },
     {
       "hex": "0X55",
@@ -6234,7 +6269,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 181)"
+      "notes": "Runtime function (action.h line 182)"
     },
     {
       "hex": "0X60",
@@ -6303,7 +6338,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 184)"
+      "notes": "Runtime function (action.h line 185)"
     },
     {
       "hex": "0X61",
@@ -6372,7 +6407,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 185)"
+      "notes": "Runtime function (action.h line 186)"
     },
     {
       "hex": "0X62",
@@ -6441,7 +6476,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 186)"
+      "notes": "Runtime function (action.h line 187)"
     },
     {
       "hex": "0X63",
@@ -6510,7 +6545,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 187)"
+      "notes": "Runtime function (action.h line 188)"
     },
     {
       "hex": "0X64",
@@ -6579,7 +6614,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 188)"
+      "notes": "Runtime function (action.h line 189)"
     },
     {
       "hex": "0X65",
@@ -6648,7 +6683,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 189)"
+      "notes": "Runtime function (action.h line 190)"
     },
     {
       "hex": "0X66",
@@ -6729,7 +6764,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 190)"
+      "notes": "Runtime function (action.h line 191)"
     },
     {
       "hex": "0X67",
@@ -6798,7 +6833,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 191)"
+      "notes": "Runtime function (action.h line 192)"
     },
     {
       "hex": "0X68",
@@ -6867,7 +6902,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 192)"
+      "notes": "Runtime function (action.h line 193)"
     },
     {
       "hex": "0X69",
@@ -6936,7 +6971,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 193)"
+      "notes": "Runtime function (action.h line 194)"
     },
     {
       "hex": "0X81",
@@ -7029,7 +7064,7 @@
           "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
         ]
       },
-      "notes": "Runtime function (action.h line 161)"
+      "notes": "Runtime function (action.h line 162)"
     },
     {
       "hex": "0X83",
@@ -7125,7 +7160,7 @@
           "URL scheme validation and sanitization"
         ]
       },
-      "notes": "Runtime function (action.h line 166)"
+      "notes": "Runtime function (action.h line 167)"
     },
     {
       "hex": "0X87",
@@ -7194,7 +7229,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 194)"
+      "notes": "Runtime function (action.h line 195)"
     },
     {
       "hex": "0X88",
@@ -7584,7 +7619,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 207)"
+      "notes": "Runtime function (action.h line 208)"
     },
     {
       "hex": "0X8F",
@@ -8326,7 +8361,7 @@
           "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
         ]
       },
-      "notes": "Runtime function (action.h line 199)"
+      "notes": "Runtime function (action.h line 200)"
     },
     {
       "hex": "0X9B",
@@ -8509,7 +8544,7 @@
           "Multi-MovieClip support (requires MovieClip context switching - graphics-only)"
         ]
       },
-      "notes": "Runtime function (action.h line 197)"
+      "notes": "Runtime function (action.h line 198)"
     },
     {
       "hex": "0X9F",
@@ -8610,9 +8645,21 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/focal_radial_gradient",
+        "SWFRecomp/tests/graphics/jpeg2_bitmap",
+        "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
+        "SWFRecomp/tests/graphics/lossless_bitmap",
+        "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/remove_object",
+        "SWFRecomp/tests/graphics/remove_object2",
+        "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
         "SWFRecomp/tests/graphics/thiccie",
@@ -8642,6 +8689,7 @@
       "category": "Shape Tags",
       "description": "Shape with full RGBA support (SWF tag 32)",
       "tests": [
+        "SWFRecomp/tests/graphics/gradient_spread",
         "SWFRecomp/tests/graphics/rgba_shape"
       ],
       "fully_implemented": true
@@ -8652,8 +8700,10 @@
       "tag_id": 83,
       "category": "Shape Tags",
       "description": "Shape with LINESTYLE2 and edge bounds (SWF tag 83)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_shape4"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOLID_FILL",
@@ -8663,10 +8713,38 @@
       "description": "Solid color fill (type 0x00)",
       "tests": [
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/bevel_filter",
+        "SWFRecomp/tests/graphics/blur_filter",
+        "SWFRecomp/tests/graphics/clip_actions",
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
+        "SWFRecomp/tests/graphics/color_matrix_filter",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/convolution_filter",
+        "SWFRecomp/tests/graphics/define_button",
+        "SWFRecomp/tests/graphics/define_button2",
+        "SWFRecomp/tests/graphics/define_edit_text",
+        "SWFRecomp/tests/graphics/define_font2",
+        "SWFRecomp/tests/graphics/define_morph_shape",
+        "SWFRecomp/tests/graphics/define_morph_shape2",
+        "SWFRecomp/tests/graphics/define_shape4",
+        "SWFRecomp/tests/graphics/define_sound",
+        "SWFRecomp/tests/graphics/define_text2",
+        "SWFRecomp/tests/graphics/drop_shadow_filter",
+        "SWFRecomp/tests/graphics/glow_filter",
+        "SWFRecomp/tests/graphics/gradient_bevel_filter",
+        "SWFRecomp/tests/graphics/gradient_glow_filter",
+        "SWFRecomp/tests/graphics/movieclip_control",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/place_object",
+        "SWFRecomp/tests/graphics/place_object3",
+        "SWFRecomp/tests/graphics/remove_object",
+        "SWFRecomp/tests/graphics/remove_object2",
         "SWFRecomp/tests/graphics/rgba_shape",
+        "SWFRecomp/tests/graphics/sound_stream",
+        "SWFRecomp/tests/graphics/sound_stream_head2",
+        "SWFRecomp/tests/graphics/sprite_multiframe",
+        "SWFRecomp/tests/graphics/sprite_nested",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
         "SWFRecomp/tests/graphics/three_boxes",
@@ -8685,7 +8763,8 @@
       "description": "Linear gradient fill (type 0x10)",
       "tests": [
         "SWFRecomp/tests/graphics/awful_gradient",
-        "SWFRecomp/tests/graphics/awful_radial_gradient"
+        "SWFRecomp/tests/graphics/awful_radial_gradient",
+        "SWFRecomp/tests/graphics/gradient_spread"
       ],
       "fully_implemented": true
     },
@@ -8706,8 +8785,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Focal radial gradient fill (type 0x13, SWF 8+)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/focal_radial_gradient"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "REPEATING_BITMAP",
@@ -8715,8 +8796,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Tiled bitmap fill (type 0x40)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/repeating_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "CLIPPED_BITMAP",
@@ -8725,6 +8808,11 @@
       "category": "Fill Types",
       "description": "Clipped bitmap fill (type 0x41)",
       "tests": [
+        "SWFRecomp/tests/graphics/jpeg2_bitmap",
+        "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
+        "SWFRecomp/tests/graphics/lossless_bitmap",
+        "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess"
       ],
       "fully_implemented": true
@@ -8735,8 +8823,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Tiled bitmap without anti-aliasing (type 0x42)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "NON_SMOOTHED_CLIPPED_BITMAP",
@@ -8744,8 +8834,10 @@
       "tag_id": null,
       "category": "Fill Types",
       "description": "Clipped bitmap without anti-aliasing (type 0x43)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "STRAIGHT_EDGE",
@@ -8757,12 +8849,52 @@
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
         "SWFRecomp/tests/graphics/awful_shape_swf_4",
+        "SWFRecomp/tests/graphics/bevel_filter",
+        "SWFRecomp/tests/graphics/blur_filter",
+        "SWFRecomp/tests/graphics/clip_actions",
+        "SWFRecomp/tests/graphics/clip_mask",
+        "SWFRecomp/tests/graphics/color_matrix_filter",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/convolution_filter",
+        "SWFRecomp/tests/graphics/define_button",
+        "SWFRecomp/tests/graphics/define_button2",
+        "SWFRecomp/tests/graphics/define_edit_text",
+        "SWFRecomp/tests/graphics/define_font2",
+        "SWFRecomp/tests/graphics/define_font3",
+        "SWFRecomp/tests/graphics/define_morph_shape",
+        "SWFRecomp/tests/graphics/define_morph_shape2",
+        "SWFRecomp/tests/graphics/define_shape4",
+        "SWFRecomp/tests/graphics/define_sound",
+        "SWFRecomp/tests/graphics/define_text2",
+        "SWFRecomp/tests/graphics/drop_shadow_filter",
+        "SWFRecomp/tests/graphics/focal_radial_gradient",
+        "SWFRecomp/tests/graphics/glow_filter",
+        "SWFRecomp/tests/graphics/gradient_bevel_filter",
+        "SWFRecomp/tests/graphics/gradient_glow_filter",
+        "SWFRecomp/tests/graphics/gradient_spread",
+        "SWFRecomp/tests/graphics/jpeg2_bitmap",
+        "SWFRecomp/tests/graphics/jpeg3_bitmap",
+        "SWFRecomp/tests/graphics/jpeg4_bitmap",
+        "SWFRecomp/tests/graphics/lossless_bitmap",
+        "SWFRecomp/tests/graphics/lossless_bitmap_rgba",
         "SWFRecomp/tests/graphics/mess",
+        "SWFRecomp/tests/graphics/movieclip_control",
         "SWFRecomp/tests/graphics/new_styles",
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/place_object",
+        "SWFRecomp/tests/graphics/place_object3",
+        "SWFRecomp/tests/graphics/remove_object",
+        "SWFRecomp/tests/graphics/remove_object2",
+        "SWFRecomp/tests/graphics/repeating_bitmap",
         "SWFRecomp/tests/graphics/rgba_shape",
+        "SWFRecomp/tests/graphics/sound_stream",
+        "SWFRecomp/tests/graphics/sound_stream_head2",
+        "SWFRecomp/tests/graphics/sprite_multiframe",
+        "SWFRecomp/tests/graphics/sprite_nested",
         "SWFRecomp/tests/graphics/ssquare",
         "SWFRecomp/tests/graphics/sssquare",
+        "SWFRecomp/tests/graphics/static_text",
         "SWFRecomp/tests/graphics/thiccie",
         "SWFRecomp/tests/graphics/three_boxes",
         "SWFRecomp/tests/graphics/three_boxes_hole",
@@ -8779,8 +8911,20 @@
       "category": "Edge Types",
       "description": "Curved edge records (CurveTo)",
       "tests": [
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/coicle",
         "SWFRecomp/tests/graphics/wild_shadow"
+      ],
+      "fully_implemented": true
+    },
+    {
+      "id": "GRADIENT_SPREAD",
+      "name": "GradientSpread",
+      "tag_id": null,
+      "category": "Gradient Features",
+      "description": "Gradient spread modes (pad, reflect, repeat)",
+      "tests": [
+        "SWFRecomp/tests/graphics/gradient_spread"
       ],
       "fully_implemented": true
     },
@@ -8793,7 +8937,9 @@
       "tests": [
         "SWFRecomp/tests/graphics/awful_gradient",
         "SWFRecomp/tests/graphics/awful_radial_gradient",
+        "SWFRecomp/tests/graphics/clip_mask",
         "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/focal_radial_gradient",
         "SWFRecomp/tests/graphics/new_styles",
         "SWFRecomp/tests/graphics/rgba_shape",
         "SWFRecomp/tests/graphics/thiccie",
@@ -8810,8 +8956,10 @@
       "tag_id": null,
       "category": "Style Features",
       "description": "Advanced line style with caps/joins (LINESTYLE2, DefineShape4)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_shape4"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "NEW_STYLES",
@@ -8853,8 +9001,10 @@
       "tag_id": 21,
       "category": "Image/Bitmap Tags",
       "description": "Self-contained JPEG image (SWF tag 21)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/jpeg2_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_JPEG3",
@@ -8862,8 +9012,10 @@
       "tag_id": 35,
       "category": "Image/Bitmap Tags",
       "description": "JPEG image with alpha channel (SWF tag 35)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/jpeg3_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_JPEG4",
@@ -8871,8 +9023,10 @@
       "tag_id": 90,
       "category": "Image/Bitmap Tags",
       "description": "JPEG with embedded alpha (SWF tag 90, SWF 10+)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/jpeg4_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_LOSSLESS",
@@ -8880,8 +9034,13 @@
       "tag_id": 20,
       "category": "Image/Bitmap Tags",
       "description": "Lossless RGB bitmap (SWF tag 20)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/lossless_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_clipped_bitmap",
+        "SWFRecomp/tests/graphics/nonsmoothed_repeating_bitmap",
+        "SWFRecomp/tests/graphics/repeating_bitmap"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BITS_LOSSLESS2",
@@ -8889,8 +9048,10 @@
       "tag_id": 36,
       "category": "Image/Bitmap Tags",
       "description": "Lossless RGBA bitmap (SWF tag 36)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/lossless_bitmap_rgba"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_OBJECT",
@@ -8898,8 +9059,10 @@
       "tag_id": 4,
       "category": "Display List Tags",
       "description": "Basic object placement (SWF tag 4)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/place_object"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_OBJECT2",
@@ -8907,8 +9070,10 @@
       "tag_id": 26,
       "category": "Display List Tags",
       "description": "Enhanced object placement (SWF tag 26)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/movieclip_control"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_OBJECT3",
@@ -8916,8 +9081,14 @@
       "tag_id": 70,
       "category": "Display List Tags",
       "description": "Object placement with filters/blend (SWF tag 70)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/blur_filter",
+        "SWFRecomp/tests/graphics/color_matrix_filter",
+        "SWFRecomp/tests/graphics/drop_shadow_filter",
+        "SWFRecomp/tests/graphics/glow_filter",
+        "SWFRecomp/tests/graphics/place_object3"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "REMOVE_OBJECT",
@@ -8925,8 +9096,10 @@
       "tag_id": 5,
       "category": "Display List Tags",
       "description": "Remove object by ID (SWF tag 5)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/remove_object"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "REMOVE_OBJECT2",
@@ -8934,8 +9107,10 @@
       "tag_id": 28,
       "category": "Display List Tags",
       "description": "Remove object by depth (SWF tag 28)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/remove_object2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "PLACE_SCALE",
@@ -8966,7 +9141,8 @@
       "category": "Transform Features",
       "description": "Color transform (CXFORM/CXFORMWITHALPHA)",
       "tests": [
-        "SWFRecomp/tests/graphics/color_transform"
+        "SWFRecomp/tests/graphics/color_transform",
+        "SWFRecomp/tests/graphics/place_object"
       ],
       "fully_implemented": true
     },
@@ -8976,8 +9152,21 @@
       "tag_id": null,
       "category": "Transform Features",
       "description": "Clipping mask via PlaceObject2 ClipDepth",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/clip_mask"
+      ],
+      "fully_implemented": true
+    },
+    {
+      "id": "CLIP_ACTIONS",
+      "name": "ClipActions",
+      "tag_id": null,
+      "category": "Transform Features",
+      "description": "CLIPACTIONS event handlers on PlaceObject2",
+      "tests": [
+        "SWFRecomp/tests/graphics/clip_actions"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_MORPH_SHAPE",
@@ -8985,8 +9174,10 @@
       "tag_id": 46,
       "category": "Morph Shape Tags",
       "description": "Shape morphing/tweening (SWF tag 46)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_morph_shape"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_MORPH_SHAPE2",
@@ -8994,8 +9185,10 @@
       "tag_id": 84,
       "category": "Morph Shape Tags",
       "description": "Enhanced morphing with LINESTYLE2 (SWF tag 84)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_morph_shape2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT",
@@ -9003,8 +9196,11 @@
       "tag_id": 10,
       "category": "Text Tags",
       "description": "Basic font with glyph shapes (SWF tag 10)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_text2",
+        "SWFRecomp/tests/graphics/static_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT2",
@@ -9012,8 +9208,11 @@
       "tag_id": 48,
       "category": "Text Tags",
       "description": "Font with layout metrics (SWF tag 48)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_edit_text",
+        "SWFRecomp/tests/graphics/define_font2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT3",
@@ -9021,8 +9220,10 @@
       "tag_id": 75,
       "category": "Text Tags",
       "description": "Enhanced font definition (SWF tag 75)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_font3"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_FONT4",
@@ -9039,8 +9240,13 @@
       "tag_id": 11,
       "category": "Text Tags",
       "description": "Static text with glyph indices (SWF tag 11)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_font2",
+        "SWFRecomp/tests/graphics/define_font3",
+        "SWFRecomp/tests/graphics/sprite_nested",
+        "SWFRecomp/tests/graphics/static_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_TEXT2",
@@ -9048,8 +9254,10 @@
       "tag_id": 33,
       "category": "Text Tags",
       "description": "Static text with RGBA colors (SWF tag 33)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_text2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_EDIT_TEXT",
@@ -9057,8 +9265,10 @@
       "tag_id": 37,
       "category": "Text Tags",
       "description": "Dynamic/editable text field (SWF tag 37)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_edit_text"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_SPRITE",
@@ -9066,8 +9276,14 @@
       "tag_id": 39,
       "category": "Sprite Tags",
       "description": "Embedded movie clip with own timeline (SWF tag 39)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/clip_actions",
+        "SWFRecomp/tests/graphics/movieclip_control",
+        "SWFRecomp/tests/graphics/sprite_basic",
+        "SWFRecomp/tests/graphics/sprite_multiframe",
+        "SWFRecomp/tests/graphics/sprite_nested"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BUTTON",
@@ -9075,8 +9291,10 @@
       "tag_id": 7,
       "category": "Button Tags",
       "description": "Basic button with state shapes (SWF tag 7)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_button"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_BUTTON2",
@@ -9084,8 +9302,10 @@
       "tag_id": 34,
       "category": "Button Tags",
       "description": "Enhanced button with actions (SWF tag 34)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_button2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_SOUND",
@@ -9093,8 +9313,10 @@
       "tag_id": 14,
       "category": "Sound Tags",
       "description": "Event sound definition (SWF tag 14)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_sound"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "START_SOUND",
@@ -9102,8 +9324,10 @@
       "tag_id": 15,
       "category": "Sound Tags",
       "description": "Play/stop event sound (SWF tag 15)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_sound"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOUND_STREAM_HEAD",
@@ -9111,8 +9335,10 @@
       "tag_id": 18,
       "category": "Sound Tags",
       "description": "Streaming sound header (SWF tag 18)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/sound_stream"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOUND_STREAM_HEAD2",
@@ -9120,8 +9346,10 @@
       "tag_id": 45,
       "category": "Sound Tags",
       "description": "Enhanced streaming sound header (SWF tag 45)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/sound_stream_head2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "SOUND_STREAM_BLOCK",
@@ -9129,8 +9357,11 @@
       "tag_id": 19,
       "category": "Sound Tags",
       "description": "Streaming audio frame data (SWF tag 19)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/sound_stream",
+        "SWFRecomp/tests/graphics/sound_stream_head2"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DEFINE_VIDEO_STREAM",
@@ -9156,8 +9387,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Drop shadow effect (filter ID 0)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/drop_shadow_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "BLUR_FILTER",
@@ -9165,8 +9398,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Gaussian blur effect (filter ID 1)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/blur_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "GLOW_FILTER",
@@ -9174,8 +9409,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Glow/halo effect (filter ID 2)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/glow_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "BEVEL_FILTER",
@@ -9183,8 +9420,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Beveled edge effect (filter ID 3)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/bevel_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "GRADIENT_GLOW_FILTER",
@@ -9192,8 +9431,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Gradient-based glow (filter ID 4)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/gradient_glow_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "CONVOLUTION_FILTER",
@@ -9201,8 +9442,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Convolution matrix filter (filter ID 5)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/convolution_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "COLOR_MATRIX_FILTER",
@@ -9210,8 +9453,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "4x5 color matrix transform (filter ID 6)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/color_matrix_filter"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "GRADIENT_BEVEL_FILTER",
@@ -9219,8 +9464,10 @@
       "tag_id": null,
       "category": "Filter Types",
       "description": "Gradient-based bevel (filter ID 7)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/gradient_bevel_filter"
+      ],
+      "fully_implemented": true
     }
   ]
 }

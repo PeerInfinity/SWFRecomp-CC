@@ -23,34 +23,36 @@ def push_float(f):
     float_bytes = struct.pack('<f', f)
     return struct.pack('<BHB', 0x96, 5, 1) + float_bytes
 
-# Test 1: Basic ASCII extraction - mbsubstring("Hello World", 0, 5) → "Hello"
+# Note: MBStringExtract uses 1-based indexing per Flash spec and Ruffle
+
+# Test 1: Basic ASCII extraction - mbsubstring("Hello World", 1, 5) → "Hello"
 test1 = b''
 test1 += push_string("Hello World")  # Push string
-test1 += push_float(0.0)             # Push index
+test1 += push_float(1.0)             # Push index (1-based)
 test1 += push_float(5.0)             # Push count
 test1 += bytes([0x35])               # MB_STRING_EXTRACT opcode
 test1 += bytes([0x26])               # TRACE
 
-# Test 2: Extract from middle - mbsubstring("Hello World", 6, 5) → "World"
+# Test 2: Extract from middle - mbsubstring("Hello World", 7, 5) → "World"
 test2 = b''
 test2 += push_string("Hello World")  # Push string
-test2 += push_float(6.0)             # Push index
+test2 += push_float(7.0)             # Push index (1-based: 'W' at position 7)
 test2 += push_float(5.0)             # Push count
 test2 += bytes([0x35])               # MB_STRING_EXTRACT opcode
 test2 += bytes([0x26])               # TRACE
 
-# Test 3: Multibyte characters (UTF-8) - mbsubstring("café", 0, 3) → "caf"
+# Test 3: Multibyte characters (UTF-8) - mbsubstring("café", 1, 3) → "caf"
 test3 = b''
 test3 += push_string("café")         # Push string (é is 2 bytes in UTF-8)
-test3 += push_float(0.0)             # Push index
+test3 += push_float(1.0)             # Push index (1-based)
 test3 += push_float(3.0)             # Push count (3 characters)
 test3 += bytes([0x35])               # MB_STRING_EXTRACT opcode
 test3 += bytes([0x26])               # TRACE
 
-# Test 4: Count extends beyond end - mbsubstring("Hello", 2, 100) → "llo"
+# Test 4: Count extends beyond end - mbsubstring("Hello", 3, 100) → "llo"
 test4 = b''
 test4 += push_string("Hello")        # Push string
-test4 += push_float(2.0)             # Push index
+test4 += push_float(3.0)             # Push index (1-based: 'l' at position 3)
 test4 += push_float(100.0)           # Push count (beyond string)
 test4 += bytes([0x35])               # MB_STRING_EXTRACT opcode
 test4 += bytes([0x26])               # TRACE

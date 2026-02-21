@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <sstream>
 #include <map>
 
 #include <common.h>
@@ -9,6 +10,7 @@
 using std::string;
 using std::ofstream;
 using std::ostream;
+using std::stringstream;
 
 namespace SWFRecomp
 {
@@ -125,6 +127,8 @@ namespace SWFRecomp
 		bool needs_setjmp;  // Flag to track if script uses try-catch
 		std::map<std::string, size_t> string_to_id;  // Track declared strings for deduplication
 		std::vector<size_t> constant_pool;  // Maps constant pool index to string ID
+		stringstream pending_string_defs;  // Buffer string definitions for file-scope emission
+		int parse_depth;  // Track parseActions nesting depth
 
 		SWFAction();
 
