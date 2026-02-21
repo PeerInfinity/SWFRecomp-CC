@@ -1,17 +1,19 @@
 # XML/XMLNode Implementation Plan
 <!-- TESTS: xml, xml_append_child, xml_append_child_with_parent, xml_attributes_read, xml_cdata, xml_child_nodes_edge_cases, xml_clone_expandos, xml_first_last_child, xml_has_child_nodes, xml_idmap, xml_ignore_comments, xml_ignore_white, xml_insert_before, xml_inspect_createmethods, xml_inspect_doctype, xml_inspect_parsexml, xml_inspect_xmldecl, xml_namespaces, xml_parent_and_child, xml_remove_node, xml_reparenting, xml_siblings, xml_to_string, xml_to_string_comment, xml_unescaping, xmlnode_proto, xml_load, xml_socket, xml_socket_close_in_handler, xml_socket_on_data, xml_socket_segmented, xml_getbytes, swf5_xml_event_handler_context -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-20
 
-## Status: ALL PHASES COMPLETE
+## Status: FULLY COMPLETE — ALL 26 ACTIVE TESTS PASS
 
-All 7 phases have been implemented. 24 out of 26 active XML tests pass (92%).
+All 7 phases have been implemented. All 26 active XML tests pass (100%).
 
 ### Implementation Commits
 - `c8c38b1` — Implement XML/XMLNode runtime support (phases 1-5) and add glob test filtering
 - `73a7b45` — Fix XML runtime bugs: memory allocator mismatches, reparenting, ignoreWhite, idMap, namespaces
 - `733a70e` — Fix regression: restrict varToStringBuf toString to XML nodes only
 - `0778863` — Fix actionPushRegister, actionNewObject _global lookup, CallMethod own_props, and XML namespace scanning
+- `229cb53` — TextField enumeration + condenseWhite fix (also fixed xml_to_string, xml_child_nodes_edge_cases)
+- (this session) — Fix xml_attributes_read: attribute enumeration order (collect in temp array, insert reversed for LIFO, resolve namespaces from temp array in forward parse order)
 
 ### Current Test Results
 
@@ -22,7 +24,7 @@ All 7 phases have been implemented. 24 out of 26 active XML tests pass (92%).
 | xml_append_child_with_parent | 20/20 | **PASS** |
 | xml_attributes_read | 4/4 | **PASS** |
 | xml_cdata | 11/11 | **PASS** |
-| xml_child_nodes_edge_cases | 3/4 | output_mismatch (1 line off) |
+| xml_child_nodes_edge_cases | 4/4 | **PASS** |
 | xml_clone_expandos | 19/19 | **PASS** |
 | xml_first_last_child | 8/8 | **PASS** |
 | xml_has_child_nodes | 3/3 | **PASS** |
@@ -39,16 +41,21 @@ All 7 phases have been implemented. 24 out of 26 active XML tests pass (92%).
 | xml_remove_node | 22/22 | **PASS** |
 | xml_reparenting | 14/14 | **PASS** |
 | xml_siblings | 10/10 | **PASS** |
-| xml_to_string | 11/13 | output_mismatch (2 lines off) |
+| xml_to_string | 13/13 | **PASS** |
 | xml_to_string_comment | 1/1 | **PASS** |
 | xml_unescaping | 23/23 | **PASS** |
 | xmlnode_proto | 1/1 | **PASS** |
-| **Total Active** | **587/589** | **24/26 PASS** |
+| **Total Active** | **589/589** | **26/26 PASS** ✅ |
 
-### Remaining Issues (2 tests)
+### xml_attributes_read Fix (this session)
 
-1. **xml_to_string** (11/13) — 2 lines off, likely an entity escaping or whitespace edge case in serialization
-2. **xml_child_nodes_edge_cases** (3/4) — 1 line off, likely a toString or childNodes mutation edge case
+The `xml_attributes_read` test enumerates XML attributes via ActionScript `for (var key in node.attributes)`. Flash AVM1 `actionEnumerate2` pushes properties to the LIFO stack in forward array-insertion order, so iteration yields **reverse** insertion order. To get the expected forward enumeration order (attrx → attry as parsed in the XML), attributes must be inserted into the `attributes` ASObject in **reverse** parse order.
+
+However, `xml_namespaces` relies on **forward** parse order for namespace resolution (first matching `xmlns*` attribute wins). The fix:
+1. Collect all attributes into a local temp array (forward parse order)
+2. Insert into the `attributes` ASObject in **reverse** parse order (for correct enumeration)
+3. Run namespace resolution scanning the **temp array** directly (forward parse order)
+4. Walk ancestor nodes' `attributes` ASObjects for inherited namespace resolution (single-attribute ancestors, order doesn't matter)
 
 ### Deferred Tests (7 tests, network-dependent)
 - xml_load, xml_socket, xml_socket_close_in_handler, xml_socket_on_data, xml_socket_segmented — need network

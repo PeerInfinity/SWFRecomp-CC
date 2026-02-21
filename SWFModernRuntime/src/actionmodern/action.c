@@ -6781,7 +6781,16 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 				ASObject* elem = xml_create_node(app_context, 1,
 					&text[name_start], name_len, NULL, 0);
 
-				// Parse attributes
+				// Parse attributes — collect into temp array first.
+				// We insert them in REVERSE parse order into the ASObject so that
+				// actionEnumerate2 (LIFO) yields forward (parse) enumeration order.
+				// Namespace resolution scans the temp array in forward parse order
+				// (Flash first-attribute-wins) and must be done before freeing.
+				#define XML_MAX_ATTRS 64
+				struct { char* name; u32 name_len; char* value; u32 value_len; }
+					parsed_attrs[XML_MAX_ATTRS];
+				u32 num_parsed_attrs = 0;
+
 				while (pos < text_len && text[pos] != '>' && text[pos] != '/') {
 					// Skip whitespace
 					while (pos < text_len && (text[pos] == ' ' || text[pos] == '\t' ||
@@ -6808,20 +6817,36 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 					u32 attr_val_len = pos - attr_val_start;
 					if (pos < text_len) pos++; // skip closing quote
 
-					// Unescape and store attribute
+					// Unescape and save to temp array
 					u32 ue_len = 0;
 					char* ue_val = xml_unescape(app_context, &text[attr_val_start], attr_val_len, &ue_len);
 
+					if (num_parsed_attrs < XML_MAX_ATTRS) {
+						parsed_attrs[num_parsed_attrs].name = xml_strdup(app_context, &text[attr_name_start], attr_name_len);
+						parsed_attrs[num_parsed_attrs].name_len = attr_name_len;
+						parsed_attrs[num_parsed_attrs].value = ue_val;
+						parsed_attrs[num_parsed_attrs].value_len = ue_len;
+						num_parsed_attrs++;
+					} else {
+						free(ue_val);
+					}
+				}
+
+				// Insert attributes into ASObject in REVERSE parse order.
+				// actionEnumerate2 pushes in forward array order then LIFO-reverses,
+				// so reverse insertion gives correct forward (parse) enumeration order.
+				{
 					ActionVar* attrs_prop = getProperty(elem, "attributes", 10);
 					if (attrs_prop != NULL && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
 						ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
 						if (attrs != NULL) {
-							char* a_name = xml_strdup(app_context, &text[attr_name_start], attr_name_len);
-							xml_set_str(app_context, attrs, a_name, attr_name_len, ue_val, ue_len);
-							free(a_name);
+							for (int ai = (int)num_parsed_attrs - 1; ai >= 0; ai--) {
+								xml_set_str(app_context, attrs,
+									parsed_attrs[ai].name, parsed_attrs[ai].name_len,
+									parsed_attrs[ai].value, parsed_attrs[ai].value_len);
+							}
 						}
 					}
-					free(ue_val);
 				}
 
 				// Check for self-closing />
@@ -6834,34 +6859,26 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 
 				xml_do_append(app_context, stack[stack_top], elem);
 
-				// Populate idMap if element has an 'id' attribute
-				ActionVar* id_attrs = getProperty(elem, "attributes", 10);
-				if (id_attrs != NULL && id_attrs->type == ACTION_STACK_VALUE_OBJECT) {
-					ASObject* ia = (ASObject*) id_attrs->data.numeric_value;
-					if (ia != NULL) {
-						ActionVar* id_val = getProperty(ia, "id", 2);
-						if (id_val != NULL && id_val->type == ACTION_STACK_VALUE_STRING) {
-							char _xml_id_buf[512];
-							const uint16_t* _xml_id_u16 = varGetU16Ptr(id_val);
-							u16_to_utf8(_xml_id_u16, id_val->str_size, _xml_id_buf, sizeof(_xml_id_buf));
-							const char* id_str = _xml_id_buf;
-							u32 id_len = (u32)strlen(id_str);
-							ActionVar* idmap_prop = getProperty(doc, "idMap", 5);
-							if (idmap_prop != NULL && idmap_prop->type == ACTION_STACK_VALUE_OBJECT) {
-								ASObject* idmap = (ASObject*) idmap_prop->data.numeric_value;
-								if (idmap != NULL) {
-									ActionVar ev = {0}; ev.type = ACTION_STACK_VALUE_OBJECT;
-									ev.data.numeric_value = (u64) elem;
-									setProperty(app_context, idmap, id_str, id_len, &ev);
-								}
+				// Populate idMap if element has an 'id' attribute (scan temp array)
+				for (u32 ai = 0; ai < num_parsed_attrs; ai++) {
+					if (parsed_attrs[ai].name_len == 2 &&
+					    strncmp(parsed_attrs[ai].name, "id", 2) == 0) {
+						ActionVar* idmap_prop = getProperty(doc, "idMap", 5);
+						if (idmap_prop != NULL && idmap_prop->type == ACTION_STACK_VALUE_OBJECT) {
+							ASObject* idmap = (ASObject*) idmap_prop->data.numeric_value;
+							if (idmap != NULL) {
+								ActionVar ev = {0}; ev.type = ACTION_STACK_VALUE_OBJECT;
+								ev.data.numeric_value = (u64) elem;
+								setProperty(app_context, idmap,
+									parsed_attrs[ai].value, parsed_attrs[ai].value_len, &ev);
 							}
 						}
+						break;
 					}
 				}
 
-				// Resolve namespaceURI based on xmlns* attributes up the tree.
-				// Flash treats ANY attribute starting with "xmlns" as a namespace declaration.
-				// Derived prefix: if name[5]==':' then everything after ':', otherwise "".
+				// Resolve namespaceURI: scan own-element temp array in forward parse order
+				// (Flash first-attribute-wins semantics), then walk up ancestors via ASObject.
 				{
 					ActionVar* nn = getProperty(elem, "nodeName", 8);
 					if (nn != NULL && nn->type == ACTION_STACK_VALUE_STRING) {
@@ -6881,13 +6898,31 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 							}
 						}
 
-						// Helper: scan an attributes object for matching xmlns* declaration
-						// Returns 1 if found and sets uri/uri_len
 						int resolved = 0;
-						// Check element's own attributes first, then walk up ancestors
-						// Build a list of attribute objects to check: elem first, then stack[stack_top] down to stack[0]
-						for (int check = -1; check <= stack_top && !resolved; check++) {
-							ASObject* check_node = (check == -1) ? elem : stack[stack_top - check];
+
+						// 1. Scan own element's attributes from temp array (forward parse order).
+						//    Temp array preserves forward parse order regardless of ASObject order.
+						for (u32 ai = 0; ai < num_parsed_attrs && !resolved; ai++) {
+							const char* aname = parsed_attrs[ai].name;
+							if (strncmp(aname, "xmlns", 5) != 0) continue;
+							// Derive this attr's prefix
+							const char* ap = (aname[5] == ':') ? &aname[6] : "";
+							u32 ap_len = strlen(ap);
+							if (ap_len == elem_prefix_len &&
+							    (elem_prefix_len == 0 || strncmp(ap, elem_prefix, elem_prefix_len) == 0)) {
+								const char* uri = parsed_attrs[ai].value;
+								u32 uri_len = parsed_attrs[ai].value_len;
+								if (uri_len > 0) {
+									xml_set_str(app_context, elem, "namespaceURI", 12, uri, uri_len);
+									resolved = 1;
+								}
+							}
+						}
+
+						// 2. Walk up ancestors (their attributes are in ASObject, order is fine
+						//    for specific-prefix lookups since each xmlns:prefix is unique).
+						for (int check = 0; check <= stack_top && !resolved; check++) {
+							ASObject* check_node = stack[stack_top - check];
 							ActionVar* a_prop = getProperty(check_node, "attributes", 10);
 							if (a_prop == NULL || a_prop->type != ACTION_STACK_VALUE_OBJECT) continue;
 							ASObject* aobj = (ASObject*) a_prop->data.numeric_value;
@@ -6896,7 +6931,6 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 								const char* aname = aobj->properties[i].name;
 								if (strncmp(aname, "xmlns", 5) != 0) continue;
 								if (aobj->properties[i].value.type != ACTION_STACK_VALUE_STRING) continue;
-								// Derive this attr's prefix
 								const char* ap = (aname[5] == ':') ? &aname[6] : "";
 								u32 ap_len = strlen(ap);
 								if (ap_len == elem_prefix_len &&
@@ -6914,6 +6948,12 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 							}
 						}
 					}
+				}
+
+				// Free temp attribute array
+				for (u32 ai = 0; ai < num_parsed_attrs; ai++) {
+					free(parsed_attrs[ai].name);
+					free(parsed_attrs[ai].value);
 				}
 
 				if (!self_closing && stack_top < XML_STACK_MAX - 1) {
