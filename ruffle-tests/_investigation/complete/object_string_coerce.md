@@ -51,27 +51,15 @@ Flash's behavior.
 
 ## Remaining Issues
 
-### SWF5: Extra toString call at end (3 extra lines)
+### SWF5: FIXED
 
-Actual output has 65 lines vs 62 expected (62/62 matching). The extra lines appear
-near the end:
-```
-Date.toString -> {}, valueOf -> {}
-toString called
-[type Object]
+SWF5 now passes (62/62 lines match). The extra 3 lines issue was resolved.
 
-toString called     ← extra
-[type Object]       ← extra
-```
+### SWF6: Date ToPrimitive toString-first in Add2 (SWF6+)
 
-This appears to be a spurious extra toString invocation in the Date section. The
-Date `toString->{}` case traces the toString call, gets `[type Object]` from the
-fallback, but then an additional toString call + `[type Object]` output is produced
-(likely from the Add2 `"" + date_obj` path double-calling toString).
+**Status: READY TO IMPLEMENT** (SWF5 already passes, SWF6 is the only remaining issue)
 
-### SWF6: Date ToPrimitive prefers wrong method (~22 lines)
-
-Multiple sections where the Date-specific ToPrimitive order is wrong:
+Multiple sections where the Date-specific ToPrimitive order is wrong for Add2:
 
 ```
 // Date with toString -> String, valueOf -> String
@@ -80,20 +68,27 @@ Expected: toString called / toString
 Actual:   valueOf called / valueOf
 ```
 
-**Root cause:** Date objects need toString-first ToPrimitive hint, but our runtime
-always uses valueOf-first for Add2/Less2/etc. There's currently no Date object type
-distinction or Date-specific ToPrimitive path.
+**Root cause:** Date objects need toString-first ToPrimitive hint for Add2 in SWF6+,
+but our runtime always uses valueOf-first. The `isDateObject` check and `g_swf_version >= 6`
+guard are needed.
 
-**Fix:** Would require:
-1. A Date object type flag or special prototype chain marker
-2. ToPrimitive to check for Date-ness and use toString-first hint
-3. This is a larger feature — no Date constructor support exists yet
+**Fix plan:**
+1. Add `isDateObject(ActionVar*)` helper that checks `obj.__proto__ == g_date_prototype`
+2. In `actionAdd2`, for object operands: if `isDateObject` && `g_swf_version >= 6`,
+   call `objectCallToString` instead of `objectCallValueOf`
+3. This matches the ECMAScript Date `[[DefaultValue]]` string-hint behavior
 
-### SWF6: toString→{} fallback chain (several lines)
+**Verified expected behavior for each section (actionAdd2 with "" + date):**
+- toString→String, valueOf→String: call toString (1st), get "toString", use it → "toString"
+- toString→undefined, valueOf→String: call toString (1st), toString is undefined (not callable)
+  → a_vo=undefined, a_vo_is_prim=true → convert undefined → "undefined"
+- toString→{}, valueOf→String: call toString (1st), get {} (object), a_vo_found=1;
+  then string concat path calls toString again (2nd call) → {} → "[type Object]"
+- toString→{}, valueOf→undefined: same as above, two toString calls → "[type Object]"
+- toString→{}, valueOf→{}: same, two toString calls → "[type Object]"
 
-When toString returns an object (`{}`), Flash falls back to valueOf. When valueOf
-also returns an object, it falls back to `[type Object]`. Our fallback chain doesn't
-fully match Flash's behavior in these edge cases.
+**SWF5 not affected:** g_swf_version=5 < 6, so `isDateObject && g_swf_version>=6` = false
+→ Date objects in SWF5 use valueOf-first (current behavior, already correct)
 
 ---
 

@@ -9466,18 +9466,34 @@ void actionAdd(SWFAppContext* app_context)
 	}
 }
 
+// Returns 1 if obj_var is a Date instance (has __proto__ == g_date_prototype) in SWF6+.
+// Date objects use toString-first ToPrimitive for Add2 (ECMAScript Date [[DefaultValue]]).
+static int isDateObjectSWF6(ActionVar* obj_var)
+{
+	if (g_swf_version < 6) return 0;
+	if (obj_var->type != ACTION_STACK_VALUE_OBJECT) return 0;
+	if (g_date_prototype == NULL) return 0;
+	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
+	if (obj == NULL) return 0;
+	ActionVar* proto_prop = getProperty(obj, "__proto__", 9);
+	if (proto_prop == NULL) return 0;
+	if (proto_prop->type != ACTION_STACK_VALUE_OBJECT) return 0;
+	ASObject* proto = (ASObject*) proto_prop->data.numeric_value;
+	return (proto == g_date_prototype);
+}
+
 void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 {
 	// Flash Add2 algorithm:
 	// 1. Pop both operands
-	// 2. Call valueOf on each object operand (right first for Flash evaluation order)
-	// 3. If either raw type or valueOf result is a string → string concatenation
-	//    - Objects with primitive valueOf: convert that primitive to string
-	//    - Objects with non-primitive valueOf: call toString, fallback to "[type Object]"
-	//    - Objects with no valueOf: use convertString → "[type Object]"
+	// 2. Call ToPrimitive on each object operand (right first for Flash evaluation order)
+	//    - For regular objects: valueOf-first (number hint)
+	//    - For Date objects in SWF6+: toString-first (string hint, ECMAScript Date spec)
+	// 3. If either raw type or ToPrimitive result is a string → string concatenation
+	//    - Objects with primitive ToPrimitive: convert that primitive to string
+	//    - Objects with non-primitive ToPrimitive: call toString, fallback to "[type Object]"
+	//    - Objects with no ToPrimitive: use convertString → "[type Object]"
 	// 4. Else → numeric addition using original operands (convertFloat calls valueOf again)
-	//    - Objects with primitive valueOf: use that result for numeric conversion
-	//    - Objects with non-primitive valueOf: convertFloat on original (valueOf called again)
 
 	// Pop right operand (a = top of stack)
 	ActionVar a_raw;
@@ -9495,13 +9511,17 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 	                b_raw.type == ACTION_STACK_VALUE_ARRAY ||
 	                b_raw.type == ACTION_STACK_VALUE_FUNCTION);
 
-	// Call valueOf on object operands (right first for Flash evaluation order)
+	// Call ToPrimitive on object operands (right first for Flash evaluation order).
+	// Date objects in SWF6+ use toString-first (string hint); others use valueOf-first.
 	ActionVar a_vo = a_raw;
 	int a_vo_found = 0;
 	int a_vo_is_prim = !a_is_obj;  // non-objects are already primitive
 	if (a_is_obj)
 	{
-		a_vo = objectCallValueOf(app_context, &a_raw, &a_vo_found);
+		if (isDateObjectSWF6(&a_raw))
+			a_vo = objectCallToString(app_context, &a_raw, &a_vo_found);
+		else
+			a_vo = objectCallValueOf(app_context, &a_raw, &a_vo_found);
 		a_vo_is_prim = (a_vo.type != ACTION_STACK_VALUE_OBJECT &&
 		                a_vo.type != ACTION_STACK_VALUE_ARRAY &&
 		                a_vo.type != ACTION_STACK_VALUE_FUNCTION);
@@ -9512,7 +9532,10 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 	int b_vo_is_prim = !b_is_obj;
 	if (b_is_obj)
 	{
-		b_vo = objectCallValueOf(app_context, &b_raw, &b_vo_found);
+		if (isDateObjectSWF6(&b_raw))
+			b_vo = objectCallToString(app_context, &b_raw, &b_vo_found);
+		else
+			b_vo = objectCallValueOf(app_context, &b_raw, &b_vo_found);
 		b_vo_is_prim = (b_vo.type != ACTION_STACK_VALUE_OBJECT &&
 		                b_vo.type != ACTION_STACK_VALUE_ARRAY &&
 		                b_vo.type != ACTION_STACK_VALUE_FUNCTION);
