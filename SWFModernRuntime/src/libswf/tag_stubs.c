@@ -1055,9 +1055,10 @@ void ng_renameDisplayEntry(const char* old_name, const char* new_name)
 			if (display_list[d].instance_name_owned)
 			{
 				free(display_list[d].instance_name);
-				display_list[d].instance_name_owned = 0;
 			}
-			display_list[d].instance_name = (char*)new_name;
+			// Must strdup since new_name may point to a stack buffer
+			display_list[d].instance_name = strdup(new_name);
+			display_list[d].instance_name_owned = 1;
 			return;
 		}
 	}

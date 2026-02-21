@@ -16596,7 +16596,14 @@ void actionSetMember(SWFAppContext* app_context)
 						strncpy(mc->name, new_name, sizeof(mc->name) - 1);
 						mc->name[sizeof(mc->name) - 1] = '\0';
 						if (mc->parent != NULL)
-							snprintf(mc->target, sizeof(mc->target), "%s.%s", mc->parent->target, new_name);
+						{
+							if (mc->parent->target[0] == '/' && mc->parent->target[1] == '\0')
+								snprintf(mc->target, sizeof(mc->target), "/%s", new_name);
+							else if (mc->parent->target[0] != '\0')
+								snprintf(mc->target, sizeof(mc->target), "%s/%s", mc->parent->target, new_name);
+							else
+								snprintf(mc->target, sizeof(mc->target), "/%s", new_name);
+						}
 					}
 					return;
 				}
