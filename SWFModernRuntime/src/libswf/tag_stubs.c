@@ -987,6 +987,9 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 		DisplayObject tmp = display_list[old_depth];
 		display_list[old_depth] = display_list[new_swf_depth];
 		display_list[new_swf_depth] = tmp;
+		// Mark both as swapped so timeline modifies are ignored
+		display_list[old_depth].depth_swapped = 1;
+		display_list[new_swf_depth].depth_swapped = 1;
 
 		// Update the other MC's cached depth (AS depth = SWF depth - 16384)
 		if (display_list[old_depth].instance_name != NULL)
@@ -1009,6 +1012,7 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 	{
 		// Target depth empty: move entry and clear old slot
 		display_list[new_swf_depth] = display_list[old_depth];
+		display_list[new_swf_depth].depth_swapped = 1;
 		memset(&display_list[old_depth], 0, sizeof(DisplayObject));
 	}
 
@@ -1036,6 +1040,9 @@ void ng_swapDisplayDepths(const char* name1, const char* name2)
 		DisplayObject tmp = display_list[d1];
 		display_list[d1] = display_list[d2];
 		display_list[d2] = tmp;
+		// Mark both as swapped so timeline modifies are ignored
+		display_list[d1].depth_swapped = 1;
+		display_list[d2].depth_swapped = 1;
 	}
 }
 

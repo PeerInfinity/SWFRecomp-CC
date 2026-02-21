@@ -208,6 +208,32 @@ def get_num_frames(test_dir, wait_count=0, has_input=False):
     return max(declared, min_ticks)
 
 
+def get_epsilon(test_dir):
+    """Parse [approximations] epsilon from test.toml, default 0 (exact match)."""
+    toml_path = test_dir / "test.toml"
+    if toml_path.exists():
+        text = toml_path.read_text()
+        m = re.search(r"epsilon\s*=\s*([0-9.]+)", text)
+        if m:
+            return float(m.group(1))
+    return 0.0
+
+
+def _lines_approx_equal(actual_line, expected_line, epsilon):
+    """Check if two lines are approximately equal (for numeric values)."""
+    if actual_line == expected_line:
+        return True
+    if epsilon <= 0:
+        return False
+    # Try to parse both as numbers and compare with epsilon
+    try:
+        a = float(actual_line)
+        e = float(expected_line)
+        return abs(a - e) <= epsilon
+    except (ValueError, OverflowError):
+        return False
+
+
 def filter_output(raw_output):
     """Remove runtime boilerplate, return only trace lines."""
     lines = raw_output.split("\n")
@@ -350,7 +376,7 @@ def run_binary(build_dir, event_file=None):
         return None, -1
 
 
-def compare_output(actual, expected):
+def compare_output(actual, expected, epsilon=0.0):
     """Compare filtered actual output with expected output.
     Returns (match, diff_summary, stats_dict)."""
     actual_lines = actual.split("\n")
@@ -368,8 +394,11 @@ def compare_output(actual, expected):
     matching = sum(
         1
         for i in range(max_lines)
-        if (actual_lines[i] if i < len(actual_lines) else "<missing>")
-        == (expected_lines[i] if i < len(expected_lines) else "<missing>")
+        if _lines_approx_equal(
+            actual_lines[i] if i < len(actual_lines) else "<missing>",
+            expected_lines[i] if i < len(expected_lines) else "<missing>",
+            epsilon,
+        )
     )
     line_stats = {
         "actual_lines": len(actual_lines),
@@ -377,7 +406,7 @@ def compare_output(actual, expected):
         "matching_lines": matching,
     }
 
-    if actual_lines == expected_lines:
+    if matching == max_lines:
         return True, "", line_stats
 
     # Generate a brief diff summary
@@ -386,7 +415,7 @@ def compare_output(actual, expected):
     for i in range(min(max_lines, 20)):
         a = actual_lines[i] if i < len(actual_lines) else "<missing>"
         e = expected_lines[i] if i < len(expected_lines) else "<missing>"
-        if a != e:
+        if not _lines_approx_equal(a, e, epsilon):
             mismatches += 1
             if mismatches <= 3:
                 diff.append(f"  line {i+1}: got {a!r}, expected {e!r}")
@@ -398,7 +427,7 @@ def compare_output(actual, expected):
     return False, summary, line_stats
 
 
-def format_diff(actual, expected, context=3):
+def format_diff(actual, expected, context=3, epsilon=0.0):
     """Generate a unified-diff-style view showing mismatches with context."""
     actual_lines = actual.split("\n")
     expected_lines = expected.split("\n")
@@ -412,7 +441,7 @@ def format_diff(actual, expected, context=3):
         a = actual_lines[i] if i < len(actual_lines) else None
         e = expected_lines[i] if i < len(expected_lines) else None
 
-        if a == e:
+        if _lines_approx_equal(a if a is not None else "", e if e is not None else "", epsilon):
             if in_context:
                 skipped += 1
                 if skipped <= context:
@@ -630,6 +659,7 @@ def main():
 
     for i, name in enumerate(tests):
         test_dir = SCRIPT_DIR / name
+        epsilon = get_epsilon(test_dir)
         if args.verbose:
             print(f"[{i+1}/{len(tests)}] {name}...", end=" ", flush=True)
 
@@ -716,12 +746,12 @@ def main():
                 if raw_output and raw_output.strip():
                     crash_actual = filter_output(raw_output)
                     crash_expected = (test_dir / "output.txt").read_text().replace("\r\n", "\n").rstrip("\n")
-                    crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected)
+                    crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected, epsilon)
                     entry["lines"] = crash_line_stats
                     if crash_match:
                         entry["detail"] += " (output matches)"
                     if args.diff:
-                        fail_diffs[name] = format_diff(crash_actual, crash_expected)
+                        fail_diffs[name] = format_diff(crash_actual, crash_expected, epsilon=epsilon)
                 test_results.append(entry)
                 if args.verbose:
                     line_info = ""
@@ -736,7 +766,7 @@ def main():
         actual = filter_output(raw_output)
         expected = (test_dir / "output.txt").read_text().replace("\r\n", "\n").rstrip("\n")
 
-        match, diff_summary, line_stats = compare_output(actual, expected)
+        match, diff_summary, line_stats = compare_output(actual, expected, epsilon)
         entry["lines"] = line_stats
         entry["duration"] = round(time.monotonic() - test_start, 2)
         if match:
@@ -751,7 +781,7 @@ def main():
             fail_list.append(name)
             fail_details[name] = diff_summary
             if args.diff:
-                fail_diffs[name] = format_diff(actual, expected)
+                fail_diffs[name] = format_diff(actual, expected, epsilon=epsilon)
             entry["status"] = "output_mismatch"
             entry["detail"] = diff_summary.split("\n")[0]  # first line only
             actual_snip, expected_snip = snippet_around_mismatch(actual, expected)

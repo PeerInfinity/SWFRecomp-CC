@@ -2,6 +2,7 @@
 #include <tag.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <utils.h>
 #include <heap.h>
@@ -760,6 +761,8 @@ void tagShowFrame(SWFAppContext* app_context)
 	{
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0 || obj->clip_action_count == 0) continue;
+		// Flash: onClipEvent(enterFrame) doesn't fire on the placement frame
+		if (obj->placed_at_frame == current_frame) continue;
 
 		for (size_t a = 0; a < obj->clip_action_count; a++)
 		{
@@ -1397,6 +1400,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 	if (char_id == 0)
 	{
+		// Skip timeline modify on clips moved by swapDepths
+		if (display_list[depth].depth_swapped) return;
 		// Modify operation (HasCharacter=0): update transform/cxform only, preserve identity.
 		display_list[depth].transform_id = transform_id;
 		display_list[depth].cxform_id = cxform_id;
@@ -1409,10 +1414,16 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		if (depth > max_depth) max_depth = depth;
 #ifdef NO_GRAPHICS
 		// Re-init cxform via ng_on_place_object2 (handles ng_init_cxform_from_data internally).
-		// Pass actual char_id so type detection works; reset sprite_needs_init after.
+		// Pass actual char_id so type detection works.
+		// Preserve sprite_needs_init if already set (sprite awaiting Phase 2 init from
+		// a placement earlier in the same frame).
+		u8 saved_needs_init = display_list[depth].sprite_needs_init;
 		size_t actual_char_id = display_list[depth].char_id;
 		ng_on_place_object2(app_context, depth, actual_char_id);
-		display_list[depth].sprite_needs_init = 0;
+		if (saved_needs_init)
+			display_list[depth].sprite_needs_init = saved_needs_init;
+		else
+			display_list[depth].sprite_needs_init = 0;
 #else
 		(void)app_context;
 #endif
@@ -1443,6 +1454,24 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 #endif
 
+	// Flash rejects placement at occupied depth with a different character
+	if (display_list[depth].char_id != 0 && display_list[depth].char_id != char_id)
+	{
+		printf("Warning: Failed to place object at depth %zu.\n", depth);
+		return;
+	}
+	// Same character at same depth: treat as modify (update transform only, don't re-init)
+	if (display_list[depth].char_id == char_id && display_list[depth].char_id != 0)
+	{
+		display_list[depth].transform_id = transform_id;
+		display_list[depth].cxform_id = cxform_id;
+		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+		init_cx_fields(&display_list[depth]);
+		if (depth > max_depth) max_depth = depth;
+		return;
+	}
+
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
 	display_list[depth].cxform_id = cxform_id;
@@ -1467,6 +1496,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
+	display_list[depth].depth_swapped = 0;
 	// Restore persistent button state if the same character is being re-placed
 	// (e.g. a looping movie that removes+replaces a button each frame cycle).
 	if (display_list[depth].sticky_char_id == char_id && char_id != 0)
@@ -1594,6 +1624,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
+	display_list[depth].depth_swapped = 0;
 	// Restore persistent button state if the same character is being re-placed
 	// (e.g. a looping movie that removes+replaces a button each frame cycle).
 	if (display_list[depth].sticky_char_id == char_id && char_id != 0)

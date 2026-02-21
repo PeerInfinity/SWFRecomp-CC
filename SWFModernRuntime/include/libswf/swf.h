@@ -161,6 +161,7 @@ typedef struct DisplayObject
 	int cx_overridden;                   // 1 if cx_* fields override cxform_data[]
 	// Timeline tracking
 	u8 sprite_needs_init;   // 1 if frame_0 needs to run this tick (NO_GRAPHICS)
+	u8 depth_swapped;       // 1 if moved here by swapDepths (skip timeline modifies)
 	size_t placed_at_frame; // frame index when this object was placed
 	// Clip event interaction state
 	u8 clip_mc_pressed;     // 1 if CLIP_EVENT_PRESS was fired for this clip (awaiting RELEASE/RELEASE_OUTSIDE)

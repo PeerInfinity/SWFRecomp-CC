@@ -17979,7 +17979,7 @@ void actionNewObject(SWFAppContext* app_context)
 			ActionVar len_var = {0};
 			len_var.type = ACTION_STACK_VALUE_F64;
 			VAL(double, &len_var.data.numeric_value) = slen_d;
-			setPropertyWithFlags(app_context, str_obj, "length", 6, &len_var, PROPERTY_FLAGS_DONTENUM);
+			setPropertyWithFlags(app_context, str_obj, "length", 6, &len_var, PROPERTY_FLAG_WRITABLE);
 		}
 
 		// Set up valueOf and toString using the wrapper infrastructure
@@ -18910,6 +18910,18 @@ void actionNewMethod(SWFAppContext* app_context)
 			setProperty(app_context, str_obj, "valueOf", 7, &empty_str);
 		}
 
+		// Set length property (DontEnum, DontDelete = writable only)
+		{
+			u32 slen = 0;
+			if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+				slen = args[0].str_size;
+			double slen_d = (double) slen;
+			ActionVar len_var = {0};
+			len_var.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &len_var.data.numeric_value) = slen_d;
+			setPropertyWithFlags(app_context, str_obj, "length", 6, &len_var, PROPERTY_FLAG_WRITABLE);
+		}
+
 		new_obj = str_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, VAL(u64, new_obj));
 	}
@@ -19702,10 +19714,27 @@ int actionWithStart(SWFAppContext* app_context)
 		actionTrace_str(app_context, "Error: A 'with' action failed because the specified object did not exist.\n\n");
 		return 0;
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		// Wrap string primitive in a String object for WITH scope
+		ASObject* str_obj = allocObject(app_context, 4);
+		// Set valueOf so toString/valueOf can retrieve the string
+		setPropertyWithFlags(app_context, str_obj, "valueOf", 7, &obj_var, PROPERTY_FLAGS_DONTENUM);
+		// Set length property
+		double slen = (double)obj_var.str_size;
+		ActionVar len_var = {0};
+		len_var.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &len_var.data.numeric_value) = slen;
+		setPropertyWithFlags(app_context, str_obj, "length", 6, &len_var, PROPERTY_FLAG_WRITABLE);
+
+		scope_is_with[scope_depth] = 1;
+		scope_mc[scope_depth] = NULL;
+		scope_chain[scope_depth++] = str_obj;
+		return 1;
+	}
 	else
 	{
-		// Non-object type (string, number, boolean) — push null marker
-		// TODO: wrap primitives in their wrapper objects (String, Number, Boolean)
+		// Non-object type (number, boolean) — push null marker
 		scope_is_with[scope_depth] = 1;
 		scope_mc[scope_depth] = NULL;
 		scope_chain[scope_depth++] = NULL;
@@ -24940,6 +24969,142 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 7 && strncmp(method_name, "endFill", 7) == 0)
 		{
 			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 13 && strncmp(method_name, "localToGlobal", 13) == 0)
+		{
+			// localToGlobal(pt): transform pt.x/pt.y from this MC's local coords to stage coords
+			if (num_args < 1 || args[0].type != ACTION_STACK_VALUE_OBJECT) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			ASObject* _ltg_pt = (ASObject*) args[0].data.numeric_value;
+			if (args != NULL) FREE(args);
+			if (_ltg_pt == NULL) { pushUndefined(app_context); return; }
+#ifdef NO_GRAPHICS
+			{
+				ActionVar* _ltg_xv = getProperty(_ltg_pt, "x", 1);
+				ActionVar* _ltg_yv = getProperty(_ltg_pt, "y", 1);
+				int _ltg_has_x = (_ltg_xv != NULL && (_ltg_xv->type == ACTION_STACK_VALUE_F64 ||
+				                   _ltg_xv->type == ACTION_STACK_VALUE_F32));
+				int _ltg_has_y = (_ltg_yv != NULL && (_ltg_yv->type == ACTION_STACK_VALUE_F64 ||
+				                   _ltg_yv->type == ACTION_STACK_VALUE_F32));
+				if (_ltg_has_x && _ltg_has_y) {
+					double _ltg_px = varToDouble(_ltg_xv);
+					double _ltg_py = varToDouble(_ltg_yv);
+					// Match Ruffle: f32 for a/b/c/d, i32 twips for tx/ty
+					float _ltg_a = 1, _ltg_b = 0, _ltg_c = 0, _ltg_d = 1;
+					int32_t _ltg_tx = 0, _ltg_ty = 0;
+					MovieClip* _ltg_chain[64];
+					int _ltg_n = 0;
+					for (MovieClip* _ltg_cur = mc; _ltg_cur != NULL && _ltg_n < 64; _ltg_cur = _ltg_cur->parent)
+						_ltg_chain[_ltg_n++] = _ltg_cur;
+					for (int _ltg_i = _ltg_n - 1; _ltg_i >= 0; _ltg_i--) {
+						double _la, _lb, _lc, _ld, _ltx, _lty;
+						getLocalMatrixForMC(_ltg_chain[_ltg_i], &_la, &_lb, &_lc, &_ld, &_ltx, &_lty);
+						float _rla = (float)_la, _rlb = (float)_lb, _rlc = (float)_lc, _rld = (float)_ld;
+						float _rltx = (float)(_ltx * 20.0), _rlty = (float)(_lty * 20.0);
+						// Compose: self * rhs (Ruffle uses fma for a/b/c/d, round_to_i32 for tx/ty)
+						float _na = fmaf(_ltg_a, _rla, _ltg_c * _rlb);
+						float _nb = fmaf(_ltg_b, _rla, _ltg_d * _rlb);
+						float _nc = fmaf(_ltg_a, _rlc, _ltg_c * _rld);
+						float _nd = fmaf(_ltg_b, _rlc, _ltg_d * _rld);
+						int32_t _ntx = (int32_t)rintf(fmaf(_ltg_a, _rltx, _ltg_c * _rlty)) + _ltg_tx;
+						int32_t _nty = (int32_t)rintf(fmaf(_ltg_b, _rltx, _ltg_d * _rlty)) + _ltg_ty;
+						_ltg_a = _na; _ltg_b = _nb; _ltg_c = _nc; _ltg_d = _nd;
+						_ltg_tx = _ntx; _ltg_ty = _nty;
+					}
+					// Apply to point: convert pixels to twips (truncate), transform, convert back
+					float _ptx = (float)((int32_t)(_ltg_px * 20.0));
+					float _pty = (float)((int32_t)(_ltg_py * 20.0));
+					int32_t _gx_tw = (int32_t)rintf(fmaf(_ltg_a, _ptx, _ltg_c * _pty)) + _ltg_tx;
+					int32_t _gy_tw = (int32_t)rintf(fmaf(_ltg_b, _ptx, _ltg_d * _pty)) + _ltg_ty;
+					double _gx = (double)_gx_tw / 20.0;
+					double _gy = (double)_gy_tw / 20.0;
+					ActionVar _ltg_rv = {0};
+					_ltg_rv.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_ltg_rv.data.numeric_value) = _gx;
+					setProperty(app_context, _ltg_pt, "x", 1, &_ltg_rv);
+					VAL(double, &_ltg_rv.data.numeric_value) = _gy;
+					setProperty(app_context, _ltg_pt, "y", 1, &_ltg_rv);
+				}
+			}
+#endif
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 13 && strncmp(method_name, "globalToLocal", 13) == 0)
+		{
+			// globalToLocal(pt): transform pt.x/pt.y from stage coords to this MC's local coords
+			if (num_args < 1 || args[0].type != ACTION_STACK_VALUE_OBJECT) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			ASObject* _gtl_pt = (ASObject*) args[0].data.numeric_value;
+			if (args != NULL) FREE(args);
+			if (_gtl_pt == NULL) { pushUndefined(app_context); return; }
+#ifdef NO_GRAPHICS
+			{
+				ActionVar* _gtl_xv = getProperty(_gtl_pt, "x", 1);
+				ActionVar* _gtl_yv = getProperty(_gtl_pt, "y", 1);
+				int _gtl_has_x = (_gtl_xv != NULL && (_gtl_xv->type == ACTION_STACK_VALUE_F64 ||
+				                   _gtl_xv->type == ACTION_STACK_VALUE_F32));
+				int _gtl_has_y = (_gtl_yv != NULL && (_gtl_yv->type == ACTION_STACK_VALUE_F64 ||
+				                   _gtl_yv->type == ACTION_STACK_VALUE_F32));
+				if (_gtl_has_x && _gtl_has_y) {
+					double _gtl_px = varToDouble(_gtl_xv);
+					double _gtl_py = varToDouble(_gtl_yv);
+					// Match Ruffle: f32 for a/b/c/d, i32 twips for tx/ty
+					float _gtl_a = 1, _gtl_b = 0, _gtl_c = 0, _gtl_d = 1;
+					int32_t _gtl_tx = 0, _gtl_ty = 0;
+					MovieClip* _gtl_chain[64];
+					int _gtl_n = 0;
+					for (MovieClip* _gtl_cur = mc; _gtl_cur != NULL && _gtl_n < 64; _gtl_cur = _gtl_cur->parent)
+						_gtl_chain[_gtl_n++] = _gtl_cur;
+					for (int _gtl_i = _gtl_n - 1; _gtl_i >= 0; _gtl_i--) {
+						double _la, _lb, _lc, _ld, _ltx, _lty;
+						getLocalMatrixForMC(_gtl_chain[_gtl_i], &_la, &_lb, &_lc, &_ld, &_ltx, &_lty);
+						float _rla = (float)_la, _rlb = (float)_lb, _rlc = (float)_lc, _rld = (float)_ld;
+						float _rltx = (float)(_ltx * 20.0), _rlty = (float)(_lty * 20.0);
+						float _na = fmaf(_gtl_a, _rla, _gtl_c * _rlb);
+						float _nb = fmaf(_gtl_b, _rla, _gtl_d * _rlb);
+						float _nc = fmaf(_gtl_a, _rlc, _gtl_c * _rld);
+						float _nd = fmaf(_gtl_b, _rlc, _gtl_d * _rld);
+						int32_t _ntx = (int32_t)rintf(fmaf(_gtl_a, _rltx, _gtl_c * _rlty)) + _gtl_tx;
+						int32_t _nty = (int32_t)rintf(fmaf(_gtl_b, _rltx, _gtl_d * _rlty)) + _gtl_ty;
+						_gtl_a = _na; _gtl_b = _nb; _gtl_c = _nc; _gtl_d = _nd;
+						_gtl_tx = _ntx; _gtl_ty = _nty;
+					}
+					// Invert the composed matrix (Ruffle: f32 for a/b/c/d, round_to_i32 for tx/ty)
+					float _det = _gtl_a * _gtl_d - _gtl_b * _gtl_c;
+					if (_det > 1.1920929e-7f) { // f32 EPSILON
+						float _ia =  _gtl_d / _det;
+						float _ib =  _gtl_b / -_det;
+						float _ic =  _gtl_c / -_det;
+						float _id =  _gtl_a / _det;
+						float _ftx = (float)_gtl_tx, _fty = (float)_gtl_ty;
+						int32_t _itx = (int32_t)rintf((_gtl_d * _ftx - _gtl_c * _fty) / -_det);
+						int32_t _ity = (int32_t)rintf((_gtl_b * _ftx - _gtl_a * _fty) / _det);
+						// Apply inverse to point (convert pixels to twips, transform, convert back)
+						float _ptx = (float)((int32_t)(_gtl_px * 20.0));
+						float _pty = (float)((int32_t)(_gtl_py * 20.0));
+						int32_t _lx_tw = (int32_t)rintf(fmaf(_ia, _ptx, _ic * _pty)) + _itx;
+						int32_t _ly_tw = (int32_t)rintf(fmaf(_ib, _ptx, _id * _pty)) + _ity;
+						double _lx = (double)_lx_tw / 20.0;
+						double _ly = (double)_ly_tw / 20.0;
+						ActionVar _gtl_rv = {0};
+						_gtl_rv.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &_gtl_rv.data.numeric_value) = _lx;
+						setProperty(app_context, _gtl_pt, "x", 1, &_gtl_rv);
+						VAL(double, &_gtl_rv.data.numeric_value) = _ly;
+						setProperty(app_context, _gtl_pt, "y", 1, &_gtl_rv);
+					}
+				}
+			}
+#endif
 			pushUndefined(app_context);
 			return;
 		}
