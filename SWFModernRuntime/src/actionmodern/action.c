@@ -17805,7 +17805,7 @@ void actionNewObject(SWFAppContext* app_context)
 			arr->length = num_args;
 			for (u32 i = 0; i < num_args; i++)
 			{
-				arr->elements[i] = args[num_args - 1 - i];
+				arr->elements[i] = args[i];
 				// Retain if object/array
 				if (args[i].type == ACTION_STACK_VALUE_OBJECT)
 				{
@@ -18886,15 +18886,15 @@ void actionNewMethod(SWFAppContext* app_context)
 			arr->length = num_args;
 			for (u32 i = 0; i < num_args; i++)
 			{
-				arr->elements[i] = args[num_args - 1 - i];
+				arr->elements[i] = args[i];
 				// Retain if object/array
-				if (args[num_args - 1 - i].type == ACTION_STACK_VALUE_OBJECT)
+				if (args[i].type == ACTION_STACK_VALUE_OBJECT)
 				{
-					retainObject((ASObject*) args[num_args - 1 - i].data.numeric_value);
+					retainObject((ASObject*) args[i].data.numeric_value);
 				}
-				else if (args[num_args - 1 - i].type == ACTION_STACK_VALUE_ARRAY)
+				else if (args[i].type == ACTION_STACK_VALUE_ARRAY)
 				{
-					retainArray((ASArray*) args[num_args - 1 - i].data.numeric_value);
+					retainArray((ASArray*) args[i].data.numeric_value);
 				}
 			}
 			new_obj = arr;
@@ -25475,9 +25475,12 @@ bool actionWaitForFrame(SWFAppContext* app_context, u16 frame)
 		return true;  // No MovieClip -> consider loaded (Ruffle: unwrap_or(true))
 
 	// For non-streaming SWFs, all existing frames are loaded.
-	// The frame parameter is 0-based from bytecode.
-	// Return true if the requested frame exists, false if it's beyond totalframes.
-	return frame < (u16)mc->totalframes;
+	// Clamp frame to totalframes (matching Ruffle: min(frame, header_frames)).
+	// Since frames_loaded == totalframes, this always returns true for valid frames.
+	int32_t frames_loaded = (int32_t)mc->totalframes;
+	u16 header_frames = (u16)mc->totalframes;
+	u16 check_frame = frame < header_frames ? frame : header_frames;
+	return frames_loaded >= (int32_t)check_frame;
 }
 
 bool actionWaitForFrame2(SWFAppContext* app_context)
@@ -25582,9 +25585,13 @@ bool actionWaitForFrame2(SWFAppContext* app_context)
 		return true;  // No MovieClip -> consider loaded
 
 	// For non-streaming SWFs, all existing frames are loaded.
-	// WaitForFrame2 uses 1-based frame numbers (after the wrapping_sub/saturating_add adjustment).
-	// Return true if the requested frame exists, false if it's beyond totalframes.
-	return (uint16_t)frame_num <= (uint16_t)mc->totalframes;
+	// Clamp to totalframes (matching Ruffle: min(frame_u16, header_frames)).
+	// WaitForFrame2 uses 1-based frame numbers (after wrapping_sub/saturating_add).
+	int32_t frames_loaded = (int32_t)mc->totalframes;
+	uint16_t frame_u16 = (uint16_t)frame_num;
+	uint16_t header_frames = (uint16_t)mc->totalframes;
+	uint16_t check_frame = frame_u16 < header_frames ? frame_u16 : header_frames;
+	return (frames_loaded + 1) >= (int32_t)check_frame;
 }
 
 // ===========================================================================

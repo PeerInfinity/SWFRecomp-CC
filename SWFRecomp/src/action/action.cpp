@@ -1641,9 +1641,11 @@ namespace SWFRecomp
 					out_script << "\t" << "}" << endl;
 					out_script << "\t" << "actionWithEnd(app_context);" << endl;
 
-					// Move action_buffer past the entire WITH record body
-					// block_end already points past (block_size field + body)
-					action_buffer = block_end;
+					// Move action_buffer past the WITH body.
+					// Length only covers the 2-byte Size field (not the body),
+					// so block_end = data_start + 2 = start of body.
+					// We need to skip past the body too.
+					action_buffer = block_end + block_size;
 
 					break;
 				}

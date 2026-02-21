@@ -48,10 +48,10 @@ test1 += bytes([OP_POP])              # Pop the array -> stack: []
 
 # Test 2: new Array(10, 20, 30) - creates array with elements [10, 20, 30]
 test2 = b''
-# Create array with 3 elements
-test2 += push_float(10.0)             # Push arg1 (first element)
-test2 += push_float(20.0)             # Push arg2 (second element)
-test2 += push_float(30.0)             # Push arg3 (third element)
+# Create array with 3 elements (push rightmost first per SWF spec)
+test2 += push_float(30.0)             # Push arg3 (rightmost, pushed first)
+test2 += push_float(20.0)             # Push arg2
+test2 += push_float(10.0)             # Push arg1 (leftmost, pushed last, on top)
 test2 += push_float(3.0)              # Push numArgs: 3
 test2 += push_string("Array")         # Push constructor name
 test2 += bytes([OP_NEW_OBJECT])       # Create array with elements -> stack: [array]
@@ -65,10 +65,10 @@ test2 += bytes([OP_POP])              # Pop the array -> stack: []
 
 # Test 3: new Array(10, 20, 30) - verify first element
 test3 = b''
-# Create array with 3 elements
-test3 += push_float(10.0)             # Push arg1
+# Create array with 3 elements (push rightmost first per SWF spec)
+test3 += push_float(30.0)             # Push arg3 (rightmost, pushed first)
 test3 += push_float(20.0)             # Push arg2
-test3 += push_float(30.0)             # Push arg3
+test3 += push_float(10.0)             # Push arg1 (leftmost, pushed last, on top)
 test3 += push_float(3.0)              # Push numArgs: 3
 test3 += push_string("Array")         # Push constructor name
 test3 += bytes([OP_NEW_OBJECT])       # Create array -> stack: [array]
