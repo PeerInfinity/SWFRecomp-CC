@@ -1,48 +1,47 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d1fa478f0551` (2026-02-20T17:34:58.147738+00:00)
-**Current:** `7c3cc798128e` (2026-02-20T18:03:45.886761+00:00)
+**Previous:** `7c3cc798128e` (2026-02-20T18:03:45.886761+00:00)
+**Current:** `07bb2fe2056e` (2026-02-21T01:19:44.350634+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 231 | 237 | +6 |
+| Passing | 237 | 242 | +5 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 37.3% | 38.3% | +1.0% |
-| Mismatched lines | 39845 | 39788 | -57 |
-|   Decreased | | | -58 |
-|   Increased | | | +1 |
+| Pass rate | 38.3% | 39.1% | +0.8% |
+| Mismatched lines | 39788 | 39629 | -159 |
+|   Decreased | | | -185 |
+|   Increased | | | +26 |
 
-## Newly Passing (6)
+## Newly Passing (8)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `clone_sprite_types` | output_mismatch | 12/24 | 24/24 |
-| `create_empty_movie_clip` | output_mismatch | 2/3 | 3/3 |
-| `duplicate_movie_clip` | output_mismatch | 17/20 | 20/20 |
-| `movieclip_get_instance_at_depth` | output_mismatch | 25/28 | 28/28 |
-| `swf7_case_sensitive` | output_mismatch | 43/44 | 44/44 |
-| `textfield_properties` | output_mismatch | 43/44 | 44/44 |
+| `globals_swf5` | output_mismatch | 293/304 | 304/304 |
+| `localconnection_properties` | output_mismatch | 4/8 | 8/8 |
+| `printjob_props_swf5` | output_mismatch | 7/45 | 45/45 |
+| `printjob_props_swf6` | output_mismatch | 5/45 | 45/45 |
+| `printjob_props_swf7` | output_mismatch | 7/45 | 45/45 |
+| `sound_props_swf5` | output_mismatch | 48/68 | 68/68 |
+| `sound_props_swf6` | output_mismatch | 36/68 | 68/68 |
+| `target_clip_removed` | output_mismatch | 4/5 | 5/5 |
 
-## Status Changed (1)
+## Newly Failing (3)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `movieclip_state_values` | output_mismatch | runtime_error | 1/114 | 1/114 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `mouse_listeners` | output_mismatch | 67/67 | 59/67 |
+| `object_prototypes` | output_mismatch | 74/74 | 71/74 |
+| `textfield_props_swf6` | output_mismatch | 210/210 | 208/210 |
 
-## Line Count Changed (11)
+## Line Count Changed (6)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `movieclip_library_state_values` | output_mismatch | 0/78 | 13/78 | -13 |
-| `remove_movie_clip` | output_mismatch | 12/29 | 21/29 | -9 |
-| `string_paths_other` | output_mismatch | 12/36 | 21/36 | -9 |
-| `default_names` | output_mismatch | 12/52 | 14/52 | -2 |
-| `device_font_spacing` | output_mismatch | 0/91 | 1/91 | -1 |
-| `movieclip_depth_methods` | output_mismatch | 94/98 | 95/98 | -1 |
-| `stage_object_children` | output_mismatch | 67/83 | 68/83 | -1 |
-| `swf6_case_insensitive` | output_mismatch | 27/42 | 28/42 | -1 |
-| `button_order` | output_mismatch | 0/2 | 0/2 | 0 |
-| `movieclip_in_removed_button` | output_mismatch | 0/4 | 0/4 | 0 |
-| `button_children` | output_mismatch | 6/8 | 5/8 | +1 |
+| `tell_target_invalid_swf6` | output_mismatch | 0/5 | 1/5 | -1 |
+| `global_proto_decls` | output_mismatch | 9/4497 | 9/4497 | 0 |
+| `global_proto_decls_delete` | output_mismatch | 0/4158 | 0/4158 | 0 |
+| `this_swf6` | output_mismatch | 18/41 | 17/41 | +1 |
+| `textsnapshot_props_swf6` | output_mismatch | 7/56 | 5/56 | +2 |
+| `focusrect_property_swf6` | output_mismatch | 717/1237 | 707/1237 | +10 |
