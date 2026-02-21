@@ -951,19 +951,71 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 void ng_updateDisplayDepth(const char* name, int new_as_depth)
 {
 	size_t new_swf_depth = (size_t)(new_as_depth + 16384);
+
+	// Find the entry by name
+	size_t old_depth = SIZE_MAX;
 	for (size_t d = 0; d <= max_depth; d++)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL &&
 		    strcmp(display_list[d].instance_name, name) == 0)
 		{
-			// We can't actually move entries in display_list[] by depth easily.
-			// For now, update transform_id to the new depth slot (no-op if same).
-			// TODO: implement proper depth remapping if needed.
-			(void)new_swf_depth;
-			return;
+			old_depth = d;
+			break;
 		}
 	}
+	if (old_depth == SIZE_MAX || old_depth == new_swf_depth) return;
+
+	// Ensure display_list is large enough for new_swf_depth
+	if (new_swf_depth >= display_list_capacity)
+	{
+		// Grow display_list using HCALLOC (copy + free old)
+		size_t new_cap = new_swf_depth + 64;
+		DisplayObject* new_dl = (DisplayObject*) calloc(new_cap, sizeof(DisplayObject));
+		if (new_dl == NULL) return;
+		memcpy(new_dl, display_list, (max_depth + 1) * sizeof(DisplayObject));
+		// Note: can't FREE the original HCALLOC'd list safely here,
+		// but we need to update the pointer. In practice swapDepths
+		// to very high depths is rare and the old memory will leak.
+		display_list = new_dl;
+		display_list_capacity = new_cap;
+	}
+
+	if (display_list[new_swf_depth].char_id != 0)
+	{
+		// Target depth occupied: swap entries and update the other MC's depth
+		DisplayObject tmp = display_list[old_depth];
+		display_list[old_depth] = display_list[new_swf_depth];
+		display_list[new_swf_depth] = tmp;
+
+		// Update the other MC's cached depth (AS depth = SWF depth - 16384)
+		if (display_list[old_depth].instance_name != NULL)
+		{
+			extern int child_mc_count;
+			extern MovieClip* child_mc_cache[];
+			const char* other_name = display_list[old_depth].instance_name;
+			for (int _ci = 0; _ci < child_mc_count; _ci++)
+			{
+				if (child_mc_cache[_ci] != NULL &&
+				    strcmp(child_mc_cache[_ci]->name, other_name) == 0)
+				{
+					child_mc_cache[_ci]->depth = (int)old_depth - 16384;
+					break;
+				}
+			}
+		}
+	}
+	else
+	{
+		// Target depth empty: move entry and clear old slot
+		display_list[new_swf_depth] = display_list[old_depth];
+		memset(&display_list[old_depth], 0, sizeof(DisplayObject));
+	}
+
+	// Update max_depth
+	if (new_swf_depth > max_depth) max_depth = new_swf_depth;
+	// Shrink max_depth if we just cleared the last entry
+	while (max_depth > 0 && display_list[max_depth].char_id == 0) max_depth--;
 }
 
 void ng_swapDisplayDepths(const char* name1, const char* name2)

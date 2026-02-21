@@ -7772,8 +7772,8 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 // MovieClip cache: ensures same instance name always returns same pointer
 // so properties (dynamic_props) persist across lookups
 #define MAX_CHILD_MOVIECLIPS 128
-static MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
-static int child_mc_count = 0;
+MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
+int child_mc_count = 0;
 
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	(void)app_context;  // used only in NO_GRAPHICS for TextField init
