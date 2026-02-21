@@ -1,6 +1,16 @@
 # string_coercion Test Investigation
 <!-- TESTS: string_coercion -->
 
+## Status: COMPLETE ✅
+
+**Final result: 117/117 lines match — test PASSES**
+
+Verified 2026-02-20. All fixes applied. Related comparison tests also pass:
+- `lessthan2_swf5`, `lessthan2_swf6`, `lessthan2_swf7` — PASS
+- `greater_swf6`, `greater_swf7` — PASS
+
+---
+
 ## Test Overview
 
 Tests string coercion semantics for `trace()`, Add2 (`+`), comparison operators (Less2, Greater,
@@ -10,11 +20,9 @@ SWF version 6.
 Creates objects with custom `toString` (via MyClass/EvilToString.prototype) and `valueOf`
 (via EvilValueOf.prototype), then tests how they behave in various contexts.
 
-### SWFRecomp result: FAIL — 81/117 lines match (actual=108), 36 lines differ
-
 ---
 
-## Fixes Applied
+## Fixes Applied (all complete)
 
 ### 1. actionTrace calls toString on objects (fixed)
 
@@ -53,12 +61,18 @@ using convertString. Handles `"prefix" + obj` where obj only has toString.
 These operators now call `objectCallToString()` on object operands before comparing,
 matching Flash's string-hint ToPrimitive behavior.
 
-### 8. Less2/Greater valueOf coercion (fixed, then partially regressed)
+### 8. objectToPrimitive uses getPropertyWithPrototype for valueOf (fixed)
 
-These operators originally called `objectCallValueOf()` on object operands, matching
-Flash's number-hint ToPrimitive behavior. This was later changed to `objectToPrimitive()`
-with own-property-only lookup to fix lessthan2/greater/equals2 regressions. See
-"objectToPrimitive own-only lookup" below for details.
+`objectToPrimitive` uses `getPropertyWithPrototype` to walk the prototype chain when
+looking for valueOf. This correctly handles:
+- `new EvilValueOf("a") < new EvilValueOf("b")`: EvilValueOf.prototype.valueOf found
+  via prototype chain → returns primitive string → comparison works ✓
+- Bare `{}`: Object.prototype.valueOf returns `this` (non-primitive) → bail → `false` ✓
+- `new EvilToString(...)`: Object.prototype.valueOf returns `this` → bail → `false` ✓
+  (no "ToString Called" side effects, matching expected output for lines 31-38)
+
+When valueOf returns a non-primitive, objectToPrimitive bails without falling through
+to toString — matching Flash's number-hint ToPrimitive behavior for Less2/Greater.
 
 ### 9. Property array growth bug (fixed)
 
@@ -80,63 +94,19 @@ constructor as ACTION_STACK_VALUE_FUNCTION.
 Added built-in `valueOf` to Object.prototype (type-2 function) that returns `this`
 (the object itself). Makes `o.valueOf() === o` evaluate to `true` for plain objects.
 
----
+### 13. GetVariable("dummy") returns function (fixed)
 
-## Remaining Issues (36 lines differ)
+`dummy` (defined via `actionDefineFunction`) is correctly retrieved as a function.
+`trace(dummy)` outputs `[type Function]` as expected (line 112).
 
-### 1. objectToPrimitive uses own-property-only lookup (~18 lines: 71-86, 95-96)
+### 14. Function.toString() after prototype.toString deleted (fixed)
 
-`objectToPrimitive` was changed to use `getProperty` (own-only) instead of
-`getPropertyWithPrototype` to fix lessthan2/greater/equals2 regressions. This means
-Less2/Greater cannot find `valueOf` on prototype chains (e.g. EvilValueOf.prototype).
-
-```
-// new EvilValueOf("a") < new EvilValueOf("b")  — EvilValueOf.prototype.valueOf defined
-Expected: ValueOf Called / true     ← valueOf found via prototype, "a" < "b"
-Actual:   false                     ← valueOf not found (own-only), bail early
-```
-
-The "string sorting with valueOf" section (lines 70-97) expects "ValueOf Called" side
-effects from EvilValueOf's prototype valueOf, but objectToPrimitive doesn't find it.
-
-**Correct fix:** `objectToPrimitive` should use `getPropertyWithPrototype` for valueOf
-lookup, but should NOT fall back to toString when valueOf returns a non-primitive. This
-way:
-- Bare `{}`: Object.prototype.valueOf returns `this` (non-primitive) → bail → `false` ✓
-- `new EvilValueOf("a")`: EvilValueOf.prototype.valueOf returns `"a"` (primitive) → use ✓
-- `new EvilToString("b")`: Object.prototype.valueOf returns `this` → bail → `false` ✓
-  (no "ToString Called" side effects, matching expected output lines 31-38)
-
-This would fix both the string_coercion regression AND keep lessthan2/greater/equals2
-passing.
-
-### 2. GetVariable("dummy") → undefined (1 line: 112)
-
-```
-// trace(dummy)  — user-defined function
-Expected: [type Function]
-Actual:   undefined
-```
-
-`dummy` is defined via `actionDefineFunction` which stores it as
-ACTION_STACK_VALUE_FUNCTION. Investigate why `getVariable("dummy")` returns undefined.
-
-### 3. Function.toString() after prototype.toString deleted (2 lines: 116-117)
-
-```
-// delete dummy.prototype.toString; trace(dummy.toString())
-Expected: undefined / [type Function]
-Actual:   (missing lines — output ends at 108 vs 117 expected)
-```
-
-After deleting the prototype toString, `dummy.toString()` should return `undefined`
-(line 116), then `String(dummy)` should still return `[type Function]` (line 117).
-Our output is 9 lines short, suggesting these sections don't execute or produce
-different output.
+After `delete dummy.prototype.toString`, `dummy.toString()` returns `undefined` (line 116).
+`String(dummy)` still returns `[type Function]` via the built-in string coercion path (line 117).
 
 ---
 
-## Key Findings
+## Key Findings (for reference)
 
 ### NaN comparison behavior in Flash
 
@@ -144,11 +114,10 @@ Flash's Less2 (0x48) and Greater (0x67) opcodes return `undefined` for NaN compa
 NOT `false` as ECMAScript specifies. This was confirmed by the lessthan2_swf5/6/7 and
 greater_swf6/7 tests.
 
-The earlier analysis in this document incorrectly stated NaN comparisons return `false`.
 The `false` results in the "string sorting with toString" section (lines 31-38) are NOT
-due to NaN→false, but because `objectToPrimitive` bails early when no valueOf is found
-on the object (EvilToString has toString but not valueOf — and with own-only lookup,
-Object.prototype.valueOf isn't found either).
+due to NaN→false, but because `objectToPrimitive` bails early when valueOf returns a
+non-primitive (Object.prototype.valueOf returns `this` for EvilToString objects which
+have no own valueOf).
 
 ### Less2/Greater number-hint ToPrimitive
 
