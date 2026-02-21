@@ -1380,7 +1380,7 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 		clone_mc->as_set_flags  = src_mc->as_set_flags;
 	}
 	clone_mc->currentframe = 1;
-	clone_mc->depth = swf_depth;
+	clone_mc->depth = as_depth;
 
 	// Evict any old clone at this SWF depth, then register this one
 	clone_depth_register(swf_depth, target_name);

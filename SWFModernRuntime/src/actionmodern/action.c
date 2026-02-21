@@ -19388,30 +19388,18 @@ void actionRemoveSprite(SWFAppContext* app_context)
 		const uint16_t* _remove_tgt_u16 = varGetU16Ptr(&target);
 		u16_to_utf8(_remove_tgt_u16, target.str_size, _remove_tgt_buf, sizeof(_remove_tgt_buf));
 		target_name = _remove_tgt_buf;
+	} else if (target.type == ACTION_STACK_VALUE_MOVIECLIP && target.data.numeric_value != 0) {
+		// MovieClip reference: use its name directly
+		MovieClip* _rs_target_mc = (MovieClip*)(uintptr_t)target.data.numeric_value;
+		target_name = _rs_target_mc->name;
 	}
 
 	// Handle null/empty gracefully
 	if (target_name[0] == '\0') {
-		#ifdef DEBUG
-		printf("[RemoveSprite] Empty or null target, skipping\n");
-		#endif
 		return;
 	}
 
 	#ifndef NO_GRAPHICS
-	// TODO: Full graphics implementation requires:
-	// 1. Display list management system
-	// 2. MovieClip reference counting
-	// 3. Proper resource cleanup
-	//
-	// When implemented, this should:
-	// - Look up the target sprite in the display list
-	// - Verify it's a clone (created by ActionCloneSprite)
-	// - Remove it from the display list
-	// - Decrement reference count and free if needed
-	// - Update any parent/child relationships
-	//
-	// For now, log in debug mode
 	#ifdef DEBUG
 	printf("[RemoveSprite] Graphics mode stub: would remove %s\n", target_name);
 	#endif
@@ -19426,7 +19414,11 @@ void actionRemoveSprite(SWFAppContext* app_context)
 				break;
 			}
 		}
-		if (_rs_mc != NULL && _rs_mc->depth >= 0) {
+		// Only clips at removable AS depths [0, 2130690032) can be removed.
+		#ifndef AVM_MAX_REMOVE_DEPTH
+		#define AVM_MAX_REMOVE_DEPTH 2130690032
+		#endif
+		if (_rs_mc != NULL && _rs_mc->depth >= 0 && _rs_mc->depth < AVM_MAX_REMOVE_DEPTH) {
 			// Queue AS-set onUnload handler for deferred firing at ShowFrame
 			if (_rs_mc->dynamic_props != NULL) {
 				ActionVar* _rs_handler = getProperty((ASObject*)_rs_mc->dynamic_props, "onUnload", 8);
@@ -23852,7 +23844,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			{
 				// Extract thisArg
 				void* this_obj = NULL;
-				if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT)
+				if (num_args >= 1 && (args[0].type == ACTION_STACK_VALUE_OBJECT ||
+				                      args[0].type == ACTION_STACK_VALUE_MOVIECLIP))
 					this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
 
 				// Extract arguments from array
@@ -23945,6 +23938,44 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					releaseObject(app_context, local_scope_ap);
 
 					pushVar(app_context, &result);
+				}
+				else if (func->function_type == 1 && func->simple_func == NULL && this_obj != NULL)
+				{
+					// Built-in MC method (e.g., removeMovieClip) applied to a target
+					if (apply_args != NULL) FREE(apply_args);
+					if (args != NULL) FREE(args);
+#ifdef NO_GRAPHICS
+					if (strcmp(func->name, "removeMovieClip") == 0) {
+						MovieClip* _apply_mc = (MovieClip*)this_obj;
+						#ifndef AVM_MAX_REMOVE_DEPTH
+						#define AVM_MAX_REMOVE_DEPTH 2130690032
+						#endif
+						if (_apply_mc->depth >= 0 && _apply_mc->depth < AVM_MAX_REMOVE_DEPTH) {
+							if (_apply_mc->dynamic_props != NULL) {
+								ActionVar* _ah = getProperty((ASObject*)_apply_mc->dynamic_props, "onUnload", 8);
+								if (_ah != NULL && _ah->type == ACTION_STACK_VALUE_FUNCTION) {
+									ASFunction* _af = (ASFunction*) _ah->data.numeric_value;
+									if (_af != NULL) queueOnUnload(_af, _apply_mc);
+								}
+							}
+							MovieClip* _ap = _apply_mc->parent ? _apply_mc->parent : &root_movieclip;
+							if (_ap->dynamic_props != NULL && _apply_mc->name[0]) {
+								ActionVar _au = {0}; _au.type = ACTION_STACK_VALUE_UNDEFINED;
+								setProperty(app_context, (ASObject*)_ap->dynamic_props,
+								            _apply_mc->name, strlen(_apply_mc->name), &_au);
+							}
+							if (_apply_mc->name[0]) {
+								ActionVar _au = {0}; _au.type = ACTION_STACK_VALUE_UNDEFINED;
+								setVariableByName(_apply_mc->name, &_au);
+							}
+							_apply_mc->depth = INT_MIN;
+							for (int _ai = 0; _ai < child_mc_count; _ai++) {
+								if (child_mc_cache[_ai] == _apply_mc) { child_mc_cache[_ai] = NULL; break; }
+							}
+						}
+					}
+#endif
+					pushUndefined(app_context);
 				}
 				else
 				{
@@ -24909,9 +24940,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			if (args != NULL) FREE(args);
 #ifdef NO_GRAPHICS
-			// Only dynamically-created clips (AS depth >= 0) can be removed.
-			// Timeline-placed clips (negative depth) are immune to removeMovieClip.
-			if (mc != NULL && mc->depth >= 0) {
+			// Only dynamically-created clips at removable AS depths [0, 2130690032) can be removed.
+			// Timeline-placed clips (negative depth) and reserved-range clips are immune.
+			#define AVM_MAX_REMOVE_DEPTH 2130690032
+			if (mc != NULL && mc->depth >= 0 && mc->depth < AVM_MAX_REMOVE_DEPTH) {
 				// Queue onUnload handler for deferred firing at ShowFrame (matches Flash behavior)
 				if (mc->dynamic_props != NULL) {
 					ActionVar* _rmc_handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
