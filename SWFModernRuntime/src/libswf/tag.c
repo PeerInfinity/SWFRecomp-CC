@@ -1510,6 +1510,16 @@ void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, si
 	// onLoad fires deferred in tagShowFrame's sprite_needs_init block (after frame scripts run)
 }
 
+void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* clip_actions, size_t clip_action_count)
+{
+	(void)app_context;
+	if (depth < display_list_capacity && display_list[depth].char_id != 0)
+	{
+		display_list[depth].clip_actions = clip_actions;
+		display_list[depth].clip_action_count = clip_action_count;
+	}
+}
+
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
 {
