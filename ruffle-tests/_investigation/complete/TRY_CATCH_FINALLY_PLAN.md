@@ -1,13 +1,13 @@
 # Try/Catch/Finally Implementation Plan
 <!-- TESTS: try_finally_simple, catch_references_registers, uncaught_exception, uncaught_exception_bubbled, try_catch_finally -->
 
-Last updated: 2026-02-16
+Last updated: 2026-02-20
 
-## Status: IMPLEMENTED (114/120 lines passing)
+## Status: COMPLETE — All 5 tests PASS (120/120 lines)
 
-### Current State
+### Final Verification (2026-02-20)
 
-Exception handler stack, control flow flags, and recompiler codegen all implemented. The core try/catch/finally control flow works correctly. 6 remaining line differences are all CastOp/instanceof issues (pre-existing, separate from exception handling).
+All five tests pass with 100% line match:
 
 | Test | Status | Notes |
 |------|--------|-------|
@@ -15,9 +15,21 @@ Exception handler stack, control flow flags, and recompiler codegen all implemen
 | `catch_references_registers` | **PASS** | Simple try-catch with register-based catch |
 | `uncaught_exception` | **PASS** | No try block, prints warning and halts |
 | `uncaught_exception_bubbled` | **PASS** | Throw propagates through call chain |
-| `try_catch_finally` | **MISMATCH (114/120)** | 6 line diff — CastOp typed catch doesn't match `new String()` or `{}` |
+| `try_catch_finally` | **PASS (120/120)** | Typed catch (String/Object) fixed by 40120e6 + 1851972 |
 
-### What Works (after implementation)
+### What Was Fixed
+
+The 6-line diff that remained when the plan was written (2026-02-16) was caused by:
+- `new String()` not recognized as instance of String constructor → fell to "other" catch
+- `{}` not recognized as instance of Object constructor → fell to "other" catch
+
+These were fixed by two subsequent commits:
+- **40120e6**: Fix AS2 instanceof/ImplementsOp — handle FUNCTION-type constructors
+- **1851972**: Fix SWF5 undefined variable behavior and stub constructor prototypes
+
+---
+
+## What Works (fully implemented)
 
 - Exception handler stack with `ExceptionFrame[16]` supporting nested try blocks
 - `actionThrow` searches handler stack top-down, skipping consumed handlers
@@ -28,17 +40,11 @@ Exception handler stack, control flow flags, and recompiler codegen all implemen
 - `actionCatchGetException` for DefineFunction2 local register catch
 - First-pass label registration for finally_start and after_end
 - Label placement: after_end label emitted BEFORE actionTryEnd for try-catch-no-finally
-
-### Remaining Issues (6 lines)
-
-All in `try_catch_catch_finally` — typed catches using CastOp:
-- `new String()` not recognized as instance of String constructor → falls to "other" catch
-- `{}` not recognized as instance of Object constructor → falls to "other" catch
-- These are **CastOp/instanceof issues**, not exception handling issues
+- CastOp/instanceof correctly identifies built-in constructors (String, Object, Array, etc.)
 
 ---
 
-## Implementation Details (completed)
+## Implementation Details
 
 ### Architecture: Exception Handler Stack + Control Flow Flags
 
@@ -132,20 +138,4 @@ static ExceptionState g_exception_state = {0};
 
 3. **Label not registered for finally blocks**: The first-pass bug (item 1) meant `finally_start` was never added to the labels set, so `goto label_XX` for finally had no target label in the generated code, causing a compile error.
 
----
-
-## Verification Results
-
-```
-try_finally_simple:          PASS (no regression)
-catch_references_registers:  PASS (no regression)
-uncaught_exception:          PASS (no regression)
-uncaught_exception_bubbled:  PASS (no regression)
-try_catch_finally:           MISMATCH (114/120 lines)
-                             - 6 lines differ, all CastOp/instanceof
-                             - Was: TIMEOUT/SEGFAULT (infinite rethrow loop)
-```
-
-## Next Steps
-
-The 6 remaining line differences require fixing CastOp/instanceof to properly check prototype chains for built-in constructors (String, Object). This is tracked separately from exception handling.
+4. **CastOp/instanceof for built-in constructors**: `new String()` and `{}` were not recognized as instances of their respective constructors in typed catch blocks. Fixed by 40120e6 (instanceof for FUNCTION-type constructors) and 1851972 (stub constructor prototypes).
