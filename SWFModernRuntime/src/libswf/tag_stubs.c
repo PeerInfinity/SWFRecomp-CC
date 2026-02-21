@@ -408,7 +408,7 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 	if (is_sprite)
 	{
 		Character* ch = &dictionary[char_id];
-		if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs != NULL)
+		if (ch->sprite_frame_funcs != NULL && ch->sprite_frame_funcs[0] != NULL)
 		{
 			if (obj->sprite_display_list == NULL)
 			{
@@ -649,6 +649,17 @@ size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
 			return d;
 	}
 	return SIZE_MAX;
+}
+
+// ---------------------------------------------------------------------------
+// Tab ordering: character-level queries for recursive display list scanning
+// ---------------------------------------------------------------------------
+
+// Return the ng_textfields[] index for a given character ID, or -1 if not a textfield.
+// Used by action.c for setting ng_textfield_idx on nested (non-root) text field MCs.
+int ng_getCharTextfieldIdx(size_t char_id)
+{
+	return ng_find_textfield(char_id);
 }
 
 // ---------------------------------------------------------------------------

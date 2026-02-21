@@ -107,7 +107,7 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			g_current_sprite_obj = obj;
 			if (child_mc) actionSetCurrentContext(child_mc);
 
-			if (ch->sprite_frame_count > 0 && ch->sprite_frame_funcs[0] != NULL)
+			if (ch->sprite_frame_funcs != NULL && ch->sprite_frame_funcs[0] != NULL)
 			{
 				if (was_eager)
 				{
@@ -125,8 +125,9 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			actionSetCurrentContext(saved_ctx);
 			g_current_sprite_obj = saved_sprite_obj;
 
-			// Advance frame counter so advance_sprite_frames picks up at frame 1
-			obj->sprite_current_frame = 1 % ch->sprite_frame_count;
+			// Advance frame counter so advance_sprite_frames picks up at frame 1.
+			// For 0-frame sprites (no ShowFrame in definition), keep at frame 0.
+			obj->sprite_current_frame = (ch->sprite_frame_count > 0) ? (1 % ch->sprite_frame_count) : 0;
 
 			// Recursively initialize any children placed by the frame function
 			process_sprite_needs_init(app_context, child_mc);
@@ -1471,7 +1472,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		if (dictionary[char_id].type == CHAR_TYPE_SPRITE)
 		{
 			Character* sp_ch = &dictionary[char_id];
-			if (sp_ch->sprite_frame_count > 0 && sp_ch->sprite_frame_funcs[0] != NULL)
+			if (sp_ch->sprite_frame_funcs != NULL && sp_ch->sprite_frame_funcs[0] != NULL)
 			{
 				display_list[depth].sprite_needs_init = 2; // mark: frame_0 done, scripts deferred
 				DisplayObject* saved_dl = display_list;
@@ -1492,7 +1493,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				display_list = saved_dl;
 				max_depth = saved_max;
 				display_list_capacity = saved_cap;
-				saved_dl[depth].sprite_current_frame = 1 % sp_ch->sprite_frame_count;
+				saved_dl[depth].sprite_current_frame = (sp_ch->sprite_frame_count > 0) ? (1 % sp_ch->sprite_frame_count) : 0;
 			}
 		}
 	}

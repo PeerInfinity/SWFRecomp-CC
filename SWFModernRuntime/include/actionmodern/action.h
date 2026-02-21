@@ -288,6 +288,9 @@ void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr);
 // Broadcasts onKeyDown/onKeyUp to all registered Key listeners.
 void actionDispatchKeyDown(SWFAppContext* app_context);
 void actionDispatchKeyUp(SWFAppContext* app_context);
+// Tab key focus advance — called on Tab key press (before Key.broadcastMessage).
+// reversed=1 for Shift+Tab (go backward), 0 for Tab (go forward).
+void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed);
 
 // AS2 onEnterFrame dispatch — call after sprite initialization to fire mc.onEnterFrame
 // for any MovieClip that has the property set. Iterates cache in reverse creation order

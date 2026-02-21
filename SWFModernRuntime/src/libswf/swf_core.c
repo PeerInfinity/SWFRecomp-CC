@@ -218,6 +218,12 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         // Broadcast onKeyDown to Key listeners, then check button key conditions
         actionDispatchKeyDown(app_context);
         dispatch_button_key_actions(app_context, ev->code);
+        // Tab key: advance focus after broadcasting Key event
+        // Shift+Tab (key 16 held) = reverse direction
+        if (ev->code == 9) {
+            int shift_held = (app_context->keys.down[16] != 0);
+            actionAdvanceTabFocus(app_context, shift_held);
+        }
         break;
     case EV_KEY_UP:
         if (ev->code >= 0 && ev->code < 256)
