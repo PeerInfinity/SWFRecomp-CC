@@ -7,6 +7,10 @@
 #define FRAME_RATE 12
 #endif
 
+#ifndef SWF_VERSION
+#define SWF_VERSION 4
+#endif
+
 #include "draws.h"
 
 SWFAppContext app_context = {

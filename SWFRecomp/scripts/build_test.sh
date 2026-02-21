@@ -171,7 +171,9 @@ if [ "$GRAPHICS_FLAG" = true ]; then
 else
     echo "Using NO_GRAPHICS mode for ${TARGET} build..."
     cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
 fi
 
 # Copy hashmap library (required for variable storage)
@@ -192,6 +194,11 @@ cp "${TEST_DIR}/RecompiledScripts"/*.c "${BUILD_DIR}/" 2>/dev/null || true
 cp "${TEST_DIR}/RecompiledScripts"/*.h "${BUILD_DIR}/" 2>/dev/null || true
 cp "${TEST_DIR}/RecompiledTags"/*.c "${BUILD_DIR}/" 2>/dev/null || true
 cp "${TEST_DIR}/RecompiledTags"/*.h "${BUILD_DIR}/" 2>/dev/null || true
+
+# If the test has its own main.c, use it instead of the wrapper
+if [ -f "${TEST_DIR}/main.c" ]; then
+    cp "${TEST_DIR}/main.c" "${BUILD_DIR}/"
+fi
 
 # Build
 if [ "$TARGET" == "wasm" ]; then
