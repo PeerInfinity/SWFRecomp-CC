@@ -3152,7 +3152,14 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 #ifdef NO_GRAPHICS
 	size_t entry_idx = getDisplayEntryIdxForMC(mc);
 	float lxmin, lxmax, lymin, lymax;
-	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax)) return r;
+	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax)) {
+		// Empty clip: return (x=0, y=0, w=0, h=0) rectangle
+		ActionVar zero = makeF64(0.0);
+		ASObject* rect = createRectObj(app_context, &zero, &zero, &zero, &zero);
+		r.type = ACTION_STACK_VALUE_OBJECT;
+		r.data.numeric_value = (u64) rect;
+		return r;
+	}
 	double ca, cb, cc, cd, ctx, cty;
 	getConcatMatrixForMC(mc, &ca, &cb, &cc, &cd, &ctx, &cty);
 	double lx0 = (double)lxmin, lx1 = (double)lxmax;

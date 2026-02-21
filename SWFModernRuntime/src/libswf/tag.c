@@ -1619,6 +1619,39 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 #ifdef NO_GRAPHICS
 	ng_on_place_object2(app_context, depth, char_id);
+	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
+	// internal display list is populated BEFORE the parent frame's ActionScript runs.
+	// Same eager init as tagPlaceObject2 — needed for scripts that access children before tagShowFrame.
+	if (display_list[depth].sprite_needs_init)
+	{
+		if (dictionary[char_id].type == CHAR_TYPE_SPRITE)
+		{
+			Character* sp_ch = &dictionary[char_id];
+			if (sp_ch->sprite_frame_funcs != NULL && sp_ch->sprite_frame_funcs[0] != NULL)
+			{
+				display_list[depth].sprite_needs_init = 2; // mark: frame_0 done, scripts deferred
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
+				display_list = saved_dl[depth].sprite_display_list;
+				max_depth = saved_dl[depth].sprite_max_depth;
+				display_list_capacity = saved_dl[depth].sprite_dl_capacity;
+				// Phase 1: run with catch_up_mode=1 so only placement tags execute;
+				// DoAction scripts are deferred to tagShowFrame Phase 2.
+				int saved_catch_up = catch_up_mode;
+				catch_up_mode = 1;
+				CALL_FRAME(app_context, &saved_dl[depth], sp_ch->sprite_frame_funcs[0]);
+				catch_up_mode = saved_catch_up;
+				saved_dl[depth].sprite_display_list = display_list;
+				saved_dl[depth].sprite_max_depth = max_depth;
+				saved_dl[depth].sprite_dl_capacity = display_list_capacity;
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+				saved_dl[depth].sprite_current_frame = (sp_ch->sprite_frame_count > 0) ? (1 % sp_ch->sprite_frame_count) : 0;
+			}
+		}
+	}
 #else
 	(void)app_context;
 #endif
