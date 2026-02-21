@@ -157,6 +157,7 @@ echo "Copying SWFModernRuntime sources..."
 cp "${SWFMODERN_SRC}/actionmodern/action.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/variables.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/object.c" "${BUILD_DIR}/"
+cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
 
 if [ "$GRAPHICS_FLAG" = true ]; then
