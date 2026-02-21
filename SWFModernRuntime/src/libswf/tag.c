@@ -34,6 +34,10 @@ DisplayObject* g_current_sprite_obj = NULL;
 // without disturbing the display list already set up in Phase 1 (eager init).
 static int g_script_only_mode = 0;
 
+// Monotonically increasing counter to detect within-same-frame placement conflicts.
+// Incremented at the end of each tagShowFrame call and before goto catch-up.
+size_t g_place_gen = 0;
+
 // g_settarget_explicit_root: set by actionSetTarget("_root"/"") to distinguish
 // "goto root" from "goto unnamed sprite with inherited root context".
 // Declared in action.c; saved/cleared/restored here per sprite-frame invocation.
@@ -762,7 +766,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0 || obj->clip_action_count == 0) continue;
 		// Flash: onClipEvent(enterFrame) doesn't fire on the placement frame
-		if (obj->placed_at_frame == current_frame) continue;
+		if (obj->place_gen == g_place_gen) continue;
 
 		for (size_t a = 0; a < obj->clip_action_count; a++)
 		{
@@ -998,6 +1002,9 @@ void tagShowFrame(SWFAppContext* app_context)
 
 	renderer_close_pass(context);
 #endif // NO_GRAPHICS
+
+	// Advance placement generation so next frame's placements are distinguishable
+	g_place_gen++;
 }
 
 #ifdef NO_GRAPHICS
@@ -1446,6 +1453,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 			display_list[depth].placed_at_frame = current_frame;
+			display_list[depth].place_gen = g_place_gen;
 			init_cx_fields(&display_list[depth]);
 			ng_on_place_object2(app_context, depth, char_id);
 			display_list[depth].sprite_needs_init = 0;
@@ -1454,15 +1462,16 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 #endif
 
-	// Flash rejects placement at occupied depth with a different character
-	if (display_list[depth].char_id != 0 && display_list[depth].char_id != char_id)
+	// Within-same-frame placement conflict handling
+	if (display_list[depth].char_id != 0 && display_list[depth].place_gen == g_place_gen)
 	{
-		printf("Warning: Failed to place object at depth %zu.\n", depth);
-		return;
-	}
-	// Same character at same depth: treat as modify (update transform only, don't re-init)
-	if (display_list[depth].char_id == char_id && display_list[depth].char_id != 0)
-	{
+		if (display_list[depth].char_id != char_id)
+		{
+			// Flash rejects placing a different character at a depth already occupied this frame
+			printf("Warning: Failed to place object at depth %zu.\n", depth);
+			return;
+		}
+		// Same character at same depth in same frame: treat as modify (don't re-init)
 		display_list[depth].transform_id = transform_id;
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
@@ -1513,6 +1522,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
+	display_list[depth].place_gen = g_place_gen;
 	init_cx_fields(&display_list[depth]);
 
 	if (depth > max_depth)
@@ -1597,6 +1607,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 			display_list[depth].ratio = ratio;
 			display_list[depth].placed_at_frame = current_frame;
+			display_list[depth].place_gen = g_place_gen;
 			init_cx_fields(&display_list[depth]);
 			ng_on_place_object2(app_context, depth, char_id);
 			display_list[depth].sprite_needs_init = 0;
@@ -1641,6 +1652,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	}
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
+	display_list[depth].place_gen = g_place_gen;
 	init_cx_fields(&display_list[depth]);
 
 	if (depth > max_depth)

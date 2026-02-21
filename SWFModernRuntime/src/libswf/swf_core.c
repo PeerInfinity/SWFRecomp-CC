@@ -42,6 +42,11 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 {
 	if (!goto_from_action || !manual_next_frame) return;
 
+	// Advance placement generation so goto target frame's placements
+	// are distinguishable from the calling frame's placements.
+	extern size_t g_place_gen;
+	g_place_gen++;
+
 	frame_func* funcs = g_frame_funcs;
 	size_t original_frame = current_frame;
 	size_t target = next_frame;
