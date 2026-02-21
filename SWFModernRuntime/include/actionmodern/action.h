@@ -68,6 +68,10 @@ void actionSetCurrentContext(MovieClip* mc);
 MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
 // Invalidate cached MovieClip when removed from display list
 void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name);
+// Fire the AS-set onUnload handler on a MovieClip being removed (call BEFORE Invalidate)
+void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name);
+// Fire all pending deferred onUnload handlers (queued by removeMovieClip); call from tagShowFrame
+void actionFirePendingUnloads(SWFAppContext* app_context);
 
 // VAL macro must be defined before other macros that use it
 #define VAL(type, x) *((type*) x)

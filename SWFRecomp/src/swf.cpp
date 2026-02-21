@@ -2962,6 +2962,10 @@ namespace SWFRecomp
 				{
 					context.tag_main << "\t" << "tagPlaceObject3(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(blend_mode_val) << ");" << endl;
 				}
+				else if (has_ratio && clip_action_count > 0)
+				{
+					context.tag_main << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
+				}
 				else if (has_ratio)
 				{
 					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ");" << endl;
@@ -3866,6 +3870,18 @@ namespace SWFRecomp
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
 												   << to_string(sp_blend_mode_val) << ");" << endl;
+							}
+							else if (has_ratio && clip_action_count > 0)
+							{
+								sprite_definitions << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, "
+												   << to_string(depth) << ", "
+												   << to_string(char_id) << ", "
+												   << to_string(transform_id) << ", "
+												   << to_string(cxform_id) << ", "
+												   << to_string(clip_depth_val) << ", "
+												   << to_string(ratio_val) << ", "
+												   << clip_actions_var << ", "
+												   << to_string(clip_action_count) << ");" << endl;
 							}
 							else if (has_ratio)
 							{

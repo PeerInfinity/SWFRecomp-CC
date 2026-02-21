@@ -621,6 +621,10 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
+	// --- Fire deferred onUnload handlers from removeMovieClip ---
+	// These are queued mid-script and fire between frames, matching Flash behavior.
+	actionFirePendingUnloads(app_context);
+
 	// --- Run initial frame 0 with scripts for newly placed sprites/buttons ---
 	// sprite_needs_init=1 is set by ng_on_place_object2 when a sprite or button is placed.
 	// We run frame 0 here (in the same tick as placement) to match Flash behavior.
@@ -1554,6 +1558,37 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 #endif
 }
 
+void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count)
+{
+	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio);
+	display_list[depth].clip_actions = clip_actions;
+	display_list[depth].clip_action_count = clip_action_count;
+}
+
+// Replace an existing clip at `depth` in the same frame: does NOT fire CLIP_EVENT_UNLOAD
+// for the old clip's actions. Instead, saves them as accumulated_clip_actions on the new
+// entry so they fire (before new_clip_actions) when the new entry is eventually removed.
+void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio,
+    ClipAction* old_clip_actions, size_t old_clip_action_count,
+    ClipAction* new_clip_actions, size_t new_clip_action_count)
+{
+	// Fire AS-set onUnload for the old clip (not clip events — those are deferred to next removal)
+#ifdef NO_GRAPHICS
+	if (depth <= max_depth && display_list[depth].char_id != 0)
+		ng_on_remove_object(app_context, depth);
+#endif
+	// Place the new clip (clears all fields including clip_actions)
+	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio);
+	// Set new clip actions
+	display_list[depth].clip_actions = new_clip_actions;
+	display_list[depth].clip_action_count = new_clip_action_count;
+	// Accumulate old clip actions to fire before new_clip_actions on next removal
+	display_list[depth].accumulated_clip_actions = old_clip_actions;
+	display_list[depth].accumulated_clip_action_count = old_clip_action_count;
+}
+
 static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 {
 	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
@@ -1581,12 +1616,25 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	display_list[depth].instance_name_owned = 0;
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
+	display_list[depth].accumulated_clip_actions = NULL;
+	display_list[depth].accumulated_clip_action_count = 0;
 }
 
 void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
+		// Fire accumulated clip actions (from prior Remove+Replace cycle) first
+		if (display_list[depth].accumulated_clip_action_count > 0)
+		{
+			for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++)
+			{
+				if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+					display_list[depth].accumulated_clip_actions[a].action(app_context);
+			}
+			display_list[depth].accumulated_clip_actions = NULL;
+			display_list[depth].accumulated_clip_action_count = 0;
+		}
 		// Dispatch onUnload clip actions before clearing
 		if (display_list[depth].clip_action_count > 0)
 		{
@@ -1618,7 +1666,18 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		if (catch_up_backward && display_list[depth].placed_at_frame <= catch_up_target)
 			return;
 #endif
-		// Dispatch onUnload clip actions before clearing
+		// Fire accumulated clip actions (from prior Remove+Replace cycle) first
+		if (display_list[depth].accumulated_clip_action_count > 0)
+		{
+			for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++)
+			{
+				if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+					display_list[depth].accumulated_clip_actions[a].action(app_context);
+			}
+			display_list[depth].accumulated_clip_actions = NULL;
+			display_list[depth].accumulated_clip_action_count = 0;
+		}
+		// Dispatch current onUnload clip actions before clearing
 		if (display_list[depth].clip_action_count > 0)
 		{
 			for (size_t a = 0; a < display_list[depth].clip_action_count; a++)
