@@ -17,7 +17,7 @@ For current test results, regressions, and recommended work order, see `CURRENT_
 |----------|---------|
 | `ruffle-tests/_investigation/ACCEPTED_DIFFS.md` | Tests with permanently unfixable diffs, categorised by root cause (Flash UB, platform UB, Ruffle test bugs). Check here before spending time on a diff that can never be fixed. |
 | `ruffle-tests/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` | Tests where Ruffle's expected output disagrees with Flash Player's spec. We follow Flash. |
-| `ruffle-tests/ignored_tests.txt` | All tests excluded from filtered results. Sections: interactive input, networking, audio/video, ExternalInterface, bitmaps, Ruffle-vs-Flash spec divergences, permanently accepted diffs. |
+| `ruffle-tests/ignored_tests.txt` | 140 tests excluded from filtered results. Sections: interactive input, networking, audio/video, ExternalInterface, bitmaps, Ruffle-vs-Flash spec divergences, permanently accepted diffs. |
 
 ## How to Run Tests
 
@@ -85,7 +85,7 @@ The SWF file format specification (version 19) is at `SWFRecompDocs/specs/swf-sp
 | `ruffle-tests/verify_output.py` | Main test runner (single or batch) |
 | `ruffle-tests/run_tests.py` | Quick recompiler-only check (no runtime) |
 | `ruffle-tests/filter_results.py` | Removes ignored tests from results |
-| `ruffle-tests/ignored_tests.txt` | 125 tests to ignore (interactive, network, etc.) |
+| `ruffle-tests/ignored_tests.txt` | 140 tests to ignore (interactive, network, etc.) |
 | `ruffle-tests/download_tests.sh` | Downloads Ruffle test SWFs via sparse git checkout |
 | `scripts/diff_ruffle_results.py` | Compares two result JSON files, generates diff |
 | `scripts/generate_ruffle_results_markdown.py` | Generates markdown reports from results |
@@ -95,8 +95,8 @@ The SWF file format specification (version 19) is at `SWFRecompDocs/specs/swf-sp
 
 | Path | Purpose |
 |------|---------|
-| `ruffle-tests/results.json` | Full raw results (616 tests) |
-| `ruffle-tests/results_filtered.json` | After removing ignored tests (491 tests) |
+| `ruffle-tests/results.json` | Full raw results (619 tests) |
+| `ruffle-tests/results_filtered.json` | After removing ignored tests (479 tests) |
 | `ruffle-tests/results_diff.json` | JSON diff between previous and current |
 | `ruffle-results.md` | Human-readable full report |
 | `ruffle-results-filtered.md` | Human-readable filtered report |
@@ -121,9 +121,7 @@ The workflow is manual dispatch only (no auto-trigger). User must go to GitHub A
 
 ## Old Test System (SWFRecomp/tests/)
 
-**NOTE: Ignore the old test suite until we're finished getting all Ruffle tests passing.** Some old tests may have stale expected values that need updating, but that's lower priority than Ruffle test progress.
-
-There is a separate, older test system in `SWFRecomp/tests/`. These are hand-written opcode-level unit tests (115 tests, ~79 currently passing).
+There is a separate, older test system in `SWFRecomp/tests/`. These are hand-written opcode-level unit tests (115 trace tests + ~61 graphics tests). All 115 trace tests pass (477/477 sub-tests).
 
 ### Key differences from Ruffle tests
 
@@ -137,27 +135,18 @@ There is a separate, older test system in `SWFRecomp/tests/`. These are hand-wri
 | **Runner** | `all_tests.sh` (bash, calls `build_test.sh`) | `verify_output.py` (Python, self-contained build) |
 | **Build** | `build_test.sh` (supports native + WASM) | `verify_output.py` builds native only (gcc, temp dir) |
 | **Results** | `test_results.json` (structured: sub-tests, opcodes, timing) | `results.json` (line-level stats, failure categories) |
-| **CI** | None (run locally) | GitHub Actions workflow |
+| **CI** | "SWFRecomp CI" workflow | "Ruffle AVM1 Tests" workflow |
 
-### Old test runner usage
+### Running old tests
 
+Do NOT run the old test suite locally. Use the CI workflows instead:
+- **"SWFRecomp CI"** workflow runs the old test suite (along with WASM builds and opcode docs)
+- **"Run All Tests"** workflow triggers both old and Ruffle test suites together
+
+If you must run a single old test locally for debugging:
 ```bash
 cd SWFRecomp/tests
-
-# Run all tests
-./all_tests.sh
-
-# Run specific test
-./all_tests.sh add_swf_4
-
-# Rebuild + run
-./all_tests.sh --clean
-
-# Re-run only previously failed
-./all_tests.sh --retest
-
-# Build SWFRecomp first if needed
-./all_tests.sh --build
+./all_tests.sh --build test_name_here
 ```
 
 ### Old test structure
@@ -170,16 +159,6 @@ Each test in `SWFRecomp/tests/{test_name}/`:
 - `main.c` — runtime wrapper (usually minimal)
 - `RecompiledScripts/` / `RecompiledTags/` — generated C code
 
-### Potential for unification
+### Relationship to Ruffle tests
 
-Both test systems share the same core pipeline: recompile SWF → compile C → run → compare output. The main differences are:
-
-1. **Build mechanism**: Old uses `build_test.sh` (bash), new uses Python `compile_native()`. Both invoke gcc with the same runtime sources and flags.
-2. **Output filtering**: Nearly identical boilerplate patterns in both.
-3. **Validation**: Old has custom per-test `validate.py` scripts (sub-test granularity); new does simple line-by-line diff against `output.txt`.
-4. **Results format**: Different JSON schemas but similar data.
-
-To unify, the old tests would need:
-- An `output.txt` file per test (could be generated from existing `validate.py` expected values)
-- Or: `verify_output.py` would need to support per-test custom validators (more complex)
-- The old `test_info.json` metadata (opcodes, description) has no Ruffle equivalent and would need to be preserved or dropped
+Both systems share the same core pipeline (recompile SWF → compile C → run → compare output) but serve different purposes. The old tests are opcode-level unit tests with custom validators; Ruffle tests are integration tests with line diffs. See `SWFRecompDocs/plans/test-suite-unification.md` for analysis of potential unification (currently deferred).

@@ -18,6 +18,18 @@ on:
           - '20'
           - '30'
         default: '10'
+  workflow_call:
+    inputs:
+      limit:
+        description: 'Max number of tests to run (0 = all)'
+        required: false
+        default: '0'
+        type: string
+      parallel:
+        description: 'Number of parallel runners'
+        required: false
+        default: '10'
+        type: string
 
 permissions:
   contents: write

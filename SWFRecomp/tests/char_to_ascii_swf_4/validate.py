@@ -23,7 +23,7 @@ def validate_output(output):
     1. 65    (from 'A')
     2. 72    (from 'Hello' - first char 'H')
     3. 33    (from '!')
-    4. nan   (from empty string)
+    4. 0     (from empty string — Flash returns 0, not NaN)
     5. 233   (from 'é')
     """
     lines = parse_output(output)
@@ -33,7 +33,7 @@ def validate_output(output):
         ("65", "char_A"),
         ("72", "char_Hello"),
         ("33", "char_exclamation"),
-        ("nan", "empty_string"),
+        ("0", "empty_string"),
         ("233", "char_e_acute")
     ]
 
@@ -43,11 +43,7 @@ def validate_output(output):
     for i, (expected, test_name) in enumerate(expected_values):
         if i < len(lines):
             actual = lines[i]
-            # NaN comparison is case-insensitive and handles -nan
-            if expected.lower() == "nan":
-                passed = actual.lower() in ["nan", "-nan"]
-            else:
-                passed = actual == expected
+            passed = actual == expected
 
             results.append(make_result(
                 test_name,

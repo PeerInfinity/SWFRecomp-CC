@@ -1,0 +1,24 @@
+name: Run All Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  old-tests:
+    name: Old Test Suite
+    uses: ./.github/workflows/test.yml
+    with:
+      run_tests: true
+      build_wasm: false
+      update_docs: false
+      clean: true
+
+  ruffle-tests:
+    name: Ruffle AVM1 Tests
+    uses: ./.github/workflows/ruffle-tests.yml
+    with:
+      limit: '0'
+      parallel: '10'

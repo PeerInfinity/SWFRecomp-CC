@@ -31,7 +31,7 @@ action_push3 = struct.pack('<BHB', 0x96, len(string3) + 1, 0) + string3
 action_char_to_ascii3 = bytes([0x32])
 action_trace3 = bytes([0x26])
 
-# Test 4: Empty string - should output NaN
+# Test 4: Empty string - should output 0 (Flash returns 0, not NaN)
 string4 = b'\x00'
 action_push4 = struct.pack('<BHB', 0x96, len(string4) + 1, 0) + string4
 action_char_to_ascii4 = bytes([0x32])
@@ -82,5 +82,5 @@ print("\nExpected output:")
 print("65    (from 'A')")
 print("72    (from 'Hello' - first char 'H')")
 print("33    (from '!')")
-print("nan   (from empty string)")
+print("0     (from empty string)")
 print("233   (from 'é')")
