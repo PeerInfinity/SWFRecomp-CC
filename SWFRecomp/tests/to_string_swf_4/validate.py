@@ -78,12 +78,12 @@ def validate_output(output):
         lines[2]
     ))
 
-    # Test Case 4: toString(-123.45) -> "-123.44999694824"
-    # This shows 32-bit float precision for negative numbers
+    # Test Case 4: toString(-123.45) -> "-123.449996948242"
+    # This shows 32-bit float precision for negative numbers (%.15g format)
     results.append(make_result(
         "toString_float_negative",
-        lines[3] == "-123.44999694824",
-        "-123.44999694824",
+        lines[3] == "-123.449996948242",
+        "-123.449996948242",
         lines[3]
     ))
 

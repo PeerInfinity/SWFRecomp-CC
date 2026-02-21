@@ -23,26 +23,28 @@ def push_float(f):
     float_bytes = struct.pack('<f', f)
     return struct.pack('<BHB', 0x96, 5, 1) + float_bytes
 
-# Test 1: Basic substring - substring("Hello World", 0, 5) → "Hello"
+# Note: StringExtract uses 1-based indexing per Flash spec and Ruffle
+
+# Test 1: Basic substring - substring("Hello World", 1, 5) → "Hello"
 test1 = b''
 test1 += push_string("Hello World")  # Push string
-test1 += push_float(0.0)             # Push index
+test1 += push_float(1.0)             # Push index (1-based)
 test1 += push_float(5.0)             # Push length
 test1 += bytes([0x15])               # STRING_EXTRACT opcode
 test1 += bytes([0x26])               # TRACE
 
-# Test 2: Middle of string - substring("Hello World", 6, 5) → "World"
+# Test 2: Middle of string - substring("Hello World", 7, 5) → "World"
 test2 = b''
 test2 += push_string("Hello World")  # Push string
-test2 += push_float(6.0)             # Push index
+test2 += push_float(7.0)             # Push index (1-based: 'W' is at position 7)
 test2 += push_float(5.0)             # Push length
 test2 += bytes([0x15])               # STRING_EXTRACT opcode
 test2 += bytes([0x26])               # TRACE
 
-# Test 3: Length extends beyond string - substring("Hello", 2, 100) → "llo"
+# Test 3: Length extends beyond string - substring("Hello", 3, 100) → "llo"
 test3 = b''
 test3 += push_string("Hello")        # Push string
-test3 += push_float(2.0)             # Push index
+test3 += push_float(3.0)             # Push index (1-based: 'l' at position 3)
 test3 += push_float(100.0)           # Push length (beyond string)
 test3 += bytes([0x15])               # STRING_EXTRACT opcode
 test3 += bytes([0x26])               # TRACE

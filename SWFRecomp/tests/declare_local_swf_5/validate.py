@@ -6,11 +6,8 @@ Tests the DECLARE_LOCAL opcode (0x41).
 
 Expected behavior:
 - DECLARE_LOCAL opcode is recognized and executed
-- When called outside a function, it shows a warning
+- When called outside a function, Flash silently ignores it (no warning)
 - Test completes successfully without crashing
-
-Note: Full local variable functionality requires DEFINE_FUNCTION opcode.
-This test validates basic opcode recognition and handling.
 """
 import sys
 import json
@@ -28,69 +25,33 @@ def validate_output(output):
 
     Expected output:
     1. "Testing DECLARE_LOCAL opcode"
-    2. "Warning: DECLARE_LOCAL outside function for variable 'x'"
-    3. "DECLARE_LOCAL completed (warning expected)"
+    2. "DECLARE_LOCAL completed (warning expected)"
+
+    Note: Flash silently ignores DECLARE_LOCAL outside functions (no warning).
     """
     lines = parse_output(output)
 
     results = []
 
     # Check first line
-    if len(lines) > 0:
-        expected = "Testing DECLARE_LOCAL opcode"
-        actual = lines[0]
-        results.append(make_result(
-            "first_trace",
-            actual == expected,
-            expected,
-            actual
-        ))
-    else:
-        results.append(make_result(
-            "first_trace",
-            False,
-            "Testing DECLARE_LOCAL opcode",
-            "(no output)",
-            "Expected first trace output"
-        ))
+    expected_1 = "Testing DECLARE_LOCAL opcode"
+    actual_1 = lines[0] if len(lines) > 0 else "(no output)"
+    results.append(make_result(
+        "first_trace",
+        actual_1 == expected_1,
+        expected_1,
+        actual_1
+    ))
 
-    # Check warning message (from printf)
-    if len(lines) > 1:
-        expected = "Warning: DECLARE_LOCAL outside function for variable 'x'"
-        actual = lines[1]
-        results.append(make_result(
-            "warning_message",
-            actual == expected,
-            expected,
-            actual
-        ))
-    else:
-        results.append(make_result(
-            "warning_message",
-            False,
-            "Warning: DECLARE_LOCAL outside function for variable 'x'",
-            "(no output)",
-            "Expected warning message"
-        ))
-
-    # Check third line
-    if len(lines) > 2:
-        expected = "DECLARE_LOCAL completed (warning expected)"
-        actual = lines[2]
-        results.append(make_result(
-            "completion_trace",
-            actual == expected,
-            expected,
-            actual
-        ))
-    else:
-        results.append(make_result(
-            "completion_trace",
-            False,
-            "DECLARE_LOCAL completed (warning expected)",
-            "(no output)",
-            "Expected completion trace output"
-        ))
+    # Check completion line (no warning in between — Flash silently ignores)
+    expected_2 = "DECLARE_LOCAL completed (warning expected)"
+    actual_2 = lines[1] if len(lines) > 1 else "(no output)"
+    results.append(make_result(
+        "completion_trace",
+        actual_2 == expected_2,
+        expected_2,
+        actual_2
+    ))
 
     return make_validation_result(results)
 
