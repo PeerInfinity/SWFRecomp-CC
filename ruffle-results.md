@@ -1,309 +1,310 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-02-21 06:56 UTC
+**Date**: 2026-02-21 17:48 UTC
 
-**Git SHA**: `139ab34eb4`
+**Git SHA**: `937b361e7c`
 
-**Run Duration**: 77m 38s
+**Run Duration**: 78m 22s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 619 |
-| Passing | **266** (43.0%) |
-| Failing | 353 |
+| Passing | **267** (43.1%) |
+| Failing | 352 |
 | Total expected lines | 91478 |
-| Matching lines | 52467 (57.4%) |
-| Mismatched lines | 39011 |
+| Matching lines | 52469 (57.4%) |
+| Mismatched lines | 39009 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 347 | 98.3% |
+| Output Mismatch | 346 | 98.3% |
 | Runtime Segfault | 4 | 1.1% |
 | Runtime Error | 1 | 0.3% |
 | Timeout | 1 | 0.3% |
 
 ## Passing Tests
 
-**266 tests passing**
+**267 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `access_unnamed_shape` | 1 | 7.9s |  |
-| 2 | `action_to_integer` | 28 | 7.5s |  |
-| 3 | `add` | 28 | 7.4s |  |
-| 4 | `add2` | 354 | 7.7s | [1](ruffle-tests/_investigation/complete/add2.md) |
-| 5 | `add_swf4` | 28 | 7.4s |  |
-| 6 | `add_swf5` | 28 | 7.5s |  |
-| 7 | `arguments` | 127 | 7.4s | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) [23](ruffle-tests/_investigation/incomplete/PARSING_FUNCTIONS_PLAN.md) |
-| 8 | `array_call_method` | 9 | 7.4s | [2](ruffle-tests/_investigation/complete/ARRAY_METHODS_PLAN.md) |
-| 9 | `array_concat` | 98 | 7.4s |  |
-| 10 | `array_constructor` | 30 | 7.4s |  |
-| 11 | `array_enumerate` | 4 | 7.3s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) |
-| 12 | `array_length` | 42 | 7.5s |  |
-| 13 | `array_properties` | 36 | 7.4s |  |
-| 14 | `array_prototyping` | 12 | 7.3s | [2](ruffle-tests/_investigation/complete/ARRAY_METHODS_PLAN.md) |
-| 15 | `array_slice` | 34 | 7.4s |  |
-| 16 | `array_sort_random` | 443 | 7.4s | [2](ruffle-tests/_investigation/complete/ARRAY_METHODS_PLAN.md) |
-| 17 | `array_splice` | 207 | 7.5s |  |
-| 18 | `array_trivial` | 209 | 7.5s |  |
-| 19 | `as1_constructor_v6` | 35 | 7.4s |  |
-| 20 | `as1_constructor_v7` | 35 | 8.9s |  |
-| 21 | `as2_oop` | 13 | 7.3s | [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) [22](ruffle-tests/_investigation/incomplete/OOP_SUPER_EXTENDS_PLAN.md) |
-| 22 | `as_broadcaster_initialize` | 10 | 7.1s |  |
-| 23 | `as_set_prop_flags_version` | 31 | 7.1s | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 24 | `as_set_prop_flags_version_swf5` | 1 | 7.1s |  |
-| 25 | `as_set_prop_flags_version_swf6` | 1 | 7.1s |  |
-| 26 | `as_set_prop_flags_version_swf7` | 1 | 7.1s |  |
+| 1 | `access_unnamed_shape` | 1 | 8.7s |  |
+| 2 | `action_to_integer` | 28 | 7.4s |  |
+| 3 | `add` | 28 | 7.2s |  |
+| 4 | `add2` | 354 | 7.4s | [1](ruffle-tests/_investigation/complete/add2.md) |
+| 5 | `add_swf4` | 28 | 7.2s |  |
+| 6 | `add_swf5` | 28 | 7.2s |  |
+| 7 | `arguments` | 127 | 7.2s | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) [23](ruffle-tests/_investigation/incomplete/PARSING_FUNCTIONS_PLAN.md) |
+| 8 | `array_call_method` | 9 | 7.2s | [2](ruffle-tests/_investigation/complete/ARRAY_METHODS_PLAN.md) |
+| 9 | `array_concat` | 98 | 7.3s |  |
+| 10 | `array_constructor` | 30 | 7.2s |  |
+| 11 | `array_enumerate` | 4 | 7.2s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) |
+| 12 | `array_length` | 42 | 7.2s |  |
+| 13 | `array_properties` | 36 | 7.2s |  |
+| 14 | `array_prototyping` | 12 | 7.2s | [2](ruffle-tests/_investigation/complete/ARRAY_METHODS_PLAN.md) |
+| 15 | `array_slice` | 34 | 7.3s |  |
+| 16 | `array_sort_random` | 443 | 7.3s | [2](ruffle-tests/_investigation/complete/ARRAY_METHODS_PLAN.md) |
+| 17 | `array_splice` | 207 | 7.4s |  |
+| 18 | `array_trivial` | 209 | 7.4s |  |
+| 19 | `as1_constructor_v6` | 35 | 7.2s |  |
+| 20 | `as1_constructor_v7` | 35 | 7.5s |  |
+| 21 | `as2_oop` | 13 | 7.5s | [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) [22](ruffle-tests/_investigation/incomplete/OOP_SUPER_EXTENDS_PLAN.md) |
+| 22 | `as_broadcaster_initialize` | 10 | 7.2s |  |
+| 23 | `as_set_prop_flags_version` | 31 | 7.2s | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
+| 24 | `as_set_prop_flags_version_swf5` | 1 | 7.2s |  |
+| 25 | `as_set_prop_flags_version_swf6` | 1 | 7.2s |  |
+| 26 | `as_set_prop_flags_version_swf7` | 1 | 7.2s |  |
 | 27 | `as_set_prop_flags_version_swf8` | 1 | 7.2s |  |
-| 28 | `as_set_prop_flags_version_swf9` | 1 | 7.1s |  |
-| 29 | `as_transformed_flag` | 20 | 7.1s |  |
+| 28 | `as_set_prop_flags_version_swf9` | 1 | 7.2s |  |
+| 29 | `as_transformed_flag` | 20 | 7.2s |  |
 | 30 | `bad_swf_tag_past_eof` | 0 | 7.2s |  |
-| 31 | `bitand` | 1058 | 10.0s |  |
-| 32 | `bitmap_data_colortransform` | 0 | 7.5s |  |
-| 33 | `bitmap_data_fillrect` | 0 | 7.4s |  |
-| 34 | `bitmap_data_max_size_swf10` | 12 | 7.3s |  |
-| 35 | `bitmap_data_max_size_swf9` | 10 | 7.3s |  |
-| 36 | `bitmap_data_perlinnoise` | 0 | 7.9s |  |
-| 37 | `bitmap_data_pixeldissolve_image` | 0 | 7.7s |  |
-| 38 | `bitmapdata_applyfilter_colormatrix` | 0 | 7.3s |  |
-| 39 | `bitor` | 1058 | 9.9s |  |
-| 40 | `biturshift` | 14 | 7.3s |  |
-| 41 | `biturshift_swf8` | 14 | 7.3s |  |
+| 31 | `bitand` | 1058 | 9.7s |  |
+| 32 | `bitmap_data_colortransform` | 0 | 7.4s |  |
+| 33 | `bitmap_data_fillrect` | 0 | 7.3s |  |
+| 34 | `bitmap_data_max_size_swf10` | 12 | 7.2s |  |
+| 35 | `bitmap_data_max_size_swf9` | 10 | 7.2s |  |
+| 36 | `bitmap_data_perlinnoise` | 0 | 7.8s |  |
+| 37 | `bitmap_data_pixeldissolve_image` | 0 | 7.6s |  |
+| 38 | `bitmapdata_applyfilter_colormatrix` | 0 | 7.2s |  |
+| 39 | `bitor` | 1058 | 9.7s |  |
+| 40 | `biturshift` | 14 | 7.2s |  |
+| 41 | `biturshift_swf8` | 14 | 8.4s |  |
 | 42 | `bitxor` | 1058 | 9.7s |  |
 | 43 | `boxed_primitives` | 24 | 7.3s | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
 | 44 | `call_method_empty_name` | 1 | 7.2s |  |
 | 45 | `capabilities_resolution` | 8 | 7.2s |  |
 | 46 | `catch_references_registers` | 2 | 7.2s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
 | 47 | `clone_sprite_types` | 24 | 7.5s | [4](ruffle-tests/_investigation/incomplete/CLONE_DUPLICATE_PLAN.md) [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 48 | `color` | 57 | 7.7s | [5](ruffle-tests/_investigation/incomplete/COLOR_OBJECT_PLAN.md) |
+| 48 | `color` | 57 | 7.6s | [5](ruffle-tests/_investigation/incomplete/COLOR_OBJECT_PLAN.md) |
 | 49 | `color_transform` | 48 | 7.6s | [5](ruffle-tests/_investigation/incomplete/COLOR_OBJECT_PLAN.md) |
 | 50 | `conflicting_instance_names` | 23 | 7.5s |  |
-| 51 | `create_empty_movie_clip` | 3 | 7.4s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 52 | `define_function2` | 8 | 7.5s |  |
+| 51 | `create_empty_movie_clip` | 3 | 7.5s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 52 | `define_function2` | 8 | 7.6s |  |
 | 53 | `define_function2_preload` | 13 | 7.5s |  |
-| 54 | `define_function2_preload_order` | 4 | 7.5s |  |
+| 54 | `define_function2_preload_order` | 4 | 9.3s |  |
 | 55 | `define_function_case_sensitive` | 2 | 7.3s |  |
-| 56 | `delete` | 3 | 7.4s |  |
+| 56 | `delete` | 3 | 7.3s |  |
 | 57 | `display_object_properties` | 2 | 7.2s |  |
 | 58 | `divide_swf4` | 107 | 7.3s |  |
-| 59 | `do_init_action` | 3 | 7.2s |  |
+| 59 | `do_init_action` | 3 | 7.3s |  |
 | 60 | `duplicate_movie_clip` | 20 | 7.3s | [4](ruffle-tests/_investigation/incomplete/CLONE_DUPLICATE_PLAN.md) [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 61 | `edittext_antialiastype` | 296 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 62 | `edittext_autosize_setter` | 20 | 7.6s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 63 | `edittext_default_format` | 221 | 7.1s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 64 | `edittext_default_format_empty` | 95 | 7.0s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 65 | `edittext_default_format_font_style` | 335 | 7.1s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 66 | `edittext_html_align_swf7` | 52 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 67 | `edittext_html_align_swf8` | 52 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 68 | `edittext_newline_stripping` | 64 | 12.1s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 69 | `edittext_password` | 5 | 7.3s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 70 | `edittext_width_height` | 103 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 71 | `enumerate` | 64 | 7.3s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) |
-| 72 | `equals` | 32 | 7.2s |  |
+| 61 | `edittext_antialiastype` | 296 | 7.3s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 62 | `edittext_autosize_setter` | 20 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 63 | `edittext_default_format` | 221 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 64 | `edittext_default_format_empty` | 95 | 7.3s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 65 | `edittext_default_format_font_style` | 335 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 66 | `edittext_html_align_swf7` | 52 | 7.5s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 67 | `edittext_html_align_swf8` | 52 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 68 | `edittext_newline_stripping` | 64 | 12.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 69 | `edittext_password` | 5 | 7.5s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 70 | `edittext_width_height` | 103 | 7.5s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 71 | `enumerate` | 64 | 7.5s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) |
+| 72 | `equals` | 32 | 7.3s |  |
 | 73 | `equals2_swf5` | 926 | 9.0s |  |
-| 74 | `equals2_swf6` | 926 | 8.9s |  |
+| 74 | `equals2_swf6` | 926 | 9.0s |  |
 | 75 | `equals2_swf7` | 926 | 9.1s |  |
-| 76 | `equals_swf4` | 665 | 7.7s |  |
-| 77 | `equals_swf4_alt` | 32 | 7.3s |  |
-| 78 | `equals_swf5` | 32 | 7.3s |  |
-| 79 | `error` | 58 | 7.3s |  |
-| 80 | `escape` | 14 | 7.3s |  |
+| 76 | `equals_swf4` | 665 | 7.6s |  |
+| 77 | `equals_swf4_alt` | 32 | 7.2s |  |
+| 78 | `equals_swf5` | 32 | 7.2s |  |
+| 79 | `error` | 58 | 7.2s |  |
+| 80 | `escape` | 14 | 7.2s |  |
 | 81 | `execution_order1` | 5 | 7.3s |  |
 | 82 | `execution_order2` | 7 | 7.3s |  |
 | 83 | `execution_order3` | 4 | 7.2s |  |
 | 84 | `focusrect_mouse_swf8` | 0 | 7.2s |  |
-| 85 | `focusrect_mouse_swf9` | 0 | 7.7s |  |
-| 86 | `focusrect_swf5` | 6 | 7.5s | [31](ruffle-tests/_investigation/incomplete/TAB_ORDERING_PLAN.md) |
-| 87 | `function_suppress_and_preload` | 28 | 7.4s |  |
-| 88 | `get_variable_in_scope` | 29 | 7.3s |  |
-| 89 | `getproperty` | 28 | 7.3s |  |
-| 90 | `getproperty_swf4` | 28 | 7.2s |  |
-| 91 | `getproperty_swf5` | 28 | 7.0s |  |
-| 92 | `global_array` | 3 | 7.0s |  |
-| 93 | `global_is_bare` | 7 | 7.0s |  |
-| 94 | `globals_swf5` | 304 | 7.2s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
-| 95 | `globals_swf6` | 304 | 7.2s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
-| 96 | `globals_swf7` | 304 | 7.2s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
-| 97 | `globals_swf8` | 304 | 7.2s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
-| 98 | `goto_advance1` | 6 | 7.0s |  |
-| 99 | `goto_advance2` | 2 | 7.0s |  |
-| 100 | `goto_both_ways1` | 3 | 7.0s |  |
-| 101 | `goto_both_ways2` | 3 | 7.0s |  |
-| 102 | `goto_execution_order2` | 2 | 7.0s |  |
-| 103 | `goto_frame_number` | 3 | 7.2s |  |
-| 104 | `goto_rewind1` | 1 | 7.3s |  |
-| 105 | `goto_rewind2` | 3 | 7.2s |  |
-| 106 | `greater_swf6` | 1175 | 9.1s |  |
-| 107 | `greater_swf7` | 1175 | 9.1s |  |
-| 108 | `greaterthan_swf5` | 1 | 7.1s |  |
-| 109 | `greaterthan_swf8` | 1 | 7.2s |  |
-| 110 | `has_own_property` | 32 | 7.2s |  |
-| 111 | `infinite_recursion_function` | 4 | 7.2s | [14](ruffle-tests/_investigation/complete/infinite_recursion_function.md) |
-| 112 | `infinite_recursion_function_in_setter` | 131 | 7.2s | [14](ruffle-tests/_investigation/complete/infinite_recursion_function.md) |
-| 113 | `infinite_recursion_virtual_property` | 67 | 7.1s | [14](ruffle-tests/_investigation/complete/infinite_recursion_function.md) |
-| 114 | `init_array_invalid` | 4 | 7.1s |  |
-| 115 | `init_object_invalid` | 4 | 9.4s |  |
-| 116 | `is_finite` | 49 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 117 | `is_finite_swf6` | 49 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 118 | `is_prototype_of` | 89 | 7.3s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 119 | `issue_1086` | 1 | 7.2s |  |
-| 120 | `issue_1104` | 2 | 7.2s |  |
-| 121 | `issue_1671` | 0 | 7.2s |  |
-| 122 | `issue_2166` | 9 | 7.2s |  |
-| 123 | `issue_3446` | 1 | 7.2s |  |
-| 124 | `issue_4377` | 2 | 7.2s |  |
-| 125 | `issue_710` | 4 | 7.2s |  |
-| 126 | `issue_768` | 3 | 8.8s | [15](ruffle-tests/_investigation/complete/issue_768.md) |
-| 127 | `issue_9885` | 2 | 7.2s |  |
-| 128 | `lessthan` | 41 | 7.2s |  |
-| 129 | `lessthan2_swf5` | 1226 | 9.3s |  |
-| 130 | `lessthan2_swf6` | 1226 | 9.3s |  |
-| 131 | `lessthan2_swf7` | 1226 | 9.3s |  |
-| 132 | `lessthan_swf4` | 902 | 7.9s |  |
-| 133 | `lessthan_swf4_alt` | 41 | 7.2s |  |
-| 134 | `lessthan_swf5` | 41 | 7.2s |  |
-| 135 | `localconnection_properties` | 8 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 136 | `logical_ops_swf4` | 90 | 7.2s |  |
-| 137 | `logical_ops_swf8` | 108 | 7.4s |  |
-| 138 | `looping` | 6 | 7.4s |  |
-| 139 | `mask_reapply` | 0 | 7.5s |  |
-| 140 | `mask_with_drawing` | 0 | 7.4s |  |
-| 141 | `math_min_max` | 101 | 7.4s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
-| 142 | `math_swf6` | 530 | 7.6s | [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
-| 143 | `math_swf7` | 530 | 7.6s | [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
-| 144 | `math_swf8` | 530 | 7.6s | [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
-| 145 | `matrix` | 171 | 7.7s | [5](ruffle-tests/_investigation/incomplete/COLOR_OBJECT_PLAN.md) [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
-| 146 | `mouse_listeners` | 67 | 7.1s |  |
-| 147 | `mouse_wheel_enabled` | 2 | 7.1s |  |
-| 148 | `movieclip_begin_gradient_fill` | 0 | 7.5s |  |
-| 149 | `movieclip_blend_mode_property` | 35 | 7.9s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 150 | `movieclip_default_state` | 69 | 7.4s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 151 | `movieclip_depth_methods` | 98 | 7.4s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
-| 152 | `movieclip_get_instance_at_depth` | 28 | 7.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 153 | `movieclip_line_gradient_style` | 0 | 7.7s |  |
-| 154 | `movieclip_name_from_timeline` | 13 | 7.1s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 155 | `movieclip_prototype_extension` | 5 | 7.1s |  |
-| 156 | `nested_textfields_in_buttons` | 0 | 7.2s |  |
-| 157 | `netstream_play_flv_screen` | 0 | 20.1s |  |
-| 158 | `new_method_wrap` | 4 | 7.4s |  |
-| 159 | `new_object_enumerate` | 7 | 7.4s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) |
-| 160 | `new_object_wrap` | 4 | 7.4s |  |
-| 161 | `o` | 3 | 7.4s |  |
-| 162 | `object_constructor` | 33 | 7.5s |  |
-| 163 | `object_function` | 32 | 7.4s |  |
-| 164 | `object_properties` | 31 | 7.6s | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 165 | `object_prototypes` | 74 | 7.5s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 166 | `object_string_coerce_swf5` | 62 | 7.4s | [20](ruffle-tests/_investigation/complete/object_string_coerce.md) |
-| 167 | `object_string_coerce_swf6` | 68 | 7.5s | [20](ruffle-tests/_investigation/complete/object_string_coerce.md) |
-| 168 | `parse_int` | 64 | 7.6s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [23](ruffle-tests/_investigation/incomplete/PARSING_FUNCTIONS_PLAN.md) |
-| 169 | `placeobject_occupied_depth` | 6 | 7.4s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 170 | `point` | 175 | 7.8s | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
-| 171 | `primitive_instanceof` | 37 | 7.4s |  |
-| 172 | `primitive_type_globals` | 557 | 8.0s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 173 | `printjob_props_swf5` | 45 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 174 | `printjob_props_swf6` | 45 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 175 | `printjob_props_swf7` | 45 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 176 | `prototype_delete` | 12 | 7.2s |  |
-| 177 | `prototype_enumerate` | 5 | 7.3s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 178 | `prototype_properties` | 17 | 7.3s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 179 | `rectangle` | 745 | 8.2s | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
-| 180 | `recursive_prototypes` | 0 | 7.4s |  |
-| 181 | `remove_movie_clip` | 29 | 7.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
-| 182 | `sandbox_type_local_file` | 1 | 7.2s |  |
-| 183 | `set_variable_scope` | 58 | 7.2s |  |
-| 184 | `single_frame` | 1 | 7.2s |  |
-| 185 | `sound_props_swf5` | 68 | 7.5s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 186 | `sound_props_swf6` | 68 | 7.4s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 187 | `sound_start_load` | 0 | 7.5s |  |
-| 188 | `stage_object_enumerate` | 4 | 7.5s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [27](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md) [28](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md) |
-| 189 | `stage_object_properties_get_var` | 5 | 7.4s |  |
-| 190 | `stage_property_representation` | 586 | 7.4s | [27](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md) [28](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md) |
-| 191 | `strictequals_swf6` | 902 | 9.0s |  |
-| 192 | `strictly_equals` | 7 | 7.3s |  |
-| 193 | `string_coercion` | 117 | 7.6s | [29](ruffle-tests/_investigation/complete/string_coercion.md) |
-| 194 | `string_methods` | 285 | 7.9s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
-| 195 | `string_methods_negative_args` | 240 | 7.4s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
-| 196 | `string_methods_swfv5` | 275 | 7.9s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
-| 197 | `string_ops_swf6` | 95 | 7.4s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
-| 198 | `string_paths_keyevents` | 0 | 7.2s |  |
-| 199 | `string_paths_timer` | 0 | 7.2s |  |
-| 200 | `swf4_actions_bool` | 96 | 7.2s |  |
-| 201 | `swf4_bool` | 4 | 7.2s |  |
-| 202 | `swf4_function_calls` | 7 | 7.2s |  |
-| 203 | `swf5_encoding` | 3 | 7.2s |  |
-| 204 | `swf7_case_sensitive` | 44 | 7.2s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 205 | `tab_ordering_properties_tab_index_edge_case` | 4 | 7.2s |  |
-| 206 | `target_clip_removed` | 5 | 7.4s | [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
-| 207 | `text_format` | 1146 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 208 | `text_format_display` | 21 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 209 | `text_format_font_max_length` | 2 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 210 | `text_format_rounding_swf7` | 840 | 7.3s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 211 | `text_format_rounding_swf8` | 840 | 7.3s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 212 | `textfield_background_color` | 11 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 213 | `textfield_border_color` | 11 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 214 | `textfield_maxchars` | 3 | 7.6s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 215 | `textfield_properties` | 44 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 216 | `textfield_props_swf5` | 175 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 217 | `textfield_props_swf6` | 210 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 218 | `textfield_props_swf7` | 210 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 219 | `textfield_props_swf8` | 210 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 220 | `textfield_text` | 7 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 221 | `textfield_variable` | 81 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 222 | `this_swf7` | 41 | 7.2s | [34](ruffle-tests/_investigation/complete/this_swf7.md) |
-| 223 | `timeline_function_def` | 7 | 7.3s |  |
-| 224 | `try_catch_finally` | 118 | 7.4s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
-| 225 | `try_finally_simple` | 16 | 7.3s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
-| 226 | `typeof` | 22 | 7.3s |  |
-| 227 | `typeof_globals` | 7 | 7.2s |  |
-| 228 | `uncaught_exception` | 1 | 7.2s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
-| 229 | `uncaught_exception_bubbled` | 1 | 7.2s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
-| 230 | `undefined_to_string_swf6` | 4 | 7.2s |  |
-| 231 | `unescape` | 43 | 7.3s |  |
-| 232 | `unload_clip_event` | 4 | 7.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
-| 233 | `use_hand_cursor` | 8 | 7.3s |  |
-| 234 | `variable_args` | 5 | 7.4s |  |
-| 235 | `waitforframe` | 7 | 7.2s |  |
-| 236 | `waitforframe2` | 16 | 8.7s |  |
-| 237 | `watch` | 117 | 7.5s | [21](ruffle-tests/_investigation/incomplete/OBJECT_WATCH_PLAN.md) |
-| 238 | `watch_virtual_property_proto` | 2 | 7.3s | [21](ruffle-tests/_investigation/incomplete/OBJECT_WATCH_PLAN.md) |
-| 239 | `with_return` | 2 | 7.2s |  |
-| 240 | `with_variable_scopes` | 43 | 7.3s | [38](ruffle-tests/_investigation/incomplete/WITH_SCOPE_PLAN.md) |
-| 241 | `xml` | 15 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 242 | `xml_append_child` | 28 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 243 | `xml_append_child_with_parent` | 20 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 244 | `xml_attributes_read` | 4 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 245 | `xml_cdata` | 11 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 246 | `xml_child_nodes_edge_cases` | 4 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 247 | `xml_clone_expandos` | 19 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 248 | `xml_first_last_child` | 8 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 249 | `xml_has_child_nodes` | 3 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 250 | `xml_idmap` | 21 | 7.4s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 251 | `xml_ignore_comments` | 21 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 252 | `xml_ignore_white` | 34 | 7.5s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 253 | `xml_insert_before` | 20 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 254 | `xml_inspect_createmethods` | 15 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 255 | `xml_inspect_doctype` | 7 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 256 | `xml_inspect_parsexml` | 62 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 257 | `xml_inspect_xmldecl` | 7 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 258 | `xml_namespaces` | 203 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 259 | `xml_parent_and_child` | 5 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 260 | `xml_remove_node` | 22 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 261 | `xml_reparenting` | 14 | 7.4s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 262 | `xml_siblings` | 10 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 263 | `xml_to_string` | 13 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 264 | `xml_to_string_comment` | 1 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 265 | `xml_unescaping` | 23 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 266 | `xmlnode_proto` | 1 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 85 | `focusrect_mouse_swf9` | 0 | 8.9s |  |
+| 86 | `focusrect_swf5` | 6 | 7.7s | [31](ruffle-tests/_investigation/incomplete/TAB_ORDERING_PLAN.md) |
+| 87 | `function_suppress_and_preload` | 28 | 7.7s |  |
+| 88 | `get_variable_in_scope` | 29 | 7.7s |  |
+| 89 | `getproperty` | 28 | 7.5s |  |
+| 90 | `getproperty_swf4` | 28 | 7.4s |  |
+| 91 | `getproperty_swf5` | 28 | 7.3s |  |
+| 92 | `global_array` | 3 | 7.2s |  |
+| 93 | `global_is_bare` | 7 | 7.2s |  |
+| 94 | `globals_swf5` | 304 | 7.5s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 95 | `globals_swf6` | 304 | 7.5s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 96 | `globals_swf7` | 304 | 7.5s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 97 | `globals_swf8` | 304 | 7.5s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 98 | `goto_advance1` | 6 | 7.3s |  |
+| 99 | `goto_advance2` | 2 | 7.2s |  |
+| 100 | `goto_both_ways1` | 3 | 7.2s |  |
+| 101 | `goto_both_ways2` | 3 | 7.2s |  |
+| 102 | `goto_execution_order` | 2 | 7.2s |  |
+| 103 | `goto_execution_order2` | 2 | 7.3s |  |
+| 104 | `goto_frame_number` | 3 | 7.3s |  |
+| 105 | `goto_rewind1` | 1 | 7.5s |  |
+| 106 | `goto_rewind2` | 3 | 7.3s |  |
+| 107 | `greater_swf6` | 1175 | 9.2s |  |
+| 108 | `greater_swf7` | 1175 | 9.2s |  |
+| 109 | `greaterthan_swf5` | 1 | 7.2s |  |
+| 110 | `greaterthan_swf8` | 1 | 7.2s |  |
+| 111 | `has_own_property` | 32 | 7.2s |  |
+| 112 | `infinite_recursion_function` | 4 | 7.2s | [14](ruffle-tests/_investigation/complete/infinite_recursion_function.md) |
+| 113 | `infinite_recursion_function_in_setter` | 131 | 7.2s | [14](ruffle-tests/_investigation/complete/infinite_recursion_function.md) |
+| 114 | `infinite_recursion_virtual_property` | 67 | 7.2s | [14](ruffle-tests/_investigation/complete/infinite_recursion_function.md) |
+| 115 | `init_array_invalid` | 4 | 7.2s |  |
+| 116 | `init_object_invalid` | 4 | 7.5s |  |
+| 117 | `is_finite` | 49 | 7.2s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 118 | `is_finite_swf6` | 49 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 119 | `is_prototype_of` | 89 | 7.3s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
+| 120 | `issue_1086` | 1 | 7.2s |  |
+| 121 | `issue_1104` | 2 | 7.2s |  |
+| 122 | `issue_1671` | 0 | 7.2s |  |
+| 123 | `issue_2166` | 9 | 7.2s |  |
+| 124 | `issue_3446` | 1 | 7.2s |  |
+| 125 | `issue_4377` | 2 | 7.1s |  |
+| 126 | `issue_710` | 4 | 7.2s |  |
+| 127 | `issue_768` | 3 | 7.6s | [15](ruffle-tests/_investigation/complete/issue_768.md) |
+| 128 | `issue_9885` | 2 | 7.5s |  |
+| 129 | `lessthan` | 41 | 7.5s |  |
+| 130 | `lessthan2_swf5` | 1226 | 9.6s |  |
+| 131 | `lessthan2_swf6` | 1226 | 9.6s |  |
+| 132 | `lessthan2_swf7` | 1226 | 9.6s |  |
+| 133 | `lessthan_swf4` | 902 | 8.0s |  |
+| 134 | `lessthan_swf4_alt` | 41 | 7.4s |  |
+| 135 | `lessthan_swf5` | 41 | 7.4s |  |
+| 136 | `localconnection_properties` | 8 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 137 | `logical_ops_swf4` | 90 | 7.3s |  |
+| 138 | `logical_ops_swf8` | 108 | 7.3s |  |
+| 139 | `looping` | 6 | 7.2s |  |
+| 140 | `mask_reapply` | 0 | 7.2s |  |
+| 141 | `mask_with_drawing` | 0 | 7.3s |  |
+| 142 | `math_min_max` | 101 | 7.4s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
+| 143 | `math_swf6` | 530 | 7.6s | [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
+| 144 | `math_swf7` | 530 | 7.6s | [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
+| 145 | `math_swf8` | 530 | 7.6s | [16](ruffle-tests/_investigation/complete/MATH_PLAN.md) |
+| 146 | `matrix` | 171 | 7.6s | [5](ruffle-tests/_investigation/incomplete/COLOR_OBJECT_PLAN.md) [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
+| 147 | `mouse_listeners` | 67 | 7.3s |  |
+| 148 | `mouse_wheel_enabled` | 2 | 7.2s |  |
+| 149 | `movieclip_begin_gradient_fill` | 0 | 7.7s |  |
+| 150 | `movieclip_blend_mode_property` | 35 | 7.6s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 151 | `movieclip_default_state` | 69 | 7.5s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 152 | `movieclip_depth_methods` | 98 | 7.5s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
+| 153 | `movieclip_get_instance_at_depth` | 28 | 7.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 154 | `movieclip_line_gradient_style` | 0 | 8.3s |  |
+| 155 | `movieclip_name_from_timeline` | 13 | 7.4s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 156 | `movieclip_prototype_extension` | 5 | 7.3s |  |
+| 157 | `nested_textfields_in_buttons` | 0 | 7.3s |  |
+| 158 | `netstream_play_flv_screen` | 0 | 20.4s |  |
+| 159 | `new_method_wrap` | 4 | 7.7s |  |
+| 160 | `new_object_enumerate` | 7 | 7.7s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) |
+| 161 | `new_object_wrap` | 4 | 7.6s |  |
+| 162 | `o` | 3 | 7.7s |  |
+| 163 | `object_constructor` | 33 | 7.7s |  |
+| 164 | `object_function` | 32 | 7.6s |  |
+| 165 | `object_properties` | 31 | 7.5s | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
+| 166 | `object_prototypes` | 74 | 7.4s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
+| 167 | `object_string_coerce_swf5` | 62 | 7.4s | [20](ruffle-tests/_investigation/complete/object_string_coerce.md) |
+| 168 | `object_string_coerce_swf6` | 68 | 7.4s | [20](ruffle-tests/_investigation/complete/object_string_coerce.md) |
+| 169 | `parse_int` | 64 | 7.5s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [23](ruffle-tests/_investigation/incomplete/PARSING_FUNCTIONS_PLAN.md) |
+| 170 | `placeobject_occupied_depth` | 6 | 7.4s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 171 | `point` | 175 | 7.8s | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
+| 172 | `primitive_instanceof` | 37 | 7.4s |  |
+| 173 | `primitive_type_globals` | 557 | 8.8s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 174 | `printjob_props_swf5` | 45 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 175 | `printjob_props_swf6` | 45 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 176 | `printjob_props_swf7` | 45 | 7.4s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 177 | `prototype_delete` | 12 | 7.2s |  |
+| 178 | `prototype_enumerate` | 5 | 7.2s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
+| 179 | `prototype_properties` | 17 | 7.2s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
+| 180 | `rectangle` | 745 | 8.0s | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
+| 181 | `recursive_prototypes` | 0 | 7.2s |  |
+| 182 | `remove_movie_clip` | 29 | 7.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
+| 183 | `sandbox_type_local_file` | 1 | 7.2s |  |
+| 184 | `set_variable_scope` | 58 | 7.3s |  |
+| 185 | `single_frame` | 1 | 7.2s |  |
+| 186 | `sound_props_swf5` | 68 | 7.3s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 187 | `sound_props_swf6` | 68 | 7.2s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 188 | `sound_start_load` | 0 | 7.2s |  |
+| 189 | `stage_object_enumerate` | 4 | 7.1s | [8](ruffle-tests/_investigation/complete/ENUMERATION_PLAN.md) [27](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md) [28](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md) |
+| 190 | `stage_object_properties_get_var` | 5 | 7.2s |  |
+| 191 | `stage_property_representation` | 586 | 7.2s | [27](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md) [28](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md) |
+| 192 | `strictequals_swf6` | 902 | 8.6s |  |
+| 193 | `strictly_equals` | 7 | 7.2s |  |
+| 194 | `string_coercion` | 117 | 7.5s | [29](ruffle-tests/_investigation/complete/string_coercion.md) |
+| 195 | `string_methods` | 285 | 7.7s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
+| 196 | `string_methods_negative_args` | 240 | 7.2s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
+| 197 | `string_methods_swfv5` | 275 | 7.7s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
+| 198 | `string_ops_swf6` | 95 | 7.2s | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) |
+| 199 | `string_paths_keyevents` | 0 | 7.4s |  |
+| 200 | `string_paths_timer` | 0 | 7.5s |  |
+| 201 | `swf4_actions_bool` | 96 | 7.4s |  |
+| 202 | `swf4_bool` | 4 | 7.3s |  |
+| 203 | `swf4_function_calls` | 7 | 7.3s |  |
+| 204 | `swf5_encoding` | 3 | 7.7s |  |
+| 205 | `swf7_case_sensitive` | 44 | 7.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 206 | `tab_ordering_properties_tab_index_edge_case` | 4 | 7.5s |  |
+| 207 | `target_clip_removed` | 5 | 7.6s | [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
+| 208 | `text_format` | 1146 | 7.7s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 209 | `text_format_display` | 21 | 7.5s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 210 | `text_format_font_max_length` | 2 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 211 | `text_format_rounding_swf7` | 840 | 7.6s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 212 | `text_format_rounding_swf8` | 840 | 7.6s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 213 | `textfield_background_color` | 11 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 214 | `textfield_border_color` | 11 | 7.4s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 215 | `textfield_maxchars` | 3 | 9.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 216 | `textfield_properties` | 44 | 7.3s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 217 | `textfield_props_swf5` | 175 | 7.5s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 218 | `textfield_props_swf6` | 210 | 7.6s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 219 | `textfield_props_swf7` | 210 | 7.5s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 220 | `textfield_props_swf8` | 210 | 7.6s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 221 | `textfield_text` | 7 | 7.2s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 222 | `textfield_variable` | 81 | 7.5s | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 223 | `this_swf7` | 41 | 7.4s | [34](ruffle-tests/_investigation/complete/this_swf7.md) |
+| 224 | `timeline_function_def` | 7 | 7.6s |  |
+| 225 | `try_catch_finally` | 118 | 7.4s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
+| 226 | `try_finally_simple` | 16 | 7.3s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
+| 227 | `typeof` | 22 | 7.3s |  |
+| 228 | `typeof_globals` | 7 | 7.2s |  |
+| 229 | `uncaught_exception` | 1 | 7.3s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
+| 230 | `uncaught_exception_bubbled` | 1 | 7.3s | [36](ruffle-tests/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) |
+| 231 | `undefined_to_string_swf6` | 4 | 7.2s |  |
+| 232 | `unescape` | 43 | 7.3s |  |
+| 233 | `unload_clip_event` | 4 | 7.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
+| 234 | `use_hand_cursor` | 8 | 7.2s |  |
+| 235 | `variable_args` | 5 | 7.4s |  |
+| 236 | `waitforframe` | 7 | 7.2s |  |
+| 237 | `waitforframe2` | 16 | 7.4s |  |
+| 238 | `watch` | 117 | 7.5s | [21](ruffle-tests/_investigation/incomplete/OBJECT_WATCH_PLAN.md) |
+| 239 | `watch_virtual_property_proto` | 2 | 7.2s | [21](ruffle-tests/_investigation/incomplete/OBJECT_WATCH_PLAN.md) |
+| 240 | `with_return` | 2 | 7.2s |  |
+| 241 | `with_variable_scopes` | 43 | 7.3s | [38](ruffle-tests/_investigation/incomplete/WITH_SCOPE_PLAN.md) |
+| 242 | `xml` | 15 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 243 | `xml_append_child` | 28 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 244 | `xml_append_child_with_parent` | 20 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 245 | `xml_attributes_read` | 4 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 246 | `xml_cdata` | 11 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 247 | `xml_child_nodes_edge_cases` | 4 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 248 | `xml_clone_expandos` | 19 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 249 | `xml_first_last_child` | 8 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 250 | `xml_has_child_nodes` | 3 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 251 | `xml_idmap` | 21 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 252 | `xml_ignore_comments` | 21 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 253 | `xml_ignore_white` | 34 | 8.5s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 254 | `xml_insert_before` | 20 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 255 | `xml_inspect_createmethods` | 15 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 256 | `xml_inspect_doctype` | 7 | 7.4s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 257 | `xml_inspect_parsexml` | 62 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 258 | `xml_inspect_xmldecl` | 7 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 259 | `xml_namespaces` | 203 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 260 | `xml_parent_and_child` | 5 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 261 | `xml_remove_node` | 22 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 262 | `xml_reparenting` | 14 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 263 | `xml_siblings` | 10 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 264 | `xml_to_string` | 13 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 265 | `xml_to_string_comment` | 1 | 7.2s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 266 | `xml_unescaping` | 23 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 267 | `xmlnode_proto` | 1 | 7.3s | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**76 tests** within reach
+**77 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
@@ -374,15 +375,16 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 65 | `hittest_winding_rule` | 50.0% | 6 | 12 | 6 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
 | 66 | `issue_1906` | 50.0% | 2 | 4 | 2 | [5](ruffle-tests/_investigation/incomplete/COLOR_OBJECT_PLAN.md) |
 | 67 | `issue_2030` | 50.0% | 2 | 4 | 2 |  |
-| 68 | `issue_3522` | 50.0% | 1 | 2 | 1 |  |
-| 69 | `loadmovie` | 50.0% | 1 | 2 | 1 |  |
-| 70 | `loadmovie_fail` | 50.0% | 1 | 2 | 1 |  |
-| 71 | `loadmovie_method` | 50.0% | 1 | 2 | 1 |  |
-| 72 | `string_paths_basic` | 50.0% | 2 | 4 | 2 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
-| 73 | `string_paths_variable_alias` | 50.0% | 2 | 4 | 2 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
-| 74 | `stylesheet_transform` | 50.0% | 375 | 750 | 375 |  |
-| 75 | `textsnapshot_available_text` | 50.0% | 10 | 20 | 10 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 76 | `unloadmovie` | 50.0% | 2 | 4 | 2 | [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
+| 68 | `issue_2870` | 50.0% | 2 | 4 | 2 |  |
+| 69 | `issue_3522` | 50.0% | 1 | 2 | 1 |  |
+| 70 | `loadmovie` | 50.0% | 1 | 2 | 1 |  |
+| 71 | `loadmovie_fail` | 50.0% | 1 | 2 | 1 |  |
+| 72 | `loadmovie_method` | 50.0% | 1 | 2 | 1 |  |
+| 73 | `string_paths_basic` | 50.0% | 2 | 4 | 2 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
+| 74 | `string_paths_variable_alias` | 50.0% | 2 | 4 | 2 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
+| 75 | `stylesheet_transform` | 50.0% | 375 | 750 | 375 |  |
+| 76 | `textsnapshot_available_text` | 50.0% | 10 | 20 | 10 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 77 | `unloadmovie` | 50.0% | 2 | 4 | 2 | [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
 
 ## Segfaults
 
@@ -390,10 +392,10 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
-| 1 | `goto_methods` | 9.4s | [10](ruffle-tests/_investigation/incomplete/FRAME_NAVIGATION_PLAN.md) |
-| 2 | `native_objects_swf6` | 8.9s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
-| 3 | `native_objects_swf7` | 9.1s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
-| 4 | `native_objects_swf8` | 8.9s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 1 | `goto_methods` | 9.5s | [10](ruffle-tests/_investigation/incomplete/FRAME_NAVIGATION_PLAN.md) |
+| 2 | `native_objects_swf6` | 9.7s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 3 | `native_objects_swf7` | 9.8s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 4 | `native_objects_swf8` | 9.7s | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
 
 ## Runtime Errors
 
@@ -401,7 +403,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `movieclip_state_values` | exit code -6 | 9.4s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 1 | `movieclip_state_values` | exit code -6 | 10.3s | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
 
 ## Timeouts
 
@@ -409,11 +411,11 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `timeout` | runtime timeout (>10s) | 17.1s | [35](ruffle-tests/_investigation/incomplete/TIMER_PLAN.md) |
+| 1 | `timeout` | runtime timeout (>10s) | 17.4s | [35](ruffle-tests/_investigation/incomplete/TIMER_PLAN.md) |
 
 ## All Output Mismatches
 
-**347 tests** with output mismatch, sorted by match rate (best first)
+**346 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -484,70 +486,70 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 65 | `hittest_winding_rule` | 50.0% | 6/12 | 12 | 12 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
 | 66 | `issue_1906` | 50.0% | 2/4 | 4 | 4 | [5](ruffle-tests/_investigation/incomplete/COLOR_OBJECT_PLAN.md) |
 | 67 | `issue_2030` | 50.0% | 2/4 | 4 | 4 |  |
-| 68 | `issue_3522` | 50.0% | 1/2 | 2 | 2 |  |
-| 69 | `loadmovie` | 50.0% | 1/2 | 2 | 2 |  |
-| 70 | `loadmovie_fail` | 50.0% | 1/2 | 1 | 2 |  |
-| 71 | `loadmovie_method` | 50.0% | 1/2 | 1 | 2 |  |
-| 72 | `string_paths_basic` | 50.0% | 2/4 | 4 | 4 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
-| 73 | `string_paths_variable_alias` | 50.0% | 2/4 | 4 | 4 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
-| 74 | `stylesheet_transform` | 50.0% | 375/750 | 750 | 750 |  |
-| 75 | `textsnapshot_available_text` | 50.0% | 10/20 | 20 | 20 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 76 | `unloadmovie` | 50.0% | 2/4 | 4 | 4 | [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
-| 77 | `selection_handlers` | 48.1% | 13/27 | 19 | 27 | [26](ruffle-tests/_investigation/incomplete/SELECTION_PLAN.md) |
-| 78 | `selection` | 47.8% | 217/454 | 433 | 454 | [26](ruffle-tests/_investigation/incomplete/SELECTION_PLAN.md) |
-| 79 | `bitmap_data_hittest` | 47.0% | 62/132 | 131 | 132 | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
-| 80 | `hittest_lockroot` | 46.7% | 7/15 | 15 | 15 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
-| 81 | `edittext_html_condensewhite_swf7` | 46.6% | 145/311 | 311 | 311 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 82 | `stage_scale_mode` | 46.2% | 18/39 | 38 | 39 | [27](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md) [28](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md) |
-| 83 | `edittext_align_trailing_spaces_swf7` | 45.8% | 264/576 | 576 | 576 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 84 | `edittext_html_condensewhite_swf8` | 45.7% | 142/311 | 311 | 311 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 85 | `this_swf6` | 43.9% | 18/41 | 41 | 41 |  |
-| 86 | `register_globals_across_frames` | 43.8% | 7/16 | 16 | 15 | [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
-| 87 | `swf5_no_closure` | 42.1% | 8/19 | 15 | 19 |  |
-| 88 | `edittext_html_swf7` | 42.1% | 2262/5377 | 5377 | 5377 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 89 | `edittext_html_swf8` | 41.8% | 2247/5377 | 5377 | 5377 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 90 | `mcl_as_broadcaster` | 41.7% | 5/12 | 8 | 12 |  |
-| 91 | `native_double_construct` | 41.7% | 5/12 | 11 | 12 | [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
-| 92 | `coerce_to_primitive_resolve` | 41.2% | 7/17 | 13 | 17 | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 93 | `as_broadcaster_undef` | 39.3% | 35/89 | 81 | 89 |  |
-| 94 | `register_class_return_value` | 37.5% | 6/16 | 16 | 16 | [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
-| 95 | `function_as_function` | 37.1% | 13/35 | 32 | 35 |  |
-| 96 | `load_vars` | 37.1% | 13/35 | 23 | 35 |  |
-| 97 | `define_local_with_paths` | 35.2% | 19/54 | 34 | 54 |  |
-| 98 | `attach_movie_stop` | 33.3% | 1/3 | 1 | 3 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
-| 99 | `edittext_font_size` | 33.3% | 15/45 | 45 | 45 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 100 | `edittext_html_color` | 33.3% | 38/114 | 114 | 114 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 101 | `edittext_leading` | 33.3% | 3/9 | 9 | 9 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 102 | `goto_execution_order` | 33.3% | 1/3 | 3 | 2 |  |
+| 68 | `issue_2870` | 50.0% | 2/4 | 4 | 3 |  |
+| 69 | `issue_3522` | 50.0% | 1/2 | 2 | 2 |  |
+| 70 | `loadmovie` | 50.0% | 1/2 | 2 | 2 |  |
+| 71 | `loadmovie_fail` | 50.0% | 1/2 | 1 | 2 |  |
+| 72 | `loadmovie_method` | 50.0% | 1/2 | 1 | 2 |  |
+| 73 | `string_paths_basic` | 50.0% | 2/4 | 4 | 4 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
+| 74 | `string_paths_variable_alias` | 50.0% | 2/4 | 4 | 4 | [30](ruffle-tests/_investigation/incomplete/STRING_PLAN.md) [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
+| 75 | `stylesheet_transform` | 50.0% | 375/750 | 750 | 750 |  |
+| 76 | `textsnapshot_available_text` | 50.0% | 10/20 | 20 | 20 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 77 | `unloadmovie` | 50.0% | 2/4 | 4 | 4 | [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
+| 78 | `selection_handlers` | 48.1% | 13/27 | 19 | 27 | [26](ruffle-tests/_investigation/incomplete/SELECTION_PLAN.md) |
+| 79 | `selection` | 47.8% | 217/454 | 433 | 454 | [26](ruffle-tests/_investigation/incomplete/SELECTION_PLAN.md) |
+| 80 | `bitmap_data_hittest` | 47.0% | 62/132 | 131 | 132 | [11](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
+| 81 | `hittest_lockroot` | 46.7% | 7/15 | 15 | 15 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
+| 82 | `edittext_html_condensewhite_swf7` | 46.6% | 145/311 | 311 | 311 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 83 | `stage_scale_mode` | 46.2% | 18/39 | 38 | 39 | [27](ruffle-tests/_investigation/incomplete/STAGE_FRAME_PROPS_PLAN.md) [28](ruffle-tests/_investigation/incomplete/STAGE_PLAN.md) |
+| 84 | `edittext_align_trailing_spaces_swf7` | 45.8% | 264/576 | 576 | 576 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 85 | `edittext_html_condensewhite_swf8` | 45.7% | 142/311 | 311 | 311 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 86 | `this_swf6` | 43.9% | 18/41 | 41 | 41 |  |
+| 87 | `register_globals_across_frames` | 43.8% | 7/16 | 16 | 15 | [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
+| 88 | `swf5_no_closure` | 42.1% | 8/19 | 15 | 19 |  |
+| 89 | `edittext_html_swf7` | 42.1% | 2262/5377 | 5377 | 5377 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 90 | `edittext_html_swf8` | 41.8% | 2247/5377 | 5377 | 5377 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 91 | `mcl_as_broadcaster` | 41.7% | 5/12 | 8 | 12 |  |
+| 92 | `native_double_construct` | 41.7% | 5/12 | 11 | 12 | [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) |
+| 93 | `coerce_to_primitive_resolve` | 41.2% | 7/17 | 13 | 17 | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
+| 94 | `as_broadcaster_undef` | 39.3% | 35/89 | 81 | 89 |  |
+| 95 | `register_class_return_value` | 37.5% | 6/16 | 16 | 16 | [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
+| 96 | `function_as_function` | 37.1% | 13/35 | 32 | 35 |  |
+| 97 | `load_vars` | 37.1% | 13/35 | 23 | 35 |  |
+| 98 | `define_local_with_paths` | 35.2% | 19/54 | 34 | 54 |  |
+| 99 | `attach_movie_stop` | 33.3% | 1/3 | 1 | 3 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
+| 100 | `edittext_font_size` | 33.3% | 15/45 | 45 | 45 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 101 | `edittext_html_color` | 33.3% | 38/114 | 114 | 114 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 102 | `edittext_leading` | 33.3% | 3/9 | 9 | 9 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
 | 103 | `init_object_order` | 33.3% | 5/15 | 5 | 15 | [24](ruffle-tests/_investigation/incomplete/PROTOTYPE_OBJECT_PLAN.md) |
-| 104 | `issue_2870` | 33.3% | 1/3 | 1 | 3 |  |
-| 105 | `loadmovienum` | 33.3% | 1/3 | 3 | 3 |  |
-| 106 | `place_and_lookup` | 33.3% | 10/30 | 30 | 30 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 107 | `unloadmovie_method` | 33.3% | 1/3 | 2 | 3 | [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
-| 108 | `edittext_stylesheet` | 32.9% | 107/325 | 325 | 325 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 109 | `swf7_global_funcs` | 32.8% | 76/232 | 232 | 232 | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 110 | `default_names` | 30.8% | 16/52 | 44 | 52 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 111 | `property_invalid_base_clip` | 30.6% | 11/36 | 35 | 36 |  |
-| 112 | `asnew` | 29.4% | 10/34 | 18 | 34 |  |
-| 113 | `closure_scope` | 28.6% | 2/7 | 7 | 7 | [38](ruffle-tests/_investigation/incomplete/WITH_SCOPE_PLAN.md) |
-| 114 | `as2_super_via_manual_prototype` | 27.5% | 11/40 | 28 | 40 | [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) [22](ruffle-tests/_investigation/incomplete/OOP_SUPER_EXTENDS_PLAN.md) |
-| 115 | `swf6_global_funcs` | 25.9% | 60/232 | 232 | 232 | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 116 | `clone_sprite_edittext` | 25.5% | 24/94 | 94 | 94 | [4](ruffle-tests/_investigation/incomplete/CLONE_DUPLICATE_PLAN.md) [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 117 | `sound` | 25.5% | 160/628 | 628 | 628 |  |
-| 118 | `do_init_action_child` | 25.0% | 3/12 | 3 | 12 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
-| 119 | `execution_order4` | 25.0% | 3/12 | 11 | 12 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 120 | `goto_frame` | 25.0% | 3/12 | 10 | 12 | [10](ruffle-tests/_investigation/incomplete/FRAME_NAVIGATION_PLAN.md) |
-| 121 | `loadmovie_flashvars` | 25.0% | 1/4 | 2 | 4 |  |
-| 122 | `moviecliploader_flashvars` | 25.0% | 1/4 | 1 | 4 |  |
-| 123 | `movieclip_getbounds` | 24.7% | 53/215 | 215 | 191 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
-| 124 | `swf5_global_funcs` | 24.6% | 57/232 | 232 | 232 | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
-| 125 | `edittext_tag_indent` | 22.6% | 7/31 | 31 | 31 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 126 | `hittest_morph` | 21.4% | 15/70 | 70 | 70 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
-| 127 | `textsnapshot_props_swf5` | 21.4% | 12/56 | 38 | 56 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 128 | `focus_remove` | 21.2% | 7/33 | 21 | 33 |  |
-| 129 | `focusrect_property_swf5` | 20.9% | 259/1237 | 1236 | 1237 |  |
-| 130 | `file_reference_download_success` | 20.6% | 7/34 | 14 | 34 |  |
-| 131 | `external_interface_toxml_array` | 20.0% | 5/25 | 25 | 25 |  |
+| 104 | `loadmovienum` | 33.3% | 1/3 | 3 | 3 |  |
+| 105 | `place_and_lookup` | 33.3% | 10/30 | 30 | 30 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 106 | `unloadmovie_method` | 33.3% | 1/3 | 2 | 3 | [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
+| 107 | `edittext_stylesheet` | 32.9% | 107/325 | 325 | 325 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 108 | `swf7_global_funcs` | 32.8% | 76/232 | 232 | 232 | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 109 | `property_invalid_base_clip` | 30.6% | 11/36 | 35 | 36 |  |
+| 110 | `asnew` | 29.4% | 10/34 | 18 | 34 |  |
+| 111 | `default_names` | 28.8% | 15/52 | 44 | 52 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 112 | `closure_scope` | 28.6% | 2/7 | 7 | 7 | [38](ruffle-tests/_investigation/incomplete/WITH_SCOPE_PLAN.md) |
+| 113 | `as2_super_via_manual_prototype` | 27.5% | 11/40 | 28 | 40 | [19](ruffle-tests/_investigation/incomplete/NATIVE_INTROSPECTION_PLAN.md) [22](ruffle-tests/_investigation/incomplete/OOP_SUPER_EXTENDS_PLAN.md) |
+| 114 | `swf6_global_funcs` | 25.9% | 60/232 | 232 | 232 | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 115 | `clone_sprite_edittext` | 25.5% | 24/94 | 94 | 94 | [4](ruffle-tests/_investigation/incomplete/CLONE_DUPLICATE_PLAN.md) [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 116 | `sound` | 25.5% | 160/628 | 628 | 628 |  |
+| 117 | `do_init_action_child` | 25.0% | 3/12 | 3 | 12 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [25](ruffle-tests/_investigation/incomplete/REGISTERCLASS_PLAN.md) |
+| 118 | `execution_order4` | 25.0% | 3/12 | 11 | 12 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 119 | `goto_frame` | 25.0% | 3/12 | 10 | 12 | [10](ruffle-tests/_investigation/incomplete/FRAME_NAVIGATION_PLAN.md) |
+| 120 | `loadmovie_flashvars` | 25.0% | 1/4 | 2 | 4 |  |
+| 121 | `moviecliploader_flashvars` | 25.0% | 1/4 | 1 | 4 |  |
+| 122 | `movieclip_getbounds` | 24.7% | 53/215 | 215 | 191 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) |
+| 123 | `swf5_global_funcs` | 24.6% | 57/232 | 232 | 232 | [12](ruffle-tests/_investigation/incomplete/GLOBALS_PLAN.md) |
+| 124 | `edittext_tag_indent` | 22.6% | 7/31 | 31 | 31 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 125 | `hittest_morph` | 21.4% | 15/70 | 70 | 70 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
+| 126 | `textsnapshot_props_swf5` | 21.4% | 12/56 | 38 | 56 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 127 | `focus_remove` | 21.2% | 7/33 | 21 | 33 |  |
+| 128 | `focusrect_property_swf5` | 20.9% | 259/1237 | 1236 | 1237 |  |
+| 129 | `file_reference_download_success` | 20.6% | 7/34 | 14 | 34 |  |
+| 130 | `external_interface_toxml_array` | 20.0% | 5/25 | 25 | 25 |  |
+| 131 | `tell_target_invalid_swf6` | 20.0% | 1/5 | 4 | 5 | [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
 | 132 | `unloadmovienum` | 20.0% | 3/15 | 15 | 13 | [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
 | 133 | `external_interface_toxml_basic` | 19.6% | 35/179 | 179 | 179 |  |
 | 134 | `set_interval` | 18.5% | 5/27 | 17 | 27 | [35](ruffle-tests/_investigation/incomplete/TIMER_PLAN.md) |
@@ -755,15 +757,14 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 336 | `target_clip_swf6` | 0.0% | 0/2 | 0 | 2 | [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
 | 337 | `tell_target` | 0.0% | 0/37 | 0 | 37 | [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
 | 338 | `tell_target_invalid` | 0.0% | 0/6 | 2 | 6 | [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
-| 339 | `tell_target_invalid_swf6` | 0.0% | 0/5 | 4 | 5 | [32](ruffle-tests/_investigation/incomplete/TELLTARGET_PLAN.md) |
-| 340 | `text_blocks_clicks` | 0.0% | 0/4 | 0 | 4 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
-| 341 | `textfield_cache_as_bitmap` | 0.0% | 0/1 | 0 | 1 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 342 | `textsnapshot_text_order` | 0.0% | 0/1 | 1 | 1 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
-| 343 | `unload_nested_child` | 0.0% | 0/5 | 0 | 5 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
-| 344 | `xml_load` | 0.0% | 0/2 | 0 | 2 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 345 | `xml_socket_close_in_handler` | 0.0% | 0/6 | 0 | 6 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 346 | `xml_socket_on_data` | 0.0% | 0/7 | 0 | 7 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
-| 347 | `xml_socket_segmented` | 0.0% | 0/29 | 0 | 29 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 339 | `text_blocks_clicks` | 0.0% | 0/4 | 0 | 4 | [13](ruffle-tests/_investigation/incomplete/HIT_TESTING_PLAN.md) |
+| 340 | `textfield_cache_as_bitmap` | 0.0% | 0/1 | 0 | 1 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 341 | `textsnapshot_text_order` | 0.0% | 0/1 | 1 | 1 | [33](ruffle-tests/_investigation/incomplete/TEXTFIELD_PLAN.md) |
+| 342 | `unload_nested_child` | 0.0% | 0/5 | 0 | 5 | [18](ruffle-tests/_investigation/incomplete/MOVIECLIP_PLAN.md) [37](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) |
+| 343 | `xml_load` | 0.0% | 0/2 | 0 | 2 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 344 | `xml_socket_close_in_handler` | 0.0% | 0/6 | 0 | 6 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 345 | `xml_socket_on_data` | 0.0% | 0/7 | 0 | 7 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
+| 346 | `xml_socket_segmented` | 0.0% | 0/29 | 0 | 29 | [39](ruffle-tests/_investigation/complete/XML_PLAN.md) |
 
 ## Investigation Documents
 
@@ -808,4 +809,4 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 37 | [UNLOAD_PLAN.md](ruffle-tests/_investigation/incomplete/UNLOAD_PLAN.md) | 12 | 3 | 9 |
 | 38 | [WITH_SCOPE_PLAN.md](ruffle-tests/_investigation/incomplete/WITH_SCOPE_PLAN.md) | 5 | 1 | 4 |
 | 39 | [XML_PLAN.md](ruffle-tests/_investigation/complete/XML_PLAN.md) | 33 | 26 | 7 |
-| | *(tests not in any document)* | 268 | 140 | 128 |
+| | *(tests not in any document)* | 268 | 141 | 127 |
