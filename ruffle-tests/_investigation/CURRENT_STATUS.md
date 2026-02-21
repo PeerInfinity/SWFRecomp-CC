@@ -1,6 +1,6 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-20 (TextField Phase 3+5: textfield_props_swf5, edittext_newline_stripping, edittext_html_align_swf7/swf8)
+Last updated: 2026-02-20 (Math plan complete: math_swf6/7/8 now pass via ASnative(200,index) implementation)
 
 Previous CI baseline: 227/619 (36.7%), commit d71ead7
 
@@ -105,7 +105,7 @@ These tests were near-passing in the previous update and now pass locally:
 |------|--------|--------------|---------------|
 | DATE_PLAN | **FULLY COMPLETE** (moved to complete/) | 8+ tests passing; `date` at ~99.2% (103 diff lines, all unfixable edge cases) | TZ=Asia/Kathmandu added to CI workflow |
 | TRY_CATCH_PLAN | **Phase 1 DONE** | 0 pass (91% match) | Typed catch block matching (String/Object/etc.) |
-| MATH_PLAN | **COMPLETE** | 1/4 pass, 3 at 98.5% | ASnative(200,50), throwing valueOf |
+| MATH_PLAN | **FULLY COMPLETE** (moved to complete/) | 4/4 pass (math_min_max, math_swf6/7/8) | ASnative(200,index) implemented |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | GLOBALS_PLAN | **Phase 6 DONE** | globals_swf6/7/8, primitive_type_globals PASS | Phase 7-8 (prototype methods, property flags) |
 | XML_PLAN | **ALL PHASES COMPLETE** | 24/26 active tests pass | xml_to_string (11/13), xml_child_nodes_edge_cases (3/4) |
