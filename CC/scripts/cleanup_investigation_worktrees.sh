@@ -2,7 +2,7 @@
 # Removes all investigation worktrees and their branches.
 #
 # Usage:
-#   ./scripts/cleanup_investigation_worktrees.sh [--keep-branches]
+#   ./CC/scripts/cleanup_investigation_worktrees.sh [--keep-branches]
 #
 # By default, deletes both the worktree directories and the investigation/*
 # branches. Pass --keep-branches to remove only the worktrees.

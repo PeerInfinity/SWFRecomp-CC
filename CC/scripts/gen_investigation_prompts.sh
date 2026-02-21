@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Generates a text file with one prompt block per incomplete investigation document.
 # Output: SWFRecomp-CC/ruffle-tests/_investigation/investigation_prompts.txt
+#
+# Usage:
+#   ./CC/scripts/gen_investigation_prompts.sh [--keep-branches]
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 INCOMPLETE_DIR="$REPO_ROOT/ruffle-tests/_investigation/incomplete"

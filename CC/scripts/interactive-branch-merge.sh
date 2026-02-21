@@ -2,6 +2,9 @@
 
 # Interactive Branch Fetch and Merge Script
 # This script helps you fetch and merge remote branches interactively
+#
+# Usage:
+#   ./CC/scripts/interactive-branch-merge.sh
 
 # Color codes for better readability
 GREEN='\033[0;32m'

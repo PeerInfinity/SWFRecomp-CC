@@ -2,9 +2,9 @@
 # Sets up a git worktree for one (or all) incomplete investigation plans.
 #
 # Usage:
-#   ./scripts/setup_investigation_worktree.sh PLAN_NAME
-#   ./scripts/setup_investigation_worktree.sh all
-#   ./scripts/setup_investigation_worktree.sh --first N
+#   ./CC/scripts/setup_investigation_worktree.sh PLAN_NAME
+#   ./CC/scripts/setup_investigation_worktree.sh all
+#   ./CC/scripts/setup_investigation_worktree.sh --first N
 #
 # PLAN_NAME is the basename of the .md file without extension, e.g.:
 #   ARRAY_METHODS_PLAN  or  array_methods_plan  (case-insensitive)
