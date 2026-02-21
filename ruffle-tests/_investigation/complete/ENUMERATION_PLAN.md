@@ -9,7 +9,7 @@ All 5 directly-affected tests now pass:
 
 | Test | Status | Commit |
 |------|--------|--------|
-| `enumerate` | **PASS** | b899e90 (+ prior work) |
+| `enumerate` | **PASS** (regressed after b899e90 due to toString threshold change, re-fixed) | b899e90 (+ prior work) |
 | `array_enumerate` | **PASS** | prior work |
 | `new_object_enumerate` | **PASS** | prior work |
 | `prototype_enumerate` | **PASS** | prior work |

@@ -1,6 +1,21 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-20 (Math plan complete: math_swf6/7/8 now pass via ASnative(200,index) implementation)
+Last updated: 2026-02-21 (Regression fixes: 13 tests recovered)
+
+## Recent Regression Fixes
+
+| Fix | Tests Recovered | Root Cause |
+|-----|----------------|------------|
+| Revert `builtin_object_toString` threshold `< 7` → `< 6` | `enumerate`, `mouse_listeners`, `object_prototypes`, `textfield_props_swf6` | Commit 78e5e4e over-broadened SWF version check |
+| `actionEnumerate` OBJECT bypass | `enumerate` | Enumerate opcode uses internal `[object Object]` conversion, not toString() |
+| PrintJob.prototype toString override | `printjob_props_swf6` | Class-specific `[type Object]` for SWF < 7 |
+| 1-frame sprite skip in `advance_sprite_frames` | `do_init_action`, `goto_rewind2`, `goto_advance2` | Missing `if (frame_count <= 1) continue` guard |
+| Reverse iteration order in `advance_sprite_frames` | `execution_order2` | Forward→reverse depth order to match Flash |
+| Don't update `placed_at_frame` on modify | `goto_rewind1`, `goto_advance1`, `goto_both_ways1`, `goto_both_ways2`, `conflicting_instance_names` | Modify ops set placed_at_frame causing backward goto to delete preserved sprites |
+| GetMember `_x`/`_y` syncTransformIfNeeded | `goto_advance1`, `conflicting_instance_names` | GetMember path didn't sync from timeline transforms |
+| Backward goto catch-up guards | `goto_both_ways1`, `goto_both_ways2` | Preserve sprites during backward catch-up |
+
+**Still regressed (3):** `goto_rewind3` (complex backward goto with depth reuse), `movieclip_name_from_timeline` (MC rename path), `transform` (pixelBounds)
 
 Previous CI baseline: 227/619 (36.7%), commit d71ead7
 

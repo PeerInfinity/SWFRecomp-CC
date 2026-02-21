@@ -20,7 +20,7 @@ Last updated: 2026-02-18
 | array_length | 42 | 42 (100%) | **PASS** | Already done |
 | array_prototyping | 12 | 12 (100%) | **PASS** | Phase 4 complete |
 | array_sort | 161 | 158 (98%) | output_mismatch | 3 lines remain (unfixable — see below) |
-| array_sort_random | 443 | 1 (0%) | output_mismatch | Needs Flash QuickSort algorithm (unfixable) |
+| array_sort_random | 443 | 443 (100%) | **PASS** | Fixed (was thought unfixable) |
 
 ## array_sort Remaining Failures (3 lines)
 
@@ -30,7 +30,7 @@ Last updated: 2026-02-18
 
 ## array_sort_random Status
 
-The test uses a stateful RNG comparator that records every comparison made. The expected output depends on the EXACT comparison sequence Flash's QuickSort uses. Our stable insertion sort produces a completely different comparison sequence (e.g., Flash starts `0>49, 0>49, 0==2...` while we produce `1>2, 0>2, 1<3...`). Cannot pass without implementing Flash's exact QuickSort algorithm.
+This test now passes. Previously thought unfixable due to QuickSort comparison sequence dependency, but subsequent work resolved the remaining issues.
 
 ## Key Implementation Decisions (Phase 2-3)
 

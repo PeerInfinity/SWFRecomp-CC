@@ -9,7 +9,7 @@ combinations of `valueOf` and `toString` returning String, undefined, or Object 
 Tests both plain Objects and Date objects (which have different ToPrimitive hint order).
 
 - **SWF5**: `object_string_coerce_swf5` — 62/62 lines match (actual=65, 3 extra lines)
-- **SWF6**: `object_string_coerce_swf6` — 46/68 lines match (actual=65)
+- **SWF6**: `object_string_coerce_swf6` — 68/68 lines match (**PASS**)
 
 ---
 
@@ -55,40 +55,9 @@ Flash's behavior.
 
 SWF5 now passes (62/62 lines match). The extra 3 lines issue was resolved.
 
-### SWF6: Date ToPrimitive toString-first in Add2 (SWF6+)
+### SWF6: FIXED
 
-**Status: READY TO IMPLEMENT** (SWF5 already passes, SWF6 is the only remaining issue)
-
-Multiple sections where the Date-specific ToPrimitive order is wrong for Add2:
-
-```
-// Date with toString -> String, valueOf -> String
-// trace("" + date_obj) — should call toString first (Date hint)
-Expected: toString called / toString
-Actual:   valueOf called / valueOf
-```
-
-**Root cause:** Date objects need toString-first ToPrimitive hint for Add2 in SWF6+,
-but our runtime always uses valueOf-first. The `isDateObject` check and `g_swf_version >= 6`
-guard are needed.
-
-**Fix plan:**
-1. Add `isDateObject(ActionVar*)` helper that checks `obj.__proto__ == g_date_prototype`
-2. In `actionAdd2`, for object operands: if `isDateObject` && `g_swf_version >= 6`,
-   call `objectCallToString` instead of `objectCallValueOf`
-3. This matches the ECMAScript Date `[[DefaultValue]]` string-hint behavior
-
-**Verified expected behavior for each section (actionAdd2 with "" + date):**
-- toString→String, valueOf→String: call toString (1st), get "toString", use it → "toString"
-- toString→undefined, valueOf→String: call toString (1st), toString is undefined (not callable)
-  → a_vo=undefined, a_vo_is_prim=true → convert undefined → "undefined"
-- toString→{}, valueOf→String: call toString (1st), get {} (object), a_vo_found=1;
-  then string concat path calls toString again (2nd call) → {} → "[type Object]"
-- toString→{}, valueOf→undefined: same as above, two toString calls → "[type Object]"
-- toString→{}, valueOf→{}: same, two toString calls → "[type Object]"
-
-**SWF5 not affected:** g_swf_version=5 < 6, so `isDateObject && g_swf_version>=6` = false
-→ Date objects in SWF5 use valueOf-first (current behavior, already correct)
+SWF6 now passes (68/68 lines match). The Date ToPrimitive toString-first issue was resolved in subsequent work.
 
 ---
 

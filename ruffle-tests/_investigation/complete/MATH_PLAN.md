@@ -1,5 +1,6 @@
 # Math Object Implementation Plan
-<!-- TESTS: math_min_max, math_swf6, math_swf7, math_swf8, asnative -->
+<!-- TESTS: math_min_max, math_swf6, math_swf7, math_swf8 -->
+<!-- NOTE: asnative test is partially improved by this plan (class 200 only) but not fully fixed -->
 
 Last updated: 2026-02-20
 

@@ -211,7 +211,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 	if (catch_up_mode) return;
 #endif
 
-	for (size_t i = 1; i <= max_depth; ++i)
+	for (size_t i = max_depth; i >= 1; --i)
 	{
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
@@ -312,6 +312,9 @@ void advance_sprite_frames(SWFAppContext* app_context)
 
 		// Only advance if playing
 		if (!obj->sprite_is_playing) continue;
+
+		// Skip 1-frame sprites — they don't advance
+		if (ch->sprite_frame_count <= 1) continue;
 
 		// Swap to sprite's display list context
 		DisplayObject* saved_dl = display_list;
@@ -1399,7 +1402,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
-		display_list[depth].placed_at_frame = current_frame;
+		// Don't update placed_at_frame on modify — the object was originally placed
+		// at the earlier frame. Updating here would cause ng_display_clear_after to
+		// incorrectly remove the object during backward goto catch-up.
 		init_cx_fields(&display_list[depth]);
 		if (depth > max_depth) max_depth = depth;
 #ifdef NO_GRAPHICS
@@ -1413,6 +1418,30 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #endif
 		return;
 	}
+
+#ifdef NO_GRAPHICS
+	// During backward goto catch-up, if the same character is already at this depth,
+	// preserve it (update transform only) instead of destroying and re-creating.
+	// Flash preserves existing child movieclips during backward goto; their scripts
+	// should NOT re-fire.
+	{
+		extern int catch_up_backward;
+		extern size_t catch_up_target;
+		if (catch_up_backward && display_list[depth].char_id == char_id)
+		{
+			// Treat as modify: update transform/cxform, preserve sprite state
+			display_list[depth].transform_id = transform_id;
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+			display_list[depth].placed_at_frame = current_frame;
+			init_cx_fields(&display_list[depth]);
+			ng_on_place_object2(app_context, depth, char_id);
+			display_list[depth].sprite_needs_init = 0;
+			return;
+		}
+	}
+#endif
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
@@ -1525,6 +1554,26 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
 {
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
+
+#ifdef NO_GRAPHICS
+	// During backward goto catch-up, preserve existing sprite at same depth/char
+	{
+		extern int catch_up_backward;
+		if (catch_up_backward && display_list[depth].char_id == char_id)
+		{
+			display_list[depth].transform_id = transform_id;
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+			display_list[depth].ratio = ratio;
+			display_list[depth].placed_at_frame = current_frame;
+			init_cx_fields(&display_list[depth]);
+			ng_on_place_object2(app_context, depth, char_id);
+			display_list[depth].sprite_needs_init = 0;
+			return;
+		}
+	}
+#endif
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;

@@ -474,17 +474,31 @@ static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_STRING;
-	if (g_swf_version < 7) {
-		// SWF5/6 uses "[type Object]" format for user-created objects
+	if (g_swf_version < 6) {
+		// SWF5 uses "[type Object]" format for user-created objects
 		ret.str_size = 13;
 		ret.data.numeric_value = (u64) u16_type_Object;
 	} else {
-		// SWF7+ uses "[object Object]" format
+		// SWF6+ uses "[object Object]" format
 		ret.str_size = 15;
 		ret.data.numeric_value = (u64) u16_object_Object;
 	}
 	return ret;
 }
+
+// --- Stub class toString (always "[type Object]" regardless of SWF version) ---
+// Used for stub class instances (PrintJob, etc.) which trace as "[type Object]" in SWF < 7,
+// overriding the Object.prototype.toString that would otherwise return "[object Object]".
+static ActionVar builtin_type_object_toString(SWFAppContext* app_context)
+{
+	ActionVar ret;
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 13;
+	ret.data.numeric_value = (u64) u16_type_Object;
+	return ret;
+}
+
+static ASFunction g_type_object_toString_func;
 
 // --- Native object toString (always "[object Object]" regardless of SWF version) ---
 // Used for static native objects (Math, Key, Mouse, Stage, etc.) which always trace
@@ -10321,6 +10335,15 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 			var_name_len = (u32)u16_to_utf8(u16_ptr, _en_u16_len, _en_buf, sizeof(_en_buf));
 		POP();
 	}
+	else if (top_type == ACTION_STACK_VALUE_OBJECT)
+	{
+		// Flash's Enumerate opcode converts objects to "[object Object]"
+		// regardless of SWF version (does NOT call toString()).
+		POP();
+		memcpy(_en_buf, "[object Object]", 15);
+		_en_buf[15] = '\0';
+		var_name_len = 15;
+	}
 	else
 	{
 		// Non-string on stack: convert to string, then use as variable name
@@ -12070,6 +12093,21 @@ static void initPrintJobPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+
+	// In SWF < 7, PrintJob instances trace as "[type Object]" (not "[object Object]").
+	// Install a toString override on the prototype to produce this behavior.
+	if (g_swf_version < 7) {
+		memset(&g_type_object_toString_func, 0, sizeof(ASFunction));
+		strncpy(g_type_object_toString_func.name, "toString", 255);
+		g_type_object_toString_func.function_type = 1;
+		g_type_object_toString_func.simple_func = (SimpleFunctionPtr) builtin_type_object_toString;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_type_object_toString_func;
+		ActionVar ts_var = {0};
+		ts_var.type = ACTION_STACK_VALUE_FUNCTION;
+		ts_var.data.numeric_value = (u64) &g_type_object_toString_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "toString", 8, &ts_var, PROPERTY_FLAGS_DONTENUM);
+	}
 
 	// Numeric properties: ENUMERABLE only (READ_ONLY + DONT_DELETE = no WRITABLE, no CONFIGURABLE)
 	// Inserted in REVERSE of desired for-in order (LIFO enumeration reverses insertion order):
@@ -17427,15 +17465,50 @@ void actionGetMember(SWFAppContext* app_context)
 		{
 			// Case-insensitive comparison for built-in MC properties
 			if (strcasecmp(prop_name, "_x") == 0) {
-				// Return AS-tracked position. Initial placement syncs mc->x via findOrCreateMovieClip.
-				// PlaceObject2 Modify does NOT update _x (Flash AVM1 behavior: _x tracks
-				// the script-controlled position, not the display list timeline position).
+#ifdef NO_GRAPHICS
+				syncTransformIfNeeded(mc);
+				if (!(mc->as_set_flags & 1)) {
+					size_t _dep = ng_findDisplayEntryByName(mc->name);
+					if (_dep != SIZE_MAX) {
+						double _dx;
+						if (ng_getTransformXY_d(_dep, &_dx, NULL)) {
+							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
+							return;
+						}
+					}
+				}
+#endif
 				float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_y") == 0) {
+#ifdef NO_GRAPHICS
+				syncTransformIfNeeded(mc);
+				if (!(mc->as_set_flags & 2)) {
+					size_t _dep = ng_findDisplayEntryByName(mc->name);
+					if (_dep != SIZE_MAX) {
+						double _dy;
+						if (ng_getTransformXY_d(_dep, NULL, &_dy)) {
+							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
+							return;
+						}
+					}
+				}
+#endif
 				float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_xscale") == 0) {
+#ifdef NO_GRAPHICS
+				syncTransformIfNeeded(mc);
+#endif
+				float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_yscale") == 0) {
+#ifdef NO_GRAPHICS
+				syncTransformIfNeeded(mc);
+#endif
+				float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_rotation") == 0) {
+#ifdef NO_GRAPHICS
+				syncTransformIfNeeded(mc);
+#endif
+				float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
 			if (strcasecmp(prop_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
