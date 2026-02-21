@@ -4,7 +4,7 @@ import struct
 # Create a SWF5 file to test MB_CHAR_TO_ASCII opcode (0x36)
 # SWF Header
 signature = b'FWS'  # Uncompressed SWF
-version = 5  # SWF5 for multibyte support
+version = 6  # SWF6 so UTF-8 multibyte strings are not double-encoded
 
 # Frame size (RECT): 0-8000 twips (0-400 pixels)
 rect_data = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])

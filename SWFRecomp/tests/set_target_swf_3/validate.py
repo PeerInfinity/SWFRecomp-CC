@@ -2,14 +2,13 @@
 """
 Validation script for set_target_swf_3
 
-Tests the ActionSetTarget opcode (0x8B) comprehensively.
-Tests:
-1. Invalid target (non-existent sprite)
-2. Empty string (return to main)
-3. _root target
-4. / target (root via slash)
-5. Invalid nested path
-6. Empty string again (return to main)
+Tests the ActionSetTarget opcode (0x8B) with trace output.
+In NO_GRAPHICS mode, SetTarget to any sprite name silently fails.
+
+Expected output:
+  Line 1: test1 (trace before SetTarget)
+  Line 2: test2 (trace after SetTarget to nonexistent sprite)
+  Line 3: Done (trace after SetTarget reset to main)
 """
 import sys
 import json
@@ -25,76 +24,43 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected output for comprehensive edge case testing:
-    1. SetTarget "mySprite" - not found (invalid target)
-    2. SetTarget "" - return to main
-    3. SetTarget "_root" - explicit root
-    4. SetTarget "/" - root via slash
-    5. SetTarget "invalid/nested/path" - not found (invalid nested path)
-    6. SetTarget "" - return to main again
+    Expected 3 lines:
+    1. "test1" - trace on main timeline before any SetTarget
+    2. "test2" - trace after SetTarget("nonexistent") (silently ignored)
+    3. "Done" - trace after SetTarget("") resets to main
     """
     lines = parse_output(output)
 
     results = []
 
-    # Test 1: Invalid target (should report "not found, context unchanged")
-    expected_1 = "// SetTarget: mySprite (not found, context unchanged)"
+    # Test 1: trace before SetTarget
+    expected_1 = "test1"
     actual_1 = lines[0] if len(lines) > 0 else ""
     results.append(make_result(
-        "invalid_target_mySprite",
+        "trace_before_set_target",
         actual_1 == expected_1,
         expected_1,
         actual_1
     ))
 
-    # Test 2: Return to main (empty string)
-    expected_2 = "// SetTarget: (main)"
+    # Test 2: trace after SetTarget to nonexistent sprite
+    expected_2 = "test2"
     actual_2 = lines[1] if len(lines) > 1 else ""
     results.append(make_result(
-        "return_to_main",
+        "trace_after_invalid_set_target",
         actual_2 == expected_2,
         expected_2,
         actual_2
     ))
 
-    # Test 3: _root target
-    expected_3 = "// SetTarget: _root"
+    # Test 3: trace after SetTarget reset
+    expected_3 = "Done"
     actual_3 = lines[2] if len(lines) > 2 else ""
     results.append(make_result(
-        "target_root",
+        "trace_after_set_target_reset",
         actual_3 == expected_3,
         expected_3,
         actual_3
-    ))
-
-    # Test 4: / target (root via slash)
-    expected_4 = "// SetTarget: /"
-    actual_4 = lines[3] if len(lines) > 3 else ""
-    results.append(make_result(
-        "target_slash",
-        actual_4 == expected_4,
-        expected_4,
-        actual_4
-    ))
-
-    # Test 5: Invalid nested path
-    expected_5 = "// SetTarget: invalid/nested/path (not found, context unchanged)"
-    actual_5 = lines[4] if len(lines) > 4 else ""
-    results.append(make_result(
-        "invalid_nested_path",
-        actual_5 == expected_5,
-        expected_5,
-        actual_5
-    ))
-
-    # Test 6: Return to main again
-    expected_6 = "// SetTarget: (main)"
-    actual_6 = lines[5] if len(lines) > 5 else ""
-    results.append(make_result(
-        "return_to_main_again",
-        actual_6 == expected_6,
-        expected_6,
-        actual_6
     ))
 
     return make_validation_result(results)

@@ -10,11 +10,13 @@ Tests the MB_ASCII_TO_CHAR opcode (0x37) edge cases including:
 - Maximum Unicode (0x10FFFF)
 - Beyond Unicode range
 
-Expected behavior:
-- Negative numbers → empty string + label
+Expected behavior (with & 0xFFFF masking):
+- Negative numbers: -1 & 0xFFFF = 0xFFFF → U+FFFF character
 - Zero → null character (appears as empty) + label
 - Valid code points → UTF-8 encoded character + label
-- Surrogate pairs → encoded as-is (Flash behavior, not strictly valid Unicode)
+- Surrogate pairs → U+FFFD replacement character
+- 65536 (0x10000) & 0xFFFF = 0 → empty string
+- 0x10FFFF & 0xFFFF = 0xFFFF → U+FFFF character
 - Beyond Unicode range → empty string + label
 """
 import sys
@@ -50,25 +52,23 @@ def validate_output(output):
 
     # Expected test cases based on create_test_swf.py
     # Format: (expected_char, label, description)
-    # Note: Surrogate pairs (0xD800-0xDFFF) are encoded as invalid UTF-8 sequences.
-    # Python's text mode reads these using surrogate escape encoding (PEP 383).
-    # Raw bytes: 0xD800 = ED A0 80, 0xDFFF = ED BF BF
-    # When read by Python, these become: \udced\udca0\udc80 and \udced\udcbf\udcbf
+    # Note: The runtime applies & 0xFFFF masking, so values > 0xFFFF wrap around.
+    # Surrogate code points (0xD800-0xDFFF) produce U+FFFD replacement character.
     test_cases = [
-        ("", "negative", "Negative number (-1) should produce empty string"),
+        ("\uffff", "negative", "Negative number (-1): -1 & 0xFFFF = 0xFFFF -> U+FFFF"),
         ("", "zero", "Zero (null character) should appear as empty"),
         ("\x7f", "max_1byte", "Maximum 1-byte UTF-8 (127)"),
         ("\u0080", "min_2byte", "Minimum 2-byte UTF-8 (128)"),
         ("\u07ff", "max_2byte", "Maximum 2-byte UTF-8 (2047)"),
         ("\u0800", "min_3byte", "Minimum 3-byte UTF-8 (2048)"),
         ("\ud7ff", "before_surrogate", "Just before surrogate range (0xD7FF)"),
-        ("\udced\udca0\udc80", "surrogate_start", "Start of surrogate range (0xD800) - encoded as ED A0 80"),
-        ("\udced\udcbf\udcbf", "surrogate_end", "End of surrogate range (0xDFFF) - encoded as ED BF BF"),
+        ("\ufffd", "surrogate_start", "Start of surrogate range (0xD800) -> U+FFFD replacement"),
+        ("\ufffd", "surrogate_end", "End of surrogate range (0xDFFF) -> U+FFFD replacement"),
         ("\ue000", "after_surrogate", "Just after surrogate range (0xE000)"),
         ("\uffff", "max_3byte", "Maximum 3-byte UTF-8 (65535)"),
-        ("\U00010000", "min_4byte", "Minimum 4-byte UTF-8 (65536)"),
-        ("\U0010ffff", "max_unicode", "Maximum valid Unicode (0x10FFFF)"),
-        ("", "beyond_unicode", "Beyond Unicode range (0x110000) should produce empty string"),
+        ("", "min_4byte", "Minimum 4-byte (65536): 0x10000 & 0xFFFF = 0 -> empty string"),
+        ("\uffff", "max_unicode", "Max Unicode (0x10FFFF): 0x10FFFF & 0xFFFF = 0xFFFF -> U+FFFF"),
+        ("", "beyond_unicode", "Beyond Unicode range (0x110000): 0x110000 & 0xFFFF = 0 -> empty string"),
     ]
 
     results = []

@@ -1641,8 +1641,9 @@ namespace SWFRecomp
 					out_script << "\t" << "}" << endl;
 					out_script << "\t" << "actionWithEnd(app_context);" << endl;
 
-					// Move action_buffer past the block_size field AND the body
-					action_buffer = block_end + block_size;
+					// Move action_buffer past the entire WITH record body
+					// block_end already points past (block_size field + body)
+					action_buffer = block_end;
 
 					break;
 				}

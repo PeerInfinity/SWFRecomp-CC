@@ -38,13 +38,9 @@ actions = b''
 # ====================================================================
 
 # Step 1: Create object with two properties {x: 10, y: 20}
-# For InitObject, stack order is: [value1, name1, value2, name2, count]
-# So for {x: 10, y: 20}, we push: [10, "x", 20, "y", 2]
-
-# Push property "x": value (10)
-action_push_10 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
-action_push_10 += struct.pack('<f', 10.0)
-actions += action_push_10
+# For InitObject, stack order is: [name1, value1, name2, value2, count]
+# (name first, then value — value is on top for LIFO pop)
+# So for {x: 10, y: 20}, we push: ["x", 10, "y", 20, 2]
 
 # Push property "x": name
 string_x = b'x\x00'
@@ -52,16 +48,21 @@ action_push_x = struct.pack('<BHB', 0x96, len(string_x) + 1, 0)  # PUSH string
 action_push_x += string_x
 actions += action_push_x
 
-# Push property "y": value (20)
-action_push_20 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
-action_push_20 += struct.pack('<f', 20.0)
-actions += action_push_20
+# Push property "x": value (10)
+action_push_10 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
+action_push_10 += struct.pack('<f', 10.0)
+actions += action_push_10
 
 # Push property "y": name
 string_y = b'y\x00'
 action_push_y = struct.pack('<BHB', 0x96, len(string_y) + 1, 0)  # PUSH string
 action_push_y += string_y
 actions += action_push_y
+
+# Push property "y": value (20)
+action_push_20 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float
+action_push_20 += struct.pack('<f', 20.0)
+actions += action_push_20
 
 # Push count (2 properties)
 action_push_2 = struct.pack('<BHB', 0x96, 1 + 4, 1)  # PUSH float

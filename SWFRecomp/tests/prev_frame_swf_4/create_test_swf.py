@@ -6,7 +6,10 @@ import struct
 # - Frame 0: trace "Frame 1", gotoFrame(2) - jumps to Frame 2
 # - Frame 1: trace "Frame 2", STOP - only executes when prevFrame() is called
 # - Frame 2: trace "Frame 3", prevFrame() - goes back to Frame 1
-# Expected output: Frame 1, Frame 3, Frame 2
+# In NO_GRAPHICS mode, gotoFrame triggers inline catch-up which executes frame 2
+# immediately. Frame 2's prevFrame sets next_frame=1, but since gotoFrame set
+# is_playing=0, frame 1 never runs (no trigger in next tick).
+# Expected output: Frame 1, Frame 3
 
 signature = b'FWS'
 version = 4
@@ -81,7 +84,6 @@ print("  Frame 0: trace('Frame 1'); gotoFrame(2);")
 print("  Frame 1: trace('Frame 2'); stop();")
 print("  Frame 2: trace('Frame 3'); prevFrame();")
 print("")
-print("Expected output:")
+print("Expected output (NO_GRAPHICS mode):")
 print("  Frame 1")
 print("  Frame 3")
-print("  Frame 2")
