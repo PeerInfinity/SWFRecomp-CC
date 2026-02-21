@@ -125,6 +125,8 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
             lines.append(f"TEXT_CONTROL {evt.get('code', 'Backspace')}")
         elif t == "FocusGained":
             lines.append("FOCUSGAINED")
+        elif t == "SetClipboardText":
+            lines.append(f"SET_CLIPBOARD_TEXT {evt.get('text', '')}")
         elif t == "FocusLost":
             lines.append("FOCUSLOST")
         # Skip ImePreedit, ImeCommit for now

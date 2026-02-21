@@ -105,6 +105,7 @@ typedef enum {
     EV_TEXT_INPUT,
     EV_TEXT_CONTROL,
     EV_FOCUS_GAINED, EV_FOCUS_LOST,
+    EV_SET_CLIPBOARD_TEXT,
 } InputEventType;
 
 typedef struct {
@@ -112,6 +113,7 @@ typedef struct {
     float x, y;    // for mouse events (stage pixels)
     int code;      // for key events, text codepoint
     char ctrl[32]; // for TEXT_CONTROL
+    char text[1024]; // for SET_CLIPBOARD_TEXT
 } InputEvent;
 
 static InputEvent* g_events = NULL;
@@ -122,7 +124,7 @@ void input_events_load(const char* path)
 {
     FILE* f = fopen(path, "r");
     if (!f) return;
-    char line[256];
+    char line[1088];
     size_t count = 0;
     while (fgets(line, sizeof(line), f)) count++;
     rewind(f);
@@ -157,6 +159,21 @@ void input_events_load(const char* path)
             ev.type = EV_FOCUS_GAINED;
         else if (strncmp(line, "FOCUSLOST", 9) == 0)
             ev.type = EV_FOCUS_LOST;
+        else if (strncmp(line, "SET_CLIPBOARD_TEXT", 18) == 0 && line[18] == ' ') {
+            ev.type = EV_SET_CLIPBOARD_TEXT;
+            // "SET_CLIPBOARD_TEXT " = 19 chars prefix; text starts at position 19
+            strncpy(ev.text, line + 19, sizeof(ev.text) - 1);
+            ev.text[sizeof(ev.text) - 1] = '\0';
+            size_t tlen = strlen(ev.text);
+            while (tlen > 0 && (ev.text[tlen-1] == '\n' || ev.text[tlen-1] == '\r'))
+                ev.text[--tlen] = '\0';
+        }
+        else if (strncmp(line, "SET_CLIPBOARD_TEXT\n", 18) == 0
+              || strncmp(line, "SET_CLIPBOARD_TEXT\r", 18) == 0
+              || strcmp(line, "SET_CLIPBOARD_TEXT") == 0) {
+            ev.type = EV_SET_CLIPBOARD_TEXT;
+            ev.text[0] = '\0';
+        }
         else continue;
         g_events[g_event_count++] = ev;
     }
@@ -235,6 +252,19 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             app_context->keys.down[ev->code] = 0;
         // Broadcast onKeyUp to Key listeners
         actionDispatchKeyUp(app_context);
+        break;
+    case EV_TEXT_CONTROL:
+        if (strcmp(ev->ctrl, "Paste") == 0)
+            actionTextControlPaste(app_context);
+        else if (strcmp(ev->ctrl, "Copy") == 0)
+            actionTextControlCopy(app_context);
+        else if (strcmp(ev->ctrl, "Cut") == 0)
+            actionTextControlCut(app_context);
+        else if (strcmp(ev->ctrl, "SelectAll") == 0)
+            actionTextControlSelectAll(app_context);
+        break;
+    case EV_SET_CLIPBOARD_TEXT:
+        actionSetClipboardText(ev->text);
         break;
     default:
         break;

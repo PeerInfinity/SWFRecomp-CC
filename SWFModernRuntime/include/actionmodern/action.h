@@ -305,4 +305,11 @@ void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context);
 void actionDispatchMCPress(SWFAppContext* app_context);
 void actionDispatchMCRelease(SWFAppContext* app_context);
 void actionDispatchMCMouseMove(SWFAppContext* app_context);
+
+// Clipboard and text control operations — called from swf_core.c on input events.
+void actionSetClipboardText(const char* text);
+void actionTextControlPaste(SWFAppContext* app_context);
+void actionTextControlCopy(SWFAppContext* app_context);
+void actionTextControlCut(SWFAppContext* app_context);
+void actionTextControlSelectAll(SWFAppContext* app_context);
 #endif

@@ -10795,9 +10795,9 @@ void actionCharToAscii(SWFAppContext* app_context)
 	// Get pointer to the UTF-16 string
 	const uint16_t* str = varGetU16Ptr(&v);
 
-	// Handle empty string edge case
+	// Handle empty string edge case — Flash returns 0 (verified via Gnash tests)
 	if (str == NULL || v.str_size == 0) {
-		float result = 0.0f / 0.0f;  // NaN
+		float result = 0.0f;
 		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
 		return;
 	}
@@ -12069,6 +12069,11 @@ static ASObject* g_stage_obj = NULL;
 
 // Currently focused MovieClip (NULL = no focus)
 static MovieClip* g_focused_mc = NULL;
+
+// Clipboard buffer for SetClipboardText / TextControl operations
+static char g_clipboard_text[1024] = {0};
+static size_t g_clipboard_len = 0;
+static int g_tf_select_all = 0;  // 1 = entire text field is selected
 
 // Static function objects for Selection.setFocus / Selection.getFocus
 static ASFunction g_selection_setFocus_func;
@@ -25871,6 +25876,11 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 	mc_call_as2_handler_ng(app_context, new_mc, "onSetFocus", 10);
 	// 3. Update focused MC before broadcasting
 	g_focused_mc = new_mc;
+	// When a text field gains focus, select all text (matches Flash behavior)
+	if (new_mc != NULL && new_mc->ng_textfield_idx >= 0)
+		g_tf_select_all = 1;
+	else
+		g_tf_select_all = 0;
 	// 4. Selection.broadcastMessage("onSetFocus", old_path, new_path)
 	if (!g_selection_obj) return;
 	static const uint16_t s_onSetFocus_u16[] = {
@@ -26192,6 +26202,222 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 	MovieClip* new_mc = tab_order[next_pos];
 	if (new_mc == g_focused_mc) return;
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard + Text Control operations
+// ---------------------------------------------------------------------------
+
+void actionSetClipboardText(const char* text)
+{
+	if (text == NULL) {
+		g_clipboard_text[0] = '\0';
+		g_clipboard_len = 0;
+		return;
+	}
+	size_t len = strlen(text);
+	if (len >= sizeof(g_clipboard_text))
+		len = sizeof(g_clipboard_text) - 1;
+	memcpy(g_clipboard_text, text, len);
+	g_clipboard_text[len] = '\0';
+	g_clipboard_len = len;
+}
+
+void actionTextControlSelectAll(SWFAppContext* app_context)
+{
+	(void)app_context;
+	g_tf_select_all = 1;
+}
+
+void actionTextControlCopy(SWFAppContext* app_context)
+{
+	(void)app_context;
+	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	// Check password flag — password fields don't allow Copy
+	ActionVar* pw_prop = getProperty(props, "password", 8);
+	if (pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0)
+		return;
+
+	// Read text property
+	ActionVar* text_prop = getProperty(props, "text", 4);
+	if (text_prop == NULL || text_prop->type != ACTION_STACK_VALUE_STRING) {
+		g_clipboard_text[0] = '\0';
+		g_clipboard_len = 0;
+		return;
+	}
+
+	const uint16_t* u16 = varGetU16Ptr(text_prop);
+	if (u16 == NULL || text_prop->str_size == 0) {
+		g_clipboard_text[0] = '\0';
+		g_clipboard_len = 0;
+		return;
+	}
+
+	int written = u16_to_utf8(u16, text_prop->str_size, g_clipboard_text, (int)sizeof(g_clipboard_text));
+	g_clipboard_len = (size_t)written;
+}
+
+void actionTextControlCut(SWFAppContext* app_context)
+{
+	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	// Check password flag — password fields: complete no-op (no copy, no delete)
+	ActionVar* pw_prop = getProperty(props, "password", 8);
+	if (pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0)
+		return;
+
+	// Copy text to clipboard first
+	actionTextControlCopy(app_context);
+
+	// Clear the text field
+	static const uint16_t empty_u16[] = {0};
+	ActionVar empty_text = {0};
+	empty_text.type = ACTION_STACK_VALUE_STRING;
+	empty_text.data.numeric_value = (u64)(uintptr_t)empty_u16;
+	empty_text.str_size = 0;
+	setProperty(app_context, props, "text", 4, &empty_text);
+
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = 0.0;
+	setProperty(app_context, props, "length", 6, &len_val);
+
+	ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
+	g_tf_select_all = 0;
+}
+
+// Apply restrict filter: for each char in input, check against restrict string.
+// If tolower(input_char) matches tolower(restrict_char), output the restrict_char.
+// Returns number of bytes written to output (not including NUL).
+static size_t apply_restrict_filter(const char* input, size_t input_len,
+                                     const char* restrict_str, char* output, size_t max_out)
+{
+	size_t out_pos = 0;
+	size_t restrict_len = strlen(restrict_str);
+
+	for (size_t i = 0; i < input_len && out_pos < max_out - 1; i++) {
+		unsigned char ic = (unsigned char)input[i];
+		// For multi-byte UTF-8, pass through bytes that aren't ASCII
+		if (ic >= 0x80) {
+			output[out_pos++] = (char)ic;
+			continue;
+		}
+		char ic_lower = (ic >= 'A' && ic <= 'Z') ? (char)(ic + 32) : (char)ic;
+		int found = 0;
+		for (size_t r = 0; r < restrict_len; r++) {
+			unsigned char rc = (unsigned char)restrict_str[r];
+			if (rc >= 0x80) continue;
+			char rc_lower = (rc >= 'A' && rc <= 'Z') ? (char)(rc + 32) : (char)rc;
+			if (ic_lower == rc_lower) {
+				output[out_pos++] = (char)rc;
+				found = 1;
+				break;
+			}
+		}
+		// If not found in restrict, the character is dropped
+		(void)found;
+	}
+	output[out_pos] = '\0';
+	return out_pos;
+}
+
+void actionTextControlPaste(SWFAppContext* app_context)
+{
+	// Empty clipboard → no-op
+	if (g_clipboard_len == 0) return;
+
+	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	// Start with clipboard text
+	char filtered[1024];
+	size_t filtered_len = g_clipboard_len;
+	memcpy(filtered, g_clipboard_text, g_clipboard_len);
+	filtered[g_clipboard_len] = '\0';
+
+	// Apply restrict filter if set
+	ActionVar* restrict_prop = getProperty(props, "restrict", 8);
+	if (restrict_prop != NULL && restrict_prop->type == ACTION_STACK_VALUE_STRING
+	    && restrict_prop->str_size > 0) {
+		const uint16_t* r_u16 = varGetU16Ptr(restrict_prop);
+		char restrict_utf8[256];
+		if (r_u16 != NULL) {
+			u16_to_utf8(r_u16, restrict_prop->str_size, restrict_utf8, (int)sizeof(restrict_utf8));
+			char restricted[1024];
+			filtered_len = apply_restrict_filter(filtered, filtered_len, restrict_utf8, restricted, sizeof(restricted));
+			memcpy(filtered, restricted, filtered_len);
+			filtered[filtered_len] = '\0';
+		}
+	}
+
+	// If filtered result is empty, no-op
+	if (filtered_len == 0) return;
+
+	// Determine existing text
+	char existing[2048] = {0};
+	size_t existing_len = 0;
+	if (!g_tf_select_all) {
+		ActionVar* text_prop = getProperty(props, "text", 4);
+		if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
+			const uint16_t* t_u16 = varGetU16Ptr(text_prop);
+			if (t_u16 != NULL)
+				existing_len = (size_t)u16_to_utf8(t_u16, text_prop->str_size, existing, (int)sizeof(existing));
+		}
+	}
+
+	// Build result: existing + filtered (or just filtered if select_all)
+	char result[2048];
+	size_t result_len = 0;
+	if (existing_len > 0) {
+		memcpy(result, existing, existing_len);
+		result_len = existing_len;
+	}
+	if (result_len + filtered_len < sizeof(result)) {
+		memcpy(result + result_len, filtered, filtered_len);
+		result_len += filtered_len;
+	}
+	result[result_len] = '\0';
+
+	// Apply maxChars truncation (in characters, not bytes — count UTF-16 code units)
+	ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
+	int max_chars = -1;
+	if (maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
+		double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
+		if (d > 0 && d == d) max_chars = (int)d;
+	}
+
+	// Convert result to UTF-16
+	u32 u16_len = 0;
+	uint16_t* u16_result = utf8_to_u16(app_context, result, (u32)result_len, &u16_len);
+
+	// Truncate to maxChars if needed
+	if (max_chars > 0 && (int)u16_len > max_chars) {
+		u16_len = (u32)max_chars;
+		u16_result[u16_len] = 0;
+	}
+
+	// Set text property
+	ActionVar new_text = {0};
+	new_text.type = ACTION_STACK_VALUE_STRING;
+	new_text.data.numeric_value = (u64)(uintptr_t)u16_result;
+	new_text.str_size = u16_len;
+	setProperty(app_context, props, "text", 4, &new_text);
+
+	// Update length property
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)u16_len;
+	setProperty(app_context, props, "length", 6, &len_val);
+
+	// Sync to variable binding
+	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+	g_tf_select_all = 0;
 }
 
 #endif // NO_GRAPHICS (AS2 MC event dispatch)
