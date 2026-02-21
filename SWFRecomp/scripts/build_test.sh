@@ -195,11 +195,6 @@ cp "${TEST_DIR}/RecompiledScripts"/*.h "${BUILD_DIR}/" 2>/dev/null || true
 cp "${TEST_DIR}/RecompiledTags"/*.c "${BUILD_DIR}/" 2>/dev/null || true
 cp "${TEST_DIR}/RecompiledTags"/*.h "${BUILD_DIR}/" 2>/dev/null || true
 
-# If the test has its own main.c, use it instead of the wrapper
-if [ -f "${TEST_DIR}/main.c" ]; then
-    cp "${TEST_DIR}/main.c" "${BUILD_DIR}/"
-fi
-
 # Build
 if [ "$TARGET" == "wasm" ]; then
     echo "Building WASM with SWFModernRuntime..."
