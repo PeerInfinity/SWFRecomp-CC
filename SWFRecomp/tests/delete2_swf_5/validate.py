@@ -3,7 +3,7 @@
 Validation script for delete2_swf_5
 
 Tests the DELETE2 opcode (0x3B).
-Expected output: 1 (DELETE2 returns true for non-existent properties per Flash spec)
+Expected output: "true" (DELETE2 returns boolean; SWF5+ traces booleans as "true"/"false")
 
 DELETE2 is fully implemented:
 - Searches scope chain for named property
@@ -25,7 +25,7 @@ def validate_output(output):
     """
     Validate test output.
 
-    Expected: "1" (DELETE2 returns true for non-existent properties)
+    Expected: "true" (DELETE2 returns boolean; SWF5+ traces as "true")
     """
     # Filter out runtime debug messages
     filtered_lines = []
@@ -36,11 +36,12 @@ def validate_output(output):
             'SWF Runtime' not in line and
             '===' not in line and
             not line.startswith('[Frame') and
-            not line.startswith('[Tag')):
+            not line.startswith('[Tag') and
+            not line.startswith('[HEAP')):
             filtered_lines.append(line)
 
-    # Test: Delete non-existent property -> 1
-    expected = "1"
+    # Test: Delete non-existent property -> true (SWF5 boolean coercion)
+    expected = "true"
     actual = filtered_lines[0] if filtered_lines else ""
 
     return make_validation_result([

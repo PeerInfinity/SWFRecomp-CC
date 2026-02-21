@@ -17039,17 +17039,50 @@ void actionInitObject(SWFAppContext* app_context)
 		const char* name = NULL;
 		u32 name_length = 0;
 
-		// Handle string name
+		// Coerce property name to string (Flash spec: "The name of the property is converted to a string")
 		char _io_buf[512];
 		if (name_var.type == ACTION_STACK_VALUE_STRING)
 		{
 			name_length = (u32)u16_to_utf8((const uint16_t*)name_var.data.numeric_value, name_var.str_size, _io_buf, sizeof(_io_buf));
 			name = _io_buf;
 		}
+		else if (name_var.type == ACTION_STACK_VALUE_F32 || name_var.type == ACTION_STACK_VALUE_F64)
+		{
+			if (name_var.type == ACTION_STACK_VALUE_F32)
+			{
+				float f = VAL(float, &name_var.data.numeric_value);
+				snprintf(_io_buf, sizeof(_io_buf), "%.15g", f);
+			}
+			else
+			{
+				double d = VAL(double, &name_var.data.numeric_value);
+				snprintf(_io_buf, sizeof(_io_buf), "%.15g", d);
+			}
+			name = _io_buf;
+			name_length = strlen(_io_buf);
+		}
+		else if (name_var.type == ACTION_STACK_VALUE_BOOLEAN)
+		{
+			name = name_var.data.numeric_value ? "true" : "false";
+			name_length = name_var.data.numeric_value ? 4 : 5;
+		}
+		else if (name_var.type == ACTION_STACK_VALUE_NULL)
+		{
+			name = "null";
+			name_length = 4;
+		}
+		else if (name_var.type == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			if (EFFECTIVE_SWF_VERSION() >= 7) {
+				name = "undefined";
+				name_length = 9;
+			} else {
+				name = "";
+				name_length = 0;
+			}
+		}
 		else
 		{
-			// If name is not a string, skip this property
-			fprintf(stderr, "WARNING: Property name is not a string (type=%d), skipping\n", name_var.type);
 			continue;
 		}
 
