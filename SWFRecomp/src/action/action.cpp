@@ -1674,7 +1674,7 @@ namespace SWFRecomp
 								size_t str_id = getStringId((char*) push_value);
 
 								out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
-								           << push_str_len << ", " << str_id << ");" << endl;
+								           << "strlen(str_" << to_string(str_id) << "), " << str_id << ");" << endl;
 
 								break;
 							}
