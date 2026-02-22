@@ -1,28 +1,31 @@
 # Ruffle Test Results Diff
 
-**Previous:** `acb5aaf09d73` (2026-02-22T20:31:47.321776+00:00)
-**Current:** `ebdc0601bed5` (2026-02-22T21:02:54.246670+00:00)
+**Previous:** `ebdc0601bed5` (2026-02-22T21:02:54.246670+00:00)
+**Current:** `5cc8b9b38579` (2026-02-22T21:09:10.555536+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 283 | 284 | +1 |
+| Passing | 284 | 285 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 45.7% | 45.9% | +0.2% |
-| Mismatched lines | 36599 | 36585 | -14 |
-|   Decreased | | | -14 |
+| Pass rate | 45.9% | 46.0% | +0.1% |
+| Mismatched lines | 36585 | 36582 | -3 |
+|   Decreased | | | -5 |
+|   Increased | | | +2 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `local_to_global` | output_mismatch | 47/49 | 49/49 |
+| `closure_scope` | output_mismatch | 2/7 | 7/7 |
 
-## Line Count Changed (3)
+## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `slash_syntax` | output_mismatch | 0/14 | 9/14 | -9 |
-| `tell_target` | output_mismatch | 0/37 | 3/37 | -3 |
 | `goto_methods` | segfault | 8/40 | 8/40 | 0 |
+| `native_objects_swf6` | segfault | 0/84 | 0/84 | 0 |
+| `native_objects_swf7` | segfault | 0/84 | 0/84 | 0 |
+| `native_objects_swf8` | segfault | 0/84 | 0/84 | 0 |
+| `swf5_no_closure` | output_mismatch | 8/19 | 6/19 | +2 |
