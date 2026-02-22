@@ -83,8 +83,8 @@ for test_dir in "${SRC_DIR}"/*/; do
     dest="${SCRIPT_DIR}/${test_name}"
     mkdir -p "${dest}"
 
-    # Copy the essential files: test.swf, output.txt, test.toml, and .as/.fla sources
-    for file in test.swf output.txt test.toml; do
+    # Copy the essential files: test.swf, output.txt, test.toml, input.json, and .as/.fla sources
+    for file in test.swf output.txt test.toml input.json; do
         if [[ -f "${test_dir}/${file}" ]]; then
             cp "${test_dir}/${file}" "${dest}/"
         fi
