@@ -298,6 +298,10 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed);
 void actionDispatchEnterFrameHandlers(SWFAppContext* app_context);
 // Dispatch root timeline onEnterFrame stored in var_map (DefineFunction/SetVariable path).
 void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context);
+// Dispatch _root.onLoad (fires once after first frame completes).
+void actionDispatchRootOnLoad(SWFAppContext* app_context);
+// Check if any onEnterFrame handlers are registered.
+int actionHasEnterFrameHandlers(void);
 
 #ifdef NO_GRAPHICS
 // AS2 MC event dispatch — called from swf_core.c on mouse events.

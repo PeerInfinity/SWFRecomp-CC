@@ -340,9 +340,9 @@ void swfStart(SWFAppContext* app_context)
 #endif
 	size_t tick_count = 0;
 
-	// Continue as long as quit_swf is clear, OR there are still input events to deliver
-	// (allows single-frame SWFs with quit_swf=1 to still process multi-tick input files).
-	while ((!quit_swf || (g_events && g_event_pos < g_event_count)) && tick_count < max_ticks)
+	// Continue until max_ticks. quit_swf prevents timeline looping but per-tick
+	// handlers (onEnterFrame, sprite timelines, clip events) keep firing.
+	while (tick_count < max_ticks)
 	{
 		tick_count++;
 
@@ -373,16 +373,15 @@ void swfStart(SWFAppContext* app_context)
 				}
 			}
 		}
-		else if (g_events && g_event_pos < g_event_count)
+		else
 		{
-			// Past the last frame but input events remain (e.g. single-frame SWF with
-			// quit_swf=1 and 75 input ticks).  Keep dispatching per-tick AS handlers
-			// so that onEnterFrame, sprite timelines, and clip ENTER_FRAME events
-			// continue to fire on every tick while events are being consumed.
+			// Past the last frame: keep dispatching per-tick AS handlers
+			// (onEnterFrame, sprite timelines, clip ENTER_FRAME events).
+			// Break if quit_swf and no remaining input events or handlers.
+			if (quit_swf && !(g_events && g_event_pos < g_event_count)
+			    && !actionHasEnterFrameHandlers()) break;
 			advance_sprite_frames(app_context);
 			actionDispatchEnterFrameHandlers(app_context);
-			// Also dispatch root onEnterFrame set via DefineFunction/SetVariable
-			// (stored in var_map, not dynamic_props — not reached by the function above).
 			actionDispatchRootVarMapEnterFrame(app_context);
 			// Dispatch onClipEvent(enterFrame) clip actions
 			for (size_t _fi = 1; _fi <= max_depth; _fi++)

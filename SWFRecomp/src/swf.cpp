@@ -132,7 +132,8 @@ namespace SWFRecomp
 								 has_streaming_sound(false),
 							 shape_has_alpha(false),
 							 shape_is_v4(false),
-							 shape_is_morph2(false)
+							 shape_is_morph2(false),
+							 use_network(false)
 	{
 		// Configure reusable struct records
 		//
@@ -666,7 +667,8 @@ namespace SWFRecomp
 		context.constants_header << endl << endl
 								 << "#define BITMAP_COUNT " << to_string(current_bitmap) << endl
 								 << "#define BITMAP_HIGHEST_W " << to_string(highest_w) << endl
-								 << "#define BITMAP_HIGHEST_H " << to_string(highest_h);
+								 << "#define BITMAP_HIGHEST_H " << to_string(highest_h) << endl
+								 << "#define SWF_USE_NETWORK " << (use_network ? "1" : "0");
 
 		// Add FRAME_COUNT to out.h for ActionCall opcode
 		context.out_script_header << endl << endl
@@ -3098,12 +3100,18 @@ namespace SWFRecomp
 				tag.parseFields(cur_pos);
 				
 				u8 flags = (u8) tag.fields[0].value;
-				
+
 				if ((flags & 0b00001000) != 0)
 				{
 					//EXC("ActionScript 3 SWFs not implemented.\n");
 				}
-				
+
+				// Bit 0: UseNetwork
+				if ((flags & 0b00000001) != 0)
+				{
+					use_network = true;
+				}
+
 				break;
 			}
 			
