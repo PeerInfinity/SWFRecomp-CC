@@ -12920,7 +12920,21 @@ void actionGetVariable(SWFAppContext* app_context)
 			else { PUSH(ACTION_STACK_VALUE_UNDEFINED, 0); }
 			return;
 		}
-		// Not found on clip — fall through to global variable table
+		// Not found on clip — check _global properties before global var table.
+		// In Flash, tellTarget(mc) { foo } resolves _global.foo, NOT root timeline foo.
+		{
+			extern ASObject* global_object;
+			if (global_object != NULL)
+			{
+				ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+				if (gprop != NULL)
+				{
+					PUSH_VAR(gprop);
+					return;
+				}
+			}
+		}
+		// Fall through to global variable table (for actionDefineLocal vars outside functions)
 	}
 
 	if (var == NULL)
