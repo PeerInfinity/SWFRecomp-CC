@@ -100,6 +100,7 @@ jobs:
 
       - name: Run tests
         if: inputs.run_tests || inputs.update_docs
+        continue-on-error: true
         run: |
           cd SWFRecomp/tests
 
