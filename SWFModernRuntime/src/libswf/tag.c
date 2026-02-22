@@ -1335,6 +1335,68 @@ void dispatch_clip_event_release(SWFAppContext* app_context)
 		actionSetCurrentContext(saved_ctx);
 	}
 }
+// ---------------------------------------------------------------------------
+// Generic clip event flag dispatch (MOUSE_DOWN/UP/MOVE, KEY_DOWN/UP)
+// ---------------------------------------------------------------------------
+// These are GLOBAL clip events — fire on ALL clips in the display list that
+// have a matching clip action, regardless of mouse position.
+
+static void dispatch_clip_event_flag_dl(SWFAppContext* app_context,
+    DisplayObject* dl, size_t dl_max_depth, uint32_t flag, MovieClip* parent_mc)
+{
+	for (size_t i = 1; i <= dl_max_depth; i++)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		// Fire matching clip actions on this entry
+		if (obj->clip_action_count > 0)
+		{
+			int has_flag = 0;
+			for (size_t a = 0; a < obj->clip_action_count; a++)
+			{
+				if (obj->clip_actions[a].event_flags & flag) { has_flag = 1; break; }
+			}
+			if (has_flag)
+			{
+				MovieClip* saved_ctx = g_current_context;
+				if (obj->instance_name)
+				{
+					MovieClip* mc = actionFindOrCreateMovieClip(app_context,
+					    obj->instance_name, parent_mc);
+					if (mc) actionSetCurrentContext(mc);
+				}
+				for (size_t a = 0; a < obj->clip_action_count; a++)
+				{
+					if (obj->clip_actions[a].event_flags & flag)
+						obj->clip_actions[a].action(app_context);
+				}
+				actionSetCurrentContext(saved_ctx);
+			}
+		}
+
+		// Recurse into sprite children
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+		{
+			MovieClip* child_parent = parent_mc;
+			if (obj->instance_name)
+			{
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context,
+				    obj->instance_name, parent_mc);
+				if (mc) child_parent = mc;
+			}
+			dispatch_clip_event_flag_dl(app_context,
+			    obj->sprite_display_list, obj->sprite_max_depth, flag, child_parent);
+		}
+	}
+}
+
+void dispatch_clip_event_flag(SWFAppContext* app_context, uint32_t flag)
+{
+	dispatch_clip_event_flag_dl(app_context, display_list, max_depth, flag,
+	    &root_movieclip);
+}
+
 #endif // NO_GRAPHICS
 
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id,

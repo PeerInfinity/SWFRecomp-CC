@@ -2886,6 +2886,64 @@ static void setLocalCTRaw(MovieClip* mc,
 		(double)rb, (double)gb, (double)bb, (double)ab);
 }
 
+// Compute _xmouse/_ymouse for an MC by transforming the global mouse position
+// (in pixels) through the MC's inverse world matrix to local coordinates.
+// For root MC this is just the global mouse position (identity transform).
+static void mc_get_local_mouse(SWFAppContext* app_context, MovieClip* mc,
+    float* out_x, float* out_y)
+{
+	extern MovieClip root_movieclip;
+	float global_mx = app_context->mouse.stage_x / 20.0f;  // twips → pixels
+	float global_my = app_context->mouse.stage_y / 20.0f;
+
+	if (mc == NULL || mc == &root_movieclip) {
+		*out_x = global_mx;
+		*out_y = global_my;
+		return;
+	}
+
+	// Build world matrix by composing bottom-up (same as globalToLocal)
+	float wa, wb, wc, wd;
+	int32_t wtx, wty;
+	getLocalMatrixForMC_render(mc, &wa, &wb, &wc, &wd, &wtx, &wty);
+	for (MovieClip* par = mc->parent; par != NULL; par = par->parent) {
+		float pa, pb, pc, pd;
+		int32_t ptx, pty;
+		getLocalMatrixForMC_render(par, &pa, &pb, &pc, &pd, &ptx, &pty);
+		float mtxf = (float)wtx, mtyf = (float)wty;
+		float na = pa * wa + pc * wb;
+		float nb = pb * wa + pd * wb;
+		float nc = pa * wc + pc * wd;
+		float nd = pb * wc + pd * wd;
+		int32_t ntx = (int32_t)rintf(pa * mtxf + pc * mtyf) + ptx;
+		int32_t nty = (int32_t)rintf(pb * mtxf + pd * mtyf) + pty;
+		wa = na; wb = nb; wc = nc; wd = nd; wtx = ntx; wty = nty;
+	}
+
+	// Invert the world matrix (same as globalToLocal)
+	float det = wa * wd - wb * wc;
+	if (fabsf(det) > 1.1920929e-7f) {
+		float ia =  wd / det;
+		float ib =  wb / -det;
+		float ic =  wc / -det;
+		float id =  wa / det;
+		float ftx = (float)wtx, fty = (float)wty;
+		int32_t itx = (int32_t)rintf((wd * ftx - wc * fty) / -det);
+		int32_t ity = (int32_t)rintf((wb * ftx - wa * fty) / det);
+		// Transform global mouse point (pixels→twips, invert, twips→pixels)
+		float ptx = (float)((int32_t)(global_mx * 20.0));
+		float pty = (float)((int32_t)(global_my * 20.0));
+		int32_t lx_tw = (int32_t)rintf(ia * ptx + ic * pty) + itx;
+		int32_t ly_tw = (int32_t)rintf(ib * ptx + id * pty) + ity;
+		*out_x = (float)((double)lx_tw / 20.0);
+		*out_y = (float)((double)ly_tw / 20.0);
+	} else {
+		// Degenerate matrix: fall back to global coords
+		*out_x = global_mx;
+		*out_y = global_my;
+	}
+}
+
 // Extract CT raw Fixed8 values from a ColorTransform ASObject.
 static void ctObjToRaw(ASObject* ct_obj,
 	s16* ra, s16* ga, s16* ba, s16* aa,
@@ -12038,8 +12096,9 @@ static void initAsBroadcasterFuncs(SWFAppContext* app_context)
     (void)app_context;
 }
 
-// Forward declaration (defined later in ensureGlobalInit block)
+// Forward declarations (defined later in ensureGlobalInit block)
 static ASObject* g_key_obj;
+static ASObject* g_mouse_obj;
 
 // ============================================================================
 // Key object methods: isDown, getCode, getAscii, isToggled
@@ -12346,6 +12405,47 @@ void actionDispatchKeyUp(SWFAppContext* app_context)
     method_name.data.numeric_value = (u64)(uintptr_t)onKeyUp_u16;
     method_name.str_size = 7;
     builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_key_obj);
+}
+
+// Dispatch onMouseDown/onMouseUp/onMouseMove to all Mouse listeners.
+// Called from swf_core.c after delivering mouse events.
+void actionDispatchMouseDown(SWFAppContext* app_context)
+{
+    if (!g_mouse_obj) return;
+    static const uint16_t onMouseDown_u16[] = {
+        'o','n','M','o','u','s','e','D','o','w','n'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onMouseDown_u16;
+    method_name.str_size = 11;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+}
+
+void actionDispatchMouseUp(SWFAppContext* app_context)
+{
+    if (!g_mouse_obj) return;
+    static const uint16_t onMouseUp_u16[] = {
+        'o','n','M','o','u','s','e','U','p'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onMouseUp_u16;
+    method_name.str_size = 9;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+}
+
+void actionDispatchMouseMove(SWFAppContext* app_context)
+{
+    if (!g_mouse_obj) return;
+    static const uint16_t onMouseMove_u16[] = {
+        'o','n','M','o','u','s','e','M','o','v','e'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onMouseMove_u16;
+    method_name.str_size = 11;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
 }
 
 static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
@@ -13764,8 +13864,22 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(var_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
-			if (strcasecmp(var_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_xmouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)lx})); return;
+#else
+				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
+			if (strcasecmp(var_name, "_ymouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)ly})); return;
+#else
+				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
 		}
 
 		// Check display list children by instance name (e.g., GetVariable("clip"))
@@ -14555,10 +14669,20 @@ void actionGetProperty(SWFAppContext* app_context)
 			is_string = 1;
 			break;
 		case 20: // _xmouse (SWF 5+)
+#ifdef NO_GRAPHICS
+			if (mc) { float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly); value = lx; }
+			else { value = 0.0f; }
+#else
 			value = mc ? mc->xmouse : 0.0f;
+#endif
 			break;
 		case 21: // _ymouse (SWF 5+)
+#ifdef NO_GRAPHICS
+			if (mc) { float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly); value = ly; }
+			else { value = 0.0f; }
+#else
 			value = mc ? mc->ymouse : 0.0f;
+#endif
 			break;
 		default:
 			// Unknown/out-of-range property index - push undefined (Flash behavior)
@@ -18227,8 +18351,22 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(prop_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
-			if (strcasecmp(prop_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_xmouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)lx})); return;
+#else
+				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
+			if (strcasecmp(prop_name, "_ymouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)ly})); return;
+#else
+				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
 			if (strcasecmp(prop_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_focusrect") == 0) {
 				// _focusrect defaults to null in Flash (not a number)

@@ -195,7 +195,11 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             g_drag_virt_x = ms->stage_x;
             g_drag_virt_y = ms->stage_y;
         }
-        // Run per-event button state machine (before MC mouse move dispatch)
+        // Dispatch onClipEvent(mouseMove) to all clips
+        dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_MOVE);
+        // Broadcast Mouse.onMouseMove to Mouse listeners
+        actionDispatchMouseMove(app_context);
+        // Run per-event button state machine
         ng_update_button_states(app_context);
         // Dispatch AS2 roll/drag over/out events to dynamic MCs
         actionDispatchMCMouseMove(app_context);
@@ -209,6 +213,10 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         app_context->keys.toggled[1] ^= 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
+        // Dispatch onClipEvent(mouseDown) to all clips
+        dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_DOWN);
+        // Broadcast Mouse.onMouseDown to Mouse listeners
+        actionDispatchMouseDown(app_context);
         // Run per-event button state machine (processes OverUpToOverDown = press)
         ng_update_button_states(app_context);
         dispatch_clip_event_press(app_context);
@@ -222,6 +230,10 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ms->released = 1;
         root_movieclip.xmouse = ev->x;
         root_movieclip.ymouse = ev->y;
+        // Dispatch onClipEvent(mouseUp) to all clips
+        dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_UP);
+        // Broadcast Mouse.onMouseUp to Mouse listeners
+        actionDispatchMouseUp(app_context);
         // Run per-event button state machine (processes OverDownToOverUp = release)
         ng_update_button_states(app_context);
         dispatch_clip_event_release(app_context);
@@ -237,6 +249,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         app_context->keys.last_key_down = ev->code;
         // ASCII value: printable ASCII range (32-126)
         app_context->keys.last_key_ascii = (ev->code >= 32 && ev->code <= 126) ? ev->code : 0;
+        // Dispatch onClipEvent(keyDown) to all clips
+        dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_DOWN);
         // Broadcast onKeyDown to Key listeners, then check button key conditions
         actionDispatchKeyDown(app_context);
         dispatch_button_key_actions(app_context, ev->code);
@@ -250,6 +264,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
     case EV_KEY_UP:
         if (ev->code >= 0 && ev->code < 256)
             app_context->keys.down[ev->code] = 0;
+        // Dispatch onClipEvent(keyUp) to all clips
+        dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_UP);
         // Broadcast onKeyUp to Key listeners
         actionDispatchKeyUp(app_context);
         break;
