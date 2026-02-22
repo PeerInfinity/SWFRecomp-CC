@@ -7827,6 +7827,9 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 #define MAX_CHILD_MOVIECLIPS 128
 MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 int child_mc_count = 0;
+// MCs at index >= this threshold were just placed in the current frame's
+// process_sprite_needs_init and should not fire onEnterFrame until next frame.
+int g_enterframe_new_mc_start = -1;  // -1 = no skip
 
 static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
 
@@ -12075,6 +12078,8 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
+		// Skip MCs placed in the current frame's process_sprite_needs_init
+		if (g_enterframe_new_mc_start >= 0 && i >= g_enterframe_new_mc_start) continue;
 
 		ASObject* props = (ASObject*) mc->dynamic_props;
 		ActionVar* ef_prop = getProperty(props, "onEnterFrame", 12);
@@ -13593,6 +13598,16 @@ void actionGetVariable(SWFAppContext* app_context)
 					// Non-scriptable type (shape, statictext, morphshape, image) — resolves to parent MC
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 					return;
+				}
+				// SWF5: buttons are transparent — accessing button by name returns parent MC
+				if (g_swf_version < 6) {
+					extern DisplayObject* display_list;
+					extern Character* dictionary;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+						return;
+					}
 				}
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
 				if (child_mc != NULL)
@@ -17968,6 +17983,18 @@ void actionGetMember(SWFAppContext* app_context)
 				child_depth = ng_findChildEntryDepth(mc->name, child_name_buf);
 			}
 			if (child_depth != SIZE_MAX) {
+				// SWF5: buttons are transparent — accessing mc.buttonName returns mc itself
+				if (g_swf_version < 6) {
+					extern Character* dictionary;
+					DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+					if (parent_dobj != NULL && parent_dobj->sprite_display_list != NULL) {
+						size_t _cid = parent_dobj->sprite_display_list[child_depth].char_id;
+						if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+							return;
+						}
+					}
+				}
 				// Found as nested child of mc -- create MC with parent=mc and correct depth
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
@@ -17979,6 +18006,16 @@ void actionGetMember(SWFAppContext* app_context)
 			// Fall back to root-level name search
 			child_depth = ng_findDisplayEntryByName(child_name_buf);
 			if (child_depth != SIZE_MAX) {
+				// SWF5: buttons are transparent
+				if (g_swf_version < 6) {
+					extern Character* dictionary;
+					extern DisplayObject* display_list;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+						return;
+					}
+				}
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);

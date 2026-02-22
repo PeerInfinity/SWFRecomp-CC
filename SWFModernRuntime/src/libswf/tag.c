@@ -761,6 +761,12 @@ void tagShowFrame(SWFAppContext* app_context)
 		extern void ng_sync_root_display_obj(void);
 		ng_sync_root_display_obj();
 
+		// Record MC count before sprite/button init — MCs created during init
+		// should not fire onEnterFrame on their placement frame.
+		extern int child_mc_count;
+		extern int g_enterframe_new_mc_start;
+		int mc_count_before = child_mc_count;
+
 		int saved_catch_up = catch_up_mode;
 		catch_up_mode = 0;
 		process_sprite_needs_init(app_context, &root_movieclip);
@@ -769,9 +775,11 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
 		ng_fire_pending_loads(app_context);
 
-		// Dispatch AS2 mc.onEnterFrame property handlers for all initialized MCs.
-		// This fires in reverse-creation order (front-to-back) matching Flash behavior.
+		// Dispatch AS2 mc.onEnterFrame property handlers, but skip MCs
+		// created during process_sprite_needs_init (they fire next frame).
+		g_enterframe_new_mc_start = mc_count_before;
 		actionDispatchEnterFrameHandlers(app_context);
+		g_enterframe_new_mc_start = -1;  // reset skip threshold
 	}
 #else
 	// --- Advance sprite timelines (recursive) ---
