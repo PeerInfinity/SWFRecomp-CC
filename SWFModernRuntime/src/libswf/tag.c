@@ -1412,6 +1412,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		// Skip timeline modify on clips moved by swapDepths
 		if (display_list[depth].depth_swapped) return;
+		// Skip timeline modify on clips whose color transform was set by script
+		// (e.g. Color.setTransform). In Flash, once script touches a display object's
+		// color transform, subsequent PlaceObject2 modify operations are ignored
+		// entirely — both the matrix and the color transform are preserved.
+		if (display_list[depth].cx_overridden) return;
 		// Modify operation (HasCharacter=0): update transform/cxform only, preserve identity.
 		display_list[depth].transform_id = transform_id;
 		display_list[depth].cxform_id = cxform_id;
