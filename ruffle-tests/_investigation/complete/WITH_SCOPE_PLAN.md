@@ -1,13 +1,25 @@
 # With Statement Scope Implementation Plan
 <!-- TESTS: with, with_variable_scopes, define_local, this_scoping, closure_scope -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-22
 
-## Status: PHASES 1-3 IMPLEMENTED
+## Status: ALL PHASES (1-5) COMPLETE
 
 ### Results
-- **`with_variable_scopes`**: 24/43 → **43/43 (PASS)** — fully passing now
-- **`with`**: 30/49 → still failing, but MC identity (lines 3,6,9) and undefined/null error messages now work. Remaining failures: addProperty in scope chain (Phase 4), `this` binding in with, string primitive wrapping (Phase 5).
+- **`with_variable_scopes`**: 24/43 → **43/43 (PASS)** ✅
+- **`with`**: 30/49 → **49/49 (PASS)** ✅
+- **`closure_scope`**: **PASS** ✅ (closure scope chain capture working)
+- **`define_local`**: output_mismatch (DefineLocal with virtual property setters — separate issue)
+- **`this_scoping`**: output_mismatch (partial — `this` binding in some call contexts still differs)
+
+### Implementation Summary
+All 5 phases have been implemented:
+- **Phase 1**: Function vs WITH scope distinction (`scope_is_with[]` array) ✅
+- **Phase 2**: MovieClip identity in scope chain (`scope_mc[]` array, MC builtin property lookup) ✅
+- **Phase 3**: with(undefined/null) skip (returns 0, recompiler wraps body in conditional) ✅
+- **Phase 4**: addProperty getters/setters in scope chain (virtual property checking via `findPropertyStructWithPrototype`) ✅
+- **Phase 5**: Primitive wrapping (string wrapping creates temporary ASObject with length/valueOf) ✅
+- **Bonus**: Closure scope capture (`captured_scope[]`, `captured_scope_mc[]`, `captured_scope_is_with[]` on ASFunction) ✅
 
 ## Overview
 

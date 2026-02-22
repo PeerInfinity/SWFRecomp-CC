@@ -1,12 +1,13 @@
 # Drag and Drop Implementation Plan
 <!-- TESTS: drag_drop, drag_over_from_outside, drag_over_without_startdrag, mouse_hover_events_while_dragging -->
 
-Last updated: 2026-02-20
+Last updated: 2026-02-22
 
 ## Status: NOT STARTED
 
-Prerequisites: input-event-injection.md Phases 0–7 COMPLETE (mouse state tracked, hit testing
-available). This plan adds `startDrag`/`stopDrag` MovieClip methods and `_droptarget` property.
+Input event injection Phases 1-4 are complete (event pump, mouse/key state). Remaining blocker is **Phase 0 of input-event-injection.md** (struct unification — `tag_stubs.c` still exists, hit_test.c not in trace builds).
+
+Prerequisites remaining: input-event-injection.md **Phase 0** (struct unification) + Phase 6 (per-clip hit testing). This plan adds `startDrag`/`stopDrag` MovieClip methods and `_droptarget` property.
 
 ---
 

@@ -1,29 +1,39 @@
 # Color Object Implementation Plan
 <!-- TESTS: color, color_transform, transform, issue_1906, matrix -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-22
 
-## Overview
+## Status: MOSTLY COMPLETE
+
+All 5 tests now PASS on CI. The Color class, flash.geom.ColorTransform, flash.geom.Matrix, flash.geom.Transform, and flash.geom.Point/Rectangle are all functional.
+
+### Current Results
+
+| Test | Status | Notes |
+|------|--------|-------|
+| color | **PASS** ✅ | Color constructor, getRGB/setRGB, getTransform/setTransform all functional |
+| color_transform | **PASS** ✅ | flash.geom.ColorTransform constructor and methods working |
+| transform | **PASS** ✅ | flash.geom.Transform wired to MovieClip, pixelBounds for nested sprites |
+| issue_1906 | **PASS** ✅ | |
+| matrix | **PASS** ✅ | flash.geom.Matrix toString and methods working |
+
+### Implementation Summary
+
+- **Color class**: Constructor takes MovieClip target; getRGB/setRGB/getTransform/setTransform all functional via `ng_getColorTransform()`/`ng_setColorTransform()` in NO_GRAPHICS mode
+- **flash.geom.ColorTransform**: Functional constructor with 8 parameters (ra,ga,ba,aa,rb,gb,bb,ab)
+- **flash.geom.Matrix**: Functional constructor, toString, identity values
+- **flash.geom.Transform**: `createTransformObject()` reads actual clip data (no longer hardcoded identity)
+- **Color.prototype methods**: getRGB, setRGB, getTransform, setTransform registered and functional
+
+### Remaining Work
+
+Most Color/Transform infrastructure is complete. Remaining gaps:
+- Color transform setters that modify actual clip rendering (NO_GRAPHICS mode stores values but doesn't apply to display)
+- Some edge cases in flash.geom API (concat, invert, etc.) may still be stubs
+
+## Overview (original)
 
 The Color object family spans two related but distinct APIs: the **AVM1 `Color` class** (Flash 5+) and the **AS2 `flash.geom` package** (Flash 8+) containing `ColorTransform`, `Matrix`, and `Transform`. Together they affect 4 failing tests (+ `issue_1906`), and improving them also benefits the `matrix`, `point`, and `rectangle` tests which share the `flash.geom` infrastructure.
-
-**Current state**:
-- `Color` is registered as a global stub constructor (no functional implementation)
-- `flash.geom.ColorTransform`, `flash.geom.Matrix`, `flash.geom.Transform` are stub constructors in the flash.geom package (no functional implementation)
-- `createTransformObject()` exists in action.c and creates a Transform object for `mc.transform` property access, but returns hardcoded identity values (static toString strings), doesn't read actual clip data, and doesn't support setters
-- The `transform` test already matches 50/70 lines because the comment/trace lines and `[object Object]`/`undefined` lines match by coincidence
-
-**Tests affected**:
-
-| Test | Expected Lines | Current Match | Current % |
-|------|---------------|---------------|-----------|
-| color | 57 | 2 | 4% |
-| color_transform | 48 | 7 | 15% |
-| transform | 70 | 50 | 71% |
-| issue_1906 | 4 | 2 | 50% |
-| **Total** | **179** | **61** | **34%** |
-
-Additionally, improvements to `flash.geom.Matrix`'s toString() will benefit the `matrix` test (123/171, 72%), and a working `flash.geom.ColorTransform` constructor helps with other tests that use it.
 
 ---
 

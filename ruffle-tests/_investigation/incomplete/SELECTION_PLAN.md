@@ -9,7 +9,7 @@ The `Selection` object is a built-in global static object (NOT a constructor —
 
 **Tests**: 2 direct tests (`selection`, `selection_handlers`), plus `edittext_focus_selection` (categorized under TextField) that depends on Selection.
 
-**Current state**: `g_selection_obj` is allocated as an empty `ASObject` and registered on `_global` as `"Selection"` (action.c:7741-7748). No methods are implemented.
+**Current state (updated 2026-02-22)**: `g_selection_obj` is allocated as an empty `ASObject` and registered on `_global` as `"Selection"`. Input event injection Phases 1-4 are complete (event pump, mouse/key state). Text control actions (Copy/Cut/Paste/SelectAll, clipboard) are implemented in action.c. Focus tracking and Selection methods (setFocus, getFocus, setSelection, getBeginIndex, etc.) are not yet implemented. The remaining infrastructure blocker is **Phase 0 of input-event-injection.md** (struct unification) for hit-test-based focus acquisition.
 
 ---
 

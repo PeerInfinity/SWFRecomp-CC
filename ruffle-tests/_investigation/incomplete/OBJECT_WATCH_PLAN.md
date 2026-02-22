@@ -1,9 +1,30 @@
 # Object.watch / Object.unwatch Implementation Plan
 <!-- TESTS: watch, watch_textfield, watch_virtual_property, watch_virtual_property_proto -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-22
 
-## Overview
+## Status: PHASE 1 COMPLETE (3/4 tests passing)
+
+### CI Results (2026-02-22)
+
+| Test | CI Status | Notes |
+|------|-----------|-------|
+| watch | **PASS** ✅ | Core watch/unwatch fully working |
+| watch_textfield | output_mismatch | Watch callback not fired on TextField.text assignment (MC built-in property path) |
+| watch_virtual_property | output_mismatch | addProperty interaction not working (known_failure even in Ruffle) |
+| watch_virtual_property_proto | **PASS** ✅ | Watch on prototype chain properties working |
+
+### Implementation Summary
+- **Data structure**: Global `WatchEntry g_watch_table[MAX_WATCH_ENTRIES]` (pragmatic alternative to per-object approach proposed below)
+- **Registration**: `builtin_object_watch()` and `builtin_object_unwatch()` on Object.prototype
+- **Invocation**: Watch callbacks fire in `actionSetVariable()` (timeline variables) and `actionSetMember()` (object properties)
+- **Missing**: Watch check in MovieClip built-in property assignment path (explains watch_textfield failure)
+
+### Remaining Work
+- **watch_textfield**: Add watch table check in the MC built-in property set path (where `.text`, `._x`, etc. are assigned directly) — small fix
+- **watch_virtual_property**: addProperty registration doesn't invoke watches — low priority (known_failure in Ruffle)
+
+## Overview (original)
 
 `Object.prototype.watch()` and `Object.prototype.unwatch()` allow registering callbacks that fire when a property value changes. The callback can modify or reject the new value. This is a Flash-native feature (not standard ECMAScript) available in all SWF versions.
 
@@ -12,8 +33,6 @@ Last updated: 2026-02-15
 - `watch_textfield` (13 lines) — watch on built-in TextField property (`text`)
 - `watch_virtual_property` (62 lines, `known_failure = true`) — interaction with addProperty
 - `watch_virtual_property_proto` (3 lines) — watch on prototype chain properties
-
-**Estimated difficulty**: Medium — the core mechanism is simple, but it touches multiple property-set code paths and must interact correctly with the existing virtual property (addProperty) system.
 
 ---
 
