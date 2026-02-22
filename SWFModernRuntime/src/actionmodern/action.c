@@ -403,6 +403,11 @@ typedef struct ASFunction {
 
 	// Own properties on the function object itself (e.g., toString override)
 	ASObject* own_props;  // Created lazily when SetMember is called
+
+	// Captured scope chain (WITH scope entries at time of definition)
+	u8 captured_scope_count;
+	ASObject* captured_scope[8];   // scope objects (WITH scopes only)
+	MovieClip* captured_scope_mc[8]; // associated MovieClip (if any)
 } ASFunction;
 
 // Function registry
@@ -19904,6 +19909,19 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
 
+	// Capture WITH scope chain entries at definition time.
+	// AVM1 closures (both DefineFunction and DefineFunction2) capture the scope chain.
+	as_func->captured_scope_count = 0;
+	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
+	{
+		if (scope_is_with[si] && scope_chain[si] != NULL)
+		{
+			u8 idx = as_func->captured_scope_count++;
+			as_func->captured_scope[idx] = scope_chain[si];
+			as_func->captured_scope_mc[idx] = scope_mc[si];
+		}
+	}
+
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
 		function_registry[function_count++] = as_func;
@@ -19946,6 +19964,19 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	as_func->flags = flags;
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
+
+	// Capture WITH scope chain entries at definition time.
+	as_func->captured_scope_count = 0;
+	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
+	{
+		if (scope_is_with[si] && scope_chain[si] != NULL)
+		{
+			u8 idx = as_func->captured_scope_count++;
+			as_func->captured_scope[idx] = scope_chain[si];
+			as_func->captured_scope_mc[idx] = scope_mc[si];
+		}
+	}
+
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
 		function_registry[function_count++] = as_func;
@@ -21199,6 +21230,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Start with capacity for a few local variables
 				ASObject* local_scope = allocObject(app_context, 8);
 
+				// Restore captured WITH scope chain entries from definition time
+				u8 captured_count = func->captured_scope_count;
+				for (u8 ci = 0; ci < captured_count; ci++)
+				{
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 1;
+						scope_mc[scope_depth] = func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = func->captured_scope[ci];
+					}
+				}
+
 				// Push local scope onto scope chain
 				if (scope_depth < MAX_SCOPE_DEPTH) {
 					scope_is_with[scope_depth] = 0;
@@ -21249,9 +21291,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 				g_current_executing_func = prev_executing_func;
 
-				// Pop local scope from scope chain
-				if (scope_depth > 0) {
-					scope_depth--;
+				// Pop local scope + captured scopes from scope chain
+				for (u8 ci = 0; ci < captured_count + 1; ci++)
+				{
+					if (scope_depth > 0) scope_depth--;
 				}
 
 				// Clean up local scope object
@@ -21287,6 +21330,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				args_var.data.numeric_value = (u64) arguments_arr;
 				setProperty(app_context, local_scope, "arguments", 9, &args_var);
 
+				// Restore captured WITH scope chain entries from definition time
+				u8 captured_count_t1 = func->captured_scope_count;
+				for (u8 ci = 0; ci < captured_count_t1; ci++)
+				{
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 1;
+						scope_mc[scope_depth] = func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = func->captured_scope[ci];
+					}
+				}
+
 				// Push local scope onto scope chain
 				if (scope_depth < MAX_SCOPE_DEPTH) {
 					scope_is_with[scope_depth] = 0;
@@ -21313,7 +21367,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Pop all items we pushed: num_args actual args + padding up to param_count
 					u32 total_pushed = num_args > func->param_count ? num_args : func->param_count;
 					for (u32 i = 0; i < total_pushed; i++) { POP(); }
-					if (scope_depth > 0) { scope_depth--; }
+					// Pop local scope + captured scopes
+					for (u8 ci = 0; ci < captured_count_t1 + 1; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
 					releaseObject(app_context, local_scope);
 
 					// Check if this is a built-in converter function (called without new)
@@ -21392,9 +21449,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					g_current_executing_func = prev_executing_func_t1;
 
-					// Pop local scope from scope chain
-					if (scope_depth > 0) {
-						scope_depth--;
+					// Pop local scope + captured scopes from scope chain
+					for (u8 ci = 0; ci < captured_count_t1 + 1; ci++) {
+						if (scope_depth > 0) scope_depth--;
 					}
 					releaseObject(app_context, local_scope);
 

@@ -1445,19 +1445,29 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		extern int catch_up_backward;
 		extern size_t catch_up_target;
-		if (catch_up_backward && display_list[depth].char_id == char_id)
+		if (catch_up_backward && display_list[depth].char_id != 0)
 		{
-			// Treat as modify: update transform/cxform, preserve sprite state
-			display_list[depth].transform_id = transform_id;
-			display_list[depth].cxform_id = cxform_id;
-			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
-			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
-			display_list[depth].placed_at_frame = current_frame;
-			display_list[depth].place_gen = g_place_gen;
-			init_cx_fields(&display_list[depth]);
-			ng_on_place_object2(app_context, depth, char_id);
-			display_list[depth].sprite_needs_init = 0;
-			return;
+			if (display_list[depth].char_id == char_id)
+			{
+				// Same character: treat as modify, preserve sprite state
+				display_list[depth].transform_id = transform_id;
+				display_list[depth].cxform_id = cxform_id;
+				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+				if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+				display_list[depth].placed_at_frame = current_frame;
+				display_list[depth].place_gen = g_place_gen;
+				init_cx_fields(&display_list[depth]);
+				ng_on_place_object2(app_context, depth, char_id);
+				display_list[depth].sprite_needs_init = 0;
+				return;
+			}
+			// Different character at this depth during intermediate backward catch-up:
+			// if the current occupant was placed at a later frame, skip this placement.
+			// The later frame's tag will re-establish the correct entry.
+			if (catch_up_mode && display_list[depth].placed_at_frame > current_frame)
+			{
+				return;
+			}
 		}
 	}
 #endif
@@ -1598,19 +1608,27 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	// During backward goto catch-up, preserve existing sprite at same depth/char
 	{
 		extern int catch_up_backward;
-		if (catch_up_backward && display_list[depth].char_id == char_id)
+		extern int catch_up_mode;
+		if (catch_up_backward && display_list[depth].char_id != 0)
 		{
-			display_list[depth].transform_id = transform_id;
-			display_list[depth].cxform_id = cxform_id;
-			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
-			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
-			display_list[depth].ratio = ratio;
-			display_list[depth].placed_at_frame = current_frame;
-			display_list[depth].place_gen = g_place_gen;
-			init_cx_fields(&display_list[depth]);
-			ng_on_place_object2(app_context, depth, char_id);
-			display_list[depth].sprite_needs_init = 0;
-			return;
+			if (display_list[depth].char_id == char_id)
+			{
+				display_list[depth].transform_id = transform_id;
+				display_list[depth].cxform_id = cxform_id;
+				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+				if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+				display_list[depth].ratio = ratio;
+				display_list[depth].placed_at_frame = current_frame;
+				display_list[depth].place_gen = g_place_gen;
+				init_cx_fields(&display_list[depth]);
+				ng_on_place_object2(app_context, depth, char_id);
+				display_list[depth].sprite_needs_init = 0;
+				return;
+			}
+			if (catch_up_mode && display_list[depth].placed_at_frame > current_frame)
+			{
+				return;
+			}
 		}
 	}
 #endif
