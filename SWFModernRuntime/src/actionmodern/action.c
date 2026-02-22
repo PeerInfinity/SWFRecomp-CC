@@ -403,6 +403,11 @@ typedef struct ASFunction {
 
 	// Own properties on the function object itself (e.g., toString override)
 	ASObject* own_props;  // Created lazily when SetMember is called
+
+	// Captured scope chain (WITH scope entries at time of definition)
+	u8 captured_scope_count;
+	ASObject* captured_scope[8];   // scope objects (WITH scopes only)
+	MovieClip* captured_scope_mc[8]; // associated MovieClip (if any)
 } ASFunction;
 
 // Function registry
@@ -7683,8 +7688,9 @@ extern void ng_swapDisplayDepths(const char* name1, const char* name2);
  * Called by ActionCloneSprite in graphics mode
  */
 static void cloneMovieClip(const char* source_name, const char* target_name, int depth) {
-	printf("[CloneSprite] STUB: source='%s' -> target='%s' (depth=%d)\n",
-	       source_name, target_name, depth);
+	(void)source_name;
+	(void)target_name;
+	(void)depth;
 }
 #endif
 
@@ -11314,10 +11320,6 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 	extern int manual_next_frame;
 	extern int is_playing;
 
-	// Debug output
-	printf("// GoToLabel: %s\n", label ? label : "(null)");
-	fflush(stdout);
-
 	if (!label)
 	{
 		return;
@@ -11561,14 +11563,9 @@ void actionStopSounds(SWFAppContext* app_context)
  */
 void actionGetURL(SWFAppContext* app_context, const char* url, const char* target)
 {
-	// Handle null pointers
-	const char* safe_url = url ? url : "(null)";
-	const char* safe_target = target ? target : "(null)";
-
-	// Log the URL request for verification in NO_GRAPHICS mode
-	// Format: "// GetURL: <url> -> <target>"
-	printf("// GetURL: %s -> %s\n", safe_url, safe_target);
-
+	(void)app_context;
+	(void)url;
+	(void)target;
 	// Note: Full implementation would check target type and dispatch accordingly:
 	// - _level targets: Load SWF file into specified level
 	// - Browser targets (_blank, _self, etc.): Open in browser window/frame
@@ -15670,16 +15667,11 @@ void actionCall(SWFAppContext* app_context)
 		// Handle negative frames (ignore)
 		s32 frame_num = (s32)frame_float;
 		if (frame_num < 0) {
-			printf("// Call: negative frame %d (ignored)\n", frame_num);
-			fflush(stdout);
 			return;
 		}
 
 		// Validate frame is in range
 		if (g_frame_funcs && (size_t)frame_num < g_frame_count) {
-			printf("// Call: frame %d\n", frame_num);
-			fflush(stdout);
-
 			// Save quit_swf state to prevent frame from terminating execution
 			int saved_quit_swf = quit_swf;
 			quit_swf = 0;
@@ -15690,9 +15682,6 @@ void actionCall(SWFAppContext* app_context)
 
 			// Restore quit_swf state (only quit if we were already quitting)
 			quit_swf = saved_quit_swf;
-		} else {
-			printf("// Call: frame %d out of range (ignored, total frames: %zu)\n", frame_num, g_frame_count);
-			fflush(stdout);
 		}
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
@@ -15706,8 +15695,6 @@ void actionCall(SWFAppContext* app_context)
 		const char* frame_str = _ac_buf;
 
 		if (frame_str[0] == '\0') {
-			printf("// Call: null frame identifier (ignored)\n");
-			fflush(stdout);
 			return;
 		}
 
@@ -15736,26 +15723,14 @@ void actionCall(SWFAppContext* app_context)
 		if (endptr != frame_part && *endptr == '\0') {
 			// It's a numeric frame
 			if (frame_num < 0) {
-				if (target) {
-					printf("// Call: target '%s', negative frame %ld (ignored)\n", target, frame_num);
-				} else {
-					printf("// Call: negative frame %ld (ignored)\n", frame_num);
-				}
-				fflush(stdout);
 				return;
 			}
 
 			if (target) {
-				// Target path specified - requires MovieClip infrastructure
-				printf("// Call: target '%s', frame %ld (target paths not implemented)\n", target, frame_num);
-				fflush(stdout);
-				// Note: Full implementation would require MovieClip tree traversal
+				// Target path specified - not yet implemented (requires MovieClip tree traversal)
 			} else {
 				// Main timeline - can execute
 				if (g_frame_funcs && (size_t)frame_num < g_frame_count) {
-					printf("// Call: frame %ld\n", frame_num);
-					fflush(stdout);
-
 					// Save quit_swf state to prevent frame from terminating execution
 					int saved_quit_swf = quit_swf;
 					quit_swf = 0;
@@ -15765,51 +15740,20 @@ void actionCall(SWFAppContext* app_context)
 
 					// Restore quit_swf state
 					quit_swf = saved_quit_swf;
-				} else {
-					printf("// Call: frame %ld out of range (ignored, total frames: %zu)\n", frame_num, g_frame_count);
-					fflush(stdout);
 				}
 			}
 		} else {
-			// It's a frame label
-			if (target) {
-				printf("// Call: target '%s', label '%s' (frame labels not implemented)\n", target, frame_part);
-			} else {
-				printf("// Call: label '%s' (frame labels not implemented)\n", frame_part);
-			}
-			fflush(stdout);
-
+			// It's a frame label - not yet implemented
 			// Note: Frame label lookup requires:
 			// - Frame label registry (mapping labels to frame numbers)
 			// - SWFRecomp to parse FrameLabel tags (tag type 43) and generate the registry
 			// - MovieClip context switching for target paths
 		}
 	}
-	else if (frame_var.type == ACTION_STACK_VALUE_UNDEFINED) {
-		// Undefined - ignore
-		printf("// Call: undefined frame (ignored)\n");
-		fflush(stdout);
-	}
 	else {
-		// Invalid type - ignore with warning
-		printf("// Call: invalid frame type %d (ignored)\n", frame_var.type);
-		fflush(stdout);
+		// Undefined or invalid type - ignore
 	}
 	// If frame not found or invalid, do nothing (per SWF spec)
-}
-
-// Helper function to print a string value (UTF-16 → UTF-8 for output)
-static void printStringValue(ActionVar* var)
-{
-	if (var->type == ACTION_STACK_VALUE_STRING) {
-		const uint16_t* u16 = varGetU16Ptr(var);
-		if (u16 != NULL && var->str_size > 0) {
-			char utf8_buf[4096];
-			int utf8_len = u16_to_utf8(u16, var->str_size, utf8_buf, sizeof(utf8_buf));
-			fwrite(utf8_buf, 1, utf8_len, stdout);
-		}
-	}
-	// For other types, print nothing (empty string)
 }
 
 /**
@@ -15856,11 +15800,6 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 	convertString(app_context, url_str);
 	popVar(app_context, &url_var);
 
-	// Determine HTTP method
-	const char* method = "NONE";
-	if (send_vars_method == 1) method = "GET";
-	else if (send_vars_method == 2) method = "POST";
-
 	// Handle FSCommand: protocol (e.g. fscommand("quit", ""))
 	// The URL is "FSCommand:<command>"; handle silently without printing.
 	if (url_var.type == ACTION_STACK_VALUE_STRING && url_var.str_size >= 10) {
@@ -15877,54 +15816,10 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 		}
 	}
 
-	// Determine operation type
-	bool is_sprite = (load_target_flag == 1);
-	bool load_vars = (load_variables_flag == 1);
-
-	// Log the operation (NO_GRAPHICS mode implementation)
-	// In a full implementation, this would perform the actual operation
-	if (is_sprite) {
-		// Load into sprite/movieclip
-		if (load_vars) {
-			// Load variables into sprite
-			// Full implementation: Make HTTP request, parse x-www-form-urlencoded response,
-			// set variables in target sprite scope
-			printf("// LoadVariables: ");
-			printStringValue(&url_var);
-			printf(" -> ");
-			printStringValue(&target_var);
-			printf(" (method: %s)\n", method);
-		} else {
-			// Load SWF into sprite
-			// Full implementation: Download SWF file, parse it, load into target sprite path
-			printf("// LoadMovie: ");
-			printStringValue(&url_var);
-			printf(" -> ");
-			printStringValue(&target_var);
-			printf("\n");
-		}
-	} else {
-		// Load into browser window
-		if (load_vars) {
-			// Load variables into timeline
-			// Full implementation: Make HTTP request, parse response, set variables in timeline
-			printf("// LoadVariables: ");
-			printStringValue(&url_var);
-			printf(" (method: %s)\n", method);
-		} else {
-			// Open URL in browser
-			// Full implementation: Open URL in specified browser window/frame using
-			// platform-specific APIs (e.g., system(), ShellExecute on Windows, open on macOS)
-			printf("// OpenURL: ");
-			printStringValue(&url_var);
-			printf(" (target: ");
-			printStringValue(&target_var);
-			if (send_vars_method != 0) {
-				printf(", method: %s", method);
-			}
-			printf(")\n");
-		}
-	}
+	// Full URL loading/variables not yet implemented
+	(void)send_vars_method;
+	(void)load_target_flag;
+	(void)load_variables_flag;
 }
 
 void actionInitArray(SWFAppContext* app_context)
@@ -20014,6 +19909,19 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
 
+	// Capture WITH scope chain entries at definition time.
+	// AVM1 closures (both DefineFunction and DefineFunction2) capture the scope chain.
+	as_func->captured_scope_count = 0;
+	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
+	{
+		if (scope_is_with[si] && scope_chain[si] != NULL)
+		{
+			u8 idx = as_func->captured_scope_count++;
+			as_func->captured_scope[idx] = scope_chain[si];
+			as_func->captured_scope_mc[idx] = scope_mc[si];
+		}
+	}
+
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
 		function_registry[function_count++] = as_func;
@@ -20056,6 +19964,19 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	as_func->flags = flags;
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
+
+	// Capture WITH scope chain entries at definition time.
+	as_func->captured_scope_count = 0;
+	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
+	{
+		if (scope_is_with[si] && scope_chain[si] != NULL)
+		{
+			u8 idx = as_func->captured_scope_count++;
+			as_func->captured_scope[idx] = scope_chain[si];
+			as_func->captured_scope_mc[idx] = scope_mc[si];
+		}
+	}
+
 	// Register function
 	if (function_count < MAX_FUNCTIONS) {
 		function_registry[function_count++] = as_func;
@@ -21309,6 +21230,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Start with capacity for a few local variables
 				ASObject* local_scope = allocObject(app_context, 8);
 
+				// Restore captured WITH scope chain entries from definition time
+				u8 captured_count = func->captured_scope_count;
+				for (u8 ci = 0; ci < captured_count; ci++)
+				{
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 1;
+						scope_mc[scope_depth] = func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = func->captured_scope[ci];
+					}
+				}
+
 				// Push local scope onto scope chain
 				if (scope_depth < MAX_SCOPE_DEPTH) {
 					scope_is_with[scope_depth] = 0;
@@ -21359,9 +21291,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 				g_current_executing_func = prev_executing_func;
 
-				// Pop local scope from scope chain
-				if (scope_depth > 0) {
-					scope_depth--;
+				// Pop local scope + captured scopes from scope chain
+				for (u8 ci = 0; ci < captured_count + 1; ci++)
+				{
+					if (scope_depth > 0) scope_depth--;
 				}
 
 				// Clean up local scope object
@@ -21397,6 +21330,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				args_var.data.numeric_value = (u64) arguments_arr;
 				setProperty(app_context, local_scope, "arguments", 9, &args_var);
 
+				// Restore captured WITH scope chain entries from definition time
+				u8 captured_count_t1 = func->captured_scope_count;
+				for (u8 ci = 0; ci < captured_count_t1; ci++)
+				{
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 1;
+						scope_mc[scope_depth] = func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = func->captured_scope[ci];
+					}
+				}
+
 				// Push local scope onto scope chain
 				if (scope_depth < MAX_SCOPE_DEPTH) {
 					scope_is_with[scope_depth] = 0;
@@ -21423,7 +21367,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Pop all items we pushed: num_args actual args + padding up to param_count
 					u32 total_pushed = num_args > func->param_count ? num_args : func->param_count;
 					for (u32 i = 0; i < total_pushed; i++) { POP(); }
-					if (scope_depth > 0) { scope_depth--; }
+					// Pop local scope + captured scopes
+					for (u8 ci = 0; ci < captured_count_t1 + 1; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
 					releaseObject(app_context, local_scope);
 
 					// Check if this is a built-in converter function (called without new)
@@ -21502,9 +21449,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					g_current_executing_func = prev_executing_func_t1;
 
-					// Pop local scope from scope chain
-					if (scope_depth > 0) {
-						scope_depth--;
+					// Pop local scope + captured scopes from scope chain
+					for (u8 ci = 0; ci < captured_count_t1 + 1; ci++) {
+						if (scope_depth > 0) scope_depth--;
 					}
 					releaseObject(app_context, local_scope);
 

@@ -357,7 +357,6 @@ void swfStart(SWFAppContext* app_context)
 		// the same tick (matching Flash/Ruffle's frame-then-event execution order).
 		if (current_frame < g_frame_count)
 		{
-			printf("[Frame %zu]\n", current_frame);
 			// Advance child sprite timelines BEFORE running frame tags/scripts
 			// (Flash executes child frame advancement before parent DoAction)
 			advance_sprite_frames(app_context);
@@ -370,7 +369,6 @@ void swfStart(SWFAppContext* app_context)
 				}
 				else
 				{
-					printf("No function for frame %zu, stopping.\n", current_frame);
 					break;
 				}
 			}

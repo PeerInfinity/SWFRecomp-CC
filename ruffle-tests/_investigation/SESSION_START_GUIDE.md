@@ -102,6 +102,10 @@ The SWF file format specification (version 19) is at `SWFRecompDocs/specs/swf-sp
 | `ruffle-results-filtered.md` | Human-readable filtered report |
 | `ruffle-results-diff.md` | Human-readable diff report |
 
+### Local Ruffle repository
+
+If running locally, the Ruffle source repository is available at `~/CC/ruffle`. This can be useful for inspecting test source code, understanding expected behavior, or checking how Ruffle implements specific features.
+
 ### Test data location
 
 Each test lives in: `ruffle-tests/{test_name}/`

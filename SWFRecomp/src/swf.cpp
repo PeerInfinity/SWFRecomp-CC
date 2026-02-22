@@ -683,8 +683,6 @@ namespace SWFRecomp
 	
 	void SWF::interpretTag(Context& context, SWFTag& tag)
 	{
-		printf("tag code: %d, tag length: %d\n", tag.code, tag.length);
-		
 		if (another_frame && tag.code != SWF_TAG_END_TAG)
 		{
 			context.tag_main << "}" << endl << endl
@@ -3241,7 +3239,7 @@ namespace SWFRecomp
 						break;
 
 					sub_tag.parseHeader(cur_pos);
-					printf("  sprite sub-tag code: %d, length: %d\n", sub_tag.code, sub_tag.length);
+	
 
 					// Open new frame function if previous was closed by ShowFrame
 					if (sprite_another_frame && sub_tag.code != SWF_TAG_END_TAG)

@@ -852,8 +852,15 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 		}
 		else
 		{
-			// Level-1 nested sprite bounds not supported (return empty)
-			return 0;
+			// Level-1 nested: find child in parent's sprite display list
+			if (parent_d < 1 || parent_d > max_depth || display_list[parent_d].char_id == 0) return 0;
+			DisplayObject* parent_obj = &display_list[parent_d];
+			if (parent_obj->sprite_display_list == NULL) return 0;
+			if (child_d < 1 || child_d > parent_obj->sprite_max_depth) return 0;
+			DisplayObject* child_obj = &parent_obj->sprite_display_list[child_d];
+			if (child_obj->char_id == 0 || child_obj->sprite_display_list == NULL) return 0;
+			dl     = child_obj->sprite_display_list;
+			dl_max = child_obj->sprite_max_depth;
 		}
 	}
 
