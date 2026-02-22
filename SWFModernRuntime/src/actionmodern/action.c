@@ -406,10 +406,11 @@ typedef struct ASFunction {
 	// Own properties on the function object itself (e.g., toString override)
 	ASObject* own_props;  // Created lazily when SetMember is called
 
-	// Captured scope chain (WITH scope entries at time of definition)
+	// Captured scope chain (scope entries at time of definition)
 	u8 captured_scope_count;
-	ASObject* captured_scope[8];   // scope objects (WITH scopes only)
+	ASObject* captured_scope[8];   // scope objects
 	MovieClip* captured_scope_mc[8]; // associated MovieClip (if any)
+	u8 captured_scope_is_with[8]; // 1 = with scope, 0 = local scope
 } ASFunction;
 
 // Function registry
@@ -20399,16 +20400,19 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
 
-	// Capture WITH scope chain entries at definition time.
-	// AVM1 closures (both DefineFunction and DefineFunction2) capture the scope chain.
+	// Capture scope chain entries at definition time.
+	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
 	as_func->captured_scope_count = 0;
 	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
 	{
-		if (scope_is_with[si] && scope_chain[si] != NULL)
+		if (scope_chain[si] != NULL)
 		{
 			u8 idx = as_func->captured_scope_count++;
 			as_func->captured_scope[idx] = scope_chain[si];
 			as_func->captured_scope_mc[idx] = scope_mc[si];
+			as_func->captured_scope_is_with[idx] = scope_is_with[si];
+			// Retain local scopes so they survive after the enclosing function returns
+			if (!scope_is_with[si]) retainObject(scope_chain[si]);
 		}
 	}
 
@@ -20455,15 +20459,19 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
 
-	// Capture WITH scope chain entries at definition time.
+	// Capture scope chain entries at definition time.
+	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
 	as_func->captured_scope_count = 0;
 	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
 	{
-		if (scope_is_with[si] && scope_chain[si] != NULL)
+		if (scope_chain[si] != NULL)
 		{
 			u8 idx = as_func->captured_scope_count++;
 			as_func->captured_scope[idx] = scope_chain[si];
 			as_func->captured_scope_mc[idx] = scope_mc[si];
+			as_func->captured_scope_is_with[idx] = scope_is_with[si];
+			// Retain local scopes so they survive after the enclosing function returns
+			if (!scope_is_with[si]) retainObject(scope_chain[si]);
 		}
 	}
 
@@ -21720,12 +21728,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Start with capacity for a few local variables
 				ASObject* local_scope = allocObject(app_context, 8);
 
-				// Restore captured WITH scope chain entries from definition time
+				// Restore captured scope chain entries from definition time
 				u8 captured_count = func->captured_scope_count;
 				for (u8 ci = 0; ci < captured_count; ci++)
 				{
 					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 1;
+						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
 						scope_mc[scope_depth] = func->captured_scope_mc[ci];
 						scope_chain[scope_depth++] = func->captured_scope[ci];
 					}
@@ -21820,12 +21828,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				args_var.data.numeric_value = (u64) arguments_arr;
 				setProperty(app_context, local_scope, "arguments", 9, &args_var);
 
-				// Restore captured WITH scope chain entries from definition time
+				// Restore captured scope chain entries from definition time
 				u8 captured_count_t1 = func->captured_scope_count;
 				for (u8 ci = 0; ci < captured_count_t1; ci++)
 				{
 					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 1;
+						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
 						scope_mc[scope_depth] = func->captured_scope_mc[ci];
 						scope_chain[scope_depth++] = func->captured_scope[ci];
 					}
