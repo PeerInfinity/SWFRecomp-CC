@@ -7711,6 +7711,101 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 	return NULL;  // Other paths not supported yet
 }
 
+// Forward declarations for resolveSlashPathToMC
+static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
+
+// Resolve a slash-separated MC path (e.g., "/clip1/clip2", "../clip1/clip2", "clip2")
+// relative to a starting MC. Returns the target MC or NULL if not found.
+// Does NOT handle colon — caller should split on ':' first.
+static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
+	if (path_len == 0 || start_mc == NULL) return NULL;
+
+	MovieClip* mc = start_mc;
+
+	// Absolute path: leading '/' means start from root
+	u32 pos = 0;
+	if (path[0] == '/') {
+		mc = &root_movieclip;
+		pos = 1;
+		if (pos >= path_len) return mc; // just "/"
+	}
+
+	while (pos < path_len) {
+		// Find next '/' separator
+		u32 seg_start = pos;
+		while (pos < path_len && path[pos] != '/') pos++;
+		u32 seg_len = pos - seg_start;
+
+		// Empty segment means consecutive slashes (or slash at end of path after separator skip)
+		if (seg_len == 0) {
+			// A single trailing slash is valid (pos == path_len after the inner while).
+			// But double slash (//) is always invalid — if there's more path or
+			// if we arrived here because the separator-skip already consumed one '/'.
+			if (pos == path_len) break; // single trailing slash = OK
+			return NULL; // double slash or other invalid pattern
+		}
+
+		if (seg_len == 2 && path[seg_start] == '.' && path[seg_start + 1] == '.') {
+			// ".." = go to parent
+			if (mc->parent != NULL) mc = mc->parent;
+			else return NULL; // no parent = invalid path
+		} else {
+			// Named child segment — find child MC by name
+			char seg_buf[64];
+			u32 copy_len = seg_len < 63 ? seg_len : 63;
+			memcpy(seg_buf, path + seg_start, copy_len);
+			seg_buf[copy_len] = '\0';
+
+			// Special names
+			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+				mc = &root_movieclip;
+			} else {
+#ifdef NO_GRAPHICS
+				// Try direct child lookup via display_obj sprite_display_list
+				size_t child_depth = SIZE_MAX;
+				if (mc->display_obj != NULL) {
+					DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+					if (parent_dobj->sprite_display_list != NULL) {
+						for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
+							DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
+							if (_ch->char_id == 0) continue;
+							if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
+								child_depth = _cd;
+								break;
+							}
+						}
+					}
+				}
+				// Fall back to ng_findChildEntryDepth
+				if (child_depth == SIZE_MAX && mc->name[0] != '\0') {
+					child_depth = ng_findChildEntryDepth(mc->name, seg_buf);
+				}
+				// Fall back to root-level search if mc is root
+				if (child_depth == SIZE_MAX && mc == &root_movieclip) {
+					child_depth = ng_findDisplayEntryByName(seg_buf);
+				}
+				if (child_depth == SIZE_MAX) return NULL; // child not found
+				// exec_sprite_frame registers all MCs with parent=root_movieclip,
+				// so try findOrCreateMovieClip with root as parent first (to reuse
+				// existing MC with its dynamic_props), then fall back to mc as parent.
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, seg_buf, &root_movieclip);
+				if (child_mc == NULL) child_mc = findOrCreateMovieClip(app_context, seg_buf, mc);
+				if (child_mc == NULL) return NULL;
+				child_mc->depth = (int)child_depth - 16384;
+				mc = child_mc;
+#else
+				(void)app_context;
+				return NULL; // graphics mode: slash-path not supported
+#endif
+			}
+		}
+
+		if (pos < path_len) pos++; // skip the '/' separator
+	}
+
+	return mc;
+}
+
 #ifndef NO_GRAPHICS
 // Targeted sprite for SetTarget — when non-NULL, play/stop/goto operate on this sprite
 static DisplayObject* targeted_sprite = NULL;
@@ -12293,6 +12388,49 @@ static ASObject* g_mouse_obj = NULL;
 static ASObject* g_selection_obj = NULL;
 static ASObject* g_stage_obj = NULL;
 
+// Helper: create a string ActionVar from a UTF-8 string
+static ActionVar makeStringActionVar(SWFAppContext* app_context, const char* str, u32 len)
+{
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len = 0;
+	uint16_t* u16 = utf8_to_u16(app_context, str, len, &u16_len);
+	ret.str_size = u16_len;
+	ret.data.numeric_value = (u64)u16;
+	return ret;
+}
+
+// Stage.align normalization: filter to L/T/R/B chars (case-insensitive), uppercase, deduplicate, canonical order
+static void normalizeStageAlign(const char* input, u32 input_len, char* out, u32* out_len)
+{
+	int has_l = 0, has_t = 0, has_r = 0, has_b = 0;
+	for (u32 i = 0; i < input_len; i++) {
+		char c = input[i];
+		if (c == 'L' || c == 'l') has_l = 1;
+		else if (c == 'T' || c == 't') has_t = 1;
+		else if (c == 'R' || c == 'r') has_r = 1;
+		else if (c == 'B' || c == 'b') has_b = 1;
+	}
+	u32 pos = 0;
+	if (has_l) out[pos++] = 'L';
+	if (has_t) out[pos++] = 'T';
+	if (has_r) out[pos++] = 'R';
+	if (has_b) out[pos++] = 'B';
+	out[pos] = '\0';
+	*out_len = pos;
+}
+
+// Stage.scaleMode normalization: case-insensitive match to canonical form
+// Returns canonical string or NULL if not a valid scaleMode value
+static const char* normalizeStageScaleMode(const char* input, u32 input_len)
+{
+	if (input_len == 7 && strncasecmp(input, "showAll", 7) == 0) return "showAll";
+	if (input_len == 7 && strncasecmp(input, "noScale", 7) == 0) return "noScale";
+	if (input_len == 8 && strncasecmp(input, "exactFit", 8) == 0) return "exactFit";
+	if (input_len == 8 && strncasecmp(input, "noBorder", 8) == 0) return "noBorder";
+	return NULL; // invalid value
+}
+
 // Currently focused MovieClip (NULL = no focus)
 static MovieClip* g_focused_mc = NULL;
 
@@ -12639,6 +12777,26 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		installAsBroadcaster(app_context, g_key_obj);
 		installKeyMethods(app_context, g_key_obj);
 		installAsBroadcaster(app_context, g_stage_obj);
+		// Stage default properties
+		{
+			ActionVar sv;
+			sv = makeStringActionVar(app_context, "", 0);
+			setProperty(app_context, g_stage_obj, "align", 5, &sv);
+			sv = makeStringActionVar(app_context, "showAll", 7);
+			setProperty(app_context, g_stage_obj, "scaleMode", 9, &sv);
+			sv = makeStringActionVar(app_context, "normal", 6);
+			setProperty(app_context, g_stage_obj, "displayState", 12, &sv);
+			sv = makeF64((double)FRAME_WIDTH);
+			setProperty(app_context, g_stage_obj, "width", 5, &sv);
+			sv = makeF64((double)FRAME_HEIGHT);
+			setProperty(app_context, g_stage_obj, "height", 6, &sv);
+			sv = makeStringActionVar(app_context, "HIGH", 4);
+			setProperty(app_context, g_stage_obj, "quality", 7, &sv);
+			ActionVar bv = {0};
+			bv.type = ACTION_STACK_VALUE_BOOLEAN;
+			bv.data.numeric_value = 1;
+			setProperty(app_context, g_stage_obj, "showMenu", 8, &bv);
+		}
 		installAsBroadcaster(app_context, g_selection_obj);
 
 		// Install Selection.setFocus and Selection.getFocus
@@ -12737,6 +12895,54 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	// Pop variable name
 	POP();
+
+	// Handle colon-path + slash-path resolution (SWF4 syntax: "path:var" or "/path/to/mc:var")
+	{
+		char* colon = (var_name_len > 1) ? (char*)memchr(var_name, ':', var_name_len) : NULL;
+		if (colon != NULL)
+		{
+			u32 target_len = (u32)(colon - var_name);
+			const char* prop_name = colon + 1;
+			u32 prop_len = var_name_len - target_len - 1;
+
+			// Resolve target MC path
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, target_len, ctx);
+			if (target_mc != NULL && prop_len > 0) {
+				// Check MC's dynamic_props first
+				if (target_mc->dynamic_props != NULL) {
+					ActionVar* prop = getProperty((ASObject*)target_mc->dynamic_props, prop_name, prop_len);
+					if (prop != NULL) { PUSH_VAR(prop); return; }
+				}
+				// Fall back to global variables — in our architecture, timeline
+				// variables (DefineLocal outside functions) go to globals
+				{
+					extern hashmap* var_map;
+					ActionVar* gvar;
+					if (var_map != NULL && hashmap_get(var_map, prop_name, prop_len, (uintptr_t*)&gvar)) {
+						if (gvar != NULL && !(gvar->type == ACTION_STACK_VALUE_STRING && gvar->str_size == 0 && gvar->data.string_data.heap_ptr == NULL)) {
+							PUSH_VAR(gvar); return;
+						}
+					}
+				}
+			}
+			// Not found — push undefined
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+		// Also handle pure slash-paths without colon (e.g., "/clip1/clip2" resolves to MC)
+		if (var_name_len > 0 && (var_name[0] == '/' || (var_name_len >= 2 && var_name[0] == '.' && var_name[1] == '.')))
+		{
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, var_name_len, ctx);
+			if (target_mc != NULL) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+			} else {
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			}
+			return;
+		}
+	}
 
 	// Handle dot-path resolution (e.g., "a.b.c", "_root.x.y", "_global.x.y.z")
 	{
@@ -13659,6 +13865,37 @@ void actionSetVariable(SWFAppContext* app_context)
 	u32 _sv_u16_len = VAL(u32, &STACK[var_name_sp + 8]);
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[var_name_sp + 16]), _sv_u16_len, _sv_buf, sizeof(_sv_buf));
 	char* var_name = _sv_buf;
+
+	// Handle colon-path + slash-path resolution for SetVariable (SWF4 syntax: "path:var")
+	{
+		char* colon = (var_name_len > 1) ? (char*)memchr(var_name, ':', var_name_len) : NULL;
+		if (colon != NULL)
+		{
+			u32 target_len = (u32)(colon - var_name);
+			const char* prop_name = colon + 1;
+			u32 prop_len = var_name_len - target_len - 1;
+
+			// Resolve target MC path
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, target_len, ctx);
+			if (target_mc != NULL && prop_len > 0) {
+				// Ensure dynamic_props exists
+				if (target_mc->dynamic_props == NULL) {
+					target_mc->dynamic_props = (void*) allocObject(app_context, 16);
+					retainObject((ASObject*) target_mc->dynamic_props);
+				}
+				// Read value from stack, pop both name and value
+				ActionVar value_var;
+				peekVar(app_context, &value_var);
+				POP_2();
+				setProperty(app_context, (ASObject*)target_mc->dynamic_props, prop_name, prop_len, &value_var);
+			} else {
+				// Invalid path — silently ignore (pop both name and value)
+				POP_2();
+			}
+			return;
+		}
+	}
 
 	// Handle dot-path resolution for SetVariable (e.g., "a.b.c" → resolve a.b, then SetMember c)
 	{
@@ -16290,6 +16527,102 @@ void actionSetMember(SWFAppContext* app_context)
 			if (isTextFormatInstance(obj) && textFormatSetProperty(app_context, obj, prop_name, prop_name_len, &value_var))
 			{
 				return;
+			}
+			// Stage property setters: normalize align, scaleMode, displayState
+			if (obj == g_stage_obj && prop_name != NULL)
+			{
+				if (prop_name_len == 5 && memcmp(prop_name, "align", 5) == 0)
+				{
+					// Convert value to string first
+					char val_buf[512];
+					u32 val_len = 0;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						val_len = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value, value_var.str_size, val_buf, sizeof(val_buf));
+					} else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
+						const char* bs = value_var.data.numeric_value ? "true" : "false";
+						val_len = value_var.data.numeric_value ? 4 : 5;
+						memcpy(val_buf, bs, val_len); val_buf[val_len] = '\0';
+					} else if (value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+						val_len = 0; val_buf[0] = '\0';
+					} else {
+						val_len = 0; val_buf[0] = '\0';
+					}
+					char norm_buf[8];
+					u32 norm_len = 0;
+					normalizeStageAlign(val_buf, val_len, norm_buf, &norm_len);
+					ActionVar sv = makeStringActionVar(app_context, norm_buf, norm_len);
+					setProperty(app_context, obj, "align", 5, &sv);
+					return;
+				}
+				if (prop_name_len == 9 && memcmp(prop_name, "scaleMode", 9) == 0)
+				{
+					char val_buf[512];
+					u32 val_len = 0;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						val_len = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value, value_var.str_size, val_buf, sizeof(val_buf));
+					} else {
+						// Non-string values (boolean, undefined, etc.) → reset to "showAll"
+						ActionVar sv = makeStringActionVar(app_context, "showAll", 7);
+						setProperty(app_context, obj, "scaleMode", 9, &sv);
+						return;
+					}
+					const char* canonical = normalizeStageScaleMode(val_buf, val_len);
+					if (canonical == NULL) canonical = "showAll"; // invalid → reset to showAll
+					ActionVar sv = makeStringActionVar(app_context, canonical, (u32)strlen(canonical));
+					setProperty(app_context, obj, "scaleMode", 9, &sv);
+					return;
+				}
+				if (prop_name_len == 12 && memcmp(prop_name, "displayState", 12) == 0)
+				{
+					char val_buf[512];
+					u32 val_len = 0;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						val_len = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value, value_var.str_size, val_buf, sizeof(val_buf));
+					} else {
+						return; // Non-string → no change
+					}
+					// Read current displayState
+					char old_state[32] = "";
+					{
+						ActionVar* old_ds = getProperty(obj, "displayState", 12);
+						if (old_ds && old_ds->type == ACTION_STACK_VALUE_STRING) {
+							u16_to_utf8((const uint16_t*)old_ds->data.numeric_value, old_ds->str_size, old_state, sizeof(old_state));
+						}
+					}
+					const char* new_state = NULL;
+					if (val_len == 6 && strncasecmp(val_buf, "normal", 6) == 0) {
+						new_state = "normal";
+					} else if (val_len == 10 && strncasecmp(val_buf, "fullScreen", 10) == 0) {
+						new_state = "fullScreen";
+					}
+					if (new_state != NULL) {
+						ActionVar sv = makeStringActionVar(app_context, new_state, (u32)strlen(new_state));
+						setProperty(app_context, obj, "displayState", 12, &sv);
+						// Fire Stage.broadcastMessage("onFullScreen", bFull) if state actually changed
+						if (strcmp(old_state, new_state) != 0) {
+							int is_full = (strcmp(new_state, "fullScreen") == 0);
+							static const uint16_t onFullScreen_u16[] = {
+								'o','n','F','u','l','l','S','c','r','e','e','n'
+							};
+							ActionVar bm_args[2];
+							bm_args[0].type = ACTION_STACK_VALUE_STRING;
+							bm_args[0].data.numeric_value = (u64)(uintptr_t)onFullScreen_u16;
+							bm_args[0].str_size = 12;
+							bm_args[1].type = ACTION_STACK_VALUE_BOOLEAN;
+							bm_args[1].data.numeric_value = is_full ? 1 : 0;
+							bm_args[1].str_size = 0;
+							builtin_broadcaster_broadcastMessage(app_context, bm_args, 2, NULL, (void*)obj);
+						}
+					}
+					// Invalid value → no change
+					return;
+				}
+				// Stage.width and Stage.height are read-only — silently ignore writes
+				if ((prop_name_len == 5 && memcmp(prop_name, "width", 5) == 0) ||
+				    (prop_name_len == 6 && memcmp(prop_name, "height", 6) == 0))
+				{
+					return;
+				}
 			}
 			// Rectangle computed property setters
 			if (g_rect_prototype != NULL) {
