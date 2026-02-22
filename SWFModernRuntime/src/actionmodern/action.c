@@ -3127,7 +3127,7 @@ static ActionVar transformCTSetter(SWFAppContext* app_context, ActionVar* args, 
 	if (!mc) return undef;
 	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
 	ASObject* ct_obj = (ASObject*) args[0].data.numeric_value;
-	if (!getProperty(ct_obj, "redMultiplier", 13)) return undef;
+	if (!getPropertyWithPrototype(ct_obj, "redMultiplier", 13)) return undef;
 #ifdef NO_GRAPHICS
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	ctObjToRaw(ct_obj, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
@@ -3240,7 +3240,7 @@ static ActionVar* geomGetProp(ActionVar* obj_var, const char* name, u32 len)
 // (unlike varToDoubleSimple(NULL) which returns 0.0)
 static double propToDouble(ASObject* obj, const char* name, u32 name_len)
 {
-	ActionVar* prop = getProperty(obj, name, name_len);
+	ActionVar* prop = getPropertyWithPrototype(obj, name, name_len);
 	if (prop == NULL) return NAN;
 	return varToDoubleSimple(prop);
 }
