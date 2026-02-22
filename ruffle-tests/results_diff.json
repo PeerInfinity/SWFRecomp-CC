@@ -1,77 +1,157 @@
 {
   "metadata": {
-    "old_timestamp": "2026-02-21T21:31:13.744903+00:00",
-    "old_git_sha": "b4ded467611681972a3b4dc7cce8d15da91b63fc",
-    "new_timestamp": "2026-02-21T22:19:01.983226+00:00",
-    "new_git_sha": "4d432e56f8e773cfae97f746450ba6b91af07be7",
+    "old_timestamp": "2026-02-21T22:19:01.983226+00:00",
+    "old_git_sha": "4d432e56f8e773cfae97f746450ba6b91af07be7",
+    "new_timestamp": "2026-02-22T00:23:17.600104+00:00",
+    "new_git_sha": "7b56f94b8a75e05e409df9f15fad514b3715e815",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 260,
+    "old_pass": 267,
     "old_total": 619,
-    "old_pass_rate": 42.0,
-    "new_pass": 267,
+    "old_pass_rate": 43.1,
+    "new_pass": 269,
     "new_total": 619,
-    "new_pass_rate": 43.1,
-    "old_mismatched_lines": 39167,
-    "new_mismatched_lines": 39009,
-    "increased_mismatches": 2,
-    "decreased_mismatches": 160,
-    "newly_passing": 7,
-    "newly_failing": 0,
-    "status_changed": 7,
-    "unchanged": 606,
+    "new_pass_rate": 43.5,
+    "old_mismatched_lines": 39009,
+    "new_mismatched_lines": 38998,
+    "increased_mismatches": 9,
+    "decreased_mismatches": 20,
+    "newly_passing": 3,
+    "newly_failing": 1,
+    "status_changed": 4,
+    "unchanged": 585,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "array_concat",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 98,
-        "expected_lines": 98,
-        "matching_lines": 87
-      },
-      "new_lines": {
-        "actual_lines": 98,
-        "expected_lines": 98,
-        "matching_lines": 98
-      }
-    },
-    {
-      "test": "array_constructor",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 28
-      },
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "define_local_with_paths",
+      "test": "call",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 39,
-        "expected_lines": 54,
-        "matching_lines": 21
+        "actual_lines": 40,
+        "expected_lines": 63,
+        "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 34,
-        "expected_lines": 54,
-        "matching_lines": 19
+        "actual_lines": 28,
+        "expected_lines": 63,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "cross_movie_root",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 10,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 10,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "form_loader_encoding_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "form_loader_encoding_2",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "form_loader_encoding_3",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 3,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "form_loader_encoding_4",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 3,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "geturl",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 7,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 7,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "goto_label",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 11,
+        "expected_lines": 17,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 9,
+        "expected_lines": 17,
+        "matching_lines": 8
       }
     },
     {
@@ -80,158 +160,414 @@
       "old_status": "segfault",
       "new_status": "segfault",
       "old_lines": {
-        "actual_lines": 32525,
-        "expected_lines": 40,
-        "matching_lines": 8
-      },
-      "new_lines": {
         "actual_lines": 32535,
         "expected_lines": 40,
         "matching_lines": 8
+      },
+      "new_lines": {
+        "actual_lines": 32525,
+        "expected_lines": 40,
+        "matching_lines": 8
       }
     },
     {
-      "test": "set_variable_scope",
+      "test": "goto_rewind3",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 63,
-        "expected_lines": 58,
-        "matching_lines": 49
+        "actual_lines": 3,
+        "expected_lines": 2,
+        "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 58,
-        "expected_lines": 58,
-        "matching_lines": 58
-      }
-    },
-    {
-      "test": "this_scoping",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 77,
-        "expected_lines": 52,
-        "matching_lines": 6
-      },
-      "new_lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 42
-      }
-    },
-    {
-      "test": "this_swf5",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 55,
-        "expected_lines": 41,
-        "matching_lines": 23
-      },
-      "new_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 24
-      }
-    },
-    {
-      "test": "this_swf6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 55,
-        "expected_lines": 41,
-        "matching_lines": 17
-      },
-      "new_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 18
-      }
-    },
-    {
-      "test": "this_swf7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 55,
-        "expected_lines": 41,
-        "matching_lines": 40
-      },
-      "new_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 41
-      }
-    },
-    {
-      "test": "waitforframe",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
         "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "loading_avm2",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 5,
         "expected_lines": 7,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 7,
+        "actual_lines": 3,
         "expected_lines": 7,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "loadmovie",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "loadmovie_flashvars",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 4,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 4,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "loadmovie_registerclass",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 30,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 30,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "loadmovie_replace_root",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 5,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 5,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "loadmovienum",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 3,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "loadmovienum_cross_version_prototype",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 9,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 9,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "loadvariables",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "loadvariables2",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 8,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 8,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "loadvariablesnum",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "localconnection",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 579,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 579,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "movieclip_library_state_values",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 73,
+        "expected_lines": 78,
+        "matching_lines": 13
+      },
+      "new_lines": {
+        "actual_lines": 72,
+        "expected_lines": 78,
+        "matching_lines": 15
+      }
+    },
+    {
+      "test": "movieclip_state_values",
+      "change_type": "changed",
+      "old_status": "runtime_error",
+      "new_status": "runtime_error",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 114,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 114,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "placeobject_occupied_depth",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 6,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "register_globals_across_frames",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 16,
+        "expected_lines": 15,
+        "matching_lines": 7
+      },
+      "new_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
         "matching_lines": 7
       }
     },
     {
-      "test": "waitforframe2",
+      "test": "root_button_mode",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 10,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 10,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "swf4_actions_coercion_order",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 95,
+        "expected_lines": 158,
+        "matching_lines": 11
+      },
+      "new_lines": {
+        "actual_lines": 93,
+        "expected_lines": 158,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "swf5_to_6_cross_call",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 29,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 29,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "swf5_xml_event_handler_context",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "swf6_to_5_cross_call",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 29,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 29,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "transform",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 11,
-        "expected_lines": 16,
-        "matching_lines": 1
+        "actual_lines": 70,
+        "expected_lines": 70,
+        "matching_lines": 69
       },
       "new_lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
+        "actual_lines": 70,
+        "expected_lines": 70,
+        "matching_lines": 70
+      }
+    },
+    {
+      "test": "unloadmovie",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 4,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "unloadmovienum",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 13,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 13,
+        "matching_lines": 6
       }
     },
     {
       "test": "with",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 71,
+        "actual_lines": 49,
         "expected_lines": 49,
-        "matching_lines": 8
+        "matching_lines": 47
       },
       "new_lines": {
         "actual_lines": 49,
         "expected_lines": 49,
-        "matching_lines": 47
-      }
-    },
-    {
-      "test": "with_variable_scopes",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 68,
-        "expected_lines": 43,
-        "matching_lines": 4
-      },
-      "new_lines": {
-        "actual_lines": 43,
-        "expected_lines": 43,
-        "matching_lines": 43
+        "matching_lines": 49
       }
     }
   ]
