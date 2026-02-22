@@ -90,6 +90,7 @@ static const uint16_t u16_block[] = {'b','l','o','c','k',0};
 static const uint16_t u16_normal[] = {'n','o','r','m','a','l',0};
 static const uint16_t u16_pixel[] = {'p','i','x','e','l',0};
 static const uint16_t u16_localWithFile[] = {'l','o','c','a','l','W','i','t','h','F','i','l','e',0};
+static const uint16_t u16_localWithNetwork[] = {'l','o','c','a','l','W','i','t','h','N','e','t','w','o','r','k',0};
 static const uint16_t u16_StandAlone[] = {'S','t','a','n','d','A','l','o','n','e',0};
 static const uint16_t u16_WIN_ver[] = {'W','I','N',' ','3','2',',','0',',','0',',','0',0};
 static const uint16_t u16_Windows_XP[] = {'W','i','n','d','o','w','s',' ','X','P',0};
@@ -351,6 +352,7 @@ bool setVariableOnLocalScope(const char* var_name, ActionVar* value)
 // ==================================================================
 
 int g_swf_version = 5;       // SWF version — set at startup from constants.h
+int g_use_network = 0;       // UseNetwork flag from FileAttributes tag
 u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
 u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
 static u32 g_call_depth = 0;
@@ -2786,6 +2788,39 @@ static void getLocalMatrixForMC(MovieClip* mc,
 	if (mc->as_set_flags & 1) btx = (double)mc->x;
 	if (mc->as_set_flags & 2) bty = (double)mc->y;
 	*a = ba; *b = bb; *c = bc; *d = bd; *tx = btx; *ty = bty;
+}
+
+// Variant returning f32 a/b/c/d and i32 twips tx/ty (matches Ruffle render Matrix)
+extern int ng_getMatrixFromEntry_render(size_t entry_idx,
+    float* out_a, float* out_b, float* out_c, float* out_d,
+    int32_t* out_tx_twips, int32_t* out_ty_twips);
+static void getLocalMatrixForMC_render(MovieClip* mc,
+	float* a, float* b, float* c, float* d, int32_t* tx_twips, int32_t* ty_twips)
+{
+	size_t idx = getDisplayEntryIdxForMC(mc);
+	float ba = 1.0f, bb = 0.0f, bc = 0.0f, bd = 1.0f;
+	int32_t btx = 0, bty = 0;
+	int has_base = (idx != (size_t)-1) &&
+		ng_getMatrixFromEntry_render(idx, &ba, &bb, &bc, &bd, &btx, &bty);
+	if (!has_base) {
+		double xs = (double)mc->xscale / 100.0;
+		double ys = (double)mc->yscale / 100.0;
+		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
+		double cr = cos(rot), sr = sin(rot);
+		ba = (float)(xs*cr); bb = (float)(xs*sr); bc = (float)(-(ys*sr)); bd = (float)(ys*cr);
+		btx = (int32_t)rintf((float)mc->x * 20.0f);
+		bty = (int32_t)rintf((float)mc->y * 20.0f);
+	}
+	if (mc->as_set_flags & (4|8|16)) {
+		double xs = (double)mc->xscale / 100.0;
+		double ys = (double)mc->yscale / 100.0;
+		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
+		double cr = cos(rot), sr = sin(rot);
+		ba = (float)(xs*cr); bb = (float)(xs*sr); bc = (float)(-(ys*sr)); bd = (float)(ys*cr);
+	}
+	if (mc->as_set_flags & 1) btx = (int32_t)rintf((float)mc->x * 20.0f);
+	if (mc->as_set_flags & 2) bty = (int32_t)rintf((float)mc->y * 20.0f);
+	*a = ba; *b = bb; *c = bc; *d = bd; *tx_twips = btx; *ty_twips = bty;
 }
 
 // Get local CT as raw Fixed8 int16 values.
@@ -7781,6 +7816,8 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 int child_mc_count = 0;
 
+static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
+
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	(void)app_context;  // used only in NO_GRAPHICS for TextField init
 	MovieClip* mc = NULL;
@@ -8031,6 +8068,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				// If the bound variable already has a value (e.g., textfield placed after
 				// the variable was set), initialize text from that current value.
 				if (var_name[0] != '\0') {
+					ActionVar* _fi_val = NULL;
 					const char* _fi_dot = strchr(var_name, '.');
 					if (_fi_dot != NULL) {
 						// Path variable (e.g., "obj.theVar"): resolve container then read property
@@ -8053,9 +8091,39 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 							if (_fi_mc != NULL) _fi_obj = (ASObject*) _fi_mc->dynamic_props;
 						}
 						if (_fi_obj != NULL) {
-							ActionVar* _fi_val = getProperty(_fi_obj, _fi_prop, _fi_plen);
-							if (_fi_val != NULL && _fi_val->type != ACTION_STACK_VALUE_UNDEFINED)
-								setProperty(app_context, props, "text", 4, _fi_val);
+							_fi_val = getProperty(_fi_obj, _fi_prop, _fi_plen);
+							if (_fi_val != NULL && _fi_val->type == ACTION_STACK_VALUE_UNDEFINED)
+								_fi_val = NULL;
+						}
+					} else {
+						// Simple variable: look up in global scope
+						extern bool hasVariable(char* var_name, size_t key_size);
+						if (hasVariable((char*)var_name, strlen(var_name))) {
+							PUSH_STR(var_name, (u32)strlen(var_name));
+							actionGetVariable(app_context);
+							static ActionVar _fi_simple_val;
+							peekVar(app_context, &_fi_simple_val);
+							POP();
+							if (_fi_simple_val.type != ACTION_STACK_VALUE_UNDEFINED)
+								_fi_val = &_fi_simple_val;
+						}
+					}
+				if (_fi_val != NULL) {
+						int _fi_is_html = (tf_flags & 0x0040) != 0;
+						if (_fi_is_html && _fi_val->type == ACTION_STACK_VALUE_STRING) {
+							// HTML field: store raw as htmlText, stripped as text
+							setProperty(app_context, props, "htmlText", 8, _fi_val);
+							const uint16_t* _fi_u16 = varGetU16Ptr(_fi_val);
+							u32 _fi_u16_len = _fi_val->str_size;
+							u32 _fi_stripped_len;
+							uint16_t* _fi_stripped = strip_html_tags_u16(app_context, _fi_u16, _fi_u16_len, &_fi_stripped_len);
+							ActionVar _fi_text_val = {0};
+							_fi_text_val.type = ACTION_STACK_VALUE_STRING;
+							_fi_text_val.str_size = _fi_stripped_len;
+							VAL(u64, &_fi_text_val.data.numeric_value) = (u64)_fi_stripped;
+							setProperty(app_context, props, "text", 4, &_fi_text_val);
+						} else {
+							setProperty(app_context, props, "text", 4, _fi_val);
 						}
 					}
 				}
@@ -8489,6 +8557,24 @@ void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_nam
 	}
 }
 
+// Strip HTML tags from UTF-16 string, returning a new UTF-16 buffer.
+// Caller must free the returned buffer. Sets *out_len to the output length.
+static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len)
+{
+	(void)app_context;
+	uint16_t* dst = (uint16_t*) malloc((src_len + 1) * sizeof(uint16_t));
+	u32 di = 0;
+	int in_tag = 0;
+	for (u32 si = 0; si < src_len; si++) {
+		if (src[si] == '<') { in_tag = 1; continue; }
+		if (src[si] == '>') { in_tag = 0; continue; }
+		if (!in_tag) dst[di++] = src[si];
+	}
+	dst[di] = 0;
+	*out_len = di;
+	return dst;
+}
+
 // Sync variable → all text fields bound to var_name
 // Called when a variable is set via SetVariable/DefineLocal/etc.
 static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_name, u32 var_name_len, ActionVar* value)
@@ -8530,16 +8616,43 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 		// Compare (case-insensitive for SWF<=6)
 		int match = (g_swf_version < 7) ? (strcasecmp(bound, var_name) == 0) : (strcmp(bound, var_name) == 0);
 		if (match) {
-			ActionVar text_val = {0};
-			text_val.type = ACTION_STACK_VALUE_STRING;
-			text_val.str_size = text_len;
-			VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
-			setProperty(app_context, props, "text", 4, &text_val);
-			// Update length
-			ActionVar len_val = {0};
-			len_val.type = ACTION_STACK_VALUE_F64;
-			VAL(double, &len_val.data.numeric_value) = (double)text_len;
-			setProperty(app_context, props, "length", 6, &len_val);
+			// Check if this is an HTML text field
+			u16 tf_flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+			int is_html = (tf_flags & 0x0040) != 0;
+			if (is_html && mc->dynamic_props != NULL) {
+				ActionVar* html_prop = getProperty((ASObject*) mc->dynamic_props, "html", 4);
+				if (html_prop != NULL && html_prop->type == ACTION_STACK_VALUE_BOOLEAN)
+					is_html = html_prop->data.numeric_value ? 1 : 0;
+			}
+			if (is_html && text_u16 != NULL && text_len > 0) {
+				// HTML field: store raw as htmlText, stripped as text
+				ActionVar html_val = {0};
+				html_val.type = ACTION_STACK_VALUE_STRING;
+				html_val.str_size = text_len;
+				VAL(u64, &html_val.data.numeric_value) = (u64)text_u16;
+				setProperty(app_context, props, "htmlText", 8, &html_val);
+				u32 stripped_len;
+				uint16_t* stripped = strip_html_tags_u16(app_context, text_u16, text_len, &stripped_len);
+				ActionVar text_val = {0};
+				text_val.type = ACTION_STACK_VALUE_STRING;
+				text_val.str_size = stripped_len;
+				VAL(u64, &text_val.data.numeric_value) = (u64)stripped;
+				setProperty(app_context, props, "text", 4, &text_val);
+				ActionVar len_val = {0};
+				len_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &len_val.data.numeric_value) = (double)stripped_len;
+				setProperty(app_context, props, "length", 6, &len_val);
+			} else {
+				ActionVar text_val = {0};
+				text_val.type = ACTION_STACK_VALUE_STRING;
+				text_val.str_size = text_len;
+				VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
+				setProperty(app_context, props, "text", 4, &text_val);
+				ActionVar len_val = {0};
+				len_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &len_val.data.numeric_value) = (double)text_len;
+				setProperty(app_context, props, "length", 6, &len_val);
+			}
 		}
 	}
 }
@@ -10234,16 +10347,18 @@ void actionTargetPath(SWFAppContext* app_context, char* str_buffer)
 
 		if (mc) {
 			// Convert slash notation (mc->target) to dot notation for targetPath()
-			// "/" -> "_level0", "/.clip" -> "_level0.clip"
+			// "/" -> "_level0", "/clip" -> "_level0.clip", "/a/b" -> "_level0.a.b"
 			const char* path = mc->target;
 			if (path[0] == '/' && path[1] == '\0') {
-				// Root: "/" -> "_level0"
 				strcpy(str_buffer, "_level0");
-			} else if (path[0] == '/' && path[1] == '.') {
-				// Child: "/.clip" -> "_level0.clip"
-				snprintf(str_buffer, 256, "_level0%s", path + 1);
+			} else if (path[0] == '/') {
+				strcpy(str_buffer, "_level0.");
+				int wi = 8; // strlen("_level0.")
+				for (int ri = 1; path[ri] && wi < 255; ri++) {
+					str_buffer[wi++] = (path[ri] == '/') ? '.' : path[ri];
+				}
+				str_buffer[wi] = '\0';
 			} else {
-				// Fallback: copy as-is
 				strncpy(str_buffer, path, 256);
 				str_buffer[255] = '\0';
 			}
@@ -11994,6 +12109,72 @@ void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context)
 	actionSetCurrentContext(saved_ctx);
 }
 
+// Check if any onEnterFrame handlers are registered (root or child MCs).
+int actionHasEnterFrameHandlers(void)
+{
+	extern MovieClip root_movieclip;
+	if (root_movieclip.dynamic_props != NULL) {
+		ActionVar* ef = getProperty((ASObject*)root_movieclip.dynamic_props, "onEnterFrame", 12);
+		if (ef != NULL && ef->type == ACTION_STACK_VALUE_FUNCTION) return 1;
+	}
+	ActionVar* ef2 = getVariable("onEnterFrame", 12);
+	if (ef2 != NULL && ef2->type == ACTION_STACK_VALUE_FUNCTION) return 1;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc && mc->dynamic_props) {
+			ActionVar* ef3 = getProperty((ASObject*)mc->dynamic_props, "onEnterFrame", 12);
+			if (ef3 && ef3->type == ACTION_STACK_VALUE_FUNCTION) return 1;
+		}
+	}
+	return 0;
+}
+
+// Dispatch _root.onLoad (fires once after first frame).
+static int g_root_onload_fired = 0;
+void actionDispatchRootOnLoad(SWFAppContext* app_context)
+{
+	if (g_root_onload_fired) return;
+	g_root_onload_fired = 1;
+
+	extern MovieClip root_movieclip;
+	ASFunction* func = NULL;
+
+	// Check dynamic_props first
+	if (root_movieclip.dynamic_props != NULL)
+	{
+		ASObject* rp = (ASObject*) root_movieclip.dynamic_props;
+		ActionVar* ol = getProperty(rp, "onLoad", 6);
+		if (ol != NULL && ol->type == ACTION_STACK_VALUE_FUNCTION)
+			func = (ASFunction*) ol->data.numeric_value;
+	}
+	// Then check global var map
+	if (func == NULL)
+	{
+		ActionVar* ol = getVariable("onLoad", 6);
+		if (ol != NULL && ol->type == ACTION_STACK_VALUE_FUNCTION)
+			func = (ASFunction*) ol->data.numeric_value;
+	}
+	if (func == NULL) return;
+
+	MovieClip* saved_ctx = g_current_context;
+	if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		ActionVar this_av = {0};
+		this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_av.data.numeric_value = (u64)&root_movieclip;
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+		func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
+		if (regs != NULL) FREE(regs);
+	}
+	else if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+	}
+	actionSetCurrentContext(saved_ctx);
+}
+
 // Dispatch onKeyDown/onKeyUp to all Key listeners.
 // Called from swf_core.c after delivering a key event.
 void actionDispatchKeyDown(SWFAppContext* app_context)
@@ -13011,8 +13192,13 @@ void actionGetVariable(SWFAppContext* app_context)
 				setObjectProto(app_context, security_obj);
 				ActionVar sandbox_val = {0};
 				sandbox_val.type = ACTION_STACK_VALUE_STRING;
-				sandbox_val.str_size = 13;
-				VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
+				if (g_use_network) {
+					sandbox_val.str_size = 16;
+					VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithNetwork;
+				} else {
+					sandbox_val.str_size = 13;
+					VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
+				}
 				setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
 				ActionVar security_var = {0};
 				security_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -16689,6 +16875,112 @@ void actionSetMember(SWFAppContext* app_context)
 				ng_syncTextToVar(app_context, mc, &value_var);
 #endif
 			}
+			// TextField htmlText: decode HTML entities and strip tags → update text + length
+			if (strcmp(prop_name, "htmlText") == 0 && mc->dynamic_props != NULL
+				&& value_var.type == ACTION_STACK_VALUE_STRING)
+			{
+				ASObject* props = (ASObject*) mc->dynamic_props;
+				// Check if html property is true
+				ActionVar* html_flag = getProperty(props, "html", 4);
+				if (html_flag != NULL && html_flag->type == ACTION_STACK_VALUE_BOOLEAN && html_flag->data.numeric_value)
+				{
+					// Convert UTF-16 input to UTF-8
+					const uint16_t* _ht_u16 = varGetU16Ptr(&value_var);
+					char _ht_buf[4096];
+					if (_ht_u16 && value_var.str_size > 0)
+						u16_to_utf8(_ht_u16, value_var.str_size, _ht_buf, sizeof(_ht_buf));
+					else
+						_ht_buf[0] = '\0';
+					u32 src_len = (u32)strlen(_ht_buf);
+					// Strip tags and decode entities into a buffer
+					char* decoded = (char*)malloc(src_len + 1);
+					u32 di = 0;
+					int in_tag = 0;
+					for (u32 si = 0; si < src_len; ) {
+						if (_ht_buf[si] == '<') { in_tag = 1; si++; continue; }
+						if (_ht_buf[si] == '>') { in_tag = 0; si++; continue; }
+						if (in_tag) { si++; continue; }
+						if (_ht_buf[si] == '&') {
+							if (si + 5 <= src_len && strncmp(&_ht_buf[si], "&amp;", 5) == 0) {
+								decoded[di++] = '&'; si += 5;
+							} else if (si + 4 <= src_len && strncmp(&_ht_buf[si], "&lt;", 4) == 0) {
+								decoded[di++] = '<'; si += 4;
+							} else if (si + 4 <= src_len && strncmp(&_ht_buf[si], "&gt;", 4) == 0) {
+								decoded[di++] = '>'; si += 4;
+							} else if (si + 6 <= src_len && strncmp(&_ht_buf[si], "&apos;", 6) == 0) {
+								decoded[di++] = '\''; si += 6;
+							} else if (si + 6 <= src_len && strncmp(&_ht_buf[si], "&quot;", 6) == 0) {
+								decoded[di++] = '"'; si += 6;
+							} else if (si + 6 <= src_len && strncmp(&_ht_buf[si], "&nbsp;", 6) == 0) {
+								// Non-breaking space: U+00A0 in UTF-8 = 0xC2 0xA0
+								decoded[di++] = (char)0xC2;
+								decoded[di++] = (char)0xA0;
+								si += 6;
+							} else if (si + 2 < src_len && _ht_buf[si+1] == '#') {
+								u32 j = si + 2;
+								int codepoint = 0;
+								if (j < src_len && _ht_buf[j] == 'x') {
+									j++;
+									while (j < src_len && _ht_buf[j] != ';') {
+										char c = _ht_buf[j];
+										if (c >= '0' && c <= '9') codepoint = codepoint * 16 + (c - '0');
+										else if (c >= 'a' && c <= 'f') codepoint = codepoint * 16 + (c - 'a' + 10);
+										else if (c >= 'A' && c <= 'F') codepoint = codepoint * 16 + (c - 'A' + 10);
+										else break;
+										j++;
+									}
+								} else {
+									while (j < src_len && _ht_buf[j] != ';') {
+										if (_ht_buf[j] >= '0' && _ht_buf[j] <= '9')
+											codepoint = codepoint * 10 + (_ht_buf[j] - '0');
+										else break;
+										j++;
+									}
+								}
+								if (j < src_len && _ht_buf[j] == ';') {
+									j++;
+									if (codepoint < 0x80) {
+										decoded[di++] = (char)codepoint;
+									} else if (codepoint < 0x800) {
+										decoded[di++] = (char)(0xC0 | (codepoint >> 6));
+										decoded[di++] = (char)(0x80 | (codepoint & 0x3F));
+									} else if (codepoint < 0x10000) {
+										decoded[di++] = (char)(0xE0 | (codepoint >> 12));
+										decoded[di++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+										decoded[di++] = (char)(0x80 | (codepoint & 0x3F));
+									} else {
+										decoded[di++] = (char)(0xF0 | (codepoint >> 18));
+										decoded[di++] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+										decoded[di++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+										decoded[di++] = (char)(0x80 | (codepoint & 0x3F));
+									}
+									si = j;
+								} else {
+									decoded[di++] = _ht_buf[si++];
+								}
+							} else {
+								decoded[di++] = _ht_buf[si++];
+							}
+						} else {
+							decoded[di++] = _ht_buf[si++];
+						}
+					}
+					decoded[di] = '\0';
+					// Convert decoded UTF-8 → UTF-16 and store as text
+					u32 text_u16_len = 0;
+					uint16_t* text_u16 = utf8_to_u16(app_context, decoded, di, &text_u16_len);
+					free(decoded);
+					ActionVar text_val = {0};
+					text_val.type = ACTION_STACK_VALUE_STRING;
+					text_val.str_size = text_u16_len;
+					VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
+					setProperty(app_context, props, "text", 4, &text_val);
+					ActionVar len_val = {0};
+					len_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &len_val.data.numeric_value) = (double)text_u16_len;
+					setProperty(app_context, props, "length", 6, &len_val);
+				}
+			}
 			// TextField variable: changing binding breaks old, creates new
 			if (strcmp(prop_name, "variable") == 0 && mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
 			{
@@ -17492,6 +17784,31 @@ void actionGetMember(SWFAppContext* app_context)
 			ActionVar* prop = getPropertyWithPrototype((ASObject*) mc->dynamic_props, prop_name, prop_name_len);
 			if (prop != NULL)
 			{
+#ifdef NO_GRAPHICS
+				// TextField "text" property: for HTML text fields with variable binding,
+				// the variable stores raw HTML but .text should return stripped plain text.
+				if (prop_name_len == 4 && memcmp(prop_name, "text", 4) == 0 &&
+				    mc->ng_textfield_idx >= 0 && prop->type == ACTION_STACK_VALUE_STRING)
+				{
+					u16 _gm_tf_flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+					int _gm_is_html = (_gm_tf_flags & 0x0040) != 0;
+					if (_gm_is_html) {
+						// Check if the text contains HTML tags
+						const uint16_t* _gm_u16 = varGetU16Ptr(prop);
+						u32 _gm_len = prop->str_size;
+						int has_tags = 0;
+						for (u32 _gm_i = 0; _gm_i < _gm_len; _gm_i++) {
+							if (_gm_u16[_gm_i] == '<') { has_tags = 1; break; }
+						}
+						if (has_tags) {
+							u32 _gm_stripped_len;
+							uint16_t* _gm_stripped = strip_html_tags_u16(app_context, _gm_u16, _gm_len, &_gm_stripped_len);
+							PUSH_U16(_gm_stripped, _gm_stripped_len);
+							return;
+						}
+					}
+				}
+#endif
 				pushVar(app_context, prop);
 				return;
 			}
@@ -24979,7 +25296,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (_ltg_has_x && _ltg_has_y) {
 					double _ltg_px = varToDouble(_ltg_xv);
 					double _ltg_py = varToDouble(_ltg_yv);
-					// Match Ruffle: f32 for a/b/c/d, i32 twips for tx/ty
+					// Match ruffle_render::matrix::Matrix exactly
 					float _ltg_a = 1, _ltg_b = 0, _ltg_c = 0, _ltg_d = 1;
 					int32_t _ltg_tx = 0, _ltg_ty = 0;
 					MovieClip* _ltg_chain[64];
@@ -24987,25 +25304,25 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					for (MovieClip* _ltg_cur = mc; _ltg_cur != NULL && _ltg_n < 64; _ltg_cur = _ltg_cur->parent)
 						_ltg_chain[_ltg_n++] = _ltg_cur;
 					for (int _ltg_i = _ltg_n - 1; _ltg_i >= 0; _ltg_i--) {
-						double _la, _lb, _lc, _ld, _ltx, _lty;
-						getLocalMatrixForMC(_ltg_chain[_ltg_i], &_la, &_lb, &_lc, &_ld, &_ltx, &_lty);
-						float _rla = (float)_la, _rlb = (float)_lb, _rlc = (float)_lc, _rld = (float)_ld;
-						float _rltx = (float)(_ltx * 20.0), _rlty = (float)(_lty * 20.0);
-						// Compose: self * rhs (Ruffle uses fma for a/b/c/d, round_to_i32 for tx/ty)
-						float _na = fmaf(_ltg_a, _rla, _ltg_c * _rlb);
-						float _nb = fmaf(_ltg_b, _rla, _ltg_d * _rlb);
-						float _nc = fmaf(_ltg_a, _rlc, _ltg_c * _rld);
-						float _nd = fmaf(_ltg_b, _rlc, _ltg_d * _rld);
-						int32_t _ntx = (int32_t)rintf(fmaf(_ltg_a, _rltx, _ltg_c * _rlty)) + _ltg_tx;
-						int32_t _nty = (int32_t)rintf(fmaf(_ltg_b, _rltx, _ltg_d * _rlty)) + _ltg_ty;
+						float _rla, _rlb, _rlc, _rld;
+						int32_t _rltx, _rlty; // twips directly
+						getLocalMatrixForMC_render(_ltg_chain[_ltg_i], &_rla, &_rlb, &_rlc, &_rld, &_rltx, &_rlty);
+						float _rltxf = (float)_rltx, _rltyf = (float)_rlty;
+						// Compose: self * rhs (ruffle_render f32 matrix multiply)
+						float _na = _ltg_a * _rla + _ltg_c * _rlb;
+						float _nb = _ltg_b * _rla + _ltg_d * _rlb;
+						float _nc = _ltg_a * _rlc + _ltg_c * _rld;
+						float _nd = _ltg_b * _rlc + _ltg_d * _rld;
+						int32_t _ntx = (int32_t)rintf(_ltg_a * _rltxf + _ltg_c * _rltyf) + _ltg_tx;
+						int32_t _nty = (int32_t)rintf(_ltg_b * _rltxf + _ltg_d * _rltyf) + _ltg_ty;
 						_ltg_a = _na; _ltg_b = _nb; _ltg_c = _nc; _ltg_d = _nd;
 						_ltg_tx = _ntx; _ltg_ty = _nty;
 					}
 					// Apply to point: convert pixels to twips (truncate), transform, convert back
 					float _ptx = (float)((int32_t)(_ltg_px * 20.0));
 					float _pty = (float)((int32_t)(_ltg_py * 20.0));
-					int32_t _gx_tw = (int32_t)rintf(fmaf(_ltg_a, _ptx, _ltg_c * _pty)) + _ltg_tx;
-					int32_t _gy_tw = (int32_t)rintf(fmaf(_ltg_b, _ptx, _ltg_d * _pty)) + _ltg_ty;
+					int32_t _gx_tw = (int32_t)rintf(_ltg_a * _ptx + _ltg_c * _pty) + _ltg_tx;
+					int32_t _gy_tw = (int32_t)rintf(_ltg_b * _ptx + _ltg_d * _pty) + _ltg_ty;
 					double _gx = (double)_gx_tw / 20.0;
 					double _gy = (double)_gy_tw / 20.0;
 					ActionVar _ltg_rv = {0};
@@ -25042,7 +25359,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (_gtl_has_x && _gtl_has_y) {
 					double _gtl_px = varToDouble(_gtl_xv);
 					double _gtl_py = varToDouble(_gtl_yv);
-					// Match Ruffle: f32 for a/b/c/d, i32 twips for tx/ty
+					// Match ruffle_render::matrix::Matrix exactly:
+					// a/b/c/d: f32, tx/ty: Twips (i32)
+					// Compose: f32 mul for a/b/c/d, round_to_i32 for tx/ty
+					// Invert: f32, round_to_i32 for tx/ty
+					// Apply: round_to_i32(f32*f32) + wrapping_add(tx)
 					float _gtl_a = 1, _gtl_b = 0, _gtl_c = 0, _gtl_d = 1;
 					int32_t _gtl_tx = 0, _gtl_ty = 0;
 					MovieClip* _gtl_chain[64];
@@ -25050,22 +25371,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					for (MovieClip* _gtl_cur = mc; _gtl_cur != NULL && _gtl_n < 64; _gtl_cur = _gtl_cur->parent)
 						_gtl_chain[_gtl_n++] = _gtl_cur;
 					for (int _gtl_i = _gtl_n - 1; _gtl_i >= 0; _gtl_i--) {
-						double _la, _lb, _lc, _ld, _ltx, _lty;
-						getLocalMatrixForMC(_gtl_chain[_gtl_i], &_la, &_lb, &_lc, &_ld, &_ltx, &_lty);
-						float _rla = (float)_la, _rlb = (float)_lb, _rlc = (float)_lc, _rld = (float)_ld;
-						float _rltx = (float)(_ltx * 20.0), _rlty = (float)(_lty * 20.0);
-						float _na = fmaf(_gtl_a, _rla, _gtl_c * _rlb);
-						float _nb = fmaf(_gtl_b, _rla, _gtl_d * _rlb);
-						float _nc = fmaf(_gtl_a, _rlc, _gtl_c * _rld);
-						float _nd = fmaf(_gtl_b, _rlc, _gtl_d * _rld);
-						int32_t _ntx = (int32_t)rintf(fmaf(_gtl_a, _rltx, _gtl_c * _rlty)) + _gtl_tx;
-						int32_t _nty = (int32_t)rintf(fmaf(_gtl_b, _rltx, _gtl_d * _rlty)) + _gtl_ty;
+						float _rla, _rlb, _rlc, _rld;
+						int32_t _rltx, _rlty; // twips directly, no pixel conversion
+						getLocalMatrixForMC_render(_gtl_chain[_gtl_i], &_rla, &_rlb, &_rlc, &_rld, &_rltx, &_rlty);
+						float _rltxf = (float)_rltx, _rltyf = (float)_rlty;
+						// Compose: self * rhs (ruffle_render f32 matrix multiply)
+						float _na = _gtl_a * _rla + _gtl_c * _rlb;
+						float _nb = _gtl_b * _rla + _gtl_d * _rlb;
+						float _nc = _gtl_a * _rlc + _gtl_c * _rld;
+						float _nd = _gtl_b * _rlc + _gtl_d * _rld;
+						// round_to_i32 + wrapping_add
+						int32_t _ntx = (int32_t)rintf(_gtl_a * _rltxf + _gtl_c * _rltyf) + _gtl_tx;
+						int32_t _nty = (int32_t)rintf(_gtl_b * _rltxf + _gtl_d * _rltyf) + _gtl_ty;
 						_gtl_a = _na; _gtl_b = _nb; _gtl_c = _nc; _gtl_d = _nd;
 						_gtl_tx = _ntx; _gtl_ty = _nty;
 					}
-					// Invert the composed matrix (Ruffle: f32 for a/b/c/d, round_to_i32 for tx/ty)
+					// Invert (ruffle_render::matrix::Matrix::inverse)
 					float _det = _gtl_a * _gtl_d - _gtl_b * _gtl_c;
-					if (_det > 1.1920929e-7f) { // f32 EPSILON
+					if (fabsf(_det) > 1.1920929e-7f) { // f32 EPSILON
 						float _ia =  _gtl_d / _det;
 						float _ib =  _gtl_b / -_det;
 						float _ic =  _gtl_c / -_det;
@@ -25073,11 +25396,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						float _ftx = (float)_gtl_tx, _fty = (float)_gtl_ty;
 						int32_t _itx = (int32_t)rintf((_gtl_d * _ftx - _gtl_c * _fty) / -_det);
 						int32_t _ity = (int32_t)rintf((_gtl_b * _ftx - _gtl_a * _fty) / _det);
-						// Apply inverse to point (convert pixels to twips, transform, convert back)
+						// Apply inverse to point: pixels→twips, transform, twips→pixels
 						float _ptx = (float)((int32_t)(_gtl_px * 20.0));
 						float _pty = (float)((int32_t)(_gtl_py * 20.0));
-						int32_t _lx_tw = (int32_t)rintf(fmaf(_ia, _ptx, _ic * _pty)) + _itx;
-						int32_t _ly_tw = (int32_t)rintf(fmaf(_ib, _ptx, _id * _pty)) + _ity;
+						int32_t _lx_tw = (int32_t)rintf(_ia * _ptx + _ic * _pty) + _itx;
+						int32_t _ly_tw = (int32_t)rintf(_ib * _ptx + _id * _pty) + _ity;
 						double _lx = (double)_lx_tw / 20.0;
 						double _ly = (double)_ly_tw / 20.0;
 						ActionVar _gtl_rv = {0};

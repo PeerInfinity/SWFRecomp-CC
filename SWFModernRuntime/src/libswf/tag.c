@@ -1003,6 +1003,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	renderer_close_pass(context);
 #endif // NO_GRAPHICS
 
+	// Dispatch _root.onLoad once after first frame
+	actionDispatchRootOnLoad(app_context);
+
 	// Advance placement generation so next frame's placements are distinguishable
 	g_place_gen++;
 }

@@ -11,6 +11,10 @@
 #define SWF_VERSION 4
 #endif
 
+#ifndef SWF_USE_NETWORK
+#define SWF_USE_NETWORK 0
+#endif
+
 #include "draws.h"
 
 SWFAppContext app_context = {
@@ -35,6 +39,8 @@ void input_events_load(const char* path);
 int main(int argc, char* argv[]) {
     extern int g_swf_version;
     g_swf_version = SWF_VERSION;
+    extern int g_use_network;
+    g_use_network = SWF_USE_NETWORK;
 
     app_context.frame_funcs = frame_funcs;
     app_context.frame_count = FRAME_COUNT;

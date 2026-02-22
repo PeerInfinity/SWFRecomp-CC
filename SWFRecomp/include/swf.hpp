@@ -223,6 +223,7 @@ namespace SWFRecomp
 		bool shape_has_alpha;
 		bool shape_is_v4;
 		bool shape_is_morph2;
+		bool use_network;
 
 		SWF();
 		SWF(Context& context);
