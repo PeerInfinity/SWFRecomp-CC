@@ -384,9 +384,10 @@ void swfStart(SWFAppContext* app_context)
 		{
 			// Past the last frame: keep dispatching per-tick AS handlers
 			// (onEnterFrame, sprite timelines, clip ENTER_FRAME events).
-			// Break if quit_swf and no remaining input events or handlers.
+			// Break if quit_swf and no remaining input events, handlers, or playing sprites.
 			if (quit_swf && !(g_events && g_event_pos < g_event_count)
-			    && !actionHasEnterFrameHandlers()) break;
+			    && !actionHasEnterFrameHandlers()
+			    && !hasPlayingSprites()) break;
 			advance_sprite_frames(app_context);
 			actionDispatchEnterFrameHandlers(app_context);
 			actionDispatchRootVarMapEnterFrame(app_context);

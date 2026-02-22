@@ -25526,25 +25526,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (_ltg_has_x && _ltg_has_y) {
 					double _ltg_px = varToDouble(_ltg_xv);
 					double _ltg_py = varToDouble(_ltg_yv);
-					// Match ruffle_render::matrix::Matrix exactly
-					float _ltg_a = 1, _ltg_b = 0, _ltg_c = 0, _ltg_d = 1;
-					int32_t _ltg_tx = 0, _ltg_ty = 0;
-					MovieClip* _ltg_chain[64];
-					int _ltg_n = 0;
-					for (MovieClip* _ltg_cur = mc; _ltg_cur != NULL && _ltg_n < 64; _ltg_cur = _ltg_cur->parent)
-						_ltg_chain[_ltg_n++] = _ltg_cur;
-					for (int _ltg_i = _ltg_n - 1; _ltg_i >= 0; _ltg_i--) {
-						float _rla, _rlb, _rlc, _rld;
-						int32_t _rltx, _rlty; // twips directly
-						getLocalMatrixForMC_render(_ltg_chain[_ltg_i], &_rla, &_rlb, &_rlc, &_rld, &_rltx, &_rlty);
-						float _rltxf = (float)_rltx, _rltyf = (float)_rlty;
-						// Compose: self * rhs (ruffle_render f32 matrix multiply)
-						float _na = _ltg_a * _rla + _ltg_c * _rlb;
-						float _nb = _ltg_b * _rla + _ltg_d * _rlb;
-						float _nc = _ltg_a * _rlc + _ltg_c * _rld;
-						float _nd = _ltg_b * _rlc + _ltg_d * _rld;
-						int32_t _ntx = (int32_t)rintf(_ltg_a * _rltxf + _ltg_c * _rltyf) + _ltg_tx;
-						int32_t _nty = (int32_t)rintf(_ltg_b * _rltxf + _ltg_d * _rltyf) + _ltg_ty;
+					// Match ruffle_render::matrix::Matrix exactly.
+					// Compose bottom-up to match Ruffle's precision:
+					//   matrix = self.matrix; for parent in parents { matrix = parent * matrix; }
+					float _ltg_a, _ltg_b, _ltg_c, _ltg_d;
+					int32_t _ltg_tx, _ltg_ty;
+					getLocalMatrixForMC_render(mc, &_ltg_a, &_ltg_b, &_ltg_c, &_ltg_d, &_ltg_tx, &_ltg_ty);
+					for (MovieClip* _ltg_par = mc->parent; _ltg_par != NULL; _ltg_par = _ltg_par->parent) {
+						float _pa, _pb, _pc, _pd;
+						int32_t _ptxp, _ptyp;
+						getLocalMatrixForMC_render(_ltg_par, &_pa, &_pb, &_pc, &_pd, &_ptxp, &_ptyp);
+						// Compose: parent * accumulated (parent is lhs)
+						float _mtxf = (float)_ltg_tx, _mtyf = (float)_ltg_ty;
+						float _na = _pa * _ltg_a + _pc * _ltg_b;
+						float _nb = _pb * _ltg_a + _pd * _ltg_b;
+						float _nc = _pa * _ltg_c + _pc * _ltg_d;
+						float _nd = _pb * _ltg_c + _pd * _ltg_d;
+						int32_t _ntx = (int32_t)rintf(_pa * _mtxf + _pc * _mtyf) + _ptxp;
+						int32_t _nty = (int32_t)rintf(_pb * _mtxf + _pd * _mtyf) + _ptyp;
 						_ltg_a = _na; _ltg_b = _nb; _ltg_c = _nc; _ltg_d = _nd;
 						_ltg_tx = _ntx; _ltg_ty = _nty;
 					}
@@ -25590,29 +25589,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					double _gtl_px = varToDouble(_gtl_xv);
 					double _gtl_py = varToDouble(_gtl_yv);
 					// Match ruffle_render::matrix::Matrix exactly:
-					// a/b/c/d: f32, tx/ty: Twips (i32)
-					// Compose: f32 mul for a/b/c/d, round_to_i32 for tx/ty
-					// Invert: f32, round_to_i32 for tx/ty
-					// Apply: round_to_i32(f32*f32) + wrapping_add(tx)
-					float _gtl_a = 1, _gtl_b = 0, _gtl_c = 0, _gtl_d = 1;
-					int32_t _gtl_tx = 0, _gtl_ty = 0;
-					MovieClip* _gtl_chain[64];
-					int _gtl_n = 0;
-					for (MovieClip* _gtl_cur = mc; _gtl_cur != NULL && _gtl_n < 64; _gtl_cur = _gtl_cur->parent)
-						_gtl_chain[_gtl_n++] = _gtl_cur;
-					for (int _gtl_i = _gtl_n - 1; _gtl_i >= 0; _gtl_i--) {
-						float _rla, _rlb, _rlc, _rld;
-						int32_t _rltx, _rlty; // twips directly, no pixel conversion
-						getLocalMatrixForMC_render(_gtl_chain[_gtl_i], &_rla, &_rlb, &_rlc, &_rld, &_rltx, &_rlty);
-						float _rltxf = (float)_rltx, _rltyf = (float)_rlty;
-						// Compose: self * rhs (ruffle_render f32 matrix multiply)
-						float _na = _gtl_a * _rla + _gtl_c * _rlb;
-						float _nb = _gtl_b * _rla + _gtl_d * _rlb;
-						float _nc = _gtl_a * _rlc + _gtl_c * _rld;
-						float _nd = _gtl_b * _rlc + _gtl_d * _rld;
-						// round_to_i32 + wrapping_add
-						int32_t _ntx = (int32_t)rintf(_gtl_a * _rltxf + _gtl_c * _rltyf) + _gtl_tx;
-						int32_t _nty = (int32_t)rintf(_gtl_b * _rltxf + _gtl_d * _rltyf) + _gtl_ty;
+					// Compose bottom-up to match Ruffle's precision:
+					//   matrix = self.matrix; for parent in parents { matrix = parent * matrix; }
+					float _gtl_a, _gtl_b, _gtl_c, _gtl_d;
+					int32_t _gtl_tx, _gtl_ty;
+					getLocalMatrixForMC_render(mc, &_gtl_a, &_gtl_b, &_gtl_c, &_gtl_d, &_gtl_tx, &_gtl_ty);
+					for (MovieClip* _gtl_par = mc->parent; _gtl_par != NULL; _gtl_par = _gtl_par->parent) {
+						float _pa, _pb, _pc, _pd;
+						int32_t _ptxp, _ptyp;
+						getLocalMatrixForMC_render(_gtl_par, &_pa, &_pb, &_pc, &_pd, &_ptxp, &_ptyp);
+						// Compose: parent * accumulated (parent is lhs)
+						float _mtxf = (float)_gtl_tx, _mtyf = (float)_gtl_ty;
+						float _na = _pa * _gtl_a + _pc * _gtl_b;
+						float _nb = _pb * _gtl_a + _pd * _gtl_b;
+						float _nc = _pa * _gtl_c + _pc * _gtl_d;
+						float _nd = _pb * _gtl_c + _pd * _gtl_d;
+						int32_t _ntx = (int32_t)rintf(_pa * _mtxf + _pc * _mtyf) + _ptxp;
+						int32_t _nty = (int32_t)rintf(_pb * _mtxf + _pd * _mtyf) + _ptyp;
 						_gtl_a = _na; _gtl_b = _nb; _gtl_c = _nc; _gtl_d = _nd;
 						_gtl_tx = _ntx; _gtl_ty = _nty;
 					}
