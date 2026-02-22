@@ -9076,7 +9076,13 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			MovieClip* mc = (MovieClip*) VAL(u64, &STACK_TOP_VALUE);
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
 			extern MovieClip root_movieclip;
-			if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0')
+			if (mc != NULL && mc->depth == INT_MIN)
+			{
+				// Removed/dead MovieClip: toString returns empty string
+				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
+				STACK_TOP_N = 0;
+			}
+			else if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0')
 			{
 				// Child MovieClip: use full dot-path "_level0.parent.child" from mc->target
 				static char mc_path_buf[256];
@@ -17699,6 +17705,13 @@ void actionGetMember(SWFAppContext* app_context)
 		// MovieClip member access — check built-in properties, then MovieClip.prototype
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 
+		// Removed/dead MovieClip: all property access returns undefined
+		if (mc != NULL && mc->depth == INT_MIN)
+		{
+			pushUndefined(app_context);
+			return;
+		}
+
 		// Check built-in MovieClip properties (case-insensitive for _ prefixed ones)
 		if (mc != NULL && prop_name_len > 0 && prop_name[0] == '_')
 		{
@@ -21896,6 +21909,65 @@ static double varToDoubleSimple(ActionVar* v)
 	}
 }
 
+// Helper: decode one UTF-8 codepoint, advance pointer. Returns 0xFFFD on error.
+static uint32_t _utf8_decode(const unsigned char** pp)
+{
+	const unsigned char* p = *pp;
+	uint32_t c = *p;
+	if (c < 0x80) { (*pp)++; return c; }
+	if ((c & 0xE0) == 0xC0) {
+		uint32_t r = (c & 0x1F) << 6;
+		if ((p[1] & 0xC0) == 0x80) { r |= (p[1] & 0x3F); *pp += 2; return r; }
+		(*pp)++; return 0xFFFD;
+	}
+	if ((c & 0xF0) == 0xE0) {
+		uint32_t r = (c & 0x0F) << 12;
+		if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+			r |= ((p[1] & 0x3F) << 6) | (p[2] & 0x3F); *pp += 3; return r;
+		}
+		(*pp)++; return 0xFFFD;
+	}
+	if ((c & 0xF8) == 0xF0) {
+		uint32_t r = (c & 0x07) << 18;
+		if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+			r |= ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F); *pp += 4; return r;
+		}
+		(*pp)++; return 0xFFFD;
+	}
+	(*pp)++; return 0xFFFD;
+}
+
+// Helper: fold a codepoint to lowercase for case-insensitive comparison
+static uint32_t _unicode_fold_lower(uint32_t c)
+{
+	if (c >= 'A' && c <= 'Z') return c + ('a' - 'A');
+	if (c > 0x7F && c <= 0xFFFF) {
+		int lo = 0, hi = CASE_MAP_UPPER_TO_LOWER_COUNT - 1;
+		while (lo <= hi) {
+			int mid = (lo + hi) / 2;
+			if (case_map_upper_to_lower[mid][0] == (uint16_t)c) return case_map_upper_to_lower[mid][1];
+			if (case_map_upper_to_lower[mid][0] < (uint16_t)c) lo = mid + 1; else hi = mid - 1;
+		}
+	}
+	return c;
+}
+
+// Helper: Unicode-aware case-insensitive UTF-8 string comparison
+static int _utf8_strcasecmp(const char* a, const char* b)
+{
+	const unsigned char* pa = (const unsigned char*)a;
+	const unsigned char* pb = (const unsigned char*)b;
+	while (*pa && *pb) {
+		uint32_t ca = _unicode_fold_lower(_utf8_decode(&pa));
+		uint32_t cb = _unicode_fold_lower(_utf8_decode(&pb));
+		if (ca < cb) return -1;
+		if (ca > cb) return 1;
+	}
+	if (*pa) return 1;
+	if (*pb) return -1;
+	return 0;
+}
+
 // Helper: compare two ActionVars for sort/sortOn
 // flags: CASEINSENSITIVE=1, DESCENDING=2, NUMERIC=16
 // Returns negative if a < b, 0 if equal, positive if a > b
@@ -21929,7 +22001,7 @@ static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVa
 		varToStringBuf(app_context, a, buf_a, sizeof(buf_a));
 		varToStringBuf(app_context, b, buf_b, sizeof(buf_b));
 		if (flags & 1) /* CASEINSENSITIVE */
-			result = strcasecmp(buf_a, buf_b);
+			result = _utf8_strcasecmp(buf_a, buf_b);
 		else
 			result = strcmp(buf_a, buf_b);
 	}
@@ -22811,20 +22883,18 @@ static int callArrayMethod(SWFAppContext* app_context,
 			if (flags_arg->type == ACTION_STACK_VALUE_ARRAY)
 			{
 				ASArray* _flarr = (ASArray*) flags_arg->data.numeric_value;
-				if (_flarr != NULL)
+				// Per-key flags array is only used when its length exactly matches
+				// the number of field names (Flash behavior). Otherwise, all flags stay 0.
+				if (_flarr != NULL && _flarr->length == (u32)_so_nkeys)
 				{
 					for (int _ki = 0; _ki < _so_nkeys; _ki++)
 					{
-						if ((u32)_ki < _flarr->length)
+						ActionVar* _fe = &_flarr->elements[_ki];
+						if (_fe->type == ACTION_STACK_VALUE_F64 || _fe->type == ACTION_STACK_VALUE_F32)
 						{
-							ActionVar* _fe = &_flarr->elements[_ki];
-							if (_fe->type == ACTION_STACK_VALUE_F64 || _fe->type == ACTION_STACK_VALUE_F32)
-							{
-								double _fv = varToDouble(_fe);
-								if (!isnan(_fv)) _so_flags[_ki] = (int)_fv;
-							}
+							double _fv = varToDouble(_fe);
+							if (!isnan(_fv)) _so_flags[_ki] = (int)_fv;
 						}
-						// else _so_flags[_ki] = 0 (already zeroed)
 					}
 				}
 			}
