@@ -44,6 +44,7 @@ struct MovieClip {
 	u8 is_button_mc;       // 1 if this MC represents a SWF button (affects _parent resolution in SWF5)
 	int depth;             // ActionScript display depth (-16384 for _root, SWF_depth-16384 for timeline clips, AS-space for dynamic clips)
 #ifdef NO_GRAPHICS
+	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
 	int ng_textfield_idx;  // index into ng_textfields, or -1 if not a textfield

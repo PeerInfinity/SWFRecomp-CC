@@ -328,6 +328,13 @@ void swfStart(SWFAppContext* app_context)
 		return;
 	}
 
+	// Initialize root display sentinel and set root_movieclip.display_obj
+	extern void ng_sync_root_display_obj(void);
+	extern void* ng_get_root_display_obj(void);
+	ng_sync_root_display_obj();
+	extern MovieClip root_movieclip;
+	root_movieclip.display_obj = ng_get_root_display_obj();
+
 	tagInit(app_context);
 
 	// Run frames in console mode

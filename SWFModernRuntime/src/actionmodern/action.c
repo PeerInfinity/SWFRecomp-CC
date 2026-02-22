@@ -7679,7 +7679,17 @@ MovieClip root_movieclip = {
 	.dynamic_props = NULL,
 	.lockroot = 0,
 	.blend_mode = 0,
+	.is_button_mc = 0,
 	.depth = -16384,   // _root is at Flash "level 0" depth
+#ifdef NO_GRAPHICS
+	.display_obj = NULL,
+	.last_transform_id = 0,
+	.as_set_flags = 0,
+	.ng_textfield_idx = -1,
+	.draw_has_bounds = 0,
+	.mc_mouse_inside = 0,
+	.mc_as_pressed = 0,
+#endif
 };
 
 // Helper function to get MovieClip by target path
@@ -7768,6 +7778,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->dynamic_props = NULL;
 	mc->lockroot = 0;
 	mc->blend_mode = 0;
+	mc->is_button_mc = 0;
 	mc->depth = 0;
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
@@ -7777,6 +7788,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->draw_has_bounds = 0;
 	mc->mc_mouse_inside = 0;
 	mc->mc_as_pressed = 0;
+	mc->display_obj = NULL;
 #endif
 
 	// Set instance name
@@ -8823,13 +8835,37 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 	// If width/height not explicitly set, compute from display hierarchy bounds
 	if (scaled_w == 0.0 && scaled_h == 0.0) {
 		float gxmin, gxmax, gymin, gymax;
-		size_t entry_idx;
-		if (mc == &root_movieclip) {
-			entry_idx = (size_t)-1;
-		} else {
-			entry_idx = ng_findDisplayEntryIdx(mc->name);
+		int bounds_found = 0;
+
+		// For buttons, _width/_height come from the hit shape bounds
+		if (mc->is_button_mc) {
+			extern Character* dictionary;
+			DisplayObject* btn_dobj = (DisplayObject*)mc->display_obj;
+			if (btn_dobj != NULL) {
+				size_t cid = btn_dobj->char_id;
+				if (cid > 0 && dictionary[cid].type == CHAR_TYPE_BUTTON) {
+					size_t hit_cid = dictionary[cid].button_hit_char_id;
+					s32 hxmin, hxmax, hymin, hymax;
+					if (ng_getCharBounds(hit_cid, &hxmin, &hxmax, &hymin, &hymax)) {
+						gxmin = hxmin / 20.0f; gxmax = hxmax / 20.0f;
+						gymin = hymin / 20.0f; gymax = hymax / 20.0f;
+						bounds_found = 1;
+					}
+				}
+			}
 		}
-		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+
+		if (!bounds_found) {
+			size_t entry_idx;
+			if (mc == &root_movieclip) {
+				entry_idx = (size_t)-1;
+			} else {
+				entry_idx = ng_findDisplayEntryIdx(mc->name);
+			}
+			bounds_found = ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax);
+		}
+
+		if (bounds_found) {
 			double nat_w = (double)(gxmax - gxmin);
 			double nat_h = (double)(gymax - gymin);
 			scaled_w = nat_w * mc->xscale / 100.0;
@@ -12836,6 +12872,12 @@ void actionGetVariable(SWFAppContext* app_context)
 	ActionVar* var = NULL;
 	if (g_current_context != NULL && g_current_context != &root_movieclip)
 	{
+		// "this" in a non-root context refers to the current clip
+		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_current_context);
+			return;
+		}
 		// Check target clip's dynamic properties
 		if (g_current_context->dynamic_props != NULL)
 		{
@@ -12847,11 +12889,43 @@ void actionGetVariable(SWFAppContext* app_context)
 				return;
 			}
 		}
-		// Not found on clip — var stays NULL, falls through to _global/special vars
+		// Check MC built-in properties (_x, _y, _width, _height, _name, _target, etc.)
+		{
+			ActionVar mc_result = {0};
+			int mc_found = getMCBuiltinProperty(g_current_context, var_name, var_name_len, &mc_result);
+			if (mc_found == 1)
+			{
+				pushVar(app_context, &mc_result);
+				return;
+			}
+			else if (mc_found == 2)  // _name
+			{
+				PUSH_STR(g_current_context->name, strlen(g_current_context->name));
+				return;
+			}
+			else if (mc_found == 3)  // _target
+			{
+				PUSH_STR(g_current_context->target, strlen(g_current_context->target));
+				return;
+			}
+		}
+		// Check _parent (not in getMCBuiltinProperty)
+		if (var_name_len == 7 && strncmp(var_name, "_parent", 7) == 0)
+		{
+			MovieClip* par = g_current_context->parent;
+			// SWF5: buttons are transparent — skip button parents
+			if (par != NULL && par->is_button_mc && g_swf_version < 6)
+				par = par->parent;
+			if (par != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)par); }
+			else { PUSH(ACTION_STACK_VALUE_UNDEFINED, 0); }
+			return;
+		}
+		// Not found on clip — fall through to global variable table
 	}
-	else
+
+	if (var == NULL)
 	{
-		// Root context: check global_object for addProperty getter before var table
+		// Check global_object for addProperty getter before var table
 		{
 			extern ASObject* global_object;
 			if (global_object != NULL)
@@ -12866,7 +12940,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 		}
 
-		// Root context: check global variable table (normal behavior)
+		// Check global variable table
 		if (string_id != 0)
 		{
 			// Constant string - use array (O(1))
@@ -13509,6 +13583,13 @@ void actionGetVariable(SWFAppContext* app_context)
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
+					// Sync display_obj and is_button_mc from display list
+					extern DisplayObject* display_list;
+					child_mc->display_obj = (void*)&display_list[child_depth];
+					extern Character* dictionary;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON)
+						child_mc->is_button_mc = 1;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
 					return;
 				}
@@ -14385,6 +14466,16 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 			// only actual sprites/movieclips return "movieclip"
 			{
 				MovieClip* mc = (MovieClip*) typeof_val;
+				if (mc && mc->is_button_mc)
+				{
+					type_str = "object";
+					break;
+				}
+				if (mc && mc->ng_textfield_idx >= 0)
+				{
+					type_str = "object";
+					break;
+				}
 				if (mc && mc->name[0] != '\0')
 				{
 					size_t d = ng_findDisplayEntryByName(mc->name);
@@ -17785,7 +17876,11 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_lockroot") == 0) { PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)mc->lockroot); return; }
 			if (strcasecmp(prop_name, "_parent") == 0) {
-				if (mc->parent != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc->parent); }
+				MovieClip* par = mc->parent;
+				// SWF5: buttons are transparent — skip button parents
+				if (par != NULL && par->is_button_mc && g_swf_version < 6)
+					par = par->parent;
+				if (par != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)par); }
 				else { pushUndefined(app_context); }
 				return;
 			}
@@ -17839,9 +17934,23 @@ void actionGetMember(SWFAppContext* app_context)
 				memcpy(child_name_buf, prop_name, 63);
 				child_name_buf[63] = '\0';
 			}
-			// First try nested child lookup (for mc.childName inside mc's display list)
+			// First try direct child lookup via mc->display_obj (works even during nested init)
 			size_t child_depth = SIZE_MAX;
-			if (mc->name[0] != '\0') {
+			if (mc->display_obj != NULL) {
+				DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+				if (parent_dobj->sprite_display_list != NULL) {
+					for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
+						DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
+						if (_ch->char_id == 0) continue;
+						if (_ch->instance_name != NULL && strcmp(_ch->instance_name, child_name_buf) == 0) {
+							child_depth = _cd;
+							break;
+						}
+					}
+				}
+			}
+			// Fall back to ng_findChildEntryDepth (uses global display_list)
+			if (child_depth == SIZE_MAX && mc->name[0] != '\0') {
 				child_depth = ng_findChildEntryDepth(mc->name, child_name_buf);
 			}
 			if (child_depth != SIZE_MAX) {
