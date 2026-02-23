@@ -4,9 +4,8 @@ Last updated: 2026-02-22
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 306/619 (49.4%)
-- **Estimated after uncommitted changes**: ~308/619 (+stage_scale_mode, selection improvement)
-- **Main failure types**: output_mismatch (305), segfault (5), runtime_error (2), timeout (1)
+- **Pass rate (CI, last run)**: 307/619 (49.6%)
+- **Main failure types**: output_mismatch (304), segfault (5), runtime_error (2), timeout (1)
 - **Recent gains**: input event dispatch (+18 tests), Stage.scaleMode onResize, Selection methods, broadcastMessage MC variable fallback
 
 ## Crashes and Errors (8 tests)
@@ -34,16 +33,13 @@ Last updated: 2026-02-22
 | `stage_property_representation` | 586/586 ✅ | F64 bug in actionSetProperty |
 | `stage_object_enumerate` | 4/4 ✅ | Stage child enumeration |
 | `stage_display_state` | 16/16 ✅ | displayState property + onFullScreen |
-
-### Uncommitted fix
-| Test | Match | Fix |
-|------|-------|-----|
 | `stage_scale_mode` | 39/39 ✅ | onResize broadcast + viewport dims + broadcastMessage MC variable fallback |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
+| `selection` | 434/454 (95.6%) | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
 | `stage_object_properties` | 226/241 (93.8%) | _width/_height↔scale coupling, rotation, original bounds |
@@ -52,8 +48,7 @@ Last updated: 2026-02-22
 ### 80-90%
 | Test | Match | Issue |
 |------|-------|-------|
-| `movieclip_focusenabled` | 82/99 (82.8%) | Focus system / hasOwnProperty on empty MCs |
-| `selection` | 372/454 (81.9%) → ~433/454 locally | Selection.getBeginIndex/getCaretIndex/getEndIndex stubs, setFocus return value |
+| `movieclip_focusenabled` | 85/99 (85.9%) | Focus system / hasOwnProperty on empty MCs |
 | `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
 | `function_base_clip_readded` | 9/11 (81.8%) | _parent resolution after removal+re-add |
 | `this_scoping` | 42/52 (80.8%) | `this` binding in various call contexts |
@@ -94,7 +89,7 @@ Last updated: 2026-02-22
 | STAGE_PLAN | **Phases 1,5,7 DONE** | stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅ | Phase 2 (width↔scale), Phase 4 (_level), Phase 8 (children) |
 | STAGE_FRAME_PROPS_PLAN | **Phases 1,5 DONE** | Several stages pass | Phase 2 (shape bounds), Phase 3 (content bounds) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
-| SELECTION_PLAN | **Partial** | selection at ~433/454 locally | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
+| SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
 | OOP_SUPER_EXTENDS_PLAN | Not started | 0/8 | `super` keyword non-functional |
 | REGISTERCLASS_PLAN | Not started | 0/7 | Object.registerClass, attachMovie |
 | PROTOTYPE_OBJECT_PLAN | Not started | 0/12 | addProperty, __resolve, property flags |
