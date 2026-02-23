@@ -1,31 +1,40 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ead961fbbf43` (2026-02-22T23:54:26.198884+00:00)
-**Current:** `2a0809e5f3dc` (2026-02-23T00:43:47.222999+00:00)
+**Previous:** `2a0809e5f3dc` (2026-02-23T00:43:47.222999+00:00)
+**Current:** `034db2a0f605` (2026-02-23T02:38:02.525888+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 306 | 307 | +1 |
+| Passing | 307 | 307 | 0 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 49.4% | 49.6% | +0.2% |
-| Mismatched lines | 35256 | 35189 | -67 |
-|   Decreased | | | -69 |
-|   Increased | | | +2 |
+| Pass rate | 49.6% | 49.6% | 0% |
+| Mismatched lines | 35189 | 35263 | +74 |
+|   Decreased | | | -30 |
+|   Increased | | | +104 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `stage_scale_mode` | output_mismatch | 35/39 | 39/39 |
+| `stage_object_properties` | output_mismatch | 226/241 | 241/241 |
 
-## Line Count Changed (5)
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `edittext_width_height` | output_mismatch | 103/103 | 83/103 |
+
+## Line Count Changed (8)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `selection` | output_mismatch | 372/454 | 434/454 | -62 |
-| `movieclip_focusenabled` | output_mismatch | 82/99 | 85/99 | -3 |
+| `stage_object_properties_swf6` | output_mismatch | 214/231 | 229/231 | -15 |
 | `goto_methods` | segfault | 8/40 | 8/40 | 0 |
-| `global_proto_decls` | output_mismatch | 14/4497 | 13/4497 | +1 |
-| `global_proto_decls_delete` | output_mismatch | 1/4158 | 0/4158 | +1 |
+| `frame_size_translated_negative` | output_mismatch | 20/21 | 18/21 | +2 |
+| `frame_size_translated_positive` | output_mismatch | 20/21 | 18/21 | +2 |
+| `edittext_autosize` | output_mismatch | 44/71 | 41/71 | +3 |
+| `clone_sprite_edittext_dynamic` | output_mismatch | 50/86 | 45/86 | +5 |
+| `edittext_align_trailing_spaces_swf7` | output_mismatch | 264/576 | 228/576 | +36 |
+| `edittext_align_trailing_spaces_swf8` | output_mismatch | 288/576 | 252/576 | +36 |
