@@ -1263,6 +1263,164 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 }
 
 // ---------------------------------------------------------------------------
+// getBounds helper: compute local content bounds for a MovieClip (twips)
+// ---------------------------------------------------------------------------
+
+// Recursively compute union of child bounds in a display list (results in twips)
+// Uses Fixed16 integer arithmetic to match Ruffle/Flash's truncating behavior.
+// Fixed16: 16.16 signed fixed-point. Matrix entries stored as Fixed16 raw i32 values.
+// wrapping_mul_int(fixed16, twips_i32) = (int32_t)(((int64_t)fixed16 * twips_i32) >> 16)
+#define FP16_ONE 65536
+#define FP_MUL(f16, tw) ((int32_t)(((int64_t)(f16) * (int64_t)(tw)) >> 16))
+// Compose two Fixed16 values: (a * b) >> 16  (both are 16.16)
+#define FP_MUL16(a, b) ((int32_t)(((int64_t)(a) * (int64_t)(b)) >> 16))
+// Convert float matrix entry to Fixed16 raw i32
+#define FLOAT_TO_FP16(f) ((int32_t)((f) * 65536.0f))
+// Convert twips (float, from transform_data) to i32 twips
+#define FLOAT_TO_TWIPS(f) ((int32_t)(f))
+
+static void boundsUnionCornerFP(int32_t px, int32_t py,
+	int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
+	int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax)
+{
+	int32_t tx = FP_MUL(fa, px) + FP_MUL(fc, py) + ftx;
+	int32_t ty = FP_MUL(fb, px) + FP_MUL(fd, py) + fty;
+	if (!*has) { *gxmin = *gxmax = tx; *gymin = *gymax = ty; *has = 1; }
+	else {
+		if (tx < *gxmin) *gxmin = tx;
+		if (tx > *gxmax) *gxmax = tx;
+		if (ty < *gymin) *gymin = ty;
+		if (ty > *gymax) *gymax = ty;
+	}
+}
+
+// Compute bounds using Fixed16 integer arithmetic matching Ruffle/Flash.
+// Matrix entries (fa,fb,fc,fd) are Fixed16 raw i32 values; ftx,fty are i32 twips.
+int ng_computeBoundsFromDL_fp16(DisplayObject* dl, size_t dl_max,
+    int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
+    int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax)
+{
+	for (size_t i = 1; i <= dl_max; i++) {
+		DisplayObject* child = &dl[i];
+		if (child->char_id == 0) continue;
+		u32 tid = child->transform_id;
+		int32_t ca = FLOAT_TO_FP16(transform_data[tid][0]);
+		int32_t cb = FLOAT_TO_FP16(transform_data[tid][1]);
+		int32_t cc = FLOAT_TO_FP16(transform_data[tid][4]);
+		int32_t cd = FLOAT_TO_FP16(transform_data[tid][5]);
+		int32_t ctx_tw = FLOAT_TO_TWIPS(transform_data[tid][12]);
+		int32_t cty_tw = FLOAT_TO_TWIPS(transform_data[tid][13]);
+		// Compose: new_matrix = outer * child  (Fixed16 composition)
+		int32_t na = FP_MUL16(fa, ca) + FP_MUL16(fc, cb);
+		int32_t nb = FP_MUL16(fb, ca) + FP_MUL16(fd, cb);
+		int32_t nc = FP_MUL16(fa, cc) + FP_MUL16(fc, cd);
+		int32_t nd = FP_MUL16(fb, cc) + FP_MUL16(fd, cd);
+		int32_t ntx = FP_MUL(fa, ctx_tw) + FP_MUL(fc, cty_tw) + ftx;
+		int32_t nty = FP_MUL(fb, ctx_tw) + FP_MUL(fd, cty_tw) + fty;
+
+		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+			ng_computeBoundsFromDL_fp16(child->sprite_display_list, child->sprite_max_depth,
+				na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		} else {
+			s32 cxmin, cxmax, cymin, cymax;
+			int child_has = ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax);
+			if (!child_has) {
+				int tf_idx = ng_find_textfield(child->char_id);
+				if (tf_idx >= 0) {
+					cxmin = ng_textfields[tf_idx].bounds_xmin;
+					cxmax = ng_textfields[tf_idx].bounds_xmax;
+					cymin = ng_textfields[tf_idx].bounds_ymin;
+					cymax = ng_textfields[tf_idx].bounds_ymax;
+					child_has = 1;
+				}
+			}
+			if (!child_has) continue;
+			boundsUnionCornerFP(cxmin, cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCornerFP(cxmax, cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCornerFP(cxmin, cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCornerFP(cxmax, cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		}
+	}
+	return *has;
+}
+
+// Double-precision wrappers kept for non-getBounds uses
+static void boundsUnionCorner(double px, double py,
+	double ma, double mb, double mc, double md, double mtx, double mty,
+	int* has, double* gxmin, double* gymin, double* gxmax, double* gymax)
+{
+	double tx = ma * px + mc * py + mtx;
+	double ty = mb * px + md * py + mty;
+	if (!*has) { *gxmin = *gxmax = tx; *gymin = *gymax = ty; *has = 1; }
+	else {
+		if (tx < *gxmin) *gxmin = tx;
+		if (tx > *gxmax) *gxmax = tx;
+		if (ty < *gymin) *gymin = ty;
+		if (ty > *gymax) *gymax = ty;
+	}
+}
+
+int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
+    double ma, double mb, double mc, double md, double mtx, double mty,
+    int* has, double* gxmin, double* gymin, double* gxmax, double* gymax)
+{
+	for (size_t i = 1; i <= dl_max; i++) {
+		DisplayObject* child = &dl[i];
+		if (child->char_id == 0) continue;
+		u32 tid = child->transform_id;
+		double ca = (double)transform_data[tid][0];
+		double cb = (double)transform_data[tid][1];
+		double cc = (double)transform_data[tid][4];
+		double cd = (double)transform_data[tid][5];
+		double ctx = (double)transform_data[tid][12];
+		double cty = (double)transform_data[tid][13];
+		double na = ma*ca + mc*cb, nb = mb*ca + md*cb;
+		double nc = ma*cc + mc*cd, nd = mb*cc + md*cd;
+		double ntx = ma*ctx + mc*cty + mtx;
+		double nty = mb*ctx + md*cty + mty;
+
+		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+			ng_computeBoundsFromDL_matrix(child->sprite_display_list, child->sprite_max_depth,
+				na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		} else {
+			s32 cxmin, cxmax, cymin, cymax;
+			int child_has = ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax);
+			if (!child_has) {
+				int tf_idx = ng_find_textfield(child->char_id);
+				if (tf_idx >= 0) {
+					cxmin = ng_textfields[tf_idx].bounds_xmin;
+					cxmax = ng_textfields[tf_idx].bounds_xmax;
+					cymin = ng_textfields[tf_idx].bounds_ymin;
+					cymax = ng_textfields[tf_idx].bounds_ymax;
+					child_has = 1;
+				}
+			}
+			if (!child_has) continue;
+			boundsUnionCorner((double)cxmin, (double)cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCorner((double)cxmax, (double)cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCorner((double)cxmin, (double)cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCorner((double)cxmax, (double)cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		}
+	}
+	return *has;
+}
+
+// Simple wrapper: compute bounds in local space (identity matrix)
+int ng_computeBoundsFromDL(DisplayObject* dl, size_t dl_max,
+    int32_t* out_xmin, int32_t* out_ymin, int32_t* out_xmax, int32_t* out_ymax)
+{
+	int has = 0;
+	double gxmin = 0, gymin = 0, gxmax = 0, gymax = 0;
+	ng_computeBoundsFromDL_matrix(dl, dl_max, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+		&has, &gxmin, &gymin, &gxmax, &gymax);
+	if (has) {
+		*out_xmin = (int32_t)rintf((float)gxmin); *out_ymin = (int32_t)rintf((float)gymin);
+		*out_xmax = (int32_t)rintf((float)gxmax); *out_ymax = (int32_t)rintf((float)gymax);
+	}
+	return has;
+}
+
+// ---------------------------------------------------------------------------
 // Depth manipulation (swapDepths, updateDepth)
 // ---------------------------------------------------------------------------
 

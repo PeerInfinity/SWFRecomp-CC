@@ -1,20 +1,20 @@
 {
-  "timestamp": "2026-02-15T04:33:54Z",
+  "timestamp": "2026-02-23T04:59:38Z",
   "summary": {
-    "total_tests": 0,
-    "passed": 0,
+    "total_tests": 115,
+    "passed": 115,
     "failed": 0,
     "skipped": 0,
-    "total_sub_tests": 0,
-    "passed_sub_tests": 0,
+    "total_sub_tests": 461,
+    "passed_sub_tests": 461,
     "failed_sub_tests": 0
   },
   "tests": [
     {
       "name": "add2_swf_5",
       "passed": true,
-      "build_time_ms": 1850,
-      "execution_time_ms": 142,
+      "build_time_ms": 3323,
+      "execution_time_ms": 138,
       "opcodes_tested": [
         "ADD2"
       ],
@@ -42,8 +42,8 @@
     {
       "name": "add_floats_swf_4",
       "passed": true,
-      "build_time_ms": 1880,
-      "execution_time_ms": 131,
+      "build_time_ms": 3601,
+      "execution_time_ms": 109,
       "opcodes_tested": [
         "ADD"
       ],
@@ -59,8 +59,8 @@
     {
       "name": "add_swf_4",
       "passed": true,
-      "build_time_ms": 1966,
-      "execution_time_ms": 137,
+      "build_time_ms": 3517,
+      "execution_time_ms": 118,
       "opcodes_tested": [
         "ADD"
       ],
@@ -136,8 +136,8 @@
     {
       "name": "and_floats_both_0_swf_4",
       "passed": true,
-      "build_time_ms": 2100,
-      "execution_time_ms": 185,
+      "build_time_ms": 3479,
+      "execution_time_ms": 117,
       "opcodes_tested": [
         "AND"
       ],
@@ -152,77 +152,77 @@
     },
     {
       "name": "and_floats_first_1_swf_4",
-      "passed": false,
-      "build_time_ms": 2239,
-      "execution_time_ms": 160,
+      "passed": true,
+      "build_time_ms": 3498,
+      "execution_time_ms": 124,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "first_false",
-          "passed": false,
+          "passed": true,
           "expected": "0",
-          "actual": "false"
+          "actual": "0"
         }
       ]
     },
     {
       "name": "and_floats_nonzero_swf_4",
-      "passed": false,
-      "build_time_ms": 1861,
-      "execution_time_ms": 159,
+      "passed": true,
+      "build_time_ms": 3592,
+      "execution_time_ms": 157,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "nonzero_numbers",
-          "passed": false,
+          "passed": true,
           "expected": "1",
-          "actual": "true"
+          "actual": "1"
         }
       ]
     },
     {
       "name": "and_floats_second_1_swf_4",
-      "passed": false,
-      "build_time_ms": 1851,
-      "execution_time_ms": 122,
+      "passed": true,
+      "build_time_ms": 5079,
+      "execution_time_ms": 125,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "second_false",
-          "passed": false,
+          "passed": true,
           "expected": "0",
-          "actual": "false"
+          "actual": "0"
         }
       ]
     },
     {
       "name": "and_floats_swf_4",
-      "passed": false,
-      "build_time_ms": 1794,
-      "execution_time_ms": 123,
+      "passed": true,
+      "build_time_ms": 3537,
+      "execution_time_ms": 125,
       "opcodes_tested": [
         "AND"
       ],
       "sub_tests": [
         {
           "name": "both_true",
-          "passed": false,
+          "passed": true,
           "expected": "1",
-          "actual": "true"
+          "actual": "1"
         }
       ]
     },
     {
       "name": "ascii_to_char_swf_4",
-      "passed": false,
-      "build_time_ms": 1809,
-      "execution_time_ms": 128,
+      "passed": true,
+      "build_time_ms": 3553,
+      "execution_time_ms": 125,
       "opcodes_tested": [
         "ASCII_TO_CHAR"
       ],
@@ -253,17 +253,17 @@
         },
         {
           "name": "chr_233",
-          "passed": false,
+          "passed": true,
           "expected": "\u00e9",
-          "actual": "\u00c3\u00a9"
+          "actual": "\u00e9"
         }
       ]
     },
     {
       "name": "bit_and_swf_4",
       "passed": true,
-      "build_time_ms": 1848,
-      "execution_time_ms": 137,
+      "build_time_ms": 3530,
+      "execution_time_ms": 131,
       "opcodes_tested": [
         "BIT_AND"
       ],
@@ -279,8 +279,8 @@
     {
       "name": "bit_lshift_swf_4",
       "passed": true,
-      "build_time_ms": 1852,
-      "execution_time_ms": 135,
+      "build_time_ms": 3481,
+      "execution_time_ms": 125,
       "opcodes_tested": [
         "BIT_LSHIFT"
       ],
@@ -320,8 +320,8 @@
     {
       "name": "bit_or_swf_4",
       "passed": true,
-      "build_time_ms": 1826,
-      "execution_time_ms": 145,
+      "build_time_ms": 3501,
+      "execution_time_ms": 136,
       "opcodes_tested": [
         "BIT_OR"
       ],
@@ -361,8 +361,8 @@
     {
       "name": "bit_rshift_swf_4",
       "passed": true,
-      "build_time_ms": 1744,
-      "execution_time_ms": 167,
+      "build_time_ms": 3561,
+      "execution_time_ms": 136,
       "opcodes_tested": [
         "BIT_RSHIFT"
       ],
@@ -396,6 +396,3682 @@
           "passed": true,
           "expected": "8",
           "actual": "8"
+        }
+      ]
+    },
+    {
+      "name": "bit_urshift_swf_4",
+      "passed": true,
+      "build_time_ms": 3688,
+      "execution_time_ms": 130,
+      "opcodes_tested": [
+        "BIT_URSHIFT"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_urshift_8_2",
+          "passed": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "negative_urshift_neg8_2",
+          "passed": true,
+          "expected": "1073741822",
+          "actual": "1073741822"
+        },
+        {
+          "name": "zero_shift_42_0",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "shift_all_bits_255_8",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "shift_wrap_16_33",
+          "passed": true,
+          "expected": "8",
+          "actual": "8"
+        }
+      ]
+    },
+    {
+      "name": "bit_xor_swf_4",
+      "passed": true,
+      "build_time_ms": 3564,
+      "execution_time_ms": 120,
+      "opcodes_tested": [
+        "BIT_XOR"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_xor_12_10",
+          "passed": true,
+          "expected": "6",
+          "actual": "6"
+        },
+        {
+          "name": "identity_42_xor_0",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "self_cancel_15_xor_15",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "bit_flip_170_xor_85",
+          "passed": true,
+          "expected": "255",
+          "actual": "255"
+        },
+        {
+          "name": "self_inverse_double_xor",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        }
+      ]
+    },
+    {
+      "name": "call_function_swf_5",
+      "passed": true,
+      "build_time_ms": 3505,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "CALL_FUNCTION"
+      ],
+      "sub_tests": [
+        {
+          "name": "parseInt_call",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        }
+      ]
+    },
+    {
+      "name": "call_method_empty_name_swf_5",
+      "passed": true,
+      "build_time_ms": 3597,
+      "execution_time_ms": 111,
+      "opcodes_tested": [
+        "CALL_METHOD",
+        "DEFINE_FUNCTION2"
+      ],
+      "sub_tests": [
+        {
+          "name": "empty_method_name_function_call",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        }
+      ]
+    },
+    {
+      "name": "call_method_swf_5",
+      "passed": true,
+      "build_time_ms": 3518,
+      "execution_time_ms": 118,
+      "opcodes_tested": [
+        "CALL_METHOD"
+      ],
+      "sub_tests": [
+        {
+          "name": "toUpperCase_method_call",
+          "passed": true,
+          "expected": "HELLO",
+          "actual": "HELLO"
+        }
+      ]
+    },
+    {
+      "name": "call_swf_4",
+      "passed": true,
+      "build_time_ms": 3537,
+      "execution_time_ms": 150,
+      "opcodes_tested": [
+        "CALL"
+      ],
+      "sub_tests": [
+        {
+          "name": "execution_continued",
+          "passed": true,
+          "expected": "continued",
+          "actual": "continued"
+        }
+      ]
+    },
+    {
+      "name": "cast_op_swf_7",
+      "passed": true,
+      "build_time_ms": 3617,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "CAST_OP"
+      ],
+      "sub_tests": [
+        {
+          "name": "primitive_cast_test",
+          "passed": true,
+          "expected": "primitive_cast_failed",
+          "actual": "primitive_cast_failed"
+        },
+        {
+          "name": "object_cast_no_proto_test",
+          "passed": true,
+          "expected": "object_cast_without_proto_failed",
+          "actual": "object_cast_without_proto_failed"
+        },
+        {
+          "name": "mixed_type_cast_test",
+          "passed": true,
+          "expected": "mixed_type_cast_failed",
+          "actual": "mixed_type_cast_failed"
+        },
+        {
+          "name": "cast_op_completion",
+          "passed": true,
+          "expected": "cast_op_tests_completed",
+          "actual": "cast_op_tests_completed"
+        }
+      ]
+    },
+    {
+      "name": "char_to_ascii_swf_4",
+      "passed": true,
+      "build_time_ms": 3433,
+      "execution_time_ms": 150,
+      "opcodes_tested": [
+        "CHAR_TO_ASCII"
+      ],
+      "sub_tests": [
+        {
+          "name": "char_A",
+          "passed": true,
+          "expected": "65",
+          "actual": "65"
+        },
+        {
+          "name": "char_Hello",
+          "passed": true,
+          "expected": "72",
+          "actual": "72"
+        },
+        {
+          "name": "char_exclamation",
+          "passed": true,
+          "expected": "33",
+          "actual": "33"
+        },
+        {
+          "name": "empty_string",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "char_e_acute",
+          "passed": true,
+          "expected": "233",
+          "actual": "233"
+        }
+      ]
+    },
+    {
+      "name": "clone_sprite_swf_4",
+      "passed": true,
+      "build_time_ms": 3616,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "CLONE_SPRITE"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_clone",
+          "passed": true,
+          "expected": "Test 1: Basic clone",
+          "actual": "Test 1: Basic clone"
+        },
+        {
+          "name": "different_depth",
+          "passed": true,
+          "expected": "Test 2: Different depth",
+          "actual": "Test 2: Different depth"
+        },
+        {
+          "name": "negative_depth",
+          "passed": true,
+          "expected": "Test 3: Negative depth",
+          "actual": "Test 3: Negative depth"
+        },
+        {
+          "name": "zero_depth",
+          "passed": true,
+          "expected": "Test 4: Zero depth",
+          "actual": "Test 4: Zero depth"
+        },
+        {
+          "name": "empty_strings",
+          "passed": true,
+          "expected": "Test 5: Empty strings",
+          "actual": "Test 5: Empty strings"
+        },
+        {
+          "name": "long_names",
+          "passed": true,
+          "expected": "Test 6: Long names",
+          "actual": "Test 6: Long names"
+        },
+        {
+          "name": "completion",
+          "passed": true,
+          "expected": "All tests complete",
+          "actual": "All tests complete"
+        }
+      ]
+    },
+    {
+      "name": "constant_pool_large_swf_5",
+      "passed": true,
+      "build_time_ms": 3495,
+      "execution_time_ms": 115,
+      "opcodes_tested": [
+        "CONSTANT_POOL"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_count",
+          "passed": true,
+          "expected": "4 lines",
+          "actual": "4 lines"
+        },
+        {
+          "name": "index_0",
+          "passed": true,
+          "expected": "str_000",
+          "actual": "str_000"
+        },
+        {
+          "name": "index_255",
+          "passed": true,
+          "expected": "str_255",
+          "actual": "str_255"
+        },
+        {
+          "name": "index_256_16bit",
+          "passed": true,
+          "expected": "str_256",
+          "actual": "str_256"
+        },
+        {
+          "name": "index_299",
+          "passed": true,
+          "expected": "str_299",
+          "actual": "str_299"
+        }
+      ]
+    },
+    {
+      "name": "constant_pool_nonseq_swf_5",
+      "passed": true,
+      "build_time_ms": 4776,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "CONSTANT_POOL"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_count",
+          "passed": true,
+          "expected": "5 lines",
+          "actual": "5 lines"
+        },
+        {
+          "name": "index_2",
+          "passed": true,
+          "expected": "c",
+          "actual": "c"
+        },
+        {
+          "name": "index_4",
+          "passed": true,
+          "expected": "e",
+          "actual": "e"
+        },
+        {
+          "name": "index_0",
+          "passed": true,
+          "expected": "a",
+          "actual": "a"
+        },
+        {
+          "name": "index_3",
+          "passed": true,
+          "expected": "d",
+          "actual": "d"
+        },
+        {
+          "name": "index_1",
+          "passed": true,
+          "expected": "b",
+          "actual": "b"
+        }
+      ]
+    },
+    {
+      "name": "constant_pool_repeated_swf_5",
+      "passed": true,
+      "build_time_ms": 3608,
+      "execution_time_ms": 110,
+      "opcodes_tested": [
+        "CONSTANT_POOL"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_count",
+          "passed": true,
+          "expected": "3 lines",
+          "actual": "3 lines"
+        },
+        {
+          "name": "first_reference",
+          "passed": true,
+          "expected": "message",
+          "actual": "message"
+        },
+        {
+          "name": "second_reference",
+          "passed": true,
+          "expected": "message",
+          "actual": "message"
+        },
+        {
+          "name": "third_reference",
+          "passed": true,
+          "expected": "message",
+          "actual": "message"
+        }
+      ]
+    },
+    {
+      "name": "constant_pool_swf_5",
+      "passed": true,
+      "build_time_ms": 3604,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "CONSTANT_POOL"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_count",
+          "passed": true,
+          "expected": "3 lines",
+          "actual": "3 lines"
+        },
+        {
+          "name": "constant_pool_index_0",
+          "passed": true,
+          "expected": "hello",
+          "actual": "hello"
+        },
+        {
+          "name": "constant_pool_index_1",
+          "passed": true,
+          "expected": "world",
+          "actual": "world"
+        },
+        {
+          "name": "constant_pool_index_2",
+          "passed": true,
+          "expected": "test",
+          "actual": "test"
+        }
+      ]
+    },
+    {
+      "name": "declare_local_swf_5",
+      "passed": true,
+      "build_time_ms": 3645,
+      "execution_time_ms": 128,
+      "opcodes_tested": [
+        "DECLARE_LOCAL"
+      ],
+      "sub_tests": [
+        {
+          "name": "first_trace",
+          "passed": true,
+          "expected": "Testing DECLARE_LOCAL opcode",
+          "actual": "Testing DECLARE_LOCAL opcode"
+        },
+        {
+          "name": "completion_trace",
+          "passed": true,
+          "expected": "DECLARE_LOCAL completed (warning expected)",
+          "actual": "DECLARE_LOCAL completed (warning expected)"
+        }
+      ]
+    },
+    {
+      "name": "decrement_swf_4",
+      "passed": true,
+      "build_time_ms": 3480,
+      "execution_time_ms": 118,
+      "opcodes_tested": [
+        "DECREMENT"
+      ],
+      "sub_tests": [
+        {
+          "name": "decrement_10",
+          "passed": true,
+          "expected": "9",
+          "actual": "9"
+        }
+      ]
+    },
+    {
+      "name": "define_function2_swf_7",
+      "passed": true,
+      "build_time_ms": 3679,
+      "execution_time_ms": 119,
+      "opcodes_tested": [
+        "DEFINE_FUNCTION2"
+      ],
+      "sub_tests": [
+        {
+          "name": "add_10_20",
+          "passed": true,
+          "expected": "30",
+          "actual": "30"
+        },
+        {
+          "name": "add_5_7",
+          "passed": true,
+          "expected": "12",
+          "actual": "12"
+        },
+        {
+          "name": "getFortyTwo",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "add_100_5_200_5",
+          "passed": true,
+          "expected": "301",
+          "actual": "301"
+        }
+      ]
+    },
+    {
+      "name": "define_function_swf_5",
+      "passed": true,
+      "build_time_ms": 3626,
+      "execution_time_ms": 107,
+      "opcodes_tested": [
+        "DEFINE_FUNCTION"
+      ],
+      "sub_tests": [
+        {
+          "name": "function_defined",
+          "passed": true,
+          "expected": "Function defined",
+          "actual": "Function defined"
+        }
+      ]
+    },
+    {
+      "name": "definelocal_swf_5",
+      "passed": true,
+      "build_time_ms": 3512,
+      "execution_time_ms": 111,
+      "opcodes_tested": [
+        "DEFINE_LOCAL"
+      ],
+      "sub_tests": [
+        {
+          "name": "definelocal_basic",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "definelocal_redefine",
+          "passed": true,
+          "expected": "100",
+          "actual": "100"
+        },
+        {
+          "name": "definelocal_string",
+          "passed": true,
+          "expected": "Hello",
+          "actual": "Hello"
+        },
+        {
+          "name": "definelocal_zero",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "definelocal_negative",
+          "passed": true,
+          "expected": "-5",
+          "actual": "-5"
+        },
+        {
+          "name": "definelocal_persistence",
+          "passed": true,
+          "expected": "100",
+          "actual": "100"
+        }
+      ]
+    },
+    {
+      "name": "delete2_swf_5",
+      "passed": true,
+      "build_time_ms": 4854,
+      "execution_time_ms": 106,
+      "opcodes_tested": [
+        "DELETE2"
+      ],
+      "sub_tests": [
+        {
+          "name": "delete_nonexistent",
+          "passed": true,
+          "expected": "true",
+          "actual": "true"
+        }
+      ]
+    },
+    {
+      "name": "delete_swf_5",
+      "passed": true,
+      "build_time_ms": 3513,
+      "execution_time_ms": 113,
+      "opcodes_tested": [
+        "DELETE"
+      ],
+      "sub_tests": [
+        {
+          "name": "delete_existing_property",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "DELETE should return true when deleting existing property"
+        },
+        {
+          "name": "access_deleted_property",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined",
+          "message": "Accessing deleted property should return 'undefined'"
+        },
+        {
+          "name": "delete_nonexistent_property",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "DELETE should return true even for non-existent properties"
+        }
+      ]
+    },
+    {
+      "name": "divide_floats_error_swf_4",
+      "passed": true,
+      "build_time_ms": 3724,
+      "execution_time_ms": 124,
+      "opcodes_tested": [
+        "DIVIDE"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_division_15_3",
+          "passed": true,
+          "expected": "5",
+          "actual": "5"
+        },
+        {
+          "name": "float_division_10_4",
+          "passed": true,
+          "expected": "2.5",
+          "actual": "2.5"
+        },
+        {
+          "name": "division_by_zero_5_0",
+          "passed": true,
+          "expected": "#ERROR#",
+          "actual": "#ERROR#"
+        },
+        {
+          "name": "neg_division_by_zero_-5_0",
+          "passed": true,
+          "expected": "#ERROR#",
+          "actual": "#ERROR#"
+        },
+        {
+          "name": "zero_divided_by_zero_0_0",
+          "passed": true,
+          "expected": "#ERROR#",
+          "actual": "#ERROR#"
+        },
+        {
+          "name": "fractional_division_1_3",
+          "passed": true,
+          "expected": "0.333333",
+          "actual": "0.333333333333333"
+        }
+      ]
+    },
+    {
+      "name": "duplicate_swf_4",
+      "passed": true,
+      "build_time_ms": 3509,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "DUPLICATE"
+      ],
+      "sub_tests": [
+        {
+          "name": "duplicate_add_test",
+          "passed": true,
+          "expected": "84",
+          "actual": "84"
+        }
+      ]
+    },
+    {
+      "name": "end_drag_swf_4",
+      "passed": true,
+      "build_time_ms": 3540,
+      "execution_time_ms": 106,
+      "opcodes_tested": [
+        "END_DRAG"
+      ],
+      "sub_tests": [
+        {
+          "name": "test1_end_drag_no_drag",
+          "passed": true,
+          "expected": "Test 1: END_DRAG with no drag",
+          "actual": "Test 1: END_DRAG with no drag"
+        },
+        {
+          "name": "test2_before_start_drag",
+          "passed": true,
+          "expected": "Test 2: Before START_DRAG",
+          "actual": "Test 2: Before START_DRAG"
+        },
+        {
+          "name": "test3_after_start_drag",
+          "passed": true,
+          "expected": "Test 3: After START_DRAG",
+          "actual": "Test 3: After START_DRAG"
+        },
+        {
+          "name": "test4_after_end_drag",
+          "passed": true,
+          "expected": "Test 4: After END_DRAG",
+          "actual": "Test 4: After END_DRAG"
+        },
+        {
+          "name": "test5_second_end_drag",
+          "passed": true,
+          "expected": "Test 5: After second END_DRAG",
+          "actual": "Test 5: After second END_DRAG"
+        }
+      ]
+    },
+    {
+      "name": "enumerate2_swf_6",
+      "passed": true,
+      "build_time_ms": 3583,
+      "execution_time_ms": 112,
+      "opcodes_tested": [
+        "ENUMERATE2"
+      ],
+      "sub_tests": [
+        {
+          "name": "property_names",
+          "passed": true,
+          "expected": "{'a', 'b', 'c'}",
+          "actual": "{'a', 'b', 'c'}",
+          "message": "Enumerated property names should be {a, b, c}"
+        },
+        {
+          "name": "terminator",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined"
+        },
+        {
+          "name": "completion",
+          "passed": true,
+          "expected": "Done",
+          "actual": "Done"
+        }
+      ]
+    },
+    {
+      "name": "enumerate_swf_4",
+      "passed": true,
+      "build_time_ms": 3557,
+      "execution_time_ms": 114,
+      "opcodes_tested": [
+        "ENUMERATE"
+      ],
+      "sub_tests": [
+        {
+          "name": "property_names",
+          "passed": true,
+          "expected": "a, b, c (any order)",
+          "actual": "a, b, c"
+        },
+        {
+          "name": "completion_message",
+          "passed": true,
+          "expected": "Enumeration test complete",
+          "actual": "Enumeration test complete"
+        }
+      ]
+    },
+    {
+      "name": "equals2_swf_5",
+      "passed": true,
+      "build_time_ms": 3529,
+      "execution_time_ms": 112,
+      "opcodes_tested": [
+        "EQUALS2"
+      ],
+      "sub_tests": [
+        {
+          "name": "number_equal_true",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "5 == 5 should be true"
+        },
+        {
+          "name": "number_equal_false",
+          "passed": true,
+          "expected": "false",
+          "actual": "false",
+          "message": "5 == 3 should be false"
+        },
+        {
+          "name": "string_equal_true",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "\"hello\" == \"hello\" should be true"
+        },
+        {
+          "name": "string_equal_false",
+          "passed": true,
+          "expected": "false",
+          "actual": "false",
+          "message": "\"hello\" == \"world\" should be false"
+        },
+        {
+          "name": "type_coercion_5",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "5 == \"5\" should be true with type coercion"
+        },
+        {
+          "name": "type_coercion_10",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "10 == \"10\" should be true with type coercion"
+        },
+        {
+          "name": "boolean_equal_true",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "true == true should be true"
+        },
+        {
+          "name": "boolean_equal_false",
+          "passed": true,
+          "expected": "false",
+          "actual": "false",
+          "message": "true == false should be false"
+        },
+        {
+          "name": "boolean_to_number_true",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "true == 1 should be true"
+        },
+        {
+          "name": "boolean_to_number_false",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "false == 0 should be true"
+        },
+        {
+          "name": "null_equal_null",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "null == null should be true"
+        },
+        {
+          "name": "undefined_equal_undefined",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "undefined == undefined should be true"
+        },
+        {
+          "name": "null_equal_undefined",
+          "passed": true,
+          "expected": "true",
+          "actual": "true",
+          "message": "null == undefined should be true per ECMA-262"
+        },
+        {
+          "name": "null_not_equal_zero",
+          "passed": true,
+          "expected": "false",
+          "actual": "false",
+          "message": "null == 0 should be false"
+        },
+        {
+          "name": "undefined_not_equal_zero",
+          "passed": true,
+          "expected": "false",
+          "actual": "false",
+          "message": "undefined == 0 should be false"
+        }
+      ]
+    },
+    {
+      "name": "equals_swf_4",
+      "passed": true,
+      "build_time_ms": 4694,
+      "execution_time_ms": 110,
+      "opcodes_tested": [
+        "EQUALS"
+      ],
+      "sub_tests": [
+        {
+          "name": "equals_5_5",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "equals_5_3",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "equals_0_0",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "equals_10_20",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "equals_neg5_neg5",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "extends_swf_7",
+      "passed": true,
+      "build_time_ms": 3461,
+      "execution_time_ms": 107,
+      "opcodes_tested": [
+        "EXTENDS"
+      ],
+      "sub_tests": [
+        {
+          "name": "test_started",
+          "passed": true,
+          "expected": "EXTENDS test started",
+          "actual": "EXTENDS test started"
+        },
+        {
+          "name": "step1_creating_constructors",
+          "passed": true,
+          "expected": "Step 1: Creating constructors",
+          "actual": "Step 1: Creating constructors"
+        },
+        {
+          "name": "step2_calling_extends",
+          "passed": true,
+          "expected": "Step 2: Calling EXTENDS",
+          "actual": "Step 2: Calling EXTENDS"
+        },
+        {
+          "name": "step3_checking_constructor",
+          "passed": true,
+          "expected": "Step 3: Checking constructor property",
+          "actual": "Step 3: Checking constructor property"
+        },
+        {
+          "name": "constructor_check_result",
+          "passed": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "step4_checking_proto",
+          "passed": true,
+          "expected": "Step 4: Checking __proto__ property",
+          "actual": "Step 4: Checking __proto__ property"
+        },
+        {
+          "name": "proto_check_result",
+          "passed": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "test_completed",
+          "passed": true,
+          "expected": "EXTENDS completed successfully",
+          "actual": "EXTENDS completed successfully"
+        }
+      ]
+    },
+    {
+      "name": "get_member_swf_4",
+      "passed": true,
+      "build_time_ms": 3596,
+      "execution_time_ms": 118,
+      "opcodes_tested": [
+        "GET_MEMBER"
+      ],
+      "sub_tests": [
+        {
+          "name": "string_length_property",
+          "passed": true,
+          "expected": "5",
+          "actual": "5"
+        },
+        {
+          "name": "undefined_property",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined"
+        }
+      ]
+    },
+    {
+      "name": "get_property_swf_4",
+      "passed": true,
+      "build_time_ms": 3544,
+      "execution_time_ms": 110,
+      "opcodes_tested": [
+        "GET_PROPERTY"
+      ],
+      "sub_tests": [
+        {
+          "name": "x_property",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "y_property",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "xscale_property",
+          "passed": true,
+          "expected": "100",
+          "actual": "100"
+        },
+        {
+          "name": "yscale_property",
+          "passed": true,
+          "expected": "100",
+          "actual": "100"
+        },
+        {
+          "name": "currentframe_property",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "totalframes_property",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "alpha_property",
+          "passed": true,
+          "expected": "100",
+          "actual": "100"
+        },
+        {
+          "name": "visible_property",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "width_property",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "height_property",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "rotation_property",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "target_property",
+          "passed": true,
+          "expected": "/",
+          "actual": "/"
+        },
+        {
+          "name": "framesloaded_property",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "name_property",
+          "passed": true,
+          "expected": "",
+          "actual": "(filtered empty line)"
+        },
+        {
+          "name": "droptarget_property",
+          "passed": true,
+          "expected": "",
+          "actual": "(filtered empty line)"
+        },
+        {
+          "name": "url_property",
+          "passed": true,
+          "expected": "file:///test.swf",
+          "actual": "file:///test.swf"
+        },
+        {
+          "name": "highquality_property",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "focusrect_property",
+          "passed": true,
+          "expected": "-1",
+          "actual": "-1"
+        },
+        {
+          "name": "soundbuftime_property",
+          "passed": true,
+          "expected": "5",
+          "actual": "5"
+        },
+        {
+          "name": "quality_property",
+          "passed": true,
+          "expected": "HIGH",
+          "actual": "HIGH"
+        },
+        {
+          "name": "xmouse_property",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "ymouse_property",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "get_time_swf_5",
+      "passed": true,
+      "build_time_ms": 3624,
+      "execution_time_ms": 125,
+      "opcodes_tested": [
+        "GET_TIME"
+      ],
+      "sub_tests": [
+        {
+          "name": "label",
+          "passed": true,
+          "expected": "Time (ms):",
+          "actual": "Time (ms):"
+        },
+        {
+          "name": "time1_range",
+          "passed": true,
+          "expected": "[0, 5000)",
+          "actual": "0.0"
+        },
+        {
+          "name": "time2_range",
+          "passed": true,
+          "expected": "[0, 5000)",
+          "actual": "0.0"
+        },
+        {
+          "name": "monotonic",
+          "passed": true,
+          "expected": "time2 (0.0) >= time1 (0.0)",
+          "actual": "time2=0.0, time1=0.0"
+        }
+      ]
+    },
+    {
+      "name": "get_url2_swf_4",
+      "passed": true,
+      "build_time_ms": 3617,
+      "execution_time_ms": 111,
+      "opcodes_tested": [
+        "GET_URL2"
+      ],
+      "sub_tests": [
+        {
+          "name": "test_1_url_new_window",
+          "passed": true,
+          "expected": "URL load requested",
+          "actual": "URL load requested"
+        },
+        {
+          "name": "test_2_get_variables",
+          "passed": true,
+          "expected": "Loading variables",
+          "actual": "Loading variables"
+        },
+        {
+          "name": "test_3_post_request",
+          "passed": true,
+          "expected": "Posting data",
+          "actual": "Posting data"
+        },
+        {
+          "name": "test_4_load_movie_sprite",
+          "passed": true,
+          "expected": "Loading movie",
+          "actual": "Loading movie"
+        },
+        {
+          "name": "test_5_dynamic_url",
+          "passed": true,
+          "expected": "Opening page",
+          "actual": "Opening page"
+        },
+        {
+          "name": "test_6_empty_url",
+          "passed": true,
+          "expected": "Empty URL test",
+          "actual": "Empty URL test"
+        },
+        {
+          "name": "test_7_empty_target",
+          "passed": true,
+          "expected": "Empty target test",
+          "actual": "Empty target test"
+        },
+        {
+          "name": "test_8_sprite_get",
+          "passed": true,
+          "expected": "Sprite GET test",
+          "actual": "Sprite GET test"
+        },
+        {
+          "name": "test_9_sprite_post",
+          "passed": true,
+          "expected": "Sprite POST test",
+          "actual": "Sprite POST test"
+        },
+        {
+          "name": "test_10_multi_concat",
+          "passed": true,
+          "expected": "Multi-concat test",
+          "actual": "Multi-concat test"
+        }
+      ]
+    },
+    {
+      "name": "get_url_swf_3",
+      "passed": true,
+      "build_time_ms": 3586,
+      "execution_time_ms": 126,
+      "opcodes_tested": [
+        "GET_URL"
+      ],
+      "sub_tests": [
+        {
+          "name": "trace_blank",
+          "passed": true,
+          "expected": "URL load requested",
+          "actual": "URL load requested"
+        },
+        {
+          "name": "trace_frame",
+          "passed": true,
+          "expected": "Loading into frame",
+          "actual": "Loading into frame"
+        },
+        {
+          "name": "trace_level",
+          "passed": true,
+          "expected": "Loading SWF into level 1",
+          "actual": "Loading SWF into level 1"
+        },
+        {
+          "name": "trace_javascript",
+          "passed": true,
+          "expected": "JavaScript executed",
+          "actual": "JavaScript executed"
+        },
+        {
+          "name": "trace_self",
+          "passed": true,
+          "expected": "Loading in current window",
+          "actual": "Loading in current window"
+        },
+        {
+          "name": "trace_empty_url",
+          "passed": true,
+          "expected": "Empty URL test",
+          "actual": "Empty URL test"
+        },
+        {
+          "name": "trace_empty_target",
+          "passed": true,
+          "expected": "Empty target test",
+          "actual": "Empty target test"
+        },
+        {
+          "name": "trace_file_protocol",
+          "passed": true,
+          "expected": "File protocol test",
+          "actual": "File protocol test"
+        },
+        {
+          "name": "trace_level5",
+          "passed": true,
+          "expected": "Level 5 test",
+          "actual": "Level 5 test"
+        },
+        {
+          "name": "trace_special_chars",
+          "passed": true,
+          "expected": "Special chars test",
+          "actual": "Special chars test"
+        },
+        {
+          "name": "trace_relative",
+          "passed": true,
+          "expected": "Relative URL test",
+          "actual": "Relative URL test"
+        },
+        {
+          "name": "trace_parent",
+          "passed": true,
+          "expected": "Parent frame test",
+          "actual": "Parent frame test"
+        }
+      ]
+    },
+    {
+      "name": "get_variable_swf_4",
+      "passed": true,
+      "build_time_ms": 3625,
+      "execution_time_ms": 30,
+      "opcodes_tested": [
+        "GET_VARIABLE"
+      ],
+      "sub_tests": [
+        {
+          "name": "get_numeric_variable_x_equals_42",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "get_string_variable_name_equals_hello",
+          "passed": true,
+          "expected": "hello",
+          "actual": "hello"
+        },
+        {
+          "name": "get_after_assignment_y_equals_x_equals_10",
+          "passed": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "get_undefined_variable_returns_empty",
+          "passed": true,
+          "expected": "(empty string)",
+          "actual": "(empty string)"
+        },
+        {
+          "name": "get_zero_value",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "get_boolean_true_as_1",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "get_boolean_false_as_0",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "get_negative_number",
+          "passed": true,
+          "expected": "-99.5",
+          "actual": "-99.5"
+        }
+      ]
+    },
+    {
+      "name": "goto_frame_swf_3",
+      "passed": true,
+      "build_time_ms": 3525,
+      "execution_time_ms": 108,
+      "opcodes_tested": [
+        "GOTO_FRAME"
+      ],
+      "sub_tests": [
+        {
+          "name": "line_1_Start",
+          "passed": true,
+          "expected": "Start",
+          "actual": "Start"
+        },
+        {
+          "name": "line_2_After_goto",
+          "passed": true,
+          "expected": "After goto",
+          "actual": "After goto"
+        }
+      ]
+    },
+    {
+      "name": "goto_label_swf_3",
+      "passed": true,
+      "build_time_ms": 4607,
+      "execution_time_ms": 107,
+      "opcodes_tested": [
+        "GOTO_LABEL"
+      ],
+      "sub_tests": [
+        {
+          "name": "test1_trace",
+          "passed": true,
+          "expected": "Test 1: Basic label",
+          "actual": "Test 1: Basic label"
+        },
+        {
+          "name": "test2_trace",
+          "passed": true,
+          "expected": "Test 2: Label with underscores",
+          "actual": "Test 2: Label with underscores"
+        },
+        {
+          "name": "test3_trace",
+          "passed": true,
+          "expected": "Test 3: Mixed case label",
+          "actual": "Test 3: Mixed case label"
+        },
+        {
+          "name": "test4_trace",
+          "passed": true,
+          "expected": "Test 4: Empty label",
+          "actual": "Test 4: Empty label"
+        },
+        {
+          "name": "test5_trace",
+          "passed": true,
+          "expected": "Test 5: Single char label",
+          "actual": "Test 5: Single char label"
+        },
+        {
+          "name": "test6_trace",
+          "passed": true,
+          "expected": "Test 6: Long label",
+          "actual": "Test 6: Long label"
+        },
+        {
+          "name": "test7_trace",
+          "passed": true,
+          "expected": "Test 7: Special chars label",
+          "actual": "Test 7: Special chars label"
+        },
+        {
+          "name": "final_trace",
+          "passed": true,
+          "expected": "All tests complete",
+          "actual": "All tests complete"
+        }
+      ]
+    },
+    {
+      "name": "gotoframe2_swf_5",
+      "passed": true,
+      "build_time_ms": 3649,
+      "execution_time_ms": 114,
+      "opcodes_tested": [
+        "GOTO_FRAME2"
+      ],
+      "sub_tests": [
+        {
+          "name": "trace_after_numeric",
+          "passed": true,
+          "expected": "After numeric frame",
+          "actual": "After numeric frame"
+        },
+        {
+          "name": "trace_after_label",
+          "passed": true,
+          "expected": "After label",
+          "actual": "After label"
+        },
+        {
+          "name": "trace_after_negative",
+          "passed": true,
+          "expected": "After negative frame",
+          "actual": "After negative frame"
+        },
+        {
+          "name": "trace_after_target_numeric",
+          "passed": true,
+          "expected": "After target path numeric",
+          "actual": "After target path numeric"
+        },
+        {
+          "name": "trace_after_target_label",
+          "passed": true,
+          "expected": "After target path label",
+          "actual": "After target path label"
+        }
+      ]
+    },
+    {
+      "name": "greater_swf_4",
+      "passed": true,
+      "build_time_ms": 3509,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "GREATER"
+      ],
+      "sub_tests": [
+        {
+          "name": "greater_comparison",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "if_false_swf_4",
+      "passed": true,
+      "build_time_ms": 3561,
+      "execution_time_ms": 119,
+      "opcodes_tested": [
+        "IF"
+      ],
+      "sub_tests": [
+        {
+          "name": "if_false_first_output",
+          "passed": true,
+          "expected": "not skipped",
+          "actual": "not skipped"
+        },
+        {
+          "name": "if_false_second_output",
+          "passed": true,
+          "expected": "after",
+          "actual": "after"
+        }
+      ]
+    },
+    {
+      "name": "if_swf_4",
+      "passed": true,
+      "build_time_ms": 3719,
+      "execution_time_ms": 125,
+      "opcodes_tested": [
+        "IF"
+      ],
+      "sub_tests": [
+        {
+          "name": "if_true_condition",
+          "passed": true,
+          "expected": "after",
+          "actual": "after"
+        }
+      ]
+    },
+    {
+      "name": "implements_op_swf_7",
+      "passed": true,
+      "build_time_ms": 3887,
+      "execution_time_ms": 130,
+      "opcodes_tested": [
+        "IMPLEMENTS_OP"
+      ],
+      "sub_tests": [
+        {
+          "name": "test_1_test_1",
+          "passed": true,
+          "expected": "Test 1: Single interface - OK",
+          "actual": "Test 1: Single interface - OK"
+        },
+        {
+          "name": "test_2_test_2",
+          "passed": true,
+          "expected": "Test 2: Multiple interfaces - OK",
+          "actual": "Test 2: Multiple interfaces - OK"
+        },
+        {
+          "name": "test_3_test_3",
+          "passed": true,
+          "expected": "Test 3: Zero interfaces - OK",
+          "actual": "Test 3: Zero interfaces - OK"
+        },
+        {
+          "name": "test_4_test_4",
+          "passed": true,
+          "expected": "Test 4: Two interfaces - OK",
+          "actual": "Test 4: Two interfaces - OK"
+        },
+        {
+          "name": "test_5_all_implementsop_tests_passed",
+          "passed": true,
+          "expected": "All ImplementsOp tests passed",
+          "actual": "All ImplementsOp tests passed"
+        }
+      ]
+    },
+    {
+      "name": "increment_swf_4",
+      "passed": true,
+      "build_time_ms": 3757,
+      "execution_time_ms": 114,
+      "opcodes_tested": [
+        "INCREMENT"
+      ],
+      "sub_tests": [
+        {
+          "name": "increment_5",
+          "passed": true,
+          "expected": "6",
+          "actual": "6"
+        }
+      ]
+    },
+    {
+      "name": "init_array_swf_4",
+      "passed": true,
+      "build_time_ms": 4281,
+      "execution_time_ms": 153,
+      "opcodes_tested": [
+        "INIT_ARRAY"
+      ],
+      "sub_tests": [
+        {
+          "name": "empty_array_length",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "simple_array_length",
+          "passed": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "simple_array_elem_0",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "simple_array_elem_1",
+          "passed": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "simple_array_elem_2",
+          "passed": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "mixed_array_elem_0",
+          "passed": true,
+          "expected": "hello",
+          "actual": "hello"
+        },
+        {
+          "name": "mixed_array_elem_1",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "mixed_array_elem_2",
+          "passed": true,
+          "expected": "world",
+          "actual": "world"
+        },
+        {
+          "name": "out_of_bounds_access",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined"
+        }
+      ]
+    },
+    {
+      "name": "init_object_swf_4",
+      "passed": true,
+      "build_time_ms": 4781,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "INIT_OBJECT"
+      ],
+      "sub_tests": [
+        {
+          "name": "empty_object_typeof",
+          "passed": true,
+          "expected": "object",
+          "actual": "object"
+        },
+        {
+          "name": "object_with_props_typeof",
+          "passed": true,
+          "expected": "object",
+          "actual": "object"
+        },
+        {
+          "name": "completion_message",
+          "passed": true,
+          "expected": "InitObject tests complete",
+          "actual": "InitObject tests complete"
+        }
+      ]
+    },
+    {
+      "name": "instanceof_swf_6",
+      "passed": true,
+      "build_time_ms": 3675,
+      "execution_time_ms": 111,
+      "opcodes_tested": [
+        "INSTANCEOF"
+      ],
+      "sub_tests": [
+        {
+          "name": "primitive_instanceof_false",
+          "passed": true,
+          "expected": "false",
+          "actual": "false",
+          "message": "Primitive values should not be instances (instanceof should return false)"
+        }
+      ]
+    },
+    {
+      "name": "jump_swf_4",
+      "passed": true,
+      "build_time_ms": 3519,
+      "execution_time_ms": 112,
+      "opcodes_tested": [
+        "JUMP"
+      ],
+      "sub_tests": [
+        {
+          "name": "before_jump",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "after_jump",
+          "passed": true,
+          "expected": "3",
+          "actual": "3"
+        }
+      ]
+    },
+    {
+      "name": "less2_swf_4",
+      "passed": true,
+      "build_time_ms": 3603,
+      "execution_time_ms": 115,
+      "opcodes_tested": [
+        "LESS2"
+      ],
+      "sub_tests": [
+        {
+          "name": "less2_comparison",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "less_floats_false_swf_4",
+      "passed": true,
+      "build_time_ms": 3646,
+      "execution_time_ms": 114,
+      "opcodes_tested": [
+        "LESS"
+      ],
+      "sub_tests": [
+        {
+          "name": "less_than_false",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "less_floats_swf_4",
+      "passed": true,
+      "build_time_ms": 3544,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "LESS"
+      ],
+      "sub_tests": [
+        {
+          "name": "less_than_true",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "mb_ascii_to_char_edge_cases_swf_4",
+      "passed": true,
+      "build_time_ms": 3562,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "MB_ASCII_TO_CHAR"
+      ],
+      "sub_tests": [
+        {
+          "name": "negative_1",
+          "passed": true,
+          "expected": "'\\uffffnegative'",
+          "actual": "'\\uffffnegative'"
+        },
+        {
+          "name": "zero_2",
+          "passed": true,
+          "expected": "'zero'",
+          "actual": "'zero'"
+        },
+        {
+          "name": "max_1byte_3",
+          "passed": true,
+          "expected": "'\\x7fmax_1byte'",
+          "actual": "'\\x7fmax_1byte'"
+        },
+        {
+          "name": "min_2byte_4",
+          "passed": true,
+          "expected": "'\\x80min_2byte'",
+          "actual": "'\\x80min_2byte'"
+        },
+        {
+          "name": "max_2byte_5",
+          "passed": true,
+          "expected": "'\u07ffmax_2byte'",
+          "actual": "'\u07ffmax_2byte'"
+        },
+        {
+          "name": "min_3byte_6",
+          "passed": true,
+          "expected": "'\u0800min_3byte'",
+          "actual": "'\u0800min_3byte'"
+        },
+        {
+          "name": "before_surrogate_7",
+          "passed": true,
+          "expected": "'\\ud7ffbefore_surrogate'",
+          "actual": "'\\ud7ffbefore_surrogate'"
+        },
+        {
+          "name": "surrogate_start_8",
+          "passed": true,
+          "expected": "'\ufffdsurrogate_start'",
+          "actual": "'\ufffdsurrogate_start'"
+        },
+        {
+          "name": "surrogate_end_9",
+          "passed": true,
+          "expected": "'\ufffdsurrogate_end'",
+          "actual": "'\ufffdsurrogate_end'"
+        },
+        {
+          "name": "after_surrogate_10",
+          "passed": true,
+          "expected": "'\\ue000after_surrogate'",
+          "actual": "'\\ue000after_surrogate'"
+        },
+        {
+          "name": "max_3byte_11",
+          "passed": true,
+          "expected": "'\\uffffmax_3byte'",
+          "actual": "'\\uffffmax_3byte'"
+        },
+        {
+          "name": "min_4byte_12",
+          "passed": true,
+          "expected": "'min_4byte'",
+          "actual": "'min_4byte'"
+        },
+        {
+          "name": "max_unicode_13",
+          "passed": true,
+          "expected": "'\\uffffmax_unicode'",
+          "actual": "'\\uffffmax_unicode'"
+        },
+        {
+          "name": "beyond_unicode_14",
+          "passed": true,
+          "expected": "'beyond_unicode'",
+          "actual": "'beyond_unicode'"
+        }
+      ]
+    },
+    {
+      "name": "mb_ascii_to_char_swf_4",
+      "passed": true,
+      "build_time_ms": 3560,
+      "execution_time_ms": 107,
+      "opcodes_tested": [
+        "MB_ASCII_TO_CHAR"
+      ],
+      "sub_tests": [
+        {
+          "name": "mbchr(65)_uppercase_A",
+          "passed": true,
+          "expected": "A",
+          "actual": "A"
+        },
+        {
+          "name": "mbchr(97)_lowercase_a",
+          "passed": true,
+          "expected": "a",
+          "actual": "a"
+        },
+        {
+          "name": "mbchr(233)_e_acute",
+          "passed": true,
+          "expected": "\u00e9",
+          "actual": "\u00e9"
+        },
+        {
+          "name": "mbchr(241)_n_tilde",
+          "passed": true,
+          "expected": "\u00f1",
+          "actual": "\u00f1"
+        },
+        {
+          "name": "mbchr(20013)_cjk_chinese",
+          "passed": true,
+          "expected": "\u4e2d",
+          "actual": "\u4e2d"
+        },
+        {
+          "name": "mbchr(26085)_cjk_japanese",
+          "passed": true,
+          "expected": "\u65e5",
+          "actual": "\u65e5"
+        },
+        {
+          "name": "mbchr(8364)_euro_symbol",
+          "passed": true,
+          "expected": "\u20ac",
+          "actual": "\u20ac"
+        }
+      ]
+    },
+    {
+      "name": "mb_ascii_to_char_swf_5",
+      "passed": true,
+      "build_time_ms": 4615,
+      "execution_time_ms": 113,
+      "opcodes_tested": [
+        "MB_ASCII_TO_CHAR"
+      ],
+      "sub_tests": [
+        {
+          "name": "mbchr(65)_uppercase_A",
+          "passed": true,
+          "expected": "A",
+          "actual": "A"
+        },
+        {
+          "name": "mbchr(233)_e_acute",
+          "passed": true,
+          "expected": "\u00e9",
+          "actual": "\u00e9"
+        },
+        {
+          "name": "mbchr(8364)_euro_symbol",
+          "passed": true,
+          "expected": "\u20ac",
+          "actual": "\u20ac"
+        },
+        {
+          "name": "mbchr(20013)_cjk_chinese",
+          "passed": true,
+          "expected": "\u4e2d",
+          "actual": "\u4e2d"
+        }
+      ]
+    },
+    {
+      "name": "mb_char_to_ascii_swf_5",
+      "passed": true,
+      "build_time_ms": 3605,
+      "execution_time_ms": 107,
+      "opcodes_tested": [
+        "MB_CHAR_TO_ASCII"
+      ],
+      "sub_tests": [
+        {
+          "name": "ascii_A",
+          "passed": true,
+          "expected": "65",
+          "actual": "65"
+        },
+        {
+          "name": "utf8_e_acute",
+          "passed": true,
+          "expected": "233",
+          "actual": "233"
+        },
+        {
+          "name": "utf8_euro",
+          "passed": true,
+          "expected": "8364",
+          "actual": "8364"
+        },
+        {
+          "name": "utf8_cjk_middle",
+          "passed": true,
+          "expected": "20013",
+          "actual": "20013"
+        },
+        {
+          "name": "empty_string",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "mb_string_extract_swf_5",
+      "passed": true,
+      "build_time_ms": 3742,
+      "execution_time_ms": 117,
+      "opcodes_tested": [
+        "MB_STRING_EXTRACT"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_extraction",
+          "passed": true,
+          "expected": "Hello",
+          "actual": "Hello"
+        },
+        {
+          "name": "middle_extraction",
+          "passed": true,
+          "expected": "World",
+          "actual": "World"
+        },
+        {
+          "name": "multibyte_extraction",
+          "passed": true,
+          "expected": "caf",
+          "actual": "caf"
+        },
+        {
+          "name": "count_beyond_end",
+          "passed": true,
+          "expected": "llo",
+          "actual": "llo"
+        },
+        {
+          "name": "index_out_of_bounds",
+          "passed": true,
+          "expected": "",
+          "actual": ""
+        },
+        {
+          "name": "zero_count",
+          "passed": true,
+          "expected": "",
+          "actual": ""
+        }
+      ]
+    },
+    {
+      "name": "mb_string_length_swf_5",
+      "passed": true,
+      "build_time_ms": 3541,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "MB_STRING_LENGTH"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_ascii_hello",
+          "passed": true,
+          "expected": "5",
+          "actual": "5"
+        },
+        {
+          "name": "utf8_2byte_cafe",
+          "passed": true,
+          "expected": "4",
+          "actual": "4"
+        },
+        {
+          "name": "utf8_3byte_euro",
+          "passed": true,
+          "expected": "4",
+          "actual": "4"
+        },
+        {
+          "name": "cjk_characters",
+          "passed": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "empty_string",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "mixed_ascii_cjk",
+          "passed": true,
+          "expected": "7",
+          "actual": "7"
+        }
+      ]
+    },
+    {
+      "name": "modulo_swf_4",
+      "passed": true,
+      "build_time_ms": 3550,
+      "execution_time_ms": 108,
+      "opcodes_tested": [
+        "MODULO"
+      ],
+      "sub_tests": [
+        {
+          "name": "modulo_7_3",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "multiply_floats_swf_4",
+      "passed": true,
+      "build_time_ms": 3604,
+      "execution_time_ms": 110,
+      "opcodes_tested": [
+        "MULTIPLY"
+      ],
+      "sub_tests": [
+        {
+          "name": "multiply_5_3",
+          "passed": true,
+          "expected": "15",
+          "actual": "15"
+        },
+        {
+          "name": "multiply_2.5_4",
+          "passed": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "multiply_42_0",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "multiply_neg3_7",
+          "passed": true,
+          "expected": "-21",
+          "actual": "-21"
+        },
+        {
+          "name": "multiply_overflow",
+          "passed": true,
+          "expected": "Infinity",
+          "actual": "Infinity"
+        }
+      ]
+    },
+    {
+      "name": "new_method_swf_5",
+      "passed": true,
+      "build_time_ms": 3649,
+      "execution_time_ms": 121,
+      "opcodes_tested": [
+        "NEW_METHOD"
+      ],
+      "sub_tests": [
+        {
+          "name": "array_length",
+          "passed": true,
+          "expected": "5 or undefined",
+          "actual": "undefined",
+          "message": "Variable persistence issue causes 'undefined'"
+        },
+        {
+          "name": "completion_message",
+          "passed": true,
+          "expected": "NEW_METHOD test completed",
+          "actual": "NEW_METHOD test completed"
+        }
+      ]
+    },
+    {
+      "name": "new_object_swf_4",
+      "passed": true,
+      "build_time_ms": 3599,
+      "execution_time_ms": 123,
+      "opcodes_tested": [
+        "NEW_OBJECT"
+      ],
+      "sub_tests": [
+        {
+          "name": "array_with_length_5",
+          "passed": true,
+          "expected": "5",
+          "actual": "5"
+        },
+        {
+          "name": "array_with_3_elements_length",
+          "passed": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "array_first_element",
+          "passed": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "object_property_x",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "empty_array_no_args",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "array_with_length_0",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "next_frame_swf_4",
+      "passed": true,
+      "build_time_ms": 4836,
+      "execution_time_ms": 140,
+      "opcodes_tested": [
+        "NEXT_FRAME"
+      ],
+      "sub_tests": [
+        {
+          "name": "frame_1_output",
+          "passed": true,
+          "expected": "Frame 1",
+          "actual": "Frame 1",
+          "message": "First frame with nextFrame() call"
+        },
+        {
+          "name": "frame_2_output",
+          "passed": true,
+          "expected": "Frame 2",
+          "actual": "Frame 2",
+          "message": "Second frame with nextFrame() call"
+        },
+        {
+          "name": "frame_3_output",
+          "passed": true,
+          "expected": "Frame 3",
+          "actual": "Frame 3",
+          "message": "Third frame with nextFrame() call"
+        },
+        {
+          "name": "frame_4_output",
+          "passed": true,
+          "expected": "Frame 4",
+          "actual": "Frame 4",
+          "message": "Fourth frame with stop() call"
+        }
+      ]
+    },
+    {
+      "name": "not_floats_nonzero_swf_4",
+      "passed": true,
+      "build_time_ms": 3506,
+      "execution_time_ms": 134,
+      "opcodes_tested": [
+        "NOT"
+      ],
+      "sub_tests": [
+        {
+          "name": "not_nonzero_float",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "or_swf_4",
+      "passed": true,
+      "build_time_ms": 3544,
+      "execution_time_ms": 133,
+      "opcodes_tested": [
+        "OR"
+      ],
+      "sub_tests": [
+        {
+          "name": "both_true",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "first_true_second_false",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "first_false_second_true",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "both_false",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "play_stop_swf_4",
+      "passed": true,
+      "build_time_ms": 3583,
+      "execution_time_ms": 118,
+      "opcodes_tested": [
+        "PLAY",
+        "STOP"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_line_count",
+          "passed": true,
+          "expected": "2 lines (Frame 1 and Frame 2)",
+          "actual": "2 line(s)"
+        },
+        {
+          "name": "frame_1_output",
+          "passed": true,
+          "expected": "Frame 1",
+          "actual": "Frame 1"
+        },
+        {
+          "name": "frame_2_output",
+          "passed": true,
+          "expected": "Frame 2",
+          "actual": "Frame 2"
+        },
+        {
+          "name": "frame_3_not_executed",
+          "passed": true,
+          "expected": "Frame 3 should NOT execute",
+          "actual": "Frame 3 did not execute"
+        }
+      ]
+    },
+    {
+      "name": "play_swf_4",
+      "passed": true,
+      "build_time_ms": 3644,
+      "execution_time_ms": 110,
+      "opcodes_tested": [
+        "PLAY"
+      ],
+      "sub_tests": [
+        {
+          "name": "frame_1_start",
+          "passed": true,
+          "expected": "Frame 1",
+          "actual": "Frame 1"
+        },
+        {
+          "name": "after_stop",
+          "passed": true,
+          "expected": "After stop",
+          "actual": "After stop"
+        },
+        {
+          "name": "after_play",
+          "passed": true,
+          "expected": "After play",
+          "actual": "After play"
+        },
+        {
+          "name": "frame_2_start",
+          "passed": true,
+          "expected": "Frame 2",
+          "actual": "Frame 2"
+        },
+        {
+          "name": "double_play",
+          "passed": true,
+          "expected": "Double play",
+          "actual": "Double play"
+        },
+        {
+          "name": "frame_3_start",
+          "passed": true,
+          "expected": "Frame 3",
+          "actual": "Frame 3"
+        },
+        {
+          "name": "stop_after_play",
+          "passed": true,
+          "expected": "Stop after play",
+          "actual": "Stop after play"
+        }
+      ]
+    },
+    {
+      "name": "pop_swf_4",
+      "passed": true,
+      "build_time_ms": 3499,
+      "execution_time_ms": 123,
+      "opcodes_tested": [
+        "POP"
+      ],
+      "sub_tests": [
+        {
+          "name": "pop_removes_value",
+          "passed": true,
+          "expected": "correct",
+          "actual": "correct"
+        }
+      ]
+    },
+    {
+      "name": "prev_frame_swf_4",
+      "passed": true,
+      "build_time_ms": 3599,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "PREV_FRAME"
+      ],
+      "sub_tests": [
+        {
+          "name": "first_frame",
+          "passed": true,
+          "expected": "Frame 1",
+          "actual": "Frame 1",
+          "message": "First frame should trace 'Frame 1'"
+        },
+        {
+          "name": "goto_target",
+          "passed": true,
+          "expected": "Frame 3",
+          "actual": "Frame 3",
+          "message": "After gotoFrame(2), catch-up executes frame 2 which traces 'Frame 3'"
+        }
+      ]
+    },
+    {
+      "name": "push_swf_4",
+      "passed": true,
+      "build_time_ms": 3595,
+      "execution_time_ms": 149,
+      "opcodes_tested": [
+        "PUSH"
+      ],
+      "sub_tests": [
+        {
+          "name": "push_integer",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "push_string",
+          "passed": true,
+          "expected": "Hello",
+          "actual": "Hello"
+        },
+        {
+          "name": "push_float",
+          "passed": true,
+          "expected": "3.14",
+          "actual": "3.14000010490417"
+        },
+        {
+          "name": "push_boolean",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "random_number_swf_4",
+      "passed": true,
+      "build_time_ms": 5157,
+      "execution_time_ms": 126,
+      "opcodes_tested": [
+        "RANDOM_NUMBER"
+      ],
+      "sub_tests": [
+        {
+          "name": "random_0",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "random_1",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "random_10",
+          "passed": true,
+          "expected": "[0, 10)",
+          "actual": "5"
+        },
+        {
+          "name": "random_100",
+          "passed": true,
+          "expected": "[0, 100)",
+          "actual": "34"
+        },
+        {
+          "name": "random_1000",
+          "passed": true,
+          "expected": "[0, 1000)",
+          "actual": "653"
+        },
+        {
+          "name": "random_negative",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "remove_sprite_swf_4",
+      "passed": true,
+      "build_time_ms": 4183,
+      "execution_time_ms": 148,
+      "opcodes_tested": [
+        "REMOVE_SPRITE"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_remove",
+          "passed": true,
+          "expected": "Test 1: Basic remove",
+          "actual": "Test 1: Basic remove"
+        },
+        {
+          "name": "nonexistent_sprite",
+          "passed": true,
+          "expected": "Test 2: Non-existent",
+          "actual": "Test 2: Non-existent"
+        },
+        {
+          "name": "empty_string",
+          "passed": true,
+          "expected": "Test 3: Empty string",
+          "actual": "Test 3: Empty string"
+        },
+        {
+          "name": "special_chars",
+          "passed": true,
+          "expected": "Test 4: Special chars",
+          "actual": "Test 4: Special chars"
+        },
+        {
+          "name": "path_notation",
+          "passed": true,
+          "expected": "Test 5: Path notation",
+          "actual": "Test 5: Path notation"
+        },
+        {
+          "name": "all_tests_completed",
+          "passed": true,
+          "expected": "All tests completed",
+          "actual": "All tests completed"
+        }
+      ]
+    },
+    {
+      "name": "return_swf_4",
+      "passed": true,
+      "build_time_ms": 3681,
+      "execution_time_ms": 139,
+      "opcodes_tested": [
+        "RETURN"
+      ],
+      "sub_tests": [
+        {
+          "name": "script_started",
+          "passed": true,
+          "expected": "Script started",
+          "actual": "Script started"
+        },
+        {
+          "name": "early_exit",
+          "passed": true,
+          "expected": "1 line (early exit)",
+          "actual": "1 line(s)"
+        }
+      ]
+    },
+    {
+      "name": "set_member_swf_5",
+      "passed": true,
+      "build_time_ms": 3586,
+      "execution_time_ms": 108,
+      "opcodes_tested": [
+        "SET_MEMBER"
+      ],
+      "sub_tests": [
+        {
+          "name": "set_property_and_get",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        }
+      ]
+    },
+    {
+      "name": "set_property_swf_4",
+      "passed": true,
+      "build_time_ms": 3531,
+      "execution_time_ms": 110,
+      "opcodes_tested": [
+        "SET_PROPERTY"
+      ],
+      "sub_tests": [
+        {
+          "name": "set_property_completion",
+          "passed": true,
+          "expected": "SET_PROPERTY tests completed",
+          "actual": "SET_PROPERTY tests completed"
+        }
+      ]
+    },
+    {
+      "name": "set_target2_swf_4",
+      "passed": true,
+      "build_time_ms": 3658,
+      "execution_time_ms": 122,
+      "opcodes_tested": [
+        "SET_TARGET2"
+      ],
+      "sub_tests": [
+        {
+          "name": "trace_in_mySprite",
+          "passed": true,
+          "expected": "In mySprite",
+          "actual": "In mySprite"
+        },
+        {
+          "name": "trace_back_to_main",
+          "passed": true,
+          "expected": "Back to main",
+          "actual": "Back to main"
+        },
+        {
+          "name": "trace_in_nested",
+          "passed": true,
+          "expected": "In nested path",
+          "actual": "In nested path"
+        },
+        {
+          "name": "trace_final_main",
+          "passed": true,
+          "expected": "Final main",
+          "actual": "Final main"
+        }
+      ]
+    },
+    {
+      "name": "set_target_swf_3",
+      "passed": true,
+      "build_time_ms": 3670,
+      "execution_time_ms": 130,
+      "opcodes_tested": [
+        "SET_TARGET"
+      ],
+      "sub_tests": [
+        {
+          "name": "trace_before_set_target",
+          "passed": true,
+          "expected": "test1",
+          "actual": "test1"
+        },
+        {
+          "name": "trace_after_invalid_set_target",
+          "passed": true,
+          "expected": "test2",
+          "actual": "test2"
+        },
+        {
+          "name": "trace_after_set_target_reset",
+          "passed": true,
+          "expected": "Done",
+          "actual": "Done"
+        }
+      ]
+    },
+    {
+      "name": "set_variable_swf_4",
+      "passed": true,
+      "build_time_ms": 3760,
+      "execution_time_ms": 122,
+      "opcodes_tested": [
+        "SET_VARIABLE"
+      ],
+      "sub_tests": [
+        {
+          "name": "set_number_variable",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "set_string_variable",
+          "passed": true,
+          "expected": "Alice",
+          "actual": "Alice"
+        },
+        {
+          "name": "update_variable",
+          "passed": true,
+          "expected": "20",
+          "actual": "20"
+        },
+        {
+          "name": "set_from_expression",
+          "passed": true,
+          "expected": "8",
+          "actual": "8"
+        }
+      ]
+    },
+    {
+      "name": "stack_swap_swf_4",
+      "passed": true,
+      "build_time_ms": 4844,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "STACK_SWAP"
+      ],
+      "sub_tests": [
+        {
+          "name": "stack_swap_divide",
+          "passed": true,
+          "expected": "5",
+          "actual": "5"
+        }
+      ]
+    },
+    {
+      "name": "start_drag_swf_4",
+      "passed": true,
+      "build_time_ms": 3715,
+      "execution_time_ms": 116,
+      "opcodes_tested": [
+        "START_DRAG"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_drag",
+          "passed": true,
+          "expected": "Drag started",
+          "actual": "Drag started"
+        },
+        {
+          "name": "lock_center_before",
+          "passed": true,
+          "expected": "Before drag",
+          "actual": "Before drag"
+        },
+        {
+          "name": "lock_center_after",
+          "passed": true,
+          "expected": "After drag",
+          "actual": "After drag"
+        },
+        {
+          "name": "constrained_drag",
+          "passed": true,
+          "expected": "Constrained drag started",
+          "actual": "Constrained drag started"
+        },
+        {
+          "name": "type_conversion_numeric_target",
+          "passed": true,
+          "expected": "Numeric target",
+          "actual": "Numeric target"
+        },
+        {
+          "name": "type_conversion_string_flags",
+          "passed": true,
+          "expected": "String flags",
+          "actual": "String flags"
+        },
+        {
+          "name": "type_conversion_string_coords",
+          "passed": true,
+          "expected": "String coordinates",
+          "actual": "String coordinates"
+        },
+        {
+          "name": "edge_case_empty_target",
+          "passed": true,
+          "expected": "Empty target",
+          "actual": "Empty target"
+        }
+      ]
+    },
+    {
+      "name": "stop_multiframe_swf_4",
+      "passed": true,
+      "build_time_ms": 3635,
+      "execution_time_ms": 115,
+      "opcodes_tested": [
+        "STOP"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_line_count",
+          "passed": true,
+          "expected": "1 line (Frame 2 should not execute)",
+          "actual": "1 line(s)"
+        },
+        {
+          "name": "frame_1_output",
+          "passed": true,
+          "expected": "Frame 1",
+          "actual": "Frame 1"
+        },
+        {
+          "name": "frame_2_not_executed",
+          "passed": true,
+          "expected": "Frame 2 should NOT execute",
+          "actual": "Frame 2 did not execute"
+        }
+      ]
+    },
+    {
+      "name": "stop_sounds_swf_4",
+      "passed": true,
+      "build_time_ms": 3632,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "STOP_SOUNDS"
+      ],
+      "sub_tests": [
+        {
+          "name": "test1_header",
+          "passed": true,
+          "expected": "Test 1: Basic stopAllSounds",
+          "actual": "Test 1: Basic stopAllSounds"
+        },
+        {
+          "name": "test1_success",
+          "passed": true,
+          "expected": "Success",
+          "actual": "Success"
+        },
+        {
+          "name": "test2_header",
+          "passed": true,
+          "expected": "Test 2: Stack integrity",
+          "actual": "Test 2: Stack integrity"
+        },
+        {
+          "name": "test2_stack_integrity",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "test3_header",
+          "passed": true,
+          "expected": "Test 3: Multiple calls",
+          "actual": "Test 3: Multiple calls"
+        },
+        {
+          "name": "test3_success",
+          "passed": true,
+          "expected": "Success",
+          "actual": "Success"
+        },
+        {
+          "name": "test4_header",
+          "passed": true,
+          "expected": "Test 4: Integration test",
+          "actual": "Test 4: Integration test"
+        },
+        {
+          "name": "test4_arithmetic",
+          "passed": true,
+          "expected": "15",
+          "actual": "15"
+        }
+      ]
+    },
+    {
+      "name": "stop_swf_4",
+      "passed": true,
+      "build_time_ms": 3556,
+      "execution_time_ms": 117,
+      "opcodes_tested": [
+        "STOP"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_line_count",
+          "passed": true,
+          "expected": "2 lines",
+          "actual": "2 line(s)"
+        },
+        {
+          "name": "before_stop_output",
+          "passed": true,
+          "expected": "Before stop",
+          "actual": "Before stop"
+        },
+        {
+          "name": "after_stop_output",
+          "passed": true,
+          "expected": "After stop",
+          "actual": "After stop"
+        }
+      ]
+    },
+    {
+      "name": "store_register_swf_4",
+      "passed": true,
+      "build_time_ms": 3655,
+      "execution_time_ms": 111,
+      "opcodes_tested": [
+        "STORE_REGISTER"
+      ],
+      "sub_tests": [
+        {
+          "name": "store_and_push_register",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        }
+      ]
+    },
+    {
+      "name": "strict_equals_swf_4",
+      "passed": true,
+      "build_time_ms": 3628,
+      "execution_time_ms": 126,
+      "opcodes_tested": [
+        "STRICT_EQUALS"
+      ],
+      "sub_tests": [
+        {
+          "name": "strict_equals_same_value",
+          "passed": true,
+          "expected": "1",
+          "actual": "1",
+          "message": "Testing: 5 === 5 (should be true)"
+        },
+        {
+          "name": "strict_equals_different_value",
+          "passed": true,
+          "expected": "0",
+          "actual": "0",
+          "message": "Testing: 5 === 3 (should be false)"
+        }
+      ]
+    },
+    {
+      "name": "string_add_swf_4",
+      "passed": true,
+      "build_time_ms": 3583,
+      "execution_time_ms": 122,
+      "opcodes_tested": [
+        "STRING_ADD"
+      ],
+      "sub_tests": [
+        {
+          "name": "string_concatenation",
+          "passed": true,
+          "expected": " WorldHello",
+          "actual": " WorldHello"
+        }
+      ]
+    },
+    {
+      "name": "string_equals_0_swf_4",
+      "passed": true,
+      "build_time_ms": 4759,
+      "execution_time_ms": 128,
+      "opcodes_tested": [
+        "STRING_EQUALS"
+      ],
+      "sub_tests": [
+        {
+          "name": "string_equals_unequal",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "string_equals_1_swf_4",
+      "passed": true,
+      "build_time_ms": 3558,
+      "execution_time_ms": 118,
+      "opcodes_tested": [
+        "STRING_EQUALS"
+      ],
+      "sub_tests": [
+        {
+          "name": "string_equals_equal",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "string_extract_swf_4",
+      "passed": true,
+      "build_time_ms": 3626,
+      "execution_time_ms": 140,
+      "opcodes_tested": [
+        "STRING_EXTRACT"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_substring",
+          "passed": true,
+          "expected": "Hello",
+          "actual": "Hello"
+        },
+        {
+          "name": "middle_substring",
+          "passed": true,
+          "expected": "World",
+          "actual": "World"
+        },
+        {
+          "name": "length_clamping",
+          "passed": true,
+          "expected": "llo",
+          "actual": "llo"
+        }
+      ]
+    },
+    {
+      "name": "string_greater_swf_4",
+      "passed": true,
+      "build_time_ms": 3822,
+      "execution_time_ms": 121,
+      "opcodes_tested": [
+        "STRING_GREATER"
+      ],
+      "sub_tests": [
+        {
+          "name": "apple_vs_zebra",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "zebra_vs_apple",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "equal_strings",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "case_sensitivity",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "prefix_comparison",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
+    },
+    {
+      "name": "string_length_swf_4",
+      "passed": true,
+      "build_time_ms": 3688,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "STRING_LENGTH"
+      ],
+      "sub_tests": [
+        {
+          "name": "length_hello",
+          "passed": true,
+          "expected": "5",
+          "actual": "5"
+        },
+        {
+          "name": "length_empty",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "length_hello_world",
+          "passed": true,
+          "expected": "11",
+          "actual": "11"
+        }
+      ]
+    },
+    {
+      "name": "string_less_swf_4",
+      "passed": true,
+      "build_time_ms": 3850,
+      "execution_time_ms": 135,
+      "opcodes_tested": [
+        "STRING_LESS"
+      ],
+      "sub_tests": [
+        {
+          "name": "apple_less_banana",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "zebra_less_apple",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "Apple_less_apple_case_sensitive",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "hello_equals_hello",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "cat_less_catch_prefix",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "empty_less_a",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "subtract_swf_4",
+      "passed": true,
+      "build_time_ms": 3579,
+      "execution_time_ms": 165,
+      "opcodes_tested": [
+        "SUBTRACT"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_subtraction_10_minus_3",
+          "passed": true,
+          "expected": "7",
+          "actual": "7"
+        },
+        {
+          "name": "floating_point_5.5_minus_2.5",
+          "passed": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "string_conversion_20_minus_5",
+          "passed": true,
+          "expected": "15",
+          "actual": "15"
+        },
+        {
+          "name": "subtracting_zero_42_minus_0",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "negative_result_5_minus_10",
+          "passed": true,
+          "expected": "-5",
+          "actual": "-5"
+        },
+        {
+          "name": "negative_numbers_-5_minus_3",
+          "passed": true,
+          "expected": "-8",
+          "actual": "-8"
+        },
+        {
+          "name": "double_negative_-5_minus_-3",
+          "passed": true,
+          "expected": "-2",
+          "actual": "-2"
+        },
+        {
+          "name": "large_numbers_1000000_minus_250000",
+          "passed": true,
+          "expected": "750000",
+          "actual": "750000"
+        },
+        {
+          "name": "small_decimals_0.005_minus_0.002",
+          "passed": true,
+          "expected": "0.003",
+          "actual": "0.00299999979324639"
+        },
+        {
+          "name": "zero_minus_number_0_minus_10",
+          "passed": true,
+          "expected": "-10",
+          "actual": "-10"
+        },
+        {
+          "name": "non_numeric_string_hello_minus_5",
+          "passed": true,
+          "expected": "-5",
+          "actual": "-5"
+        }
+      ]
+    },
+    {
+      "name": "target_path_swf_5",
+      "passed": true,
+      "build_time_ms": 3722,
+      "execution_time_ms": 117,
+      "opcodes_tested": [
+        "TARGET_PATH"
+      ],
+      "sub_tests": [
+        {
+          "name": "output_count",
+          "passed": true,
+          "expected": "5 lines",
+          "actual": "5 lines"
+        },
+        {
+          "name": "targetPath_number",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined"
+        },
+        {
+          "name": "targetPath_string",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined"
+        },
+        {
+          "name": "targetPath_zero",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined"
+        },
+        {
+          "name": "targetPath_undefined",
+          "passed": true,
+          "expected": "undefined",
+          "actual": "undefined"
+        },
+        {
+          "name": "completion_message",
+          "passed": true,
+          "expected": "All tests complete",
+          "actual": "All tests complete"
+        }
+      ]
+    },
+    {
+      "name": "throw_swf_7",
+      "passed": true,
+      "build_time_ms": 4692,
+      "execution_time_ms": 111,
+      "opcodes_tested": [
+        "THROW"
+      ],
+      "sub_tests": [
+        {
+          "name": "trace_before_throw",
+          "passed": true,
+          "expected": "Before throw",
+          "actual": "Before throw"
+        },
+        {
+          "name": "uncaught_exception",
+          "passed": true,
+          "expected": "Warning: Uncaught exception, Error message",
+          "actual": "Warning: Uncaught exception, Error message"
+        },
+        {
+          "name": "execution_stopped_after_throw",
+          "passed": true,
+          "expected": "Should NOT contain: After throw",
+          "actual": "OK - text not found"
+        }
+      ]
+    },
+    {
+      "name": "to_integer_swf_4",
+      "passed": true,
+      "build_time_ms": 3590,
+      "execution_time_ms": 128,
+      "opcodes_tested": [
+        "TO_INTEGER"
+      ],
+      "sub_tests": [
+        {
+          "name": "to_integer_truncation",
+          "passed": true,
+          "expected": "12",
+          "actual": "12"
+        }
+      ]
+    },
+    {
+      "name": "to_number_swf_4",
+      "passed": true,
+      "build_time_ms": 3506,
+      "execution_time_ms": 113,
+      "opcodes_tested": [
+        "TO_NUMBER"
+      ],
+      "sub_tests": [
+        {
+          "name": "string_to_number_conversion",
+          "passed": true,
+          "expected": "123.45",
+          "actual": "123.45"
+        }
+      ]
+    },
+    {
+      "name": "to_string_swf_4",
+      "passed": true,
+      "build_time_ms": 3586,
+      "execution_time_ms": 115,
+      "opcodes_tested": [
+        "TO_STRING"
+      ],
+      "sub_tests": [
+        {
+          "name": "toString_integer",
+          "passed": true,
+          "expected": "42",
+          "actual": "42"
+        },
+        {
+          "name": "toString_float_positive",
+          "passed": true,
+          "expected": "3.14000010490417",
+          "actual": "3.14000010490417"
+        },
+        {
+          "name": "toString_zero",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "toString_float_negative",
+          "passed": true,
+          "expected": "-123.449996948242",
+          "actual": "-123.449996948242"
+        }
+      ]
+    },
+    {
+      "name": "toggle_quality_swf_4",
+      "passed": true,
+      "build_time_ms": 3612,
+      "execution_time_ms": 129,
+      "opcodes_tested": [
+        "TOGGLE_QUALITY"
+      ],
+      "sub_tests": [
+        {
+          "name": "before_toggle",
+          "passed": true,
+          "expected": "Before toggleHighQuality",
+          "actual": "Before toggleHighQuality"
+        },
+        {
+          "name": "after_toggle",
+          "passed": true,
+          "expected": "After toggleHighQuality",
+          "actual": "After toggleHighQuality"
+        },
+        {
+          "name": "multiple_toggles_start",
+          "passed": true,
+          "expected": "Start",
+          "actual": "Start"
+        },
+        {
+          "name": "toggled_once",
+          "passed": true,
+          "expected": "Toggled once",
+          "actual": "Toggled once"
+        },
+        {
+          "name": "toggled_twice",
+          "passed": true,
+          "expected": "Toggled twice",
+          "actual": "Toggled twice"
+        }
+      ]
+    },
+    {
+      "name": "trace_swf_4",
+      "passed": true,
+      "build_time_ms": 3517,
+      "execution_time_ms": 134,
+      "opcodes_tested": [
+        "TRACE"
+      ],
+      "sub_tests": [
+        {
+          "name": "trace_output",
+          "passed": true,
+          "expected": "sup from SWF 4",
+          "actual": "sup from SWF 4"
+        }
+      ]
+    },
+    {
+      "name": "try_swf_7",
+      "passed": true,
+      "build_time_ms": 3538,
+      "execution_time_ms": 123,
+      "opcodes_tested": [
+        "TRY",
+        "THROW"
+      ],
+      "sub_tests": [
+        {
+          "name": "try_block_executes",
+          "passed": true,
+          "expected": "In try",
+          "actual": "In try"
+        },
+        {
+          "name": "catch_block_executes",
+          "passed": true,
+          "expected": "Caught: Error!",
+          "actual": "Caught: Error!"
+        },
+        {
+          "name": "after_try_catch_executes",
+          "passed": true,
+          "expected": "After try-catch",
+          "actual": "After try-catch"
+        },
+        {
+          "name": "throw_stops_execution",
+          "passed": true,
+          "expected": "No 'This won't print' in output",
+          "actual": "Not found"
+        }
+      ]
+    },
+    {
+      "name": "typeof_swf_5",
+      "passed": true,
+      "build_time_ms": 3515,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "TYPEOF"
+      ],
+      "sub_tests": [
+        {
+          "name": "typeof_number_42",
+          "passed": true,
+          "expected": "number",
+          "actual": "number"
+        },
+        {
+          "name": "typeof_string_hello",
+          "passed": true,
+          "expected": "string",
+          "actual": "string"
+        },
+        {
+          "name": "typeof_number_3.14",
+          "passed": true,
+          "expected": "number",
+          "actual": "number"
+        },
+        {
+          "name": "typeof_empty_string",
+          "passed": true,
+          "expected": "string",
+          "actual": "string"
+        }
+      ]
+    },
+    {
+      "name": "wait_for_frame2_swf_4",
+      "passed": true,
+      "build_time_ms": 3507,
+      "execution_time_ms": 114,
+      "opcodes_tested": [
+        "WAIT_FOR_FRAME2"
+      ],
+      "sub_tests": [
+        {
+          "name": "frame_loaded_trace",
+          "passed": true,
+          "expected": "Frame 1 loaded",
+          "actual": "Frame 1 loaded",
+          "message": "First trace should execute since frame is loaded"
+        },
+        {
+          "name": "continuation_trace",
+          "passed": true,
+          "expected": "Continued",
+          "actual": "Continued",
+          "message": "Second trace should always execute"
+        }
+      ]
+    },
+    {
+      "name": "wait_for_frame_swf_3",
+      "passed": true,
+      "build_time_ms": 4801,
+      "execution_time_ms": 108,
+      "opcodes_tested": [
+        "WAIT_FOR_FRAME"
+      ],
+      "sub_tests": [
+        {
+          "name": "frame_0",
+          "passed": true,
+          "expected": "Frame 0 loaded",
+          "actual": "Frame 0 loaded"
+        },
+        {
+          "name": "frame_100",
+          "passed": true,
+          "expected": "Frame 100 loaded",
+          "actual": "Frame 100 loaded"
+        },
+        {
+          "name": "skip_count_0",
+          "passed": true,
+          "expected": "Skip count 0",
+          "actual": "Skip count 0"
+        },
+        {
+          "name": "frame_1",
+          "passed": true,
+          "expected": "Frame 1 loaded",
+          "actual": "Frame 1 loaded"
+        },
+        {
+          "name": "skip_test_2",
+          "passed": true,
+          "expected": "Skip test 2",
+          "actual": "Skip test 2"
+        },
+        {
+          "name": "skip_test_1",
+          "passed": true,
+          "expected": "Skip test 1",
+          "actual": "Skip test 1"
+        },
+        {
+          "name": "continued",
+          "passed": true,
+          "expected": "Continued",
+          "actual": "Continued"
+        }
+      ]
+    },
+    {
+      "name": "with_swf_5",
+      "passed": true,
+      "build_time_ms": 3731,
+      "execution_time_ms": 101,
+      "opcodes_tested": [
+        "WITH"
+      ],
+      "sub_tests": [
+        {
+          "name": "with_property_x",
+          "passed": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "with_property_y",
+          "passed": true,
+          "expected": "20",
+          "actual": "20"
         }
       ]
     }
