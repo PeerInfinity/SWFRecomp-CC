@@ -87,6 +87,19 @@ def get_scale_factor(test_dir):
     return float(m.group(1)) if m else 1.0
 
 
+def get_viewport_dimensions(test_dir):
+    """Parse viewport width/height from test.toml, returns (width, height) or None."""
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return None
+    text = toml_path.read_text()
+    wm = re.search(r"viewport_dimensions\s*=\s*\{[^}]*width\s*=\s*(\d+)", text)
+    hm = re.search(r"viewport_dimensions\s*=\s*\{[^}]*height\s*=\s*(\d+)", text)
+    if wm and hm:
+        return (int(wm.group(1)), int(hm.group(1)))
+    return None
+
+
 def preprocess_input_json(src, dst, scale_factor=1.0):
     """Convert input.json to simple line-based event format. Returns wait_count."""
     with open(src) as f:
@@ -364,6 +377,10 @@ def compile_native(test_dir, num_frames, build_dir):
     mock_time = get_mock_date_time(test_dir)
     if mock_time is not None:
         extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
+    viewport = get_viewport_dimensions(test_dir)
+    if viewport is not None:
+        extra_defines.append(f"-DVIEWPORT_WIDTH={viewport[0]}")
+        extra_defines.append(f"-DVIEWPORT_HEIGHT={viewport[1]}")
     try:
         result = subprocess.run(
             [

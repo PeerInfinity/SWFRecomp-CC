@@ -4033,6 +4033,93 @@
           "actual": "20"
         }
       ]
+    },
+    {
+      "name": "string_equals_1_swf_4",
+      "passed": true,
+      "build_time_ms": 3522,
+      "execution_time_ms": 106,
+      "opcodes_tested": [
+        "STRING_EQUALS"
+      ],
+      "sub_tests": [
+        {
+          "name": "string_equals_equal",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        }
+      ]
+    },
+    {
+      "name": "string_extract_swf_4",
+      "passed": true,
+      "build_time_ms": 3323,
+      "execution_time_ms": 106,
+      "opcodes_tested": [
+        "STRING_EXTRACT"
+      ],
+      "sub_tests": [
+        {
+          "name": "basic_substring",
+          "passed": true,
+          "expected": "Hello",
+          "actual": "Hello"
+        },
+        {
+          "name": "middle_substring",
+          "passed": true,
+          "expected": "World",
+          "actual": "World"
+        },
+        {
+          "name": "length_clamping",
+          "passed": true,
+          "expected": "llo",
+          "actual": "llo"
+        }
+      ]
+    },
+    {
+      "name": "string_greater_swf_4",
+      "passed": true,
+      "build_time_ms": 3697,
+      "execution_time_ms": 109,
+      "opcodes_tested": [
+        "STRING_GREATER"
+      ],
+      "sub_tests": [
+        {
+          "name": "apple_vs_zebra",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "zebra_vs_apple",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "equal_strings",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "case_sensitivity",
+          "passed": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "prefix_comparison",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ]
     }
   ]
 }

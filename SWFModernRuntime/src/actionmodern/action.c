@@ -12033,21 +12033,28 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
         if (!elem) continue;
 
         ASObject* listener_obj = NULL;
+        MovieClip* listener_mc = NULL;
         if (elem->type == ACTION_STACK_VALUE_OBJECT) {
             listener_obj = (ASObject*)(uintptr_t)elem->data.numeric_value;
         } else if (elem->type == ACTION_STACK_VALUE_MOVIECLIP) {
-            MovieClip* mc = (MovieClip*)(uintptr_t)elem->data.numeric_value;
-            if (mc && mc->dynamic_props)
-                listener_obj = (ASObject*) mc->dynamic_props;
+            listener_mc = (MovieClip*)(uintptr_t)elem->data.numeric_value;
+            if (listener_mc && listener_mc->dynamic_props)
+                listener_obj = (ASObject*) listener_mc->dynamic_props;
         } else if (elem->type == ACTION_STACK_VALUE_FUNCTION) {
             // Function used as listener — look up method on its own_props
             ASFunction* f = lookupFunctionFromVar(elem);
             if (f && f->own_props)
                 listener_obj = f->own_props;
         }
-        if (!listener_obj) continue;
 
-        ActionVar* method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
+        ActionVar* method_prop = NULL;
+        if (listener_obj)
+            method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
+        // If not found on dynamic_props, check the MC's variable system
+        // (in Flash, root-level DefineFunction stores vars that are accessible as MC properties)
+        if ((!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) && listener_mc) {
+            method_prop = getVariable(method_name, method_name_len);
+        }
         if (!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
         ASFunction* func = lookupFunctionFromVar(method_prop);
         if (!func) continue;
@@ -12539,13 +12546,17 @@ static char g_clipboard_text[1024] = {0};
 static size_t g_clipboard_len = 0;
 static int g_tf_select_all = 0;  // 1 = entire text field is selected
 
-// Static function objects for Selection.setFocus / Selection.getFocus
+// Static function objects for Selection methods
 static ASFunction g_selection_setFocus_func;
 static ASFunction g_selection_getFocus_func;
+static ASFunction g_selection_getBeginIndex_func;
+static ASFunction g_selection_getCaretIndex_func;
+static ASFunction g_selection_getEndIndex_func;
 #ifdef NO_GRAPHICS
 // Forward declarations — implementations are in the NO_GRAPHICS block at end of file
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_selection_getIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 #endif
 
 static int g_global_init_done = 0;
@@ -12899,7 +12910,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		}
 		installAsBroadcaster(app_context, g_selection_obj);
 
-		// Install Selection.setFocus and Selection.getFocus
+		// Install Selection methods
 #ifdef NO_GRAPHICS
 		{
 			static int sel_funcs_init = 0;
@@ -12912,6 +12923,18 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 				strncpy(g_selection_getFocus_func.name, "getFocus", 255);
 				g_selection_getFocus_func.function_type = 2;
 				g_selection_getFocus_func.advanced_func = (Function2Ptr)builtin_selection_getFocus;
+				memset(&g_selection_getBeginIndex_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_getBeginIndex_func.name, "getBeginIndex", 255);
+				g_selection_getBeginIndex_func.function_type = 2;
+				g_selection_getBeginIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
+				memset(&g_selection_getCaretIndex_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_getCaretIndex_func.name, "getCaretIndex", 255);
+				g_selection_getCaretIndex_func.function_type = 2;
+				g_selection_getCaretIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
+				memset(&g_selection_getEndIndex_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_getEndIndex_func.name, "getEndIndex", 255);
+				g_selection_getEndIndex_func.function_type = 2;
+				g_selection_getEndIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
 				sel_funcs_init = 1;
 			}
 			ActionVar fv = {0};
@@ -12920,6 +12943,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setProperty(app_context, g_selection_obj, "setFocus", 8, &fv);
 			fv.data.numeric_value = (u64)&g_selection_getFocus_func;
 			setProperty(app_context, g_selection_obj, "getFocus", 8, &fv);
+			fv.data.numeric_value = (u64)&g_selection_getBeginIndex_func;
+			setProperty(app_context, g_selection_obj, "getBeginIndex", 13, &fv);
+			fv.data.numeric_value = (u64)&g_selection_getCaretIndex_func;
+			setProperty(app_context, g_selection_obj, "getCaretIndex", 13, &fv);
+			fv.data.numeric_value = (u64)&g_selection_getEndIndex_func;
+			setProperty(app_context, g_selection_obj, "getEndIndex", 11, &fv);
 		}
 #endif
 
@@ -16682,18 +16711,55 @@ void actionSetMember(SWFAppContext* app_context)
 				{
 					char val_buf[512];
 					u32 val_len = 0;
+					const char* canonical = NULL;
 					if (value_var.type == ACTION_STACK_VALUE_STRING) {
 						val_len = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value, value_var.str_size, val_buf, sizeof(val_buf));
+						canonical = normalizeStageScaleMode(val_buf, val_len);
+						if (canonical == NULL) canonical = "showAll";
 					} else {
-						// Non-string values (boolean, undefined, etc.) → reset to "showAll"
-						ActionVar sv = makeStringActionVar(app_context, "showAll", 7);
-						setProperty(app_context, obj, "scaleMode", 9, &sv);
-						return;
+						canonical = "showAll";
 					}
-					const char* canonical = normalizeStageScaleMode(val_buf, val_len);
-					if (canonical == NULL) canonical = "showAll"; // invalid → reset to showAll
+					// Read old scaleMode
+					char old_mode[32] = "";
+					{
+						ActionVar* old_sm = getProperty(obj, "scaleMode", 9);
+						if (old_sm && old_sm->type == ACTION_STACK_VALUE_STRING) {
+							u16_to_utf8((const uint16_t*)old_sm->data.numeric_value, old_sm->str_size, old_mode, sizeof(old_mode));
+						}
+					}
 					ActionVar sv = makeStringActionVar(app_context, canonical, (u32)strlen(canonical));
 					setProperty(app_context, obj, "scaleMode", 9, &sv);
+					// Update Stage.width/height based on new scaleMode
+					if (strcmp(canonical, "noScale") == 0) {
+#ifdef VIEWPORT_WIDTH
+						sv = makeF64((double)VIEWPORT_WIDTH);
+#else
+						sv = makeF64((double)FRAME_WIDTH);
+#endif
+						setProperty(app_context, obj, "width", 5, &sv);
+#ifdef VIEWPORT_HEIGHT
+						sv = makeF64((double)VIEWPORT_HEIGHT);
+#else
+						sv = makeF64((double)FRAME_HEIGHT);
+#endif
+						setProperty(app_context, obj, "height", 6, &sv);
+					} else {
+						sv = makeF64((double)FRAME_WIDTH);
+						setProperty(app_context, obj, "width", 5, &sv);
+						sv = makeF64((double)FRAME_HEIGHT);
+						setProperty(app_context, obj, "height", 6, &sv);
+					}
+					// Fire onResize if scaleMode actually changed
+					if (strcmp(old_mode, canonical) != 0) {
+						static const uint16_t onResize_u16[] = {
+							'o','n','R','e','s','i','z','e'
+						};
+						ActionVar bm_args[1];
+						bm_args[0].type = ACTION_STACK_VALUE_STRING;
+						bm_args[0].data.numeric_value = (u64)(uintptr_t)onResize_u16;
+						bm_args[0].str_size = 8;
+						builtin_broadcaster_broadcastMessage(app_context, bm_args, 1, NULL, (void*)obj);
+					}
 					return;
 				}
 				if (prop_name_len == 12 && memcmp(prop_name, "displayState", 12) == 0)
@@ -26911,26 +26977,42 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 }
 
 // Selection.setFocus(target) — move keyboard focus to a specific object.
+// Returns: true if focus was changed, false otherwise.
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
-	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
-	if (arg_count < 1) return undef;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN; ret.data.numeric_value = 0;
+	if (arg_count < 1) return ret;
 	ActionVar* arg = &args[0];
+	// setFocus(false) — returns false (boolean arg is not a valid target)
+	if (arg->type == ACTION_STACK_VALUE_BOOLEAN && arg->data.numeric_value == 0) {
+		return ret;
+	}
 	// setFocus(null or undefined) — clear focus
 	if (arg->type == ACTION_STACK_VALUE_NULL || arg->type == ACTION_STACK_VALUE_UNDEFINED) {
 		if (g_focused_mc != NULL)
 			selection_do_focus_change(app_context, g_focused_mc, NULL);
-		return undef;
+		ret.data.numeric_value = 1;
+		return ret;
 	}
+	// setFocus(string path) — resolve path to MovieClip
 	MovieClip* new_mc = NULL;
-	if (arg->type == ACTION_STACK_VALUE_MOVIECLIP)
+	if (arg->type == ACTION_STACK_VALUE_MOVIECLIP) {
 		new_mc = (MovieClip*)(uintptr_t)arg->data.numeric_value;
-	if (new_mc == NULL) return undef;
-	if (!mc_is_focusable_by_setfocus(new_mc)) return undef;
-	if (new_mc == g_focused_mc) return undef;
+	} else if (arg->type == ACTION_STACK_VALUE_STRING) {
+		// Resolve string path to MC
+		char path_buf[320];
+		if (arg->str_size > 0) {
+			u16_to_utf8((const uint16_t*)(uintptr_t)arg->data.numeric_value, arg->str_size, path_buf, sizeof(path_buf));
+			new_mc = getMovieClipByTarget(path_buf);
+		}
+	}
+	if (new_mc == NULL) return ret;
+	if (!mc_is_focusable_by_setfocus(new_mc)) return ret;
+	if (new_mc == g_focused_mc) { ret.data.numeric_value = 1; return ret; }
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
-	return undef;
+	ret.data.numeric_value = 1;
+	return ret;
 }
 
 // Selection.getFocus() — returns dot-path string of focused object, or null.
@@ -26951,6 +27033,17 @@ static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVa
 	result.data.numeric_value = (u64)(uintptr_t)u16;
 	result.str_size = u16_len;
 	return result;
+}
+
+// Selection.getBeginIndex() / getCaretIndex() / getEndIndex() — return -1 (no text selection).
+static ActionVar builtin_selection_getIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_F64;
+	double neg1 = -1.0;
+	memcpy(&ret.data.numeric_value, &neg1, sizeof(double));
+	return ret;
 }
 
 // Check tabChildren property of an MC (default: true = recurse into children).

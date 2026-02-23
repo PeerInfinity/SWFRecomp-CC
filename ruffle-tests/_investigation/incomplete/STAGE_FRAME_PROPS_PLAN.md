@@ -14,28 +14,31 @@ Stage object properties (align, scaleMode, displayState, width, height) are now 
 |------|-----------|-------|
 | `stage_property_representation` | **PASS** ✅ | Was 0% — F64 bug fixed, Stage properties implemented |
 | `stage_object_enumerate` | **PASS** ✅ | Was 20% — Stage enumeration working |
-| `frame_size_translated_positive` | output_mismatch | Was 67% — shape bounds still needed |
-| `frame_size_translated_negative` | output_mismatch | Was 67% — shape bounds still needed |
-| `stage_scale_mode` | output_mismatch | Partially working (normalization implemented) |
-| `stage_display_state` | output_mismatch | Partially working (displayState property exists) |
-| `stage_object_properties` | output_mismatch | Was 72% — improved but _width/_height from children still missing |
-| `stage_object_properties_swf6` | output_mismatch | Was 72% — same issues |
-| `stage_object_children` | output_mismatch | Was 81% — child enumeration order issues |
+| `stage_display_state` | **PASS** ✅ | displayState + onFullScreen callback working |
+| `stage_scale_mode` | **PASS** ✅ (uncommitted) | onResize broadcast + viewport dims + broadcastMessage MC variable fallback |
+| `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
+| `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
+| `stage_object_properties` | 226/241 (93.8%) | _width/_height↔scale coupling, rotation, original bounds |
+| `stage_object_properties_swf6` | 214/231 (92.6%) | Same issues |
+| `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
 
 ### What's Implemented
 - **Stage singleton** (`g_stage_obj`): Registered with width/height (FRAME_WIDTH/FRAME_HEIGHT), quality, showMenu
 - **Stage.align**: Normalizes to uppercase L/T/R/B chars, deduplicates, canonical order
-- **Stage.scaleMode**: Validates "showAll"/"noScale"/"exactFit"/"noBorder" (case-insensitive)
+- **Stage.scaleMode**: Validates "showAll"/"noScale"/"exactFit"/"noBorder" (case-insensitive), updates width/height on change
 - **Stage.displayState**: Validates "normal"/"fullScreen" (case-insensitive)
 - **AsBroadcaster**: Stage has addListener/removeListener/broadcastMessage
+- **Stage.onResize**: Fires via broadcastMessage when scaleMode changes
+- **Stage.onFullScreen**: Fires via broadcastMessage when displayState changes
+- **Viewport dimensions**: Passed via -DVIEWPORT_WIDTH/-DVIEWPORT_HEIGHT from test.toml
 - **actionSetProperty F64 bug**: Fixed — F64 values now read correctly as doubles
 
 ### Remaining Work
 - Shape bounds tracking in NO_GRAPHICS mode (Phase 2)
 - Root `_width`/`_height` from children bounds union (Phase 3)
-- `_yscale` precision differences (Phase 4)
-- Stage.onResize/onFullScreen callbacks (Phase 5)
+- `_yscale` precision differences / width↔scale coupling (Phase 4)
 - Stage children enumeration order (Phase 8)
+- _level0/_flash0 addressing (Phase 4 of STAGE_PLAN)
 
 ---
 
