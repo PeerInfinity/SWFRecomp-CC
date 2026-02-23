@@ -1,40 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `906fab0ddf93` (2026-02-23T17:44:55.577948+00:00)
-**Current:** `f2aaa7b36366` (2026-02-23T19:00:12.937520+00:00)
+**Previous:** `f2aaa7b36366` (2026-02-23T19:00:12.937520+00:00)
+**Current:** `f2819cb89a25` (2026-02-23T21:28:27.444647+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 313 | 314 | +1 |
+| Passing | 314 | 315 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 50.6% | 50.7% | +0.1% |
-| Mismatched lines | 34877 | 34734 | -143 |
-|   Decreased | | | -148 |
-|   Increased | | | +5 |
+| Pass rate | 50.7% | 50.9% | +0.2% |
+| Mismatched lines | 34734 | 34711 | -23 |
+|   Decreased | | | -46 |
+|   Increased | | | +23 |
 
-## Newly Passing (2)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `clip_events` | output_mismatch | 1/19 | 19/19 |
-| `movieclip_hittest` | output_mismatch | 71/92 | 92/92 |
+| `hittest_lockroot` | output_mismatch | 7/15 | 15/15 |
 
-## Newly Failing (1)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `issue_1104` | output_mismatch | 2/2 | 1/2 |
-
-## Line Count Changed (7)
+## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `movieclip_hittest_shapeflag` | output_mismatch | 193/338 | 276/338 | -83 |
-| `hittest_morph` | output_mismatch | 15/70 | 29/70 | -14 |
-| `on_construct` | output_mismatch | 0/25 | 9/25 | -9 |
-| `hittest_winding_rule` | output_mismatch | 6/12 | 9/12 | -3 |
+| `hittest_morph` | output_mismatch | 29/70 | 67/70 | -38 |
 | `goto_methods` | segfault | 8/40 | 8/40 | 0 |
-| `movieclip_in_removed_button` | output_mismatch | 1/4 | 1/4 | 0 |
-| `string_paths_variable_scopes` | output_mismatch | 4/5 | 0/5 | +4 |
+| `movieclip_hittest_shapeflag` | output_mismatch | 276/338 | 253/338 | +23 |
