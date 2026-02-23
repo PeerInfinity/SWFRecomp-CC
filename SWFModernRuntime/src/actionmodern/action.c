@@ -8983,53 +8983,78 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 }
 #endif
 
-static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
+// Helper: is this MC a textfield (static or dynamically created)?
+// Static textfields have ng_textfield_idx >= 0 (index into metadata table).
+// Dynamic textfields (createTextField) have ng_textfield_idx == -2.
+#define MC_IS_TEXTFIELD(mc) ((mc)->ng_textfield_idx >= 0 || (mc)->ng_textfield_idx == -2)
+
+// Get the original (unscaled, unrotated) content bounds for an MC, in pixels.
+// Returns 1 if bounds found, 0 if not.
+static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat_h)
 {
-	double scaled_w = (double)mc->width * mc->xscale / 100.0;
-	double scaled_h = (double)mc->height * mc->yscale / 100.0;
-
 #ifdef NO_GRAPHICS
-	// If width/height not explicitly set, compute from display hierarchy bounds
-	if (scaled_w == 0.0 && scaled_h == 0.0) {
-		float gxmin, gxmax, gymin, gymax;
-		int bounds_found = 0;
+	extern MovieClip root_movieclip;
+	float gxmin, gxmax, gymin, gymax;
 
-		// For buttons, _width/_height come from the hit shape bounds
-		if (mc->is_button_mc) {
-			extern Character* dictionary;
-			DisplayObject* btn_dobj = (DisplayObject*)mc->display_obj;
-			if (btn_dobj != NULL) {
-				size_t cid = btn_dobj->char_id;
-				if (cid > 0 && dictionary[cid].type == CHAR_TYPE_BUTTON) {
-					size_t hit_cid = dictionary[cid].button_hit_char_id;
-					s32 hxmin, hxmax, hymin, hymax;
-					if (ng_getCharBounds(hit_cid, &hxmin, &hxmax, &hymin, &hymax)) {
-						gxmin = hxmin / 20.0f; gxmax = hxmax / 20.0f;
-						gymin = hymin / 20.0f; gymax = hymax / 20.0f;
-						bounds_found = 1;
-					}
+	// For buttons, use hit shape bounds
+	if (mc->is_button_mc) {
+		extern Character* dictionary;
+		DisplayObject* btn_dobj = (DisplayObject*)mc->display_obj;
+		if (btn_dobj != NULL) {
+			size_t cid = btn_dobj->char_id;
+			if (cid > 0 && dictionary[cid].type == CHAR_TYPE_BUTTON) {
+				size_t hit_cid = dictionary[cid].button_hit_char_id;
+				s32 hxmin, hxmax, hymin, hymax;
+				if (ng_getCharBounds(hit_cid, &hxmin, &hxmax, &hymin, &hymax)) {
+					*out_nat_w = (double)(hxmax - hxmin) / 20.0;
+					*out_nat_h = (double)(hymax - hymin) / 20.0;
+					return 1;
 				}
 			}
 		}
+	}
 
-		if (!bounds_found) {
-			size_t entry_idx;
-			if (mc == &root_movieclip) {
-				entry_idx = (size_t)-1;
-			} else {
-				entry_idx = ng_findDisplayEntryIdx(mc->name);
-			}
-			bounds_found = ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax);
-		}
+	// For textfields (static or dynamic), use stored width/height directly
+	if (MC_IS_TEXTFIELD(mc)) {
+		*out_nat_w = (double)mc->width;
+		*out_nat_h = (double)mc->height;
+		return (*out_nat_w > 0.0 || *out_nat_h > 0.0) ? 1 : 0;
+	}
 
-		if (bounds_found) {
-			double nat_w = (double)(gxmax - gxmin);
-			double nat_h = (double)(gymax - gymin);
-			scaled_w = nat_w * mc->xscale / 100.0;
-			scaled_h = nat_h * mc->yscale / 100.0;
-		}
+	// For sprites/shapes, use display entry bounds (these are unscaled by AS xscale/yscale)
+	size_t entry_idx;
+	if (mc == &root_movieclip) {
+		entry_idx = (size_t)-1;
+	} else {
+		entry_idx = ng_findDisplayEntryIdx(mc->name);
+	}
+	if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+		*out_nat_w = (double)(gxmax - gxmin);
+		*out_nat_h = (double)(gymax - gymin);
+		return 1;
 	}
 #endif
+	*out_nat_w = 0.0;
+	*out_nat_h = 0.0;
+	return 0;
+}
+
+static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
+{
+	double nat_w = 0.0, nat_h = 0.0;
+
+#ifdef NO_GRAPHICS
+	// Always compute from original bounds + xscale/yscale
+	// For textfields, mcGetOriginalBounds uses mc->width/mc->height as natural bounds.
+	// For sprites/shapes, it uses ng_getDisplayEntryBounds.
+	mcGetOriginalBounds(mc, &nat_w, &nat_h);
+#else
+	nat_w = (double)mc->width;
+	nat_h = (double)mc->height;
+#endif
+
+	double scaled_w = nat_w * mc->xscale / 100.0;
+	double scaled_h = nat_h * mc->yscale / 100.0;
 
 	double rot = mc->rotation;
 	// _width/_height are always positive bounding-box dimensions (Flash convention)
@@ -9049,83 +9074,102 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 	}
 }
 
-// Set _width on a MovieClip by adjusting xscale to achieve the desired bounding width.
-// In Flash, setting _width adjusts xscale; mc->width is not a persistent field.
+// Set _width on a MovieClip by adjusting both xscale and yscale.
+// Flash uses a coupled formula that accounts for rotation, derived from the
+// AABB of a rotated OBB: W = |a*sx*cos| + |b*sy*sin|, H = |a*sx*sin| + |b*sy*cos|
+// where a,b are original bounds, sx,sy are scales, and angle is rotation.
 static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, double v)
 {
+	if (mc == NULL) return;
 #ifdef NO_GRAPHICS
-	// TextFields store _width as a direct bounding-box dimension, not via xscale.
-	if (mc != NULL && mc->ng_textfield_idx >= 0) {
+	// TextFields (static or dynamic) store _width as a direct dimension, not via xscale.
+	if (MC_IS_TEXTFIELD(mc)) {
 		mc->width = (float)v;
 		return;
 	}
-	if (mc != NULL && v >= 0.0) {
-		size_t entry_idx;
-		if (mc == &root_movieclip) {
-			entry_idx = (size_t)-1;
-		} else {
-			entry_idx = ng_findDisplayEntryIdx(mc->name);
-			if (entry_idx == (size_t)-1) {
-				// MC not in the display list (e.g. programmatic createTextField).
-				// Fall through to direct mc->width assignment.
-				goto set_width_direct;
-			}
-		}
-		float gxmin, gxmax, gymin, gymax;
-		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
-			double nat_w = (double)(gxmax - gxmin);
-			if (nat_w > 0.01) {
-				float sign = mc->xscale < 0.0f ? -1.0f : 1.0f;
-				mc->xscale = (float)(v / nat_w * 100.0 * sign);
-				mc->width = 0.0f;
-				mc->as_set_flags |= 4;  // mark _xscale as AS-set
-				return;
-			}
-		}
+	double nat_w = 0, nat_h = 0;
+	mcGetOriginalBounds(mc, &nat_w, &nat_h);
+	if (nat_w < 0.001 && nat_h < 0.001) {
+		mc->width = (float)v;
+		return;
 	}
-	set_width_direct:;
-#endif
+	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
+	double prev_sy = (double)mc->yscale / 100.0;
+	double rot_rad = (double)mc->rotation * 3.14159265358979323846 / 180.0;
+	double c = fabs(cos(rot_rad));
+	double s = fabs(sin(rot_rad));
+
+	double new_sx, new_sy;
+	if (nat_w > 0.001) {
+		double ar = nat_h / nat_w;  // aspect ratio
+		double tsx = v / nat_w;     // target scale x
+		double tsy = v / nat_h;     // target scale y
+		double denom1 = (c + ar * s) * (ar * c + s);
+		double denom2 = ar * c + s;
+		new_sx = (denom1 != 0.0) ? ar * (c * tsx + s * tsy) / denom1 : 0.0;
+		new_sy = (denom2 != 0.0) ? (s * prev_sx + ar * c * prev_sy) / denom2 : 0.0;
+	} else {
+		// Zero-width original: can't compute meaningful scale
+		new_sx = 0.0;
+		new_sy = prev_sy;
+	}
+	if (!isfinite(new_sx)) new_sx = 0.0;
+	if (!isfinite(new_sy)) new_sy = 0.0;
+	mc->xscale = (float)(new_sx * 100.0);
+	mc->yscale = (float)(new_sy * 100.0);
+	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
+#else
 	(void)app_context;
-	if (mc) mc->width = (float)v;
+	mc->width = (float)v;
+#endif
 }
 
-// Set _height on a MovieClip by adjusting yscale to achieve the desired bounding height.
+// Set _height on a MovieClip by adjusting both xscale and yscale.
+// Mirror of mcSetEffectiveWidth with the roles of width/height and x/y swapped.
 static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, double v)
 {
+	if (mc == NULL) return;
 #ifdef NO_GRAPHICS
-	// TextFields store _height as a direct bounding-box dimension, not via yscale.
-	if (mc != NULL && mc->ng_textfield_idx >= 0) {
+	// TextFields (static or dynamic) store _height as a direct dimension, not via yscale.
+	if (MC_IS_TEXTFIELD(mc)) {
 		mc->height = (float)v;
 		return;
 	}
-	if (mc != NULL && v >= 0.0) {
-		size_t entry_idx;
-		if (mc == &root_movieclip) {
-			entry_idx = (size_t)-1;
-		} else {
-			entry_idx = ng_findDisplayEntryIdx(mc->name);
-			if (entry_idx == (size_t)-1) {
-				// MC not in the display list (e.g. programmatic createTextField).
-				// Fall through to direct mc->height assignment.
-				goto set_height_direct;
-			}
-		}
-		float gxmin, gxmax, gymin, gymax;
-		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
-			double nat_h = (double)(gymax - gymin);
-			if (nat_h > 0.01) {
-				float sign = mc->yscale < 0.0f ? -1.0f : 1.0f;
-				mc->yscale = (float)(v / nat_h * 100.0 * sign);
-				mc->height = 0.0f;
-				mc->as_set_flags |= 8;  // mark _yscale as AS-set
-				return;
-			}
-		}
+	double nat_w = 0, nat_h = 0;
+	mcGetOriginalBounds(mc, &nat_w, &nat_h);
+	if (nat_w < 0.001 && nat_h < 0.001) {
+		mc->height = (float)v;
+		return;
 	}
-	set_height_direct:;
-#endif
+	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
+	double prev_sy = (double)mc->yscale / 100.0;
+	double rot_rad = (double)mc->rotation * 3.14159265358979323846 / 180.0;
+	double c = fabs(cos(rot_rad));
+	double s = fabs(sin(rot_rad));
+
+	double new_sx, new_sy;
+	if (nat_h > 0.001) {
+		double ar = nat_w / nat_h;  // aspect ratio (swapped from set_width)
+		double tsx = v / nat_w;     // target scale x
+		double tsy = v / nat_h;     // target scale y
+		double denom1 = (c + ar * s) * (ar * c + s);
+		double denom2 = ar * c + s;
+		new_sx = (denom2 != 0.0) ? (ar * c * prev_sx + s * prev_sy) / denom2 : 0.0;
+		new_sy = (denom1 != 0.0) ? ar * (s * tsx + c * tsy) / denom1 : 0.0;
+	} else {
+		// Zero-height original: can't compute meaningful scale
+		new_sx = prev_sx;
+		new_sy = 0.0;
+	}
+	if (!isfinite(new_sx)) new_sx = 0.0;
+	if (!isfinite(new_sy)) new_sy = 0.0;
+	mc->xscale = (float)(new_sx * 100.0);
+	mc->yscale = (float)(new_sy * 100.0);
+	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
+#else
 	(void)app_context;
-	if (mc) mc->height = (float)v;
+	mc->height = (float)v;
+#endif
 }
 
 /**
@@ -21938,7 +21982,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			child->y = (float) y;
 			child->width = (float) w;
 			child->height = (float) h;
-			child->ng_textfield_idx = -1;
+			child->ng_textfield_idx = -2; // dynamically created textfield
 
 			if (child->dynamic_props == NULL) {
 				child->dynamic_props = (void*) allocObject(app_context, 32);
@@ -25329,7 +25373,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				child->y = (float) y;
 				child->width = (float) w;
 				child->height = (float) h;
-				child->ng_textfield_idx = -1; // dynamically created, no static metadata
+				child->ng_textfield_idx = -2; // dynamically created textfield (no static metadata, but still a TF)
 
 				// Set up dynamic_props with TextField defaults
 				if (child->dynamic_props == NULL) {

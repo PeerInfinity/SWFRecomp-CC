@@ -1,20 +1,20 @@
 {
-  "timestamp": "2026-02-23T00:33:47Z",
+  "timestamp": "2026-02-23T03:08:29Z",
   "summary": {
     "total_tests": 115,
-    "passed": 113,
-    "failed": 2,
+    "passed": 115,
+    "failed": 0,
     "skipped": 0,
-    "total_sub_tests": 454,
-    "passed_sub_tests": 441,
-    "failed_sub_tests": 13
+    "total_sub_tests": 461,
+    "passed_sub_tests": 461,
+    "failed_sub_tests": 0
   },
   "tests": [
     {
       "name": "add2_swf_5",
       "passed": true,
-      "build_time_ms": 3239,
-      "execution_time_ms": 129,
+      "build_time_ms": 3271,
+      "execution_time_ms": 119,
       "opcodes_tested": [
         "ADD2"
       ],
@@ -42,8 +42,8 @@
     {
       "name": "add_floats_swf_4",
       "passed": true,
-      "build_time_ms": 3181,
-      "execution_time_ms": 52,
+      "build_time_ms": 3145,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "ADD"
       ],
@@ -59,8 +59,8 @@
     {
       "name": "add_swf_4",
       "passed": true,
-      "build_time_ms": 3234,
-      "execution_time_ms": 51,
+      "build_time_ms": 3149,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "ADD"
       ],
@@ -136,8 +136,8 @@
     {
       "name": "and_floats_both_0_swf_4",
       "passed": true,
-      "build_time_ms": 3213,
-      "execution_time_ms": 50,
+      "build_time_ms": 3128,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "AND"
       ],
@@ -153,8 +153,8 @@
     {
       "name": "and_floats_first_1_swf_4",
       "passed": true,
-      "build_time_ms": 3197,
-      "execution_time_ms": 50,
+      "build_time_ms": 3136,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "AND"
       ],
@@ -170,8 +170,8 @@
     {
       "name": "and_floats_nonzero_swf_4",
       "passed": true,
-      "build_time_ms": 3215,
-      "execution_time_ms": 54,
+      "build_time_ms": 3146,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "AND"
       ],
@@ -187,8 +187,8 @@
     {
       "name": "and_floats_second_1_swf_4",
       "passed": true,
-      "build_time_ms": 3215,
-      "execution_time_ms": 50,
+      "build_time_ms": 3126,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "AND"
       ],
@@ -204,8 +204,8 @@
     {
       "name": "and_floats_swf_4",
       "passed": true,
-      "build_time_ms": 3206,
-      "execution_time_ms": 50,
+      "build_time_ms": 3141,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "AND"
       ],
@@ -221,8 +221,8 @@
     {
       "name": "ascii_to_char_swf_4",
       "passed": true,
-      "build_time_ms": 3206,
-      "execution_time_ms": 50,
+      "build_time_ms": 3144,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "ASCII_TO_CHAR"
       ],
@@ -262,8 +262,8 @@
     {
       "name": "bit_and_swf_4",
       "passed": true,
-      "build_time_ms": 3210,
-      "execution_time_ms": 52,
+      "build_time_ms": 3125,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "BIT_AND"
       ],
@@ -279,8 +279,8 @@
     {
       "name": "bit_lshift_swf_4",
       "passed": true,
-      "build_time_ms": 3199,
-      "execution_time_ms": 51,
+      "build_time_ms": 3146,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "BIT_LSHIFT"
       ],
@@ -320,8 +320,8 @@
     {
       "name": "bit_or_swf_4",
       "passed": true,
-      "build_time_ms": 3201,
-      "execution_time_ms": 51,
+      "build_time_ms": 3142,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "BIT_OR"
       ],
@@ -361,8 +361,8 @@
     {
       "name": "bit_rshift_swf_4",
       "passed": true,
-      "build_time_ms": 3185,
-      "execution_time_ms": 51,
+      "build_time_ms": 3134,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "BIT_RSHIFT"
       ],
@@ -402,8 +402,8 @@
     {
       "name": "bit_urshift_swf_4",
       "passed": true,
-      "build_time_ms": 3235,
-      "execution_time_ms": 52,
+      "build_time_ms": 3134,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "BIT_URSHIFT"
       ],
@@ -443,8 +443,8 @@
     {
       "name": "bit_xor_swf_4",
       "passed": true,
-      "build_time_ms": 3236,
-      "execution_time_ms": 52,
+      "build_time_ms": 3140,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "BIT_XOR"
       ],
@@ -484,8 +484,8 @@
     {
       "name": "call_function_swf_5",
       "passed": true,
-      "build_time_ms": 3198,
-      "execution_time_ms": 52,
+      "build_time_ms": 3132,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "CALL_FUNCTION"
       ],
@@ -501,8 +501,8 @@
     {
       "name": "call_method_empty_name_swf_5",
       "passed": true,
-      "build_time_ms": 3212,
-      "execution_time_ms": 51,
+      "build_time_ms": 3129,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "CALL_METHOD",
         "DEFINE_FUNCTION2"
@@ -519,8 +519,8 @@
     {
       "name": "call_method_swf_5",
       "passed": true,
-      "build_time_ms": 3198,
-      "execution_time_ms": 50,
+      "build_time_ms": 3134,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "CALL_METHOD"
       ],
@@ -536,8 +536,8 @@
     {
       "name": "call_swf_4",
       "passed": true,
-      "build_time_ms": 3185,
-      "execution_time_ms": 50,
+      "build_time_ms": 3138,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "CALL"
       ],
@@ -553,8 +553,8 @@
     {
       "name": "cast_op_swf_7",
       "passed": true,
-      "build_time_ms": 3263,
-      "execution_time_ms": 51,
+      "build_time_ms": 3138,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "CAST_OP"
       ],
@@ -588,8 +588,8 @@
     {
       "name": "char_to_ascii_swf_4",
       "passed": true,
-      "build_time_ms": 3181,
-      "execution_time_ms": 52,
+      "build_time_ms": 3128,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "CHAR_TO_ASCII"
       ],
@@ -629,8 +629,8 @@
     {
       "name": "clone_sprite_swf_4",
       "passed": true,
-      "build_time_ms": 3182,
-      "execution_time_ms": 51,
+      "build_time_ms": 3133,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "CLONE_SPRITE"
       ],
@@ -682,8 +682,8 @@
     {
       "name": "constant_pool_large_swf_5",
       "passed": true,
-      "build_time_ms": 3185,
-      "execution_time_ms": 49,
+      "build_time_ms": 3145,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "CONSTANT_POOL"
       ],
@@ -723,8 +723,8 @@
     {
       "name": "constant_pool_nonseq_swf_5",
       "passed": true,
-      "build_time_ms": 3171,
-      "execution_time_ms": 51,
+      "build_time_ms": 3132,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "CONSTANT_POOL"
       ],
@@ -770,8 +770,8 @@
     {
       "name": "constant_pool_repeated_swf_5",
       "passed": true,
-      "build_time_ms": 3166,
-      "execution_time_ms": 50,
+      "build_time_ms": 3129,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "CONSTANT_POOL"
       ],
@@ -805,8 +805,8 @@
     {
       "name": "constant_pool_swf_5",
       "passed": true,
-      "build_time_ms": 3211,
-      "execution_time_ms": 53,
+      "build_time_ms": 3181,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "CONSTANT_POOL"
       ],
@@ -840,8 +840,8 @@
     {
       "name": "declare_local_swf_5",
       "passed": true,
-      "build_time_ms": 3197,
-      "execution_time_ms": 51,
+      "build_time_ms": 3166,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "DECLARE_LOCAL"
       ],
@@ -863,8 +863,8 @@
     {
       "name": "decrement_swf_4",
       "passed": true,
-      "build_time_ms": 3210,
-      "execution_time_ms": 51,
+      "build_time_ms": 3138,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "DECREMENT"
       ],
@@ -880,8 +880,8 @@
     {
       "name": "define_function2_swf_7",
       "passed": true,
-      "build_time_ms": 3214,
-      "execution_time_ms": 50,
+      "build_time_ms": 3138,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "DEFINE_FUNCTION2"
       ],
@@ -915,8 +915,8 @@
     {
       "name": "define_function_swf_5",
       "passed": true,
-      "build_time_ms": 3205,
-      "execution_time_ms": 50,
+      "build_time_ms": 3138,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "DEFINE_FUNCTION"
       ],
@@ -932,8 +932,8 @@
     {
       "name": "definelocal_swf_5",
       "passed": true,
-      "build_time_ms": 3214,
-      "execution_time_ms": 51,
+      "build_time_ms": 3139,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "DEFINE_LOCAL"
       ],
@@ -979,8 +979,8 @@
     {
       "name": "delete2_swf_5",
       "passed": true,
-      "build_time_ms": 3179,
-      "execution_time_ms": 49,
+      "build_time_ms": 3153,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "DELETE2"
       ],
@@ -996,8 +996,8 @@
     {
       "name": "delete_swf_5",
       "passed": true,
-      "build_time_ms": 3159,
-      "execution_time_ms": 50,
+      "build_time_ms": 3121,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "DELETE"
       ],
@@ -1028,8 +1028,8 @@
     {
       "name": "divide_floats_error_swf_4",
       "passed": true,
-      "build_time_ms": 3168,
-      "execution_time_ms": 50,
+      "build_time_ms": 3120,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "DIVIDE"
       ],
@@ -1075,8 +1075,8 @@
     {
       "name": "duplicate_swf_4",
       "passed": true,
-      "build_time_ms": 3166,
-      "execution_time_ms": 50,
+      "build_time_ms": 3150,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "DUPLICATE"
       ],
@@ -1092,8 +1092,8 @@
     {
       "name": "end_drag_swf_4",
       "passed": true,
-      "build_time_ms": 3150,
-      "execution_time_ms": 51,
+      "build_time_ms": 3141,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "END_DRAG"
       ],
@@ -1133,8 +1133,8 @@
     {
       "name": "enumerate2_swf_6",
       "passed": true,
-      "build_time_ms": 3204,
-      "execution_time_ms": 50,
+      "build_time_ms": 3151,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "ENUMERATE2"
       ],
@@ -1163,8 +1163,8 @@
     {
       "name": "enumerate_swf_4",
       "passed": true,
-      "build_time_ms": 3232,
-      "execution_time_ms": 51,
+      "build_time_ms": 3161,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "ENUMERATE"
       ],
@@ -1186,8 +1186,8 @@
     {
       "name": "equals2_swf_5",
       "passed": true,
-      "build_time_ms": 3217,
-      "execution_time_ms": 50,
+      "build_time_ms": 3153,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "EQUALS2"
       ],
@@ -1302,8 +1302,8 @@
     {
       "name": "equals_swf_4",
       "passed": true,
-      "build_time_ms": 3160,
-      "execution_time_ms": 49,
+      "build_time_ms": 3147,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "EQUALS"
       ],
@@ -1343,8 +1343,8 @@
     {
       "name": "extends_swf_7",
       "passed": true,
-      "build_time_ms": 3148,
-      "execution_time_ms": 50,
+      "build_time_ms": 3159,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "EXTENDS"
       ],
@@ -1402,8 +1402,8 @@
     {
       "name": "get_member_swf_4",
       "passed": true,
-      "build_time_ms": 3150,
-      "execution_time_ms": 49,
+      "build_time_ms": 3138,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "GET_MEMBER"
       ],
@@ -1425,8 +1425,8 @@
     {
       "name": "get_property_swf_4",
       "passed": true,
-      "build_time_ms": 3170,
-      "execution_time_ms": 50,
+      "build_time_ms": 3146,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "GET_PROPERTY"
       ],
@@ -1568,8 +1568,8 @@
     {
       "name": "get_time_swf_5",
       "passed": true,
-      "build_time_ms": 3152,
-      "execution_time_ms": 50,
+      "build_time_ms": 3131,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "GET_TIME"
       ],
@@ -1584,27 +1584,27 @@
           "name": "time1_range",
           "passed": true,
           "expected": "[0, 5000)",
-          "actual": "0.0"
+          "actual": "1.0"
         },
         {
           "name": "time2_range",
           "passed": true,
           "expected": "[0, 5000)",
-          "actual": "0.0"
+          "actual": "1.0"
         },
         {
           "name": "monotonic",
           "passed": true,
-          "expected": "time2 (0.0) >= time1 (0.0)",
-          "actual": "time2=0.0, time1=0.0"
+          "expected": "time2 (1.0) >= time1 (1.0)",
+          "actual": "time2=1.0, time1=1.0"
         }
       ]
     },
     {
       "name": "get_url2_swf_4",
       "passed": true,
-      "build_time_ms": 3159,
-      "execution_time_ms": 50,
+      "build_time_ms": 3126,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "GET_URL2"
       ],
@@ -1673,83 +1673,83 @@
     },
     {
       "name": "get_url_swf_3",
-      "passed": false,
-      "build_time_ms": 3162,
-      "execution_time_ms": 49,
+      "passed": true,
+      "build_time_ms": 3123,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "GET_URL"
       ],
       "sub_tests": [
         {
-          "name": "geturl_blank",
-          "passed": false,
-          "expected": "// GetURL: https://www.example.com -> _blank",
+          "name": "trace_blank",
+          "passed": true,
+          "expected": "URL load requested",
           "actual": "URL load requested"
         },
         {
-          "name": "trace_blank",
-          "passed": false,
-          "expected": "URL load requested",
+          "name": "trace_frame",
+          "passed": true,
+          "expected": "Loading into frame",
           "actual": "Loading into frame"
         },
         {
-          "name": "geturl_frame",
-          "passed": false,
-          "expected": "// GetURL: page.html -> content",
+          "name": "trace_level",
+          "passed": true,
+          "expected": "Loading SWF into level 1",
           "actual": "Loading SWF into level 1"
         },
         {
-          "name": "trace_frame",
-          "passed": false,
-          "expected": "Loading into frame",
+          "name": "trace_javascript",
+          "passed": true,
+          "expected": "JavaScript executed",
           "actual": "JavaScript executed"
         },
         {
-          "name": "geturl_level",
-          "passed": false,
-          "expected": "// GetURL: movie.swf -> _level1",
+          "name": "trace_self",
+          "passed": true,
+          "expected": "Loading in current window",
           "actual": "Loading in current window"
         },
         {
-          "name": "trace_level",
-          "passed": false,
-          "expected": "Loading SWF into level 1",
+          "name": "trace_empty_url",
+          "passed": true,
+          "expected": "Empty URL test",
           "actual": "Empty URL test"
         },
         {
-          "name": "geturl_javascript",
-          "passed": false,
-          "expected": "// GetURL: javascript:alert('Hello') ->",
+          "name": "trace_empty_target",
+          "passed": true,
+          "expected": "Empty target test",
           "actual": "Empty target test"
         },
         {
-          "name": "trace_javascript",
-          "passed": false,
-          "expected": "JavaScript executed",
+          "name": "trace_file_protocol",
+          "passed": true,
+          "expected": "File protocol test",
           "actual": "File protocol test"
         },
         {
-          "name": "geturl_self",
-          "passed": false,
-          "expected": "// GetURL: https://www.example.com -> _self",
+          "name": "trace_level5",
+          "passed": true,
+          "expected": "Level 5 test",
           "actual": "Level 5 test"
         },
         {
-          "name": "trace_self",
-          "passed": false,
-          "expected": "Loading in current window",
+          "name": "trace_special_chars",
+          "passed": true,
+          "expected": "Special chars test",
           "actual": "Special chars test"
         },
         {
-          "name": "geturl_empty_url",
-          "passed": false,
-          "expected": "// GetURL:  -> _blank",
+          "name": "trace_relative",
+          "passed": true,
+          "expected": "Relative URL test",
           "actual": "Relative URL test"
         },
         {
-          "name": "trace_empty_url",
-          "passed": false,
-          "expected": "Empty URL test",
+          "name": "trace_parent",
+          "passed": true,
+          "expected": "Parent frame test",
           "actual": "Parent frame test"
         }
       ]
@@ -1757,8 +1757,8 @@
     {
       "name": "get_variable_swf_4",
       "passed": true,
-      "build_time_ms": 3154,
-      "execution_time_ms": 29,
+      "build_time_ms": 3131,
+      "execution_time_ms": 26,
       "opcodes_tested": [
         "GET_VARIABLE"
       ],
@@ -1816,8 +1816,8 @@
     {
       "name": "goto_frame_swf_3",
       "passed": true,
-      "build_time_ms": 3154,
-      "execution_time_ms": 50,
+      "build_time_ms": 3125,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "GOTO_FRAME"
       ],
@@ -1838,27 +1838,68 @@
     },
     {
       "name": "goto_label_swf_3",
-      "passed": false,
-      "build_time_ms": 3147,
-      "execution_time_ms": 50,
+      "passed": true,
+      "build_time_ms": 3121,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "GOTO_LABEL"
       ],
       "sub_tests": [
         {
-          "name": "output_line_count",
-          "passed": false,
-          "expected": "15",
-          "actual": "8",
-          "message": "Expected 15 lines of output, got 8"
+          "name": "test1_trace",
+          "passed": true,
+          "expected": "Test 1: Basic label",
+          "actual": "Test 1: Basic label"
+        },
+        {
+          "name": "test2_trace",
+          "passed": true,
+          "expected": "Test 2: Label with underscores",
+          "actual": "Test 2: Label with underscores"
+        },
+        {
+          "name": "test3_trace",
+          "passed": true,
+          "expected": "Test 3: Mixed case label",
+          "actual": "Test 3: Mixed case label"
+        },
+        {
+          "name": "test4_trace",
+          "passed": true,
+          "expected": "Test 4: Empty label",
+          "actual": "Test 4: Empty label"
+        },
+        {
+          "name": "test5_trace",
+          "passed": true,
+          "expected": "Test 5: Single char label",
+          "actual": "Test 5: Single char label"
+        },
+        {
+          "name": "test6_trace",
+          "passed": true,
+          "expected": "Test 6: Long label",
+          "actual": "Test 6: Long label"
+        },
+        {
+          "name": "test7_trace",
+          "passed": true,
+          "expected": "Test 7: Special chars label",
+          "actual": "Test 7: Special chars label"
+        },
+        {
+          "name": "final_trace",
+          "passed": true,
+          "expected": "All tests complete",
+          "actual": "All tests complete"
         }
       ]
     },
     {
       "name": "gotoframe2_swf_5",
       "passed": true,
-      "build_time_ms": 3148,
-      "execution_time_ms": 49,
+      "build_time_ms": 3140,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "GOTO_FRAME2"
       ],
@@ -1898,8 +1939,8 @@
     {
       "name": "greater_swf_4",
       "passed": true,
-      "build_time_ms": 3144,
-      "execution_time_ms": 50,
+      "build_time_ms": 3132,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "GREATER"
       ],
@@ -1915,8 +1956,8 @@
     {
       "name": "if_false_swf_4",
       "passed": true,
-      "build_time_ms": 3141,
-      "execution_time_ms": 49,
+      "build_time_ms": 3138,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "IF"
       ],
@@ -1938,8 +1979,8 @@
     {
       "name": "if_swf_4",
       "passed": true,
-      "build_time_ms": 3175,
-      "execution_time_ms": 51,
+      "build_time_ms": 3135,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "IF"
       ],
@@ -1955,8 +1996,8 @@
     {
       "name": "implements_op_swf_7",
       "passed": true,
-      "build_time_ms": 3168,
-      "execution_time_ms": 49,
+      "build_time_ms": 3146,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "IMPLEMENTS_OP"
       ],
@@ -1996,8 +2037,8 @@
     {
       "name": "increment_swf_4",
       "passed": true,
-      "build_time_ms": 3141,
-      "execution_time_ms": 50,
+      "build_time_ms": 3133,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "INCREMENT"
       ],
@@ -2013,8 +2054,8 @@
     {
       "name": "init_array_swf_4",
       "passed": true,
-      "build_time_ms": 3151,
-      "execution_time_ms": 50,
+      "build_time_ms": 3178,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "INIT_ARRAY"
       ],
@@ -2078,8 +2119,8 @@
     {
       "name": "init_object_swf_4",
       "passed": true,
-      "build_time_ms": 3144,
-      "execution_time_ms": 51,
+      "build_time_ms": 3147,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "INIT_OBJECT"
       ],
@@ -2107,8 +2148,8 @@
     {
       "name": "instanceof_swf_6",
       "passed": true,
-      "build_time_ms": 3142,
-      "execution_time_ms": 50,
+      "build_time_ms": 3151,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "INSTANCEOF"
       ],
@@ -2126,7 +2167,7 @@
       "name": "jump_swf_4",
       "passed": true,
       "build_time_ms": 3149,
-      "execution_time_ms": 49,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "JUMP"
       ],
@@ -2148,8 +2189,8 @@
     {
       "name": "less2_swf_4",
       "passed": true,
-      "build_time_ms": 3153,
-      "execution_time_ms": 49,
+      "build_time_ms": 3130,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "LESS2"
       ],
@@ -2165,8 +2206,8 @@
     {
       "name": "less_floats_false_swf_4",
       "passed": true,
-      "build_time_ms": 3140,
-      "execution_time_ms": 49,
+      "build_time_ms": 3129,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "LESS"
       ],
@@ -2182,8 +2223,8 @@
     {
       "name": "less_floats_swf_4",
       "passed": true,
-      "build_time_ms": 3161,
-      "execution_time_ms": 50,
+      "build_time_ms": 3127,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "LESS"
       ],
@@ -2199,8 +2240,8 @@
     {
       "name": "mb_ascii_to_char_edge_cases_swf_4",
       "passed": true,
-      "build_time_ms": 3160,
-      "execution_time_ms": 49,
+      "build_time_ms": 3153,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "MB_ASCII_TO_CHAR"
       ],
@@ -2294,8 +2335,8 @@
     {
       "name": "mb_ascii_to_char_swf_4",
       "passed": true,
-      "build_time_ms": 3167,
-      "execution_time_ms": 51,
+      "build_time_ms": 3153,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "MB_ASCII_TO_CHAR"
       ],
@@ -2347,8 +2388,8 @@
     {
       "name": "mb_ascii_to_char_swf_5",
       "passed": true,
-      "build_time_ms": 3198,
-      "execution_time_ms": 51,
+      "build_time_ms": 3130,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "MB_ASCII_TO_CHAR"
       ],
@@ -2382,8 +2423,8 @@
     {
       "name": "mb_char_to_ascii_swf_5",
       "passed": true,
-      "build_time_ms": 3147,
-      "execution_time_ms": 50,
+      "build_time_ms": 3133,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "MB_CHAR_TO_ASCII"
       ],
@@ -2423,8 +2464,8 @@
     {
       "name": "mb_string_extract_swf_5",
       "passed": true,
-      "build_time_ms": 3157,
-      "execution_time_ms": 51,
+      "build_time_ms": 3174,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "MB_STRING_EXTRACT"
       ],
@@ -2470,8 +2511,8 @@
     {
       "name": "mb_string_length_swf_5",
       "passed": true,
-      "build_time_ms": 3163,
-      "execution_time_ms": 50,
+      "build_time_ms": 3161,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "MB_STRING_LENGTH"
       ],
@@ -2517,8 +2558,8 @@
     {
       "name": "modulo_swf_4",
       "passed": true,
-      "build_time_ms": 3170,
-      "execution_time_ms": 50,
+      "build_time_ms": 3120,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "MODULO"
       ],
@@ -2534,8 +2575,8 @@
     {
       "name": "multiply_floats_swf_4",
       "passed": true,
-      "build_time_ms": 3165,
-      "execution_time_ms": 49,
+      "build_time_ms": 3125,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "MULTIPLY"
       ],
@@ -2576,7 +2617,7 @@
       "name": "new_method_swf_5",
       "passed": true,
       "build_time_ms": 3152,
-      "execution_time_ms": 50,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "NEW_METHOD"
       ],
@@ -2599,8 +2640,8 @@
     {
       "name": "new_object_swf_4",
       "passed": true,
-      "build_time_ms": 3181,
-      "execution_time_ms": 50,
+      "build_time_ms": 3153,
+      "execution_time_ms": 54,
       "opcodes_tested": [
         "NEW_OBJECT"
       ],
@@ -2646,8 +2687,8 @@
     {
       "name": "next_frame_swf_4",
       "passed": true,
-      "build_time_ms": 3220,
-      "execution_time_ms": 50,
+      "build_time_ms": 3177,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "NEXT_FRAME"
       ],
@@ -2685,8 +2726,8 @@
     {
       "name": "not_floats_nonzero_swf_4",
       "passed": true,
-      "build_time_ms": 3164,
-      "execution_time_ms": 50,
+      "build_time_ms": 3152,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "NOT"
       ],
@@ -2702,8 +2743,8 @@
     {
       "name": "or_swf_4",
       "passed": true,
-      "build_time_ms": 3151,
-      "execution_time_ms": 50,
+      "build_time_ms": 3146,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "OR"
       ],
@@ -2737,8 +2778,8 @@
     {
       "name": "play_stop_swf_4",
       "passed": true,
-      "build_time_ms": 3198,
-      "execution_time_ms": 51,
+      "build_time_ms": 3177,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "PLAY",
         "STOP"
@@ -2773,8 +2814,8 @@
     {
       "name": "play_swf_4",
       "passed": true,
-      "build_time_ms": 3199,
-      "execution_time_ms": 51,
+      "build_time_ms": 3146,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "PLAY"
       ],
@@ -2826,8 +2867,8 @@
     {
       "name": "pop_swf_4",
       "passed": true,
-      "build_time_ms": 3147,
-      "execution_time_ms": 51,
+      "build_time_ms": 3121,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "POP"
       ],
@@ -2843,8 +2884,8 @@
     {
       "name": "prev_frame_swf_4",
       "passed": true,
-      "build_time_ms": 3189,
-      "execution_time_ms": 51,
+      "build_time_ms": 3151,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "PREV_FRAME"
       ],
@@ -2868,8 +2909,8 @@
     {
       "name": "push_swf_4",
       "passed": true,
-      "build_time_ms": 3149,
-      "execution_time_ms": 51,
+      "build_time_ms": 3131,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "PUSH"
       ],
@@ -2903,8 +2944,8 @@
     {
       "name": "random_number_swf_4",
       "passed": true,
-      "build_time_ms": 3152,
-      "execution_time_ms": 49,
+      "build_time_ms": 3123,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "RANDOM_NUMBER"
       ],
@@ -2925,19 +2966,19 @@
           "name": "random_10",
           "passed": true,
           "expected": "[0, 10)",
-          "actual": "9"
+          "actual": "1"
         },
         {
           "name": "random_100",
           "passed": true,
           "expected": "[0, 100)",
-          "actual": "81"
+          "actual": "17"
         },
         {
           "name": "random_1000",
           "passed": true,
           "expected": "[0, 1000)",
-          "actual": "814"
+          "actual": "744"
         },
         {
           "name": "random_negative",
@@ -2950,8 +2991,8 @@
     {
       "name": "remove_sprite_swf_4",
       "passed": true,
-      "build_time_ms": 3146,
-      "execution_time_ms": 49,
+      "build_time_ms": 3121,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "REMOVE_SPRITE"
       ],
@@ -2997,8 +3038,8 @@
     {
       "name": "return_swf_4",
       "passed": true,
-      "build_time_ms": 3145,
-      "execution_time_ms": 50,
+      "build_time_ms": 3128,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "RETURN"
       ],
@@ -3020,8 +3061,8 @@
     {
       "name": "set_member_swf_5",
       "passed": true,
-      "build_time_ms": 3149,
-      "execution_time_ms": 50,
+      "build_time_ms": 3120,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "SET_MEMBER"
       ],
@@ -3037,8 +3078,8 @@
     {
       "name": "set_property_swf_4",
       "passed": true,
-      "build_time_ms": 3159,
-      "execution_time_ms": 51,
+      "build_time_ms": 3137,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "SET_PROPERTY"
       ],
@@ -3054,8 +3095,8 @@
     {
       "name": "set_target2_swf_4",
       "passed": true,
-      "build_time_ms": 3143,
-      "execution_time_ms": 51,
+      "build_time_ms": 3113,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "SET_TARGET2"
       ],
@@ -3090,7 +3131,7 @@
       "name": "set_target_swf_3",
       "passed": true,
       "build_time_ms": 3142,
-      "execution_time_ms": 50,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "SET_TARGET"
       ],
@@ -3118,8 +3159,8 @@
     {
       "name": "set_variable_swf_4",
       "passed": true,
-      "build_time_ms": 3143,
-      "execution_time_ms": 51,
+      "build_time_ms": 3114,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "SET_VARIABLE"
       ],
@@ -3153,8 +3194,8 @@
     {
       "name": "stack_swap_swf_4",
       "passed": true,
-      "build_time_ms": 3151,
-      "execution_time_ms": 50,
+      "build_time_ms": 3117,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STACK_SWAP"
       ],
@@ -3170,8 +3211,8 @@
     {
       "name": "start_drag_swf_4",
       "passed": true,
-      "build_time_ms": 3163,
-      "execution_time_ms": 49,
+      "build_time_ms": 3143,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "START_DRAG"
       ],
@@ -3229,8 +3270,8 @@
     {
       "name": "stop_multiframe_swf_4",
       "passed": true,
-      "build_time_ms": 3159,
-      "execution_time_ms": 50,
+      "build_time_ms": 3131,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "STOP"
       ],
@@ -3258,8 +3299,8 @@
     {
       "name": "stop_sounds_swf_4",
       "passed": true,
-      "build_time_ms": 3144,
-      "execution_time_ms": 49,
+      "build_time_ms": 3123,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "STOP_SOUNDS"
       ],
@@ -3317,8 +3358,8 @@
     {
       "name": "stop_swf_4",
       "passed": true,
-      "build_time_ms": 3158,
-      "execution_time_ms": 50,
+      "build_time_ms": 3125,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STOP"
       ],
@@ -3346,8 +3387,8 @@
     {
       "name": "store_register_swf_4",
       "passed": true,
-      "build_time_ms": 3156,
-      "execution_time_ms": 51,
+      "build_time_ms": 3122,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STORE_REGISTER"
       ],
@@ -3363,8 +3404,8 @@
     {
       "name": "strict_equals_swf_4",
       "passed": true,
-      "build_time_ms": 3159,
-      "execution_time_ms": 50,
+      "build_time_ms": 3121,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STRICT_EQUALS"
       ],
@@ -3388,8 +3429,8 @@
     {
       "name": "string_add_swf_4",
       "passed": true,
-      "build_time_ms": 3146,
-      "execution_time_ms": 50,
+      "build_time_ms": 3117,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STRING_ADD"
       ],
@@ -3405,8 +3446,8 @@
     {
       "name": "string_equals_0_swf_4",
       "passed": true,
-      "build_time_ms": 3151,
-      "execution_time_ms": 50,
+      "build_time_ms": 3134,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STRING_EQUALS"
       ],
@@ -3422,8 +3463,8 @@
     {
       "name": "string_equals_1_swf_4",
       "passed": true,
-      "build_time_ms": 3155,
-      "execution_time_ms": 50,
+      "build_time_ms": 3120,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STRING_EQUALS"
       ],
@@ -3439,8 +3480,8 @@
     {
       "name": "string_extract_swf_4",
       "passed": true,
-      "build_time_ms": 3174,
-      "execution_time_ms": 50,
+      "build_time_ms": 3135,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STRING_EXTRACT"
       ],
@@ -3468,8 +3509,8 @@
     {
       "name": "string_greater_swf_4",
       "passed": true,
-      "build_time_ms": 3175,
-      "execution_time_ms": 52,
+      "build_time_ms": 3116,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "STRING_GREATER"
       ],
@@ -3509,8 +3550,8 @@
     {
       "name": "string_length_swf_4",
       "passed": true,
-      "build_time_ms": 3184,
-      "execution_time_ms": 50,
+      "build_time_ms": 3127,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STRING_LENGTH"
       ],
@@ -3538,8 +3579,8 @@
     {
       "name": "string_less_swf_4",
       "passed": true,
-      "build_time_ms": 3184,
-      "execution_time_ms": 51,
+      "build_time_ms": 3112,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "STRING_LESS"
       ],
@@ -3585,8 +3626,8 @@
     {
       "name": "subtract_swf_4",
       "passed": true,
-      "build_time_ms": 3195,
-      "execution_time_ms": 50,
+      "build_time_ms": 3120,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "SUBTRACT"
       ],
@@ -3662,8 +3703,8 @@
     {
       "name": "target_path_swf_5",
       "passed": true,
-      "build_time_ms": 3152,
-      "execution_time_ms": 50,
+      "build_time_ms": 3145,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "TARGET_PATH"
       ],
@@ -3709,8 +3750,8 @@
     {
       "name": "throw_swf_7",
       "passed": true,
-      "build_time_ms": 3140,
-      "execution_time_ms": 49,
+      "build_time_ms": 3142,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "THROW"
       ],
@@ -3738,8 +3779,8 @@
     {
       "name": "to_integer_swf_4",
       "passed": true,
-      "build_time_ms": 3140,
-      "execution_time_ms": 49,
+      "build_time_ms": 3126,
+      "execution_time_ms": 44,
       "opcodes_tested": [
         "TO_INTEGER"
       ],
@@ -3755,8 +3796,8 @@
     {
       "name": "to_number_swf_4",
       "passed": true,
-      "build_time_ms": 3141,
-      "execution_time_ms": 49,
+      "build_time_ms": 3121,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "TO_NUMBER"
       ],
@@ -3772,8 +3813,8 @@
     {
       "name": "to_string_swf_4",
       "passed": true,
-      "build_time_ms": 3167,
-      "execution_time_ms": 50,
+      "build_time_ms": 3130,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "TO_STRING"
       ],
@@ -3807,8 +3848,8 @@
     {
       "name": "toggle_quality_swf_4",
       "passed": true,
-      "build_time_ms": 3146,
-      "execution_time_ms": 49,
+      "build_time_ms": 3151,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "TOGGLE_QUALITY"
       ],
@@ -3848,8 +3889,8 @@
     {
       "name": "trace_swf_4",
       "passed": true,
-      "build_time_ms": 3142,
-      "execution_time_ms": 50,
+      "build_time_ms": 3146,
+      "execution_time_ms": 47,
       "opcodes_tested": [
         "TRACE"
       ],
@@ -3865,8 +3906,8 @@
     {
       "name": "try_swf_7",
       "passed": true,
-      "build_time_ms": 3145,
-      "execution_time_ms": 49,
+      "build_time_ms": 3133,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "TRY",
         "THROW"
@@ -3901,8 +3942,8 @@
     {
       "name": "typeof_swf_5",
       "passed": true,
-      "build_time_ms": 3150,
-      "execution_time_ms": 50,
+      "build_time_ms": 3120,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "TYPEOF"
       ],
@@ -3936,8 +3977,8 @@
     {
       "name": "wait_for_frame2_swf_4",
       "passed": true,
-      "build_time_ms": 3149,
-      "execution_time_ms": 49,
+      "build_time_ms": 3130,
+      "execution_time_ms": 45,
       "opcodes_tested": [
         "WAIT_FOR_FRAME2"
       ],
@@ -3961,8 +4002,8 @@
     {
       "name": "wait_for_frame_swf_3",
       "passed": true,
-      "build_time_ms": 3160,
-      "execution_time_ms": 49,
+      "build_time_ms": 3142,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "WAIT_FOR_FRAME"
       ],
@@ -4014,8 +4055,8 @@
     {
       "name": "with_swf_5",
       "passed": true,
-      "build_time_ms": 3152,
-      "execution_time_ms": 50,
+      "build_time_ms": 3124,
+      "execution_time_ms": 46,
       "opcodes_tested": [
         "WITH"
       ],

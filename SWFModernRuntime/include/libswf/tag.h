@@ -119,6 +119,7 @@ const char* ng_getTextFieldInitialText(size_t depth);
 u32 ng_getTextFieldColor(size_t depth);
 u32 ng_getTextFieldColorByIdx(int idx);
 int ng_getTextFieldIdx(size_t depth);
+int ng_getCharTextfieldIdx(size_t char_id);
 u16 ng_getTextFieldFlags(int tf_idx);
 u16 ng_getTextFieldFontId(int tf_idx);
 u16 ng_getTextFieldFontHeight(int tf_idx);
