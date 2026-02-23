@@ -1,12 +1,12 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 307/619 (49.6%)
 - **Main failure types**: output_mismatch (304), segfault (5), runtime_error (2), timeout (1)
-- **Recent gains**: input event dispatch (+18 tests), Stage.scaleMode onResize, Selection methods, broadcastMessage MC variable fallback
+- **Recent gains**: shape-accurate hitTest (+1 test: hittest_winding_rule), input event dispatch (+18 tests), Stage.scaleMode onResize, Selection methods
 
 ## Crashes and Errors (8 tests)
 
@@ -101,7 +101,7 @@ Last updated: 2026-02-22
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
 | BUTTON_PLAN | Not started | 0/14 | Button actions, states |
-| HIT_TESTING_PLAN | Not started | 0/17 | Coordinate transforms, bounds |
+| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie, mouse events, morph interp |
 
 ## Recommended Work Order
 
