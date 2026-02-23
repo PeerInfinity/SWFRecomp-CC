@@ -18,6 +18,9 @@ void dispatch_clip_event_press(SWFAppContext* app_context);
 // Dispatch CLIP_EVENT_RELEASE for sprites that had PRESS fired (clip_mc_pressed=1).
 // Called from swf_core.c on EV_MOUSE_UP_LEFT.
 void dispatch_clip_event_release(SWFAppContext* app_context);
+// Dispatch a generic clip event flag (CLIP_EVENT_MOUSE_DOWN/UP/MOVE, KEY_DOWN/UP)
+// to ALL clips in the display list (global events, no hit-test).
+void dispatch_clip_event_flag(SWFAppContext* app_context, uint32_t flag);
 // Compute the _droptarget slash-path for a point (in stage twips), skipping skip_name.
 // Writes result to out_path (at most out_size-1 chars + NUL). Returns 1 if found, 0 if not.
 int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,

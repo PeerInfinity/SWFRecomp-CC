@@ -1,13 +1,35 @@
 # TellTarget / Target Path Resolution Implementation Plan
 <!-- TESTS: tell_target, tell_target_invalid, tell_target_invalid_swf6, target_clip_swf5, target_clip_swf6, target_clip_removed, path_string, slash_syntax, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes, removed_base_clip_tell_target, removed_target_clip_scope -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-22
 
-## Overview
+## Status: PARTIALLY IMPLEMENTED
+
+### CI Results (2026-02-22)
+All core tellTarget tests still fail on CI:
+- `tell_target` — output_mismatch
+- `removed_base_clip_tell_target` — output_mismatch
+- `removed_clip_halts_script` — output_mismatch
+- `removed_target_clip_scope` — output_mismatch
+
+### What's Implemented
+- **actionSetTarget**: Resolves target names via `findDisplayObjectByName()`, sets `g_current_context`
+- **actionSetTarget2**: Stack-based variant, fast path for MOVIECLIP type objects
+- **Scope isolation**: Inside non-root context, variables resolve to clip's dynamic_props then _global
+- **Empty/"_root" reset**: Resets targeted_sprite to NULL
+
+### Still Missing
+- Slash-path parsing (e.g. `/A/B`)
+- Colon-syntax for variable access (e.g. `/A/B:FOO`)
+- `..`/`_parent` navigation
+- `eval()` function
+- "Target not found" error messages
+- Base clip tracking for nested tellTarget
+- Recursive child lookup (only root display list scanned)
+
+## Overview (original)
 
 TellTarget (ActionSetTarget/ActionSetTarget2) and string path resolution are interconnected features that control how ActionScript code addresses movie clips and their variables by name. This involves two distinct but related path resolution algorithms — one for `GetVariable`/`SetVariable` (dot-path oriented) and one for `SetTarget`/`tellTarget` (slash-path oriented) — plus supporting features like `eval()`, `_parent` navigation, base clip tracking, and error messages.
-
-**Current state**: The runtime has basic `actionSetTarget()` that can resolve single flat names via `findDisplayObjectByName()` (root display list only). `actionGetVariable()` can split on `.` (dot) for multi-segment paths. There is no slash-path parsing, no colon-syntax, no `..`/`_parent` navigation, no `eval()`, no "Target not found" error messages, no base clip tracking for nested tellTarget, and no recursive child lookup.
 
 **Key insight from the `path_string` test**: `GetVariable` (get) and `SetTarget` (tellTarget) use **fundamentally different path parsing algorithms**. The same path string can resolve successfully in `get()` but fail in `tellTarget()`, and vice versa. We must implement both algorithms correctly.
 

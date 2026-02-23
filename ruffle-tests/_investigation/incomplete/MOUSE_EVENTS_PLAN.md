@@ -1,12 +1,15 @@
 # Mouse Events Implementation Plan
 <!-- TESTS: mouse_pos, mouse_pos_with_scale_factor, mouse_events, mouse_events_visible_enabled, click_block -->
 
-Last updated: 2026-02-20
+Last updated: 2026-02-22
 
-## Status: NOT STARTED
+## Status: PARTIALLY IMPLEMENTED
 
-Prerequisites: input-event-injection.md Phases 0–7 COMPLETE (mouse state tracked, hit testing
-included in trace builds, button state machine runs). This plan adds the AS-level bindings
+Input event injection Phases 1-4 are complete (event pump, mouse/key state, verify_output.py preprocessing). Phases 5/7 are partially implemented (global mouse dispatch, key listeners, button key dispatch exist). The remaining blocker is **Phase 0 of input-event-injection.md** (struct unification — `tag_stubs.c` still exists, `#ifndef NO_GRAPHICS` guards still wrap `Character`/`DisplayObject` in `swf.h`, `hit_test.c` not compiled in trace builds).
+
+Mouse dispatch functions already exist in action.c: `actionDispatchMCMouseMove`, `actionDispatchMCPress`, `actionDispatchMCRelease`. Button state machine exists in tag.c (`ng_update_button_states`). These are called from the event pump but cannot fully function until Phase 0 unifies the structs.
+
+Prerequisites remaining: input-event-injection.md **Phase 0** (struct unification). This plan adds the AS-level bindings
 and clip-level event dispatch that sit on top of that infrastructure.
 
 ---

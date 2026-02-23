@@ -1,13 +1,36 @@
 # OOP / Super / Extends / Interfaces Implementation Plan
 <!-- TESTS: as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, as2_super_via_manual_prototype, extends_chain, extends_native_type, super_edge_cases, interface_implements_op -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-22
 
-## Overview
+## Status: PARTIALLY IMPLEMENTED (2/8 tests passing)
+
+### CI Results (2026-02-22)
+
+| Test | CI Status | Notes |
+|------|-----------|-------|
+| as2_oop | **PASS** ✅ | ImplementsOp/InstanceOf/CastOp working |
+| extends_native_type | **PASS** ✅ | Flash.geom native extends working |
+| as2_super_and_this_v6 | output_mismatch | super() still non-functional |
+| as2_super_and_this_v8 | output_mismatch | super() still non-functional |
+| as2_super_via_manual_prototype | output_mismatch | super via GetVariable not working |
+| extends_chain | output_mismatch | super.method() calls not working |
+| super_edge_cases | output_mismatch | __constructor__ lookup issues |
+| interface_implements_op | output_mismatch | Complex interface cases |
+
+### What's Implemented
+- **actionExtends**: Correctly sets up prototype chains ✅
+- **actionInstanceOf**: Fully implemented ✅ (type-handling bugs fixed since original plan)
+- **actionImplementsOp**: Fully implemented ✅
+- **actionCastOp**: Fully implemented ✅
+- **extends_native_type**: flash.geom types can be extended ✅
+
+### Critical Gap
+- **`super` keyword**: Still a stub — preload_super register filled with empty ASObject, no prototype chain or constructor reference. This blocks 5 of the 6 remaining tests.
+
+## Overview (original)
 
 OOP (super/extends/interfaces) affects 8 Ruffle tests totaling 473 expected output lines. Most of the foundational infrastructure exists (actionExtends, actionInstanceOf, actionImplementsOp, actionNewObject) but has bugs and missing pieces. The critical gap is that `super` is completely non-functional — the recompiler creates an empty stub object instead of a real super reference.
-
-**Current state**: `actionExtends` correctly sets up prototype chains. `actionInstanceOf` and `actionImplementsOp` exist but have type-handling bugs (reject ASFunction types). `super` in constructors and methods does nothing — the preload_super register is filled with an empty ASObject that has no prototype chain or constructor reference.
 
 **Key insight**: Flash's `super` is a context-sensitive reference that depends on *where in the prototype chain* the current function was found. It's not a simple object — each level of constructor/method call shifts `super` one level up the chain. Implementing this requires runtime tracking of the "super depth" across nested calls.
 

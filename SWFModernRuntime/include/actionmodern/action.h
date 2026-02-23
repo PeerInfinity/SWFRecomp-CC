@@ -44,6 +44,7 @@ struct MovieClip {
 	u8 is_button_mc;       // 1 if this MC represents a SWF button (affects _parent resolution in SWF5)
 	int depth;             // ActionScript display depth (-16384 for _root, SWF_depth-16384 for timeline clips, AS-space for dynamic clips)
 #ifdef NO_GRAPHICS
+	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
 	int ng_textfield_idx;  // index into ng_textfields, or -1 if not a textfield
@@ -288,6 +289,11 @@ void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr);
 // Broadcasts onKeyDown/onKeyUp to all registered Key listeners.
 void actionDispatchKeyDown(SWFAppContext* app_context);
 void actionDispatchKeyUp(SWFAppContext* app_context);
+// Mouse event dispatch — called from swf_core.c after delivering mouse events.
+// Broadcasts onMouseDown/onMouseUp/onMouseMove to all registered Mouse listeners.
+void actionDispatchMouseDown(SWFAppContext* app_context);
+void actionDispatchMouseUp(SWFAppContext* app_context);
+void actionDispatchMouseMove(SWFAppContext* app_context);
 // Tab key focus advance — called on Tab key press (before Key.broadcastMessage).
 // reversed=1 for Shift+Tab (go backward), 0 for Tab (go forward).
 void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed);

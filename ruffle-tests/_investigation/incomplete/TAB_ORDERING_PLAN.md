@@ -1,16 +1,19 @@
 # Tab Ordering Implementation Plan
 <!-- TESTS: tab_ordering_automatic_basic, tab_ordering_automatic_order_grid, tab_ordering_automatic_order_same_position, tab_ordering_children, tab_ordering_custom_basic, tab_ordering_custom_duplicate_index, tab_ordering_custom_i32_vs_u32, tab_ordering_custom_m1, tab_ordering_events, tab_ordering_events_mouse, tab_ordering_movieclip_enabled_default, tab_ordering_reverse, tab_ordering_tabbable, edittext_tab_focus, focusrect_swf5, focusrect_swf6 -->
 
-Last updated: 2026-02-20
+Last updated: 2026-02-22
 
-## Status: NOT STARTED
+## Status: PARTIALLY IMPLEMENTED
 
-Prerequisites:
+Tab key detection and `actionAdvanceTabFocus(app_context, shift_held)` are implemented in the event pump. Shift+Tab reversal works. However, full tab index sorting, tabEnabled/tabIndex property handling, and focus rect rendering are not yet implemented. The remaining blocker is **Phase 0 of input-event-injection.md** (struct unification) for proper focus system.
+
+Prerequisites remaining:
+- **input-event-injection.md Phase 0** (struct unification) — needed for hit testing
 - **FOCUS_SYSTEM_PLAN.md** (focus state tracking, onSetFocus/onKillFocus callbacks,
   `Selection.getFocus()`, focus dispatch to clips). Tab ordering builds on the focus
   system — Tab key just advances which clip is focused.
-- **input-event-injection.md Phase 7** (Key AsBroadcaster) — COMPLETE (Tab key delivered as
-  `EV_KEY_DOWN` with code 9)
+- **input-event-injection.md Phase 7** (Key AsBroadcaster) — PARTIALLY COMPLETE (Tab key delivered as
+  `EV_KEY_DOWN` with code 9, `actionAdvanceTabFocus` called)
 
 Corresponds to **Phase 9** of `input-event-injection.md`.
 

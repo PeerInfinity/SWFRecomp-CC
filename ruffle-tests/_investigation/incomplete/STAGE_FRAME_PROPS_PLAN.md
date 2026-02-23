@@ -2,9 +2,43 @@
 
 <!-- TESTS: stage_property_representation, frame_size_translated_positive, frame_size_translated_negative, stage_scale_mode, stage_display_state, stage_object_properties, stage_object_properties_swf6, stage_object_enumerate, stage_object_children -->
 
-Last updated: 2026-02-18
+Last updated: 2026-02-22
 
-## Status: NOT STARTED
+## Status: PARTIALLY IMPLEMENTED
+
+Stage object properties (align, scaleMode, displayState, width, height) are now registered and functional. Several tests have improved significantly.
+
+### CI Results (2026-02-22)
+
+| Test | CI Status | Notes |
+|------|-----------|-------|
+| `stage_property_representation` | **PASS** ✅ | Was 0% — F64 bug fixed, Stage properties implemented |
+| `stage_object_enumerate` | **PASS** ✅ | Was 20% — Stage enumeration working |
+| `stage_display_state` | **PASS** ✅ | displayState + onFullScreen callback working |
+| `stage_scale_mode` | **PASS** ✅ (uncommitted) | onResize broadcast + viewport dims + broadcastMessage MC variable fallback |
+| `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
+| `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
+| `stage_object_properties` | 226/241 (93.8%) | _width/_height↔scale coupling, rotation, original bounds |
+| `stage_object_properties_swf6` | 214/231 (92.6%) | Same issues |
+| `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
+
+### What's Implemented
+- **Stage singleton** (`g_stage_obj`): Registered with width/height (FRAME_WIDTH/FRAME_HEIGHT), quality, showMenu
+- **Stage.align**: Normalizes to uppercase L/T/R/B chars, deduplicates, canonical order
+- **Stage.scaleMode**: Validates "showAll"/"noScale"/"exactFit"/"noBorder" (case-insensitive), updates width/height on change
+- **Stage.displayState**: Validates "normal"/"fullScreen" (case-insensitive)
+- **AsBroadcaster**: Stage has addListener/removeListener/broadcastMessage
+- **Stage.onResize**: Fires via broadcastMessage when scaleMode changes
+- **Stage.onFullScreen**: Fires via broadcastMessage when displayState changes
+- **Viewport dimensions**: Passed via -DVIEWPORT_WIDTH/-DVIEWPORT_HEIGHT from test.toml
+- **actionSetProperty F64 bug**: Fixed — F64 values now read correctly as doubles
+
+### Remaining Work
+- Shape bounds tracking in NO_GRAPHICS mode (Phase 2)
+- Root `_width`/`_height` from children bounds union (Phase 3)
+- `_yscale` precision differences / width↔scale coupling (Phase 4)
+- Stage children enumeration order (Phase 8)
+- _level0/_flash0 addressing (Phase 4 of STAGE_PLAN)
 
 ---
 
@@ -16,22 +50,6 @@ Two categories of failing tests are covered here:
 - **Category 15 — Stage Object Properties** (7 tests, ~30–72% passing): `stage_property_representation`, `stage_scale_mode`, `stage_display_state`, `stage_object_properties`, `stage_object_properties_swf6`, `stage_object_enumerate`, `stage_object_children`
 
 These are grouped because they share a common root cause cluster: shape bounds not tracked in trace mode, `_root._width/_height` being hardcoded Flash-player defaults, Stage object missing property initialization, and the `actionSetProperty` F64 bug.
-
----
-
-## Test Inventory
-
-| Test | Current | Lines | Phase(s) Needed |
-|------|---------|-------|-----------------|
-| `stage_property_representation` | 0% | 0/586 | Phase 1 (F64 bug) |
-| `frame_size_translated_positive` | 67% | 14/21 | Phase 2 (shape bounds) + Phase 3 (root bounds) |
-| `frame_size_translated_negative` | 67% | 14/21 | Phase 2 + Phase 3 |
-| `stage_scale_mode` | ~50% | ?/? | Phase 5 (Stage.scaleMode/align normalization) |
-| `stage_display_state` | ~30% | ?/? | Phase 5 (Stage.displayState + onFullScreen) |
-| `stage_object_properties` | 72% | 173/241 | Phase 3+4+6+7 |
-| `stage_object_properties_swf6` | 72% | 166/231 | Phase 3+4+6+7 |
-| `stage_object_enumerate` | 20% | 1/5 | Phase 8 (Stage children) |
-| `stage_object_children` | 81% | 67/83 | Phase 6+8 |
 
 ---
 

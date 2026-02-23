@@ -406,10 +406,11 @@ typedef struct ASFunction {
 	// Own properties on the function object itself (e.g., toString override)
 	ASObject* own_props;  // Created lazily when SetMember is called
 
-	// Captured scope chain (WITH scope entries at time of definition)
+	// Captured scope chain (scope entries at time of definition)
 	u8 captured_scope_count;
-	ASObject* captured_scope[8];   // scope objects (WITH scopes only)
+	ASObject* captured_scope[8];   // scope objects
 	MovieClip* captured_scope_mc[8]; // associated MovieClip (if any)
+	u8 captured_scope_is_with[8]; // 1 = with scope, 0 = local scope
 } ASFunction;
 
 // Function registry
@@ -2885,6 +2886,64 @@ static void setLocalCTRaw(MovieClip* mc,
 		(double)rb, (double)gb, (double)bb, (double)ab);
 }
 
+// Compute _xmouse/_ymouse for an MC by transforming the global mouse position
+// (in pixels) through the MC's inverse world matrix to local coordinates.
+// For root MC this is just the global mouse position (identity transform).
+static void mc_get_local_mouse(SWFAppContext* app_context, MovieClip* mc,
+    float* out_x, float* out_y)
+{
+	extern MovieClip root_movieclip;
+	float global_mx = app_context->mouse.stage_x / 20.0f;  // twips → pixels
+	float global_my = app_context->mouse.stage_y / 20.0f;
+
+	if (mc == NULL || mc == &root_movieclip) {
+		*out_x = global_mx;
+		*out_y = global_my;
+		return;
+	}
+
+	// Build world matrix by composing bottom-up (same as globalToLocal)
+	float wa, wb, wc, wd;
+	int32_t wtx, wty;
+	getLocalMatrixForMC_render(mc, &wa, &wb, &wc, &wd, &wtx, &wty);
+	for (MovieClip* par = mc->parent; par != NULL; par = par->parent) {
+		float pa, pb, pc, pd;
+		int32_t ptx, pty;
+		getLocalMatrixForMC_render(par, &pa, &pb, &pc, &pd, &ptx, &pty);
+		float mtxf = (float)wtx, mtyf = (float)wty;
+		float na = pa * wa + pc * wb;
+		float nb = pb * wa + pd * wb;
+		float nc = pa * wc + pc * wd;
+		float nd = pb * wc + pd * wd;
+		int32_t ntx = (int32_t)rintf(pa * mtxf + pc * mtyf) + ptx;
+		int32_t nty = (int32_t)rintf(pb * mtxf + pd * mtyf) + pty;
+		wa = na; wb = nb; wc = nc; wd = nd; wtx = ntx; wty = nty;
+	}
+
+	// Invert the world matrix (same as globalToLocal)
+	float det = wa * wd - wb * wc;
+	if (fabsf(det) > 1.1920929e-7f) {
+		float ia =  wd / det;
+		float ib =  wb / -det;
+		float ic =  wc / -det;
+		float id =  wa / det;
+		float ftx = (float)wtx, fty = (float)wty;
+		int32_t itx = (int32_t)rintf((wd * ftx - wc * fty) / -det);
+		int32_t ity = (int32_t)rintf((wb * ftx - wa * fty) / det);
+		// Transform global mouse point (pixels→twips, invert, twips→pixels)
+		float ptx = (float)((int32_t)(global_mx * 20.0));
+		float pty = (float)((int32_t)(global_my * 20.0));
+		int32_t lx_tw = (int32_t)rintf(ia * ptx + ic * pty) + itx;
+		int32_t ly_tw = (int32_t)rintf(ib * ptx + id * pty) + ity;
+		*out_x = (float)((double)lx_tw / 20.0);
+		*out_y = (float)((double)ly_tw / 20.0);
+	} else {
+		// Degenerate matrix: fall back to global coords
+		*out_x = global_mx;
+		*out_y = global_my;
+	}
+}
+
 // Extract CT raw Fixed8 values from a ColorTransform ASObject.
 static void ctObjToRaw(ASObject* ct_obj,
 	s16* ra, s16* ga, s16* ba, s16* aa,
@@ -3126,7 +3185,7 @@ static ActionVar transformCTSetter(SWFAppContext* app_context, ActionVar* args, 
 	if (!mc) return undef;
 	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
 	ASObject* ct_obj = (ASObject*) args[0].data.numeric_value;
-	if (!getProperty(ct_obj, "redMultiplier", 13)) return undef;
+	if (!getPropertyWithPrototype(ct_obj, "redMultiplier", 13)) return undef;
 #ifdef NO_GRAPHICS
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	ctObjToRaw(ct_obj, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
@@ -3239,7 +3298,7 @@ static ActionVar* geomGetProp(ActionVar* obj_var, const char* name, u32 len)
 // (unlike varToDoubleSimple(NULL) which returns 0.0)
 static double propToDouble(ASObject* obj, const char* name, u32 name_len)
 {
-	ActionVar* prop = getProperty(obj, name, name_len);
+	ActionVar* prop = getPropertyWithPrototype(obj, name, name_len);
 	if (prop == NULL) return NAN;
 	return varToDoubleSimple(prop);
 }
@@ -7679,7 +7738,17 @@ MovieClip root_movieclip = {
 	.dynamic_props = NULL,
 	.lockroot = 0,
 	.blend_mode = 0,
+	.is_button_mc = 0,
 	.depth = -16384,   // _root is at Flash "level 0" depth
+#ifdef NO_GRAPHICS
+	.display_obj = NULL,
+	.last_transform_id = 0,
+	.as_set_flags = 0,
+	.ng_textfield_idx = -1,
+	.draw_has_bounds = 0,
+	.mc_mouse_inside = 0,
+	.mc_as_pressed = 0,
+#endif
 };
 
 // Helper function to get MovieClip by target path
@@ -7698,6 +7767,101 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		return &root_movieclip;
 	}
 	return NULL;  // Other paths not supported yet
+}
+
+// Forward declarations for resolveSlashPathToMC
+static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
+
+// Resolve a slash-separated MC path (e.g., "/clip1/clip2", "../clip1/clip2", "clip2")
+// relative to a starting MC. Returns the target MC or NULL if not found.
+// Does NOT handle colon — caller should split on ':' first.
+static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
+	if (path_len == 0 || start_mc == NULL) return NULL;
+
+	MovieClip* mc = start_mc;
+
+	// Absolute path: leading '/' means start from root
+	u32 pos = 0;
+	if (path[0] == '/') {
+		mc = &root_movieclip;
+		pos = 1;
+		if (pos >= path_len) return mc; // just "/"
+	}
+
+	while (pos < path_len) {
+		// Find next '/' separator
+		u32 seg_start = pos;
+		while (pos < path_len && path[pos] != '/') pos++;
+		u32 seg_len = pos - seg_start;
+
+		// Empty segment means consecutive slashes (or slash at end of path after separator skip)
+		if (seg_len == 0) {
+			// A single trailing slash is valid (pos == path_len after the inner while).
+			// But double slash (//) is always invalid — if there's more path or
+			// if we arrived here because the separator-skip already consumed one '/'.
+			if (pos == path_len) break; // single trailing slash = OK
+			return NULL; // double slash or other invalid pattern
+		}
+
+		if (seg_len == 2 && path[seg_start] == '.' && path[seg_start + 1] == '.') {
+			// ".." = go to parent
+			if (mc->parent != NULL) mc = mc->parent;
+			else return NULL; // no parent = invalid path
+		} else {
+			// Named child segment — find child MC by name
+			char seg_buf[64];
+			u32 copy_len = seg_len < 63 ? seg_len : 63;
+			memcpy(seg_buf, path + seg_start, copy_len);
+			seg_buf[copy_len] = '\0';
+
+			// Special names
+			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+				mc = &root_movieclip;
+			} else {
+#ifdef NO_GRAPHICS
+				// Try direct child lookup via display_obj sprite_display_list
+				size_t child_depth = SIZE_MAX;
+				if (mc->display_obj != NULL) {
+					DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+					if (parent_dobj->sprite_display_list != NULL) {
+						for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
+							DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
+							if (_ch->char_id == 0) continue;
+							if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
+								child_depth = _cd;
+								break;
+							}
+						}
+					}
+				}
+				// Fall back to ng_findChildEntryDepth
+				if (child_depth == SIZE_MAX && mc->name[0] != '\0') {
+					child_depth = ng_findChildEntryDepth(mc->name, seg_buf);
+				}
+				// Fall back to root-level search if mc is root
+				if (child_depth == SIZE_MAX && mc == &root_movieclip) {
+					child_depth = ng_findDisplayEntryByName(seg_buf);
+				}
+				if (child_depth == SIZE_MAX) return NULL; // child not found
+				// exec_sprite_frame registers all MCs with parent=root_movieclip,
+				// so try findOrCreateMovieClip with root as parent first (to reuse
+				// existing MC with its dynamic_props), then fall back to mc as parent.
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, seg_buf, &root_movieclip);
+				if (child_mc == NULL) child_mc = findOrCreateMovieClip(app_context, seg_buf, mc);
+				if (child_mc == NULL) return NULL;
+				child_mc->depth = (int)child_depth - 16384;
+				mc = child_mc;
+#else
+				(void)app_context;
+				return NULL; // graphics mode: slash-path not supported
+#endif
+			}
+		}
+
+		if (pos < path_len) pos++; // skip the '/' separator
+	}
+
+	return mc;
 }
 
 #ifndef NO_GRAPHICS
@@ -7768,6 +7932,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->dynamic_props = NULL;
 	mc->lockroot = 0;
 	mc->blend_mode = 0;
+	mc->is_button_mc = 0;
 	mc->depth = 0;
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
@@ -7777,6 +7942,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->draw_has_bounds = 0;
 	mc->mc_mouse_inside = 0;
 	mc->mc_as_pressed = 0;
+	mc->display_obj = NULL;
 #endif
 
 	// Set instance name
@@ -7815,6 +7981,9 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 #define MAX_CHILD_MOVIECLIPS 128
 MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 int child_mc_count = 0;
+// MCs at index >= this threshold were just placed in the current frame's
+// process_sprite_needs_init and should not fire onEnterFrame until next frame.
+int g_enterframe_new_mc_start = -1;  // -1 = no skip
 
 static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
 
@@ -8823,13 +8992,37 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 	// If width/height not explicitly set, compute from display hierarchy bounds
 	if (scaled_w == 0.0 && scaled_h == 0.0) {
 		float gxmin, gxmax, gymin, gymax;
-		size_t entry_idx;
-		if (mc == &root_movieclip) {
-			entry_idx = (size_t)-1;
-		} else {
-			entry_idx = ng_findDisplayEntryIdx(mc->name);
+		int bounds_found = 0;
+
+		// For buttons, _width/_height come from the hit shape bounds
+		if (mc->is_button_mc) {
+			extern Character* dictionary;
+			DisplayObject* btn_dobj = (DisplayObject*)mc->display_obj;
+			if (btn_dobj != NULL) {
+				size_t cid = btn_dobj->char_id;
+				if (cid > 0 && dictionary[cid].type == CHAR_TYPE_BUTTON) {
+					size_t hit_cid = dictionary[cid].button_hit_char_id;
+					s32 hxmin, hxmax, hymin, hymax;
+					if (ng_getCharBounds(hit_cid, &hxmin, &hxmax, &hymin, &hymax)) {
+						gxmin = hxmin / 20.0f; gxmax = hxmax / 20.0f;
+						gymin = hymin / 20.0f; gymax = hymax / 20.0f;
+						bounds_found = 1;
+					}
+				}
+			}
 		}
-		if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+
+		if (!bounds_found) {
+			size_t entry_idx;
+			if (mc == &root_movieclip) {
+				entry_idx = (size_t)-1;
+			} else {
+				entry_idx = ng_findDisplayEntryIdx(mc->name);
+			}
+			bounds_found = ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax);
+		}
+
+		if (bounds_found) {
 			double nat_w = (double)(gxmax - gxmin);
 			double nat_h = (double)(gymax - gymin);
 			scaled_w = nat_w * mc->xscale / 100.0;
@@ -11840,21 +12033,28 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
         if (!elem) continue;
 
         ASObject* listener_obj = NULL;
+        MovieClip* listener_mc = NULL;
         if (elem->type == ACTION_STACK_VALUE_OBJECT) {
             listener_obj = (ASObject*)(uintptr_t)elem->data.numeric_value;
         } else if (elem->type == ACTION_STACK_VALUE_MOVIECLIP) {
-            MovieClip* mc = (MovieClip*)(uintptr_t)elem->data.numeric_value;
-            if (mc && mc->dynamic_props)
-                listener_obj = (ASObject*) mc->dynamic_props;
+            listener_mc = (MovieClip*)(uintptr_t)elem->data.numeric_value;
+            if (listener_mc && listener_mc->dynamic_props)
+                listener_obj = (ASObject*) listener_mc->dynamic_props;
         } else if (elem->type == ACTION_STACK_VALUE_FUNCTION) {
             // Function used as listener — look up method on its own_props
             ASFunction* f = lookupFunctionFromVar(elem);
             if (f && f->own_props)
                 listener_obj = f->own_props;
         }
-        if (!listener_obj) continue;
 
-        ActionVar* method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
+        ActionVar* method_prop = NULL;
+        if (listener_obj)
+            method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
+        // If not found on dynamic_props, check the MC's variable system
+        // (in Flash, root-level DefineFunction stores vars that are accessible as MC properties)
+        if ((!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) && listener_mc) {
+            method_prop = getVariable(method_name, method_name_len);
+        }
         if (!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
         ASFunction* func = lookupFunctionFromVar(method_prop);
         if (!func) continue;
@@ -11903,8 +12103,9 @@ static void initAsBroadcasterFuncs(SWFAppContext* app_context)
     (void)app_context;
 }
 
-// Forward declaration (defined later in ensureGlobalInit block)
+// Forward declarations (defined later in ensureGlobalInit block)
 static ASObject* g_key_obj;
+static ASObject* g_mouse_obj;
 
 // ============================================================================
 // Key object methods: isDown, getCode, getAscii, isToggled
@@ -12039,6 +12240,8 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
+		// Skip MCs placed in the current frame's process_sprite_needs_init
+		if (g_enterframe_new_mc_start >= 0 && i >= g_enterframe_new_mc_start) continue;
 
 		ASObject* props = (ASObject*) mc->dynamic_props;
 		ActionVar* ef_prop = getProperty(props, "onEnterFrame", 12);
@@ -12211,6 +12414,47 @@ void actionDispatchKeyUp(SWFAppContext* app_context)
     builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_key_obj);
 }
 
+// Dispatch onMouseDown/onMouseUp/onMouseMove to all Mouse listeners.
+// Called from swf_core.c after delivering mouse events.
+void actionDispatchMouseDown(SWFAppContext* app_context)
+{
+    if (!g_mouse_obj) return;
+    static const uint16_t onMouseDown_u16[] = {
+        'o','n','M','o','u','s','e','D','o','w','n'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onMouseDown_u16;
+    method_name.str_size = 11;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+}
+
+void actionDispatchMouseUp(SWFAppContext* app_context)
+{
+    if (!g_mouse_obj) return;
+    static const uint16_t onMouseUp_u16[] = {
+        'o','n','M','o','u','s','e','U','p'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onMouseUp_u16;
+    method_name.str_size = 9;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+}
+
+void actionDispatchMouseMove(SWFAppContext* app_context)
+{
+    if (!g_mouse_obj) return;
+    static const uint16_t onMouseMove_u16[] = {
+        'o','n','M','o','u','s','e','M','o','v','e'
+    };
+    ActionVar method_name = {0};
+    method_name.type = ACTION_STACK_VALUE_STRING;
+    method_name.data.numeric_value = (u64)(uintptr_t)onMouseMove_u16;
+    method_name.str_size = 11;
+    builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+}
+
 static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
 {
     initAsBroadcasterFuncs(app_context);
@@ -12251,6 +12495,49 @@ static ASObject* g_mouse_obj = NULL;
 static ASObject* g_selection_obj = NULL;
 static ASObject* g_stage_obj = NULL;
 
+// Helper: create a string ActionVar from a UTF-8 string
+static ActionVar makeStringActionVar(SWFAppContext* app_context, const char* str, u32 len)
+{
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_STRING;
+	u32 u16_len = 0;
+	uint16_t* u16 = utf8_to_u16(app_context, str, len, &u16_len);
+	ret.str_size = u16_len;
+	ret.data.numeric_value = (u64)u16;
+	return ret;
+}
+
+// Stage.align normalization: filter to L/T/R/B chars (case-insensitive), uppercase, deduplicate, canonical order
+static void normalizeStageAlign(const char* input, u32 input_len, char* out, u32* out_len)
+{
+	int has_l = 0, has_t = 0, has_r = 0, has_b = 0;
+	for (u32 i = 0; i < input_len; i++) {
+		char c = input[i];
+		if (c == 'L' || c == 'l') has_l = 1;
+		else if (c == 'T' || c == 't') has_t = 1;
+		else if (c == 'R' || c == 'r') has_r = 1;
+		else if (c == 'B' || c == 'b') has_b = 1;
+	}
+	u32 pos = 0;
+	if (has_l) out[pos++] = 'L';
+	if (has_t) out[pos++] = 'T';
+	if (has_r) out[pos++] = 'R';
+	if (has_b) out[pos++] = 'B';
+	out[pos] = '\0';
+	*out_len = pos;
+}
+
+// Stage.scaleMode normalization: case-insensitive match to canonical form
+// Returns canonical string or NULL if not a valid scaleMode value
+static const char* normalizeStageScaleMode(const char* input, u32 input_len)
+{
+	if (input_len == 7 && strncasecmp(input, "showAll", 7) == 0) return "showAll";
+	if (input_len == 7 && strncasecmp(input, "noScale", 7) == 0) return "noScale";
+	if (input_len == 8 && strncasecmp(input, "exactFit", 8) == 0) return "exactFit";
+	if (input_len == 8 && strncasecmp(input, "noBorder", 8) == 0) return "noBorder";
+	return NULL; // invalid value
+}
+
 // Currently focused MovieClip (NULL = no focus)
 static MovieClip* g_focused_mc = NULL;
 
@@ -12259,13 +12546,17 @@ static char g_clipboard_text[1024] = {0};
 static size_t g_clipboard_len = 0;
 static int g_tf_select_all = 0;  // 1 = entire text field is selected
 
-// Static function objects for Selection.setFocus / Selection.getFocus
+// Static function objects for Selection methods
 static ASFunction g_selection_setFocus_func;
 static ASFunction g_selection_getFocus_func;
+static ASFunction g_selection_getBeginIndex_func;
+static ASFunction g_selection_getCaretIndex_func;
+static ASFunction g_selection_getEndIndex_func;
 #ifdef NO_GRAPHICS
 // Forward declarations — implementations are in the NO_GRAPHICS block at end of file
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_selection_getIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 #endif
 
 static int g_global_init_done = 0;
@@ -12597,9 +12888,29 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		installAsBroadcaster(app_context, g_key_obj);
 		installKeyMethods(app_context, g_key_obj);
 		installAsBroadcaster(app_context, g_stage_obj);
+		// Stage default properties
+		{
+			ActionVar sv;
+			sv = makeStringActionVar(app_context, "", 0);
+			setProperty(app_context, g_stage_obj, "align", 5, &sv);
+			sv = makeStringActionVar(app_context, "showAll", 7);
+			setProperty(app_context, g_stage_obj, "scaleMode", 9, &sv);
+			sv = makeStringActionVar(app_context, "normal", 6);
+			setProperty(app_context, g_stage_obj, "displayState", 12, &sv);
+			sv = makeF64((double)FRAME_WIDTH);
+			setProperty(app_context, g_stage_obj, "width", 5, &sv);
+			sv = makeF64((double)FRAME_HEIGHT);
+			setProperty(app_context, g_stage_obj, "height", 6, &sv);
+			sv = makeStringActionVar(app_context, "HIGH", 4);
+			setProperty(app_context, g_stage_obj, "quality", 7, &sv);
+			ActionVar bv = {0};
+			bv.type = ACTION_STACK_VALUE_BOOLEAN;
+			bv.data.numeric_value = 1;
+			setProperty(app_context, g_stage_obj, "showMenu", 8, &bv);
+		}
 		installAsBroadcaster(app_context, g_selection_obj);
 
-		// Install Selection.setFocus and Selection.getFocus
+		// Install Selection methods
 #ifdef NO_GRAPHICS
 		{
 			static int sel_funcs_init = 0;
@@ -12612,6 +12923,18 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 				strncpy(g_selection_getFocus_func.name, "getFocus", 255);
 				g_selection_getFocus_func.function_type = 2;
 				g_selection_getFocus_func.advanced_func = (Function2Ptr)builtin_selection_getFocus;
+				memset(&g_selection_getBeginIndex_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_getBeginIndex_func.name, "getBeginIndex", 255);
+				g_selection_getBeginIndex_func.function_type = 2;
+				g_selection_getBeginIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
+				memset(&g_selection_getCaretIndex_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_getCaretIndex_func.name, "getCaretIndex", 255);
+				g_selection_getCaretIndex_func.function_type = 2;
+				g_selection_getCaretIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
+				memset(&g_selection_getEndIndex_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_getEndIndex_func.name, "getEndIndex", 255);
+				g_selection_getEndIndex_func.function_type = 2;
+				g_selection_getEndIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
 				sel_funcs_init = 1;
 			}
 			ActionVar fv = {0};
@@ -12620,6 +12943,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setProperty(app_context, g_selection_obj, "setFocus", 8, &fv);
 			fv.data.numeric_value = (u64)&g_selection_getFocus_func;
 			setProperty(app_context, g_selection_obj, "getFocus", 8, &fv);
+			fv.data.numeric_value = (u64)&g_selection_getBeginIndex_func;
+			setProperty(app_context, g_selection_obj, "getBeginIndex", 13, &fv);
+			fv.data.numeric_value = (u64)&g_selection_getCaretIndex_func;
+			setProperty(app_context, g_selection_obj, "getCaretIndex", 13, &fv);
+			fv.data.numeric_value = (u64)&g_selection_getEndIndex_func;
+			setProperty(app_context, g_selection_obj, "getEndIndex", 11, &fv);
 		}
 #endif
 
@@ -12695,6 +13024,54 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	// Pop variable name
 	POP();
+
+	// Handle colon-path + slash-path resolution (SWF4 syntax: "path:var" or "/path/to/mc:var")
+	{
+		char* colon = (var_name_len > 1) ? (char*)memchr(var_name, ':', var_name_len) : NULL;
+		if (colon != NULL)
+		{
+			u32 target_len = (u32)(colon - var_name);
+			const char* prop_name = colon + 1;
+			u32 prop_len = var_name_len - target_len - 1;
+
+			// Resolve target MC path
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, target_len, ctx);
+			if (target_mc != NULL && prop_len > 0) {
+				// Check MC's dynamic_props first
+				if (target_mc->dynamic_props != NULL) {
+					ActionVar* prop = getProperty((ASObject*)target_mc->dynamic_props, prop_name, prop_len);
+					if (prop != NULL) { PUSH_VAR(prop); return; }
+				}
+				// Fall back to global variables — in our architecture, timeline
+				// variables (DefineLocal outside functions) go to globals
+				{
+					extern hashmap* var_map;
+					ActionVar* gvar;
+					if (var_map != NULL && hashmap_get(var_map, prop_name, prop_len, (uintptr_t*)&gvar)) {
+						if (gvar != NULL && !(gvar->type == ACTION_STACK_VALUE_STRING && gvar->str_size == 0 && gvar->data.string_data.heap_ptr == NULL)) {
+							PUSH_VAR(gvar); return;
+						}
+					}
+				}
+			}
+			// Not found — push undefined
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+		// Also handle pure slash-paths without colon (e.g., "/clip1/clip2" resolves to MC)
+		if (var_name_len > 0 && (var_name[0] == '/' || (var_name_len >= 2 && var_name[0] == '.' && var_name[1] == '.')))
+		{
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, var_name_len, ctx);
+			if (target_mc != NULL) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+			} else {
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			}
+			return;
+		}
+	}
 
 	// Handle dot-path resolution (e.g., "a.b.c", "_root.x.y", "_global.x.y.z")
 	{
@@ -12836,6 +13213,12 @@ void actionGetVariable(SWFAppContext* app_context)
 	ActionVar* var = NULL;
 	if (g_current_context != NULL && g_current_context != &root_movieclip)
 	{
+		// "this" in a non-root context refers to the current clip
+		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_current_context);
+			return;
+		}
 		// Check target clip's dynamic properties
 		if (g_current_context->dynamic_props != NULL)
 		{
@@ -12847,11 +13230,57 @@ void actionGetVariable(SWFAppContext* app_context)
 				return;
 			}
 		}
-		// Not found on clip — var stays NULL, falls through to _global/special vars
+		// Check MC built-in properties (_x, _y, _width, _height, _name, _target, etc.)
+		{
+			ActionVar mc_result = {0};
+			int mc_found = getMCBuiltinProperty(g_current_context, var_name, var_name_len, &mc_result);
+			if (mc_found == 1)
+			{
+				pushVar(app_context, &mc_result);
+				return;
+			}
+			else if (mc_found == 2)  // _name
+			{
+				PUSH_STR(g_current_context->name, strlen(g_current_context->name));
+				return;
+			}
+			else if (mc_found == 3)  // _target
+			{
+				PUSH_STR(g_current_context->target, strlen(g_current_context->target));
+				return;
+			}
+		}
+		// Check _parent (not in getMCBuiltinProperty)
+		if (var_name_len == 7 && strncmp(var_name, "_parent", 7) == 0)
+		{
+			MovieClip* par = g_current_context->parent;
+			// SWF5: buttons are transparent — skip button parents
+			if (par != NULL && par->is_button_mc && g_swf_version < 6)
+				par = par->parent;
+			if (par != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)par); }
+			else { PUSH(ACTION_STACK_VALUE_UNDEFINED, 0); }
+			return;
+		}
+		// Not found on clip — check _global properties before global var table.
+		// In Flash, tellTarget(mc) { foo } resolves _global.foo, NOT root timeline foo.
+		{
+			extern ASObject* global_object;
+			if (global_object != NULL)
+			{
+				ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+				if (gprop != NULL)
+				{
+					PUSH_VAR(gprop);
+					return;
+				}
+			}
+		}
+		// Fall through to global variable table (for actionDefineLocal vars outside functions)
 	}
-	else
+
+	if (var == NULL)
 	{
-		// Root context: check global_object for addProperty getter before var table
+		// Check global_object for addProperty getter before var table
 		{
 			extern ASObject* global_object;
 			if (global_object != NULL)
@@ -12866,7 +13295,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 		}
 
-		// Root context: check global variable table (normal behavior)
+		// Check global variable table
 		if (string_id != 0)
 		{
 			// Constant string - use array (O(1))
@@ -13464,8 +13893,22 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(var_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
-			if (strcasecmp(var_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_xmouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)lx})); return;
+#else
+				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
+			if (strcasecmp(var_name, "_ymouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)ly})); return;
+#else
+				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
 		}
 
 		// Check display list children by instance name (e.g., GetVariable("clip"))
@@ -13506,9 +13949,26 @@ void actionGetVariable(SWFAppContext* app_context)
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 					return;
 				}
+				// SWF5: buttons are transparent — accessing button by name returns parent MC
+				if (g_swf_version < 6) {
+					extern DisplayObject* display_list;
+					extern Character* dictionary;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+						return;
+					}
+				}
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
 				if (child_mc != NULL)
 				{
+					// Sync display_obj and is_button_mc from display list
+					extern DisplayObject* display_list;
+					child_mc->display_obj = (void*)&display_list[child_depth];
+					extern Character* dictionary;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON)
+						child_mc->is_button_mc = 1;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
 					return;
 				}
@@ -13548,6 +14008,37 @@ void actionSetVariable(SWFAppContext* app_context)
 	u32 _sv_u16_len = VAL(u32, &STACK[var_name_sp + 8]);
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[var_name_sp + 16]), _sv_u16_len, _sv_buf, sizeof(_sv_buf));
 	char* var_name = _sv_buf;
+
+	// Handle colon-path + slash-path resolution for SetVariable (SWF4 syntax: "path:var")
+	{
+		char* colon = (var_name_len > 1) ? (char*)memchr(var_name, ':', var_name_len) : NULL;
+		if (colon != NULL)
+		{
+			u32 target_len = (u32)(colon - var_name);
+			const char* prop_name = colon + 1;
+			u32 prop_len = var_name_len - target_len - 1;
+
+			// Resolve target MC path
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, target_len, ctx);
+			if (target_mc != NULL && prop_len > 0) {
+				// Ensure dynamic_props exists
+				if (target_mc->dynamic_props == NULL) {
+					target_mc->dynamic_props = (void*) allocObject(app_context, 16);
+					retainObject((ASObject*) target_mc->dynamic_props);
+				}
+				// Read value from stack, pop both name and value
+				ActionVar value_var;
+				peekVar(app_context, &value_var);
+				POP_2();
+				setProperty(app_context, (ASObject*)target_mc->dynamic_props, prop_name, prop_len, &value_var);
+			} else {
+				// Invalid path — silently ignore (pop both name and value)
+				POP_2();
+			}
+			return;
+		}
+	}
 
 	// Handle dot-path resolution for SetVariable (e.g., "a.b.c" → resolve a.b, then SetMember c)
 	{
@@ -14207,10 +14698,20 @@ void actionGetProperty(SWFAppContext* app_context)
 			is_string = 1;
 			break;
 		case 20: // _xmouse (SWF 5+)
+#ifdef NO_GRAPHICS
+			if (mc) { float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly); value = lx; }
+			else { value = 0.0f; }
+#else
 			value = mc ? mc->xmouse : 0.0f;
+#endif
 			break;
 		case 21: // _ymouse (SWF 5+)
+#ifdef NO_GRAPHICS
+			if (mc) { float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly); value = ly; }
+			else { value = 0.0f; }
+#else
 			value = mc ? mc->ymouse : 0.0f;
+#endif
 			break;
 		default:
 			// Unknown/out-of-range property index - push undefined (Flash behavior)
@@ -14385,6 +14886,16 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 			// only actual sprites/movieclips return "movieclip"
 			{
 				MovieClip* mc = (MovieClip*) typeof_val;
+				if (mc && mc->is_button_mc)
+				{
+					type_str = "object";
+					break;
+				}
+				if (mc && mc->ng_textfield_idx >= 0)
+				{
+					type_str = "object";
+					break;
+				}
 				if (mc && mc->name[0] != '\0')
 				{
 					size_t d = ng_findDisplayEntryByName(mc->name);
@@ -16170,6 +16681,139 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
+			// Stage property setters: normalize align, scaleMode, displayState
+			if (obj == g_stage_obj && prop_name != NULL)
+			{
+				if (prop_name_len == 5 && memcmp(prop_name, "align", 5) == 0)
+				{
+					// Convert value to string first
+					char val_buf[512];
+					u32 val_len = 0;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						val_len = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value, value_var.str_size, val_buf, sizeof(val_buf));
+					} else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
+						const char* bs = value_var.data.numeric_value ? "true" : "false";
+						val_len = value_var.data.numeric_value ? 4 : 5;
+						memcpy(val_buf, bs, val_len); val_buf[val_len] = '\0';
+					} else if (value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+						val_len = 0; val_buf[0] = '\0';
+					} else {
+						val_len = 0; val_buf[0] = '\0';
+					}
+					char norm_buf[8];
+					u32 norm_len = 0;
+					normalizeStageAlign(val_buf, val_len, norm_buf, &norm_len);
+					ActionVar sv = makeStringActionVar(app_context, norm_buf, norm_len);
+					setProperty(app_context, obj, "align", 5, &sv);
+					return;
+				}
+				if (prop_name_len == 9 && memcmp(prop_name, "scaleMode", 9) == 0)
+				{
+					char val_buf[512];
+					u32 val_len = 0;
+					const char* canonical = NULL;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						val_len = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value, value_var.str_size, val_buf, sizeof(val_buf));
+						canonical = normalizeStageScaleMode(val_buf, val_len);
+						if (canonical == NULL) canonical = "showAll";
+					} else {
+						canonical = "showAll";
+					}
+					// Read old scaleMode
+					char old_mode[32] = "";
+					{
+						ActionVar* old_sm = getProperty(obj, "scaleMode", 9);
+						if (old_sm && old_sm->type == ACTION_STACK_VALUE_STRING) {
+							u16_to_utf8((const uint16_t*)old_sm->data.numeric_value, old_sm->str_size, old_mode, sizeof(old_mode));
+						}
+					}
+					ActionVar sv = makeStringActionVar(app_context, canonical, (u32)strlen(canonical));
+					setProperty(app_context, obj, "scaleMode", 9, &sv);
+					// Update Stage.width/height based on new scaleMode
+					if (strcmp(canonical, "noScale") == 0) {
+#ifdef VIEWPORT_WIDTH
+						sv = makeF64((double)VIEWPORT_WIDTH);
+#else
+						sv = makeF64((double)FRAME_WIDTH);
+#endif
+						setProperty(app_context, obj, "width", 5, &sv);
+#ifdef VIEWPORT_HEIGHT
+						sv = makeF64((double)VIEWPORT_HEIGHT);
+#else
+						sv = makeF64((double)FRAME_HEIGHT);
+#endif
+						setProperty(app_context, obj, "height", 6, &sv);
+					} else {
+						sv = makeF64((double)FRAME_WIDTH);
+						setProperty(app_context, obj, "width", 5, &sv);
+						sv = makeF64((double)FRAME_HEIGHT);
+						setProperty(app_context, obj, "height", 6, &sv);
+					}
+					// Fire onResize if scaleMode actually changed
+					if (strcmp(old_mode, canonical) != 0) {
+						static const uint16_t onResize_u16[] = {
+							'o','n','R','e','s','i','z','e'
+						};
+						ActionVar bm_args[1];
+						bm_args[0].type = ACTION_STACK_VALUE_STRING;
+						bm_args[0].data.numeric_value = (u64)(uintptr_t)onResize_u16;
+						bm_args[0].str_size = 8;
+						builtin_broadcaster_broadcastMessage(app_context, bm_args, 1, NULL, (void*)obj);
+					}
+					return;
+				}
+				if (prop_name_len == 12 && memcmp(prop_name, "displayState", 12) == 0)
+				{
+					char val_buf[512];
+					u32 val_len = 0;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						val_len = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value, value_var.str_size, val_buf, sizeof(val_buf));
+					} else {
+						return; // Non-string → no change
+					}
+					// Read current displayState
+					char old_state[32] = "";
+					{
+						ActionVar* old_ds = getProperty(obj, "displayState", 12);
+						if (old_ds && old_ds->type == ACTION_STACK_VALUE_STRING) {
+							u16_to_utf8((const uint16_t*)old_ds->data.numeric_value, old_ds->str_size, old_state, sizeof(old_state));
+						}
+					}
+					const char* new_state = NULL;
+					if (val_len == 6 && strncasecmp(val_buf, "normal", 6) == 0) {
+						new_state = "normal";
+					} else if (val_len == 10 && strncasecmp(val_buf, "fullScreen", 10) == 0) {
+						new_state = "fullScreen";
+					}
+					if (new_state != NULL) {
+						ActionVar sv = makeStringActionVar(app_context, new_state, (u32)strlen(new_state));
+						setProperty(app_context, obj, "displayState", 12, &sv);
+						// Fire Stage.broadcastMessage("onFullScreen", bFull) if state actually changed
+						if (strcmp(old_state, new_state) != 0) {
+							int is_full = (strcmp(new_state, "fullScreen") == 0);
+							static const uint16_t onFullScreen_u16[] = {
+								'o','n','F','u','l','l','S','c','r','e','e','n'
+							};
+							ActionVar bm_args[2];
+							bm_args[0].type = ACTION_STACK_VALUE_STRING;
+							bm_args[0].data.numeric_value = (u64)(uintptr_t)onFullScreen_u16;
+							bm_args[0].str_size = 12;
+							bm_args[1].type = ACTION_STACK_VALUE_BOOLEAN;
+							bm_args[1].data.numeric_value = is_full ? 1 : 0;
+							bm_args[1].str_size = 0;
+							builtin_broadcaster_broadcastMessage(app_context, bm_args, 2, NULL, (void*)obj);
+						}
+					}
+					// Invalid value → no change
+					return;
+				}
+				// Stage.width and Stage.height are read-only — silently ignore writes
+				if ((prop_name_len == 5 && memcmp(prop_name, "width", 5) == 0) ||
+				    (prop_name_len == 6 && memcmp(prop_name, "height", 6) == 0))
+				{
+					return;
+				}
+			}
 			// Rectangle computed property setters
 			if (g_rect_prototype != NULL) {
 				ActionVar* __rp = getProperty(obj, "__proto__", 9);
@@ -17773,8 +18417,22 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(prop_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
-			if (strcasecmp(prop_name, "_xmouse") == 0) { float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_ymouse") == 0) { float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_xmouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)lx})); return;
+#else
+				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
+			if (strcasecmp(prop_name, "_ymouse") == 0) {
+#ifdef NO_GRAPHICS
+				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)ly})); return;
+#else
+				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
+#endif
+			}
 			if (strcasecmp(prop_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_focusrect") == 0) {
 				// _focusrect defaults to null in Flash (not a number)
@@ -17785,7 +18443,11 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_lockroot") == 0) { PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)mc->lockroot); return; }
 			if (strcasecmp(prop_name, "_parent") == 0) {
-				if (mc->parent != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc->parent); }
+				MovieClip* par = mc->parent;
+				// SWF5: buttons are transparent — skip button parents
+				if (par != NULL && par->is_button_mc && g_swf_version < 6)
+					par = par->parent;
+				if (par != NULL) { PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)par); }
 				else { pushUndefined(app_context); }
 				return;
 			}
@@ -17839,12 +18501,38 @@ void actionGetMember(SWFAppContext* app_context)
 				memcpy(child_name_buf, prop_name, 63);
 				child_name_buf[63] = '\0';
 			}
-			// First try nested child lookup (for mc.childName inside mc's display list)
+			// First try direct child lookup via mc->display_obj (works even during nested init)
 			size_t child_depth = SIZE_MAX;
-			if (mc->name[0] != '\0') {
+			if (mc->display_obj != NULL) {
+				DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+				if (parent_dobj->sprite_display_list != NULL) {
+					for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
+						DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
+						if (_ch->char_id == 0) continue;
+						if (_ch->instance_name != NULL && strcmp(_ch->instance_name, child_name_buf) == 0) {
+							child_depth = _cd;
+							break;
+						}
+					}
+				}
+			}
+			// Fall back to ng_findChildEntryDepth (uses global display_list)
+			if (child_depth == SIZE_MAX && mc->name[0] != '\0') {
 				child_depth = ng_findChildEntryDepth(mc->name, child_name_buf);
 			}
 			if (child_depth != SIZE_MAX) {
+				// SWF5: buttons are transparent — accessing mc.buttonName returns mc itself
+				if (g_swf_version < 6) {
+					extern Character* dictionary;
+					DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+					if (parent_dobj != NULL && parent_dobj->sprite_display_list != NULL) {
+						size_t _cid = parent_dobj->sprite_display_list[child_depth].char_id;
+						if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+							return;
+						}
+					}
+				}
 				// Found as nested child of mc -- create MC with parent=mc and correct depth
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
@@ -17856,6 +18544,16 @@ void actionGetMember(SWFAppContext* app_context)
 			// Fall back to root-level name search
 			child_depth = ng_findDisplayEntryByName(child_name_buf);
 			if (child_depth != SIZE_MAX) {
+				// SWF5: buttons are transparent
+				if (g_swf_version < 6) {
+					extern Character* dictionary;
+					extern DisplayObject* display_list;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+						return;
+					}
+				}
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
@@ -20239,16 +20937,19 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
 
-	// Capture WITH scope chain entries at definition time.
-	// AVM1 closures (both DefineFunction and DefineFunction2) capture the scope chain.
+	// Capture scope chain entries at definition time.
+	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
 	as_func->captured_scope_count = 0;
 	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
 	{
-		if (scope_is_with[si] && scope_chain[si] != NULL)
+		if (scope_chain[si] != NULL)
 		{
 			u8 idx = as_func->captured_scope_count++;
 			as_func->captured_scope[idx] = scope_chain[si];
 			as_func->captured_scope_mc[idx] = scope_mc[si];
+			as_func->captured_scope_is_with[idx] = scope_is_with[si];
+			// Retain local scopes so they survive after the enclosing function returns
+			if (!scope_is_with[si]) retainObject(scope_chain[si]);
 		}
 	}
 
@@ -20295,15 +20996,19 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
 
-	// Capture WITH scope chain entries at definition time.
+	// Capture scope chain entries at definition time.
+	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
 	as_func->captured_scope_count = 0;
 	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
 	{
-		if (scope_is_with[si] && scope_chain[si] != NULL)
+		if (scope_chain[si] != NULL)
 		{
 			u8 idx = as_func->captured_scope_count++;
 			as_func->captured_scope[idx] = scope_chain[si];
 			as_func->captured_scope_mc[idx] = scope_mc[si];
+			as_func->captured_scope_is_with[idx] = scope_is_with[si];
+			// Retain local scopes so they survive after the enclosing function returns
+			if (!scope_is_with[si]) retainObject(scope_chain[si]);
 		}
 	}
 
@@ -21560,12 +22265,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Start with capacity for a few local variables
 				ASObject* local_scope = allocObject(app_context, 8);
 
-				// Restore captured WITH scope chain entries from definition time
+				// Restore captured scope chain entries from definition time
 				u8 captured_count = func->captured_scope_count;
 				for (u8 ci = 0; ci < captured_count; ci++)
 				{
 					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 1;
+						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
 						scope_mc[scope_depth] = func->captured_scope_mc[ci];
 						scope_chain[scope_depth++] = func->captured_scope[ci];
 					}
@@ -21660,12 +22365,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				args_var.data.numeric_value = (u64) arguments_arr;
 				setProperty(app_context, local_scope, "arguments", 9, &args_var);
 
-				// Restore captured WITH scope chain entries from definition time
+				// Restore captured scope chain entries from definition time
 				u8 captured_count_t1 = func->captured_scope_count;
 				for (u8 ci = 0; ci < captured_count_t1; ci++)
 				{
 					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 1;
+						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
 						scope_mc[scope_depth] = func->captured_scope_mc[ci];
 						scope_chain[scope_depth++] = func->captured_scope[ci];
 					}
@@ -25366,25 +26071,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (_ltg_has_x && _ltg_has_y) {
 					double _ltg_px = varToDouble(_ltg_xv);
 					double _ltg_py = varToDouble(_ltg_yv);
-					// Match ruffle_render::matrix::Matrix exactly
-					float _ltg_a = 1, _ltg_b = 0, _ltg_c = 0, _ltg_d = 1;
-					int32_t _ltg_tx = 0, _ltg_ty = 0;
-					MovieClip* _ltg_chain[64];
-					int _ltg_n = 0;
-					for (MovieClip* _ltg_cur = mc; _ltg_cur != NULL && _ltg_n < 64; _ltg_cur = _ltg_cur->parent)
-						_ltg_chain[_ltg_n++] = _ltg_cur;
-					for (int _ltg_i = _ltg_n - 1; _ltg_i >= 0; _ltg_i--) {
-						float _rla, _rlb, _rlc, _rld;
-						int32_t _rltx, _rlty; // twips directly
-						getLocalMatrixForMC_render(_ltg_chain[_ltg_i], &_rla, &_rlb, &_rlc, &_rld, &_rltx, &_rlty);
-						float _rltxf = (float)_rltx, _rltyf = (float)_rlty;
-						// Compose: self * rhs (ruffle_render f32 matrix multiply)
-						float _na = _ltg_a * _rla + _ltg_c * _rlb;
-						float _nb = _ltg_b * _rla + _ltg_d * _rlb;
-						float _nc = _ltg_a * _rlc + _ltg_c * _rld;
-						float _nd = _ltg_b * _rlc + _ltg_d * _rld;
-						int32_t _ntx = (int32_t)rintf(_ltg_a * _rltxf + _ltg_c * _rltyf) + _ltg_tx;
-						int32_t _nty = (int32_t)rintf(_ltg_b * _rltxf + _ltg_d * _rltyf) + _ltg_ty;
+					// Match ruffle_render::matrix::Matrix exactly.
+					// Compose bottom-up to match Ruffle's precision:
+					//   matrix = self.matrix; for parent in parents { matrix = parent * matrix; }
+					float _ltg_a, _ltg_b, _ltg_c, _ltg_d;
+					int32_t _ltg_tx, _ltg_ty;
+					getLocalMatrixForMC_render(mc, &_ltg_a, &_ltg_b, &_ltg_c, &_ltg_d, &_ltg_tx, &_ltg_ty);
+					for (MovieClip* _ltg_par = mc->parent; _ltg_par != NULL; _ltg_par = _ltg_par->parent) {
+						float _pa, _pb, _pc, _pd;
+						int32_t _ptxp, _ptyp;
+						getLocalMatrixForMC_render(_ltg_par, &_pa, &_pb, &_pc, &_pd, &_ptxp, &_ptyp);
+						// Compose: parent * accumulated (parent is lhs)
+						float _mtxf = (float)_ltg_tx, _mtyf = (float)_ltg_ty;
+						float _na = _pa * _ltg_a + _pc * _ltg_b;
+						float _nb = _pb * _ltg_a + _pd * _ltg_b;
+						float _nc = _pa * _ltg_c + _pc * _ltg_d;
+						float _nd = _pb * _ltg_c + _pd * _ltg_d;
+						int32_t _ntx = (int32_t)rintf(_pa * _mtxf + _pc * _mtyf) + _ptxp;
+						int32_t _nty = (int32_t)rintf(_pb * _mtxf + _pd * _mtyf) + _ptyp;
 						_ltg_a = _na; _ltg_b = _nb; _ltg_c = _nc; _ltg_d = _nd;
 						_ltg_tx = _ntx; _ltg_ty = _nty;
 					}
@@ -25430,29 +26134,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					double _gtl_px = varToDouble(_gtl_xv);
 					double _gtl_py = varToDouble(_gtl_yv);
 					// Match ruffle_render::matrix::Matrix exactly:
-					// a/b/c/d: f32, tx/ty: Twips (i32)
-					// Compose: f32 mul for a/b/c/d, round_to_i32 for tx/ty
-					// Invert: f32, round_to_i32 for tx/ty
-					// Apply: round_to_i32(f32*f32) + wrapping_add(tx)
-					float _gtl_a = 1, _gtl_b = 0, _gtl_c = 0, _gtl_d = 1;
-					int32_t _gtl_tx = 0, _gtl_ty = 0;
-					MovieClip* _gtl_chain[64];
-					int _gtl_n = 0;
-					for (MovieClip* _gtl_cur = mc; _gtl_cur != NULL && _gtl_n < 64; _gtl_cur = _gtl_cur->parent)
-						_gtl_chain[_gtl_n++] = _gtl_cur;
-					for (int _gtl_i = _gtl_n - 1; _gtl_i >= 0; _gtl_i--) {
-						float _rla, _rlb, _rlc, _rld;
-						int32_t _rltx, _rlty; // twips directly, no pixel conversion
-						getLocalMatrixForMC_render(_gtl_chain[_gtl_i], &_rla, &_rlb, &_rlc, &_rld, &_rltx, &_rlty);
-						float _rltxf = (float)_rltx, _rltyf = (float)_rlty;
-						// Compose: self * rhs (ruffle_render f32 matrix multiply)
-						float _na = _gtl_a * _rla + _gtl_c * _rlb;
-						float _nb = _gtl_b * _rla + _gtl_d * _rlb;
-						float _nc = _gtl_a * _rlc + _gtl_c * _rld;
-						float _nd = _gtl_b * _rlc + _gtl_d * _rld;
-						// round_to_i32 + wrapping_add
-						int32_t _ntx = (int32_t)rintf(_gtl_a * _rltxf + _gtl_c * _rltyf) + _gtl_tx;
-						int32_t _nty = (int32_t)rintf(_gtl_b * _rltxf + _gtl_d * _rltyf) + _gtl_ty;
+					// Compose bottom-up to match Ruffle's precision:
+					//   matrix = self.matrix; for parent in parents { matrix = parent * matrix; }
+					float _gtl_a, _gtl_b, _gtl_c, _gtl_d;
+					int32_t _gtl_tx, _gtl_ty;
+					getLocalMatrixForMC_render(mc, &_gtl_a, &_gtl_b, &_gtl_c, &_gtl_d, &_gtl_tx, &_gtl_ty);
+					for (MovieClip* _gtl_par = mc->parent; _gtl_par != NULL; _gtl_par = _gtl_par->parent) {
+						float _pa, _pb, _pc, _pd;
+						int32_t _ptxp, _ptyp;
+						getLocalMatrixForMC_render(_gtl_par, &_pa, &_pb, &_pc, &_pd, &_ptxp, &_ptyp);
+						// Compose: parent * accumulated (parent is lhs)
+						float _mtxf = (float)_gtl_tx, _mtyf = (float)_gtl_ty;
+						float _na = _pa * _gtl_a + _pc * _gtl_b;
+						float _nb = _pb * _gtl_a + _pd * _gtl_b;
+						float _nc = _pa * _gtl_c + _pc * _gtl_d;
+						float _nd = _pb * _gtl_c + _pd * _gtl_d;
+						int32_t _ntx = (int32_t)rintf(_pa * _mtxf + _pc * _mtyf) + _ptxp;
+						int32_t _nty = (int32_t)rintf(_pb * _mtxf + _pd * _mtyf) + _ptyp;
 						_gtl_a = _na; _gtl_b = _nb; _gtl_c = _nc; _gtl_d = _nd;
 						_gtl_tx = _ntx; _gtl_ty = _nty;
 					}
@@ -26279,26 +26977,42 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 }
 
 // Selection.setFocus(target) — move keyboard focus to a specific object.
+// Returns: true if focus was changed, false otherwise.
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
-	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
-	if (arg_count < 1) return undef;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN; ret.data.numeric_value = 0;
+	if (arg_count < 1) return ret;
 	ActionVar* arg = &args[0];
+	// setFocus(false) — returns false (boolean arg is not a valid target)
+	if (arg->type == ACTION_STACK_VALUE_BOOLEAN && arg->data.numeric_value == 0) {
+		return ret;
+	}
 	// setFocus(null or undefined) — clear focus
 	if (arg->type == ACTION_STACK_VALUE_NULL || arg->type == ACTION_STACK_VALUE_UNDEFINED) {
 		if (g_focused_mc != NULL)
 			selection_do_focus_change(app_context, g_focused_mc, NULL);
-		return undef;
+		ret.data.numeric_value = 1;
+		return ret;
 	}
+	// setFocus(string path) — resolve path to MovieClip
 	MovieClip* new_mc = NULL;
-	if (arg->type == ACTION_STACK_VALUE_MOVIECLIP)
+	if (arg->type == ACTION_STACK_VALUE_MOVIECLIP) {
 		new_mc = (MovieClip*)(uintptr_t)arg->data.numeric_value;
-	if (new_mc == NULL) return undef;
-	if (!mc_is_focusable_by_setfocus(new_mc)) return undef;
-	if (new_mc == g_focused_mc) return undef;
+	} else if (arg->type == ACTION_STACK_VALUE_STRING) {
+		// Resolve string path to MC
+		char path_buf[320];
+		if (arg->str_size > 0) {
+			u16_to_utf8((const uint16_t*)(uintptr_t)arg->data.numeric_value, arg->str_size, path_buf, sizeof(path_buf));
+			new_mc = getMovieClipByTarget(path_buf);
+		}
+	}
+	if (new_mc == NULL) return ret;
+	if (!mc_is_focusable_by_setfocus(new_mc)) return ret;
+	if (new_mc == g_focused_mc) { ret.data.numeric_value = 1; return ret; }
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
-	return undef;
+	ret.data.numeric_value = 1;
+	return ret;
 }
 
 // Selection.getFocus() — returns dot-path string of focused object, or null.
@@ -26319,6 +27033,17 @@ static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVa
 	result.data.numeric_value = (u64)(uintptr_t)u16;
 	result.str_size = u16_len;
 	return result;
+}
+
+// Selection.getBeginIndex() / getCaretIndex() / getEndIndex() — return -1 (no text selection).
+static ActionVar builtin_selection_getIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_F64;
+	double neg1 = -1.0;
+	memcpy(&ret.data.numeric_value, &neg1, sizeof(double));
+	return ret;
 }
 
 // Check tabChildren property of an MC (default: true = recurse into children).

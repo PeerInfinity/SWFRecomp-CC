@@ -17,6 +17,12 @@ Character* dictionary = NULL;
 DisplayObject* display_list = NULL;
 size_t max_depth = 0;
 
+// Sentinel DisplayObject for root level — allows child lookup on root_movieclip
+// even when display_list/max_depth are temporarily swapped during nested init.
+// sprite_display_list and sprite_max_depth are synced by ng_sync_root_display_obj().
+static DisplayObject ng_root_display_obj;
+
+
 // ---------------------------------------------------------------------------
 // Access generated data arrays (from draws.c / tagMain.c, linked per-test)
 // ---------------------------------------------------------------------------
@@ -196,6 +202,20 @@ static DisplayObject* ng_entry_to_obj(size_t entry_idx)
 		if (parent->sprite_display_list[child_depth].char_id == 0) return NULL;
 		return &parent->sprite_display_list[child_depth];
 	}
+}
+
+// Sync root display object — call after any operation that may have changed
+// the root display_list pointer (ENSURE_SIZE / realloc).
+void ng_sync_root_display_obj(void)
+{
+	ng_root_display_obj.sprite_display_list = display_list;
+	ng_root_display_obj.sprite_max_depth    = max_depth;
+}
+
+// Return pointer to root display sentinel object (for root_movieclip.display_obj)
+void* ng_get_root_display_obj(void)
+{
+	return &ng_root_display_obj;
 }
 
 // ---------------------------------------------------------------------------

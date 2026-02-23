@@ -1,25 +1,31 @@
 # Parsing Functions (parseInt/parseFloat) Implementation Plan
 <!-- TESTS: parse_int, parse_float, arguments -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-22
 
-## Status: PARTIALLY IMPLEMENTED
+## Status: PHASES 1-2 COMPLETE, PHASE 3 PARTIAL
 
 ### Implementation Commits
 - `3048065` — Implement global constructors/objects, rewrite parseInt, fix isFinite/isNaN
+- `360cd12` — Add arguments object for simple functions
+- `b9cfc9d` — Fix arguments object: add callee/caller/__proto__
+- `2f007dd` — Fix arguments object properties for DefineFunction2
 
 ### Current Results
 
 | Test | Lines | Status | Notes |
 |------|-------|--------|-------|
-| parse_int | 0/64 | output_mismatch | **Blocked by `arguments` object** — test wrapper function uses `arguments.length` and `arguments[N]` to call parseInt with variable arg counts. parseInt itself is rewritten and correct, but the test produces 0 output because `arguments` is not created for DefineFunction-style functions. |
-| parse_float | 43/74 | output_mismatch | No longer times out (was TIMEOUT). Partially working but edge cases remain. |
+| parse_int | 64/64 | **PASS** ✅ | All edge cases passing (arguments blocker resolved) |
+| parse_float | ~43/74 | output_mismatch | Still using atof(); needs custom Flash-compatible parser |
+| arguments | 127/127 | **PASS** ✅ | All properties working: length, indices, callee, caller, __proto__ |
 
-### Key Blocker: `arguments` Object
+### Phase Completion
 
-The `parse_int` test defines a `traceParseInt(...)` wrapper function (via `actionDefineFunction`, 0 named params) that reads `arguments.length` and `arguments[0..N]`. The runtime doesn't create an `arguments` local variable for DefineFunction-style calls. This is the reason for 0/64 — the wrapper silently fails before calling parseInt.
-
-**Fix required**: In `actionCallFunction` / `actionCallMethod`, when calling a DefineFunction-style function, create an `arguments` ASArray in the local scope with `length`, numeric indices for all passed args, and `callee` pointing to the function itself.
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | `arguments` object for DefineFunction | **DONE** ✅ |
+| 2 | parseInt edge cases | **DONE** ✅ |
+| 3 | parseFloat custom parser | PARTIAL (using atof, edge cases fail) |
 
 ---
 

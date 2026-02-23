@@ -1,26 +1,26 @@
 # Button Behavior and Events Implementation Plan
 <!-- TESTS: button_children, button_goto, button_key_events, button_key_events_special, button_keypress, button_keypress_vs_press, button_keypress_vs_tab, button_keypress_vs_textinput, button_order, button_properties_special_cases, button_v5, button_v6, movieclip_in_removed_button, root_button_mode -->
 
-Last updated: 2026-02-19
+Last updated: 2026-02-22
 
-## Status: NOT STARTED — prerequisites in progress
+## Status: MOSTLY NOT STARTED — but `button_order` now passes on CI
 
-All 14 tests are currently failing with avg 1% match. Progress is blocked on the following
-prerequisites from `SWFRecompDocs/plans/input-event-injection.md`:
+### CI Results (2026-02-22)
+- `button_order` — **PASS** ✅ (likely benefited from MovieClip/depth infrastructure improvements)
+- All other 13 tests — still failing (require struct unification + hit testing)
+
+Input event injection **Phases 1-4 are complete** (event pump, mouse/key state, verify_output.py preprocessing). Button state machine (`ng_update_button_states`) and button key dispatch (`dispatch_button_key_actions`) exist in tag.c and are called from the event pump.
+
+All remaining 13 tests are blocked on the following prerequisite from `SWFRecompDocs/plans/input-event-injection.md`:
 
 - **Phase 0** (struct unification): Delete `tag_stubs.c`, merge into `tag.c`; make
   `Character`/`DisplayObject`/`MouseState` unconditional in `swf.h`; include
-  `shape_data`/`transform_data` + `hit_test.c` in trace builds. All button-specific
-  work below targets `tag.c` after this is complete.
-- **Phases 1–4** of input-event-injection.md: `verify_output.py` input.json processing
-  → text-file event pump in `swf_core.c` → mouse/key state in `SWFAppContext`.
-  Phase 2 of this plan (formerly "events.c generation") is **superseded** by those
-  phases; see the redirect in Phase 2 below.
+  `shape_data`/`transform_data` + `hit_test.c` in trace builds. This is the **sole remaining blocker** — once done, the existing button state machine and event dispatch should work in trace builds.
 
 Current state of `tag_stubs.c` (before Phase 0 merges it away):
 - Registers button char_ids for `typeof` discrimination (returns "object" in SWF6+)
 - Does NOT store state frame functions → button children never initialize
-- Does NOT dispatch events (no input.json support exists)
+- Does NOT dispatch events (button state machine in tag.c can't run until struct unification)
 
 ---
 

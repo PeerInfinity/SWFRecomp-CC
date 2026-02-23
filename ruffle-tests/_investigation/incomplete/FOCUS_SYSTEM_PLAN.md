@@ -1,14 +1,17 @@
 # Focus System Implementation Plan
 <!-- TESTS: focus_mouse, focus_mouse_focusable, focus_mouse_rollout, focus_root_movie, focus_keyboard_press, focusrect_focuslost -->
 
-Last updated: 2026-02-20
+Last updated: 2026-02-22
 
-## Status: NOT STARTED
+## Status: PARTIALLY IMPLEMENTED
 
-Prerequisites:
+Input event injection Phases 1-4, 7 (partial) are implemented. Key dispatch (`actionDispatchKeyDown`/`actionDispatchKeyUp`) and `actionAdvanceTabFocus` exist. Focus tracking state is partially in place. The remaining blocker is **Phase 0 of input-event-injection.md** (struct unification) for hit-test-based focus acquisition.
+
+Prerequisites remaining:
+- **input-event-injection.md Phase 0** (struct unification) — needed for hit-test-based focus
 - **MOUSE_EVENTS_PLAN.md Phase B** (clip AS2 handler dispatch: `onMouseDown`/`onMouseUp`)
   — `focus_mouse` fires `clip.onMouseDown`/`clip.onMouseUp` alongside focus events
-- **input-event-injection.md Phase 7** (Key AsBroadcaster) — COMPLETE
+- **input-event-injection.md Phase 7** (Key AsBroadcaster) — PARTIALLY COMPLETE
 - **SELECTION_PLAN.md Phase 1** is related but separate (covers `Selection.setFocus()` API,
   `Selection.addListener`, `getBeginIndex`/`getCaretIndex`/`getEndIndex`, `replaceSel`).
   This plan focuses on mouse-triggered focus only.

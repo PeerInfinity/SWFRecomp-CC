@@ -1,21 +1,47 @@
 # MovieClip Features Implementation Plan
 <!-- TESTS: movieclip_default_state, movieclip_blend_mode_property, movieclip_focusenabled, movieclip_lockroot, movieclip_depth_methods, movieclip_get_instance_at_depth, create_empty_movie_clip, default_names, place_and_lookup, placeobject_occupied_depth, attach_movie, attach_movie_stop, export_assets, movieclip_init_object, empty_movieclip_can_attach_movies, duplicate_movie_clip, clone_sprite_types, remove_movie_clip, rewind_depth, clip_events, clip_event_propagation_order, on_construct, clip_constructors, do_init_action_child, execution_order4, movieclip_getbounds, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8, movieclip_hittest, movieclip_hittest_shapeflag, local_to_global, custom_clip_methods, movieclip_state_values, movieclip_library_state_values, movieclip_methods_with_loaded_image, movieclip_create_text_field, movieclip_gettextsnapshot, movieclip_setmask, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, unload, unload_clip_event, unload_nested_child, removed_base_clip_tell_target, removed_clip_halts_script, removed_target_clip_scope, stage_object_children, swf7_case_sensitive, movieclip_name_from_timeline, register_class, register_and_init_order -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-22
 
-## Status: Phase 1 COMPLETE
+## Status: Phases 1-3, 5, 9 MOSTLY COMPLETE
 
 ### Implementation Commits
 - `c616aeb` — Implement MovieClip Phase 1: properties, prototype, transform, blendMode
+- (subsequent) — Depth methods, createEmptyMovieClip, duplicateMovieClip, removeMovieClip, localToGlobal/globalToLocal
 
 ### Phase Completion
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | MovieClip prototype + missing properties | **DONE** |
-| 2 | Depth methods | NOT STARTED |
-| 3 | createEmptyMovieClip + display list management | NOT STARTED |
-| 4+ | getBounds, hitTest, attachMovie, etc. | NOT STARTED |
+| Phase | Description | Status | Key Tests |
+|-------|-------------|--------|-----------|
+| 1 | MovieClip prototype + missing properties | **DONE** ✅ | movieclip_default_state PASS, movieclip_blend_mode_property PASS |
+| 2 | Depth methods | **DONE** ✅ | movieclip_depth_methods PASS, movieclip_get_instance_at_depth PASS |
+| 3 | createEmptyMovieClip + display list | **DONE** ✅ | create_empty_movie_clip PASS |
+| 4 | ExportAssets + attachMovie | NOT STARTED | attach_movie, export_assets |
+| 5 | duplicateMovieClip + removeMovieClip | **DONE** ✅ | duplicate_movie_clip PASS, remove_movie_clip PASS, clone_sprite_types PASS |
+| 6 | Clip events + construction order | NOT STARTED | clip_events, on_construct |
+| 7 | getBounds / getRect | SKELETON (sentinel values only) | movieclip_getbounds partial |
+| 8 | hitTest | NOT STARTED | movieclip_hittest partial |
+| 9 | localToGlobal / globalToLocal + others | **DONE** ✅ | local_to_global PASS |
+
+### CI Results (2026-02-22)
+
+| Test | CI Status | Notes |
+|------|-----------|-------|
+| movieclip_default_state | **PASS** ✅ | |
+| movieclip_blend_mode_property | **PASS** ✅ | |
+| movieclip_depth_methods | **PASS** ✅ | Was 65/98, now fully passing |
+| movieclip_get_instance_at_depth | **PASS** ✅ | Was 18/28, now fully passing |
+| create_empty_movie_clip | **PASS** ✅ | Was 1/3, now fully passing |
+| duplicate_movie_clip | **PASS** ✅ | Was 4/20, now fully passing |
+| clone_sprite_types | **PASS** ✅ | Was 12/24, now fully passing |
+| remove_movie_clip | **PASS** ✅ | Was 17/29, now fully passing |
+| local_to_global | **PASS** ✅ | Was 41/49, now fully passing |
+| is_prototype_of | **PASS** ✅ | |
+| object_properties | **PASS** ✅ | |
+| movieclip_lockroot | output_mismatch | Still failing |
+| default_names | output_mismatch | Still failing |
+| place_and_lookup | output_mismatch | Still failing |
+| custom_clip_methods | output_mismatch | Still failing |
 
 ---
 
@@ -28,33 +54,33 @@ MovieClip-related tests are spread across several categories in the failing test
 ## Test Inventory (54 tests, grouped by phase)
 
 ### Phase 1 — MovieClip Prototype + Missing Properties (~4 tests)
-- movieclip_default_state (13/69)
-- movieclip_blend_mode_property (24/35)
-- movieclip_focusenabled (53/99)
-- movieclip_lockroot (15/29)
+- movieclip_default_state — **PASS** ✅ (was 13/69)
+- movieclip_blend_mode_property — **PASS** ✅ (was 24/35)
+- movieclip_focusenabled (53/99) — still failing (focus system not implemented)
+- movieclip_lockroot — output_mismatch (was 15/29)
 
 ### Phase 2 — Depth Methods (~2 tests)
-- movieclip_depth_methods (65/98)
-- movieclip_get_instance_at_depth (18/28)
+- movieclip_depth_methods — **PASS** ✅ (was 65/98)
+- movieclip_get_instance_at_depth — **PASS** ✅ (was 18/28)
 
 ### Phase 3 — createEmptyMovieClip + Display List Management (~4 tests)
-- create_empty_movie_clip (1/3)
-- default_names (12/52)
-- place_and_lookup (0/30)
-- placeobject_occupied_depth (0/6)
+- create_empty_movie_clip — **PASS** ✅ (was 1/3)
+- default_names — output_mismatch (was 12/52)
+- place_and_lookup — output_mismatch (was 0/30)
+- placeobject_occupied_depth — segfault (was 0/6)
 
 ### Phase 4 — ExportAssets + attachMovie (~5 tests)
-- attach_movie (43/59)
-- attach_movie_stop (1/3)
-- export_assets (2/3)
-- movieclip_init_object (0/5)
-- empty_movieclip_can_attach_movies (8/11)
+- attach_movie (43/59) — still failing
+- attach_movie_stop (1/3) — still failing
+- export_assets (2/3) — still failing
+- movieclip_init_object (0/5) — still failing
+- empty_movieclip_can_attach_movies (8/11) — still failing
 
 ### Phase 5 — duplicateMovieClip + removeMovieClip (~4 tests)
-- duplicate_movie_clip (4/20)
-- clone_sprite_types (12/24)
-- remove_movie_clip (17/29)
-- rewind_depth (9/30)
+- duplicate_movie_clip — **PASS** ✅ (was 4/20)
+- clone_sprite_types — **PASS** ✅ (was 12/24)
+- remove_movie_clip — **PASS** ✅ (was 17/29)
+- rewind_depth (9/30) — still failing
 
 ### Phase 6 — Clip Events + Construction Order (~6 tests)
 - clip_events (1/19)

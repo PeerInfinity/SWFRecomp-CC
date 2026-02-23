@@ -3,7 +3,7 @@
 # Output: SWFRecomp-CC/ruffle-tests/_investigation/investigation_prompts.txt
 #
 # Usage:
-#   ./CC/scripts/gen_investigation_prompts.sh [--keep-branches]
+#   ./CC/scripts/gen_investigation_prompts.sh
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 INCOMPLETE_DIR="$REPO_ROOT/ruffle-tests/_investigation/incomplete"
@@ -40,7 +40,7 @@ Then follow these steps in order:
 
 4. **Implement:** Work through the remaining items one at a time. After each change, run the affected tests to verify progress. Commit working changes.
 
-5. **Stop when:** the plan is fully passing, or you hit a blocker — in which case document the blocker in the plan file before stopping. If the plan is complete and all the tests pass, then move the document to ruffle-tests/_investigation/complete/
+5. **Stop when:** the plan is fully passing, or you hit a blocker — in which case document the blocker in the plan file before stopping. If there are remaining failures, and the plan to fix them is blocked, then move the document to ruffle-tests/_investigation/blocked/  If the plan is complete and all the tests pass, then move the document to ruffle-tests/_investigation/complete/
 EOF
 done
 

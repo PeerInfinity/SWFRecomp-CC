@@ -1,13 +1,27 @@
 # Unload / UnloadMovie Implementation Plan
 <!-- TESTS: unload_clip_event, unload_nested_child, unload, unloadmovie, unloadmovie_method, unloadmovienum, clip_events, clip_event_propagation_order, movieclip_depth_methods, remove_movie_clip, attach_movie, empty_movieclip_can_attach_movies -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-22
+
+## Status: PARTIALLY IMPLEMENTED (1/3 fixable tests passing)
+
+### CI Results (2026-02-22)
+
+| Test | CI Status | Notes |
+|------|-----------|-------|
+| unload_clip_event | **PASS** ✅ | Clip action unload dispatch now working |
+| unload | output_mismatch | Still failing — complex depth/event ordering |
+| unload_nested_child | output_mismatch | Still failing — nested unload event ordering |
+
+### What's Implemented Since Original Analysis
+- `tagPlaceObject2WithClipActions` is now functional (no longer a no-op)
+- `removeMovieClip()` queues onUnload handler via `queueOnUnload()`
+- `getDepth()` returns actual clip depth
+- Clip action storage and dispatch infrastructure exists
 
 ## Overview
 
 There are 6 failing Ruffle tests related to unloading movie clips. Three tests (`unload`, `unload_clip_event`, `unload_nested_child`) test timeline-based clip removal with onUnload event dispatch. Three tests (`unloadmovie`, `unloadmovie_method`, `unloadmovienum`) test runtime movie loading/unloading which requires loadMovie infrastructure that is out of scope.
-
-**Current state**: In NO_GRAPHICS mode, `tagPlaceObject2WithClipActions` is a complete no-op (doesn't place the clip OR store clip actions), `tagRemoveObject2` removes from `ng_display` but never fires unload events, `actionRemoveSprite` does nothing, and `getDepth()` always returns 0. No onUnload handlers (either clip events or AS-set handlers) are ever called.
 
 **Key insight**: The first 3 tests are fixable with targeted changes to existing infrastructure. The last 3 require loadMovie/loadMovieNum which is a larger feature (network-dependent). We should focus on the first 3.
 

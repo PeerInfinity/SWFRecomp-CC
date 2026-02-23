@@ -1,9 +1,31 @@
 # Frame Navigation Implementation Plan
 <!-- TESTS: goto_frame, goto_frame2, goto_label, goto_methods -->
 
-Last updated: 2026-02-19
+Last updated: 2026-02-22
 
-## Status: NOT STARTED
+## Status: PARTIALLY IMPLEMENTED
+
+Frame navigation functions exist (gotoFrame, gotoFrame2, gotoLabel, prevFrame, nextFrame) but frame execution ordering bugs remain. All 4 tests still fail on CI.
+
+### CI Results (2026-02-22)
+
+| Test | CI Status | Notes |
+|------|-----------|-------|
+| goto_frame | output_mismatch | Ordering bug still present |
+| goto_frame2 | output_mismatch | Ordering bug + label/scene edge cases |
+| goto_label | output_mismatch | Label lookup exists but ordering issues |
+| goto_methods | segfault | Still crashing |
+
+### What's Implemented
+- **actionGotoFrame**: Functional — sets next_frame, manual_next_frame, calls ng_executeGotoCatchUp() synchronously
+- **actionGoToLabel**: Functional — looks up label via findFrameByLabel(), converts to frame number
+- **actionGotoFrame2**: Functional — takes 1-based frame from stack, adds scene_bias
+- **actionPrevFrame**: Fully implemented — decrements current_frame
+- **actionNextFrame**: Fully implemented — increments current_frame
+
+### Remaining Issues
+- **Ordering bug** (Bug 1): ng_executeGotoCatchUp() runs synchronously during the calling frame's script, causing target frame's script to execute BEFORE code after the goto call
+- **goto_methods segfault**: Needs investigation — prevFrame/nextFrame dispatch may have issues with extreme values
 
 **4 failing tests** (3 MISMATCH, 1 SEGFAULT):
 
@@ -11,8 +33,8 @@ Last updated: 2026-02-19
 |------|-------|--------|---------------|
 | goto_frame | 11/12 (91%) | MISMATCH | Ordering bug: _currentframe trace appears after target frame's script |
 | goto_frame2 | varies | MISMATCH | Ordering bug + label strings + scene navigation + edge cases |
-| goto_label | partial | MISMATCH | Debug printf + frame labels not parsed |
-| goto_methods | SEGFAULT | SEGFAULT | prevFrame/nextFrame not in dispatch |
+| goto_label | partial | MISMATCH | Ordering issues |
+| goto_methods | SEGFAULT | SEGFAULT | Extreme values cause crash |
 
 ---
 

@@ -53,7 +53,7 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	if (obj->instance_name != NULL)
 	{
 		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
-		if (mc) actionSetCurrentContext(mc);
+		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); }
 	}
 
 	// Each sprite frame starts with a fresh SetTarget state (no explicit root target)
@@ -92,6 +92,7 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			MovieClip* child_mc = NULL;
 			if (obj->instance_name != NULL)
 				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (child_mc) child_mc->display_obj = (void*)obj;
 
 			// sprite_needs_init == 2: Phase 1 (placement) ran eagerly; run Phase 2
 			// (scripts only) now. sprite_needs_init == 1: normal deferred path.
@@ -114,17 +115,23 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 
 			if (ch->sprite_frame_funcs != NULL && ch->sprite_frame_funcs[0] != NULL)
 			{
+				// Call frame func directly (NOT via CALL_FRAME/exec_sprite_frame)
+				// because we already set g_current_context and g_current_sprite_obj above.
+				// exec_sprite_frame would create a duplicate MC with root as parent.
+				int saved_settarget = g_settarget_explicit_root;
+				g_settarget_explicit_root = 0;
 				if (was_eager)
 				{
 					// Phase 2: run scripts only; placement tags are no-ops via g_script_only_mode.
 					g_script_only_mode = 1;
-					CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+					ch->sprite_frame_funcs[0](app_context);
 					g_script_only_mode = 0;
 				}
 				else
 				{
-					CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+					ch->sprite_frame_funcs[0](app_context);
 				}
+				g_settarget_explicit_root = saved_settarget;
 			}
 
 			actionSetCurrentContext(saved_ctx);
@@ -167,7 +174,7 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			if (obj->instance_name != NULL)
 			{
 				button_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-				if (button_mc) button_mc->is_button_mc = 1;
+				if (button_mc) { button_mc->is_button_mc = 1; button_mc->display_obj = (void*)obj; }
 			}
 
 			obj->sprite_needs_init = 0;
@@ -184,11 +191,17 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			// Do NOT change g_current_context — button state funcs don't run AS2 scripts.
 			ch->button_state_funcs[0](app_context);
 
+			// Sync back to obj BEFORE recursive init so that child scripts
+			// accessing parent_mc->display_obj see up-to-date sprite_max_depth.
+			obj->sprite_display_list  = display_list;
+			obj->sprite_max_depth     = max_depth;
+			obj->sprite_dl_capacity   = display_list_capacity;
+
 			// Recursively initialize sprites placed by the up-state func,
 			// using button_mc as their parent.
 			process_sprite_needs_init(app_context, button_mc);
 
-			// Save back
+			// Save back (recursive init may have updated display_list via realloc)
 			obj->sprite_display_list  = display_list;
 			obj->sprite_max_depth     = max_depth;
 			obj->sprite_dl_capacity   = display_list_capacity;
@@ -743,6 +756,17 @@ void tagShowFrame(SWFAppContext* app_context)
 	// We run frame 0 here (in the same tick as placement) to match Flash behavior.
 	// process_sprite_needs_init handles CHAR_TYPE_SPRITE and CHAR_TYPE_BUTTON recursively.
 	{
+		// Sync root display sentinel before nested init — child scripts may access
+		// root children via GetMember(root_mc, name) while display_list is swapped.
+		extern void ng_sync_root_display_obj(void);
+		ng_sync_root_display_obj();
+
+		// Record MC count before sprite/button init — MCs created during init
+		// should not fire onEnterFrame on their placement frame.
+		extern int child_mc_count;
+		extern int g_enterframe_new_mc_start;
+		int mc_count_before = child_mc_count;
+
 		int saved_catch_up = catch_up_mode;
 		catch_up_mode = 0;
 		process_sprite_needs_init(app_context, &root_movieclip);
@@ -751,9 +775,11 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
 		ng_fire_pending_loads(app_context);
 
-		// Dispatch AS2 mc.onEnterFrame property handlers for all initialized MCs.
-		// This fires in reverse-creation order (front-to-back) matching Flash behavior.
+		// Dispatch AS2 mc.onEnterFrame property handlers, but skip MCs
+		// created during process_sprite_needs_init (they fire next frame).
+		g_enterframe_new_mc_start = mc_count_before;
 		actionDispatchEnterFrameHandlers(app_context);
+		g_enterframe_new_mc_start = -1;  // reset skip threshold
 	}
 #else
 	// --- Advance sprite timelines (recursive) ---
@@ -1309,6 +1335,68 @@ void dispatch_clip_event_release(SWFAppContext* app_context)
 		actionSetCurrentContext(saved_ctx);
 	}
 }
+// ---------------------------------------------------------------------------
+// Generic clip event flag dispatch (MOUSE_DOWN/UP/MOVE, KEY_DOWN/UP)
+// ---------------------------------------------------------------------------
+// These are GLOBAL clip events — fire on ALL clips in the display list that
+// have a matching clip action, regardless of mouse position.
+
+static void dispatch_clip_event_flag_dl(SWFAppContext* app_context,
+    DisplayObject* dl, size_t dl_max_depth, uint32_t flag, MovieClip* parent_mc)
+{
+	for (size_t i = 1; i <= dl_max_depth; i++)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		// Fire matching clip actions on this entry
+		if (obj->clip_action_count > 0)
+		{
+			int has_flag = 0;
+			for (size_t a = 0; a < obj->clip_action_count; a++)
+			{
+				if (obj->clip_actions[a].event_flags & flag) { has_flag = 1; break; }
+			}
+			if (has_flag)
+			{
+				MovieClip* saved_ctx = g_current_context;
+				if (obj->instance_name)
+				{
+					MovieClip* mc = actionFindOrCreateMovieClip(app_context,
+					    obj->instance_name, parent_mc);
+					if (mc) actionSetCurrentContext(mc);
+				}
+				for (size_t a = 0; a < obj->clip_action_count; a++)
+				{
+					if (obj->clip_actions[a].event_flags & flag)
+						obj->clip_actions[a].action(app_context);
+				}
+				actionSetCurrentContext(saved_ctx);
+			}
+		}
+
+		// Recurse into sprite children
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+		{
+			MovieClip* child_parent = parent_mc;
+			if (obj->instance_name)
+			{
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context,
+				    obj->instance_name, parent_mc);
+				if (mc) child_parent = mc;
+			}
+			dispatch_clip_event_flag_dl(app_context,
+			    obj->sprite_display_list, obj->sprite_max_depth, flag, child_parent);
+		}
+	}
+}
+
+void dispatch_clip_event_flag(SWFAppContext* app_context, uint32_t flag)
+{
+	dispatch_clip_event_flag_dl(app_context, display_list, max_depth, flag,
+	    &root_movieclip);
+}
+
 #endif // NO_GRAPHICS
 
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id,
