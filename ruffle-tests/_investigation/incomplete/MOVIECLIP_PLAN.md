@@ -3,7 +3,7 @@
 
 Last updated: 2026-02-22
 
-## Status: Phases 1-5, 7, 9 MOSTLY COMPLETE
+## Status: Phases 1-5, 7-9 MOSTLY COMPLETE
 
 ### Implementation Commits
 - `c616aeb` — Implement MovieClip Phase 1: properties, prototype, transform, blendMode
@@ -109,9 +109,9 @@ MovieClip-related tests are spread across several categories in the failing test
 - movieclip_invalid_get_bounds_7 (1/10)
 - movieclip_invalid_get_bounds_8 (1/11)
 
-### Phase 8 — hitTest (~2 tests)
-- movieclip_hittest (71/92)
-- movieclip_hittest_shapeflag (180/338)
+### Phase 8 — hitTest (~2 tests) **DONE**
+- movieclip_hittest (92/92 ✅)
+- movieclip_hittest_shapeflag (180/338) — shapeflag requires pixel-level testing, not AABB
 
 ### Phase 9 — localToGlobal/globalToLocal + Other Methods (~2 tests)
 - local_to_global (40/49)

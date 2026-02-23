@@ -107,6 +107,20 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			max_depth             = obj->sprite_max_depth;
 			display_list_capacity = obj->sprite_dl_capacity;
 
+			// Fire onLoad clip actions BEFORE frame scripts (Flash fires load before frame 0 scripts)
+			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
+			{
+				MovieClip* saved_ctx2 = g_current_context;
+				MovieClip* mc2 = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (mc2) actionSetCurrentContext(mc2);
+				for (size_t a = 0; a < obj->clip_action_count; a++)
+				{
+					if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
+						obj->clip_actions[a].action(app_context);
+				}
+				actionSetCurrentContext(saved_ctx2);
+			}
+
 			// Run frame 0 with correct MC context
 			MovieClip*    saved_ctx        = g_current_context;
 			DisplayObject* saved_sprite_obj = g_current_sprite_obj;
@@ -153,19 +167,22 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			max_depth             = saved_max;
 			display_list_capacity = saved_cap;
 
-			// Fire onLoad clip actions for newly initialized sprites
+			// Fire CLIP_EVENT_ENTER_FRAME after initialization (children first via recursive init above)
 			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
 			{
-				MovieClip* saved_ctx2 = g_current_context;
-				MovieClip* mc2 = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-				if (mc2) actionSetCurrentContext(mc2);
+				MovieClip* saved_ctx3 = g_current_context;
+				MovieClip* mc3 = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (mc3) actionSetCurrentContext(mc3);
 				for (size_t a = 0; a < obj->clip_action_count; a++)
 				{
-					if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
+					if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME)
 						obj->clip_actions[a].action(app_context);
 				}
-				actionSetCurrentContext(saved_ctx2);
+				actionSetCurrentContext(saved_ctx3);
 			}
+
+			// Mark eligible for AS2 onEnterFrame dispatch on the init tick
+			obj->enterframe_eligible = 1;
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON && ch->button_state_funcs != NULL)
 		{
@@ -325,6 +342,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 				}
 				obj->sprite_current_frame = target;
 			}
+			obj->enterframe_eligible = 1;
 			continue; // Manual nav done, skip normal advancement
 		}
 
@@ -363,6 +381,9 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		{
 			CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[frame]);
 		}
+
+		// Mark eligible for AS2 onEnterFrame dispatch (sprite actually advanced)
+		obj->enterframe_eligible = 1;
 
 		// Recurse: advance nested sprites within this sprite's display list
 		advance_sprite_frames(app_context);
@@ -744,6 +765,46 @@ void ng_update_button_states(SWFAppContext* app_context)
 	}
 }
 
+// Recursively dispatch CLIP_EVENT_ENTER_FRAME: children before parents.
+static void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
+{
+	for (size_t i = 1; i <= dl_max; ++i)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		// Recurse into sprite children first (depth-first, children before parents)
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+		{
+			MovieClip* child_mc = NULL;
+			if (obj->instance_name != NULL)
+				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			dispatch_enterframe_clip_actions(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth,
+				child_mc ? child_mc : parent_mc);
+		}
+
+		if (obj->clip_action_count == 0) continue;
+
+		// Set correct MC context for the clip action
+		MovieClip* saved_ctx = g_current_context;
+		if (obj->instance_name != NULL) {
+			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (mc) actionSetCurrentContext(mc);
+		}
+		int fired = 0;
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME) {
+				obj->clip_actions[a].action(app_context);
+				fired++;
+			}
+		}
+		actionSetCurrentContext(saved_ctx);
+	}
+}
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
@@ -788,23 +849,6 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Advance sprite timelines (recursive) ---
 	advance_sprite_frames(app_context);
 #endif
-
-	// --- Dispatch onEnterFrame clip actions ---
-	for (size_t i = 1; i <= max_depth; ++i)
-	{
-		DisplayObject* obj = &display_list[i];
-		if (obj->char_id == 0 || obj->clip_action_count == 0) continue;
-		// Flash: onClipEvent(enterFrame) doesn't fire on the placement frame
-		if (obj->place_gen == g_place_gen) continue;
-
-		for (size_t a = 0; a < obj->clip_action_count; a++)
-		{
-			if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME)
-			{
-				obj->clip_actions[a].action(app_context);
-			}
-		}
-	}
 
 	// --- Button hit testing + state machine + action dispatch ---
 	// In NO_GRAPHICS mode, ng_update_button_states() is called from input_events_deliver()
@@ -1490,6 +1534,34 @@ static void init_cx_fields(DisplayObject* obj)
 	obj->cx_overridden = 0;
 }
 
+// Pending clip actions to attach before eager init runs — set by WithClipActions variants
+static ClipAction* g_pending_clip_actions = NULL;
+static size_t g_pending_clip_action_count = 0;
+
+// Recursively fire CLIP_EVENT_CONSTRUCT for child sprite display list entries
+// that had CONSTRUCT deferred (placed during eager init with catch_up_mode=1).
+static void fire_deferred_construct(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
+{
+#ifdef NO_GRAPHICS
+	for (size_t i = 1; i <= dl_max; i++) {
+		if (dl[i].char_id == 0 || dl[i].clip_action_count == 0) continue;
+		if (dl[i].instance_name == NULL) continue;
+		MovieClip* mc = actionFindOrCreateMovieClip(app_context, dl[i].instance_name, parent_mc);
+		MovieClip* saved_ctx = g_current_context;
+		if (mc) actionSetCurrentContext(mc);
+		for (size_t a = 0; a < dl[i].clip_action_count; a++) {
+			if (dl[i].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
+				dl[i].clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+		// Recurse into sprite children
+		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0) {
+			fire_deferred_construct(app_context, dl[i].sprite_display_list, dl[i].sprite_max_depth, mc ? mc : parent_mc);
+		}
+	}
+#endif
+}
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
@@ -1641,6 +1713,30 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 #ifdef NO_GRAPHICS
 	ng_on_place_object2(app_context, depth, char_id);
+
+	// Consume pending clip actions (set by WithClipActions variants).
+	// Reset immediately so nested tagPlaceObject2 calls during eager init
+	// don't inherit the parent's clip actions.
+	if (g_pending_clip_actions != NULL) {
+		display_list[depth].clip_actions = g_pending_clip_actions;
+		display_list[depth].clip_action_count = g_pending_clip_action_count;
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
+	}
+
+	// Fire CLIP_EVENT_INITIALIZE immediately at placement time (before eager init)
+	if (display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
+		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
+		if (_mc) actionSetCurrentContext(_mc);
+		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_INITIALIZE)
+				display_list[depth].clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+	}
+
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.
 	// This matches Flash AVM1 behavior: sprites placed via PlaceObject2 are
@@ -1675,6 +1771,26 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			}
 		}
 	}
+
+	// Fire CLIP_EVENT_CONSTRUCT after eager init (children placed, their initialize fired)
+	// But only at the top level — during catch_up_mode (inside another clip's eager init),
+	// CONSTRUCT is deferred to fire_deferred_construct below.
+	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
+		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
+		if (_mc) actionSetCurrentContext(_mc);
+		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
+				display_list[depth].clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+		// Fire deferred CONSTRUCT for child clips placed during eager init
+		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0) {
+			fire_deferred_construct(app_context, display_list[depth].sprite_display_list,
+				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
+		}
+	}
 #else
 	(void)app_context;
 #endif
@@ -1683,10 +1799,13 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
 {
+	// Set pending so tagPlaceObject2 attaches them before eager init
+	g_pending_clip_actions = clip_actions;
+	g_pending_clip_action_count = clip_action_count;
 	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
-	display_list[depth].clip_actions = clip_actions;
-	display_list[depth].clip_action_count = clip_action_count;
-	// onLoad fires deferred in tagShowFrame's sprite_needs_init block (after frame scripts run)
+	// tagPlaceObject2 consumes g_pending_clip_actions and fires events
+	g_pending_clip_actions = NULL;
+	g_pending_clip_action_count = 0;
 }
 
 void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* clip_actions, size_t clip_action_count)
@@ -1779,6 +1898,30 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 #ifdef NO_GRAPHICS
 	ng_on_place_object2(app_context, depth, char_id);
+
+	// Consume pending clip actions (set by WithClipActions variants).
+	// Reset immediately so nested tagPlaceObject2 calls during eager init
+	// don't inherit the parent's clip actions.
+	if (g_pending_clip_actions != NULL) {
+		display_list[depth].clip_actions = g_pending_clip_actions;
+		display_list[depth].clip_action_count = g_pending_clip_action_count;
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
+	}
+
+	// Fire CLIP_EVENT_INITIALIZE immediately at placement time (before eager init)
+	if (display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
+		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
+		if (_mc) actionSetCurrentContext(_mc);
+		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_INITIALIZE)
+				display_list[depth].clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+	}
+
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.
 	// Same eager init as tagPlaceObject2 — needed for scripts that access children before tagShowFrame.
@@ -1812,6 +1955,26 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 			}
 		}
 	}
+
+	// Fire CLIP_EVENT_CONSTRUCT after eager init (children placed, their initialize fired)
+	// But only at the top level — during catch_up_mode (inside another clip's eager init),
+	// CONSTRUCT is deferred to fire_deferred_construct below.
+	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
+		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
+		if (_mc) actionSetCurrentContext(_mc);
+		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
+				display_list[depth].clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+		// Fire deferred CONSTRUCT for child clips placed during eager init
+		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0) {
+			fire_deferred_construct(app_context, display_list[depth].sprite_display_list,
+				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
+		}
+	}
 #else
 	(void)app_context;
 #endif
@@ -1820,9 +1983,13 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count)
 {
+	// Set pending so tagPlaceObject2Ratio attaches them before eager init
+	g_pending_clip_actions = clip_actions;
+	g_pending_clip_action_count = clip_action_count;
 	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio);
-	display_list[depth].clip_actions = clip_actions;
-	display_list[depth].clip_action_count = clip_action_count;
+	// tagPlaceObject2Ratio consumes g_pending_clip_actions and fires events
+	g_pending_clip_actions = NULL;
+	g_pending_clip_action_count = 0;
 }
 
 // Replace an existing clip at `depth` in the same frame: does NOT fire CLIP_EVENT_UNLOAD
@@ -1877,6 +2044,45 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].accumulated_clip_actions = NULL;
 	display_list[depth].accumulated_clip_action_count = 0;
+}
+
+// Recursively fire CLIP_EVENT_UNLOAD for children of a display object.
+// Fires children-first (depth order within each sprite's display list),
+// recursing into nested sprites before firing the child's own unload.
+static void fire_recursive_child_unloads(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
+{
+	for (size_t i = 1; i <= dl_max; i++)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		// Recurse into nested sprite's children first (even if this obj has no clip actions)
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+		{
+			MovieClip* child_mc = NULL;
+			if (obj->instance_name != NULL)
+				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			fire_recursive_child_unloads(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth,
+				child_mc ? child_mc : parent_mc);
+		}
+
+		// Fire this child's CLIP_EVENT_UNLOAD
+		if (obj->clip_action_count == 0) continue;
+		MovieClip* saved_ctx = g_current_context;
+		if (obj->instance_name != NULL)
+		{
+			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (mc) actionSetCurrentContext(mc);
+		}
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+				obj->clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+	}
 }
 
 void tagRemoveObject(SWFAppContext* app_context, size_t depth)
@@ -1936,14 +2142,33 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			display_list[depth].accumulated_clip_actions = NULL;
 			display_list[depth].accumulated_clip_action_count = 0;
 		}
+		// Fire CLIP_EVENT_UNLOAD for children first (recursive, depth-first)
+#ifdef NO_GRAPHICS
+		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
+		{
+			MovieClip* parent_mc = NULL;
+			if (display_list[depth].instance_name != NULL)
+				parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+			fire_recursive_child_unloads(app_context,
+				display_list[depth].sprite_display_list, display_list[depth].sprite_max_depth,
+				parent_mc ? parent_mc : &root_movieclip);
+		}
+#endif
 		// Dispatch current onUnload clip actions before clearing
 		if (display_list[depth].clip_action_count > 0)
 		{
+			MovieClip* saved_ctx = g_current_context;
+			if (display_list[depth].instance_name != NULL)
+			{
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+				if (mc) actionSetCurrentContext(mc);
+			}
 			for (size_t a = 0; a < display_list[depth].clip_action_count; a++)
 			{
 				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
 					display_list[depth].clip_actions[a].action(app_context);
 			}
+			actionSetCurrentContext(saved_ctx);
 		}
 #ifdef NO_GRAPHICS
 		ng_on_remove_object(app_context, depth);

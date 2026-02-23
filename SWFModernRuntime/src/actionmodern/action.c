@@ -12374,6 +12374,15 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
 		// Skip MCs placed in the current frame's process_sprite_needs_init
 		if (g_enterframe_new_mc_start >= 0 && i >= g_enterframe_new_mc_start) continue;
+		// Skip sprite-backed MCs whose timeline didn't advance this tick.
+		// enterframe_eligible is set by process_sprite_needs_init (init tick)
+		// or advance_sprite_frames (subsequent ticks). 1-frame sprites that
+		// don't advance won't have the flag set, matching Flash behavior.
+		if (mc->display_obj != NULL) {
+			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+			if (!dobj->enterframe_eligible) continue;
+			dobj->enterframe_eligible = 0; // consume
+		}
 
 		ASObject* props = (ASObject*) mc->dynamic_props;
 		ActionVar* ef_prop = getProperty(props, "onEnterFrame", 12);
@@ -26570,6 +26579,229 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			setProperty(app_context, bounds, "yMin", 4, &v);
 			setProperty(app_context, bounds, "yMax", 4, &v);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
+			return;
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "hitTest", 7) == 0)
+		{
+			// hitTest — two forms:
+			//   hitTest(x, y [, shapeFlag]) — point-in-bounding-box (shapeFlag ignored, always BB)
+			//   hitTest(target) — clip-vs-clip bounding box overlap
+			// Coordinates are in _root's coordinate space (not stage space).
+			// Save args before freeing
+			ActionVar ht_args[3] = {0};
+			for (int hi = 0; hi < num_args && hi < 3; hi++) ht_args[hi] = args[hi];
+			if (args != NULL) FREE(args);
+#ifdef NO_GRAPHICS
+			{
+				extern DisplayObject* display_list;
+				extern size_t max_depth;
+				extern int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
+					double ma, double mb, double mc, double md, double mtx, double mty,
+					int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
+				extern float transform_data[][16];
+
+				// Helper: compute global AABB for a MovieClip (in _root twips space)
+				// This finds the MC's sprite_display_list, computes local bounds,
+				// then transforms by the MC's world matrix.
+				#define COMPUTE_GLOBAL_AABB(the_mc, out_has, out_xmin, out_ymin, out_xmax, out_ymax) do { \
+					out_has = 0; \
+					/* Find MC's sprite_display_list */ \
+					DisplayObject* _hmc_dl = NULL; size_t _hmc_max = 0; \
+					if (the_mc == &root_movieclip) { \
+						_hmc_dl = display_list; _hmc_max = max_depth; \
+					} \
+					else if (the_mc != NULL && the_mc->display_obj != NULL) { \
+						DisplayObject* _hdobj = (DisplayObject*)the_mc->display_obj; \
+						if (_hdobj->sprite_display_list != NULL) { \
+							_hmc_dl = _hdobj->sprite_display_list; _hmc_max = _hdobj->sprite_max_depth; \
+						} \
+					} \
+					if (_hmc_dl == NULL && the_mc != NULL && the_mc->name[0] != '\0') { \
+						MovieClip* _hch[16]; int _hcl = 0; \
+						for (MovieClip* _hcur = the_mc; _hcur && _hcur != &root_movieclip && _hcl < 16; _hcur = _hcur->parent) \
+							_hch[_hcl++] = _hcur; \
+						DisplayObject* _hdl = display_list; size_t _hm = max_depth; \
+						for (int _hi = _hcl - 1; _hi >= 0; _hi--) { \
+							size_t _hfd = SIZE_MAX; \
+							for (size_t _hd = 1; _hd <= _hm; _hd++) { \
+								if (_hdl[_hd].char_id == 0) continue; \
+								if (_hdl[_hd].instance_name && strcmp(_hdl[_hd].instance_name, _hch[_hi]->name) == 0) \
+									{ _hfd = _hd; break; } \
+							} \
+							if (_hfd == SIZE_MAX) break; \
+							if (_hi == 0) { \
+								if (_hdl[_hfd].sprite_display_list) { \
+									_hmc_dl = _hdl[_hfd].sprite_display_list; _hmc_max = _hdl[_hfd].sprite_max_depth; \
+								} \
+							} else { \
+								if (!_hdl[_hfd].sprite_display_list) break; \
+								_hm = _hdl[_hfd].sprite_max_depth; _hdl = _hdl[_hfd].sprite_display_list; \
+							} \
+						} \
+					} \
+					/* Compute local bounds */ \
+					double _hlxmin=0, _hlymin=0, _hlxmax=0, _hlymax=0; \
+					if (_hmc_dl != NULL) { \
+						ng_computeBoundsFromDL_matrix(_hmc_dl, _hmc_max, \
+							1.0, 0.0, 0.0, 1.0, 0.0, 0.0, \
+							&out_has, &_hlxmin, &_hlymin, &_hlxmax, &_hlymax); \
+					} \
+					/* Include drawing bounds */ \
+					if (the_mc != NULL && the_mc->draw_has_bounds) { \
+						double _hdxmin = the_mc->draw_xmin * 20.0, _hdxmax = the_mc->draw_xmax * 20.0; \
+						double _hdymin = the_mc->draw_ymin * 20.0, _hdymax = the_mc->draw_ymax * 20.0; \
+						if (!out_has) { _hlxmin=_hdxmin; _hlxmax=_hdxmax; _hlymin=_hdymin; _hlymax=_hdymax; out_has=1; } \
+						else { if (_hdxmin<_hlxmin) _hlxmin=_hdxmin; if (_hdxmax>_hlxmax) _hlxmax=_hdxmax; \
+							   if (_hdymin<_hlymin) _hlymin=_hdymin; if (_hdymax>_hlymax) _hlymax=_hdymax; } \
+					} \
+					/* Transform through world matrix to global (stage) space */ \
+					/* Compose: root_as_transform * display_list_world_matrix */ \
+					if (out_has) { \
+						double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0; \
+						COMPUTE_WORLD_MATRIX_DBL(the_mc, _hwa, _hwb, _hwc, _hwd, _hwtx, _hwty); \
+						/* Apply _root's AS-set transform (x, y, rotation, xscale, yscale) */ \
+						{ \
+							double _rxs = (double)root_movieclip.xscale / 100.0; \
+							double _rys = (double)root_movieclip.yscale / 100.0; \
+							double _rrot = (double)root_movieclip.rotation * 3.14159265358979323846 / 180.0; \
+							double _rcos = cos(_rrot), _rsin = sin(_rrot); \
+							double _rra = _rcos * _rxs, _rrb = _rsin * _rxs; \
+							double _rrc = -_rsin * _rys, _rrd = _rcos * _rys; \
+							double _rrtx = (double)root_movieclip.x * 20.0; \
+							double _rrty = (double)root_movieclip.y * 20.0; \
+							/* Compose: root * world */ \
+							double _fna = _rra*_hwa + _rrc*_hwb, _fnb = _rrb*_hwa + _rrd*_hwb; \
+							double _fnc = _rra*_hwc + _rrc*_hwd, _fnd = _rrb*_hwc + _rrd*_hwd; \
+							double _fntx = _rra*_hwtx + _rrc*_hwty + _rrtx; \
+							double _fnty = _rrb*_hwtx + _rrd*_hwty + _rrty; \
+							_hwa=_fna; _hwb=_fnb; _hwc=_fnc; _hwd=_fnd; _hwtx=_fntx; _hwty=_fnty; \
+						} \
+						double _hcorners[4][2] = { \
+							{_hlxmin, _hlymin}, {_hlxmax, _hlymin}, {_hlxmin, _hlymax}, {_hlxmax, _hlymax} \
+						}; \
+						for (int _hci = 0; _hci < 4; _hci++) { \
+							double _hpx = _hcorners[_hci][0], _hpy = _hcorners[_hci][1]; \
+							double _hox = _hwa*_hpx + _hwc*_hpy + _hwtx; \
+							double _hoy = _hwb*_hpx + _hwd*_hpy + _hwty; \
+							if (_hci == 0) { out_xmin=out_xmax=_hox; out_ymin=out_ymax=_hoy; } \
+							else { if (_hox<out_xmin) out_xmin=_hox; if (_hox>out_xmax) out_xmax=_hox; \
+								   if (_hoy<out_ymin) out_ymin=_hoy; if (_hoy>out_ymax) out_ymax=_hoy; } \
+						} \
+					} \
+				} while(0)
+
+				if (num_args >= 2) {
+					// Point hitTest: hitTest(x, y [, shapeFlag])
+					// x, y are in _root's coordinate space (pixels)
+					double tx = varToDouble(&ht_args[0]);
+					double ty = varToDouble(&ht_args[1]);
+					// shapeFlag is ignored for now (always bounding box)
+
+					if (tx != tx || ty != ty) {
+						// NaN → false
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// Compute MC's global AABB in _root space (twips)
+					int has_bounds = 0;
+					double gxmin = 0, gymin = 0, gxmax = 0, gymax = 0;
+					COMPUTE_GLOBAL_AABB(mc, has_bounds, gxmin, gymin, gxmax, gymax);
+
+					if (!has_bounds) {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// Convert test point from root-local to global (stage) space (twips)
+					// Apply _root's AS-set transform
+					double ptx_local = tx * 20.0;
+					double pty_local = ty * 20.0;
+					double rxs = (double)root_movieclip.xscale / 100.0;
+					double rys = (double)root_movieclip.yscale / 100.0;
+					double rrot = (double)root_movieclip.rotation * 3.14159265358979323846 / 180.0;
+					double rcos = cos(rrot), rsin = sin(rrot);
+					double rra = rcos * rxs, rrb = rsin * rxs;
+					double rrc = -rsin * rys, rrd = rcos * rys;
+					double rrtx = (double)root_movieclip.x * 20.0;
+					double rrty = (double)root_movieclip.y * 20.0;
+					double ptx = rra * ptx_local + rrc * pty_local + rrtx;
+					double pty = rrb * ptx_local + rrd * pty_local + rrty;
+
+					// Check inclusion (both AABB and point are now in global/stage space)
+					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, hit ? 1 : 0);
+					return;
+				} else if (num_args == 1) {
+					// Clip-vs-clip hitTest: hitTest(target)
+					// Target can be a MovieClip reference or a string path
+					MovieClip* target_mc = NULL;
+					int target_valid = 0;
+
+					if (ht_args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+						target_mc = (MovieClip*) ht_args[0].data.numeric_value;
+						target_valid = (target_mc != NULL);
+					} else if (ht_args[0].type == ACTION_STACK_VALUE_STRING) {
+						char path_buf[256];
+						u32 path_len = u16_to_utf8((const uint16_t*)varGetU16Ptr(&ht_args[0]),
+							ht_args[0].str_size, path_buf, sizeof(path_buf));
+						if (path_len == 0) {
+							// Empty string → false
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+							return;
+						}
+						// First try the path as-is (handles /, ../, slash-separated paths)
+						MovieClip* resolved = resolveSlashPathToMC(app_context, path_buf, path_len, mc);
+						if (resolved == NULL) {
+							// Try converting dots to slashes for ActionScript dot notation
+							// (e.g., "_root.lower" → "_root/lower")
+							// But preserve ".." (parent navigation)
+							char slash_path[256]; u32 sp_len = 0;
+							for (u32 pi = 0; pi < path_len && sp_len < 255; pi++) {
+								if (path_buf[pi] == '.' && !(pi + 1 < path_len && path_buf[pi+1] == '.') && !(pi > 0 && path_buf[pi-1] == '.')) {
+									slash_path[sp_len++] = '/';
+								} else {
+									slash_path[sp_len++] = path_buf[pi];
+								}
+							}
+							slash_path[sp_len] = '\0';
+							resolved = resolveSlashPathToMC(app_context, slash_path, sp_len, mc);
+						}
+						if (resolved != NULL) {
+							target_mc = resolved;
+							target_valid = 1;
+						}
+					}
+
+					if (!target_valid) {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// Compute global AABB for both clips in stage space
+					int has1 = 0, has2 = 0;
+					double x1min=0, y1min=0, x1max=0, y1max=0;
+					double x2min=0, y2min=0, x2max=0, y2max=0;
+					COMPUTE_GLOBAL_AABB(mc, has1, x1min, y1min, x1max, y1max);
+					COMPUTE_GLOBAL_AABB(target_mc, has2, x2min, y2min, x2max, y2max);
+
+					if (!has1 || !has2) {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// AABB overlap test
+					int overlap = !(x1max < x2min || x2max < x1min ||
+					                y1max < y2min || y2max < y1min);
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, overlap ? 1 : 0);
+					return;
+				}
+
+				#undef COMPUTE_GLOBAL_AABB
+			}
+#endif
+			// No args or non-NO_GRAPHICS fallback
+			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 6 && strncmp(method_name, "moveTo", 6) == 0)

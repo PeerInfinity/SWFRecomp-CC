@@ -57,7 +57,7 @@ Last updated: 2026-02-22
 | Test | Match | Issue |
 |------|-------|-------|
 | `as_set_prop_flags` | 62/79 (78.5%) | ASSetPropFlags with valueOf/toString coercion |
-| `movieclip_hittest` | 71/92 (77.2%) | hitTest coordinate transforms |
+| `movieclip_hittest` | **PASS** ✅ | hitTest point + clip, coordinate transforms |
 | `edittext_restrict` | 147/191 (77.0%) | TextField.restrict pattern matching |
 | `tab_ordering_tabbable` | 36/47 (76.6%) | Tab navigation |
 | `tab_ordering_automatic_order_same_position` | 9/12 (75.0%) | Tab navigation |
@@ -80,7 +80,7 @@ Last updated: 2026-02-22
 | GLOBALS_PLAN | **Phases 1-7 COMPLETE** | globals_swf6/7/8, primitive_type_globals PASS | Phase 8 (property flags) |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
-| MOVIECLIP_PLAN | **Phases 1-5, 7, 9 DONE** | 16 tests pass ✅ | Phase 6 (events), Phase 8 (hitTest) |
+| MOVIECLIP_PLAN | **Phases 1-5, 7-9 DONE** | 17 tests pass ✅ | Phase 6 (events) |
 | CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** | 2/5 pass | clone_sprite_edittext* needs TF clone |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
 | PARSING_FUNCTIONS_PLAN | **parse_int DONE** | parse_int passes | parseFloat edge cases remain |
