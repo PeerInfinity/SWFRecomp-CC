@@ -385,6 +385,7 @@ extern MovieClip* g_current_context;
 typedef struct {
 	char instance_name[256];
 	frame_func func;
+	int swf_depth;
 } PendingAttachInit;
 static PendingAttachInit g_pending_attach_inits[MAX_PENDING_ATTACH_INITS];
 static size_t g_pending_attach_init_count = 0;
@@ -398,29 +399,46 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 			app_context, g_pending_attach_inits[i].instance_name, &root_movieclip);
 		if (mc) actionSetCurrentContext(mc);
 
-		// Save/create temp display list for placement tags
+		// Save display list state and switch to the MC's sprite display list
 		DisplayObject* saved_dl = display_list;
 		size_t saved_max = max_depth;
 		size_t saved_cap = display_list_capacity;
 		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
 		int saved_settarget = g_settarget_explicit_root;
 
-		size_t tmp_cap = 64;
-		DisplayObject* tmp_dl = calloc(tmp_cap, sizeof(DisplayObject));
-		display_list = tmp_dl;
-		max_depth = 0;
-		display_list_capacity = tmp_cap;
+		// Use the MC's own sprite display list (created during ng_attachMovie)
+		if (mc != NULL && mc->display_obj != NULL) {
+			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+			display_list = dobj->sprite_display_list;
+			max_depth = dobj->sprite_max_depth;
+			display_list_capacity = dobj->sprite_dl_capacity;
+		} else {
+			// Fallback: create a temp display list
+			size_t tmp_cap = 64;
+			display_list = calloc(tmp_cap, sizeof(DisplayObject));
+			max_depth = 0;
+			display_list_capacity = tmp_cap;
+		}
 		g_settarget_explicit_root = 0;
 		g_current_sprite_obj = NULL;
 
 		// Run the frame function (scripts will run this time since catch_up_mode = 0)
 		g_pending_attach_inits[i].func(app_context);
 
+		// Persist updated display list state back to the MC's display obj
+		if (mc != NULL && mc->display_obj != NULL) {
+			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+			dobj->sprite_display_list = display_list;
+			dobj->sprite_max_depth = max_depth;
+			dobj->sprite_dl_capacity = display_list_capacity;
+		} else {
+			free(display_list);
+		}
+
 		// Restore
 		actionSetCurrentContext(saved_ctx);
 		g_current_sprite_obj = saved_sprite_obj;
 		g_settarget_explicit_root = saved_settarget;
-		free(tmp_dl);
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
@@ -482,12 +500,27 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		int            saved_settarget = g_settarget_explicit_root;
 		int            saved_catch_up = catch_up_mode;
 
-		// Create a temporary display list for the sprite's children
-		size_t tmp_cap = 64;
-		DisplayObject* tmp_dl = calloc(tmp_cap, sizeof(DisplayObject));
-		display_list = tmp_dl;
-		max_depth = 0;
-		display_list_capacity = tmp_cap;
+		// Create a display object for the attached clip to hold its children
+		if (new_mc->display_obj == NULL) {
+			DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
+			dobj->sprite_dl_capacity = 64;
+			dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+			dobj->sprite_max_depth = 0;
+			new_mc->display_obj = dobj;
+		} else {
+			// Re-attach: clear existing children
+			DisplayObject* dobj = (DisplayObject*)new_mc->display_obj;
+			if (dobj->sprite_display_list) {
+				memset(dobj->sprite_display_list, 0, dobj->sprite_dl_capacity * sizeof(DisplayObject));
+				dobj->sprite_max_depth = 0;
+			}
+		}
+
+		// Use the MC's own sprite display list for placement tags
+		DisplayObject* dobj = (DisplayObject*)new_mc->display_obj;
+		display_list = dobj->sprite_display_list;
+		max_depth = dobj->sprite_max_depth;
+		display_list_capacity = dobj->sprite_dl_capacity;
 		g_settarget_explicit_root = 0;
 
 		// Set the MC context so _name, _x etc resolve correctly
@@ -505,14 +538,19 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		g_current_sprite_obj = saved_sprite_obj;
 		g_settarget_explicit_root = saved_settarget;
 
+		// Persist the updated display list state on the MC's display obj
+		dobj->sprite_display_list = display_list;
+		dobj->sprite_max_depth = max_depth;
+		dobj->sprite_dl_capacity = display_list_capacity;
+
 		// Compute content bounds from children placed during frame 0
 		{
 			float bxmin = 1e30f, bxmax = -1e30f, bymin = 1e30f, bymax = -1e30f;
 			int has_bounds = 0;
-			for (size_t d = 0; d <= max_depth && d < tmp_cap; d++) {
-				if (tmp_dl[d].char_id == 0) continue;
+			for (size_t d = 0; d <= dobj->sprite_max_depth && d < dobj->sprite_dl_capacity; d++) {
+				if (dobj->sprite_display_list[d].char_id == 0) continue;
 				s32 cxmin, cxmax, cymin, cymax;
-				if (ng_getCharBounds(tmp_dl[d].char_id, &cxmin, &cxmax, &cymin, &cymax)) {
+				if (ng_getCharBounds(dobj->sprite_display_list[d].char_id, &cxmin, &cxmax, &cymin, &cymax)) {
 					float pxmin = (float)cxmin / 20.0f;
 					float pxmax = (float)cxmax / 20.0f;
 					float pymin = (float)cymin / 20.0f;
@@ -530,21 +568,37 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			}
 		}
 
-		// Free temporary display list (children from PlaceObject2 during init)
-		free(tmp_dl);
+		// Restore the parent display list
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
 
 		// Queue the frame function for deferred script execution
 		// (Flash runs attached clip init scripts at end of frame)
-		if (g_pending_attach_init_count < MAX_PENDING_ATTACH_INITS) {
-			strncpy(g_pending_attach_inits[g_pending_attach_init_count].instance_name,
-				new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
-			g_pending_attach_inits[g_pending_attach_init_count].instance_name[
-				sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
-			g_pending_attach_inits[g_pending_attach_init_count].func = funcs[0];
-			g_pending_attach_init_count++;
+		// If an init is already pending for the same SWF depth, replace it
+		// (re-attaching at the same depth supersedes the previous init)
+		{
+			int found = 0;
+			for (size_t qi = 0; qi < g_pending_attach_init_count; qi++) {
+				if (g_pending_attach_inits[qi].swf_depth == swf_depth) {
+					strncpy(g_pending_attach_inits[qi].instance_name,
+						new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
+					g_pending_attach_inits[qi].instance_name[
+						sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
+					g_pending_attach_inits[qi].func = funcs[0];
+					found = 1;
+					break;
+				}
+			}
+			if (!found && g_pending_attach_init_count < MAX_PENDING_ATTACH_INITS) {
+				strncpy(g_pending_attach_inits[g_pending_attach_init_count].instance_name,
+					new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
+				g_pending_attach_inits[g_pending_attach_init_count].instance_name[
+					sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
+				g_pending_attach_inits[g_pending_attach_init_count].func = funcs[0];
+				g_pending_attach_inits[g_pending_attach_init_count].swf_depth = swf_depth;
+				g_pending_attach_init_count++;
+			}
 		}
 	}
 

@@ -3236,11 +3236,12 @@ namespace SWFRecomp
 				size_t saved_last_queued = last_queued_script;
 				size_t scripts_before_sprite = next_script_i;
 
-				// Emit tagDefineSprite call in the current main frame
-				context.tag_main << "\t" << "tagDefineSprite(app_context, "
+				// Emit tagDefineSprite call in tagInit (before any scripts)
+				// so that DoInitAction scripts can reference the sprite dictionary
+				tag_init << endl << "\t" << "tagDefineSprite(app_context, "
 								 << to_string(sprite_id) << ", "
 								 << sp << "_frame_funcs, "
-								 << to_string(sprite_frame_count_declared) << ");" << endl;
+								 << to_string(sprite_frame_count_declared) << ");";
 
 				// Parse sprite sub-tags and generate sprite frame functions
 				size_t sprite_frame_i = 0;
