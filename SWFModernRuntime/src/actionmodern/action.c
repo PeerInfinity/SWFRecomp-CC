@@ -26441,7 +26441,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				if (!has_bounds) {
 					// Empty clip: return sentinel values
-					double sentinel = 134217727.0 / 20.0; // 6710886.35 (Flash/Ruffle INVALID rect value)
+					// Self-target: (2^27-1)/20 = 6710886.35, cross-target (SWF>=8): 2^27/20 = 6710886.4
+					double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
 					ASObject* bounds = allocObject(app_context, 8);
 					ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &v.data.numeric_value) = sentinel;
@@ -26560,7 +26561,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 #endif
 			// Fallback: sentinel values
-			double sentinel = 134217727.0 / 20.0;
+			double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
 			ASObject* bounds = allocObject(app_context, 8);
 			ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
 			VAL(double, &v.data.numeric_value) = sentinel;
