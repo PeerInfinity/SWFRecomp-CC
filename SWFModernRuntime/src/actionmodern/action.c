@@ -17883,6 +17883,47 @@ void actionSetMember(SWFAppContext* app_context)
 				value_var.data.string_data.owns_memory = false;
 				VAL(u64, &value_var.data.numeric_value) = (u64)_as_result;
 			}
+			// TextField condenseWhite setter: coerce value to boolean
+			if (prop_name_len == 13 && strncmp(prop_name, "condenseWhite", 13) == 0
+				&& mc->ng_textfield_idx >= 0)
+			{
+				u32 bval = 0;
+				if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+					bval = value_var.data.numeric_value ? 1 : 0;
+				else if (value_var.type == ACTION_STACK_VALUE_F32)
+					bval = (VAL(float, &value_var.data.numeric_value) != 0.0f) ? 1 : 0;
+				else if (value_var.type == ACTION_STACK_VALUE_F64)
+					bval = (VAL(double, &value_var.data.numeric_value) != 0.0) ? 1 : 0;
+				else if (value_var.type == ACTION_STACK_VALUE_STRING)
+					bval = (value_var.str_size > 0) ? 1 : 0;
+				else if (value_var.type == ACTION_STACK_VALUE_OBJECT || value_var.type == ACTION_STACK_VALUE_ARRAY || value_var.type == ACTION_STACK_VALUE_FUNCTION)
+					bval = 1;
+				// null and undefined → false (bval stays 0)
+				value_var.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &value_var.data.numeric_value) = bval;
+			}
+			// TextField scroll setter: coerce to int, clamp to [1, maxscroll]
+			if (prop_name_len == 6 && strncmp(prop_name, "scroll", 6) == 0
+				&& mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
+			{
+				double dval = varToDoubleSimple(&value_var);
+				int32_t ival;
+				if (isnan(dval) || value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+					ival = 1; // null/undefined/NaN → 1
+				else
+					ival = (int32_t)dval; // truncate
+				// Clamp to [1, maxscroll]
+				ASObject* props = (ASObject*) mc->dynamic_props;
+				ActionVar* ms_var = getProperty(props, "maxscroll", 9);
+				int32_t max_scroll = 1;
+				if (ms_var && (ms_var->type == ACTION_STACK_VALUE_F64 || ms_var->type == ACTION_STACK_VALUE_F32))
+					max_scroll = (int32_t)varToDoubleSimple(ms_var);
+				if (max_scroll < 1) max_scroll = 1;
+				if (ival < 1) ival = 1;
+				if (ival > max_scroll) ival = max_scroll;
+				value_var.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &value_var.data.numeric_value) = (double)ival;
+			}
 			// transform property: copy transform state from src MC to this MC
 			if (prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
 			{
