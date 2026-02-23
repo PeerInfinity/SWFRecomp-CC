@@ -7780,10 +7780,56 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 
 	MovieClip* mc = start_mc;
 
+#ifdef NO_GRAPHICS
+	// Track current position in display list tree for correct child lookup.
+	// cur_sprite_dl/cur_sprite_max point to the current MC's sprite children.
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	DisplayObject* cur_sprite_dl = NULL;
+	size_t cur_sprite_max = 0;
+
+	// Initialize cur_sprite_dl for start_mc
+	if (mc == &root_movieclip) {
+		cur_sprite_dl = display_list;
+		cur_sprite_max = max_depth;
+	} else if (mc->display_obj != NULL) {
+		DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+		if (dobj->sprite_display_list) {
+			cur_sprite_dl = dobj->sprite_display_list;
+			cur_sprite_max = dobj->sprite_max_depth;
+		}
+	}
+	// If not found via display_obj, try navigating from root using MC name chain
+	if (cur_sprite_dl == NULL && mc != &root_movieclip && mc->name[0] != '\0') {
+		MovieClip* chain[16]; int clen = 0;
+		for (MovieClip* cur = mc; cur && cur != &root_movieclip && clen < 16; cur = cur->parent)
+			chain[clen++] = cur;
+		DisplayObject* dl = display_list; size_t dlmax = max_depth;
+		int found_all = 1;
+		for (int ci = clen - 1; ci >= 0; ci--) {
+			size_t fd = SIZE_MAX;
+			for (size_t d = 1; d <= dlmax; d++) {
+				if (dl[d].char_id == 0) continue;
+				if (dl[d].instance_name && strcmp(dl[d].instance_name, chain[ci]->name) == 0) { fd = d; break; }
+			}
+			if (fd == SIZE_MAX) { found_all = 0; break; }
+			if (dl[fd].sprite_display_list) {
+				dlmax = dl[fd].sprite_max_depth;
+				dl = dl[fd].sprite_display_list;
+			} else if (ci > 0) { found_all = 0; break; }
+		}
+		if (found_all) { cur_sprite_dl = dl; cur_sprite_max = dlmax; }
+	}
+#endif
+
 	// Absolute path: leading '/' means start from root
 	u32 pos = 0;
 	if (path[0] == '/') {
 		mc = &root_movieclip;
+#ifdef NO_GRAPHICS
+		cur_sprite_dl = display_list;
+		cur_sprite_max = max_depth;
+#endif
 		pos = 1;
 		if (pos >= path_len) return mc; // just "/"
 	}
@@ -7817,11 +7863,28 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 			// Special names
 			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
 				mc = &root_movieclip;
+#ifdef NO_GRAPHICS
+				cur_sprite_dl = display_list;
+				cur_sprite_max = max_depth;
+#endif
 			} else {
 #ifdef NO_GRAPHICS
-				// Try direct child lookup via display_obj sprite_display_list
+				// Search cur_sprite_dl first (tracks our position in display tree)
 				size_t child_depth = SIZE_MAX;
-				if (mc->display_obj != NULL) {
+				DisplayObject* found_entry = NULL;
+				if (cur_sprite_dl != NULL) {
+					for (size_t _cd = 1; _cd <= cur_sprite_max; _cd++) {
+						DisplayObject* _ch = &cur_sprite_dl[_cd];
+						if (_ch->char_id == 0) continue;
+						if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
+							child_depth = _cd;
+							found_entry = _ch;
+							break;
+						}
+					}
+				}
+				// Fall back to display_obj
+				if (child_depth == SIZE_MAX && mc->display_obj != NULL) {
 					DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
 					if (parent_dobj->sprite_display_list != NULL) {
 						for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
@@ -7829,6 +7892,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 							if (_ch->char_id == 0) continue;
 							if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
 								child_depth = _cd;
+								found_entry = _ch;
 								break;
 							}
 						}
@@ -7846,10 +7910,27 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 				// exec_sprite_frame registers all MCs with parent=root_movieclip,
 				// so try findOrCreateMovieClip with root as parent first (to reuse
 				// existing MC with its dynamic_props), then fall back to mc as parent.
-				MovieClip* child_mc = findOrCreateMovieClip(app_context, seg_buf, &root_movieclip);
-				if (child_mc == NULL) child_mc = findOrCreateMovieClip(app_context, seg_buf, mc);
+				// BUT: when mc != root, prefer mc as parent to avoid finding a
+				// same-named MC at a different nesting level.
+				MovieClip* child_mc = NULL;
+				if (mc == &root_movieclip) {
+					child_mc = findOrCreateMovieClip(app_context, seg_buf, &root_movieclip);
+				} else {
+					child_mc = findOrCreateMovieClip(app_context, seg_buf, mc);
+					if (child_mc == NULL)
+						child_mc = findOrCreateMovieClip(app_context, seg_buf, &root_movieclip);
+				}
 				if (child_mc == NULL) return NULL;
 				child_mc->depth = (int)child_depth - 16384;
+				// Fix parent to actual parent MC (exec_sprite_frame may have registered under root)
+				child_mc->parent = mc;
+				// Update cur_sprite_dl to track into this child's sprite display list
+				if (found_entry && found_entry->sprite_display_list) {
+					cur_sprite_dl = found_entry->sprite_display_list;
+					cur_sprite_max = found_entry->sprite_max_depth;
+				} else {
+					cur_sprite_dl = NULL; cur_sprite_max = 0;
+				}
 				mc = child_mc;
 #else
 				(void)app_context;
@@ -9031,6 +9112,13 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 	if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
 		*out_nat_w = (double)(gxmax - gxmin);
 		*out_nat_h = (double)(gymax - gymin);
+		return 1;
+	}
+
+	// Fallback: use stored width/height (set by ng_attachMovie for dynamically attached clips)
+	if (mc->width > 0.0f || mc->height > 0.0f) {
+		*out_nat_w = (double)mc->width;
+		*out_nat_h = (double)mc->height;
 		return 1;
 	}
 #endif
@@ -12286,6 +12374,15 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
 		// Skip MCs placed in the current frame's process_sprite_needs_init
 		if (g_enterframe_new_mc_start >= 0 && i >= g_enterframe_new_mc_start) continue;
+		// Skip sprite-backed MCs whose timeline didn't advance this tick.
+		// enterframe_eligible is set by process_sprite_needs_init (init tick)
+		// or advance_sprite_frames (subsequent ticks). 1-frame sprites that
+		// don't advance won't have the flag set, matching Flash behavior.
+		if (mc->display_obj != NULL) {
+			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+			if (!dobj->enterframe_eligible) continue;
+			dobj->enterframe_eligible = 0; // consume
+		}
 
 		ASObject* props = (ASObject*) mc->dynamic_props;
 		ActionVar* ef_prop = getProperty(props, "onEnterFrame", 12);
@@ -17351,13 +17448,18 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
 				if (strcasecmp(prop_name, "_lockroot") == 0) {
-					// Coerce to boolean: non-zero numbers, non-empty strings → true
+					// Coerce to boolean: non-zero numbers, non-empty strings, objects → true
 					if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
 						mc->lockroot = value_var.data.numeric_value ? 1 : 0;
 					} else if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
 						mc->lockroot = 0;
 					} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
 						mc->lockroot = (value_var.str_size > 0) ? 1 : 0;
+					} else if (value_var.type == ACTION_STACK_VALUE_OBJECT ||
+					           value_var.type == ACTION_STACK_VALUE_FUNCTION ||
+					           value_var.type == ACTION_STACK_VALUE_ARRAY) {
+						// Objects are always truthy
+						mc->lockroot = 1;
 					} else {
 						mc->lockroot = (!isnan(fval) && fval != 0.0f) ? 1 : 0;
 					}
@@ -18041,6 +18143,18 @@ void actionDelete(SWFAppContext* app_context)
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		obj = (ASObject*) obj_var.data.numeric_value;
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// Delete from MovieClip's dynamic_props
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+		if (mc != NULL && mc->dynamic_props != NULL) {
+			bool success = deleteProperty(app_context, (ASObject*)mc->dynamic_props, prop_name, prop_name_len);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+		} else {
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+		}
+		return;
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
 	{
@@ -22221,6 +22335,87 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 #endif
 		builtin_handled = 1;
 	}
+	// attachMovie(linkageId, newName, depth [, initObject]) — MC method called as CallFunction
+	else if (func_name_len == 11 && strncmp(func_name, "attachMovie", 11) == 0)
+	{
+#ifdef NO_GRAPHICS
+		if (num_args >= 3) {
+			extern MovieClip root_movieclip;
+			MovieClip* mc = &root_movieclip;
+			char _am_buf1[256], _am_buf2[256];
+			if (args[0].type == ACTION_STACK_VALUE_STRING) {
+				const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+				u16_to_utf8(_u16, args[0].str_size, _am_buf1, sizeof(_am_buf1));
+			} else {
+				varToStringBuf(app_context, &args[0], _am_buf1, sizeof(_am_buf1));
+			}
+			if (args[1].type == ACTION_STACK_VALUE_STRING) {
+				const uint16_t* _u16 = varGetU16Ptr(&args[1]);
+				u16_to_utf8(_u16, args[1].str_size, _am_buf2, sizeof(_am_buf2));
+			} else {
+				varToStringBuf(app_context, &args[1], _am_buf2, sizeof(_am_buf2));
+			}
+			int depth_val = (int)varToDouble(&args[2]);
+			size_t char_id = ng_lookupExport(_am_buf1);
+			if (char_id != (size_t)-1) {
+				MovieClip* attached = ng_attachMovie(app_context, char_id, _am_buf2, depth_val, mc);
+				if (attached != NULL) {
+					// Apply initObject if present
+					if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* init_obj = (ASObject*)(uintptr_t)args[3].data.numeric_value;
+						if (init_obj != NULL) {
+							for (u32 pi = 0; pi < init_obj->num_used; pi++) {
+								if (init_obj->properties[pi].name_length > 0) {
+									// Try MC builtin props first (_x, _y, etc.)
+									if (!setMCBuiltinProperty(app_context, attached,
+											init_obj->properties[pi].name,
+											init_obj->properties[pi].name_length,
+											&init_obj->properties[pi].value)) {
+										// Fall through to dynamic properties
+										if (attached->dynamic_props == NULL) {
+											attached->dynamic_props = (void*) allocObject(app_context, 8);
+											retainObject((ASObject*) attached->dynamic_props);
+										}
+										setProperty(app_context, (ASObject*)attached->dynamic_props,
+											init_obj->properties[pi].name,
+											init_obj->properties[pi].name_length,
+											&init_obj->properties[pi].value);
+									}
+								}
+							}
+						}
+					}
+					// Register on parent's dynamic_props
+					if (mc->dynamic_props == NULL) {
+						mc->dynamic_props = (void*) allocObject(app_context, 8);
+						retainObject((ASObject*) mc->dynamic_props);
+					}
+					ActionVar mc_var = {0};
+					mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					mc_var.data.numeric_value = (u64) attached;
+					setProperty(app_context, (ASObject*) mc->dynamic_props,
+						_am_buf2, (u32)strlen(_am_buf2), &mc_var);
+					setVariableByName(_am_buf2, &mc_var);
+					if (args != NULL) FREE(args);
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
+				} else {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+				}
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+		} else {
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+#else
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+#endif
+		builtin_handled = 1;
+	}
 	// getNextHighestDepth() — as a global function, operates on root
 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
 	{
@@ -25535,6 +25730,101 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
+		else if (method_name_len == 11 && strncmp(method_name, "attachMovie", 11) == 0)
+		{
+			// attachMovie(linkageId, newName, depth [, initObject])
+			// Instantiates an exported library symbol as a child clip
+#ifdef NO_GRAPHICS
+			if (num_args >= 3) {
+				char _am_id_buf[512], _am_name_buf[512];
+				const char* linkage_id = "";
+				const char* new_name = "";
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+					u16_to_utf8(_u16, args[0].str_size, _am_id_buf, sizeof(_am_id_buf));
+					linkage_id = _am_id_buf;
+				}
+				if (args[1].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _u16 = varGetU16Ptr(&args[1]);
+					u16_to_utf8(_u16, args[1].str_size, _am_name_buf, sizeof(_am_name_buf));
+					new_name = _am_name_buf;
+				}
+				int depth_val = ecmaToInt32(varToDouble(&args[2]));
+
+				// Lookup exported symbol
+				size_t char_id = ng_lookupExport(linkage_id);
+				if (char_id != (size_t)-1 && new_name[0] != '\0') {
+					// Attach the movie
+					MovieClip* attached = ng_attachMovie(app_context, char_id, new_name, depth_val, mc);
+					if (attached != NULL) {
+						// Copy URL from parent
+						strncpy(attached->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(attached->url) - 1);
+
+						// Apply initObject properties (arg 3) if provided
+						if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
+							ASObject* init_obj = (ASObject*) args[3].data.numeric_value;
+							if (init_obj != NULL) {
+								// Copy all properties from initObject
+								for (u32 pi = 0; pi < init_obj->num_used; pi++) {
+									if (init_obj->properties[pi].name_length > 0) {
+										// Try MC builtin props first (_x, _y, etc.)
+										if (!setMCBuiltinProperty(app_context, attached,
+												init_obj->properties[pi].name,
+												init_obj->properties[pi].name_length,
+												&init_obj->properties[pi].value)) {
+											// Fall through to dynamic properties
+											if (attached->dynamic_props == NULL) {
+												attached->dynamic_props = (void*) allocObject(app_context, 8);
+												retainObject((ASObject*) attached->dynamic_props);
+											}
+											setProperty(app_context, (ASObject*)attached->dynamic_props,
+												init_obj->properties[pi].name,
+												init_obj->properties[pi].name_length,
+												&init_obj->properties[pi].value);
+										}
+									}
+								}
+							}
+						}
+
+						// Register on parent's dynamic_props
+						if (mc->dynamic_props == NULL) {
+							mc->dynamic_props = (void*) allocObject(app_context, 8);
+							retainObject((ASObject*) mc->dynamic_props);
+						}
+						ActionVar am_var = {0};
+						am_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						am_var.data.numeric_value = (u64)attached;
+						setProperty(app_context, (ASObject*)mc->dynamic_props, new_name, strlen(new_name), &am_var);
+
+						// Add to child_mc_cache
+						{
+							int _sl = -1;
+							for (int _di = 0; _di < child_mc_count; _di++) {
+								if (child_mc_cache[_di] == NULL) { _sl = _di; break; }
+							}
+							if (_sl >= 0) child_mc_cache[_sl] = attached;
+							else if (child_mc_count < MAX_CHILD_MOVIECLIPS) child_mc_cache[child_mc_count++] = attached;
+						}
+
+						if (args != NULL) FREE(args);
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
+						return;
+					}
+				}
+				// Not found or not a sprite — return undefined
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
+			return;
+		}
 		else if (method_name_len == 20 && strncmp(method_name, "createEmptyMovieClip", 20) == 0)
 		{
 			// createEmptyMovieClip(instanceName, depth)
@@ -26013,26 +26303,490 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		         (method_name_len == 7 && strncmp(method_name, "getRect", 7) == 0))
 		{
 			// getBounds(targetCoordSpace) / getRect(targetCoordSpace)
-			// For empty clips, return sentinel "no bounds" values
-			// getBounds(this) uses 6710886.4 (2^27/20), getBounds(otherMC) uses 6710886.35 ((2^27-1)/20)
-			int target_is_self = 0;
-			if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
-				MovieClip* target = (MovieClip*) args[0].data.numeric_value;
-				target_is_self = (target == mc);
+			// Returns {xMin, yMin, xMax, yMax} in the target's coordinate space.
+			// Empty clips return sentinel values.
+
+			// Resolve target MovieClip
+			MovieClip* target_mc = mc;  // default: own coordinate space
+			int target_resolved = (num_args == 0); // no arg = self (valid)
+			if (num_args > 0) {
+				if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+					target_mc = (MovieClip*) args[0].data.numeric_value;
+					target_resolved = (target_mc != NULL);
+				} else {
+					// Convert arg to string path and try to resolve
+					char path_buf[256];
+					u32 path_len = 0;
+					if (args[0].type == ACTION_STACK_VALUE_STRING) {
+						path_len = u16_to_utf8((const uint16_t*)varGetU16Ptr(&args[0]),
+							args[0].str_size, path_buf, sizeof(path_buf));
+					} else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
+						memcpy(path_buf, "undefined", 9); path_len = 9;
+					} else if (args[0].type == ACTION_STACK_VALUE_NULL) {
+						memcpy(path_buf, "null", 4); path_len = 4;
+					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT) {
+						// Object with toString — call toString to get path
+						int ts_found = 0;
+						ActionVar ts = objectCallToString(app_context, &args[0], &ts_found);
+						if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
+							path_len = u16_to_utf8((const uint16_t*)varGetU16Ptr(&ts),
+								ts.str_size, path_buf, sizeof(path_buf));
+						}
+					}
+					if (path_len > 0) {
+						// Convert colons to slashes for path resolution
+						// Note: dots are NOT path separators in getBounds (only colon and slash)
+						char resolved_path[256];
+						u32 rp_len = 0;
+						for (u32 pi = 0; pi < path_len && rp_len < 255; pi++) {
+							resolved_path[rp_len++] = (path_buf[pi] == ':') ? '/' : path_buf[pi];
+						}
+						resolved_path[rp_len] = '\0';
+						MovieClip* resolved = resolveSlashPathToMC(app_context, resolved_path, rp_len, mc);
+						if (resolved != NULL) { target_mc = resolved; target_resolved = 1; }
+					}
+				}
 			}
+			int target_is_self = (target_mc == mc);
 			if (args != NULL) FREE(args);
 
-			double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
+			// If a target argument was provided but couldn't be resolved, return undefined
+			if (!target_resolved) {
+				pushUndefined(app_context);
+				return;
+			}
 
+#ifdef NO_GRAPHICS
+			{
+				extern DisplayObject* display_list;
+				extern size_t max_depth;
+				extern int ng_computeBoundsFromDL(DisplayObject* dl, size_t dl_max,
+					int32_t* out_xmin, int32_t* out_ymin, int32_t* out_xmax, int32_t* out_ymax);
+				extern int ng_computeBoundsFromDL_fp16(DisplayObject* dl, size_t dl_max,
+					int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
+					int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax);
+
+				// Find the sprite_display_list for this MC by navigating the display tree
+				DisplayObject* mc_dl = NULL;
+				size_t mc_dl_max = 0;
+
+				// 1. Check MC's own display_obj (for attached clips)
+				if (mc != NULL && mc->display_obj != NULL) {
+					DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+					if (dobj->sprite_display_list != NULL) {
+						mc_dl = dobj->sprite_display_list;
+						mc_dl_max = dobj->sprite_max_depth;
+					}
+				}
+
+				// 2. Root MC: use global display list
+				if (mc_dl == NULL && mc == &root_movieclip) {
+					mc_dl = display_list;
+					mc_dl_max = max_depth;
+				}
+
+				// 3. Navigate display list tree to find MC's sprite entry
+				if (mc_dl == NULL && mc != NULL && mc->name[0] != '\0') {
+					MovieClip* chain[16];
+					int chain_len = 0;
+					for (MovieClip* cur = mc; cur != NULL && cur != &root_movieclip && chain_len < 16; cur = cur->parent) {
+						chain[chain_len++] = cur;
+					}
+					DisplayObject* cur_dl = display_list;
+					size_t cur_max = max_depth;
+					for (int ci = chain_len - 1; ci >= 0; ci--) {
+						size_t found_d = SIZE_MAX;
+						for (size_t d = 1; d <= cur_max; d++) {
+							if (cur_dl[d].char_id == 0) continue;
+							if (cur_dl[d].instance_name && strcmp(cur_dl[d].instance_name, chain[ci]->name) == 0) {
+								found_d = d; break;
+							}
+						}
+						if (found_d == SIZE_MAX) break;
+						if (ci == 0) {
+							// Found the MC's display entry — use its sprite children
+							if (cur_dl[found_d].sprite_display_list != NULL) {
+								mc_dl = cur_dl[found_d].sprite_display_list;
+								mc_dl_max = cur_dl[found_d].sprite_max_depth;
+							}
+						} else {
+							if (cur_dl[found_d].sprite_display_list == NULL) break;
+							size_t next_max = cur_dl[found_d].sprite_max_depth;
+							cur_dl = cur_dl[found_d].sprite_display_list;
+							cur_max = next_max;
+						}
+					}
+				}
+
+				// (world matrix computation is inline in cross-target section below)
+
+				// Step 1: Compute local bounds AABB in MC's own coordinate space.
+				// Uses double precision (composing child transforms to leaf shapes).
+				extern int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
+					double ma, double mb, double mc, double md, double mtx, double mty,
+					int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
+				int has_bounds = 0;
+				double lxmin = 0, lymin = 0, lxmax = 0, lymax = 0;
+
+				if (mc_dl != NULL) {
+					ng_computeBoundsFromDL_matrix(mc_dl, mc_dl_max,
+						1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+						&has_bounds, &lxmin, &lymin, &lxmax, &lymax);
+				}
+
+				// Include drawing bounds
+				if (mc != NULL && mc->draw_has_bounds) {
+					double dxmin = mc->draw_xmin * 20.0;
+					double dxmax = mc->draw_xmax * 20.0;
+					double dymin = mc->draw_ymin * 20.0;
+					double dymax = mc->draw_ymax * 20.0;
+					if (!has_bounds) {
+						lxmin=dxmin; lxmax=dxmax; lymin=dymin; lymax=dymax; has_bounds=1;
+					} else {
+						if (dxmin<lxmin) lxmin=dxmin; if (dxmax>lxmax) lxmax=dxmax;
+						if (dymin<lymin) lymin=dymin; if (dymax>lymax) lymax=dymax;
+					}
+				}
+
+				if (!has_bounds) {
+					// Empty clip: return sentinel values
+					// Self-target: (2^27-1)/20 = 6710886.35, cross-target (SWF>=8): 2^27/20 = 6710886.4
+					double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
+					ASObject* bounds = allocObject(app_context, 8);
+					ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &v.data.numeric_value) = sentinel;
+					setProperty(app_context, bounds, "xMin", 4, &v);
+					setProperty(app_context, bounds, "xMax", 4, &v);
+					setProperty(app_context, bounds, "yMin", 4, &v);
+					setProperty(app_context, bounds, "yMax", 4, &v);
+					PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
+					return;
+				}
+
+				// Step 2: For self-target, return local bounds as-is (in pixels).
+				// For cross-target, transform LOCAL AABB through relative matrix
+				// (matching Flash: AABB-to-AABB transform, not tight bounds).
+				double bxmin_d, bymin_d, bxmax_d, bymax_d;
+				if (target_is_self) {
+					bxmin_d = lxmin; bymin_d = lymin;
+					bxmax_d = lxmax; bymax_d = lymax;
+				} else {
+					// Build double-precision world matrix for this MC
+					#define COMPUTE_WORLD_MATRIX_DBL(the_mc, wa, wb, wc, wd, wtx, wty) do { \
+						wa = 1.0; wb = 0.0; wc = 0.0; wd = 1.0; wtx = 0.0; wty = 0.0; \
+						if (the_mc != &root_movieclip && the_mc->name[0] != '\0') { \
+							const char* _names[16]; int _nlen = 0; \
+							for (MovieClip* _cur = the_mc; _cur && _cur != &root_movieclip && _nlen < 16; _cur = _cur->parent) \
+								_names[_nlen++] = _cur->name; \
+							for (int _i = 0; _i < _nlen/2; _i++) { \
+								const char* _tmp = _names[_i]; _names[_i] = _names[_nlen-1-_i]; _names[_nlen-1-_i] = _tmp; \
+							} \
+							DisplayObject* _wdl = display_list; size_t _wmax = max_depth; \
+							for (int _wi = 0; _wi < _nlen; _wi++) { \
+								size_t _wd = SIZE_MAX; \
+								for (size_t _d = 1; _d <= _wmax; _d++) { \
+									if (_wdl[_d].char_id == 0) continue; \
+									if (_wdl[_d].instance_name && strcmp(_wdl[_d].instance_name, _names[_wi]) == 0) \
+										{ _wd = _d; break; } \
+								} \
+								if (_wd == SIZE_MAX) break; \
+								u32 _tid = _wdl[_wd].transform_id; \
+								extern float transform_data[][16]; \
+								double _la = (double)transform_data[_tid][0], _lb = (double)transform_data[_tid][1]; \
+								double _lc = (double)transform_data[_tid][4], _ld = (double)transform_data[_tid][5]; \
+								double _ltx = (double)transform_data[_tid][12], _lty = (double)transform_data[_tid][13]; \
+								double _na = wa*_la + wc*_lb, _nb = wb*_la + wd*_lb; \
+								double _nc = wa*_lc + wc*_ld, _nd = wb*_lc + wd*_ld; \
+								double _ntx = wa*_ltx + wc*_lty + wtx; \
+								double _nty = wb*_ltx + wd*_lty + wty; \
+								wa=_na; wb=_nb; wc=_nc; wd=_nd; wtx=_ntx; wty=_nty; \
+								if (_wi < _nlen - 1 && _wdl[_wd].sprite_display_list) { \
+									_wmax = _wdl[_wd].sprite_max_depth; _wdl = _wdl[_wd].sprite_display_list; \
+								} \
+							} \
+						} \
+					} while(0)
+
+					double sa, sb, sc, sd, sfx, sfy;
+					COMPUTE_WORLD_MATRIX_DBL(mc, sa, sb, sc, sd, sfx, sfy);
+					double ta, tb, tc, td, tfx, tfy;
+					COMPUTE_WORLD_MATRIX_DBL(target_mc, ta, tb, tc, td, tfx, tfy);
+
+					// Invert target world matrix
+					double det = ta * td - tb * tc;
+					double ia, ib, ic, id; double fitx, fity;
+					if (fabs(det) > 1e-14) {
+						ia =  td / det; ib = -tb / det;
+						ic = -tc / det; id =  ta / det;
+						fitx = -(ia * tfx + ic * tfy);
+						fity = -(ib * tfx + id * tfy);
+					} else {
+						ia = 1; ib = 0; ic = 0; id = 1; fitx = 0; fity = 0;
+					}
+
+					// relative = target_inv * this_world
+					double ra = ia*sa + ic*sb, rb = ib*sa + id*sb;
+					double rc = ia*sc + ic*sd, rd = ib*sc + id*sd;
+					double rtx = ia*sfx + ic*sfy + fitx;
+					double rty = ib*sfx + id*sfy + fity;
+
+					// Transform local AABB through relative matrix (4 corners)
+					double corners[4][2] = {
+						{lxmin, lymin}, {lxmax, lymin}, {lxmin, lymax}, {lxmax, lymax}
+					};
+					for (int ci = 0; ci < 4; ci++) {
+						double px = corners[ci][0], py = corners[ci][1];
+						double ox = ra*px + rc*py + rtx;
+						double oy = rb*px + rd*py + rty;
+						if (ci == 0) { bxmin_d=bxmax_d=ox; bymin_d=bymax_d=oy; }
+						else {
+							if (ox<bxmin_d) bxmin_d=ox; if (ox>bxmax_d) bxmax_d=ox;
+							if (oy<bymin_d) bymin_d=oy; if (oy>bymax_d) bymax_d=oy;
+						}
+					}
+				}
+
+				// Round to integer twips (Flash/Ruffle compute bounds in integer twips
+				// via Fixed16 arithmetic) then convert to pixels.
+				bxmin_d = round(bxmin_d) / 20.0;
+				bymin_d = round(bymin_d) / 20.0;
+				bxmax_d = round(bxmax_d) / 20.0;
+				bymax_d = round(bymax_d) / 20.0;
+
+				// Property order: xMin, xMax, yMin, yMax (matches Flash)
+				// Enumerate2 LIFO yields: yMax, yMin, xMax, xMin
+				ASObject* bounds = allocObject(app_context, 8);
+				ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &v.data.numeric_value) = bxmin_d;
+				setProperty(app_context, bounds, "xMin", 4, &v);
+				VAL(double, &v.data.numeric_value) = bxmax_d;
+				setProperty(app_context, bounds, "xMax", 4, &v);
+				VAL(double, &v.data.numeric_value) = bymin_d;
+				setProperty(app_context, bounds, "yMin", 4, &v);
+				VAL(double, &v.data.numeric_value) = bymax_d;
+				setProperty(app_context, bounds, "yMax", 4, &v);
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
+				return;
+			}
+#endif
+			// Fallback: sentinel values
+			double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
 			ASObject* bounds = allocObject(app_context, 8);
-			ActionVar v = {0};
-			v.type = ACTION_STACK_VALUE_F64;
+			ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
 			VAL(double, &v.data.numeric_value) = sentinel;
 			setProperty(app_context, bounds, "xMin", 4, &v);
 			setProperty(app_context, bounds, "xMax", 4, &v);
 			setProperty(app_context, bounds, "yMin", 4, &v);
 			setProperty(app_context, bounds, "yMax", 4, &v);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
+			return;
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "hitTest", 7) == 0)
+		{
+			// hitTest — two forms:
+			//   hitTest(x, y [, shapeFlag]) — point-in-bounding-box (shapeFlag ignored, always BB)
+			//   hitTest(target) — clip-vs-clip bounding box overlap
+			// Coordinates are in _root's coordinate space (not stage space).
+			// Save args before freeing
+			ActionVar ht_args[3] = {0};
+			for (int hi = 0; hi < num_args && hi < 3; hi++) ht_args[hi] = args[hi];
+			if (args != NULL) FREE(args);
+#ifdef NO_GRAPHICS
+			{
+				extern DisplayObject* display_list;
+				extern size_t max_depth;
+				extern int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
+					double ma, double mb, double mc, double md, double mtx, double mty,
+					int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
+				extern float transform_data[][16];
+
+				// Helper: compute global AABB for a MovieClip (in _root twips space)
+				// This finds the MC's sprite_display_list, computes local bounds,
+				// then transforms by the MC's world matrix.
+				#define COMPUTE_GLOBAL_AABB(the_mc, out_has, out_xmin, out_ymin, out_xmax, out_ymax) do { \
+					out_has = 0; \
+					/* Find MC's sprite_display_list */ \
+					DisplayObject* _hmc_dl = NULL; size_t _hmc_max = 0; \
+					if (the_mc == &root_movieclip) { \
+						_hmc_dl = display_list; _hmc_max = max_depth; \
+					} \
+					else if (the_mc != NULL && the_mc->display_obj != NULL) { \
+						DisplayObject* _hdobj = (DisplayObject*)the_mc->display_obj; \
+						if (_hdobj->sprite_display_list != NULL) { \
+							_hmc_dl = _hdobj->sprite_display_list; _hmc_max = _hdobj->sprite_max_depth; \
+						} \
+					} \
+					if (_hmc_dl == NULL && the_mc != NULL && the_mc->name[0] != '\0') { \
+						MovieClip* _hch[16]; int _hcl = 0; \
+						for (MovieClip* _hcur = the_mc; _hcur && _hcur != &root_movieclip && _hcl < 16; _hcur = _hcur->parent) \
+							_hch[_hcl++] = _hcur; \
+						DisplayObject* _hdl = display_list; size_t _hm = max_depth; \
+						for (int _hi = _hcl - 1; _hi >= 0; _hi--) { \
+							size_t _hfd = SIZE_MAX; \
+							for (size_t _hd = 1; _hd <= _hm; _hd++) { \
+								if (_hdl[_hd].char_id == 0) continue; \
+								if (_hdl[_hd].instance_name && strcmp(_hdl[_hd].instance_name, _hch[_hi]->name) == 0) \
+									{ _hfd = _hd; break; } \
+							} \
+							if (_hfd == SIZE_MAX) break; \
+							if (_hi == 0) { \
+								if (_hdl[_hfd].sprite_display_list) { \
+									_hmc_dl = _hdl[_hfd].sprite_display_list; _hmc_max = _hdl[_hfd].sprite_max_depth; \
+								} \
+							} else { \
+								if (!_hdl[_hfd].sprite_display_list) break; \
+								_hm = _hdl[_hfd].sprite_max_depth; _hdl = _hdl[_hfd].sprite_display_list; \
+							} \
+						} \
+					} \
+					/* Compute local bounds */ \
+					double _hlxmin=0, _hlymin=0, _hlxmax=0, _hlymax=0; \
+					if (_hmc_dl != NULL) { \
+						ng_computeBoundsFromDL_matrix(_hmc_dl, _hmc_max, \
+							1.0, 0.0, 0.0, 1.0, 0.0, 0.0, \
+							&out_has, &_hlxmin, &_hlymin, &_hlxmax, &_hlymax); \
+					} \
+					/* Include drawing bounds */ \
+					if (the_mc != NULL && the_mc->draw_has_bounds) { \
+						double _hdxmin = the_mc->draw_xmin * 20.0, _hdxmax = the_mc->draw_xmax * 20.0; \
+						double _hdymin = the_mc->draw_ymin * 20.0, _hdymax = the_mc->draw_ymax * 20.0; \
+						if (!out_has) { _hlxmin=_hdxmin; _hlxmax=_hdxmax; _hlymin=_hdymin; _hlymax=_hdymax; out_has=1; } \
+						else { if (_hdxmin<_hlxmin) _hlxmin=_hdxmin; if (_hdxmax>_hlxmax) _hlxmax=_hdxmax; \
+							   if (_hdymin<_hlymin) _hlymin=_hdymin; if (_hdymax>_hlymax) _hlymax=_hdymax; } \
+					} \
+					/* Transform through world matrix to global (stage) space */ \
+					/* Uses getConcatMatrixForMC which handles AS-set _x/_y/etc. */ \
+					if (out_has) { \
+						double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0; \
+						getConcatMatrixForMC(the_mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty); \
+						/* getConcatMatrixForMC returns tx/ty in pixels; convert to twips */ \
+						_hwtx *= 20.0; _hwty *= 20.0; \
+						double _hcorners[4][2] = { \
+							{_hlxmin, _hlymin}, {_hlxmax, _hlymin}, {_hlxmin, _hlymax}, {_hlxmax, _hlymax} \
+						}; \
+						for (int _hci = 0; _hci < 4; _hci++) { \
+							double _hpx = _hcorners[_hci][0], _hpy = _hcorners[_hci][1]; \
+							double _hox = _hwa*_hpx + _hwc*_hpy + _hwtx; \
+							double _hoy = _hwb*_hpx + _hwd*_hpy + _hwty; \
+							if (_hci == 0) { out_xmin=out_xmax=_hox; out_ymin=out_ymax=_hoy; } \
+							else { if (_hox<out_xmin) out_xmin=_hox; if (_hox>out_xmax) out_xmax=_hox; \
+								   if (_hoy<out_ymin) out_ymin=_hoy; if (_hoy>out_ymax) out_ymax=_hoy; } \
+						} \
+					} \
+				} while(0)
+
+				if (num_args >= 2) {
+					// Point hitTest: hitTest(x, y [, shapeFlag])
+					// x, y are in _root's coordinate space (pixels)
+					double tx = varToDouble(&ht_args[0]);
+					double ty = varToDouble(&ht_args[1]);
+					// shapeFlag is ignored for now (always bounding box)
+
+					if (tx != tx || ty != ty) {
+						// NaN → false
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// Compute MC's global AABB in _root space (twips)
+					int has_bounds = 0;
+					double gxmin = 0, gymin = 0, gxmax = 0, gymax = 0;
+					COMPUTE_GLOBAL_AABB(mc, has_bounds, gxmin, gymin, gxmax, gymax);
+
+					if (!has_bounds) {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// Convert test point from root-local to global (stage) space (twips)
+					// Apply _root's AS-set transform
+					double ptx_local = tx * 20.0;
+					double pty_local = ty * 20.0;
+					double rxs = (double)root_movieclip.xscale / 100.0;
+					double rys = (double)root_movieclip.yscale / 100.0;
+					double rrot = (double)root_movieclip.rotation * 3.14159265358979323846 / 180.0;
+					double rcos = cos(rrot), rsin = sin(rrot);
+					double rra = rcos * rxs, rrb = rsin * rxs;
+					double rrc = -rsin * rys, rrd = rcos * rys;
+					double rrtx = (double)root_movieclip.x * 20.0;
+					double rrty = (double)root_movieclip.y * 20.0;
+					double ptx = rra * ptx_local + rrc * pty_local + rrtx;
+					double pty = rrb * ptx_local + rrd * pty_local + rrty;
+
+					// Check inclusion (both AABB and point are now in global/stage space)
+					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, hit ? 1 : 0);
+					return;
+				} else if (num_args == 1) {
+					// Clip-vs-clip hitTest: hitTest(target)
+					// Target can be a MovieClip reference or a string path
+					MovieClip* target_mc = NULL;
+					int target_valid = 0;
+
+					if (ht_args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+						target_mc = (MovieClip*) ht_args[0].data.numeric_value;
+						target_valid = (target_mc != NULL);
+					} else if (ht_args[0].type == ACTION_STACK_VALUE_STRING) {
+						char path_buf[256];
+						u32 path_len = u16_to_utf8((const uint16_t*)varGetU16Ptr(&ht_args[0]),
+							ht_args[0].str_size, path_buf, sizeof(path_buf));
+						if (path_len == 0) {
+							// Empty string → false
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+							return;
+						}
+						// First try the path as-is (handles /, ../, slash-separated paths)
+						MovieClip* resolved = resolveSlashPathToMC(app_context, path_buf, path_len, mc);
+						if (resolved == NULL) {
+							// Try converting dots to slashes for ActionScript dot notation
+							// (e.g., "_root.lower" → "_root/lower")
+							// But preserve ".." (parent navigation)
+							char slash_path[256]; u32 sp_len = 0;
+							for (u32 pi = 0; pi < path_len && sp_len < 255; pi++) {
+								if (path_buf[pi] == '.' && !(pi + 1 < path_len && path_buf[pi+1] == '.') && !(pi > 0 && path_buf[pi-1] == '.')) {
+									slash_path[sp_len++] = '/';
+								} else {
+									slash_path[sp_len++] = path_buf[pi];
+								}
+							}
+							slash_path[sp_len] = '\0';
+							resolved = resolveSlashPathToMC(app_context, slash_path, sp_len, mc);
+						}
+						if (resolved != NULL) {
+							target_mc = resolved;
+							target_valid = 1;
+						}
+					}
+
+					if (!target_valid) {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// Compute global AABB for both clips in stage space
+					int has1 = 0, has2 = 0;
+					double x1min=0, y1min=0, x1max=0, y1max=0;
+					double x2min=0, y2min=0, x2max=0, y2max=0;
+					COMPUTE_GLOBAL_AABB(mc, has1, x1min, y1min, x1max, y1max);
+					COMPUTE_GLOBAL_AABB(target_mc, has2, x2min, y2min, x2max, y2max);
+
+					if (!has1 || !has2) {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
+					// AABB overlap test
+					int overlap = !(x1max < x2min || x2max < x1min ||
+					                y1max < y2min || y2max < y1min);
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, overlap ? 1 : 0);
+					return;
+				}
+
+				#undef COMPUTE_GLOBAL_AABB
+			}
+#endif
+			// No args or non-NO_GRAPHICS fallback
+			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 6 && strncmp(method_name, "moveTo", 6) == 0)
@@ -26271,6 +27025,34 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 #endif
 			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
+		{
+			// hasOwnProperty(name): check if MC has the named property directly
+			int _hop_result = 0;
+			if (num_args >= 1) {
+				char _hop_buf[512];
+				const char* _hop_name = _hop_buf;
+				u32 _hop_len = 0;
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+					_hop_len = (u32)u16_to_utf8(_u16, args[0].str_size, _hop_buf, sizeof(_hop_buf));
+				} else {
+					int l = varToStringBuf(app_context, &args[0], _hop_buf, sizeof(_hop_buf));
+					_hop_len = (u32) l;
+				}
+				// Check dynamic_props (user-set properties)
+				if (mc->dynamic_props != NULL) {
+					if (hasPropertyRaw((ASObject*)mc->dynamic_props, _hop_name, _hop_len))
+						_hop_result = 1;
+				}
+			}
+			if (args != NULL) FREE(args);
+			ActionVar _hop_ret = {0};
+			_hop_ret.type = ACTION_STACK_VALUE_BOOLEAN;
+			_hop_ret.data.numeric_value = _hop_result;
+			pushVar(app_context, &_hop_ret);
 			return;
 		}
 		else

@@ -3123,10 +3123,28 @@ namespace SWFRecomp
 			}
 			
 			case SWF_TAG_METADATA:
-			case SWF_TAG_EXPORT_ASSETS:
 			case SWF_TAG_DEBUG_ID:
 			{
 				cur_pos += tag.length;
+				break;
+			}
+
+			case SWF_TAG_EXPORT_ASSETS:
+			{
+				// DoExportAssets: Count(UI16), then Count * [Tag(UI16) + Name(STRING)]
+				char* export_start = cur_pos;
+				u16 export_count = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+				cur_pos += 2;
+				for (u16 ei = 0; ei < export_count; ei++)
+				{
+					u16 export_char_id = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+					cur_pos += 2;
+					// Name is null-terminated string
+					std::string export_name(cur_pos);
+					cur_pos += export_name.length() + 1;  // +1 for null terminator
+					// Emit registration call in tagInit
+					tag_init << endl << "\ttagRegisterExport(app_context, \"" << export_name << "\", " << to_string(export_char_id) << ");";
+				}
 				break;
 			}
 
@@ -3218,11 +3236,12 @@ namespace SWFRecomp
 				size_t saved_last_queued = last_queued_script;
 				size_t scripts_before_sprite = next_script_i;
 
-				// Emit tagDefineSprite call in the current main frame
-				context.tag_main << "\t" << "tagDefineSprite(app_context, "
+				// Emit tagDefineSprite call in tagInit (before any scripts)
+				// so that DoInitAction scripts can reference the sprite dictionary
+				tag_init << endl << "\t" << "tagDefineSprite(app_context, "
 								 << to_string(sprite_id) << ", "
 								 << sp << "_frame_funcs, "
-								 << to_string(sprite_frame_count_declared) << ");" << endl;
+								 << to_string(sprite_frame_count_declared) << ");";
 
 				// Parse sprite sub-tags and generate sprite frame functions
 				size_t sprite_frame_i = 0;
@@ -5300,7 +5319,8 @@ namespace SWFRecomp
 
 						shape_tag.parseFields(cur_pos);
 
-						// EndBounds parsed and ignored (not needed at ratio=0)
+						// EndBounds available in fields[1-4] but not used for static bounds.
+						// Morph bounds are per-ratio; we only store start bounds for now.
 
 						if (is_morph2)
 						{
@@ -6294,7 +6314,11 @@ namespace SWFRecomp
 										 << to_string(3*tris_size) << ", "
 										 << to_string(morph_end_start_vertex) << ", "
 										 << to_string(morph_color_start_saved) << ", "
-										 << to_string(morph_color_count) << ");" << endl;
+										 << to_string(morph_color_count) << ", "
+										 << to_string(shape_bounds_xmin) << ", "
+										 << to_string(shape_bounds_xmax) << ", "
+										 << to_string(shape_bounds_ymin) << ", "
+										 << to_string(shape_bounds_ymax) << ");" << endl;
 					}
 					else
 					{

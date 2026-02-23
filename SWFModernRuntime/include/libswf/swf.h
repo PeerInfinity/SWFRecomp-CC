@@ -166,6 +166,7 @@ typedef struct DisplayObject
 	size_t place_gen;       // monotonic generation counter for same-frame detection
 	// Clip event interaction state
 	u8 clip_mc_pressed;     // 1 if CLIP_EVENT_PRESS was fired for this clip (awaiting RELEASE/RELEASE_OUTSIDE)
+	u8 enterframe_eligible; // 1 if AS2 onEnterFrame should fire this tick (set by init/advance, cleared after dispatch)
 } DisplayObject;
 
 typedef struct KeyState {

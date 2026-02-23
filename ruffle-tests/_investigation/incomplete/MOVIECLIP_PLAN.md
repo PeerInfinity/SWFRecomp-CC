@@ -3,11 +3,13 @@
 
 Last updated: 2026-02-22
 
-## Status: Phases 1-3, 5, 9 MOSTLY COMPLETE
+## Status: Phases 1-5, 7-9 MOSTLY COMPLETE
 
 ### Implementation Commits
 - `c616aeb` — Implement MovieClip Phase 1: properties, prototype, transform, blendMode
 - (subsequent) — Depth methods, createEmptyMovieClip, duplicateMovieClip, removeMovieClip, localToGlobal/globalToLocal
+- `f0cb91ca` — Implement ExportAssets + attachMovie (Phase 4)
+- `feedc1a8` — Fix attachMovie: deferred init dedup, sprite child persistence, tagDefineSprite ordering
 
 ### Phase Completion
 
@@ -16,10 +18,10 @@ Last updated: 2026-02-22
 | 1 | MovieClip prototype + missing properties | **DONE** ✅ | movieclip_default_state PASS, movieclip_blend_mode_property PASS |
 | 2 | Depth methods | **DONE** ✅ | movieclip_depth_methods PASS, movieclip_get_instance_at_depth PASS |
 | 3 | createEmptyMovieClip + display list | **DONE** ✅ | create_empty_movie_clip PASS |
-| 4 | ExportAssets + attachMovie | NOT STARTED | attach_movie, export_assets |
+| 4 | ExportAssets + attachMovie | **MOSTLY DONE** ✅ | attach_movie PASS, attach_movie_stop PASS, export_assets PASS, empty_movieclip_can_attach_movies PASS |
 | 5 | duplicateMovieClip + removeMovieClip | **DONE** ✅ | duplicate_movie_clip PASS, remove_movie_clip PASS, clone_sprite_types PASS |
 | 6 | Clip events + construction order | NOT STARTED | clip_events, on_construct |
-| 7 | getBounds / getRect | SKELETON (sentinel values only) | movieclip_getbounds partial |
+| 7 | getBounds / getRect | **MOSTLY DONE** ✅ | movieclip_getbounds 189/191 (98.95%) |
 | 8 | hitTest | NOT STARTED | movieclip_hittest partial |
 | 9 | localToGlobal / globalToLocal + others | **DONE** ✅ | local_to_global PASS |
 
@@ -29,19 +31,25 @@ Last updated: 2026-02-22
 |------|-----------|-------|
 | movieclip_default_state | **PASS** ✅ | |
 | movieclip_blend_mode_property | **PASS** ✅ | |
-| movieclip_depth_methods | **PASS** ✅ | Was 65/98, now fully passing |
-| movieclip_get_instance_at_depth | **PASS** ✅ | Was 18/28, now fully passing |
-| create_empty_movie_clip | **PASS** ✅ | Was 1/3, now fully passing |
-| duplicate_movie_clip | **PASS** ✅ | Was 4/20, now fully passing |
-| clone_sprite_types | **PASS** ✅ | Was 12/24, now fully passing |
-| remove_movie_clip | **PASS** ✅ | Was 17/29, now fully passing |
-| local_to_global | **PASS** ✅ | Was 41/49, now fully passing |
+| movieclip_depth_methods | **PASS** ✅ | |
+| movieclip_get_instance_at_depth | **PASS** ✅ | |
+| create_empty_movie_clip | **PASS** ✅ | |
+| duplicate_movie_clip | **PASS** ✅ | |
+| clone_sprite_types | **PASS** ✅ | |
+| remove_movie_clip | **PASS** ✅ | |
+| local_to_global | **PASS** ✅ | |
 | is_prototype_of | **PASS** ✅ | |
 | object_properties | **PASS** ✅ | |
-| movieclip_lockroot | output_mismatch | Still failing |
+| placeobject_occupied_depth | **PASS** ✅ | |
+| attach_movie | **PASS** ✅ | Was 43/59, now fully passing |
+| attach_movie_stop | **PASS** ✅ | Was 1/3, now fully passing |
+| export_assets | **PASS** ✅ | Was 2/3, now fully passing |
+| empty_movieclip_can_attach_movies | **PASS** ✅ | Was 8/11, now fully passing |
+| movieclip_lockroot | output_mismatch | Needs child sprite script execution |
 | default_names | output_mismatch | Still failing |
 | place_and_lookup | output_mismatch | Still failing |
-| custom_clip_methods | output_mismatch | Still failing |
+| custom_clip_methods | output_mismatch | Needs multi-frame + registerClass |
+| movieclip_init_object | output_mismatch | Needs Object.registerClass |
 
 ---
 
@@ -67,14 +75,14 @@ MovieClip-related tests are spread across several categories in the failing test
 - create_empty_movie_clip — **PASS** ✅ (was 1/3)
 - default_names — output_mismatch (was 12/52)
 - place_and_lookup — output_mismatch (was 0/30)
-- placeobject_occupied_depth — segfault (was 0/6)
+- placeobject_occupied_depth — **PASS** ✅ (was 0/6)
 
 ### Phase 4 — ExportAssets + attachMovie (~5 tests)
-- attach_movie (43/59) — still failing
-- attach_movie_stop (1/3) — still failing
-- export_assets (2/3) — still failing
-- movieclip_init_object (0/5) — still failing
-- empty_movieclip_can_attach_movies (8/11) — still failing
+- attach_movie — **PASS** ✅ (was 43/59)
+- attach_movie_stop — **PASS** ✅ (was 1/3)
+- export_assets — **PASS** ✅ (was 2/3)
+- movieclip_init_object — output_mismatch (needs Object.registerClass)
+- empty_movieclip_can_attach_movies — **PASS** ✅ (was 8/11)
 
 ### Phase 5 — duplicateMovieClip + removeMovieClip (~4 tests)
 - duplicate_movie_clip — **PASS** ✅ (was 4/20)
@@ -101,9 +109,9 @@ MovieClip-related tests are spread across several categories in the failing test
 - movieclip_invalid_get_bounds_7 (1/10)
 - movieclip_invalid_get_bounds_8 (1/11)
 
-### Phase 8 — hitTest (~2 tests)
-- movieclip_hittest (71/92)
-- movieclip_hittest_shapeflag (180/338)
+### Phase 8 — hitTest (~2 tests) **DONE**
+- movieclip_hittest (92/92 ✅)
+- movieclip_hittest_shapeflag (180/338) — shapeflag requires pixel-level testing, not AABB
 
 ### Phase 9 — localToGlobal/globalToLocal + Other Methods (~2 tests)
 - local_to_global (40/49)

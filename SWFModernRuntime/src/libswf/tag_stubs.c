@@ -123,6 +123,27 @@ void ng_try_reclaim_auto_instance_name(const char* auto_name)
 }
 
 // ---------------------------------------------------------------------------
+// Exported symbols registry (DoExportAssets → attachMovie linkage)
+// ---------------------------------------------------------------------------
+#define MAX_EXPORTED_SYMBOLS 128
+static struct {
+	char name[128];
+	size_t char_id;
+} ng_exported_symbols[MAX_EXPORTED_SYMBOLS];
+static size_t ng_exported_symbol_count = 0;
+
+size_t ng_lookupExport(const char* name)
+{
+	// Last registration wins (Flash behavior for duplicate export names)
+	// Case-insensitive matching (Flash AVM1 behavior)
+	size_t result = (size_t)-1;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (strcasecmp(ng_exported_symbols[i].name, name) == 0)
+			result = ng_exported_symbols[i].char_id;
+	return result;
+}
+
+// ---------------------------------------------------------------------------
 // Clone depth table — tracks which variable name occupies each SWF depth for
 // script-created clones (CloneSprite / duplicateMovieClip). When a new clone
 // takes an occupied SWF depth, the old variable is set to undefined so that
@@ -333,6 +354,259 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id)
 	(void)app_context;
 	if (ng_video_count < MAX_VIDEOS_NG)
 		ng_video_ids[ng_video_count++] = (size_t)char_id;
+}
+
+// ---------------------------------------------------------------------------
+// tagRegisterExport — called from generated tagInit() for DoExportAssets
+// ---------------------------------------------------------------------------
+void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id)
+{
+	(void)app_context;
+	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
+		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, name, 127);
+		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
+		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
+		ng_exported_symbol_count++;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Pending attach init queue — deferred frame-0 script execution for attachMovie
+// ---------------------------------------------------------------------------
+extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* name, MovieClip* parent);
+extern void setVariableByName(const char* var_name, ActionVar* value);
+extern void actionSetCurrentContext(MovieClip* mc);
+extern MovieClip root_movieclip;
+extern int g_settarget_explicit_root;
+extern DisplayObject* g_current_sprite_obj;
+extern MovieClip* g_current_context;
+
+#define MAX_PENDING_ATTACH_INITS 64
+typedef struct {
+	char instance_name[256];
+	frame_func func;
+	int swf_depth;
+} PendingAttachInit;
+static PendingAttachInit g_pending_attach_inits[MAX_PENDING_ATTACH_INITS];
+static size_t g_pending_attach_init_count = 0;
+
+void ng_fire_pending_attach_inits(SWFAppContext* app_context)
+{
+	for (size_t i = 0; i < g_pending_attach_init_count; i++) {
+		// Set context to the attached clip for correct variable resolution
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* mc = actionFindOrCreateMovieClip(
+			app_context, g_pending_attach_inits[i].instance_name, &root_movieclip);
+		if (mc) actionSetCurrentContext(mc);
+
+		// Save display list state and switch to the MC's sprite display list
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+		int saved_settarget = g_settarget_explicit_root;
+
+		// Use the MC's own sprite display list (created during ng_attachMovie)
+		if (mc != NULL && mc->display_obj != NULL) {
+			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+			display_list = dobj->sprite_display_list;
+			max_depth = dobj->sprite_max_depth;
+			display_list_capacity = dobj->sprite_dl_capacity;
+		} else {
+			// Fallback: create a temp display list
+			size_t tmp_cap = 64;
+			display_list = calloc(tmp_cap, sizeof(DisplayObject));
+			max_depth = 0;
+			display_list_capacity = tmp_cap;
+		}
+		g_settarget_explicit_root = 0;
+		g_current_sprite_obj = NULL;
+
+		// Run the frame function (scripts will run this time since catch_up_mode = 0)
+		g_pending_attach_inits[i].func(app_context);
+
+		// Persist updated display list state back to the MC's display obj
+		if (mc != NULL && mc->display_obj != NULL) {
+			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+			dobj->sprite_display_list = display_list;
+			dobj->sprite_max_depth = max_depth;
+			dobj->sprite_dl_capacity = display_list_capacity;
+		} else {
+			free(display_list);
+		}
+
+		// Restore
+		actionSetCurrentContext(saved_ctx);
+		g_current_sprite_obj = saved_sprite_obj;
+		g_settarget_explicit_root = saved_settarget;
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+	}
+	g_pending_attach_init_count = 0;
+}
+
+// ---------------------------------------------------------------------------
+// ng_attachMovie — instantiate an exported library symbol at runtime
+// ---------------------------------------------------------------------------
+
+MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent)
+{
+	extern size_t display_list_capacity;
+
+	if (char_id >= INITIAL_DICTIONARY_CAPACITY) return NULL;
+	if (dictionary[char_id].type != CHAR_TYPE_SPRITE) return NULL;
+	// Flash valid depth range: -16384 to 2130690044
+	if (as_depth > 2130690044 || as_depth < -16384) return NULL;
+
+	// Create MC for the attached clip (reset position/scale to defaults for re-attach)
+	MovieClip* new_mc = actionFindOrCreateMovieClip(app_context, new_name, parent);
+	if (new_mc == NULL) return NULL;
+	new_mc->depth = as_depth;
+	new_mc->x = 0.0f;
+	new_mc->y = 0.0f;
+	new_mc->xscale = 100.0f;
+	new_mc->yscale = 100.0f;
+	new_mc->rotation = 0.0f;
+	new_mc->alpha = 100.0f;
+	new_mc->visible = 1;
+	new_mc->width = 0.0f;
+	new_mc->height = 0.0f;
+#ifdef NO_GRAPHICS
+	new_mc->as_set_flags = 0;
+#endif
+
+	// Remove any existing clone at this SWF depth
+	int swf_depth = as_depth + 16384;
+	clone_depth_register(swf_depth, new_name);
+
+	// Register as a variable so GetVariable finds it
+	ActionVar mc_var = {0};
+	mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	mc_var.data.numeric_value = (u64)(uintptr_t)new_mc;
+	setVariableByName(new_name, &mc_var);
+
+	// Execute the sprite's frame 0 placement tags (scripts deferred to end of frame)
+	frame_func* funcs = dictionary[char_id].sprite_frame_funcs;
+	size_t frame_count = dictionary[char_id].sprite_frame_count;
+	if (funcs != NULL && frame_count > 0 && funcs[0] != NULL) {
+		// Context swap: save current display list and switch to a temporary one
+		// for the sprite's children
+		DisplayObject* saved_dl    = display_list;
+		size_t         saved_max   = max_depth;
+		size_t         saved_cap   = display_list_capacity;
+		MovieClip*     saved_ctx   = NULL;
+		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+		int            saved_settarget = g_settarget_explicit_root;
+		int            saved_catch_up = catch_up_mode;
+
+		// Create a display object for the attached clip to hold its children
+		if (new_mc->display_obj == NULL) {
+			DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
+			dobj->sprite_dl_capacity = 64;
+			dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+			dobj->sprite_max_depth = 0;
+			new_mc->display_obj = dobj;
+		} else {
+			// Re-attach: clear existing children
+			DisplayObject* dobj = (DisplayObject*)new_mc->display_obj;
+			if (dobj->sprite_display_list) {
+				memset(dobj->sprite_display_list, 0, dobj->sprite_dl_capacity * sizeof(DisplayObject));
+				dobj->sprite_max_depth = 0;
+			}
+		}
+
+		// Use the MC's own sprite display list for placement tags
+		DisplayObject* dobj = (DisplayObject*)new_mc->display_obj;
+		display_list = dobj->sprite_display_list;
+		max_depth = dobj->sprite_max_depth;
+		display_list_capacity = dobj->sprite_dl_capacity;
+		g_settarget_explicit_root = 0;
+
+		// Set the MC context so _name, _x etc resolve correctly
+		saved_ctx = g_current_context;
+		actionSetCurrentContext(new_mc);
+		g_current_sprite_obj = NULL;
+
+		// Run frame 0 with catch_up_mode=1 to skip scripts (only placement tags run)
+		catch_up_mode = 1;
+		funcs[0](app_context);
+		catch_up_mode = saved_catch_up;
+
+		// Restore context
+		actionSetCurrentContext(saved_ctx);
+		g_current_sprite_obj = saved_sprite_obj;
+		g_settarget_explicit_root = saved_settarget;
+
+		// Persist the updated display list state on the MC's display obj
+		dobj->sprite_display_list = display_list;
+		dobj->sprite_max_depth = max_depth;
+		dobj->sprite_dl_capacity = display_list_capacity;
+
+		// Compute content bounds from children placed during frame 0
+		{
+			float bxmin = 1e30f, bxmax = -1e30f, bymin = 1e30f, bymax = -1e30f;
+			int has_bounds = 0;
+			for (size_t d = 0; d <= dobj->sprite_max_depth && d < dobj->sprite_dl_capacity; d++) {
+				if (dobj->sprite_display_list[d].char_id == 0) continue;
+				s32 cxmin, cxmax, cymin, cymax;
+				if (ng_getCharBounds(dobj->sprite_display_list[d].char_id, &cxmin, &cxmax, &cymin, &cymax)) {
+					float pxmin = (float)cxmin / 20.0f;
+					float pxmax = (float)cxmax / 20.0f;
+					float pymin = (float)cymin / 20.0f;
+					float pymax = (float)cymax / 20.0f;
+					if (pxmin < bxmin) bxmin = pxmin;
+					if (pxmax > bxmax) bxmax = pxmax;
+					if (pymin < bymin) bymin = pymin;
+					if (pymax > bymax) bymax = pymax;
+					has_bounds = 1;
+				}
+			}
+			if (has_bounds) {
+				new_mc->width = bxmax - bxmin;
+				new_mc->height = bymax - bymin;
+			}
+		}
+
+		// Restore the parent display list
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+
+		// Queue the frame function for deferred script execution
+		// (Flash runs attached clip init scripts at end of frame)
+		// If an init is already pending for the same SWF depth, replace it
+		// (re-attaching at the same depth supersedes the previous init)
+		{
+			int found = 0;
+			for (size_t qi = 0; qi < g_pending_attach_init_count; qi++) {
+				if (g_pending_attach_inits[qi].swf_depth == swf_depth) {
+					strncpy(g_pending_attach_inits[qi].instance_name,
+						new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
+					g_pending_attach_inits[qi].instance_name[
+						sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
+					g_pending_attach_inits[qi].func = funcs[0];
+					found = 1;
+					break;
+				}
+			}
+			if (!found && g_pending_attach_init_count < MAX_PENDING_ATTACH_INITS) {
+				strncpy(g_pending_attach_inits[g_pending_attach_init_count].instance_name,
+					new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
+				g_pending_attach_inits[g_pending_attach_init_count].instance_name[
+					sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
+				g_pending_attach_inits[g_pending_attach_init_count].func = funcs[0];
+				g_pending_attach_inits[g_pending_attach_init_count].swf_depth = swf_depth;
+				g_pending_attach_init_count++;
+			}
+		}
+	}
+
+	new_mc->totalframes = (int)frame_count;
+	new_mc->framesloaded = (int)frame_count;
+	new_mc->currentframe = 1;
+
+	return new_mc;
 }
 
 // ---------------------------------------------------------------------------
@@ -986,6 +1260,164 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 		if (out_ymax_px) *out_ymax_px = gymax;
 	}
 	return found;
+}
+
+// ---------------------------------------------------------------------------
+// getBounds helper: compute local content bounds for a MovieClip (twips)
+// ---------------------------------------------------------------------------
+
+// Recursively compute union of child bounds in a display list (results in twips)
+// Uses Fixed16 integer arithmetic to match Ruffle/Flash's truncating behavior.
+// Fixed16: 16.16 signed fixed-point. Matrix entries stored as Fixed16 raw i32 values.
+// wrapping_mul_int(fixed16, twips_i32) = (int32_t)(((int64_t)fixed16 * twips_i32) >> 16)
+#define FP16_ONE 65536
+#define FP_MUL(f16, tw) ((int32_t)(((int64_t)(f16) * (int64_t)(tw)) >> 16))
+// Compose two Fixed16 values: (a * b) >> 16  (both are 16.16)
+#define FP_MUL16(a, b) ((int32_t)(((int64_t)(a) * (int64_t)(b)) >> 16))
+// Convert float matrix entry to Fixed16 raw i32
+#define FLOAT_TO_FP16(f) ((int32_t)((f) * 65536.0f))
+// Convert twips (float, from transform_data) to i32 twips
+#define FLOAT_TO_TWIPS(f) ((int32_t)(f))
+
+static void boundsUnionCornerFP(int32_t px, int32_t py,
+	int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
+	int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax)
+{
+	int32_t tx = FP_MUL(fa, px) + FP_MUL(fc, py) + ftx;
+	int32_t ty = FP_MUL(fb, px) + FP_MUL(fd, py) + fty;
+	if (!*has) { *gxmin = *gxmax = tx; *gymin = *gymax = ty; *has = 1; }
+	else {
+		if (tx < *gxmin) *gxmin = tx;
+		if (tx > *gxmax) *gxmax = tx;
+		if (ty < *gymin) *gymin = ty;
+		if (ty > *gymax) *gymax = ty;
+	}
+}
+
+// Compute bounds using Fixed16 integer arithmetic matching Ruffle/Flash.
+// Matrix entries (fa,fb,fc,fd) are Fixed16 raw i32 values; ftx,fty are i32 twips.
+int ng_computeBoundsFromDL_fp16(DisplayObject* dl, size_t dl_max,
+    int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
+    int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax)
+{
+	for (size_t i = 1; i <= dl_max; i++) {
+		DisplayObject* child = &dl[i];
+		if (child->char_id == 0) continue;
+		u32 tid = child->transform_id;
+		int32_t ca = FLOAT_TO_FP16(transform_data[tid][0]);
+		int32_t cb = FLOAT_TO_FP16(transform_data[tid][1]);
+		int32_t cc = FLOAT_TO_FP16(transform_data[tid][4]);
+		int32_t cd = FLOAT_TO_FP16(transform_data[tid][5]);
+		int32_t ctx_tw = FLOAT_TO_TWIPS(transform_data[tid][12]);
+		int32_t cty_tw = FLOAT_TO_TWIPS(transform_data[tid][13]);
+		// Compose: new_matrix = outer * child  (Fixed16 composition)
+		int32_t na = FP_MUL16(fa, ca) + FP_MUL16(fc, cb);
+		int32_t nb = FP_MUL16(fb, ca) + FP_MUL16(fd, cb);
+		int32_t nc = FP_MUL16(fa, cc) + FP_MUL16(fc, cd);
+		int32_t nd = FP_MUL16(fb, cc) + FP_MUL16(fd, cd);
+		int32_t ntx = FP_MUL(fa, ctx_tw) + FP_MUL(fc, cty_tw) + ftx;
+		int32_t nty = FP_MUL(fb, ctx_tw) + FP_MUL(fd, cty_tw) + fty;
+
+		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+			ng_computeBoundsFromDL_fp16(child->sprite_display_list, child->sprite_max_depth,
+				na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		} else {
+			s32 cxmin, cxmax, cymin, cymax;
+			int child_has = ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax);
+			if (!child_has) {
+				int tf_idx = ng_find_textfield(child->char_id);
+				if (tf_idx >= 0) {
+					cxmin = ng_textfields[tf_idx].bounds_xmin;
+					cxmax = ng_textfields[tf_idx].bounds_xmax;
+					cymin = ng_textfields[tf_idx].bounds_ymin;
+					cymax = ng_textfields[tf_idx].bounds_ymax;
+					child_has = 1;
+				}
+			}
+			if (!child_has) continue;
+			boundsUnionCornerFP(cxmin, cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCornerFP(cxmax, cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCornerFP(cxmin, cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCornerFP(cxmax, cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		}
+	}
+	return *has;
+}
+
+// Double-precision wrappers kept for non-getBounds uses
+static void boundsUnionCorner(double px, double py,
+	double ma, double mb, double mc, double md, double mtx, double mty,
+	int* has, double* gxmin, double* gymin, double* gxmax, double* gymax)
+{
+	double tx = ma * px + mc * py + mtx;
+	double ty = mb * px + md * py + mty;
+	if (!*has) { *gxmin = *gxmax = tx; *gymin = *gymax = ty; *has = 1; }
+	else {
+		if (tx < *gxmin) *gxmin = tx;
+		if (tx > *gxmax) *gxmax = tx;
+		if (ty < *gymin) *gymin = ty;
+		if (ty > *gymax) *gymax = ty;
+	}
+}
+
+int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
+    double ma, double mb, double mc, double md, double mtx, double mty,
+    int* has, double* gxmin, double* gymin, double* gxmax, double* gymax)
+{
+	for (size_t i = 1; i <= dl_max; i++) {
+		DisplayObject* child = &dl[i];
+		if (child->char_id == 0) continue;
+		u32 tid = child->transform_id;
+		double ca = (double)transform_data[tid][0];
+		double cb = (double)transform_data[tid][1];
+		double cc = (double)transform_data[tid][4];
+		double cd = (double)transform_data[tid][5];
+		double ctx = (double)transform_data[tid][12];
+		double cty = (double)transform_data[tid][13];
+		double na = ma*ca + mc*cb, nb = mb*ca + md*cb;
+		double nc = ma*cc + mc*cd, nd = mb*cc + md*cd;
+		double ntx = ma*ctx + mc*cty + mtx;
+		double nty = mb*ctx + md*cty + mty;
+
+		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+			ng_computeBoundsFromDL_matrix(child->sprite_display_list, child->sprite_max_depth,
+				na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		} else {
+			s32 cxmin, cxmax, cymin, cymax;
+			int child_has = ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax);
+			if (!child_has) {
+				int tf_idx = ng_find_textfield(child->char_id);
+				if (tf_idx >= 0) {
+					cxmin = ng_textfields[tf_idx].bounds_xmin;
+					cxmax = ng_textfields[tf_idx].bounds_xmax;
+					cymin = ng_textfields[tf_idx].bounds_ymin;
+					cymax = ng_textfields[tf_idx].bounds_ymax;
+					child_has = 1;
+				}
+			}
+			if (!child_has) continue;
+			boundsUnionCorner((double)cxmin, (double)cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCorner((double)cxmax, (double)cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCorner((double)cxmin, (double)cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+			boundsUnionCorner((double)cxmax, (double)cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
+		}
+	}
+	return *has;
+}
+
+// Simple wrapper: compute bounds in local space (identity matrix)
+int ng_computeBoundsFromDL(DisplayObject* dl, size_t dl_max,
+    int32_t* out_xmin, int32_t* out_ymin, int32_t* out_xmax, int32_t* out_ymax)
+{
+	int has = 0;
+	double gxmin = 0, gymin = 0, gxmax = 0, gymax = 0;
+	ng_computeBoundsFromDL_matrix(dl, dl_max, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+		&has, &gxmin, &gymin, &gxmax, &gymax);
+	if (has) {
+		*out_xmin = (int32_t)rintf((float)gxmin); *out_ymin = (int32_t)rintf((float)gymin);
+		*out_xmax = (int32_t)rintf((float)gxmax); *out_ymax = (int32_t)rintf((float)gymax);
+	}
+	return has;
 }
 
 // ---------------------------------------------------------------------------
