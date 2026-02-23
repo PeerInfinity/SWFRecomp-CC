@@ -8983,6 +8983,11 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 }
 #endif
 
+// Helper: is this MC a textfield (static or dynamically created)?
+// Static textfields have ng_textfield_idx >= 0 (index into metadata table).
+// Dynamic textfields (createTextField) have ng_textfield_idx == -2.
+#define MC_IS_TEXTFIELD(mc) ((mc)->ng_textfield_idx >= 0 || (mc)->ng_textfield_idx == -2)
+
 // Get the original (unscaled, unrotated) content bounds for an MC, in pixels.
 // Returns 1 if bounds found, 0 if not.
 static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat_h)
@@ -9009,8 +9014,8 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 		}
 	}
 
-	// For textfields, use stored width/height directly
-	if (mc->ng_textfield_idx >= 0) {
+	// For textfields (static or dynamic), use stored width/height directly
+	if (MC_IS_TEXTFIELD(mc)) {
 		*out_nat_w = (double)mc->width;
 		*out_nat_h = (double)mc->height;
 		return (*out_nat_w > 0.0 || *out_nat_h > 0.0) ? 1 : 0;
@@ -9039,14 +9044,9 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 	double nat_w = 0.0, nat_h = 0.0;
 
 #ifdef NO_GRAPHICS
-	// For textfields, width/height are stored directly (not computed from bounds+scale)
-	if (mc->ng_textfield_idx >= 0) {
-		*eff_w = fabs((double)mc->width);
-		*eff_h = fabs((double)mc->height);
-		return;
-	}
-
 	// Always compute from original bounds + xscale/yscale
+	// For textfields, mcGetOriginalBounds uses mc->width/mc->height as natural bounds.
+	// For sprites/shapes, it uses ng_getDisplayEntryBounds.
 	mcGetOriginalBounds(mc, &nat_w, &nat_h);
 #else
 	nat_w = (double)mc->width;
@@ -9082,8 +9082,8 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 {
 	if (mc == NULL) return;
 #ifdef NO_GRAPHICS
-	// TextFields store _width as a direct bounding-box dimension, not via xscale.
-	if (mc->ng_textfield_idx >= 0) {
+	// TextFields (static or dynamic) store _width as a direct dimension, not via xscale.
+	if (MC_IS_TEXTFIELD(mc)) {
 		mc->width = (float)v;
 		return;
 	}
@@ -9130,8 +9130,8 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 {
 	if (mc == NULL) return;
 #ifdef NO_GRAPHICS
-	// TextFields store _height as a direct bounding-box dimension, not via yscale.
-	if (mc->ng_textfield_idx >= 0) {
+	// TextFields (static or dynamic) store _height as a direct dimension, not via yscale.
+	if (MC_IS_TEXTFIELD(mc)) {
 		mc->height = (float)v;
 		return;
 	}
@@ -21982,7 +21982,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			child->y = (float) y;
 			child->width = (float) w;
 			child->height = (float) h;
-			child->ng_textfield_idx = -1;
+			child->ng_textfield_idx = -2; // dynamically created textfield
 
 			if (child->dynamic_props == NULL) {
 				child->dynamic_props = (void*) allocObject(app_context, 32);
@@ -25373,7 +25373,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				child->y = (float) y;
 				child->width = (float) w;
 				child->height = (float) h;
-				child->ng_textfield_idx = -1; // dynamically created, no static metadata
+				child->ng_textfield_idx = -2; // dynamically created textfield (no static metadata, but still a TF)
 
 				// Set up dynamic_props with TextField defaults
 				if (child->dynamic_props == NULL) {
