@@ -34,7 +34,8 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
-    size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count);
+    size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id);
 void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,

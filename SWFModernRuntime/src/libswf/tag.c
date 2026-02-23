@@ -1466,7 +1466,8 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
-    size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count)
+    size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
 	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
@@ -1477,6 +1478,12 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 	dictionary[char_id].morph_end_offset = morph_end_offset;
 	dictionary[char_id].morph_color_start = morph_color_start;
 	dictionary[char_id].morph_color_count = morph_color_count;
+
+#ifdef NO_GRAPHICS
+	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
+#else
+	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
+#endif
 }
 
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id)

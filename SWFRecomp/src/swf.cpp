@@ -5319,7 +5319,8 @@ namespace SWFRecomp
 
 						shape_tag.parseFields(cur_pos);
 
-						// EndBounds parsed and ignored (not needed at ratio=0)
+						// EndBounds available in fields[1-4] but not used for static bounds.
+						// Morph bounds are per-ratio; we only store start bounds for now.
 
 						if (is_morph2)
 						{
@@ -6313,7 +6314,11 @@ namespace SWFRecomp
 										 << to_string(3*tris_size) << ", "
 										 << to_string(morph_end_start_vertex) << ", "
 										 << to_string(morph_color_start_saved) << ", "
-										 << to_string(morph_color_count) << ");" << endl;
+										 << to_string(morph_color_count) << ", "
+										 << to_string(shape_bounds_xmin) << ", "
+										 << to_string(shape_bounds_xmax) << ", "
+										 << to_string(shape_bounds_ymin) << ", "
+										 << to_string(shape_bounds_ymax) << ");" << endl;
 					}
 					else
 					{

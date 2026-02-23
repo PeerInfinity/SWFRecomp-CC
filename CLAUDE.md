@@ -39,3 +39,4 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 - Scope resolution: WITH scope chain → global variables → undefined
 - `emsdk_env.sh` is at `SWFRecomp-CC/emsdk/emsdk_env.sh`
 - Build scripts are under `SWFRecomp/scripts/`, NOT project root `scripts/`
+- If running locally, the Ruffle source repository is available at `~/CC/ruffle`

@@ -26655,27 +26655,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							   if (_hdymin<_hlymin) _hlymin=_hdymin; if (_hdymax>_hlymax) _hlymax=_hdymax; } \
 					} \
 					/* Transform through world matrix to global (stage) space */ \
-					/* Compose: root_as_transform * display_list_world_matrix */ \
+					/* Uses getConcatMatrixForMC which handles AS-set _x/_y/etc. */ \
 					if (out_has) { \
 						double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0; \
-						COMPUTE_WORLD_MATRIX_DBL(the_mc, _hwa, _hwb, _hwc, _hwd, _hwtx, _hwty); \
-						/* Apply _root's AS-set transform (x, y, rotation, xscale, yscale) */ \
-						{ \
-							double _rxs = (double)root_movieclip.xscale / 100.0; \
-							double _rys = (double)root_movieclip.yscale / 100.0; \
-							double _rrot = (double)root_movieclip.rotation * 3.14159265358979323846 / 180.0; \
-							double _rcos = cos(_rrot), _rsin = sin(_rrot); \
-							double _rra = _rcos * _rxs, _rrb = _rsin * _rxs; \
-							double _rrc = -_rsin * _rys, _rrd = _rcos * _rys; \
-							double _rrtx = (double)root_movieclip.x * 20.0; \
-							double _rrty = (double)root_movieclip.y * 20.0; \
-							/* Compose: root * world */ \
-							double _fna = _rra*_hwa + _rrc*_hwb, _fnb = _rrb*_hwa + _rrd*_hwb; \
-							double _fnc = _rra*_hwc + _rrc*_hwd, _fnd = _rrb*_hwc + _rrd*_hwd; \
-							double _fntx = _rra*_hwtx + _rrc*_hwty + _rrtx; \
-							double _fnty = _rrb*_hwtx + _rrd*_hwty + _rrty; \
-							_hwa=_fna; _hwb=_fnb; _hwc=_fnc; _hwd=_fnd; _hwtx=_fntx; _hwty=_fnty; \
-						} \
+						getConcatMatrixForMC(the_mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty); \
+						/* getConcatMatrixForMC returns tx/ty in pixels; convert to twips */ \
+						_hwtx *= 20.0; _hwty *= 20.0; \
 						double _hcorners[4][2] = { \
 							{_hlxmin, _hlymin}, {_hlxmax, _hlymin}, {_hlxmin, _hlymax}, {_hlxmax, _hlymax} \
 						}; \

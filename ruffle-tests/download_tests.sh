@@ -61,7 +61,7 @@ if ${CLEAN}; then
     for dir in "${SCRIPT_DIR}"/*/; do
         dirname="$(basename "${dir}")"
         case "${dirname}" in
-            _shared|__framework__) ;;
+            _shared|__framework__|_investigation) ;;
             *) rm -rf "${dir}" ;;
         esac
     done
