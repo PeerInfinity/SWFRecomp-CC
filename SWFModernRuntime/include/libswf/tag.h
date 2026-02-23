@@ -178,6 +178,16 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 
 // Callbacks from tag.c → tag_stubs.c supplemental registries (NO_GRAPHICS builds)
 void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
+// Record that a shape uses non-zero winding rule (DefineShape4 UsesFillWindingRule flag)
+void ng_record_char_winding(size_t char_id);
+// Shape-accurate point-in-shape test for a display list.
+// Walks the display list recursively; for leaf shapes, tests the test point against triangles.
+// ma..mty is the accumulated parent matrix (twips space).
+// test_x/test_y are the test point in twips.
+// Returns: 1 = hit, 0 = miss.
+int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
+    double ma, double mb, double mc, double md, double mtx, double mty,
+    double test_x, double test_y);
 void ng_record_button(size_t char_id);
 void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,

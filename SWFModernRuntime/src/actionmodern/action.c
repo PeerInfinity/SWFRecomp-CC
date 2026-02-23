@@ -26680,7 +26680,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// x, y are in _root's coordinate space (pixels)
 					double tx = varToDouble(&ht_args[0]);
 					double ty = varToDouble(&ht_args[1]);
-					// shapeFlag is ignored for now (always bounding box)
+					int shape_flag = 0;
+					if (num_args >= 3) {
+						if (ht_args[2].type == ACTION_STACK_VALUE_BOOLEAN)
+							shape_flag = (ht_args[2].data.numeric_value != 0);
+						else {
+							double sf = varToDouble(&ht_args[2]);
+							shape_flag = (sf != 0.0 && sf == sf);
+						}
+					}
 
 					if (tx != tx || ty != ty) {
 						// NaN → false
@@ -26713,8 +26721,76 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					double ptx = rra * ptx_local + rrc * pty_local + rrtx;
 					double pty = rrb * ptx_local + rrd * pty_local + rrty;
 
-					// Check inclusion (both AABB and point are now in global/stage space)
+					// Check bounding box first (fast reject)
 					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
+
+					// If shapeFlag=true and BB says hit, refine with shape-accurate test
+					if (hit && shape_flag) {
+						extern int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
+							double ma, double mb, double mc_m, double md, double mtx, double mty,
+							double test_x, double test_y);
+						// Find MC's display list (same logic as COMPUTE_GLOBAL_AABB)
+						DisplayObject* _htdl = NULL; size_t _htm = 0;
+						if (mc == &root_movieclip) {
+							_htdl = display_list; _htm = max_depth;
+						} else if (mc != NULL && mc->display_obj != NULL) {
+							DisplayObject* _hdobj = (DisplayObject*)mc->display_obj;
+							if (_hdobj->sprite_display_list != NULL) {
+								_htdl = _hdobj->sprite_display_list; _htm = _hdobj->sprite_max_depth;
+							}
+						}
+						if (_htdl == NULL && mc != NULL && mc->name[0] != '\0') {
+							MovieClip* _hch[16]; int _hcl = 0;
+							for (MovieClip* _hcur = mc; _hcur && _hcur != &root_movieclip && _hcl < 16; _hcur = _hcur->parent)
+								_hch[_hcl++] = _hcur;
+							DisplayObject* _hdl = display_list; size_t _hm = max_depth;
+							for (int _hi = _hcl - 1; _hi >= 0; _hi--) {
+								size_t _hfd = SIZE_MAX;
+								for (size_t _hd = 1; _hd <= _hm; _hd++) {
+									if (_hdl[_hd].char_id == 0) continue;
+									if (_hdl[_hd].instance_name && strcmp(_hdl[_hd].instance_name, _hch[_hi]->name) == 0)
+										{ _hfd = _hd; break; }
+								}
+								if (_hfd == SIZE_MAX) break;
+								if (_hi == 0) {
+									if (_hdl[_hfd].sprite_display_list) {
+										_htdl = _hdl[_hfd].sprite_display_list; _htm = _hdl[_hfd].sprite_max_depth;
+									}
+								} else {
+									if (!_hdl[_hfd].sprite_display_list) break;
+									_hm = _hdl[_hfd].sprite_max_depth; _hdl = _hdl[_hfd].sprite_display_list;
+								}
+							}
+						}
+						// Shape test: default to false unless we find a shape hit
+						hit = 0;
+						if (_htdl != NULL) {
+							// Get MC's world matrix in twips for shape testing
+							double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0;
+							getConcatMatrixForMC(mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty);
+							_hwtx *= 20.0; _hwty *= 20.0; // pixels→twips
+							hit = ng_hitTestShapeFromDL(_htdl, _htm,
+								_hwa, _hwb, _hwc, _hwd, _hwtx, _hwty, ptx, pty);
+						}
+						// Also check drawing bounds (for drawing-API shapes)
+						if (!hit && mc != NULL && mc->draw_has_bounds) {
+							// Inverse-transform test point to MC's local pixel space
+							double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0;
+							getConcatMatrixForMC(mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty);
+							double ddet = _hwa*_hwd - _hwb*_hwc;
+							if (ddet != 0.0) {
+								double dinv = 1.0 / ddet;
+								double dpx = ptx / 20.0, dpy = pty / 20.0; // stage pixels
+								double dsx = dpx - _hwtx, dsy = dpy - _hwty;
+								double dlx = (_hwd*dsx - _hwc*dsy) * dinv;
+								double dly = (-_hwb*dsx + _hwa*dsy) * dinv;
+								// Check if in draw bounds (pixels)
+								hit = (dlx >= mc->draw_xmin && dlx <= mc->draw_xmax &&
+								       dly >= mc->draw_ymin && dly <= mc->draw_ymax);
+							}
+						}
+					}
+
 					PUSH(ACTION_STACK_VALUE_BOOLEAN, hit ? 1 : 0);
 					return;
 				} else if (num_args == 1) {

@@ -5302,7 +5302,12 @@ namespace SWFRecomp
 
 						shape_tag.parseFields(cur_pos);
 
-						// Flags parsed and ignored for rendering purposes
+						// Extract UsesFillWindingRule flag (bit 2)
+						int uses_fill_winding_rule = ((int)shape_tag.fields[0].value >> 2) & 1;
+						if (uses_fill_winding_rule)
+						{
+							context.tag_main << "\t" << "ng_record_char_winding(" << to_string(shape_id) << ");" << endl;
+						}
 					}
 
 					if (is_morph)
