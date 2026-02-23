@@ -9033,6 +9033,13 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 		*out_nat_h = (double)(gymax - gymin);
 		return 1;
 	}
+
+	// Fallback: use stored width/height (set by ng_attachMovie for dynamically attached clips)
+	if (mc->width > 0.0f || mc->height > 0.0f) {
+		*out_nat_w = (double)mc->width;
+		*out_nat_h = (double)mc->height;
+		return 1;
+	}
 #endif
 	*out_nat_w = 0.0;
 	*out_nat_h = 0.0;
@@ -22238,6 +22245,87 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 #endif
 		builtin_handled = 1;
 	}
+	// attachMovie(linkageId, newName, depth [, initObject]) — MC method called as CallFunction
+	else if (func_name_len == 11 && strncmp(func_name, "attachMovie", 11) == 0)
+	{
+#ifdef NO_GRAPHICS
+		if (num_args >= 3) {
+			extern MovieClip root_movieclip;
+			MovieClip* mc = &root_movieclip;
+			char _am_buf1[256], _am_buf2[256];
+			if (args[0].type == ACTION_STACK_VALUE_STRING) {
+				const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+				u16_to_utf8(_u16, args[0].str_size, _am_buf1, sizeof(_am_buf1));
+			} else {
+				varToStringBuf(app_context, &args[0], _am_buf1, sizeof(_am_buf1));
+			}
+			if (args[1].type == ACTION_STACK_VALUE_STRING) {
+				const uint16_t* _u16 = varGetU16Ptr(&args[1]);
+				u16_to_utf8(_u16, args[1].str_size, _am_buf2, sizeof(_am_buf2));
+			} else {
+				varToStringBuf(app_context, &args[1], _am_buf2, sizeof(_am_buf2));
+			}
+			int depth_val = (int)varToDouble(&args[2]);
+			size_t char_id = ng_lookupExport(_am_buf1);
+			if (char_id != (size_t)-1) {
+				MovieClip* attached = ng_attachMovie(app_context, char_id, _am_buf2, depth_val, mc);
+				if (attached != NULL) {
+					// Apply initObject if present
+					if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* init_obj = (ASObject*)(uintptr_t)args[3].data.numeric_value;
+						if (init_obj != NULL) {
+							for (u32 pi = 0; pi < init_obj->num_used; pi++) {
+								if (init_obj->properties[pi].name_length > 0) {
+									// Try MC builtin props first (_x, _y, etc.)
+									if (!setMCBuiltinProperty(app_context, attached,
+											init_obj->properties[pi].name,
+											init_obj->properties[pi].name_length,
+											&init_obj->properties[pi].value)) {
+										// Fall through to dynamic properties
+										if (attached->dynamic_props == NULL) {
+											attached->dynamic_props = (void*) allocObject(app_context, 8);
+											retainObject((ASObject*) attached->dynamic_props);
+										}
+										setProperty(app_context, (ASObject*)attached->dynamic_props,
+											init_obj->properties[pi].name,
+											init_obj->properties[pi].name_length,
+											&init_obj->properties[pi].value);
+									}
+								}
+							}
+						}
+					}
+					// Register on parent's dynamic_props
+					if (mc->dynamic_props == NULL) {
+						mc->dynamic_props = (void*) allocObject(app_context, 8);
+						retainObject((ASObject*) mc->dynamic_props);
+					}
+					ActionVar mc_var = {0};
+					mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					mc_var.data.numeric_value = (u64) attached;
+					setProperty(app_context, (ASObject*) mc->dynamic_props,
+						_am_buf2, (u32)strlen(_am_buf2), &mc_var);
+					setVariableByName(_am_buf2, &mc_var);
+					if (args != NULL) FREE(args);
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
+				} else {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+				}
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+		} else {
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+		}
+#else
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+#endif
+		builtin_handled = 1;
+	}
 	// getNextHighestDepth() — as a global function, operates on root
 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
 	{
@@ -25542,6 +25630,101 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					VAL(u64, &result.data.numeric_value) = (u64)_tgt_u16;
 					pushVar(app_context, &result);
 				}
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+#else
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+#endif
+			return;
+		}
+		else if (method_name_len == 11 && strncmp(method_name, "attachMovie", 11) == 0)
+		{
+			// attachMovie(linkageId, newName, depth [, initObject])
+			// Instantiates an exported library symbol as a child clip
+#ifdef NO_GRAPHICS
+			if (num_args >= 3) {
+				char _am_id_buf[512], _am_name_buf[512];
+				const char* linkage_id = "";
+				const char* new_name = "";
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+					u16_to_utf8(_u16, args[0].str_size, _am_id_buf, sizeof(_am_id_buf));
+					linkage_id = _am_id_buf;
+				}
+				if (args[1].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _u16 = varGetU16Ptr(&args[1]);
+					u16_to_utf8(_u16, args[1].str_size, _am_name_buf, sizeof(_am_name_buf));
+					new_name = _am_name_buf;
+				}
+				int depth_val = ecmaToInt32(varToDouble(&args[2]));
+
+				// Lookup exported symbol
+				size_t char_id = ng_lookupExport(linkage_id);
+				if (char_id != (size_t)-1 && new_name[0] != '\0') {
+					// Attach the movie
+					MovieClip* attached = ng_attachMovie(app_context, char_id, new_name, depth_val, mc);
+					if (attached != NULL) {
+						// Copy URL from parent
+						strncpy(attached->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(attached->url) - 1);
+
+						// Apply initObject properties (arg 3) if provided
+						if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
+							ASObject* init_obj = (ASObject*) args[3].data.numeric_value;
+							if (init_obj != NULL) {
+								// Copy all properties from initObject
+								for (u32 pi = 0; pi < init_obj->num_used; pi++) {
+									if (init_obj->properties[pi].name_length > 0) {
+										// Try MC builtin props first (_x, _y, etc.)
+										if (!setMCBuiltinProperty(app_context, attached,
+												init_obj->properties[pi].name,
+												init_obj->properties[pi].name_length,
+												&init_obj->properties[pi].value)) {
+											// Fall through to dynamic properties
+											if (attached->dynamic_props == NULL) {
+												attached->dynamic_props = (void*) allocObject(app_context, 8);
+												retainObject((ASObject*) attached->dynamic_props);
+											}
+											setProperty(app_context, (ASObject*)attached->dynamic_props,
+												init_obj->properties[pi].name,
+												init_obj->properties[pi].name_length,
+												&init_obj->properties[pi].value);
+										}
+									}
+								}
+							}
+						}
+
+						// Register on parent's dynamic_props
+						if (mc->dynamic_props == NULL) {
+							mc->dynamic_props = (void*) allocObject(app_context, 8);
+							retainObject((ASObject*) mc->dynamic_props);
+						}
+						ActionVar am_var = {0};
+						am_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						am_var.data.numeric_value = (u64)attached;
+						setProperty(app_context, (ASObject*)mc->dynamic_props, new_name, strlen(new_name), &am_var);
+
+						// Add to child_mc_cache
+						{
+							int _sl = -1;
+							for (int _di = 0; _di < child_mc_count; _di++) {
+								if (child_mc_cache[_di] == NULL) { _sl = _di; break; }
+							}
+							if (_sl >= 0) child_mc_cache[_sl] = attached;
+							else if (child_mc_count < MAX_CHILD_MOVIECLIPS) child_mc_cache[child_mc_count++] = attached;
+						}
+
+						if (args != NULL) FREE(args);
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
+						return;
+					}
+				}
+				// Not found or not a sprite — return undefined
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
 			} else {
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);

@@ -123,6 +123,27 @@ void ng_try_reclaim_auto_instance_name(const char* auto_name)
 }
 
 // ---------------------------------------------------------------------------
+// Exported symbols registry (DoExportAssets → attachMovie linkage)
+// ---------------------------------------------------------------------------
+#define MAX_EXPORTED_SYMBOLS 128
+static struct {
+	char name[128];
+	size_t char_id;
+} ng_exported_symbols[MAX_EXPORTED_SYMBOLS];
+static size_t ng_exported_symbol_count = 0;
+
+size_t ng_lookupExport(const char* name)
+{
+	// Last registration wins (Flash behavior for duplicate export names)
+	// Case-insensitive matching (Flash AVM1 behavior)
+	size_t result = (size_t)-1;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (strcasecmp(ng_exported_symbols[i].name, name) == 0)
+			result = ng_exported_symbols[i].char_id;
+	return result;
+}
+
+// ---------------------------------------------------------------------------
 // Clone depth table — tracks which variable name occupies each SWF depth for
 // script-created clones (CloneSprite / duplicateMovieClip). When a new clone
 // takes an occupied SWF depth, the old variable is set to undefined so that
@@ -333,6 +354,205 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id)
 	(void)app_context;
 	if (ng_video_count < MAX_VIDEOS_NG)
 		ng_video_ids[ng_video_count++] = (size_t)char_id;
+}
+
+// ---------------------------------------------------------------------------
+// tagRegisterExport — called from generated tagInit() for DoExportAssets
+// ---------------------------------------------------------------------------
+void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id)
+{
+	(void)app_context;
+	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
+		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, name, 127);
+		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
+		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
+		ng_exported_symbol_count++;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Pending attach init queue — deferred frame-0 script execution for attachMovie
+// ---------------------------------------------------------------------------
+extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* name, MovieClip* parent);
+extern void setVariableByName(const char* var_name, ActionVar* value);
+extern void actionSetCurrentContext(MovieClip* mc);
+extern MovieClip root_movieclip;
+extern int g_settarget_explicit_root;
+extern DisplayObject* g_current_sprite_obj;
+extern MovieClip* g_current_context;
+
+#define MAX_PENDING_ATTACH_INITS 64
+typedef struct {
+	char instance_name[256];
+	frame_func func;
+} PendingAttachInit;
+static PendingAttachInit g_pending_attach_inits[MAX_PENDING_ATTACH_INITS];
+static size_t g_pending_attach_init_count = 0;
+
+void ng_fire_pending_attach_inits(SWFAppContext* app_context)
+{
+	for (size_t i = 0; i < g_pending_attach_init_count; i++) {
+		// Set context to the attached clip for correct variable resolution
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* mc = actionFindOrCreateMovieClip(
+			app_context, g_pending_attach_inits[i].instance_name, &root_movieclip);
+		if (mc) actionSetCurrentContext(mc);
+
+		// Save/create temp display list for placement tags
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+		int saved_settarget = g_settarget_explicit_root;
+
+		size_t tmp_cap = 64;
+		DisplayObject* tmp_dl = calloc(tmp_cap, sizeof(DisplayObject));
+		display_list = tmp_dl;
+		max_depth = 0;
+		display_list_capacity = tmp_cap;
+		g_settarget_explicit_root = 0;
+		g_current_sprite_obj = NULL;
+
+		// Run the frame function (scripts will run this time since catch_up_mode = 0)
+		g_pending_attach_inits[i].func(app_context);
+
+		// Restore
+		actionSetCurrentContext(saved_ctx);
+		g_current_sprite_obj = saved_sprite_obj;
+		g_settarget_explicit_root = saved_settarget;
+		free(tmp_dl);
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+	}
+	g_pending_attach_init_count = 0;
+}
+
+// ---------------------------------------------------------------------------
+// ng_attachMovie — instantiate an exported library symbol at runtime
+// ---------------------------------------------------------------------------
+
+MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent)
+{
+	extern size_t display_list_capacity;
+
+	if (char_id >= INITIAL_DICTIONARY_CAPACITY) return NULL;
+	if (dictionary[char_id].type != CHAR_TYPE_SPRITE) return NULL;
+	// Flash valid depth range: -16384 to 2130690044
+	if (as_depth > 2130690044 || as_depth < -16384) return NULL;
+
+	// Create MC for the attached clip (reset position/scale to defaults for re-attach)
+	MovieClip* new_mc = actionFindOrCreateMovieClip(app_context, new_name, parent);
+	if (new_mc == NULL) return NULL;
+	new_mc->depth = as_depth;
+	new_mc->x = 0.0f;
+	new_mc->y = 0.0f;
+	new_mc->xscale = 100.0f;
+	new_mc->yscale = 100.0f;
+	new_mc->rotation = 0.0f;
+	new_mc->alpha = 100.0f;
+	new_mc->visible = 1;
+	new_mc->width = 0.0f;
+	new_mc->height = 0.0f;
+#ifdef NO_GRAPHICS
+	new_mc->as_set_flags = 0;
+#endif
+
+	// Remove any existing clone at this SWF depth
+	int swf_depth = as_depth + 16384;
+	clone_depth_register(swf_depth, new_name);
+
+	// Register as a variable so GetVariable finds it
+	ActionVar mc_var = {0};
+	mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+	mc_var.data.numeric_value = (u64)(uintptr_t)new_mc;
+	setVariableByName(new_name, &mc_var);
+
+	// Execute the sprite's frame 0 placement tags (scripts deferred to end of frame)
+	frame_func* funcs = dictionary[char_id].sprite_frame_funcs;
+	size_t frame_count = dictionary[char_id].sprite_frame_count;
+	if (funcs != NULL && frame_count > 0 && funcs[0] != NULL) {
+		// Context swap: save current display list and switch to a temporary one
+		// for the sprite's children
+		DisplayObject* saved_dl    = display_list;
+		size_t         saved_max   = max_depth;
+		size_t         saved_cap   = display_list_capacity;
+		MovieClip*     saved_ctx   = NULL;
+		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+		int            saved_settarget = g_settarget_explicit_root;
+		int            saved_catch_up = catch_up_mode;
+
+		// Create a temporary display list for the sprite's children
+		size_t tmp_cap = 64;
+		DisplayObject* tmp_dl = calloc(tmp_cap, sizeof(DisplayObject));
+		display_list = tmp_dl;
+		max_depth = 0;
+		display_list_capacity = tmp_cap;
+		g_settarget_explicit_root = 0;
+
+		// Set the MC context so _name, _x etc resolve correctly
+		saved_ctx = g_current_context;
+		actionSetCurrentContext(new_mc);
+		g_current_sprite_obj = NULL;
+
+		// Run frame 0 with catch_up_mode=1 to skip scripts (only placement tags run)
+		catch_up_mode = 1;
+		funcs[0](app_context);
+		catch_up_mode = saved_catch_up;
+
+		// Restore context
+		actionSetCurrentContext(saved_ctx);
+		g_current_sprite_obj = saved_sprite_obj;
+		g_settarget_explicit_root = saved_settarget;
+
+		// Compute content bounds from children placed during frame 0
+		{
+			float bxmin = 1e30f, bxmax = -1e30f, bymin = 1e30f, bymax = -1e30f;
+			int has_bounds = 0;
+			for (size_t d = 0; d <= max_depth && d < tmp_cap; d++) {
+				if (tmp_dl[d].char_id == 0) continue;
+				s32 cxmin, cxmax, cymin, cymax;
+				if (ng_getCharBounds(tmp_dl[d].char_id, &cxmin, &cxmax, &cymin, &cymax)) {
+					float pxmin = (float)cxmin / 20.0f;
+					float pxmax = (float)cxmax / 20.0f;
+					float pymin = (float)cymin / 20.0f;
+					float pymax = (float)cymax / 20.0f;
+					if (pxmin < bxmin) bxmin = pxmin;
+					if (pxmax > bxmax) bxmax = pxmax;
+					if (pymin < bymin) bymin = pymin;
+					if (pymax > bymax) bymax = pymax;
+					has_bounds = 1;
+				}
+			}
+			if (has_bounds) {
+				new_mc->width = bxmax - bxmin;
+				new_mc->height = bymax - bymin;
+			}
+		}
+
+		// Free temporary display list (children from PlaceObject2 during init)
+		free(tmp_dl);
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+
+		// Queue the frame function for deferred script execution
+		// (Flash runs attached clip init scripts at end of frame)
+		if (g_pending_attach_init_count < MAX_PENDING_ATTACH_INITS) {
+			strncpy(g_pending_attach_inits[g_pending_attach_init_count].instance_name,
+				new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
+			g_pending_attach_inits[g_pending_attach_init_count].instance_name[
+				sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
+			g_pending_attach_inits[g_pending_attach_init_count].func = funcs[0];
+			g_pending_attach_init_count++;
+		}
+	}
+
+	new_mc->totalframes = (int)frame_count;
+	new_mc->framesloaded = (int)frame_count;
+	new_mc->currentframe = 1;
+
+	return new_mc;
 }
 
 // ---------------------------------------------------------------------------

@@ -85,6 +85,7 @@ void tagStopAllSounds(SWFAppContext* app_context);
 void tagScriptLimits(u16 max_recursion, u16 timeout);
 void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id);
+void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
 
 // Forward declaration (defined in actionmodern/action.h)
 typedef struct MovieClip MovieClip;
@@ -187,6 +188,10 @@ void ng_record_csm(size_t text_id, const char* anti_alias_type, const char* grid
     float thickness, float sharpness);
 void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
+// Look up exported symbol by linkage name. Returns char_id or (size_t)-1 if not found.
+size_t ng_lookupExport(const char* name);
+// Attach a library symbol by char_id. Returns created MC, or NULL if not sprite.
+MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent);
 // Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 // Called before tagRemoveObject clears an object (handles MC invalidation, cleanup)
@@ -195,4 +200,6 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
 void ng_try_reclaim_auto_instance_name(const char* auto_name);
 // Fire queued onLoad events for duplicated clips (called from tagShowFrame)
 void ng_fire_pending_loads(SWFAppContext* app_context);
+// Fire deferred init scripts for attachMovie clips (called from tagShowFrame)
+void ng_fire_pending_attach_inits(SWFAppContext* app_context);
 #endif

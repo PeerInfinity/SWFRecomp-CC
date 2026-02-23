@@ -775,6 +775,9 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
 		ng_fire_pending_loads(app_context);
 
+		// Fire deferred init scripts for attachMovie clips
+		ng_fire_pending_attach_inits(app_context);
+
 		// Dispatch AS2 mc.onEnterFrame property handlers, but skip MCs
 		// created during process_sprite_needs_init (they fire next frame).
 		g_enterframe_new_mc_start = mc_count_before;
@@ -2101,6 +2104,15 @@ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
 	(void)app_context; (void)char_id;
 #endif
 }
+
+// tagRegisterExport: in NO_GRAPHICS mode, implemented in tag_stubs.c.
+// In graphics mode, provide a no-op stub.
+#ifndef NO_GRAPHICS
+void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id)
+{
+	(void)app_context; (void)name; (void)char_id;
+}
+#endif
 
 #ifdef NO_GRAPHICS
 // Returns 1 if any multi-frame sprite at root level is playing.

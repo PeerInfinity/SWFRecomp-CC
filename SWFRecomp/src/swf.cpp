@@ -3123,10 +3123,28 @@ namespace SWFRecomp
 			}
 			
 			case SWF_TAG_METADATA:
-			case SWF_TAG_EXPORT_ASSETS:
 			case SWF_TAG_DEBUG_ID:
 			{
 				cur_pos += tag.length;
+				break;
+			}
+
+			case SWF_TAG_EXPORT_ASSETS:
+			{
+				// DoExportAssets: Count(UI16), then Count * [Tag(UI16) + Name(STRING)]
+				char* export_start = cur_pos;
+				u16 export_count = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+				cur_pos += 2;
+				for (u16 ei = 0; ei < export_count; ei++)
+				{
+					u16 export_char_id = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+					cur_pos += 2;
+					// Name is null-terminated string
+					std::string export_name(cur_pos);
+					cur_pos += export_name.length() + 1;  // +1 for null terminator
+					// Emit registration call in tagInit
+					tag_init << endl << "\ttagRegisterExport(app_context, \"" << export_name << "\", " << to_string(export_char_id) << ");";
+				}
 				break;
 			}
 
