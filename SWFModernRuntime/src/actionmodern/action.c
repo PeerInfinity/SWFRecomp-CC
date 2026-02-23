@@ -17351,13 +17351,18 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
 				if (strcasecmp(prop_name, "_lockroot") == 0) {
-					// Coerce to boolean: non-zero numbers, non-empty strings → true
+					// Coerce to boolean: non-zero numbers, non-empty strings, objects → true
 					if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
 						mc->lockroot = value_var.data.numeric_value ? 1 : 0;
 					} else if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
 						mc->lockroot = 0;
 					} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
 						mc->lockroot = (value_var.str_size > 0) ? 1 : 0;
+					} else if (value_var.type == ACTION_STACK_VALUE_OBJECT ||
+					           value_var.type == ACTION_STACK_VALUE_FUNCTION ||
+					           value_var.type == ACTION_STACK_VALUE_ARRAY) {
+						// Objects are always truthy
+						mc->lockroot = 1;
 					} else {
 						mc->lockroot = (!isnan(fval) && fval != 0.0f) ? 1 : 0;
 					}
@@ -18041,6 +18046,18 @@ void actionDelete(SWFAppContext* app_context)
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		obj = (ASObject*) obj_var.data.numeric_value;
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// Delete from MovieClip's dynamic_props
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+		if (mc != NULL && mc->dynamic_props != NULL) {
+			bool success = deleteProperty(app_context, (ASObject*)mc->dynamic_props, prop_name, prop_name_len);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+		} else {
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+		}
+		return;
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
 	{
@@ -26271,6 +26288,34 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 #endif
 			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
+		{
+			// hasOwnProperty(name): check if MC has the named property directly
+			int _hop_result = 0;
+			if (num_args >= 1) {
+				char _hop_buf[512];
+				const char* _hop_name = _hop_buf;
+				u32 _hop_len = 0;
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+					_hop_len = (u32)u16_to_utf8(_u16, args[0].str_size, _hop_buf, sizeof(_hop_buf));
+				} else {
+					int l = varToStringBuf(app_context, &args[0], _hop_buf, sizeof(_hop_buf));
+					_hop_len = (u32) l;
+				}
+				// Check dynamic_props (user-set properties)
+				if (mc->dynamic_props != NULL) {
+					if (hasPropertyRaw((ASObject*)mc->dynamic_props, _hop_name, _hop_len))
+						_hop_result = 1;
+				}
+			}
+			if (args != NULL) FREE(args);
+			ActionVar _hop_ret = {0};
+			_hop_ret.type = ACTION_STACK_VALUE_BOOLEAN;
+			_hop_ret.data.numeric_value = _hop_result;
+			pushVar(app_context, &_hop_ret);
 			return;
 		}
 		else

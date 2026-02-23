@@ -1574,6 +1574,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		if (display_list[depth].char_id != char_id)
 		{
 			// Flash rejects placing a different character at a depth already occupied this frame
+			printf("Warning: Failed to place object at depth %zu.\n", depth);
 			return;
 		}
 		// Same character at same depth in same frame: treat as modify (don't re-init)
