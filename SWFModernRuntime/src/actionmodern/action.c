@@ -16748,10 +16748,37 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 		}
 	}
 
-	// Full URL loading/variables not yet implemented
+	// loadMovie: load_target_flag=1, load_variables_flag=0
+	if (load_target_flag && !load_variables_flag) {
+		// Convert URL and target to UTF-8
+		char url_utf8[512];
+		char target_utf8[512];
+		if (url_var.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* url_u16 = varGetU16Ptr(&url_var);
+			u16_to_utf8(url_u16, url_var.str_size, url_utf8, sizeof(url_utf8));
+		} else {
+			url_utf8[0] = '\0';
+		}
+		if (target_var.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* tgt_u16 = varGetU16Ptr(&target_var);
+			u16_to_utf8(tgt_u16, target_var.str_size, target_utf8, sizeof(target_utf8));
+		} else {
+			target_utf8[0] = '\0';
+		}
+
+		MovieEntry* entry = findMovieEntry(url_utf8);
+		if (entry != NULL) {
+			// Run the child movie's init and frame 0
+			entry->init_func(app_context);
+			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+				entry->frame_funcs[0](app_context);
+			}
+		}
+		return;
+	}
+
+	// loadVariables and browser navigation not yet implemented
 	(void)send_vars_method;
-	(void)load_target_flag;
-	(void)load_variables_flag;
 }
 
 void actionInitArray(SWFAppContext* app_context)
@@ -27229,6 +27256,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 #endif
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 9 && strncmp(method_name, "loadMovie", 9) == 0)
+		{
+			// mc.loadMovie(url) — load a pre-compiled child SWF into this clip
+			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_STRING) {
+				char _lm_url[512];
+				const uint16_t* _lm_u16 = varGetU16Ptr(&args[0]);
+				u16_to_utf8(_lm_u16, args[0].str_size, _lm_url, sizeof(_lm_url));
+				MovieEntry* entry = findMovieEntry(_lm_url);
+				if (entry != NULL && mc != NULL) {
+					// Run the child movie's init and frame 0
+					entry->init_func(app_context);
+					if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+						entry->frame_funcs[0](app_context);
+					}
+				}
+			}
+			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}

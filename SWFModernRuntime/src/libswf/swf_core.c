@@ -30,6 +30,14 @@ float g_drag_virt_x = 0.0f;   // virtual stage X of dragged clip (twips)
 float g_drag_virt_y = 0.0f;   // virtual stage Y of dragged clip (twips)
 char g_drag_target_name[256] = "";  // name of most-recently dragged clip (persists after stopDrag)
 
+// Default findMovieEntry stub when no child movies are linked
+#ifndef HAS_CHILD_MOVIES
+MovieEntry* findMovieEntry(const char* filename) {
+	(void)filename;
+	return NULL;
+}
+#endif
+
 // Goto catch-up state
 int catch_up_mode = 0;
 int goto_from_action = 0;

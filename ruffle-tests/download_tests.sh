@@ -90,6 +90,14 @@ for test_dir in "${SRC_DIR}"/*/; do
         fi
     done
 
+    # Copy child/target SWF files (target.swf, child.swf, assets.swf, etc.)
+    # These are needed for multi-SWF tests (loadMovie, registerClass, etc.)
+    for swf_file in "${test_dir}"/*.swf; do
+        [[ -f "${swf_file}" ]] || continue
+        [[ "$(basename "${swf_file}")" == "test.swf" ]] && continue
+        cp "${swf_file}" "${dest}/"
+    done
+
     # Copy ActionScript source files if present (useful for debugging)
     for ext in as fla; do
         for src_file in "${test_dir}"/*.${ext}; do
