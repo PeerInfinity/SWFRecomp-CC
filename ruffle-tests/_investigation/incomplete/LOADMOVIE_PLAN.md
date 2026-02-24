@@ -3,7 +3,7 @@
 
 Last updated: 2026-02-24
 
-## Status: IN PROGRESS — 15/49 tests passing, Phases 0-5 complete + FlashVars + context switch
+## Status: IN PROGRESS — 18/49 tests passing, Phases 0-5 complete + FlashVars + context switch + loadVariables + root replacement
 
 Phases 0-5 (build pipeline, _level management, core loadMovie, actionGetURL routing,
 MovieClipLoader class, unloadMovie) are implemented. FlashVars (URL query string) parsing

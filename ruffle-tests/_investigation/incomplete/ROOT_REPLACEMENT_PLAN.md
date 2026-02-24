@@ -1,9 +1,26 @@
 # Root Replacement Plan (loadMovie into _root/_level0)
 <!-- TESTS: loadmovie_replace_root, mcl_loadclip_replace_root, mcl_replace_root_swf7_to_swf5, mcl_replace_root_swf7_to_swf6 -->
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
-## Status: NOT STARTED — 0/4 tests passing
+## Status: PARTIAL — 1/4 tests passing (loadmovie_replace_root)
+
+---
+
+## Implementation Notes
+
+**Phases 1-4 implemented (2026-02-25):**
+- Root state clearing: dynamic_props cleared + var_map/var_array reset on root replacement
+- Stage dimensions updated from MovieEntry's stage_width/stage_height
+- Frame count metadata updated (totalframes, framesloaded, currentframe)
+- _global persistence verified (works automatically — singleton not cleared)
+- Dynamic props clearing also added for non-root loadMovie targets (consistency with MCL path)
+
+**loadmovie_replace_root: PASS** — All 5 lines match
+
+**mcl_loadclip_replace_root: BLOCKED** — Test uses MTASC class convention (_root.main()). Requires REGISTERCLASS_PLAN or MTASC class linking.
+
+**mcl_replace_root_swf7_to_swf5/6: DEFERRED** — Needs cross-version scope isolation.
 
 ---
 
@@ -29,8 +46,8 @@ from loading into a child clip because it changes the execution context of the e
 
 | Test | Feasible? | Notes |
 |------|-----------|-------|
-| **loadmovie_replace_root** | **YES** | Core mechanics: clear root state, install child, update Stage dims |
-| **mcl_loadclip_replace_root** | **YES** | Simple: just needs onLoadStart to fire before replacement |
+| **loadmovie_replace_root** | **PASS** ✅ | Root state clearing + Stage dims + var_map reset |
+| **mcl_loadclip_replace_root** | **BLOCKED** | Needs MTASC class support (_root.main() resolution) |
 | **mcl_replace_root_swf7_to_swf5** | **HARD** | Needs SWF version switching, closure var scoping across versions |
 | **mcl_replace_root_swf7_to_swf6** | **HARD** | Same as above but with SWF6 behavior differences |
 

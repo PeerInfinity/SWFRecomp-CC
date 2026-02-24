@@ -4,9 +4,9 @@ Last updated: 2026-02-24
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 333/619 (53.8%)
-- **Main failure types**: output_mismatch (276), segfault (5), runtime_error (4), timeout (1)
-- **Recent gains**: FlashVars URL query parsing (+2 flashvars tests), instanceof MovieClip (+1 mcl_mislabeled_target), _visible undefined/null no-op (+1 stage_object_properties_swf6), child SWF context switching, getBytesLoaded/Total, _url property, getTextSnapshot stub
+- **Pass rate (CI, last run)**: 342/619 (55.3%)
+- **Main failure types**: output_mismatch (~267), segfault (5), runtime_error (4), timeout (1)
+- **Recent gains**: loadVariables data file pre-bundling (+2 loadvariables tests), root replacement with Stage dimension update (+1 loadmovie_replace_root), dynamic_props clearing on loadMovie targets, var_map/var_array reset on root replacement
 
 ## Crashes and Errors (8 tests)
 
@@ -105,10 +105,10 @@ Last updated: 2026-02-24
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by closure capture bug |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
-| LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 15/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) NOT FEASIBLE |
-| LOADVARIABLES_PLAN | Not started | 0/4 | loadVariables pre-bundled data files; 2/4 feasible (loadvariables2 needs TIMER_PLAN) |
-| ROOT_REPLACEMENT_PLAN | Not started | 0/4 | loadMovie into _root/_level0; 2/4 feasible (swf7→5/6 needs cross-version scoping) |
-| LOADMOVIE_REMAINING_PLAN | Not started | 0/5 | var_persistence, cross_version_prototype, mcl_events_swf_version, clip state |
+| LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 18/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) → LOADVARIABLES_PLAN |
+| LOADVARIABLES_PLAN | **Phases 1-2 DONE** | 2/4 pass | loadvariables + loadvariablesnum ✅; loadvariables2 needs TIMER_PLAN; loadvariables_method needs log_fetch |
+| ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** | 1/4 pass | loadmovie_replace_root ✅; mcl_loadclip_replace_root blocked by MTASC class support; swf7→5/6 deferred |
+| LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **DONE** (via LOADMOVIE_PLAN) | 3/3 pass (unloadmovie, unloadmovie_method, unloadmovienum) | — |
 | BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie (compile failures now fixed), mouse events, morph interp |

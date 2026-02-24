@@ -12501,6 +12501,9 @@ static int g_ab_funcs_init = 0;
 // MovieClipLoader methods: loadClip, unloadClip, getProgress
 // ============================================================================
 
+// Forward declaration — defined later in the file, needed for root replacement in MCL loads
+static ASObject* g_stage_obj;
+
 // Deferred MCL event queue — fires at ShowFrame time
 // Events queue: onLoadStart, onLoadProgress, onLoadComplete fire in order,
 // then child init runs, then onLoadInit fires in LIFO order.
@@ -12862,6 +12865,20 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     for (int i = 0; i < count; i++) {
         if (g_execution_halted) break;
         if (loads[i].entry != NULL) {
+            // Root replacement: update Stage dimensions when loading into root
+            extern MovieClip root_movieclip;
+            if (loads[i].target == &root_movieclip) {
+                if (g_stage_obj != NULL && loads[i].entry->stage_width > 0 && loads[i].entry->stage_height > 0) {
+                    ActionVar sv;
+                    sv = makeF64((double)loads[i].entry->stage_width);
+                    setProperty(app_context, g_stage_obj, "width", 5, &sv);
+                    sv = makeF64((double)loads[i].entry->stage_height);
+                    setProperty(app_context, g_stage_obj, "height", 6, &sv);
+                }
+                root_movieclip.totalframes = loads[i].entry->frame_count;
+                root_movieclip.framesloaded = loads[i].entry->frame_count;
+                root_movieclip.currentframe = 1;
+            }
             // Run child in target MC context so this/getVariable resolve correctly
             MovieClip* _saved_ctx = g_current_context;
             if (loads[i].target != NULL) actionSetCurrentContext(loads[i].target);
@@ -17491,14 +17508,24 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			target_utf8[0] = '\0';
 		}
 
-		// Resolve target MC: prefer direct MC pointer, fall back to name lookup
+		// Resolve target MC: prefer direct MC pointer, then _root/_level, then name lookup
 		MovieClip* _gu2_mc = _gu2_target_mc;
 		if (_gu2_mc == NULL && target_utf8[0] != '\0') {
-			for (int _lm_i = 0; _lm_i < child_mc_count; _lm_i++) {
-				if (child_mc_cache[_lm_i] != NULL && child_mc_cache[_lm_i]->name != NULL
-					&& strcmp(child_mc_cache[_lm_i]->name, target_utf8) == 0) {
-					_gu2_mc = child_mc_cache[_lm_i];
-					break;
+			// Check _root / _level0 / _levelN
+			if (strcmp(target_utf8, "_root") == 0 || strcmp(target_utf8, "_level0") == 0) {
+				_gu2_mc = &root_movieclip;
+			} else if (strncmp(target_utf8, "_level", 6) == 0) {
+				int _lev = atoi(target_utf8 + 6);
+				_gu2_mc = getOrCreateLevel(app_context, _lev);
+			}
+			// Fall back to name lookup in child_mc_cache
+			if (_gu2_mc == NULL) {
+				for (int _lm_i = 0; _lm_i < child_mc_count; _lm_i++) {
+					if (child_mc_cache[_lm_i] != NULL && child_mc_cache[_lm_i]->name != NULL
+						&& strcmp(child_mc_cache[_lm_i]->name, target_utf8) == 0) {
+						_gu2_mc = child_mc_cache[_lm_i];
+						break;
+					}
 				}
 			}
 		}
@@ -17525,6 +17552,34 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 
 		MovieEntry* entry = findMovieEntry(url_utf8);
 		if (entry != NULL) {
+			// Clear target MC's dynamic properties before loading new content
+			if (_gu2_mc != NULL && _gu2_mc->dynamic_props != NULL) {
+				releaseObject(app_context, (ASObject*)_gu2_mc->dynamic_props);
+				_gu2_mc->dynamic_props = NULL;
+			}
+			// Root replacement: clear state when loading into _root/_level0
+			if (_gu2_mc == &root_movieclip) {
+				// Clear global variable table (parent's root-level variables)
+				// _root.foo = 2 also writes to var_map via setVariableByName;
+				// we must clear it so the child doesn't inherit parent variables.
+				freeMap();
+				initMap();
+				for (size_t _vi = 0; _vi < var_array_size; _vi++) {
+					var_array[_vi] = NULL;
+				}
+				// Update Stage dimensions from child SWF
+				if (g_stage_obj != NULL && entry->stage_width > 0 && entry->stage_height > 0) {
+					ActionVar sv;
+					sv = makeF64((double)entry->stage_width);
+					setProperty(app_context, g_stage_obj, "width", 5, &sv);
+					sv = makeF64((double)entry->stage_height);
+					setProperty(app_context, g_stage_obj, "height", 6, &sv);
+				}
+				// Update frame counts
+				root_movieclip.totalframes = entry->frame_count;
+				root_movieclip.framesloaded = entry->frame_count;
+				root_movieclip.currentframe = 1;
+			}
 			// Run child in target MC context so this/getVariable resolve correctly
 			MovieClip* _saved_ctx = g_current_context;
 			if (_gu2_mc != NULL) actionSetCurrentContext(_gu2_mc);

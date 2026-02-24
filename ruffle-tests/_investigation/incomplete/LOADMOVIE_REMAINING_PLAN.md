@@ -3,7 +3,7 @@
 
 Last updated: 2026-02-24
 
-## Status: NOT STARTED — 0/5 tests
+## Status: PARTIALLY BLOCKED — 0/5 tests passing (dynamic_props clearing done, but tests need setTimeout)
 
 This plan covers the remaining feasible tests that are blocked by the loadMovie infrastructure
 but aren't covered by other specific plans (LOADVARIABLES_PLAN, ROOT_REPLACEMENT_PLAN,
