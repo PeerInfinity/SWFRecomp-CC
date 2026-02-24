@@ -105,6 +105,18 @@ for test_dir in "${SRC_DIR}"/*/; do
         done
     done
 
+    # Copy data files for loadVariables tests (testvars.txt, variables, etc.)
+    # These are non-SWF, non-config files that the test loads at runtime
+    for data_file in "${test_dir}"/*; do
+        [[ -f "${data_file}" ]] || continue
+        local base="$(basename "${data_file}")"
+        # Skip files we already copy or that aren't data files
+        case "${base}" in
+            test.swf|output.txt|test.toml|input.json|*.swf|*.as|*.fla) continue ;;
+        esac
+        cp "${data_file}" "${dest}/"
+    done
+
     INSTALLED=$((INSTALLED + 1))
 done
 
