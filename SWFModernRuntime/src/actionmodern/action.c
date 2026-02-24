@@ -5387,9 +5387,18 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		setProperty(app_context, proto, mc_methods[i].name, mc_methods[i].len, &func_val);
 	}
 
-	// Mark all methods and __proto__ as DontEnum
+	// Set MovieClip.prototype.enabled = true (used by button state machine)
+	{
+		ActionVar en_val = {0};
+		en_val.type = ACTION_STACK_VALUE_BOOLEAN;
+		en_val.data.numeric_value = 1;
+		setProperty(app_context, proto, "enabled", 7, &en_val);
+	}
+
+	// Mark all methods and __proto__ as DontEnum (but NOT enabled — it's enumerable)
 	for (u32 i = 0; i < proto->num_used; i++)
 	{
+		if (strcmp(proto->properties[i].name, "enabled") == 0) continue;
 		proto->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
 	}
 
@@ -9327,6 +9336,10 @@ static const char* constructPath(MovieClip* mc, char* buffer, size_t buffer_size
 // When NULL, defaults to root_movieclip
 MovieClip* g_current_context = NULL;
 
+// Event 'this' MC — set by onEnterFrame/onLoad dispatch before calling
+// DefineFunction2 with this_obj=NULL. Consumed by generated code.
+MovieClip* g_event_this_mc = NULL;
+
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
@@ -12383,19 +12396,18 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 				ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
 				if (func != NULL) {
 					MovieClip* saved_ctx = g_current_context;
-					// Dispatch with root as this
-					ActionVar this_av = {0};
-					this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
-					this_av.data.numeric_value = (u64)&root_movieclip;
+					actionSetCurrentContext(&root_movieclip);
+					g_event_this_mc = &root_movieclip;
 					if (func->function_type == 2 && func->advanced_func != NULL) {
 						ActionVar* regs = NULL;
 						if (func->register_count > 0)
 							regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-						func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
+						func->advanced_func(app_context, NULL, 0, regs, NULL);
 						if (regs != NULL) FREE(regs);
 					} else if (func->function_type == 1 && func->simple_func != NULL) {
 						((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					}
+					g_event_this_mc = NULL;
 					actionSetCurrentContext(saved_ctx);
 				}
 			}
@@ -12428,25 +12440,23 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 
 		MovieClip* saved_ctx = g_current_context;
 		actionSetCurrentContext(mc);
+		g_event_this_mc = mc;
 
-		// Pass ActionVar* with MOVIECLIP type as this_obj so generated
-		// functions preload register 1 (this) as a MovieClip correctly.
-		ActionVar this_av = {0};
-		this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
-		this_av.data.numeric_value = (u64)mc;
-
+		// Pass NULL as this_obj; the generated code's else branch uses
+		// g_event_this_mc to preload 'this' as MOVIECLIP.
 		if (func->function_type == 2 && func->advanced_func != NULL)
 		{
 			ActionVar* regs = NULL;
 			if (func->register_count > 0)
 				regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-			func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
+			func->advanced_func(app_context, NULL, 0, regs, NULL);
 			if (regs != NULL) FREE(regs);
 		}
 		else if (func->function_type == 1 && func->simple_func != NULL)
 		{
 			((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 		}
+		g_event_this_mc = NULL;
 
 		actionSetCurrentContext(saved_ctx);
 	}
@@ -12476,21 +12486,21 @@ void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context)
 	if (func == NULL) return;
 
 	MovieClip* saved_ctx = g_current_context;
+	actionSetCurrentContext(&root_movieclip);
+	g_event_this_mc = &root_movieclip;
 	if (func->function_type == 2 && func->advanced_func != NULL)
 	{
-		ActionVar this_av = {0};
-		this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
-		this_av.data.numeric_value = (u64)&root_movieclip;
 		ActionVar* regs = NULL;
 		if (func->register_count > 0)
 			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-		func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
+		func->advanced_func(app_context, NULL, 0, regs, NULL);
 		if (regs != NULL) FREE(regs);
 	}
 	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
 		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 	}
+	g_event_this_mc = NULL;
 	actionSetCurrentContext(saved_ctx);
 }
 
@@ -12542,21 +12552,21 @@ void actionDispatchRootOnLoad(SWFAppContext* app_context)
 	if (func == NULL) return;
 
 	MovieClip* saved_ctx = g_current_context;
+	actionSetCurrentContext(&root_movieclip);
+	g_event_this_mc = &root_movieclip;
 	if (func->function_type == 2 && func->advanced_func != NULL)
 	{
-		ActionVar this_av = {0};
-		this_av.type = ACTION_STACK_VALUE_MOVIECLIP;
-		this_av.data.numeric_value = (u64)&root_movieclip;
 		ActionVar* regs = NULL;
 		if (func->register_count > 0)
 			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-		func->advanced_func(app_context, NULL, 0, regs, (void*)&this_av);
+		func->advanced_func(app_context, NULL, 0, regs, NULL);
 		if (regs != NULL) FREE(regs);
 	}
 	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
 		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 	}
+	g_event_this_mc = NULL;
 	actionSetCurrentContext(saved_ctx);
 }
 
@@ -15598,7 +15608,8 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
 		// MovieClip enumeration — child instance names first (bottom of stack),
-		// then dynamic_props (top of stack). LIFO pop means dynamic_props iterated first.
+		// then dynamic_props + MovieClip.prototype (top of stack).
+		// LIFO pop means dynamic_props iterated first.
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 		if (mc != NULL)
 		{
@@ -15610,12 +15621,12 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			}
 #endif
 
+			EnumeratedName* enumerated_head = NULL;
+
+			// Walk dynamic_props __proto__ chain
 			if (mc->dynamic_props != NULL)
 			{
-				ASObject* obj = (ASObject*) mc->dynamic_props;
-				EnumeratedName* enumerated_head = NULL;
-
-				ASObject* current_obj = obj;
+				ASObject* current_obj = (ASObject*) mc->dynamic_props;
 				int chain_depth = 0;
 				const int MAX_CHAIN_DEPTH = 100;
 
@@ -15644,9 +15655,47 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					else
 						current_obj = NULL;
 				}
-
-				freeEnumeratedNames(enumerated_head);
 			}
+
+			// Also walk MovieClip.prototype chain (enumerable props like 'enabled')
+			{
+				extern ASFunction g_movieclip_constructor;
+				extern int g_movieclip_constructor_init;
+				if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL)
+				{
+					ASObject* current_obj = g_movieclip_constructor.prototype_obj;
+					int chain_depth = 0;
+					const int MAX_CHAIN_DEPTH = 100;
+
+					while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
+					{
+						chain_depth++;
+
+						for (u32 i = 0; i < current_obj->num_used; i++)
+						{
+							const char* prop_name = current_obj->properties[i].name;
+							u32 prop_name_len = current_obj->properties[i].name_length;
+							u8 prop_flags = current_obj->properties[i].flags;
+
+							if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
+								continue;
+							if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
+								continue;
+
+							addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
+							PUSH_STR((char*)prop_name, prop_name_len);
+						}
+
+						ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+						if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+							current_obj = (ASObject*) proto_var->data.numeric_value;
+						else
+							current_obj = NULL;
+					}
+				}
+			}
+
+			freeEnumeratedNames(enumerated_head);
 		}
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)

@@ -63,6 +63,11 @@ extern MovieClip root_movieclip;
 // Current execution context (MovieClip scope for variable resolution)
 extern MovieClip* g_current_context;
 
+// Event 'this' MC — set by onEnterFrame/onLoad dispatch before calling
+// DefineFunction2 with this_obj=NULL. The generated code's 'preload this'
+// path consumes this (sets it to NULL after reading).
+extern MovieClip* g_event_this_mc;
+
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);
 // Create or find a cached MovieClip by instance name
