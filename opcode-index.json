@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_date": "2026-02-09",
+    "generated_date": "2026-02-24",
     "total_opcodes": 100,
     "implemented_opcodes": 99,
     "total_entries": 288,
     "total_graphics_features": 62,
-    "graphics_features_with_tests": 59
+    "graphics_features_with_tests": 61
   },
   "entries": [
     {
@@ -94,7 +94,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 159)"
+      "notes": "Runtime function (action.h line 211)"
     },
     {
       "hex": "0X05",
@@ -163,7 +163,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 106)"
+      "notes": "Runtime function (action.h line 158)"
     },
     {
       "hex": "0X06",
@@ -250,7 +250,7 @@
           "SetTarget support: Cannot control individual sprite/MovieClip timelines (requires MovieClip architecture not available in NO_GRAPHICS mode)"
         ]
       },
-      "notes": "Runtime function (action.h line 160)"
+      "notes": "Runtime function (action.h line 212)"
     },
     {
       "hex": "0X07",
@@ -355,7 +355,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 161)"
+      "notes": "Runtime function (action.h line 213)"
     },
     {
       "hex": "0X08",
@@ -436,7 +436,7 @@
           "Graphics rendering not implemented (requires SDL3/Vulkan) - quality toggle has no visible effect in NO_GRAPHICS mode"
         ]
       },
-      "notes": "Runtime function (action.h line 107)"
+      "notes": "Runtime function (action.h line 159)"
     },
     {
       "hex": "0X09",
@@ -505,7 +505,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 166)"
+      "notes": "Runtime function (action.h line 218)"
     },
     {
       "hex": "0X0A",
@@ -610,7 +610,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 109)"
+      "notes": "Runtime function (action.h line 161)"
     },
     {
       "hex": "0X0B",
@@ -679,7 +679,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 111)"
+      "notes": "Runtime function (action.h line 163)"
     },
     {
       "hex": "0X0C",
@@ -748,7 +748,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 112)"
+      "notes": "Runtime function (action.h line 164)"
     },
     {
       "hex": "0X0D",
@@ -829,7 +829,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 113)"
+      "notes": "Runtime function (action.h line 165)"
     },
     {
       "hex": "0X0E",
@@ -898,7 +898,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 115)"
+      "notes": "Runtime function (action.h line 167)"
     },
     {
       "hex": "0X0F",
@@ -973,7 +973,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 116)"
+      "notes": "Runtime function (action.h line 168)"
     },
     {
       "hex": "0X10",
@@ -1066,7 +1066,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 119)"
+      "notes": "Runtime function (action.h line 171)"
     },
     {
       "hex": "0X11",
@@ -1135,7 +1135,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 120)"
+      "notes": "Runtime function (action.h line 172)"
     },
     {
       "hex": "0X12",
@@ -1204,7 +1204,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 121)"
+      "notes": "Runtime function (action.h line 173)"
     },
     {
       "hex": "0X13",
@@ -1279,7 +1279,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 138)"
+      "notes": "Runtime function (action.h line 190)"
     },
     {
       "hex": "0X14",
@@ -1348,7 +1348,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 139)"
+      "notes": "Runtime function (action.h line 191)"
     },
     {
       "hex": "0X15",
@@ -1417,7 +1417,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 140)"
+      "notes": "Runtime function (action.h line 192)"
     },
     {
       "hex": "0X17",
@@ -1556,7 +1556,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 122)"
+      "notes": "Runtime function (action.h line 174)"
     },
     {
       "hex": "0X1C",
@@ -1691,7 +1691,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 148)"
+      "notes": "Runtime function (action.h line 200)"
     },
     {
       "hex": "0X1D",
@@ -1820,7 +1820,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 149)"
+      "notes": "Runtime function (action.h line 201)"
     },
     {
       "hex": "0X20",
@@ -1913,7 +1913,7 @@
           "Advanced path syntax not supported: dot notation (sprite1.sprite2), relative paths (../sprite), special targets (_parent, this)"
         ]
       },
-      "notes": "Runtime function (action.h line 150)"
+      "notes": "Runtime function (action.h line 202)"
     },
     {
       "hex": "0X21",
@@ -2006,7 +2006,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 143)"
+      "notes": "Runtime function (action.h line 195)"
     },
     {
       "hex": "0X22",
@@ -2075,7 +2075,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 153)"
+      "notes": "Runtime function (action.h line 205)"
     },
     {
       "hex": "0X23",
@@ -2144,7 +2144,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 154)"
+      "notes": "Runtime function (action.h line 206)"
     },
     {
       "hex": "0X24",
@@ -2228,7 +2228,7 @@
           "Actual sprite cloning only works with graphics support - NO_GRAPHICS mode validates parameters only"
         ]
       },
-      "notes": "Runtime function (action.h line 155)"
+      "notes": "Runtime function (action.h line 207)"
     },
     {
       "hex": "0X25",
@@ -2315,7 +2315,7 @@
           "Graphics mode: Actual sprite removal and resource cleanup requires SDL3/Vulkan rendering"
         ]
       },
-      "notes": "Runtime function (action.h line 156)"
+      "notes": "Runtime function (action.h line 208)"
     },
     {
       "hex": "0X26",
@@ -3056,7 +3056,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 163)"
+      "notes": "Runtime function (action.h line 215)"
     },
     {
       "hex": "0X27",
@@ -3137,7 +3137,7 @@
       "fully_implemented": false,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 164)"
+      "notes": "Runtime function (action.h line 216)"
     },
     {
       "hex": "0X28",
@@ -3224,7 +3224,7 @@
           "Display list integration: finding and updating sprites in the display list"
         ]
       },
-      "notes": "Runtime function (action.h line 165)"
+      "notes": "Runtime function (action.h line 217)"
     },
     {
       "hex": "0X29",
@@ -3293,7 +3293,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 144)"
+      "notes": "Runtime function (action.h line 196)"
     },
     {
       "hex": "0X2A",
@@ -3395,7 +3395,7 @@
           "Only tested uncaught exceptions (requires ActionTry 0x8F for full testing)"
         ]
       },
-      "notes": "Runtime function (action.h line 213)"
+      "notes": "Runtime function (action.h line 265)"
     },
     {
       "hex": "0X2B",
@@ -3464,7 +3464,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 174)"
+      "notes": "Runtime function (action.h line 226)"
     },
     {
       "hex": "0X2C",
@@ -3533,7 +3533,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 145)"
+      "notes": "Runtime function (action.h line 197)"
     },
     {
       "hex": "0X30",
@@ -3602,7 +3602,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 168)"
+      "notes": "Runtime function (action.h line 220)"
     },
     {
       "hex": "0X31",
@@ -3671,7 +3671,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 141)"
+      "notes": "Runtime function (action.h line 193)"
     },
     {
       "hex": "0X32",
@@ -3740,7 +3740,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 146)"
+      "notes": "Runtime function (action.h line 198)"
     },
     {
       "hex": "0X33",
@@ -3809,7 +3809,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 169)"
+      "notes": "Runtime function (action.h line 221)"
     },
     {
       "hex": "0X34",
@@ -3878,7 +3878,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 171)"
+      "notes": "Runtime function (action.h line 223)"
     },
     {
       "hex": "0X35",
@@ -3947,7 +3947,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 142)"
+      "notes": "Runtime function (action.h line 194)"
     },
     {
       "hex": "0X36",
@@ -4016,7 +4016,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 170)"
+      "notes": "Runtime function (action.h line 222)"
     },
     {
       "hex": "0X37",
@@ -4097,7 +4097,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 172)"
+      "notes": "Runtime function (action.h line 224)"
     },
     {
       "hex": "0X3A",
@@ -4166,7 +4166,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 183)"
+      "notes": "Runtime function (action.h line 235)"
     },
     {
       "hex": "0X3B",
@@ -4235,7 +4235,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 184)"
+      "notes": "Runtime function (action.h line 236)"
     },
     {
       "hex": "0X3C",
@@ -4304,7 +4304,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 151)"
+      "notes": "Runtime function (action.h line 203)"
     },
     {
       "hex": "0X3D",
@@ -4391,7 +4391,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 125)"
+      "notes": "Runtime function (action.h line 177)"
     },
     {
       "hex": "0X3E",
@@ -4484,7 +4484,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 176)"
+      "notes": "Runtime function (action.h line 228)"
     },
     {
       "hex": "0X3F",
@@ -4553,7 +4553,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 114)"
+      "notes": "Runtime function (action.h line 166)"
     },
     {
       "hex": "0X40",
@@ -4622,7 +4622,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 202)"
+      "notes": "Runtime function (action.h line 254)"
     },
     {
       "hex": "0X41",
@@ -4691,7 +4691,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 152)"
+      "notes": "Runtime function (action.h line 204)"
     },
     {
       "hex": "0X42",
@@ -4760,7 +4760,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 177)"
+      "notes": "Runtime function (action.h line 229)"
     },
     {
       "hex": "0X43",
@@ -4889,7 +4889,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 178)"
+      "notes": "Runtime function (action.h line 230)"
     },
     {
       "hex": "0X44",
@@ -4976,7 +4976,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 173)"
+      "notes": "Runtime function (action.h line 225)"
     },
     {
       "hex": "0X45",
@@ -5045,7 +5045,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 128)"
+      "notes": "Runtime function (action.h line 180)"
     },
     {
       "hex": "0X46",
@@ -5114,7 +5114,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 129)"
+      "notes": "Runtime function (action.h line 181)"
     },
     {
       "hex": "0X47",
@@ -5183,7 +5183,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 110)"
+      "notes": "Runtime function (action.h line 162)"
     },
     {
       "hex": "0X48",
@@ -5202,7 +5202,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5225,7 +5225,7 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
@@ -5248,11 +5248,11 @@
       "tests_primary_no_results": [],
       "tests_secondary_passing": [],
       "tests_secondary_no_results": [],
-      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-less2-0x48.md",
+      "documentation_prompt": "SWFRecompDocs/prompts/completed/opcode-greater-0x48.md",
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 117)"
+      "notes": "Runtime function (action.h line 169)"
     },
     {
       "hex": "0X49",
@@ -5321,7 +5321,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 118)"
+      "notes": "Runtime function (action.h line 170)"
     },
     {
       "hex": "0X4A",
@@ -5390,7 +5390,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 123)"
+      "notes": "Runtime function (action.h line 175)"
     },
     {
       "hex": "0X4B",
@@ -5459,7 +5459,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 124)"
+      "notes": "Runtime function (action.h line 176)"
     },
     {
       "hex": "0X4C",
@@ -5564,7 +5564,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 126)"
+      "notes": "Runtime function (action.h line 178)"
     },
     {
       "hex": "0X4D",
@@ -5651,7 +5651,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 125)"
+      "notes": "Runtime function (action.h line 177)"
     },
     {
       "hex": "0X4E",
@@ -5762,7 +5762,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 127)"
+      "notes": "Runtime function (action.h line 179)"
     },
     {
       "hex": "0X4F",
@@ -5849,7 +5849,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 201)"
+      "notes": "Runtime function (action.h line 253)"
     },
     {
       "hex": "0X50",
@@ -5918,7 +5918,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 179)"
+      "notes": "Runtime function (action.h line 231)"
     },
     {
       "hex": "0X51",
@@ -5987,7 +5987,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 180)"
+      "notes": "Runtime function (action.h line 232)"
     },
     {
       "hex": "0X52",
@@ -6062,7 +6062,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 199)"
+      "notes": "Runtime function (action.h line 251)"
     },
     {
       "hex": "0X53",
@@ -6131,7 +6131,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": true,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 203)"
+      "notes": "Runtime function (action.h line 255)"
     },
     {
       "hex": "0X54",
@@ -6200,7 +6200,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 181)"
+      "notes": "Runtime function (action.h line 233)"
     },
     {
       "hex": "0X55",
@@ -6269,7 +6269,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 182)"
+      "notes": "Runtime function (action.h line 234)"
     },
     {
       "hex": "0X60",
@@ -6338,7 +6338,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 185)"
+      "notes": "Runtime function (action.h line 237)"
     },
     {
       "hex": "0X61",
@@ -6407,7 +6407,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 186)"
+      "notes": "Runtime function (action.h line 238)"
     },
     {
       "hex": "0X62",
@@ -6476,7 +6476,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 187)"
+      "notes": "Runtime function (action.h line 239)"
     },
     {
       "hex": "0X63",
@@ -6545,7 +6545,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 188)"
+      "notes": "Runtime function (action.h line 240)"
     },
     {
       "hex": "0X64",
@@ -6614,7 +6614,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 189)"
+      "notes": "Runtime function (action.h line 241)"
     },
     {
       "hex": "0X65",
@@ -6683,7 +6683,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 190)"
+      "notes": "Runtime function (action.h line 242)"
     },
     {
       "hex": "0X66",
@@ -6764,7 +6764,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 191)"
+      "notes": "Runtime function (action.h line 243)"
     },
     {
       "hex": "0X67",
@@ -6833,7 +6833,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 192)"
+      "notes": "Runtime function (action.h line 244)"
     },
     {
       "hex": "0X68",
@@ -6902,7 +6902,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 193)"
+      "notes": "Runtime function (action.h line 245)"
     },
     {
       "hex": "0X69",
@@ -6971,7 +6971,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 194)"
+      "notes": "Runtime function (action.h line 246)"
     },
     {
       "hex": "0X81",
@@ -7064,7 +7064,7 @@
           "Display list updates on frame change (graphics-only feature, requires SDL3/Vulkan rendering)"
         ]
       },
-      "notes": "Runtime function (action.h line 162)"
+      "notes": "Runtime function (action.h line 214)"
     },
     {
       "hex": "0X83",
@@ -7160,7 +7160,7 @@
           "URL scheme validation and sanitization"
         ]
       },
-      "notes": "Runtime function (action.h line 167)"
+      "notes": "Runtime function (action.h line 219)"
     },
     {
       "hex": "0X87",
@@ -7229,7 +7229,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 195)"
+      "notes": "Runtime function (action.h line 247)"
     },
     {
       "hex": "0X88",
@@ -7417,7 +7417,7 @@
           "In NO_GRAPHICS mode, only _root is available as a valid target - all other target names are treated as 'not found'"
         ]
       },
-      "notes": "Runtime function (action.h line 157)"
+      "notes": "Runtime function (action.h line 209)"
     },
     {
       "hex": "0X8C",
@@ -7486,7 +7486,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 132)"
+      "notes": "Runtime function (action.h line 184)"
     },
     {
       "hex": "0X8D",
@@ -7619,7 +7619,7 @@
       "fully_implemented": true,
       "fully_implemented_no_graphics": false,
       "missing_features": {},
-      "notes": "Runtime function (action.h line 208)"
+      "notes": "Runtime function (action.h line 260)"
     },
     {
       "hex": "0X8F",
@@ -8361,7 +8361,7 @@
           "Cross-domain security policy enforcement (requires security sandbox infrastructure)"
         ]
       },
-      "notes": "Runtime function (action.h line 200)"
+      "notes": "Runtime function (action.h line 252)"
     },
     {
       "hex": "0X9B",
@@ -8544,7 +8544,7 @@
           "Multi-MovieClip support (requires MovieClip context switching - graphics-only)"
         ]
       },
-      "notes": "Runtime function (action.h line 198)"
+      "notes": "Runtime function (action.h line 250)"
     },
     {
       "hex": "0X9F",
@@ -8631,7 +8631,7 @@
           "MovieClip context switching for target paths (requires full MovieClip tree - graphics-only)"
         ]
       },
-      "notes": "Runtime function (action.h line 133)"
+      "notes": "Runtime function (action.h line 185)"
     }
   ],
   "graphics_entries": [
@@ -9369,8 +9369,10 @@
       "tag_id": 60,
       "category": "Video Tags",
       "description": "Video stream definition (SWF tag 60)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_video_stream"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "VIDEO_FRAME",
@@ -9378,8 +9380,10 @@
       "tag_id": 61,
       "category": "Video Tags",
       "description": "Video frame data (SWF tag 61)",
-      "tests": [],
-      "fully_implemented": false
+      "tests": [
+        "SWFRecomp/tests/graphics/define_video_stream"
+      ],
+      "fully_implemented": true
     },
     {
       "id": "DROP_SHADOW_FILTER",
