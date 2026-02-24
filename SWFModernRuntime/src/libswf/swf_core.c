@@ -380,6 +380,11 @@ void swfStart(SWFAppContext* app_context)
 	extern MovieClip root_movieclip;
 	root_movieclip.display_obj = ng_get_root_display_obj();
 
+#ifdef SWF_URL
+	strncpy(root_movieclip.url, SWF_URL, sizeof(root_movieclip.url) - 1);
+	root_movieclip.url[sizeof(root_movieclip.url) - 1] = '\0';
+#endif
+
 	tagInit(app_context);
 
 	// Run frames in console mode

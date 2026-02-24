@@ -714,6 +714,12 @@ def compile_native(test_dir, num_frames, build_dir):
         extra_defines.append(f"-DVIEWPORT_HEIGHT={viewport[1]}")
     if has_children:
         extra_defines.append("-DHAS_CHILD_MOVIES")
+    # Pass SWF file size for getBytesLoaded/getBytesTotal
+    test_swf = test_dir / "test.swf"
+    if test_swf.exists():
+        extra_defines.append(f"-DSWF_FILE_SIZE={test_swf.stat().st_size}")
+    # Pass test directory name for _url property
+    extra_defines.append(f'-DSWF_URL="{test_dir.name}/test.swf"')
     try:
         result = subprocess.run(
             [

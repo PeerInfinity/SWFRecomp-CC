@@ -552,6 +552,14 @@ static ActionVar builtin_stub_method(SWFAppContext* app_context, ActionVar* args
 	return ret;
 }
 
+static ActionVar builtin_return_zero(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_F64;
+	return ret;
+}
+
 #define MAX_PROTO_STUB_FUNCS 64
 static ASFunction g_proto_stub_funcs[MAX_PROTO_STUB_FUNCS];
 static int g_proto_stub_func_count = 0;
@@ -8073,7 +8081,19 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->xmouse = 0.0f;
 	mc->ymouse = 0.0f;
 	mc->droptarget[0] = '\0';
-	mc->url[0] = '\0';
+	// Inherit URL from parent (or root); overridden by createEmptyMovieClip/loadMovie
+	if (parent != NULL && parent->url[0] != '\0') {
+		strncpy(mc->url, parent->url, sizeof(mc->url) - 1);
+		mc->url[sizeof(mc->url) - 1] = '\0';
+	} else {
+		extern MovieClip root_movieclip;
+		if (root_movieclip.url[0] != '\0') {
+			strncpy(mc->url, root_movieclip.url, sizeof(mc->url) - 1);
+			mc->url[sizeof(mc->url) - 1] = '\0';
+		} else {
+			mc->url[0] = '\0';
+		}
+	}
 	mc->dynamic_props = NULL;
 	mc->lockroot = 0;
 	mc->blend_mode = 0;
@@ -12069,6 +12089,86 @@ void actionStopSounds(SWFAppContext* app_context)
 	#endif
 }
 
+// ============================================================================
+// FlashVars helper: strips query string from URL, parses key=value pairs,
+// sets them as variables on the target MovieClip
+// ============================================================================
+
+// URL-decode a string in-place: %XX → char, + → space
+static void urlDecode(char* str) {
+	char* dst = str;
+	while (*str) {
+		if (*str == '%' && str[1] && str[2]) {
+			int hi = str[1], lo = str[2];
+			if (hi >= '0' && hi <= '9') hi -= '0';
+			else if (hi >= 'A' && hi <= 'F') hi = hi - 'A' + 10;
+			else if (hi >= 'a' && hi <= 'f') hi = hi - 'a' + 10;
+			else { *dst++ = *str++; continue; }
+			if (lo >= '0' && lo <= '9') lo -= '0';
+			else if (lo >= 'A' && lo <= 'F') lo = lo - 'A' + 10;
+			else if (lo >= 'a' && lo <= 'f') lo = lo - 'a' + 10;
+			else { *dst++ = *str++; continue; }
+			*dst++ = (char)(hi * 16 + lo);
+			str += 3;
+		} else if (*str == '+') {
+			*dst++ = ' ';
+			str++;
+		} else {
+			*dst++ = *str++;
+		}
+	}
+	*dst = '\0';
+}
+
+// Strip query string from URL (modifies url in-place, returns pointer to query or NULL)
+// Also parses FlashVars and sets them on target MC
+static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieClip* target_mc) {
+	char* query = strchr(url, '?');
+	if (query == NULL) return;
+	*query = '\0';  // terminate URL at '?'
+	query++;        // skip past the NUL to the query string
+
+	if (target_mc == NULL || *query == '\0') return;
+
+	// Ensure target has dynamic_props
+	if (target_mc->dynamic_props == NULL) {
+		target_mc->dynamic_props = allocObject(app_context, 8);
+	}
+
+	// Parse key=value&key=value... pairs
+	char* pair = query;
+	while (pair && *pair) {
+		char* next = strchr(pair, '&');
+		if (next) *next++ = '\0';
+
+		char* eq = strchr(pair, '=');
+		if (eq) {
+			*eq = '\0';
+			char* key = pair;
+			char* value = eq + 1;
+			urlDecode(key);
+			urlDecode(value);
+
+			// Set as string variable on the target MC's dynamic props
+			int key_len = (int)strlen(key);
+			int val_len = (int)strlen(value);
+			if (key_len > 0) {
+				// Convert UTF-8 value to UTF-16 for ActionVar string storage
+				u32 u16_len = 0;
+				uint16_t* u16_val = utf8_to_u16(app_context, value, val_len, &u16_len);
+				ActionVar sv = {0};
+				sv.type = ACTION_STACK_VALUE_STRING;
+				sv.str_size = u16_len;
+				if (u16_len > 0 && u16_val != NULL) {
+					sv.data.numeric_value = (u64)(uintptr_t)u16_val;
+				}
+				setProperty(app_context, (ASObject*)target_mc->dynamic_props, key, key_len, &sv);
+			}
+		}
+		pair = next;
+	}
+}
+
 /**
  * ActionGetURL - Load a URL into browser frame or Flash level
  *
@@ -12131,15 +12231,17 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			return;
 		}
 
-		// Load SWF into level
-		MovieEntry* entry = findMovieEntry(url);
-		if (entry != NULL) {
-			MovieClip* mc = getOrCreateLevel(app_context, level_num);
-			if (mc != NULL) {
-				entry->init_func(app_context);
-				if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
-					entry->frame_funcs[0](app_context);
-				}
+		// Load SWF into level — make mutable copy for FlashVars parsing
+		char url_mut[512];
+		strncpy(url_mut, url, sizeof(url_mut) - 1);
+		url_mut[sizeof(url_mut) - 1] = '\0';
+		MovieClip* mc = getOrCreateLevel(app_context, level_num);
+		parseAndSetFlashVars(app_context, url_mut, mc);
+		MovieEntry* entry = findMovieEntry(url_mut);
+		if (entry != NULL && mc != NULL) {
+			entry->init_func(app_context);
+			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+				entry->frame_funcs[0](app_context);
 			}
 		}
 		return;
@@ -12174,8 +12276,12 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			return;
 		}
 
-		// Load SWF into named clip
-		MovieEntry* entry = findMovieEntry(url);
+		// Load SWF into named clip — make mutable copy for FlashVars parsing
+		char url_mut2[512];
+		strncpy(url_mut2, url, sizeof(url_mut2) - 1);
+		url_mut2[sizeof(url_mut2) - 1] = '\0';
+		parseAndSetFlashVars(app_context, url_mut2, mc);
+		MovieEntry* entry = findMovieEntry(url_mut2);
 		if (entry != NULL) {
 			entry->init_func(app_context);
 			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
@@ -12550,6 +12656,9 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
         target_mc->dynamic_props = NULL;
     }
 
+    // Strip query string (FlashVars) and set on target MC before child init
+    parseAndSetFlashVars(app_context, url_utf8, target_mc);
+
     // Look up movie entry and queue for deferred event dispatch at ShowFrame
     MovieEntry* entry = findMovieEntry(url_utf8);
 
@@ -12749,11 +12858,15 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     for (int i = 0; i < count; i++) {
         if (g_execution_halted) break;
         if (loads[i].entry != NULL) {
+            // Run child in target MC context so this/getVariable resolve correctly
+            MovieClip* _saved_ctx = g_current_context;
+            if (loads[i].target != NULL) actionSetCurrentContext(loads[i].target);
             loads[i].entry->init_func(app_context);
             if (loads[i].entry->frame_count > 0 && loads[i].entry->frame_funcs != NULL
                 && loads[i].entry->frame_funcs[0] != NULL) {
                 loads[i].entry->frame_funcs[0](app_context);
             }
+            actionSetCurrentContext(_saved_ctx);
         }
     }
 
@@ -15803,6 +15916,41 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 		return 0;
 	}
 
+	// MovieClip special case: check against MovieClip.prototype chain
+	if (obj_var->type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// Get constructor's prototype
+		ASObject* ctor_proto = NULL;
+		if (ctor_var->type == ACTION_STACK_VALUE_FUNCTION) {
+			ASFunction* cf = (ASFunction*) ctor_var->data.numeric_value;
+			ctor_proto = cf->prototype_obj;
+		} else if (ctor_var->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* co = (ASObject*) ctor_var->data.numeric_value;
+			ActionVar* cpv = getProperty(co, "prototype", 9);
+			if (cpv && cpv->type == ACTION_STACK_VALUE_OBJECT)
+				ctor_proto = (ASObject*) cpv->data.numeric_value;
+		}
+		if (ctor_proto == NULL) return 0;
+		// Walk MovieClip.prototype chain: MC.__proto__ = MovieClip.prototype
+		extern ASFunction g_movieclip_constructor;
+		ASObject* mc_proto = g_movieclip_constructor.prototype_obj;
+		int depth = 0;
+		while (mc_proto != NULL && depth < 100) {
+			if (mc_proto == ctor_proto) return 1;
+			// Check interfaces
+			for (u32 ii = 0; ii < mc_proto->interface_count; ii++) {
+				if (mc_proto->interfaces[ii] == ctor_proto) return 1;
+			}
+			ActionVar* next = getProperty(mc_proto, "__proto__", 9);
+			if (next && next->type == ACTION_STACK_VALUE_OBJECT)
+				mc_proto = (ASObject*) next->data.numeric_value;
+			else
+				break;
+			depth++;
+		}
+		return 0;
+	}
+
 	// Object and constructor must be object types
 	if (obj_var->type != ACTION_STACK_VALUE_OBJECT &&
 		obj_var->type != ACTION_STACK_VALUE_ARRAY &&
@@ -17368,18 +17516,24 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			return;
 		}
 
+		// Strip query string (FlashVars) from URL before lookup
+		parseAndSetFlashVars(app_context, url_utf8, _gu2_mc);
+
 		MovieEntry* entry = findMovieEntry(url_utf8);
 		if (entry != NULL) {
-			// Run the child movie's init and frame 0
+			// Run child in target MC context so this/getVariable resolve correctly
+			MovieClip* _saved_ctx = g_current_context;
+			if (_gu2_mc != NULL) actionSetCurrentContext(_gu2_mc);
 			entry->init_func(app_context);
 			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 				entry->frame_funcs[0](app_context);
 			}
+			actionSetCurrentContext(_saved_ctx);
 		}
 		return;
 	}
 
-	// Check if target is a _level reference (loadMovieNum/unloadMovieNum)
+	// Check if target is a _level reference (loadMovieNum/unloadMovieNum via GetURL2 loadTarget=0)
 	// This handles GetURL2 with loadTarget=0 but _level target (like SWF4 loadMovieNum)
 	{
 		char url_utf8[512];
@@ -18123,6 +18277,9 @@ void actionSetMember(SWFAppContext* app_context)
 					mc->alpha = fval; return;
 				}
 				if (strcasecmp(prop_name, "_visible") == 0) {
+					// _visible: undefined and null are no-ops (preserve current value)
+					if (value_var.type == ACTION_STACK_VALUE_UNDEFINED ||
+					    value_var.type == ACTION_STACK_VALUE_NULL) return;
 					// _visible conversion: use convertFloat (SWF-version-aware for null/undefined).
 					// For objects: try valueOf; if valueOf returns OBJECT (not primitive) → treat as 0 (false).
 					// This matches Flash Player AVM1 behavior.
@@ -23091,8 +23248,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			MovieClip* child = createMovieClip(inst_name, mc);
 			child->currentframe = 0;  // Empty clips have _currentframe = 0
-			child->totalframes = 1;
-			child->framesloaded = 1;
+			child->totalframes = 0;
+			child->framesloaded = 0;
 			child->depth = depth_val;
 			strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
 			child->url[sizeof(child->url) - 1] = '\0';
@@ -26915,17 +27072,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 14 && strncmp(method_name, "getBytesLoaded", 14) == 0)
 		{
-			// Empty/created MovieClips return 0 (SWF data not loaded)
 			if (args != NULL) FREE(args);
 			double v = 0.0;
+#ifdef SWF_FILE_SIZE
+			// Non-empty clips (placed by timeline) return SWF file size
+			if (mc->totalframes > 0) v = (double)SWF_FILE_SIZE;
+#endif
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
 		else if (method_name_len == 13 && strncmp(method_name, "getBytesTotal", 13) == 0)
 		{
-			// Empty/created MovieClips return 0
 			if (args != NULL) FREE(args);
 			double v = 0.0;
+#ifdef SWF_FILE_SIZE
+			if (mc->totalframes > 0) v = (double)SWF_FILE_SIZE;
+#endif
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
@@ -26950,6 +27112,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			double v = (_max_d < 0) ? 0.0 : (double)(_max_d + 1);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+			return;
+		}
+		else if (method_name_len == 15 && strncmp(method_name, "getTextSnapshot", 15) == 0)
+		{
+			// Return a TextSnapshot stub object with getCount() → 0
+			if (args != NULL) FREE(args);
+			ASObject* ts = allocObject(app_context, 4);
+			retainObject(ts);
+			// Create a getCount function that returns 0
+			static ASFunction ts_getCount_func;
+			static int ts_init = 0;
+			if (!ts_init) {
+				memset(&ts_getCount_func, 0, sizeof(ASFunction));
+				strncpy(ts_getCount_func.name, "getCount", 255);
+				ts_getCount_func.function_type = 2;
+				ts_getCount_func.advanced_func = builtin_return_zero;
+				ts_getCount_func.register_count = 0;
+				ts_init = 1;
+			}
+			ActionVar fn_val = {0};
+			fn_val.type = ACTION_STACK_VALUE_FUNCTION;
+			fn_val.data.numeric_value = (u64)&ts_getCount_func;
+			setProperty(app_context, ts, "getCount", 8, &fn_val);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)ts);
 			return;
 		}
 		else if (method_name_len == 10 && strncmp(method_name, "swapDepths", 10) == 0)
@@ -27921,6 +28107,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 				} else {
+					// Strip query string (FlashVars) and set on target MC
+					parseAndSetFlashVars(app_context, _lm_url, mc);
 					MovieEntry* entry = findMovieEntry(_lm_url);
 					if (entry != NULL && mc != NULL) {
 						// Run the child movie's init and frame 0

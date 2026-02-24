@@ -490,6 +490,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	new_mc->visible = 1;
 	new_mc->width = 0.0f;
 	new_mc->height = 0.0f;
+	// Don't reset frame counters here — they stay at createMovieClip defaults (1,1,1).
+	// attachMovie clips that run frame 0 get their counters set at the end of ng_attachMovie.
 #ifdef NO_GRAPHICS
 	new_mc->as_set_flags = 0;
 #endif
