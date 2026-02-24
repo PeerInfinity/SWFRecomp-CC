@@ -3,20 +3,34 @@
 
 Last updated: 2026-02-24
 
-## Status: NOT STARTED — 0/5 tests passing (5 failing)
+## Status: PHASES 1-4 COMPLETE — 4/5 tests passing
 
-### Target Tests
+### Test Results (commit 33edeb1a)
 
-| Test | SWF Ver | Match | Expected | Issue |
-|------|---------|-------|----------|-------|
-| this_swf5 | 5 | 24/41 | 41 | `this` resolves to `undefined` instead of `_level0` for unbound function calls |
-| this_swf6 | 6 | 18/41 | 41 | Same issue as swf5, plus `[type Object]` vs `[object Object]` |
-| this_scoping | 15 | 42/52 | 52 | `this.bar` vs `bar` wrong in WITH scope; gotoAndStop frame nav |
-| mutable_this | 15 | 12/18 | 18 | `this` not reverting on nested function calls without receiver |
-| swf5_no_closure | 5 | 6/19 | 19 | `this` not bound to clip/object in SWF5 method calls |
+| Test | SWF Ver | Match | Expected | Status |
+|------|---------|-------|----------|--------|
+| this_swf5 | 5 | 41/41 | 41 | **PASS** |
+| this_swf6 | 6 | 41/41 | 41 | **PASS** |
+| this_scoping | 15 | 42/52 | 52 | FAIL — Phase 5 (WITH scope this) + Phase 6 (gotoAndStop via string) |
+| mutable_this | 15 | 18/18 | 18 | **PASS** |
+| swf5_no_closure | 5 | 20/20 | 20 | **PASS** |
 
-### Related tests (may improve as side effect)
-- `this_swf7` — already PASS (41/41), serves as control case
+### Related tests (no regression)
+- `this_swf7` — still PASS (41/41)
+
+### What Was Fixed (commit 33edeb1a)
+
+1. **Phase 1**: Set `this = _level0` on type 1 function local scope in `actionCallFunction`
+2. **Phase 2**: Set `this = receiver` on type 1 function local scope in `actionCallMethod`
+3. **Phase 3**: Added `this` resolution fallback in `actionGetVariable` with SWF-version-aware case sensitivity (SWF5: case-sensitive in functions, case-insensitive at root; SWF6: always case-insensitive; SWF7+: always case-sensitive). Moved fallback after global variable table so `SetVariable("this")` mutations take priority.
+4. **Phase 4**: MC dynamic_props method call path now creates local scope with `this = mc`, restores captured scopes, switches `g_current_context` to MC for variable resolution.
+5. **Extra**: `actionNewObject` type 2 constructor path now creates local scope with `this` and manages scope chain. Fixed `[object Object]` toString threshold from `< 6` to `< 5`. Initialized `g_current_context` to `&root_movieclip` at startup.
+
+### Remaining: this_scoping (42/52)
+
+- Lines 10-12: `this.bar` vs `bar` inside `with(mc)` — `this.bar` should resolve from the function's `this` object, not the with-target. Requires Phase 5 (WITH scope `this` resolution).
+- Line 20: Variable `foobar` leaking from wrong scope
+- Lines 37-52: `gotoAndStop` via string path resolution — Phase 6, separate infrastructure
 
 ---
 
