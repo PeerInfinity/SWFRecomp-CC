@@ -1396,8 +1396,15 @@ namespace SWFRecomp
 						context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
 						context.out_script_defs << "\t} else {" << endl;
 						context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
-						context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-						context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+						context.out_script_defs << "\t\textern MovieClip* g_event_this_mc;" << endl;
+						context.out_script_defs << "\t\tif (g_event_this_mc != NULL) {" << endl;
+						context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+						context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)g_event_this_mc;" << endl;
+						context.out_script_defs << "\t\t\tg_event_this_mc = NULL;" << endl;
+						context.out_script_defs << "\t\t} else {" << endl;
+						context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+						context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+						context.out_script_defs << "\t\t}" << endl;
 						context.out_script_defs << "\t}" << endl;
 					}
 					next_reg++;

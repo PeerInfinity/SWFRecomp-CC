@@ -286,4 +286,28 @@ extern Character* dictionary;
 extern DisplayObject* display_list;
 extern size_t max_depth;
 
+// Movie entry for pre-compiled child SWFs (multi-SWF / loadMovie support)
+typedef struct MovieEntry {
+	const char* filename;              // "target.swf"
+	frame_func* frame_funcs;           // child's frame function array
+	void (*init_func)(SWFAppContext*); // child's tagInit function
+	u16 swf_version;
+	u16 frame_count;
+	u16 stage_width;
+	u16 stage_height;
+} MovieEntry;
+
+// Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)
+MovieEntry* findMovieEntry(const char* filename);
+
+// Data file entry for loadVariables pre-bundled data
+typedef struct DataFileEntry {
+	const char* filename;
+	const char* content;
+	int content_length;
+} DataFileEntry;
+
+// Find a pre-bundled data file by filename (defined in data_registry.c when HAS_DATA_FILES)
+DataFileEntry* findDataFile(const char* filename);
+
 void swfStart(SWFAppContext* app_context);

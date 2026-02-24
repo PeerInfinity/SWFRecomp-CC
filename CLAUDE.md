@@ -12,9 +12,9 @@ We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 t
 ```bash
 # Run a single Ruffle test locally
 python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
-
-# Do NOT run full suite locally — commit changes, then user triggers CI
 ```
+
+**IMPORTANT: Do NOT run full test suites.** Never run `all_tests.sh`, `verify_output.py` without `--test`, or any command that runs all tests. Both the Ruffle suite and the old test suite have CI workflows — commit your changes and the user will trigger them. Only run individual tests with `--test=TEST_NAME`.
 
 ## Project Structure
 

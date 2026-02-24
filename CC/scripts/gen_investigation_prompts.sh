@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generates a text file with one prompt block per incomplete investigation document.
+# Generates a text file with one prompt block per incomplete/blocked investigation document.
 # Output: SWFRecomp-CC/ruffle-tests/_investigation/investigation_prompts.txt
 #
 # Usage:
@@ -7,15 +7,19 @@
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 INCOMPLETE_DIR="$REPO_ROOT/ruffle-tests/_investigation/incomplete"
+BLOCKED_DIR="$REPO_ROOT/ruffle-tests/_investigation/blocked"
 OUTPUT_FILE="$REPO_ROOT/ruffle-tests/_investigation/investigation_prompts.txt"
 SEPARATOR=$(printf '=%.0s' {1..80})
 
 > "$OUTPUT_FILE"
 
 first=1
-for filepath in "$INCOMPLETE_DIR"/*.md; do
+
+emit_prompt() {
+    local subdir="$1"
+    local filepath="$2"
+    local filename
     filename=$(basename "$filepath")
-    docname="${filename%.md}"
 
     if [ "$first" -eq 1 ]; then
         first=0
@@ -28,7 +32,7 @@ Please read these files:
 - ruffle-tests/_investigation/ENVIRONMENT_SETUP.md
 - ruffle-tests/_investigation/SESSION_START_GUIDE.md
 - ruffle-tests/_investigation/CURRENT_STATUS.md
-- ruffle-tests/_investigation/incomplete/${filename}
+- ruffle-tests/_investigation/${subdir}/${filename}
 
 Then follow these steps in order:
 
@@ -42,6 +46,16 @@ Then follow these steps in order:
 
 5. **Stop when:** the plan is fully passing, or you hit a blocker — in which case document the blocker in the plan file before stopping. If there are remaining failures, and the plan to fix them is blocked, then move the document to ruffle-tests/_investigation/blocked/  If the plan is complete and all the tests pass, then move the document to ruffle-tests/_investigation/complete/
 EOF
+}
+
+for filepath in "$INCOMPLETE_DIR"/*.md; do
+    [ -e "$filepath" ] || continue
+    emit_prompt "incomplete" "$filepath"
+done
+
+for filepath in "$BLOCKED_DIR"/*.md; do
+    [ -e "$filepath" ] || continue
+    emit_prompt "blocked" "$filepath"
 done
 
 echo "Written $OUTPUT_FILE"

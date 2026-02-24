@@ -63,6 +63,11 @@ extern MovieClip root_movieclip;
 // Current execution context (MovieClip scope for variable resolution)
 extern MovieClip* g_current_context;
 
+// Event 'this' MC — set by onEnterFrame/onLoad dispatch before calling
+// DefineFunction2 with this_obj=NULL. The generated code's 'preload this'
+// path consumes this (sets it to NULL after reading).
+extern MovieClip* g_event_this_mc;
+
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);
 // Create or find a cached MovieClip by instance name
@@ -73,6 +78,8 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name);
 // Fire all pending deferred onUnload handlers (queued by removeMovieClip); call from tagShowFrame
 void actionFirePendingUnloads(SWFAppContext* app_context);
+// Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame
+void actionFirePendingLoadInits(SWFAppContext* app_context);
 
 // VAL macro must be defined before other macros that use it
 #define VAL(type, x) *((type*) x)
@@ -315,6 +322,19 @@ int actionHasEnterFrameHandlers(void);
 void actionDispatchMCPress(SWFAppContext* app_context);
 void actionDispatchMCRelease(SWFAppContext* app_context);
 void actionDispatchMCMouseMove(SWFAppContext* app_context);
+// Global AS2 onMouseDown/onMouseUp/onMouseMove dispatch — fires on ALL sprite MCs.
+void actionDispatchMCMouseDown(SWFAppContext* app_context);
+void actionDispatchMCMouseUp(SWFAppContext* app_context);
+void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context);
+// Dispatch key events to focused MC — fires onKeyDown/onKeyUp on g_focused_mc.
+// Enter/Space on focused MC with onPress → simulated press+release.
+void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code);
+void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code);
+void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code);
+// Mouse click focus acquisition — on mouse down, check if clicked MC is focusable.
+void actionMouseClickFocus(SWFAppContext* app_context);
+// Window focus lost — clear keyboard focus, firing onRollOut + onKillFocus.
+void actionWindowFocusLost(SWFAppContext* app_context);
 
 // Clipboard and text control operations — called from swf_core.c on input events.
 void actionSetClipboardText(const char* text);

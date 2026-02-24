@@ -300,6 +300,377 @@ def filter_output(raw_output):
     return "\n".join(filtered)
 
 
+def find_child_swfs(test_dir):
+    """Find child .swf files (non-test.swf) in a test directory."""
+    children = []
+    for f in sorted(test_dir.iterdir()):
+        if f.suffix == ".swf" and f.name != "test.swf":
+            children.append(f)
+    return children
+
+
+def recompile_child_swf(swf_path, output_dir):
+    """Recompile a child SWF into output_dir. Returns True on success."""
+    # Create a temp dir with the child SWF as test.swf
+    with tempfile.TemporaryDirectory(prefix="swf_child_") as tmpdir:
+        tmp = Path(tmpdir)
+        shutil.copy2(swf_path, tmp / "test.swf")
+        shutil.copy2(RECOMP_CONFIG, tmp / "config.toml")
+        try:
+            result = subprocess.run(
+                ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
+                 str(RECOMP_BIN), str(RECOMP_CONFIG)],
+                cwd=str(tmp),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                return False
+        except subprocess.TimeoutExpired:
+            return False
+
+        # Copy generated files to output_dir
+        for folder in ["RecompiledScripts", "RecompiledTags"]:
+            src = tmp / folder
+            dst = output_dir / folder
+            if src.exists():
+                dst.mkdir(exist_ok=True)
+                for f in src.iterdir():
+                    if f.suffix in (".c", ".h"):
+                        shutil.copy2(f, dst)
+    return True
+
+
+def _sanitize_prefix(filename):
+    """Convert a filename like 'target.swf' to a C-safe identifier prefix like 'target'."""
+    name = filename.rsplit(".", 1)[0]  # strip extension
+    name = re.sub(r'[^a-zA-Z0-9]', '_', name)
+    # C identifiers can't start with a digit
+    if name and name[0].isdigit():
+        name = "m_" + name
+    return name
+
+
+def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir):
+    """Generate a self-contained C file for a child SWF movie.
+
+    Reads the recompiled C files from child_recomp_dir and generates a single
+    movie_<prefix>.c file in build_dir that wraps all symbols with a unique prefix.
+    Returns the prefix used, or None on failure.
+    """
+    prefix = _sanitize_prefix(child_swf_name)
+
+    # Read the child's constants.h to extract SWF_VERSION and frame dimensions
+    constants_h = child_recomp_dir / "RecompiledTags" / "constants.h"
+    swf_version = 8
+    frame_width = 550
+    frame_height = 400
+    frame_count_val = 1
+    if constants_h.exists():
+        text = constants_h.read_text()
+        m = re.search(r"#define\s+SWF_VERSION\s+(\d+)", text)
+        if m:
+            swf_version = int(m.group(1))
+        m = re.search(r"#define\s+FRAME_WIDTH\s+(\d+)", text)
+        if m:
+            frame_width = int(m.group(1))
+        m = re.search(r"#define\s+FRAME_HEIGHT\s+(\d+)", text)
+        if m:
+            frame_height = int(m.group(1))
+
+    # Read the child's out.h to extract FRAME_COUNT and script declarations
+    out_h = child_recomp_dir / "RecompiledScripts" / "out.h"
+    script_funcs = []
+    if out_h.exists():
+        text = out_h.read_text()
+        m = re.search(r"#define\s+FRAME_COUNT\s+(\d+)", text)
+        if m:
+            frame_count_val = int(m.group(1))
+        for m in re.finditer(r"void\s+([a-zA-Z_]\w+)\(", text):
+            fname = m.group(1)
+            if fname not in script_funcs:
+                script_funcs.append(fname)
+
+    # Read the child's script_decls.h for all user-defined functions
+    # (func2_*, func_anonymous_*, func_* etc.)
+    user_funcs = []  # list of (name, full_declaration_line)
+    script_decls = child_recomp_dir / "RecompiledScripts" / "script_decls.h"
+    if script_decls.exists():
+        text = script_decls.read_text()
+        # Match function declarations like:
+        # ActionVar func2_getGlobal_0(SWFAppContext* ...)
+        # ActionVar func_anonymous_0(SWFAppContext* ...)
+        # void func_something(SWFAppContext* ...)
+        for m in re.finditer(r'\b(func2?_[a-zA-Z_][a-zA-Z0-9_]*)\s*\(', text):
+            fname = m.group(1)
+            if fname not in user_funcs:
+                user_funcs.append(fname)
+
+    # Read the child's script_defs.c to get string definitions and function implementations
+    script_defs_path = child_recomp_dir / "RecompiledScripts" / "script_defs.c"
+    str_defs = []
+    str_names = []  # all str_N identifiers (both pointer and buffer types)
+    max_string_id = 0
+    script_defs_source = ""
+    if script_defs_path.exists():
+        script_defs_source = script_defs_path.read_text()
+        for m in re.finditer(r'char\*\s+(str_\d+)\s*=\s*(".*?")\s*;', script_defs_source):
+            str_defs.append((m.group(1), m.group(2)))
+        # Also find buffer-type strings: char str_15[17];
+        for m in re.finditer(r'\b(str_\d+)\b', script_defs_source):
+            if m.group(1) not in str_names:
+                str_names.append(m.group(1))
+        m = re.search(r"#define\s+MAX_STRING_ID\s+(\d+)", script_defs_source)
+        if m:
+            max_string_id = int(m.group(1))
+
+    # Read the child's script_N.c files (exclude script_defs.c — handled above)
+    script_sources = {}
+    scripts_dir = child_recomp_dir / "RecompiledScripts"
+    if scripts_dir.exists():
+        for f in sorted(scripts_dir.iterdir()):
+            if (f.name.startswith("script_") and f.suffix == ".c"
+                    and f.name != "script_defs.c"):
+                script_sources[f.name] = f.read_text()
+
+    # Read the child's tagMain.c
+    tag_main = child_recomp_dir / "RecompiledTags" / "tagMain.c"
+    tag_main_text = ""
+    if tag_main.exists():
+        tag_main_text = tag_main.read_text()
+
+    # Build a list of all symbols that need prefixing
+    all_renames = {}  # old_name -> new_name
+    for str_name in str_names:
+        all_renames[str_name] = f'{prefix}_{str_name}'
+    for str_name, _ in str_defs:
+        all_renames[str_name] = f'{prefix}_{str_name}'
+    for func_name in script_funcs:
+        all_renames[func_name] = f'{prefix}_{func_name}'
+    for func_name in user_funcs:
+        all_renames[func_name] = f'{prefix}_{func_name}'
+    # Detect sprite_N_frame_*, button_*, and clip_actions_* symbols in tagMain
+    if tag_main_text:
+        for m in re.finditer(r'\b(sprite_\d+_frame_(?:funcs|\d+))\b', tag_main_text):
+            sym = m.group(1)
+            if sym not in all_renames:
+                all_renames[sym] = f'{prefix}_{sym}'
+        for m in re.finditer(r'\b(button_\d+_\w+)\b', tag_main_text):
+            sym = m.group(1)
+            if sym not in all_renames:
+                all_renames[sym] = f'{prefix}_{sym}'
+        for m in re.finditer(r'\b(clip_actions_\d+)\b', tag_main_text):
+            sym = m.group(1)
+            if sym not in all_renames:
+                all_renames[sym] = f'{prefix}_{sym}'
+
+    # Build a single compiled regex for all renames (single-pass replacement)
+    # Match known symbol prefixes and check against rename dict in callback
+    if all_renames:
+        _rename_pattern = re.compile(
+            r'\b(str_\d+|script_\d+|func2?_\w+|button_\d+_\w+|clip_action(?:s)?_\d+|sprite_\d+_frame_\w+)\b')
+        _renames = all_renames  # capture for closure
+
+        def apply_renames(text):
+            """Apply all symbol renames to a block of C code (single pass)."""
+            def _repl(m):
+                sym = m.group(1)
+                return _renames.get(sym, sym)
+            return _rename_pattern.sub(_repl, text)
+    else:
+        def apply_renames(text):
+            return text
+
+    # Generate the combined wrapper file
+    lines = []
+    lines.append(f"// Auto-generated movie wrapper for {child_swf_name}")
+    lines.append(f"// Prefix: {prefix}_")
+    lines.append("")
+    lines.append("#include <recomp.h>")
+    lines.append("#include <setjmp.h>")
+    lines.append("#include <string.h>")
+    lines.append("#include <stackvalue.h>")
+    lines.append("#include <variables.h>")
+    lines.append("#include <actionmodern/action.h>")
+    lines.append("")
+
+    # Forward declarations for all strings and functions
+    ptr_str_names = {s for s, _ in str_defs}
+    for str_name, _ in str_defs:
+        lines.append(f"extern char* {prefix}_{str_name};")
+    for str_name in str_names:
+        if str_name not in ptr_str_names:
+            lines.append(f"extern char {prefix}_{str_name}[];")
+    for func_name in script_funcs:
+        lines.append(f"void {prefix}_{func_name}(SWFAppContext* app_context);")
+    for func_name in user_funcs:
+        lines.append(f"// Forward decl: {prefix}_{func_name}")
+    # Forward declarations for button and clip_actions arrays from tagMain
+    if tag_main_text:
+        for m in re.finditer(r'^frame_func\s+(button_\d+_state_funcs)\s*\[\]', tag_main_text, re.MULTILINE):
+            lines.append(f"extern frame_func {prefix}_{m.group(1)}[];")
+        for m in re.finditer(r'^ButtonAction\s+(button_\d+_actions)\s*\[\]', tag_main_text, re.MULTILINE):
+            lines.append(f"extern ButtonAction {prefix}_{m.group(1)}[];")
+        for m in re.finditer(r'^ClipAction\s+(clip_actions_\d+)\s*\[\]', tag_main_text, re.MULTILINE):
+            lines.append(f"extern ClipAction {prefix}_{m.group(1)}[];")
+    lines.append("")
+
+    # Include script_defs.c content (string definitions + function implementations)
+    if script_defs_source:
+        modified = script_defs_source
+        # Remove #include lines and #define MAX_STRING_ID
+        modified = re.sub(r'#include\s+[<"].*?[>"]\s*\n', '', modified)
+        modified = re.sub(r'#define\s+MAX_STRING_ID\s+\d+\s*\n?', '', modified)
+        # Apply all symbol renames
+        modified = apply_renames(modified)
+        lines.append(modified)
+    lines.append("")
+
+    # Script function implementations
+    for fname, source in script_sources.items():
+        modified = source
+        # Remove #include lines
+        modified = re.sub(r'#include\s+[<"].*?[>"]\s*\n', '', modified)
+        # Apply all symbol renames
+        modified = apply_renames(modified)
+        lines.append(modified)
+        lines.append("")
+
+    # Frame functions from tagMain.c
+    if tag_main_text:
+        modified = tag_main_text
+        # Remove includes
+        modified = re.sub(r'#include\s+[<"].*?[>"]\s*\n', '', modified)
+        # Remove FrameLabelEntry typedef (already defined in runtime)
+        modified = re.sub(
+            r'// Frame labels.*?size_t frame_label_count = \d+;',
+            '', modified, flags=re.DOTALL)
+        # Prefix frame_N functions
+        frame_funcs_in_tag = list(set(re.findall(r'\b(frame_\d+)\b', tag_main_text)))
+        for ff in frame_funcs_in_tag:
+            modified = re.sub(rf'\b{ff}\b', f'{prefix}_{ff}', modified)
+        # Apply all symbol renames (str_N, script_N, func_*)
+        modified = apply_renames(modified)
+        # Rename frame_funcs array
+        modified = modified.replace('frame_func frame_funcs[]', f'frame_func {prefix}_frame_funcs[]')
+        # Rename frame_label_data and frame_label_count
+        modified = re.sub(r'\bframe_label_data\b', f'{prefix}_frame_label_data', modified)
+        modified = re.sub(r'\bframe_label_count\b', f'{prefix}_frame_label_count', modified)
+        # Rename tagInit
+        modified = modified.replace('void tagInit(', f'void {prefix}_tagInit(')
+        # Rename initVarArray call's MAX_STRING_ID
+        modified = re.sub(r'initVarArray\(MAX_STRING_ID\)', f'initVarArray({max_string_id})', modified)
+        lines.append(modified)
+        lines.append("")
+
+    # Generate the movie entry struct access function
+    lines.append(f"// Movie entry for {child_swf_name}")
+    lines.append(f"#include <libswf/swf.h>")
+    lines.append("")
+    lines.append(f"MovieEntry {prefix}_movie_entry = {{")
+    lines.append(f'    .filename = "{child_swf_name}",')
+    lines.append(f"    .frame_funcs = {prefix}_frame_funcs,")
+    lines.append(f"    .init_func = {prefix}_tagInit,")
+    lines.append(f"    .swf_version = {swf_version},")
+    lines.append(f"    .frame_count = {frame_count_val},")
+    lines.append(f"    .stage_width = {frame_width},")
+    lines.append(f"    .stage_height = {frame_height},")
+    lines.append(f"}};")
+    lines.append("")
+
+    # Write the file
+    out_path = build_dir / f"movie_{prefix}.c"
+    out_path.write_text("\n".join(lines))
+    return prefix
+
+
+def generate_movie_registry(prefixes, build_dir):
+    """Generate movie_registry.c that maps filenames to MovieEntry pointers."""
+    lines = []
+    lines.append("// Auto-generated movie registry for multi-SWF tests")
+    lines.append("#include <libswf/swf.h>")
+    lines.append("#include <string.h>")
+    lines.append("")
+    for prefix in prefixes:
+        lines.append(f"extern MovieEntry {prefix}_movie_entry;")
+    lines.append("")
+    lines.append(f"static MovieEntry* g_movie_entries[] = {{")
+    for prefix in prefixes:
+        lines.append(f"    &{prefix}_movie_entry,")
+    lines.append("    NULL")
+    lines.append("};")
+    lines.append("")
+    lines.append("MovieEntry* findMovieEntry(const char* filename) {")
+    lines.append("    for (int i = 0; g_movie_entries[i] != NULL; i++) {")
+    lines.append("        if (strcmp(g_movie_entries[i]->filename, filename) == 0)")
+    lines.append("            return g_movie_entries[i];")
+    lines.append("    }")
+    lines.append("    return NULL;")
+    lines.append("}")
+    lines.append("")
+
+    out_path = build_dir / "movie_registry.c"
+    out_path.write_text("\n".join(lines))
+
+
+def find_data_files(test_dir):
+    """Find data files (non-.swf, non-.fla, non-config) in a test directory.
+    These are files like testvars.txt that loadVariables loads at runtime."""
+    skip_names = {"test.swf", "test.fla", "test.toml", "test.as", "output.txt"}
+    skip_suffixes = {".swf", ".fla", ".toml"}
+    data_files = []
+    for f in sorted(test_dir.iterdir()):
+        if f.is_dir():
+            continue
+        if f.name in skip_names:
+            continue
+        if f.suffix in skip_suffixes:
+            continue
+        data_files.append(f)
+    return data_files
+
+
+def generate_data_registry(data_files, build_dir):
+    """Generate data_registry.c that embeds data file contents as C strings."""
+    lines = []
+    lines.append("// Auto-generated data file registry for loadVariables tests")
+    lines.append('#include <libswf/swf.h>')
+    lines.append('#include <string.h>')
+    lines.append("")
+
+    var_names = []
+    for df in data_files:
+        content = df.read_bytes()
+        var_name = "data_" + re.sub(r'[^a-zA-Z0-9]', '_', df.name)
+        var_names.append((var_name, df.name, len(content)))
+        # Emit as a C byte array to handle any content safely
+        hex_bytes = ", ".join(f"0x{b:02x}" for b in content)
+        lines.append(f"static const char {var_name}[] = {{ {hex_bytes}, 0x00 }};")
+    lines.append("")
+
+    lines.append("static DataFileEntry g_data_files[] = {")
+    for var_name, filename, length in var_names:
+        # Escape filename for C string
+        escaped = filename.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'    {{ "{escaped}", {var_name}, {length} }},')
+    lines.append("    { NULL, NULL, 0 }")
+    lines.append("};")
+    lines.append("")
+
+    lines.append("DataFileEntry* findDataFile(const char* filename) {")
+    lines.append("    for (int i = 0; g_data_files[i].filename != NULL; i++) {")
+    lines.append("        if (strcmp(g_data_files[i].filename, filename) == 0)")
+    lines.append("            return &g_data_files[i];")
+    lines.append("    }")
+    lines.append("    return NULL;")
+    lines.append("}")
+    lines.append("")
+
+    out_path = build_dir / "data_registry.c"
+    out_path.write_text("\n".join(lines))
+
+
 def recompile_swf(test_dir, force=False):
     """Run SWFRecomp on test.swf if not already done (or if forced)."""
     if not force and (test_dir / "RecompiledScripts").exists():
@@ -363,13 +734,36 @@ def compile_native(test_dir, num_frames, build_dir):
     shutil.copy2(SWFMODERN / "include/memory/heap.h", mem_dir)
     shutil.copy2(MAIN_C, build_dir)
 
-    # Copy generated files
+    # Copy generated files for main SWF
     for folder in ["RecompiledScripts", "RecompiledTags"]:
         src_dir = test_dir / folder
         if src_dir.exists():
             for f in src_dir.iterdir():
                 if f.suffix in (".c", ".h"):
                     shutil.copy2(f, build_dir)
+
+    # Handle child SWFs (multi-SWF tests like loadMovie)
+    child_swfs = find_child_swfs(test_dir)
+    child_prefixes = []
+    has_children = len(child_swfs) > 0
+
+    for child_swf in child_swfs:
+        child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
+        child_recomp_dir.mkdir(exist_ok=True)
+        if recompile_child_swf(child_swf, child_recomp_dir):
+            prefix = generate_child_movie_file(
+                child_swf.name, child_recomp_dir, build_dir)
+            if prefix:
+                child_prefixes.append(prefix)
+
+    if has_children:
+        generate_movie_registry(child_prefixes, build_dir)
+
+    # Handle data files (loadVariables tests: testvars.txt, etc.)
+    data_files = find_data_files(test_dir)
+    has_data_files = len(data_files) > 0
+    if has_data_files:
+        generate_data_registry(data_files, build_dir)
 
     # Compile
     inc = SWFMODERN / "include"
@@ -381,6 +775,16 @@ def compile_native(test_dir, num_frames, build_dir):
     if viewport is not None:
         extra_defines.append(f"-DVIEWPORT_WIDTH={viewport[0]}")
         extra_defines.append(f"-DVIEWPORT_HEIGHT={viewport[1]}")
+    if has_children:
+        extra_defines.append("-DHAS_CHILD_MOVIES")
+    if has_data_files:
+        extra_defines.append("-DHAS_DATA_FILES")
+    # Pass SWF file size for getBytesLoaded/getBytesTotal
+    test_swf = test_dir / "test.swf"
+    if test_swf.exists():
+        extra_defines.append(f"-DSWF_FILE_SIZE={test_swf.stat().st_size}")
+    # Pass test directory name for _url property
+    extra_defines.append(f'-DSWF_URL="{test_dir.name}/test.swf"')
     try:
         result = subprocess.run(
             [

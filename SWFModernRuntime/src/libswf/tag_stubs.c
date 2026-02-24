@@ -43,6 +43,11 @@ static struct {
 } ng_char_bounds[MAX_CHAR_BOUNDS_NG];
 static size_t ng_char_bounds_count = 0;
 
+// Non-zero winding rule char_ids (DefineShape4 UsesFillWindingRule)
+#define MAX_WINDING_NG 64
+static size_t ng_winding_ids[MAX_WINDING_NG];
+static size_t ng_winding_count = 0;
+
 // Button char_id registry (for typeof discrimination)
 #define MAX_BUTTONS_NG 64
 static size_t ng_button_ids[MAX_BUTTONS_NG];
@@ -252,6 +257,19 @@ void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 yma
 	ng_char_bounds[ng_char_bounds_count].ymin = ymin;
 	ng_char_bounds[ng_char_bounds_count].ymax = ymax;
 	ng_char_bounds_count++;
+}
+
+void ng_record_char_winding(size_t char_id)
+{
+	if (ng_winding_count < MAX_WINDING_NG)
+		ng_winding_ids[ng_winding_count++] = char_id;
+}
+
+static int ng_uses_nonzero_winding(size_t char_id)
+{
+	for (size_t i = 0; i < ng_winding_count; i++)
+		if (ng_winding_ids[i] == char_id) return 1;
+	return 0;
 }
 
 void ng_record_button(size_t char_id)
@@ -472,6 +490,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	new_mc->visible = 1;
 	new_mc->width = 0.0f;
 	new_mc->height = 0.0f;
+	// Don't reset frame counters here — they stay at createMovieClip defaults (1,1,1).
+	// attachMovie clips that run frame 0 get their counters set at the end of ng_attachMovie.
 #ifdef NO_GRAPHICS
 	new_mc->as_set_flags = 0;
 #endif
@@ -1418,6 +1438,100 @@ int ng_computeBoundsFromDL(DisplayObject* dl, size_t dl_max,
 		*out_xmax = (int32_t)rintf((float)gxmax); *out_ymax = (int32_t)rintf((float)gymax);
 	}
 	return has;
+}
+
+// ---------------------------------------------------------------------------
+// Shape-accurate point-in-shape test (for hitTest shapeFlag=true)
+// ---------------------------------------------------------------------------
+extern u32 shape_data[][4];
+
+// Test if a point is inside a single triangle (barycentric coordinates)
+static int pit(double px, double py,
+               double ax, double ay, double bx, double by, double cx, double cy)
+{
+	double d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+	double d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+	double d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+	int has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+	int has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+	return !(has_neg && has_pos);
+}
+
+// Test a point (in twips, parent-accumulated matrix space) against a char's shape triangles.
+// ma..mty is the child's accumulated world matrix (mapping local twips → test space).
+// Returns 1 if hit, 0 if miss.
+static int ng_hitTestShapeChar(size_t char_id,
+    double ma, double mb, double mc_m, double md, double mtx, double mty,
+    double test_x, double test_y)
+{
+	Character* ch = &dictionary[char_id];
+	if (ch->type != CHAR_TYPE_SHAPE) return 0;
+
+	size_t offset = ch->shape_offset;
+	size_t count = ch->size;
+	if (count < 3) return 0;
+
+	// Inverse-transform test point into shape's local space
+	double det = ma * md - mb * mc_m;
+	if (det == 0.0) return 0;
+	double inv_det = 1.0 / det;
+	double sx = test_x - mtx;
+	double sy = test_y - mty;
+	double local_x = ( md * sx - mc_m * sy) * inv_det;
+	double local_y = (-mb * sx + ma  * sy) * inv_det;
+
+	// Count triangle hits
+	int hits = 0;
+	size_t num_tris = count / 3;
+	for (size_t t = 0; t < num_tris; t++) {
+		const u32* v0 = shape_data[offset + t * 3 + 0];
+		const u32* v1 = shape_data[offset + t * 3 + 1];
+		const u32* v2 = shape_data[offset + t * 3 + 2];
+		double ax = (double)*(const float*)&v0[0];
+		double ay = (double)*(const float*)&v0[1];
+		double bx = (double)*(const float*)&v1[0];
+		double by = (double)*(const float*)&v1[1];
+		double cx = (double)*(const float*)&v2[0];
+		double cy = (double)*(const float*)&v2[1];
+		if (pit(local_x, local_y, ax, ay, bx, by, cx, cy))
+			hits++;
+	}
+
+	if (ng_uses_nonzero_winding(char_id))
+		return hits > 0;  // non-zero: any hit means inside
+	return (hits % 2) == 1;  // even-odd: odd count = inside
+}
+
+int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
+    double ma, double mb, double mc_m, double md, double mtx, double mty,
+    double test_x, double test_y)
+{
+	for (size_t i = 1; i <= dl_max; i++) {
+		DisplayObject* child = &dl[i];
+		if (child->char_id == 0) continue;
+		u32 tid = child->transform_id;
+		double ca = (double)transform_data[tid][0];
+		double cb = (double)transform_data[tid][1];
+		double cc = (double)transform_data[tid][4];
+		double cd = (double)transform_data[tid][5];
+		double ctx_v = (double)transform_data[tid][12];
+		double cty_v = (double)transform_data[tid][13];
+		double na = ma*ca + mc_m*cb, nb = mb*ca + md*cb;
+		double nc = ma*cc + mc_m*cd, nd = mb*cc + md*cd;
+		double ntx = ma*ctx_v + mc_m*cty_v + mtx;
+		double nty = mb*ctx_v + md*cty_v + mty;
+
+		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+			if (ng_hitTestShapeFromDL(child->sprite_display_list, child->sprite_max_depth,
+				na, nb, nc, nd, ntx, nty, test_x, test_y))
+				return 1;
+		} else {
+			if (ng_hitTestShapeChar(child->char_id, na, nb, nc, nd, ntx, nty,
+				test_x, test_y))
+				return 1;
+		}
+	}
+	return 0;
 }
 
 // ---------------------------------------------------------------------------

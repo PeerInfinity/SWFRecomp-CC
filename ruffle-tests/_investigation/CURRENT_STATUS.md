@@ -1,12 +1,12 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-22
+Last updated: 2026-02-24
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 307/619 (49.6%)
-- **Main failure types**: output_mismatch (304), segfault (5), runtime_error (2), timeout (1)
-- **Recent gains**: input event dispatch (+18 tests), Stage.scaleMode onResize, Selection methods, broadcastMessage MC variable fallback
+- **Pass rate (CI, last run)**: 333/619 (53.8%)
+- **Main failure types**: output_mismatch (276), segfault (5), runtime_error (4), timeout (1)
+- **Recent gains**: FlashVars URL query parsing (+2 flashvars tests), instanceof MovieClip (+1 mcl_mislabeled_target), _visible undefined/null no-op (+1 stage_object_properties_swf6), child SWF context switching, getBytesLoaded/Total, _url property, getTextSnapshot stub
 
 ## Crashes and Errors (8 tests)
 
@@ -17,8 +17,8 @@ Last updated: 2026-02-22
 | native_objects_swf6 | segfault | 0/84 | Crashes constructing native Flash classes (filters, geom, etc.) |
 | native_objects_swf7 | segfault | 0/84 | Same root cause as swf6 |
 | native_objects_swf8 | segfault | 0/84 | Same root cause as swf6 |
-| movieclip_library_state_values | runtime_error | 16/78 | exit code -6 (abort) |
-| movieclip_state_values | runtime_error | 3/114 | exit code -6 (abort) |
+| movieclip_invalid_get_bounds_6 | compile_fail | 0/? | Needs button/clip_actions symbol renaming (fixed locally, not in CI yet) |
+| movieclip_invalid_get_bounds_7 | compile_fail | 0/? | Same fix as _6 (fixed locally, not in CI yet) |
 | timeout | timeout | 0/0 | setTimeout/clearTimeout not implemented |
 
 ## Top Near-Passing Tests (best ROI to fix)
@@ -34,21 +34,27 @@ Last updated: 2026-02-22
 | `stage_object_enumerate` | 4/4 ✅ | Stage child enumeration |
 | `stage_display_state` | 16/16 ✅ | displayState property + onFullScreen |
 | `stage_scale_mode` | 39/39 ✅ | onResize broadcast + viewport dims + broadcastMessage MC variable fallback |
+| `stage_object_properties` | 241/241 ✅ | Was already passing in CI |
+| `stage_object_properties_swf6` | 231/231 ✅ | _visible undefined/null no-op fix |
+| `mcl_mislabeled_target` | 6/6 ✅ | instanceof MovieClip for MOVIECLIP type |
+| `loadmovie_flashvars` | 4/4 ✅ | FlashVars URL query parsing + child context switch |
+| `moviecliploader_flashvars` | 4/4 ✅ | FlashVars URL query parsing + MCL child context switch |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
+| `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
 | `selection` | 434/454 (95.6%) | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
+| `hittest_morph` | 67/70 (95.7%) | Morph shape bounds interpolation |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
-| `stage_object_properties` | 226/241 (93.8%) | _width/_height↔scale coupling, rotation, original bounds |
-| `stage_object_properties_swf6` | 214/231 (92.6%) | Same as above, SWF6 variant |
+| `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
 
 ### 80-90%
 | Test | Match | Issue |
 |------|-------|-------|
-| `movieclip_focusenabled` | 85/99 (85.9%) | Focus system / hasOwnProperty on empty MCs |
+| `movieclip_focusenabled` | **PASS** ✅ | Fixed: dot-path resolution in getMovieClipByTarget |
 | `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
 | `function_base_clip_readded` | 9/11 (81.8%) | _parent resolution after removal+re-add |
 | `this_scoping` | 42/52 (80.8%) | `this` binding in various call contexts |
@@ -86,7 +92,7 @@ Last updated: 2026-02-22
 | PARSING_FUNCTIONS_PLAN | **parse_int DONE** | parse_int passes | parseFloat edge cases remain |
 | COLOR_OBJECT_PLAN | **COMPLETE** | extends_native_type ✅ | — |
 | GEOMETRY_CLASSES_PLAN | **COMPLETE** | transform, local_to_global partial | — |
-| STAGE_PLAN | **Phases 1,5,7 DONE** | stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅ | Phase 2 (width↔scale), Phase 4 (_level), Phase 8 (children) |
+| STAGE_PLAN | **Phases 1,2,5,7 DONE** | stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅ | Phase 4 (_level addressing), Phase 8 (children) |
 | STAGE_FRAME_PROPS_PLAN | **Phases 1,5 DONE** | Several stages pass | Phase 2 (shape bounds), Phase 3 (content bounds) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
@@ -96,23 +102,27 @@ Last updated: 2026-02-22
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
 | TELLTARGET_PLAN | Not started | 0/3+ | tellTarget scope, path resolution |
 | TIMER_PLAN | Not started | 0/3 | setInterval, setTimeout |
-| FOCUS_SYSTEM_PLAN | Not started | 0/6 | Mouse-triggered focus |
+| FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by closure capture bug |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
-| UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
-| BUTTON_PLAN | Not started | 0/14 | Button actions, states |
-| HIT_TESTING_PLAN | Not started | 0/17 | Coordinate transforms, bounds |
+| LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 15/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) NOT FEASIBLE |
+| LOADVARIABLES_PLAN | Not started | 0/4 | loadVariables pre-bundled data files; 2/4 feasible (loadvariables2 needs TIMER_PLAN) |
+| ROOT_REPLACEMENT_PLAN | Not started | 0/4 | loadMovie into _root/_level0; 2/4 feasible (swf7→5/6 needs cross-version scoping) |
+| LOADMOVIE_REMAINING_PLAN | Not started | 0/5 | var_persistence, cross_version_prototype, mcl_events_swf_version, clip state |
+| UNLOAD_PLAN | **DONE** (via LOADMOVIE_PLAN) | 3/3 pass (unloadmovie, unloadmovie_method, unloadmovienum) | — |
+| BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
+| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie (compile failures now fixed), mouse events, morph interp |
 
 ## Recommended Work Order
 
 ### Highest ROI — near-passing tests
-1. **STAGE_PLAN Phase 2** (width↔scale coupling) — `stage_object_properties` 226→~235/241, `stage_object_properties_swf6` 214→~225/231
-2. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83
+1. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83
+2. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (2 lines)
 
 ### Medium ROI — feature phases with multiple test payoff
-3. **OOP_SUPER_EXTENDS_PLAN** — `super` keyword, 8 tests
+3. **OOP_SUPER_EXTENDS_PLAN** — `super` keyword, 4 tests
 4. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, 12 tests
-5. **REGISTERCLASS_PLAN** — registerClass + attachMovie, 7 tests (also fixes `attach_movie`, `empty_movieclip_can_attach_movies`)
+5. **REGISTERCLASS_PLAN** — registerClass + attachMovie, 7 tests
 
 ### Lower ROI — new features
 6. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8), would prevent 252 expected lines from crashing

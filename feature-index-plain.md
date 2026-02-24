@@ -1,6 +1,6 @@
 # SWF Graphics Feature Index
 
-**Generated**: 2026-02-09
+**Generated**: 2026-02-24
 
 See also: [AS2 Opcode Index](opcode-index-plain.md)
 
@@ -8,13 +8,13 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Total SWF Features**: 62
 
-**Features With Tests**: 59/62
+**Features With Tests**: 61/62
 
-**Features Without Tests**: 3
+**Features Without Tests**: 1
 
-**Total Feature Tests**: 217
+**Total Feature Tests**: 219
 
-**Fully Implemented**: 59/62
+**Fully Implemented**: 61/62
 
 ## Summary Tables
 
@@ -149,12 +149,12 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | SoundStreamBlock | Streaming audio frame data (SWF tag 19) | 19 | 2 | Yes |
 
 ### Video Tags
-(0/2 with tests)
+(2/2 with tests)
 
 | Feature | Description | Tag ID | Tests | Implemented |
 |---------|-------------|--------|-------|-------------|
-| DefineVideoStream | Video stream definition (SWF tag 60) | 60 | **0** | No |
-| VideoFrame | Video frame data (SWF tag 61) | 61 | **0** | No |
+| DefineVideoStream | Video stream definition (SWF tag 60) | 60 | 1 | Yes |
+| VideoFrame | Video frame data (SWF tag 61) | 61 | 1 | Yes |
 
 ### Filter Types
 (8/8 with tests)
@@ -173,7 +173,7 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 ## Implementation Status
 
 ### Fully Implemented
-(59 features)
+(61 features)
 
 | Feature | Category | Tag ID | Tests |
 |---------|----------|--------|-------|
@@ -228,6 +228,8 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | SoundStreamHead | Sound Tags | 18 | 1 |
 | SoundStreamHead2 | Sound Tags | 45 | 1 |
 | SoundStreamBlock | Sound Tags | 19 | 2 |
+| DefineVideoStream | Video Tags | 60 | 1 |
+| VideoFrame | Video Tags | 61 | 1 |
 | DropShadowFilter | Filter Types | - | 1 |
 | BlurFilter | Filter Types | - | 1 |
 | GlowFilter | Filter Types | - | 1 |
@@ -248,8 +250,6 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 | Feature | Category | Tag ID |
 |---------|----------|--------|
 | DefineFont4 | Text Tags | 91 |
-| DefineVideoStream | Video Tags | 60 |
-| VideoFrame | Video Tags | 61 |
 
 ## Detailed Information
 
@@ -1304,9 +1304,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: 60
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_video_stream`
 
 ---
 
@@ -1320,9 +1321,10 @@ See also: [AS2 Opcode Index](opcode-index-plain.md)
 
 **Tag ID**: 61
 
-**Fully Implemented**: No
+**Fully Implemented**: Yes
 
-**Tests:** None
+**Tests:**
+- `SWFRecomp/tests/graphics/define_video_stream`
 
 ---
 

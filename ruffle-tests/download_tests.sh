@@ -90,11 +90,31 @@ for test_dir in "${SRC_DIR}"/*/; do
         fi
     done
 
+    # Copy child/target SWF files (target.swf, child.swf, assets.swf, etc.)
+    # These are needed for multi-SWF tests (loadMovie, registerClass, etc.)
+    for swf_file in "${test_dir}"/*.swf; do
+        [[ -f "${swf_file}" ]] || continue
+        [[ "$(basename "${swf_file}")" == "test.swf" ]] && continue
+        cp "${swf_file}" "${dest}/"
+    done
+
     # Copy ActionScript source files if present (useful for debugging)
     for ext in as fla; do
         for src_file in "${test_dir}"/*.${ext}; do
             [[ -f "${src_file}" ]] && cp "${src_file}" "${dest}/"
         done
+    done
+
+    # Copy data files for loadVariables tests (testvars.txt, variables, etc.)
+    # These are non-SWF, non-config files that the test loads at runtime
+    for data_file in "${test_dir}"/*; do
+        [[ -f "${data_file}" ]] || continue
+        base="$(basename "${data_file}")"
+        # Skip files we already copy or that aren't data files
+        case "${base}" in
+            test.swf|output.txt|test.toml|input.json|*.swf|*.as|*.fla) continue ;;
+        esac
+        cp "${data_file}" "${dest}/"
     done
 
     INSTALLED=$((INSTALLED + 1))

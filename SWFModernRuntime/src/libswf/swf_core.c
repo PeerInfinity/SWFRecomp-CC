@@ -30,6 +30,22 @@ float g_drag_virt_x = 0.0f;   // virtual stage X of dragged clip (twips)
 float g_drag_virt_y = 0.0f;   // virtual stage Y of dragged clip (twips)
 char g_drag_target_name[256] = "";  // name of most-recently dragged clip (persists after stopDrag)
 
+// Default findMovieEntry stub when no child movies are linked
+#ifndef HAS_CHILD_MOVIES
+MovieEntry* findMovieEntry(const char* filename) {
+	(void)filename;
+	return NULL;
+}
+#endif
+
+// Default findDataFile stub when no data files are linked
+#ifndef HAS_DATA_FILES
+DataFileEntry* findDataFile(const char* filename) {
+	(void)filename;
+	return NULL;
+}
+#endif
+
 // Goto catch-up state
 int catch_up_mode = 0;
 int goto_from_action = 0;
@@ -203,6 +219,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ng_update_button_states(app_context);
         // Dispatch AS2 roll/drag over/out events to dynamic MCs
         actionDispatchMCMouseMove(app_context);
+        // Global AS2 mc.onMouseMove dispatch to all sprite MCs
+        actionDispatchMCMouseMoveGlobal(app_context);
         break;
     case EV_MOUSE_DOWN_LEFT:
         ms->stage_x = ev->x * 20.0f;
@@ -217,11 +235,15 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_DOWN);
         // Broadcast Mouse.onMouseDown to Mouse listeners
         actionDispatchMouseDown(app_context);
+        // Global AS2 mc.onMouseDown dispatch to all sprite MCs
+        actionDispatchMCMouseDown(app_context);
         // Run per-event button state machine (processes OverUpToOverDown = press)
         ng_update_button_states(app_context);
         dispatch_clip_event_press(app_context);
         // Dispatch AS2 onPress to dynamic MCs
         actionDispatchMCPress(app_context);
+        // Mouse click focus acquisition
+        actionMouseClickFocus(app_context);
         break;
     case EV_MOUSE_UP_LEFT:
         ms->stage_x = ev->x * 20.0f;
@@ -234,6 +256,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_UP);
         // Broadcast Mouse.onMouseUp to Mouse listeners
         actionDispatchMouseUp(app_context);
+        // Global AS2 mc.onMouseUp dispatch to all sprite MCs
+        actionDispatchMCMouseUp(app_context);
         // Run per-event button state machine (processes OverDownToOverUp = release)
         ng_update_button_states(app_context);
         dispatch_clip_event_release(app_context);
@@ -251,9 +275,13 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         app_context->keys.last_key_ascii = (ev->code >= 32 && ev->code <= 126) ? ev->code : 0;
         // Dispatch onClipEvent(keyDown) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_DOWN);
+        // Dispatch onKeyDown to focused MC (fires before Key broadcast)
+        actionDispatchKeyDownToFocused(app_context, ev->code);
         // Broadcast onKeyDown to Key listeners, then check button key conditions
         actionDispatchKeyDown(app_context);
         dispatch_button_key_actions(app_context, ev->code);
+        // Fire onPress/onRelease on focused MC for Enter/Space (after DoAction conditions)
+        actionDispatchKeyPressToFocused(app_context, ev->code);
         // Tab key: advance focus after broadcasting Key event
         // Shift+Tab (key 16 held) = reverse direction
         if (ev->code == 9) {
@@ -266,6 +294,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             app_context->keys.down[ev->code] = 0;
         // Dispatch onClipEvent(keyUp) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_UP);
+        // Dispatch onKeyUp to focused MC
+        actionDispatchKeyUpToFocused(app_context, ev->code);
         // Broadcast onKeyUp to Key listeners
         actionDispatchKeyUp(app_context);
         break;
@@ -281,6 +311,13 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         break;
     case EV_SET_CLIPBOARD_TEXT:
         actionSetClipboardText(ev->text);
+        break;
+    case EV_FOCUS_LOST:
+        // Window/tab lost focus: clear keyboard focus
+        actionWindowFocusLost(app_context);
+        break;
+    case EV_FOCUS_GAINED:
+        // Window/tab regained focus: no-op (focus is not auto-restored)
         break;
     default:
         break;
@@ -350,6 +387,11 @@ void swfStart(SWFAppContext* app_context)
 	ng_sync_root_display_obj();
 	extern MovieClip root_movieclip;
 	root_movieclip.display_obj = ng_get_root_display_obj();
+
+#ifdef SWF_URL
+	strncpy(root_movieclip.url, SWF_URL, sizeof(root_movieclip.url) - 1);
+	root_movieclip.url[sizeof(root_movieclip.url) - 1] = '\0';
+#endif
 
 	tagInit(app_context);
 
