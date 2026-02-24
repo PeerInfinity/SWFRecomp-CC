@@ -395,6 +395,9 @@ void swfStart(SWFAppContext* app_context)
 
 	tagInit(app_context);
 
+	// Set root movieclip as default execution context (for 'this' resolution)
+	actionSetCurrentContext(&root_movieclip);
+
 	// Run frames in console mode
 	frame_func* funcs = app_context->frame_funcs;
 	current_frame = 0;

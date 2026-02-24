@@ -482,12 +482,12 @@ static ActionVar builtin_object_toString(SWFAppContext* app_context)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_STRING;
-	if (g_swf_version < 6) {
-		// SWF5 uses "[type Object]" format for user-created objects
+	if (g_swf_version < 5) {
+		// SWF4 and below uses "[type Object]" format for user-created objects
 		ret.str_size = 13;
 		ret.data.numeric_value = (u64) u16_type_Object;
 	} else {
-		// SWF6+ uses "[object Object]" format
+		// SWF5+ uses "[object Object]" format
 		ret.str_size = 15;
 		ret.data.numeric_value = (u64) u16_object_Object;
 	}
@@ -14120,12 +14120,6 @@ void actionGetVariable(SWFAppContext* app_context)
 	ActionVar* var = NULL;
 	if (g_current_context != NULL && g_current_context != &root_movieclip)
 	{
-		// "this" in a non-root context refers to the current clip
-		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
-		{
-			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_current_context);
-			return;
-		}
 		// Check target clip's dynamic properties
 		if (g_current_context->dynamic_props != NULL)
 		{
@@ -14229,12 +14223,38 @@ void actionGetVariable(SWFAppContext* app_context)
 		// Check special variables (SWF5+ only — SWF4 has no built-in constants)
 		// Note: inside functions in SWF4, use SWF5+ behavior (DefineFunction is SWF5 opcode)
 		if (EFFECTIVE_SWF_VERSION() >= 5) {
-		if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
+		if (var_name_len == 4)
 		{
-			// "this" refers to the current object context (root MovieClip)
-			extern MovieClip root_movieclip;
-			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
-			return;
+			// "this" resolution fallback (after scope chain + variable table):
+			// - SWF <= 5: case-sensitive inside function scopes, case-insensitive at root
+			// - SWF 6: always case-insensitive
+			// - SWF >= 7: always case-sensitive (exact "this" only)
+			int is_this = (strncmp(var_name, "this", 4) == 0);
+			if (!is_this) {
+				int case_insensitive = 0;
+				if (g_swf_version == 6) {
+					case_insensitive = 1;
+				} else if (g_swf_version <= 5) {
+					// SWF <= 5: case-insensitive only when NOT inside a function (local) scope
+					int in_local_scope = 0;
+					for (int si = scope_depth - 1; si >= 0; si--) {
+						if (!scope_is_with[si]) { in_local_scope = 1; break; }
+					}
+					case_insensitive = !in_local_scope;
+				}
+				if (case_insensitive) {
+					is_this = (var_name[0] == 't' || var_name[0] == 'T') &&
+					          (var_name[1] == 'h' || var_name[1] == 'H') &&
+					          (var_name[2] == 'i' || var_name[2] == 'I') &&
+					          (var_name[3] == 's' || var_name[3] == 'S');
+				}
+			}
+			if (is_this) {
+				extern MovieClip root_movieclip;
+				MovieClip* ctx = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+				return;
+			}
 		}
 
 		// _root and _level0 both refer to the root MovieClip
@@ -20781,11 +20801,38 @@ void actionNewObject(SWFAppContext* app_context)
 				// Prepare arguments for the constructor
 				ActionVar registers[256] = {0};  // Max registers
 
+				// Create local scope for constructor call so GetVariable("this")
+				// correctly identifies we're inside a function scope
+				ASObject* ctor_scope = allocObject(app_context, 4);
+				{
+					ActionVar this_var = {0};
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)obj;
+					setProperty(app_context, ctor_scope, "this", 4, &this_var);
+				}
+
+				// Restore captured scope chain entries (closure support)
+				u8 ctor_captured = ctor_func->captured_scope_count;
+				for (u8 ci = 0; ci < ctor_captured; ci++) {
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = ctor_func->captured_scope_is_with[ci];
+						scope_mc[scope_depth] = ctor_func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = ctor_func->captured_scope[ci];
+					}
+				}
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
+					scope_chain[scope_depth++] = ctor_scope;
+				}
+
 				// Call constructor with 'this' binding
 				// Note: Return value is discarded per ActionScript spec for constructors
 				if (ctor_func->advanced_func != NULL)
 				{
+					g_call_depth++;
 					ActionVar return_value = ctor_func->advanced_func(app_context, args, num_args, registers, obj);
+					g_call_depth--;
 
 					// Check if constructor returned an object (override default behavior)
 					// Per ECMAScript spec: if constructor returns object, use it; otherwise use 'this'
@@ -20798,6 +20845,12 @@ void actionNewObject(SWFAppContext* app_context)
 					}
 					// Note: If constructor returns non-object, we use the original 'this' object
 				}
+
+				// Pop local scope + captured scopes
+				for (u8 ci = 0; ci < ctor_captured + 1; ci++) {
+					if (scope_depth > 0) scope_depth--;
+				}
+				releaseObject(app_context, ctor_scope);
 			}
 
 			// MovieClipLoader constructor: auto-add self as first listener
@@ -23698,6 +23751,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Create local scope object for function-local variables
 				ASObject* local_scope = allocObject(app_context, 8);
 
+				// Set 'this' on local scope for type 1 functions (DefineFunction)
+				// In Flash, 'this' defaults to _level0 (root movieclip) for plain calls
+				{
+					extern MovieClip root_movieclip;
+					ActionVar this_var = {0};
+					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_var.data.numeric_value = (u64)&root_movieclip;
+					setProperty(app_context, local_scope, "this", 4, &this_var);
+				}
+
 				// Track calling function for arguments.caller
 				ASFunction* prev_executing_func_t1 = g_current_executing_func;
 
@@ -26167,6 +26230,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Create local scope with arguments object for proper arguments.callee/caller
 				ASFunction* prev_executing_func_am1 = g_current_executing_func;
 				ASObject* local_scope_am1 = allocObject(app_context, 8);
+
+				// Set 'this' to receiver for type 1 method calls
+				{
+					ActionVar this_var_am1 = {0};
+					if (obj != NULL) {
+						this_var_am1.type = ACTION_STACK_VALUE_OBJECT;
+						this_var_am1.data.numeric_value = (u64)obj;
+					} else {
+						extern MovieClip root_movieclip;
+						this_var_am1.type = ACTION_STACK_VALUE_MOVIECLIP;
+						this_var_am1.data.numeric_value = (u64)&root_movieclip;
+					}
+					setProperty(app_context, local_scope_am1, "this", 4, &this_var_am1);
+				}
+
 				ASArray* arguments_arr_am1 = allocArray(app_context, num_args > 0 ? num_args : 1);
 				for (u32 i = 0; i < num_args; i++)
 				{
@@ -28334,12 +28412,68 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (method_var != NULL && method_var->type == ACTION_STACK_VALUE_FUNCTION) {
 					// Call user-defined function with this = mc
 					ASFunction* func = (ASFunction*) method_var->data.numeric_value;
-					if (func != NULL && func->advanced_func != NULL) {
+					if (func != NULL) {
+						// Create local scope and set this = mc
+						ASObject* mc_method_scope = allocObject(app_context, 4);
 						ActionVar this_var = {0};
 						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 						this_var.data.numeric_value = (u64) mc;
-						ActionVar result = func->advanced_func(app_context, args, num_args, NULL, (void*)&this_var);
-						if (args != NULL) FREE(args);
+						setProperty(app_context, mc_method_scope, "this", 4, &this_var);
+
+						// Restore captured scope chain entries (closure support)
+						u8 mc_captured = func->captured_scope_count;
+						for (u8 ci = 0; ci < mc_captured; ci++) {
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+								scope_mc[scope_depth] = func->captured_scope_mc[ci];
+								scope_chain[scope_depth++] = func->captured_scope[ci];
+							}
+						}
+
+						// Push local scope onto scope chain
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = 0;
+							scope_mc[scope_depth] = NULL;
+							scope_chain[scope_depth++] = mc_method_scope;
+						}
+
+						ASFunction* prev_exec_mc = g_current_executing_func;
+						g_current_executing_func = func;
+						g_call_depth++;
+
+						// Switch execution context to the MC for _target/GetVariable resolution
+						MovieClip* saved_mc_ctx = g_current_context;
+						actionSetCurrentContext(mc);
+
+						ActionVar result;
+						if (func->function_type == 1 && func->simple_func != NULL) {
+							// Type 1: push args onto stack
+							for (u32 i = 0; i < num_args; i++)
+								pushVar(app_context, &args[i]);
+							for (u32 i = num_args; i < func->param_count; i++)
+								PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+							if (args != NULL) FREE(args);
+							result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+						} else if (func->advanced_func != NULL) {
+							// Type 2: pass args array
+							result = func->advanced_func(app_context, args, num_args, NULL, (void*)&this_var);
+							if (args != NULL) FREE(args);
+						} else {
+							result.type = ACTION_STACK_VALUE_UNDEFINED;
+							result.data.numeric_value = 0;
+							if (args != NULL) FREE(args);
+						}
+
+						g_call_depth--;
+						g_current_executing_func = prev_exec_mc;
+						actionSetCurrentContext(saved_mc_ctx);
+
+						// Pop local scope + captured scopes
+						for (u8 ci = 0; ci < mc_captured + 1; ci++) {
+							if (scope_depth > 0) scope_depth--;
+						}
+						releaseObject(app_context, mc_method_scope);
+
 						pushVar(app_context, &result);
 						return;
 					}
