@@ -12120,15 +12120,10 @@ static void urlDecode(char* str) {
 	*dst = '\0';
 }
 
-// Strip query string from URL (modifies url in-place, returns pointer to query or NULL)
-// Also parses FlashVars and sets them on target MC
-static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieClip* target_mc) {
-	char* query = strchr(url, '?');
-	if (query == NULL) return;
-	*query = '\0';  // terminate URL at '?'
-	query++;        // skip past the NUL to the query string
-
-	if (target_mc == NULL || *query == '\0') return;
+// Parse URL-encoded key=value pairs from a mutable content string and set as
+// properties on the target MC's dynamic_props. Content is modified in-place.
+static void parseURLEncodedVars(SWFAppContext* app_context, char* content, MovieClip* target_mc) {
+	if (target_mc == NULL || content == NULL || *content == '\0') return;
 
 	// Ensure target has dynamic_props
 	if (target_mc->dynamic_props == NULL) {
@@ -12136,7 +12131,7 @@ static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieCli
 	}
 
 	// Parse key=value&key=value... pairs
-	char* pair = query;
+	char* pair = content;
 	while (pair && *pair) {
 		char* next = strchr(pair, '&');
 		if (next) *next++ = '\0';
@@ -12167,6 +12162,15 @@ static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieCli
 		}
 		pair = next;
 	}
+}
+
+// Strip query string from URL (modifies url in-place), parse FlashVars, set on target MC
+static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieClip* target_mc) {
+	char* query = strchr(url, '?');
+	if (query == NULL) return;
+	*query = '\0';  // terminate URL at '?'
+	query++;        // skip past the NUL to the query string
+	parseURLEncodedVars(app_context, query, target_mc);
 }
 
 /**
@@ -17529,6 +17533,69 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				entry->frame_funcs[0](app_context);
 			}
 			actionSetCurrentContext(_saved_ctx);
+		}
+		return;
+	}
+
+	// loadVariables: load_variables_flag != 0
+	// load_target_flag=1: target is MC reference from stack
+	// load_target_flag=0: target is window/level string from stack
+	if (load_variables_flag) {
+		char url_utf8[512];
+		char target_utf8[512];
+		if (url_var.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* url_u16 = varGetU16Ptr(&url_var);
+			u16_to_utf8(url_u16, url_var.str_size, url_utf8, sizeof(url_utf8));
+		} else {
+			url_utf8[0] = '\0';
+		}
+		if (target_var.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* tgt_u16 = varGetU16Ptr(&target_var);
+			u16_to_utf8(tgt_u16, target_var.str_size, target_utf8, sizeof(target_utf8));
+		} else {
+			target_utf8[0] = '\0';
+		}
+
+		// Resolve target MC
+		MovieClip* _lv_mc = _gu2_target_mc;
+		if (_lv_mc == NULL) {
+			// Check for _level target
+			if (strncmp(target_utf8, "_level", 6) == 0) {
+				int level_num = atoi(target_utf8 + 6);
+				if (level_num == 0) {
+					extern MovieClip root_movieclip;
+					_lv_mc = &root_movieclip;
+				} else {
+					_lv_mc = getOrCreateLevel(app_context, level_num);
+				}
+			} else if (strcmp(target_utf8, "this") == 0 || strcmp(target_utf8, "") == 0) {
+				// "this" or empty → current context (root)
+				extern MovieClip root_movieclip;
+				_lv_mc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+			} else {
+				// Try name lookup
+				for (int _lv_i = 0; _lv_i < child_mc_count; _lv_i++) {
+					if (child_mc_cache[_lv_i] != NULL && child_mc_cache[_lv_i]->name != NULL
+						&& strcmp(child_mc_cache[_lv_i]->name, target_utf8) == 0) {
+						_lv_mc = child_mc_cache[_lv_i];
+						break;
+					}
+				}
+			}
+		}
+
+		if (_lv_mc != NULL && url_utf8[0] != '\0') {
+			DataFileEntry* data = findDataFile(url_utf8);
+			if (data != NULL && data->content != NULL && data->content_length > 0) {
+				// Make a mutable copy of the content for in-place parsing
+				// Data files are small (< 1KB), safe for stack allocation
+				int _lv_len = data->content_length;
+				if (_lv_len > 4096) _lv_len = 4096;
+				char _lv_buf[4097];
+				memcpy(_lv_buf, data->content, _lv_len);
+				_lv_buf[_lv_len] = '\0';
+				parseURLEncodedVars(app_context, _lv_buf, _lv_mc);
+			}
 		}
 		return;
 	}

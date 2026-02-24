@@ -38,6 +38,14 @@ MovieEntry* findMovieEntry(const char* filename) {
 }
 #endif
 
+// Default findDataFile stub when no data files are linked
+#ifndef HAS_DATA_FILES
+DataFileEntry* findDataFile(const char* filename) {
+	(void)filename;
+	return NULL;
+}
+#endif
+
 // Goto catch-up state
 int catch_up_mode = 0;
 int goto_from_action = 0;

@@ -614,6 +614,63 @@ def generate_movie_registry(prefixes, build_dir):
     out_path.write_text("\n".join(lines))
 
 
+def find_data_files(test_dir):
+    """Find data files (non-.swf, non-.fla, non-config) in a test directory.
+    These are files like testvars.txt that loadVariables loads at runtime."""
+    skip_names = {"test.swf", "test.fla", "test.toml", "test.as", "output.txt"}
+    skip_suffixes = {".swf", ".fla", ".toml"}
+    data_files = []
+    for f in sorted(test_dir.iterdir()):
+        if f.is_dir():
+            continue
+        if f.name in skip_names:
+            continue
+        if f.suffix in skip_suffixes:
+            continue
+        data_files.append(f)
+    return data_files
+
+
+def generate_data_registry(data_files, build_dir):
+    """Generate data_registry.c that embeds data file contents as C strings."""
+    lines = []
+    lines.append("// Auto-generated data file registry for loadVariables tests")
+    lines.append('#include <libswf/swf.h>')
+    lines.append('#include <string.h>')
+    lines.append("")
+
+    var_names = []
+    for df in data_files:
+        content = df.read_bytes()
+        var_name = "data_" + re.sub(r'[^a-zA-Z0-9]', '_', df.name)
+        var_names.append((var_name, df.name, len(content)))
+        # Emit as a C byte array to handle any content safely
+        hex_bytes = ", ".join(f"0x{b:02x}" for b in content)
+        lines.append(f"static const char {var_name}[] = {{ {hex_bytes}, 0x00 }};")
+    lines.append("")
+
+    lines.append("static DataFileEntry g_data_files[] = {")
+    for var_name, filename, length in var_names:
+        # Escape filename for C string
+        escaped = filename.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'    {{ "{escaped}", {var_name}, {length} }},')
+    lines.append("    { NULL, NULL, 0 }")
+    lines.append("};")
+    lines.append("")
+
+    lines.append("DataFileEntry* findDataFile(const char* filename) {")
+    lines.append("    for (int i = 0; g_data_files[i].filename != NULL; i++) {")
+    lines.append("        if (strcmp(g_data_files[i].filename, filename) == 0)")
+    lines.append("            return &g_data_files[i];")
+    lines.append("    }")
+    lines.append("    return NULL;")
+    lines.append("}")
+    lines.append("")
+
+    out_path = build_dir / "data_registry.c"
+    out_path.write_text("\n".join(lines))
+
+
 def recompile_swf(test_dir, force=False):
     """Run SWFRecomp on test.swf if not already done (or if forced)."""
     if not force and (test_dir / "RecompiledScripts").exists():
@@ -702,6 +759,12 @@ def compile_native(test_dir, num_frames, build_dir):
     if has_children:
         generate_movie_registry(child_prefixes, build_dir)
 
+    # Handle data files (loadVariables tests: testvars.txt, etc.)
+    data_files = find_data_files(test_dir)
+    has_data_files = len(data_files) > 0
+    if has_data_files:
+        generate_data_registry(data_files, build_dir)
+
     # Compile
     inc = SWFMODERN / "include"
     extra_defines = []
@@ -714,6 +777,8 @@ def compile_native(test_dir, num_frames, build_dir):
         extra_defines.append(f"-DVIEWPORT_HEIGHT={viewport[1]}")
     if has_children:
         extra_defines.append("-DHAS_CHILD_MOVIES")
+    if has_data_files:
+        extra_defines.append("-DHAS_DATA_FILES")
     # Pass SWF file size for getBytesLoaded/getBytesTotal
     test_swf = test_dir / "test.swf"
     if test_swf.exists():
