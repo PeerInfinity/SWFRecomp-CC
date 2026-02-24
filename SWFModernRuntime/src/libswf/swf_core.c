@@ -203,6 +203,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ng_update_button_states(app_context);
         // Dispatch AS2 roll/drag over/out events to dynamic MCs
         actionDispatchMCMouseMove(app_context);
+        // Global AS2 mc.onMouseMove dispatch to all sprite MCs
+        actionDispatchMCMouseMoveGlobal(app_context);
         break;
     case EV_MOUSE_DOWN_LEFT:
         ms->stage_x = ev->x * 20.0f;
@@ -217,11 +219,15 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_DOWN);
         // Broadcast Mouse.onMouseDown to Mouse listeners
         actionDispatchMouseDown(app_context);
+        // Global AS2 mc.onMouseDown dispatch to all sprite MCs
+        actionDispatchMCMouseDown(app_context);
         // Run per-event button state machine (processes OverUpToOverDown = press)
         ng_update_button_states(app_context);
         dispatch_clip_event_press(app_context);
         // Dispatch AS2 onPress to dynamic MCs
         actionDispatchMCPress(app_context);
+        // Mouse click focus acquisition
+        actionMouseClickFocus(app_context);
         break;
     case EV_MOUSE_UP_LEFT:
         ms->stage_x = ev->x * 20.0f;
@@ -234,6 +240,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_UP);
         // Broadcast Mouse.onMouseUp to Mouse listeners
         actionDispatchMouseUp(app_context);
+        // Global AS2 mc.onMouseUp dispatch to all sprite MCs
+        actionDispatchMCMouseUp(app_context);
         // Run per-event button state machine (processes OverDownToOverUp = release)
         ng_update_button_states(app_context);
         dispatch_clip_event_release(app_context);
@@ -251,9 +259,13 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         app_context->keys.last_key_ascii = (ev->code >= 32 && ev->code <= 126) ? ev->code : 0;
         // Dispatch onClipEvent(keyDown) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_DOWN);
+        // Dispatch onKeyDown to focused MC (fires before Key broadcast)
+        actionDispatchKeyDownToFocused(app_context, ev->code);
         // Broadcast onKeyDown to Key listeners, then check button key conditions
         actionDispatchKeyDown(app_context);
         dispatch_button_key_actions(app_context, ev->code);
+        // Fire onPress/onRelease on focused MC for Enter/Space (after DoAction conditions)
+        actionDispatchKeyPressToFocused(app_context, ev->code);
         // Tab key: advance focus after broadcasting Key event
         // Shift+Tab (key 16 held) = reverse direction
         if (ev->code == 9) {
@@ -266,6 +278,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             app_context->keys.down[ev->code] = 0;
         // Dispatch onClipEvent(keyUp) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_UP);
+        // Dispatch onKeyUp to focused MC
+        actionDispatchKeyUpToFocused(app_context, ev->code);
         // Broadcast onKeyUp to Key listeners
         actionDispatchKeyUp(app_context);
         break;
@@ -281,6 +295,13 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         break;
     case EV_SET_CLIPBOARD_TEXT:
         actionSetClipboardText(ev->text);
+        break;
+    case EV_FOCUS_LOST:
+        // Window/tab lost focus: clear keyboard focus
+        actionWindowFocusLost(app_context);
+        break;
+    case EV_FOCUS_GAINED:
+        // Window/tab regained focus: no-op (focus is not auto-restored)
         break;
     default:
         break;

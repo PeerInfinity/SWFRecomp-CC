@@ -315,6 +315,19 @@ int actionHasEnterFrameHandlers(void);
 void actionDispatchMCPress(SWFAppContext* app_context);
 void actionDispatchMCRelease(SWFAppContext* app_context);
 void actionDispatchMCMouseMove(SWFAppContext* app_context);
+// Global AS2 onMouseDown/onMouseUp/onMouseMove dispatch — fires on ALL sprite MCs.
+void actionDispatchMCMouseDown(SWFAppContext* app_context);
+void actionDispatchMCMouseUp(SWFAppContext* app_context);
+void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context);
+// Dispatch key events to focused MC — fires onKeyDown/onKeyUp on g_focused_mc.
+// Enter/Space on focused MC with onPress → simulated press+release.
+void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code);
+void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code);
+void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code);
+// Mouse click focus acquisition — on mouse down, check if clicked MC is focusable.
+void actionMouseClickFocus(SWFAppContext* app_context);
+// Window focus lost — clear keyboard focus, firing onRollOut + onKillFocus.
+void actionWindowFocusLost(SWFAppContext* app_context);
 
 // Clipboard and text control operations — called from swf_core.c on input events.
 void actionSetClipboardText(const char* text);

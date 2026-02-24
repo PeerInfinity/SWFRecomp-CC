@@ -7751,8 +7751,11 @@ MovieClip root_movieclip = {
 #endif
 };
 
+// Forward declarations for child_mc_cache (defined later in the file)
+extern MovieClip* child_mc_cache[];
+extern int child_mc_count;
+
 // Helper function to get MovieClip by target path
-// Simplified: only supports "_root" or empty string
 static MovieClip* getMovieClipByTarget(const char* target) {
 	if (!target || strlen(target) == 0) {
 		// Empty target = "this clip" = current execution context (not necessarily root).
@@ -7763,10 +7766,42 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		return &root_movieclip;
 #endif
 	}
-	if (strcmp(target, "_root") == 0 || strcmp(target, "/") == 0) {
+	if (strcmp(target, "_root") == 0 || strcmp(target, "/") == 0 ||
+	    strcmp(target, "_level0") == 0) {
 		return &root_movieclip;
 	}
-	return NULL;  // Other paths not supported yet
+	// Dot-path resolution: _level0.child.grandchild or _root.child.grandchild
+	const char* rest = NULL;
+	MovieClip* mc = NULL;
+	if (strncmp(target, "_level0.", 8) == 0) {
+		mc = &root_movieclip;
+		rest = target + 8;
+	} else if (strncmp(target, "_root.", 6) == 0) {
+		mc = &root_movieclip;
+		rest = target + 6;
+	}
+	if (mc != NULL && rest != NULL && rest[0] != '\0') {
+		// Walk dot-separated segments, finding child MCs by name
+		while (rest[0] != '\0') {
+			const char* dot = strchr(rest, '.');
+			int seg_len = dot ? (int)(dot - rest) : (int)strlen(rest);
+			MovieClip* found = NULL;
+			for (int i = 0; i < child_mc_count; i++) {
+				if (child_mc_cache[i] == NULL) continue;
+				if (child_mc_cache[i]->parent == mc &&
+				    (int)strlen(child_mc_cache[i]->name) == seg_len &&
+				    strncmp(child_mc_cache[i]->name, rest, seg_len) == 0) {
+					found = child_mc_cache[i];
+					break;
+				}
+			}
+			if (found == NULL) return NULL;
+			mc = found;
+			rest = dot ? dot + 1 : rest + seg_len;
+		}
+		return mc;
+	}
+	return NULL;
 }
 
 // Forward declarations for resolveSlashPathToMC
@@ -27767,6 +27802,42 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 	}
 }
 
+// Global AS2 onMouseMove dispatch — fires on all sprite MCs that have onMouseMove handler.
+// Fires regardless of mouse position (global, not hit-test based).
+void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
+		mc_call_as2_handler_ng(app_context, mc, "onMouseMove", 11);
+	}
+}
+
+// Global AS2 onMouseDown dispatch — fires on all sprite MCs that have onMouseDown handler.
+// Unlike onPress (hit-test), onMouseDown fires regardless of mouse position.
+// Only fires on sprite MCs, not on buttons or text fields.
+void actionDispatchMCMouseDown(SWFAppContext* app_context)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
+		mc_call_as2_handler_ng(app_context, mc, "onMouseDown", 11);
+	}
+}
+
+// Global AS2 onMouseUp dispatch — fires on all sprite MCs that have onMouseUp handler.
+void actionDispatchMCMouseUp(SWFAppContext* app_context)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
+		mc_call_as2_handler_ng(app_context, mc, "onMouseUp", 9);
+	}
+}
+
 // ====== Focus and Tab Navigation System ======
 
 // Convert mc->target (Flash slash-path) to ActionScript dot-path format.
@@ -27803,13 +27874,20 @@ static void mc_get_dot_path(MovieClip* mc, char* buf, size_t buf_size)
 static int mc_is_focusable_by_setfocus(MovieClip* mc)
 {
 	if (mc == NULL) return 0;
-	if (mc->ng_textfield_idx >= 0) return 1;   // text field: always focusable
+	// Root MovieClip (_level0) is never focusable
+	extern MovieClip root_movieclip;
+	if (mc == &root_movieclip) return 0;
+	if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) return 1;  // text field
 	if (mc->is_button_mc) return 1;             // button: always focusable
 	if (mc->dynamic_props == NULL) return 0;
-	// MC with onSetFocus handler: focusable
-	ActionVar* h = getProperty((ASObject*)mc->dynamic_props, "onSetFocus", 10);
-	if (h != NULL && h->type == ACTION_STACK_VALUE_FUNCTION) return 1;
-	// MC with focusEnabled = true: focusable
+	// MC with button-mode handlers (onPress, onRelease, etc.): focusable
+	static const char* btn_handlers[] = {"onPress","onRelease","onRollOver","onRollOut",
+	    "onDragOver","onDragOut","onReleaseOutside"};
+	for (int i = 0; i < 7; i++) {
+		ActionVar* h = getProperty((ASObject*)mc->dynamic_props, btn_handlers[i], (u32)strlen(btn_handlers[i]));
+		if (h != NULL && h->type == ACTION_STACK_VALUE_FUNCTION) return 1;
+	}
+	// MC with focusEnabled = truthy: focusable
 	ActionVar* fe = getProperty((ASObject*)mc->dynamic_props, "focusEnabled", 12);
 	if (fe != NULL) {
 		if (fe->type == ACTION_STACK_VALUE_BOOLEAN) return (int)fe->data.numeric_value;
@@ -27817,6 +27895,8 @@ static int mc_is_focusable_by_setfocus(MovieClip* mc)
 			double d; memcpy(&d, &fe->data.numeric_value, 8);
 			return (d != 0.0);
 		}
+		// String: any non-empty string is truthy
+		if (fe->type == ACTION_STACK_VALUE_STRING && fe->str_size > 0) return 1;
 	}
 	return 0;
 }
@@ -28241,7 +28321,138 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 	}
 	MovieClip* new_mc = tab_order[next_pos];
 	if (new_mc == g_focused_mc) return;
+	// Tab focus triggers onRollOut on old MC and onRollOver on new MC
+	if (g_focused_mc != NULL)
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9);
+	if (new_mc != NULL)
+		mc_call_as2_handler_ng(app_context, new_mc, "onRollOver", 10);
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
+}
+
+// ---------------------------------------------------------------------------
+// Key dispatch to focused MC
+// ---------------------------------------------------------------------------
+
+// Dispatch onKeyDown to the focused MC. Called BEFORE Key.broadcastMessage.
+// Tab key (9) is excluded — Tab changes focus before delivering key events.
+void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code)
+{
+	if (g_focused_mc == NULL) return;
+	if (key_code == 9) return;  // Tab: focus advances, no onKeyDown to focused MC
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyDown", 9);
+
+	// Enter/Space on focused MC with onPress → simulated press+release
+	if (key_code == 13 || key_code == 32) {
+		// For buttons: fire DoAction button conditions (press/release) too
+		// DoAction conditions are fired via dispatch_button_key_actions in swf_core.c,
+		// which runs after this function. So we only fire the AS2 onPress/onRelease here.
+		// Actually, looking at the expected output for focus_keyboard_press:
+		// _level0.button.onKeyDown: 13
+		// press                           ← DoAction fires (from button key condition)
+		// _level0.button.onPress: 13      ← AS2 onPress
+		// release                         ← DoAction fires
+		// _level0.button.onRelease: 13    ← AS2 onRelease
+		// The DoAction (press/release) fires between onKeyDown and onPress.
+		// dispatch_button_key_actions handles the DoAction part.
+		// We handle onPress/onRelease here, but they need to fire AFTER the DoAction.
+		// Solution: we'll fire onPress/onRelease from swf_core.c AFTER dispatch_button_key_actions.
+		// So skip onPress/onRelease here — they'll be called separately.
+	}
+}
+
+// Fire onPress + onRelease on focused MC for Enter/Space key (simulated press).
+// Called from swf_core.c AFTER dispatch_button_key_actions so DoAction fires first.
+void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code)
+{
+	if (g_focused_mc == NULL) return;
+	if (key_code != 13 && key_code != 32) return;
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7);
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9);
+}
+
+// Dispatch onKeyUp to the focused MC.
+void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code)
+{
+	(void)key_code;
+	if (g_focused_mc == NULL) return;
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyUp", 7);
+}
+
+// ---------------------------------------------------------------------------
+// Mouse click focus acquisition
+// ---------------------------------------------------------------------------
+
+// Check if a MovieClip is focusable by mouse click.
+// Only text fields (selectable) and buttons gain focus on click.
+// MovieClips with focusEnabled only gain focus via Tab or Selection.setFocus().
+static int mc_is_focusable_by_click(MovieClip* mc)
+{
+	if (mc == NULL) return 0;
+	extern MovieClip root_movieclip;
+	if (mc == &root_movieclip) return 0;
+	if (mc->ng_textfield_idx >= 0) {
+		// SWF-defined text field: focusable if selectable
+		u16 flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+		// Bit 0x0004 = noSelect (inverse of selectable)
+		if (flags & 0x0004) return 0;
+		return 1;
+	}
+	if (mc->ng_textfield_idx == -2) {
+		// Dynamic text field (createTextField): check selectable property
+		if (mc->dynamic_props == NULL) return 0;
+		ActionVar* sel = getProperty((ASObject*)mc->dynamic_props, "selectable", 10);
+		if (sel != NULL && sel->type == ACTION_STACK_VALUE_BOOLEAN && sel->data.numeric_value == 0)
+			return 0;
+		return 1;  // default: selectable = true for dynamic text fields
+	}
+	if (mc->is_button_mc) return 1;             // button: focusable by click
+	return 0;
+}
+
+// On mouse click, determine which MC was clicked and set focus if appropriate.
+// Called from swf_core.c after onPress dispatch on EV_MOUSE_DOWN_LEFT.
+void actionMouseClickFocus(SWFAppContext* app_context)
+{
+	float mx = app_context->mouse.stage_x / 20.0f;
+	float my = app_context->mouse.stage_y / 20.0f;
+
+	// Find the frontmost MC that was hit by the click
+	// Iterate in reverse (highest depth = frontmost) to find topmost hit
+	MovieClip* hit_mc = NULL;
+	for (int i = child_mc_count - 1; i >= 0; i--) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL) continue;
+
+		float x1, y1, x2, y2;
+		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+
+		hit_mc = mc;
+		break;
+	}
+
+	if (hit_mc != NULL && mc_is_focusable_by_click(hit_mc)) {
+		if (hit_mc != g_focused_mc)
+			selection_do_focus_change(app_context, g_focused_mc, hit_mc);
+	} else {
+		// Clicked non-focusable or empty area: clear focus
+		if (g_focused_mc != NULL)
+			selection_do_focus_change(app_context, g_focused_mc, NULL);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Window focus lost/gained
+// ---------------------------------------------------------------------------
+
+// Called when the window/browser tab loses focus. Clears keyboard focus.
+void actionWindowFocusLost(SWFAppContext* app_context)
+{
+	if (g_focused_mc != NULL) {
+		// Fire onRollOut before onKillFocus
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9);
+		selection_do_focus_change(app_context, g_focused_mc, NULL);
+	}
 }
 
 // ---------------------------------------------------------------------------
