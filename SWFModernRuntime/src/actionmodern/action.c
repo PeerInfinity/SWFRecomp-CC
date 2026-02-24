@@ -9641,6 +9641,60 @@ static inline int isTruthy(double d)
 	return !isnan(d) && d != 0.0;
 }
 
+// Helper: convert a string ActionVar to double for SWF6 boolean coercion
+// Handles hex (0x), octal (0NNN), and regular decimal, matching convertFloat logic
+static double stringVarToDouble(ActionVar* v)
+{
+	if (v->type != ACTION_STACK_VALUE_STRING) return 0.0;
+	const uint16_t* u16_str = varGetU16Ptr(v);
+	u32 u16_len = v->str_size;
+	if (u16_str == NULL || u16_len == 0) return NAN;
+	char utf8_buf[256];
+	int utf8_len = u16_to_utf8(u16_str, u16_len, utf8_buf, sizeof(utf8_buf));
+	utf8_buf[utf8_len] = '\0';
+	const char* s = utf8_buf;
+	// Skip whitespace
+	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+	if (*s == '\0') return NAN;
+	int neg = 0;
+	if (*s == '-') { neg = 1; s++; }
+	else if (*s == '+') { s++; }
+	char* end;
+	double result;
+	if (g_swf_version >= 6 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+		// Skip "0x" prefix, then parse remainder as hex (may include sign like "-10")
+		const char* hex_start = s + 2;
+		long val = strtol(hex_start, &end, 16);
+		if (end == hex_start) return NAN;
+		result = neg ? -(double)val : (double)val;
+	} else if (g_swf_version >= 6 && s[0] == '0' && s[1] >= '0' && s[1] <= '7') {
+		// Only treat as octal if ALL remaining chars are octal digits
+		int all_octal = 1;
+		for (const char* p = s + 1; *p; p++) {
+			if (*p < '0' || *p > '7') { all_octal = 0; break; }
+		}
+		if (all_octal) {
+			long val = strtol(s, &end, 8);
+			if (end == s) return NAN;
+			result = neg ? -(double)val : (double)val;
+		} else {
+			goto parse_decimal;
+		}
+	} else {
+		parse_decimal:
+		// Block strtod special values Flash doesn't recognize
+		if ((*s == 'i' || *s == 'I') && strncasecmp(s, "inf", 3) == 0) return NAN;
+		if ((*s == 'n' || *s == 'N') && strncasecmp(s, "nan", 3) == 0) return NAN;
+		result = strtod(s, &end);
+		if (end == s) return NAN;
+		result = neg ? -result : result;
+	}
+	// Trailing non-whitespace → NaN
+	while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
+	if (*end != '\0') return NAN;
+	return result;
+}
+
 // Check truthiness of an ActionVar, respecting type semantics
 // Objects, functions, arrays are always truthy
 static inline int isVarTruthy(ActionVar* var)
@@ -9659,7 +9713,13 @@ static inline int isVarTruthy(ActionVar* var)
 			return 0;
 		case ACTION_STACK_VALUE_STRING:
 		{
-			// UTF-16 string: truthy if non-empty
+			if (g_swf_version <= 6) {
+				// SWF6 and below: convert string to number first, then to boolean
+				// "0" → false, "1" → true, "" → false, "abc" → NaN → false
+				double d = stringVarToDouble(var);
+				return !isnan(d) && d != 0.0;
+			}
+			// SWF7+: non-empty string is truthy
 			return var->str_size > 0;
 		}
 		default:
@@ -10680,8 +10740,19 @@ void actionNot(SWFAppContext* app_context)
 			break;
 		case ACTION_STACK_VALUE_STRING:
 		{
-			u32 slen = VAL(u32, &STACK[SP + 8]);
-			is_truthy = (slen > 0);
+			if (g_swf_version <= 6) {
+				// SWF6 and below: convert string to number, then to boolean
+				ActionVar sv;
+				sv.type = ACTION_STACK_VALUE_STRING;
+				sv.str_size = VAL(u32, &STACK[SP + 8]);
+				sv.data.numeric_value = val;
+				double d = stringVarToDouble(&sv);
+				is_truthy = (!isnan(d) && d != 0.0);
+			} else {
+				// SWF7+: non-empty string is truthy
+				u32 slen = VAL(u32, &STACK[SP + 8]);
+				is_truthy = (slen > 0);
+			}
 			break;
 		}
 		case ACTION_STACK_VALUE_UNDEFINED:
@@ -11149,6 +11220,15 @@ int evaluateCondition(SWFAppContext* app_context)
 			return (val != 0);
 		case ACTION_STACK_VALUE_STRING:
 		{
+			if (g_swf_version <= 6) {
+				// SWF6 and below: convert string to number, then to boolean
+				ActionVar sv;
+				sv.type = ACTION_STACK_VALUE_STRING;
+				sv.str_size = str_size;
+				sv.data.numeric_value = val;
+				double d = stringVarToDouble(&sv);
+				return (!isnan(d) && d != 0.0);
+			}
 			return (str_size > 0);
 		}
 		case ACTION_STACK_VALUE_UNDEFINED:
