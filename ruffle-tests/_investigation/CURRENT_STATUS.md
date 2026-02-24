@@ -48,7 +48,7 @@ Last updated: 2026-02-23
 ### 80-90%
 | Test | Match | Issue |
 |------|-------|-------|
-| `movieclip_focusenabled` | 85/99 (85.9%) | Focus system / hasOwnProperty on empty MCs |
+| `movieclip_focusenabled` | **PASS** ✅ | Fixed: dot-path resolution in getMovieClipByTarget |
 | `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
 | `function_base_clip_readded` | 9/11 (81.8%) | _parent resolution after removal+re-add |
 | `this_scoping` | 42/52 (80.8%) | `this` binding in various call contexts |
@@ -96,7 +96,7 @@ Last updated: 2026-02-23
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
 | TELLTARGET_PLAN | Not started | 0/3+ | tellTarget scope, path resolution |
 | TIMER_PLAN | Not started | 0/3 | setInterval, setTimeout |
-| FOCUS_SYSTEM_PLAN | Not started | 0/6 | Mouse-triggered focus |
+| FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by closure capture bug |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
