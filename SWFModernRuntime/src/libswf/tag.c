@@ -839,6 +839,9 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Fire deferred init scripts for attachMovie clips
 		ng_fire_pending_attach_inits(app_context);
 
+		// Fire deferred onLoadInit handlers from MovieClipLoader.loadClip
+		actionFirePendingLoadInits(app_context);
+
 		// Dispatch AS2 mc.onEnterFrame property handlers, but skip MCs
 		// created during process_sprite_needs_init (they fire next frame).
 		g_enterframe_new_mc_start = mc_count_before;

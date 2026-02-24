@@ -78,6 +78,8 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name);
 // Fire all pending deferred onUnload handlers (queued by removeMovieClip); call from tagShowFrame
 void actionFirePendingUnloads(SWFAppContext* app_context);
+// Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame
+void actionFirePendingLoadInits(SWFAppContext* app_context);
 
 // VAL macro must be defined before other macros that use it
 #define VAL(type, x) *((type*) x)
