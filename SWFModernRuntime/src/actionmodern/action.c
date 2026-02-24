@@ -12474,9 +12474,31 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             ActionVar* regs = NULL;
             if (func->register_count > 0)
                 regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+            // Restore captured scope chain entries (closure support)
+            u8 bm_captured = func->captured_scope_count;
+            for (u8 ci = 0; ci < bm_captured; ci++) {
+                if (scope_depth < MAX_SCOPE_DEPTH) {
+                    scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+                    scope_mc[scope_depth] = func->captured_scope_mc[ci];
+                    scope_chain[scope_depth++] = func->captured_scope[ci];
+                }
+            }
             func->advanced_func(app_context, extra_args, extra_count, regs, listener_obj);
+            // Pop captured scopes
+            for (u8 ci = 0; ci < bm_captured; ci++) {
+                if (scope_depth > 0) scope_depth--;
+            }
             if (regs) FREE(regs);
         } else if (func->function_type == 1 && func->simple_func != NULL) {
+            // Restore captured scope chain entries (closure support)
+            u8 bm_captured_t1 = func->captured_scope_count;
+            for (u8 ci = 0; ci < bm_captured_t1; ci++) {
+                if (scope_depth < MAX_SCOPE_DEPTH) {
+                    scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+                    scope_mc[scope_depth] = func->captured_scope_mc[ci];
+                    scope_chain[scope_depth++] = func->captured_scope[ci];
+                }
+            }
             // Set 'this' to the listener object for type 1 (DefineFunction) callbacks
             ActionVar this_var = {0};
             this_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -12485,6 +12507,10 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             for (u32 j = 0; j < extra_count; j++)
                 pushVar(app_context, &extra_args[j]);
             ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+            // Pop captured scopes
+            for (u8 ci = 0; ci < bm_captured_t1; ci++) {
+                if (scope_depth > 0) scope_depth--;
+            }
         }
     }
 
@@ -22172,17 +22198,21 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
+	// SWF5 does NOT support closures — only SWF6+ captures the scope chain.
 	as_func->captured_scope_count = 0;
-	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
+	if (g_swf_version >= 6)
 	{
-		if (scope_chain[si] != NULL)
+		for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
 		{
-			u8 idx = as_func->captured_scope_count++;
-			as_func->captured_scope[idx] = scope_chain[si];
-			as_func->captured_scope_mc[idx] = scope_mc[si];
-			as_func->captured_scope_is_with[idx] = scope_is_with[si];
-			// Retain local scopes so they survive after the enclosing function returns
-			if (!scope_is_with[si]) retainObject(scope_chain[si]);
+			if (scope_chain[si] != NULL)
+			{
+				u8 idx = as_func->captured_scope_count++;
+				as_func->captured_scope[idx] = scope_chain[si];
+				as_func->captured_scope_mc[idx] = scope_mc[si];
+				as_func->captured_scope_is_with[idx] = scope_is_with[si];
+				// Retain local scopes so they survive after the enclosing function returns
+				if (!scope_is_with[si]) retainObject(scope_chain[si]);
+			}
 		}
 	}
 
@@ -22231,17 +22261,21 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
+	// SWF5 does NOT support closures — only SWF6+ captures the scope chain.
 	as_func->captured_scope_count = 0;
-	for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
+	if (g_swf_version >= 6)
 	{
-		if (scope_chain[si] != NULL)
+		for (u32 si = 0; si < scope_depth && as_func->captured_scope_count < 8; si++)
 		{
-			u8 idx = as_func->captured_scope_count++;
-			as_func->captured_scope[idx] = scope_chain[si];
-			as_func->captured_scope_mc[idx] = scope_mc[si];
-			as_func->captured_scope_is_with[idx] = scope_is_with[si];
-			// Retain local scopes so they survive after the enclosing function returns
-			if (!scope_is_with[si]) retainObject(scope_chain[si]);
+			if (scope_chain[si] != NULL)
+			{
+				u8 idx = as_func->captured_scope_count++;
+				as_func->captured_scope[idx] = scope_chain[si];
+				as_func->captured_scope_mc[idx] = scope_mc[si];
+				as_func->captured_scope_is_with[idx] = scope_is_with[si];
+				// Retain local scopes so they survive after the enclosing function returns
+				if (!scope_is_with[si]) retainObject(scope_chain[si]);
+			}
 		}
 	}
 
@@ -28770,6 +28804,17 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 		if (func->register_count > 0)
 			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 
+		// Restore captured scope chain entries from definition time (closure support)
+		u8 captured_count = func->captured_scope_count;
+		for (u8 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = func->captured_scope[ci];
+			}
+		}
+
 		ASObject* local_scope = allocObject(app_context, 8);
 		// Expose "this" = mc so GetVariable("this") resolves inside the handler
 		setProperty(app_context, local_scope, "this", 4, &this_var);
@@ -28788,16 +28833,35 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 		g_current_executing_func = prev_func;
 		g_call_depth--;
 
-		if (scope_depth > 0) scope_depth--;
+		// Pop local scope + captured scopes
+		for (u8 ci = 0; ci < captured_count + 1; ci++) {
+			if (scope_depth > 0) scope_depth--;
+		}
 		releaseObject(app_context, local_scope);
 		if (registers != NULL) FREE(registers);
 	}
 	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
+		// Restore captured scope chain entries from definition time (closure support)
+		u8 captured_count_t1 = func->captured_scope_count;
+		for (u8 ci = 0; ci < captured_count_t1; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = func->captured_scope[ci];
+			}
+		}
+
 		g_call_depth++;
 		ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 		(void)result;
 		g_call_depth--;
+
+		// Pop captured scopes
+		for (u8 ci = 0; ci < captured_count_t1; ci++) {
+			if (scope_depth > 0) scope_depth--;
+		}
 	}
 }
 
