@@ -106,6 +106,9 @@ Last updated: 2026-02-24
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
 | LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 15/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) NOT FEASIBLE |
+| LOADVARIABLES_PLAN | Not started | 0/4 | loadVariables pre-bundled data files; 2/4 feasible (loadvariables2 needs TIMER_PLAN) |
+| ROOT_REPLACEMENT_PLAN | Not started | 0/4 | loadMovie into _root/_level0; 2/4 feasible (swf7→5/6 needs cross-version scoping) |
+| LOADMOVIE_REMAINING_PLAN | Not started | 0/5 | var_persistence, cross_version_prototype, mcl_events_swf_version, clip state |
 | UNLOAD_PLAN | **DONE** (via LOADMOVIE_PLAN) | 3/3 pass (unloadmovie, unloadmovie_method, unloadmovienum) | — |
 | BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie (compile failures now fixed), mouse events, morph interp |
