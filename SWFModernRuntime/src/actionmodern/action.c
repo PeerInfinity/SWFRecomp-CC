@@ -15657,7 +15657,11 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 
-			// Also walk MovieClip.prototype chain (enumerable props like 'enabled')
+			// For button MCs, also walk MovieClip.prototype chain.
+			// In Flash, Button is a separate type with its own prototype where
+			// 'enabled' is enumerable. Regular MovieClip.prototype has 'enabled'
+			// as DontEnum. We only walk the prototype for button-backed MCs.
+			if (mc->is_button_mc)
 			{
 				extern ASFunction g_movieclip_constructor;
 				extern int g_movieclip_constructor_init;
