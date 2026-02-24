@@ -43,7 +43,8 @@ def load_results(path: Path) -> dict:
 def build_investigation_index() -> tuple[dict[str, list[tuple[int, str]]], list[tuple[str, str, list[str]]]]:
     """Parse investigation docs for <!-- TESTS: ... --> comments.
 
-    Scans _investigation/ and _investigation/complete/ for .md files
+    Scans _investigation/, _investigation/complete/, _investigation/incomplete/,
+    and _investigation/blocked/ for .md files
     (excluding EXCLUDED_DOCS), parses the TESTS comment from each,
     and builds a reverse index from test names to document numbers.
 
@@ -73,6 +74,12 @@ def build_investigation_index() -> tuple[dict[str, list[tuple[int, str]]], list[
     if incomplete_dir.is_dir():
         for p in incomplete_dir.glob("*.md"):
             rel = f"ruffle-tests/_investigation/incomplete/{p.name}"
+            candidates.append((p.name, rel, p))
+
+    blocked_dir = INVESTIGATION_DIR / "blocked"
+    if blocked_dir.is_dir():
+        for p in blocked_dir.glob("*.md"):
+            rel = f"ruffle-tests/_investigation/blocked/{p.name}"
             candidates.append((p.name, rel, p))
 
     # Sort alphabetically by display name (case-insensitive)
