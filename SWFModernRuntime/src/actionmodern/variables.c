@@ -22,6 +22,24 @@ void initMap()
 
 void initVarArray(size_t max_string_id)
 {
+	if (var_array != NULL) {
+		// Already initialized (e.g., child SWF calling initVarArray after parent).
+		// Only grow if the child needs more slots; never shrink or reinitialize.
+		if (max_string_id > var_array_size) {
+			ActionVar** new_array = (ActionVar**) calloc(max_string_id, sizeof(ActionVar*));
+			if (!new_array) {
+				EXC("Failed to reallocate variable array\n");
+				exit(1);
+			}
+			for (size_t i = 0; i < var_array_size; i++) {
+				new_array[i] = var_array[i];
+			}
+			free(var_array);
+			var_array = new_array;
+			var_array_size = max_string_id;
+		}
+		return;
+	}
 	var_array_size = max_string_id;
 	var_array = (ActionVar**) calloc(var_array_size, sizeof(ActionVar*));
 

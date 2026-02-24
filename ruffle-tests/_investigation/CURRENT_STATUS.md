@@ -4,9 +4,9 @@ Last updated: 2026-02-23
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 324/619 (52.3%)
-- **Main failure types**: output_mismatch (287), segfault (5), compile_fail (2), timeout (1)
-- **Recent gains**: loadMovie multi-SWF infrastructure (3 tests), shape-accurate hitTest (+1 test: hittest_winding_rule), input event dispatch (+18 tests), Stage.scaleMode onResize, Selection methods
+- **Pass rate (CI, last run)**: 330/619 (53.3%)
+- **Main failure types**: output_mismatch (279), segfault (5), runtime_error (4), timeout (1)
+- **Recent gains**: MovieClipLoader class (+5 MCL tests), _level management (+2 loadmovienum tests), actionGetURL loadMovie (+1 loadmovie_fail), initVarArray child SWF protection, loadMovie multi-SWF infrastructure, input event dispatch (+18 tests), Stage.scaleMode onResize
 
 ## Crashes and Errors (8 tests)
 
@@ -99,8 +99,8 @@ Last updated: 2026-02-23
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by closure capture bug |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
-| LOADMOVIE_PLAN | **Phases 0-3 PARTIAL** | 3/49 pass (loadmovie, loadmovie_method, unloadmovie_method) | Phase 4 (MCL), Phase 5 (unload), Phase 6 (globals) |
-| UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
+| LOADMOVIE_PLAN | **Phases 0-5 DONE** | 12/49 pass | Phase 6 (globals), Phase 7 (loadVariables) |
+| UNLOAD_PLAN | **DONE** (via LOADMOVIE_PLAN) | 3/3 pass (unloadmovie, unloadmovie_method, unloadmovienum) | — |
 | BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie (compile failures now fixed), mouse events, morph interp |
 

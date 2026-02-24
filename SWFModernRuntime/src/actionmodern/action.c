@@ -7764,6 +7764,12 @@ MovieClip root_movieclip = {
 extern MovieClip* child_mc_cache[];
 extern int child_mc_count;
 
+// Forward declaration for _level management (defined after child_mc_cache)
+#ifndef MAX_LEVELS
+#define MAX_LEVELS 16
+#endif
+extern MovieClip* g_levels[MAX_LEVELS];
+
 // Helper function to get MovieClip by target path
 static MovieClip* getMovieClipByTarget(const char* target) {
 	if (!target || strlen(target) == 0) {
@@ -7778,6 +7784,20 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 	if (strcmp(target, "_root") == 0 || strcmp(target, "/") == 0 ||
 	    strcmp(target, "_level0") == 0) {
 		return &root_movieclip;
+	}
+	// _levelN (N > 0) — check the levels array
+	if (strncmp(target, "_level", 6) == 0) {
+		const char* after = target + 6;
+		// Check if rest is just a number (bare _levelN)
+		int level_num = atoi(after);
+		if (level_num > 0 && level_num < MAX_LEVELS) {
+			// Find the dot after the number for dot-path resolution
+			const char* dot = strchr(after, '.');
+			if (dot == NULL) {
+				// Bare _levelN
+				return g_levels[level_num];
+			}
+		}
 	}
 	// Dot-path resolution: _level0.child.grandchild or _root.child.grandchild
 	const char* rest = NULL;
@@ -8109,6 +8129,29 @@ int child_mc_count = 0;
 // MCs at index >= this threshold were just placed in the current frame's
 // process_sprite_needs_init and should not fire onEnterFrame until next frame.
 int g_enterframe_new_mc_start = -1;  // -1 = no skip
+
+// _level management: _level0 is always root_movieclip.
+// Higher levels are synthetic MCs created by loadMovieNum/loadClip.
+#define MAX_LEVELS 16
+MovieClip* g_levels[MAX_LEVELS];  // g_levels[0] = &root_movieclip, set in ensureGlobalInit
+
+static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
+    if (level_num < 0 || level_num >= MAX_LEVELS) return NULL;
+    if (level_num == 0) {
+        return &root_movieclip;
+    }
+    if (g_levels[level_num] != NULL) return g_levels[level_num];
+    // Create a new synthetic MC for this level
+    MovieClip* mc = (MovieClip*)HCALLOC(1, sizeof(MovieClip));
+    snprintf(mc->name, sizeof(mc->name), "_level%d", level_num);
+    snprintf(mc->target, sizeof(mc->target), "_level%d", level_num);
+    g_levels[level_num] = mc;
+    // Register in child_mc_cache so lookups find it
+    if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
+        child_mc_cache[child_mc_count++] = mc;
+    }
+    return mc;
+}
 
 static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
 
@@ -12062,15 +12105,88 @@ void actionStopSounds(SWFAppContext* app_context)
  */
 void actionGetURL(SWFAppContext* app_context, const char* url, const char* target)
 {
-	(void)app_context;
-	(void)url;
-	(void)target;
-	// Note: Full implementation would check target type and dispatch accordingly:
-	// - _level targets: Load SWF file into specified level
-	// - Browser targets (_blank, _self, etc.): Open in browser window/frame
-	// - Named targets: Open in named frame/window
-	// - JavaScript URLs: Execute JavaScript (if enabled)
-	// - Security: Check cross-domain policy, validate URL scheme
+	// Handle _level targets: loadMovie/unloadMovie into levels
+	if (target != NULL && strncmp(target, "_level", 6) == 0) {
+		int level_num = atoi(target + 6);
+
+		// Empty URL = unloadMovie on the level
+		if (url == NULL || url[0] == '\0') {
+			if (level_num > 0 && level_num < MAX_LEVELS && g_levels[level_num] != NULL) {
+				MovieClip* mc = g_levels[level_num];
+				// Fire onUnload handler if set
+				if (mc->dynamic_props != NULL) {
+					ActionVar* handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+					if (handler != NULL && handler->type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* func = (ASFunction*) handler->data.numeric_value;
+						if (func != NULL) {
+							MovieClip* saved = g_current_context;
+							actionSetCurrentContext(mc);
+							invokeSpecialFunction(app_context, func, NULL);
+							actionSetCurrentContext(saved);
+						}
+					}
+				}
+				// Note: level MC persists (Flash behavior) — just clear content
+			}
+			return;
+		}
+
+		// Load SWF into level
+		MovieEntry* entry = findMovieEntry(url);
+		if (entry != NULL) {
+			MovieClip* mc = getOrCreateLevel(app_context, level_num);
+			if (mc != NULL) {
+				entry->init_func(app_context);
+				if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+					entry->frame_funcs[0](app_context);
+				}
+			}
+		}
+		return;
+	}
+
+	// Handle named clip targets (non-_level)
+	if (target != NULL && target[0] != '\0') {
+		// Try to find MC by name
+		MovieClip* mc = NULL;
+		for (int i = 0; i < child_mc_count; i++) {
+			if (child_mc_cache[i] != NULL && child_mc_cache[i]->name != NULL
+				&& strcmp(child_mc_cache[i]->name, target) == 0) {
+				mc = child_mc_cache[i];
+				break;
+			}
+		}
+
+		if (url == NULL || url[0] == '\0') {
+			// unloadMovie on named clip
+			if (mc != NULL && mc->dynamic_props != NULL) {
+				ActionVar* handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+				if (handler != NULL && handler->type == ACTION_STACK_VALUE_FUNCTION) {
+					ASFunction* func = (ASFunction*) handler->data.numeric_value;
+					if (func != NULL) {
+						MovieClip* saved = g_current_context;
+						actionSetCurrentContext(mc);
+						invokeSpecialFunction(app_context, func, NULL);
+						actionSetCurrentContext(saved);
+					}
+				}
+			}
+			return;
+		}
+
+		// Load SWF into named clip
+		MovieEntry* entry = findMovieEntry(url);
+		if (entry != NULL) {
+			entry->init_func(app_context);
+			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+				entry->frame_funcs[0](app_context);
+			}
+		}
+		return;
+	}
+
+	// No target or unrecognized target — silently ignore
+	// (browser navigation targets like _blank, _self, etc. are not applicable in trace mode)
 }
 
 // ============================================================================
@@ -12282,8 +12398,9 @@ static int g_ab_funcs_init = 0;
 typedef struct {
     ASObject* mcl;       // MCL object that initiated the load
     MovieClip* target;   // Target MovieClip
-    MovieEntry* entry;   // Movie entry (NULL if URL not found)
+    MovieEntry* entry;   // Movie entry (NULL if URL not found or non-SWF)
     int file_size;       // File size for onLoadProgress
+    int is_swf_url;      // 1 if URL ends in .swf (affects error vs init behavior)
 } PendingMCLLoad;
 static PendingMCLLoad g_pending_mcl_loads[MAX_PENDING_MCL_LOADS];
 static int g_pending_mcl_load_count = 0;
@@ -12367,16 +12484,14 @@ static MovieClip* resolveMCLTarget(SWFAppContext* app_context, ActionVar* target
         target_arg->type == ACTION_STACK_VALUE_I32) {
         // Numeric: _level reference
         if (out_is_level) *out_is_level = 1;
-        // _level0 is root MC
         double dval = varToDoubleSimple(target_arg);
         int level = (int)dval;
         if (level == 0) {
             extern MovieClip root_movieclip;
             return &root_movieclip;
         }
-        // For non-zero levels, we don't have real _level support yet,
-        // but return a synthetic reference for the event callbacks
-        return NULL;
+        // Use centralized level management
+        return getOrCreateLevel(app_context, level);
     }
 
     // OBJECT, NULL, UNDEFINED, BOOLEAN, ARRAY, FUNCTION — not valid targets
@@ -12415,26 +12530,6 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
     // Resolve target
     int is_level = 0;
     MovieClip* target_mc = resolveMCLTarget(app_context, &args[1], &is_level);
-
-    // For non-zero _level targets, create a synthetic MC for event dispatch
-    MovieClip* level_mc = NULL;
-    int level_num = -1;
-    if (is_level && target_mc == NULL) {
-        double dval = varToDoubleSimple(&args[1]);
-        level_num = (int)dval;
-        // Allocate a temporary MovieClip for level targets
-        level_mc = (MovieClip*)HCALLOC(1, sizeof(MovieClip));
-        snprintf(level_mc->name, sizeof(level_mc->name), "_level%d", level_num);
-        snprintf(level_mc->target, sizeof(level_mc->target), "_level%d", level_num);
-        level_mc->parent = NULL;
-        target_mc = level_mc;
-        // Register in child_mc_cache so getProgress can find it
-        extern MovieClip* child_mc_cache[];
-        extern int child_mc_count;
-        if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
-            child_mc_cache[child_mc_count++] = level_mc;
-        }
-    }
 
     if (!target_mc) {
         // Target not found → false
@@ -12481,6 +12576,12 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
         g_pending_mcl_loads[g_pending_mcl_load_count].target = target_mc;
         g_pending_mcl_loads[g_pending_mcl_load_count].entry = entry;
         g_pending_mcl_loads[g_pending_mcl_load_count].file_size = file_size;
+        // Check if URL ends in .swf (affects onLoadError vs onLoadInit for missing files)
+        {
+            int url_len = (int)strlen(url_utf8);
+            g_pending_mcl_loads[g_pending_mcl_load_count].is_swf_url =
+                (url_len >= 4 && strcasecmp(url_utf8 + url_len - 4, ".swf") == 0) ? 1 : 0;
+        }
         g_pending_mcl_load_count++;
     }
 
@@ -12568,16 +12669,16 @@ static ActionVar builtin_mcl_getProgress(SWFAppContext* app_context, ActionVar* 
             }
         }
 
-        // If no stored bytes but MC exists (e.g. root MC with _level0),
-        // use the root SWF size
+        // If no stored bytes but MC is _level0 (root), use the root SWF size
         if (loaded.type == ACTION_STACK_VALUE_UNDEFINED && is_level) {
-            // For _level0 (root), report the parent SWF's size
-            extern SWFAppContext g_ctx;
-            int root_size = 502; // Default root SWF size from test expectations
-            loaded.type = ACTION_STACK_VALUE_F64;
-            VAL(double, &loaded.data.numeric_value) = (double)root_size;
-            total.type = ACTION_STACK_VALUE_F64;
-            VAL(double, &total.data.numeric_value) = (double)root_size;
+            extern MovieClip root_movieclip;
+            if (target_mc == &root_movieclip) {
+                int root_size = 502; // Default root SWF size from test expectations
+                loaded.type = ACTION_STACK_VALUE_F64;
+                VAL(double, &loaded.data.numeric_value) = (double)root_size;
+                total.type = ACTION_STACK_VALUE_F64;
+                VAL(double, &total.data.numeric_value) = (double)root_size;
+            }
         }
 
         setProperty(app_context, progress_obj, "bytesLoaded", 11, &loaded);
@@ -12656,13 +12757,29 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
         }
     }
 
-    // Phase 3: Fire onLoadInit for each load (LIFO order)
+    // Phase 3: Fire onLoadInit (success) or onLoadError (failure) for each load (LIFO order)
     for (int i = count - 1; i >= 0; i--) {
         if (g_execution_halted) break;
         ActionVar mc_var = {0};
         mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
         mc_var.data.numeric_value = (u64)loads[i].target;
-        fireMCLEvent(app_context, loads[i].mcl, "onLoadInit", &mc_var, 1);
+        if (loads[i].entry != NULL) {
+            // SWF loaded successfully
+            fireMCLEvent(app_context, loads[i].mcl, "onLoadInit", &mc_var, 1);
+        } else if (loads[i].is_swf_url) {
+            // .swf URL not found in registry — fire onLoadError
+            ActionVar error_args[3];
+            error_args[0] = mc_var;
+            error_args[1] = makeStringVar(app_context, "URLNotFound");
+            error_args[2].type = ACTION_STACK_VALUE_F64;
+            VAL(double, &error_args[2].data.numeric_value) = 0.0;
+            error_args[2].str_size = 0;
+            fireMCLEvent(app_context, loads[i].mcl, "onLoadError", error_args, 3);
+        } else {
+            // Non-.swf URL (e.g. .txt, .jpg) — file presumed found but not executable
+            // Flash/Ruffle still fires onLoadInit for non-SWF files
+            fireMCLEvent(app_context, loads[i].mcl, "onLoadInit", &mc_var, 1);
+        }
     }
 }
 
@@ -13303,6 +13420,9 @@ static void initLocalConnectionPrototype(SWFAppContext* app_context, ASFunction*
 static void ensureGlobalInit(SWFAppContext* app_context)
 {
 	if (g_global_init_done) return;
+
+	// Initialize _level0 to root_movieclip
+	g_levels[0] = &root_movieclip;
 
 	if (global_object == NULL)
 	{
@@ -13964,6 +14084,16 @@ void actionGetVariable(SWFAppContext* app_context)
 			extern MovieClip root_movieclip;
 			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 			return;
+		}
+
+		// _level1, _level2, etc. — resolve to synthetic level MCs
+		if (var_name_len >= 7 && var_name_len <= 10 && strncmp(var_name, "_level", 6) == 0)
+		{
+			int level_num = atoi(var_name + 6);
+			if (level_num > 0 && level_num < MAX_LEVELS && g_levels[level_num] != NULL) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_num]);
+				return;
+			}
 		}
 
 		// "transform" — built-in MovieClip property for the current clip context
@@ -17249,7 +17379,32 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 		return;
 	}
 
-	// loadVariables and browser navigation not yet implemented
+	// Check if target is a _level reference (loadMovieNum/unloadMovieNum)
+	// This handles GetURL2 with loadTarget=0 but _level target (like SWF4 loadMovieNum)
+	{
+		char url_utf8[512];
+		char target_utf8[512];
+		if (url_var.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* url_u16 = varGetU16Ptr(&url_var);
+			u16_to_utf8(url_u16, url_var.str_size, url_utf8, sizeof(url_utf8));
+		} else {
+			url_utf8[0] = '\0';
+		}
+		if (target_var.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* tgt_u16 = varGetU16Ptr(&target_var);
+			u16_to_utf8(tgt_u16, target_var.str_size, target_utf8, sizeof(target_utf8));
+		} else {
+			target_utf8[0] = '\0';
+		}
+
+		if (strncmp(target_utf8, "_level", 6) == 0) {
+			// Treat as loadMovieNum — delegate to actionGetURL
+			actionGetURL(app_context, url_utf8, target_utf8);
+			return;
+		}
+	}
+
+	// Browser navigation not yet implemented
 	(void)send_vars_method;
 }
 

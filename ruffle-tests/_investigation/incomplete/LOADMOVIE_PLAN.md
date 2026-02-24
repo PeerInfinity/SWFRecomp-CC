@@ -3,14 +3,15 @@
 
 Last updated: 2026-02-23
 
-## Status: IN PROGRESS — 4/49 tests passing, Phases 0-3 + partial 5 complete
+## Status: IN PROGRESS — 12/49 tests passing, Phases 0-5 + partial MCL complete
 
-Phases 0-3 (build pipeline, basic loadMovie, actionGetURL2 routing) and partial Phase 5
-(unloadMovie via empty URL) are implemented.
-4 tests pass: `loadmovie`, `loadmovie_method`, `unloadmovie_method`, `unloadmovie`.
-All compile failures resolved (was 22, now 0). Remaining 45 tests are output mismatches
-requiring deeper runtime work (MovieClipLoader class, _level management, cross-version
-global isolation, getBounds on loaded clips, etc.).
+Phases 0-5 (build pipeline, _level management, core loadMovie, actionGetURL routing,
+MovieClipLoader class, unloadMovie) are implemented.
+12 tests pass: `loadmovie`, `loadmovie_method`, `loadmovie_fail`, `loadmovienum`,
+`unloadmovie`, `unloadmovie_method`, `unloadmovienum`, `mcl_as_broadcaster`,
+`mcl_getprogress`, `mcl_loadclip`, `mcl_loadclip_properties`, `mcl_unloadclip`.
+Remaining 37 tests need: registerClass, cross-version global isolation, _level child
+addressing, root replacement, image loading, loadVariables, timers.
 
 This is the single largest blocker across the entire test suite. loadMovie infrastructure
 is referenced as a blocker in BUTTON_PLAN, HIT_TESTING_PLAN, UNLOAD_PLAN, MOVIECLIP_PLAN,
@@ -118,14 +119,15 @@ them into the same binary, using a dispatch mechanism to "load" them at runtime.
 
 ### What does NOT exist (still needed)
 
-- **_level1+ management**: Only `_level0` exists. No container for multiple levels.
-- **MovieClipLoader class**: Not implemented.
-- **unloadMovie()**: Not implemented (actionRemoveSprite exists but is different).
+- ~~**_level1+ management**~~: ✅ DONE — `g_levels[MAX_LEVELS]` with `getOrCreateLevel()`
+- ~~**MovieClipLoader class**~~: ✅ DONE — loadClip, unloadClip, getProgress, deferred events
+- ~~**unloadMovie()**~~: ✅ DONE — via empty URL in actionGetURL/GetURL2
 - **loadVariables()**: Not implemented.
 - **Cross-SWF global scope isolation**: SWF7+ need separate `_global` per loaded SWF.
 - **Proper clip clearing on loadMovie**: Current loadMovie just runs init+frame0 without clearing target clip state.
 - **DoInitAction for child SWFs**: Not implemented.
 - **getBounds on loaded clips**: Returns wrong values (loaded clip doesn't update display list properly).
+- **initVarArray protection**: ✅ DONE — child SWF init no longer clobbers parent's variable array.
 
 ---
 
@@ -195,13 +197,18 @@ MovieEntry* findMovieEntry(const char* filename) {
 6. ✅ `generate_movie_registry()` creates findMovieEntry() dispatch
 7. ✅ `compile_native()` links everything together with `-DHAS_CHILD_MOVIES`
 
-### Phase 1: _level management (runtime) — NOT STARTED
+### Phase 1: _level management (runtime) — DONE ✅
 
 **Goal**: Support `_level0`, `_level1`, etc. as separate MovieClip roots.
 
-Need `g_levels[MAX_LEVELS]` array, `getLevel()`/`getOrCreateLevel()`, update `actionGetVariable` to resolve `_level1+`.
+**Completed:**
+- ✅ `g_levels[MAX_LEVELS]` array with `g_levels[0] = &root_movieclip`
+- ✅ `getOrCreateLevel(level_num)` creates synthetic MCs for higher levels
+- ✅ `actionGetVariable` resolves `_levelN` (N > 0) to level MCs
+- ✅ `getMovieClipByTarget` resolves `_levelN` paths
+- ✅ Level MCs registered in `child_mc_cache` for lookup
 
-**Tests enabled**: loadmovienum (partial — still needs movie loading)
+**Tests passing**: loadmovienum ✅, unloadmovienum ✅
 
 ### Phase 2: Core loadMovie (runtime) — PARTIAL ✅
 
@@ -231,38 +238,24 @@ Need `g_levels[MAX_LEVELS]` array, `getLevel()`/`getOrCreateLevel()`, update `ac
 
 **Tests passing via this path**: loadmovie ✅ (uses GetURL2 opcode)
 
-### Phase 4: MovieClipLoader class
+### Phase 4: MovieClipLoader class — DONE ✅
 
 **Goal**: AS2 `MovieClipLoader` with broadcaster pattern.
 
-```c
-// MovieClipLoader is an ASObject with:
-// - loadClip(url, target) method
-// - unloadClip(target) method
-// - getProgress(target) method
-// - addListener(obj) / removeListener(obj) via AsBroadcaster mixin
+**Completed:**
+- ✅ MCL constructor auto-adds self as first listener (in actionNewObject)
+- ✅ `loadClip(url, target)` — resolves target, queues deferred event dispatch
+- ✅ `unloadClip(target)` — resolves target, fires onUnload
+- ✅ `getProgress(target)` — returns {bytesLoaded, bytesTotal} object
+- ✅ Deferred event dispatch at ShowFrame: onLoadStart/Progress/Complete (FIFO), child init, onLoadInit (LIFO)
+- ✅ onLoadError for missing .swf URLs, onLoadInit for non-.swf URLs
+- ✅ broadcastMessage this-binding for type 1 and type 2 functions
+- ✅ Instance broadcastMessage overrides respected via property chain lookup
 
-void mclLoadClip(SWFAppContext* app, ActionVar* args, u32 arg_count) {
-    char* url = convertToString(args[0]);
-    // target can be: string path, number (level), or MovieClip object
-    MovieClip* target = resolveTarget(args[1]);
+**Tests passing**: mcl_as_broadcaster ✅, mcl_getprogress ✅, mcl_loadclip ✅,
+mcl_loadclip_properties ✅, mcl_unloadclip ✅, loadmovie_fail ✅
 
-    MovieEntry* entry = findMovieEntry(url);
-    if (!entry) {
-        broadcastMessage(mcl, "onLoadError", target, "URLNotFound", 0);
-        return;
-    }
-
-    broadcastMessage(mcl, "onLoadStart", target);
-    installMovie(app, target, entry);
-    broadcastMessage(mcl, "onLoadComplete", target, 0);
-    // onLoadInit fires after first frame executes
-}
-```
-
-**Tests enabled**: mcl_loadclip, mcl_as_broadcaster, mcl_getprogress, mcl_unloadclip, etc.
-
-### Phase 5: unloadMovie — PARTIAL ✅
+### Phase 5: unloadMovie — DONE ✅
 
 **Goal**: Remove loaded content from a clip or level.
 
@@ -270,12 +263,10 @@ void mclLoadClip(SWFAppContext* app, ActionVar* args, u32 arg_count) {
 - ✅ Empty URL in `actionGetURL2` and `MC.loadMovie("")` triggers onUnload handler
 - ✅ `MC.unloadMovie()` method fires onUnload handler
 - ✅ Target MC resolved from stack (direct MC pointer or name lookup)
+- ✅ `actionGetURL("", "_levelN")` unloads level N (fires onUnload)
+- ✅ Level MCs persist after unload (Flash behavior)
 
-**Still needed:**
-- Clear display list and variables on unload
-- `unloadMovieNum()` needs _level support (Phase 1)
-
-**Tests passing**: unloadmovie ✅, unloadmovie_method ✅ (was already passing)
+**Tests passing**: unloadmovie ✅, unloadmovie_method ✅, unloadmovienum ✅
 
 ### Phase 6: Cross-version global isolation
 
@@ -321,16 +312,16 @@ This may be low priority since it requires simulating network responses.
 | Phase | Status | Tests Fixed | Difficulty |
 |-------|--------|-----------|------------|
 | 0 (build pipeline) | ✅ DONE | — (infrastructure) | High (done) |
-| 1 (_level management) | NOT STARTED | ~2 (loadmovienum) | Medium |
-| 2 (core loadMovie) | ✅ PARTIAL | 3 passing (loadmovie, loadmovie_method, unloadmovie_method) via this phase | High (partial done) |
-| 3 (GetURL2 routing) | ✅ DONE | — (merged into phase 2) | Low (done) |
-| 4 (MovieClipLoader) | NOT STARTED | ~6 (mcl_loadclip, mcl_getprogress, etc.) | Medium |
-| 5 (unloadMovie) | ✅ PARTIAL | unloadmovie ✅ (new), unloadmovie_method ✅ (existing). unloadmovienum needs _level | Low |
+| 1 (_level management) | ✅ DONE | loadmovienum ✅, unloadmovienum ✅ | Medium (done) |
+| 2 (core loadMovie) | ✅ DONE | loadmovie ✅, loadmovie_method ✅ | High (done) |
+| 3 (GetURL2/GetURL routing) | ✅ DONE | actionGetURL + actionGetURL2 _level routing | Low (done) |
+| 4 (MovieClipLoader) | ✅ DONE | mcl_as_broadcaster ✅, mcl_getprogress ✅, mcl_loadclip ✅, mcl_loadclip_properties ✅, mcl_unloadclip ✅, loadmovie_fail ✅ | Medium (done) |
+| 5 (unloadMovie) | ✅ DONE | unloadmovie ✅, unloadmovie_method ✅, unloadmovienum ✅ | Low (done) |
 | 6 (global isolation) | NOT STARTED | ~2 (global_swf5_6_7_8_9, global_swf6_7_8) | Medium |
 | 7 (loadVariables) | NOT STARTED | ~4 | Medium |
 
-**Current**: 4/49 passing. **Realistically fixable**: ~25-31 of the 49 tests.
-Image loading (4 tests), loading_avm2 (1), and some edge cases (~10) are likely unfixable.
+**Current**: 12/49 passing. **Realistically fixable**: ~20-25 of the 49 tests.
+Image loading (4 tests), loading_avm2 (1), root replacement (3), timers (1) are likely unfixable.
 
 ---
 
