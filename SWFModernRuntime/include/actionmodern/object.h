@@ -118,10 +118,14 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 
 // Check if property exists ignoring flash_flags visibility (for hasOwnProperty)
 bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length);
+ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length);
 
 // Delete property by name (returns true if deleted or not found, false if protected)
 // Handles refcount management if value is an object
 bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length);
+
+// SWF version-aware name comparison (case-insensitive for SWF <= 6 with Unicode case folding)
+int swf_name_match(const char* a, const char* b);
 
 /**
  * Interface Management (ActionScript 2.0)

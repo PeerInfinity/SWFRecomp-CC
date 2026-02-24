@@ -8,8 +8,20 @@
 #include <map.h>
 #include <common.h>
 #include <variables.h>
+#include <actionmodern/action.h>
+#include <ctype.h>
 
 #define VAL(type, x) *((type*) x)
+
+// For SWF <= 6, fold a variable name to lowercase (ASCII only since hashmap keys are typically ASCII)
+// Returns a stack-allocated buffer valid until next call
+static void fold_key_lower(const char* src, size_t len, char* dst)
+{
+	for (size_t i = 0; i < len; i++) {
+		dst[i] = (src[i] >= 'A' && src[i] <= 'Z') ? (src[i] + 32) : src[i];
+	}
+	dst[len] = '\0';
+}
 
 hashmap* var_map = NULL;
 ActionVar** var_array = NULL;
@@ -136,7 +148,16 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 {
 	ActionVar* var;
 
-	if (hashmap_get(var_map, var_name, key_size, (uintptr_t*) &var))
+	// For SWF <= 6, fold keys to lowercase for case-insensitive matching
+	char folded_buf[512];
+	char* lookup_key = var_name;
+	size_t lookup_size = key_size;
+	if (g_swf_version <= 6 && key_size < sizeof(folded_buf)) {
+		fold_key_lower(var_name, key_size, folded_buf);
+		lookup_key = folded_buf;
+	}
+
+	if (hashmap_get(var_map, lookup_key, lookup_size, (uintptr_t*) &var))
 	{
 		return var;
 	}
@@ -154,12 +175,12 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 
 	// The hashmap stores the key pointer directly (not a copy), so we must
 	// heap-allocate the key to ensure it outlives the caller's stack frame.
-	char* key_copy = (char*) malloc(key_size + 1);
+	char* key_copy = (char*) malloc(lookup_size + 1);
 	if (key_copy == NULL) { free(var); return NULL; }
-	memcpy(key_copy, var_name, key_size);
-	key_copy[key_size] = '\0';
+	memcpy(key_copy, lookup_key, lookup_size);
+	key_copy[lookup_size] = '\0';
 
-	hashmap_set(var_map, key_copy, key_size, (uintptr_t) var);
+	hashmap_set(var_map, key_copy, lookup_size, (uintptr_t) var);
 
 	return var;
 }
@@ -167,7 +188,14 @@ ActionVar* getVariable(char* var_name, size_t key_size)
 bool hasVariable(char* var_name, size_t key_size)
 {
 	ActionVar* var;
-	return hashmap_get(var_map, var_name, key_size, (uintptr_t*) &var);
+	// For SWF <= 6, fold keys to lowercase for case-insensitive matching
+	char folded_buf[512];
+	char* lookup_key = var_name;
+	if (g_swf_version <= 6 && key_size < sizeof(folded_buf)) {
+		fold_key_lower(var_name, key_size, folded_buf);
+		lookup_key = folded_buf;
+	}
+	return hashmap_get(var_map, lookup_key, key_size, (uintptr_t*) &var);
 }
 
 void setVariableByName(const char* var_name, ActionVar* value)

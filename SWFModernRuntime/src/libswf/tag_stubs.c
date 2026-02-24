@@ -4,6 +4,7 @@
 #include <swf.h>
 #include <common.h>
 #include <action.h>
+#include <object.h>
 #include <heap.h>
 #include <string.h>
 #include <stdio.h>
@@ -845,7 +846,7 @@ size_t ng_findDisplayEntryByName(const char* name)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name == NULL) continue;
-		if (strcmp(display_list[d].instance_name, name) == 0)
+		if (swf_name_match(display_list[d].instance_name, name))
 		{
 			if (result == SIZE_MAX || d < result)
 				result = d;
@@ -863,7 +864,7 @@ size_t ng_findDisplayEntryIdx(const char* name)
 	{
 		if (display_list[d].char_id == 0) continue;
 		if (display_list[d].instance_name != NULL &&
-		    strcmp(display_list[d].instance_name, name) == 0)
+		    swf_name_match(display_list[d].instance_name, name))
 			return d;  // entry_idx = root depth (upper bits = 0)
 	}
 	return (size_t)-1;
@@ -893,7 +894,7 @@ size_t ng_findDisplayEntryIdxWithParent(const char* name, size_t parent_idx)
 	{
 		DisplayObject* child = &parent_obj->sprite_display_list[d];
 		if (child->char_id == 0) continue;
-		if (child->instance_name != NULL && strcmp(child->instance_name, name) == 0)
+		if (child->instance_name != NULL && swf_name_match(child->instance_name, name))
 			return (parent_root_depth << 20) | d;  // encoded nested entry_idx
 	}
 	return (size_t)-1;

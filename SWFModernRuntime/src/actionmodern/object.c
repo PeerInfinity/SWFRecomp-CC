@@ -6,6 +6,89 @@
 #include <actionmodern/object.h>
 #include <actionmodern/action.h>
 #include <heap.h>
+#include "unicode_case_tables.h"
+
+// UTF-8 decode one codepoint, advance pointer
+static uint32_t _obj_utf8_decode(const unsigned char** pp)
+{
+	const unsigned char* p = *pp;
+	uint32_t c = *p;
+	if (c < 0x80) { (*pp)++; return c; }
+	if ((c & 0xE0) == 0xC0) {
+		uint32_t r = (c & 0x1F) << 6;
+		if ((p[1] & 0xC0) == 0x80) { r |= (p[1] & 0x3F); *pp += 2; return r; }
+		(*pp)++; return 0xFFFD;
+	}
+	if ((c & 0xF0) == 0xE0) {
+		uint32_t r = (c & 0x0F) << 12;
+		if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+			r |= ((p[1] & 0x3F) << 6) | (p[2] & 0x3F); *pp += 3; return r;
+		}
+		(*pp)++; return 0xFFFD;
+	}
+	if ((c & 0xF8) == 0xF0) {
+		uint32_t r = (c & 0x07) << 18;
+		if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+			r |= ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F); *pp += 4; return r;
+		}
+		(*pp)++; return 0xFFFD;
+	}
+	(*pp)++; return 0xFFFD;
+}
+
+// Fold codepoint to lowercase for case-insensitive comparison
+static uint32_t _obj_fold_lower(uint32_t c)
+{
+	if (c >= 'A' && c <= 'Z') return c + ('a' - 'A');
+	if (c > 0x7F && c <= 0xFFFF) {
+		int lo = 0, hi = CASE_MAP_UPPER_TO_LOWER_COUNT - 1;
+		while (lo <= hi) {
+			int mid = (lo + hi) / 2;
+			if (case_map_upper_to_lower[mid][0] == (uint16_t)c) return case_map_upper_to_lower[mid][1];
+			if (case_map_upper_to_lower[mid][0] < (uint16_t)c) lo = mid + 1; else hi = mid - 1;
+		}
+	}
+	return c;
+}
+
+// SWF version-aware property name comparison
+// For SWF <= 6: Unicode case-insensitive comparison
+// For SWF >= 7: byte-exact comparison (strncmp)
+static int prop_name_match(const char* a, u32 alen, const char* b, u32 blen)
+{
+	if (g_swf_version >= 7) {
+		return alen == blen && strncmp(a, b, alen) == 0;
+	}
+	// SWF <= 6: Unicode case-insensitive
+	const unsigned char* pa = (const unsigned char*)a;
+	const unsigned char* ea = pa + alen;
+	const unsigned char* pb = (const unsigned char*)b;
+	const unsigned char* eb = pb + blen;
+	while (pa < ea && pb < eb) {
+		uint32_t ca = _obj_fold_lower(_obj_utf8_decode(&pa));
+		uint32_t cb = _obj_fold_lower(_obj_utf8_decode(&pb));
+		if (ca != cb) return 0;
+	}
+	return (pa >= ea && pb >= eb);
+}
+
+// Null-terminated SWF version-aware name comparison (exposed for tag_stubs.c)
+// Returns 1 if names match, 0 if they don't
+int swf_name_match(const char* a, const char* b)
+{
+	if (g_swf_version >= 7) {
+		return strcmp(a, b) == 0;
+	}
+	// SWF <= 6: Unicode case-insensitive
+	const unsigned char* pa = (const unsigned char*)a;
+	const unsigned char* pb = (const unsigned char*)b;
+	while (*pa && *pb) {
+		uint32_t ca = _obj_fold_lower(_obj_utf8_decode(&pa));
+		uint32_t cb = _obj_fold_lower(_obj_utf8_decode(&pb));
+		if (ca != cb) return 0;
+	}
+	return (*pa == 0 && *pb == 0);
+}
 
 // Version-based property hiding masks for ASSetPropFlags
 // When (property->flash_flags & FLASH_HIDE_MASK) != 0, property is hidden from GetMember
@@ -169,13 +252,12 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
  * Returns pointer to ActionVar, or NULL if property not found.
  */
 // Find property struct by name (ignoring version hiding) - for ASSetPropFlags
-static ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
+ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL) return NULL;
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
-		if (obj->properties[i].name_length == name_length &&
-		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			return &obj->properties[i];
 		}
@@ -199,8 +281,7 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 	// For production, consider hash table for large objects
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
-		if (obj->properties[i].name_length == name_length &&
-		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Check version-based hiding (ASSetPropFlags)
 			if (FLASH_HIDE_MASK && (obj->properties[i].flash_flags & FLASH_HIDE_MASK))
@@ -337,8 +418,7 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	// Check if property already exists
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
-		if (obj->properties[i].name_length == name_length &&
-		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Property exists - update value
 
@@ -459,8 +539,7 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 	// If property already exists, just update the value
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
-		if (obj->properties[i].name_length == name_length &&
-		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Release old value
 			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
@@ -485,8 +564,7 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 	if (obj->num_used > 0)
 	{
 		ASProperty* new_prop = &obj->properties[obj->num_used - 1];
-		if (new_prop->name_length == name_length &&
-		    strncmp(new_prop->name, name, name_length) == 0)
+		if (prop_name_match(new_prop->name, new_prop->name_length, name, name_length))
 		{
 			new_prop->flags = flags;
 		}
@@ -509,8 +587,7 @@ bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name,
 	// Find property by name
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
-		if (obj->properties[i].name_length == name_length &&
-		    strncmp(obj->properties[i].name, name, name_length) == 0)
+		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Check if property is configurable (deletable)
 			if (!(obj->properties[i].flags & PROPERTY_FLAG_CONFIGURABLE))
