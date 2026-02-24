@@ -16718,9 +16718,11 @@ void actionCall(SWFAppContext* app_context)
  */
 void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag)
 {
-	// Pop target from stack
-	// convertString() is called to handle the case where the value might be a number
-	// that needs to be converted to a string, though in practice URLs/targets are always strings
+	// Pop target from stack — save MC pointer before convertString destroys it
+	MovieClip* _gu2_target_mc = NULL;
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP) {
+		_gu2_target_mc = (MovieClip*) VAL(u64, &STACK_TOP_VALUE);
+	}
 	char target_str[17];
 	ActionVar target_var;
 	convertString(app_context, target_str);
@@ -16764,6 +16766,35 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			u16_to_utf8(tgt_u16, target_var.str_size, target_utf8, sizeof(target_utf8));
 		} else {
 			target_utf8[0] = '\0';
+		}
+
+		// Resolve target MC: prefer direct MC pointer, fall back to name lookup
+		MovieClip* _gu2_mc = _gu2_target_mc;
+		if (_gu2_mc == NULL && target_utf8[0] != '\0') {
+			for (int _lm_i = 0; _lm_i < child_mc_count; _lm_i++) {
+				if (child_mc_cache[_lm_i] != NULL && child_mc_cache[_lm_i]->name != NULL
+					&& strcmp(child_mc_cache[_lm_i]->name, target_utf8) == 0) {
+					_gu2_mc = child_mc_cache[_lm_i];
+					break;
+				}
+			}
+		}
+
+		// Empty URL = unloadMovie: fire onUnload on the target clip
+		if (url_utf8[0] == '\0') {
+			if (_gu2_mc != NULL && _gu2_mc->dynamic_props != NULL) {
+				ActionVar* _ul_handler = getProperty((ASObject*)_gu2_mc->dynamic_props, "onUnload", 8);
+				if (_ul_handler != NULL && _ul_handler->type == ACTION_STACK_VALUE_FUNCTION) {
+					ASFunction* _ul_func = (ASFunction*) _ul_handler->data.numeric_value;
+					if (_ul_func != NULL) {
+						MovieClip* _ul_saved = g_current_context;
+						actionSetCurrentContext(_gu2_mc);
+						invokeSpecialFunction(app_context, _ul_func, NULL);
+						actionSetCurrentContext(_ul_saved);
+					}
+				}
+			}
+			return;
 		}
 
 		MovieEntry* entry = findMovieEntry(url_utf8);
@@ -27266,12 +27297,47 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				char _lm_url[512];
 				const uint16_t* _lm_u16 = varGetU16Ptr(&args[0]);
 				u16_to_utf8(_lm_u16, args[0].str_size, _lm_url, sizeof(_lm_url));
-				MovieEntry* entry = findMovieEntry(_lm_url);
-				if (entry != NULL && mc != NULL) {
-					// Run the child movie's init and frame 0
-					entry->init_func(app_context);
-					if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
-						entry->frame_funcs[0](app_context);
+				if (_lm_url[0] == '\0') {
+					// Empty URL = unloadMovie: fire onUnload on this clip
+					if (mc != NULL && mc->dynamic_props != NULL) {
+						ActionVar* _ul_h = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+						if (_ul_h != NULL && _ul_h->type == ACTION_STACK_VALUE_FUNCTION) {
+							ASFunction* _ul_f = (ASFunction*) _ul_h->data.numeric_value;
+							if (_ul_f != NULL) {
+								MovieClip* _ul_s = g_current_context;
+								actionSetCurrentContext(mc);
+								invokeSpecialFunction(app_context, _ul_f, NULL);
+								actionSetCurrentContext(_ul_s);
+							}
+						}
+					}
+				} else {
+					MovieEntry* entry = findMovieEntry(_lm_url);
+					if (entry != NULL && mc != NULL) {
+						// Run the child movie's init and frame 0
+						entry->init_func(app_context);
+						if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+							entry->frame_funcs[0](app_context);
+						}
+					}
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 11 && strncmp(method_name, "unloadMovie", 11) == 0)
+		{
+			// mc.unloadMovie() — unload content and fire onUnload
+			if (mc != NULL && mc->dynamic_props != NULL) {
+				ActionVar* _ul_h = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+				if (_ul_h != NULL && _ul_h->type == ACTION_STACK_VALUE_FUNCTION) {
+					ASFunction* _ul_f = (ASFunction*) _ul_h->data.numeric_value;
+					if (_ul_f != NULL) {
+						MovieClip* _ul_s = g_current_context;
+						actionSetCurrentContext(mc);
+						invokeSpecialFunction(app_context, _ul_f, NULL);
+						actionSetCurrentContext(_ul_s);
 					}
 				}
 			}

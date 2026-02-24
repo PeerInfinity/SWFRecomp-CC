@@ -4,9 +4,9 @@ Last updated: 2026-02-23
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 307/619 (49.6%)
-- **Main failure types**: output_mismatch (304), segfault (5), runtime_error (2), timeout (1)
-- **Recent gains**: shape-accurate hitTest (+1 test: hittest_winding_rule), input event dispatch (+18 tests), Stage.scaleMode onResize, Selection methods
+- **Pass rate (CI, last run)**: 324/619 (52.3%)
+- **Main failure types**: output_mismatch (287), segfault (5), compile_fail (2), timeout (1)
+- **Recent gains**: loadMovie multi-SWF infrastructure (3 tests), shape-accurate hitTest (+1 test: hittest_winding_rule), input event dispatch (+18 tests), Stage.scaleMode onResize, Selection methods
 
 ## Crashes and Errors (8 tests)
 
@@ -17,8 +17,8 @@ Last updated: 2026-02-23
 | native_objects_swf6 | segfault | 0/84 | Crashes constructing native Flash classes (filters, geom, etc.) |
 | native_objects_swf7 | segfault | 0/84 | Same root cause as swf6 |
 | native_objects_swf8 | segfault | 0/84 | Same root cause as swf6 |
-| movieclip_library_state_values | runtime_error | 16/78 | exit code -6 (abort) |
-| movieclip_state_values | runtime_error | 3/114 | exit code -6 (abort) |
+| movieclip_invalid_get_bounds_6 | compile_fail | 0/? | Needs button/clip_actions symbol renaming (fixed locally, not in CI yet) |
+| movieclip_invalid_get_bounds_7 | compile_fail | 0/? | Same fix as _6 (fixed locally, not in CI yet) |
 | timeout | timeout | 0/0 | setTimeout/clearTimeout not implemented |
 
 ## Top Near-Passing Tests (best ROI to fix)
@@ -99,9 +99,10 @@ Last updated: 2026-02-23
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by closure capture bug |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
+| LOADMOVIE_PLAN | **Phases 0-3 PARTIAL** | 3/49 pass (loadmovie, loadmovie_method, unloadmovie_method) | Phase 4 (MCL), Phase 5 (unload), Phase 6 (globals) |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
 | BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
-| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie, mouse events, morph interp |
+| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie (compile failures now fixed), mouse events, morph interp |
 
 ## Recommended Work Order
 

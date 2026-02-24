@@ -387,8 +387,10 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir):
         m = re.search(r"#define\s+FRAME_COUNT\s+(\d+)", text)
         if m:
             frame_count_val = int(m.group(1))
-        for m in re.finditer(r"void\s+(script_\d+)\(", text):
-            script_funcs.append(m.group(1))
+        for m in re.finditer(r"void\s+([a-zA-Z_]\w+)\(", text):
+            fname = m.group(1)
+            if fname not in script_funcs:
+                script_funcs.append(fname)
 
     # Read the child's script_decls.h for all user-defined functions
     # (func2_*, func_anonymous_*, func_* etc.)
@@ -448,18 +450,37 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir):
         all_renames[func_name] = f'{prefix}_{func_name}'
     for func_name in user_funcs:
         all_renames[func_name] = f'{prefix}_{func_name}'
-    # Detect sprite_N_frame_* and sprite_N_frame_funcs symbols in tagMain
+    # Detect sprite_N_frame_*, button_*, and clip_actions_* symbols in tagMain
     if tag_main_text:
         for m in re.finditer(r'\b(sprite_\d+_frame_(?:funcs|\d+))\b', tag_main_text):
             sym = m.group(1)
             if sym not in all_renames:
                 all_renames[sym] = f'{prefix}_{sym}'
+        for m in re.finditer(r'\b(button_\d+_\w+)\b', tag_main_text):
+            sym = m.group(1)
+            if sym not in all_renames:
+                all_renames[sym] = f'{prefix}_{sym}'
+        for m in re.finditer(r'\b(clip_actions_\d+)\b', tag_main_text):
+            sym = m.group(1)
+            if sym not in all_renames:
+                all_renames[sym] = f'{prefix}_{sym}'
 
-    def apply_renames(text):
-        """Apply all symbol renames to a block of C code."""
-        for old, new in all_renames.items():
-            text = re.sub(rf'\b{re.escape(old)}\b', new, text)
-        return text
+    # Build a single compiled regex for all renames (single-pass replacement)
+    # Match known symbol prefixes and check against rename dict in callback
+    if all_renames:
+        _rename_pattern = re.compile(
+            r'\b(str_\d+|script_\d+|func2?_\w+|button_\d+_\w+|clip_action(?:s)?_\d+|sprite_\d+_frame_\w+)\b')
+        _renames = all_renames  # capture for closure
+
+        def apply_renames(text):
+            """Apply all symbol renames to a block of C code (single pass)."""
+            def _repl(m):
+                sym = m.group(1)
+                return _renames.get(sym, sym)
+            return _rename_pattern.sub(_repl, text)
+    else:
+        def apply_renames(text):
+            return text
 
     # Generate the combined wrapper file
     lines = []
@@ -485,6 +506,14 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir):
         lines.append(f"void {prefix}_{func_name}(SWFAppContext* app_context);")
     for func_name in user_funcs:
         lines.append(f"// Forward decl: {prefix}_{func_name}")
+    # Forward declarations for button and clip_actions arrays from tagMain
+    if tag_main_text:
+        for m in re.finditer(r'^frame_func\s+(button_\d+_state_funcs)\s*\[\]', tag_main_text, re.MULTILINE):
+            lines.append(f"extern frame_func {prefix}_{m.group(1)}[];")
+        for m in re.finditer(r'^ButtonAction\s+(button_\d+_actions)\s*\[\]', tag_main_text, re.MULTILINE):
+            lines.append(f"extern ButtonAction {prefix}_{m.group(1)}[];")
+        for m in re.finditer(r'^ClipAction\s+(clip_actions_\d+)\s*\[\]', tag_main_text, re.MULTILINE):
+            lines.append(f"extern ClipAction {prefix}_{m.group(1)}[];")
     lines.append("")
 
     # Include script_defs.c content (string definitions + function implementations)

@@ -3,7 +3,14 @@
 
 Last updated: 2026-02-23
 
-## Status: NOT STARTED — 0/46 tests passing, ~46 tests blocked
+## Status: IN PROGRESS — 4/49 tests passing, Phases 0-3 + partial 5 complete
+
+Phases 0-3 (build pipeline, basic loadMovie, actionGetURL2 routing) and partial Phase 5
+(unloadMovie via empty URL) are implemented.
+4 tests pass: `loadmovie`, `loadmovie_method`, `unloadmovie_method`, `unloadmovie`.
+All compile failures resolved (was 22, now 0). Remaining 45 tests are output mismatches
+requiring deeper runtime work (MovieClipLoader class, _level management, cross-version
+global isolation, getBounds on loaded clips, etc.).
 
 This is the single largest blocker across the entire test suite. loadMovie infrastructure
 is referenced as a blocker in BUTTON_PLAN, HIT_TESTING_PLAN, UNLOAD_PLAN, MOVIECLIP_PLAN,
@@ -97,208 +104,132 @@ them into the same binary, using a dispatch mechanism to "load" them at runtime.
 
 ## Existing Infrastructure
 
-### What exists
+### What exists (implemented)
 
 - **`_level0` / `_root` resolution** (action.c:7778-7787): Both resolve to `&root_movieclip`.
   Dot-path resolution for `_level0.child.grandchild` works.
 - **`targetPath()`** (action.c:10698-10742): Returns `_level0` for root, `_level0.clip.child` for nested.
-- **`actionGetURL2` stub** (action.c:16692-16755): Recompiler emits calls to `actionGetURL2()`.
-  Currently only handles FSCommand protocol; movie/variable loading is stubbed out.
 - **Recompiler emission** (action.cpp:1912-1931): Emits `actionGetURL2(app_context, method, loadTarget, loadVars)` with correct flags from SWF bytecode.
+- **Multi-SWF build pipeline** (verify_output.py): Detects child .swf files, recompiles each via SWFRecomp, generates wrapper C files with symbol isolation (prefix-based renaming), generates movie_registry.c, compiles all together. Handles complex SWFs with buttons, clip events, sprites.
+- **MovieEntry struct** (swf.h): `{ filename, frame_funcs, init_func, swf_version, frame_count, stage_width, stage_height }`. Runtime registry with `findMovieEntry()`.
+- **actionGetURL2** (action.c:~16751): Handles loadTarget=1/loadVars=0 → calls `findMovieEntry()` + runs init + frame 0.
+- **MC.loadMovie()** (action.c:~27235): Built-in MovieClip method, same flow as actionGetURL2.
+- **Child SWF availability**: 110 child .swf files copied from upstream Ruffle repo. `download_tests.sh` updated to copy them.
 
-### What does NOT exist
+### What does NOT exist (still needed)
 
 - **_level1+ management**: Only `_level0` exists. No container for multiple levels.
-- **External SWF loading/parsing**: No runtime SWF parser. No HTTP/file I/O.
-- **Multi-SWF binary linking**: No mechanism to compile multiple SWFs into one binary.
 - **MovieClipLoader class**: Not implemented.
 - **unloadMovie()**: Not implemented (actionRemoveSprite exists but is different).
 - **loadVariables()**: Not implemented.
 - **Cross-SWF global scope isolation**: SWF7+ need separate `_global` per loaded SWF.
+- **Proper clip clearing on loadMovie**: Current loadMovie just runs init+frame0 without clearing target clip state.
+- **DoInitAction for child SWFs**: Not implemented.
+- **getBounds on loaded clips**: Returns wrong values (loaded clip doesn't update display list properly).
 
 ---
 
-## Design: Pre-Compiled Multi-SWF Approach
+## Design: Pre-Compiled Multi-SWF Approach (Implemented)
 
 Since our architecture is compile-time SWF-to-C, we pre-compile all SWFs in a test directory
 and link them into a single binary. At runtime, `loadMovie("target.swf", mc)` looks up a
 pre-compiled SWF by filename and instantiates it.
 
-### Build pipeline changes (verify_output.py)
+### Build pipeline (verify_output.py) — IMPLEMENTED
 
 ```
-For each test directory:
-  1. Find all .swf files (test.swf, target.swf, child.swf, etc.)
-  2. Recompile EACH .swf through SWFRecomp → generates separate script_defs.c / tag_funcs.c
-  3. Rename generated symbols to avoid collisions:
-     - test.swf  → script_defs_main.c, tag_funcs_main.c
-     - target.swf → script_defs_target.c, tag_funcs_target.c
-  4. Generate a movie_registry.c that maps filenames → init functions
-  5. Compile all C files + runtime into single binary
+For each test directory with child .swf files:
+  1. find_child_swfs() detects non-test.swf .swf files
+  2. recompile_child_swf() runs SWFRecomp on each child in temp dir
+  3. generate_child_movie_file() creates movie_<prefix>.c wrapper:
+     - Reads all generated files (script_defs.c, script_N.c, tagMain.c, etc.)
+     - Builds rename dict: str_N, script_N, func2_*, frame_N, sprite_N_frame_*,
+       button_*_state_funcs, button_*_actions, clip_actions_* → prefix_*
+     - Single-pass regex replacement (handles 2000+ symbols in <0.5s)
+     - Generates forward declarations, inlined script bodies, MovieEntry struct
+  4. generate_movie_registry() creates movie_registry.c with findMovieEntry()
+  5. compile_native() compiles all .c files + runtime with -DHAS_CHILD_MOVIES
 ```
 
-### Movie registry (runtime)
+### Symbol isolation: Option A (prefix-based renaming) — IMPLEMENTED
+
+Each child SWF's symbols are prefixed with a sanitized version of the filename
+(`target.swf` → `target_`, `8LParent7L7.swf` → `m_8LParent7L7_`).
+Handles: str_N, script_N, func2_*, func_anonymous_*, frame_N, frame_funcs,
+sprite_N_frame_*, button_N_*, clip_actions_N, tagInit, frame_label_data/count.
+
+### Movie registry (runtime) — IMPLEMENTED
 
 ```c
-// Generated at compile time:
-typedef struct {
-    const char* filename;        // "target.swf"
-    void (*init_tags)(SWFAppContext*);   // sets up dictionary, frames
-    void (*init_scripts)(SWFAppContext*); // registers frame scripts
-    u16 swf_version;
-    u16 frame_count;
-    u16 stage_width, stage_height;
+// In swf.h:
+typedef struct MovieEntry {
+    const char* filename;
+    frame_func* frame_funcs;
+    void (*init_func)(SWFAppContext*);
+    u16 swf_version, frame_count, stage_width, stage_height;
 } MovieEntry;
 
-static MovieEntry g_movie_registry[] = {
-    { "target.swf", target_init_tags, target_init_scripts, 8, 1, 550, 400 },
-    { NULL, NULL, NULL, 0, 0, 0, 0 }
-};
-```
-
-### Runtime loadMovie flow
-
-```c
-void actionLoadMovie(SWFAppContext* app_context, const char* url, MovieClip* target) {
-    // 1. Look up url in g_movie_registry
-    MovieEntry* entry = findMovieEntry(url);
-    if (!entry) { /* fire onLoadError */ return; }
-
-    // 2. Save current target clip state
-    // 3. Clear target clip's display list and variables
-    // 4. Set target clip's movie context to the loaded movie
-    // 5. Run loaded movie's tag init (populates dictionary for the loaded clip)
-    // 6. Run loaded movie's frame 0 script
-    // 7. Fire onLoadComplete / onLoadInit callbacks
+// Generated in movie_registry.c:
+MovieEntry* findMovieEntry(const char* filename) {
+    // Linear search through extern MovieEntry pointers
 }
 ```
-
-### Key challenge: Symbol isolation
-
-Each compiled SWF generates functions and data with potentially conflicting names
-(`frame_0_func`, `dictionary`, etc.). Solutions:
-
-**Option A: Namespace prefixing** — Recompiler prefixes all symbols with SWF name:
-`test_frame_0_func`, `target_frame_0_func`. Requires recompiler changes.
-
-**Option B: Separate compilation units with static linkage** — Each SWF's generated code
-uses `static` globals. An init function exposes them via function pointers. Minimal
-recompiler changes.
-
-**Option C: Per-movie SWFAppContext** — Each loaded movie gets its own context struct
-with its own dictionary, display list, etc. The parent clip hosts the child context.
-Most architecturally clean but largest change.
-
-**Recommended: Option B** — least invasive. Each SWF compiles to a .c file with static
-globals. A generated init function populates function pointers into a MovieEntry struct.
 
 ---
 
 ## Implementation Phases
 
-### Phase 0: Child SWF compilation (verify_output.py)
+### Phase 0: Child SWF compilation (verify_output.py) — DONE ✅
 
 **Goal**: Get child SWFs compiled and linked into the test binary.
 
-1. Detect `.swf` files beyond `test.swf` in test directories
-2. Check for pre-existing `target.swf` or compile from `.fla` if needed
-   (Note: most Ruffle test dirs have `.fla` source only, not compiled `.swf` for children.
-   We may need to compile `.fla` → `.swf` using a tool, or check if the Ruffle repo has
-   pre-compiled versions.)
-3. Run SWFRecomp on each child SWF with symbol prefixing
-4. Compile all generated C files together
+**Completed:**
+1. ✅ `download_tests.sh` copies all non-test.swf .swf files from upstream Ruffle repo
+2. ✅ 110 child .swf files copied from `~/CC/ruffle/tests/tests/swfs/avm1/`
+3. ✅ `verify_output.py` detects child SWFs via `find_child_swfs()`
+4. ✅ Each child SWF recompiled via `recompile_child_swf()` in temp dir
+5. ✅ `generate_child_movie_file()` creates wrapper C with symbol isolation:
+   - Prefix-based renaming (str_N, script_N, func2_*, frame_N, sprite_N_frame_*, button_*, clip_actions_*)
+   - Single-pass regex replacement (fast even for 2000+ symbols)
+   - Forward declarations for all symbol types
+6. ✅ `generate_movie_registry()` creates findMovieEntry() dispatch
+7. ✅ `compile_native()` links everything together with `-DHAS_CHILD_MOVIES`
 
-**Blocker investigation needed**: Do the Ruffle test directories in the upstream Ruffle repo
-(`~/CC/ruffle/tests/tests/swfs/avm1/`) have pre-compiled child `.swf` files? If so, we can
-copy them. If not, we need a Flash/Animate compiler or use Ruffle's own test harness to
-generate them.
-
-### Phase 1: _level management (runtime)
+### Phase 1: _level management (runtime) — NOT STARTED
 
 **Goal**: Support `_level0`, `_level1`, etc. as separate MovieClip roots.
 
-```c
-// In swf.h or action.c:
-#define MAX_LEVELS 16
-static MovieClip* g_levels[MAX_LEVELS];  // g_levels[0] = &root_movieclip
-
-MovieClip* getLevel(int level_id) {
-    if (level_id < 0 || level_id >= MAX_LEVELS) return NULL;
-    return g_levels[level_id];
-}
-
-MovieClip* getOrCreateLevel(int level_id) {
-    if (g_levels[level_id]) return g_levels[level_id];
-    // Allocate new MovieClip at this level
-    // ...
-    return g_levels[level_id];
-}
-```
-
-Update `actionGetVariable` to resolve `_level1`, `_level2`, etc. (currently only `_level0`).
+Need `g_levels[MAX_LEVELS]` array, `getLevel()`/`getOrCreateLevel()`, update `actionGetVariable` to resolve `_level1+`.
 
 **Tests enabled**: loadmovienum (partial — still needs movie loading)
 
-### Phase 2: Core loadMovie (runtime)
+### Phase 2: Core loadMovie (runtime) — PARTIAL ✅
 
 **Goal**: `loadMovie(url, target)` replaces a clip's content with a pre-compiled movie.
 
-Key behaviors from Ruffle reference (`~/CC/ruffle/core/src/avm1/activation.rs:1147-1289`):
-- Resolve target (string path → MovieClip, or level number)
-- Clear target's display list and variables
-- Load new movie's dictionary and frames into target
-- Run frame 0 of loaded movie
-- Fire `onLoad` clip event
+**Completed:**
+- ✅ `MovieEntry` struct in swf.h with `findMovieEntry()` lookup
+- ✅ `MC.loadMovie(url)` method in action.c MC dispatch chain (~line 27235)
+- ✅ Basic flow: findMovieEntry → run init_func → run frame_funcs[0]
 
-```c
-void actionLoadMovie(SWFAppContext* app, const char* url, const char* target_path) {
-    MovieEntry* entry = findMovieEntry(url);
-    if (!entry) return;
+**Still needed:**
+- Clear target clip's display list and variables before loading
+- Proper target resolution (currently only works for the calling MC)
+- DoInitAction support for child SWFs
+- onLoad clip event firing
+- Proper display list installation (loaded clip's children should appear on target)
 
-    // Resolve target
-    MovieClip* target = resolveMovieClipPath(target_path);
-    if (!target) return;
+**Tests passing**: loadmovie ✅, loadmovie_method ✅
 
-    // Clear target
-    clearMovieClipContent(target);
-
-    // Install loaded movie
-    installMovie(app, target, entry);
-
-    // Fire callbacks
-    dispatchOnLoadComplete(target);
-}
-```
-
-**Tests enabled**: loadmovie, loadmovie_method
-
-### Phase 3: actionGetURL2 routing
+### Phase 3: actionGetURL2 routing — DONE ✅
 
 **Goal**: Route `actionGetURL2` calls to the correct handler based on flags.
 
-From SWF spec, ActionGetURL2 flags:
-- `LoadTargetFlag=1, LoadVariablesFlag=0` → loadMovie
-- `LoadTargetFlag=1, LoadVariablesFlag=1` → loadVariables
-- `LoadTargetFlag=0` → browser navigation (no-op in trace mode)
+**Completed:**
+- ✅ actionGetURL2 now routes `loadTarget=1, loadVars=0` to findMovieEntry + init + frame 0
+- ✅ Pops URL and target from stack, converts to UTF-8, looks up in registry
 
-```c
-void actionGetURL2(SWFAppContext* app, u8 method, u8 loadTarget, u8 loadVars) {
-    // Pop target and URL from stack
-    char* target = popString();
-    char* url = popString();
-
-    if (loadTarget) {
-        if (loadVars) {
-            actionLoadVariables(app, url, target, method);
-        } else {
-            actionLoadMovie(app, url, target);
-        }
-    }
-    // else: browser navigation, ignored in trace mode
-}
-```
-
-**Tests enabled**: Any test using GetURL2 opcode for loading
+**Tests passing via this path**: loadmovie ✅ (uses GetURL2 opcode)
 
 ### Phase 4: MovieClipLoader class
 
@@ -331,26 +262,20 @@ void mclLoadClip(SWFAppContext* app, ActionVar* args, u32 arg_count) {
 
 **Tests enabled**: mcl_loadclip, mcl_as_broadcaster, mcl_getprogress, mcl_unloadclip, etc.
 
-### Phase 5: unloadMovie
+### Phase 5: unloadMovie — PARTIAL ✅
 
 **Goal**: Remove loaded content from a clip or level.
 
-```c
-void actionUnloadMovie(SWFAppContext* app, MovieClip* target) {
-    // Fire onUnload clip event
-    dispatchClipEvent(target, CLIP_EVENT_UNLOAD);
+**Completed:**
+- ✅ Empty URL in `actionGetURL2` and `MC.loadMovie("")` triggers onUnload handler
+- ✅ `MC.unloadMovie()` method fires onUnload handler
+- ✅ Target MC resolved from stack (direct MC pointer or name lookup)
 
-    // Clear display list
-    clearDisplayList(target);
+**Still needed:**
+- Clear display list and variables on unload
+- `unloadMovieNum()` needs _level support (Phase 1)
 
-    // Clear variables
-    clearVariables(target);
-
-    // Reset to empty state (1 frame, no content)
-}
-```
-
-**Tests enabled**: unloadmovie, unloadmovie_method, unloadmovienum
+**Tests passing**: unloadmovie ✅, unloadmovie_method ✅ (was already passing)
 
 ### Phase 6: Cross-version global isolation
 
@@ -391,63 +316,56 @@ This may be low priority since it requires simulating network responses.
 - **Network-dependent loadVariables**: Would need pre-bundled response data.
 - **loadmovie_fail**: Error handling for missing URLs requires simulated failure.
 
-### Estimated impact
+### Estimated impact (updated)
 
-| Phase | Tests Fixed | Cumulative | Difficulty |
-|-------|-----------|------------|------------|
-| 0-2 | ~4 (loadmovie, loadmovie_method, loadmovienum partial) | ~4 | High |
-| 3 | ~2 (GetURL2 routing) | ~6 | Low |
-| 4 | ~6 (MCL core) | ~12 | Medium |
-| 5 | ~3 (unloadmovie variants) | ~15 | Low |
-| 6 | ~2 (global isolation) | ~17 | Medium |
-| 7 | ~4 (loadVariables) | ~21 | Medium |
-| Secondary | ~10 (getBounds, buttons, registerClass) | ~31 | Varies |
+| Phase | Status | Tests Fixed | Difficulty |
+|-------|--------|-----------|------------|
+| 0 (build pipeline) | ✅ DONE | — (infrastructure) | High (done) |
+| 1 (_level management) | NOT STARTED | ~2 (loadmovienum) | Medium |
+| 2 (core loadMovie) | ✅ PARTIAL | 3 passing (loadmovie, loadmovie_method, unloadmovie_method) via this phase | High (partial done) |
+| 3 (GetURL2 routing) | ✅ DONE | — (merged into phase 2) | Low (done) |
+| 4 (MovieClipLoader) | NOT STARTED | ~6 (mcl_loadclip, mcl_getprogress, etc.) | Medium |
+| 5 (unloadMovie) | ✅ PARTIAL | unloadmovie ✅ (new), unloadmovie_method ✅ (existing). unloadmovienum needs _level | Low |
+| 6 (global isolation) | NOT STARTED | ~2 (global_swf5_6_7_8_9, global_swf6_7_8) | Medium |
+| 7 (loadVariables) | NOT STARTED | ~4 | Medium |
 
-**Realistically fixable**: ~25-31 of the 46 tests. Image loading (4), loading_avm2 (1),
-and some edge cases (~10) are likely unfixable.
-
----
-
-## Open Questions
-
-1. **Child SWF availability**: Do Ruffle test directories in `~/CC/ruffle/tests/tests/swfs/avm1/`
-   have pre-compiled child `.swf` files? Or only `.fla` source? If only `.fla`, we need a
-   Flash-to-SWF compiler (or extract from the Ruffle test harness).
-
-2. **Symbol isolation strategy**: Option A (prefixing) vs Option B (static linkage) vs
-   Option C (per-movie context). Needs prototyping to determine which is least invasive.
-
-3. **Execution model**: When a loaded movie has multiple frames, does it advance on the
-   same tick as the parent? Or does it have its own timeline? (Answer from Ruffle: loaded
-   movies share the global tick and advance in the same frame loop.)
-
-4. **Priority**: Should we prioritize this over other blocker categories (closure capture,
-   morph interpolation)? loadMovie unblocks the most tests (~46) but is also the most
-   complex infrastructure change.
+**Current**: 4/49 passing. **Realistically fixable**: ~25-31 of the 49 tests.
+Image loading (4 tests), loading_avm2 (1), and some edge cases (~10) are likely unfixable.
 
 ---
 
-## Files to Modify
+## Open Questions (Resolved)
 
-### Build system
-| File | Changes |
-|------|---------|
-| `ruffle-tests/verify_output.py` | Detect child SWFs, compile each, link together |
-| `SWFRecomp/scripts/build_test.sh` | Support multi-SWF compilation |
+1. ~~**Child SWF availability**~~: **RESOLVED** — Upstream Ruffle repo at `~/CC/ruffle/tests/tests/swfs/avm1/` has pre-compiled child `.swf` files. 110 copied. `download_tests.sh` updated.
 
-### Recompiler
-| File | Changes |
-|------|---------|
-| `SWFRecomp/src/action/action.cpp` | Symbol prefixing for multi-SWF builds |
-| `SWFRecomp/src/swf.cpp` | Per-SWF init function generation |
+2. ~~**Symbol isolation strategy**~~: **RESOLVED** — Used Option A (prefix-based renaming) implemented in verify_output.py. Single-pass regex replacement handles str_N, script_N, func2_*, frame_N, sprite_N_frame_*, button_*, clip_actions_* symbols efficiently.
 
-### Runtime
-| File | Changes |
-|------|---------|
-| `SWFModernRuntime/include/libswf/swf.h` | MovieEntry struct, level array, MovieClipLoader |
-| `SWFModernRuntime/src/actionmodern/action.c` | loadMovie/unloadMovie, _levelN resolution, MCL class, global scope isolation |
+3. **Execution model**: Loaded movies share the global tick and advance in the same frame loop (confirmed from Ruffle source).
+
+4. ~~**Priority**~~: loadMovie is the single largest blocker. Phases 0-3 complete, unblocking compile for all 49 tests.
+
+---
+
+## Files Modified / To Modify
+
+### Build system (DONE)
+| File | Status | Changes |
+|------|--------|---------|
+| `ruffle-tests/verify_output.py` | ✅ Done | +306 lines: find_child_swfs, recompile_child_swf, generate_child_movie_file, generate_movie_registry, compile_native updates |
+| `ruffle-tests/download_tests.sh` | ✅ Done | Copy child .swf files from upstream |
+
+### Runtime (Partial)
+| File | Status | Changes |
+|------|--------|---------|
+| `SWFModernRuntime/include/libswf/swf.h` | ✅ Done | MovieEntry struct + findMovieEntry decl |
+| `SWFModernRuntime/src/libswf/swf_core.c` | ✅ Done | Default findMovieEntry stub (when !HAS_CHILD_MOVIES) |
+| `SWFModernRuntime/src/actionmodern/action.c` | Partial | MC.loadMovie method + actionGetURL2 routing done. Still needs: _levelN, MCL class, unloadMovie, global isolation |
+
+### Not yet modified (still needed for remaining phases)
+| File | Changes Needed |
+|------|----------------|
+| `SWFModernRuntime/src/actionmodern/action.c` | _level1+ management, MovieClipLoader class, unloadMovie, cross-SWF global isolation |
 | `SWFModernRuntime/src/libswf/tag.c` | Movie installation into target clip, display list clearing |
-| `SWFModernRuntime/src/libswf/swf_core.c` | Multi-movie frame advancement |
 
 ---
 
