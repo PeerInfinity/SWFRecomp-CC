@@ -1,7 +1,7 @@
 # Focus System Implementation Plan
 <!-- TESTS: focus_mouse, focus_mouse_focusable, focus_mouse_rollout, focus_root_movie, focus_keyboard_press, focusrect_focuslost -->
 
-Last updated: 2026-02-23
+Last updated: 2026-02-24
 
 ## Status: BLOCKED — 3/6 tests passing
 
@@ -10,30 +10,32 @@ Last updated: 2026-02-23
 - `focusrect_focuslost` — Tab-triggered onRollOut/onRollOver + window focus lost handling
 - `movieclip_focusenabled` — Dot-path resolution in `getMovieClipByTarget` + string focusEnabled + button-handler focusability
 
-### Blocked tests (4) — pre-existing architectural limitations
+### Blocked tests (3) — remaining architectural limitations
 
-| Test | Issue | Blocker |
-|------|-------|---------|
-| `focus_keyboard_press` | Closures over function parameters show "undefined" instead of MC path | **Closure variable capture bug** |
-| `focus_mouse` | Same closure bug + hit-test for MC-as-button | **Closure variable capture bug** |
-| `focus_mouse_rollout` | Same closure bug + empty output (no hit test match) | **Closure variable capture bug** |
-| `focus_mouse_focusable` | createEmptyMovieClip/createTextField dynamic objects not fully supported | **Dynamic object creation infrastructure** |
+| Test | Match | Issue | Blocker |
+|------|-------|-------|---------|
+| `focus_keyboard_press` | 15/60 | Tab focus cycling dispatches events to wrong target; extra key events; event ordering | **Key event dispatch ordering** |
+| `focus_mouse` | 7/45 | Missing onPress/onRelease (needs MC-as-button hit-test); missing Focus events | **Mouse hit-testing + focus change events** |
+| `focus_mouse_rollout` | 0/4 | No output — needs mouse rollover/rollout and focus tracking | **Mouse rollout infrastructure** |
+| `focus_mouse_focusable` | unknown | Dynamic createEmptyMovieClip/createTextField not fully supported | **Dynamic object creation** |
 
-### Blocker: Closure variable capture
+### Resolved blocker: Closure variable capture (2026-02-24)
 
-The test SWFs define handler functions like:
-```actionscript
-function setHandlers(obj) {
-    obj.onKeyDown = function() { trace(obj + ".onKeyDown: " + Key.getCode()); };
-}
-```
-The inner function captures `obj` (a function parameter). In Flash, this works via the scope chain. In our runtime, closures over function parameters don't capture the value — `obj` resolves to `undefined` at call time. This produces `undefined.onKeyDown` instead of `_level0.clip.onKeyDown`.
+The closure capture bug that blocked 3 tests has been fixed (commit 7f3569ed). Event handler closures now correctly resolve captured variables from enclosing function scopes. See `blocked/CLOSURE_CAPTURE_PLAN.md`.
 
-This affects 3 of the 4 blocked tests. Fixing closure variable capture is a significant architectural change to the scope chain/function call system.
+### Remaining blockers
 
-### Blocker: Dynamic object creation
+**focus_keyboard_press**: Closure part works (lines 1-15 match). Remaining issues:
+- After Tab advances focus to button, key events still fire to clip instead of button
+- Tab-triggered focus events (`Tab pressed`, `Focus at: _level0.button`) are interleaved incorrectly with key events
+- Expected: Tab → focus change → key events on new target. Actual: key events on old target continue, Tab + focus happen later
 
-`focus_mouse_focusable` creates ~40 dynamic objects via `createEmptyMovieClip`/`createTextField` with specific positions and properties. While these functions exist, the click-focus hit testing doesn't properly match dynamically created objects. This is a separate infrastructure gap.
+**focus_mouse**: Closure part works. Remaining issues:
+- MC-as-button: clicking on clip should trigger `onPress`/`onRelease` (needs bounds hit-test for clip area)
+- Button press/release actions (`press`, `release`) need to fire when clicking on the button
+- Focus acquisition on click (`Focus at: _level0.text`, `Focus at: null`) not implemented for mouse clicks
+
+**focus_mouse_rollout**: Empty output — the test uses mouse movement between objects to trigger `onRollOut`/`onRollOver`, then `onPress` on focused MC. Needs full mouse event dispatch chain.
 
 ---
 
@@ -51,6 +53,7 @@ This affects 3 of the 4 blocked tests. Fixing closure variable capture is a sign
 - `actionWindowFocusLost()`: Clear focus on window focus loss
 - `getMovieClipByTarget()`: Extended to resolve `_level0.child` and `_root.child` dot-paths
 - Tab focus now fires onRollOut/onRollOver during `actionAdvanceTabFocus()`
+- Closure scope restoration in `mc_call_as2_handler_ng` and `broadcastMessage` (2026-02-24)
 
 ### In `swf_core.c`:
 - EV_MOUSE_MOVE: calls `actionDispatchMCMouseMoveGlobal()`
