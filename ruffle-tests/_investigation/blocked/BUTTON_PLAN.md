@@ -1,26 +1,42 @@
 # Button Behavior and Events Implementation Plan
 <!-- TESTS: button_children, button_goto, button_key_events, button_key_events_special, button_keypress, button_keypress_vs_press, button_keypress_vs_tab, button_keypress_vs_textinput, button_order, button_properties_special_cases, button_v5, button_v6, movieclip_in_removed_button, root_button_mode -->
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
-## Status: MOSTLY NOT STARTED — but `button_order` now passes on CI
+## Status: 6/14 PASSING — remaining 8 blocked on infrastructure
 
-### CI Results (2026-02-22)
-- `button_order` — **PASS** ✅ (likely benefited from MovieClip/depth infrastructure improvements)
-- All other 13 tests — still failing (require struct unification + hit testing)
+### Results (2026-02-23)
+- `button_children` — **PASS** ✅
+- `button_goto` — **PASS** ✅
+- `button_order` — **PASS** ✅
+- `button_properties_special_cases` — **PASS** ✅ (MovieClip.prototype.enabled + Enumerate2 prototype chain)
+- `button_v5` — **PASS** ✅
+- `button_v6` — **PASS** ✅
+- `movieclip_in_removed_button` — FAIL (improved: correct MC path, but enterFrame dispatch ordering wrong)
+- `button_key_events` — FAIL (blocked: Key.addListener dispatch + focus model)
+- `button_key_events_special` — FAIL (blocked: same + special key codes)
+- `button_keypress` — FAIL (blocked: mouse press hit test + gotoFrame mid-action)
+- `button_keypress_vs_press` — FAIL (blocked: key + mouse press ordering)
+- `button_keypress_vs_tab` — FAIL (blocked: Selection object + Tab focus)
+- `button_keypress_vs_textinput` — FAIL (blocked: key events + TextField onChanged)
+- `root_button_mode` — FAIL (blocked: loadMovie + createEmptyMovieClip)
 
+### Recent fixes (2026-02-23)
+- Added `MovieClip.prototype.enabled = true` (enumerable) for button state machine
+- Fixed Enumerate2 on MovieClips to walk MovieClip.prototype chain (`'enabled' in button` now works)
+- Added `g_event_this_mc` mechanism for correct `this` binding in onEnterFrame/onLoad dispatch
+- Updated recompiler DefineFunction2 codegen to use `g_event_this_mc` before root_movieclip fallback
+
+### Blockers for remaining 8 tests
 Input event injection **Phases 1-4 are complete** (event pump, mouse/key state, verify_output.py preprocessing). Button state machine (`ng_update_button_states`) and button key dispatch (`dispatch_button_key_actions`) exist in tag.c and are called from the event pump.
 
-All remaining 13 tests are blocked on the following prerequisite from `SWFRecompDocs/plans/input-event-injection.md`:
-
-- **Phase 0** (struct unification): Delete `tag_stubs.c`, merge into `tag.c`; make
-  `Character`/`DisplayObject`/`MouseState` unconditional in `swf.h`; include
-  `shape_data`/`transform_data` + `hit_test.c` in trace builds. This is the **sole remaining blocker** — once done, the existing button state machine and event dispatch should work in trace builds.
-
-Current state of `tag_stubs.c` (before Phase 0 merges it away):
-- Registers button char_ids for `typeof` discrimination (returns "object" in SWF6+)
-- Does NOT store state frame functions → button children never initialize
-- Does NOT dispatch events (button state machine in tag.c can't run until struct unification)
+The remaining tests are blocked on:
+1. **enterFrame dispatch ordering** — root fires before children, button children don't get enterframe_eligible reset (movieclip_in_removed_button)
+2. **Key.addListener full dispatch** — listener callbacks not firing `keyPress` traces (button_key_events, button_key_events_special)
+3. **Button mouse press hit testing** — on(press) button condition not triggering for specific button instances (button_keypress)
+4. **gotoFrame interaction** — gotoFrame mid-button-action prevents remaining traces (button_keypress)
+5. **Selection object + Tab focus** — not implemented (button_keypress_vs_tab)
+6. **loadMovie + createEmptyMovieClip** — not implemented (root_button_mode)
 
 ---
 

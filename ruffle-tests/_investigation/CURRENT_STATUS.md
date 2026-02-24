@@ -100,7 +100,7 @@ Last updated: 2026-02-23
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
 | UNLOAD_PLAN | Not started | 0/3 | unloadMovie, onUnload |
-| BUTTON_PLAN | Not started | 0/14 | Button actions, states |
+| BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie, mouse events, morph interp |
 
 ## Recommended Work Order
