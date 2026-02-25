@@ -313,6 +313,75 @@ static u32 scope_depth = 0;
 static ActionVar g_this_stack[MAX_THIS_DEPTH];
 static u32 g_this_depth = 0;
 
+// Super context stack — tracks prototype chain depth for super() resolution.
+// Ruffle model: super is a virtual (this, depth) pair. Depth indicates how many
+// __proto__ levels to skip when resolving super properties/constructors.
+// depth=1 means "start from this.__proto__" (i.e. the first parent class).
+#define MAX_SUPER_DEPTH 64
+static void* g_super_this_stack[MAX_SUPER_DEPTH];   // this binding for each super level
+static u8    g_super_depth_stack[MAX_SUPER_DEPTH];   // prototype chain depth
+static u32   g_super_stack_pos = 0;
+
+static void pushSuperContext(void* this_obj, u8 depth) {
+	if (g_super_stack_pos < MAX_SUPER_DEPTH) {
+		g_super_this_stack[g_super_stack_pos] = this_obj;
+		g_super_depth_stack[g_super_stack_pos] = depth;
+		g_super_stack_pos++;
+	}
+}
+
+static void popSuperContext(void) {
+	if (g_super_stack_pos > 0) g_super_stack_pos--;
+}
+
+static int hasSuperContext(void) {
+	return g_super_stack_pos > 0;
+}
+
+static void* getSuperThis(void) {
+	return g_super_stack_pos > 0 ? g_super_this_stack[g_super_stack_pos - 1] : NULL;
+}
+
+static u8 getSuperDepth(void) {
+	return g_super_stack_pos > 0 ? g_super_depth_stack[g_super_stack_pos - 1] : 0;
+}
+
+// Walk the __proto__ chain from 'this_obj' by 'depth' levels.
+// Returns the prototype object at that depth, or NULL if chain is too short.
+static ASObject* walkProtoChain(void* this_obj, u8 depth) {
+	if (this_obj == NULL) return NULL;
+	ASObject* current = (ASObject*) this_obj;
+	for (u8 i = 0; i < depth; i++) {
+		ActionVar* proto_var = getProperty(current, "__proto__", 9);
+		if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT ||
+		    proto_var->data.numeric_value == 0)
+			return NULL;
+		current = (ASObject*) proto_var->data.numeric_value;
+	}
+	return current;
+}
+
+// Get the "super proto" — the prototype where super methods are searched.
+// This is this.__proto__^depth (i.e., walk depth levels up).
+static ASObject* getSuperBaseProto(void) {
+	if (g_super_stack_pos == 0) return NULL;
+	void* this_obj = g_super_this_stack[g_super_stack_pos - 1];
+	u8 depth = g_super_depth_stack[g_super_stack_pos - 1];
+	return walkProtoChain(this_obj, depth);
+}
+
+// Get the prototype of the base proto — where super property/method searches start.
+// This is this.__proto__^(depth+1).
+static ASObject* getSuperSearchStart(void) {
+	ASObject* base = getSuperBaseProto();
+	if (base == NULL) return NULL;
+	ActionVar* proto_var = getProperty(base, "__proto__", 9);
+	if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT ||
+	    proto_var->data.numeric_value == 0)
+		return NULL;
+	return (ASObject*) proto_var->data.numeric_value;
+}
+
 // Forward declarations for MC property helpers (defined in WITH section)
 static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* result);
 static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const char* name, u32 name_len, ActionVar* value);
@@ -10036,6 +10105,14 @@ void pushVar(SWFAppContext* app_context, ActionVar* var)
 			break;
 		}
 
+		case ACTION_STACK_VALUE_SUPER:
+		{
+			// SUPER uses str_size (SP+8) to store the prototype chain depth
+			PUSH(var->type, var->data.numeric_value);
+			VAL(u32, &STACK[SP + 8]) = var->str_size;
+			break;
+		}
+
 		case ACTION_STACK_VALUE_STRING:
 		{
 			// Use heap pointer if variable owns memory, otherwise use numeric_value as pointer
@@ -14220,6 +14297,22 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
+	// GetVariable("super") — return a SUPER proxy value from context stack
+	// SWF6 Pattern A: super is accessed via GetVariable, not a register
+	// The SUPER type carries (this, depth) so CallMethod can resolve correctly.
+	if (var_name_len == 5 && strncmp(var_name, "super", 5) == 0) {
+		if (hasSuperContext()) {
+			ActionVar super_var = {0};
+			super_var.type = ACTION_STACK_VALUE_SUPER;
+			super_var.data.numeric_value = (u64)getSuperThis();
+			super_var.str_size = (u32)getSuperDepth();
+			pushVar(app_context, &super_var);
+		} else {
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		}
+		return;
+	}
+
 	// Early "this" resolution — mirrors Ruffle's Activation.resolve() which checks
 	// this_cell() BEFORE any scope chain or variable table lookup.
 	// SetVariable("this") mutates the current this binding (g_this_stack entry).
@@ -17369,8 +17462,11 @@ void actionExtends(SWFAppContext* app_context)
 	// Set constructor property to superclass
 	setProperty(app_context, new_proto, "constructor", 11, &superclass);
 
+	// Set __constructor__ (DontEnum) — needed for super() to find parent constructor
+	setPropertyWithFlags(app_context, new_proto, "__constructor__", 15, &superclass, PROPERTY_FLAGS_DONTENUM);
+
 #ifdef DEBUG
-	printf("[DEBUG] actionExtends: Set constructor property - type=%d, ptr=%p\n",
+	printf("[DEBUG] actionExtends: Set constructor + __constructor__ property - type=%d, ptr=%p\n",
 		superclass.type, (void*)superclass.data.numeric_value);
 #endif
 
@@ -17400,6 +17496,19 @@ void actionExtends(SWFAppContext* app_context)
 #endif
 
 	// Note: No values pushed back on stack
+}
+
+// Public accessor for generated code (preload_super in DefineFunction2)
+// Returns a SUPER-typed ActionVar packed into two u64s: [type|str_size|...][numeric_value]
+// For simplicity, we pack (this_ptr, depth) and the caller reconstructs.
+void actionGetCurrentSuperInfo(u64* out_this, u32* out_depth) {
+	if (hasSuperContext()) {
+		*out_this = (u64)getSuperThis();
+		*out_depth = (u32)getSuperDepth();
+	} else {
+		*out_this = 0;
+		*out_depth = 0;
+	}
 }
 
 // ==================================================================
@@ -18490,14 +18599,37 @@ void actionSetMember(SWFAppContext* app_context)
 			}
 			// Check prototype chain for addProperty setter before creating own property
 			{
-				ASProperty* setter_prop = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
-				if (setter_prop != NULL && (setter_prop->getter != NULL || setter_prop->setter != NULL))
+				ASProperty* setter_prop = NULL;
+				u8 setter_search_depth = 0;
+				{
+					ASObject* _cur = obj;
+					int _md = 256;
+					while (_cur != NULL && _md-- > 0) {
+						ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
+						if (_ps != NULL && (_ps->getter != NULL || _ps->setter != NULL)) {
+							setter_prop = _ps;
+							break;
+						}
+						if (_ps != NULL) break; // found but not virtual
+						ActionVar* _np = getProperty(_cur, "__proto__", 9);
+						if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
+						ASObject* _next = (ASObject*) _np->data.numeric_value;
+						if (_next == obj) break;
+						_cur = _next;
+						setter_search_depth++;
+					}
+				}
+				if (setter_search_depth < 1) setter_search_depth = 1;
+				if (setter_prop != NULL)
 				{
 					// Virtual property (addProperty): has getter and/or setter
 					if (setter_prop->setter != NULL)
 					{
 						// Invoke setter with this = original obj
+						// Push super context so setter can access super
+						pushSuperContext((void*)obj, setter_search_depth);
 						invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
+						popSuperContext();
 					}
 					// If no setter (read-only virtual property) — silently ignore the assignment
 					return;
@@ -19606,7 +19738,54 @@ void actionGetMember(SWFAppContext* app_context)
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
 
-	// 3. Handle different object types
+	// 3. Handle SUPER type (virtual super proxy with this + depth)
+	if (obj_var.type == ACTION_STACK_VALUE_SUPER)
+	{
+		void* super_this = (void*) obj_var.data.numeric_value;
+		u8 super_depth = (u8) obj_var.str_size;
+
+		// Property access uses depth+1 (one level deeper than constructor lookup).
+		// Constructor super() at depth D finds __constructor__ on walkProtoChain(this, D).
+		// Property access (including __proto__) uses walkProtoChain(this, D+1) as base,
+		// so super.__proto__ = walkProtoChain(this, D+1).__proto__.
+		ASObject* prop_base = walkProtoChain(super_this, super_depth + 1);
+
+		if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0)
+		{
+			// super.__proto__ returns prop_base.__proto__
+			if (prop_base != NULL) {
+				ActionVar* pp = getProperty(prop_base, "__proto__", 9);
+				if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT)
+					pushVar(app_context, pp);
+				else
+					pushUndefined(app_context);
+			} else {
+				pushUndefined(app_context);
+			}
+			return;
+		}
+
+		// For other properties, search starting from prop_base.__proto__
+		ASObject* search_start = NULL;
+		if (prop_base != NULL) {
+			ActionVar* pp = getProperty(prop_base, "__proto__", 9);
+			if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT)
+				search_start = (ASObject*) pp->data.numeric_value;
+		}
+
+		if (search_start != NULL) {
+			ActionVar* prop = getPropertyWithPrototype(search_start, prop_name, prop_name_len);
+			if (prop != NULL)
+				pushVar(app_context, prop);
+			else
+				pushUndefined(app_context);
+		} else {
+			pushUndefined(app_context);
+		}
+		return;
+	}
+
+	// Handle different object types
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		// Handle AS object
@@ -19646,14 +19825,37 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Look up property with prototype chain support (returns ASProperty* for getter check)
-		ASProperty* prop_struct = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
+		// Also track search depth for super context in getter invocations
+		ASProperty* prop_struct = NULL;
+		u8 prop_search_depth = 0;
+		{
+			ASObject* _cur = obj;
+			int _md = 256;
+			while (_cur != NULL && _md-- > 0) {
+				ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
+				if (_ps != NULL) {
+					prop_struct = _ps;
+					break;
+				}
+				ActionVar* _np = getProperty(_cur, "__proto__", 9);
+				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
+				ASObject* _next = (ASObject*) _np->data.numeric_value;
+				if (_next == obj) { g_execution_halted = 1; break; }
+				_cur = _next;
+				prop_search_depth++;
+			}
+		}
+		if (prop_search_depth < 1) prop_search_depth = 1;
 
 		if (prop_struct != NULL)
 		{
 			if (prop_struct->getter != NULL)
 			{
 				// Virtual property (addProperty) — invoke getter with this = original obj
+				// Push super context so getter can access super (Ruffle behavior)
+				pushSuperContext((void*)obj, prop_search_depth);
 				ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)obj);
+				popSuperContext();
 				pushVar(app_context, &result);
 			}
 			else
@@ -21073,14 +21275,24 @@ void actionNewObject(SWFAppContext* app_context)
 				setProperty(app_context, obj, "__proto__", 9, &proto_var);
 			}
 
-			// SWF6 and below: set constructor directly on each instance
-			if (g_swf_version < 7) {
+			// Set constructor and __constructor__ on each new instance.
+			// __constructor__ is critical for super() to find the parent constructor
+			// in manual prototype chains (Extended.prototype = new Base()).
+			{
 				ActionVar ctor_inst_var;
 				ctor_inst_var.type = ACTION_STACK_VALUE_FUNCTION;
 				ctor_inst_var.str_size = 0;
 				ctor_inst_var.data.numeric_value = (u64) ctor_func;
-				setProperty(app_context, obj, "constructor", 11, &ctor_inst_var);
+				if (g_swf_version < 7) {
+					setProperty(app_context, obj, "constructor", 11, &ctor_inst_var);
+				}
+				setPropertyWithFlags(app_context, obj, "__constructor__", 15, &ctor_inst_var, PROPERTY_FLAGS_DONTENUM);
 			}
+
+			// Push super context for constructor call (depth=1, matching Ruffle).
+			// Constructor super() uses walkProtoChain(this, depth) for __constructor__ lookup.
+			// Property access uses depth+1 for the extra SWF6 manual prototype level.
+			pushSuperContext((void*)obj, 1);
 
 			// Call the constructor with 'this' binding
 			if (ctor_func->function_type == 1)
@@ -21190,6 +21402,8 @@ void actionNewObject(SWFAppContext* app_context)
 				releaseObject(app_context, ctor_scope);
 				g_this_depth = saved_this_depth_ctor;
 			}
+
+			popSuperContext();
 
 			// MovieClipLoader constructor: auto-add self as first listener
 			if (ctor_func == &g_stub_ctors[9]) {
@@ -21317,13 +21531,19 @@ void actionNewMethod(SWFAppContext* app_context)
 					proto_pv.data.numeric_value = (u64) func->prototype_obj;
 					setProperty(app_context, new_obj, "__proto__", 9, &proto_pv);
 				}
-				if (g_swf_version < 7) {
+				{
 					ActionVar ctor_iv;
 					ctor_iv.type = ACTION_STACK_VALUE_FUNCTION;
 					ctor_iv.str_size = 0;
 					ctor_iv.data.numeric_value = (u64) func;
-					setProperty(app_context, new_obj, "constructor", 11, &ctor_iv);
+					if (g_swf_version < 7) {
+						setProperty(app_context, new_obj, "constructor", 11, &ctor_iv);
+					}
+					setPropertyWithFlags(app_context, new_obj, "__constructor__", 15, &ctor_iv, PROPERTY_FLAGS_DONTENUM);
 				}
+
+				// Push super context for constructor call (depth=1, matching Ruffle)
+				pushSuperContext((void*)new_obj, 1);
 
 				// Call function as constructor with 'this' binding
 				ActionVar return_value;
@@ -21371,6 +21591,7 @@ void actionNewMethod(SWFAppContext* app_context)
 				// According to SWF spec: constructor return value should be discarded
 				// Always return the newly created object
 				// (unless constructor explicitly returns an object, but we simplify here)
+				popSuperContext();
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 				return;
 			}
@@ -21712,14 +21933,20 @@ void actionNewMethod(SWFAppContext* app_context)
 			setProperty(app_context, new_obj_inst, "__proto__", 9, &proto_v);
 		}
 
-		// SWF6 and below: set constructor directly on each instance
-		if (g_swf_version < 7) {
+		// Set constructor and __constructor__ on each new instance
+		{
 			ActionVar ctor_inst_v;
 			ctor_inst_v.type = ACTION_STACK_VALUE_FUNCTION;
 			ctor_inst_v.str_size = 0;
 			ctor_inst_v.data.numeric_value = (u64) user_ctor_func;
-			setProperty(app_context, new_obj_inst, "constructor", 11, &ctor_inst_v);
+			if (g_swf_version < 7) {
+				setProperty(app_context, new_obj_inst, "constructor", 11, &ctor_inst_v);
+			}
+			setPropertyWithFlags(app_context, new_obj_inst, "__constructor__", 15, &ctor_inst_v, PROPERTY_FLAGS_DONTENUM);
 		}
+
+		// Push super context for constructor call (depth=1, matching Ruffle)
+		pushSuperContext((void*)new_obj_inst, 1);
 
 		// Call function as constructor with 'this' binding
 		ActionVar return_value;
@@ -21763,6 +21990,8 @@ void actionNewMethod(SWFAppContext* app_context)
 			// Call simple function (cast to correct return type — generated functions return ActionVar)
 			return_value = ((ActionVar(*)(SWFAppContext*))user_ctor_func->simple_func)(app_context);
 		}
+
+		popSuperContext();
 
 		// According to SWF spec: constructor return value should be discarded
 		// Always return the newly created object
@@ -22793,7 +23022,62 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
-	// 4. Check for built-in global functions first
+	// 4. Handle CallFunction("super") — SWF6 Pattern A super() constructor call
+	// Depth-based: walk this.__proto__^depth to find base_proto, look up __constructor__ there
+	if (func_name_len == 5 && strncmp(func_name, "super", 5) == 0)
+	{
+		if (hasSuperContext())
+		{
+			void* this_obj = getSuperThis();
+			u8 depth = getSuperDepth();
+			ASObject* base_proto = walkProtoChain(this_obj, depth);
+
+			ASFunction* parent_ctor = NULL;
+			if (base_proto != NULL)
+			{
+				// Look up __constructor__ on base_proto (set by NewObject on each instance).
+				// Only check __constructor__, NOT "constructor" — the "constructor" property
+				// on lazily-created prototypes (e.g. Base.prototype) would cause infinite
+				// recursion for the base class constructor.
+				ActionVar* ctor_var = getProperty(base_proto, "__constructor__", 15);
+				if (ctor_var != NULL && ctor_var->type == ACTION_STACK_VALUE_FUNCTION)
+					parent_ctor = (ASFunction*) ctor_var->data.numeric_value;
+			}
+
+			if (parent_ctor != NULL)
+			{
+				// Push new super context: depth + 1 (one level deeper for nested super() calls)
+				pushSuperContext(this_obj, depth + 1);
+
+				if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL)
+				{
+					ActionVar registers[256] = {0};
+					g_call_depth++;
+					parent_ctor->advanced_func(app_context, args, num_args, registers, this_obj);
+					g_call_depth--;
+				}
+				else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL)
+				{
+					ActionVar this_var = {0};
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)this_obj;
+					setVariableByName("this", &this_var);
+					for (int i = (int)num_args - 1; i >= 0; i--)
+						pushVar(app_context, &args[i]);
+					g_call_depth++;
+					((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
+					g_call_depth--;
+				}
+
+				popSuperContext();
+			}
+		}
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+		return;
+	}
+
+	// Check for built-in global functions first
 	int builtin_handled = 0;
 
 	// parseInt(string [, radix]) - Parse string to integer (Flash/ECMA-262 semantics)
@@ -24143,10 +24427,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						setProperty(app_context, local_scope, "arguments", 9, &args_var);
 					}
 					if (!f2_preload_super && !f2_suppress_super) {
-						ASObject* super_obj = allocObject(app_context, 0);
 						ActionVar super_var = {0};
-						super_var.type = ACTION_STACK_VALUE_OBJECT;
-						super_var.data.numeric_value = (u64)super_obj;
+						if (hasSuperContext()) {
+							super_var.type = ACTION_STACK_VALUE_SUPER;
+							super_var.data.numeric_value = (u64)getSuperThis();
+							super_var.str_size = (u32)getSuperDepth();
+						} else {
+							super_var.type = ACTION_STACK_VALUE_UNDEFINED;
+						}
 						setProperty(app_context, local_scope, "super", 5, &super_var);
 					}
 				}
@@ -26405,6 +26693,117 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
+	// Pattern B (SWF7+ DefineFunction2): CallMethod(arguments_array, undefined) = super()
+	// The arguments array stands in as a proxy for super — AVM1 recognizes this pattern.
+	if (method_is_empty && obj_var.type == ACTION_STACK_VALUE_ARRAY && hasSuperContext())
+	{
+		void* this_obj = getSuperThis();
+		u8 depth = getSuperDepth();
+		ASObject* base_proto = walkProtoChain(this_obj, depth);
+
+		ASFunction* parent_ctor = NULL;
+		if (base_proto != NULL)
+		{
+			ActionVar* ctor_var = getProperty(base_proto, "__constructor__", 15);
+			if (ctor_var == NULL || ctor_var->type != ACTION_STACK_VALUE_FUNCTION)
+				ctor_var = getProperty(base_proto, "constructor", 11);
+			if (ctor_var != NULL && ctor_var->type == ACTION_STACK_VALUE_FUNCTION)
+				parent_ctor = (ASFunction*) ctor_var->data.numeric_value;
+		}
+
+		if (parent_ctor != NULL)
+		{
+			pushSuperContext(this_obj, depth + 1);
+
+			if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL)
+			{
+				ActionVar registers[256] = {0};
+				g_call_depth++;
+				parent_ctor->advanced_func(app_context, args, num_args, registers, this_obj);
+				g_call_depth--;
+			}
+			else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL)
+			{
+				ActionVar this_var = {0};
+				this_var.type = ACTION_STACK_VALUE_OBJECT;
+				this_var.data.numeric_value = (u64)this_obj;
+				setVariableByName("this", &this_var);
+				for (int i = (int)num_args - 1; i >= 0; i--)
+					pushVar(app_context, &args[i]);
+				g_call_depth++;
+				((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
+				g_call_depth--;
+			}
+
+			popSuperContext();
+		}
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+		return;
+	}
+
+	// Pattern B variant: CallMethod(arguments_array, "method") = super.method()
+	if (!method_is_empty && obj_var.type == ACTION_STACK_VALUE_ARRAY && hasSuperContext())
+	{
+		void* this_obj = getSuperThis();
+		u8 depth = getSuperDepth();
+		// Search for method starting from this.__proto__^(depth+1)
+		// (i.e., the prototype *above* the current level)
+		ASObject* search_start = walkProtoChain(this_obj, depth + 1);
+		ASFunction* method_func = NULL;
+		u8 found_depth = 0;
+
+		// Walk prototype chain from search_start to find the method
+		ASObject* search = search_start;
+		while (search != NULL)
+		{
+			ActionVar* method_var = getProperty(search, method_name, method_name_len);
+			if (method_var != NULL && method_var->type == ACTION_STACK_VALUE_FUNCTION) {
+				method_func = lookupFunctionFromVar(method_var);
+				break;
+			}
+			ActionVar* next = getProperty(search, "__proto__", 9);
+			if (next == NULL || next->type != ACTION_STACK_VALUE_OBJECT || next->data.numeric_value == 0)
+				break;
+			search = (ASObject*) next->data.numeric_value;
+			found_depth++;
+		}
+
+		if (method_func != NULL)
+		{
+			// new depth = depth + found_depth + 1
+			pushSuperContext(this_obj, depth + found_depth + 1);
+
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_UNDEFINED;
+
+			if (method_func->function_type == 2 && method_func->advanced_func != NULL)
+			{
+				ActionVar registers[256] = {0};
+				g_call_depth++;
+				result = method_func->advanced_func(app_context, args, num_args, registers, this_obj);
+				g_call_depth--;
+			}
+			else if (method_func->function_type == 1 && method_func->simple_func != NULL)
+			{
+				ActionVar this_var = {0};
+				this_var.type = ACTION_STACK_VALUE_OBJECT;
+				this_var.data.numeric_value = (u64)this_obj;
+				setVariableByName("this", &this_var);
+				for (int i = (int)num_args - 1; i >= 0; i--)
+					pushVar(app_context, &args[i]);
+				g_call_depth++;
+				result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
+				g_call_depth--;
+			}
+
+			popSuperContext();
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &result);
+			return;
+		}
+	}
+
 	// 5. Check for empty/blank method name - invoke object as function
 	if (method_name_len == 0 || (method_name_len == 1 && method_name[0] == '\0'))
 	{
@@ -26476,7 +26875,105 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
-	// 6. Look up the method on the object and invoke it
+	// 6a. Handle SUPER type (Pattern A SWF6: GetVariable("super") → CallMethod)
+	if (obj_var.type == ACTION_STACK_VALUE_SUPER)
+	{
+		void* super_this = (void*) obj_var.data.numeric_value;
+		u8 super_depth = (u8) obj_var.str_size;
+
+		if (method_is_empty)
+		{
+			// super() constructor call via CallMethod(super, undefined)
+			ASObject* base_proto = walkProtoChain(super_this, super_depth);
+			ASFunction* parent_ctor = NULL;
+			if (base_proto != NULL) {
+				// Only check __constructor__ (not "constructor" fallback) to avoid
+				// infinite recursion at the base of the class hierarchy
+				ActionVar* ctor_var = getProperty(base_proto, "__constructor__", 15);
+				if (ctor_var != NULL && ctor_var->type == ACTION_STACK_VALUE_FUNCTION)
+					parent_ctor = (ASFunction*) ctor_var->data.numeric_value;
+			}
+			if (parent_ctor != NULL) {
+				pushSuperContext(super_this, super_depth + 1);
+				if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL) {
+					ActionVar registers[256] = {0};
+					g_call_depth++;
+					parent_ctor->advanced_func(app_context, args, num_args, registers, super_this);
+					g_call_depth--;
+				} else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL) {
+					ActionVar this_var = {0};
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)super_this;
+					setVariableByName("this", &this_var);
+					for (int i = (int)num_args - 1; i >= 0; i--)
+						pushVar(app_context, &args[i]);
+					g_call_depth++;
+					((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
+					g_call_depth--;
+				}
+				popSuperContext();
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else
+		{
+			// super.method() call via CallMethod(super, "method")
+			ASObject* search_start = walkProtoChain(super_this, super_depth + 1);
+			ASFunction* method_func = NULL;
+			u8 found_depth = 0;
+
+			ASObject* search = search_start;
+			while (search != NULL) {
+				ActionVar* mv = getProperty(search, method_name, method_name_len);
+				if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION) {
+					method_func = lookupFunctionFromVar(mv);
+					break;
+				}
+				ActionVar* next = getProperty(search, "__proto__", 9);
+				if (next == NULL || next->type != ACTION_STACK_VALUE_OBJECT || next->data.numeric_value == 0)
+					break;
+				search = (ASObject*) next->data.numeric_value;
+				found_depth++;
+			}
+
+			if (method_func != NULL) {
+				u8 new_depth = super_depth + found_depth + 1;
+				pushSuperContext(super_this, new_depth);
+
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_UNDEFINED;
+
+				if (method_func->function_type == 2 && method_func->advanced_func != NULL) {
+					ActionVar registers[256] = {0};
+					g_call_depth++;
+					result = method_func->advanced_func(app_context, args, num_args, registers, super_this);
+					g_call_depth--;
+				} else if (method_func->function_type == 1 && method_func->simple_func != NULL) {
+					ActionVar this_var = {0};
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)super_this;
+					setVariableByName("this", &this_var);
+					for (int i = (int)num_args - 1; i >= 0; i--)
+						pushVar(app_context, &args[i]);
+					g_call_depth++;
+					result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
+					g_call_depth--;
+				}
+
+				popSuperContext();
+				if (args != NULL) FREE(args);
+				pushVar(app_context, &result);
+				return;
+			}
+		}
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+		return;
+	}
+
+	// 6b. Look up the method on the object and invoke it
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
@@ -26569,8 +27066,25 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		// Look up the method property (with prototype chain support)
-		ActionVar* method_prop = getPropertyWithPrototype(obj, method_name, method_name_len);
+		// Look up the method property (with prototype chain support) and track search depth
+		// for super context (Ruffle: depth = max(search_depth, 1))
+		ActionVar* method_prop = NULL;
+		u8 method_search_depth = 0;
+		{
+			ASObject* _search = obj;
+			int _max_d = 256;
+			while (_search != NULL && _max_d-- > 0) {
+				ActionVar* _mv = getProperty(_search, method_name, method_name_len);
+				if (_mv != NULL) { method_prop = _mv; break; }
+				ActionVar* _np = getProperty(_search, "__proto__", 9);
+				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
+				_search = (ASObject*) _np->data.numeric_value;
+				if (_search == obj) break; // cycle
+				method_search_depth++;
+			}
+		}
+		// Clamp depth to at least 1 (Ruffle: depth.max(1))
+		if (method_search_depth < 1) method_search_depth = 1;
 
 		if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
 		{
@@ -26587,6 +27101,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			else if (func != NULL && func->function_type == 2)
 			{
 				// Invoke DefineFunction2 with 'this' binding.
+				// Push super context for SWF6+: depth = max(search_depth, 1)
+				// This allows GetVariable("super") inside the function to resolve correctly.
+				pushSuperContext((void*)obj, method_search_depth);
+
 				// Push a local scope so GetVariable("this"/"super"/"arguments") can
 				// resolve them when neither preload nor suppress is set (flags == 0 bits).
 				ASObject* local_scope = allocObject(app_context, 8);
@@ -26640,10 +27158,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, local_scope, "arguments", 9, &args_var);
 				}
 				if (!f2_preload_super && !f2_suppress_super) {
-					ASObject* super_obj = allocObject(app_context, 0);
+					// Set super on scope chain (SUPER type with this+depth)
 					ActionVar super_var = {0};
-					super_var.type = ACTION_STACK_VALUE_OBJECT;
-					super_var.data.numeric_value = (u64)super_obj;
+					if (hasSuperContext()) {
+						super_var.type = ACTION_STACK_VALUE_SUPER;
+						super_var.data.numeric_value = (u64)getSuperThis();
+						super_var.str_size = (u32)getSuperDepth();
+					} else {
+						super_var.type = ACTION_STACK_VALUE_UNDEFINED;
+					}
 					setProperty(app_context, local_scope, "super", 5, &super_var);
 				}
 
@@ -26655,8 +27178,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_call_depth++;
 				g_prev_executing_func = prev_executing_func_am2;
 				g_current_executing_func = func;
-				g_c_function_this_obj = obj;
-				ActionVar result = func->advanced_func(app_context, args, num_args, registers, (void*) obj);
+				g_c_function_this_obj = (ASObject*)obj;
+				ActionVar result = func->advanced_func(app_context, args, num_args, registers, obj);
 				g_c_function_this_obj = NULL;
 				g_current_executing_func = prev_executing_func_am2;
 				g_call_depth--;
@@ -26664,6 +27187,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (scope_depth > 0) scope_depth--;
 				releaseObject(app_context, local_scope);
 				g_this_depth = saved_this_depth_am2;
+				popSuperContext();
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
 
@@ -26672,6 +27196,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
 			{
 				// Invoke simple function (DefineFunction type 1) as method
+				// Push super context for SWF6+
+				pushSuperContext((void*)obj, method_search_depth);
 				// Create local scope with arguments object for proper arguments.callee/caller
 				ASFunction* prev_executing_func_am1 = g_current_executing_func;
 				ASObject* local_scope_am1 = allocObject(app_context, 8);
@@ -26719,6 +27245,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (scope_depth > 0) scope_depth--;
 				releaseObject(app_context, local_scope_am1);
 				g_this_depth = saved_this_depth_am1;
+				popSuperContext();
 
 				pushVar(app_context, &result);
 			}
@@ -26728,6 +27255,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}
+
 		}
 		else
 		{

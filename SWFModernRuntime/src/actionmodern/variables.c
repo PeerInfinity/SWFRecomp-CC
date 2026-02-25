@@ -228,39 +228,39 @@ void setVariableByName(const char* var_name, ActionVar* value)
 
 void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 {
-	// Free old string if variable owns memory
-	if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
-	{
-		free(var->data.string_data.heap_ptr);
-		var->data.string_data.owns_memory = false;
-	}
-
 	ActionStackValueType type = stack[sp];
 
 	if (type == ACTION_STACK_VALUE_STRING)
 	{
 		// Copy UTF-16 string data to heap (stack data is transient)
+		// IMPORTANT: Make the copy BEFORE freeing the old value, because the
+		// source pointer on the stack may point to the old heap_ptr (e.g., when
+		// DefineLocal re-assigns the same variable with a value derived from it).
 		u32 u16_len = VAL(u32, &stack[sp + 8]);  // code unit count
 		const uint16_t* src = (const uint16_t*) VAL(u64, &stack[sp + 16]);
+
+		uint16_t* heap_copy = NULL;
+		if (u16_len > 0 && src != NULL)
+		{
+			heap_copy = (uint16_t*) malloc(u16_len * sizeof(uint16_t));
+			if (heap_copy)
+				memcpy(heap_copy, src, u16_len * sizeof(uint16_t));
+		}
+
+		// Now free the old value
+		if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
+			free(var->data.string_data.heap_ptr);
 
 		var->type = ACTION_STACK_VALUE_STRING;
 		var->string_id = VAL(u32, &stack[sp + 12]);
 
-		if (u16_len > 0 && src != NULL)
+		if (heap_copy != NULL)
 		{
-			uint16_t* heap_copy = (uint16_t*) malloc(u16_len * sizeof(uint16_t));
-			if (!heap_copy)
-			{
-				var->str_size = 0;
-				var->data.numeric_value = 0;
-				return;
-			}
-			memcpy(heap_copy, src, u16_len * sizeof(uint16_t));
 			var->str_size = u16_len;
 			var->data.string_data.heap_ptr = heap_copy;
 			var->data.string_data.owns_memory = true;
 		}
-		else
+		else if (u16_len == 0 || src == NULL)
 		{
 			// Empty string: use a non-NULL sentinel pointer to distinguish
 			// from zero-initialized "unset" variable slots (which have NULL heap_ptr)
@@ -269,9 +269,19 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 			var->data.string_data.heap_ptr = (uint16_t*) empty_u16;
 			var->data.string_data.owns_memory = false;
 		}
+		else
+		{
+			// malloc failed
+			var->str_size = 0;
+			var->data.numeric_value = 0;
+		}
 	}
 	else
 	{
+		// Free old string if variable owns memory
+		if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
+			free(var->data.string_data.heap_ptr);
+
 		// Numeric types - store directly
 		var->type = type;
 		var->str_size = VAL(u32, &stack[sp + 8]);
