@@ -24143,6 +24143,26 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_OBJECT)
 		{
 			ASObject* obj = (ASObject*)(u64)args[0].data.numeric_value;
+			// Coerce set_flags (args[2]) via valueOf if it's an object
+			if (num_args >= 3 && (args[2].type == ACTION_STACK_VALUE_OBJECT ||
+			                      args[2].type == ACTION_STACK_VALUE_ARRAY)) {
+				int found = 0;
+				ActionVar coerced = objectCallValueOf(app_context, &args[2], &found);
+				if (found) args[2] = coerced;
+			}
+			// Coerce clear_flags (args[3]) via valueOf if it's an object
+			if (num_args >= 4 && (args[3].type == ACTION_STACK_VALUE_OBJECT ||
+			                      args[3].type == ACTION_STACK_VALUE_ARRAY)) {
+				int found = 0;
+				ActionVar coerced = objectCallValueOf(app_context, &args[3], &found);
+				if (found) args[3] = coerced;
+			}
+			// Coerce prop_name (args[1]) via toString if it's an object (not null/undefined)
+			if (args[1].type == ACTION_STACK_VALUE_OBJECT || args[1].type == ACTION_STACK_VALUE_FUNCTION) {
+				int found = 0;
+				ActionVar coerced = objectCallToString(app_context, &args[1], &found);
+				if (found) args[1] = coerced;
+			}
 			s32 set_flags = (num_args >= 3) ? varToInt32(&args[2]) : 0;
 			s32 clear_flags = (num_args >= 4) ? varToInt32(&args[3]) : 0;
 
