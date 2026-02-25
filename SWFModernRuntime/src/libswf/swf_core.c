@@ -471,7 +471,8 @@ void swfStart(SWFAppContext* app_context)
 			// Break if quit_swf and no remaining input events, handlers, or playing sprites.
 			if (quit_swf && !(g_events && g_event_pos < g_event_count)
 			    && !actionHasEnterFrameHandlers()
-			    && !hasPlayingSprites()) break;
+			    && !hasPlayingSprites()
+			    && !hasActiveTimers()) break;
 			advance_sprite_frames(app_context);
 			actionDispatchEnterFrameHandlers(app_context);
 			actionDispatchRootVarMapEnterFrame(app_context);
@@ -586,13 +587,20 @@ void swfStart(SWFAppContext* app_context)
 			ng_run_deferred_sprite_init(app_context);
 		}
 
+		// Process timers after frame actions + deferred scripts
+		{
+			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
+			processTimers(app_context, frame_duration_ms);
+		}
+
 		// Advance to next frame
 		// IMPORTANT: Process manual_next_frame BEFORE checking is_playing
 		// This ensures that gotoFrame/gotoAndStop commands execute the target frame
 		// even when they stop playback
 		if (current_frame >= g_frame_count)
 		{
-			// Past the end of the frame list — only continue if events remain
+			// Past the end of the frame list — only continue if events or timers remain
+			if (hasActiveTimers()) continue;
 			if (!g_events || g_event_pos >= g_event_count) break;
 			// Otherwise loop with current_frame staying OOB; events were already pumped above
 		}
@@ -614,6 +622,8 @@ void swfStart(SWFAppContext* app_context)
 				// Stay at current_frame, sprites advance via advance_sprite_frames above
 				continue;
 			}
+			// Root stopped but timers are active — keep ticking
+			if (hasActiveTimers()) continue;
 			// Truly stopped — but continue if events remain
 			if (g_events && g_event_pos < g_event_count) continue;
 			break;

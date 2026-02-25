@@ -19,7 +19,7 @@ Last updated: 2026-02-25
 | native_objects_swf8 | segfault | 0/84 | Same root cause as swf6 |
 | movieclip_invalid_get_bounds_6 | compile_fail | 0/? | Needs button/clip_actions symbol renaming (fixed locally, not in CI yet) |
 | movieclip_invalid_get_bounds_7 | compile_fail | 0/? | Same fix as _6 (fixed locally, not in CI yet) |
-| timeout | timeout | 0/0 | setTimeout/clearTimeout not implemented |
+| timeout | timeout | 0/0 | Infinite loop — needs script execution timeout mechanism |
 
 ## Top Near-Passing Tests (best ROI to fix)
 
@@ -109,7 +109,7 @@ Last updated: 2026-02-25
 | PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 8/12 pass | Remaining: `__resolve` hook, addProperty edge cases, InitObject setters, ASSetPropFlags edge cases |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
 | TELLTARGET_PLAN | **PARTIAL** | slash_syntax ✅, string_paths_basic ✅ | tellTarget scope, path resolution, eval() |
-| TIMER_PLAN | Not started | 0/3 | setInterval, setTimeout |
+| TIMER_PLAN | **Phases 1-2 DONE** | 1/3 pass (set_interval ✅) | timer_run_actions blocked on REGISTERCLASS_PLAN (attachMovie); timeout needs script timeout mechanism |
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
@@ -137,7 +137,7 @@ Last updated: 2026-02-25
 7. **TELLTARGET_PLAN Phase 1** — core path resolution, ~212 lines across 8+ tests (slash_syntax + string_paths_basic already passing)
 
 ### Lower ROI — new features
-8. **TIMER_PLAN** — setInterval/setTimeout, 2-3 tests (also unblocks LOADVARIABLES loadvariables2)
+8. ~~**TIMER_PLAN**~~ — **DONE** (Phases 1-2 complete, set_interval PASS). timer_run_actions blocked on REGISTERCLASS_PLAN.
 9. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8)
 10. **REGISTERCLASS_PLAN Phases 1-5** — full ExportAssets + registerClass + constructor invocation, ~7-10 tests
 
@@ -156,9 +156,10 @@ Lines 1-33 pass. Lines 37-39 pass (content matches, shifted by 3). Remaining 3 f
 - ~~Lines 37-39: `_root` as `__proto__`~~ — **Now passes** (these lines output correctly once prior addProperty lines were fixed)
 
 ### Dependency Blockers (plans blocking other plans)
-- **TIMER_PLAN** blocks: LOADVARIABLES_PLAN (loadvariables2), LOADMOVIE_REMAINING_PLAN (mcl_events_swf_version)
+- ~~**TIMER_PLAN**~~ — **RESOLVED** (Phases 1-2 done, set_interval ✅). loadvariables2 still blocked on compile issues; timer_run_actions blocked on REGISTERCLASS_PLAN
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; addProperty getters now invoked in super() paths; remaining 3 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
 - **MOUSE_EVENTS_PLAN** blocks: FOCUS_SYSTEM_PLAN, BUTTON_PLAN (8 tests), DRAG_DROP_PLAN, CLONE_DUPLICATE_PLAN (clip_event_propagation_order)
 - **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests)
 - **TELLTARGET_PLAN** blocks: THIS_BINDING_PLAN Phase 6 (this_scoping remaining 10 lines)
 - **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (on_construct), TIMER_PLAN (timer_run_actions partially)
+- ~~**CLOSURE_CAPTURE_PLAN**~~ — **RESOLVED** (moved to completed/). Remaining test failures in focus_keyboard_press, focus_mouse, focus_mouse_rollout now blocked by FOCUS_SYSTEM_PLAN + MOUSE_EVENTS_PLAN

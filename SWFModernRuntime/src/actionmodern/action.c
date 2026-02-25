@@ -424,6 +424,37 @@ bool setVariableOnLocalScope(const char* var_name, ActionVar* value)
 }
 
 // ==================================================================
+// Timer System (setInterval / setTimeout / clearInterval)
+// ==================================================================
+
+#define MAX_TIMERS 64
+
+typedef struct {
+	int active;                // 0 = empty slot, 1 = active
+	int id;                    // sequential ID (1, 2, 3, ...)
+	int is_interval;           // 1 = repeating (setInterval), 0 = one-shot (setTimeout)
+	double delay_ms;           // delay in milliseconds
+	double elapsed_ms;         // accumulated time since last fire (or since creation)
+
+	// Callback — either function-form or method-form
+	int is_method;             // 0 = function, 1 = method on object
+	ActionVar func;            // function reference (function-form)
+	ActionVar object;          // object reference (method-form)
+	char method_name[256];     // method name string (method-form)
+
+	// Extra arguments passed to callback
+	ActionVar extra_args[8];   // inline array of extra args (max 8)
+	int extra_arg_count;
+} TimerEntry;
+
+static TimerEntry g_timers[MAX_TIMERS];
+static int g_next_timer_id = 1;
+
+// Forward declarations for timer functions
+static void actionSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num_args, int is_interval);
+static void actionClearInterval(SWFAppContext* app_context, ActionVar* args, u32 num_args);
+
+// ==================================================================
 // Recursion Depth Limit
 // ==================================================================
 
@@ -24360,6 +24391,45 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		builtin_handled = 1;
 	}
 
+	// setInterval(func, delay, ...args) or setInterval(obj, methodName, delay, ...args)
+	else if (func_name_len == 11 && strncmp(func_name, "setInterval", 11) == 0)
+	{
+		actionSetInterval(app_context, args, num_args, 1); // 1 = repeating
+		args = NULL; // actionSetInterval takes ownership of cleanup
+		builtin_handled = 1;
+	}
+	// setTimeout(func, delay, ...args) or setTimeout(obj, methodName, delay, ...args)
+	else if (func_name_len == 10 && strncmp(func_name, "setTimeout", 10) == 0)
+	{
+		actionSetInterval(app_context, args, num_args, 0); // 0 = one-shot
+		args = NULL;
+		builtin_handled = 1;
+	}
+	// clearInterval(id) — also clears setTimeout
+	else if (func_name_len == 13 && strncmp(func_name, "clearInterval", 13) == 0)
+	{
+		actionClearInterval(app_context, args, num_args);
+		if (args != NULL) FREE(args);
+		args = NULL;
+		builtin_handled = 1;
+	}
+	// clearTimeout(id) — same as clearInterval
+	else if (func_name_len == 12 && strncmp(func_name, "clearTimeout", 12) == 0)
+	{
+		actionClearInterval(app_context, args, num_args);
+		if (args != NULL) FREE(args);
+		args = NULL;
+		builtin_handled = 1;
+	}
+	// updateAfterEvent() — no-op stub (used in timer callbacks to force display update)
+	else if (func_name_len == 16 && strncmp(func_name, "updateAfterEvent", 16) == 0)
+	{
+		if (args != NULL) FREE(args);
+		args = NULL;
+		pushUndefined(app_context);
+		builtin_handled = 1;
+	}
+
 	// If not a built-in function, look up user-defined functions
 	if (!builtin_handled)
 	{
@@ -31164,6 +31234,453 @@ void actionTextControlPaste(SWFAppContext* app_context)
 	// Sync to variable binding
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
 	g_tf_select_all = 0;
+}
+
+// ==================================================================
+// Timer System Implementation (setInterval / setTimeout / clearInterval)
+// ==================================================================
+
+// Helper: coerce an ActionVar to double using the stack (handles valueOf on objects)
+static double timerCoerceToNumber(SWFAppContext* app_context, ActionVar* v)
+{
+	if (v->type == ACTION_STACK_VALUE_UNDEFINED) return NAN;
+	if (v->type == ACTION_STACK_VALUE_NULL) return 0.0;
+	if (v->type == ACTION_STACK_VALUE_F32) return (double) VAL(float, &v->data.numeric_value);
+	if (v->type == ACTION_STACK_VALUE_F64) return VAL(double, &v->data.numeric_value);
+	if (v->type == ACTION_STACK_VALUE_BOOLEAN) return v->data.numeric_value ? 1.0 : 0.0;
+	// For objects (with valueOf), strings, etc. — use the stack-based convertFloat
+	pushVar(app_context, v);
+	convertFloat(app_context);
+	ActionVar result;
+	popVar(app_context, &result);
+	if (result.type == ACTION_STACK_VALUE_F64) return VAL(double, &result.data.numeric_value);
+	if (result.type == ACTION_STACK_VALUE_F32) return (double) VAL(float, &result.data.numeric_value);
+	return NAN;
+}
+
+// Helper: check if an ActionVar is a string type
+static int timerIsString(ActionVar* v)
+{
+	return v->type == ACTION_STACK_VALUE_STRING;
+}
+
+// Helper: check if an ActionVar is callable (FUNCTION type)
+static int timerIsCallable(ActionVar* v)
+{
+	return v->type == ACTION_STACK_VALUE_FUNCTION;
+}
+
+// Helper: check if an ActionVar is an object/movieclip (can have methods)
+static int timerIsObject(ActionVar* v)
+{
+	return v->type == ACTION_STACK_VALUE_OBJECT ||
+	       v->type == ACTION_STACK_VALUE_MOVIECLIP;
+}
+
+// setInterval / setTimeout registration
+// Called from actionCallFunction dispatch. args[] are the function arguments.
+// is_interval: 1 = setInterval (repeating), 0 = setTimeout (one-shot)
+static void actionSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num_args, int is_interval)
+{
+	// Validation: need at least 2 args
+	if (num_args < 2)
+	{
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+		return;
+	}
+
+	// Detect calling convention:
+	// Function-form: setInterval(func, delay, ...extraArgs)
+	//   - args[0] is a function
+	// Method-form: setInterval(obj, methodName, delay, ...extraArgs)
+	//   - args[0] is an object/movieclip, args[1] is a string (or coercible to string)
+	//   - Flash uses method-form when: num_args >= 3, args[0] is obj/mc, and args[0] is NOT callable
+	int is_method = 0;
+
+	if (num_args >= 3 && timerIsObject(&args[0]) && !timerIsCallable(&args[0]))
+	{
+		is_method = 1;
+	}
+
+	if (is_method)
+	{
+		// Method-form: setInterval(obj, methodName, delay, ...extraArgs)
+		// Need at least 3 args
+		if (num_args < 3)
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
+		// Get method name — coerce args[1] to string via the stack
+		char method_buf[256];
+		method_buf[0] = '\0';
+		if (timerIsString(&args[1]))
+		{
+			const uint16_t* u16_str = varGetU16Ptr(&args[1]);
+			if (u16_str != NULL && args[1].str_size > 0)
+			{
+				int len = u16_to_utf8(u16_str, args[1].str_size, method_buf, sizeof(method_buf) - 1);
+				method_buf[len] = '\0';
+			}
+		}
+		else if (args[1].type != ACTION_STACK_VALUE_NULL && args[1].type != ACTION_STACK_VALUE_UNDEFINED)
+		{
+			// Coerce to string (handles objects with toString)
+			pushVar(app_context, &args[1]);
+			char _ts_buf[17];
+			convertString(app_context, _ts_buf);
+			const uint16_t* u16_str = (const uint16_t*)STACK_TOP_VALUE;
+			u32 u16_len = STACK_TOP_N;
+			if (u16_str != NULL && u16_len > 0)
+			{
+				int len = u16_to_utf8(u16_str, u16_len, method_buf, sizeof(method_buf) - 1);
+				method_buf[len] = '\0';
+			}
+			POP();
+		}
+		else
+		{
+			// null or undefined method name — store "null" / "undefined"
+			if (args[1].type == ACTION_STACK_VALUE_NULL)
+				strcpy(method_buf, "null");
+			else
+				strcpy(method_buf, "undefined");
+		}
+
+		// Coerce delay (args[2])
+		double delay = timerCoerceToNumber(app_context, &args[2]);
+		if (isnan(delay))
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
+		// Find empty slot
+		int slot = -1;
+		for (int i = 0; i < MAX_TIMERS; i++)
+		{
+			if (!g_timers[i].active) { slot = i; break; }
+		}
+		if (slot == -1)
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
+		// Register timer
+		TimerEntry* t = &g_timers[slot];
+		memset(t, 0, sizeof(TimerEntry));
+		t->active = 1;
+		t->id = g_next_timer_id++;
+		t->is_interval = is_interval;
+		t->delay_ms = delay;
+		t->elapsed_ms = 0.0;
+		t->is_method = 1;
+		t->object = args[0]; // shallow copy (object pointer)
+		strncpy(t->method_name, method_buf, sizeof(t->method_name) - 1);
+		t->method_name[sizeof(t->method_name) - 1] = '\0';
+
+		// Copy extra args (args[3], args[4], ...)
+		t->extra_arg_count = 0;
+		for (u32 i = 3; i < num_args && t->extra_arg_count < 8; i++)
+		{
+			t->extra_args[t->extra_arg_count++] = args[i];
+		}
+
+		// Push timer ID
+		double id_val = (double)t->id;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &id_val));
+		if (args != NULL) FREE(args);
+	}
+	else
+	{
+		// Function-form: setInterval(func, delay, ...extraArgs)
+		// Validate: args[0] must be a callable function
+		if (!timerIsCallable(&args[0]))
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
+		// Coerce delay (args[1])
+		double delay = timerCoerceToNumber(app_context, &args[1]);
+		if (isnan(delay))
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
+		// Find empty slot
+		int slot = -1;
+		for (int i = 0; i < MAX_TIMERS; i++)
+		{
+			if (!g_timers[i].active) { slot = i; break; }
+		}
+		if (slot == -1)
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
+		// Register timer
+		TimerEntry* t = &g_timers[slot];
+		memset(t, 0, sizeof(TimerEntry));
+		t->active = 1;
+		t->id = g_next_timer_id++;
+		t->is_interval = is_interval;
+		t->delay_ms = delay;
+		t->elapsed_ms = 0.0;
+		t->is_method = 0;
+		t->func = args[0]; // shallow copy (function pointer)
+
+		// Copy extra args (args[2], args[3], ...)
+		t->extra_arg_count = 0;
+		for (u32 i = 2; i < num_args && t->extra_arg_count < 8; i++)
+		{
+			t->extra_args[t->extra_arg_count++] = args[i];
+		}
+
+		// Push timer ID
+		double id_val = (double)t->id;
+		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &id_val));
+		if (args != NULL) FREE(args);
+	}
+}
+
+// clearInterval / clearTimeout
+static void actionClearInterval(SWFAppContext* app_context, ActionVar* args, u32 num_args)
+{
+	if (num_args == 0)
+	{
+		pushUndefined(app_context);
+		return;
+	}
+
+	// Get timer ID from first arg
+	double id_d = timerCoerceToNumber(app_context, &args[0]);
+	int id = (int)id_d;
+
+	// Find and deactivate the timer
+	for (int i = 0; i < MAX_TIMERS; i++)
+	{
+		if (g_timers[i].active && g_timers[i].id == id)
+		{
+			g_timers[i].active = 0;
+			break;
+		}
+	}
+
+	pushUndefined(app_context);
+}
+
+// Fire a timer callback (function-form or method-form)
+static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
+{
+	if (g_execution_halted) return;
+
+	if (t->is_method)
+	{
+		// Method-form: look up method on object at fire time, call with this=obj
+		ASObject* obj = NULL;
+		MovieClip* mc = NULL;
+
+		if (t->object.type == ACTION_STACK_VALUE_OBJECT)
+			obj = (ASObject*)(uintptr_t)t->object.data.numeric_value;
+		else if (t->object.type == ACTION_STACK_VALUE_MOVIECLIP)
+			mc = (MovieClip*)(uintptr_t)t->object.data.numeric_value;
+
+		// Look up the method
+		ASFunction* method_func = NULL;
+		if (obj != NULL)
+		{
+			ActionVar* mv = getPropertyWithPrototype(obj, t->method_name, strlen(t->method_name));
+			if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION)
+				method_func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
+		}
+		else if (mc != NULL)
+		{
+			// Look up on MC's dynamic_props
+			ASObject* dprops = (ASObject*)mc->dynamic_props;
+			if (dprops != NULL)
+			{
+				ActionVar* mv = getPropertyWithPrototype(dprops, t->method_name, strlen(t->method_name));
+				if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION)
+					method_func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
+			}
+		}
+
+		if (method_func == NULL) return; // method not found, skip silently
+
+		// Call the method with this = obj or mc
+		void* this_obj = NULL;
+		if (obj != NULL) this_obj = obj;
+		else if (mc != NULL) this_obj = mc;
+
+		if (method_func->function_type == 2)
+		{
+			// Type 2 (DefineFunction2) — allocate registers, call with args
+			ActionVar* registers = NULL;
+			if (method_func->register_count > 0)
+				registers = (ActionVar*) HCALLOC(method_func->register_count, sizeof(ActionVar));
+
+			// Restore captured scopes
+			int captured_count = method_func->captured_scope_count;
+			for (int s = 0; s < captured_count; s++)
+			{
+				scope_chain[scope_depth] = method_func->captured_scope[s];
+				scope_is_with[scope_depth] = 1;
+				scope_depth++;
+			}
+
+			g_call_depth++;
+			ActionVar result = method_func->advanced_func(app_context,
+				t->extra_arg_count > 0 ? t->extra_args : NULL,
+				t->extra_arg_count, registers, this_obj);
+			g_call_depth--;
+
+			// Pop captured scopes
+			scope_depth -= captured_count;
+
+			if (registers) FREE(registers);
+			// Discard return value
+		}
+		else
+		{
+			// Type 1 (DefineFunction) — push args on stack
+			for (int i = 0; i < t->extra_arg_count; i++)
+				pushVar(app_context, &t->extra_args[i]);
+
+			// Save and set event this
+			MovieClip* old_event_this = g_event_this_mc;
+			if (mc != NULL) g_event_this_mc = mc;
+
+			g_call_depth++;
+			((void(*)(SWFAppContext*))method_func->simple_func)(app_context);
+			g_call_depth--;
+
+			g_event_this_mc = old_event_this;
+		}
+	}
+	else
+	{
+		// Function-form: call the function directly
+		ASFunction* func = (ASFunction*)(uintptr_t)t->func.data.numeric_value;
+		if (func == NULL) return;
+
+		if (func->function_type == 2)
+		{
+			ActionVar* registers = NULL;
+			if (func->register_count > 0)
+				registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+			// Restore captured scopes
+			int captured_count = func->captured_scope_count;
+			for (int s = 0; s < captured_count; s++)
+			{
+				scope_chain[scope_depth] = func->captured_scope[s];
+				scope_is_with[scope_depth] = 1;
+				scope_depth++;
+			}
+
+			// Restore base_clip context for SWF6+
+			MovieClip* old_context = g_current_context;
+			if (g_swf_version >= 6 && func->base_clip != NULL)
+				g_current_context = func->base_clip;
+
+			g_call_depth++;
+			ActionVar result = func->advanced_func(app_context,
+				t->extra_arg_count > 0 ? t->extra_args : NULL,
+				t->extra_arg_count, registers, NULL);
+			g_call_depth--;
+
+			g_current_context = old_context;
+
+			// Pop captured scopes
+			scope_depth -= captured_count;
+
+			if (registers) FREE(registers);
+		}
+		else
+		{
+			// Type 1 — push args on stack
+			for (int i = 0; i < t->extra_arg_count; i++)
+				pushVar(app_context, &t->extra_args[i]);
+
+			// Restore base_clip context for SWF6+
+			MovieClip* old_context = g_current_context;
+			if (g_swf_version >= 6 && func->base_clip != NULL)
+				g_current_context = func->base_clip;
+
+			g_call_depth++;
+			((void(*)(SWFAppContext*))func->simple_func)(app_context);
+			g_call_depth--;
+
+			g_current_context = old_context;
+		}
+	}
+}
+
+// Process all active timers. Called from swf_core.c after each frame tick.
+// frame_duration_ms = 1000.0 / fps
+void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+{
+	// Advance all timers by frame_duration_ms
+	for (int i = 0; i < MAX_TIMERS; i++)
+	{
+		if (g_timers[i].active)
+			g_timers[i].elapsed_ms += frame_duration_ms;
+	}
+
+	// Fire eligible timers. May fire multiple times per frame if delay is short.
+	// Fire lowest ID first when multiple timers are ready at the same time.
+	int fired_any;
+	int iteration_limit = 10000; // safety limit to prevent infinite loops
+	do {
+		fired_any = 0;
+		if (--iteration_limit <= 0) break;
+
+		for (int i = 0; i < MAX_TIMERS; i++)
+		{
+			if (!g_timers[i].active) continue;
+			if (g_timers[i].elapsed_ms < g_timers[i].delay_ms) continue;
+
+			// Fire this timer's callback
+			fireTimerCallback(app_context, &g_timers[i]);
+			fired_any = 1;
+
+			if (g_timers[i].is_interval)
+			{
+				// Repeating: subtract one delay period
+				g_timers[i].elapsed_ms -= g_timers[i].delay_ms;
+				// If delay is 0, prevent infinite loop
+				if (g_timers[i].delay_ms <= 0) g_timers[i].active = 0;
+			}
+			else
+			{
+				// One-shot: deactivate
+				g_timers[i].active = 0;
+			}
+			break; // Re-scan from beginning (firing may have cleared other timers)
+		}
+	} while (fired_any);
+}
+
+// Check if any timers are active
+int hasActiveTimers(void)
+{
+	for (int i = 0; i < MAX_TIMERS; i++)
+	{
+		if (g_timers[i].active) return 1;
+	}
+	return 0;
 }
 
 #endif // NO_GRAPHICS (AS2 MC event dispatch)

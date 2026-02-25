@@ -321,6 +321,10 @@ void actionDispatchRootOnLoad(SWFAppContext* app_context);
 // Check if any onEnterFrame handlers are registered.
 int actionHasEnterFrameHandlers(void);
 
+// Timer system (setInterval / setTimeout / clearInterval)
+void processTimers(SWFAppContext* app_context, double frame_duration_ms);
+int hasActiveTimers(void);
+
 #ifdef NO_GRAPHICS
 // AS2 MC event dispatch — called from swf_core.c on mouse events.
 // Iterates child_mc_cache, checks hit area, and calls onPress/onDragOver etc.

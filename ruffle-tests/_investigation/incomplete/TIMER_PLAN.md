@@ -1,13 +1,38 @@
 # Timer / setInterval Implementation Plan
 <!-- TESTS: set_interval, timer_run_actions, timeout -->
 
-Last updated: 2026-02-15
+Last updated: 2026-02-25
+
+## Status: PHASES 1-2 COMPLETE — set_interval PASSING (27/27)
+
+### Implementation Summary (2026-02-25)
+
+**Phases 1-2 implemented** in a single session:
+- Timer data structures (`TimerEntry`, `g_timers[64]`, sequential IDs)
+- `actionSetInterval()` — function-form and method-form with toString coercion for method names
+- `actionClearInterval()` — deactivates by ID
+- `processTimers()` — multi-fire-per-frame engine integrated into `swf_core.c` frame loop
+- `fireTimerCallback()` — invokes type 1 and type 2 functions with captured scopes, base_clip context
+- `hasActiveTimers()` — keeps frame loop alive when timers are active
+- Also added: `clearTimeout`, `updateAfterEvent` (no-op stub)
+- Dispatch via built-in name matching in `actionCallFunction()` (alongside parseInt, isNaN, etc.)
+
+**Files modified:**
+- `SWFModernRuntime/src/actionmodern/action.c` — Timer structs, registration, dispatch, firing
+- `SWFModernRuntime/include/actionmodern/action.h` — `processTimers()`, `hasActiveTimers()` declarations
+- `SWFModernRuntime/src/libswf/swf_core.c` — Timer processing in frame loop, exit conditions
+
+### Test Results After Implementation
+
+| Test | Before | After | Notes |
+|------|--------|-------|-------|
+| set_interval | 0/27 | **27/27 PASS** ✅ | All timer types working: function-form, method-form, extra args, valueOf coercion, null delay, validation |
+| timer_run_actions | SEGFAULT | SEGFAULT (0/18) | Timer fires but callback calls `attachMovie` → segfaults (blocked on REGISTERCLASS_PLAN) |
+| timeout | TIMEOUT | TIMEOUT | Needs script execution timeout mechanism (Phase 4, deferred) |
 
 ## Overview
 
-Three Ruffle tests need timer support: `set_interval` (0/27), `timer_run_actions` (0/18), and `timeout` (TIMEOUT). This requires implementing `setInterval()`, `setTimeout()`, and `clearInterval()` as global built-in functions in the runtime, plus a timer scheduling engine integrated into the frame loop.
-
-**Current state**: No timer support exists. `setInterval`/`setTimeout`/`clearInterval` are called via `actionCallFunction` bytecode, which looks them up as regular function names. Since they're not registered, the lookup returns NULL and `undefined` is pushed. No timer callbacks ever fire.
+Three Ruffle tests need timer support: `set_interval` (27/27 ✅), `timer_run_actions` (0/18, blocked), and `timeout` (TIMEOUT, deferred). Timer registration and execution are fully implemented. Remaining tests blocked on external dependencies.
 
 ## Test Analysis
 
