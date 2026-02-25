@@ -26,8 +26,8 @@ These are addressed in Phase 0 as quick wins before the main RegisterClass work.
 | register_class_swf6 | ~68 | 0/? | SWF6 case-insensitive registerClass |
 | register_class_with_sound | 10 | 0/10 | RegisterClass with Sound (known_failure in Ruffle) |
 | register_and_init_order | 233 | 0/233 | DoInitAction + registerClass execution ordering |
-| register_globals_across_frames | 12 | 0/12 | VM register reset between frames |
-| register_underflow | 26 | 18/26 (69%) | DefineFunction2 register count underflow |
+| register_globals_across_frames | 12 | **12/12 PASS** ✅ | VM register reset between frames |
+| register_underflow | 26 | **26/26 PASS** ✅ | DefineFunction2 register count underflow |
 
 ### Dependent Tests (benefit from this work)
 
