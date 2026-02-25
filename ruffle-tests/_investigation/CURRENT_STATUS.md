@@ -76,7 +76,7 @@ Last updated: 2026-02-25
 | `tab_ordering_tabbable` | 36/47 (76.6%) | Tab navigation |
 | `tab_ordering_automatic_order_same_position` | 9/12 (75.0%) | Tab navigation |
 | `rewind_depth` | 22/30 (73.3%) | Backward goto depth handling |
-| `add_property` | 11/15 (73.3%) | Object.addProperty |
+| `add_property` | 11/15 (73.3%) | Object.addProperty (compiles now — was stale FrameLabelEntry typedef; remaining 4 lines = prototype chain getter invocation in non-super paths) |
 | `attach_movie` | **PASS** ✅ | Fixed: deferred init dedup + sprite child persistence |
 | `empty_movieclip_can_attach_movies` | **PASS** ✅ | Fixed: sprite display list persistence for child lookup |
 
@@ -104,7 +104,7 @@ Last updated: 2026-02-25
 | STAGE_FRAME_PROPS_PLAN | **Phases 1,5 DONE** | Several stages pass | Phase 2 (shape bounds), Phase 3 (content bounds) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
-| OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 26/39 — see blockers below; `funky_function_calls` segfaults |
+| OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 36/39 — addProperty getters now invoked; remaining 3 lines = makeSuperWith (SUPER value as __proto__); `funky_function_calls` segfaults |
 | REGISTERCLASS_PLAN | **Phase 0 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅ | Phases 1-5: Object.registerClass, ExportAssets, constructor invocation |
 | PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 8/12 pass | Remaining: `__resolve` hook, addProperty edge cases, InitObject setters, ASSetPropFlags edge cases |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
@@ -130,7 +130,7 @@ Last updated: 2026-02-25
 2. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (2 lines)
 
 ### Medium ROI — feature phases with multiple test payoff
-3. **OOP_SUPER_EXTENDS_PLAN** — core super done (6/8 pass); `super_edge_cases` remaining 13 lines blocked by addProperty integration + MovieClip __constructor__ handling
+3. **OOP_SUPER_EXTENDS_PLAN** — core super done (6/8 pass); `super_edge_cases` 36/39 — remaining 3 lines blocked by SUPER value stored as __proto__ in makeSuperWith pattern
 4. **REGISTERCLASS_PLAN Phases 1-2** — ExportAssets parsing + attachMovie handler (Phase 0 register fixes already passing)
 5. **FRAME_NAVIGATION_PLAN Phase 1-2** — frame labels + execution ordering, 4 tests (goto_frame, goto_frame2, goto_label, goto_methods)
 6. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, 4 remaining tests
@@ -141,35 +141,23 @@ Last updated: 2026-02-25
 9. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8)
 10. **REGISTERCLASS_PLAN Phases 1-5** — full ExportAssets + registerClass + constructor invocation, ~7-10 tests
 
-### super_edge_cases Blockers (26/39 pass, 13 lines remaining)
+### super_edge_cases Blockers (36/39 pass, 3 lines remaining)
 
-Lines 1-26 pass. Remaining failures:
+Lines 1-33 pass. Lines 37-39 pass (content matches, shifted by 3). Remaining 3 failures:
 
-**Lines 27-31: `addProperty`-based virtual `__constructor__`**
-- Test sets `__proto__.addProperty('__constructor__', getter, setter)` where getter returns the constructor function
-- Our `getPropertyWithPrototype()` reads raw property values — it does NOT invoke addProperty getters
-- Fix requires: `getPropertyWithPrototype` (or a new variant) must check if property is a virtual property (has getter) and invoke the getter function
-- Blocked by: PROTOTYPE_OBJECT_PLAN addProperty integration — `getProperty`/`getPropertyWithPrototype` currently bypass addProperty getters entirely
-- Impact: 3 lines (29-31)
+**Lines 34-36: `makeSuperWith` pattern — SUPER value as `__proto__`**
+- `makeSuperWith(obj.__proto__)` creates a helper with `getSuper: function() { return super; }`, calls it, and stores the returned SUPER value as `obj.__proto__`
+- When super() runs, `walkProtoChain(this, depth)` calls `getProperty(current, "__proto__")` which returns an `ACTION_STACK_VALUE_SUPER` (type 16) instead of an OBJECT — so the chain walk returns NULL
+- Fix requires: `walkProtoChain` (or `findPropertyStructWithPrototype`) to resolve SUPER values stored as `__proto__` into actual prototype chain objects
+- Impact: 3 lines (34-36)
 
-**Lines 32-36: `makeSuperWith` pattern**
-- Uses a helper that wraps `__proto__` with addProperty so `__constructor__` is virtual
-- Same root cause as lines 27-31 — addProperty getter invocation during `__constructor__` lookup
-- Fix is identical: once addProperty getters work in property lookup, this passes too
-- Impact: 4 lines (33-36) — line 32 is a comment that prints correctly once prior lines pass
-
-**Lines 37-39: `_root` as `__proto__` with `__constructor__`**
-- Sets `obj.__proto__ = _root` then `_root.__constructor__ = ctor`
-- Expected: `super(): undefined` (Flash treats _root specially, constructor call does NOT invoke)
-- Our code currently outputs nothing for these 3 lines (they never execute — the test ends early because the addProperty failures above cause line desync)
-- Real blocker: MovieClip objects as `__proto__` may need special handling in super() — once addProperty lines are fixed, this section may "just work" or may need `_root`/MovieClip special-casing
-- Impact: 3 lines (37-39)
-
-**Summary**: All 13 remaining lines are blocked by a single root cause — **addProperty getter invocation in property lookup**. This is shared with PROTOTYPE_OBJECT_PLAN (`add_property` test, 11/15 pass). Fixing property getter invocation in `getPropertyWithPrototype` would likely resolve all 13 lines (minus possibly the _root special case on lines 37-39).
+**Fixed (previously blocking)**:
+- ~~Lines 27-31: addProperty-based virtual `__constructor__`~~ — **FIXED**: replaced `getPropertyWithPrototype` with `findPropertyStructWithPrototype` + getter invocation at all 3 super() `__constructor__` lookup sites
+- ~~Lines 37-39: `_root` as `__proto__`~~ — **Now passes** (these lines output correctly once prior addProperty lines were fixed)
 
 ### Dependency Blockers (plans blocking other plans)
 - **TIMER_PLAN** blocks: LOADVARIABLES_PLAN (loadvariables2), LOADMOVIE_REMAINING_PLAN (mcl_events_swf_version)
-- **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining `super_edge_cases` blocked by PROTOTYPE_OBJECT_PLAN (addProperty getters). NATIVE_INTROSPECTION Phase 3 no longer blocked (super mechanism works)
+- **OOP_SUPER_EXTENDS_PLAN** — core super() done; addProperty getters now invoked in super() paths; remaining 3 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
 - **MOUSE_EVENTS_PLAN** blocks: FOCUS_SYSTEM_PLAN, BUTTON_PLAN (8 tests), DRAG_DROP_PLAN, CLONE_DUPLICATE_PLAN (clip_event_propagation_order)
 - **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests)
 - **TELLTARGET_PLAN** blocks: THIS_BINDING_PLAN Phase 6 (this_scoping remaining 10 lines)

@@ -7,7 +7,7 @@ Last updated: 2026-02-22
 
 Many features from this plan have been implemented since 2026-02-14. Per-object `addProperty`, `isPrototypeOf`, `Object.prototype.watch/unwatch`, ASSetPropFlags, and prototype chain enumeration are all now functional.
 
-### CI Results (2026-02-22)
+### CI Results (2026-02-25)
 
 **Core tests** (4):
 - `is_prototype_of` — **PASS** ✅ (was 59/89)
@@ -16,7 +16,7 @@ Many features from this plan have been implemented since 2026-02-14. Per-object 
 - `prototype_properties` — **PASS** ✅ (was 12/17)
 
 **Related Object System tests** (8):
-- `add_property` — output_mismatch (was 0/15) — partial improvement
+- `add_property` — output_mismatch 11/15 (compiles now — stale FrameLabelEntry typedef fixed; remaining 4 lines = prototype chain getter invocation in non-super paths)
 - `object_properties` — **PASS** ✅ (was 0/31)
 - `as_set_prop_flags` — output_mismatch (was 16/79) — partial improvement
 - `as_set_prop_flags_version` — **PASS** ✅ (was 21/31)
@@ -25,7 +25,9 @@ Many features from this plan have been implemented since 2026-02-14. Per-object 
 - `boxed_primitives` — **PASS** ✅ (was 12/25)
 - `init_object_order` — output_mismatch (was 0/15)
 
-**Summary**: 8 of 12 tests now PASS (was 0 of 12). Remaining issues: `__resolve` hook, addProperty edge cases, ASSetPropFlags flag enforcement, InitObject setter invocation.
+**Summary**: 8 of 12 tests now PASS (was 0 of 12). Remaining issues: `__resolve` hook, addProperty edge cases (prototype chain getter invocation in GetMember non-super paths), ASSetPropFlags flag enforcement, InitObject setter invocation.
+
+**Note on addProperty getters in super()**: All 3 super() `__constructor__` lookup sites now use `findPropertyStructWithPrototype` + getter invocation instead of `getPropertyWithPrototype`. This fixed `super_edge_cases` from 26/39 → 36/39. Phase 1 core infrastructure (per-object getter/setter on ASProperty, GetMember/SetMember invocation) was already implemented.
 
 ### What's been implemented
 - **isPrototypeOf()**: Fully implemented on Object.prototype, walks __proto__ chain

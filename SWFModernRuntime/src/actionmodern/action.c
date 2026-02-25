@@ -23052,9 +23052,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Only check __constructor__, NOT "constructor" — the "constructor" property
 				// on lazily-created prototypes (e.g. Base.prototype) would cause infinite
 				// recursion for the base class constructor.
-				ActionVar* ctor_var = getPropertyWithPrototype(base_proto, "__constructor__", 15);
-				if (ctor_var != NULL && ctor_var->type == ACTION_STACK_VALUE_FUNCTION)
-					parent_ctor = (ASFunction*) ctor_var->data.numeric_value;
+				ASProperty* ctor_prop = findPropertyStructWithPrototype(base_proto, "__constructor__", 15);
+				if (ctor_prop != NULL) {
+					if (ctor_prop->getter != NULL) {
+						ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop->getter, (void*)base_proto);
+						if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
+							parent_ctor = (ASFunction*) getter_result.data.numeric_value;
+					} else if (ctor_prop->value.type == ACTION_STACK_VALUE_FUNCTION) {
+						parent_ctor = (ASFunction*) ctor_prop->value.data.numeric_value;
+					}
+				}
 			}
 
 			if (parent_ctor != NULL)
@@ -26717,11 +26724,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		ASFunction* parent_ctor = NULL;
 		if (base_proto != NULL)
 		{
-			ActionVar* ctor_var = getPropertyWithPrototype(base_proto, "__constructor__", 15);
-			if (ctor_var == NULL || ctor_var->type != ACTION_STACK_VALUE_FUNCTION)
-				ctor_var = getPropertyWithPrototype(base_proto, "constructor", 11);
-			if (ctor_var != NULL && ctor_var->type == ACTION_STACK_VALUE_FUNCTION)
-				parent_ctor = (ASFunction*) ctor_var->data.numeric_value;
+			ASProperty* ctor_prop = findPropertyStructWithPrototype(base_proto, "__constructor__", 15);
+			if (ctor_prop != NULL) {
+				if (ctor_prop->getter != NULL) {
+					ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop->getter, (void*)base_proto);
+					if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
+						parent_ctor = (ASFunction*) getter_result.data.numeric_value;
+				} else if (ctor_prop->value.type == ACTION_STACK_VALUE_FUNCTION) {
+					parent_ctor = (ASFunction*) ctor_prop->value.data.numeric_value;
+				}
+			}
+			if (parent_ctor == NULL) {
+				ASProperty* ctor_prop2 = findPropertyStructWithPrototype(base_proto, "constructor", 11);
+				if (ctor_prop2 != NULL) {
+					if (ctor_prop2->getter != NULL) {
+						ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop2->getter, (void*)base_proto);
+						if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
+							parent_ctor = (ASFunction*) getter_result.data.numeric_value;
+					} else if (ctor_prop2->value.type == ACTION_STACK_VALUE_FUNCTION) {
+						parent_ctor = (ASFunction*) ctor_prop2->value.data.numeric_value;
+					}
+				}
+			}
 		}
 
 		if (parent_ctor != NULL)
@@ -26832,9 +26856,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (base_proto != NULL) {
 				// Search prototype chain from base_proto for __constructor__
 				// (Ruffle uses get_opt which walks the full __proto__ chain)
-				ActionVar* ctor_var = getPropertyWithPrototype(base_proto, "__constructor__", 15);
-				if (ctor_var != NULL && ctor_var->type == ACTION_STACK_VALUE_FUNCTION)
-					parent_ctor = (ASFunction*) ctor_var->data.numeric_value;
+				ASProperty* ctor_prop = findPropertyStructWithPrototype(base_proto, "__constructor__", 15);
+				if (ctor_prop != NULL) {
+					if (ctor_prop->getter != NULL) {
+						ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop->getter, (void*)base_proto);
+						if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
+							parent_ctor = (ASFunction*) getter_result.data.numeric_value;
+					} else if (ctor_prop->value.type == ACTION_STACK_VALUE_FUNCTION) {
+						parent_ctor = (ASFunction*) ctor_prop->value.data.numeric_value;
+					}
+				}
 			}
 			ActionVar ctor_result = {0};
 			ctor_result.type = ACTION_STACK_VALUE_UNDEFINED;
