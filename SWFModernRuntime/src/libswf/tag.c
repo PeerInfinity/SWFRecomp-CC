@@ -45,6 +45,14 @@ size_t g_place_gen = 0;
 // parent-frame DoAction (matching Ruffle's execution order).
 int g_defer_sprite_init = 0;
 
+// Frame filter for process_sprite_needs_init during deferred init.
+// When g_sprite_init_filter_active=1, only process sprites matching the filter:
+//   g_sprite_init_before_target=1: only placed_at_frame < g_sprite_init_target_frame
+//   g_sprite_init_before_target=0: only placed_at_frame >= g_sprite_init_target_frame
+static int g_sprite_init_filter_active = 0;
+static int g_sprite_init_before_target = 0;
+static size_t g_sprite_init_target_frame = 0;
+
 // g_settarget_explicit_root: set by actionSetTarget("_root"/"") to distinguish
 // "goto root" from "goto unnamed sprite with inherited root context".
 // Declared in action.c; saved/cleared/restored here per sprite-frame invocation.
@@ -83,12 +91,55 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 // parent_mc: the MovieClip that "owns" the current display_list (used as
 //            parent when creating child MCs, so _parent is set correctly).
 // ---------------------------------------------------------------------------
+// Forward declaration for the inner processing logic (processes a single depth index).
+static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* parent_mc, size_t depth_idx);
+
 static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* parent_mc)
 {
-	for (size_t i = 1; i <= max_depth; i++)
+	// When frame filter is active, process in placed_at_frame order (not depth order)
+	// to match Ruffle's placement-ordered initialization.
+	if (g_sprite_init_filter_active)
 	{
+		// Collect eligible depth indices, then sort by placed_at_frame
+		size_t eligible[256];
+		size_t eligible_count = 0;
+		for (size_t i = 1; i <= max_depth && i < 256; i++)
+		{
+			DisplayObject* obj = &display_list[i];
+			if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
+			if (g_sprite_init_before_target && obj->placed_at_frame >= g_sprite_init_target_frame)
+				continue;
+			if (!g_sprite_init_before_target && obj->placed_at_frame < g_sprite_init_target_frame)
+				continue;
+			eligible[eligible_count++] = i;
+		}
+		// Simple insertion sort by placed_at_frame (usually very few entries)
+		for (size_t a = 1; a < eligible_count; a++)
+		{
+			size_t key = eligible[a];
+			size_t key_frame = display_list[key].placed_at_frame;
+			int b = (int)a - 1;
+			while (b >= 0 && display_list[eligible[b]].placed_at_frame > key_frame)
+			{
+				eligible[b + 1] = eligible[b];
+				b--;
+			}
+			eligible[b + 1] = key;
+		}
+		for (size_t k = 0; k < eligible_count; k++)
+			process_sprite_init_at_depth(app_context, parent_mc, eligible[k]);
+		return;
+	}
+
+	// Normal path: iterate by depth
+	for (size_t i = 1; i <= max_depth; i++)
+		process_sprite_init_at_depth(app_context, parent_mc, i);
+}
+
+static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* parent_mc, size_t i)
+{
 		DisplayObject* obj = &display_list[i];
-		if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
+		if (obj->char_id == 0 || !obj->sprite_needs_init) return;
 
 		Character* ch = &dictionary[obj->char_id];
 
@@ -182,6 +233,15 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			max_depth             = saved_max;
 			display_list_capacity = saved_cap;
 
+			// Invoke registered class constructor if this sprite has an exported symbol with a registered class
+			{
+				extern const char* ng_lookupExportName(size_t char_id);
+				extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
+				const char* export_name = ng_lookupExportName(obj->char_id);
+				if (export_name != NULL && child_mc != NULL)
+					actionInvokeRegisteredClassConstructor(app_context, export_name, child_mc);
+			}
+
 			// Fire CLIP_EVENT_ENTER_FRAME after initialization (children first via recursive init above)
 			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
 			{
@@ -242,7 +302,6 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			max_depth             = saved_max;
 			display_list_capacity = saved_cap;
 		}
-	}
 }
 
 #else
@@ -2446,13 +2505,9 @@ int hasPlayingSprites(void)
 	return 0;
 }
 
-// Run the deferred sprite-init block that was skipped by tagShowFrame during
-// ng_executeGotoCatchUp (when g_defer_sprite_init was set).
-// Must be called after the deferred parent-frame DoAction script executes,
-// so that sprite init scripts fire in the correct Flash/Ruffle order:
-//   1. Parent frame DoAction ("root 2")
-//   2. Child sprite init scripts ("childA frame 1", "childB frame 1")
-void ng_run_deferred_sprite_init(SWFAppContext* app_context)
+// Run deferred sprite-init with optional frame filter.
+// filter_mode: 0=all, 1=only placed_at_frame < target, 2=only placed_at_frame >= target
+static void ng_run_deferred_sprite_init_impl(SWFAppContext* app_context, int filter_mode, size_t target_frame)
 {
 	extern void ng_sync_root_display_obj(void);
 	ng_sync_root_display_obj();
@@ -2461,8 +2516,17 @@ void ng_run_deferred_sprite_init(SWFAppContext* app_context)
 	extern int g_enterframe_new_mc_start;
 	int mc_count_before = child_mc_count;
 
+	if (filter_mode != 0)
+	{
+		g_sprite_init_filter_active = 1;
+		g_sprite_init_before_target = (filter_mode == 1) ? 1 : 0;
+		g_sprite_init_target_frame = target_frame;
+	}
+
 	catch_up_mode = 0;
 	process_sprite_needs_init(app_context, &root_movieclip);
+
+	g_sprite_init_filter_active = 0;
 
 	ng_fire_pending_loads(app_context);
 	ng_fire_pending_attach_inits(app_context);
@@ -2471,6 +2535,26 @@ void ng_run_deferred_sprite_init(SWFAppContext* app_context)
 	g_enterframe_new_mc_start = mc_count_before;
 	actionDispatchEnterFrameHandlers(app_context);
 	g_enterframe_new_mc_start = -1;
+}
+
+// Run ALL deferred sprite inits (used when no target frame distinction needed).
+void ng_run_deferred_sprite_init(SWFAppContext* app_context)
+{
+	ng_run_deferred_sprite_init_impl(app_context, 0, 0);
+}
+
+// Run deferred sprite inits only for sprites placed BEFORE target_frame.
+// Ruffle phase 1: children placed before target frame init before target DoAction.
+void ng_run_deferred_sprite_init_before(SWFAppContext* app_context, size_t target_frame)
+{
+	ng_run_deferred_sprite_init_impl(app_context, 1, target_frame);
+}
+
+// Run deferred sprite inits only for sprites placed ON or AFTER target_frame.
+// Ruffle phase 3: children placed on target frame init after target DoAction.
+void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t target_frame)
+{
+	ng_run_deferred_sprite_init_impl(app_context, 2, target_frame);
 }
 
 // Clear display entries whose placed_at_frame is after target_frame.

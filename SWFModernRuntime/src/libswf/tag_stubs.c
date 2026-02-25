@@ -149,6 +149,14 @@ size_t ng_lookupExport(const char* name)
 	return result;
 }
 
+const char* ng_lookupExportName(size_t char_id)
+{
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (ng_exported_symbols[i].char_id == char_id)
+			return ng_exported_symbols[i].name;
+	return NULL;
+}
+
 // ---------------------------------------------------------------------------
 // Clone depth table — tracks which variable name occupies each SWF depth for
 // script-created clones (CloneSprite / duplicateMovieClip). When a new clone
@@ -403,6 +411,7 @@ extern MovieClip* g_current_context;
 #define MAX_PENDING_ATTACH_INITS 64
 typedef struct {
 	char instance_name[256];
+	char export_name[128];  // For registered class constructor invocation
 	frame_func func;
 	int swf_depth;
 } PendingAttachInit;
@@ -461,6 +470,12 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
+
+		// Invoke registered class constructor after frame script runs
+		if (g_pending_attach_inits[i].export_name[0] != '\0' && mc != NULL) {
+			extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
+			actionInvokeRegisteredClassConstructor(app_context, g_pending_attach_inits[i].export_name, mc);
+		}
 	}
 	g_pending_attach_init_count = 0;
 }
@@ -599,6 +614,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		// If an init is already pending for the same SWF depth, replace it
 		// (re-attaching at the same depth supersedes the previous init)
 		{
+			const char* exp_name = ng_lookupExportName(char_id);
 			int found = 0;
 			for (size_t qi = 0; qi < g_pending_attach_init_count; qi++) {
 				if (g_pending_attach_inits[qi].swf_depth == swf_depth) {
@@ -607,6 +623,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 					g_pending_attach_inits[qi].instance_name[
 						sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
 					g_pending_attach_inits[qi].func = funcs[0];
+					if (exp_name) { strncpy(g_pending_attach_inits[qi].export_name, exp_name, 127); g_pending_attach_inits[qi].export_name[127] = '\0'; }
+					else g_pending_attach_inits[qi].export_name[0] = '\0';
 					found = 1;
 					break;
 				}
@@ -618,6 +636,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 					sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
 				g_pending_attach_inits[g_pending_attach_init_count].func = funcs[0];
 				g_pending_attach_inits[g_pending_attach_init_count].swf_depth = swf_depth;
+				if (exp_name) { strncpy(g_pending_attach_inits[g_pending_attach_init_count].export_name, exp_name, 127); g_pending_attach_inits[g_pending_attach_init_count].export_name[127] = '\0'; }
+				else g_pending_attach_inits[g_pending_attach_init_count].export_name[0] = '\0';
 				g_pending_attach_init_count++;
 			}
 		}

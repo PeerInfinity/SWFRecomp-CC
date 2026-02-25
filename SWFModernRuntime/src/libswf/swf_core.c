@@ -558,14 +558,24 @@ void swfStart(SWFAppContext* app_context)
 			// to the normal advance logic below.
 		}
 
-		// Run deferred goto script: when ng_executeGotoCatchUp processed tags inline
-		// but deferred the target frame's script, run it now (after the calling script
-		// finished, so trace ordering is correct: calling script traces appear before
-		// target frame's traces).
+		// Run deferred goto script with Ruffle-compatible 3-phase ordering:
+		//   Phase 1: Sprites placed BEFORE target frame → init before target DoAction
+		//   Phase 2: Target frame DoAction runs
+		//   Phase 3: Sprites placed ON/AFTER target frame → init after target DoAction
 		while (g_deferred_goto_script)
 		{
 			size_t target = g_deferred_goto_target;
 			g_deferred_goto_script = 0;
+
+			extern int g_defer_sprite_init;
+			extern void ng_run_deferred_sprite_init_before(SWFAppContext* app_context, size_t target_frame);
+			extern void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t target_frame);
+
+			// Phase 1: Init sprites placed in intermediate frames (before target)
+			g_defer_sprite_init = 0;
+			ng_run_deferred_sprite_init_before(app_context, target);
+
+			// Phase 2: Run the target frame's script
 			if (target < g_frame_count && funcs[target])
 			{
 				// Run the target frame function in "scripts-only" mode:
@@ -577,14 +587,9 @@ void swfStart(SWFAppContext* app_context)
 				// If the script triggered another goto, g_deferred_goto_script
 				// will be set again and the loop continues.
 			}
-			// Run sprite init scripts deferred from ng_executeGotoCatchUp.
-			// Flash/Ruffle order: parent-frame DoAction first, then child sprite inits.
-			// Clear g_defer_sprite_init before calling so that tagShowFrame calls
-			// inside ng_run_deferred_sprite_init work normally.
-			extern int g_defer_sprite_init;
-			extern void ng_run_deferred_sprite_init(SWFAppContext* app_context);
-			g_defer_sprite_init = 0;
-			ng_run_deferred_sprite_init(app_context);
+
+			// Phase 3: Init sprites placed on the target frame (after target DoAction)
+			ng_run_deferred_sprite_init_on_or_after(app_context, target);
 		}
 
 		// Process timers after frame actions + deferred scripts

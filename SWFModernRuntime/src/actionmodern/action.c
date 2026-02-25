@@ -453,6 +453,59 @@ static int g_next_timer_id = 1;
 // Forward declarations for timer functions
 static void actionSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num_args, int is_interval);
 static void actionClearInterval(SWFAppContext* app_context, ActionVar* args, u32 num_args);
+ActionStackValueType convertString(SWFAppContext* app_context, char* var_str);
+
+// ==================================================================
+// Object.registerClass Registry
+// ==================================================================
+// Note: uses void* for constructor pointers because ASFunction is defined
+// later in this file. Cast to ASFunction* when accessing.
+#define MAX_REGISTERED_CLASSES 128
+
+typedef struct {
+	char symbol_name[128];
+	void* constructor; // ASFunction* or NULL (unregistered)
+} RegisteredClassEntry;
+
+static RegisteredClassEntry g_registered_classes[MAX_REGISTERED_CLASSES];
+static size_t g_registered_class_count = 0;
+
+// Look up a registered class constructor by symbol name.
+// Returns NULL if not found or if unregistered (constructor == NULL).
+void* lookupRegisteredClass(const char* symbol_name)
+{
+	// Last match wins (in case of re-registration)
+	void* result = NULL;
+	for (size_t i = 0; i < g_registered_class_count; i++)
+	{
+		if (strcmp(g_registered_classes[i].symbol_name, symbol_name) == 0)
+			result = g_registered_classes[i].constructor;
+	}
+	return result;
+}
+
+// Register or unregister a class for a symbol name.
+// constructor=NULL means unregister.
+static void registerClassForSymbol(const char* symbol_name, void* constructor)
+{
+	// Check if already registered — update in place
+	for (size_t i = 0; i < g_registered_class_count; i++)
+	{
+		if (strcmp(g_registered_classes[i].symbol_name, symbol_name) == 0)
+		{
+			g_registered_classes[i].constructor = constructor;
+			return;
+		}
+	}
+	// New entry
+	if (g_registered_class_count < MAX_REGISTERED_CLASSES)
+	{
+		strncpy(g_registered_classes[g_registered_class_count].symbol_name, symbol_name, 127);
+		g_registered_classes[g_registered_class_count].symbol_name[127] = '\0';
+		g_registered_classes[g_registered_class_count].constructor = constructor;
+		g_registered_class_count++;
+	}
+}
 
 // ==================================================================
 // Recursion Depth Limit
@@ -562,6 +615,51 @@ typedef struct {
 } WatchEntry;
 static WatchEntry g_watch_table[MAX_WATCH_ENTRIES];
 static int g_watch_count = 0;
+
+// Object.registerClass(symbolName, constructorFunc)
+// Returns true on success, false on invalid args.
+static ActionVar actionObjectRegisterClass(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_BOOLEAN;
+
+	// Need at least 2 args
+	if (arg_count < 2)
+	{
+		result.data.numeric_value = 0; // false
+		return result;
+	}
+
+	// Coerce first arg (symbol name) to string via the stack
+	pushVar(app_context, &args[0]);
+	char _rc_buf[17];
+	convertString(app_context, _rc_buf);
+	char symbol_buf[256];
+	u32 sym_len = (u32)u16_to_utf8((const uint16_t*)STACK_TOP_VALUE, STACK_TOP_N, symbol_buf, sizeof(symbol_buf) - 1);
+	symbol_buf[sym_len] = '\0';
+	POP();
+
+	// Second arg: null = unregister, function = register, anything else = false
+	if (args[1].type == ACTION_STACK_VALUE_NULL)
+	{
+		// Unregister
+		registerClassForSymbol(symbol_buf, NULL);
+		result.data.numeric_value = 1; // true
+		return result;
+	}
+
+	if (args[1].type != ACTION_STACK_VALUE_FUNCTION)
+	{
+		result.data.numeric_value = 0; // false
+		return result;
+	}
+
+	ASFunction* ctor = (ASFunction*)(uintptr_t)args[1].data.numeric_value;
+	registerClassForSymbol(symbol_buf, (void*)ctor);
+	result.data.numeric_value = 1; // true
+	return result;
+}
 
 // Built-in toString for Object(primitive) wrappers — returns valueOf as string
 static ActionVar builtin_wrapper_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -14796,6 +14894,7 @@ void actionGetVariable(SWFAppContext* app_context)
 		{
 			// Return the built-in Object constructor as a function
 			static ASFunction g_object_constructor;
+			static ASFunction g_registerClass_func;
 			static int g_object_constructor_init = 0;
 			if (!g_object_constructor_init)
 			{
@@ -14807,6 +14906,14 @@ void actionGetVariable(SWFAppContext* app_context)
 				// Point prototype_obj at the REAL g_object_prototype so that
 				// Object.prototype identity checks (isPrototypeOf etc.) work correctly
 				g_object_constructor.prototype_obj = getObjectPrototype(app_context);
+
+				// Add registerClass as a static method on Object (own_props)
+				g_object_constructor.own_props = allocObject(app_context, 4);
+				retainObject(g_object_constructor.own_props);
+				registerGeomMethod(&g_registerClass_func, "registerClass",
+					(Function2Ptr)actionObjectRegisterClass, app_context,
+					g_object_constructor.own_props);
+
 				g_object_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
@@ -21536,6 +21643,139 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 }
 
+// Invoke the registered class constructor on a timeline-placed movieclip.
+// Called from tag.c during sprite init when the sprite's export name has a registered class.
+// Sets __proto__ to ctor.prototype, then calls the constructor with mc as 'this'.
+void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
+{
+	if (export_name == NULL || mc == NULL) return;
+	void* raw_ctor = lookupRegisteredClass(export_name);
+	if (raw_ctor == NULL) return;
+
+	ASFunction* ctor_func = (ASFunction*)raw_ctor;
+
+	// Ensure the MC has dynamic_props for property storage
+	if (mc->dynamic_props == NULL)
+	{
+		mc->dynamic_props = allocObject(app_context, 8);
+		retainObject((ASObject*)mc->dynamic_props);
+	}
+	ASObject* obj = (ASObject*)mc->dynamic_props;
+
+	// Set __proto__ to constructor's prototype
+	if (ctor_func->prototype_obj == NULL)
+	{
+		ctor_func->prototype_obj = allocObject(app_context, 4);
+		retainObject(ctor_func->prototype_obj);
+		setObjectProto(app_context, ctor_func->prototype_obj);
+		ActionVar ctor_var;
+		ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+		ctor_var.str_size = 0;
+		ctor_var.data.numeric_value = (u64) ctor_func;
+		setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+	}
+	{
+		ActionVar proto_var;
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.str_size = 0;
+		proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
+		setProperty(app_context, obj, "__proto__", 9, &proto_var);
+	}
+
+	// Set __constructor__ on the instance
+	{
+		ActionVar ctor_inst_var;
+		ctor_inst_var.type = ACTION_STACK_VALUE_FUNCTION;
+		ctor_inst_var.str_size = 0;
+		ctor_inst_var.data.numeric_value = (u64) ctor_func;
+		setPropertyWithFlags(app_context, obj, "__constructor__", 15, &ctor_inst_var, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	// Push super context for constructor call
+	pushSuperContext((void*)obj, 1);
+
+	// Switch to MC's context for the constructor call
+	MovieClip* saved_ctx = g_current_context;
+	actionSetCurrentContext(mc);
+
+	// Call constructor with mc as 'this' (MOVIECLIP type, not OBJECT)
+	if (ctor_func->function_type == 1 && ctor_func->simple_func != NULL)
+	{
+		// Type 1: simple function — set 'this' as MOVIECLIP variable
+		ActionVar this_var;
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.str_size = 0;
+		this_var.data.numeric_value = (u64) mc;
+		setVariableByName("this", &this_var);
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))ctor_func->simple_func)(app_context);
+		g_call_depth--;
+	}
+	else if (ctor_func->function_type == 2 && ctor_func->advanced_func != NULL)
+	{
+		// Type 2: advanced function with registers
+		ActionVar registers[256] = {0};
+
+		ASObject* ctor_scope = allocObject(app_context, 4);
+		u32 saved_this_depth = g_this_depth;
+		{
+			u16 f2flags = ctor_func->flags;
+			int preload_this  = (f2flags & 0x0001);
+			int suppress_this = (f2flags & 0x0002);
+			if (!preload_this && !suppress_this) {
+				if (g_this_depth < MAX_THIS_DEPTH) {
+					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+					g_this_stack[g_this_depth].data.numeric_value = (u64)mc;
+					g_this_depth++;
+				}
+				ActionVar ctor_this_var = {0};
+				ctor_this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+				ctor_this_var.data.numeric_value = (u64)mc;
+				setProperty(app_context, ctor_scope, "this", 4, &ctor_this_var);
+			}
+		}
+
+		// Restore captured scope chain entries (closure support)
+		u8 captured = ctor_func->captured_scope_count;
+		for (u8 ci = 0; ci < captured; ci++) {
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = ctor_func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = ctor_func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = ctor_func->captured_scope[ci];
+			}
+		}
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = ctor_scope;
+		}
+
+		// SWF6+ closure: switch to function's base_clip context
+		MovieClip* saved_base = NULL;
+		if (g_swf_version >= 6 && ctor_func->base_clip != NULL) {
+			saved_base = g_current_context;
+			actionSetCurrentContext(ctor_func->base_clip);
+		}
+
+		g_call_depth++;
+		ctor_func->advanced_func(app_context, NULL, 0, registers, (void*)mc);
+		g_call_depth--;
+
+		if (saved_base != NULL)
+			actionSetCurrentContext(saved_base);
+
+		// Pop local scope + captured scopes
+		for (u8 ci = 0; ci < captured + 1; ci++) {
+			if (scope_depth > 0) scope_depth--;
+		}
+		releaseObject(app_context, ctor_scope);
+		g_this_depth = saved_this_depth;
+	}
+
+	popSuperContext();
+	actionSetCurrentContext(saved_ctx);
+}
+
 /**
  * ActionNewMethod (0x53) - Create new object by calling method on object as constructor
  *
@@ -24318,6 +24558,31 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (char_id != (size_t)-1) {
 				MovieClip* attached = ng_attachMovie(app_context, char_id, _am_buf2, depth_val, mc);
 				if (attached != NULL) {
+					// Set __proto__ from registered class (if any) BEFORE initObject
+					// Constructor invocation happens in ng_fire_pending_attach_inits (deferred)
+					{
+						void* reg_ctor = lookupRegisteredClass(_am_buf1);
+						if (reg_ctor != NULL) {
+							ASFunction* ctor_func = (ASFunction*)reg_ctor;
+							if (attached->dynamic_props == NULL) {
+								attached->dynamic_props = (void*) allocObject(app_context, 8);
+								retainObject((ASObject*) attached->dynamic_props);
+							}
+							if (ctor_func->prototype_obj == NULL) {
+								ctor_func->prototype_obj = allocObject(app_context, 4);
+								retainObject(ctor_func->prototype_obj);
+								setObjectProto(app_context, ctor_func->prototype_obj);
+								ActionVar ctor_var = {0};
+								ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+								ctor_var.data.numeric_value = (u64) ctor_func;
+								setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+							}
+							ActionVar proto_var = {0};
+							proto_var.type = ACTION_STACK_VALUE_OBJECT;
+							proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
+							setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+						}
+					}
 					// Apply initObject if present
 					if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
 						ASObject* init_obj = (ASObject*)(uintptr_t)args[3].data.numeric_value;
@@ -28200,6 +28465,31 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (attached != NULL) {
 						// Copy URL from parent
 						strncpy(attached->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(attached->url) - 1);
+
+						// Set __proto__ from registered class (if any) BEFORE initObject
+						{
+							void* reg_ctor = lookupRegisteredClass(linkage_id);
+							if (reg_ctor != NULL) {
+								ASFunction* ctor_func = (ASFunction*)reg_ctor;
+								if (attached->dynamic_props == NULL) {
+									attached->dynamic_props = (void*) allocObject(app_context, 8);
+									retainObject((ASObject*) attached->dynamic_props);
+								}
+								if (ctor_func->prototype_obj == NULL) {
+									ctor_func->prototype_obj = allocObject(app_context, 4);
+									retainObject(ctor_func->prototype_obj);
+									setObjectProto(app_context, ctor_func->prototype_obj);
+									ActionVar ctor_var = {0};
+									ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+									ctor_var.data.numeric_value = (u64) ctor_func;
+									setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+								}
+								ActionVar proto_var = {0};
+								proto_var.type = ACTION_STACK_VALUE_OBJECT;
+								proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
+								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+							}
+						}
 
 						// Apply initObject properties (arg 3) if provided
 						if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {

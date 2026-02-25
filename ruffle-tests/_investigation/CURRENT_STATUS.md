@@ -4,9 +4,9 @@ Last updated: 2026-02-25
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 348/619 (56.2%)
-- **Main failure types**: output_mismatch (~263), segfault (5), runtime_error (4), timeout (1)
-- **Recent gains**: All 13 goto tests now pass (was 11/13). Key fixes: closure context reset in actionCallFunction, out-of-bounds goto script suppression. Also locally fixed: clone_sprite_types (not yet in CI).
+- **Pass rate (CI, last run)**: 356/619 (57.5%) — 309/479 filtered (64.5%)
+- **Main failure types**: output_mismatch (~255), segfault (5), runtime_error (4), compile_fail (many due to FrameLabelEntry typedef conflict), timeout (1)
+- **Recent gains**: +9 tests in last CI run. Timer system (set_interval ✅). Goto execution ordering fix (execution_order3, goto_execution_order2 regressions fixed locally). Newly passing in CI: define_function2_preload, function_suppress_and_preload, as_set_prop_flags_version (6 variants), swf5_no_closure, define_function2_preload_order, execution_order2.
 
 ## Crashes and Errors (8 tests)
 
@@ -17,8 +17,8 @@ Last updated: 2026-02-25
 | native_objects_swf6 | segfault | 0/84 | Crashes constructing native Flash classes (filters, geom, etc.) |
 | native_objects_swf7 | segfault | 0/84 | Same root cause as swf6 |
 | native_objects_swf8 | segfault | 0/84 | Same root cause as swf6 |
-| movieclip_invalid_get_bounds_6 | compile_fail | 0/? | Needs button/clip_actions symbol renaming (fixed locally, not in CI yet) |
-| movieclip_invalid_get_bounds_7 | compile_fail | 0/? | Same fix as _6 (fixed locally, not in CI yet) |
+| movieclip_invalid_get_bounds_6 | runtime_error | 0/0 | FrameLabelEntry typedef fixed; now hits runtime error |
+| movieclip_invalid_get_bounds_7 | runtime_error | 0/0 | Same as _6 |
 | timeout | timeout | 0/0 | Infinite loop — needs script execution timeout mechanism |
 
 ## Top Near-Passing Tests (best ROI to fix)
@@ -47,38 +47,51 @@ Last updated: 2026-02-25
 | `string_paths_basic` | 4/4 ✅ | Basic path resolution |
 | `attach_movie` | ✅ | Deferred init dedup + sprite child persistence |
 | `empty_movieclip_can_attach_movies` | ✅ | Sprite display list persistence |
+| `define_function2_preload` | 13/13 ✅ | DefineFunction2 preload flags |
+| `function_suppress_and_preload` | 28/28 ✅ | DefineFunction2 suppress+preload |
+| `define_function2_preload_order` | 4/4 ✅ | Reverse function registry lookup |
+| `swf5_no_closure` | 19/19 ✅ | SWF5 context switch for MC user-methods |
+| `execution_order2` | 7/7 ✅ | Deferred sprite init ordering |
+| `execution_order3` | 4/4 ✅ | 3-phase goto sprite init ordering |
+| `goto_execution_order2` | 2/2 ✅ | Placement-ordered sprite init |
+| `as_set_prop_flags_version` | 31/31 ✅ | ASSetPropFlags version gating |
+| `as_set_prop_flags_version_swf5-9` | 1/1 each ✅ | Version-specific variants |
+| `set_interval` | 27/27 ✅ | Timer system (setInterval/setTimeout/clearInterval) |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
+| `movieclip_default_state` | 66/69 (95.7%) | _totalframes=0 vs 1, _url path difference |
 | `selection` | 434/454 (95.6%) | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
 | `hittest_morph` | 67/70 (95.7%) | Morph shape bounds interpolation |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
-| `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
+| `property_invalid_base_clip` | 34/36 (94.4%) | getProperty path resolution without leading _root |
 
 ### 80-90%
 | Test | Match | Issue |
 |------|-------|-------|
-| `movieclip_focusenabled` | **PASS** ✅ | Fixed: dot-path resolution in getMovieClipByTarget |
+| `movieclip_library_state_values` | 70/78 (89.7%) | Library sprite default state values |
+| `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
+| `super_edge_cases` | 33/39 (84.6%) | makeSuperWith: SUPER value as __proto__ (3 lines), addProperty virtual __constructor__ (3 lines) |
 | `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
 | `function_base_clip_readded` | 9/11 (81.8%) | _parent resolution after removal+re-add |
-| `this_scoping` | 42/52 (80.8%) | `this` binding in various call contexts |
+| `function_base_clip_removed` | 20/25 (80.0%) | base_clip after function definer removed |
 
 ### 70-80%
 | Test | Match | Issue |
 |------|-------|-------|
 | `as_set_prop_flags` | 62/79 (78.5%) | ASSetPropFlags with valueOf/toString coercion |
-| `movieclip_hittest` | **PASS** ✅ | hitTest point + clip, coordinate transforms |
 | `edittext_restrict` | 147/191 (77.0%) | TextField.restrict pattern matching |
 | `tab_ordering_tabbable` | 36/47 (76.6%) | Tab navigation |
 | `tab_ordering_automatic_order_same_position` | 9/12 (75.0%) | Tab navigation |
 | `rewind_depth` | 22/30 (73.3%) | Backward goto depth handling |
-| `add_property` | 11/15 (73.3%) | Object.addProperty (compiles now — was stale FrameLabelEntry typedef; remaining 4 lines = prototype chain getter invocation in non-super paths) |
-| `attach_movie` | **PASS** ✅ | Fixed: deferred init dedup + sprite child persistence |
-| `empty_movieclip_can_attach_movies` | **PASS** ✅ | Fixed: sprite display list persistence for child lookup |
+| `add_property` | 11/15 (73.3%) | Object.addProperty prototype chain getter invocation |
+
+### FrameLabelEntry compile_fail (FIXED)
+202 tests had stale `FrameLabelEntry` typedef in generated tagMain.c conflicting with tag.h. Fixed by removing the stale typedefs from all generated files. The recompiler was already updated to not emit the typedef, but pre-existing generated files needed cleanup. Many tests that were compile_fail now compile and run (some pass, some have output_mismatch).
 
 ## Plan Implementation Status
 
@@ -104,7 +117,7 @@ Last updated: 2026-02-25
 | STAGE_FRAME_PROPS_PLAN | **Phases 1,5 DONE** | Several stages pass | Phase 2 (shape bounds), Phase 3 (content bounds) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
-| OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 36/39 — addProperty getters now invoked; remaining 3 lines = makeSuperWith (SUPER value as __proto__); `funky_function_calls` segfaults |
+| OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 33/39 — remaining 6 lines = makeSuperWith (SUPER as __proto__) + addProperty virtual __constructor__; `funky_function_calls` segfaults |
 | REGISTERCLASS_PLAN | **Phase 0 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅ | Phases 1-5: Object.registerClass, ExportAssets, constructor invocation |
 | PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 8/12 pass | Remaining: `__resolve` hook, addProperty edge cases, InitObject setters, ASSetPropFlags edge cases |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
@@ -141,9 +154,9 @@ Last updated: 2026-02-25
 9. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8)
 10. **REGISTERCLASS_PLAN Phases 1-5** — full ExportAssets + registerClass + constructor invocation, ~7-10 tests
 
-### super_edge_cases Blockers (36/39 pass, 3 lines remaining)
+### super_edge_cases Blockers (33/39 — 6 lines remaining)
 
-Lines 1-33 pass. Lines 37-39 pass (content matches, shifted by 3). Remaining 3 failures:
+Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 
 **Lines 34-36: `makeSuperWith` pattern — SUPER value as `__proto__`**
 - `makeSuperWith(obj.__proto__)` creates a helper with `getSuper: function() { return super; }`, calls it, and stores the returned SUPER value as `obj.__proto__`
