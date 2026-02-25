@@ -40,6 +40,11 @@ static int g_script_only_mode = 0;
 // Incremented at the end of each tagShowFrame call and before goto catch-up.
 size_t g_place_gen = 0;
 
+// When 1, tagShowFrame defers process_sprite_needs_init.
+// Set by ng_executeGotoCatchUp so sprite init scripts run AFTER the deferred
+// parent-frame DoAction (matching Ruffle's execution order).
+int g_defer_sprite_init = 0;
+
 // g_settarget_explicit_root: set by actionSetTarget("_root"/"") to distinguish
 // "goto root" from "goto unnamed sprite with inherited root context".
 // Declared in action.c; saved/cleared/restored here per sprite-frame invocation.
@@ -91,9 +96,17 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 		{
 			// Pre-create/sync the child MC while still in the parent's display_list
 			// context so x/y are synced from the correct transform entry.
+			// Even unnamed sprites need a MC with the correct parent so that
+			// _parent preloading and base_clip context work correctly.
 			MovieClip* child_mc = NULL;
 			if (obj->instance_name != NULL)
 				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			else
+			{
+				char anon_name[32];
+				snprintf(anon_name, sizeof(anon_name), "__anon_depth_%zu__", i);
+				child_mc = actionFindOrCreateMovieClip(app_context, anon_name, parent_mc);
+			}
 			if (child_mc) child_mc->display_obj = (void*)obj;
 
 			// sprite_needs_init == 2: Phase 1 (placement) ran eagerly; run Phase 2
@@ -819,6 +832,11 @@ void tagShowFrame(SWFAppContext* app_context)
 	// sprite_needs_init=1 is set by ng_on_place_object2 when a sprite or button is placed.
 	// We run frame 0 here (in the same tick as placement) to match Flash behavior.
 	// process_sprite_needs_init handles CHAR_TYPE_SPRITE and CHAR_TYPE_BUTTON recursively.
+	//
+	// When g_defer_sprite_init is set (during ng_executeGotoCatchUp), we skip this block.
+	// Sprite init scripts must run AFTER the deferred parent-frame DoAction, not before.
+	// ng_run_deferred_sprite_init() handles the deferred case.
+	if (!g_defer_sprite_init)
 	{
 		// Sync root display sentinel before nested init — child scripts may access
 		// root children via GetMember(root_mc, name) while display_list is swapped.
@@ -2426,6 +2444,33 @@ int hasPlayingSprites(void)
 			return 1;
 	}
 	return 0;
+}
+
+// Run the deferred sprite-init block that was skipped by tagShowFrame during
+// ng_executeGotoCatchUp (when g_defer_sprite_init was set).
+// Must be called after the deferred parent-frame DoAction script executes,
+// so that sprite init scripts fire in the correct Flash/Ruffle order:
+//   1. Parent frame DoAction ("root 2")
+//   2. Child sprite init scripts ("childA frame 1", "childB frame 1")
+void ng_run_deferred_sprite_init(SWFAppContext* app_context)
+{
+	extern void ng_sync_root_display_obj(void);
+	ng_sync_root_display_obj();
+
+	extern int child_mc_count;
+	extern int g_enterframe_new_mc_start;
+	int mc_count_before = child_mc_count;
+
+	catch_up_mode = 0;
+	process_sprite_needs_init(app_context, &root_movieclip);
+
+	ng_fire_pending_loads(app_context);
+	ng_fire_pending_attach_inits(app_context);
+	actionFirePendingLoadInits(app_context);
+
+	g_enterframe_new_mc_start = mc_count_before;
+	actionDispatchEnterFrameHandlers(app_context);
+	g_enterframe_new_mc_start = -1;
 }
 
 // Clear display entries whose placed_at_frame is after target_frame.

@@ -103,6 +103,11 @@ static const u16 flash_hide_masks[] = {
 };
 #define FLASH_HIDE_MASK (g_swf_version <= 10 ? flash_hide_masks[g_swf_version] : 0)
 
+// Check if a property with given flash_flags is hidden at the current SWF version
+int isPropertyHiddenAtVersion(u16 flash_flags) {
+	return (FLASH_HIDE_MASK != 0) && ((flash_flags & FLASH_HIDE_MASK) != 0);
+}
+
 /**
  * Object Allocation
  *

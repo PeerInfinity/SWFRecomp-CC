@@ -2467,7 +2467,10 @@ void swf_setup_arguments_props(SWFAppContext* app_context, ASArray* arr)
 
 // Helper to look up function by name
 static ASFunction* lookupFunctionByName(const char* name, u32 name_len) {
-	for (u32 i = 0; i < function_count; i++) {
+	// Search in reverse order (most recently defined first) so that function
+	// redefinitions at the same scope level shadow earlier definitions.
+	// In ActionScript, defining "f" twice means the second definition wins.
+	for (int i = (int)function_count - 1; i >= 0; i--) {
 		if (strlen(function_registry[i]->name) == name_len &&
 		    strncmp(function_registry[i]->name, name, name_len) == 0) {
 			return function_registry[i];
@@ -9698,6 +9701,19 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			}
 			break;
 		}
+		case ACTION_STACK_VALUE_SUPER:
+		{
+			// Super acts as an object proxy; stringify like an object
+			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+			if (g_swf_version < 5) {
+				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_type_Object;
+				STACK_TOP_N = 13;
+			} else {
+				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
+				STACK_TOP_N = 15;
+			}
+			break;
+		}
 		default:
 			// STRING already UTF-16; other types leave as-is
 			break;
@@ -11914,6 +11930,46 @@ void actionTrace(SWFAppContext* app_context)
 				POP();
 			}
 			printf("\n");
+			break;
+		}
+
+		case ACTION_STACK_VALUE_SUPER:
+		{
+			// SUPER is a virtual (this, depth) proxy for the ancestor prototype.
+			// Trace it by walking the proto chain and calling toString, exactly
+			// like the OBJECT case — so the result matches what Flash produces.
+			// Use depth+1: the stored depth is the "current class" level;
+			// super refers to one level above that (the parent class proto).
+			ASObject* super_this = (ASObject*) STACK_TOP_VALUE;
+			u8 super_depth = (u8) STACK_TOP_N;
+			ASObject* super_obj = walkProtoChain(super_this, super_depth + 1);
+			if (super_obj != NULL)
+			{
+				ActionVar super_obj_var;
+				super_obj_var.type = ACTION_STACK_VALUE_OBJECT;
+				super_obj_var.data.numeric_value = (u64) super_obj;
+				int ts_found = 0;
+				ActionVar ts = objectCallToString(app_context, &super_obj_var, &ts_found);
+				if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
+				{
+					const uint16_t* u16 = varGetU16Ptr(&ts);
+					if (u16 && ts.str_size > 0)
+					{
+						char utf8_buf[4096];
+						int utf8_len = u16_to_utf8(u16, ts.str_size, utf8_buf, sizeof(utf8_buf));
+						fwrite(utf8_buf, 1, utf8_len, stdout);
+					}
+					printf("\n");
+				}
+				else
+				{
+					printf("[type Object]\n");
+				}
+			}
+			else
+			{
+				printf("[type Object]\n");
+			}
 			break;
 		}
 
@@ -14297,22 +14353,6 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// GetVariable("super") — return a SUPER proxy value from context stack
-	// SWF6 Pattern A: super is accessed via GetVariable, not a register
-	// The SUPER type carries (this, depth) so CallMethod can resolve correctly.
-	if (var_name_len == 5 && strncmp(var_name, "super", 5) == 0) {
-		if (hasSuperContext()) {
-			ActionVar super_var = {0};
-			super_var.type = ACTION_STACK_VALUE_SUPER;
-			super_var.data.numeric_value = (u64)getSuperThis();
-			super_var.str_size = (u32)getSuperDepth();
-			pushVar(app_context, &super_var);
-		} else {
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-		}
-		return;
-	}
-
 	// Early "this" resolution — mirrors Ruffle's Activation.resolve() which checks
 	// this_cell() BEFORE any scope chain or variable table lookup.
 	// SetVariable("this") mutates the current this binding (g_this_stack entry).
@@ -14416,6 +14456,21 @@ void actionGetVariable(SWFAppContext* app_context)
 				return;
 			}
 		}
+	}
+
+	// Fallback: GetVariable("super") when not found in scope chain
+	// (for non-function contexts or type-1 functions without local scope setup)
+	if (var_name_len == 5 && strncmp(var_name, "super", 5) == 0) {
+		if (hasSuperContext()) {
+			ActionVar super_var = {0};
+			super_var.type = ACTION_STACK_VALUE_SUPER;
+			super_var.data.numeric_value = (u64)getSuperThis();
+			super_var.str_size = (u32)getSuperDepth();
+			pushVar(app_context, &super_var);
+		} else {
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		}
+		return;
 	}
 
 	// Inside tellTarget (non-root context): use target clip's variable scope
@@ -18618,11 +18673,14 @@ void actionSetMember(SWFAppContext* app_context)
 					int _md = 256;
 					while (_cur != NULL && _md-- > 0) {
 						ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
-						if (_ps != NULL && (_ps->getter != NULL || _ps->setter != NULL)) {
-							setter_prop = _ps;
-							break;
+						if (_ps != NULL) {
+							if (!isPropertyHiddenAtVersion(_ps->flash_flags)) {
+								if (_ps->getter != NULL || _ps->setter != NULL) {
+									setter_prop = _ps;
+								}
+							}
+							break; // stop traversal (found or hidden)
 						}
-						if (_ps != NULL) break; // found but not virtual
 						ActionVar* _np = getProperty(_cur, "__proto__", 9);
 						if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
 						ASObject* _next = (ASObject*) _np->data.numeric_value;
@@ -19846,6 +19904,9 @@ void actionGetMember(SWFAppContext* app_context)
 			while (_cur != NULL && _md-- > 0) {
 				ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
 				if (_ps != NULL) {
+					if (isPropertyHiddenAtVersion(_ps->flash_flags)) {
+						break;  // Property hidden by ASSetPropFlags — stop traversal
+					}
 					prop_struct = _ps;
 					break;
 				}
@@ -24446,14 +24507,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						args_var.data.numeric_value = (u64)arguments_arr;
 						setProperty(app_context, local_scope, "arguments", 9, &args_var);
 					}
-					if (!f2_preload_super && !f2_suppress_super) {
-						ActionVar super_var = {0};
-						if (hasSuperContext()) {
+					{
+						// Base case (no preload/suppress + super context): expose super as named variable.
+						// Suppress/preload: super variable not accessible by name — set to undefined.
+						ActionVar super_var;
+						super_var.type = ACTION_STACK_VALUE_UNDEFINED;
+						super_var.data.numeric_value = 0;
+						super_var.str_size = 0;
+						if (!f2_preload_super && !f2_suppress_super && hasSuperContext()) {
 							super_var.type = ACTION_STACK_VALUE_SUPER;
 							super_var.data.numeric_value = (u64)getSuperThis();
 							super_var.str_size = (u32)getSuperDepth();
-						} else {
-							super_var.type = ACTION_STACK_VALUE_UNDEFINED;
 						}
 						setProperty(app_context, local_scope, "super", 5, &super_var);
 					}
@@ -27205,15 +27269,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					args_var.data.numeric_value = (u64)arguments_arr;
 					setProperty(app_context, local_scope, "arguments", 9, &args_var);
 				}
-				if (!f2_preload_super && !f2_suppress_super) {
-					// Set super on scope chain (SUPER type with this+depth)
-					ActionVar super_var = {0};
-					if (hasSuperContext()) {
+				{
+					// Base case (no preload/suppress + super context): expose super as named variable.
+					// Suppress/preload: super variable not accessible by name — set to undefined.
+					ActionVar super_var;
+					super_var.type = ACTION_STACK_VALUE_UNDEFINED;
+					super_var.data.numeric_value = 0;
+					super_var.str_size = 0;
+					if (!f2_preload_super && !f2_suppress_super && hasSuperContext()) {
 						super_var.type = ACTION_STACK_VALUE_SUPER;
 						super_var.data.numeric_value = (u64)getSuperThis();
 						super_var.str_size = (u32)getSuperDepth();
-					} else {
-						super_var.type = ACTION_STACK_VALUE_UNDEFINED;
 					}
 					setProperty(app_context, local_scope, "super", 5, &super_var);
 				}
@@ -29560,11 +29626,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_call_depth++;
 
 						// SWF6+ closure: switch to function's base_clip
+						// SWF5: no closures — execute in receiver's context (mc)
 						MovieClip* saved_cm_context = g_current_context;
 						DisplayObject* saved_cm_sprite = g_current_sprite_obj;
 						if (g_swf_version >= 6 && func->base_clip != NULL)
 						{
 							actionSetCurrentContext(func->base_clip);
+							g_current_sprite_obj = NULL;
+						}
+						else if (g_swf_version < 6 && mc != NULL)
+						{
+							actionSetCurrentContext(mc);
 							g_current_sprite_obj = NULL;
 						}
 

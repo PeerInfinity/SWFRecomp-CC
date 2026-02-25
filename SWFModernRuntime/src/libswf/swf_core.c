@@ -78,8 +78,13 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	// after the calling script finishes.
 	// Save/restore g_tag_skip_mode so nested gotos (from deferred scripts)
 	// properly process tags.
+	// Set g_defer_sprite_init so tagShowFrame defers process_sprite_needs_init:
+	// sprite init scripts must fire AFTER the deferred parent-frame DoAction.
 	int saved_tag_skip = g_tag_skip_mode;
+	extern int g_defer_sprite_init;
+	int saved_defer_sprite = g_defer_sprite_init;
 	g_tag_skip_mode = 0;
+	g_defer_sprite_init = 1;
 	catch_up_mode = 1;
 	if (target <= original_frame)
 	{
@@ -102,6 +107,11 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	}
 	catch_up_mode = 0;
 	g_tag_skip_mode = saved_tag_skip;
+	// Do NOT restore g_defer_sprite_init here — keep it set so that the
+	// calling frame's tagShowFrame (which runs after this returns) also defers
+	// sprite init. g_defer_sprite_init is cleared in the deferred-script loop
+	// after ng_run_deferred_sprite_init completes.
+	(void)saved_defer_sprite;
 	current_frame = target;
 
 	// Leave goto_from_action and manual_next_frame set so the main loop
@@ -566,6 +576,14 @@ void swfStart(SWFAppContext* app_context)
 				// If the script triggered another goto, g_deferred_goto_script
 				// will be set again and the loop continues.
 			}
+			// Run sprite init scripts deferred from ng_executeGotoCatchUp.
+			// Flash/Ruffle order: parent-frame DoAction first, then child sprite inits.
+			// Clear g_defer_sprite_init before calling so that tagShowFrame calls
+			// inside ng_run_deferred_sprite_init work normally.
+			extern int g_defer_sprite_init;
+			extern void ng_run_deferred_sprite_init(SWFAppContext* app_context);
+			g_defer_sprite_init = 0;
+			ng_run_deferred_sprite_init(app_context);
 		}
 
 		// Advance to next frame

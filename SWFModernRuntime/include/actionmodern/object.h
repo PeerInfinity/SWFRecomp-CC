@@ -120,6 +120,9 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length);
 ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length);
 
+// Check if a property with given flash_flags is hidden at the current SWF version
+int isPropertyHiddenAtVersion(u16 flash_flags);
+
 // Delete property by name (returns true if deleted or not found, false if protected)
 // Handles refcount management if value is an object
 bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length);
