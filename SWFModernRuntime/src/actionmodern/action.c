@@ -418,6 +418,11 @@ typedef struct ASFunction {
 	ASObject* captured_scope[8];   // scope objects
 	MovieClip* captured_scope_mc[8]; // associated MovieClip (if any)
 	u8 captured_scope_is_with[8]; // 1 = with scope, 0 = local scope
+
+	// Closure context: the MovieClip where this function was defined
+	// SWF6+: GotoFrame/GetProperty("") operate on base_clip, not caller's context
+	// SWF5: base_clip is not used (functions execute in caller's context)
+	MovieClip* base_clip;
 } ASFunction;
 
 // Function registry
@@ -22638,6 +22643,9 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
 
+	// Capture the defining MovieClip as base_clip (SWF6+ closure context)
+	as_func->base_clip = g_current_context;
+
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
 	// SWF5 does NOT support closures — only SWF6+ captures the scope chain.
@@ -22700,6 +22708,9 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	as_func->flags = flags;
 	as_func->prototype_obj = NULL;
 	as_func->own_props = NULL;
+
+	// Capture the defining MovieClip as base_clip (SWF6+ closure context)
+	as_func->base_clip = g_current_context;
 
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
@@ -24055,14 +24066,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			// SWF6+ closure semantics: the function executes in its
 			// definition context (base_clip), not the caller's context.
-			// Since we don't track definition context on ASFunction, we
-			// approximate by resetting to root (where most functions are
-			// defined). This makes GotoFrame/GetProperty("") inside the
-			// function operate on root, not the calling sprite.
+			// SWF5 does NOT have closures — functions execute in the caller's context.
 			MovieClip* saved_cf_context = g_current_context;
 			DisplayObject* saved_cf_sprite = g_current_sprite_obj;
-			actionSetCurrentContext(&root_movieclip);
-			g_current_sprite_obj = NULL;
+			if (g_swf_version >= 6 && func->base_clip != NULL)
+			{
+				actionSetCurrentContext(func->base_clip);
+				g_current_sprite_obj = NULL;
+			}
 
 			if (func->function_type == 2)
 			{
@@ -28972,10 +28983,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_current_executing_func = func;
 						g_call_depth++;
 
-						// Do NOT switch g_current_context to the MC here.
-						// The 'this' binding is already set on the scope chain.
-						// Raw SWF opcodes (GotoFrame, GetProperty) should use
-						// the caller's timeline context, not the method receiver.
+						// SWF6+ closure: switch to function's base_clip
+						MovieClip* saved_cm_context = g_current_context;
+						DisplayObject* saved_cm_sprite = g_current_sprite_obj;
+						if (g_swf_version >= 6 && func->base_clip != NULL)
+						{
+							actionSetCurrentContext(func->base_clip);
+							g_current_sprite_obj = NULL;
+						}
 
 						ActionVar result;
 						if (func->function_type == 1 && func->simple_func != NULL) {
@@ -28998,6 +29013,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 						g_call_depth--;
 						g_current_executing_func = prev_exec_mc;
+
+						// Restore caller's context
+						actionSetCurrentContext(saved_cm_context);
+						g_current_sprite_obj = saved_cm_sprite;
 
 						// Pop local scope + captured scopes
 						for (u8 ci = 0; ci < mc_captured + 1; ci++) {
