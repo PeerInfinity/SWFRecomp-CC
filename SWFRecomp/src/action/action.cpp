@@ -250,9 +250,9 @@ namespace SWFRecomp
 					out_script << "\t\t" << "actionCatchEnter(app_context);" << endl;
 					if (tb.catch_in_register)
 					{
-						if (context.inside_function2)
+						if (context.inside_function2 && (int)tb.catch_register < context.function2_register_count)
 						{
-							// DefineFunction2 uses local registers — get exception value directly
+							// DefineFunction2, local register — get exception value directly
 							out_script << "\t\t" << "actionCatchGetException(app_context, &regs[" << (int)tb.catch_register << "]);" << endl;
 						}
 						else
@@ -1108,8 +1108,16 @@ namespace SWFRecomp
 
 					if (context.inside_function2)
 					{
-						// Inside DefineFunction2: store to local registers array
-						out_script << "\t" << "peekVar(app_context, &regs[" << (int)register_num << "]);" << endl;
+						if ((int)register_num < context.function2_register_count)
+						{
+							// Inside DefineFunction2, register is local: store to local registers array
+							out_script << "\t" << "peekVar(app_context, &regs[" << (int)register_num << "]);" << endl;
+						}
+						else
+						{
+							// Inside DefineFunction2, register bleeds through to caller: use global
+							out_script << "\t" << "actionStoreRegister(app_context, " << (int)register_num << ");" << endl;
+						}
 					}
 					else
 					{
@@ -1524,7 +1532,9 @@ namespace SWFRecomp
 
 				// Set flag to indicate we're inside a DefineFunction2 (for local register handling)
 				bool prev_inside_function2 = context.inside_function2;
+				int prev_function2_register_count = context.function2_register_count;
 				context.inside_function2 = true;
+				context.function2_register_count = (int)register_count;
 
 				char* temp_ptr = temp_buffer;
 				parseActions(context, temp_ptr, context.out_script_defs);
@@ -1532,6 +1542,7 @@ namespace SWFRecomp
 
 				// Restore previous state
 				context.inside_function2 = prev_inside_function2;
+				context.function2_register_count = prev_function2_register_count;
 
 				// Advance the actual buffer past the function body
 				action_buffer = func_body_end;
@@ -1754,8 +1765,16 @@ namespace SWFRecomp
 
 							if (context.inside_function2)
 							{
-								// Inside DefineFunction2: use local registers array
-								out_script << "\t" << "pushVar(app_context, &regs[" << (int)register_num << "]);" << endl;
+								if ((int)register_num < context.function2_register_count)
+								{
+									// Inside DefineFunction2, register is local: use local registers array
+									out_script << "\t" << "pushVar(app_context, &regs[" << (int)register_num << "]);" << endl;
+								}
+								else
+								{
+									// Inside DefineFunction2, register bleeds through to caller: use global
+									out_script << "\t" << "actionPushRegister(app_context, " << (int)register_num << ");" << endl;
+								}
 							}
 							else
 							{

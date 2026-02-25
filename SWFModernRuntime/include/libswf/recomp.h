@@ -16,4 +16,7 @@
 // while tag functions (PlaceObject, RemoveObject, etc.) still execute.
 #ifdef NO_GRAPHICS
 extern int catch_up_mode;
+// When set, tag functions are no-ops but scripts still run.
+// Used for deferred goto script execution (tags already processed inline).
+extern int g_tag_skip_mode;
 #endif

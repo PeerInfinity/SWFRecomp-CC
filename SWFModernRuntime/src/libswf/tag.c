@@ -1,6 +1,7 @@
 #include <swf.h>
 #include <tag.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -16,6 +17,7 @@ extern RenderContext* context;
 extern float transform_data[][16];
 extern float cxform_data[];
 extern int catch_up_mode;
+extern int g_tag_skip_mode;
 #include <action.h>
 #endif
 
@@ -808,6 +810,7 @@ static void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
+	if (g_tag_skip_mode) return;
 	// --- Fire deferred onUnload handlers from removeMovieClip ---
 	// These are queued mid-script and fire between frames, matching Flash behavior.
 	actionFirePendingUnloads(app_context);
@@ -1574,6 +1577,9 @@ static void fire_deferred_construct(SWFAppContext* app_context, DisplayObject* d
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
+#ifdef NO_GRAPHICS
+	if (g_tag_skip_mode) return;
+#endif
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
 #ifdef NO_GRAPHICS
@@ -1809,6 +1815,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
 {
+#ifdef NO_GRAPHICS
+	if (g_tag_skip_mode) return;
+#endif
 	// Set pending so tagPlaceObject2 attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
@@ -1831,6 +1840,9 @@ void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* cli
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
 {
+#ifdef NO_GRAPHICS
+	if (g_tag_skip_mode) return;
+#endif
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
 #ifdef NO_GRAPHICS
@@ -1993,6 +2005,9 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count)
 {
+#ifdef NO_GRAPHICS
+	if (g_tag_skip_mode) return;
+#endif
 	// Set pending so tagPlaceObject2Ratio attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
@@ -2131,6 +2146,9 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
+#ifdef NO_GRAPHICS
+	if (g_tag_skip_mode) return;
+#endif
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
 #ifdef NO_GRAPHICS
@@ -2198,6 +2216,51 @@ void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* fun
 	dictionary[char_id].type = CHAR_TYPE_SPRITE;
 	dictionary[char_id].sprite_frame_funcs = funcs;
 	dictionary[char_id].sprite_frame_count = frame_count;
+}
+
+// Per-sprite frame label storage (separate from Character union)
+#define MAX_SPRITE_LABEL_ENTRIES 256
+static struct {
+	size_t char_id;
+	FrameLabelEntry* labels;
+	size_t count;
+} sprite_label_store[MAX_SPRITE_LABEL_ENTRIES];
+static size_t sprite_label_store_count = 0;
+
+void tagSetSpriteLabels(size_t char_id, FrameLabelEntry* labels, size_t count)
+{
+	if (sprite_label_store_count >= MAX_SPRITE_LABEL_ENTRIES) return;
+	sprite_label_store[sprite_label_store_count].char_id = char_id;
+	sprite_label_store[sprite_label_store_count].labels = labels;
+	sprite_label_store[sprite_label_store_count].count = count;
+	sprite_label_store_count++;
+}
+
+int ng_findSpriteLabelFrame(size_t char_id, const char* label)
+{
+	if (!label) return -1;
+	for (size_t i = 0; i < sprite_label_store_count; i++)
+	{
+		if (sprite_label_store[i].char_id == char_id)
+		{
+			FrameLabelEntry* entries = sprite_label_store[i].labels;
+			size_t count = sprite_label_store[i].count;
+			// Exact match first
+			for (size_t j = 0; j < count; j++)
+			{
+				if (entries[j].label && strcmp(entries[j].label, label) == 0)
+					return (int)entries[j].frame;
+			}
+			// Case-insensitive fallback (ASCII only, like Flash)
+			for (size_t j = 0; j < count; j++)
+			{
+				if (entries[j].label && strcasecmp(entries[j].label, label) == 0)
+					return (int)entries[j].frame;
+			}
+			return -1;
+		}
+	}
+	return -1;
 }
 
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count)

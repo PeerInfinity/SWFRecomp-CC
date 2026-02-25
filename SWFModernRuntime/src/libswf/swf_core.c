@@ -51,6 +51,9 @@ int catch_up_mode = 0;
 int goto_from_action = 0;
 int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
 size_t catch_up_target = 0;   // target frame for backward goto protection
+int g_deferred_goto_script = 0;     // 1 if target frame script should run after calling script
+size_t g_deferred_goto_target = 0;  // target frame whose script is deferred
+int g_tag_skip_mode = 0;            // 1 = tag functions are no-ops (scripts-only re-run)
 
 // Execute goto catch-up inline (called from actionGotoFrame)
 // Processes intermediate frame tags and target frame tags immediately
@@ -66,44 +69,54 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	frame_func* funcs = g_frame_funcs;
 	size_t original_frame = current_frame;
 	size_t target = next_frame;
-	manual_next_frame = 0;
-	goto_from_action = 0;
 
 	ng_display_clear_after(app_context, target);
 
+	// Process ALL frames (intermediate + target) with catch_up_mode=1
+	// so only tags execute (PlaceObject, etc.) and scripts are suppressed.
+	// The target frame's script will run later via the main loop's catch-up
+	// after the calling script finishes.
+	// Save/restore g_tag_skip_mode so nested gotos (from deferred scripts)
+	// properly process tags.
+	int saved_tag_skip = g_tag_skip_mode;
+	g_tag_skip_mode = 0;
 	catch_up_mode = 1;
 	if (target <= original_frame)
 	{
 		catch_up_backward = 1;
 		catch_up_target = target;
-		for (size_t f = 0; f < target && f < g_frame_count; f++)
+		for (size_t f = 0; f <= target && f < g_frame_count; f++)
 		{
 			current_frame = f;
 			if (funcs[f]) funcs[f](app_context);
-		}
-		catch_up_mode = 0;
-		if (target < g_frame_count)
-		{
-			current_frame = target;
-			if (funcs[target]) funcs[target](app_context);
 		}
 		catch_up_backward = 0;
 	}
 	else
 	{
-		for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
+		for (size_t f = original_frame + 1; f <= target && f < g_frame_count; f++)
 		{
 			current_frame = f;
 			if (funcs[f]) funcs[f](app_context);
 		}
-		catch_up_mode = 0;
-		if (target < g_frame_count)
-		{
-			current_frame = target;
-			if (funcs[target]) funcs[target](app_context);
-		}
 	}
+	catch_up_mode = 0;
+	g_tag_skip_mode = saved_tag_skip;
 	current_frame = target;
+
+	// Leave goto_from_action and manual_next_frame set so the main loop
+	// will run the target frame's script after the calling script finishes.
+	// But we need to clear them to avoid double-processing of tags.
+	// Instead, set a flag for the main loop to run ONLY the target frame's script.
+	goto_from_action = 0;
+	manual_next_frame = 0;
+
+	// Queue the target frame's script to run after the calling script returns.
+	// We use a simple static flag + frame number for the main loop to check.
+	extern int g_deferred_goto_script;
+	extern size_t g_deferred_goto_target;
+	g_deferred_goto_script = 1;
+	g_deferred_goto_target = target;
 }
 
 // ---------------------------------------------------------------------------
@@ -532,6 +545,27 @@ void swfStart(SWFAppContext* app_context)
 
 			// After catch-up, the goto's advance is consumed; fall through
 			// to the normal advance logic below.
+		}
+
+		// Run deferred goto script: when ng_executeGotoCatchUp processed tags inline
+		// but deferred the target frame's script, run it now (after the calling script
+		// finished, so trace ordering is correct: calling script traces appear before
+		// target frame's traces).
+		while (g_deferred_goto_script)
+		{
+			size_t target = g_deferred_goto_target;
+			g_deferred_goto_script = 0;
+			if (target < g_frame_count && funcs[target])
+			{
+				// Run the target frame function in "scripts-only" mode:
+				// g_tag_skip_mode=1 causes tag functions to return immediately,
+				// while catch_up_mode=0 allows script calls to execute.
+				g_tag_skip_mode = 1;
+				funcs[target](app_context);
+				g_tag_skip_mode = 0;
+				// If the script triggered another goto, g_deferred_goto_script
+				// will be set again and the loop continues.
+			}
 		}
 
 		// Advance to next frame

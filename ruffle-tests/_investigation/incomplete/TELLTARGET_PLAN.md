@@ -1,12 +1,14 @@
 # TellTarget / Target Path Resolution Implementation Plan
 <!-- TESTS: tell_target, tell_target_invalid, tell_target_invalid_swf6, target_clip_swf5, target_clip_swf6, target_clip_removed, path_string, slash_syntax, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes, removed_base_clip_tell_target, removed_target_clip_scope -->
 
-Last updated: 2026-02-22
+Last updated: 2026-02-25
 
 ## Status: PARTIALLY IMPLEMENTED
 
-### CI Results (2026-02-22)
-All core tellTarget tests still fail on CI:
+### CI Results (2026-02-25)
+Some progress since plan was written:
+- `slash_syntax` ✅ — **NOW PASSING** in CI (was 0/14)
+- `string_paths_basic` ✅ — **NOW PASSING** in CI (was 2/4)
 - `tell_target` — output_mismatch
 - `removed_base_clip_tell_target` — output_mismatch
 - `removed_clip_halts_script` — output_mismatch
@@ -66,12 +68,12 @@ Internal MovieClip `target` fields use slash-path format: `"/"` for root, `"/cli
 ### Slash Syntax (1 test)
 | Test | Lines | Current Match | Notes |
 |------|-------|--------------|-------|
-| slash_syntax | 14 | 0/14 (0%) | Colon syntax, absolute/relative slash paths, `..` parent nav |
+| slash_syntax | 14 | **14/14 PASS** ✅ | Colon syntax, absolute/relative slash paths, `..` parent nav |
 
 ### String Paths (9 tests)
 | Test | Lines | Current Match | Notes |
 |------|-------|--------------|-------|
-| string_paths_basic | 4 | 2/4 (50%) | Basic eval + path resolution |
+| string_paths_basic | 4 | **4/4 PASS** ✅ | Basic eval + path resolution |
 | string_paths_eval | 4 | 0/4 (0%) | eval() function resolving paths |
 | string_paths_eval2 | 7 | 1/7 (14%) | eval() with loadMovie (partially network) |
 | string_paths_hidden | 54 | 34/54 (63%) | get() with shapes as path components |

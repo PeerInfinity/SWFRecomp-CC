@@ -1,7 +1,7 @@
 # RegisterClass and Export/Registration Implementation Plan
 <!-- TESTS: register_class_return_value, register_class, register_class_swf6, register_class_with_sound, register_and_init_order, register_globals_across_frames, register_underflow, attach_movie, attach_movie_stop, export_assets, clip_constructors, on_construct, movieclip_init_object, empty_movieclip_can_attach_movies, do_init_action_child -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-25
 
 ## Overview
 
@@ -33,13 +33,13 @@ These are addressed in Phase 0 as quick wins before the main RegisterClass work.
 
 | Test | Lines | Current | Why |
 |------|-------|---------|-----|
-| attach_movie | 59 | 43/59 (73%) | Needs ExportAssets + attachMovie |
+| attach_movie | 59 | **PASS** ✅ | Now passing in CI (was 43/59) |
 | attach_movie_stop | 3 | 1/3 | Needs attachMovie |
 | export_assets | 3 | 2/3 | Needs ExportAssets + attachMovie |
 | clip_constructors | 8 | 0/8 | Needs registerClass + constructor invocation |
 | on_construct | 25 | 0/25 | Needs onConstruct event + registerClass |
 | movieclip_init_object | 5 | 0/5 | Needs attachMovie initObject |
-| empty_movieclip_can_attach_movies | 11 | 8/11 | Needs attachMovie |
+| empty_movieclip_can_attach_movies | 11 | **PASS** ✅ | Now passing in CI (was 8/11) |
 
 ---
 

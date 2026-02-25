@@ -479,7 +479,7 @@ namespace SWFRecomp
 			while (last_queued_script < next_script_i)
 			{
 				if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
-					context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
+					context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 				last_queued_script += 1;
 			}
 
@@ -528,13 +528,8 @@ namespace SWFRecomp
 		context.tag_main << "};" << endl
 						 << endl;
 
-		// Generate frame label data
-		context.tag_main << "// Frame labels (label -> frame number)" << endl
-						 << "typedef struct {" << endl
-						 << "\tconst char* label;" << endl
-						 << "\tsize_t frame;" << endl
-						 << "} FrameLabelEntry;" << endl
-						 << endl;
+		// Generate frame label data (FrameLabelEntry typedef is in tag.h)
+		context.tag_main << "// Frame labels (label -> frame number)" << endl;
 
 		if (frame_labels.empty())
 		{
@@ -703,7 +698,7 @@ namespace SWFRecomp
 				while (last_queued_script < next_script_i)
 				{
 					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
-						context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
+						context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 					last_queued_script += 1;
 				}
 
@@ -728,7 +723,13 @@ namespace SWFRecomp
 			
 			case SWF_TAG_FRAME_LABEL:
 			{
-				// Skip FrameLabel tags for now (parse label string and advance cur_pos)
+				// Parse null-terminated label string
+				const char* label_str = cur_pos;
+				std::string label(label_str);
+				// next_frame_i has already been incremented when the frame function was opened,
+				// so the current frame being built is next_frame_i - 1
+				// Use insert to keep first occurrence (Flash uses first label for navigation)
+				frame_labels.insert({label, next_frame_i - 1});
 				cur_pos += tag.length;
 
 				break;
@@ -739,7 +740,7 @@ namespace SWFRecomp
 				while (last_queued_script < next_script_i)
 				{
 					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
-						context.tag_main << "\t" << "if (!catch_up_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
+						context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
 					last_queued_script += 1;
 				}
 
@@ -2156,6 +2157,7 @@ namespace SWFRecomp
 						   << "void script_" << next_script_i << "(SWFAppContext* app_context)" << endl
 						   << "{" << endl;
 				out_script << "\t" << "char str_buffer[17];" << endl << endl;
+				out_script << "\t" << "actionResetRegisters();" << endl << endl;
 
 				next_script_i += 1;
 
@@ -2197,6 +2199,7 @@ namespace SWFRecomp
 						   << "void " << func_name << "(SWFAppContext* app_context)" << endl
 						   << "{" << endl;
 				out_script << "\t" << "char str_buffer[17];" << endl << endl;
+				out_script << "\t" << "actionResetRegisters();" << endl << endl;
 
 				next_script_i += 1;
 
@@ -2928,6 +2931,7 @@ namespace SWFRecomp
 								   << "void " << func_name << "(SWFAppContext* app_context)" << endl
 								   << "{" << endl;
 						out_script << "\t" << "char str_buffer[17];" << endl << endl;
+						out_script << "\t" << "actionResetRegisters();" << endl << endl;
 						next_script_i += 1;
 
 						action.parseActions(context, cur_pos, out_script);
@@ -3245,6 +3249,7 @@ namespace SWFRecomp
 
 				// Parse sprite sub-tags and generate sprite frame functions
 				size_t sprite_frame_i = 0;
+				std::unordered_map<std::string, size_t> sprite_labels;
 				bool sprite_another_frame = false;
 				// Buffer for DoAction (script) calls in current sprite frame.
 				// These are emitted AFTER all placement tags to match Flash Player
@@ -4041,7 +4046,12 @@ namespace SWFRecomp
 
 						case SWF_TAG_FRAME_LABEL:
 						{
-							// Skip frame labels in sprites for now
+							// Parse sprite frame label
+							const char* label_str = cur_pos;
+							std::string label(label_str);
+							// sprite_frame_i has already been incremented after opening the frame function,
+							// so the current frame being built is sprite_frame_i - 1
+							sprite_labels.insert({label, sprite_frame_i - 1});
 							cur_pos += sub_tag.length;
 							break;
 						}
@@ -4059,6 +4069,7 @@ namespace SWFRecomp
 											  << "void " << script_name << "(SWFAppContext* app_context)" << endl
 											  << "{" << endl;
 							sprite_out_script << "\t" << "char str_buffer[17];" << endl << endl;
+							sprite_out_script << "\t" << "actionResetRegisters();" << endl << endl;
 
 							next_script_i += 1;
 
@@ -4106,6 +4117,25 @@ namespace SWFRecomp
 					sprite_definitions << "\t" << sp << "_frame_" << to_string(i) << "," << endl;
 				}
 				sprite_definitions << "};" << endl << endl;
+
+				// Generate per-sprite frame label table and registration call
+				if (!sprite_labels.empty())
+				{
+					sprite_definitions << "FrameLabelEntry " << sp << "_frame_labels[] =" << endl
+									   << "{" << endl;
+					for (const auto& pair : sprite_labels)
+					{
+						sprite_definitions << "\t{ \"" << pair.first << "\", " << to_string(pair.second) << " }," << endl;
+					}
+					sprite_definitions << "\t{ NULL, 0 }" << endl
+									   << "};" << endl << endl;
+
+					// Register sprite labels in tagInit (after tagDefineSprite)
+					tag_init << endl << "\t" << "tagSetSpriteLabels("
+							 << to_string(sprite_id) << ", "
+							 << sp << "_frame_labels, "
+							 << to_string(sprite_labels.size()) << ");";
+				}
 
 				// Restore main timeline script queue — sprite-created scripts are
 				// called from sprite frame functions, not from main timeline frames.
@@ -4405,6 +4435,7 @@ namespace SWFRecomp
 								   << "void " << func_name << "(SWFAppContext* app_context)" << endl
 								   << "{" << endl;
 						out_script << "\t" << "char str_buffer[17];" << endl << endl;
+						out_script << "\t" << "actionResetRegisters();" << endl << endl;
 						next_script_i += 1;
 
 						action.parseActions(context, cur_pos, out_script);
@@ -4433,6 +4464,7 @@ namespace SWFRecomp
 								   << "void " << func_name << "(SWFAppContext* app_context)" << endl
 								   << "{" << endl;
 						out_script << "\t" << "char str_buffer[17];" << endl << endl;
+						out_script << "\t" << "actionResetRegisters();" << endl << endl;
 						next_script_i += 1;
 
 						action.parseActions(context, action_ptr, out_script);

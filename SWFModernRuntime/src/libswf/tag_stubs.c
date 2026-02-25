@@ -784,12 +784,13 @@ void ng_gotoFrameCurrentSprite(u16 frame)
 	if (obj == NULL || obj->char_id == 0) return;
 	Character* ch = &dictionary[obj->char_id];
 	if (ch->type != CHAR_TYPE_SPRITE) return;
-	if (frame < ch->sprite_frame_count)
-	{
-		obj->sprite_manual_next_frame = 1;
-		obj->sprite_next_frame = frame;
-		obj->sprite_is_playing = 0;
-	}
+	if (ch->sprite_frame_count == 0) return;
+	// Clamp to last frame
+	if (frame >= ch->sprite_frame_count)
+		frame = (u16)(ch->sprite_frame_count - 1);
+	obj->sprite_manual_next_frame = 1;
+	obj->sprite_next_frame = frame;
+	obj->sprite_is_playing = 0;
 }
 
 size_t ng_getSpriteFrameCount(void)
@@ -799,6 +800,49 @@ size_t ng_getSpriteFrameCount(void)
 	Character* ch = &dictionary[obj->char_id];
 	if (ch->type != CHAR_TYPE_SPRITE) return 0;
 	return ch->sprite_frame_count;
+}
+
+// Navigate a specific MovieClip's sprite to a given 0-based frame.
+// Searches display_list for the entry matching mc->name.
+// Returns 1 if sprite found and navigated, 0 if not found.
+int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int play)
+{
+	(void)app_context;
+	extern MovieClip root_movieclip;
+	if (!mc || mc == &root_movieclip) return 0;
+	if (!mc->name || mc->name[0] == '\0') return 0;
+
+	size_t depth = ng_findDisplayEntryByName(mc->name);
+	if (depth == SIZE_MAX) return 0;
+
+	DisplayObject* obj = &display_list[depth];
+	if (obj->char_id == 0) return 0;
+	Character* ch = &dictionary[obj->char_id];
+	if (ch->type != CHAR_TYPE_SPRITE) return 0;
+
+	size_t fc = ch->sprite_frame_count;
+	if (fc == 0) return 0;
+
+	// Clamp to last frame
+	if (frame >= (u16)fc) frame = (u16)(fc - 1);
+
+	obj->sprite_manual_next_frame = 1;
+	obj->sprite_next_frame = frame;
+	obj->sprite_is_playing = play ? 1 : 0;
+	mc->currentframe = (int)frame + 1;  // 1-indexed
+	return 1;
+}
+
+// Get the character ID for a MovieClip's display entry (for sprite label lookup).
+// Returns 0 if not found.
+size_t ng_getCharIdByMC(MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	if (!mc || mc == &root_movieclip) return 0;
+	if (!mc->name || mc->name[0] == '\0') return 0;
+	size_t depth = ng_findDisplayEntryByName(mc->name);
+	if (depth == SIZE_MAX) return 0;
+	return display_list[depth].char_id;
 }
 
 // ---------------------------------------------------------------------------

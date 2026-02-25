@@ -1,7 +1,7 @@
 # Hit Testing Implementation Plan
 <!-- TESTS: hittest_lockroot, hittest_morph, hittest_morph_input, hittest_winding_rule, text_blocks_clicks, movieclip_hittest, movieclip_hittest_shapeflag, local_to_global, movieclip_getbounds, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8 -->
 
-Last updated: 2026-02-23
+Last updated: 2026-02-25
 
 ## Status: BLOCKED (remaining tests need loadMovie, mouse events, or morph interpolation)
 
@@ -17,7 +17,7 @@ Last updated: 2026-02-23
 | hittest_winding_rule | 12 | **PASS** (12/12) | Phase 6 (shape-accurate + winding rules) |
 | movieclip_getbounds | 191 | 186/191 (5 diff) | Rounding precision (-99.9 vs -100) |
 | hittest_morph | 70 | 67/70 (3 diff) | Needs morph ratio interpolation for bounds + shape |
-| movieclip_hittest_shapeflag | 339 | ~267/339 (145 diff) | Edge cases in triangulation approach |
+| movieclip_hittest_shapeflag | 338 | 266/338 (72 diff) | Was compile_fail, now output_mismatch — edge cases in triangulation approach |
 | movieclip_invalid_get_bounds_1-8 | varies | BLOCKED | Needs loadMovie infrastructure |
 | hittest_morph_input | 1 | BLOCKED | Needs mouse event dispatch |
 | text_blocks_clicks | 4 | BLOCKED | Needs mouse event dispatch |

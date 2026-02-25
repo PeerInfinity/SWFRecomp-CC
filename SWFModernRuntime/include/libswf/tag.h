@@ -91,6 +91,22 @@ void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char
 // Forward declaration (defined in actionmodern/action.h)
 typedef struct MovieClip MovieClip;
 
+// Frame label entry for label→frame mapping
+typedef struct {
+	const char* label;
+	size_t frame;
+} FrameLabelEntry;
+
+// Register per-sprite frame labels (called from tagInit after tagDefineSprite)
+void tagSetSpriteLabels(size_t char_id, FrameLabelEntry* labels, size_t count);
+// Find a frame label in a sprite's label table. Returns 0-based frame or -1 if not found.
+int ng_findSpriteLabelFrame(size_t char_id, const char* label);
+// Navigate a MovieClip's sprite to a given 0-based frame.
+// Returns 1 if sprite found and navigated, 0 if not found.
+int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int play);
+// Get the character ID for a MovieClip's display entry.
+size_t ng_getCharIdByMC(MovieClip* mc);
+
 // NO_GRAPHICS helpers for sprite timeline control from action.c
 #ifdef NO_GRAPHICS
 // Advance sprite timelines (replaces old ng_advanceSprites; called by swf_core.c)

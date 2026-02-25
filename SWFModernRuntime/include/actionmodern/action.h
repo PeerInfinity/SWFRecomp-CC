@@ -246,6 +246,7 @@ void actionStringGreater(SWFAppContext* app_context);
 void actionExtends(SWFAppContext* app_context);
 void actionStoreRegister(SWFAppContext* app_context, u8 register_num);
 void actionPushRegister(SWFAppContext* app_context, u8 register_num);
+void actionResetRegisters(void);
 void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*func)(SWFAppContext*), u32 param_count);
 void actionCall(SWFAppContext* app_context);
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer);

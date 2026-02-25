@@ -1,19 +1,19 @@
 # Clone/Duplicate MovieClip Implementation Plan
 <!-- TESTS: duplicate_movie_clip, clone_sprite_types, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, clip_events, clip_event_propagation_order, on_construct -->
 
-Last updated: 2026-02-20
+Last updated: 2026-02-25
 
 ## Overview
 
 Clone/Duplicate MovieClip covers 5 failing Ruffle tests. The core feature is `ActionCloneSprite` (opcode 0x24), which duplicates an existing display list object, giving the copy a new name and depth. The AS2 method wrapper is `MovieClip.duplicateMovieClip(name, depth, initObj)`.
 
-**Current state (as of 2026-02-20)**:
+**Current state (as of 2026-02-25)**:
 - `duplicate_movie_clip` (21/21) ✅ — DONE
-- `clone_sprite_types` (25/25) ✅ — DONE
+- `clone_sprite_types` (25/25) ✅ — DONE (locally passing; CI results pending — fix committed f81910c1)
 - `clone_sprite_edittext` (MISMATCH ~15-20/95) — BLOCKED: TextField clone init + position reading
 - `clone_sprite_edittext_dynamic` (MISMATCH ~15-20/87) — BLOCKED: same
 - `duplicate_movie_clip_drawing` (2 lines off) — DEFERRED: needs Drawing API _width/_height from drawn content
-- `clip_events` (SEGFAULT) — REGRESSION: recompiler bug (local ClipAction array in sprite frame function is stack-allocated, becomes dangling pointer) + has_ratio+clip_actions not combined in recompiler
+- `clip_events` ✅ — NOW PASSING in CI (was SEGFAULT, fixed by prior commits)
 - `clip_event_propagation_order` (0/17) — BLOCKED: needs mouse events (MOUSE_EVENTS_PLAN) + recursive clip event dispatch
 - `on_construct` (0/25) — BLOCKED: needs CLIP_EVENT_CONSTRUCT dispatch + RegisterClass (REGISTERCLASS_PLAN)
 

@@ -1,19 +1,19 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 342/619 (55.3%)
-- **Main failure types**: output_mismatch (~267), segfault (5), runtime_error (4), timeout (1)
-- **Recent gains**: loadVariables data file pre-bundling (+2 loadvariables tests), root replacement with Stage dimension update (+1 loadmovie_replace_root), dynamic_props clearing on loadMovie targets, var_map/var_array reset on root replacement
+- **Pass rate (CI, last run)**: 348/619 (56.2%)
+- **Main failure types**: output_mismatch (~263), segfault (5), runtime_error (4), timeout (1)
+- **Recent gains**: All 13 goto tests now pass (was 11/13). Key fixes: closure context reset in actionCallFunction, out-of-bounds goto script suppression. Also locally fixed: clone_sprite_types (not yet in CI).
 
 ## Crashes and Errors (8 tests)
 
 | Test | Status | Match | Notes |
 |------|--------|-------|-------|
 | funky_function_calls | segfault | 9/56 | Function call edge cases |
-| goto_methods | segfault | 8/40 | MovieClip.gotoAndStop/gotoAndPlay with extreme values |
+| goto_methods | ~~segfault~~ PASS | 41/41 ✅ | Fixed: MC dispatch, ECMAScript ToInt32, sprite labels |
 | native_objects_swf6 | segfault | 0/84 | Crashes constructing native Flash classes (filters, geom, etc.) |
 | native_objects_swf7 | segfault | 0/84 | Same root cause as swf6 |
 | native_objects_swf8 | segfault | 0/84 | Same root cause as swf6 |
@@ -39,6 +39,14 @@ Last updated: 2026-02-24
 | `mcl_mislabeled_target` | 6/6 ✅ | instanceof MovieClip for MOVIECLIP type |
 | `loadmovie_flashvars` | 4/4 ✅ | FlashVars URL query parsing + child context switch |
 | `moviecliploader_flashvars` | 4/4 ✅ | FlashVars URL query parsing + MCL child context switch |
+| `mcl_as_broadcaster` | 12/12 ✅ | this binding fix in broadcastMessage type 1 callbacks |
+| `textfield_props_swf5` | 175/175 ✅ | SWF5 TextField toString → [type Object] |
+| `textfield_variable` | 81/81 ✅ | TextField variable binding |
+| `clip_events` | ✅ | Was SEGFAULT, now passing |
+| `slash_syntax` | 14/14 ✅ | Slash-path colon syntax |
+| `string_paths_basic` | 4/4 ✅ | Basic path resolution |
+| `attach_movie` | ✅ | Deferred init dedup + sprite child persistence |
+| `empty_movieclip_can_attach_movies` | ✅ | Sprite display list persistence |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -87,7 +95,7 @@ Last updated: 2026-02-24
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
 | MOVIECLIP_PLAN | **Phases 1-5, 7-9 DONE** | 17 tests pass ✅ | Phase 6 (events) |
-| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** | 2/5 pass | clone_sprite_edittext* needs TF clone |
+| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** | 3/5 pass + clip_events ✅ | clone_sprite_edittext* needs TF clone |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
 | PARSING_FUNCTIONS_PLAN | **parse_int DONE** | parse_int passes | parseFloat edge cases remain |
 | COLOR_OBJECT_PLAN | **COMPLETE** | extends_native_type ✅ | — |
@@ -97,12 +105,12 @@ Last updated: 2026-02-24
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
 | OOP_SUPER_EXTENDS_PLAN | Not started | 0/8 | `super` keyword non-functional |
-| REGISTERCLASS_PLAN | Not started | 0/7 | Object.registerClass, attachMovie |
+| REGISTERCLASS_PLAN | Not started | attach_movie ✅, empty_movieclip_can_attach_movies ✅ | Object.registerClass, ExportAssets, constructor invocation |
 | PROTOTYPE_OBJECT_PLAN | Not started | 0/12 | addProperty, __resolve, property flags |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
-| TELLTARGET_PLAN | Not started | 0/3+ | tellTarget scope, path resolution |
+| TELLTARGET_PLAN | **PARTIAL** | slash_syntax ✅, string_paths_basic ✅ | tellTarget scope, path resolution, eval() |
 | TIMER_PLAN | Not started | 0/3 | setInterval, setTimeout |
-| FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by closure capture bug |
+| FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
 | DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
 | LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 18/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) → LOADVARIABLES_PLAN |
@@ -113,7 +121,7 @@ Last updated: 2026-02-24
 | BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** | swf6_case_insensitive ✅, swf6_string_as_bool ✅, swf4_actions_coercion_order ✅ | Phase 4 (cross-version calls) blocked on loadMovie + per-function version tracking |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** | this_swf6 ✅, mutable_this ✅ | — |
-| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie (compile failures now fixed), mouse events, morph interp |
+| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events, morph interp |
 
 ## Recommended Work Order
 
@@ -122,11 +130,21 @@ Last updated: 2026-02-24
 2. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (2 lines)
 
 ### Medium ROI — feature phases with multiple test payoff
-3. **OOP_SUPER_EXTENDS_PLAN** — `super` keyword, 4 tests
-4. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, 12 tests
-5. **REGISTERCLASS_PLAN** — registerClass + attachMovie, 7 tests
+3. **OOP_SUPER_EXTENDS_PLAN** — `super` keyword, 5-6 tests + unblocks NATIVE_INTROSPECTION Phase 3
+4. **REGISTERCLASS_PLAN Phase 0** — VM register fixes only, 2 quick-win tests (register_underflow, register_globals_across_frames)
+5. **FRAME_NAVIGATION_PLAN Phase 1-2** — frame labels + execution ordering, 4 tests (goto_frame, goto_frame2, goto_label, goto_methods)
+6. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, 4 remaining tests
+7. **TELLTARGET_PLAN Phase 1** — core path resolution, ~212 lines across 8+ tests (slash_syntax + string_paths_basic already passing)
 
 ### Lower ROI — new features
-6. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8), would prevent 252 expected lines from crashing
-7. **TIMER_PLAN** — setInterval/setTimeout, 3 tests
-8. **TELLTARGET_PLAN** — tellTarget scope, 3+ tests
+8. **TIMER_PLAN** — setInterval/setTimeout, 2-3 tests (also unblocks LOADVARIABLES loadvariables2)
+9. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8)
+10. **REGISTERCLASS_PLAN Phases 1-5** — full ExportAssets + registerClass + constructor invocation, ~7-10 tests
+
+### Dependency Blockers (plans blocking other plans)
+- **TIMER_PLAN** blocks: LOADVARIABLES_PLAN (loadvariables2), LOADMOVIE_REMAINING_PLAN (mcl_events_swf_version)
+- **OOP_SUPER_EXTENDS_PLAN** blocks: NATIVE_INTROSPECTION_PLAN Phase 3 (super() mechanism)
+- **MOUSE_EVENTS_PLAN** blocks: FOCUS_SYSTEM_PLAN, BUTTON_PLAN (8 tests), DRAG_DROP_PLAN, CLONE_DUPLICATE_PLAN (clip_event_propagation_order)
+- **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests)
+- **TELLTARGET_PLAN** blocks: THIS_BINDING_PLAN Phase 6 (this_scoping remaining 10 lines)
+- **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (on_construct), TIMER_PLAN (timer_run_actions partially)

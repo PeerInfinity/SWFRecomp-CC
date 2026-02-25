@@ -26,9 +26,12 @@ namespace SWFRecomp
 		// Track if we're inside a DefineFunction2 (for local register handling)
 		bool inside_function2;
 
+		// RegisterCount of the current DefineFunction2 (registers >= this bleed through to caller)
+		int function2_register_count;
+
 		// SWF version (needed for string encoding: SWF<6 uses Latin-1/Win-1252)
 		uint8_t swf_version;
 
-		Context() : inside_function2(false), swf_version(0) {}
+		Context() : inside_function2(false), function2_register_count(0), swf_version(0) {}
 	};
 };

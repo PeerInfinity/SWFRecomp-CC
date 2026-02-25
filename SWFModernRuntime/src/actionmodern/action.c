@@ -11935,9 +11935,13 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	extern int is_playing;
 	extern size_t g_frame_count;
 
+	int was_clamped = 0;
 	if (frame >= g_frame_count)
 	{
-		return;
+		// Clamp to last frame
+		if (g_frame_count == 0) return;
+		frame = (u16)(g_frame_count - 1);
+		was_clamped = 1;
 	}
 
 #ifdef NO_GRAPHICS
@@ -11953,10 +11957,17 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	root_movieclip.currentframe = frame + 1;  // 1-indexed
 
 #ifdef NO_GRAPHICS
-	// Execute goto catch-up inline so target frame tags are processed
-	// before the calling script continues (Flash's goto is synchronous)
+	// Execute tags-only catch-up inline (PlaceObject, etc.) so that properties
+	// like clip._x reflect the new frame's state. Scripts are deferred until
+	// after the calling script finishes.
 	extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
 	ng_executeGotoCatchUp(app_context);
+	// Ruffle: "gotoAndStop(9999) displays the final frame, but actions don't run!"
+	// When the requested frame was beyond the last frame, suppress the deferred script.
+	if (was_clamped) {
+		extern int g_deferred_goto_script;
+		g_deferred_goto_script = 0;
+	}
 #endif
 }
 
@@ -11977,18 +11988,23 @@ int findFrameByLabel(const char* label)
 	}
 
 	// Extern declarations for generated frame label data
-	typedef struct {
-		const char* label;
-		size_t frame;
-	} FrameLabelEntry;
-
 	extern FrameLabelEntry frame_label_data[];
 	extern size_t frame_label_count;
 
-	// Search through frame labels
+	// Search through frame labels (case-sensitive first, then case-insensitive fallback)
+	// Flash uses case-insensitive ASCII label matching
 	for (size_t i = 0; i < frame_label_count; i++)
 	{
 		if (frame_label_data[i].label && strcmp(frame_label_data[i].label, label) == 0)
+		{
+			return (int)frame_label_data[i].frame;
+		}
+	}
+
+	// Case-insensitive fallback (ASCII-only, like Flash)
+	for (size_t i = 0; i < frame_label_count; i++)
+	{
+		if (frame_label_data[i].label && strcasecmp(frame_label_data[i].label, label) == 0)
 		{
 			return (int)frame_label_data[i].frame;
 		}
@@ -12033,9 +12049,14 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 		// Stop playback (like gotoAndStop)
 		is_playing = 0;
 
+		// Update _currentframe immediately so scripts can read the new value
+		root_movieclip.currentframe = frame_index + 1;  // 1-indexed
+
 #ifdef NO_GRAPHICS
 		extern int goto_from_action;
 		goto_from_action = 1;
+
+		// Execute tags-only catch-up inline. Scripts are deferred.
 		extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
 		ng_executeGotoCatchUp(app_context);
 #endif
@@ -17383,6 +17404,16 @@ void actionExtends(SWFAppContext* app_context)
 #define MAX_REGISTERS 256
 static ActionVar g_registers[MAX_REGISTERS];
 
+void actionResetRegisters(void)
+{
+	for (int i = 0; i < MAX_REGISTERS; i++)
+	{
+		g_registers[i].type = ACTION_STACK_VALUE_UNDEFINED;
+		g_registers[i].data.numeric_value = 0;
+		g_registers[i].str_size = 0;
+	}
+}
+
 void actionStoreRegister(SWFAppContext* app_context, u8 register_num)
 {
 	// Validate register number
@@ -20137,6 +20168,17 @@ void actionGetMember(SWFAppContext* app_context)
 			ASObject* transform = createTransformObject(app_context, mc);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)transform);
 			return;
+		}
+
+		// Check dynamic_props (user-defined properties set via SetMember)
+		if (mc != NULL && mc->dynamic_props != NULL)
+		{
+			ActionVar* dp = getProperty((ASObject*)mc->dynamic_props, prop_name, prop_name_len);
+			if (dp != NULL)
+			{
+				pushVar(app_context, dp);
+				return;
+			}
 		}
 
 		// Fall back to global variable map (timeline variables are accessible as mc properties)
@@ -23971,6 +24013,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 		}
 
+		// Try current MovieClip's dynamic_props (functions set via clip.run = func)
+		if (func == NULL && g_current_context != NULL && g_current_context->dynamic_props != NULL)
+		{
+			ActionVar* dp = getProperty((ASObject*)g_current_context->dynamic_props, func_name, func_name_len);
+			if (dp != NULL && dp->type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				func = (ASFunction*) dp->data.numeric_value;
+			}
+		}
+
 		// Try dot-path resolution: _root.foo -> resolve path to function variable
 		if (func == NULL && memchr(func_name, '.', func_name_len) != NULL)
 		{
@@ -24000,6 +24052,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		else if (func != NULL)
 		{
 			g_call_depth++;
+
+			// SWF6+ closure semantics: the function executes in its
+			// definition context (base_clip), not the caller's context.
+			// Since we don't track definition context on ASFunction, we
+			// approximate by resetting to root (where most functions are
+			// defined). This makes GotoFrame/GetProperty("") inside the
+			// function operate on root, not the calling sprite.
+			MovieClip* saved_cf_context = g_current_context;
+			DisplayObject* saved_cf_sprite = g_current_sprite_obj;
+			actionSetCurrentContext(&root_movieclip);
+			g_current_sprite_obj = NULL;
 
 			if (func->function_type == 2)
 			{
@@ -24264,6 +24327,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 
 			g_call_depth--;
+
+			// Restore caller's context
+			actionSetCurrentContext(saved_cf_context);
+			g_current_sprite_obj = saved_cf_sprite;
 		}
 		else
 		{
@@ -27000,71 +27067,154 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	{
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 
-		if (method_name_len == 11 && strncmp(method_name, "gotoAndStop", 11) == 0)
+		if (method_name_len == 11 &&
+			(strncmp(method_name, "gotoAndStop", 11) == 0 || strncmp(method_name, "gotoAndPlay", 11) == 0))
 		{
+			int is_play = (method_name[7] == 'P');
 			if (num_args >= 1)
 			{
-				s32 frame_num = -1;
+				s32 frame_num = 0;  // 1-based; 0 = no-op
+				int force_root = 0;
 				if (args[0].type == ACTION_STACK_VALUE_F64) {
 					double d; memcpy(&d, &args[0].data.numeric_value, sizeof(double));
-					frame_num = (s32)d;
+					// ECMAScript ToInt32 wrapping (matches Flash/Ruffle behavior)
+					int32_t i32_frame = ecmaToInt32(d);
+					// wrapping_sub(1) then saturating_add(1) to handle edge cases
+					uint32_t u_frame = (uint32_t)i32_frame - 1u;
+					int32_t s_frame = (int32_t)u_frame;
+					// saturating_add(1)
+					if (s_frame > 0 && s_frame < INT32_MAX) s_frame += 1;
+					else if (s_frame == INT32_MAX) s_frame = INT32_MAX;
+					else s_frame += 1;
+					if (s_frame > 0) frame_num = s_frame;
 				} else if (args[0].type == ACTION_STACK_VALUE_F32) {
 					float f; memcpy(&f, &args[0].data.numeric_value, sizeof(float));
-					frame_num = (s32)f;
-				} else if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					int32_t i32_frame = ecmaToInt32((double)f);
+					uint32_t u_frame = (uint32_t)i32_frame - 1u;
+					int32_t s_frame = (int32_t)u_frame;
+					if (s_frame > 0 && s_frame < INT32_MAX) s_frame += 1;
+					else if (s_frame == INT32_MAX) s_frame = INT32_MAX;
+					else s_frame += 1;
+					if (s_frame > 0) frame_num = s_frame;
+				} else if (args[0].type == ACTION_STACK_VALUE_STRING ||
+						   args[0].type == ACTION_STACK_VALUE_OBJECT) {
 					char _gas_frame_buf[512];
-					const uint16_t* _gas_frame_u16 = varGetU16Ptr(&args[0]);
-					u16_to_utf8(_gas_frame_u16, args[0].str_size, _gas_frame_buf, sizeof(_gas_frame_buf));
+					if (args[0].type == ACTION_STACK_VALUE_OBJECT) {
+						// Call toString on the object to get a string value
+						pushVar(app_context, &args[0]);
+						convertString(app_context, _gas_frame_buf);
+						ActionVar str_var;
+						popVar(app_context, &str_var);
+						if (str_var.type == ACTION_STACK_VALUE_STRING) {
+							const uint16_t* u16p = varGetU16Ptr(&str_var);
+							u16_to_utf8(u16p, str_var.str_size, _gas_frame_buf, sizeof(_gas_frame_buf));
+						} else {
+							_gas_frame_buf[0] = '\0';
+						}
+					} else {
+						const uint16_t* _gas_frame_u16 = varGetU16Ptr(&args[0]);
+						u16_to_utf8(_gas_frame_u16, args[0].str_size, _gas_frame_buf, sizeof(_gas_frame_buf));
+					}
 					const char* frame_str = _gas_frame_buf;
 					const char* frame_part = frame_str;
 					const char* colon = strchr(frame_str, ':');
-					if (colon != NULL) frame_part = colon + 1;
+					if (colon != NULL) {
+						// SWF4 path:frame notation (e.g. "/:5" = root frame 5)
+						if (frame_str[0] == '/') force_root = 1;
+						frame_part = colon + 1;
+					}
 					char* endptr;
 					long parsed = strtol(frame_part, &endptr, 10);
-					if (endptr != frame_part && *endptr == '\0') frame_num = (s32)parsed;
+					if (endptr != frame_part && *endptr == '\0') {
+						frame_num = (s32)parsed;
+					} else {
+						// Try label lookup (sprite-specific first, then root)
+#ifdef NO_GRAPHICS
+						if (!force_root) {
+							size_t cid = ng_getCharIdByMC(mc);
+							if (cid > 0) {
+								int lf = ng_findSpriteLabelFrame(cid, frame_part);
+								if (lf >= 0) frame_num = lf + 1;
+							}
+						}
+						if (frame_num <= 0) {
+							int rf = findFrameByLabel(frame_part);
+							if (rf >= 0) frame_num = rf + 1;
+						}
+#endif
+					}
 				}
 				if (frame_num > 0) {
+#ifdef NO_GRAPHICS
+					u16 frame0 = (u16)(frame_num - 1);
+					if (!force_root && !ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
+						actionGotoFrame(app_context, frame0);
+						if (is_play) is_playing = 1;
+					} else if (force_root) {
+						actionGotoFrame(app_context, frame0);
+						if (is_play) is_playing = 1;
+					}
+#else
 					actionGotoFrame(app_context, (u16)(frame_num - 1));
+					if (is_play) is_playing = 1;
+#endif
 				}
 			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 11 && strncmp(method_name, "gotoAndPlay", 11) == 0)
+		else if (method_name_len == 9 && strncmp(method_name, "prevFrame", 9) == 0)
 		{
-			if (num_args >= 1)
-			{
-				s32 frame_num = -1;
-				if (args[0].type == ACTION_STACK_VALUE_F64) {
-					double d; memcpy(&d, &args[0].data.numeric_value, sizeof(double));
-					frame_num = (s32)d;
-				} else if (args[0].type == ACTION_STACK_VALUE_F32) {
-					float f; memcpy(&f, &args[0].data.numeric_value, sizeof(float));
-					frame_num = (s32)f;
-				} else if (args[0].type == ACTION_STACK_VALUE_STRING) {
-					char _gap_frame_buf[512];
-					const uint16_t* _gap_frame_u16 = varGetU16Ptr(&args[0]);
-					u16_to_utf8(_gap_frame_u16, args[0].str_size, _gap_frame_buf, sizeof(_gap_frame_buf));
-					const char* frame_str = _gap_frame_buf;
-					const char* frame_part = frame_str;
-					const char* colon = strchr(frame_str, ':');
-					if (colon != NULL) frame_part = colon + 1;
-					char* endptr;
-					long parsed = strtol(frame_part, &endptr, 10);
-					if (endptr != frame_part && *endptr == '\0') frame_num = (s32)parsed;
+#ifdef NO_GRAPHICS
+			if (mc) {
+				int cf = mc->currentframe;  // 1-indexed
+				if (cf > 1) {
+					u16 frame0 = (u16)(cf - 2);  // prev frame, 0-indexed
+					if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
+						if (current_frame > 0) {
+							actionGotoFrame(app_context, (u16)(current_frame - 1));
+						}
+					}
 				}
-				if (frame_num > 0) {
-					actionGotoFrame(app_context, (u16)(frame_num - 1));
-					is_playing = 1;
+				// If already at frame 1, do nothing (stay at frame 1)
+			}
+#endif
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 9 && strncmp(method_name, "nextFrame", 9) == 0)
+		{
+#ifdef NO_GRAPHICS
+			if (mc) {
+				int cf = mc->currentframe;  // 1-indexed
+				u16 frame0 = (u16)cf;  // next frame, 0-indexed (cf is 1-indexed, so cf = next 0-indexed)
+				if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
+					// Root fallback — ng_gotoFrameByMC already clamps
+					actionGotoFrame(app_context, (u16)(current_frame + 1));
 				}
 			}
+#endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 4 && strncmp(method_name, "play", 4) == 0)
 		{
+#ifdef NO_GRAPHICS
+			// Try clip-specific play first
+			if (mc) {
+				size_t depth = ng_findDisplayEntryByName(mc->name);
+				if (depth != SIZE_MAX) {
+					extern DisplayObject* display_list;
+					display_list[depth].sprite_is_playing = 1;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+			}
+#endif
 			actionPlay(app_context);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -27072,6 +27222,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 4 && strncmp(method_name, "stop", 4) == 0)
 		{
+#ifdef NO_GRAPHICS
+			// Try clip-specific stop first
+			if (mc) {
+				size_t depth = ng_findDisplayEntryByName(mc->name);
+				if (depth != SIZE_MAX) {
+					extern DisplayObject* display_list;
+					display_list[depth].sprite_is_playing = 0;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+			}
+#endif
 			actionStop(app_context);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -28809,9 +28972,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_current_executing_func = func;
 						g_call_depth++;
 
-						// Switch execution context to the MC for _target/GetVariable resolution
-						MovieClip* saved_mc_ctx = g_current_context;
-						actionSetCurrentContext(mc);
+						// Do NOT switch g_current_context to the MC here.
+						// The 'this' binding is already set on the scope chain.
+						// Raw SWF opcodes (GotoFrame, GetProperty) should use
+						// the caller's timeline context, not the method receiver.
 
 						ActionVar result;
 						if (func->function_type == 1 && func->simple_func != NULL) {
@@ -28834,7 +28998,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 						g_call_depth--;
 						g_current_executing_func = prev_exec_mc;
-						actionSetCurrentContext(saved_mc_ctx);
 
 						// Pop local scope + captured scopes
 						for (u8 ci = 0; ci < mc_captured + 1; ci++) {
