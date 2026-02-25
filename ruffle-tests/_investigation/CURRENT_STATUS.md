@@ -57,14 +57,17 @@ Last updated: 2026-02-25
 | `as_set_prop_flags_version` | 31/31 ✅ | ASSetPropFlags version gating |
 | `as_set_prop_flags_version_swf5-9` | 1/1 each ✅ | Version-specific variants |
 | `set_interval` | 27/27 ✅ | Timer system (setInterval/setTimeout/clearInterval) |
+| `register_class_return_value` | 16/16 ✅ | Object.registerClass string coercion |
+| `movieclip_default_state` | 69/69 ✅ | createEmptyMovieClip totalframes, getBytesLoaded, _url format |
+| `add_property` | 15/15 ✅ | addProperty on Arrays (getter/setter for length and indexed props) |
+| `as_set_prop_flags` | 79/79 ✅ | ASSetPropFlags valueOf/toString coercion on arguments |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
-| `movieclip_default_state` | 66/69 (95.7%) | _totalframes=0 vs 1, _url path difference |
-| `selection` | 434/454 (95.6%) | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
+| `selection` | 435/455 (95.6%) | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
 | `hittest_morph` | 67/70 (95.7%) | Morph shape bounds interpolation |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
@@ -73,17 +76,16 @@ Last updated: 2026-02-25
 ### 80-90%
 | Test | Match | Issue |
 |------|-------|-------|
-| `movieclip_library_state_values` | 70/78 (89.7%) | Library sprite default state values |
+| `movieclip_library_state_values` | 69/78 (88.5%) | Library sprite default state values; segfaults after line 73 |
 | `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
 | `super_edge_cases` | 33/39 (84.6%) | makeSuperWith: SUPER value as __proto__ (3 lines), addProperty virtual __constructor__ (3 lines) |
+| `function_base_clip_readded` | 10/12 (83.3%) | _parent resolution after removal+re-add |
 | `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
-| `function_base_clip_readded` | 9/11 (81.8%) | _parent resolution after removal+re-add |
-| `function_base_clip_removed` | 20/25 (80.0%) | base_clip after function definer removed |
+| `function_base_clip_removed` | 21/26 (80.8%) | base_clip after function definer removed |
 
 ### 70-80%
 | Test | Match | Issue |
 |------|-------|-------|
-| `as_set_prop_flags` | 62/79 (78.5%) | ASSetPropFlags with valueOf/toString coercion |
 | `edittext_restrict` | 147/191 (77.0%) | TextField.restrict pattern matching |
 | `tab_ordering_tabbable` | 36/47 (76.6%) | Tab navigation |
 | `tab_ordering_automatic_order_same_position` | 9/12 (75.0%) | Tab navigation |
@@ -118,8 +120,8 @@ Last updated: 2026-02-25
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
 | OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 33/39 — remaining 6 lines = makeSuperWith (SUPER as __proto__) + addProperty virtual __constructor__; `funky_function_calls` segfaults |
-| REGISTERCLASS_PLAN | **Phase 0 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅ | Phases 1-5: Object.registerClass, ExportAssets, constructor invocation |
-| PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 8/12 pass | Remaining: `__resolve` hook, addProperty edge cases, InitObject setters, ASSetPropFlags edge cases |
+| REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
+| PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 10/12 pass | Remaining: `__resolve` hook, InitObject setters; add_property ✅, as_set_prop_flags ✅ |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
 | TELLTARGET_PLAN | **PARTIAL** | slash_syntax ✅, string_paths_basic ✅ | tellTarget scope, path resolution, eval() |
 | TIMER_PLAN | **Phases 1-2 DONE** | 1/3 pass (set_interval ✅) | timer_run_actions blocked on REGISTERCLASS_PLAN (attachMovie); timeout needs script timeout mechanism |
