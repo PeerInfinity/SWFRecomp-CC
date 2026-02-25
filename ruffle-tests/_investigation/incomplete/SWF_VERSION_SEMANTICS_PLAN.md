@@ -3,17 +3,17 @@
 
 Last updated: 2026-02-24
 
-## Status: NOT STARTED — 0/5 tests passing
+## Status: IN PROGRESS — 3/5 tests passing (Phases 1+2+3 complete)
 
 ### Target Tests
 
-| Test | SWF Ver | Match | Expected | Issue |
-|------|---------|-------|----------|-------|
-| swf6_case_insensitive | 6 | 28/44 | 44 | Case-insensitive property lookup with Unicode not implemented |
-| swf6_string_as_bool | 6 | 0/15 | 15 | SWF6 string-to-boolean coercion wrong |
-| swf4_actions_coercion_order | 4 | 9/158 | 158 | SWF4 operators not calling valueOf/toString on operands |
-| swf5_to_6_cross_call | 5 | 8/29 | 29 | Cross-version loadMovie with different semantics |
-| swf6_to_5_cross_call | 6 | 10/29 | 29 | Cross-version loadMovie with different semantics |
+| Test | SWF Ver | Match | Expected | Status |
+|------|---------|-------|----------|--------|
+| swf6_case_insensitive | 6 | 43/43 | 43 | **PASS** (Phase 1 complete) |
+| swf6_string_as_bool | 6 | 15/15 | 15 | **PASS** (Phase 2 complete) |
+| swf4_actions_coercion_order | 8 | 158/158 | 158 | **PASS** (Phase 3 complete) |
+| swf5_to_6_cross_call | 5 | 8/29 | 29 | Phase 4 — blocked on loadMovie |
+| swf6_to_5_cross_call | 6 | 10/29 | 29 | Phase 4 — blocked on loadMovie |
 
 ### Already passing
 - `divide_swf4` — PASS
@@ -22,108 +22,55 @@ Last updated: 2026-02-24
 
 ---
 
-## Phase 1: SWF6 Case-Insensitive Property Lookup (swf6_case_insensitive)
+## Phase 1: SWF6 Case-Insensitive Property Lookup (swf6_case_insensitive) — COMPLETE
 
-### The Problem
-
-In SWF6 (and below), property names are case-insensitive. Flash uses Unicode case folding:
-- `this.FOO` should find property `foo` (and vice versa)
-- `this['ä']` should find property `Ä`
-- `_LeVeL0` should resolve to `_level0`
-- `clip` and `CLIP` and `Clip` are the same variable
-
-### Current State (28/44 lines match)
-
-Simple ASCII case-insensitive lookups partially work. Failures are:
-1. `this['FOO']` → `undefined` instead of finding `foo` (bracket access with uppercase)
-2. Unicode case folding (`ä` ↔ `Ä`, `ӥ` ↔ `Ӥ`, `ǳ` ↔ `Ǳ`)
-3. `_LeVeL0` → `undefined` (special variables not case-folded)
-4. Enumeration order of case-insensitive properties
-
-### What's Needed
-
-1. **Property lookup functions** (`getProperty`, `getPropertyWithPrototype`, `findPropertyStruct`) need case-insensitive string comparison when `g_swf_version <= 6`
-2. **Variable resolution** (`getVariable`, `actionGetVariable`) needs case-insensitive matching
-3. **Unicode case tables** — we already have `unicode_case_tables.h` with 713+683 entries. Need to use these in property comparisons.
-4. **Special variables** (`_level0`, `_root`, `_global`) need case-insensitive matching
-
-### Implementation
-
-Add a case-insensitive comparison function:
-```c
-static int strcasecmp_swf(const char* a, u32 alen, const char* b, u32 blen) {
-    if (g_swf_version > 6) return (alen == blen && strncmp(a, b, alen) == 0);
-    // Use unicode_case_tables.h for case folding
-    // Compare case-folded versions character by character
-}
-```
-
-Then use it in all property lookup hot paths.
-
-### Estimated Impact
-- swf6_case_insensitive: +~12 lines (28→~40/44)
-- May improve other SWF6 tests that use case-insensitive lookups
+Implemented in commit c1f23ada. Changes:
+- `prop_name_match()` in object.c: Unicode case-insensitive property lookup using unicode_case_tables.h
+- `swf_name_match()` exposed for tag_stubs.c MC name matching
+- variables.c: fold keys to lowercase for SWF <= 6 hashmap lookups
+- tag_stubs.c: case-insensitive display list name matching
+- `g_this_stack`: per-call-frame this binding stack (Ruffle Activation.this architecture)
+  - GetVariable("this") checks g_this_stack before scope chain/variable table
+  - SetVariable("this") mutates g_this_stack entry
+  - Type 2 functions: only push to g_this_stack when !preload_this && !suppress_this
 
 ---
 
-## Phase 2: SWF6 String-to-Boolean Coercion (swf6_string_as_bool)
+## Phase 2: SWF6 String-to-Boolean Coercion (swf6_string_as_bool) — COMPLETE
 
-### The Problem
-
-SWF6 has different string-to-boolean rules than SWF7+:
-- **SWF7+**: Empty string = false, non-empty = true
-- **SWF6**: String converted to number first. `"0"` = false, `"1"` = true, `""` = false, `"abc"` = false (NaN = false)
-
-### Current State (0/15 lines match)
-
-Expected output shows numeric strings being evaluated as booleans:
-```
-10       ← "10" as boolean context should trace "10" (truthy)
-0x10     ← "0x10" as boolean (truthy)
-0x-10    ← "0x-10" as boolean (truthy? or false?)
-```
-
-The test likely evaluates various string values in `if()` conditions with trace output.
-
-### What's Needed
-
-In `evaluateCondition()` or the boolean conversion path, when `g_swf_version <= 6`:
-```c
-if (g_swf_version <= 6 && type == ACTION_STACK_VALUE_STRING) {
-    // Convert string to number first, then to boolean
-    double num = parseStringToNumber(str);
-    return !isnan(num) && num != 0.0;
-}
-```
-
-### Estimated Impact
-- swf6_string_as_bool: potentially all 15 lines
+Implemented in commit 3d615d20. Fixed `stringVarToDouble`:
+- Hex: strip "0x" prefix before strtol (was parsing full "0x-10" which stopped at '-')
+- Octal: check ALL remaining chars are 0-7 before classifying ("010.5" → decimal, not octal)
 
 ---
 
-## Phase 3: SWF4 Operator Coercion Order (swf4_actions_coercion_order)
+## Phase 3: SWF4 Operator Coercion Order (swf4_actions_coercion_order) — COMPLETE
 
-### The Problem
+Implemented across multiple changes. Key fixes:
 
-SWF4 binary operators (`add`, `subtract`, `multiply`, etc.) should call `valueOf()` and `toString()` on their operands in left-to-right order. Currently these return NaN because objects aren't being coerced.
+1. **Root MC dynamic_props fallback**: `actionGetVariable` now checks `root_movieclip.dynamic_props` after variable table lookup, so objects stored via `SetMember` on `_root` are found.
 
-### Current State (9/158 lines match)
+2. **valueOf closure support**: `convertFloat()`'s valueOf invocation now saves/restores captured scope chains, enabling closures defined inside `with` blocks or DefineFunction2 to access their captured variables.
 
-Most lines show `NaN` instead of coerced values. The test creates objects with custom valueOf/toString and checks that operators call them in the right order.
+3. **toString closure support**: `objectCallToString()` now saves/restores captured scope chains (same pattern as valueOf fix).
 
-### What's Needed
+4. **`[type Object]` fallback**: When `toString()` returns a non-string (e.g. a number), `convertString()` now uses `[type Object]` instead of `[object Object]`, matching Ruffle/Flash behavior.
 
-In the SWF4 arithmetic operators (`actionAdd`, `actionSubtract`, `actionMultiply`, `actionDivide`, `actionLessThan`, `actionEquals`), add valueOf/toString coercion before numeric conversion:
-```c
-// For objects on the stack, call valueOf() before converting to number
-if (val.type == ACTION_STACK_VALUE_OBJECT) {
-    val = invokeValueOf(app_context, (ASObject*)val.data.numeric_value);
-}
-```
+5. **Multiply operand order**: Fixed to coerce left operand (b) before right operand (a), matching Flash's left-to-right coercion order.
 
-### Estimated Impact
-- swf4_actions_coercion_order: significant improvement (9→~100+/158)
-- Complex implementation — many SWF4 operators to update
+6. **SetTarget "Target not found" trace**: Added trace message when target resolution fails, matching Flash/Ruffle format.
+
+7. **GetProperty target not found**: Returns `undefined` instead of default property value when target MC doesn't exist.
+
+8. **SetProperty value coercion**: Added per-property-index coercion on the value argument (valueOf for numeric properties, toString for string properties like `_name`/`_quality`).
+
+9. **CloneSprite/RemoveSprite toString**: Added `convertString` calls for proper toString coercion on object arguments.
+
+10. **StartDrag constrain check**: Changed from `!= 0` to `== 1` to match Ruffle's `coerce_to_i32 == 1` behavior.
+
+11. **Call/GotoFrame2/WaitForFrame2 toString**: Added object→string coercion for frame identifier arguments.
+
+12. **GetURL2**: Already called `convertString` — now works correctly with closure-aware toString.
 
 ---
 

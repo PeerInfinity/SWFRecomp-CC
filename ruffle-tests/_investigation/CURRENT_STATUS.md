@@ -111,6 +111,8 @@ Last updated: 2026-02-24
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **DONE** (via LOADMOVIE_PLAN) | 3/3 pass (unloadmovie, unloadmovie_method, unloadmovienum) | — |
 | BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
+| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** | swf6_case_insensitive ✅, swf6_string_as_bool ✅, swf4_actions_coercion_order ✅ | Phase 4 (cross-version calls) blocked on loadMovie + per-function version tracking |
+| THIS_BINDING_PLAN | **FULLY COMPLETE** | this_swf6 ✅, mutable_this ✅ | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + partial gains | Remaining blocked by loadMovie (compile failures now fixed), mouse events, morph interp |
 
 ## Recommended Work Order

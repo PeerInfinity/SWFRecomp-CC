@@ -5039,6 +5039,16 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		{
 			if (found) *found = 1;
 			ActionVar result;
+			// Save and restore captured scopes for proper closure support
+			u32 saved_scope_depth = scope_depth;
+			u8 captured = func->captured_scope_count;
+			for (u8 ci = 0; ci < captured; ci++) {
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+					scope_mc[scope_depth] = func->captured_scope_mc[ci];
+					scope_chain[scope_depth++] = func->captured_scope[ci];
+				}
+			}
 			if (func->function_type == 2 && func->advanced_func != NULL)
 			{
 				ActionVar* regs = NULL;
@@ -5056,6 +5066,7 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 				result.type = ACTION_STACK_VALUE_UNDEFINED;
 				result.data.numeric_value = 0;
 			}
+			scope_depth = saved_scope_depth;
 			return result;
 		}
 	}
@@ -9601,7 +9612,12 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			if (_cs_found && _cs_ts.type == ACTION_STACK_VALUE_STRING) {
 				VAL(u64, &STACK_TOP_VALUE) = _cs_ts.data.numeric_value;
 				STACK_TOP_N = _cs_ts.str_size;
+			} else if (_cs_found) {
+				// toString exists but returned non-string: "[type Object]"
+				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_type_Object;
+				STACK_TOP_N = 13;
 			} else {
+				// No toString method: "[object Object]"
 				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
 				STACK_TOP_N = 15;
 			}
@@ -9915,6 +9931,16 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 						if (func != NULL)
 						{
 							ActionVar result;
+							// Save and restore captured scopes for proper closure support
+							u32 saved_scope_depth = scope_depth;
+							u8 captured = func->captured_scope_count;
+							for (u8 ci = 0; ci < captured; ci++) {
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+									scope_mc[scope_depth] = func->captured_scope_mc[ci];
+									scope_chain[scope_depth++] = func->captured_scope[ci];
+								}
+							}
 							if (func->function_type == 2 && func->advanced_func != NULL)
 							{
 								ActionVar* regs = NULL;
@@ -9932,6 +9958,7 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 								result.type = ACTION_STACK_VALUE_UNDEFINED;
 								result.data.numeric_value = 0;
 							}
+							scope_depth = saved_scope_depth;
 
 							// If valueOf returned a primitive, use it
 							if (result.type != ACTION_STACK_VALUE_OBJECT &&
@@ -10402,13 +10429,19 @@ void actionSubtract(SWFAppContext* app_context)
 
 void actionMultiply(SWFAppContext* app_context)
 {
-	convertFloat(app_context);
-	ActionVar a;
-	popVar(app_context, &a);
-	
+	// Pop both raw values first (a = top = second operand, b = first operand)
+	ActionVar a_raw, b_raw;
+	popVar(app_context, &a_raw);
+	popVar(app_context, &b_raw);
+	// Coerce b first (first operand), then a — matches Flash's left-to-right coercion order
+	pushVar(app_context, &b_raw);
 	convertFloat(app_context);
 	ActionVar b;
 	popVar(app_context, &b);
+	pushVar(app_context, &a_raw);
+	convertFloat(app_context);
+	ActionVar a;
+	popVar(app_context, &a);
 	
 	if (a.type == ACTION_STACK_VALUE_F64)
 	{
@@ -12037,6 +12070,13 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
  */
 void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 {
+	// For objects, coerce via toString
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+		convertString(app_context, NULL);
+	}
+
 	// Pop frame identifier from stack
 	ActionVar frame_var;
 	popVar(app_context, &frame_var);
@@ -14358,6 +14398,33 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
+	// Check current MovieClip's dynamic_props for properties set via SetMember
+	// (e.g., _root.obj_1 = {...} makes obj_1 accessible via GetVariable)
+	// Also checks root_movieclip.dynamic_props as fallback for root-level scripts
+	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
+	{
+		MovieClip* ctx_mc = getCurrentContext();
+		if (ctx_mc != NULL && ctx_mc->dynamic_props != NULL)
+		{
+			ActionVar* ctx_prop = getProperty((ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
+			if (ctx_prop != NULL)
+			{
+				PUSH_VAR(ctx_prop);
+				return;
+			}
+		}
+		// Also check root if current context is different
+		if (ctx_mc != &root_movieclip && root_movieclip.dynamic_props != NULL)
+		{
+			ActionVar* root_prop = getProperty((ASObject*)root_movieclip.dynamic_props, var_name, var_name_len);
+			if (root_prop != NULL)
+			{
+				PUSH_VAR(root_prop);
+				return;
+			}
+		}
+	}
+
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 	{
 		// Check special variables (SWF5+ only — SWF4 has no built-in constants)
@@ -15682,6 +15749,12 @@ void actionGetProperty(SWFAppContext* app_context)
 
 	// Get the MovieClip object
 	MovieClip* mc = getMovieClipByTarget(target);
+
+	// If target not found, push undefined (matches Flash/Ruffle)
+	if (mc == NULL) {
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		return;
+	}
 
 	// Get property value based on index
 	float value = 0.0f;
@@ -17527,6 +17600,13 @@ void actionCall(SWFAppContext* app_context)
 	extern frame_func* g_frame_funcs;
 	extern size_t g_frame_count;
 	extern int quit_swf;
+
+	// For objects, coerce via toString (unless already numeric)
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+		convertString(app_context, NULL);
+	}
 
 	// Pop frame identifier from stack
 	ActionVar frame_var;
@@ -21611,24 +21691,47 @@ void actionSetProperty(SWFAppContext* app_context)
 	// Stack layout: [target_path] [property_index] [value] <- sp
 	// Pop in reverse order: value, index, target
 
-	// 1. Pop value
+	// 1. Pop value (no coercion yet - done after index/target)
 	ActionVar value_var;
 	popVar(app_context, &value_var);
 
-	// 2. Pop property index
+	// 2. Pop property index (valueOf coercion)
 	convertFloat(app_context);
 	ActionVar index_var;
 	popVar(app_context, &index_var);
 	int prop_index = varToInt32(&index_var);
 
-	// 3. Pop target path (convert UTF-16 to char* for MovieClip lookup)
+	// 3. Pop target path (toString coercion)
 	convertString(app_context, NULL);
 	char _sp_buf[512];
 	(void)u16_to_utf8((const uint16_t*)STACK_TOP_VALUE, STACK_TOP_N, _sp_buf, sizeof(_sp_buf));
 	const char* target = _sp_buf;
 	POP();
 
-	// 4. Get the MovieClip object
+	// 4. Coerce value based on property index (matches Flash's action_property_coerce)
+	// Properties 0-10, 12: coerce to number (valueOf)
+	// Properties 16, 18, 20-21: coerce_to_f64 (valueOf)
+	// Properties 13, 19: coerce to string (toString)
+	// Others (_focusrect, _target, _droptarget, _url): no coercion
+	if (value_var.type == ACTION_STACK_VALUE_OBJECT ||
+	    value_var.type == ACTION_STACK_VALUE_ARRAY ||
+	    value_var.type == ACTION_STACK_VALUE_FUNCTION) {
+		if ((prop_index >= 0 && prop_index <= 10) || prop_index == 12 ||
+		    prop_index == 16 || prop_index == 18 ||
+		    prop_index == 20 || prop_index == 21) {
+			// valueOf coercion
+			pushVar(app_context, &value_var);
+			convertFloat(app_context);
+			popVar(app_context, &value_var);
+		} else if (prop_index == 13 || prop_index == 19) {
+			// toString coercion
+			pushVar(app_context, &value_var);
+			convertString(app_context, NULL);
+			popVar(app_context, &value_var);
+		}
+	}
+
+	// 5. Get the MovieClip object
 	MovieClip* mc = getMovieClipByTarget(target);
 	if (!mc) return; // Invalid target
 
@@ -21755,6 +21858,8 @@ void actionCloneSprite(SWFAppContext* app_context)
 	popVar(app_context, &depth);
 
 	// Pop source sprite name (2nd pop = new clone's instance name)
+	// Use convertString for proper toString coercion on objects
+	convertString(app_context, NULL);
 	ActionVar source;
 	popVar(app_context, &source);
 	char _clone_src_buf[512];
@@ -21763,18 +21868,10 @@ void actionCloneSprite(SWFAppContext* app_context)
 		const uint16_t* _clone_src_u16 = varGetU16Ptr(&source);
 		u16_to_utf8(_clone_src_u16, source.str_size, _clone_src_buf, sizeof(_clone_src_buf));
 		source_name = _clone_src_buf;
-	} else if ((source.type == ACTION_STACK_VALUE_OBJECT ||
-	            source.type == ACTION_STACK_VALUE_FUNCTION) && source.data.numeric_value != 0) {
-		// Object with toString method — call it to get the clone name
-		ActionVar ts = objectCallToString(app_context, &source, NULL);
-		if (ts.type == ACTION_STACK_VALUE_STRING && ts.str_size > 0) {
-			const uint16_t* _ts_u16 = varGetU16Ptr(&ts);
-			u16_to_utf8(_ts_u16, ts.str_size, _clone_src_buf, sizeof(_clone_src_buf));
-			source_name = _clone_src_buf;
-		}
 	}
 
-	// Pop target sprite name
+	// Pop target sprite name (toString coercion)
+	convertString(app_context, NULL);
 	ActionVar target;
 	popVar(app_context, &target);
 	char _clone_tgt_buf[512];
@@ -21839,6 +21936,12 @@ void actionCloneSprite(SWFAppContext* app_context)
  */
 void actionRemoveSprite(SWFAppContext* app_context)
 {
+	// toString coercion on target for proper side effects
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+		convertString(app_context, NULL);
+	}
 	// Pop target sprite name from stack
 	ActionVar target;
 	popVar(app_context, &target);
@@ -21994,6 +22097,30 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		}
 	}
 #endif
+	// Target not found — emit trace message matching Flash/Ruffle behavior
+	{
+		char msg_buf[512];
+		MovieClip* base = getCurrentContext();
+		const char* base_path = "_level0";
+		if (base != NULL && base != &root_movieclip && base->target[0] != '\0') {
+			static char base_path_buf[256];
+			const char* tgt = base->target;
+			if (tgt[0] == '/' && tgt[1] == '\0')
+				base_path = "_level0";
+			else {
+				char tmp[200];
+				strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
+				tmp[sizeof(tmp) - 1] = '\0';
+				for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
+				snprintf(base_path_buf, sizeof(base_path_buf), "_level0.%s", tmp);
+				base_path = base_path_buf;
+			}
+		}
+		snprintf(msg_buf, sizeof(msg_buf),
+			"Target not found: Target=\"%s\" Base=\"%s\"\n",
+			target_name, base_path);
+		fputs(msg_buf, stdout);
+	}
 }
 
 // ==================================================================
@@ -28830,11 +28957,11 @@ void actionStartDrag(SWFAppContext* app_context)
 	int has_constraint = 0;
 
 	// Check if we need to pop constraint rectangle
-	// Convert to integer to check if non-zero
+	// Flash/Ruffle checks constrain == 1 (not just non-zero)
 	if (constrain.type == ACTION_STACK_VALUE_F32) {
-		has_constraint = ((int)VAL(float, &constrain.data.numeric_value) != 0);
+		has_constraint = ((int)VAL(float, &constrain.data.numeric_value) == 1);
 	} else if (constrain.type == ACTION_STACK_VALUE_F64) {
-		has_constraint = ((int)VAL(double, &constrain.data.numeric_value) != 0);
+		has_constraint = ((int)VAL(double, &constrain.data.numeric_value) == 1);
 	}
 
 	if (has_constraint) {
@@ -28943,6 +29070,12 @@ bool actionWaitForFrame(SWFAppContext* app_context, u16 frame)
 
 bool actionWaitForFrame2(SWFAppContext* app_context)
 {
+	// For objects, coerce via toString (matching Ruffle behavior)
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY ||
+	    STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+		convertString(app_context, NULL);
+	}
 	// Pop frame identifier from stack
 	ActionVar frame_var;
 	popVar(app_context, &frame_var);
