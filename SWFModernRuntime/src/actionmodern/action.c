@@ -16349,6 +16349,17 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
  * @param ctor_var Pointer to the constructor function
  * @return 1 if object is instance of constructor, 0 otherwise
  */
+// Check if an interface prototype transitively implements ctor_proto
+static int checkInterfaceTransitive(ASObject* iface_proto, ASObject* ctor_proto, int depth) {
+	if (iface_proto == ctor_proto) return 1;
+	if (depth > 20) return 0;  // prevent infinite recursion
+	for (u32 i = 0; i < iface_proto->interface_count; i++) {
+		if (checkInterfaceTransitive(iface_proto->interfaces[i], ctor_proto, depth + 1))
+			return 1;
+	}
+	return 0;
+}
+
 static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 {
 	// Primitives (number, string, undefined) are never instances
@@ -16478,10 +16489,11 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 
 			// Check AS2 interface implementation (ImplementsOp stores interface prototypes here).
 			// When MyObject implements MyInterface, MyObject.prototype->interfaces[] holds
-			// MyInterface.prototype. If ctor_proto == MyInterface.prototype → match.
+			// MyInterface.prototype. Check transitively — if Pink implements Red,
+			// and GrandchildBB implements Pink, then GrandchildBB instanceof Red is true.
 			for (u32 _iif = 0; _iif < current_proto->interface_count; _iif++)
 			{
-				if (current_proto->interfaces[_iif] == ctor_proto)
+				if (checkInterfaceTransitive(current_proto->interfaces[_iif], ctor_proto, 0))
 					return 1;
 			}
 
@@ -26804,78 +26816,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
-	// 5. Check for empty/blank method name - invoke object as function
-	if (method_name_len == 0 || (method_name_len == 1 && method_name[0] == '\0'))
-	{
-		// Empty method name - invoke the object itself as a function
-		if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
-		{
-			// Object is a function - invoke it
-			ASFunction* func = lookupFunctionFromVar(&obj_var);
-
-			if (func != NULL && g_call_depth >= g_max_call_depth - 1)
-			{
-				// Recursion depth limit reached - halt all script execution
-				if (args != NULL) FREE(args);
-				g_execution_halted = 1;
-				pushUndefined(app_context);
-				return;
-			}
-			else if (func != NULL && func->function_type == 2)
-			{
-				// Invoke DefineFunction2
-				ActionVar* registers = NULL;
-				if (func->register_count > 0) {
-					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-				}
-
-				// No 'this' binding for direct function call (pass NULL)
-				g_call_depth++;
-				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
-				g_call_depth--;
-
-				if (registers != NULL) FREE(registers);
-				if (args != NULL) FREE(args);
-
-				pushVar(app_context, &result);
-				return;
-			}
-			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
-			{
-				// Invoke simple function (DefineFunction type 1)
-				// Push arguments onto stack for parameter binding
-				for (u32 i = 0; i < num_args; i++)
-				{
-					pushVar(app_context, &args[i]);
-				}
-				if (args != NULL) FREE(args);
-
-				g_call_depth++;
-				ActionVar result;
-				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-				g_call_depth--;
-
-				pushVar(app_context, &result);
-				return;
-			}
-			else
-			{
-				// Unknown function type or NULL - push undefined
-				if (args != NULL) FREE(args);
-				pushUndefined(app_context);
-				return;
-			}
-		}
-		else
-		{
-			// Object is not a function - cannot invoke, push undefined
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-			return;
-		}
-	}
-
-	// 6a. Handle SUPER type (Pattern A SWF6: GetVariable("super") → CallMethod)
+	// 5a. Handle SUPER type BEFORE empty-method check — super() and super.method()
+	// must be dispatched via the SUPER handler, not the generic empty-method path.
 	if (obj_var.type == ACTION_STACK_VALUE_SUPER)
 	{
 		void* super_this = (void*) obj_var.data.numeric_value;
@@ -26967,10 +26909,82 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushVar(app_context, &result);
 				return;
 			}
+
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
 		}
-		if (args != NULL) FREE(args);
-		pushUndefined(app_context);
-		return;
+	}
+
+	// 5. Check for empty/blank method name - invoke object as function
+	if (method_name_len == 0 || (method_name_len == 1 && method_name[0] == '\0'))
+	{
+		// Empty method name - invoke the object itself as a function
+		if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			// Object is a function - invoke it
+			ASFunction* func = lookupFunctionFromVar(&obj_var);
+
+			if (func != NULL && g_call_depth >= g_max_call_depth - 1)
+			{
+				// Recursion depth limit reached - halt all script execution
+				if (args != NULL) FREE(args);
+				g_execution_halted = 1;
+				pushUndefined(app_context);
+				return;
+			}
+			else if (func != NULL && func->function_type == 2)
+			{
+				// Invoke DefineFunction2
+				ActionVar* registers = NULL;
+				if (func->register_count > 0) {
+					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+				}
+
+				// No 'this' binding for direct function call (pass NULL)
+				g_call_depth++;
+				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+				g_call_depth--;
+
+				if (registers != NULL) FREE(registers);
+				if (args != NULL) FREE(args);
+
+				pushVar(app_context, &result);
+				return;
+			}
+			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
+			{
+				// Invoke simple function (DefineFunction type 1)
+				// Push arguments onto stack for parameter binding
+				for (u32 i = 0; i < num_args; i++)
+				{
+					pushVar(app_context, &args[i]);
+				}
+				if (args != NULL) FREE(args);
+
+				g_call_depth++;
+				ActionVar result;
+				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				g_call_depth--;
+
+				pushVar(app_context, &result);
+				return;
+			}
+			else
+			{
+				// Unknown function type or NULL - push undefined
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+		}
+		else
+		{
+			// Object is not a function - cannot invoke, push undefined
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 	}
 
 	// 6b. Look up the method on the object and invoke it
