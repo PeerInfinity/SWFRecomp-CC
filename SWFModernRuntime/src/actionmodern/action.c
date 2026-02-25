@@ -18868,6 +18868,25 @@ void actionSetMember(SWFAppContext* app_context)
 		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
 		if (arr != NULL)
 		{
+			// Check for addProperty setter in arr->props first (overrides built-in behavior)
+			if (arr->props != NULL)
+			{
+				ASProperty* _ap = NULL;
+				for (u32 i = 0; i < arr->props->num_used; i++) {
+					if (arr->props->properties[i].name_length == prop_name_len &&
+					    strncmp(arr->props->properties[i].name, prop_name, prop_name_len) == 0) {
+						_ap = &arr->props->properties[i];
+						break;
+					}
+				}
+				if (_ap != NULL && (_ap->getter != NULL || _ap->setter != NULL)) {
+					// Has addProperty — invoke setter or no-op if setter is null
+					if (_ap->setter != NULL) {
+						invokePropertySetter(app_context, (ASFunction*)_ap->setter, (void*)arr, &value_var);
+					}
+					return;
+				}
+			}
 			// Check for "length" property
 			if (prop_name_len == 6 && strncmp(prop_name, "length", 6) == 0)
 			{
@@ -20213,6 +20232,24 @@ void actionGetMember(SWFAppContext* app_context)
 			return;
 		}
 
+		// Check for addProperty getter in arr->props first (overrides built-in length)
+		if (arr->props != NULL)
+		{
+			ASProperty* _ap = NULL;
+			for (u32 i = 0; i < arr->props->num_used; i++) {
+				if (arr->props->properties[i].name_length == prop_name_len &&
+				    strncmp(arr->props->properties[i].name, prop_name, prop_name_len) == 0) {
+					_ap = &arr->props->properties[i];
+					break;
+				}
+			}
+			if (_ap != NULL && _ap->getter != NULL) {
+				// Invoke addProperty getter with the array as 'this' (pass as obj_var)
+				ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)_ap->getter, (void*)arr);
+				pushVar(app_context, &getter_result);
+				return;
+			}
+		}
 		// Check if accessing the "length" property
 		if (strcmp(prop_name, "length") == 0)
 		{
@@ -27723,6 +27760,80 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
+			return;
+		}
+
+		// Check addProperty BEFORE callArrayMethod (args will be freed by callArrayMethod path)
+		if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
+		{
+			u64 result = 0; // boolean false
+			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
+			                      args[0].type == ACTION_STACK_VALUE_F64 ||
+			                      args[0].type == ACTION_STACK_VALUE_F32))
+			{
+				char _addprop_buf[512];
+				const char* prop_name_ap;
+				u32 prop_name_ap_len;
+				if (args[0].type == ACTION_STACK_VALUE_STRING)
+				{
+					const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
+					u16_to_utf8(_addprop_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
+					prop_name_ap = _addprop_buf;
+					prop_name_ap_len = (u32)strlen(prop_name_ap);
+				}
+				else
+				{
+					double d = varToDouble(&args[0]);
+					s64 as_int = (s64)d;
+					if ((double)as_int == d)
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%lld", (long long)as_int);
+					else
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%.15g", d);
+					prop_name_ap = _addprop_buf;
+					prop_name_ap_len = (u32)strlen(_addprop_buf);
+				}
+
+				ASFunction* getter = NULL;
+				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
+					getter = (ASFunction*) args[1].data.numeric_value;
+				ASFunction* setter = NULL;
+				if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
+					setter = (ASFunction*) args[2].data.numeric_value;
+
+				// Ensure arr->props exists
+				if (arr->props == NULL) {
+					arr->props = allocObject(app_context, 4);
+					retainObject(arr->props);
+				}
+				ASObject* obj = arr->props;
+				ASProperty* prop = NULL;
+				for (u32 i = 0; i < obj->num_used; i++) {
+					if (obj->properties[i].name_length == prop_name_ap_len &&
+					    strncmp(obj->properties[i].name, prop_name_ap, prop_name_ap_len) == 0) {
+						prop = &obj->properties[i];
+						break;
+					}
+				}
+				if (prop == NULL) {
+					ActionVar marker = {0};
+					marker.type = ACTION_STACK_VALUE_UNDEFINED;
+					setProperty(app_context, obj, prop_name_ap, prop_name_ap_len, &marker);
+					for (u32 i = 0; i < obj->num_used; i++) {
+						if (obj->properties[i].name_length == prop_name_ap_len &&
+						    strncmp(obj->properties[i].name, prop_name_ap, prop_name_ap_len) == 0) {
+							prop = &obj->properties[i];
+							break;
+						}
+					}
+				}
+				if (prop != NULL) {
+					prop->getter = (void*)getter;
+					prop->setter = (void*)setter;
+					result = 1; // boolean true
+				}
+			}
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 			return;
 		}
 
