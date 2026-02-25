@@ -783,8 +783,8 @@ def compile_native(test_dir, num_frames, build_dir):
     test_swf = test_dir / "test.swf"
     if test_swf.exists():
         extra_defines.append(f"-DSWF_FILE_SIZE={test_swf.stat().st_size}")
-    # Pass test directory name for _url property
-    extra_defines.append(f'-DSWF_URL="{test_dir.name}/test.swf"')
+    # Pass movie URL matching Ruffle's VFS format (file:///test.swf)
+    extra_defines.append(f'-DSWF_URL="file:///test.swf"')
     try:
         result = subprocess.run(
             [

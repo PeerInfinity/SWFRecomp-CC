@@ -24493,8 +24493,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			MovieClip* child = createMovieClip(inst_name, mc);
 			child->currentframe = 0;  // Empty clips have _currentframe = 0
-			child->totalframes = 0;
-			child->framesloaded = 0;
+			child->totalframes = 1;
+			child->framesloaded = 1;
 			child->depth = depth_val;
 			strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
 			child->url[sizeof(child->url) - 1] = '\0';
@@ -28853,8 +28853,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			double v = 0.0;
 #ifdef SWF_FILE_SIZE
-			// Non-empty clips (placed by timeline) return SWF file size
-			if (mc->totalframes > 0) v = (double)SWF_FILE_SIZE;
+			// Timeline/root clips return SWF file size; dynamically created empty clips return 0
+			if (mc->display_obj != NULL || mc == &root_movieclip) v = (double)SWF_FILE_SIZE;
 #endif
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
@@ -28864,7 +28864,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			double v = 0.0;
 #ifdef SWF_FILE_SIZE
-			if (mc->totalframes > 0) v = (double)SWF_FILE_SIZE;
+			if (mc->display_obj != NULL || mc == &root_movieclip) v = (double)SWF_FILE_SIZE;
 #endif
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
