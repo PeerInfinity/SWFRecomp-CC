@@ -1857,7 +1857,8 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	{
 		size_t cid = display_list[src_depth].char_id;
 		int scriptable = (dictionary[cid].type == CHAR_TYPE_SPRITE) ||
-		                 ng_find_button(cid) || (ng_find_textfield(cid) >= 0);
+		                 ng_find_button(cid) || (ng_find_textfield(cid) >= 0) ||
+		                 ng_find_video(cid);
 		if (!scriptable) return NULL;
 
 		// Place clone at target depth (AS depth → SWF depth = depth itself for CloneSprite)
@@ -1917,6 +1918,7 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 
 	// Find source MC and create clone MC
 	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
+	if (src_mc == NULL || src_mc == &root_movieclip) return NULL; // cannot clone root
 	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
 	if (clone_mc == NULL) return NULL;
 
@@ -2008,7 +2010,8 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 	{
 		size_t cid = display_list[src_depth].char_id;
 		int scriptable = (dictionary[cid].type == CHAR_TYPE_SPRITE) ||
-		                 ng_find_button(cid) || (ng_find_textfield(cid) >= 0);
+		                 ng_find_button(cid) || (ng_find_textfield(cid) >= 0) ||
+		                 ng_find_video(cid);
 		if (!scriptable) return NULL;
 		// Note: duplicateMovieClip does NOT fire onLoad for the clone (unlike CloneSprite).
 	}

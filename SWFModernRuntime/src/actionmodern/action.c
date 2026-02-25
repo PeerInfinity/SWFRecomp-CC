@@ -21913,6 +21913,16 @@ void actionCloneSprite(SWFAppContext* app_context)
 		source_name = _clone_src_buf;
 	}
 
+	// Peek at target's type BEFORE toString coercion — if it's a MovieClip,
+	// save the pointer so we can use ng_cloneSpriteFromMC in NO_GRAPHICS mode.
+	MovieClip* _clone_target_mc = NULL;
+	{
+		ActionVar _peek;
+		peekVar(app_context, &_peek);
+		if (_peek.type == ACTION_STACK_VALUE_MOVIECLIP && _peek.data.numeric_value != 0)
+			_clone_target_mc = (MovieClip*)(uintptr_t)_peek.data.numeric_value;
+	}
+
 	// Pop target sprite name (toString coercion)
 	convertString(app_context, NULL);
 	ActionVar target;
@@ -21942,10 +21952,9 @@ void actionCloneSprite(SWFAppContext* app_context)
 		// Strip path prefix from new name
 		if (strncmp(new_name, "_root.", 6) == 0) new_name += 6;
 		else if (strncmp(new_name, "_level0.", 8) == 0) new_name += 8;
-		if (target.type == ACTION_STACK_VALUE_MOVIECLIP && target.data.numeric_value != 0) {
+		if (_clone_target_mc != NULL) {
 			// Source clip already resolved as MovieClip
-			MovieClip* src_mc = (MovieClip*)(uintptr_t)target.data.numeric_value;
-			ng_cloneSpriteFromMC(app_context, src_mc, new_name, depth_int);
+			ng_cloneSpriteFromMC(app_context, _clone_target_mc, new_name, depth_int);
 		} else {
 			// Source is a string path — look up in ng_display
 			const char* src_path = target_name;
