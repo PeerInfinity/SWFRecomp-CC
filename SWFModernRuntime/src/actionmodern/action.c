@@ -5434,6 +5434,7 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 // TextField constructor function and prototype
 static ASFunction g_textfield_constructor;
 static int g_textfield_constructor_init = 0;
+static ASFunction g_tf_type_toString_func; // [type Object] toString for SWF < 7
 // TextField prototype method stubs (static storage)
 static ASFunction g_tf_getTextFormat_func;
 static ASFunction g_tf_setTextFormat_func;
@@ -12639,14 +12640,17 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                     scope_chain[scope_depth++] = func->captured_scope[ci];
                 }
             }
-            // Set 'this' to the listener object for type 1 (DefineFunction) callbacks
-            ActionVar this_var = {0};
-            this_var.type = ACTION_STACK_VALUE_OBJECT;
-            this_var.data.numeric_value = (u64)listener_obj;
-            setVariableByName("this", &this_var);
+            // Push 'this' binding via g_this_stack (same as actionCallFunction type 1)
+            u32 saved_this_depth_bm_t1 = g_this_depth;
+            if (g_this_depth < MAX_THIS_DEPTH) {
+                g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+                g_this_stack[g_this_depth].data.numeric_value = (u64)listener_obj;
+                g_this_depth++;
+            }
             for (u32 j = 0; j < extra_count; j++)
                 pushVar(app_context, &extra_args[j]);
             ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+            g_this_depth = saved_this_depth_bm_t1;
             // Pop captured scopes
             for (u8 ci = 0; ci < bm_captured_t1; ci++) {
                 if (scope_depth > 0) scope_depth--;
@@ -15460,14 +15464,23 @@ void actionSetVariable(SWFAppContext* app_context)
 					if (string_id != 0) {
 						extern hashmap* var_map;
 						ActionVar* old_hash;
-						if (hashmap_get(var_map, var_name, var_name_len, (uintptr_t*)&old_hash)) {
+						// For SWF <= 6, fold keys to lowercase
+						char _wf_buf[512];
+						char* _wf_key = var_name;
+						if (g_swf_version <= 6 && var_name_len < sizeof(_wf_buf)) {
+							for (u32 fi = 0; fi < var_name_len; fi++)
+								_wf_buf[fi] = (var_name[fi] >= 'A' && var_name[fi] <= 'Z') ? (var_name[fi] + 32) : var_name[fi];
+							_wf_buf[var_name_len] = '\0';
+							_wf_key = _wf_buf;
+						}
+						if (hashmap_get(var_map, _wf_key, var_name_len, (uintptr_t*)&old_hash)) {
 							if (old_hash != var) {
 								if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
 									free(old_hash->data.string_data.heap_ptr);
 								free(old_hash);
 							}
 						}
-						hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+						hashmap_set(var_map, _wf_key, var_name_len, (uintptr_t)var);
 					}
 					POP_2();
 					return;
@@ -15489,7 +15502,16 @@ void actionSetVariable(SWFAppContext* app_context)
 	if (string_id != 0) {
 		extern hashmap* var_map;
 		ActionVar* old_hash;
-		if (hashmap_get(var_map, var_name, var_name_len, (uintptr_t*)&old_hash)) {
+		// For SWF <= 6, fold keys to lowercase (matching getVariable)
+		char _sv_folded[512];
+		char* _sv_key = var_name;
+		if (g_swf_version <= 6 && var_name_len < sizeof(_sv_folded)) {
+			for (u32 fi = 0; fi < var_name_len; fi++)
+				_sv_folded[fi] = (var_name[fi] >= 'A' && var_name[fi] <= 'Z') ? (var_name[fi] + 32) : var_name[fi];
+			_sv_folded[var_name_len] = '\0';
+			_sv_key = _sv_folded;
+		}
+		if (hashmap_get(var_map, _sv_key, var_name_len, (uintptr_t*)&old_hash)) {
 			if (old_hash != var) {
 				// Free the old hashmap entry being replaced
 				if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
@@ -15497,7 +15519,7 @@ void actionSetVariable(SWFAppContext* app_context)
 				free(old_hash);
 			}
 		}
-		hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+		hashmap_set(var_map, _sv_key, var_name_len, (uintptr_t)var);
 	}
 
 #ifdef NO_GRAPHICS
@@ -15597,21 +15619,29 @@ void actionDefineLocal(SWFAppContext* app_context)
 	if (string_id != 0) {
 		extern hashmap* var_map;
 		ActionVar* old_hash;
-		if (hashmap_get(var_map, var_name, var_name_len, (uintptr_t*)&old_hash)) {
+		// For SWF <= 6, fold keys to lowercase (matching getVariable behavior)
+		char _dl_folded[512];
+		char* hm_lookup_key = var_name;
+		if (g_swf_version <= 6 && var_name_len < sizeof(_dl_folded)) {
+			for (u32 fi = 0; fi < var_name_len; fi++)
+				_dl_folded[fi] = (var_name[fi] >= 'A' && var_name[fi] <= 'Z') ? (var_name[fi] + 32) : var_name[fi];
+			_dl_folded[var_name_len] = '\0';
+			hm_lookup_key = _dl_folded;
+		}
+		if (hashmap_get(var_map, hm_lookup_key, var_name_len, (uintptr_t*)&old_hash)) {
 			if (old_hash != var) {
 				if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
 					free(old_hash->data.string_data.heap_ptr);
 				free(old_hash);
 			}
 			// Existing entry has a stable heap-allocated key — just update the value.
-			hashmap_set(var_map, var_name, var_name_len, (uintptr_t)var);
+			hashmap_set(var_map, hm_lookup_key, var_name_len, (uintptr_t)var);
 		} else {
-			// New entry: var_name points to a stack buffer (_dl_buf) that becomes
-			// a dangling pointer after this function returns. Heap-allocate a copy
+			// New entry: heap-allocate a copy of the (folded) key
 			// so the hashmap key remains valid for future lookups.
 			char* hm_key = (char*) malloc(var_name_len + 1);
 			if (hm_key) {
-				memcpy(hm_key, var_name, var_name_len);
+				memcpy(hm_key, hm_lookup_key, var_name_len);
 				hm_key[var_name_len] = '\0';
 				hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
 			}
@@ -20716,6 +20746,19 @@ void actionNewObject(SWFAppContext* app_context)
 				u8 flags = (i >= 30) ? PROPERTY_FLAGS_DEFAULT :
 				                       (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
 				setPropertyWithFlags(app_context, tf_obj, swf5_tf_prop_names[i], swf5_tf_prop_lens[i], &undef_val, flags);
+			}
+			// SWF5 TextField instances trace as "[type Object]" — install toString override
+			{
+				memset(&g_tf_type_toString_func, 0, sizeof(ASFunction));
+				strncpy(g_tf_type_toString_func.name, "toString", 255);
+				g_tf_type_toString_func.function_type = 1;
+				g_tf_type_toString_func.simple_func = (SimpleFunctionPtr) builtin_type_object_toString;
+				if (function_count < MAX_FUNCTIONS)
+					function_registry[function_count++] = &g_tf_type_toString_func;
+				ActionVar ts_var = {0};
+				ts_var.type = ACTION_STACK_VALUE_FUNCTION;
+				ts_var.data.numeric_value = (u64) &g_tf_type_toString_func;
+				setPropertyWithFlags(app_context, tf_obj, "toString", 8, &ts_var, PROPERTY_FLAGS_DONTENUM);
 			}
 		}
 		new_obj = tf_obj;
