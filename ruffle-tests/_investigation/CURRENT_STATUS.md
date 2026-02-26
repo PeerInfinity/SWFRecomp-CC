@@ -1,12 +1,12 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-25
+Last updated: 2026-02-26
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 364/619 (58.8%) — local estimate with new fixes: ~372/619
-- **Main failure types**: output_mismatch (~255), segfault (5), runtime_error (4), compile_fail (many due to FrameLabelEntry typedef conflict), timeout (1)
-- **Recent gains**: Mouse events complete (mouse_pos, mouse_pos_with_scale_factor, mouse_events_visible_enabled, click_block all PASS). Frame navigation complete. Timer system. Button _visible/_enabled gating. Middle mouse button support.
+- **Pass rate (CI, last run)**: 375/619 (60.6%)
+- **Main failure types**: output_mismatch (226), segfault (14), runtime_error (2), compile_fail (1), timeout (1)
+- **Recent gains**: Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -76,7 +76,7 @@ Last updated: 2026-02-25
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
 | `selection` | 435/455 (95.6%) | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
-| `hittest_morph` | 67/70 (95.7%) | Morph shape bounds interpolation |
+| `hittest_morph` | ~~67/70~~ **70/70 PASS** ✅ | Now passing in CI |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
 | `property_invalid_base_clip` | 34/36 (94.4%) | getProperty path resolution without leading _root |
@@ -131,20 +131,20 @@ Last updated: 2026-02-25
 | REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
 | PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 10/12 pass | Remaining: `__resolve` hook, InitObject setters; add_property ✅, as_set_prop_flags ✅ |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
-| TELLTARGET_PLAN | **PARTIAL** | slash_syntax ✅, string_paths_basic ✅ | tellTarget scope, path resolution, eval() |
+| TELLTARGET_PLAN | **PARTIAL** | slash_syntax ✅, string_paths_basic ✅, target_clip_removed ✅ | tellTarget scope, path resolution, eval() |
 | TIMER_PLAN | **Phases 1-2 DONE** | 1/3 pass (set_interval ✅) | timer_run_actions blocked on REGISTERCLASS_PLAN (attachMovie); timeout needs script timeout mechanism |
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
-| TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
+| TAB_ORDERING_PLAN | **PARTIAL** | 2/7 pass (tab_ordering_automatic_basic, tab_ordering_reverse ✅) | Tab key focus navigation, blocked by FOCUS_SYSTEM_PLAN |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
 | LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 18/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) → LOADVARIABLES_PLAN |
-| LOADVARIABLES_PLAN | **Phases 1-2 DONE** | 2/4 pass | loadvariables + loadvariablesnum ✅; loadvariables2 needs TIMER_PLAN; loadvariables_method needs log_fetch |
+| LOADVARIABLES_PLAN | **Phases 1-2 DONE** | 3/4 pass | loadvariables + loadvariablesnum + loadvariables2 ✅; loadvariables_method needs log_fetch |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** | 1/4 pass | loadmovie_replace_root ✅; mcl_loadclip_replace_root blocked by MTASC class support; swf7→5/6 deferred |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
-| UNLOAD_PLAN | **DONE** (via LOADMOVIE_PLAN) | 3/3 pass (unloadmovie, unloadmovie_method, unloadmovienum) | — |
-| BUTTON_PLAN | **6/14 PASS** → `blocked/` | button_children, button_goto, button_order, button_properties_special_cases, button_v5, button_v6 ✅ | Remaining 8 blocked on key dispatch, enterFrame ordering, loadMovie |
+| UNLOAD_PLAN | **MOSTLY DONE** | 4/6 pass (unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload (36/52), unload_nested_child (0/5) |
+| BUTTON_PLAN | **11/14 PASS** → `blocked/` | button_children, button_goto, button_key_events, button_key_events_special, button_keypress, button_keypress_vs_press, button_order, button_properties_special_cases, button_v5, button_v6, movieclip_in_removed_button ✅ | Remaining 3: button_keypress_vs_tab (focus highlight), button_keypress_vs_textinput (TF onChanged), root_button_mode (loadMovie) |
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** | swf6_case_insensitive ✅, swf6_string_as_bool ✅, swf4_actions_coercion_order ✅ | Phase 4 (cross-version calls) blocked on loadMovie + per-function version tracking |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** | this_swf6 ✅, mutable_this ✅ | — |
-| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 4 PASS + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events, morph interp |
+| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events |
 
 ## Recommended Work Order
 
@@ -181,7 +181,7 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 ### Dependency Blockers (plans blocking other plans)
 - ~~**TIMER_PLAN**~~ — **RESOLVED** (Phases 1-2 done, set_interval ✅). loadvariables2 still blocked on compile issues; timer_run_actions blocked on REGISTERCLASS_PLAN
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; addProperty getters now invoked in super() paths; remaining 3 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
-- **MOUSE_EVENTS_PLAN** blocks: FOCUS_SYSTEM_PLAN, BUTTON_PLAN (8 tests), DRAG_DROP_PLAN, CLONE_DUPLICATE_PLAN (clip_event_propagation_order)
+- **MOUSE_EVENTS_PLAN** blocks: FOCUS_SYSTEM_PLAN (text field hit-testing), HIT_TESTING_PLAN (2 tests), CLONE_DUPLICATE_PLAN (clip_event_propagation_order)
 - **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests)
 - **TELLTARGET_PLAN** blocks: THIS_BINDING_PLAN Phase 6 (this_scoping remaining 10 lines)
 - **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (on_construct), TIMER_PLAN (timer_run_actions partially)

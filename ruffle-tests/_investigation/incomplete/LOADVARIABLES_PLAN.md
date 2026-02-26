@@ -3,7 +3,7 @@
 
 Last updated: 2026-02-24
 
-## Status: PARTIAL — 2/4 tests passing (loadvariables, loadvariablesnum)
+## Status: MOSTLY COMPLETE — 3/4 tests passing (loadvariables, loadvariablesnum, loadvariables2)
 
 ---
 
@@ -32,7 +32,7 @@ pairs as variables on the target MovieClip or TextField. In Flash, this is async
 | **loadvariables** | **YES** | Simple: load data file, parse, set vars, advance frames |
 | **loadvariablesnum** | **YES** | Same as above but target is `_levelN` |
 | **loadvariables_method** | **PARTIAL** | Needs `Navigator::fetch` log output (`log_fetch=true` in test.toml) |
-| **loadvariables2** | **NO** | Requires setInterval/clearInterval (TIMER_PLAN), createTextField, async polling |
+| **loadvariables2** | **YES — NOW PASSING** ✅ | Timer/createTextField/polling requirements met |
 
 **Realistically passing after this plan: 2/4** (loadvariables, loadvariablesnum).
 loadvariables_method needs `log_fetch` support (7 lines, 2 match already).

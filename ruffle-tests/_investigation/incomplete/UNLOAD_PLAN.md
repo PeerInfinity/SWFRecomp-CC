@@ -3,15 +3,18 @@
 
 Last updated: 2026-02-22
 
-## Status: PARTIALLY IMPLEMENTED (1/3 fixable tests passing)
+## Status: MOSTLY COMPLETE (4/6 tests passing)
 
-### CI Results (2026-02-22)
+### CI Results (2026-02-26)
 
 | Test | CI Status | Notes |
 |------|-----------|-------|
-| unload_clip_event | **PASS** ✅ | Clip action unload dispatch now working |
-| unload | output_mismatch | Still failing — complex depth/event ordering |
-| unload_nested_child | output_mismatch | Still failing — nested unload event ordering |
+| unload_clip_event | **PASS** ✅ | Clip action unload dispatch working |
+| unloadmovie | **PASS** ✅ | Now passing |
+| unloadmovie_method | **PASS** ✅ | Now passing |
+| unloadmovienum | **PASS** ✅ | Now passing |
+| unload | output_mismatch (36/52) | Still failing — complex depth/event ordering |
+| unload_nested_child | output_mismatch (0/5) | Still failing — nested unload event ordering |
 
 ### What's Implemented Since Original Analysis
 - `tagPlaceObject2WithClipActions` is now functional (no longer a no-op)

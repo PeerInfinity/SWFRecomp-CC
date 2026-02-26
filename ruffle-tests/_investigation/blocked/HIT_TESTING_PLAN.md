@@ -16,7 +16,7 @@ Last updated: 2026-02-25
 | hittest_lockroot | 15 | **PASS** (15/15) | Phase 4 + drawing bounds |
 | hittest_winding_rule | 12 | **PASS** (12/12) | Phase 6 (shape-accurate + winding rules) |
 | movieclip_getbounds | 191 | 186/191 (5 diff) | Rounding precision (-99.9 vs -100) |
-| hittest_morph | 70 | 67/70 (3 diff) | Needs morph ratio interpolation for bounds + shape |
+| hittest_morph | 70 | **PASS** (70/70) ✅ | Now passing in CI |
 | movieclip_hittest_shapeflag | 338 | 266/338 (72 diff) | Was compile_fail, now output_mismatch — edge cases in triangulation approach |
 | movieclip_invalid_get_bounds_1-8 | varies | BLOCKED | Needs loadMovie infrastructure |
 | hittest_morph_input | 1 | BLOCKED | Needs mouse event dispatch |

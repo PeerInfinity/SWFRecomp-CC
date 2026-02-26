@@ -1,15 +1,15 @@
 # Morph Shape Interpolation Plan
 <!-- TESTS: hittest_morph -->
 
-Last updated: 2026-02-23
+Last updated: 2026-02-26
 
-## Status: NOT STARTED — 0/1 tests blocked on this (hittest_morph at 67/70)
+## Status: COMPLETE — 1/1 test PASS
 
-### Test status
+| Test | Match | Status |
+|------|-------|--------|
+| hittest_morph | 70/70 | **PASS** ✅ |
 
-| Test | Match | Issue |
-|------|-------|-------|
-| hittest_morph | 67/70 (95.7%) | 3 lines need interpolated bounds + shape hit test at non-zero ratio |
+The test now passes in CI without explicit morph interpolation changes. The existing bounds and hit-test infrastructure handles this test correctly.
 
 The 3 failing lines in `hittest_morph`:
 - Lines 61, 66: `xMax` bounds mismatch — getBounds returns start-shape bounds instead of

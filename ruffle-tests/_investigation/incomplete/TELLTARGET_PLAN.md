@@ -5,14 +5,16 @@ Last updated: 2026-02-25
 
 ## Status: PARTIALLY IMPLEMENTED
 
-### CI Results (2026-02-25)
-Some progress since plan was written:
-- `slash_syntax` ✅ — **NOW PASSING** in CI (was 0/14)
-- `string_paths_basic` ✅ — **NOW PASSING** in CI (was 2/4)
-- `tell_target` — output_mismatch
-- `removed_base_clip_tell_target` — output_mismatch
-- `removed_clip_halts_script` — output_mismatch
-- `removed_target_clip_scope` — output_mismatch
+### CI Results (2026-02-26)
+- `slash_syntax` ✅ — **PASS**
+- `string_paths_basic` ✅ — **PASS**
+- `target_clip_removed` ✅ — **PASS** (new since last update)
+- `tell_target` — output_mismatch (10/37)
+- `tell_target_invalid` — output_mismatch (2/6)
+- `target_clip_swf5` — output_mismatch (0/2)
+- `target_clip_swf6` — output_mismatch (0/2)
+- `string_paths_other` — output_mismatch (31/36)
+- `path_string` — output_mismatch (38/322)
 
 ### What's Implemented
 - **actionSetTarget**: Resolves target names via `findDisplayObjectByName()`, sets `g_current_context`
