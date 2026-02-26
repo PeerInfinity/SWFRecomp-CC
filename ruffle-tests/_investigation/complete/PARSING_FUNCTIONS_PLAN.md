@@ -1,22 +1,16 @@
 # Parsing Functions (parseInt/parseFloat) Implementation Plan
 <!-- TESTS: parse_int, parse_float, arguments -->
 
-Last updated: 2026-02-22
+Last updated: 2026-02-26
 
-## Status: PHASES 1-2 COMPLETE, PHASE 3 PARTIAL
-
-### Implementation Commits
-- `3048065` — Implement global constructors/objects, rewrite parseInt, fix isFinite/isNaN
-- `360cd12` — Add arguments object for simple functions
-- `b9cfc9d` — Fix arguments object: add callee/caller/__proto__
-- `2f007dd` — Fix arguments object properties for DefineFunction2
+## Status: COMPLETE (3/3 tests PASS)
 
 ### Current Results
 
 | Test | Lines | Status | Notes |
 |------|-------|--------|-------|
-| parse_int | 64/64 | **PASS** ✅ | All edge cases passing (arguments blocker resolved) |
-| parse_float | ~43/74 | output_mismatch | Still using atof(); needs custom Flash-compatible parser |
+| parse_int | 64/64 | **PASS** ✅ | All edge cases passing |
+| parse_float | 74/74 | **PASS** ✅ | Rewritten: custom Flash-compatible parser (f64, no Infinity, multiple dots, wrapping exponent) |
 | arguments | 127/127 | **PASS** ✅ | All properties working: length, indices, callee, caller, __proto__ |
 
 ### Phase Completion

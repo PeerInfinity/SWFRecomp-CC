@@ -120,7 +120,7 @@ Last updated: 2026-02-26
 | MOVIECLIP_PLAN | **Phases 1-5, 7-9 DONE** | 17 tests pass ✅ | Phase 6 (events) |
 | CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** | 3/5 pass + clip_events ✅ | clone_sprite_edittext* needs TF clone |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
-| PARSING_FUNCTIONS_PLAN | **parse_int DONE** | parse_int passes | parseFloat edge cases remain |
+| PARSING_FUNCTIONS_PLAN | **FULLY COMPLETE** | 3/3 pass (parse_int, parse_float, parsefloat_swf5) ✅ | — |
 | COLOR_OBJECT_PLAN | **COMPLETE** | extends_native_type ✅ | — |
 | GEOMETRY_CLASSES_PLAN | **COMPLETE** | transform, local_to_global partial | — |
 | STAGE_PLAN | **Phases 1,2,5,7 DONE** | stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅ | Phase 4 (_level addressing), Phase 8 (children) |
