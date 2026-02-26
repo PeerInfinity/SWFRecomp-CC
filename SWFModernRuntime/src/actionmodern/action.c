@@ -15127,25 +15127,62 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 		}
 
-		// _root and _level0 both refer to the root MovieClip
+		// _root refers to the root MovieClip
 		if (g_swf_version <= 6
-		    ? ((var_name_len == 5 && strncasecmp(var_name, "_root", 5) == 0) ||
-		       (var_name_len == 7 && strncasecmp(var_name, "_level0", 7) == 0))
-		    : ((var_name_len == 5 && strncmp(var_name, "_root", 5) == 0) ||
-		       (var_name_len == 7 && strncmp(var_name, "_level0", 7) == 0)))
+		    ? (var_name_len == 5 && strncasecmp(var_name, "_root", 5) == 0)
+		    : (var_name_len == 5 && strncmp(var_name, "_root", 5) == 0))
 		{
 			extern MovieClip root_movieclip;
 			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 			return;
 		}
 
-		// _level1, _level2, etc. — resolve to synthetic level MCs
-		if (var_name_len >= 7 && var_name_len <= 10 &&
-		    (g_swf_version <= 6 ? strncasecmp(var_name, "_level", 6) == 0 : strncmp(var_name, "_level", 6) == 0))
+		// _levelN / _flashN resolution (Ruffle-compatible)
+		// Both prefixes are equivalent. Parsing uses i32 wrapping arithmetic.
+		// Non-digit trailing chars are ignored. Empty suffix → level 0.
 		{
-			int level_num = atoi(var_name + 6);
-			if (level_num > 0 && level_num < MAX_LEVELS && g_levels[level_num] != NULL) {
-				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_num]);
+			int is_level_prefix = 0;
+			if (var_name_len >= 6) {
+				if (g_swf_version <= 6) {
+					is_level_prefix = (strncasecmp(var_name, "_level", 6) == 0 ||
+					                   strncasecmp(var_name, "_flash", 6) == 0);
+				} else {
+					is_level_prefix = (strncmp(var_name, "_level", 6) == 0 ||
+					                   strncmp(var_name, "_flash", 6) == 0);
+				}
+			} else if (var_name_len == 5) {
+				// "_level" is 6 chars, but "_flash" is 6 chars too — neither fits in 5
+				// So var_name_len >= 6 already covers both prefixes
+			}
+			if (is_level_prefix) {
+				// Parse level ID from suffix using i32 wrapping arithmetic
+				const char* digits = var_name + 6;
+				u32 digits_len = var_name_len - 6;
+				int is_negative = 0;
+				if (digits_len > 0 && digits[0] == '-') {
+					is_negative = 1;
+					digits++;
+					digits_len--;
+				}
+				int32_t level_id = 0;
+				for (u32 di = 0; di < digits_len; di++) {
+					char ch = digits[di];
+					if (ch < '0' || ch > '9') break; // stop at non-digit
+					level_id = (int32_t)((uint32_t)level_id * 10);
+					level_id = (int32_t)((uint32_t)level_id + (uint32_t)(ch - '0'));
+				}
+				if (is_negative) level_id = -level_id;
+
+				if (level_id == 0) {
+					extern MovieClip root_movieclip;
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+					return;
+				} else if (level_id > 0 && level_id < MAX_LEVELS && g_levels[level_id] != NULL) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_id]);
+					return;
+				}
+				// Level not found — push undefined
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 				return;
 			}
 		}
@@ -15794,6 +15831,17 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 			}
 #endif
+		}
+
+		// Last resort: check MovieClip.prototype chain
+		// (e.g., MovieClip.prototype.clip = 2 should be accessible via GetVariable("clip"))
+		if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+			ActionVar* proto_prop = getPropertyWithPrototype(g_movieclip_constructor.prototype_obj, var_name, var_name_len);
+			if (proto_prop != NULL)
+			{
+				PUSH_VAR(proto_prop);
+				return;
+			}
 		}
 
 		// Variable not found
@@ -16864,38 +16912,53 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 			ActionVar* var = getVariableById(string_id);
 			if (var && !(var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 			{
-				// Variable exists in var_array — set to undefined
+				// Variable exists in var_array — reset to uninitialized sentinel
+				// (type=STRING=0, str_size=0, heap_ptr=NULL) so child MC lookup works
 				if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
 				{
 					free(var->data.string_data.heap_ptr);
-					var->data.string_data.heap_ptr = NULL;
-					var->data.string_data.owns_memory = false;
 				}
-				var->type = ACTION_STACK_VALUE_UNDEFINED;
-				var->data.numeric_value = 0;
-				var->str_size = 0;
+				memset(var, 0, sizeof(ActionVar));
 				found = true;
 			}
 		}
-		// Also check var_map
-		if (!found && hasVariable(var_name, var_name_len))
+		// Also check/reset var_map
+		if (hasVariable(var_name, var_name_len))
 		{
 			ActionVar* var = getVariable(var_name, var_name_len);
-			if (var)
+			if (var && !(var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 			{
+				// Reset to uninitialized sentinel
 				if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
 				{
 					free(var->data.string_data.heap_ptr);
-					var->data.string_data.heap_ptr = NULL;
-					var->data.string_data.owns_memory = false;
 				}
-				var->type = ACTION_STACK_VALUE_UNDEFINED;
-				var->data.numeric_value = 0;
-				var->str_size = 0;
+				memset(var, 0, sizeof(ActionVar));
 				found = true;
 			}
 		}
-		success = true;  // Flash always returns true for Delete2
+		// If we found and deleted a variable, success=true.
+		// If no variable was found, check if a child MC exists with this name — if so, return false
+		// (child MCs are not deletable via Delete2). Otherwise return true (no-op delete).
+		if (found) {
+			success = true;
+		} else {
+			// Check if name matches a child display object (non-deletable)
+			success = true;  // default: deleting non-existent variable is "true" in Flash
+#ifdef NO_GRAPHICS
+			extern size_t ng_findDisplayEntryByName(const char* name);
+			if (var_name != NULL && var_name_len > 0) {
+				char _del_name[64];
+				u32 _dl = var_name_len < 63 ? var_name_len : 63;
+				memcpy(_del_name, var_name, _dl);
+				_del_name[_dl] = '\0';
+				size_t child_depth = ng_findDisplayEntryByName(_del_name);
+				if (child_depth != SIZE_MAX) {
+					success = false;  // child MC exists, can't delete
+				}
+			}
+#endif
+		}
 	}
 
 	// Push result
@@ -20825,6 +20888,56 @@ void actionGetMember(SWFAppContext* app_context)
 			return;
 		}
 
+		// Check child clips by instance name BEFORE builtins, but ONLY for _ prefixed names
+		// In Flash/Ruffle, child clip names take priority over builtin MC properties
+		// (e.g., a child named "_x" shadows the builtin _x property)
+		// Exception: _levelN/_flashN names are resolved as level references, not child clips
+#ifdef NO_GRAPHICS
+		if (mc != NULL && prop_name_len > 1 && prop_name[0] == '_' &&
+		    !(prop_name_len >= 6 && (strncmp(prop_name, "_level", 6) == 0 || strncmp(prop_name, "_flash", 6) == 0)))
+		{
+			char _early_name[64];
+			u32 _en_len = prop_name_len < 63 ? prop_name_len : 63;
+			memcpy(_early_name, prop_name, _en_len);
+			_early_name[_en_len] = '\0';
+
+			// Check child via display_obj first (nested sprites)
+			size_t _early_depth = SIZE_MAX;
+			if (mc->display_obj != NULL) {
+				DisplayObject* _pdobj = (DisplayObject*)mc->display_obj;
+				if (_pdobj->sprite_display_list != NULL) {
+					for (size_t _ecd = 1; _ecd <= _pdobj->sprite_max_depth; _ecd++) {
+						DisplayObject* _ech = &_pdobj->sprite_display_list[_ecd];
+						if (_ech->char_id == 0) continue;
+						if (_ech->instance_name != NULL && strcmp(_ech->instance_name, _early_name) == 0) {
+							_early_depth = _ecd;
+							break;
+						}
+					}
+				}
+			}
+			// Fall back to root-level display list search if mc is root
+			if (_early_depth == SIZE_MAX && (mc == &root_movieclip || mc->name[0] == '\0')) {
+				extern size_t ng_findDisplayEntryByName(const char* name);
+				_early_depth = ng_findDisplayEntryByName(_early_name);
+			}
+			if (_early_depth != SIZE_MAX) {
+				MovieClip* _early_mc = findOrCreateMovieClip(app_context, _early_name, mc);
+				if (_early_mc != NULL) {
+					_early_mc->depth = (int)_early_depth - 16384;
+					// Sync display_obj
+					if (mc->display_obj != NULL) {
+						DisplayObject* _pdobj = (DisplayObject*)mc->display_obj;
+						if (_pdobj->sprite_display_list != NULL && _early_depth <= _pdobj->sprite_max_depth)
+							_early_mc->display_obj = (void*)&_pdobj->sprite_display_list[_early_depth];
+					}
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_early_mc);
+					return;
+				}
+			}
+		}
+#endif
+
 		// Check built-in MovieClip properties (case-insensitive for _ prefixed ones)
 		if (mc != NULL && prop_name_len > 0 && prop_name[0] == '_')
 		{
@@ -20956,6 +21069,37 @@ void actionGetMember(SWFAppContext* app_context)
 				pushVar(app_context, prop);
 				return;
 			}
+		}
+
+		// _levelN / _flashN resolution on MovieClip
+		// Child clips with these names are shadowed by level resolution
+		if (prop_name_len >= 6 &&
+		    (strncmp(prop_name, "_level", 6) == 0 || strncmp(prop_name, "_flash", 6) == 0))
+		{
+			const char* digits = prop_name + 6;
+			u32 digits_len = prop_name_len - 6;
+			int is_negative = 0;
+			if (digits_len > 0 && digits[0] == '-') { is_negative = 1; digits++; digits_len--; }
+			int32_t level_id = 0;
+			for (u32 di = 0; di < digits_len; di++) {
+				char ch = digits[di];
+				if (ch < '0' || ch > '9') break;
+				level_id = (int32_t)((uint32_t)level_id * 10);
+				level_id = (int32_t)((uint32_t)level_id + (uint32_t)(ch - '0'));
+			}
+			if (is_negative) level_id = -level_id;
+
+			if (level_id == 0) {
+				extern MovieClip root_movieclip;
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+				return;
+			} else if (level_id > 0 && level_id < MAX_LEVELS && g_levels[level_id] != NULL) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_id]);
+				return;
+			}
+			// Level not found — return undefined (NOT prototype chain)
+			pushUndefined(app_context);
+			return;
 		}
 
 		// Check child instance names (in Flash, mc.childName resolves to child clips)

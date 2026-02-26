@@ -1,35 +1,34 @@
 # TellTarget / Target Path Resolution Implementation Plan
 <!-- TESTS: tell_target, tell_target_invalid, tell_target_invalid_swf6, target_clip_swf5, target_clip_swf6, target_clip_removed, path_string, slash_syntax, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes, removed_base_clip_tell_target, removed_target_clip_scope -->
 
-Last updated: 2026-02-25
+Last updated: 2026-02-26
 
-## Status: PARTIALLY IMPLEMENTED
+## Status: PHASE 1 MOSTLY COMPLETE
 
-### CI Results (2026-02-26)
-- `slash_syntax` ✅ — **PASS**
-- `string_paths_basic` ✅ — **PASS**
-- `target_clip_removed` ✅ — **PASS** (new since last update)
-- `tell_target` — output_mismatch (10/37)
-- `tell_target_invalid` — output_mismatch (2/6)
-- `target_clip_swf5` — output_mismatch (0/2)
-- `target_clip_swf6` — output_mismatch (0/2)
-- `string_paths_other` — output_mismatch (31/36)
-- `path_string` — output_mismatch (38/322)
+### Results (2026-02-26, commit 6bc4092d)
+- `tell_target` ✅ — **37/37 PASS**
+- `tell_target_invalid` — 4/6 (remaining 2: frame navigation in sprites)
+- `slash_syntax` ✅ — **14/14 PASS**
+- `string_paths_basic` ✅ — **4/4 PASS**
+- `target_clip_removed` ✅ — **5/5 PASS**
+- `string_paths_other` — 31/36 (unchanged)
+- `target_clip_swf5` — 0/2 (clip events / frame execution issue)
+- `target_clip_swf6` — 0/2 (clip events / frame execution issue)
+- `path_string` — 38/322 (needs Phase 2 dot-path rewrite)
 
-### What's Implemented
-- **actionSetTarget**: Resolves target names via `findDisplayObjectByName()`, sets `g_current_context`
-- **actionSetTarget2**: Stack-based variant, fast path for MOVIECLIP type objects
+### What's Implemented (Phase 1)
+- **g_base_clip tracking**: New static in action.c, set/restored by `exec_sprite_frame` and `process_sprite_init_at_depth` in tag.c
+- **actionSetTarget rewrite**: Empty string resets to base_clip; slash/dot/colon path resolution; `_parent`/`..` navigation; invalid target → root context
+- **actionSetTarget2 update**: UNDEFINED silently resets to base_clip; NULL type produces "Target not found" error
+- **"Target not found" error messages**: Correct format with dot-notation Base path via `mcToDotBasePath` helper
+- **Child MC lookup in actionGetVariable**: `resolveSlashPathToMC` for non-root contexts
 - **Scope isolation**: Inside non-root context, variables resolve to clip's dynamic_props then _global
-- **Empty/"_root" reset**: Resets targeted_sprite to NULL
 
-### Still Missing
-- Slash-path parsing (e.g. `/A/B`)
-- Colon-syntax for variable access (e.g. `/A/B:FOO`)
-- `..`/`_parent` navigation
+### Still Missing (Phase 2+)
+- Proper dot-path GetVariable resolution (first segment MC vs variable priority)
 - `eval()` function
-- "Target not found" error messages
-- Base clip tracking for nested tellTarget
-- Recursive child lookup (only root display list scanned)
+- Colon-variable syntax in GetVariable for non-slash paths
+- Removed clip edge cases (Phase 3)
 
 ## Overview (original)
 

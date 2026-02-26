@@ -69,6 +69,7 @@ Last updated: 2026-02-26
 | `mouse_pos_with_scale_factor` | 261/261 ✅ | pixel_ratio support (VIEWPORT_WIDTH/FRAME_WIDTH) |
 | `mouse_events_visible_enabled` | 12/12 ✅ | Button _visible/_enabled gating + middle mouse button |
 | `click_block` | 5/5 ✅ | Sprite display list bounds computation for hit testing |
+| `tell_target` | 37/37 ✅ | Base clip tracking + SetTarget rewrite |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -131,7 +132,7 @@ Last updated: 2026-02-26
 | REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
 | PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 10/12 pass | Remaining: `__resolve` hook, InitObject setters; add_property ✅, as_set_prop_flags ✅ |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
-| TELLTARGET_PLAN | **PARTIAL** | slash_syntax ✅, string_paths_basic ✅, target_clip_removed ✅ | tellTarget scope, path resolution, eval() |
+| TELLTARGET_PLAN | **Phase 1 MOSTLY DONE** | tell_target ✅ (37/37), slash_syntax ✅, string_paths_basic ✅, target_clip_removed ✅ | Phase 2: dot-path GetVariable, eval() |
 | TIMER_PLAN | **Phases 1-2 DONE** | 1/3 pass (set_interval ✅) | timer_run_actions blocked on REGISTERCLASS_PLAN (attachMovie); timeout needs script timeout mechanism |
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
 | TAB_ORDERING_PLAN | **PARTIAL** | 2/7 pass (tab_ordering_automatic_basic, tab_ordering_reverse ✅) | Tab key focus navigation, blocked by FOCUS_SYSTEM_PLAN |
@@ -157,7 +158,7 @@ Last updated: 2026-02-26
 4. **REGISTERCLASS_PLAN Phases 1-2** — ExportAssets parsing + attachMovie handler (Phase 0 register fixes already passing)
 5. **FRAME_NAVIGATION_PLAN Phase 1-2** — frame labels + execution ordering, 4 tests (goto_frame, goto_frame2, goto_label, goto_methods)
 6. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, 4 remaining tests
-7. **TELLTARGET_PLAN Phase 1** — core path resolution, ~212 lines across 8+ tests (slash_syntax + string_paths_basic already passing)
+7. ~~**TELLTARGET_PLAN Phase 1**~~ — **DONE** (tell_target 37/37 PASS, tell_target_invalid 4/6). Phase 2: dot-path GetVariable for path_string
 
 ### Lower ROI — new features
 8. ~~**TIMER_PLAN**~~ — **DONE** (Phases 1-2 complete, set_interval PASS). timer_run_actions blocked on REGISTERCLASS_PLAN.
