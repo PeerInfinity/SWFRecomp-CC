@@ -771,7 +771,7 @@ static ActionVar builtin_return_zero(SWFAppContext* app_context, ActionVar* args
 	return ret;
 }
 
-#define MAX_PROTO_STUB_FUNCS 64
+#define MAX_PROTO_STUB_FUNCS 192
 static ASFunction g_proto_stub_funcs[MAX_PROTO_STUB_FUNCS];
 static int g_proto_stub_func_count = 0;
 
@@ -14492,6 +14492,398 @@ static void initLocalConnectionPrototype(SWFAppContext* app_context, ASFunction*
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
 }
 
+// TextSnapshot.prototype: 9 methods (NOT DONT_ENUM — unusual for built-in)
+static void initTextSnapshotPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 12);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// TextSnapshot methods are NOT DONT_ENUM (enumerable + writable + configurable)
+	const u8 mflags = PROPERTY_FLAGS_DEFAULT;
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getCount", 8, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setSelected", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getSelected", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getText", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getSelectedText", 15, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "hitTestTextNearPos", 18, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "findText", 8, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setSelectColor", 14, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getTextRunInfo", 14, mflags);
+}
+
+// Camera: static methods (get, names) + 6 prototype methods
+static void initCameraPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 8);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setMode", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setQuality", 10, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setKeyFrameInterval", 19, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setMotionLevel", 14, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setLoopback", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setCursor", 9, mflags);
+	// Static methods on constructor's own_props
+	if (ctor->own_props == NULL) {
+		ctor->own_props = allocObject(app_context, 4);
+		retainObject(ctor->own_props);
+	}
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	ASFunction* get_fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(get_fn, 0, sizeof(ASFunction));
+	strncpy(get_fn->name, "get", 255);
+	get_fn->function_type = 2;
+	get_fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = get_fn;
+	fv.data.numeric_value = (u64) get_fn;
+	setProperty(app_context, ctor->own_props, "get", 3, &fv);
+	// names (READ_ONLY array/object)
+	ASObject* names_arr = allocObject(app_context, 2);
+	retainObject(names_arr);
+	ActionVar names_val = {0};
+	names_val.type = ACTION_STACK_VALUE_OBJECT;
+	names_val.data.numeric_value = (u64) names_arr;
+	setPropertyWithFlags(app_context, ctor->own_props, "names", 5, &names_val, PROPERTY_FLAG_ENUMERABLE); // READ_ONLY
+}
+
+// Microphone: static methods (get, names) + 7 prototype methods
+static void initMicrophonePrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 10);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setSilenceLevel", 15, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setRate", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setGain", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setUseEchoSuppression", 21, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setCodec", 8, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setFramesPerPacket", 18, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setEncodeQuality", 16, mflags);
+	// Static methods on constructor's own_props
+	if (ctor->own_props == NULL) {
+		ctor->own_props = allocObject(app_context, 4);
+		retainObject(ctor->own_props);
+	}
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	ASFunction* get_fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(get_fn, 0, sizeof(ASFunction));
+	strncpy(get_fn->name, "get", 255);
+	get_fn->function_type = 2;
+	get_fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = get_fn;
+	fv.data.numeric_value = (u64) get_fn;
+	setProperty(app_context, ctor->own_props, "get", 3, &fv);
+	ASObject* names_arr = allocObject(app_context, 2);
+	retainObject(names_arr);
+	ActionVar names_val = {0};
+	names_val.type = ACTION_STACK_VALUE_OBJECT;
+	names_val.data.numeric_value = (u64) names_arr;
+	setPropertyWithFlags(app_context, ctor->own_props, "names", 5, &names_val, PROPERTY_FLAG_ENUMERABLE); // READ_ONLY
+}
+
+// NetConnection.prototype: 4 methods + 5 READ_ONLY undefined + proxyType string
+static void initNetConnectionPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 14);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	// proxyType is a DONT_ENUM string property
+	ActionVar sv = makeStringActionVar(app_context, "none", 4);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "proxyType", 9, &sv, mflags);
+	// READ_ONLY undefined properties (DONT_ENUM + DONT_DELETE + READ_ONLY = 0)
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "connectedProxyType", 18, &undef_val, 0);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "usingTLS", 8, &undef_val, 0);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "protocol", 8, &undef_val, 0);
+	// Methods
+	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "call", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "addHeader", 9, mflags);
+	// READ_ONLY undefined at front
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "nearNonce", 9, &undef_val, 0);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "farNonce", 8, &undef_val, 0);
+}
+
+// NetStream.prototype: 13 methods + 3 READ_ONLY undefined
+static void initNetStreamPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 20);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "publish", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "play", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "play2", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "receiveAudio", 12, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "receiveVideo", 12, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "pause", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "seek", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "onPeerConnect", 13, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "attachAudio", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "attachVideo", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setBufferTime", 13, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getInfo", 7, mflags);
+	// READ_ONLY undefined properties
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "checkPolicyFile", 15, &undef_val, 0);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "maxPauseBufferTime", 18, &undef_val, 0);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "backBufferTime", 14, &undef_val, 0);
+}
+
+// SharedObject: 4 static methods + 7 prototype methods
+static void initSharedObjectPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 10);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "flush", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getSize", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setFps", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "clear", 5, mflags);
+	// Static methods on constructor's own_props
+	if (ctor->own_props == NULL) {
+		ctor->own_props = allocObject(app_context, 6);
+		retainObject(ctor->own_props);
+	}
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	// getLocal (not DONT_ENUM)
+	ASFunction* getLocal_fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(getLocal_fn, 0, sizeof(ASFunction));
+	strncpy(getLocal_fn->name, "getLocal", 255);
+	getLocal_fn->function_type = 2;
+	getLocal_fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = getLocal_fn;
+	fv.data.numeric_value = (u64) getLocal_fn;
+	setProperty(app_context, ctor->own_props, "getLocal", 8, &fv);
+	// getRemote (not DONT_ENUM)
+	ASFunction* getRemote_fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(getRemote_fn, 0, sizeof(ASFunction));
+	strncpy(getRemote_fn->name, "getRemote", 255);
+	getRemote_fn->function_type = 2;
+	getRemote_fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = getRemote_fn;
+	fv.data.numeric_value = (u64) getRemote_fn;
+	setProperty(app_context, ctor->own_props, "getRemote", 9, &fv);
+	// deleteAll (DONT_ENUM)
+	ASFunction* deleteAll_fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(deleteAll_fn, 0, sizeof(ASFunction));
+	strncpy(deleteAll_fn->name, "deleteAll", 255);
+	deleteAll_fn->function_type = 2;
+	deleteAll_fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = deleteAll_fn;
+	fv.data.numeric_value = (u64) deleteAll_fn;
+	setPropertyWithFlags(app_context, ctor->own_props, "deleteAll", 9, &fv, PROPERTY_FLAG_WRITABLE);
+	// getDiskUsage (DONT_ENUM)
+	ASFunction* getDiskUsage_fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(getDiskUsage_fn, 0, sizeof(ASFunction));
+	strncpy(getDiskUsage_fn->name, "getDiskUsage", 255);
+	getDiskUsage_fn->function_type = 2;
+	getDiskUsage_fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = getDiskUsage_fn;
+	fv.data.numeric_value = (u64) getDiskUsage_fn;
+	setPropertyWithFlags(app_context, ctor->own_props, "getDiskUsage", 12, &fv, PROPERTY_FLAG_WRITABLE);
+}
+
+// Video.prototype: 2 methods
+static void initVideoPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 4);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "attachVideo", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "clear", 5, mflags);
+}
+
+// XMLSocket.prototype: 6 methods
+static void initXMLSocketPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 8);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "onData", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getTimeout", 10, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setTimeout", 10, mflags);
+}
+
+// ContextMenu.prototype: 2 methods
+static void initContextMenuPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 4);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "copy", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "hideBuiltInItems", 16, mflags);
+}
+
+// ContextMenuItem.prototype: 1 method
+static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 4);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "copy", 4, mflags);
+}
+
+// LoadVars.prototype: 9 methods + contentType string
+static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 14);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	addStubMethodToProto(app_context, ctor->prototype_obj, "load", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "sendAndLoad", 11, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "decode", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesLoaded", 14, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesTotal", 13, mflags);
+	// toString is NOT DONT_ENUM (overrides Object.prototype.toString)
+	addStubMethodToProto(app_context, ctor->prototype_obj, "toString", 8, PROPERTY_FLAGS_DEFAULT);
+	// contentType is a DONT_ENUM string property
+	ActionVar sv = makeStringActionVar(app_context, "application/x-www-form-urlencoded", 33);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "contentType", 11, &sv, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "onLoad", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "onData", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "addRequestHeader", 16, mflags);
+}
+
+// Button.prototype: getDepth + boolean props + READ_ONLY undefined accessors
+static void initButtonPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 10);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// Button proto methods are NOT DONT_ENUM
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getDepth", 8, PROPERTY_FLAGS_DEFAULT);
+	// Boolean properties (enumerable, writable)
+	ActionVar bv = {0};
+	bv.type = ACTION_STACK_VALUE_BOOLEAN;
+	bv.data.numeric_value = 1; // true
+	setProperty(app_context, ctor->prototype_obj, "useHandCursor", 13, &bv);
+	setProperty(app_context, ctor->prototype_obj, "enabled", 7, &bv);
+	// READ_ONLY undefined accessors
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "scale9Grid", 10, &undef_val, PROPERTY_FLAG_ENUMERABLE); // READ_ONLY
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "filters", 7, &undef_val, PROPERTY_FLAG_ENUMERABLE);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "cacheAsBitmap", 13, &undef_val, PROPERTY_FLAG_ENUMERABLE);
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "blendMode", 9, &undef_val, PROPERTY_FLAG_ENUMERABLE);
+}
+
+// Color.prototype: 4 methods (DONT_ENUM + READ_ONLY)
+static void initColorStubPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 6);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, 0); // READ_ONLY too
+	const u8 mflags = 0; // DONT_ENUM + DONT_DELETE + READ_ONLY = no flags
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setRGB", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "setTransform", 12, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getRGB", 6, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getTransform", 12, mflags);
+}
+
+// AsBroadcaster.prototype: empty (only __proto__ + constructor)
+static void initAsBroadcasterPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (g_swf_version < 6) return; // SWF5: AsBroadcaster has no prototype
+	if (ctor->prototype_obj != NULL) return;
+	ctor->prototype_obj = allocObject(app_context, 4);
+	retainObject(ctor->prototype_obj);
+	setObjectProto(app_context, ctor->prototype_obj);
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64) ctor;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+}
+
 static void ensureGlobalInit(SWFAppContext* app_context)
 {
 	if (g_global_init_done) return;
@@ -14780,53 +15172,86 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			fv.type = ACTION_STACK_VALUE_FUNCTION;
 
 			// AsBroadcaster (stub_ctors[0]) — install on own_props so AsBroadcaster.addListener works
+			// All methods DONT_ENUM
 			if (g_stub_ctors[0].own_props == NULL) {
-				g_stub_ctors[0].own_props = allocObject(app_context, 4);
+				g_stub_ctors[0].own_props = allocObject(app_context, 6);
 				retainObject(g_stub_ctors[0].own_props);
 			}
-			fv.data.numeric_value = (u64)&g_ab_addListener_func;
-			setProperty(app_context, g_stub_ctors[0].own_props, "addListener", 11, &fv);
-			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
-			setProperty(app_context, g_stub_ctors[0].own_props, "removeListener", 14, &fv);
 			fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
-			setProperty(app_context, g_stub_ctors[0].own_props, "broadcastMessage", 16, &fv);
+			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "broadcastMessage", 16, &fv, PROPERTY_FLAG_WRITABLE);
+			fv.data.numeric_value = (u64)&g_ab_addListener_func;
+			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "addListener", 11, &fv, PROPERTY_FLAG_WRITABLE);
+			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "removeListener", 14, &fv, PROPERTY_FLAG_WRITABLE);
+			// initialize
+			static ASFunction g_ab_initialize_func;
+			memset(&g_ab_initialize_func, 0, sizeof(ASFunction));
+			strncpy(g_ab_initialize_func.name, "initialize", 255);
+			g_ab_initialize_func.function_type = 2;
+			g_ab_initialize_func.advanced_func = (Function2Ptr) builtin_stub_method;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_ab_initialize_func;
+			fv.data.numeric_value = (u64)&g_ab_initialize_func;
+			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "initialize", 10, &fv, PROPERTY_FLAG_WRITABLE);
 
 			// MovieClipLoader (stub_ctors[9]) — pre-create prototype and install methods there
 			// so that MCL instances (var mcl = new MovieClipLoader()) inherit them.
+			// All methods DONT_ENUM
 			if (g_stub_ctors[9].prototype_obj == NULL) {
-				g_stub_ctors[9].prototype_obj = allocObject(app_context, 8);
+				g_stub_ctors[9].prototype_obj = allocObject(app_context, 12);
 				retainObject(g_stub_ctors[9].prototype_obj);
 				setObjectProto(app_context, g_stub_ctors[9].prototype_obj);
 				ActionVar ctor_var = {0};
 				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 				ctor_var.data.numeric_value = (u64)&g_stub_ctors[9];
-				setProperty(app_context, g_stub_ctors[9].prototype_obj, "constructor", 11, &ctor_var);
+				setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
 			}
-			fv.data.numeric_value = (u64)&g_ab_addListener_func;
-			setProperty(app_context, g_stub_ctors[9].prototype_obj, "addListener", 11, &fv);
-			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
-			setProperty(app_context, g_stub_ctors[9].prototype_obj, "removeListener", 14, &fv);
-			fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
-			setProperty(app_context, g_stub_ctors[9].prototype_obj, "broadcastMessage", 16, &fv);
-
-			// MCL-specific methods: loadClip, unloadClip, getProgress
+			// MCL-specific methods: loadClip, unloadClip, getProgress (DONT_ENUM)
 			initMCLFuncs();
 			fv.data.numeric_value = (u64)&g_mcl_loadClip_func;
-			setProperty(app_context, g_stub_ctors[9].prototype_obj, "loadClip", 8, &fv);
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "loadClip", 8, &fv, PROPERTY_FLAG_WRITABLE);
 			fv.data.numeric_value = (u64)&g_mcl_unloadClip_func;
-			setProperty(app_context, g_stub_ctors[9].prototype_obj, "unloadClip", 10, &fv);
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "unloadClip", 10, &fv, PROPERTY_FLAG_WRITABLE);
 			fv.data.numeric_value = (u64)&g_mcl_getProgress_func;
-			setProperty(app_context, g_stub_ctors[9].prototype_obj, "getProgress", 11, &fv);
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "getProgress", 11, &fv, PROPERTY_FLAG_WRITABLE);
+			// AsBroadcaster methods on MCL prototype (DONT_ENUM)
+			fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "broadcastMessage", 16, &fv, PROPERTY_FLAG_WRITABLE);
+			fv.data.numeric_value = (u64)&g_ab_addListener_func;
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "addListener", 11, &fv, PROPERTY_FLAG_WRITABLE);
+			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "removeListener", 14, &fv, PROPERTY_FLAG_WRITABLE);
+			// _listeners array (DONT_ENUM)
+			ASObject* mcl_listeners = allocObject(app_context, 4);
+			retainObject(mcl_listeners);
+			ActionVar listeners_val = {0};
+			listeners_val.type = ACTION_STACK_VALUE_OBJECT;
+			listeners_val.data.numeric_value = (u64) mcl_listeners;
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "_listeners", 10, &listeners_val, PROPERTY_FLAG_WRITABLE);
 		}
 	}
 
 	// ---- Prototype setup for stub classes ----
-	// LocalConnection (stub_ctors[7]): domain, connect, close, send
+	// Index: 0=AsBroadcaster, 1=Button, 2=Camera, 3=Color, 4=ContextMenu, 5=ContextMenuItem,
+	// 6=LoadVars, 7=LocalConnection, 8=Microphone, 9=MovieClipLoader, 10=NetConnection,
+	// 11=NetStream, 12=PrintJob, 13=SharedObject, 14=Sound, 15=TextSnapshot, 16=Video, 17=XMLSocket
+	initAsBroadcasterPrototype(app_context, &g_stub_ctors[0]);
+	initButtonPrototype(app_context, &g_stub_ctors[1]);
+	initCameraPrototype(app_context, &g_stub_ctors[2]);
+	initColorStubPrototype(app_context, &g_stub_ctors[3]);
+	initContextMenuPrototype(app_context, &g_stub_ctors[4]);
+	initContextMenuItemPrototype(app_context, &g_stub_ctors[5]);
+	initLoadVarsPrototype(app_context, &g_stub_ctors[6]);
 	initLocalConnectionPrototype(app_context, &g_stub_ctors[7]);
-	// PrintJob (stub_ctors[12]): numeric properties + SWF7 method stubs
+	initMicrophonePrototype(app_context, &g_stub_ctors[8]);
+	// MovieClipLoader (stub_ctors[9]) — already initialized above with AsBroadcaster methods
+	initNetConnectionPrototype(app_context, &g_stub_ctors[10]);
+	initNetStreamPrototype(app_context, &g_stub_ctors[11]);
 	initPrintJobPrototype(app_context, &g_stub_ctors[12]);
-	// Sound (stub_ctors[14]): toString + SWF5/6 method stubs
+	initSharedObjectPrototype(app_context, &g_stub_ctors[13]);
 	initSoundPrototype(app_context, &g_stub_ctors[14]);
+	initTextSnapshotPrototype(app_context, &g_stub_ctors[15]);
+	initVideoPrototype(app_context, &g_stub_ctors[16]);
+	initXMLSocketPrototype(app_context, &g_stub_ctors[17]);
 
 	// ---- valueOf on _global ----
 	{
