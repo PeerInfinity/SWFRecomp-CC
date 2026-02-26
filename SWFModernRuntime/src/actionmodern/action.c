@@ -2917,45 +2917,9 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 	}
 	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
-		// Type 1 (DefineFunction): push value onto stack, set "this" and scope
+		// Type 1 (DefineFunction): push value onto stack, call function
 		if (value != NULL) pushVar(app_context, value);
-
-		// Push local scope
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		// Restore captured WITH scopes
-		u32 captured_count = func->captured_scope_count;
-		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
-		{
-			scope_is_with[scope_depth] = 1;
-			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
-			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
-		}
-
-		// Switch base_clip context if SWF6+
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		// Set "this" — use OBJECT type (same as invokePropertyGetter)
-		ActionVar this_var = {0};
-		this_var.type = ACTION_STACK_VALUE_OBJECT;
-		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
-		setVariableByName("this", &this_var);
-
 		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-
-		g_current_context = saved_context;
-		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
 	}
 
 	g_special_depth--;
@@ -8256,31 +8220,35 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		}
 		return mc;
 	}
-	// Relative path resolution: bare name like "mc3" resolves relative to current context
-	// This is used by getProperty/setProperty with non-prefixed targets
-	{
-		MovieClip* base = g_current_context ? g_current_context : &root_movieclip;
-		const char* rest2 = target;
-		MovieClip* cur = base;
-		while (rest2[0] != '\0') {
-			const char* dot = strchr(rest2, '.');
-			int seg_len = dot ? (int)(dot - rest2) : (int)strlen(rest2);
-			MovieClip* found = NULL;
-			for (int i = 0; i < child_mc_count; i++) {
-				if (child_mc_cache[i] == NULL) continue;
-				if (child_mc_cache[i]->parent == cur &&
-				    (int)strlen(child_mc_cache[i]->name) == seg_len &&
-				    strncmp(child_mc_cache[i]->name, rest2, seg_len) == 0) {
-					found = child_mc_cache[i];
-					break;
-				}
+	return NULL;
+}
+
+// Relative path resolution: bare name like "mc3" resolves relative to current context.
+// Used by getProperty/setProperty with non-prefixed targets.
+// Separate from getMovieClipByTarget because actionSetTarget must NOT use relative resolution.
+static MovieClip* getMovieClipByRelativeName(const char* target) {
+	if (!target || target[0] == '\0') return NULL;
+	MovieClip* base = g_current_context ? g_current_context : &root_movieclip;
+	const char* rest2 = target;
+	MovieClip* cur = base;
+	while (rest2[0] != '\0') {
+		const char* dot = strchr(rest2, '.');
+		int seg_len = dot ? (int)(dot - rest2) : (int)strlen(rest2);
+		MovieClip* found = NULL;
+		for (int i = 0; i < child_mc_count; i++) {
+			if (child_mc_cache[i] == NULL) continue;
+			if (child_mc_cache[i]->parent == cur &&
+			    (int)strlen(child_mc_cache[i]->name) == seg_len &&
+			    strncmp(child_mc_cache[i]->name, rest2, seg_len) == 0) {
+				found = child_mc_cache[i];
+				break;
 			}
-			if (found == NULL) return NULL;
-			cur = found;
-			rest2 = dot ? dot + 1 : rest2 + seg_len;
 		}
-		return cur;
+		if (found == NULL) return NULL;
+		cur = found;
+		rest2 = dot ? dot + 1 : rest2 + seg_len;
 	}
+	return cur;
 }
 
 // Forward declarations for resolveSlashPathToMC
@@ -16306,8 +16274,9 @@ void actionGetProperty(SWFAppContext* app_context)
 	const char* target = _gp_buf;
 	POP();
 
-	// Get the MovieClip object
+	// Get the MovieClip object (try absolute first, then relative)
 	MovieClip* mc = getMovieClipByTarget(target);
+	if (!mc) mc = getMovieClipByRelativeName(target);
 
 	// If target not found, push undefined (matches Flash/Ruffle)
 	if (mc == NULL) {
@@ -22723,8 +22692,9 @@ void actionSetProperty(SWFAppContext* app_context)
 		}
 	}
 
-	// 5. Get the MovieClip object
+	// 5. Get the MovieClip object (try absolute first, then relative)
 	MovieClip* mc = getMovieClipByTarget(target);
+	if (!mc) mc = getMovieClipByRelativeName(target);
 	if (!mc) return; // Invalid target
 
 	// 5. Set property value based on index
@@ -28505,6 +28475,33 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					releaseObject(app_context, local_scope_call);
 
 					pushVar(app_context, &result);
+				}
+				else if (func->name[0] != '\0' &&
+			         strcmp(func->name, "Array") == 0)
+				{
+					// Array.call(thisArg, ...args) — create new array from call_args
+					ASArray* arr = allocArray(app_context, call_arg_count > 0 ? call_arg_count : 4);
+					if (call_arg_count == 1 &&
+					    (call_args[0].type == ACTION_STACK_VALUE_F32 ||
+					     call_args[0].type == ACTION_STACK_VALUE_F64))
+					{
+						double d = (call_args[0].type == ACTION_STACK_VALUE_F32) ?
+							(double) VAL(float, &call_args[0].data.numeric_value) :
+							VAL(double, &call_args[0].data.numeric_value);
+						arr->length = (u32) ecmaToInt32(d);
+					}
+					else
+					{
+						arr->length = call_arg_count;
+						for (u32 i = 0; i < call_arg_count; i++)
+							setArrayElement(app_context, arr, i, &call_args[i]);
+					}
+					if (call_args != NULL) FREE(call_args);
+					if (args != NULL) FREE(args);
+					ActionVar _r = {0};
+					_r.type = ACTION_STACK_VALUE_ARRAY;
+					_r.data.numeric_value = (u64) arr;
+					pushVar(app_context, &_r);
 				}
 				else
 				{
