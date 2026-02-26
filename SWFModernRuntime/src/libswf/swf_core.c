@@ -621,10 +621,11 @@ void swfStart(SWFAppContext* app_context)
 		// even when they stop playback
 		if (current_frame >= g_frame_count)
 		{
-			// Past the end of the frame list — only continue if events or timers remain
+			// Past the end of the frame list — only continue if events, timers, or handlers remain
 			if (hasActiveTimers()) continue;
-			if (!g_events || g_event_pos >= g_event_count) break;
-			// Otherwise loop with current_frame staying OOB; events were already pumped above
+			if (g_events && g_event_pos < g_event_count) continue;
+			if (actionHasEnterFrameHandlers() || hasPlayingSprites()) continue;
+			break;
 		}
 		else if (manual_next_frame)
 		{

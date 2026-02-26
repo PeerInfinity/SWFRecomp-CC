@@ -3265,14 +3265,23 @@ static void setLocalCTRaw(MovieClip* mc,
 }
 
 // Compute _xmouse/_ymouse for an MC by transforming the global mouse position
-// (in pixels) through the MC's inverse world matrix to local coordinates.
-// For root MC this is just the global mouse position (identity transform).
+// through the MC's inverse world matrix to local coordinates.
+// Matches Ruffle's local_mouse_position algorithm:
+//   1. Build local_to_global matrix (twips)
+//   2. Compose with virtual_to_device * TWIPS_TO_PIXELS to get local_twips_to_device_pixels
+//   3. Invert; on degenerate matrix use IDENTITY fallback
+//   4. Apply inverse to global_device_pixels, result in local twips, convert to pixels
+//
+// pixel_ratio = VIEWPORT_WIDTH / SWF_STAGE_WIDTH. When the viewport has scale_factor=2,
+// device coordinates are 2x stage coordinates.  verify_output.py already divides input
+// coords by scale_factor, so app_context->mouse gives stage pixels. We need to convert
+// back to device pixels for the matrix composition to match Ruffle exactly.
 static void mc_get_local_mouse(SWFAppContext* app_context, MovieClip* mc,
-    float* out_x, float* out_y)
+    double* out_x, double* out_y)
 {
 	extern MovieClip root_movieclip;
-	float global_mx = app_context->mouse.stage_x / 20.0f;  // twips → pixels
-	float global_my = app_context->mouse.stage_y / 20.0f;
+	double global_mx = (double)app_context->mouse.stage_x / 20.0;  // twips → stage pixels
+	double global_my = (double)app_context->mouse.stage_y / 20.0;
 
 	if (mc == NULL || mc == &root_movieclip) {
 		*out_x = global_mx;
@@ -3280,7 +3289,15 @@ static void mc_get_local_mouse(SWFAppContext* app_context, MovieClip* mc,
 		return;
 	}
 
-	// Build world matrix by composing bottom-up (same as globalToLocal)
+	// Compute pixel_ratio: viewport_width / stage_width_pixels
+	// When both VIEWPORT_WIDTH and FRAME_WIDTH are defined, pixel_ratio = VP/FW.
+	// Otherwise pixel_ratio = 1.0 (no viewport scaling).
+	float pixel_ratio = 1.0f;
+#if defined(VIEWPORT_WIDTH) && defined(FRAME_WIDTH) && (FRAME_WIDTH > 0)
+	pixel_ratio = (float)VIEWPORT_WIDTH / (float)FRAME_WIDTH;
+#endif
+
+	// Step 1: Build local_to_global world matrix in twips
 	float wa, wb, wc, wd;
 	int32_t wtx, wty;
 	getLocalMatrixForMC_render(mc, &wa, &wb, &wc, &wd, &wtx, &wty);
@@ -3298,27 +3315,50 @@ static void mc_get_local_mouse(SWFAppContext* app_context, MovieClip* mc,
 		wa = na; wb = nb; wc = nc; wd = nd; wtx = ntx; wty = nty;
 	}
 
-	// Invert the world matrix (same as globalToLocal)
-	float det = wa * wd - wb * wc;
+	// Step 2: Compose world matrix with virtual_to_device * TWIPS_TO_PIXELS.
+	// twips_to_device_pixels = scale(pixel_ratio/20)
+	// composite = twips_to_device_pixels * world
+	const float S = pixel_ratio / 20.0f;
+	float ca = wa * S, cb = wb * S, cc = wc * S, cd = wd * S;
+	float ftx_tw = (float)wtx, fty_tw = (float)wty;
+	int32_t ctx = (int32_t)rintf(ftx_tw * S);
+	int32_t cty = (int32_t)rintf(fty_tw * S);
+
+	// Step 3: Invert the composite matrix
+	float det = ca * cd - cb * cc;
 	if (fabsf(det) > 1.1920929e-7f) {
-		float ia =  wd / det;
-		float ib =  wb / -det;
-		float ic =  wc / -det;
-		float id =  wa / det;
-		float ftx = (float)wtx, fty = (float)wty;
-		int32_t itx = (int32_t)rintf((wd * ftx - wc * fty) / -det);
-		int32_t ity = (int32_t)rintf((wb * ftx - wa * fty) / det);
-		// Transform global mouse point (pixels→twips, invert, twips→pixels)
-		float ptx = (float)((int32_t)(global_mx * 20.0));
-		float pty = (float)((int32_t)(global_my * 20.0));
-		int32_t lx_tw = (int32_t)rintf(ia * ptx + ic * pty) + itx;
-		int32_t ly_tw = (int32_t)rintf(ib * ptx + id * pty) + ity;
-		*out_x = (float)((double)lx_tw / 20.0);
-		*out_y = (float)((double)ly_tw / 20.0);
+		float ia =  cd / det;
+		float ib =  cb / -det;
+		float ic =  cc / -det;
+		float id =  ca / det;
+		float fctx = (float)ctx, fcty = (float)cty;
+		int32_t itx = (int32_t)rintf((cd * fctx - cc * fcty) / -det);
+		int32_t ity = (int32_t)rintf((cb * fctx - ca * fcty) / det);
+		// Step 4: Apply inverse to global_device_pixels
+		// global_device_pixels = twips_to_device_pixels * mouse_twips
+		//   = scale(pixel_ratio/20) * (mouse_twips_x, mouse_twips_y)
+		// Since mouse is in stage_twips and we need device pixels:
+		int32_t mouse_tw_x = (int32_t)rintf((float)app_context->mouse.stage_x);
+		int32_t mouse_tw_y = (int32_t)rintf((float)app_context->mouse.stage_y);
+		// device_twips = pixel_ratio * mouse_twips
+		// device_pixels = TWIPS_TO_PIXELS * device_twips = round(pixel_ratio * mouse_tw / 20)
+		float gpx = (float)((int32_t)rintf(pixel_ratio * (float)mouse_tw_x / 20.0f));
+		float gpy = (float)((int32_t)rintf(pixel_ratio * (float)mouse_tw_y / 20.0f));
+		int32_t lx_tw = (int32_t)rintf(ia * gpx + ic * gpy) + itx;
+		int32_t ly_tw = (int32_t)rintf(ib * gpx + id * gpy) + ity;
+		*out_x = (double)lx_tw / 20.0;
+		*out_y = (double)ly_tw / 20.0;
 	} else {
-		// Degenerate matrix: fall back to global coords
-		*out_x = global_mx;
-		*out_y = global_my;
+		// Degenerate matrix: IDENTITY fallback (Ruffle behavior)
+		// global_device_pixels = twips_to_device_pixels * mouse_twips
+		// IDENTITY * global_device_pixels = global_device_pixels (in twips units)
+		// Convert to pixels: /20
+		int32_t mouse_tw_x = (int32_t)rintf((float)app_context->mouse.stage_x);
+		int32_t mouse_tw_y = (int32_t)rintf((float)app_context->mouse.stage_y);
+		float dpx = rintf(pixel_ratio * (float)mouse_tw_x / 20.0f);
+		float dpy = rintf(pixel_ratio * (float)mouse_tw_y / 20.0f);
+		*out_x = (double)dpx / 20.0;
+		*out_y = (double)dpy / 20.0;
 	}
 }
 
@@ -15604,16 +15644,16 @@ void actionGetVariable(SWFAppContext* app_context)
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
 			if (strcasecmp(var_name, "_xmouse") == 0) {
 #ifdef NO_GRAPHICS
-				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
-				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)lx})); return;
+				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx)); return;
 #else
 				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
 #endif
 			}
 			if (strcasecmp(var_name, "_ymouse") == 0) {
 #ifdef NO_GRAPHICS
-				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
-				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)ly})); return;
+				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly)); return;
 #else
 				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
 #endif
@@ -16446,16 +16486,22 @@ void actionGetProperty(SWFAppContext* app_context)
 			break;
 		case 20: // _xmouse (SWF 5+)
 #ifdef NO_GRAPHICS
-			if (mc) { float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly); value = lx; }
-			else { value = 0.0f; }
+			if (mc) {
+				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx));
+			} else { PUSH(ACTION_STACK_VALUE_F64, 0); }
+			return;
 #else
 			value = mc ? mc->xmouse : 0.0f;
 #endif
 			break;
 		case 21: // _ymouse (SWF 5+)
 #ifdef NO_GRAPHICS
-			if (mc) { float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly); value = ly; }
-			else { value = 0.0f; }
+			if (mc) {
+				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly));
+			} else { PUSH(ACTION_STACK_VALUE_F64, 0); }
+			return;
 #else
 			value = mc ? mc->ymouse : 0.0f;
 #endif
@@ -20757,16 +20803,16 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
 			if (strcasecmp(prop_name, "_xmouse") == 0) {
 #ifdef NO_GRAPHICS
-				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
-				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)lx})); return;
+				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx)); return;
 #else
 				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
 #endif
 			}
 			if (strcasecmp(prop_name, "_ymouse") == 0) {
 #ifdef NO_GRAPHICS
-				float lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
-				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &(double){(double)ly})); return;
+				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly)); return;
 #else
 				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
 #endif
