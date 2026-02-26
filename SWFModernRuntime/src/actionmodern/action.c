@@ -24171,54 +24171,116 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			builtin_handled = 1;
 		}
 	}
-	// parseFloat(string) - Parse string to float
+	// parseFloat(string) — Flash-compatible: returns f64, no Infinity parsing,
+	// multiple dots allowed, wrapping i32 exponent, NaN for invalid strings.
 	else if (func_name_len == 10 && strncmp(func_name, "parseFloat", 10) == 0)
 	{
 		if (num_args > 0)
 		{
-			// Convert first argument to string
-			char arg_buffer[17];
-			const char* str_value = NULL;
+			// Coerce argument to string via convertString (handles toString on objects)
+			char _pf_cs_buf[17];
+			pushVar(app_context, &args[0]);
+			convertString(app_context, _pf_cs_buf);
+			ActionVar str_var;
+			popVar(app_context, &str_var);
+			char _pf_buf[512];
+			const uint16_t* _pf_u16 = varGetU16Ptr(&str_var);
+			u16_to_utf8(_pf_u16, str_var.str_size, _pf_buf, sizeof(_pf_buf));
+			const char* s = _pf_buf;
 
-			if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				char _parseFloat_buf[512];
-				const uint16_t* _parseFloat_u16 = varGetU16Ptr(&args[0]);
-				u16_to_utf8(_parseFloat_u16, args[0].str_size, _parseFloat_buf, sizeof(_parseFloat_buf));
-				str_value = _parseFloat_buf;
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_F32)
-			{
-				// Convert float to string
-				float fval = VAL(float, &args[0].data.numeric_value);
-				snprintf(arg_buffer, 17, "%.15g", fval);
-				str_value = arg_buffer;
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_F64)
-			{
-				// Convert double to string
-				double dval = VAL(double, &args[0].data.numeric_value);
-				snprintf(arg_buffer, 17, "%.15g", dval);
-				str_value = arg_buffer;
+			// Skip leading whitespace
+			while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n' || *s == '\f')
+				s++;
+
+			// Parse sign
+			int is_negative = 0;
+			if (*s == '-') { is_negative = 1; s++; }
+			else if (*s == '+') { s++; }
+
+			const char* after_sign = s;
+
+			// Count digits before decimal point
+			while (*s >= '0' && *s <= '9') s++;
+			int digits_before = (int)(s - after_sign);
+
+			// Decimal point
+			const char* dot_pos = NULL;
+			if (*s == '.') { dot_pos = s; s++; }
+
+			// Count digits after decimal point
+			const char* after_dot = s;
+			while (*s >= '0' && *s <= '9') s++;
+			int digits_after = (int)(s - after_dot);
+
+			// Fail if no digits found at all
+			if (digits_before == 0 && digits_after == 0) {
+				if (args != NULL) FREE(args);
+
+				double nan_val = 0.0 / 0.0;
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &nan_val));
+				builtin_handled = 1;
 			}
 			else
 			{
-				// Undefined or other types -> NaN
-				str_value = "NaN";
-			}
+				// Total digit positions (for exponent calculation)
+				int total_int_digits = digits_before; // digits before dot
+				// exp = total_int_digits - 1 initially (first digit at 10^exp)
+				int32_t exp = (int32_t)(total_int_digits - 1);
 
-			// Parse float from string
-			float result = (float) atof(str_value);
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &result));
-			builtin_handled = 1;
+				// Parse exponent if present
+				if (*s == 'e' || *s == 'E') {
+					s++;
+					int exp_negative = 0;
+					if (*s == '-') { exp_negative = 1; s++; }
+					else if (*s == '+') { s++; }
+
+					int32_t exponent = 0;
+					const char* exp_start = s;
+					while (*s >= '0' && *s <= '9') {
+						// Wrapping i32 multiply+add (matches Flash/Ruffle)
+						exponent = (int32_t)((uint32_t)exponent * 10u);
+						exponent = (int32_t)((uint32_t)exponent + (uint32_t)(*s - '0'));
+						s++;
+					}
+					// Only apply exponent if we got exponent digits
+					if (s > exp_start) {
+						if (exp_negative)
+							exponent = (int32_t)(-(uint32_t)exponent);
+						exp = (int32_t)((uint32_t)exp + (uint32_t)exponent);
+					}
+				}
+
+				// Calculate result digit by digit (matches Ruffle)
+				double result = 0.0;
+				const char* p = after_sign;
+				int32_t cur_exp = exp;
+				while (*p) {
+					if (*p >= '0' && *p <= '9') {
+						int digit = *p - '0';
+						if (digit != 0)
+							result += (double)digit * pow(10.0, (double)cur_exp);
+						cur_exp = (int32_t)((uint32_t)cur_exp - 1u);
+					} else if (*p == '.') {
+						// Multiple dots are allowed — just skip them
+					} else {
+						break; // stop at non-digit, non-dot
+					}
+					p++;
+				}
+
+				if (is_negative) result = -result;
+
+				if (args != NULL) FREE(args);
+
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
+				builtin_handled = 1;
+			}
 		}
 		else
 		{
-			// No arguments - return NaN
+			// No arguments — Flash returns undefined (not NaN)
 			if (args != NULL) FREE(args);
-			float nan_val = 0.0f / 0.0f;
-			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &nan_val));
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 			builtin_handled = 1;
 		}
 	}
