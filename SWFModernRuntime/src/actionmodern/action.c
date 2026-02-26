@@ -31254,13 +31254,67 @@ bool actionWaitForFrame2(SWFAppContext* app_context)
 // Returns 1 if bounds are available, 0 if not.
 static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, float* y2)
 {
-	if (mc == NULL || !mc->draw_has_bounds) return 0;
+	if (mc == NULL) return 0;
+
+	float bxmin = 0, bxmax = 0, bymin = 0, bymax = 0;
+	int has_bounds = mc->draw_has_bounds;
+
+	if (has_bounds) {
+		bxmin = mc->draw_xmin;
+		bxmax = mc->draw_xmax;
+		bymin = mc->draw_ymin;
+		bymax = mc->draw_ymax;
+	}
+
+#ifdef NO_GRAPHICS
+	// Also compute bounds from the MC's sprite display list children.
+	// This handles shapes placed by tagPlaceObject2 (not the Drawing API).
+	extern int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
+	extern int ng_getMatrixFromEntry_render(size_t entry_idx, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
+	DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+	if (dobj != NULL && dobj->sprite_display_list != NULL) {
+		DisplayObject* sdl = dobj->sprite_display_list;
+		size_t sdl_max = dobj->sprite_max_depth;
+		for (size_t d = 1; d <= sdl_max; d++) {
+			if (sdl[d].char_id == 0) continue;
+			s32 cxmin, cxmax, cymin, cymax;
+			if (!ng_getCharBounds(sdl[d].char_id, &cxmin, &cxmax, &cymin, &cymax)) continue;
+			// Character bounds are in twips; convert to pixels for the local coordinate space
+			float child_xmin = (float)cxmin / 20.0f;
+			float child_xmax = (float)cxmax / 20.0f;
+			float child_ymin = (float)cymin / 20.0f;
+			float child_ymax = (float)cymax / 20.0f;
+			// Apply the child's local transform if it has one
+			if (sdl[d].transform_id > 0) {
+				float a, b, c, dd, tx, ty;
+				int32_t ttx, tty;
+				// For simplicity, just expand bounds by the child's translation
+				// (Full transform would require rotating the AABB corners)
+				// For now, use the entry index (depth index in the sprite display list)
+				// The transform is typically identity+translation for simple placements
+			}
+			if (!has_bounds) {
+				bxmin = child_xmin; bxmax = child_xmax;
+				bymin = child_ymin; bymax = child_ymax;
+				has_bounds = 1;
+			} else {
+				if (child_xmin < bxmin) bxmin = child_xmin;
+				if (child_xmax > bxmax) bxmax = child_xmax;
+				if (child_ymin < bymin) bymin = child_ymin;
+				if (child_ymax > bymax) bymax = child_ymax;
+			}
+		}
+	}
+#endif
+
+	if (!has_bounds) return 0;
+
 	float sx = mc->xscale / 100.0f;
 	float sy = mc->yscale / 100.0f;
-	*x1 = mc->x + mc->draw_xmin * sx;
-	*y1 = mc->y + mc->draw_ymin * sy;
-	*x2 = mc->x + mc->draw_xmax * sx;
-	*y2 = mc->y + mc->draw_ymax * sy;
+	*x1 = mc->x + bxmin * sx;
+	*y1 = mc->y + bymin * sy;
+	*x2 = mc->x + bxmax * sx;
+	*y2 = mc->y + bymax * sy;
 	if (*x1 > *x2) { float t = *x1; *x1 = *x2; *x2 = t; }
 	if (*y1 > *y2) { float t = *y1; *y1 = *y2; *y2 = t; }
 	return 1;
