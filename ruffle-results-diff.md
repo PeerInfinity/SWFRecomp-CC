@@ -1,30 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `02e65506dbe3` (2026-02-26T21:43:27.572256+00:00)
-**Current:** `f455e3d3677f` (2026-02-26T22:36:54.825356+00:00)
+**Previous:** `f455e3d3677f` (2026-02-26T22:36:54.825356+00:00)
+**Current:** `5f27cba3a70d` (2026-02-26T22:44:26.798014+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 380 | 381 | +1 |
+| Passing | 381 | 383 | +2 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 61.4% | 61.6% | +0.2% |
-| Mismatched lines | 31814 | 31744 | -70 |
-|   Decreased | | | -77 |
-|   Increased | | | +7 |
+| Pass rate | 61.6% | 61.9% | +0.3% |
+| Mismatched lines | 31744 | 31674 | -70 |
+|   Decreased | | | -76 |
+|   Increased | | | +6 |
 
-## Newly Passing (1)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `textsnapshot_props_swf6` | output_mismatch | 7/56 | 56/56 |
+| `context_menu` | output_mismatch | 2/39 | 39/39 |
+| `context_menu_item` | output_mismatch | 2/41 | 41/41 |
 
-## Line Count Changed (4)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `textsnapshot_props_swf5` | output_mismatch | 14/56 | 38/56 | -24 |
-| `global_proto_decls` | output_mismatch | 16/4497 | 20/4497 | -4 |
-| `global_proto_decls_delete` | output_mismatch | 0/4158 | 0/4158 | 0 |
-| `tab_ordering_events` | output_mismatch | 26/150 | 19/150 | +7 |
+| `tab_ordering_events` | output_mismatch | 19/150 | 13/150 | +6 |
