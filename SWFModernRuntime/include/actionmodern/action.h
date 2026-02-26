@@ -70,6 +70,10 @@ extern MovieClip* g_event_this_mc;
 
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);
+// Set/get the base clip (the clip whose timeline code is executing).
+// actionSetTarget("") resets to base_clip, not root.
+void actionSetBaseClip(MovieClip* mc);
+MovieClip* actionGetBaseClip(void);
 // Create or find a cached MovieClip by instance name
 MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
 // Invalidate cached MovieClip when removed from display list

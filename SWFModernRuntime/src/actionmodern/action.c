@@ -9869,6 +9869,19 @@ MovieClip* g_current_context = NULL;
 // DefineFunction2 with this_obj=NULL. Consumed by generated code.
 MovieClip* g_event_this_mc = NULL;
 
+// Base clip: the MovieClip whose timeline code is currently executing.
+// actionSetTarget("") resets to g_base_clip (not root) so nested tellTarget
+// blocks return to the correct parent clip context.
+static MovieClip* g_base_clip = NULL;
+
+void actionSetBaseClip(MovieClip* mc) {
+	g_base_clip = mc;
+}
+
+MovieClip* actionGetBaseClip(void) {
+	return g_base_clip ? g_base_clip : &root_movieclip;
+}
+
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
@@ -14978,6 +14991,14 @@ void actionGetVariable(SWFAppContext* app_context)
 			else { PUSH(ACTION_STACK_VALUE_UNDEFINED, 0); }
 			return;
 		}
+		// Check child MovieClips by instance name (Flash resolves child names as variables)
+		{
+			MovieClip* child = resolveSlashPathToMC(app_context, var_name, var_name_len, g_current_context);
+			if (child != NULL && child != g_current_context) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+				return;
+			}
+		}
 		// Not found on clip — check _global properties before global var table.
 		// In Flash, tellTarget(mc) { foo } resolves _global.foo, NOT root timeline foo.
 		{
@@ -16364,8 +16385,22 @@ void actionSetTarget2(SWFAppContext* app_context)
 		POP();
 		if (mc != NULL)
 			setCurrentContext(mc);
-		else
-			setCurrentContext(&root_movieclip);
+		else {
+			// NULL MovieClip → reset to base clip
+			MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
+			setCurrentContext(base);
+		}
+		return;
+	}
+
+	// Undefined → silently reset to base clip (no "Target not found" error)
+	// Null is different — it converts to "null" string and goes through actionSetTarget
+	// which produces a "Target not found" error.
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED)
+	{
+		POP();
+		MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
+		setCurrentContext(base);
 		return;
 	}
 
@@ -23145,16 +23180,34 @@ void actionRemoveSprite(SWFAppContext* app_context)
 	#endif
 }
 
+// Helper: convert a MovieClip's slash-path target to dot-notation base path
+// "/" → "_level0", "/clip1" → "_level0.clip1", "/clip1/clip2" → "_level0.clip1.clip2"
+static const char* mcToDotBasePath(MovieClip* mc) {
+	static char base_path_buf[256];
+	if (mc == NULL || mc == &root_movieclip) return "_level0";
+	if (mc->target[0] == '\0') return "_level0";
+	const char* tgt = mc->target;
+	if (tgt[0] == '/' && tgt[1] == '\0') return "_level0";
+	char tmp[200];
+	strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
+	tmp[sizeof(tmp) - 1] = '\0';
+	for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
+	snprintf(base_path_buf, sizeof(base_path_buf), "_level0.%s", tmp);
+	return base_path_buf;
+}
+
 void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
 #ifdef NO_GRAPHICS
 	extern int g_settarget_explicit_root;
 #endif
-	// Empty string or NULL means return to main timeline
+	MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
+
+	// Empty string or NULL means return to base clip (the clip whose script is running)
 	if (!target_name || strlen(target_name) == 0) {
-		setCurrentContext(&root_movieclip);
+		setCurrentContext(base);
 #ifdef NO_GRAPHICS
-		g_settarget_explicit_root = 1;
+		g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
 #endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
@@ -23174,75 +23227,121 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		return;
 	}
 
+	// --- SetTarget path resolution ---
+	// The path is resolved relative to the base clip, using dot/colon/slash separators.
+	// Algorithm: if path contains '/', use slash-based parsing (split on '/' and ':');
+	// otherwise use dot/colon parsing (split on '.' and ':').
+
+	// First try resolveSlashPathToMC for structured paths (slash, colon, dot with children)
+	int has_slash = (strchr(target_name, '/') != NULL);
+	int has_dot = (strchr(target_name, '.') != NULL);
+	int has_colon = (strchr(target_name, ':') != NULL);
+
+	if (has_slash || has_colon) {
+		// Use slash path resolution (handles '/', ':', and '..' parent nav)
+		MovieClip* target_mc = resolveSlashPathToMC(app_context, target_name, (u32)strlen(target_name), base);
+		if (target_mc) {
+			setCurrentContext(target_mc);
+#ifdef NO_GRAPHICS
+			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
+#endif
+			return;
+		}
+		// Fall through to error
+	} else if (has_dot) {
+		// Dot-separated path with no slashes: split on '.' and walk children
+		MovieClip* mc = base;
+		const char* rest = target_name;
+		int resolved = 1;
+		while (rest[0] != '\0') {
+			const char* dot = strchr(rest, '.');
+			int seg_len = dot ? (int)(dot - rest) : (int)strlen(rest);
+			if (seg_len == 0) { rest = dot ? dot + 1 : rest + seg_len; continue; }
+			// ".." = parent
+			if (seg_len == 2 && rest[0] == '.' && rest[1] == '.') {
+				if (mc->parent) mc = mc->parent;
+				else { resolved = 0; break; }
+			} else if (seg_len == 7 && strncmp(rest, "_parent", 7) == 0) {
+				if (mc->parent) mc = mc->parent;
+				else { resolved = 0; break; }
+			} else if (seg_len == 5 && strncmp(rest, "_root", 5) == 0) {
+				mc = &root_movieclip;
+			} else if (seg_len == 7 && strncmp(rest, "_level0", 7) == 0) {
+				mc = &root_movieclip;
+			} else {
+				// Find child MC by name
+				char seg_buf[64];
+				int copy_len = seg_len < 63 ? seg_len : 63;
+				memcpy(seg_buf, rest, copy_len);
+				seg_buf[copy_len] = '\0';
+				MovieClip* child = NULL;
+				for (int i = 0; i < child_mc_count; i++) {
+					if (child_mc_cache[i] == NULL) continue;
+					if (child_mc_cache[i]->parent == mc &&
+					    (int)strlen(child_mc_cache[i]->name) == seg_len &&
+					    strncmp(child_mc_cache[i]->name, rest, seg_len) == 0) {
+						child = child_mc_cache[i];
+						break;
+					}
+				}
+				if (child == NULL) { resolved = 0; break; }
+				mc = child;
+			}
+			rest = dot ? dot + 1 : rest + seg_len;
+		}
+		if (resolved) {
+			setCurrentContext(mc);
+#ifdef NO_GRAPHICS
+			g_settarget_explicit_root = (mc == &root_movieclip) ? 1 : 0;
+#endif
+			return;
+		}
+		// Fall through to error
+	} else {
+		// Simple bare name — resolve as child of base clip
+		// Try resolveSlashPathToMC (handles single-segment names and _parent)
+		MovieClip* target_mc = resolveSlashPathToMC(app_context, target_name, (u32)strlen(target_name), base);
+		if (target_mc) {
+			setCurrentContext(target_mc);
+#ifdef NO_GRAPHICS
+			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
+#endif
+			return;
+		}
+
 #ifndef NO_GRAPHICS
-	// Try to resolve as a named sprite in the display list
-	DisplayObject* obj = findDisplayObjectByName(target_name);
-	if (obj != NULL) {
-		targeted_sprite = obj;
-		return;
-	}
+		// Graphics mode: try display list lookup
+		DisplayObject* obj = findDisplayObjectByName(target_name);
+		if (obj != NULL) {
+			targeted_sprite = obj;
+			return;
+		}
 #endif
 
-	// Fallback to MovieClip resolution
-	MovieClip* target_mc = getMovieClipByTarget(target_name);
-	if (target_mc) {
-		setCurrentContext(target_mc);
+		// Try getMovieClipByTarget for _level0.path style
+		target_mc = getMovieClipByTarget(target_name);
+		if (target_mc) {
+			setCurrentContext(target_mc);
 #ifdef NO_GRAPHICS
-		g_settarget_explicit_root = 0;
-#endif
-		return;
-	}
-
-	// Try resolving as a child clip name (strip _level0. prefix if present)
-	const char* child_name = target_name;
-	if (strncmp(target_name, "_level0.", 8) == 0)
-		child_name = target_name + 8;
-	// Also strip leading slash for slash-path format (e.g., "/mc")
-	if (child_name[0] == '/')
-		child_name = child_name + 1;
-
-#ifdef NO_GRAPHICS
-	size_t child_depth = ng_findDisplayEntryByName(child_name);
-	if (child_depth != SIZE_MAX) {
-		MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name, &root_movieclip);
-		if (child_mc) {
-			setCurrentContext(child_mc);
 			g_settarget_explicit_root = 0;
+#endif
 			return;
 		}
 	}
-#else
-	{
-		DisplayObject* dobj = findDisplayObjectByName(child_name);
-		if (dobj != NULL) {
-			MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name, &root_movieclip);
-			if (child_mc) {
-				setCurrentContext(child_mc);
-				targeted_sprite = dobj;
-				return;
-			}
-		}
-	}
+
+	// Target not found — set context to root and emit trace message.
+	// Flash/Ruffle: invalid target falls back to root for variable scope.
+	setCurrentContext(&root_movieclip);
+#ifdef NO_GRAPHICS
+	g_settarget_explicit_root = 1;
 #endif
-	// Target not found — emit trace message matching Flash/Ruffle behavior
+#ifndef NO_GRAPHICS
+	targeted_sprite = NULL;
+#endif
+	// Base is always the base_clip (the clip whose timeline code is executing)
 	{
 		char msg_buf[512];
-		MovieClip* base = getCurrentContext();
-		const char* base_path = "_level0";
-		if (base != NULL && base != &root_movieclip && base->target[0] != '\0') {
-			static char base_path_buf[256];
-			const char* tgt = base->target;
-			if (tgt[0] == '/' && tgt[1] == '\0')
-				base_path = "_level0";
-			else {
-				char tmp[200];
-				strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
-				tmp[sizeof(tmp) - 1] = '\0';
-				for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
-				snprintf(base_path_buf, sizeof(base_path_buf), "_level0.%s", tmp);
-				base_path = base_path_buf;
-			}
-		}
+		const char* base_path = mcToDotBasePath(base);
 		snprintf(msg_buf, sizeof(msg_buf),
 			"Target not found: Target=\"%s\" Base=\"%s\"\n",
 			target_name, base_path);

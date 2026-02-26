@@ -67,10 +67,11 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	g_current_sprite_obj = obj;
 
 	MovieClip* saved_ctx = g_current_context;
+	MovieClip* saved_base = actionGetBaseClip();
 	if (obj->instance_name != NULL)
 	{
 		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
-		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); }
+		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); actionSetBaseClip(mc); }
 	}
 
 	// Each sprite frame starts with a fresh SetTarget state (no explicit root target)
@@ -81,6 +82,7 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 
 	g_settarget_explicit_root = saved_settarget;
 	actionSetCurrentContext(saved_ctx);
+	actionSetBaseClip(saved_base);
 	g_current_sprite_obj = saved;
 }
 #define CALL_FRAME(app, obj, f) exec_sprite_frame(app, obj, f)
@@ -191,9 +193,10 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 
 			// Run frame 0 with correct MC context
 			MovieClip*    saved_ctx        = g_current_context;
+			MovieClip*    saved_base       = actionGetBaseClip();
 			DisplayObject* saved_sprite_obj = g_current_sprite_obj;
 			g_current_sprite_obj = obj;
-			if (child_mc) actionSetCurrentContext(child_mc);
+			if (child_mc) { actionSetCurrentContext(child_mc); actionSetBaseClip(child_mc); }
 
 			if (ch->sprite_frame_funcs != NULL && ch->sprite_frame_funcs[0] != NULL)
 			{
@@ -217,6 +220,7 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			}
 
 			actionSetCurrentContext(saved_ctx);
+			actionSetBaseClip(saved_base);
 			g_current_sprite_obj = saved_sprite_obj;
 
 			// Advance frame counter so advance_sprite_frames picks up at frame 1.
