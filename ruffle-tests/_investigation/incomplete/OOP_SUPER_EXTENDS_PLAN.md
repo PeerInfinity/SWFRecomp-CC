@@ -3,7 +3,7 @@
 
 Last updated: 2026-02-25
 
-## Status: PARTIALLY IMPLEMENTED (2/8 tests passing)
+## Status: CORE COMPLETE (6/8 tests passing)
 
 ### CI Results (2026-02-25)
 
@@ -11,22 +11,32 @@ Last updated: 2026-02-25
 |------|-----------|-------|
 | as2_oop | **PASS** ✅ | ImplementsOp/InstanceOf/CastOp working |
 | extends_native_type | **PASS** ✅ | Flash.geom native extends working |
-| as2_super_and_this_v6 | output_mismatch | super() still non-functional |
-| as2_super_and_this_v8 | output_mismatch | super() still non-functional |
-| as2_super_via_manual_prototype | output_mismatch | super via GetVariable not working |
-| extends_chain | output_mismatch | super.method() calls not working |
-| super_edge_cases | output_mismatch | __constructor__ lookup issues |
-| interface_implements_op | output_mismatch | Complex interface cases |
+| as2_super_and_this_v6 | **PASS** ✅ | GetVariable("super"), CallFunction("super") working |
+| as2_super_and_this_v8 | **PASS** ✅ | SWF8 super + this binding working |
+| as2_super_via_manual_prototype | **PASS** ✅ | Manual proto chains with super working |
+| extends_chain | **PASS** ✅ | super(), super.method(), constructor chaining working |
+| super_edge_cases | output_mismatch 33/39 | Remaining: makeSuperWith SUPER-as-__proto__ (3 lines), shifted output (3 lines) |
+| interface_implements_op | output_mismatch | Complex interface cases, MovieClipLoader dependency |
 
 ### What's Implemented
 - **actionExtends**: Correctly sets up prototype chains ✅
 - **actionInstanceOf**: Fully implemented ✅ (type-handling bugs fixed since original plan)
-- **actionImplementsOp**: Fully implemented ✅
+- **actionImplementsOp**: Fully implemented with transitive interface checks ✅
 - **actionCastOp**: Fully implemented ✅
 - **extends_native_type**: flash.geom types can be extended ✅
+- **Super keyword**: Depth-based super system fully implemented ✅
+  - `ACTION_STACK_VALUE_SUPER` type (type 16) with (this, depth) pair
+  - `g_super_this_stack`/`g_super_depth_stack` with push/pop/get accessors
+  - `walkProtoChain(this_obj, depth)` for prototype chain walking
+  - Pattern A (SWF6 GetVariable/CallFunction "super") ✅
+  - Pattern B (SWF7+ arguments array proxy) ✅
+  - Pattern C (preload_super register via `actionGetCurrentSuperInfo`) ✅
+  - `__constructor__` lookup with addProperty getter invocation ✅
+  - Constructor return value capture ✅
 
-### Critical Gap
-- **`super` keyword**: Still a stub — preload_super register filled with empty ASObject, no prototype chain or constructor reference. This blocks 5 of the 6 remaining tests.
+### Remaining Gaps
+- **super_edge_cases** (33/39): `makeSuperWith` pattern stores SUPER value as `__proto__` — `walkProtoChain` returns NULL when encountering type 16 instead of OBJECT
+- **interface_implements_op**: Partially blocked by MovieClipLoader dependency
 
 ## Overview (original)
 

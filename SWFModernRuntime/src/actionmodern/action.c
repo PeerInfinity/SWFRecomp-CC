@@ -385,6 +385,7 @@ static ASObject* getSuperSearchStart(void) {
 // Forward declarations for MC property helpers (defined in WITH section)
 static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* result);
 static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const char* name, u32 name_len, ActionVar* value);
+static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc, const char* name, u32 name_len, ActionVar* value);
 
 // Stored app_context for use by setVariableOnLocalScope (called from variables.c
 // which doesn't have app_context). Set at entry to actionCallFunction/actionCallMethod.
@@ -2727,6 +2728,161 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 	return result;
 }
 
+// Find __resolve method by walking prototype chain (raw lookup, no addProperty getters).
+// Returns ASFunction* if a callable __resolve is found, NULL otherwise.
+// Semantics: FUNCTION type → return it; OBJECT type → block (return NULL, sets *blocked=1);
+// all other types (number, string, movieclip, etc.) → skip, continue up chain.
+static ASFunction* findResolveMethod(SWFAppContext* app_context, ASObject* obj)
+{
+	ASObject* current = obj;
+	int max_depth = 256;
+
+	for (int depth = 0; depth < max_depth && current != NULL; depth++)
+	{
+		ASProperty* resolve_prop = findPropertyRaw(current, "__resolve", 9);
+		if (resolve_prop != NULL && resolve_prop->getter == NULL)  // Skip addProperty-based __resolve
+		{
+			ActionVar* rv = &resolve_prop->value;
+			if (rv->type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				return (ASFunction*)(uintptr_t)rv->data.numeric_value;
+			}
+			else if (rv->type == ACTION_STACK_VALUE_OBJECT)
+			{
+				// Non-function object blocks — stop searching
+				return NULL;
+			}
+			// Primitives (number, string, bool, movieclip, etc.) — skip, continue up chain
+		}
+
+		// Walk to __proto__
+		ActionVar* proto_var = getProperty(current, "__proto__", 9);
+		if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT || proto_var->data.numeric_value == 0)
+			break;
+		ASObject* next = (ASObject*)(uintptr_t)proto_var->data.numeric_value;
+		if (next == obj) break;  // Cycle detection
+		current = next;
+	}
+
+	return NULL;
+}
+
+// Invoke a __resolve function with one string argument (the property name).
+// Returns the resolve function's return value, or undefined if invocation fails.
+static ActionVar invokeResolveFunction(SWFAppContext* app_context, ASFunction* func, void* this_obj,
+                                        const char* prop_name, u32 prop_name_len)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (func == NULL || g_execution_halted) return undef;
+
+	g_call_depth++;
+	if (g_call_depth > g_max_call_depth)
+	{
+		g_execution_halted = 1;
+		g_call_depth--;
+		return undef;
+	}
+
+	ActionVar result;
+	if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		// Type 2 (DefineFunction2): pass args array directly
+		ActionVar name_arg = {0};
+		u32 u16_len = 0;
+		uint16_t* u16_str = utf8_to_u16(app_context, prop_name, prop_name_len, &u16_len);
+		name_arg.type = ACTION_STACK_VALUE_STRING;
+		name_arg.str_size = u16_len;
+		name_arg.data.numeric_value = (u64)(uintptr_t)u16_str;
+
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		// Push local scope
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		// Restore captured WITH scopes if any
+		u32 captured_count = func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
+		}
+
+		// Switch base_clip context if SWF6+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		result = func->advanced_func(app_context, &name_arg, 1, registers, this_obj);
+
+		g_current_context = saved_context;
+		// Pop captured scopes + local scope
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		// Type 1 (DefineFunction): push args onto stack, set "this"
+		PUSH_STR(prop_name, prop_name_len);  // Push property name as string arg
+
+		// Push local scope
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		// Restore captured WITH scopes
+		u32 captured_count = func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
+		}
+
+		// Switch base_clip context if SWF6+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		// Set "this"
+		ActionVar this_var = {0};
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+		setVariableByName("this", &this_var);
+
+		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+		g_current_context = saved_context;
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+	else
+	{
+		result = undef;
+	}
+
+	g_call_depth--;
+	return result;
+}
+
 // Invoke an addProperty setter with a specific this_obj and value argument
 static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, void* this_obj, ActionVar* value)
 {
@@ -2759,10 +2915,47 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 		releaseObject(app_context, local_scope);
 		if (registers != NULL) FREE(registers);
 	}
-	else
+	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
+		// Type 1 (DefineFunction): push value onto stack, set "this" and scope
 		if (value != NULL) pushVar(app_context, value);
+
+		// Push local scope
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		// Restore captured WITH scopes
+		u32 captured_count = func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
+		}
+
+		// Switch base_clip context if SWF6+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		// Set "this" — use OBJECT type (same as invokePropertyGetter)
+		ActionVar this_var = {0};
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+		setVariableByName("this", &this_var);
+
 		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+		g_current_context = saved_context;
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
 	}
 
 	g_special_depth--;
@@ -8063,7 +8256,31 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		}
 		return mc;
 	}
-	return NULL;
+	// Relative path resolution: bare name like "mc3" resolves relative to current context
+	// This is used by getProperty/setProperty with non-prefixed targets
+	{
+		MovieClip* base = g_current_context ? g_current_context : &root_movieclip;
+		const char* rest2 = target;
+		MovieClip* cur = base;
+		while (rest2[0] != '\0') {
+			const char* dot = strchr(rest2, '.');
+			int seg_len = dot ? (int)(dot - rest2) : (int)strlen(rest2);
+			MovieClip* found = NULL;
+			for (int i = 0; i < child_mc_count; i++) {
+				if (child_mc_cache[i] == NULL) continue;
+				if (child_mc_cache[i]->parent == cur &&
+				    (int)strlen(child_mc_cache[i]->name) == seg_len &&
+				    strncmp(child_mc_cache[i]->name, rest2, seg_len) == 0) {
+					found = child_mc_cache[i];
+					break;
+				}
+			}
+			if (found == NULL) return NULL;
+			cur = found;
+			rest2 = dot ? dot + 1 : rest2 + seg_len;
+		}
+		return cur;
+	}
 }
 
 // Forward declarations for resolveSlashPathToMC
@@ -19677,7 +19894,75 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				return;
 			}
-			// User-defined property: store in dynamic_props and as global variable
+			// User-defined property: check addProperty setters on prototype chain first
+			if (mc->dynamic_props != NULL)
+			{
+				ASObject* _dp = (ASObject*) mc->dynamic_props;
+				ASObject* _cur = _dp;
+				int _md = 256;
+				ASProperty* _setter_prop = NULL;
+				while (_cur != NULL && _md-- > 0) {
+					ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
+					if (_ps != NULL) {
+						if (!isPropertyHiddenAtVersion(_ps->flash_flags)) {
+							if (_ps->getter != NULL || _ps->setter != NULL)
+								_setter_prop = _ps;
+						}
+						break;
+					}
+					ActionVar* _np = getProperty(_cur, "__proto__", 9);
+					if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
+					ASObject* _next = (ASObject*) _np->data.numeric_value;
+					if (_next == _dp) break;
+					_cur = _next;
+				}
+				if (_setter_prop != NULL && _setter_prop->setter != NULL)
+				{
+					// Invoke addProperty setter with this = MC
+					ASFunction* _sf = (ASFunction*)_setter_prop->setter;
+					if (_sf->function_type == 2) {
+						g_special_depth++;
+						if (g_special_depth < MAX_SPECIAL_DEPTH) {
+							ActionVar* _regs = NULL;
+							if (_sf->register_count > 0) _regs = (ActionVar*) HCALLOC(_sf->register_count, sizeof(ActionVar));
+							ASObject* _ls = allocObject(app_context, 8);
+							if (scope_depth < MAX_SCOPE_DEPTH) { scope_is_with[scope_depth] = 0; scope_mc[scope_depth] = NULL; scope_chain[scope_depth++] = _ls; }
+							_sf->advanced_func(app_context, &value_var, 1, _regs, (void*)mc);
+							if (scope_depth > 0) scope_depth--;
+							releaseObject(app_context, _ls);
+							if (_regs != NULL) FREE(_regs);
+						}
+						g_special_depth--;
+					} else if (_sf->function_type == 1 && _sf->simple_func != NULL) {
+						g_special_depth++;
+						if (g_special_depth < MAX_SPECIAL_DEPTH) {
+							pushVar(app_context, &value_var);
+							ASObject* _ls = allocObject(app_context, 8);
+							if (scope_depth < MAX_SCOPE_DEPTH) { scope_is_with[scope_depth] = 0; scope_mc[scope_depth] = NULL; scope_chain[scope_depth++] = _ls; }
+							u32 _cc = _sf->captured_scope_count;
+							for (u32 i = 0; i < _cc && scope_depth < MAX_SCOPE_DEPTH; i++) {
+								scope_is_with[scope_depth] = 1; scope_mc[scope_depth] = (MovieClip*)_sf->captured_scope_mc[i];
+								scope_chain[scope_depth++] = (ASObject*)_sf->captured_scope[i];
+							}
+							MovieClip* _sc = g_current_context;
+							if (g_swf_version >= 6 && _sf->base_clip != NULL) g_current_context = (MovieClip*)_sf->base_clip;
+							ActionVar _tv = {0}; _tv.type = ACTION_STACK_VALUE_MOVIECLIP; _tv.data.numeric_value = (u64)(uintptr_t)mc;
+							setVariableByName("this", &_tv);
+							((ActionVar(*)(SWFAppContext*))_sf->simple_func)(app_context);
+							g_current_context = _sc;
+							for (u32 i = 0; i < _cc && scope_depth > 0; i++) scope_depth--;
+							if (scope_depth > 0) scope_depth--;
+							releaseObject(app_context, _ls);
+						}
+						g_special_depth--;
+					}
+					return;
+				}
+				if (_setter_prop != NULL && _setter_prop->getter != NULL) {
+					return;  // Read-only virtual property
+				}
+			}
+			// Store in dynamic_props
 			if (mc->dynamic_props == NULL)
 			{
 				mc->dynamic_props = (void*) allocObject(app_context, 4);
@@ -20200,7 +20485,14 @@ void actionGetMember(SWFAppContext* app_context)
 						}
 					}
 					if (!arr_proto_handled) {
-						pushUndefined(app_context);
+						// Try __resolve hook before giving up
+						ASFunction* resolve_func = findResolveMethod(app_context, obj);
+						if (resolve_func != NULL) {
+							ActionVar result = invokeResolveFunction(app_context, resolve_func, (void*)obj, prop_name, prop_name_len);
+							pushVar(app_context, &result);
+						} else {
+							pushUndefined(app_context);
+						}
 					}
 				}
 			}
@@ -22915,6 +23207,107 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 	return 0;
 }
 
+// Apply a single initObject property to an attached MovieClip.
+// Checks MC builtins, then addProperty setters on prototype chain, then falls back to setProperty.
+static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
+	const char* name, u32 name_len, ActionVar* value)
+{
+	// Try MC builtin props first (_x, _y, etc.)
+	if (setMCBuiltinProperty(app_context, mc, name, name_len, value))
+		return;
+
+	// Ensure dynamic_props exists
+	if (mc->dynamic_props == NULL) {
+		mc->dynamic_props = (void*) allocObject(app_context, 8);
+		retainObject((ASObject*) mc->dynamic_props);
+	}
+
+	// Check prototype chain for addProperty setter
+	ASObject* dprops = (ASObject*) mc->dynamic_props;
+	{
+		ASObject* cur = dprops;
+		int max_depth = 256;
+		while (cur != NULL && max_depth-- > 0) {
+			ASProperty* ps = findPropertyRaw(cur, name, name_len);
+			if (ps != NULL) {
+				if (!isPropertyHiddenAtVersion(ps->flash_flags)) {
+					if (ps->setter != NULL) {
+						// Invoke addProperty setter with this = MC (MOVIECLIP type)
+						ASFunction* setter_func = (ASFunction*)ps->setter;
+						if (setter_func->function_type == 2) {
+							// Type 2 (DefineFunction2): call advanced_func directly
+							g_special_depth++;
+							if (g_special_depth < MAX_SPECIAL_DEPTH) {
+								ActionVar* registers = NULL;
+								if (setter_func->register_count > 0)
+									registers = (ActionVar*) HCALLOC(setter_func->register_count, sizeof(ActionVar));
+								ASObject* local_scope = allocObject(app_context, 8);
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = 0;
+									scope_mc[scope_depth] = NULL;
+									scope_chain[scope_depth++] = local_scope;
+								}
+								setter_func->advanced_func(app_context, value, 1, registers, (void*)mc);
+								if (scope_depth > 0) scope_depth--;
+								releaseObject(app_context, local_scope);
+								if (registers != NULL) FREE(registers);
+							}
+							g_special_depth--;
+						} else if (setter_func->function_type == 1 && setter_func->simple_func != NULL) {
+							// Type 1 (DefineFunction): push value, set this=MC, call
+							g_special_depth++;
+							if (g_special_depth < MAX_SPECIAL_DEPTH) {
+								pushVar(app_context, value);
+								ASObject* local_scope = allocObject(app_context, 8);
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = 0;
+									scope_mc[scope_depth] = NULL;
+									scope_chain[scope_depth++] = local_scope;
+								}
+								u32 captured_count = setter_func->captured_scope_count;
+								for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++) {
+									scope_is_with[scope_depth] = 1;
+									scope_mc[scope_depth] = (MovieClip*)setter_func->captured_scope_mc[i];
+									scope_chain[scope_depth++] = (ASObject*)setter_func->captured_scope[i];
+								}
+								MovieClip* saved_context = g_current_context;
+								if (g_swf_version >= 6 && setter_func->base_clip != NULL)
+									g_current_context = (MovieClip*)setter_func->base_clip;
+								// Set "this" as MOVIECLIP so GetMember finds MC builtins
+								ActionVar this_var = {0};
+								this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+								this_var.data.numeric_value = (u64)(uintptr_t)mc;
+								setVariableByName("this", &this_var);
+								((ActionVar(*)(SWFAppContext*))setter_func->simple_func)(app_context);
+								g_current_context = saved_context;
+								for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+									scope_depth--;
+								if (scope_depth > 0) scope_depth--;
+								releaseObject(app_context, local_scope);
+							}
+							g_special_depth--;
+						}
+						return;
+					}
+					if (ps->getter != NULL) {
+						// Read-only virtual property — silently ignore
+						return;
+					}
+				}
+				break; // Property found (possibly hidden) — stop traversal
+			}
+			ActionVar* np = getProperty(cur, "__proto__", 9);
+			if (np == NULL || np->type != ACTION_STACK_VALUE_OBJECT || np->data.numeric_value == 0) break;
+			ASObject* next = (ASObject*) np->data.numeric_value;
+			if (next == dprops) break;
+			cur = next;
+		}
+	}
+
+	// No setter found — store as plain property
+	setProperty(app_context, dprops, name, name_len, value);
+}
+
 int actionWithStart(SWFAppContext* app_context)
 {
 	// Pop object from stack
@@ -24640,27 +25033,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
 						}
 					}
-					// Apply initObject if present
+					// Apply initObject if present (checks addProperty setters on prototype chain)
 					if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
 						ASObject* init_obj = (ASObject*)(uintptr_t)args[3].data.numeric_value;
 						if (init_obj != NULL) {
 							for (u32 pi = 0; pi < init_obj->num_used; pi++) {
 								if (init_obj->properties[pi].name_length > 0) {
-									// Try MC builtin props first (_x, _y, etc.)
-									if (!setMCBuiltinProperty(app_context, attached,
-											init_obj->properties[pi].name,
-											init_obj->properties[pi].name_length,
-											&init_obj->properties[pi].value)) {
-										// Fall through to dynamic properties
-										if (attached->dynamic_props == NULL) {
-											attached->dynamic_props = (void*) allocObject(app_context, 8);
-											retainObject((ASObject*) attached->dynamic_props);
-										}
-										setProperty(app_context, (ASObject*)attached->dynamic_props,
-											init_obj->properties[pi].name,
-											init_obj->properties[pi].name_length,
-											&init_obj->properties[pi].value);
-									}
+									applyInitObjectPropToMC(app_context, attached,
+										init_obj->properties[pi].name,
+										init_obj->properties[pi].name_length,
+										&init_obj->properties[pi].value);
 								}
 							}
 						}
@@ -27765,7 +28147,104 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
-			// Method not found or not a function - push undefined
+			// Method not found — try __resolve hook
+			ASFunction* resolve_func = findResolveMethod(app_context, obj);
+			if (resolve_func != NULL)
+			{
+				ActionVar resolved = invokeResolveFunction(app_context, resolve_func, (void*)obj, method_name, method_name_len);
+				if (resolved.type == ACTION_STACK_VALUE_FUNCTION)
+				{
+					// __resolve returned a function — call it with this = obj
+					ASFunction* func = lookupFunctionFromVar(&resolved);
+					if (func != NULL)
+					{
+						pushSuperContext((void*)obj, 1);
+
+						ActionVar result = {0};
+						result.type = ACTION_STACK_VALUE_UNDEFINED;
+
+						if (func->function_type == 2 && func->advanced_func != NULL)
+						{
+							ActionVar* registers = NULL;
+							if (func->register_count > 0)
+								registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+							ASObject* local_scope = allocObject(app_context, 8);
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = 0;
+								scope_mc[scope_depth] = NULL;
+								scope_chain[scope_depth++] = local_scope;
+							}
+
+							u32 captured_count = func->captured_scope_count;
+							for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++) {
+								scope_is_with[scope_depth] = 1;
+								scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+								scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+							}
+
+							MovieClip* saved_ctx = g_current_context;
+							if (g_swf_version >= 6 && func->base_clip != NULL)
+								g_current_context = (MovieClip*)func->base_clip;
+
+							g_call_depth++;
+							result = func->advanced_func(app_context, args, num_args, NULL, (void*)obj);
+							g_call_depth--;
+
+							g_current_context = saved_ctx;
+							for (u32 ci = 0; ci < captured_count && scope_depth > 0; ci++)
+								scope_depth--;
+							if (scope_depth > 0) scope_depth--;
+							releaseObject(app_context, local_scope);
+							if (registers != NULL) FREE(registers);
+						}
+						else if (func->function_type == 1 && func->simple_func != NULL)
+						{
+							ActionVar this_var = {0};
+							this_var.type = ACTION_STACK_VALUE_OBJECT;
+							this_var.data.numeric_value = (u64)obj;
+							setVariableByName("this", &this_var);
+
+							for (int i = (int)num_args - 1; i >= 0; i--)
+								pushVar(app_context, &args[i]);
+
+							ASObject* local_scope = allocObject(app_context, 8);
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = 0;
+								scope_mc[scope_depth] = NULL;
+								scope_chain[scope_depth++] = local_scope;
+							}
+
+							u32 captured_count = func->captured_scope_count;
+							for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++) {
+								scope_is_with[scope_depth] = 1;
+								scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+								scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+							}
+
+							MovieClip* saved_ctx = g_current_context;
+							if (g_swf_version >= 6 && func->base_clip != NULL)
+								g_current_context = (MovieClip*)func->base_clip;
+
+							g_call_depth++;
+							result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+							g_call_depth--;
+
+							g_current_context = saved_ctx;
+							for (u32 ci = 0; ci < captured_count && scope_depth > 0; ci++)
+								scope_depth--;
+							if (scope_depth > 0) scope_depth--;
+							releaseObject(app_context, local_scope);
+						}
+
+						popSuperContext();
+						if (args != NULL) FREE(args);
+						pushVar(app_context, &result);
+						return;
+					}
+				}
+			}
+			// Method not found (even after __resolve) - push undefined
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
@@ -27906,21 +28385,134 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (method_name_len == 4 && strncmp(method_name, "call", 4) == 0)
 		{
 			// Function.call(thisArg, arg1, arg2, ...)
-			// Skip thisArg (args[0]), pass remaining args to the function
 			if (func != NULL)
 			{
-				u32 call_args = num_args > 1 ? num_args - 1 : 0;
-				// Push args in reverse order (actionCallFunction pops them back)
-				for (int i = (int)num_args - 1; i >= 1; i--)
-					pushVar(app_context, &args[i]);
-				// Push arg count
-				PUSH(ACTION_STACK_VALUE_F64, 0);
-				VAL(double, &STACK_TOP_VALUE) = (double) call_args;
-				// Push function name on top
-				PUSH_STR(func->name, strlen(func->name));
-				if (args != NULL) FREE(args);
-				char buf[17];
-				actionCallFunction(app_context, buf);
+				// Extract thisArg
+				void* this_obj = NULL;
+				if (num_args >= 1 && (args[0].type == ACTION_STACK_VALUE_OBJECT ||
+				                      args[0].type == ACTION_STACK_VALUE_MOVIECLIP))
+					this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+
+				// Build call_args array from args[1..n]
+				u32 call_arg_count = num_args > 1 ? num_args - 1 : 0;
+				ActionVar* call_args = NULL;
+				if (call_arg_count > 0)
+				{
+					call_args = (ActionVar*) HALLOC(sizeof(ActionVar) * call_arg_count);
+					for (u32 i = 0; i < call_arg_count; i++)
+						call_args[i] = args[i + 1];
+				}
+
+				if (g_call_depth >= g_max_call_depth - 1)
+				{
+					if (call_args != NULL) FREE(call_args);
+					if (args != NULL) FREE(args);
+					g_execution_halted = 1;
+					pushUndefined(app_context);
+				}
+				else if (func->function_type == 2)
+				{
+					ActionVar* registers = NULL;
+					if (func->register_count > 0)
+						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+					ASFunction* prev_executing_func_call = g_current_executing_func;
+					g_call_depth++;
+					g_prev_executing_func = prev_executing_func_call;
+					g_current_executing_func = func;
+
+					// Restore captured scope chain if any
+					u32 captured_count = func->captured_scope_count;
+					for (u32 ci = 0; ci < captured_count; ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = 1;
+							scope_mc[scope_depth] = func->captured_scope_mc[ci];
+							scope_chain[scope_depth++] = func->captured_scope[ci];
+						}
+					}
+
+					// Switch context to base_clip for SWF6+
+					MovieClip* prev_ctx_call = g_current_context;
+					if (g_swf_version >= 6 && func->base_clip != NULL)
+						g_current_context = func->base_clip;
+
+					ActionVar result = func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
+
+					g_current_context = prev_ctx_call;
+					for (u32 ci = 0; ci < captured_count; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
+
+					g_current_executing_func = prev_executing_func_call;
+					g_call_depth--;
+
+					if (registers != NULL) FREE(registers);
+					if (call_args != NULL) FREE(call_args);
+					if (args != NULL) FREE(args);
+					pushVar(app_context, &result);
+				}
+				else if (func->function_type == 1 && func->simple_func != NULL)
+				{
+					// User-defined simple function — set up local scope + arguments
+					ASFunction* prev_executing_func_call = g_current_executing_func;
+					ASObject* local_scope_call = allocObject(app_context, 8);
+					ASArray* arguments_arr_call = allocArray(app_context, call_arg_count > 0 ? call_arg_count : 1);
+					for (u32 i = 0; i < call_arg_count; i++)
+					{
+						setArrayElement(app_context, arguments_arr_call, i, &call_args[i]);
+						pushVar(app_context, &call_args[i]);
+					}
+					setupArgumentsProps(app_context, arguments_arr_call, func, prev_executing_func_call);
+					ActionVar args_var_call = {0};
+					args_var_call.type = ACTION_STACK_VALUE_ARRAY;
+					args_var_call.data.numeric_value = (u64)arguments_arr_call;
+					setProperty(app_context, local_scope_call, "arguments", 9, &args_var_call);
+
+					// Restore captured scope chain
+					u32 captured_count = func->captured_scope_count;
+					for (u32 ci = 0; ci < captured_count; ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = 1;
+							scope_mc[scope_depth] = func->captured_scope_mc[ci];
+							scope_chain[scope_depth++] = func->captured_scope[ci];
+						}
+					}
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = local_scope_call;
+					}
+
+					if (call_args != NULL) FREE(call_args);
+					if (args != NULL) FREE(args);
+
+					MovieClip* prev_ctx_call = g_current_context;
+					if (g_swf_version >= 6 && func->base_clip != NULL)
+						g_current_context = func->base_clip;
+
+					g_call_depth++;
+					g_prev_executing_func = prev_executing_func_call;
+					g_current_executing_func = func;
+					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					g_current_executing_func = prev_executing_func_call;
+					g_call_depth--;
+
+					g_current_context = prev_ctx_call;
+					for (u32 ci = 0; ci < captured_count; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
+					if (scope_depth > 0) scope_depth--;
+					releaseObject(app_context, local_scope_call);
+
+					pushVar(app_context, &result);
+				}
+				else
+				{
+					// No function body or built-in — just push undefined
+					if (call_args != NULL) FREE(call_args);
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+				}
 			}
 			else
 			{
@@ -28623,27 +29215,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 
 						// Apply initObject properties (arg 3) if provided
+						// Uses applyInitObjectPropToMC to invoke addProperty setters on prototype chain
 						if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
 							ASObject* init_obj = (ASObject*) args[3].data.numeric_value;
 							if (init_obj != NULL) {
-								// Copy all properties from initObject
 								for (u32 pi = 0; pi < init_obj->num_used; pi++) {
 									if (init_obj->properties[pi].name_length > 0) {
-										// Try MC builtin props first (_x, _y, etc.)
-										if (!setMCBuiltinProperty(app_context, attached,
-												init_obj->properties[pi].name,
-												init_obj->properties[pi].name_length,
-												&init_obj->properties[pi].value)) {
-											// Fall through to dynamic properties
-											if (attached->dynamic_props == NULL) {
-												attached->dynamic_props = (void*) allocObject(app_context, 8);
-												retainObject((ASObject*) attached->dynamic_props);
-											}
-											setProperty(app_context, (ASObject*)attached->dynamic_props,
-												init_obj->properties[pi].name,
-												init_obj->properties[pi].name_length,
-												&init_obj->properties[pi].value);
-										}
+										applyInitObjectPropToMC(app_context, attached,
+											init_obj->properties[pi].name,
+											init_obj->properties[pi].name_length,
+											&init_obj->properties[pi].value);
 									}
 								}
 							}

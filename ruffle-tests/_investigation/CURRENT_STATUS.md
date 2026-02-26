@@ -61,6 +61,7 @@ Last updated: 2026-02-25
 | `movieclip_default_state` | 69/69 ✅ | createEmptyMovieClip totalframes, getBytesLoaded, _url format |
 | `add_property` | 15/15 ✅ | addProperty on Arrays (getter/setter for length and indexed props) |
 | `as_set_prop_flags` | 79/79 ✅ | ASSetPropFlags valueOf/toString coercion on arguments |
+| `init_object_order` | 15/15 ✅ | attachMovie initObject addProperty setter invocation |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
