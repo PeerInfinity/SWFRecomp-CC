@@ -1550,7 +1550,8 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
-    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax,
+    s32 end_bounds_xmin, s32 end_bounds_xmax, s32 end_bounds_ymin, s32 end_bounds_ymax)
 {
 	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
@@ -1564,8 +1565,10 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 
 #ifdef NO_GRAPHICS
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
+	ng_record_morph_end_bounds(char_id, end_bounds_xmin, end_bounds_xmax, end_bounds_ymin, end_bounds_ymax);
 #else
 	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
+	(void)end_bounds_xmin; (void)end_bounds_xmax; (void)end_bounds_ymin; (void)end_bounds_ymax;
 #endif
 }
 
@@ -1950,6 +1953,20 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		}
 	}
 #endif
+
+	// char_id=0 means "modify existing entry" (PlaceObject2 without HasCharacter)
+	if (char_id == 0 && display_list[depth].char_id != 0)
+	{
+		// Update only the fields that PlaceObject2 can modify
+		if (transform_id != 0) display_list[depth].transform_id = transform_id;
+		if (cxform_id != 0) {
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = 1;
+		}
+		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+		display_list[depth].ratio = ratio;
+		return;
+	}
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;

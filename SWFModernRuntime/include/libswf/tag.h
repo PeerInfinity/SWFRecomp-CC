@@ -35,7 +35,8 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
-    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
+    s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax,
+    s32 end_bounds_xmin, s32 end_bounds_xmax, s32 end_bounds_ymin, s32 end_bounds_ymax);
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id);
 void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
@@ -163,6 +164,8 @@ int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, d
 int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
                           double rb, double gb, double bb, double ab);
 int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
+int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
+    s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
 // Compute content bounds (union of child bounds in pixels) for a display entry.
 // entry_idx = (size_t)-1 for root-level children. Returns 1 if any bounds found, 0 if empty.
 int ng_getDisplayEntryBounds(size_t entry_idx,
@@ -194,6 +197,7 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 
 // Callbacks from tag.c → tag_stubs.c supplemental registries (NO_GRAPHICS builds)
 void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
+void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
 // Record that a shape uses non-zero winding rule (DefineShape4 UsesFillWindingRule flag)
 void ng_record_char_winding(size_t char_id);
 // Shape-accurate point-in-shape test for a display list.

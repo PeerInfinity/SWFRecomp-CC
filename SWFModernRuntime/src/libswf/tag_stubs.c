@@ -44,6 +44,14 @@ static struct {
 } ng_char_bounds[MAX_CHAR_BOUNDS_NG];
 static size_t ng_char_bounds_count = 0;
 
+// Morph shape end bounds (for ratio-based interpolation)
+#define MAX_MORPH_END_BOUNDS_NG 64
+static struct {
+	size_t char_id;
+	s32 xmin, xmax, ymin, ymax;  // twips (end shape bounds)
+} ng_morph_end_bounds[MAX_MORPH_END_BOUNDS_NG];
+static size_t ng_morph_end_bounds_count = 0;
+
 // Non-zero winding rule char_ids (DefineShape4 UsesFillWindingRule)
 #define MAX_WINDING_NG 64
 static size_t ng_winding_ids[MAX_WINDING_NG];
@@ -266,6 +274,17 @@ void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 yma
 	ng_char_bounds[ng_char_bounds_count].ymin = ymin;
 	ng_char_bounds[ng_char_bounds_count].ymax = ymax;
 	ng_char_bounds_count++;
+}
+
+void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax)
+{
+	if (ng_morph_end_bounds_count >= MAX_MORPH_END_BOUNDS_NG) return;
+	ng_morph_end_bounds[ng_morph_end_bounds_count].char_id = char_id;
+	ng_morph_end_bounds[ng_morph_end_bounds_count].xmin = xmin;
+	ng_morph_end_bounds[ng_morph_end_bounds_count].xmax = xmax;
+	ng_morph_end_bounds[ng_morph_end_bounds_count].ymin = ymin;
+	ng_morph_end_bounds[ng_morph_end_bounds_count].ymax = ymax;
+	ng_morph_end_bounds_count++;
 }
 
 void ng_record_char_winding(size_t char_id)
@@ -827,7 +846,6 @@ size_t ng_getSpriteFrameCount(void)
 // Returns 1 if sprite found and navigated, 0 if not found.
 int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int play)
 {
-	(void)app_context;
 	extern MovieClip root_movieclip;
 	if (!mc || mc == &root_movieclip) return 0;
 	if (!mc->name || mc->name[0] == '\0') return 0;
@@ -846,8 +864,69 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 	// Clamp to last frame
 	if (frame >= (u16)fc) frame = (u16)(fc - 1);
 
-	obj->sprite_manual_next_frame = 1;
-	obj->sprite_next_frame = frame;
+	// Execute frames synchronously (like advance_sprite_frames but immediate)
+	size_t current = obj->sprite_current_frame;
+	if (frame != current)
+	{
+		// Swap to sprite's display list context
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+
+		display_list = obj->sprite_display_list;
+		max_depth = obj->sprite_max_depth;
+		display_list_capacity = obj->sprite_dl_capacity;
+
+		if (display_list == NULL)
+		{
+			// Allocate sprite display list if needed
+			obj->sprite_dl_capacity = 32;
+			obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
+			display_list = obj->sprite_display_list;
+			display_list_capacity = obj->sprite_dl_capacity;
+		}
+
+		if (frame <= current)
+		{
+			// Backward jump: clear display list and re-execute from frame 0
+			for (size_t j = 1; j <= max_depth; ++j)
+			{
+				if (display_list[j].sprite_display_list != NULL)
+				{
+					FREE(display_list[j].sprite_display_list);
+					display_list[j].sprite_display_list = NULL;
+				}
+				display_list[j].char_id = 0;
+			}
+			max_depth = 0;
+
+			for (size_t f = 0; f <= frame; f++)
+			{
+				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
+					ch->sprite_frame_funcs[f](app_context);
+			}
+		}
+		else
+		{
+			// Forward jump: execute frames current+1..frame
+			for (size_t f = current + 1; f <= frame; f++)
+			{
+				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
+					ch->sprite_frame_funcs[f](app_context);
+			}
+		}
+
+		obj->sprite_display_list = display_list;
+		obj->sprite_max_depth = max_depth;
+		obj->sprite_dl_capacity = display_list_capacity;
+
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+	}
+
+	obj->sprite_current_frame = frame;
+	obj->sprite_manual_next_frame = 0;
 	obj->sprite_is_playing = play ? 1 : 0;
 	mc->currentframe = (int)frame + 1;  // 1-indexed
 	return 1;
@@ -1209,6 +1288,44 @@ int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin
 	return 0;
 }
 
+// Ratio-aware bounds: interpolates between start and end bounds for morph shapes.
+// ratio: 0 = start shape, 65535 = end shape.
+int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
+    s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax)
+{
+	// First get the start bounds
+	if (!ng_getCharBounds(char_id, out_xmin, out_xmax, out_ymin, out_ymax))
+		return 0;
+
+	// If ratio is 0, start bounds are correct
+	if (ratio == 0)
+		return 1;
+
+	// Look up end bounds for this morph shape
+	for (size_t i = 0; i < ng_morph_end_bounds_count; i++)
+	{
+		if (ng_morph_end_bounds[i].char_id == char_id)
+		{
+			// Linear interpolation: t = ratio / 65535.0
+			double t = (double)ratio / 65535.0;
+			s32 sx = *out_xmin, sy = *out_ymin;
+			s32 ex = *out_xmax, ey = *out_ymax;
+			s32 esx = ng_morph_end_bounds[i].xmin;
+			s32 eex = ng_morph_end_bounds[i].xmax;
+			s32 esy = ng_morph_end_bounds[i].ymin;
+			s32 eey = ng_morph_end_bounds[i].ymax;
+			*out_xmin = (s32)(sx + (esx - sx) * t);
+			*out_xmax = (s32)(ex + (eex - ex) * t);
+			*out_ymin = (s32)(sy + (esy - sy) * t);
+			*out_ymax = (s32)(ey + (eey - ey) * t);
+			return 1;
+		}
+	}
+
+	// No end bounds found — return start bounds as-is
+	return 1;
+}
+
 // ---------------------------------------------------------------------------
 // Composite bounds computation (union of child content bounds in pixels)
 // entry_idx == (size_t)-1: root-level children
@@ -1522,18 +1639,29 @@ static int pit(double px, double py,
 	return !(has_neg && has_pos);
 }
 
+// Morph end vertex data (for interpolated shape hit testing)
+extern float morph_end_shape_data[][2];
+
 // Test a point (in twips, parent-accumulated matrix space) against a char's shape triangles.
 // ma..mty is the child's accumulated world matrix (mapping local twips → test space).
+// ratio: morph ratio (0=start, 65535=end). Ignored for non-morph shapes.
 // Returns 1 if hit, 0 if miss.
-static int ng_hitTestShapeChar(size_t char_id,
+static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
     double ma, double mb, double mc_m, double md, double mtx, double mty,
     double test_x, double test_y)
 {
 	Character* ch = &dictionary[char_id];
-	if (ch->type != CHAR_TYPE_SHAPE) return 0;
+	int is_morph = (ch->type == CHAR_TYPE_MORPH_SHAPE);
+	if (ch->type != CHAR_TYPE_SHAPE && !is_morph) return 0;
 
-	size_t offset = ch->shape_offset;
-	size_t count = ch->size;
+	size_t offset, count;
+	if (is_morph) {
+		offset = ch->morph_start_offset;
+		count = ch->morph_start_size;
+	} else {
+		offset = ch->shape_offset;
+		count = ch->size;
+	}
 	if (count < 3) return 0;
 
 	// Inverse-transform test point into shape's local space
@@ -1544,6 +1672,13 @@ static int ng_hitTestShapeChar(size_t char_id,
 	double sy = test_y - mty;
 	double local_x = ( md * sx - mc_m * sy) * inv_det;
 	double local_y = (-mb * sx + ma  * sy) * inv_det;
+
+	double interp_t = 0.0;
+	size_t morph_end_off = 0;
+	if (is_morph && ratio > 0) {
+		interp_t = (double)ratio / 65535.0;
+		morph_end_off = ch->morph_end_offset;
+	}
 
 	// Count triangle hits
 	int hits = 0;
@@ -1558,6 +1693,24 @@ static int ng_hitTestShapeChar(size_t char_id,
 		double by = (double)*(const float*)&v1[1];
 		double cx = (double)*(const float*)&v2[0];
 		double cy = (double)*(const float*)&v2[1];
+
+		if (is_morph && ratio > 0) {
+			// Interpolate with end shape vertices
+			size_t vi = morph_end_off + t * 3;
+			double eax = (double)morph_end_shape_data[vi + 0][0];
+			double eay = (double)morph_end_shape_data[vi + 0][1];
+			double ebx = (double)morph_end_shape_data[vi + 1][0];
+			double eby = (double)morph_end_shape_data[vi + 1][1];
+			double ecx = (double)morph_end_shape_data[vi + 2][0];
+			double ecy = (double)morph_end_shape_data[vi + 2][1];
+			ax += (eax - ax) * interp_t;
+			ay += (eay - ay) * interp_t;
+			bx += (ebx - bx) * interp_t;
+			by += (eby - by) * interp_t;
+			cx += (ecx - cx) * interp_t;
+			cy += (ecy - cy) * interp_t;
+		}
+
 		if (pit(local_x, local_y, ax, ay, bx, by, cx, cy))
 			hits++;
 	}
@@ -1591,7 +1744,7 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
 				na, nb, nc, nd, ntx, nty, test_x, test_y))
 				return 1;
 		} else {
-			if (ng_hitTestShapeChar(child->char_id, na, nb, nc, nd, ntx, nty,
+			if (ng_hitTestShapeChar(child->char_id, child->ratio, na, nb, nc, nd, ntx, nty,
 				test_x, test_y))
 				return 1;
 		}

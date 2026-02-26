@@ -278,7 +278,9 @@ When `actionNewObject` creates an instance of a native-backed class, it sets `ob
 
 **Tests impacted**: native_objects_swf6/7/8 (→ ~80-90% once detection works correctly)
 
-### Phase 3: super() Call Mechanism
+### Phase 3: super() Call Mechanism — **RESOLVED**
+
+**Status**: super() is now fully implemented via OOP_SUPER_EXTENDS_PLAN (completed 2026-02). Depth-based super tracking with `g_super_this_stack`/`g_super_depth_stack`, `walkProtoChain`, and all three call patterns (A/B/C) work. 6/8 OOP tests pass. This phase can be skipped.
 
 **Goal**: Make `super(args...)` work for subclassing built-in types.
 

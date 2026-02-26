@@ -5286,6 +5286,8 @@ namespace SWFRecomp
 				size_t morph_end_color_before = current_morph_end_color;
 				s32 shape_bounds_xmin = 0, shape_bounds_xmax = 0;
 				s32 shape_bounds_ymin = 0, shape_bounds_ymax = 0;
+				s32 morph_end_bounds_xmin = 0, morph_end_bounds_xmax = 0;
+				s32 morph_end_bounds_ymin = 0, morph_end_bounds_ymax = 0;
 				
 				// Save position at start of tag body for morph EndEdges skip
 				char* morph_tag_start = cur_pos;
@@ -5344,7 +5346,7 @@ namespace SWFRecomp
 
 					if (is_morph)
 					{
-						// DefineMorphShape: parse EndBounds RECT (skip) and Offset (skip)
+						// DefineMorphShape: parse EndBounds RECT
 						shape_tag.clearFields();
 						shape_tag.setFieldCount(5);
 
@@ -5356,8 +5358,11 @@ namespace SWFRecomp
 
 						shape_tag.parseFields(cur_pos);
 
-						// EndBounds available in fields[1-4] but not used for static bounds.
-						// Morph bounds are per-ratio; we only store start bounds for now.
+						// Extract end bounds for morph interpolation
+						morph_end_bounds_xmin = (s32) shape_tag.fields[1].value;
+						morph_end_bounds_xmax = (s32) shape_tag.fields[2].value;
+						morph_end_bounds_ymin = (s32) shape_tag.fields[3].value;
+						morph_end_bounds_ymax = (s32) shape_tag.fields[4].value;
 
 						if (is_morph2)
 						{
@@ -6355,7 +6360,11 @@ namespace SWFRecomp
 										 << to_string(shape_bounds_xmin) << ", "
 										 << to_string(shape_bounds_xmax) << ", "
 										 << to_string(shape_bounds_ymin) << ", "
-										 << to_string(shape_bounds_ymax) << ");" << endl;
+										 << to_string(shape_bounds_ymax) << ", "
+										 << to_string(morph_end_bounds_xmin) << ", "
+										 << to_string(morph_end_bounds_xmax) << ", "
+										 << to_string(morph_end_bounds_ymin) << ", "
+										 << to_string(morph_end_bounds_ymax) << ");" << endl;
 					}
 					else
 					{
