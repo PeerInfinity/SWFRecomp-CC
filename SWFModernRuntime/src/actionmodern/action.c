@@ -763,6 +763,105 @@ static ActionVar builtin_stub_method(SWFAppContext* app_context, ActionVar* args
 	return ret;
 }
 
+// Forward declarations for copy functions
+static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
+
+// ContextMenu.copy() — creates a new ContextMenu with copied builtInItems
+static ActionVar builtin_contextmenu_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* cm = (ASObject*)this_obj;
+	if (cm == NULL) return ret;
+
+	// Create new ContextMenu object with __proto__ from stub_ctors[4]
+	extern ASFunction g_stub_ctors[]; // forward ref
+	ASObject* new_cm = allocObject(app_context, 8);
+	retainObject(new_cm);
+	if (g_stub_ctors[4].prototype_obj != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64)g_stub_ctors[4].prototype_obj;
+		setProperty(app_context, new_cm, "__proto__", 9, &pv);
+	}
+
+	// Copy builtInItems
+	ActionVar* bi_var = getProperty(cm, "builtInItems", 12);
+	if (bi_var != NULL && bi_var->type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* old_bi = (ASObject*)bi_var->data.numeric_value;
+		ASObject* new_bi = allocObject(app_context, 10);
+		retainObject(new_bi);
+		setObjectProto(app_context, new_bi);
+		// Copy all properties from old builtInItems
+		for (u32 i = 0; i < old_bi->num_used; i++) {
+			if (old_bi->properties[i].name_length > 0) {
+				setProperty(app_context, new_bi, old_bi->properties[i].name,
+				            old_bi->properties[i].name_length, &old_bi->properties[i].value);
+			}
+		}
+		ActionVar bv = {0};
+		bv.type = ACTION_STACK_VALUE_OBJECT;
+		bv.data.numeric_value = (u64)new_bi;
+		setProperty(app_context, new_cm, "builtInItems", 12, &bv);
+	}
+
+	// Copy customItems (shallow copy of array)
+	ActionVar* ci_var = getProperty(cm, "customItems", 11);
+	if (ci_var != NULL && ci_var->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* old_ca = (ASArray*)ci_var->data.numeric_value;
+		ASArray* new_ca = allocArray(app_context, old_ca->length > 0 ? old_ca->length : 4);
+		new_ca->length = old_ca->length;
+		for (u32 i = 0; i < old_ca->length; i++) {
+			new_ca->elements[i] = old_ca->elements[i];
+		}
+		ActionVar cv = {0};
+		cv.type = ACTION_STACK_VALUE_ARRAY;
+		cv.data.numeric_value = (u64)new_ca;
+		setProperty(app_context, new_cm, "customItems", 11, &cv);
+	}
+
+	// Copy onSelect
+	ActionVar* os_var = getProperty(cm, "onSelect", 8);
+	if (os_var != NULL) {
+		setProperty(app_context, new_cm, "onSelect", 8, os_var);
+	}
+
+	ret.type = ACTION_STACK_VALUE_OBJECT;
+	ret.data.numeric_value = (u64)new_cm;
+	return ret;
+}
+
+// ContextMenuItem.copy() — creates a copy of the menu item
+static ActionVar builtin_contextmenuitem_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* cmi = (ASObject*)this_obj;
+	if (cmi == NULL) return ret;
+
+	extern ASFunction g_stub_ctors[];
+	ASObject* new_cmi = allocObject(app_context, 8);
+	retainObject(new_cmi);
+	if (g_stub_ctors[5].prototype_obj != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64)g_stub_ctors[5].prototype_obj;
+		setProperty(app_context, new_cmi, "__proto__", 9, &pv);
+	}
+	// Copy all properties
+	const char* props[] = {"caption", "onSelect", "separatorBefore", "enabled", "visible"};
+	int lens[] = {7, 8, 15, 7, 7};
+	for (int i = 0; i < 5; i++) {
+		ActionVar* pv = getProperty(cmi, props[i], lens[i]);
+		if (pv != NULL) setProperty(app_context, new_cmi, props[i], lens[i], pv);
+	}
+	ret.type = ACTION_STACK_VALUE_OBJECT;
+	ret.data.numeric_value = (u64)new_cmi;
+	return ret;
+}
+
 static ActionVar builtin_return_zero(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
@@ -14296,7 +14395,7 @@ static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
 // 8=Microphone, 9=MovieClipLoader, 10=NetConnection, 11=NetStream,
 // 12=PrintJob, 13=SharedObject, 14=Sound, 15=TextSnapshot, 16=Video, 17=XMLSocket
 #define NUM_STUB_CTORS 18
-static ASFunction g_stub_ctors[NUM_STUB_CTORS];
+ASFunction g_stub_ctors[NUM_STUB_CTORS];
 
 // Stub static objects (not constructors — typeof returns "object", no prototype)
 static ASObject* g_accessibility_obj = NULL;
@@ -14765,7 +14864,9 @@ static void initXMLSocketPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setTimeout", 10, mflags);
 }
 
-// ContextMenu.prototype: 2 methods
+// ContextMenu.prototype: copy + hideBuiltInItems
+static ASFunction g_cm_copy_func;
+static ASFunction g_cm_hideBuiltIn_func;
 static void initContextMenuPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
 	if (ctor->prototype_obj != NULL) return;
@@ -14777,11 +14878,21 @@ static void initContextMenuPrototype(SWFAppContext* app_context, ASFunction* cto
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-	addStubMethodToProto(app_context, ctor->prototype_obj, "copy", 4, mflags);
+	// Real copy() implementation
+	memset(&g_cm_copy_func, 0, sizeof(ASFunction));
+	strncpy(g_cm_copy_func.name, "copy", 255);
+	g_cm_copy_func.function_type = 2;
+	g_cm_copy_func.advanced_func = (Function2Ptr) builtin_contextmenu_copy;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_cm_copy_func;
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) &g_cm_copy_func;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "copy", 4, &fv, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "hideBuiltInItems", 16, mflags);
 }
 
-// ContextMenuItem.prototype: 1 method
+// ContextMenuItem.prototype: copy
+static ASFunction g_cmi_copy_func;
 static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
 	if (ctor->prototype_obj != NULL) return;
@@ -14793,6 +14904,16 @@ static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction*
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
+	// Real copy() implementation
+	memset(&g_cmi_copy_func, 0, sizeof(ASFunction));
+	strncpy(g_cmi_copy_func.name, "copy", 255);
+	g_cmi_copy_func.function_type = 2;
+	g_cmi_copy_func.advanced_func = (Function2Ptr) builtin_contextmenuitem_copy;
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_cmi_copy_func;
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) &g_cmi_copy_func;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "copy", 4, &fv, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "copy", 4, mflags);
 }
 
@@ -22900,6 +23021,81 @@ void actionNewObject(SWFAppContext* app_context)
 				arr_var.type = ACTION_STACK_VALUE_ARRAY;
 				arr_var.data.numeric_value = (u64)listeners;
 				setProperty(app_context, (ASObject*)new_obj, "_listeners", 10, &arr_var);
+			}
+
+			// ContextMenu constructor: create builtInItems and customItems
+			// Property insertion order is reversed (LIFO enumeration)
+			if (ctor_func == &g_stub_ctors[4]) {
+				ASObject* cm_obj = (ASObject*)new_obj;
+				// builtInItems: object with 8 boolean properties (all true)
+				// Expected enum order: save,zoom,quality,play,loop,rewind,forward_back,print
+				// LIFO: insert in reverse
+				ASObject* builtin = allocObject(app_context, 10);
+				retainObject(builtin);
+				setObjectProto(app_context, builtin);
+				ActionVar bt = {0};
+				bt.type = ACTION_STACK_VALUE_BOOLEAN;
+				bt.data.numeric_value = 1;
+				setProperty(app_context, builtin, "print", 5, &bt);
+				setProperty(app_context, builtin, "forward_back", 12, &bt);
+				setProperty(app_context, builtin, "rewind", 6, &bt);
+				setProperty(app_context, builtin, "loop", 4, &bt);
+				setProperty(app_context, builtin, "play", 4, &bt);
+				setProperty(app_context, builtin, "quality", 7, &bt);
+				setProperty(app_context, builtin, "zoom", 4, &bt);
+				setProperty(app_context, builtin, "save", 4, &bt);
+				ActionVar bv = {0};
+				bv.type = ACTION_STACK_VALUE_OBJECT;
+				bv.data.numeric_value = (u64)builtin;
+				// Expected enum order: customItems,builtInItems,onSelect
+				// LIFO: insert onSelect, builtInItems, customItems
+				ActionVar uv = {0};
+				uv.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, cm_obj, "onSelect", 8, &uv);
+				setProperty(app_context, cm_obj, "builtInItems", 12, &bv);
+				// customItems: empty array
+				ASArray* custom = allocArray(app_context, 4);
+				custom->length = 0;
+				ActionVar cv = {0};
+				cv.type = ACTION_STACK_VALUE_ARRAY;
+				cv.data.numeric_value = (u64)custom;
+				setProperty(app_context, cm_obj, "customItems", 11, &cv);
+			}
+
+			// ContextMenuItem constructor: set caption, onSelect, etc.
+			if (ctor_func == &g_stub_ctors[5]) {
+				ASObject* cmi_obj = (ASObject*)new_obj;
+				// caption from first arg (or undefined)
+				if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+					setProperty(app_context, cmi_obj, "caption", 7, &args[0]);
+				} else {
+					ActionVar uv = {0};
+					uv.type = ACTION_STACK_VALUE_UNDEFINED;
+					setProperty(app_context, cmi_obj, "caption", 7, &uv);
+				}
+				// onSelect callback from second arg (or undefined)
+				if (num_args > 1) {
+					setProperty(app_context, cmi_obj, "onSelect", 8, &args[1]);
+				} else {
+					ActionVar uv = {0};
+					uv.type = ACTION_STACK_VALUE_UNDEFINED;
+					setProperty(app_context, cmi_obj, "onSelect", 8, &uv);
+				}
+				// separatorBefore from third arg (default false)
+				ActionVar sb = {0};
+				sb.type = ACTION_STACK_VALUE_BOOLEAN;
+				sb.data.numeric_value = (num_args > 2 && args[2].data.numeric_value) ? 1 : 0;
+				setProperty(app_context, cmi_obj, "separatorBefore", 15, &sb);
+				// enabled (default true)
+				ActionVar en = {0};
+				en.type = ACTION_STACK_VALUE_BOOLEAN;
+				en.data.numeric_value = 1;
+				setProperty(app_context, cmi_obj, "enabled", 7, &en);
+				// visible (default true)
+				ActionVar vi = {0};
+				vi.type = ACTION_STACK_VALUE_BOOLEAN;
+				vi.data.numeric_value = 1;
+				setProperty(app_context, cmi_obj, "visible", 7, &vi);
 			}
 
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
