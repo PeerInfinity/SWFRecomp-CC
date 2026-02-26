@@ -8446,6 +8446,9 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 				child_mc->depth = (int)child_depth - 16384;
 				// Fix parent to actual parent MC (exec_sprite_frame may have registered under root)
 				child_mc->parent = mc;
+				// Link MC to display list entry so actionGetMember can find nested children
+				if (found_entry != NULL)
+					child_mc->display_obj = (void*)found_entry;
 				// Update cur_sprite_dl to track into this child's sprite display list
 				if (found_entry && found_entry->sprite_display_list) {
 					cur_sprite_dl = found_entry->sprite_display_list;
@@ -8462,6 +8465,144 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 		}
 
 		if (pos < path_len) pos++; // skip the '/' separator
+	}
+
+	return mc;
+}
+
+// Resolve a Flash-style path using the Ruffle resolve_target_path algorithm.
+// Rules:
+// - ':' is ALWAYS a token separator
+// - '.' is a separator ONLY when is_slash_path == false
+// - '/' is a separator AND sets is_slash_path = true
+// - Leading colons at each token start are skipped
+// - ".." (followed by '/', ':', or end-of-string) means parent navigation
+// - If first_element is true: "this" resolves to g_current_context, "_root" to root
+// - If first_element is false: all names go through child/property lookup
+static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element) {
+	if (path_len == 0 || start_mc == NULL) return NULL;
+
+	MovieClip* mc = start_mc;
+	int is_slash_path = 0;
+	const char* p = path;
+	u32 remaining = path_len;
+
+	// Leading '/' means start from root
+	if (p[0] == '/') {
+		extern MovieClip root_movieclip;
+		mc = &root_movieclip;
+		is_slash_path = 1;
+		p++; remaining--;
+		if (remaining == 0) return mc;
+	}
+
+	int prev_delim_slash = (path_len > 0 && path[0] == '/') ? 1 : 0;  // Track if we arrived via '/' delimiter
+	int segments_resolved = 0;  // Track if we've resolved any segments
+	while (remaining > 0) {
+		// Skip leading colons
+		int colons_skipped = 0;
+		while (remaining > 0 && p[0] == ':') { p++; remaining--; prev_delim_slash = 0; colons_skipped++; }
+		if (remaining == 0) {
+			// Trailing colons after at least one segment create an empty final
+			// segment which fails (Ruffle: child_by_name("") → None).
+			// But leading-only colons (before any segment) are harmless.
+			if (segments_resolved > 0 && colons_skipped > 0) return NULL;
+			break;
+		}
+
+		// Check for ".." parent navigation
+		if (remaining >= 2 && p[0] == '.' && p[1] == '.') {
+			int is_parent = 0;
+			if (remaining == 2) { is_parent = 1; }
+			else if (p[2] == '/') { is_parent = 1; is_slash_path = 1; }
+			else if (p[2] == ':') { is_parent = 1; }
+
+			if (is_parent) {
+				if (mc->parent) mc = mc->parent;
+				else return NULL;
+				segments_resolved++;
+				if (remaining <= 2) { remaining = 0; }
+				else {
+					prev_delim_slash = (p[2] == '/') ? 1 : 0;
+					p += 3; remaining -= 3;
+				}
+				first_element = 0;
+				continue;
+			}
+		}
+
+		// Scan for next delimiter
+		u32 pos = 0;
+		while (pos < remaining) {
+			char c = p[pos];
+			if (c == ':') break;
+			if (c == '.' && !is_slash_path) break;
+			if (c == '/') { is_slash_path = 1; break; }
+			pos++;
+		}
+
+		u32 seg_len = pos;
+		if (seg_len == 0) {
+			// Empty segment from a slash means invalid (double slash "//")
+			// Exception: trailing slash at end of path is OK
+			if (pos < remaining && p[pos] == '/') {
+				if (prev_delim_slash) return NULL; // Consecutive slashes
+				// Trailing slash check: only the final '/' with nothing meaningful after
+				if (pos + 1 >= remaining) { p++; remaining--; continue; }
+				return NULL; // Empty segment between slashes
+			}
+			if (pos < remaining && p[pos] == '.') return NULL; // Empty dot segment
+			p++; remaining--;
+			continue;
+		}
+
+		// Extract segment name
+		char seg_buf[128];
+		u32 copy_len = seg_len < 127 ? seg_len : 127;
+		memcpy(seg_buf, p, copy_len);
+		seg_buf[copy_len] = '\0';
+
+		extern MovieClip root_movieclip;
+
+		// Resolve segment
+		if (first_element) {
+			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+				mc = &root_movieclip;
+			} else if (strcmp(seg_buf, "this") == 0) {
+				// "this" as first element resolves to current context
+				extern MovieClip* g_current_context;
+				mc = g_current_context ? g_current_context : &root_movieclip;
+			} else {
+				// Child lookup
+				MovieClip* child = resolveSlashPathToMC(app_context, seg_buf, seg_len, mc);
+				if (child == NULL) return NULL;
+				mc = child;
+			}
+			first_element = 0;
+		} else {
+			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+				mc = &root_movieclip;
+			} else if (strcmp(seg_buf, "_parent") == 0) {
+				if (mc->parent) mc = mc->parent;
+				else return NULL;
+			} else {
+				// Child lookup via resolveSlashPathToMC (handles display list, findOrCreate, etc.)
+				MovieClip* child = resolveSlashPathToMC(app_context, seg_buf, seg_len, mc);
+				if (child == NULL) return NULL;
+				mc = child;
+			}
+		}
+
+		segments_resolved++;
+
+		// Advance past segment + delimiter
+		if (pos < remaining) {
+			prev_delim_slash = (p[pos] == '/') ? 1 : 0;
+			p += pos + 1;
+			remaining -= pos + 1;
+		} else {
+			remaining = 0;
+		}
 	}
 
 	return mc;
@@ -9896,6 +10037,10 @@ static void setCurrentContext(MovieClip* mc) {
 // "goto sprite that has no instance name" (apply to sprite immediately).
 // Reset by exec_sprite_frame() at sprite-frame entry so each sprite starts fresh.
 int g_settarget_explicit_root = 0;
+// When tellTarget fails to find a target, this flag is set.
+// In this state, MC builtin property accesses (like _name) return undefined
+// instead of the root MC's values. Cleared when tellTarget succeeds or resets.
+int g_settarget_invalid = 0;
 #endif
 
 // Get the current execution context
@@ -14706,42 +14851,68 @@ void actionGetVariable(SWFAppContext* app_context)
 	// Pop variable name
 	POP();
 
-	// Handle colon-path + slash-path resolution (SWF4 syntax: "path:var" or "/path/to/mc:var")
+	// Handle slash-path resolution (paths starting with '/' or containing '/')
 	{
-		char* colon = (var_name_len > 1) ? (char*)memchr(var_name, ':', var_name_len) : NULL;
-		if (colon != NULL)
-		{
-			u32 target_len = (u32)(colon - var_name);
-			const char* prop_name = colon + 1;
-			u32 prop_len = var_name_len - target_len - 1;
+		int has_slash = (memchr(var_name, '/', var_name_len) != NULL);
 
-			// Resolve target MC path
-			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, target_len, ctx);
-			if (target_mc != NULL && prop_len > 0) {
-				// Check MC's dynamic_props first
-				if (target_mc->dynamic_props != NULL) {
-					ActionVar* prop = getProperty((ASObject*)target_mc->dynamic_props, prop_name, prop_len);
-					if (prop != NULL) { PUSH_VAR(prop); return; }
-				}
-				// Fall back to global variables — in our architecture, timeline
-				// variables (DefineLocal outside functions) go to globals
-				{
-					extern hashmap* var_map;
-					ActionVar* gvar;
-					if (var_map != NULL && hashmap_get(var_map, prop_name, prop_len, (uintptr_t*)&gvar)) {
-						if (gvar != NULL && !(gvar->type == ACTION_STACK_VALUE_STRING && gvar->str_size == 0 && gvar->data.string_data.heap_ptr == NULL)) {
-							PUSH_VAR(gvar); return;
-						}
-					}
+		if (has_slash) {
+			// GetVariable slash-path: find RIGHTMOST ':' or '.' to split into
+			// target path (before) and property name (after).
+			// The left side is resolved using resolve_target_path (is_slash_path rules).
+			char* last_sep = NULL;
+			for (int ci = var_name_len - 1; ci >= 0; ci--) {
+				if (var_name[ci] == ':' || var_name[ci] == '.') {
+					last_sep = (char*)(var_name + ci);
+					break;
 				}
 			}
-			// Not found — push undefined
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			return;
+			if (last_sep != NULL) {
+				u32 target_len = (u32)(last_sep - var_name);
+				const char* prop_name = last_sep + 1;
+				u32 prop_len = var_name_len - target_len - 1;
+
+				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
+				if (target_mc != NULL && prop_len > 0) {
+					// Use GetMember semantics for the last segment
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+					PUSH_STR(prop_name, prop_len);
+					actionGetMember(app_context);
+					// Fall back to global variable map for timeline variables
+					if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED) {
+						extern hashmap* var_map;
+						ActionVar* gvar;
+						if (var_map != NULL && hashmap_get(var_map, prop_name, prop_len, (uintptr_t*)&gvar)) {
+							if (gvar != NULL && !(gvar->type == ACTION_STACK_VALUE_STRING && gvar->str_size == 0 && gvar->data.string_data.heap_ptr == NULL)) {
+								POP();
+								pushVar(app_context, gvar);
+							}
+						}
+					}
+					return;
+				} else if (target_mc != NULL && prop_len == 0) {
+					// Trailing separator with empty property name → undefined
+					// (has_property(obj, "") is always false in Flash)
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
+				}
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				return;
+			}
+			// Pure slash-path without colon or dot (e.g., "/clip1/clip2" resolves to MC)
+			// In Ruffle, this uses first_element=false and falls through to plain
+			// variable lookup if resolution fails.
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, var_name_len, ctx, 0);
+			if (target_mc != NULL) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+				return;
+			}
+			// Fall through to plain variable lookup (scope chain / variable table)
 		}
-		// Also handle pure slash-paths without colon (e.g., "/clip1/clip2" resolves to MC)
-		if (var_name_len > 0 && (var_name[0] == '/' || (var_name_len >= 2 && var_name[0] == '.' && var_name[1] == '.')))
+
+		// Also handle ".." paths (relative parent navigation without slashes)
+		if (var_name_len >= 2 && var_name[0] == '.' && var_name[1] == '.')
 		{
 			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
 			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, var_name_len, ctx);
@@ -14754,67 +14925,103 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Handle dot-path resolution (e.g., "a.b.c", "_root.x.y", "_global.x.y.z")
+	// Handle dot/colon path resolution (e.g., "a.b.c", "_root.x.y", "a:b:c", "a:b.c")
+	// Algorithm: find RIGHTMOST ':' or '.', split into left (target path) and right (property).
+	// Resolve left with resolveFlashPathToMC, then GetMember for right.
 	{
-		char* dot = (char*) memchr(var_name, '.', var_name_len);
-		if (dot != NULL)
+		// Find rightmost dot or colon separator
+		const char* last_sep = NULL;
+		for (int ci = var_name_len - 1; ci >= 0; ci--) {
+			if (var_name[ci] == ':' || var_name[ci] == '.') {
+				last_sep = var_name + ci;
+				break;
+			}
+		}
+		if (last_sep != NULL)
 		{
-			u32 first_len = (u32)(dot - var_name);
+			u32 target_len = (u32)(last_sep - var_name);
+			const char* prop_name = last_sep + 1;
+			u32 prop_len = var_name_len - target_len - 1;
 
-			// Resolve first segment by pushing it and recursing
-			PUSH_STR(var_name, first_len);
-			actionGetVariable(app_context);
-
-			// Walk remaining segments via GetMember
-			const char* rest = dot + 1;
-			u32 rest_len = var_name_len - first_len - 1;
-			while (rest_len > 0)
+#ifdef NO_GRAPHICS
+			// Try resolving left side as MC path via resolveFlashPathToMC
 			{
-				char* next_dot = (char*) memchr(rest, '.', rest_len);
-				u32 seg_len = next_dot ? (u32)(next_dot - rest) : rest_len;
-
-				// Push segment name on top, then GetMember pops (name, obj) → pushes result
-				PUSH_STR(rest, seg_len);
-				actionGetMember(app_context);
-
-				if (next_dot) {
-					rest = next_dot + 1;
-					rest_len -= seg_len + 1;
-				} else {
-					rest_len = 0;
+				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
+				if (target_mc != NULL && prop_len > 0) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+					PUSH_STR(prop_name, prop_len);
+					actionGetMember(app_context);
+					// Fall back to global variable map for timeline variables.
+					// In our architecture, DefineLocal outside functions stores
+					// in the global var_map, but AVM1 expects "clip:var" to find them.
+					if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED) {
+						extern hashmap* var_map;
+						ActionVar* gvar;
+						if (var_map != NULL && hashmap_get(var_map, prop_name, prop_len, (uintptr_t*)&gvar)) {
+							if (gvar != NULL && !(gvar->type == ACTION_STACK_VALUE_STRING && gvar->str_size == 0 && gvar->data.string_data.heap_ptr == NULL)) {
+								POP();
+								pushVar(app_context, gvar);
+							}
+						}
+					}
+					return;
+				} else if (target_mc != NULL && prop_len == 0) {
+					// Trailing separator with empty property → undefined
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
 				}
 			}
+#endif
 
-			// Fallback: if the path resolved to undefined, try starting from _global.
-			// In Flash, GetVariable("a.b.c") tries each scope for "a" and walks the
-			// remaining path; if the walk fails, it tries the next scope. The _global
-			// object is the last scope checked. This handles cases where a local "a"
-			// exists but doesn't have the full nested path, while _global.a does.
-			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED)
+			// Fall back: resolve first segment via GetVariable, walk remaining via GetMember
 			{
-				extern ASObject* global_object;
-				if (global_object != NULL)
-				{
-					ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, first_len);
-					if (gprop != NULL && gprop->type != ACTION_STACK_VALUE_UNDEFINED)
-					{
-						// Pop the undefined result from the first attempt
-						POP();
-						// Push the _global property value and walk the remaining path
-						pushVar(app_context, gprop);
-						rest = dot + 1;
-						rest_len = var_name_len - first_len - 1;
-						while (rest_len > 0)
-						{
-							char* next_dot2 = (char*) memchr(rest, '.', rest_len);
-							u32 seg_len2 = next_dot2 ? (u32)(next_dot2 - rest) : rest_len;
-							PUSH_STR(rest, seg_len2);
+				// Find FIRST separator for the first-segment split
+				const char* first_sep = NULL;
+				for (u32 i = 0; i < var_name_len; i++) {
+					if (var_name[i] == '.' || var_name[i] == ':') { first_sep = var_name + i; break; }
+				}
+				if (first_sep != NULL) {
+					u32 first_len = (u32)(first_sep - var_name);
+					PUSH_STR(var_name, first_len);
+					actionGetVariable(app_context);
+
+					const char* rest = first_sep + 1;
+					u32 rest_len = var_name_len - first_len - 1;
+					while (rest_len > 0) {
+						const char* next_sep = NULL;
+						for (u32 ri = 0; ri < rest_len; ri++) {
+							if (rest[ri] == '.' || rest[ri] == ':') { next_sep = rest + ri; break; }
+						}
+						u32 seg_len = next_sep ? (u32)(next_sep - rest) : rest_len;
+						if (seg_len > 0) {
+							PUSH_STR(rest, seg_len);
 							actionGetMember(app_context);
-							if (next_dot2) {
-								rest = next_dot2 + 1;
-								rest_len -= seg_len2 + 1;
-							} else {
-								rest_len = 0;
+						}
+						if (next_sep) { rest = next_sep + 1; rest_len -= seg_len + 1; }
+						else { rest_len = 0; }
+					}
+
+					// Fallback: if resolved to undefined, try starting from _global.
+					if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED) {
+						extern ASObject* global_object;
+						if (global_object != NULL) {
+							ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, first_len);
+							if (gprop != NULL && gprop->type != ACTION_STACK_VALUE_UNDEFINED) {
+								POP();
+								pushVar(app_context, gprop);
+								rest = first_sep + 1;
+								rest_len = var_name_len - first_len - 1;
+								while (rest_len > 0) {
+									const char* next_sep2 = NULL;
+									for (u32 ri = 0; ri < rest_len; ri++) {
+										if (rest[ri] == '.' || rest[ri] == ':') { next_sep2 = rest + ri; break; }
+									}
+									u32 seg_len2 = next_sep2 ? (u32)(next_sep2 - rest) : rest_len;
+									if (seg_len2 > 0) { PUSH_STR(rest, seg_len2); actionGetMember(app_context); }
+									if (next_sep2) { rest = next_sep2 + 1; rest_len -= seg_len2 + 1; }
+									else { rest_len = 0; }
+								}
 							}
 						}
 					}
@@ -15731,6 +15938,14 @@ void actionGetVariable(SWFAppContext* app_context)
 		// In Flash, timeline variables and MC properties share the same namespace
 		if (var_name_len > 0 && var_name[0] == '_')
 		{
+#ifdef NO_GRAPHICS
+			// When tellTarget failed, MC builtin property accesses return undefined
+			extern int g_settarget_invalid;
+			if (g_settarget_invalid) {
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				return;
+			}
+#endif
 			extern MovieClip root_movieclip;
 			MovieClip* mc = &root_movieclip;
 			if (strcasecmp(var_name, "_x") == 0) { float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -15877,67 +16092,50 @@ void actionSetVariable(SWFAppContext* app_context)
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[var_name_sp + 16]), _sv_u16_len, _sv_buf, sizeof(_sv_buf));
 	char* var_name = _sv_buf;
 
-	// Handle colon-path + slash-path resolution for SetVariable (SWF4 syntax: "path:var")
+	// Handle path-based SetVariable: find RIGHTMOST ':' or '.', split into
+	// target path (left) and property name (right).
+	// This matches Ruffle's set_variable which uses rfind(b":.") to split.
+	// Note: slash-only paths (no ':' or '.') are treated as plain variable names.
 	{
-		char* colon = (var_name_len > 1) ? (char*)memchr(var_name, ':', var_name_len) : NULL;
-		if (colon != NULL)
-		{
-			u32 target_len = (u32)(colon - var_name);
-			const char* prop_name = colon + 1;
-			u32 prop_len = var_name_len - target_len - 1;
-
-			// Resolve target MC path
-			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, target_len, ctx);
-			if (target_mc != NULL && prop_len > 0) {
-				// Ensure dynamic_props exists
-				if (target_mc->dynamic_props == NULL) {
-					target_mc->dynamic_props = (void*) allocObject(app_context, 16);
-					retainObject((ASObject*) target_mc->dynamic_props);
-				}
-				// Read value from stack, pop both name and value
-				ActionVar value_var;
-				peekVar(app_context, &value_var);
-				POP_2();
-				setProperty(app_context, (ASObject*)target_mc->dynamic_props, prop_name, prop_len, &value_var);
-			} else {
-				// Invalid path — silently ignore (pop both name and value)
-				POP_2();
+		const char* last_sep = NULL;
+		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
+			if (var_name[ci] == ':' || var_name[ci] == '.') {
+				last_sep = var_name + ci;
+				break;
 			}
-			return;
 		}
-	}
-
-	// Handle dot-path resolution for SetVariable (e.g., "a.b.c" → resolve a.b, then SetMember c)
-	{
-		char* dot = (char*) memchr(var_name, '.', var_name_len);
-		if (dot != NULL)
-		{
-			// Find the LAST dot to split into container path and final property name
-			char* last_dot = dot;
-			for (char* p = dot + 1; p < var_name + var_name_len; p++)
-			{
-				if (*p == '.') last_dot = p;
-			}
-
-			u32 container_len = (u32)(last_dot - var_name);
-			const char* final_prop = last_dot + 1;
-			u32 final_prop_len = var_name_len - container_len - 1;
+		if (last_sep != NULL) {
+			u32 target_len = (u32)(last_sep - var_name);
+			const char* prop_name = last_sep + 1;
+			u32 prop_len = var_name_len - target_len - 1;
 
 			// Save value from stack
 			ActionVar value_var;
 			peekVar(app_context, &value_var);
 			POP_2();
 
-			// Resolve container path via GetVariable (which handles dots recursively)
-			PUSH_STR(var_name, container_len);
-			actionGetVariable(app_context);
-
-			// Now stack has: [container_obj]
-			// Push final property name, then value for SetMember
-			PUSH_STR(final_prop, final_prop_len);
-			pushVar(app_context, &value_var);
-			actionSetMember(app_context);
+#ifdef NO_GRAPHICS
+			// Resolve target path via resolveFlashPathToMC (first_element=1)
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
+			if (target_mc != NULL && prop_len > 0) {
+				// Use SetMember semantics (handles MC builtins, dynamic_props, etc.)
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+				PUSH_STR(prop_name, prop_len);
+				pushVar(app_context, &value_var);
+				actionSetMember(app_context);
+				return;
+			}
+#endif
+			// Fallback: resolve container via GetVariable, then SetMember
+			{
+				PUSH_STR(var_name, target_len);
+				actionGetVariable(app_context);
+				// Stack has [container_obj]; push prop name and value for SetMember
+				PUSH_STR(prop_name, prop_len);
+				pushVar(app_context, &value_var);
+				actionSetMember(app_context);
+			}
 			return;
 		}
 	}
@@ -16510,6 +16708,17 @@ void actionGetProperty(SWFAppContext* app_context)
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}
+
+#ifdef NO_GRAPHICS
+	// When tellTarget failed (invalid target), all property accesses return undefined
+	{
+		extern int g_settarget_invalid;
+		if (g_settarget_invalid && (!target || target[0] == '\0')) {
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+	}
+#endif
 
 	// Get property value based on index
 	float value = 0.0f;
@@ -21150,6 +21359,12 @@ void actionGetMember(SWFAppContext* app_context)
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
 					child_mc->depth = (int)child_depth - 16384;
+					// Link to display list entry so nested child lookups work
+					if (mc->display_obj != NULL) {
+						DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+						if (parent_dobj->sprite_display_list != NULL && child_depth <= parent_dobj->sprite_max_depth)
+							child_mc->display_obj = (void*)&parent_dobj->sprite_display_list[child_depth];
+					}
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
 					return;
 				}
@@ -23344,6 +23559,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
 #ifdef NO_GRAPHICS
 	extern int g_settarget_explicit_root;
+	extern int g_settarget_invalid;
 #endif
 	MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
 
@@ -23352,6 +23568,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		setCurrentContext(base);
 #ifdef NO_GRAPHICS
 		g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
+		g_settarget_invalid = 0;
 #endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
@@ -23364,6 +23581,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		setCurrentContext(&root_movieclip);
 #ifdef NO_GRAPHICS
 		g_settarget_explicit_root = 1;
+		g_settarget_invalid = 0;
 #endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
@@ -23372,76 +23590,23 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	}
 
 	// --- SetTarget path resolution ---
-	// The path is resolved relative to the base clip, using dot/colon/slash separators.
-	// Algorithm: if path contains '/', use slash-based parsing (split on '/' and ':');
-	// otherwise use dot/colon parsing (split on '.' and ':').
-
-	// First try resolveSlashPathToMC for structured paths (slash, colon, dot with children)
-	int has_slash = (strchr(target_name, '/') != NULL);
-	int has_dot = (strchr(target_name, '.') != NULL);
-	int has_colon = (strchr(target_name, ':') != NULL);
-
-	if (has_slash || has_colon) {
-		// Use slash path resolution (handles '/', ':', and '..' parent nav)
-		MovieClip* target_mc = resolveSlashPathToMC(app_context, target_name, (u32)strlen(target_name), base);
+	// Uses the Flash/Ruffle resolve_target_path algorithm.
+	// For tellTarget, first_element is false (this/_root are not keywords).
+	{
+		u32 tn_len = (u32)strlen(target_name);
+		MovieClip* target_mc = resolveFlashPathToMC(app_context, target_name, tn_len, base, 0);
 		if (target_mc) {
 			setCurrentContext(target_mc);
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
+			g_settarget_invalid = 0;
 #endif
 			return;
 		}
-		// Fall through to error
-	} else if (has_dot) {
-		// Dot-separated path with no slashes: split on '.' and walk children
-		MovieClip* mc = base;
-		const char* rest = target_name;
-		int resolved = 1;
-		while (rest[0] != '\0') {
-			const char* dot = strchr(rest, '.');
-			int seg_len = dot ? (int)(dot - rest) : (int)strlen(rest);
-			if (seg_len == 0) { rest = dot ? dot + 1 : rest + seg_len; continue; }
-			// ".." = parent
-			if (seg_len == 2 && rest[0] == '.' && rest[1] == '.') {
-				if (mc->parent) mc = mc->parent;
-				else { resolved = 0; break; }
-			} else if (seg_len == 7 && strncmp(rest, "_parent", 7) == 0) {
-				if (mc->parent) mc = mc->parent;
-				else { resolved = 0; break; }
-			} else if (seg_len == 5 && strncmp(rest, "_root", 5) == 0) {
-				mc = &root_movieclip;
-			} else if (seg_len == 7 && strncmp(rest, "_level0", 7) == 0) {
-				mc = &root_movieclip;
-			} else {
-				// Find child MC by name
-				char seg_buf[64];
-				int copy_len = seg_len < 63 ? seg_len : 63;
-				memcpy(seg_buf, rest, copy_len);
-				seg_buf[copy_len] = '\0';
-				MovieClip* child = NULL;
-				for (int i = 0; i < child_mc_count; i++) {
-					if (child_mc_cache[i] == NULL) continue;
-					if (child_mc_cache[i]->parent == mc &&
-					    (int)strlen(child_mc_cache[i]->name) == seg_len &&
-					    strncmp(child_mc_cache[i]->name, rest, seg_len) == 0) {
-						child = child_mc_cache[i];
-						break;
-					}
-				}
-				if (child == NULL) { resolved = 0; break; }
-				mc = child;
-			}
-			rest = dot ? dot + 1 : rest + seg_len;
-		}
-		if (resolved) {
-			setCurrentContext(mc);
-#ifdef NO_GRAPHICS
-			g_settarget_explicit_root = (mc == &root_movieclip) ? 1 : 0;
-#endif
-			return;
-		}
-		// Fall through to error
-	} else {
+	}
+
+	// If no separators, also try simple bare-name resolution
+	if (!strchr(target_name, '/') && !strchr(target_name, '.') && !strchr(target_name, ':')) {
 		// Simple bare name — resolve as child of base clip
 		// Try resolveSlashPathToMC (handles single-segment names and _parent)
 		MovieClip* target_mc = resolveSlashPathToMC(app_context, target_name, (u32)strlen(target_name), base);
@@ -23449,6 +23614,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			setCurrentContext(target_mc);
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
+			g_settarget_invalid = 0;
 #endif
 			return;
 		}
@@ -23468,16 +23634,19 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			setCurrentContext(target_mc);
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = 0;
+			g_settarget_invalid = 0;
 #endif
 			return;
 		}
 	}
 
 	// Target not found — set context to root and emit trace message.
-	// Flash/Ruffle: invalid target falls back to root for variable scope.
+	// Flash/Ruffle: invalid target falls back to root for variable scope,
+	// but MC builtin properties (like _name) return undefined.
 	setCurrentContext(&root_movieclip);
 #ifdef NO_GRAPHICS
 	g_settarget_explicit_root = 1;
+	g_settarget_invalid = 1;
 #endif
 #ifndef NO_GRAPHICS
 	targeted_sprite = NULL;

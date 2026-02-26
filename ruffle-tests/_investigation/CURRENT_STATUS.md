@@ -119,7 +119,7 @@ Last updated: 2026-02-26
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
 | MOVIECLIP_PLAN | **Phases 1-5, 7-9 DONE** | 17 tests pass ✅ | Phase 6 (events) |
-| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** | 3/5 pass + clip_events ✅ | clone_sprite_edittext* needs TF clone |
+| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 3/8 pass + clip_events ✅ | Blocked on TEXTFIELD, MOUSE_EVENTS, REGISTERCLASS |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
 | PARSING_FUNCTIONS_PLAN | **FULLY COMPLETE** | 3/3 pass (parse_int, parse_float, parsefloat_swf5) ✅ | — |
 | COLOR_OBJECT_PLAN | **COMPLETE** | extends_native_type ✅ | — |
@@ -130,40 +130,41 @@ Last updated: 2026-02-26
 | SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
 | OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 33/39 — remaining 6 lines = makeSuperWith (SUPER as __proto__) + addProperty virtual __constructor__; `funky_function_calls` segfaults |
 | REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
-| PROTOTYPE_OBJECT_PLAN | **Substantially implemented** | 10/12 pass | Remaining: `__resolve` hook, InitObject setters; add_property ✅, as_set_prop_flags ✅ |
+| PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
 | TELLTARGET_PLAN | **Phase 1 MOSTLY DONE** | tell_target ✅ (37/37), slash_syntax ✅, string_paths_basic ✅, target_clip_removed ✅ | Phase 2: dot-path GetVariable, eval() |
-| TIMER_PLAN | **Phases 1-2 DONE** | 1/3 pass (set_interval ✅) | timer_run_actions blocked on REGISTERCLASS_PLAN (attachMovie); timeout needs script timeout mechanism |
+| TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
 | TAB_ORDERING_PLAN | **PARTIAL** | 2/7 pass (tab_ordering_automatic_basic, tab_ordering_reverse ✅) | Tab key focus navigation, blocked by FOCUS_SYSTEM_PLAN |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
 | LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 18/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) → LOADVARIABLES_PLAN |
-| LOADVARIABLES_PLAN | **Phases 1-2 DONE** | 3/4 pass | loadvariables + loadvariablesnum + loadvariables2 ✅; loadvariables_method needs log_fetch |
-| ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** | 1/4 pass | loadmovie_replace_root ✅; mcl_loadclip_replace_root blocked by MTASC class support; swf7→5/6 deferred |
+| LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
+| ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **MOSTLY DONE** | 4/6 pass (unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload (36/52), unload_nested_child (0/5) |
 | BUTTON_PLAN | **12/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅ (visible gating on keyPress) | Remaining 2: button_keypress_vs_textinput (TF onChanged), root_button_mode (loadMovie) |
-| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** | swf6_case_insensitive ✅, swf6_string_as_bool ✅, swf4_actions_coercion_order ✅ | Phase 4 (cross-version calls) blocked on loadMovie + per-function version tracking |
-| THIS_BINDING_PLAN | **FULLY COMPLETE** | this_swf6 ✅, mutable_this ✅ | — |
+| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4 blocked on loadMovie + per-function version tracking |
+| THIS_BINDING_PLAN | **Phases 1-4 DONE** | 4/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅) | this_scoping 42/52 — Phase 6 blocked on TELLTARGET Phase 2 |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events |
 
-## Recommended Work Order
+## Recommended Work Order (updated 2026-02-26)
 
-### Highest ROI — near-passing tests
-1. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83
-2. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (2 lines)
+### Highest ROI — unblocked, high line-count impact
+1. **TELLTARGET_PLAN Phase 2** — dot-path GetVariable, eval(). `path_string` alone is 322 lines (38/322). Also unlocks THIS_BINDING `this_scoping` (10 lines), `string_paths_other` (31/36→36), `string_paths_hidden` (34/54), `tell_target_invalid` (4/6→6)
+2. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83 (+15 lines)
+3. **SELECTION_PLAN** — `selection` at 435/455 (95.6%), getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking (+20 lines)
+4. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (+2 lines)
 
 ### Medium ROI — feature phases with multiple test payoff
-3. **OOP_SUPER_EXTENDS_PLAN** — core super done (6/8 pass); `super_edge_cases` 36/39 — remaining 3 lines blocked by SUPER value stored as __proto__ in makeSuperWith pattern
-4. **REGISTERCLASS_PLAN Phases 1-2** — ExportAssets parsing + attachMovie handler (Phase 0 register fixes already passing)
-5. **FRAME_NAVIGATION_PLAN Phase 1-2** — frame labels + execution ordering, 4 tests (goto_frame, goto_frame2, goto_label, goto_methods)
-6. **PROTOTYPE_OBJECT_PLAN** — addProperty, __resolve, 4 remaining tests
-7. ~~**TELLTARGET_PLAN Phase 1**~~ — **DONE** (tell_target 37/37 PASS, tell_target_invalid 4/6). Phase 2: dot-path GetVariable for path_string
+5. **REGISTERCLASS_PLAN Phases 4-5** — constructor dispatch on timeline placement. Unlocks `clip_constructors` (6/8→8), `on_construct`, and partially `timer_run_actions`
+6. **TEXTFIELD_PLAN Phase 4-5** — scroll properties + HTML text. 25/66 pass; ~10 more tests actionable
+7. **GLOBALS_PLAN Phase 7-8** — prototype methods for remaining stub classes + property flags. Could improve `global_proto_decls` family (4497+4158+758 lines, but formulaic)
+8. **UNLOAD_PLAN** — `unload` at 36/52 (+16 lines), `unload_nested_child` at 0/5
 
-### Lower ROI — new features
-8. ~~**TIMER_PLAN**~~ — **DONE** (Phases 1-2 complete, set_interval PASS). timer_run_actions blocked on REGISTERCLASS_PLAN.
-9. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8)
-10. **REGISTERCLASS_PLAN Phases 1-5** — full ExportAssets + registerClass + constructor invocation, ~7-10 tests
+### Lower ROI or partially blocked
+9. **OOP_SUPER_EXTENDS_PLAN** — `super_edge_cases` 33/39, remaining 6 lines blocked by SUPER-as-__proto__ (makeSuperWith pattern)
+10. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8), low overall ROI
+11. **OBJECT_WATCH_PLAN** — `watch_textfield` small fix (1 test, few lines)
 
 ### super_edge_cases Blockers (33/39 — 6 lines remaining)
 
@@ -180,10 +181,15 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - ~~Lines 37-39: `_root` as `__proto__`~~ — **Now passes** (these lines output correctly once prior addProperty lines were fixed)
 
 ### Dependency Blockers (plans blocking other plans)
-- ~~**TIMER_PLAN**~~ — **RESOLVED** (Phases 1-2 done, set_interval ✅). loadvariables2 still blocked on compile issues; timer_run_actions blocked on REGISTERCLASS_PLAN
-- **OOP_SUPER_EXTENDS_PLAN** — core super() done; addProperty getters now invoked in super() paths; remaining 3 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
-- **MOUSE_EVENTS_PLAN** blocks: FOCUS_SYSTEM_PLAN (text field hit-testing), HIT_TESTING_PLAN (2 tests), CLONE_DUPLICATE_PLAN (clip_event_propagation_order)
-- **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests)
-- **TELLTARGET_PLAN** blocks: THIS_BINDING_PLAN Phase 6 (this_scoping remaining 10 lines)
-- **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (on_construct), TIMER_PLAN (timer_run_actions partially)
-- ~~**CLOSURE_CAPTURE_PLAN**~~ — **RESOLVED** (moved to completed/). Remaining test failures in focus_keyboard_press, focus_mouse, focus_mouse_rollout now blocked by FOCUS_SYSTEM_PLAN + MOUSE_EVENTS_PLAN
+- ~~**TIMER_PLAN**~~ — **RESOLVED** (moved to complete/). set_interval ✅. timer_run_actions blocked on REGISTERCLASS_PLAN; timeout deferred.
+- ~~**CLOSURE_CAPTURE_PLAN**~~ — **RESOLVED** (moved to complete/). Remaining focus test failures blocked by FOCUS_SYSTEM_PLAN.
+- ~~**MOUSE_EVENTS_PLAN**~~ — **RESOLVED** (moved to complete/). Core mouse events done (5/5 pass). Advanced features still needed: text field hit-testing (blocks FOCUS_SYSTEM_PLAN), rollover/rollout dispatch (blocks focus_mouse_rollout), recursive clip event dispatch (blocks clip_event_propagation_order).
+- **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests). Itself blocked by text field hit-testing and event pumping model differences.
+- **TELLTARGET_PLAN** blocks: THIS_BINDING_PLAN Phase 6 (this_scoping remaining 10 lines). Phase 2 is HIGH ROI and unblocked.
+- **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (on_construct), TIMER_PLAN (timer_run_actions)
+- **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
+- **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
+
+### Plans moved this session (2026-02-26)
+- **Moved to complete/**: LOADVARIABLES_PLAN (3/4 pass, remaining needs log_fetch), MOVIECLIPLOADER_PLAN (8/16 pass, remaining unfeasible/blocked), TIMER_PLAN (core done, remaining blocked), PROTOTYPE_OBJECT_PLAN (11/12 pass, remaining blocked on recompiler bug)
+- **Moved to blocked/**: CLONE_DUPLICATE_PLAN (Phase 1 done, remaining blocked on TEXTFIELD+MOUSE+REGISTERCLASS), ROOT_REPLACEMENT_PLAN (1/4 pass, remaining blocked on MTASC/cross-version), SWF_VERSION_SEMANTICS_PLAN (3/5 pass, remaining blocked on loadMovie)
