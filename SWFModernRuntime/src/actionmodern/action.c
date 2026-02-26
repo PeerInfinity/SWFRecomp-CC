@@ -13650,6 +13650,46 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     }
 }
 
+// Query button MC visibility for button state machine (tag.c)
+int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name)
+{
+	if (instance_name == NULL) return 1;
+	MovieClip* mc = actionFindOrCreateMovieClip(app_context, instance_name, &root_movieclip);
+	if (mc == NULL) return 1;
+	return mc->visible;
+}
+
+// Query button MC 'enabled' property for button state machine (tag.c)
+int actionGetMCEnabled(SWFAppContext* app_context, const char* instance_name)
+{
+	if (instance_name == NULL) return 1;
+	MovieClip* mc = actionFindOrCreateMovieClip(app_context, instance_name, &root_movieclip);
+	if (mc == NULL) return 1;
+	// Check dynamic_props for 'enabled' property (may be overridden from prototype default of true)
+	ASObject* obj = (ASObject*)mc->dynamic_props;
+	if (obj != NULL)
+	{
+		ActionVar* val = getPropertyWithPrototype(obj, "enabled", 7);
+		if (val != NULL)
+		{
+			if (val->type == ACTION_STACK_VALUE_BOOLEAN)
+				return val->data.numeric_value ? 1 : 0;
+			// Treat non-boolean truthy values as enabled
+			if (val->type == ACTION_STACK_VALUE_F32 || val->type == ACTION_STACK_VALUE_F64)
+			{
+				double d = (val->type == ACTION_STACK_VALUE_F32) ?
+					(double)VAL(float, &val->data.numeric_value) :
+					VAL(double, &val->data.numeric_value);
+				return (d != 0.0 && d == d) ? 1 : 0;  // NaN → false
+			}
+			if (val->type == ACTION_STACK_VALUE_NULL || val->type == ACTION_STACK_VALUE_UNDEFINED)
+				return 0;
+			return 1;  // String, object, etc. → truthy
+		}
+	}
+	return 1;  // Default: enabled
+}
+
 // Static function objects for MCL methods
 static ASFunction g_mcl_loadClip_func;
 static ASFunction g_mcl_unloadClip_func;

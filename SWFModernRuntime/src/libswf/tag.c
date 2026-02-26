@@ -757,7 +757,22 @@ void ng_update_button_states(SWFAppContext* app_context)
 		u8 old_state = obj->button_state;
 		u8 new_state = old_state;
 
-		if (!found_hover)
+		// Check _visible and enabled on the button's MovieClip
+		int mc_visible = actionGetMCVisible(app_context, obj->instance_name);
+		int mc_enabled = actionGetMCEnabled(app_context, obj->instance_name);
+
+		if (!mc_visible)
+		{
+			// Invisible button: not hit-testable. Transition to Idle (Up).
+			// But allow the transition to fire rollOut/releaseOutside if the button
+			// was in an active state (not already Idle).
+			if (app_context->mouse.button_down &&
+			    (old_state == 2 || old_state == 3))
+				new_state = 3;  // OutDown: preserve pressed-outside state
+			else
+				new_state = 0;  // Idle
+		}
+		else if (!found_hover)
 		{
 			// Look up the hit-test shape
 			Character* hit_ch = &dictionary[ch->button_hit_char_id];
@@ -804,6 +819,21 @@ void ng_update_button_states(SWFAppContext* app_context)
 				new_state = 0;  // Idle
 		}
 
+		// When disabled: Ruffle-compatible state tracking.
+		// If mouse is over the button (hit test passes, not pressed), the button
+		// state stays frozen at its current value (Ruffle: update_state=false when
+		// new_state==Over). Otherwise, force state to Idle (Up).
+		// This means: mouse-away while disabled → state=Idle; mouse-back → stays Idle.
+		// When re-enabled after mouse-away/back, Idle→OverUp fires rollOver.
+		if (!mc_enabled)
+		{
+			// "Over" means: hit test passes and mouse not pressed
+			int computed_is_over = (new_state == 1);  // OverUp
+			if (!computed_is_over)
+				new_state = 0;  // Force to Idle (Ruffle: ButtonState::Up)
+			else
+				new_state = old_state;  // Freeze (Ruffle: update_state=false)
+		}
 		obj->button_state = new_state;
 		// Keep sticky state in sync so re-placements restore the latest state
 		obj->sticky_char_id = obj->char_id;
@@ -812,25 +842,50 @@ void ng_update_button_states(SWFAppContext* app_context)
 		// Dispatch actions on state transitions
 		if (old_state != new_state && ch->button_action_count > 0)
 		{
-			// Encode transition as BUTTONCONDACTION bitmask
-			u16 transition = 0;
-			if      (old_state == 0 && new_state == 1) transition = 0x0001; // IdleToOverUp
-			else if (old_state == 1 && new_state == 0) transition = 0x0002; // OverUpToIdle
-			else if (old_state == 1 && new_state == 2) transition = 0x0004; // OverUpToOverDown
-			else if (old_state == 2 && new_state == 1) transition = 0x0008; // OverDownToOverUp
-			else if (old_state == 2 && new_state == 3) transition = 0x0010; // OverDownToOutDown
-			else if (old_state == 3 && new_state == 2) transition = 0x0020; // OutDownToOverDown
-			else if (old_state == 3 && new_state == 0) transition = 0x0040; // OutDownToIdle
-			else if (old_state == 0 && new_state == 2) transition = 0x0080; // IdleToOverDown
-			else if (old_state == 2 && new_state == 0) transition = 0x0100; // OverDownToIdle
-			else if (old_state == 3 && new_state == 1) transition = 0x0040; // OutDownToIdle (closest match)
-
-			if (transition != 0)
+			// When disabled, skip action dispatch entirely (Ruffle behavior:
+			// disabled buttons don't fire SWF-defined or AS-defined events)
+			if (!mc_enabled)
 			{
-				for (size_t a = 0; a < ch->button_action_count; a++)
+				obj->button_prev_state = old_state;
+				continue;
+			}
+
+			// When invisible, only allow rollOut (OverUpToIdle) and
+			// releaseOutside (OutDownToIdle) transitions to fire.
+			// Other transitions are blocked when invisible.
+			int allow_actions = mc_visible;
+			if (!mc_visible)
+			{
+				// Allow if transitioning OUT of an active state
+				if ((old_state == 1 && new_state == 0) ||   // OverUpToIdle (rollOut)
+				    (old_state == 3 && new_state == 0) ||    // OutDownToIdle (releaseOutside)
+				    (old_state == 2 && new_state == 0) ||    // OverDownToIdle
+				    (old_state == 2 && new_state == 3))      // OverDownToOutDown
+					allow_actions = 1;
+			}
+
+			if (allow_actions)
+			{
+				// Encode transition as BUTTONCONDACTION bitmask
+				u16 transition = 0;
+				if      (old_state == 0 && new_state == 1) transition = 0x0001; // IdleToOverUp
+				else if (old_state == 1 && new_state == 0) transition = 0x0002; // OverUpToIdle
+				else if (old_state == 1 && new_state == 2) transition = 0x0004; // OverUpToOverDown
+				else if (old_state == 2 && new_state == 1) transition = 0x0008; // OverDownToOverUp
+				else if (old_state == 2 && new_state == 3) transition = 0x0010; // OverDownToOutDown
+				else if (old_state == 3 && new_state == 2) transition = 0x0020; // OutDownToOverDown
+				else if (old_state == 3 && new_state == 0) transition = 0x0040; // OutDownToIdle
+				else if (old_state == 0 && new_state == 2) transition = 0x0080; // IdleToOverDown
+				else if (old_state == 2 && new_state == 0) transition = 0x0100; // OverDownToIdle
+				else if (old_state == 3 && new_state == 1) transition = 0x0040; // OutDownToIdle (closest match)
+
+				if (transition != 0)
 				{
-					if (ch->button_actions[a].condition & transition)
-						ch->button_actions[a].action(app_context);
+					for (size_t a = 0; a < ch->button_action_count; a++)
+					{
+						if (ch->button_actions[a].condition & transition)
+							ch->button_actions[a].action(app_context);
+					}
 				}
 			}
 		}
@@ -934,8 +989,8 @@ void tagShowFrame(SWFAppContext* app_context)
 #endif
 
 	// --- Button hit testing + state machine + action dispatch ---
-	// In NO_GRAPHICS mode, ng_update_button_states() is called from input_events_deliver()
-	// on each mouse event for correct per-event timing. Skip here to avoid double-firing.
+	// In NO_GRAPHICS mode, button states are updated per-tick from swf_core.c frame loop
+	// (after event delivery), and per-mouse-event from input_events_deliver().
 #ifndef NO_GRAPHICS
 	ng_update_button_states(app_context);
 #endif

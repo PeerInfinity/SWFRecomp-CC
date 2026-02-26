@@ -145,6 +145,7 @@ typedef enum {
     EV_MOUSE_MOVE,
     EV_MOUSE_DOWN_LEFT,  EV_MOUSE_UP_LEFT,
     EV_MOUSE_DOWN_RIGHT, EV_MOUSE_UP_RIGHT,
+    EV_MOUSE_DOWN_MIDDLE, EV_MOUSE_UP_MIDDLE,
     EV_MOUSE_WHEEL,
     EV_KEY_DOWN, EV_KEY_UP,
     EV_TEXT_INPUT,
@@ -190,6 +191,10 @@ void input_events_load(const char* path)
             { sscanf(line + 17, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_DOWN_RIGHT; }
         else if (strncmp(line, "MOUSE_UP_RIGHT ", 15) == 0)
             { sscanf(line + 15, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_UP_RIGHT; }
+        else if (strncmp(line, "MOUSE_DOWN_MIDDLE ", 18) == 0)
+            { sscanf(line + 18, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_DOWN_MIDDLE; }
+        else if (strncmp(line, "MOUSE_UP_MIDDLE ", 16) == 0)
+            { sscanf(line + 16, "%f %f", &ev.x, &ev.y); ev.type = EV_MOUSE_UP_MIDDLE; }
         else if (strncmp(line, "MOUSE_WHEEL ", 12) == 0)
             { sscanf(line + 12, "%d", &ev.code); ev.type = EV_MOUSE_WHEEL; }
         else if (strncmp(line, "KEY_DOWN ", 9) == 0)
@@ -292,6 +297,29 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_release(app_context);
         // Dispatch AS2 onRelease/onReleaseOutside to dynamic MCs
         actionDispatchMCRelease(app_context);
+        break;
+    case EV_MOUSE_DOWN_MIDDLE:
+        ms->stage_x = ev->x * 20.0f;
+        ms->stage_y = ev->y * 20.0f;
+        root_movieclip.xmouse = ev->x;
+        root_movieclip.ymouse = ev->y;
+        // Middle mouse button = VK_MBUTTON = key code 4
+        app_context->keys.down[4] = 1;
+        app_context->keys.toggled[4] ^= 1;
+        // Middle click fires onClipEvent(mouseDown) but NOT button press
+        dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_DOWN);
+        actionDispatchMouseDown(app_context);
+        actionDispatchMCMouseDown(app_context);
+        break;
+    case EV_MOUSE_UP_MIDDLE:
+        ms->stage_x = ev->x * 20.0f;
+        ms->stage_y = ev->y * 20.0f;
+        root_movieclip.xmouse = ev->x;
+        root_movieclip.ymouse = ev->y;
+        app_context->keys.down[4] = 0;
+        dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_UP);
+        actionDispatchMouseUp(app_context);
+        actionDispatchMCMouseUp(app_context);
         break;
     case EV_KEY_DOWN:
         if (ev->code >= 0 && ev->code < 256) {
@@ -499,6 +527,11 @@ void swfStart(SWFAppContext* app_context)
 		if (g_events) {
 			input_events_pump_tick(app_context);
 		}
+
+		// Per-tick button state re-evaluation (NO_GRAPHICS mode).
+		// Catches _visible/_enabled changes from enterFrame/action scripts
+		// that don't have an associated mouse event.
+		ng_update_button_states(app_context);
 
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
 		// a goto, process intermediate frame tags inline to match Flash's behavior.

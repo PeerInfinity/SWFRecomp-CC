@@ -80,6 +80,11 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name);
 void actionFirePendingUnloads(SWFAppContext* app_context);
 // Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame
 void actionFirePendingLoadInits(SWFAppContext* app_context);
+// Query button MC state for the button state machine in tag.c
+// Returns mc->visible for the named button MC (1=visible, 0=hidden; defaults to 1 if MC not found)
+int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name);
+// Returns the 'enabled' property for the named button MC (1=enabled, 0=disabled; defaults to 1)
+int actionGetMCEnabled(SWFAppContext* app_context, const char* instance_name);
 
 // VAL macro must be defined before other macros that use it
 #define VAL(type, x) *((type*) x)
