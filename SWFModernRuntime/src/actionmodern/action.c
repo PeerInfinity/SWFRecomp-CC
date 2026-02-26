@@ -32126,14 +32126,35 @@ void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code)
 	}
 }
 
-// Fire onPress + onRelease on focused MC for Enter/Space key (simulated press).
+// Fire press + release on focused MC for Enter/Space key (simulated press).
 // Called from swf_core.c AFTER dispatch_button_key_actions so DoAction fires first.
+// Only fires when the focus highlight is active (_focusrect != false).
+// For SWF buttons: fires DoAction press/release conditions, then AS2 onPress/onRelease.
+// For MCs with button handlers: fires AS2 onPress/onRelease only.
 void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code)
 {
 	if (g_focused_mc == NULL) return;
 	if (key_code != 13 && key_code != 32) return;
-	mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7);
-	mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9);
+	// Check _focusrect — when false, Enter/Space do NOT simulate press/release.
+	// _focusrect is a stage-level property stored on root_movieclip.
+	extern MovieClip root_movieclip;
+	float fr = root_movieclip.focusrect;
+	// Default: focusrect = -1.0f (null) → highlight is active (true)
+	// focusrect = 0.0f → false → no press/release
+	// focusrect > 0 → true → press/release
+	if (fr == 0.0f) return;
+	if (g_focused_mc->is_button_mc) {
+		// SWF buttons: interleave DoAction and AS2 handlers
+		// press DoAction → onPress → release DoAction → onRelease
+		ng_simulateButtonTransition(app_context, g_focused_mc, 0x0004); // press DoAction
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7);
+		ng_simulateButtonTransition(app_context, g_focused_mc, 0x0008); // release DoAction
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9);
+	} else {
+		// MCs with button handlers: just fire AS2 handlers
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9);
+	}
 }
 
 // Dispatch onKeyUp to the focused MC.
@@ -32149,15 +32170,16 @@ void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code)
 // ---------------------------------------------------------------------------
 
 // Check if a MovieClip is focusable by mouse click.
-// Only text fields (selectable) and buttons gain focus on click.
-// MovieClips with focusEnabled only gain focus via Tab or Selection.setFocus().
+// In AVM1, only text fields (editable or selectable) gain focus on click.
+// Buttons, MCs with button handlers, and MCs with focusEnabled do NOT gain
+// focus by mouse click — they can only be focused via Tab or Selection.setFocus().
 static int mc_is_focusable_by_click(MovieClip* mc)
 {
 	if (mc == NULL) return 0;
 	extern MovieClip root_movieclip;
 	if (mc == &root_movieclip) return 0;
 	if (mc->ng_textfield_idx >= 0) {
-		// SWF-defined text field: focusable if selectable
+		// SWF-defined text field: focusable if selectable (or editable)
 		u16 flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
 		// Bit 0x0004 = noSelect (inverse of selectable)
 		if (flags & 0x0004) return 0;
@@ -32171,7 +32193,7 @@ static int mc_is_focusable_by_click(MovieClip* mc)
 			return 0;
 		return 1;  // default: selectable = true for dynamic text fields
 	}
-	if (mc->is_button_mc) return 1;             // button: focusable by click
+	// Buttons and MCs are NOT focusable by mouse click in AVM1
 	return 0;
 }
 
@@ -32201,8 +32223,11 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 		if (hit_mc != g_focused_mc)
 			selection_do_focus_change(app_context, g_focused_mc, hit_mc);
 	} else {
-		// Clicked non-focusable or empty area: clear focus
-		if (g_focused_mc != NULL)
+		// Clicked non-focusable or empty area: only clear focus if the
+		// current focus was itself mouse-focusable (i.e., a text field).
+		// Focus set by Tab or Selection.setFocus() on non-mouse-focusable
+		// objects (buttons, MCs) is NOT cleared by clicking elsewhere.
+		if (g_focused_mc != NULL && mc_is_focusable_by_click(g_focused_mc))
 			selection_do_focus_change(app_context, g_focused_mc, NULL);
 	}
 }

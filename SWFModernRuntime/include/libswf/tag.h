@@ -8,6 +8,11 @@ void tagInit(SWFAppContext* app_context);
 // Dispatch button key-press conditions for a given key code.
 // Called from swf_core.c after delivering EV_KEY_DOWN.
 void dispatch_button_key_actions(SWFAppContext* app_context, int key_code);
+// Fire button DoAction conditions for a specific transition on a MC.
+// transition_mask: 0x0004 = press, 0x0008 = release
+void ng_simulateButtonTransition(SWFAppContext* app_context, void* mc, int transition_mask);
+// Simulate a button press+release on a specific MC (for keyboard focus activation).
+void ng_simulateButtonPressRelease(SWFAppContext* app_context, void* mc);
 // Run button hit-test + state machine + action dispatch for current mouse state.
 // In NO_GRAPHICS mode called per mouse event; in graphics mode called from tagShowFrame.
 void ng_update_button_states(SWFAppContext* app_context);

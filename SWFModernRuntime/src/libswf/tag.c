@@ -2451,6 +2451,33 @@ void dispatch_button_key_actions(SWFAppContext* app_context, int key_code)
 	}
 }
 
+// Fire button DoAction conditions for a specific transition on a MC.
+// transition_mask: 0x0004 = OverUpToOverDown (press), 0x0008 = OverDownToOverUp (release)
+void ng_simulateButtonTransition(SWFAppContext* app_context, void* mc_ptr, int transition_mask)
+{
+	MovieClip* mc = (MovieClip*)mc_ptr;
+	if (mc == NULL || !mc->is_button_mc) return;
+	if (!mc->name || mc->name[0] == '\0') return;
+	size_t depth = ng_findDisplayEntryByName(mc->name);
+	if (depth == SIZE_MAX || depth > max_depth) return;
+	DisplayObject* obj = &display_list[depth];
+	if (obj->char_id == 0) return;
+	Character* ch = &dictionary[obj->char_id];
+	if (ch->type != CHAR_TYPE_BUTTON) return;
+	for (size_t a = 0; a < ch->button_action_count; a++) {
+		if (ch->button_actions[a].condition & transition_mask)
+			ch->button_actions[a].action(app_context);
+	}
+}
+
+// Simulate a button press+release (both transitions). Used as fallback when
+// the caller doesn't need to interleave handlers between press and release.
+void ng_simulateButtonPressRelease(SWFAppContext* app_context, void* mc_ptr)
+{
+	ng_simulateButtonTransition(app_context, mc_ptr, 0x0004); // press
+	ng_simulateButtonTransition(app_context, mc_ptr, 0x0008); // release
+}
+
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode)
 {
