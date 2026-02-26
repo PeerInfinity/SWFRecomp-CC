@@ -19397,8 +19397,12 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			return;
 		}
 
-		// Strip query string (FlashVars) from URL before lookup
-		parseAndSetFlashVars(app_context, url_utf8, _gu2_mc);
+		// Strip query string from URL before lookup (saves query for FlashVars below)
+		char* _gu2_query = strchr(url_utf8, '?');
+		if (_gu2_query != NULL) {
+			*_gu2_query = '\0';
+			_gu2_query++;
+		}
 
 		MovieEntry* entry = findMovieEntry(url_utf8);
 		if (entry != NULL) {
@@ -19406,6 +19410,10 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			if (_gu2_mc != NULL && _gu2_mc->dynamic_props != NULL) {
 				releaseObject(app_context, (ASObject*)_gu2_mc->dynamic_props);
 				_gu2_mc->dynamic_props = NULL;
+			}
+			// Set FlashVars AFTER clearing (so they survive into the child SWF)
+			if (_gu2_query != NULL && *_gu2_query != '\0') {
+				parseURLEncodedVars(app_context, _gu2_query, _gu2_mc);
 			}
 			// Root replacement: clear state when loading into _root/_level0
 			if (_gu2_mc == &root_movieclip) {

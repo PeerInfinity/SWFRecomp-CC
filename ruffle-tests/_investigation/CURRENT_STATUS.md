@@ -115,7 +115,7 @@ Last updated: 2026-02-26
 | XML_PLAN | **ALL PHASES COMPLETE** | 24/26 active tests pass | xml_to_string (11/13), xml_child_nodes_edge_cases (3/4) |
 | ARRAY_METHODS_PLAN | **FULLY COMPLETE** | All tests pass | — |
 | OBJECT_WATCH_PLAN | **Phase 1 DONE** | 3/4 pass | `watch_textfield` needs MC watcher in SetMember |
-| GLOBALS_PLAN | **Phases 1-7 COMPLETE** | globals_swf6/7/8, primitive_type_globals PASS | Phase 8 (property flags) |
+| GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 18/30 pass (globals_swf5-8, math_min_max, is_finite×2, parse_int, parse_float, primitive_type_globals, printjob×3, sound×2, localconnection, context_menu, context_menu_item) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
 | MOVIECLIP_PLAN | **Phases 1-5, 7-9 DONE** | 17 tests pass ✅ | Phase 6 (events) |
@@ -158,7 +158,7 @@ Last updated: 2026-02-26
 ### Medium ROI — feature phases with multiple test payoff
 5. **REGISTERCLASS_PLAN Phases 4-5** — constructor dispatch on timeline placement. Unlocks `clip_constructors` (6/8→8), `on_construct`, and partially `timer_run_actions`
 6. **TEXTFIELD_PLAN Phase 4-5** — scroll properties + HTML text. 25/66 pass; ~10 more tests actionable
-7. **GLOBALS_PLAN Phase 7-8** — prototype methods for remaining stub classes + property flags. Could improve `global_proto_decls` family (4497+4158+758 lines, but formulaic)
+7. **GLOBALS_PLAN** — Phase 7 DONE. Phase 8 BLOCKED by enumeration order mismatch + 20 missing Ruffle-specific globals (ASnative, ASconstructor, etc.)
 8. **UNLOAD_PLAN** — `unload` at 36/52 (+16 lines), `unload_nested_child` at 0/5
 
 ### Lower ROI or partially blocked
