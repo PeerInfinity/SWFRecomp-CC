@@ -7,7 +7,7 @@
 void tagInit(SWFAppContext* app_context);
 // Dispatch button key-press conditions for a given key code.
 // Called from swf_core.c after delivering EV_KEY_DOWN.
-void dispatch_button_key_actions(SWFAppContext* app_context, int key_code);
+int dispatch_button_key_actions(SWFAppContext* app_context, int key_code);
 // Fire button DoAction conditions for a specific transition on a MC.
 // transition_mask: 0x0004 = press, 0x0008 = release
 void ng_simulateButtonTransition(SWFAppContext* app_context, void* mc, int transition_mask);

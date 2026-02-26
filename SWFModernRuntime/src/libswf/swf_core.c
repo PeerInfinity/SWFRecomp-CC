@@ -336,12 +336,13 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchKeyDownToFocused(app_context, ev->code);
         // Broadcast onKeyDown to Key listeners, then check button key conditions
         actionDispatchKeyDown(app_context);
-        dispatch_button_key_actions(app_context, ev->code);
-        // Fire onPress/onRelease on focused MC for Enter/Space (after DoAction conditions)
-        actionDispatchKeyPressToFocused(app_context, ev->code);
-        // Tab key: advance focus after broadcasting Key event
-        // Shift+Tab (key 16 held) = reverse direction
-        if (ev->code == 9) {
+        int key_press_handled = dispatch_button_key_actions(app_context, ev->code);
+        // Fire onPress/onRelease on focused MC for Enter/Space — but ONLY if
+        // no button keyPress condition handled the event (Ruffle behavior).
+        if (!key_press_handled)
+            actionDispatchKeyPressToFocused(app_context, ev->code);
+        // Tab key: advance focus — but ONLY if no keyPress condition handled it.
+        if (!key_press_handled && ev->code == 9) {
             int shift_held = (app_context->keys.down[16] != 0);
             actionAdvanceTabFocus(app_context, shift_held);
         }
@@ -496,6 +497,13 @@ void swfStart(SWFAppContext* app_context)
 				{
 					break;
 				}
+			}
+			else
+			{
+				// Root stopped but still within frame list — dispatch enterFrame
+				// handlers for this tick (tagShowFrame would normally do this).
+				actionDispatchEnterFrameHandlers(app_context);
+				actionDispatchRootVarMapEnterFrame(app_context);
 			}
 		}
 		else
@@ -682,6 +690,8 @@ void swfStart(SWFAppContext* app_context)
 			}
 			// Root stopped but timers are active — keep ticking
 			if (hasActiveTimers()) continue;
+			// Root stopped but onEnterFrame handlers still registered — keep ticking
+			if (actionHasEnterFrameHandlers()) continue;
 			// Truly stopped — but continue if events remain
 			if (g_events && g_event_pos < g_event_count) continue;
 			break;

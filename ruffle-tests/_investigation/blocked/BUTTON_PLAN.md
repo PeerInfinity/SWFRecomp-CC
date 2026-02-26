@@ -1,42 +1,41 @@
 # Button Behavior and Events Implementation Plan
 <!-- TESTS: button_children, button_goto, button_key_events, button_key_events_special, button_keypress, button_keypress_vs_press, button_keypress_vs_tab, button_keypress_vs_textinput, button_order, button_properties_special_cases, button_v5, button_v6, movieclip_in_removed_button, root_button_mode -->
 
-Last updated: 2026-02-23
+Last updated: 2026-02-25
 
-## Status: 6/14 PASSING — remaining 8 blocked on infrastructure
+## Status: 10/14 PASSING — remaining 4 blocked on infrastructure
 
-### Results (2026-02-23)
+### Results (2026-02-25)
 - `button_children` — **PASS** ✅
 - `button_goto` — **PASS** ✅
+- `button_key_events` — **PASS** ✅ (fixed: keyPress condition mapping, propagation, Tab onKeyDown)
+- `button_key_events_special` — **PASS** ✅ (fixed: special key code mapping, keyPress-suppresses-press/release)
+- `button_keypress_vs_press` — **PASS** ✅ (fixed: keyPress-handled gates Enter/Space press simulation)
 - `button_order` — **PASS** ✅
-- `button_properties_special_cases` — **PASS** ✅ (MovieClip.prototype.enabled + Enumerate2 prototype chain)
+- `button_properties_special_cases` — **PASS** ✅
 - `button_v5` — **PASS** ✅
 - `button_v6` — **PASS** ✅
-- `movieclip_in_removed_button` — FAIL (improved: correct MC path, but enterFrame dispatch ordering wrong)
-- `button_key_events` — FAIL (blocked: Key.addListener dispatch + focus model)
-- `button_key_events_special` — FAIL (blocked: same + special key codes)
-- `button_keypress` — FAIL (blocked: mouse press hit test + gotoFrame mid-action)
-- `button_keypress_vs_press` — FAIL (blocked: key + mouse press ordering)
-- `button_keypress_vs_tab` — FAIL (blocked: Selection object + Tab focus)
-- `button_keypress_vs_textinput` — FAIL (blocked: key events + TextField onChanged)
-- `root_button_mode` — FAIL (blocked: loadMovie + createEmptyMovieClip)
+- `movieclip_in_removed_button` — **PASS** ✅ (fixed: enterFrame children-before-root, root first-frame skip, stopped-MC enterFrame dispatch)
+- `button_keypress` — FAIL (blocked: mouse click on(press) condition not firing — needs mouse hit-test to trigger button press DoAction)
+- `button_keypress_vs_tab` — FAIL (blocked: Escape key toggling focus highlight visibility — keyPress should suppress Tab focus advance only when highlight is hidden)
+- `button_keypress_vs_textinput` — FAIL (blocked: TextField text input → onChanged callback not implemented)
+- `root_button_mode` — FAIL (blocked: loadMovie + createEmptyMovieClip at runtime)
 
-### Recent fixes (2026-02-23)
-- Added `MovieClip.prototype.enabled = true` (enumerable) for button state machine
-- Fixed Enumerate2 on MovieClips to walk MovieClip.prototype chain (`'enabled' in button` now works)
-- Added `g_event_this_mc` mechanism for correct `this` binding in onEnterFrame/onLoad dispatch
-- Updated recompiler DefineFunction2 codegen to use `g_event_this_mc` before root_movieclip fallback
+### Recent fixes (2026-02-25)
+- **enterFrame children-before-root**: Reordered `actionDispatchEnterFrameHandlers` to dispatch child MCs before root (Flash fires children before parents)
+- **Root first-frame enterFrame skip**: Added `g_root_enterframe_eligible` flag — root's onEnterFrame doesn't fire on the first tick (first tick is LOAD, not enterFrame)
+- **Stopped-MC enterFrame dispatch**: When root timeline is stopped but still within frame list, enterFrame handlers now dispatch (new else branch in swf_core.c). Also added `actionHasEnterFrameHandlers()` check to keep frame loop alive.
+- **Button keyPress condition mapping**: Added `flash_key_to_button_cond()` mapping (Flash key codes → SWF button condition codes: letters uppercase→lowercase, special keys Flash→SWF mapping)
+- **KeyPress propagation**: First button to handle keyPress stops propagation (matches Ruffle `handle_clip_event` returning `Handled`)
+- **KeyPress gates Enter/Space press**: `dispatch_button_key_actions` returns handled status; when keyPress handled, `actionDispatchKeyPressToFocused` is suppressed (Ruffle: `!key_press_handled` gate)
+- **KeyPress gates Tab focus**: Tab focus advance suppressed when keyPress handled
+- **Tab onKeyDown on focused button**: Removed Tab skip from `actionDispatchKeyDownToFocused` — focused button receives onKeyDown for Tab key
 
-### Blockers for remaining 8 tests
-Input event injection **Phases 1-4 are complete** (event pump, mouse/key state, verify_output.py preprocessing). Button state machine (`ng_update_button_states`) and button key dispatch (`dispatch_button_key_actions`) exist in tag.c and are called from the event pump.
-
-The remaining tests are blocked on:
-1. **enterFrame dispatch ordering** — root fires before children, button children don't get enterframe_eligible reset (movieclip_in_removed_button)
-2. **Key.addListener full dispatch** — listener callbacks not firing `keyPress` traces (button_key_events, button_key_events_special)
-3. **Button mouse press hit testing** — on(press) button condition not triggering for specific button instances (button_keypress)
-4. **gotoFrame interaction** — gotoFrame mid-button-action prevents remaining traces (button_keypress)
-5. **Selection object + Tab focus** — not implemented (button_keypress_vs_tab)
-6. **loadMovie + createEmptyMovieClip** — not implemented (root_button_mode)
+### Blockers for remaining 4 tests
+1. **button_keypress**: Missing `on(press)` DoAction for mouse click on button instance1. The button receives a MouseDown event but the `on(press)` condition (0x4 = OverUpToOverDown) doesn't fire because the button state machine hasn't transitioned to Over state (no MouseMove/rollOver before the click). Need mouse-move-then-click sequence handling in button state machine, or allow direct Idle→Down transition.
+2. **button_keypress_vs_tab**: Escape key should toggle focus highlight visibility. When highlight is visible, Tab advances focus (no keyPress condition fires). When hidden (after Escape), Tab fires keyPress condition instead of advancing focus. Needs `focus_tracker.highlight` visibility state tracking.
+3. **button_keypress_vs_textinput**: TextField text input (`TextInput` event) should trigger `text.onChanged` callback. Missing: TextInput event → TextField character insertion → onChanged dispatch.
+4. **root_button_mode**: Needs `createEmptyMovieClip` and `loadMovie` at runtime (entirely separate feature set).
 
 ---
 

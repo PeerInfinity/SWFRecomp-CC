@@ -8599,6 +8599,9 @@ int child_mc_count = 0;
 // MCs at index >= this threshold were just placed in the current frame's
 // process_sprite_needs_init and should not fire onEnterFrame until next frame.
 int g_enterframe_new_mc_start = -1;  // -1 = no skip
+// Root MC enterFrame does not fire on the first tick (first tick fires LOAD/frame script).
+// Set to true after the first tagShowFrame completes.
+int g_root_enterframe_eligible = 0;
 
 // _level management: _level0 is always root_movieclip.
 // Higher levels are synthetic MCs created by loadMovieNum/loadClip.
@@ -13844,34 +13847,8 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
 // to match Flash's front-to-back dispatch order.
 void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 {
-	// Dispatch to root MovieClip first (it's not in child_mc_cache)
-	{
-		extern MovieClip root_movieclip;
-		ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
-		if (root_props != NULL) {
-			ActionVar* ef_prop = getProperty(root_props, "onEnterFrame", 12);
-			if (ef_prop != NULL && ef_prop->type == ACTION_STACK_VALUE_FUNCTION) {
-				ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
-				if (func != NULL) {
-					MovieClip* saved_ctx = g_current_context;
-					actionSetCurrentContext(&root_movieclip);
-					g_event_this_mc = &root_movieclip;
-					if (func->function_type == 2 && func->advanced_func != NULL) {
-						ActionVar* regs = NULL;
-						if (func->register_count > 0)
-							regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-						func->advanced_func(app_context, NULL, 0, regs, NULL);
-						if (regs != NULL) FREE(regs);
-					} else if (func->function_type == 1 && func->simple_func != NULL) {
-						((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					}
-					g_event_this_mc = NULL;
-					actionSetCurrentContext(saved_ctx);
-				}
-			}
-		}
-	}
-
+	// Dispatch children first, then root — Flash fires enterFrame in creation
+	// order (children before parents).
 	for (int i = child_mc_count - 1; i >= 0; i--)
 	{
 		MovieClip* mc = child_mc_cache[i];
@@ -13917,6 +13894,37 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		g_event_this_mc = NULL;
 
 		actionSetCurrentContext(saved_ctx);
+	}
+
+	// Dispatch root MovieClip last (after children).
+	// Skip on the first tick — root's first frame fires LOAD (frame script),
+	// not enterFrame. The flag is set after the first tagShowFrame completes.
+	if (g_root_enterframe_eligible)
+	{
+		extern MovieClip root_movieclip;
+		ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
+		if (root_props != NULL) {
+			ActionVar* ef_prop = getProperty(root_props, "onEnterFrame", 12);
+			if (ef_prop != NULL && ef_prop->type == ACTION_STACK_VALUE_FUNCTION) {
+				ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
+				if (func != NULL) {
+					MovieClip* saved_ctx = g_current_context;
+					actionSetCurrentContext(&root_movieclip);
+					g_event_this_mc = &root_movieclip;
+					if (func->function_type == 2 && func->advanced_func != NULL) {
+						ActionVar* regs = NULL;
+						if (func->register_count > 0)
+							regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+						func->advanced_func(app_context, NULL, 0, regs, NULL);
+						if (regs != NULL) FREE(regs);
+					} else if (func->function_type == 1 && func->simple_func != NULL) {
+						((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					}
+					g_event_this_mc = NULL;
+					actionSetCurrentContext(saved_ctx);
+				}
+			}
+		}
 	}
 }
 
@@ -32095,16 +32103,17 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 }
 
+// Accessor for g_focused_mc — used by tag.c for button keyPress focus gating.
+void* actionGetFocusedMC(void) { return (void*)g_focused_mc; }
+
 // ---------------------------------------------------------------------------
 // Key dispatch to focused MC
 // ---------------------------------------------------------------------------
 
 // Dispatch onKeyDown to the focused MC. Called BEFORE Key.broadcastMessage.
-// Tab key (9) is excluded — Tab changes focus before delivering key events.
 void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code)
 {
 	if (g_focused_mc == NULL) return;
-	if (key_code == 9) return;  // Tab: focus advances, no onKeyDown to focused MC
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyDown", 9);
 
 	// Enter/Space on focused MC with onPress → simulated press+release

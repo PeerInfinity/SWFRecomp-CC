@@ -982,6 +982,11 @@ void tagShowFrame(SWFAppContext* app_context)
 		g_enterframe_new_mc_start = mc_count_before;
 		actionDispatchEnterFrameHandlers(app_context);
 		g_enterframe_new_mc_start = -1;  // reset skip threshold
+
+		// After the first tagShowFrame, root's enterFrame becomes eligible.
+		// On the first frame, root fires LOAD (its frame script), not enterFrame.
+		extern int g_root_enterframe_eligible;
+		g_root_enterframe_eligible = 1;
 	}
 #else
 	// --- Advance sprite timelines (recursive) ---
@@ -2429,12 +2434,47 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 #endif
 }
 
-// Dispatch button key-press BUTTONCONDACTION conditions for a given Flash key code.
-// For each button in the display list, check if any action has a key-press condition
-// matching the given key code (stored in condition bits 9-15) and fire the action.
-void dispatch_button_key_actions(SWFAppContext* app_context, int key_code)
+// Convert a Flash key code to the SWF button condition key code.
+// Button conditions use their own mapping for special keys (1-19) and
+// ASCII for printable characters (32+). Letters are lowercase in conditions.
+static int flash_key_to_button_cond(int key_code)
 {
-	if (key_code <= 0 || key_code > 127) return;
+	// Special keys: Flash key code → SWF button condition code
+	switch (key_code) {
+	case 37: return 1;   // Left
+	case 39: return 2;   // Right
+	case 36: return 3;   // Home
+	case 35: return 4;   // End
+	case 45: return 5;   // Insert
+	case 46: return 6;   // Delete
+	case 8:  return 8;   // Backspace
+	case 13: return 13;  // Enter
+	case 38: return 14;  // Up
+	case 40: return 15;  // Down
+	case 33: return 16;  // Page Up
+	case 34: return 17;  // Page Down
+	case 9:  return 18;  // Tab
+	case 27: return 19;  // Escape
+	case 32: return 32;  // Space
+	default: break;
+	}
+	// Letters: Flash key codes are uppercase (65-90), button conditions are lowercase (97-122)
+	if (key_code >= 65 && key_code <= 90)
+		return key_code + 32;  // to lowercase ASCII
+	// Numbers and other printable: same code
+	if (key_code >= 32 && key_code <= 126)
+		return key_code;
+	return 0;
+}
+
+// Dispatch button key-press BUTTONCONDACTION conditions for a given Flash key code.
+// KeyPress propagates to all buttons in render order (low depth to high depth).
+// First button that handles the event stops propagation (Ruffle behavior).
+// Returns 1 if any button handled the keyPress, 0 otherwise.
+int dispatch_button_key_actions(SWFAppContext* app_context, int key_code)
+{
+	int cond_code = flash_key_to_button_cond(key_code);
+	if (cond_code <= 0) return 0;
 	for (size_t i = 1; i <= max_depth; i++)
 	{
 		DisplayObject* obj = &display_list[i];
@@ -2442,13 +2482,19 @@ void dispatch_button_key_actions(SWFAppContext* app_context, int key_code)
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_BUTTON) continue;
 		if (ch->button_action_count == 0) continue;
+		int handled = 0;
 		for (size_t a = 0; a < ch->button_action_count; a++)
 		{
 			int cond_key = (ch->button_actions[a].condition >> 9) & 0x7F;
-			if (cond_key != 0 && cond_key == key_code)
+			if (cond_key != 0 && cond_key == cond_code)
+			{
 				ch->button_actions[a].action(app_context);
+				handled = 1;
+			}
 		}
+		if (handled) return 1;  // first button to handle stops propagation
 	}
+	return 0;
 }
 
 // Fire button DoAction conditions for a specific transition on a MC.
