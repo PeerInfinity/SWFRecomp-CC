@@ -1924,7 +1924,8 @@ namespace SWFRecomp
 
 					u16 scene_bias = 0;
 					if (scene_bias_flag) {
-						scene_bias = VAL(u16, action_buffer + 1);
+						// Read scene_bias byte-by-byte to avoid potential alignment issues
+						scene_bias = (u8)action_buffer[1] | ((u16)(u8)action_buffer[2] << 8);
 					}
 
 					out_script << "\t" << "// GotoFrame2 (play=" << (int)play_flag

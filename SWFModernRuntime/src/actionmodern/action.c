@@ -12418,7 +12418,11 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	// When the requested frame was beyond the last frame, suppress the deferred script.
 	if (was_clamped) {
 		extern int g_deferred_goto_script;
+		extern int g_deferred_goto_queue_count;
 		g_deferred_goto_script = 0;
+		// Remove the last queue entry (the one just added by ng_executeGotoCatchUp)
+		if (g_deferred_goto_queue_count > 0)
+			g_deferred_goto_queue_count--;
 	}
 #endif
 }
@@ -12556,19 +12560,29 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	popVar(app_context, &frame_var);
 
 	// Resolve frame number from stack value
+	// Following Ruffle's goto_frame semantics:
+	// - Numeric: only proceed if value is an exact integer (fract() == 0.0)
+	// - NaN/Infinity: no-op
+	// - Frame <= 0 after wrapping: no-op
+	// - String: try numeric parse, then frame label lookup
 	s32 frame_num = -1;
 	int resolved = 0;
 
 	if (frame_var.type == ACTION_STACK_VALUE_F32) {
 		float frame_float;
 		memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
+		if (isnan(frame_float) || isinf(frame_float)) return;
+		if (frame_float != floorf(frame_float)) return; // non-integer: no-op
 		frame_num = (s32)frame_float;
 		resolved = 1;
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_F64) {
 		double frame_double;
 		memcpy(&frame_double, &frame_var.data.numeric_value, sizeof(double));
-		frame_num = (s32)frame_double;
+		if (isnan(frame_double) || isinf(frame_double)) return;
+		if (frame_double != floor(frame_double)) return; // non-integer: no-op
+		// Use i32 wrapping like Ruffle: f64_to_wrapping_i32
+		frame_num = (s32)(s64)frame_double;
 		resolved = 1;
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_I32) {
@@ -12577,9 +12591,28 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 		frame_num = frame_int;
 		resolved = 1;
 	}
-	else if (frame_var.type == ACTION_STACK_VALUE_BOOLEAN) {
-		frame_num = (s32)(frame_var.data.numeric_value & 1);
-		resolved = 1;
+	else if (frame_var.type == ACTION_STACK_VALUE_BOOLEAN ||
+	         frame_var.type == ACTION_STACK_VALUE_UNDEFINED ||
+	         frame_var.type == ACTION_STACK_VALUE_NULL) {
+		// Ruffle: booleans/undefined/null are NOT treated as numeric for GotoFrame2.
+		// They are coerced to strings ("true"/"false"/"undefined"/"null") and
+		// looked up as frame labels. If no matching label exists, it's a no-op.
+		const char* str_val = NULL;
+		if (frame_var.type == ACTION_STACK_VALUE_BOOLEAN) {
+			str_val = (frame_var.data.numeric_value & 1) ? "true" : "false";
+		} else if (frame_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+			str_val = (g_swf_version >= 7) ? "undefined" : "";
+		} else {
+			str_val = (g_swf_version >= 7) ? "null" : "";
+		}
+		if (str_val[0] != '\0') {
+			int label_frame = findFrameByLabel(str_val);
+			if (label_frame >= 0) {
+				frame_num = label_frame + 1;
+				resolved = 1;
+			}
+		}
+		// If no label match, fall through to !resolved check → no-op
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
 		char _gf2_buf[256];
@@ -12607,7 +12640,15 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 			frame_num = (s32)parsed;
 			resolved = 1;
 		}
-		// else: frame label — not yet supported
+		else {
+			// Frame label lookup
+			int label_frame = findFrameByLabel(frame_part);
+			if (label_frame >= 0) {
+				frame_num = label_frame + 1; // findFrameByLabel returns 0-based; convert to 1-based
+				resolved = 1;
+			}
+			// else: label not found — no-op
+		}
 	}
 
 	if (!resolved) {
@@ -12615,11 +12656,20 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 		return;
 	}
 
-	if (frame_num < 0) frame_num = 0;
-	frame_num += scene_bias;
+	// Ruffle wrapping arithmetic: frame.wrapping_sub(1) + scene_offset, then saturating_add(1)
+	// frame_num is 1-based. Subtract 1 to get 0-based, add scene_bias, add 1 back.
+	s32 frame_0based = frame_num - 1; // wrapping sub
+	frame_0based += (s32)scene_bias;
+	s32 frame_final = frame_0based + 1; // saturating add back to 1-based
+	if (frame_0based > 0 && frame_final < frame_0based) frame_final = 0x7FFFFFFF; // saturate
 
-	// Navigate: GotoFrame2 uses 1-based frame numbers, actionGotoFrame uses 0-based
-	actionGotoFrame(app_context, (u16)(frame_num - 1));
+	if (frame_final <= 0) {
+		// Frame <= 0 after wrapping: no-op
+		return;
+	}
+
+	// Navigate: actionGotoFrame uses 0-based
+	actionGotoFrame(app_context, (u16)(frame_final - 1));
 
 	if (play_flag) {
 #ifdef NO_GRAPHICS
@@ -14412,10 +14462,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setProperty(app_context, g_stage_obj, "scaleMode", 9, &sv);
 			sv = makeStringActionVar(app_context, "normal", 6);
 			setProperty(app_context, g_stage_obj, "displayState", 12, &sv);
+#ifdef FRAME_WIDTH
 			sv = makeF64((double)FRAME_WIDTH);
 			setProperty(app_context, g_stage_obj, "width", 5, &sv);
+#endif
+#ifdef FRAME_HEIGHT
 			sv = makeF64((double)FRAME_HEIGHT);
 			setProperty(app_context, g_stage_obj, "height", 6, &sv);
+#endif
 			sv = makeStringActionVar(app_context, "HIGH", 4);
 			setProperty(app_context, g_stage_obj, "quality", 7, &sv);
 			ActionVar bv = {0};
@@ -18739,21 +18793,27 @@ void actionSetMember(SWFAppContext* app_context)
 					if (strcmp(canonical, "noScale") == 0) {
 #ifdef VIEWPORT_WIDTH
 						sv = makeF64((double)VIEWPORT_WIDTH);
-#else
-						sv = makeF64((double)FRAME_WIDTH);
-#endif
 						setProperty(app_context, obj, "width", 5, &sv);
+#elif defined(FRAME_WIDTH)
+						sv = makeF64((double)FRAME_WIDTH);
+						setProperty(app_context, obj, "width", 5, &sv);
+#endif
 #ifdef VIEWPORT_HEIGHT
 						sv = makeF64((double)VIEWPORT_HEIGHT);
-#else
-						sv = makeF64((double)FRAME_HEIGHT);
-#endif
 						setProperty(app_context, obj, "height", 6, &sv);
+#elif defined(FRAME_HEIGHT)
+						sv = makeF64((double)FRAME_HEIGHT);
+						setProperty(app_context, obj, "height", 6, &sv);
+#endif
 					} else {
+#ifdef FRAME_WIDTH
 						sv = makeF64((double)FRAME_WIDTH);
 						setProperty(app_context, obj, "width", 5, &sv);
+#endif
+#ifdef FRAME_HEIGHT
 						sv = makeF64((double)FRAME_HEIGHT);
 						setProperty(app_context, obj, "height", 6, &sv);
+#endif
 					}
 					// Fire onResize if scaleMode actually changed
 					if (strcmp(old_mode, canonical) != 0) {

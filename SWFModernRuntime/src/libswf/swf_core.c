@@ -51,8 +51,11 @@ int catch_up_mode = 0;
 int goto_from_action = 0;
 int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
 size_t catch_up_target = 0;   // target frame for backward goto protection
-int g_deferred_goto_script = 0;     // 1 if target frame script should run after calling script
-size_t g_deferred_goto_target = 0;  // target frame whose script is deferred
+int g_deferred_goto_script = 0;     // count of deferred scripts queued
+size_t g_deferred_goto_target = 0;  // target frame whose script is deferred (last entry)
+#define MAX_DEFERRED_GOTO_QUEUE 16
+size_t g_deferred_goto_queue[MAX_DEFERRED_GOTO_QUEUE];
+int g_deferred_goto_queue_count = 0;
 int g_tag_skip_mode = 0;            // 1 = tag functions are no-ops (scripts-only re-run)
 
 // Execute goto catch-up inline (called from actionGotoFrame)
@@ -122,9 +125,12 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	manual_next_frame = 0;
 
 	// Queue the target frame's script to run after the calling script returns.
-	// We use a simple static flag + frame number for the main loop to check.
+	// Multiple gotos in the same script each queue their deferred script.
 	extern int g_deferred_goto_script;
 	extern size_t g_deferred_goto_target;
+	if (g_deferred_goto_queue_count < MAX_DEFERRED_GOTO_QUEUE) {
+		g_deferred_goto_queue[g_deferred_goto_queue_count++] = target;
+	}
 	g_deferred_goto_script = 1;
 	g_deferred_goto_target = target;
 }
@@ -558,38 +564,49 @@ void swfStart(SWFAppContext* app_context)
 			// to the normal advance logic below.
 		}
 
-		// Run deferred goto script with Ruffle-compatible 3-phase ordering:
+		// Run deferred goto scripts with Ruffle-compatible 3-phase ordering:
 		//   Phase 1: Sprites placed BEFORE target frame → init before target DoAction
 		//   Phase 2: Target frame DoAction runs
 		//   Phase 3: Sprites placed ON/AFTER target frame → init after target DoAction
-		while (g_deferred_goto_script)
+		// Multiple gotos in the same script queue multiple deferred entries.
+		while (g_deferred_goto_queue_count > 0 || g_deferred_goto_script)
 		{
-			size_t target = g_deferred_goto_target;
+			// Copy queue locally since executing deferred scripts may trigger more gotos
+			size_t local_queue[MAX_DEFERRED_GOTO_QUEUE];
+			int local_count = g_deferred_goto_queue_count;
+			for (int qi = 0; qi < local_count; qi++)
+				local_queue[qi] = g_deferred_goto_queue[qi];
+			g_deferred_goto_queue_count = 0;
 			g_deferred_goto_script = 0;
 
 			extern int g_defer_sprite_init;
 			extern void ng_run_deferred_sprite_init_before(SWFAppContext* app_context, size_t target_frame);
 			extern void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t target_frame);
 
-			// Phase 1: Init sprites placed in intermediate frames (before target)
-			g_defer_sprite_init = 0;
-			ng_run_deferred_sprite_init_before(app_context, target);
-
-			// Phase 2: Run the target frame's script
-			if (target < g_frame_count && funcs[target])
+			for (int qi = 0; qi < local_count; qi++)
 			{
-				// Run the target frame function in "scripts-only" mode:
-				// g_tag_skip_mode=1 causes tag functions to return immediately,
-				// while catch_up_mode=0 allows script calls to execute.
-				g_tag_skip_mode = 1;
-				funcs[target](app_context);
-				g_tag_skip_mode = 0;
-				// If the script triggered another goto, g_deferred_goto_script
-				// will be set again and the loop continues.
-			}
+				size_t target = local_queue[qi];
 
-			// Phase 3: Init sprites placed on the target frame (after target DoAction)
-			ng_run_deferred_sprite_init_on_or_after(app_context, target);
+				// Phase 1: Init sprites placed in intermediate frames (before target)
+				g_defer_sprite_init = 0;
+				ng_run_deferred_sprite_init_before(app_context, target);
+
+				// Phase 2: Run the target frame's script
+				if (target < g_frame_count && funcs[target])
+				{
+					// Run the target frame function in "scripts-only" mode:
+					// g_tag_skip_mode=1 causes tag functions to return immediately,
+					// while catch_up_mode=0 allows script calls to execute.
+					g_tag_skip_mode = 1;
+					funcs[target](app_context);
+					g_tag_skip_mode = 0;
+					// If the script triggered another goto, it will be added
+					// to the queue and processed in the next iteration.
+				}
+
+				// Phase 3: Init sprites placed on the target frame (after target DoAction)
+				ng_run_deferred_sprite_init_on_or_after(app_context, target);
+			}
 		}
 
 		// Process timers after frame actions + deferred scripts
@@ -613,11 +630,13 @@ void swfStart(SWFAppContext* app_context)
 		{
 			current_frame = next_frame;
 			manual_next_frame = 0;
+			root_movieclip.currentframe = (int)current_frame + 1;  // Keep 1-indexed _currentframe in sync
 		}
 		else if (is_playing)
 		{
 			// Only advance naturally if we're still playing
 			current_frame++;
+			root_movieclip.currentframe = (int)current_frame + 1;  // Keep 1-indexed _currentframe in sync
 		}
 		else
 		{

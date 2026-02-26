@@ -4,9 +4,9 @@ Last updated: 2026-02-25
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 356/619 (57.5%) — 309/479 filtered (64.5%)
+- **Pass rate (CI, last run)**: 364/619 (58.8%) — local estimate with new fixes: ~368/619
 - **Main failure types**: output_mismatch (~255), segfault (5), runtime_error (4), compile_fail (many due to FrameLabelEntry typedef conflict), timeout (1)
-- **Recent gains**: +9 tests in last CI run. Timer system (set_interval ✅). Goto execution ordering fix (execution_order3, goto_execution_order2 regressions fixed locally). Newly passing in CI: define_function2_preload, function_suppress_and_preload, as_set_prop_flags_version (6 variants), swf5_no_closure, define_function2_preload_order, execution_order2.
+- **Recent gains**: Frame navigation complete (goto_frame, goto_frame2, goto_label, goto_methods all PASS). Timer system (set_interval ✅). Scene bias recompiler fix. Deferred script queue. _currentframe sync during natural frame advance.
 
 ## Crashes and Errors (8 tests)
 
@@ -62,6 +62,9 @@ Last updated: 2026-02-25
 | `add_property` | 15/15 ✅ | addProperty on Arrays (getter/setter for length and indexed props) |
 | `as_set_prop_flags` | 79/79 ✅ | ASSetPropFlags valueOf/toString coercion on arguments |
 | `init_object_order` | 15/15 ✅ | attachMovie initObject addProperty setter invocation |
+| `goto_frame` | 12/12 ✅ | _currentframe sync during natural frame advance |
+| `goto_frame2` | 44/44 ✅ | GotoFrame2 rewrite: wrapping arithmetic, label lookup, scene_bias fix, deferred script queue |
+| `goto_label` | 13/13 ✅ | Frame label support (recompiler already had it, needed --recompile) |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
