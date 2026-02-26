@@ -2539,6 +2539,9 @@ int dispatch_button_key_actions(SWFAppContext* app_context, int key_code)
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_BUTTON) continue;
 		if (ch->button_action_count == 0) continue;
+		// Skip invisible buttons — _visible=false suppresses keyPress conditions
+		if (obj->instance_name != NULL && !actionGetMCVisible(app_context, obj->instance_name))
+			continue;
 		int handled = 0;
 		for (size_t a = 0; a < ch->button_action_count; a++)
 		{
