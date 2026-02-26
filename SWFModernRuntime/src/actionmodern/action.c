@@ -13682,8 +13682,10 @@ int actionGetMCEnabled(SWFAppContext* app_context, const char* instance_name)
 					VAL(double, &val->data.numeric_value);
 				return (d != 0.0 && d == d) ? 1 : 0;  // NaN → false
 			}
-			if (val->type == ACTION_STACK_VALUE_NULL || val->type == ACTION_STACK_VALUE_UNDEFINED)
+			if (val->type == ACTION_STACK_VALUE_NULL)
 				return 0;
+			if (val->type == ACTION_STACK_VALUE_UNDEFINED)
+				return 1;  // Ruffle: undefined → use default (enabled)
 			return 1;  // String, object, etc. → truthy
 		}
 	}
