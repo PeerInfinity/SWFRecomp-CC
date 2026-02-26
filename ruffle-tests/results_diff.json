@@ -1,23 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-02-26T06:54:22.178608+00:00",
-    "old_git_sha": "7765f51171cbca0a018649cc960017ae650e5fdb",
-    "new_timestamp": "2026-02-26T18:17:36.791288+00:00",
-    "new_git_sha": "ac538527ecf48dc683d5f808604d2d53a9ff64e1",
+    "old_timestamp": "2026-02-26T18:17:36.791288+00:00",
+    "old_git_sha": "ac538527ecf48dc683d5f808604d2d53a9ff64e1",
+    "new_timestamp": "2026-02-26T18:26:21.877753+00:00",
+    "new_git_sha": "7f0c2f075b282ecc56747ad3c84a2e3374102b59",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 375,
+    "old_pass": 376,
     "old_total": 619,
-    "old_pass_rate": 60.6,
-    "new_pass": 376,
+    "old_pass_rate": 60.7,
+    "new_pass": 377,
     "new_total": 619,
-    "new_pass_rate": 60.7,
-    "old_mismatched_lines": 32137,
-    "new_mismatched_lines": 32135,
+    "new_pass_rate": 60.9,
+    "old_mismatched_lines": 32135,
+    "new_mismatched_lines": 32104,
     "increased_mismatches": 0,
-    "decreased_mismatches": 2,
+    "decreased_mismatches": 31,
     "newly_passing": 1,
     "newly_failing": 0,
     "status_changed": 1,
@@ -27,19 +27,19 @@
   },
   "changes": [
     {
-      "test": "button_keypress_vs_tab",
+      "test": "parse_float",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 18
+        "actual_lines": 74,
+        "expected_lines": 74,
+        "matching_lines": 43
       },
       "new_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
+        "actual_lines": 74,
+        "expected_lines": 74,
+        "matching_lines": 74
       }
     }
   ]
