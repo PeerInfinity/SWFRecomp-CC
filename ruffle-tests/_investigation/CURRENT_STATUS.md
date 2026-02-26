@@ -135,7 +135,7 @@ Last updated: 2026-02-25
 | TIMER_PLAN | **Phases 1-2 DONE** | 1/3 pass (set_interval ✅) | timer_run_actions blocked on REGISTERCLASS_PLAN (attachMovie); timeout needs script timeout mechanism |
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
 | TAB_ORDERING_PLAN | Not started | 0/16 | Tab key focus navigation |
-| DRAG_DROP_PLAN | Not started | 0/4 | startDrag/stopDrag |
+| DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
 | LOADMOVIE_PLAN | **Phases 0-5 + FlashVars DONE** | 18/49 pass | Phase 6 (globals) NOT FEASIBLE, Phase 7 (loadVariables) → LOADVARIABLES_PLAN |
 | LOADVARIABLES_PLAN | **Phases 1-2 DONE** | 2/4 pass | loadvariables + loadvariablesnum ✅; loadvariables2 needs TIMER_PLAN; loadvariables_method needs log_fetch |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** | 1/4 pass | loadmovie_replace_root ✅; mcl_loadclip_replace_root blocked by MTASC class support; swf7→5/6 deferred |

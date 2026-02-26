@@ -1,13 +1,15 @@
 # Drag and Drop Implementation Plan
 <!-- TESTS: drag_drop, drag_over_from_outside, drag_over_without_startdrag, mouse_hover_events_while_dragging -->
 
-Last updated: 2026-02-22
+Last updated: 2026-02-26
 
-## Status: NOT STARTED
+## Status: COMPLETE — All 4/4 tests PASS
 
-Input event injection Phases 1-4 are complete (event pump, mouse/key state). Remaining blocker is **Phase 0 of input-event-injection.md** (struct unification — `tag_stubs.c` still exists, hit_test.c not in trace builds).
-
-Prerequisites remaining: input-event-injection.md **Phase 0** (struct unification) + Phase 6 (per-clip hit testing). This plan adds `startDrag`/`stopDrag` MovieClip methods and `_droptarget` property.
+All four tests pass without any new code changes needed. The existing startDrag/stopDrag implementation and hit-testing infrastructure already handle all cases:
+- `drag_drop` (10/10 lines) — full drag sequences with `_droptarget` slash paths including nested clips
+- `drag_over_from_outside` (1/1) — drag from outside stage
+- `drag_over_without_startdrag` (1/1) — mouseDown without startDrag
+- `mouse_hover_events_while_dragging` (1/1) — hover events during drag
 
 ---
 
