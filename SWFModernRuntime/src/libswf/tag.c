@@ -57,6 +57,8 @@ static size_t g_sprite_init_target_frame = 0;
 // "goto root" from "goto unnamed sprite with inherited root context".
 // Declared in action.c; saved/cleared/restored here per sprite-frame invocation.
 extern int g_settarget_explicit_root;
+extern MovieClip* g_current_context;
+extern void actionSetCurrentContext(MovieClip* mc);
 
 // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
 static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
@@ -735,24 +737,67 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 #endif
 }
 
+// Resolve a button's hit-test character ID to a shape, following through
+// nested buttons (e.g. button 6 whose hit char is button 5 → shape 4).
+static Character* resolve_hit_shape(size_t hit_char_id, u32* out_hit_transform_id, int depth)
+{
+	if (depth > 4) return NULL;  // guard against loops
+	if (hit_char_id >= dictionary_capacity) return NULL;
+	Character* hit_ch = &dictionary[hit_char_id];
+	if (hit_ch->type == CHAR_TYPE_SHAPE) return hit_ch;
+	if (hit_ch->type == CHAR_TYPE_BUTTON)
+	{
+		// Follow through to the nested button's hit shape
+		*out_hit_transform_id = hit_ch->button_hit_transform_id;
+		return resolve_hit_shape(hit_ch->button_hit_char_id, out_hit_transform_id, depth + 1);
+	}
+	return NULL;
+}
+
 // Button hit testing + state machine + action dispatch.
 // Runs on every mouse event (in NO_GRAPHICS mode) so that transitions fire
 // on the correct per-event boundary (e.g. MOUSE_MOVE → OverUp, then
 // MOUSE_DOWN → OverDown fires the press action in the same tick).
 //
 // States: 0=Idle, 1=OverUp, 2=OverDown, 3=OutDown
-void ng_update_button_states(SWFAppContext* app_context)
+//
+// Recursive helper: walks a display list (which may be root or a button's
+// child display list) and updates button states.  For nested buttons, the
+// parent_xf is the composed transform of the enclosing button's placement,
+// and parent_mc is the enclosing button's MovieClip context (used as the
+// "this" scope when firing the nested button's actions).
+static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max,
+	const float* parent_xf, MovieClip* parent_mc,
+	int* found_hover)
 {
-	if (app_context->shape_data == NULL) return;
-
-	int found_hover = 0;
-	for (size_t i = max_depth; i >= 1; i--)
+	for (size_t i = dl_max; i >= 1; i--)
 	{
-		DisplayObject* obj = &display_list[i];
+		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
 
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_BUTTON) continue;
+
+		// Recurse into this button's child display list FIRST (children are
+		// rendered on top, so they get events before the parent button).
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+		{
+			// Compose placement transform for recursion
+			const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
+			float child_parent_xf[16];
+			hit_test_mat4_multiply(child_parent_xf, parent_xf, place_xf);
+
+			// Find the MC for this button to use as context for children
+			MovieClip* btn_mc = NULL;
+			if (obj->instance_name != NULL)
+				btn_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+
+			ng_update_button_states_in_dl(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth,
+				child_parent_xf, btn_mc ? btn_mc : parent_mc,
+				found_hover);
+		}
 
 		u8 old_state = obj->button_state;
 		u8 new_state = old_state;
@@ -763,26 +808,25 @@ void ng_update_button_states(SWFAppContext* app_context)
 
 		if (!mc_visible)
 		{
-			// Invisible button: not hit-testable. Transition to Idle (Up).
-			// But allow the transition to fire rollOut/releaseOutside if the button
-			// was in an active state (not already Idle).
 			if (app_context->mouse.button_down &&
 			    (old_state == 2 || old_state == 3))
-				new_state = 3;  // OutDown: preserve pressed-outside state
+				new_state = 3;
 			else
-				new_state = 0;  // Idle
+				new_state = 0;
 		}
-		else if (!found_hover)
+		else if (!(*found_hover))
 		{
-			// Look up the hit-test shape
-			Character* hit_ch = &dictionary[ch->button_hit_char_id];
-			if (hit_ch->type == CHAR_TYPE_SHAPE)
+			// Resolve hit-test shape (follows through nested buttons)
+			u32 resolved_hit_xf_id = ch->button_hit_transform_id;
+			Character* hit_ch = resolve_hit_shape(ch->button_hit_char_id, &resolved_hit_xf_id, 0);
+			if (hit_ch != NULL)
 			{
-				// Compose PlaceObject2 transform with hit-record transform
+				// Compose: parent_xf * placement * hit-record transform
 				const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
-				const float* hit_xf = (const float*)(app_context->transform_data) + ch->button_hit_transform_id * 16;
-				float composed[16];
-				hit_test_mat4_multiply(composed, place_xf, hit_xf);
+				const float* hit_xf = (const float*)(app_context->transform_data) + resolved_hit_xf_id * 16;
+				float temp[16], composed[16];
+				hit_test_mat4_multiply(temp, parent_xf, place_xf);
+				hit_test_mat4_multiply(composed, temp, hit_xf);
 
 				int hit = hit_test_shape(app_context->shape_data,
 					hit_ch->shape_offset, hit_ch->size,
@@ -792,106 +836,119 @@ void ng_update_button_states(SWFAppContext* app_context)
 
 				if (hit)
 				{
-					found_hover = 1;
+					*found_hover = 1;
 					if (app_context->mouse.button_down)
-						new_state = 2;  // OverDown
+						new_state = 2;
 					else
-						new_state = 1;  // OverUp
+						new_state = 1;
 				}
 				else
 				{
-					// Not over button
 					if (app_context->mouse.button_down &&
 					    (old_state == 2 || old_state == 3))
-						new_state = 3;  // OutDown: pressed while over, dragged outside
+						new_state = 3;
 					else
-						new_state = 0;  // Idle
+						new_state = 0;
 				}
 			}
 		}
 		else
 		{
-			// Another button already has hover; this button is outside
 			if (app_context->mouse.button_down &&
 			    (old_state == 2 || old_state == 3))
-				new_state = 3;  // OutDown
+				new_state = 3;
 			else
-				new_state = 0;  // Idle
+				new_state = 0;
 		}
 
 		// When disabled: Ruffle-compatible state tracking.
-		// If mouse is over the button (hit test passes, not pressed), the button
-		// state stays frozen at its current value (Ruffle: update_state=false when
-		// new_state==Over). Otherwise, force state to Idle (Up).
-		// This means: mouse-away while disabled → state=Idle; mouse-back → stays Idle.
-		// When re-enabled after mouse-away/back, Idle→OverUp fires rollOver.
 		if (!mc_enabled)
 		{
-			// "Over" means: hit test passes and mouse not pressed
-			int computed_is_over = (new_state == 1);  // OverUp
+			int computed_is_over = (new_state == 1);
 			if (!computed_is_over)
-				new_state = 0;  // Force to Idle (Ruffle: ButtonState::Up)
+				new_state = 0;
 			else
-				new_state = old_state;  // Freeze (Ruffle: update_state=false)
+				new_state = old_state;
 		}
 		obj->button_state = new_state;
-		// Keep sticky state in sync so re-placements restore the latest state
 		obj->sticky_char_id = obj->char_id;
 		obj->sticky_button_state = new_state;
 
 		// Dispatch actions on state transitions
 		if (old_state != new_state && ch->button_action_count > 0)
 		{
-			// When disabled, skip action dispatch entirely (Ruffle behavior:
-			// disabled buttons don't fire SWF-defined or AS-defined events)
 			if (!mc_enabled)
 			{
 				obj->button_prev_state = old_state;
 				continue;
 			}
 
-			// When invisible, only allow rollOut (OverUpToIdle) and
-			// releaseOutside (OutDownToIdle) transitions to fire.
-			// Other transitions are blocked when invisible.
 			int allow_actions = mc_visible;
 			if (!mc_visible)
 			{
-				// Allow if transitioning OUT of an active state
-				if ((old_state == 1 && new_state == 0) ||   // OverUpToIdle (rollOut)
-				    (old_state == 3 && new_state == 0) ||    // OutDownToIdle (releaseOutside)
-				    (old_state == 2 && new_state == 0) ||    // OverDownToIdle
-				    (old_state == 2 && new_state == 3))      // OverDownToOutDown
+				if ((old_state == 1 && new_state == 0) ||
+				    (old_state == 3 && new_state == 0) ||
+				    (old_state == 2 && new_state == 0) ||
+				    (old_state == 2 && new_state == 3))
 					allow_actions = 1;
 			}
 
 			if (allow_actions)
 			{
-				// Encode transition as BUTTONCONDACTION bitmask
 				u16 transition = 0;
-				if      (old_state == 0 && new_state == 1) transition = 0x0001; // IdleToOverUp
-				else if (old_state == 1 && new_state == 0) transition = 0x0002; // OverUpToIdle
-				else if (old_state == 1 && new_state == 2) transition = 0x0004; // OverUpToOverDown
-				else if (old_state == 2 && new_state == 1) transition = 0x0008; // OverDownToOverUp
-				else if (old_state == 2 && new_state == 3) transition = 0x0010; // OverDownToOutDown
-				else if (old_state == 3 && new_state == 2) transition = 0x0020; // OutDownToOverDown
-				else if (old_state == 3 && new_state == 0) transition = 0x0040; // OutDownToIdle
-				else if (old_state == 0 && new_state == 2) transition = 0x0080; // IdleToOverDown
-				else if (old_state == 2 && new_state == 0) transition = 0x0100; // OverDownToIdle
-				else if (old_state == 3 && new_state == 1) transition = 0x0040; // OutDownToIdle (closest match)
+				if      (old_state == 0 && new_state == 1) transition = 0x0001;
+				else if (old_state == 1 && new_state == 0) transition = 0x0002;
+				else if (old_state == 1 && new_state == 2) transition = 0x0004;
+				else if (old_state == 2 && new_state == 1) transition = 0x0008;
+				else if (old_state == 2 && new_state == 3) transition = 0x0010;
+				else if (old_state == 3 && new_state == 2) transition = 0x0020;
+				else if (old_state == 3 && new_state == 0) transition = 0x0040;
+				else if (old_state == 0 && new_state == 2) transition = 0x0080;
+				else if (old_state == 2 && new_state == 0) transition = 0x0100;
+				else if (old_state == 3 && new_state == 1) transition = 0x0040;
 
 				if (transition != 0)
 				{
+					// Switch context to parent MC for button actions.
+					// AVM1 buttons run actions relative to their parent, not themselves.
+					MovieClip* saved_ctx = g_current_context;
+					DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+					actionSetCurrentContext(parent_mc);
+					// If the parent is a button MC, set g_current_sprite_obj to
+					// the parent's display object so that GotoFrame targets the
+					// button (a non-sprite), making it a no-op.  This matches
+					// Ruffle where button parents can't navigate frames.
+					if (parent_mc && parent_mc->is_button_mc && parent_mc->display_obj)
+						g_current_sprite_obj = (DisplayObject*)parent_mc->display_obj;
 					for (size_t a = 0; a < ch->button_action_count; a++)
 					{
 						if (ch->button_actions[a].condition & transition)
 							ch->button_actions[a].action(app_context);
 					}
+					g_current_sprite_obj = saved_sprite_obj;
+					actionSetCurrentContext(saved_ctx);
 				}
 			}
 		}
 
 		obj->button_prev_state = old_state;
 	}
+}
+
+void ng_update_button_states(SWFAppContext* app_context)
+{
+	if (app_context->shape_data == NULL) return;
+
+	// Identity transform for root-level buttons
+	static const float identity[16] = {
+		1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1
+	};
+
+	int found_hover = 0;
+	ng_update_button_states_in_dl(app_context,
+		display_list, max_depth,
+		identity, &root_movieclip,
+		&found_hover);
 }
 
 // Recursively dispatch CLIP_EVENT_ENTER_FRAME: children before parents.

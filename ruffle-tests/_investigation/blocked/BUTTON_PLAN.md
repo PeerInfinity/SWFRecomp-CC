@@ -3,20 +3,20 @@
 
 Last updated: 2026-02-25
 
-## Status: 10/14 PASSING — remaining 4 blocked on infrastructure
+## Status: 11/14 PASSING — remaining 3 blocked on infrastructure
 
 ### Results (2026-02-25)
 - `button_children` — **PASS** ✅
 - `button_goto` — **PASS** ✅
 - `button_key_events` — **PASS** ✅ (fixed: keyPress condition mapping, propagation, Tab onKeyDown)
 - `button_key_events_special` — **PASS** ✅ (fixed: special key code mapping, keyPress-suppresses-press/release)
+- `button_keypress` — **PASS** ✅ (fixed: recursive button state machine for nested buttons, resolve hit shape through button chain, button-parent context for GotoFrame no-op)
 - `button_keypress_vs_press` — **PASS** ✅ (fixed: keyPress-handled gates Enter/Space press simulation)
 - `button_order` — **PASS** ✅
 - `button_properties_special_cases` — **PASS** ✅
 - `button_v5` — **PASS** ✅
 - `button_v6` — **PASS** ✅
 - `movieclip_in_removed_button` — **PASS** ✅ (fixed: enterFrame children-before-root, root first-frame skip, stopped-MC enterFrame dispatch)
-- `button_keypress` — FAIL (blocked: mouse click on(press) condition not firing — needs mouse hit-test to trigger button press DoAction)
 - `button_keypress_vs_tab` — FAIL (blocked: Escape key toggling focus highlight visibility — keyPress should suppress Tab focus advance only when highlight is hidden)
 - `button_keypress_vs_textinput` — FAIL (blocked: TextField text input → onChanged callback not implemented)
 - `root_button_mode` — FAIL (blocked: loadMovie + createEmptyMovieClip at runtime)
@@ -30,12 +30,14 @@ Last updated: 2026-02-25
 - **KeyPress gates Enter/Space press**: `dispatch_button_key_actions` returns handled status; when keyPress handled, `actionDispatchKeyPressToFocused` is suppressed (Ruffle: `!key_press_handled` gate)
 - **KeyPress gates Tab focus**: Tab focus advance suppressed when keyPress handled
 - **Tab onKeyDown on focused button**: Removed Tab skip from `actionDispatchKeyDownToFocused` — focused button receives onKeyDown for Tab key
+- **Recursive button state machine**: `ng_update_button_states` now recurses into button children's display lists to find nested buttons. Button 6 containing button 5 as a child is now handled: button 5 participates in hit-test state machine with composed transforms.
+- **Resolve hit shape through button chain**: When a button's `hit_char_id` points to another button (not a shape), `resolve_hit_shape` follows the chain to find the ultimate hit shape. This fixes button 6 whose hit record is button 5 → shape 4.
+- **Button-parent context for actions**: Button actions run in their parent MC's context (matching Ruffle's "actions relative to parent" model). For nested buttons, if the parent is a button MC (not a sprite), `g_current_sprite_obj` is set to prevent GotoFrame from navigating the root timeline — matching Ruffle where GotoFrame on a button parent is a no-op.
 
-### Blockers for remaining 4 tests
-1. **button_keypress**: Missing `on(press)` DoAction for mouse click on button instance1. The button receives a MouseDown event but the `on(press)` condition (0x4 = OverUpToOverDown) doesn't fire because the button state machine hasn't transitioned to Over state (no MouseMove/rollOver before the click). Need mouse-move-then-click sequence handling in button state machine, or allow direct Idle→Down transition.
-2. **button_keypress_vs_tab**: Escape key should toggle focus highlight visibility. When highlight is visible, Tab advances focus (no keyPress condition fires). When hidden (after Escape), Tab fires keyPress condition instead of advancing focus. Needs `focus_tracker.highlight` visibility state tracking.
-3. **button_keypress_vs_textinput**: TextField text input (`TextInput` event) should trigger `text.onChanged` callback. Missing: TextInput event → TextField character insertion → onChanged dispatch.
-4. **root_button_mode**: Needs `createEmptyMovieClip` and `loadMovie` at runtime (entirely separate feature set).
+### Blockers for remaining 3 tests
+1. **button_keypress_vs_tab**: Escape key should toggle focus highlight visibility. When highlight is visible, Tab advances focus (no keyPress condition fires). When hidden (after Escape), Tab fires keyPress condition instead of advancing focus. Needs `focus_tracker.highlight` visibility state tracking and Tab keyPress suppression when highlight is visible.
+2. **button_keypress_vs_textinput**: TextField text input (`TextInput` event) should trigger `text.onChanged` callback. Missing: TextInput event → TextField character insertion → onChanged dispatch.
+3. **root_button_mode**: Needs `createEmptyMovieClip` and `loadMovie` at runtime (entirely separate feature set).
 
 ---
 
