@@ -4,9 +4,9 @@ Last updated: 2026-02-25
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 364/619 (58.8%) — local estimate with new fixes: ~368/619
+- **Pass rate (CI, last run)**: 364/619 (58.8%) — local estimate with new fixes: ~372/619
 - **Main failure types**: output_mismatch (~255), segfault (5), runtime_error (4), compile_fail (many due to FrameLabelEntry typedef conflict), timeout (1)
-- **Recent gains**: Frame navigation complete (goto_frame, goto_frame2, goto_label, goto_methods all PASS). Timer system (set_interval ✅). Scene bias recompiler fix. Deferred script queue. _currentframe sync during natural frame advance.
+- **Recent gains**: Mouse events complete (mouse_pos, mouse_pos_with_scale_factor, mouse_events_visible_enabled, click_block all PASS). Frame navigation complete. Timer system. Button _visible/_enabled gating. Middle mouse button support.
 
 ## Crashes and Errors (8 tests)
 
@@ -65,6 +65,10 @@ Last updated: 2026-02-25
 | `goto_frame` | 12/12 ✅ | _currentframe sync during natural frame advance |
 | `goto_frame2` | 44/44 ✅ | GotoFrame2 rewrite: wrapping arithmetic, label lookup, scene_bias fix, deferred script queue |
 | `goto_label` | 13/13 ✅ | Frame label support (recompiler already had it, needed --recompile) |
+| `mouse_pos` | 666/666 ✅ | Ruffle-compatible matrix composition + double precision + frame loop fix |
+| `mouse_pos_with_scale_factor` | 261/261 ✅ | pixel_ratio support (VIEWPORT_WIDTH/FRAME_WIDTH) |
+| `mouse_events_visible_enabled` | 12/12 ✅ | Button _visible/_enabled gating + middle mouse button |
+| `click_block` | 5/5 ✅ | Sprite display list bounds computation for hit testing |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
