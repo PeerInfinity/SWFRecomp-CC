@@ -4,9 +4,9 @@ Last updated: 2026-02-27
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 388/619 (62.7%)
+- **Pass rate (CI, last run)**: 392/619 (63.3%) — placeobject_occupied_depth regression fixed (+1), tell_target_invalid fixed (+1), rewind_depth now PASS (bonus from sprite preservation), clip_constructors now PASS, issue_768 now PASS
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains**: tell_target_invalid now PASS (6/6). tell_target_invalid_swf6 now PASS (5/5). stage_object_children now PASS (83/83). selection now PASS (454/454). place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). tab_ordering_tabbable 33→36/47. tab_ordering_movieclip_enabled_default 55→63/462. movieclip_hittest_shapeflag recovered from compile_fail (266/338). string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
+- **Recent gains**: clip_constructors now PASS (8/8). issue_768 now PASS (3/3). rewind_depth now PASS (30/30). execution_order4 improved 7→10/12. tell_target_invalid now PASS (6/6). tell_target_invalid_swf6 now PASS (5/5). placeobject_occupied_depth regression fixed. stage_object_children now PASS (83/83). selection now PASS (454/454). place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). tab_ordering_tabbable 33→36/47. tab_ordering_movieclip_enabled_default 55→63/462. movieclip_hittest_shapeflag recovered from compile_fail (266/338). string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -194,7 +194,14 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
 
-### Recent session notes (2026-02-26)
+### Recent session notes (2026-02-27 evening)
+- **placeobject_occupied_depth regression fix**: Root timeline loop-back sprite preservation was too broad — also fired for same-frame duplicate placements. Fixed by adding `place_gen != g_place_gen` guard.
+- **clip_constructors 8/8 PASS**: registerClass type 1 constructor wasn't pushing MOVIECLIP `this` onto `g_this_stack`. `GetVariable("this")` returned OBJECT from caller's context instead. Also needed proper local scope + captured scopes + base_clip for type 1 path.
+- **issue_768 3/3 PASS**: Root MC `_parent` was falling through to prototype chain (finding `MovieClip.prototype._parent = "bad parent"`). Added `_parent` check in special-variables block, guarded to only apply at root context.
+- **rewind_depth 30/30 PASS**: Bonus from sprite preservation fix in previous session (preserved sprites during root timeline loop-back).
+- **execution_order4 7→10/12**: Nested sprite parent context was wrong — `exec_sprite_frame` always used `root_movieclip` as parent for child MC creation. Fixed to use `g_current_context`, and set context to parent sprite's MC before recursive `advance_sprite_frames` calls. Remaining 2 lines need child init frame ordering (frame 0 "frame 1" output before root frame script).
+
+### Previous session notes (2026-02-26)
 - **place_and_lookup 30/30 PASS**: Four fixes: (1) `ng_isScriptableChar()` helper in tag_stubs.c for canonical scriptable check (sprite/button/textfield/video). (2) Updated 4 non-scriptable check sites in action.c to use it. (3) var_map enumeration on root MC in `actionEnumerate2` (for timeline vars like `doPrint`). (4) Videos don't get auto instance names (removed `is_video` from auto-naming condition).
 - **tab_ordering_children 208/208 PASS**: Bonus from video auto-naming fix — instance counter no longer increments for unnamed videos, fixing instance name numbering.
 - **selection 435→452/454**: Implemented selection index tracking: `g_selection_begin/caret/end` globals, split `getIndex` into 3 functions, `setSelection` with clamping/swapping semantics, reset indices on focus change. Remaining 2 lines: `replaceSel()`.
