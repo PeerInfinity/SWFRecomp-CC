@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-02-27T06:01:34.342558+00:00",
-    "old_git_sha": "e28a1321ec5f555299ac6023678b7469e72f88ae",
-    "new_timestamp": "2026-02-27T18:21:34.120419+00:00",
-    "new_git_sha": "d1968478a1730692599412033a97339c6ba6451b",
+    "old_timestamp": "2026-02-27T18:21:34.120419+00:00",
+    "old_git_sha": "d1968478a1730692599412033a97339c6ba6451b",
+    "new_timestamp": "2026-02-27T18:40:15.805628+00:00",
+    "new_git_sha": "b84cddf6ffd670d37a4d735e783a31ee37694768",
     "partial": false,
     "same_commit": false
   },
@@ -11,55 +11,23 @@
     "old_pass": 391,
     "old_total": 619,
     "old_pass_rate": 63.2,
-    "new_pass": 391,
+    "new_pass": 392,
     "new_total": 619,
-    "new_pass_rate": 63.2,
+    "new_pass_rate": 63.3,
     "old_mismatched_lines": 31564,
-    "new_mismatched_lines": 31564,
-    "increased_mismatches": 2,
+    "new_mismatched_lines": 31562,
+    "increased_mismatches": 0,
     "decreased_mismatches": 2,
     "newly_passing": 1,
-    "newly_failing": 1,
-    "status_changed": 2,
-    "unchanged": 616,
+    "newly_failing": 0,
+    "status_changed": 1,
+    "unchanged": 618,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "issue_2870",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 3,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 3,
-        "matching_lines": 2
-      }
-    },
-    {
       "test": "placeobject_occupied_depth",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 6,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "tell_target_invalid",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
