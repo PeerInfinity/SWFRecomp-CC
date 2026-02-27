@@ -8548,8 +8548,8 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 					}
 					if (check_char_id > 0) {
 						CharacterType ctype = dictionary[check_char_id].type;
-						if (ctype != CHAR_TYPE_SPRITE && ctype != CHAR_TYPE_BUTTON) {
-							// Shape/text/morph — return parent MC, don't descend
+						if (ctype == CHAR_TYPE_SHAPE || ctype == CHAR_TYPE_MORPH_SHAPE) {
+							// Shape/morph — return parent MC, don't descend
 							return mc;
 						}
 					}
@@ -21884,8 +21884,8 @@ void actionGetMember(SWFAppContext* app_context)
 						extern DisplayObject* display_list;
 						_ecid = display_list[_early_depth].char_id;
 					}
-					if (_ecid > 0 && dictionary[_ecid].type != CHAR_TYPE_SPRITE &&
-					    dictionary[_ecid].type != CHAR_TYPE_BUTTON) {
+					if (_ecid > 0 && (dictionary[_ecid].type == CHAR_TYPE_SHAPE ||
+					    dictionary[_ecid].type == CHAR_TYPE_MORPH_SHAPE)) {
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 						return;
 					}
@@ -22146,8 +22146,8 @@ void actionGetMember(SWFAppContext* app_context)
 								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 								return;
 							}
-							// Non-scriptable types (shape, text, morph) resolve to parent MC
-							if (_ctype != CHAR_TYPE_SPRITE && _ctype != CHAR_TYPE_BUTTON) {
+							// Non-scriptable types (shape, morph) resolve to parent MC
+							if (_ctype == CHAR_TYPE_SHAPE || _ctype == CHAR_TYPE_MORPH_SHAPE) {
 								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 								return;
 							}
@@ -22182,8 +22182,8 @@ void actionGetMember(SWFAppContext* app_context)
 							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 							return;
 						}
-						// Non-scriptable types (shape, text, morph) resolve to parent MC
-						if (_ctype != CHAR_TYPE_SPRITE && _ctype != CHAR_TYPE_BUTTON) {
+						// Non-scriptable types (shape, morph) resolve to parent MC
+						if (_ctype == CHAR_TYPE_SHAPE || _ctype == CHAR_TYPE_MORPH_SHAPE) {
 							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 							return;
 						}
