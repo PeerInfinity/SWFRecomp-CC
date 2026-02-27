@@ -132,7 +132,7 @@ Last updated: 2026-02-26
 | REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
-| TELLTARGET_PLAN | **Phase 1 MOSTLY DONE** | tell_target ✅ (37/37), slash_syntax ✅, string_paths_basic ✅, target_clip_removed ✅ | Phase 2: dot-path GetVariable, eval() |
+| TELLTARGET_PLAN | **Phase 2 IN PROGRESS** | tell_target ✅, slash_syntax ✅, string_paths_basic ✅, target_clip_removed ✅, path_string ✅ (322/322), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅ | Phase 2 remaining: eval(), colon-variable syntax |
 | TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
 | TAB_ORDERING_PLAN | **PARTIAL** | 2/7 pass (tab_ordering_automatic_basic, tab_ordering_reverse ✅) | Tab key focus navigation, blocked by FOCUS_SYSTEM_PLAN |

@@ -15386,6 +15386,26 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 void actionGetVariable(SWFAppContext* app_context)
 {
+	// If stack top is not a string, convert it first (handles double GetVariable pattern
+	// where first GetVariable returns a non-string like MOVIECLIP or OBJECT)
+	if (STACK_TOP_TYPE != ACTION_STACK_VALUE_STRING)
+	{
+		// NULL and UNDEFINED on stack → GetVariable returns undefined
+		// (Ruffle behavior: non-string non-object values are not valid variable refs)
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_NULL ||
+		    STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED)
+		{
+			POP();
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+		char _gv_conv_buf[17];
+		convertString(app_context, _gv_conv_buf);
+		// Clear string_id since this isn't a constant pool string —
+		// forces hashmap-based lookup instead of array-based lookup
+		VAL(u32, &STACK[SP + 12]) = 0;
+	}
+
 	// Read variable name info from stack
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
 	u32 string_id = VAL(u32, &STACK[SP + 12]);
@@ -15491,10 +15511,64 @@ void actionGetVariable(SWFAppContext* app_context)
 
 #ifdef NO_GRAPHICS
 			// Try resolving left side as MC path via resolveFlashPathToMC
+			// Ruffle compatibility: _level0 in dot-paths only resolves when the scope's
+			// local object is a MovieClip (via StageObject _levelN handling). Inside a
+			// function, the local scope is a plain ScriptObject, so _level0 won't resolve.
+			// _root has special first-element handling in Ruffle and always resolves.
 			{
+				// Check if we're inside a function scope (non-with scope entry exists)
+				int in_function_scope = 0;
+				for (int si = scope_depth - 1; si >= 0; si--) {
+					if (!scope_is_with[si]) { in_function_scope = 1; break; }
+				}
+
+				// Check if target starts with _level (case-insensitive for SWF<=6)
+				int target_is_level = 0;
+				if (target_len >= 6) {
+					if (g_swf_version <= 6)
+						target_is_level = (strncasecmp(var_name, "_level", 6) == 0);
+					else
+						target_is_level = (strncmp(var_name, "_level", 6) == 0);
+				}
+
+				// Inside a function, _levelN targets fail (Ruffle scope chain behavior)
+				if (in_function_scope && target_is_level) {
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
+				}
+
 				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
 				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
 				if (target_mc != NULL && prop_len > 0) {
+					// Ruffle compatibility: own properties (variables set via SetVariable
+					// on root timeline) are checked BEFORE display list children.
+					// In Ruffle, root timeline vars are stored as own props on root MC's
+					// ScriptObject, so get(root, "clip1") returns the variable value rather
+					// than the child MC. Our architecture stores vars in a separate table,
+					// so we check the variable table first to mimic this behavior.
+					if (target_mc == &root_movieclip) {
+						extern hashmap* var_map;
+						// Check by-name hashmap first (dynamic strings)
+						ActionVar* own_var = NULL;
+						if (var_map != NULL) {
+							char folded_prop[512];
+							const char* lookup_prop = prop_name;
+							if (g_swf_version <= 6 && prop_len < sizeof(folded_prop)) {
+								for (u32 fi = 0; fi < prop_len; fi++)
+									folded_prop[fi] = (prop_name[fi] >= 'A' && prop_name[fi] <= 'Z') ? prop_name[fi] + 32 : prop_name[fi];
+								lookup_prop = folded_prop;
+							}
+							hashmap_get(var_map, lookup_prop, prop_len, (uintptr_t*)&own_var);
+						}
+						if (own_var != NULL && !(own_var->type == ACTION_STACK_VALUE_STRING && own_var->str_size == 0 && own_var->data.string_data.heap_ptr == NULL)) {
+							pushVar(app_context, own_var);
+							return;
+						}
+						// Also check by-ID array (constant pool strings)
+						// We need the string_id for prop_name — scan the constant pool
+						// Actually, just try all IDs matching the prop name (expensive but rare)
+						// For efficiency, fall through to GetMember and check var_map after
+					}
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
 					PUSH_STR(prop_name, prop_len);
 					actionGetMember(app_context);
@@ -16673,14 +16747,97 @@ void actionSetVariable(SWFAppContext* app_context)
 				return;
 			}
 #endif
-			// Fallback: resolve container via GetVariable, then SetMember
+			// Check if the target path contains a slash (indicating slash-path semantics)
 			{
-				PUSH_STR(var_name, target_len);
-				actionGetVariable(app_context);
-				// Stack has [container_obj]; push prop name and value for SetMember
-				PUSH_STR(prop_name, prop_len);
-				pushVar(app_context, &value_var);
-				actionSetMember(app_context);
+				int has_slash_in_target = (memchr(var_name, '/', target_len) != NULL);
+				if (has_slash_in_target) {
+					// Slash-path walk: tokenize using Ruffle rules (dots NOT delimiters
+					// once a slash is seen). For each segment, try MC child lookup first,
+					// then fall back to GetMember (handles dynamic properties).
+					MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+					const char* tp = var_name;
+					u32 tp_remaining = target_len;
+					int is_slash = 0;
+					int first_seg = 1;
+					int walk_ok = 1;
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+					while (tp_remaining > 0 && walk_ok)
+					{
+						while (tp_remaining > 0 && *tp == ':') { tp++; tp_remaining--; }
+						if (tp_remaining == 0) break;
+						u32 seg_len = 0;
+						while (seg_len < tp_remaining) {
+							char c = tp[seg_len];
+							if (c == ':') break;
+							if (c == '.' && !is_slash) break;
+							if (c == '/') { is_slash = 1; break; }
+							seg_len++;
+						}
+						if (seg_len == 0) { tp++; tp_remaining--; continue; }
+						if (first_seg) {
+							POP();
+							if (seg_len == 5 && strncmp(tp, "_root", 5) == 0) {
+								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+							} else if (seg_len == 4 && strncmp(tp, "this", 4) == 0) {
+								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+							} else {
+								MovieClip* child = resolveSlashPathToMC(app_context, (char*)tp, seg_len, ctx);
+								if (child != NULL) {
+									PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+								} else {
+									PUSH_STR(tp, seg_len);
+									actionGetVariable(app_context);
+								}
+							}
+							first_seg = 0;
+						} else {
+							if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP) {
+								MovieClip* parent_mc = (MovieClip*)VAL(u64, &STACK[SP + 16]);
+								if (seg_len == 5 && strncmp(tp, "_root", 5) == 0) {
+									POP();
+									PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+								} else if (seg_len == 7 && strncmp(tp, "_parent", 7) == 0) {
+									POP();
+									if (parent_mc->parent) {
+										PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)parent_mc->parent);
+									} else {
+										PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+										walk_ok = 0;
+									}
+								} else {
+									MovieClip* child = resolveSlashPathToMC(app_context, (char*)tp, seg_len, parent_mc);
+									if (child != NULL) {
+										POP();
+										PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+									} else {
+										PUSH_STR(tp, seg_len);
+										actionGetMember(app_context);
+									}
+								}
+							} else if (STACK_TOP_TYPE != ACTION_STACK_VALUE_UNDEFINED &&
+							           STACK_TOP_TYPE != ACTION_STACK_VALUE_NULL) {
+								PUSH_STR(tp, seg_len);
+								actionGetMember(app_context);
+							} else {
+								walk_ok = 0;
+							}
+						}
+						tp += seg_len;
+						tp_remaining -= seg_len;
+						if (tp_remaining > 0) { tp++; tp_remaining--; }
+					}
+					PUSH_STR(prop_name, prop_len);
+					pushVar(app_context, &value_var);
+					actionSetMember(app_context);
+				} else {
+					// Non-slash path: use actionGetVariable which handles scope chains,
+					// _global fallback, and dot-path resolution correctly.
+					PUSH_STR(var_name, target_len);
+					actionGetVariable(app_context);
+					PUSH_STR(prop_name, prop_len);
+					pushVar(app_context, &value_var);
+					actionSetMember(app_context);
+				}
 			}
 			return;
 		}
@@ -21796,6 +21953,10 @@ void actionGetMember(SWFAppContext* app_context)
 				else { pushUndefined(app_context); }
 				return;
 			}
+			if (strcasecmp(prop_name, "_root") == 0) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+				return;
+			}
 		}
 
 		// Check user-defined dynamic properties (walks __proto__ chain for TextField prototype)
@@ -21830,6 +21991,33 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 #endif
 				pushVar(app_context, prop);
+				return;
+			}
+		}
+
+
+		// Ruffle compatibility: root MC timeline variables (set via SetVariable at root
+		// timeline level) are stored as own properties on root MC's ScriptObject in Ruffle.
+		// Own properties are checked before display list children. In our architecture,
+		// timeline vars are in the global var_map, so check it here for root MC.
+		// Only applies to root MC — non-root clips don't have this dual storage issue.
+		if (mc == &root_movieclip && prop_name_len > 0 && prop_name[0] != '_')
+		{
+			extern hashmap* var_map;
+			ActionVar* root_var = NULL;
+			if (var_map != NULL) {
+				char _rv_folded[512];
+				const char* _rv_key = prop_name;
+				if (g_swf_version <= 6 && prop_name_len < sizeof(_rv_folded)) {
+					for (u32 fi = 0; fi < prop_name_len; fi++)
+						_rv_folded[fi] = (prop_name[fi] >= 'A' && prop_name[fi] <= 'Z') ? (prop_name[fi] + 32) : prop_name[fi];
+					_rv_folded[prop_name_len] = '\0';
+					_rv_key = _rv_folded;
+				}
+				hashmap_get(var_map, _rv_key, prop_name_len, (uintptr_t*)&root_var);
+			}
+			if (root_var != NULL && !(root_var->type == ACTION_STACK_VALUE_STRING && root_var->str_size == 0 && root_var->data.string_data.heap_ptr == NULL)) {
+				pushVar(app_context, root_var);
 				return;
 			}
 		}

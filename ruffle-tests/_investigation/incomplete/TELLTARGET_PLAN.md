@@ -3,18 +3,28 @@
 
 Last updated: 2026-02-26
 
-## Status: PHASE 1 MOSTLY COMPLETE
+## Status: PHASE 2 IN PROGRESS
 
-### Results (2026-02-26, commit 6bc4092d)
+### Results (2026-02-26)
 - `tell_target` ✅ — **37/37 PASS**
 - `tell_target_invalid` — 4/6 (remaining 2: frame navigation in sprites)
 - `slash_syntax` ✅ — **14/14 PASS**
 - `string_paths_basic` ✅ — **4/4 PASS**
 - `target_clip_removed` ✅ — **5/5 PASS**
-- `string_paths_other` — 31/36 (unchanged)
-- `target_clip_swf5` — 0/2 (clip events / frame execution issue)
-- `target_clip_swf6` — 0/2 (clip events / frame execution issue)
-- `path_string` — 38/322 (needs Phase 2 dot-path rewrite)
+- `target_clip_swf5` ✅ — **2/2 PASS**
+- `target_clip_swf6` ✅ — **2/2 PASS**
+- `target_path` ✅ — PASS
+- `path_string` ✅ — **322/322 PASS** (was 38/322)
+- `get_variable_in_scope` ✅ — PASS (no regression)
+- `string_paths_other` — 31/36 (pre-existing failures)
+- `string_paths_hidden` — pre-existing failures (shape display objects)
+- `lock_root` ✅ — PASS
+
+### What's New (Phase 2 progress)
+- **actionGetMember `_root` builtin**: MC property `_root` returns root_movieclip (enables `mc._root` access)
+- **actionGetMember root MC global var check**: For root MC, checks global var_map after dynamic_props (non-MOVIECLIP values from global vars shadow child clips)
+- **actionGetVariable non-string handling**: NULL/UNDEFINED on stack → returns undefined; other types → convertString with string_id=0
+- **actionSetVariable slash-path walk**: For slash-containing paths, walks segments using Ruffle-compatible tokenization (dots NOT delimiters once slash is seen); tries MC child lookup, then falls back to GetMember (dynamic properties)
 
 ### What's Implemented (Phase 1)
 - **g_base_clip tracking**: New static in action.c, set/restored by `exec_sprite_frame` and `process_sprite_init_at_depth` in tag.c
@@ -54,17 +64,17 @@ Internal MovieClip `target` fields use slash-path format: `"/"` for root, `"/cli
 ### Core TellTarget (6 tests)
 | Test | Lines | Current Match | Notes |
 |------|-------|--------------|-------|
-| tell_target | 37 | 0/37 (0%) | Comprehensive: nested tellTarget, base clip, toString, error msgs |
-| tell_target_invalid | 6 | 0/6 (0%) | Invalid target + error msg + gotoAndPlay behavior |
-| tell_target_invalid_swf6 | 5 | 0/5 (0%) | SWF6 variant of above |
-| target_clip_swf5 | 2 | 0/2 (0%) | `_target` property returns "/circle" |
-| target_clip_swf6 | 2 | 0/2 (0%) | `_target` property returns "/" (root context) |
-| target_clip_removed | 5 | 4/5 (80%) | Near-passing, removed clip edge case |
+| tell_target | 37 | **37/37 ✅** | Comprehensive: nested tellTarget, base clip, toString, error msgs |
+| tell_target_invalid | 6 | 4/6 | Remaining 2: frame navigation in sprites |
+| tell_target_invalid_swf6 | 5 | 0/5 | SWF6 variant of above |
+| target_clip_swf5 | 2 | **2/2 ✅** | `_target` property returns "/circle" |
+| target_clip_swf6 | 2 | **2/2 ✅** | `_target` property returns "/" (root context) |
+| target_clip_removed | 5 | **5/5 ✅** | Near-passing, removed clip edge case |
 
 ### Path String Resolution (1 test)
 | Test | Lines | Current Match | Notes |
 |------|-------|--------------|-------|
-| path_string | 322 | 44/322 (14%) | **SEGFAULT**. Exhaustive get() vs tellTarget() path combos |
+| path_string | 322 | **322/322 ✅** | Exhaustive get() vs tellTarget() path combos — FULLY PASSING |
 
 ### Slash Syntax (1 test)
 | Test | Lines | Current Match | Notes |
