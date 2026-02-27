@@ -16116,6 +16116,15 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 		}
 
+		// _parent on root context: return undefined (root has no parent)
+		// Only intercept at root level — non-root contexts handle _parent at line 15973
+		if (var_name_len == 7 && strncmp(var_name, "_parent", 7) == 0
+		    && (g_current_context == NULL || g_current_context == &root_movieclip))
+		{
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+
 		// _root refers to the root MovieClip
 		if (g_swf_version <= 6
 		    ? (var_name_len == 5 && strncasecmp(var_name, "_root", 5) == 0)
@@ -23596,7 +23605,35 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 	// Call constructor with mc as 'this' (MOVIECLIP type, not OBJECT)
 	if (ctor_func->function_type == 1 && ctor_func->simple_func != NULL)
 	{
-		// Type 1: simple function — set 'this' as MOVIECLIP variable
+		// Type 1: simple function — push local scope + captured scopes (matching actionCallFunction)
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+		u32 captured_count = ctor_func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*)ctor_func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*)ctor_func->captured_scope[i];
+		}
+		// SWF6+ closure: switch to function's base_clip context
+		MovieClip* saved_base = NULL;
+		if (g_swf_version >= 6 && ctor_func->base_clip != NULL) {
+			saved_base = g_current_context;
+			actionSetCurrentContext(ctor_func->base_clip);
+		}
+		// Push 'this' as MOVIECLIP onto g_this_stack (GetVariable("this") checks this first)
+		u32 saved_this_depth = g_this_depth;
+		if (g_this_depth < MAX_THIS_DEPTH) {
+			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+			g_this_stack[g_this_depth].str_size = 0;
+			g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
+			g_this_depth++;
+		}
 		ActionVar this_var;
 		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 		this_var.str_size = 0;
@@ -23605,6 +23642,13 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		g_call_depth++;
 		((ActionVar(*)(SWFAppContext*))ctor_func->simple_func)(app_context);
 		g_call_depth--;
+		g_this_depth = saved_this_depth;
+		if (saved_base != NULL)
+			actionSetCurrentContext(saved_base);
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
 	}
 	else if (ctor_func->function_type == 2 && ctor_func->advanced_func != NULL)
 	{
