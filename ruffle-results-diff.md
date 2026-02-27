@@ -1,28 +1,38 @@
 # Ruffle Test Results Diff
 
-**Previous:** `fc96eb5ca495` (2026-02-27T01:40:24.575105+00:00)
-**Current:** `a4be5eedce2d` (2026-02-27T01:51:02.812440+00:00)
+**Previous:** `a4be5eedce2d` (2026-02-27T01:51:02.812440+00:00)
+**Current:** `4c464530ce68` (2026-02-27T03:31:32.732113+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 384 | 386 | +2 |
+| Passing | 386 | 388 | +2 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 62.0% | 62.4% | +0.4% |
-| Mismatched lines | 31662 | 31564 | -98 |
-|   Decreased | | | -98 |
+| Pass rate | 62.4% | 62.7% | +0.3% |
+| Mismatched lines | 31564 | 31577 | +13 |
+|   Decreased | | | -68 |
+|   Increased | | | +81 |
 
 ## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `edittext_antialiastype` | output_mismatch | 274/296 | 296/296 |
-| `edittext_password` | output_mismatch | 3/5 | 5/5 |
+| `place_and_lookup` | output_mismatch | 18/30 | 30/30 |
+| `tab_ordering_children` | output_mismatch | 181/208 | 208/208 |
 
-## Status Changed (2)
+## Status Changed (1)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `movieclip_hittest_shapeflag` | output_mismatch | compile_fail | 266/338 | - |
-| `resolve_different_root` | output_mismatch | segfault | 0/2 | - |
+| `movieclip_hittest_shapeflag` | compile_fail | output_mismatch | - | 266/338 |
+
+## Line Count Changed (5)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `selection` | output_mismatch | 434/454 | 452/454 | -18 |
+| `tab_ordering_movieclip_enabled_default` | output_mismatch | 55/462 | 63/462 | -8 |
+| `tab_ordering_tabbable` | output_mismatch | 33/47 | 36/47 | -3 |
+| `global_proto_decls_delete` | output_mismatch | 0/4158 | 0/4158 | 0 |
+| `global_proto_decls` | output_mismatch | 20/4497 | 11/4497 | +9 |
