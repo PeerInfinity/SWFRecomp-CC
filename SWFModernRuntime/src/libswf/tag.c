@@ -72,12 +72,10 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	MovieClip* saved_base = actionGetBaseClip();
 	if (obj->instance_name != NULL)
 	{
-		// Use current context as parent (correct for nested sprites).
-		// At root level, g_current_context is root_movieclip.
-		// Inside a recursive advance_sprite_frames, g_current_context is the parent sprite's MC.
-		extern MovieClip root_movieclip;
-		MovieClip* parent_mc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
-		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+		// Find existing MC (no creation) to avoid spurious auto-named MC entries
+		// during advance_sprite_frames display-list loop-back re-execution.
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
 		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); actionSetBaseClip(mc); }
 	}
 
@@ -398,8 +396,13 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					// Recurse nested sprites (set parent context for correct child MC creation)
 					{
 						extern MovieClip root_movieclip;
+#ifndef NO_GRAPHICS
 						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
+#else
+						extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+						MovieClip* smc = obj->instance_name ? actionFindMovieClipByName(obj->instance_name) : NULL;
+#endif
 						MovieClip* sctx = g_current_context;
 						if (smc) actionSetCurrentContext(smc);
 						advance_sprite_frames(app_context);
@@ -439,8 +442,13 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					// Recurse nested sprites (set parent context for correct child MC creation)
 					{
 						extern MovieClip root_movieclip;
+#ifndef NO_GRAPHICS
 						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
+#else
+						extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+						MovieClip* smc = obj->instance_name ? actionFindMovieClipByName(obj->instance_name) : NULL;
+#endif
 						MovieClip* sctx = g_current_context;
 						if (smc) actionSetCurrentContext(smc);
 						advance_sprite_frames(app_context);
@@ -500,27 +508,44 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// Mark eligible for AS2 onEnterFrame dispatch (sprite actually advanced)
 		obj->enterframe_eligible = 1;
 
+#ifdef NO_GRAPHICS
 		// Initialize any children placed by the frame function (deferred Phase 2
 		// scripts from eager init). Sprite frame functions don't have tagShowFrame,
 		// so process_sprite_needs_init must be called explicitly here.
+		// Only if any child actually needs init (avoid unnecessary MC lookups).
 		{
-			extern MovieClip root_movieclip;
-			MovieClip* parent_for_init = (g_current_context != NULL) ? g_current_context : &root_movieclip;
-			MovieClip* sprite_mc_init = NULL;
-			if (obj->instance_name != NULL)
-				sprite_mc_init = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_init);
-			process_sprite_needs_init(app_context, sprite_mc_init ? sprite_mc_init : parent_for_init);
+			int any_needs_init = 0;
+			for (size_t ci = 1; ci <= max_depth; ci++) {
+				if (display_list[ci].char_id != 0 && display_list[ci].sprite_needs_init) {
+					any_needs_init = 1;
+					break;
+				}
+			}
+			if (any_needs_init) {
+				extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+				extern MovieClip root_movieclip;
+				MovieClip* parent_for_init = (obj->instance_name != NULL)
+					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				process_sprite_needs_init(app_context, parent_for_init ? parent_for_init : &root_movieclip);
+			}
 		}
+#endif
 
 		// Recurse: advance nested sprites within this sprite's display list.
 		// Set g_current_context to this sprite's MC so nested exec_sprite_frame
 		// calls use the correct parent for child MC creation.
 		{
+			MovieClip* sprite_mc = NULL;
+#ifndef NO_GRAPHICS
 			extern MovieClip root_movieclip;
 			MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
-			MovieClip* sprite_mc = NULL;
 			if (obj->instance_name != NULL)
 				sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_recurse);
+#else
+			extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+			if (obj->instance_name != NULL)
+				sprite_mc = actionFindMovieClipByName(obj->instance_name);
+#endif
 			MovieClip* saved_recurse_ctx = g_current_context;
 			if (sprite_mc) actionSetCurrentContext(sprite_mc);
 			advance_sprite_frames(app_context);
@@ -541,7 +566,6 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		if (ch->sprite_frame_count > 0)
 			obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
 	}
-
 }
 
 #ifndef NO_GRAPHICS

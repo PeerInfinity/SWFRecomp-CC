@@ -9420,6 +9420,18 @@ MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* i
 	return findOrCreateMovieClip(app_context, instance_name, parent);
 }
 
+// Find a cached MovieClip by name only (no parent constraint, no creation).
+// Used by advance_sprite_frames to set context without side effects.
+MovieClip* actionFindMovieClipByName(const char* instance_name) {
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL &&
+		    swf_name_match(child_mc_cache[i]->name, instance_name)) {
+			return child_mc_cache[i];
+		}
+	}
+	return NULL;
+}
+
 // Invalidate cached MovieClip when a display entry is removed (e.g., tagRemoveObject2).
 // Clears dynamic_props so the MC starts fresh if re-placed with the same name.
 void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name)
@@ -31847,7 +31859,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					COMPUTE_WORLD_MATRIX_DBL(mc, sa, sb, sc, sd, sfx, sfy);
 					double ta, tb, tc, td, tfx, tfy;
 					COMPUTE_WORLD_MATRIX_DBL(target_mc, ta, tb, tc, td, tfx, tfy);
-
 
 					// Invert target world matrix
 					double det = ta * td - tb * tc;
