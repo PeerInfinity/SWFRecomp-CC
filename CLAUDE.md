@@ -40,3 +40,16 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 - `emsdk_env.sh` is at `SWFRecomp-CC/emsdk/emsdk_env.sh`
 - Build scripts are under `SWFRecomp/scripts/`, NOT project root `scripts/`
 - If running locally, the Ruffle source repository is available at `~/CC/ruffle`
+
+## Documenting Accepted Diffs and Ruffle/Flash Differences
+
+Two investigation docs track cases where test diffs are permanent or intentional:
+
+- `ruffle-tests/_investigation/ACCEPTED_DIFFS.md` — Tests where some output lines will **never match** due to platform UB, inconsistent expected output, Flash quirks we can't replicate, or Flash UB we intentionally don't replicate. Each entry documents the category, example diff, explanation, and decision.
+- `ruffle-tests/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` — Tests where our implementation **matches Flash's actual behavior** but disagrees with Ruffle's expected output (i.e., the Ruffle test expectation reflects Ruffle's own behavior, not Flash's).
+
+**When to update these docs:**
+- If you discover a test diff that cannot be fixed because it depends on C undefined behavior, platform-specific results, or internally inconsistent expected output → add it to `ACCEPTED_DIFFS.md` under the appropriate category.
+- If you discover a test diff where our output matches Flash's documented/known behavior but Ruffle's expected output reflects Ruffle's own divergent implementation → add it to `RUFFLE_VS_FLASH_DIFFERENCES.md`.
+- Always include: test name, example diff, explanation of why it's unfixable/intentional, and the decision.
+- Update the summary table in `ACCEPTED_DIFFS.md` when adding new entries.
