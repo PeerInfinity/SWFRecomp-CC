@@ -9991,7 +9991,25 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 	} else {
 		entry_idx = ng_findDisplayEntryIdx(mc->name);
 	}
-	if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+	int has_static = ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax);
+
+	// Union with Drawing API bounds if present
+	if (mc->draw_has_bounds) {
+		float dxmin = mc->draw_xmin, dxmax = mc->draw_xmax;
+		float dymin = mc->draw_ymin, dymax = mc->draw_ymax;
+		if (has_static) {
+			if (dxmin < gxmin) gxmin = dxmin;
+			if (dxmax > gxmax) gxmax = dxmax;
+			if (dymin < gymin) gymin = dymin;
+			if (dymax > gymax) gymax = dymax;
+		} else {
+			gxmin = dxmin; gxmax = dxmax;
+			gymin = dymin; gymax = dymax;
+			has_static = 1;
+		}
+	}
+
+	if (has_static) {
 		*out_nat_w = (double)(gxmax - gxmin);
 		*out_nat_h = (double)(gymax - gymin);
 		return 1;
@@ -10060,7 +10078,10 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 	double nat_w = 0, nat_h = 0;
 	mcGetOriginalBounds(mc, &nat_w, &nat_h);
 	if (nat_w < 0.001 && nat_h < 0.001) {
-		mc->width = (float)v;
+		// Empty clip: scales become 0 (Flash/Ruffle behavior — NaN clamped to 0)
+		mc->xscale = 0.0f;
+		mc->yscale = 0.0f;
+		mc->as_set_flags |= 4 | 8;
 		return;
 	}
 	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
@@ -10108,7 +10129,10 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 	double nat_w = 0, nat_h = 0;
 	mcGetOriginalBounds(mc, &nat_w, &nat_h);
 	if (nat_w < 0.001 && nat_h < 0.001) {
-		mc->height = (float)v;
+		// Empty clip: scales become 0 (Flash/Ruffle behavior — NaN clamped to 0)
+		mc->xscale = 0.0f;
+		mc->yscale = 0.0f;
+		mc->as_set_flags |= 4 | 8;
 		return;
 	}
 	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
@@ -31823,6 +31847,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					COMPUTE_WORLD_MATRIX_DBL(mc, sa, sb, sc, sd, sfx, sfy);
 					double ta, tb, tc, td, tfx, tfy;
 					COMPUTE_WORLD_MATRIX_DBL(target_mc, ta, tb, tc, td, tfx, tfy);
+
 
 					// Invert target world matrix
 					double det = ta * td - tb * tc;

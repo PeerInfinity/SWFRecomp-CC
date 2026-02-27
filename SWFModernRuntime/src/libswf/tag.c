@@ -500,6 +500,18 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// Mark eligible for AS2 onEnterFrame dispatch (sprite actually advanced)
 		obj->enterframe_eligible = 1;
 
+		// Initialize any children placed by the frame function (deferred Phase 2
+		// scripts from eager init). Sprite frame functions don't have tagShowFrame,
+		// so process_sprite_needs_init must be called explicitly here.
+		{
+			extern MovieClip root_movieclip;
+			MovieClip* parent_for_init = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+			MovieClip* sprite_mc_init = NULL;
+			if (obj->instance_name != NULL)
+				sprite_mc_init = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_init);
+			process_sprite_needs_init(app_context, sprite_mc_init ? sprite_mc_init : parent_for_init);
+		}
+
 		// Recurse: advance nested sprites within this sprite's display list.
 		// Set g_current_context to this sprite's MC so nested exec_sprite_frame
 		// calls use the correct parent for child MC creation.
@@ -529,6 +541,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		if (ch->sprite_frame_count > 0)
 			obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
 	}
+
 }
 
 #ifndef NO_GRAPHICS
