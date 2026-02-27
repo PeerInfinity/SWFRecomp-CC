@@ -1911,11 +1911,13 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #endif
 
 	// Root timeline loop-back preservation: when re-placing the SAME character at a depth
-	// that already has an initialized sprite, treat as modify (update transform only).
-	// This matches Ruffle's run_goto behavior where existing clips are preserved during
-	// root timeline looping (frame 4 -> frame 0).
+	// that already has an initialized sprite FROM A PREVIOUS FRAME, treat as modify
+	// (update transform only). This matches Ruffle's run_goto behavior where existing
+	// clips are preserved during root timeline looping (frame 4 -> frame 0).
+	// Only applies across frame boundaries (different place_gen), NOT within same frame.
 	if (display_list[depth].char_id == char_id && display_list[depth].char_id != 0
-	    && display_list[depth].sprite_display_list != NULL)
+	    && display_list[depth].sprite_display_list != NULL
+	    && display_list[depth].place_gen != g_place_gen)
 	{
 		display_list[depth].transform_id = transform_id;
 		display_list[depth].cxform_id = cxform_id;
