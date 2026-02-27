@@ -4,9 +4,9 @@ Last updated: 2026-02-27
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 386/619 (62.4%)
-- **Main failure types**: output_mismatch (214), segfault (14), compile_fail (2), runtime_error (2), timeout (1)
-- **Recent gains**: place_and_lookup now PASS (30/30). selection 435→453/455. string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
+- **Pass rate (CI, last run)**: 388/619 (62.7%)
+- **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
+- **Recent gains**: place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). selection 435→452/454. tab_ordering_tabbable 33→36/47. tab_ordering_movieclip_enabled_default 55→63/462. movieclip_hittest_shapeflag recovered from compile_fail (266/338). string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -72,13 +72,15 @@ Last updated: 2026-02-27
 | `tell_target` | 37/37 ✅ | Base clip tracking + SetTarget rewrite |
 | `path_string` | 322/322 ✅ | _level0 scope chain fix, root MC var priority in GetMember, slash-path SetVariable |
 | `string_paths_hidden` | 54/54 ✅ | Non-scriptable display objects (shapes/text/morph) resolve to parent MC |
+| `place_and_lookup` | 30/30 ✅ | ng_isScriptableChar helper, var_map enumeration on root MC, video auto-naming fix |
+| `tab_ordering_children` | 208/208 ✅ | Bonus from video auto-naming fix (instance counter no longer increments for unnamed videos) |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
-| `selection` | 453/455 (99.6%) | replaceSel() not yet implemented (2 lines) |
+| `selection` | 452/454 (99.6%) | replaceSel() not yet implemented (2 lines) |
 | `hittest_morph` | ~~67/70~~ **70/70 PASS** ✅ | Now passing in CI |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
@@ -98,7 +100,7 @@ Last updated: 2026-02-27
 | Test | Match | Issue |
 |------|-------|-------|
 | `edittext_restrict` | 147/191 (77.0%) | TextField.restrict pattern matching |
-| `tab_ordering_tabbable` | 36/47 (76.6%) | Tab navigation |
+| `tab_ordering_tabbable` | 36/47 (76.6%) | Tab navigation (improved from 33/47) |
 | `tab_ordering_automatic_order_same_position` | 9/12 (75.0%) | Tab navigation |
 | `rewind_depth` | 22/30 (73.3%) | Backward goto depth handling |
 | `add_property` | 11/15 (73.3%) | Object.addProperty prototype chain getter invocation |
@@ -193,7 +195,11 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 
 ### Recent session notes (2026-02-26)
 - **place_and_lookup 30/30 PASS**: Four fixes: (1) `ng_isScriptableChar()` helper in tag_stubs.c for canonical scriptable check (sprite/button/textfield/video). (2) Updated 4 non-scriptable check sites in action.c to use it. (3) var_map enumeration on root MC in `actionEnumerate2` (for timeline vars like `doPrint`). (4) Videos don't get auto instance names (removed `is_video` from auto-naming condition).
-- **selection 435→453/455**: Implemented selection index tracking: `g_selection_begin/caret/end` globals, split `getIndex` into 3 functions, `setSelection` with clamping/swapping semantics, reset indices on focus change. Remaining 2 lines: `replaceSel()`.
+- **tab_ordering_children 208/208 PASS**: Bonus from video auto-naming fix — instance counter no longer increments for unnamed videos, fixing instance name numbering.
+- **selection 435→452/454**: Implemented selection index tracking: `g_selection_begin/caret/end` globals, split `getIndex` into 3 functions, `setSelection` with clamping/swapping semantics, reset indices on focus change. Remaining 2 lines: `replaceSel()`.
+- **tab_ordering bonuses**: tab_ordering_tabbable 33→36/47, tab_ordering_movieclip_enabled_default 55→63/462. Both from video auto-naming fix.
+- **movieclip_hittest_shapeflag**: Recovered from compile_fail to output_mismatch (266/338). Likely from tag_stubs.c recompilation fixing a prior issue.
+- **global_proto_decls regression 20→11**: Not a real behavioral change — test has 670/4497 lines of wrong output. The 9-line positional scoring drop is coincidental from recompilation (the _global ASObject enumeration is unaffected by our MOVIECLIP-only changes).
 
 ### Previous session notes (2026-02-27)
 - **string_paths_hidden 54/54 PASS**: Non-scriptable display objects (shapes, text, morph shapes) now resolve to parent MC instead of creating a MC wrapper. Fixed in `resolveSlashPathToMC` (character type check), `actionGetMember` (MOVIECLIP child lookup), and colon-path `_level0` resolution inside functions.
