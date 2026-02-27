@@ -10208,7 +10208,11 @@ int g_settarget_explicit_root = 0;
 // When tellTarget fails to find a target, this flag is set.
 // In this state, MC builtin property accesses (like _name) return undefined
 // instead of the root MC's values. Cleared when tellTarget succeeds or resets.
+// GotoFrame/Play/Stop still operate on ROOT in this state.
 int g_settarget_invalid = 0;
+// SWF7+ SetTarget2(undefined) sets target to None — GotoFrame/Play/Stop become no-ops.
+// This is different from g_settarget_invalid where they target root.
+int g_settarget_none = 0;
 #endif
 
 // Get the current execution context
@@ -12391,6 +12395,7 @@ void actionPlay(SWFAppContext* app_context)
 		return;
 	}
 #else
+	{ extern int g_settarget_none; if (g_settarget_none) return; }
 	if (ng_isInsideSprite()) { ng_playCurrentSprite(); return; }
 #endif
 	is_playing = 1;
@@ -12406,6 +12411,7 @@ void actionStop(SWFAppContext* app_context)
 		return;
 	}
 #else
+	{ extern int g_settarget_none; if (g_settarget_none) return; }
 	if (ng_isInsideSprite()) { ng_stopCurrentSprite(); return; }
 #endif
 	is_playing = 0;
@@ -12744,20 +12750,26 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	}
 #else
 	extern int g_settarget_explicit_root;
+	extern int g_settarget_none;
+	// SWF7+ SetTarget2(undefined) sets target to None — GotoFrame is a no-op
+	if (g_settarget_none) return;
 	if (ng_isInsideSprite()) {
 		if (g_settarget_explicit_root) {
 			// SetTarget("_root") was called — target is root.
 			// Defer root frame navigation; don't execute inline while inside sprite script.
+			// Use goto_from_action + manual_next_frame for the goto catch-up processing,
+			// but also set g_deferred_root_goto so the root frame loop doesn't re-run
+			// the current frame before processing the goto.
 			extern size_t next_frame;
 			extern int manual_next_frame;
-			extern int is_playing;
 			extern size_t g_frame_count;
 			extern int goto_from_action;
+			extern int g_deferred_root_goto;
 			if (frame < g_frame_count) {
 				goto_from_action = 1;
 				next_frame = frame;
 				manual_next_frame = 1;
-				is_playing = 0;
+				g_deferred_root_goto = 1;
 				root_movieclip.currentframe = frame + 1;
 			}
 			return;
@@ -13055,11 +13067,58 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	}
 
 	// Navigate: actionGotoFrame uses 0-based
+#ifdef NO_GRAPHICS
+	{
+		extern int g_settarget_none;
+		if (g_settarget_none) {
+			// GotoFrame2 uses target_clip_or_root() in Ruffle — falls back to root
+			// when target_clip is None (failed SetTarget or SWF7+ SetTarget2(undefined)).
+			// GotoFrame (plain) uses target_clip() → no-op when None.
+			// So GotoFrame2 must bypass the g_settarget_none check in actionGotoFrame.
+			u16 frame = (u16)(frame_final - 1);
+			if (ng_isInsideSprite()) {
+				// Inside sprite: defer root goto to swf_core.c frame loop.
+				// Uses goto_from_action + g_deferred_root_goto for same-tick catch-up
+				// (matching Ruffle's immediate goto_frame processing).
+				extern size_t next_frame;
+				extern int manual_next_frame;
+				extern size_t g_frame_count;
+				extern int goto_from_action;
+				extern int g_deferred_root_goto;
+				if (frame < g_frame_count) {
+					goto_from_action = 1;
+					next_frame = frame;
+					manual_next_frame = 1;
+					g_deferred_root_goto = 1;
+					root_movieclip.currentframe = frame + 1;
+				}
+				if (play_flag) {
+					extern int g_deferred_goto_play;
+					g_deferred_goto_play = 1;
+				}
+			} else {
+				// At root level: temporarily clear g_settarget_none so actionGotoFrame works
+				g_settarget_none = 0;
+				actionGotoFrame(app_context, frame);
+				g_settarget_none = 1;
+				if (play_flag) is_playing = 1;
+			}
+			return;
+		}
+	}
+#endif
 	actionGotoFrame(app_context, (u16)(frame_final - 1));
 
 	if (play_flag) {
 #ifdef NO_GRAPHICS
-		if (ng_isInsideSprite()) { ng_playCurrentSprite(); }
+		extern int g_settarget_explicit_root;
+		if (ng_isInsideSprite() && g_settarget_explicit_root) {
+			// Root-targeted play from inside sprite: defer the play along with the goto.
+			// Set a flag so swf_core.c sets is_playing=1 after the goto catch-up.
+			extern int g_deferred_goto_play;
+			g_deferred_goto_play = 1;
+		}
+		else if (ng_isInsideSprite()) { ng_playCurrentSprite(); }
 		else
 #endif
 		is_playing = 1;
@@ -17445,14 +17504,32 @@ void actionSetTarget2(SWFAppContext* app_context)
 		return;
 	}
 
-	// Undefined → silently reset to base clip (no "Target not found" error)
-	// Null is different — it converts to "null" string and goes through actionSetTarget
-	// which produces a "Target not found" error.
+	// Undefined → behavior depends on SWF version:
+	// SWF ≤ 6: silently reset to base clip (the sprite whose code is executing)
+	// SWF ≥ 7: set target to None/invalid — subsequent GotoFrame etc. become no-ops
+	// (Null is different — it converts to "null" string and goes through actionSetTarget
+	// which produces a "Target not found" error.)
 	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED)
 	{
 		POP();
 		MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
 		setCurrentContext(base);
+#ifdef NO_GRAPHICS
+		extern int g_settarget_explicit_root;
+		extern int g_settarget_invalid;
+		extern int g_settarget_none;
+		if (g_swf_version > 6) {
+			// SWF7+: target becomes None — GotoFrame/Play/Stop become no-ops
+			g_settarget_none = 1;
+			g_settarget_invalid = 0;
+			g_settarget_explicit_root = 0;
+		} else {
+			// SWF6-: reset to base clip normally
+			g_settarget_none = 0;
+			g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
+			g_settarget_invalid = 0;
+		}
+#endif
 		return;
 	}
 
@@ -24530,6 +24607,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifdef NO_GRAPHICS
 	extern int g_settarget_explicit_root;
 	extern int g_settarget_invalid;
+	extern int g_settarget_none;
 #endif
 	MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
 
@@ -24539,6 +24617,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifdef NO_GRAPHICS
 		g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
 		g_settarget_invalid = 0;
+		g_settarget_none = 0;
 #endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
@@ -24552,6 +24631,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifdef NO_GRAPHICS
 		g_settarget_explicit_root = 1;
 		g_settarget_invalid = 0;
+		g_settarget_none = 0;
 #endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
@@ -24570,6 +24650,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
+			g_settarget_none = 0;
 #endif
 			return;
 		}
@@ -24585,6 +24666,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
+			g_settarget_none = 0;
 #endif
 			return;
 		}
@@ -24605,18 +24687,22 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = 0;
 			g_settarget_invalid = 0;
+			g_settarget_none = 0;
 #endif
 			return;
 		}
 	}
 
 	// Target not found — set context to root and emit trace message.
-	// Flash/Ruffle: invalid target falls back to root for variable scope,
-	// but MC builtin properties (like _name) return undefined.
+	// Ruffle: invalid target sets target_clip = None.
+	// GetVariable uses target_clip_or_root() → falls back to root.
+	// GotoFrame/Play/Stop use target_clip() → no-op when None.
+	// GotoFrame2 uses target_clip_or_root() → falls back to root.
 	setCurrentContext(&root_movieclip);
 #ifdef NO_GRAPHICS
-	g_settarget_explicit_root = 1;
+	g_settarget_explicit_root = 0;
 	g_settarget_invalid = 1;
+	g_settarget_none = 1;
 #endif
 #ifndef NO_GRAPHICS
 	targeted_sprite = NULL;

@@ -51,6 +51,8 @@ int catch_up_mode = 0;
 int goto_from_action = 0;
 int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
 size_t catch_up_target = 0;   // target frame for backward goto protection
+int g_deferred_goto_play = 0; // Set when gotoAndPlay targets root from inside a sprite
+int g_deferred_root_goto = 0; // Set when GotoFrame targets root from inside a sprite — skip re-running current frame
 int g_deferred_goto_script = 0;     // count of deferred scripts queued
 size_t g_deferred_goto_target = 0;  // target frame whose script is deferred (last entry)
 #define MAX_DEFERRED_GOTO_QUEUE 16
@@ -496,7 +498,13 @@ void swfStart(SWFAppContext* app_context)
 			// Only run the root frame function if the root timeline is playing
 			if (is_playing || manual_next_frame)
 			{
-				if (funcs[current_frame])
+				// If a deferred root goto is pending (from a sprite script targeting root),
+				// skip running funcs[current_frame] — go straight to goto catch-up.
+				if (g_deferred_root_goto)
+				{
+					// Don't re-run the current frame; the goto catch-up below will handle it
+				}
+				else if (funcs[current_frame])
 				{
 					funcs[current_frame](app_context);
 				}
@@ -614,6 +622,13 @@ void swfStart(SWFAppContext* app_context)
 				}
 			}
 			current_frame = target;
+
+			// Apply deferred play (from gotoAndPlay targeting root from inside a sprite)
+			if (g_deferred_goto_play) {
+				is_playing = 1;
+				g_deferred_goto_play = 0;
+			}
+			g_deferred_root_goto = 0;
 
 			// After catch-up, the goto's advance is consumed; fall through
 			// to the normal advance logic below.

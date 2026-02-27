@@ -6,7 +6,7 @@ Last updated: 2026-02-27
 
 - **Pass rate (CI, last run)**: 388/619 (62.7%)
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains**: selection now PASS (454/454). tell_target_invalid_swf6 now PASS (5/5). place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). tab_ordering_tabbable 33→36/47. tab_ordering_movieclip_enabled_default 55→63/462. movieclip_hittest_shapeflag recovered from compile_fail (266/338). string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
+- **Recent gains**: tell_target_invalid now PASS (6/6). tell_target_invalid_swf6 now PASS (5/5). stage_object_children now PASS (83/83). selection now PASS (454/454). place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). tab_ordering_tabbable 33→36/47. tab_ordering_movieclip_enabled_default 55→63/462. movieclip_hittest_shapeflag recovered from compile_fail (266/338). string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -77,17 +77,15 @@ Last updated: 2026-02-27
 | `selection` | 454/454 ✅ | Selection index tracking + replaceSel implementation |
 | `property_invalid_base_clip` | 36/36 ✅ | Was already passing (stale docs) |
 | `tell_target_invalid_swf6` | 5/5 ✅ | hasPlayingSprites + forward goto catch_up_mode in advance_sprite_frames |
+| `tell_target_invalid` | 6/6 ✅ | SetTarget2(undefined) SWF7+ → target_clip=None; GotoFrame2 target_clip_or_root; sprite preservation during root loop-back |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
-| `selection` | **454/454 PASS** ✅ | replaceSel() implemented |
-| `hittest_morph` | ~~67/70~~ **70/70 PASS** ✅ | Now passing in CI |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
-| `property_invalid_base_clip` | **36/36 PASS** ✅ | Was already passing (stale docs) |
 
 ### 80-90%
 | Test | Match | Issue |
@@ -96,7 +94,7 @@ Last updated: 2026-02-27
 | `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
 | `super_edge_cases` | 33/39 (84.6%) | makeSuperWith: SUPER value as __proto__ (3 lines), addProperty virtual __constructor__ (3 lines) |
 | `function_base_clip_readded` | 10/12 (83.3%) | _parent resolution after removal+re-add |
-| `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
+| `stage_object_children` | **83/83 PASS** ✅ | Was 68/83, now fixed (likely from path resolution changes) |
 | `function_base_clip_removed` | 21/26 (80.8%) | base_clip after function definer removed |
 
 ### 70-80%

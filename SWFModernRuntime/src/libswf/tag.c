@@ -57,6 +57,8 @@ static size_t g_sprite_init_target_frame = 0;
 // "goto root" from "goto unnamed sprite with inherited root context".
 // Declared in action.c; saved/cleared/restored here per sprite-frame invocation.
 extern int g_settarget_explicit_root;
+extern int g_settarget_invalid;
+extern int g_settarget_none;
 extern MovieClip* g_current_context;
 extern void actionSetCurrentContext(MovieClip* mc);
 
@@ -76,11 +78,17 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 
 	// Each sprite frame starts with a fresh SetTarget state (no explicit root target)
 	int saved_settarget = g_settarget_explicit_root;
+	int saved_invalid = g_settarget_invalid;
+	int saved_none = g_settarget_none;
 	g_settarget_explicit_root = 0;
+	g_settarget_invalid = 0;
+	g_settarget_none = 0;
 
 	f(app_context);
 
 	g_settarget_explicit_root = saved_settarget;
+	g_settarget_invalid = saved_invalid;
+	g_settarget_none = saved_none;
 	actionSetCurrentContext(saved_ctx);
 	actionSetBaseClip(saved_base);
 	g_current_sprite_obj = saved;
@@ -1901,6 +1909,26 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		}
 	}
 #endif
+
+	// Root timeline loop-back preservation: when re-placing the SAME character at a depth
+	// that already has an initialized sprite, treat as modify (update transform only).
+	// This matches Ruffle's run_goto behavior where existing clips are preserved during
+	// root timeline looping (frame 4 -> frame 0).
+	if (display_list[depth].char_id == char_id && display_list[depth].char_id != 0
+	    && display_list[depth].sprite_display_list != NULL)
+	{
+		display_list[depth].transform_id = transform_id;
+		display_list[depth].cxform_id = cxform_id;
+		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+		display_list[depth].placed_at_frame = current_frame;
+		display_list[depth].place_gen = g_place_gen;
+		init_cx_fields(&display_list[depth]);
+		if (depth > max_depth) max_depth = depth;
+		ng_on_place_object2(app_context, depth, char_id);
+		display_list[depth].sprite_needs_init = 0;
+		return;
+	}
 
 	// Within-same-frame placement conflict handling
 	if (display_list[depth].char_id != 0 && display_list[depth].place_gen == g_place_gen)

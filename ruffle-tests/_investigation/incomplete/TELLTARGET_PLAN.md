@@ -5,9 +5,10 @@ Last updated: 2026-02-27
 
 ## Status: PHASE 2 IN PROGRESS
 
-### Results (2026-02-26)
+### Results (2026-02-27)
 - `tell_target` ✅ — **37/37 PASS**
-- `tell_target_invalid` — 4/6 (remaining 2: frame navigation in sprites)
+- `tell_target_invalid` ✅ — **6/6 PASS** (was 4/6 — fixed SetTarget2(undefined) SWF7+ and GotoFrame2 target_clip_or_root)
+- `tell_target_invalid_swf6` ✅ — **5/5 PASS** (was 4/6 — fixed with same changes)
 - `slash_syntax` ✅ — **14/14 PASS**
 - `string_paths_basic` ✅ — **4/4 PASS**
 - `target_clip_removed` ✅ — **5/5 PASS**
@@ -27,6 +28,13 @@ Last updated: 2026-02-27
 - **actionGetVariable _level0 scope chain fix**: Inside function scopes, `_levelN` path targets return undefined (Ruffle scope chain behavior — _levelN relies on StageObject properties which don't exist on function local ScriptObject scopes)
 - **actionGetVariable dot-path root MC var check**: For paths targeting root MC, checks var_map before falling through to GetMember (own timeline variables take priority over child clips)
 - **actionSetVariable slash-path walk**: For slash-containing paths, walks segments using Ruffle-compatible tokenization (dots NOT delimiters once slash is seen); tries MC child lookup, then falls back to GetMember (dynamic properties)
+
+### What's New (2026-02-27 — tell_target_invalid fix)
+- **SetTarget2(undefined) SWF version handling**: SWF7+ sets target_clip to None (g_settarget_none=1) — GotoFrame/Play/Stop become no-ops. SWF≤6 resets to base_clip normally.
+- **Failed SetTarget → target_clip = None**: Matches Ruffle behavior. Failed SetTarget("dummy") now sets g_settarget_none=1 (was previously g_settarget_explicit_root=1). GotoFrame/Play/Stop are no-ops.
+- **GotoFrame2 target_clip_or_root()**: GotoFrame2 (unlike GotoFrame) uses target_clip_or_root() in Ruffle — works even when target is None by falling back to root. Implemented via deferred root goto mechanism.
+- **Sprite preservation during root loop-back**: When root timeline loops from last frame back to frame 0, existing sprites at the same depth/char_id are preserved (modify-only, no re-init). Matches Ruffle's run_goto behavior.
+- **g_deferred_root_goto**: New flag in swf_core.c — prevents re-running current frame when a deferred root goto is pending from a sprite script.
 
 ### Key Architectural Discoveries (Phase 2)
 1. **_level0 vs _root in Ruffle's resolve_target_path**: `_root` has special first-element handling (always resolves regardless of scope object type). `_level0` has NO special handling — it relies on `object.get("_level0")` which only works on StageObject (MovieClip scope objects), not on plain ScriptObjects (function local scopes).
@@ -54,7 +62,7 @@ Last updated: 2026-02-27
 | `string_paths_eval2` | 7 | 1/7 | loadMovie test (needs loaded SWF) |
 | `string_paths_variable_scopes` | 5 | 0/5 | onEnterFrame never fires (known per-tick dispatch gap) + attachMovie timing |
 | `string_paths_reference_launder` | 2 | 0/2 | MC var reference after createEmptyMovieClip + removeMovieClip. `known_failure = true` in Ruffle itself |
-| `string_paths_hidden` | 54 | 34/54 | Shapes as path components — last segment is non-MC display object, should resolve to parent MC scope (~20 lines potential) |
+| `string_paths_hidden` | 54 | **54/54 ✅** | Fixed: non-scriptable display objects resolve to parent MC |
 | `string_paths_other` | 36 | 31/36 | MC removal/re-creation edge cases, shape display objects (~5 lines potential) |
 
 ## Overview (original)

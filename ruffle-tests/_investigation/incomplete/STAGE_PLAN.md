@@ -22,7 +22,7 @@ The MovieClip property tests are already partially supported (68% on stage_objec
 |------|-------|---------|----------------|
 | stage_object_properties | 243 | 68% (165/243) | MC property precision, width↔scale, rotation wrapping, child clips |
 | stage_object_properties_swf6 | 232 | 68% | Same as above, SWF6 precision |
-| stage_object_children | 85 | 82% (68/83) | _level addressing, dynamic prop vs child clip priority, delete behavior |
+| stage_object_children | 85 | **83/83 ✅** | Now fully passing (fixed by path resolution improvements) |
 | stage_object_enumerate | 4 | 0% (0/4) | Child clip enumeration in for-in |
 | stage_display_state | 17 | 0% (0/17) | Stage.displayState + onFullScreen callback |
 | stage_property_representation | 586 | 0% (0/586) | Scale/rotation value representation (integer display) |
