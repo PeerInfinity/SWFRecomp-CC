@@ -72,7 +72,12 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	MovieClip* saved_base = actionGetBaseClip();
 	if (obj->instance_name != NULL)
 	{
-		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
+		// Use current context as parent (correct for nested sprites).
+		// At root level, g_current_context is root_movieclip.
+		// Inside a recursive advance_sprite_frames, g_current_context is the parent sprite's MC.
+		extern MovieClip root_movieclip;
+		MovieClip* parent_mc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
 		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); actionSetBaseClip(mc); }
 	}
 
@@ -390,8 +395,16 @@ void advance_sprite_frames(SWFAppContext* app_context)
 							CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
 					}
 
-					// Recurse nested sprites
-					advance_sprite_frames(app_context);
+					// Recurse nested sprites (set parent context for correct child MC creation)
+					{
+						extern MovieClip root_movieclip;
+						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
+						MovieClip* sctx = g_current_context;
+						if (smc) actionSetCurrentContext(smc);
+						advance_sprite_frames(app_context);
+						actionSetCurrentContext(sctx);
+					}
 
 					obj->sprite_display_list = display_list;
 					obj->sprite_max_depth = max_depth;
@@ -423,7 +436,16 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					}
 					catch_up_mode = saved_cm;
 
-					advance_sprite_frames(app_context);
+					// Recurse nested sprites (set parent context for correct child MC creation)
+					{
+						extern MovieClip root_movieclip;
+						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
+						MovieClip* sctx = g_current_context;
+						if (smc) actionSetCurrentContext(smc);
+						advance_sprite_frames(app_context);
+						actionSetCurrentContext(sctx);
+					}
 
 					obj->sprite_display_list = display_list;
 					obj->sprite_max_depth = max_depth;
@@ -478,8 +500,20 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// Mark eligible for AS2 onEnterFrame dispatch (sprite actually advanced)
 		obj->enterframe_eligible = 1;
 
-		// Recurse: advance nested sprites within this sprite's display list
-		advance_sprite_frames(app_context);
+		// Recurse: advance nested sprites within this sprite's display list.
+		// Set g_current_context to this sprite's MC so nested exec_sprite_frame
+		// calls use the correct parent for child MC creation.
+		{
+			extern MovieClip root_movieclip;
+			MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+			MovieClip* sprite_mc = NULL;
+			if (obj->instance_name != NULL)
+				sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_recurse);
+			MovieClip* saved_recurse_ctx = g_current_context;
+			if (sprite_mc) actionSetCurrentContext(sprite_mc);
+			advance_sprite_frames(app_context);
+			actionSetCurrentContext(saved_recurse_ctx);
+		}
 
 		// Save back (display_list pointer may have changed if realloc'd)
 		obj->sprite_display_list = display_list;
