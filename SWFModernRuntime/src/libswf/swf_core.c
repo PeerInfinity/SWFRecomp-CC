@@ -91,6 +91,13 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	catch_up_mode = 1;
 	if (target <= original_frame)
 	{
+#ifdef NO_GRAPHICS
+		// Clean up dynamic MCs and reset swapped depths before backward replay
+		{
+			extern void actionRewindCleanup(SWFAppContext* app_context);
+			actionRewindCleanup(app_context);
+		}
+#endif
 		catch_up_backward = 1;
 		catch_up_target = target;
 		for (size_t f = 0; f <= target && f < g_frame_count; f++)
@@ -565,6 +572,13 @@ void swfStart(SWFAppContext* app_context)
 				// Target frame runs normally (scripts included).
 				// Backward protection stays on through target frame so
 				// RemoveObject2 doesn't remove entries placed during rebuild.
+#ifdef NO_GRAPHICS
+				// Clean up dynamic MCs and reset swapped depths before replay
+				{
+					extern void actionRewindCleanup(SWFAppContext* app_context);
+					actionRewindCleanup(app_context);
+				}
+#endif
 				catch_up_backward = 1;
 				catch_up_target = target;
 				for (size_t f = 0; f < target && f < g_frame_count; f++)

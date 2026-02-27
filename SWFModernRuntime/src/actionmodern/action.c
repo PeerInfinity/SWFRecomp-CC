@@ -8816,6 +8816,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->blend_mode = 0;
 	mc->is_button_mc = 0;
 	mc->depth = 0;
+	mc->depth_swapped = 0;
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
 	mc->as_set_flags = 0;
@@ -8909,7 +8910,6 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			break;
 		}
 	}
-
 	if (mc != NULL) {
 #ifdef NO_GRAPHICS
 		// Check if textfield was re-placed with a different char_id
@@ -9501,6 +9501,48 @@ void actionFirePendingUnloads(SWFAppContext* app_context)
 }
 
 #ifdef NO_GRAPHICS
+// Clean up child MCs during backward goto.
+// Removes dynamically created MCs (createEmptyMovieClip) from cache and dynamic_props,
+// and resets swapped depths so the timeline replay restores original positions.
+void actionRewindCleanup(SWFAppContext* app_context)
+{
+	extern MovieClip root_movieclip;
+	extern size_t ng_findDisplayEntryByName(const char* name);
+
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* ch = child_mc_cache[i];
+		if (ch == NULL) continue;
+		if (ch->parent != &root_movieclip) continue;
+
+		// Check if this MC has a display list entry (timeline-placed)
+		size_t dl_depth = ng_findDisplayEntryByName(ch->name);
+		if (dl_depth == SIZE_MAX) {
+			// No display list entry — this is a dynamically created MC.
+			// Remove from parent's dynamic_props.
+			if (root_movieclip.dynamic_props != NULL) {
+				ActionVar undef = {0};
+				undef.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, (ASObject*)root_movieclip.dynamic_props,
+					ch->name, strlen(ch->name), &undef);
+			}
+			// Also clear from global variable table
+			{
+				ActionVar undef = {0};
+				undef.type = ACTION_STACK_VALUE_UNDEFINED;
+				extern void setVariableByName(const char* var_name, ActionVar* value);
+				setVariableByName(ch->name, &undef);
+			}
+			ch->depth = INT_MIN;
+			child_mc_cache[i] = NULL;
+		} else {
+			// Timeline MC — reset depth from display list position
+			// (undoes any swapDepths that happened before the rewind)
+			ch->depth = (int)dl_depth - 16384;
+			ch->depth_swapped = 0;
+		}
+	}
+}
+
 // Rename a MovieClip in the cache (called after tagSetInstanceName updates ng_display).
 // Updates the MC's name and target path to reflect the new name.
 void actionRenameMovieClip(const char* old_name, const char* new_name)
@@ -21870,7 +21912,6 @@ void actionGetMember(SWFAppContext* app_context)
 	{
 		// MovieClip member access — check built-in properties, then MovieClip.prototype
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
-
 		// Removed/dead MovieClip: all property access returns undefined
 		if (mc != NULL && mc->depth == INT_MIN)
 		{
@@ -22199,9 +22240,11 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 				// Found as nested child of mc -- create MC with parent=mc and correct depth
+				// If depth was changed by swapDepths, don't overwrite from display list
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
-					child_mc->depth = (int)child_depth - 16384;
+					if (!child_mc->depth_swapped)
+						child_mc->depth = (int)child_depth - 16384;
 					// Link to display list entry so nested child lookups work
 					if (mc->display_obj != NULL) {
 						DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
@@ -29052,7 +29095,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	// 2. Pop object (receiver/this) from stack
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
-
 	// 3. Pop number of arguments
 	ActionVar num_args_var;
 	popVar(app_context, &num_args_var);
@@ -31107,6 +31149,102 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
+		else if (method_name_len == 10 && strncmp(method_name, "replaceSel", 10) == 0)
+		{
+#ifdef NO_GRAPHICS
+			// replaceSel(newText): replace selected text range [begin, end) with newText.
+			// Uses global selection indices (g_selection_begin, g_selection_end).
+			// If this MC is not the focused textfield or selection is unset, defaults to position 0.
+			if (!MC_IS_TEXTFIELD(mc)) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+
+			// Coerce first arg to string (UTF-16)
+			const uint16_t* new_u16 = NULL;
+			u32 new_u16_len = 0;
+			if (num_args >= 1) {
+				PUSH(args[0].type, args[0].data.numeric_value);
+				convertString(app_context, NULL);
+				ActionVar sv; popVar(app_context, &sv);
+				if (sv.type == ACTION_STACK_VALUE_STRING) {
+					new_u16 = varGetU16Ptr(&sv);
+					new_u16_len = sv.str_size;
+				}
+			}
+			if (new_u16 == NULL) { new_u16_len = 0; }
+
+			// Get current text
+			ASObject* rs_props = (ASObject*) mc->dynamic_props;
+			const uint16_t* old_u16 = NULL;
+			u32 old_u16_len = 0;
+			if (rs_props != NULL) {
+				ActionVar* text_prop = getProperty(rs_props, "text", 4);
+				if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING) {
+					old_u16 = varGetU16Ptr(text_prop);
+					old_u16_len = text_prop->str_size;
+				}
+			}
+
+			// Determine selection range — use global indices if this MC is focused, else position 0
+			int sel_begin = 0, sel_end = 0;
+			if (mc == g_focused_mc && g_selection_begin >= 0 && g_selection_end >= 0) {
+				sel_begin = g_selection_begin;
+				sel_end = g_selection_end;
+			}
+			// Clamp to text length
+			if (sel_begin < 0) sel_begin = 0;
+			if (sel_end < 0) sel_end = 0;
+			if (sel_begin > (int)old_u16_len) sel_begin = (int)old_u16_len;
+			if (sel_end > (int)old_u16_len) sel_end = (int)old_u16_len;
+			if (sel_begin > sel_end) { int tmp = sel_begin; sel_begin = sel_end; sel_end = tmp; }
+
+			// Build new text: old[0..sel_begin] + new_text + old[sel_end..]
+			u32 prefix_len = (u32)sel_begin;
+			u32 suffix_len = old_u16_len - (u32)sel_end;
+			u32 result_len = prefix_len + new_u16_len + suffix_len;
+			uint16_t* result_u16 = (uint16_t*) heap_alloc(app_context, (result_len + 1) * sizeof(uint16_t));
+			if (prefix_len > 0 && old_u16 != NULL)
+				memcpy(result_u16, old_u16, prefix_len * sizeof(uint16_t));
+			if (new_u16_len > 0 && new_u16 != NULL)
+				memcpy(result_u16 + prefix_len, new_u16, new_u16_len * sizeof(uint16_t));
+			if (suffix_len > 0 && old_u16 != NULL)
+				memcpy(result_u16 + prefix_len + new_u16_len, old_u16 + sel_end, suffix_len * sizeof(uint16_t));
+			result_u16[result_len] = 0;
+
+			// Set text property
+			if (rs_props == NULL) {
+				mc->dynamic_props = (void*) allocObject(app_context, 8);
+				rs_props = (ASObject*) mc->dynamic_props;
+			}
+			ActionVar new_text = {0};
+			new_text.type = ACTION_STACK_VALUE_STRING;
+			new_text.data.numeric_value = (u64)(uintptr_t)result_u16;
+			new_text.str_size = result_len;
+			setProperty(app_context, rs_props, "text", 4, &new_text);
+
+			// Update length property
+			ActionVar len_val = {0};
+			len_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &len_val.data.numeric_value) = (double)result_len;
+			setProperty(app_context, rs_props, "length", 6, &len_val);
+
+			// Update selection: caret moves to end of inserted text, begin=end=caret
+			int new_caret = sel_begin + (int)new_u16_len;
+			if (mc == g_focused_mc) {
+				g_selection_begin = new_caret;
+				g_selection_end = new_caret;
+				g_selection_caret = new_caret;
+			}
+
+			// Sync to variable binding
+			ng_syncTextToVar(app_context, mc, &new_text);
+#endif
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 		else if (method_name_len == 13 && strncmp(method_name, "getSWFVersion", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
@@ -31203,9 +31341,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						int _tmp = mc->depth;
 						mc->depth = _target->depth;
 						_target->depth = _tmp;
+						mc->depth_swapped = 1;
+						_target->depth_swapped = 1;
 #ifdef NO_GRAPHICS
-						if (mc->name[0] && _target->name[0])
+						if (mc->name[0] && _target->name[0]) {
+							// Try a full display list swap first
 							ng_swapDisplayDepths(mc->name, _target->name);
+							// If one MC wasn't in the display list, the swap
+							// was a no-op.  Fall back to moving whichever MC
+							// IS in the display list to its new depth so the
+							// depth_swapped entry persists after backward goto.
+							extern size_t ng_findDisplayEntryByName(const char* name);
+							size_t _d1 = ng_findDisplayEntryByName(mc->name);
+							size_t _d2 = ng_findDisplayEntryByName(_target->name);
+							if (_d1 != SIZE_MAX && (int)_d1 - 16384 != mc->depth)
+								ng_updateDisplayDepth(mc->name, mc->depth);
+							if (_d2 != SIZE_MAX && (int)_d2 - 16384 != _target->depth)
+								ng_updateDisplayDepth(_target->name, _target->depth);
+						}
 #endif
 					}
 					// Cross-parent swap is a no-op (Flash ignores it)
@@ -31248,6 +31401,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						int _tmp = mc->depth;
 						mc->depth = _target_mc->depth;
 						_target_mc->depth = _tmp;
+						mc->depth_swapped = 1;
+						_target_mc->depth_swapped = 1;
 #ifdef NO_GRAPHICS
 						if (mc->name[0] && _target_mc->name[0])
 							ng_swapDisplayDepths(mc->name, _target_mc->name);
@@ -31270,6 +31425,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (_new_depth < -16384) _new_depth = -16384;
 			if (_new_depth > 2130690044) _new_depth = 2130690044;
 			mc->depth = _new_depth;
+			mc->depth_swapped = 1;
 #ifdef NO_GRAPHICS
 			if (mc->name[0])
 				ng_updateDisplayDepth(mc->name, _new_depth);
@@ -31572,12 +31728,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 
-				// Round to integer twips (Flash/Ruffle compute bounds in integer twips
-				// via Fixed16 arithmetic) then convert to pixels.
-				bxmin_d = round(bxmin_d) / 20.0;
-				bymin_d = round(bymin_d) / 20.0;
-				bxmax_d = round(bxmax_d) / 20.0;
-				bymax_d = round(bymax_d) / 20.0;
+				// Convert twips to pixels. Do NOT round transformed AABB corners
+				// to integer twips — only individual shape bounds are in integer twips;
+				// after matrix transformation the corners can be fractional.
+				bxmin_d = bxmin_d / 20.0;
+				bymin_d = bymin_d / 20.0;
+				bxmax_d = bxmax_d / 20.0;
+				bymax_d = bymax_d / 20.0;
 
 				// Property order: xMin, xMax, yMin, yMax (matches Flash)
 				// Enumerate2 LIFO yields: yMax, yMin, xMax, xMin

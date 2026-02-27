@@ -1560,8 +1560,10 @@ static void boundsUnionCorner(double px, double py,
 	double ma, double mb, double mc, double md, double mtx, double mty,
 	int* has, double* gxmin, double* gymin, double* gxmax, double* gymax)
 {
-	double tx = ma * px + mc * py + mtx;
-	double ty = mb * px + md * py + mty;
+	// Ruffle uses f32 matrix * i32 twips → round_to_i32 per corner, then wrapping_add(tx).
+	// tx/ty are Twips (integer). Simulate by rounding rotation+scale product and translation.
+	double tx = round((float)(ma * px + mc * py)) + round(mtx);
+	double ty = round((float)(mb * px + md * py)) + round(mty);
 	if (!*has) { *gxmin = *gxmax = tx; *gymin = *gymax = ty; *has = 1; }
 	else {
 		if (tx < *gxmin) *gxmin = tx;
@@ -1579,16 +1581,19 @@ int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
 		DisplayObject* child = &dl[i];
 		if (child->char_id == 0) continue;
 		u32 tid = child->transform_id;
-		double ca = (double)transform_data[tid][0];
-		double cb = (double)transform_data[tid][1];
-		double cc = (double)transform_data[tid][4];
-		double cd = (double)transform_data[tid][5];
-		double ctx = (double)transform_data[tid][12];
-		double cty = (double)transform_data[tid][13];
-		double na = ma*ca + mc*cb, nb = mb*ca + md*cb;
-		double nc = ma*cc + mc*cd, nd = mb*cc + md*cd;
-		double ntx = ma*ctx + mc*cty + mtx;
-		double nty = mb*ctx + md*cty + mty;
+		float ca = transform_data[tid][0];
+		float cb = transform_data[tid][1];
+		float cc = transform_data[tid][4];
+		float cd = transform_data[tid][5];
+		float ctxf = transform_data[tid][12];
+		float ctyf = transform_data[tid][13];
+		// Ruffle composes matrices in f32 arithmetic
+		float fma = (float)ma, fmb = (float)mb, fmc = (float)mc, fmd = (float)md;
+		float fmtx = (float)mtx, fmty = (float)mty;
+		double na = (double)(fma*ca + fmc*cb), nb = (double)(fmb*ca + fmd*cb);
+		double nc = (double)(fma*cc + fmc*cd), nd = (double)(fmb*cc + fmd*cd);
+		double ntx = (double)(fma*ctxf + fmc*ctyf + fmtx);
+		double nty = (double)(fmb*ctxf + fmd*ctyf + fmty);
 
 		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
 			ng_computeBoundsFromDL_matrix(child->sprite_display_list, child->sprite_max_depth,

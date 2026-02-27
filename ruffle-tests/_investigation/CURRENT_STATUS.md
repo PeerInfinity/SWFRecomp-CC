@@ -6,7 +6,7 @@ Last updated: 2026-02-27
 
 - **Pass rate (CI, last run)**: 388/619 (62.7%)
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains**: place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). selection 435→452/454. tab_ordering_tabbable 33→36/47. tab_ordering_movieclip_enabled_default 55→63/462. movieclip_hittest_shapeflag recovered from compile_fail (266/338). string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
+- **Recent gains**: selection now PASS (454/454). tell_target_invalid_swf6 now PASS (5/5). place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). tab_ordering_tabbable 33→36/47. tab_ordering_movieclip_enabled_default 55→63/462. movieclip_hittest_shapeflag recovered from compile_fail (266/338). string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -74,17 +74,20 @@ Last updated: 2026-02-27
 | `string_paths_hidden` | 54/54 ✅ | Non-scriptable display objects (shapes/text/morph) resolve to parent MC |
 | `place_and_lookup` | 30/30 ✅ | ng_isScriptableChar helper, var_map enumeration on root MC, video auto-naming fix |
 | `tab_ordering_children` | 208/208 ✅ | Bonus from video auto-naming fix (instance counter no longer increments for unnamed videos) |
+| `selection` | 454/454 ✅ | Selection index tracking + replaceSel implementation |
+| `property_invalid_base_clip` | 36/36 ✅ | Was already passing (stale docs) |
+| `tell_target_invalid_swf6` | 5/5 ✅ | hasPlayingSprites + forward goto catch_up_mode in advance_sprite_frames |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
-| `selection` | 452/454 (99.6%) | replaceSel() not yet implemented (2 lines) |
+| `selection` | **454/454 PASS** ✅ | replaceSel() implemented |
 | `hittest_morph` | ~~67/70~~ **70/70 PASS** ✅ | Now passing in CI |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
-| `property_invalid_base_clip` | 34/36 (94.4%) | getProperty path resolution without leading _root |
+| `property_invalid_base_clip` | **36/36 PASS** ✅ | Was already passing (stale docs) |
 
 ### 80-90%
 | Test | Match | Issue |
@@ -131,7 +134,7 @@ Last updated: 2026-02-27
 | STAGE_PLAN | **Phases 1,2,5,7 DONE** | stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅ | Phase 4 (_level addressing), Phase 8 (children) |
 | STAGE_FRAME_PROPS_PLAN | **Phases 1,5 DONE** | Several stages pass | Phase 2 (shape bounds), Phase 3 (content bounds) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
-| SELECTION_PLAN | **Nearly complete** | selection at 453/455 | replaceSel() not yet implemented (2 lines) |
+| SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 33/39 — remaining 6 lines = makeSuperWith (SUPER as __proto__) + addProperty virtual __constructor__; `funky_function_calls` segfaults |
 | REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |

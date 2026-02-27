@@ -396,6 +396,8 @@ void advance_sprite_frames(SWFAppContext* app_context)
 				else
 				{
 					// Jumping forward: execute frames frame+1..target
+					// Intermediate frames run in catch_up_mode (tags only, scripts skipped).
+					// Only the target frame runs scripts (matching Flash/Ruffle goto semantics).
 					DisplayObject* saved_dl = display_list;
 					size_t saved_max = max_depth;
 					size_t saved_cap = display_list_capacity;
@@ -404,11 +406,14 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					max_depth = obj->sprite_max_depth;
 					display_list_capacity = obj->sprite_dl_capacity;
 
+					int saved_cm = catch_up_mode;
 					for (size_t f = frame + 1; f <= target; f++)
 					{
+						catch_up_mode = (f < target) ? 1 : 0;
 						if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
 							CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
 					}
+					catch_up_mode = saved_cm;
 
 					advance_sprite_frames(app_context);
 
@@ -1857,6 +1862,43 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				return;
 			}
 		}
+		// During backward catch-up, if this depth is empty but a depth_swapped entry
+		// with the same char_id exists elsewhere, the character was moved by swapDepths.
+		// Treat as re-placing the same character (update transform, suppress re-init)
+		// to avoid creating a duplicate MovieClip.
+		if (catch_up_backward && display_list[depth].char_id == 0 && char_id != 0)
+		{
+			for (size_t _sd = 1; _sd <= max_depth; _sd++) {
+				if (_sd == depth) continue;
+				if (display_list[_sd].char_id == char_id && display_list[_sd].depth_swapped) {
+					// Found the swapped entry — place a fresh entry at this depth
+					// but suppress sprite init (the MC already exists in cache).
+					display_list[depth].char_id = char_id;
+					display_list[depth].transform_id = transform_id;
+					display_list[depth].cxform_id = cxform_id;
+					display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+					display_list[depth].clip_depth = clip_depth;
+					display_list[depth].ratio = 0;
+					display_list[depth].blend_mode = 0;
+					display_list[depth].sprite_display_list = NULL;
+					display_list[depth].sprite_max_depth = 0;
+					display_list[depth].sprite_dl_capacity = 0;
+					display_list[depth].sprite_current_frame = 0;
+					display_list[depth].sprite_is_playing = 1;
+					display_list[depth].sprite_manual_next_frame = 0;
+					display_list[depth].sprite_next_frame = 0;
+					display_list[depth].sprite_needs_init = 0;  // suppress re-init
+					display_list[depth].placed_at_frame = current_frame;
+					display_list[depth].place_gen = g_place_gen;
+					display_list[depth].depth_swapped = 0;
+					init_cx_fields(&display_list[depth]);
+					if (depth > max_depth) max_depth = depth;
+					ng_on_place_object2(app_context, depth, char_id);
+					display_list[depth].sprite_needs_init = 0;  // ensure no init
+					return;
+				}
+			}
+		}
 	}
 #endif
 
@@ -2699,7 +2741,9 @@ void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char
 #endif
 
 #ifdef NO_GRAPHICS
-// Returns 1 if any multi-frame sprite at root level is playing.
+// Returns 1 if any multi-frame sprite at root level is playing or has pending navigation.
+// A sprite with sprite_manual_next_frame=1 has a pending gotoAndStop/gotoAndPlay that
+// advance_sprite_frames must process, even if sprite_is_playing is false.
 int hasPlayingSprites(void)
 {
 	for (size_t i = 1; i <= max_depth; i++)
@@ -2708,7 +2752,7 @@ int hasPlayingSprites(void)
 		Character* ch = &dictionary[display_list[i].char_id];
 		if (ch->type == CHAR_TYPE_SPRITE &&
 		    ch->sprite_frame_count > 1 &&
-		    display_list[i].sprite_is_playing)
+		    (display_list[i].sprite_is_playing || display_list[i].sprite_manual_next_frame))
 			return 1;
 	}
 	return 0;
