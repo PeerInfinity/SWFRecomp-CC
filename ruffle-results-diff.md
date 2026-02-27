@@ -1,38 +1,30 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a4be5eedce2d` (2026-02-27T01:51:02.812440+00:00)
-**Current:** `4c464530ce68` (2026-02-27T03:31:32.732113+00:00)
+**Previous:** `4c464530ce68` (2026-02-27T03:31:32.732113+00:00)
+**Current:** `e28a1321ec5f` (2026-02-27T06:01:34.342558+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 386 | 388 | +2 |
+| Passing | 388 | 391 | +3 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 62.4% | 62.7% | +0.3% |
-| Mismatched lines | 31564 | 31577 | +13 |
-|   Decreased | | | -68 |
-|   Increased | | | +81 |
+| Pass rate | 62.7% | 63.2% | +0.5% |
+| Mismatched lines | 31577 | 31564 | -13 |
+|   Decreased | | | -13 |
 
-## Newly Passing (2)
+## Newly Passing (3)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `place_and_lookup` | output_mismatch | 18/30 | 30/30 |
-| `tab_ordering_children` | output_mismatch | 181/208 | 208/208 |
+| `rewind_depth` | output_mismatch | 22/30 | 30/30 |
+| `selection` | output_mismatch | 452/454 | 454/454 |
+| `tell_target_invalid_swf6` | output_mismatch | 4/5 | 5/5 |
 
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `movieclip_hittest_shapeflag` | compile_fail | output_mismatch | - | 266/338 |
-
-## Line Count Changed (5)
+## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `selection` | output_mismatch | 434/454 | 452/454 | -18 |
-| `tab_ordering_movieclip_enabled_default` | output_mismatch | 55/462 | 63/462 | -8 |
-| `tab_ordering_tabbable` | output_mismatch | 33/47 | 36/47 | -3 |
-| `global_proto_decls_delete` | output_mismatch | 0/4158 | 0/4158 | 0 |
-| `global_proto_decls` | output_mismatch | 20/4497 | 11/4497 | +9 |
+| `edittext_focus_selection` | output_mismatch | 0/2 | 1/2 | -1 |
+| `edittext_programmatic_focus` | output_mismatch | 6/12 | 7/12 | -1 |
+| `tell_target_invalid` | output_mismatch | 4/6 | 4/6 | 0 |
