@@ -1,27 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `5f27cba3a70d` (2026-02-26T22:44:26.798014+00:00)
-**Current:** `56afab65ddc6` (2026-02-26T23:28:34.001648+00:00)
+**Previous:** `56afab65ddc6` (2026-02-26T23:28:34.001648+00:00)
+**Current:** `518e30146ed4` (2026-02-27T00:48:09.669038+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 383 | 384 | +1 |
+| Passing | 384 | 385 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 61.9% | 62.0% | +0.1% |
-| Mismatched lines | 31674 | 31675 | +1 |
-|   Decreased | | | -1 |
-|   Increased | | | +2 |
+| Pass rate | 62.0% | 62.2% | +0.2% |
+| Mismatched lines | 31675 | 31555 | -120 |
+|   Decreased | | | -120 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `loadmovie_flashvars` | output_mismatch | 3/4 | 4/4 |
+| `path_string` | output_mismatch | 277/322 | 322/322 |
 
-## Status Changed (1)
+## Status Changed (2)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `resolve_different_root` | segfault | output_mismatch | - | 0/2 |
+| `movieclip_hittest_shapeflag` | output_mismatch | compile_fail | 266/338 | - |
+| `resolve_different_root` | output_mismatch | segfault | 0/2 | - |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `root_global_parent` | output_mismatch | 1/6 | 2/6 | -1 |
