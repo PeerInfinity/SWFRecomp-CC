@@ -6,7 +6,7 @@ Last updated: 2026-02-27
 
 - **Pass rate (CI, last run)**: 386/619 (62.4%)
 - **Main failure types**: output_mismatch (214), segfault (14), compile_fail (2), runtime_error (2), timeout (1)
-- **Recent gains**: string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
+- **Recent gains**: place_and_lookup now PASS (30/30). selection 435→453/455. string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -78,7 +78,7 @@ Last updated: 2026-02-27
 |------|-------|-------|
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 189/191 (99.0%) | Morph shape bounds interpolation rounding |
-| `selection` | 435/455 (95.6%) | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
+| `selection` | 453/455 (99.6%) | replaceSel() not yet implemented (2 lines) |
 | `hittest_morph` | ~~67/70~~ **70/70 PASS** ✅ | Now passing in CI |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
 | `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
@@ -117,7 +117,7 @@ Last updated: 2026-02-27
 | XML_PLAN | **ALL PHASES COMPLETE** | 24/26 active tests pass | xml_to_string (11/13), xml_child_nodes_edge_cases (3/4) |
 | ARRAY_METHODS_PLAN | **FULLY COMPLETE** | All tests pass | — |
 | OBJECT_WATCH_PLAN | **Phase 1 DONE** | 3/4 pass | `watch_textfield` needs MC watcher in SetMember |
-| GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 18/30 pass (globals_swf5-8, math_min_max, is_finite×2, parse_int, parse_float, primitive_type_globals, printjob×3, sound×2, localconnection, context_menu, context_menu_item) | Phase 8 blocked: enumeration order + 20 missing globals |
+| GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 18/30 pass + place_and_lookup ✅ (globals_swf5-8, math_min_max, is_finite×2, parse_int, parse_float, primitive_type_globals, printjob×3, sound×2, localconnection, context_menu, context_menu_item) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
 | MOVIECLIP_PLAN | **Phases 1-5, 7-9 DONE** | 17 tests pass ✅ | Phase 6 (events) |
@@ -129,7 +129,7 @@ Last updated: 2026-02-27
 | STAGE_PLAN | **Phases 1,2,5,7 DONE** | stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅ | Phase 4 (_level addressing), Phase 8 (children) |
 | STAGE_FRAME_PROPS_PLAN | **Phases 1,5 DONE** | Several stages pass | Phase 2 (shape bounds), Phase 3 (content bounds) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
-| SELECTION_PLAN | **Partial** | selection at 434/454 | getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking |
+| SELECTION_PLAN | **Nearly complete** | selection at 453/455 | replaceSel() not yet implemented (2 lines) |
 | OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 33/39 — remaining 6 lines = makeSuperWith (SUPER as __proto__) + addProperty virtual __constructor__; `funky_function_calls` segfaults |
 | REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
@@ -154,8 +154,7 @@ Last updated: 2026-02-27
 ### Highest ROI — unblocked, high line-count impact
 1. **TELLTARGET_PLAN Phase 2 remaining** — ~~eval()~~ (not needed: Flash compiles eval to GetVariable). ~~shape display objects~~ done (`string_paths_hidden` 54/54 PASS). Remaining: colon-variable syntax. THIS_BINDING `this_scoping` (10 lines) still blocked by separate `this` binding issue.
 2. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83 (+15 lines)
-3. **SELECTION_PLAN** — `selection` at 435/455 (95.6%), getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking (+20 lines)
-4. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (+2 lines)
+3. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (+2 lines)
 
 ### Medium ROI — feature phases with multiple test payoff
 5. **REGISTERCLASS_PLAN Phases 4-5** — constructor dispatch on timeline placement. Unlocks `clip_constructors` (6/8→8), `on_construct`, and partially `timer_run_actions`
@@ -192,7 +191,11 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
 
-### Recent session notes (2026-02-27)
+### Recent session notes (2026-02-26)
+- **place_and_lookup 30/30 PASS**: Four fixes: (1) `ng_isScriptableChar()` helper in tag_stubs.c for canonical scriptable check (sprite/button/textfield/video). (2) Updated 4 non-scriptable check sites in action.c to use it. (3) var_map enumeration on root MC in `actionEnumerate2` (for timeline vars like `doPrint`). (4) Videos don't get auto instance names (removed `is_video` from auto-naming condition).
+- **selection 435→453/455**: Implemented selection index tracking: `g_selection_begin/caret/end` globals, split `getIndex` into 3 functions, `setSelection` with clamping/swapping semantics, reset indices on focus change. Remaining 2 lines: `replaceSel()`.
+
+### Previous session notes (2026-02-27)
 - **string_paths_hidden 54/54 PASS**: Non-scriptable display objects (shapes, text, morph shapes) now resolve to parent MC instead of creating a MC wrapper. Fixed in `resolveSlashPathToMC` (character type check), `actionGetMember` (MOVIECLIP child lookup), and colon-path `_level0` resolution inside functions.
 - **path_string 322/322 PASS**: Fixed via _level0 scope chain behavior, root MC var priority in GetMember/GetVariable, slash-path SetVariable. Key insight: Ruffle's own-properties-before-children order for root MC.
 - **resolve_different_root regression**: output_mismatch (0/2) → segfault. Likely from new `var_map` access in GetMember for loaded movie contexts. Low priority.

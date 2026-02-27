@@ -8547,9 +8547,9 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 							check_char_id = pdobj->sprite_display_list[child_depth].char_id;
 					}
 					if (check_char_id > 0) {
-						CharacterType ctype = dictionary[check_char_id].type;
-						if (ctype == CHAR_TYPE_SHAPE || ctype == CHAR_TYPE_MORPH_SHAPE) {
-							// Shape/morph — return parent MC, don't descend
+						extern int ng_isScriptableChar(size_t char_id);
+						if (!ng_isScriptableChar(check_char_id)) {
+							// Non-scriptable (shape, morph, static text) — return parent MC, don't descend
 							return mc;
 						}
 					}
@@ -11749,6 +11749,23 @@ static void enum_child_callback(const char* name, u32 name_len, void* user_data)
 }
 #endif
 
+// Callback for hashmap_iterate on var_map — pushes variable names onto the ActionScript stack
+struct EnumVarMapState { SWFAppContext* ctx; EnumeratedName** head; };
+static int enum_varmap_callback(const void *key, size_t ksize, uintptr_t value, void *usr)
+{
+	struct EnumVarMapState* st = (struct EnumVarMapState*)usr;
+	ActionVar* var = (ActionVar*)value;
+	if (var == NULL) return 0;
+	// Skip uninitialized vars (type=STRING, str_size=0, heap_ptr=NULL sentinel)
+	if (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 &&
+	    var->data.string_data.heap_ptr == NULL) return 0;
+	if (isPropertyEnumerated(*st->head, (const char*)key, (u32)ksize)) return 0;
+	addEnumeratedName(st->head, (const char*)key, (u32)ksize);
+	SWFAppContext* app_context = st->ctx;
+	PUSH_STR((char*)key, (u32)ksize);
+	return 0;
+}
+
 void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 {
 	// Step 1: Pop value from stack — must check type before reading as string
@@ -14482,17 +14499,26 @@ static char g_clipboard_text[1024] = {0};
 static size_t g_clipboard_len = 0;
 static int g_tf_select_all = 0;  // 1 = entire text field is selected
 
+// Selection index tracking (for getBeginIndex/getCaretIndex/getEndIndex)
+static int g_selection_begin = -1;
+static int g_selection_caret = -1;
+static int g_selection_end = -1;
+
 // Static function objects for Selection methods
 static ASFunction g_selection_setFocus_func;
 static ASFunction g_selection_getFocus_func;
 static ASFunction g_selection_getBeginIndex_func;
 static ASFunction g_selection_getCaretIndex_func;
 static ASFunction g_selection_getEndIndex_func;
+static ASFunction g_selection_setSelection_func;
 #ifdef NO_GRAPHICS
 // Forward declarations — implementations are in the NO_GRAPHICS block at end of file
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
-static ActionVar builtin_selection_getIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_selection_getBeginIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_selection_getCaretIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_selection_getEndIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_selection_setSelection(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 #endif
 
 static int g_global_init_done = 0;
@@ -15283,15 +15309,19 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 				memset(&g_selection_getBeginIndex_func, 0, sizeof(ASFunction));
 				strncpy(g_selection_getBeginIndex_func.name, "getBeginIndex", 255);
 				g_selection_getBeginIndex_func.function_type = 2;
-				g_selection_getBeginIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
+				g_selection_getBeginIndex_func.advanced_func = (Function2Ptr)builtin_selection_getBeginIndex;
 				memset(&g_selection_getCaretIndex_func, 0, sizeof(ASFunction));
 				strncpy(g_selection_getCaretIndex_func.name, "getCaretIndex", 255);
 				g_selection_getCaretIndex_func.function_type = 2;
-				g_selection_getCaretIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
+				g_selection_getCaretIndex_func.advanced_func = (Function2Ptr)builtin_selection_getCaretIndex;
 				memset(&g_selection_getEndIndex_func, 0, sizeof(ASFunction));
 				strncpy(g_selection_getEndIndex_func.name, "getEndIndex", 255);
 				g_selection_getEndIndex_func.function_type = 2;
-				g_selection_getEndIndex_func.advanced_func = (Function2Ptr)builtin_selection_getIndex;
+				g_selection_getEndIndex_func.advanced_func = (Function2Ptr)builtin_selection_getEndIndex;
+				memset(&g_selection_setSelection_func, 0, sizeof(ASFunction));
+				strncpy(g_selection_setSelection_func.name, "setSelection", 255);
+				g_selection_setSelection_func.function_type = 2;
+				g_selection_setSelection_func.advanced_func = (Function2Ptr)builtin_selection_setSelection;
 				sel_funcs_init = 1;
 			}
 			ActionVar fv = {0};
@@ -15306,6 +15336,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setProperty(app_context, g_selection_obj, "getCaretIndex", 13, &fv);
 			fv.data.numeric_value = (u64)&g_selection_getEndIndex_func;
 			setProperty(app_context, g_selection_obj, "getEndIndex", 11, &fv);
+			fv.data.numeric_value = (u64)&g_selection_setSelection_func;
+			setProperty(app_context, g_selection_obj, "setSelection", 12, &fv);
 		}
 #endif
 
@@ -18365,6 +18397,15 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 #endif
 
 			EnumeratedName* enumerated_head = NULL;
+
+			// Enumerate var_map variables for root movieclip
+			if (mc == &root_movieclip) {
+				extern hashmap* var_map;
+				if (var_map != NULL) {
+					struct EnumVarMapState st = { app_context, &enumerated_head };
+					hashmap_iterate(var_map, enum_varmap_callback, &st);
+				}
+			}
 
 			// Walk dynamic_props __proto__ chain
 			if (mc->dynamic_props != NULL)
@@ -21884,10 +21925,12 @@ void actionGetMember(SWFAppContext* app_context)
 						extern DisplayObject* display_list;
 						_ecid = display_list[_early_depth].char_id;
 					}
-					if (_ecid > 0 && (dictionary[_ecid].type == CHAR_TYPE_SHAPE ||
-					    dictionary[_ecid].type == CHAR_TYPE_MORPH_SHAPE)) {
-						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
-						return;
+					if (_ecid > 0) {
+						extern int ng_isScriptableChar(size_t char_id);
+						if (!ng_isScriptableChar(_ecid)) {
+							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+							return;
+						}
 					}
 				}
 				MovieClip* _early_mc = findOrCreateMovieClip(app_context, _early_name, mc);
@@ -22146,8 +22189,9 @@ void actionGetMember(SWFAppContext* app_context)
 								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 								return;
 							}
-							// Non-scriptable types (shape, morph) resolve to parent MC
-							if (_ctype == CHAR_TYPE_SHAPE || _ctype == CHAR_TYPE_MORPH_SHAPE) {
+							// Non-scriptable types resolve to parent MC
+							extern int ng_isScriptableChar(size_t char_id);
+							if (!ng_isScriptableChar(_cid)) {
 								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 								return;
 							}
@@ -22182,8 +22226,9 @@ void actionGetMember(SWFAppContext* app_context)
 							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 							return;
 						}
-						// Non-scriptable types (shape, morph) resolve to parent MC
-						if (_ctype == CHAR_TYPE_SHAPE || _ctype == CHAR_TYPE_MORPH_SHAPE) {
+						// Non-scriptable types resolve to parent MC
+						extern int ng_isScriptableChar(size_t char_id);
+						if (!ng_isScriptableChar(_cid)) {
 							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
 							return;
 						}
@@ -33099,6 +33144,10 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 	mc_call_as2_handler_ng(app_context, new_mc, "onSetFocus", 10);
 	// 3. Update focused MC before broadcasting
 	g_focused_mc = new_mc;
+	// Reset selection indices on focus change
+	g_selection_begin = -1;
+	g_selection_caret = -1;
+	g_selection_end = -1;
 	// When a text field gains focus, select all text (matches Flash behavior)
 	if (new_mc != NULL && new_mc->ng_textfield_idx >= 0)
 		g_tf_select_all = 1;
@@ -33188,14 +33237,87 @@ static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVa
 	return result;
 }
 
-// Selection.getBeginIndex() / getCaretIndex() / getEndIndex() — return -1 (no text selection).
-static ActionVar builtin_selection_getIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+// Selection.getBeginIndex() — returns begin index of selection, or -1 if no text field focused.
+static ActionVar builtin_selection_getBeginIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_F64;
-	double neg1 = -1.0;
-	memcpy(&ret.data.numeric_value, &neg1, sizeof(double));
+	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)g_selection_begin : -1.0;
+	memcpy(&ret.data.numeric_value, &v, sizeof(double));
+	return ret;
+}
+
+// Selection.getCaretIndex() — returns caret index of selection, or -1 if no text field focused.
+static ActionVar builtin_selection_getCaretIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_F64;
+	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)g_selection_caret : -1.0;
+	memcpy(&ret.data.numeric_value, &v, sizeof(double));
+	return ret;
+}
+
+// Selection.getEndIndex() — returns end index of selection, or -1 if no text field focused.
+static ActionVar builtin_selection_getEndIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_F64;
+	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)g_selection_end : -1.0;
+	memcpy(&ret.data.numeric_value, &v, sizeof(double));
+	return ret;
+}
+
+// Selection.setSelection(beginIndex, endIndex) — set selection range on focused text field.
+static ActionVar builtin_selection_setSelection(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return ret;
+	if (arg_count == 0) return ret;  // no-op, keep previous indices
+
+	// Get text length from the "text" property on dynamic_props
+	int text_len = 0;
+	if (g_focused_mc->dynamic_props != NULL) {
+		ActionVar* tv = getProperty((ASObject*)g_focused_mc->dynamic_props, "text", 4);
+		if (tv != NULL && tv->type == ACTION_STACK_VALUE_STRING)
+			text_len = (int)tv->str_size;
+	}
+
+	int a, b;
+	if (arg_count == 1) {
+		// Single arg: select from arg to end of text
+		PUSH(args[0].type, args[0].data.numeric_value);
+		convertFloat(app_context);
+		ActionVar cv; popVar(app_context, &cv);
+		double dv; memcpy(&dv, &cv.data.numeric_value, sizeof(double));
+		a = (dv != dv) ? 0 : (int)dv;  // NaN → 0
+		b = text_len;
+	} else {
+		// Two args: explicit begin and end
+		PUSH(args[0].type, args[0].data.numeric_value);
+		convertFloat(app_context);
+		ActionVar cv0; popVar(app_context, &cv0);
+		double d0; memcpy(&d0, &cv0.data.numeric_value, sizeof(double));
+		a = (d0 != d0) ? 0 : (int)d0;
+
+		PUSH(args[1].type, args[1].data.numeric_value);
+		convertFloat(app_context);
+		ActionVar cv1; popVar(app_context, &cv1);
+		double d1; memcpy(&d1, &cv1.data.numeric_value, sizeof(double));
+		b = (d1 != d1) ? 0 : (int)d1;
+	}
+
+	// Clamp to [0, text_len]
+	if (a < 0) a = 0; if (a > text_len) a = text_len;
+	if (b < 0) b = 0; if (b > text_len) b = text_len;
+
+	g_selection_begin = (a <= b) ? a : b;
+	g_selection_end = (a <= b) ? b : a;
+	g_selection_caret = b;  // caret tracks second arg (or textLen for 1-arg form)
 	return ret;
 }
 

@@ -739,7 +739,8 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 
 	// Auto-assign instance name for scriptable characters if not already named
 	// (mirrors Flash Player behavior: sprites/buttons/textfields get "instance1", "instance2", etc.)
-	if ((is_sprite || is_button || is_tf || is_video) && obj->instance_name == NULL)
+	// Note: videos are scriptable but do NOT get auto-instance-names (Ruffle behavior).
+	if ((is_sprite || is_button || is_tf) && obj->instance_name == NULL)
 	{
 		char auto_name[32];
 		snprintf(auto_name, sizeof(auto_name), "instance%u", ng_auto_instance_counter++);
@@ -975,6 +976,14 @@ int ng_isScriptableAtDepth(size_t depth)
 	       ng_find_button(cid) ||
 	       (ng_find_textfield(cid) >= 0) ||
 	       ng_find_video(cid);
+}
+
+int ng_isScriptableChar(size_t char_id)
+{
+	return (dictionary[char_id].type == CHAR_TYPE_SPRITE) ||
+	       ng_find_button(char_id) ||
+	       (ng_find_textfield(char_id) >= 0) ||
+	       ng_find_video(char_id);
 }
 
 // ---------------------------------------------------------------------------
