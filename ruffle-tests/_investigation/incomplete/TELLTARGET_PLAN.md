@@ -17,7 +17,7 @@ Last updated: 2026-02-27
 - `path_string` ✅ — **322/322 PASS** (was 38/322)
 - `get_variable_in_scope` ✅ — PASS (no regression)
 - `string_paths_other` — 31/36 (pre-existing failures)
-- `string_paths_hidden` — pre-existing failures (shape display objects)
+- `string_paths_hidden` ✅ — **54/54 PASS** (non-scriptable display objects resolve to parent MC)
 - `lock_root` ✅ — PASS
 
 ### What's New (Phase 2 progress)
@@ -42,10 +42,20 @@ Last updated: 2026-02-27
 - **Scope isolation**: Inside non-root context, variables resolve to clip's dynamic_props then _global
 
 ### Still Missing (Phase 2 remaining + Phase 3)
-- `eval()` function — needed for `string_paths_eval` (0/4), `string_paths_eval2` (1/7), `string_paths_variable_scopes` (0/5), `string_paths_reference_launder` (0/2)
+- ~~`eval()` function~~ — **NOT NEEDED**: Flash compiles `eval()` to `GetVariable` at the SWF bytecode level. No recompiled test code calls "eval" as a function. The tests previously attributed to needing eval have different actual blockers (see below).
 - Colon-variable syntax in GetVariable for non-slash paths — `clip2:val` should read variable `val` on clip `clip2`
 - `resolve_different_root` regression: segfault (was output_mismatch 0/2). Likely from new `var_map` access in GetMember on loaded movie context. Low priority (loadMovie test, 2 lines).
 - Removed clip edge cases (Phase 3): `removed_target_clip_scope` (0/35), `removed_base_clip_tell_target` (0/2)
+
+### Actual Test Blockers (previously attributed to eval)
+| Test | Lines | Current | Actual Blocker |
+|------|-------|---------|----------------|
+| `string_paths_eval` | 4 | 2/4 | onPress callback fires twice (button/event dispatch bug) |
+| `string_paths_eval2` | 7 | 1/7 | loadMovie test (needs loaded SWF) |
+| `string_paths_variable_scopes` | 5 | 0/5 | onEnterFrame never fires (known per-tick dispatch gap) + attachMovie timing |
+| `string_paths_reference_launder` | 2 | 0/2 | MC var reference after createEmptyMovieClip + removeMovieClip. `known_failure = true` in Ruffle itself |
+| `string_paths_hidden` | 54 | 34/54 | Shapes as path components — last segment is non-MC display object, should resolve to parent MC scope (~20 lines potential) |
+| `string_paths_other` | 36 | 31/36 | MC removal/re-creation edge cases, shape display objects (~5 lines potential) |
 
 ## Overview (original)
 
@@ -427,12 +437,12 @@ if (colon) {
 - **path_string**: 38/322 → **322/322 PASS** ✅ (was the main target — _level0 scoping, root MC var priority, slash-path SetVariable)
 - **root_global_parent**: 1/6 → 2/6 (+1 line, from root MC var priority fix)
 
-**Still estimated (eval + colon-variable syntax not yet done):**
-- **string_paths_eval**: 0/4 → ~3/4 (needs eval function; eval2 needs loadMovie)
-- **string_paths_variable_scopes**: 0/5 → ~5/5 (needs eval + this/root resolution)
-- **string_paths_variable_alias**: 2/4 → 4/4 (needs eval)
-- **string_paths_reference_launder**: 0/2 → ~2/2 (needs eval)
-- **string_paths_hidden**: 34/54 → ~50/54 (may benefit from eval + colon-variable)
+**Remaining tests — actual blockers (eval NOT needed):**
+- **string_paths_eval**: 2/4 — onPress callback fires twice (button dispatch bug, not path resolution)
+- **string_paths_variable_scopes**: 0/5 — onEnterFrame per-tick dispatch not implemented
+- **string_paths_variable_alias**: **4/4 PASS** ✅ (already fixed)
+- **string_paths_reference_launder**: 0/2 — MC lifecycle after remove+recreate (`known_failure` in Ruffle too)
+- **string_paths_hidden**: 34/54 → ~50/54 potential (shape display objects as path components)
 
 ### Verification
 

@@ -8528,6 +8528,33 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 					child_depth = ng_findDisplayEntryByName(seg_buf);
 				}
 				if (child_depth == SIZE_MAX) return NULL; // child not found
+
+				// Non-scriptable display objects (shapes, text, morph shapes) resolve
+				// to their parent MC instead of descending — matches Ruffle behavior
+				// where child.object1() falls back to parent.object1().
+				{
+					extern Character* dictionary;
+					size_t check_char_id = 0;
+					if (found_entry != NULL) {
+						check_char_id = found_entry->char_id;
+					} else if (mc == &root_movieclip) {
+						// Fallback path 4: child_depth is into root display_list
+						check_char_id = display_list[child_depth].char_id;
+					} else if (mc->display_obj != NULL) {
+						// Fallback path 3: child_depth is into parent's sprite_display_list
+						DisplayObject* pdobj = (DisplayObject*)mc->display_obj;
+						if (pdobj->sprite_display_list && child_depth <= pdobj->sprite_max_depth)
+							check_char_id = pdobj->sprite_display_list[child_depth].char_id;
+					}
+					if (check_char_id > 0) {
+						CharacterType ctype = dictionary[check_char_id].type;
+						if (ctype != CHAR_TYPE_SPRITE && ctype != CHAR_TYPE_BUTTON) {
+							// Shape/text/morph — return parent MC, don't descend
+							return mc;
+						}
+					}
+				}
+
 				// exec_sprite_frame registers all MCs with parent=root_movieclip,
 				// so try findOrCreateMovieClip with root as parent first (to reuse
 				// existing MC with its dynamic_props), then fall back to mc as parent.
@@ -15532,7 +15559,9 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 
 				// Inside a function, _levelN targets fail (Ruffle scope chain behavior)
-				if (in_function_scope && target_is_level) {
+				// But only for dot-separated paths — colon is a path separator like slash
+				// where _levelN always resolves.
+				if (in_function_scope && target_is_level && *last_sep == '.') {
 					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 					return;
 				}
@@ -21842,6 +21871,25 @@ void actionGetMember(SWFAppContext* app_context)
 				_early_depth = ng_findDisplayEntryByName(_early_name);
 			}
 			if (_early_depth != SIZE_MAX) {
+				// Non-scriptable types (shape, text, morph) resolve to parent MC
+				{
+					extern Character* dictionary;
+					size_t _ecid = 0;
+					if (mc->display_obj != NULL) {
+						DisplayObject* _pdobj = (DisplayObject*)mc->display_obj;
+						if (_pdobj->sprite_display_list != NULL && _early_depth <= _pdobj->sprite_max_depth)
+							_ecid = _pdobj->sprite_display_list[_early_depth].char_id;
+					}
+					if (_ecid == 0 && (mc == &root_movieclip || mc->name[0] == '\0')) {
+						extern DisplayObject* display_list;
+						_ecid = display_list[_early_depth].char_id;
+					}
+					if (_ecid > 0 && dictionary[_ecid].type != CHAR_TYPE_SPRITE &&
+					    dictionary[_ecid].type != CHAR_TYPE_BUTTON) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+						return;
+					}
+				}
 				MovieClip* _early_mc = findOrCreateMovieClip(app_context, _early_name, mc);
 				if (_early_mc != NULL) {
 					_early_mc->depth = (int)_early_depth - 16384;
@@ -22085,15 +22133,24 @@ void actionGetMember(SWFAppContext* app_context)
 				child_depth = ng_findChildEntryDepth(mc->name, child_name_buf);
 			}
 			if (child_depth != SIZE_MAX) {
-				// SWF5: buttons are transparent — accessing mc.buttonName returns mc itself
-				if (g_swf_version < 6) {
+				// Check character type for non-scriptable display objects
+				{
 					extern Character* dictionary;
 					DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
 					if (parent_dobj != NULL && parent_dobj->sprite_display_list != NULL) {
 						size_t _cid = parent_dobj->sprite_display_list[child_depth].char_id;
-						if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
-							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
-							return;
+						if (_cid > 0) {
+							CharacterType _ctype = dictionary[_cid].type;
+							// SWF5: buttons are transparent — accessing mc.buttonName returns mc itself
+							if (g_swf_version < 6 && _ctype == CHAR_TYPE_BUTTON) {
+								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+								return;
+							}
+							// Non-scriptable types (shape, text, morph) resolve to parent MC
+							if (_ctype != CHAR_TYPE_SPRITE && _ctype != CHAR_TYPE_BUTTON) {
+								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+								return;
+							}
 						}
 					}
 				}
@@ -22114,14 +22171,22 @@ void actionGetMember(SWFAppContext* app_context)
 			// Fall back to root-level name search
 			child_depth = ng_findDisplayEntryByName(child_name_buf);
 			if (child_depth != SIZE_MAX) {
-				// SWF5: buttons are transparent
-				if (g_swf_version < 6) {
+				{
 					extern Character* dictionary;
 					extern DisplayObject* display_list;
 					size_t _cid = display_list[child_depth].char_id;
-					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
-						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
-						return;
+					if (_cid > 0) {
+						CharacterType _ctype = dictionary[_cid].type;
+						// SWF5: buttons are transparent
+						if (g_swf_version < 6 && _ctype == CHAR_TYPE_BUTTON) {
+							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+							return;
+						}
+						// Non-scriptable types (shape, text, morph) resolve to parent MC
+						if (_ctype != CHAR_TYPE_SPRITE && _ctype != CHAR_TYPE_BUTTON) {
+							PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+							return;
+						}
 					}
 				}
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);

@@ -4,9 +4,9 @@ Last updated: 2026-02-27
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 385/619 (62.2%)
-- **Main failure types**: output_mismatch (215), segfault (14), compile_fail (2), runtime_error (2), timeout (1)
-- **Recent gains**: path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
+- **Pass rate (CI, last run)**: 386/619 (62.4%)
+- **Main failure types**: output_mismatch (214), segfault (14), compile_fail (2), runtime_error (2), timeout (1)
+- **Recent gains**: string_paths_hidden now PASS (54/54). path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -71,6 +71,7 @@ Last updated: 2026-02-27
 | `click_block` | 5/5 ✅ | Sprite display list bounds computation for hit testing |
 | `tell_target` | 37/37 ✅ | Base clip tracking + SetTarget rewrite |
 | `path_string` | 322/322 ✅ | _level0 scope chain fix, root MC var priority in GetMember, slash-path SetVariable |
+| `string_paths_hidden` | 54/54 ✅ | Non-scriptable display objects (shapes/text/morph) resolve to parent MC |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -133,7 +134,7 @@ Last updated: 2026-02-27
 | REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
-| TELLTARGET_PLAN | **Phase 2 IN PROGRESS** | tell_target ✅, slash_syntax ✅, string_paths_basic ✅, target_clip_removed ✅, path_string ✅ (322/322), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅ | Phase 2 remaining: eval(), colon-variable syntax |
+| TELLTARGET_PLAN | **Phase 2 IN PROGRESS** | tell_target ✅, slash_syntax ✅, string_paths_basic ✅, string_paths_variable_alias ✅, target_clip_removed ✅, path_string ✅ (322/322), string_paths_hidden ✅ (54/54), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅ | ~~eval()~~ not needed. ~~shape path components~~ done. Remaining: colon-variable syntax |
 | TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
 | FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
 | TAB_ORDERING_PLAN | **PARTIAL** | 2/7 pass (tab_ordering_automatic_basic, tab_ordering_reverse ✅) | Tab key focus navigation, blocked by FOCUS_SYSTEM_PLAN |
@@ -151,7 +152,7 @@ Last updated: 2026-02-27
 ## Recommended Work Order (updated 2026-02-26)
 
 ### Highest ROI — unblocked, high line-count impact
-1. **TELLTARGET_PLAN Phase 2 remaining** — eval() function, colon-variable syntax. Unlocks `string_paths_eval` (0/4), `string_paths_variable_scopes` (0/5), `string_paths_variable_alias` (2/4). Also unlocks THIS_BINDING `this_scoping` (10 lines)
+1. **TELLTARGET_PLAN Phase 2 remaining** — ~~eval()~~ (not needed: Flash compiles eval to GetVariable). ~~shape display objects~~ done (`string_paths_hidden` 54/54 PASS). Remaining: colon-variable syntax. THIS_BINDING `this_scoping` (10 lines) still blocked by separate `this` binding issue.
 2. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83 (+15 lines)
 3. **SELECTION_PLAN** — `selection` at 435/455 (95.6%), getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking (+20 lines)
 4. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (+2 lines)
@@ -192,6 +193,7 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
 
 ### Recent session notes (2026-02-27)
+- **string_paths_hidden 54/54 PASS**: Non-scriptable display objects (shapes, text, morph shapes) now resolve to parent MC instead of creating a MC wrapper. Fixed in `resolveSlashPathToMC` (character type check), `actionGetMember` (MOVIECLIP child lookup), and colon-path `_level0` resolution inside functions.
 - **path_string 322/322 PASS**: Fixed via _level0 scope chain behavior, root MC var priority in GetMember/GetVariable, slash-path SetVariable. Key insight: Ruffle's own-properties-before-children order for root MC.
 - **resolve_different_root regression**: output_mismatch (0/2) → segfault. Likely from new `var_map` access in GetMember for loaded movie contexts. Low priority.
 - **root_global_parent**: gained 1 line (1/6 → 2/6) from root MC var priority fix.
