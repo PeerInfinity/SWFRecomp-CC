@@ -1,12 +1,12 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-26
+Last updated: 2026-02-27
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 383/619 (61.9%)
-- **Main failure types**: output_mismatch (226), segfault (14), runtime_error (2), compile_fail (1), timeout (1)
-- **Recent gains**: Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
+- **Pass rate (CI, last run)**: 385/619 (62.2%)
+- **Main failure types**: output_mismatch (215), segfault (14), compile_fail (2), runtime_error (2), timeout (1)
+- **Recent gains**: path_string now PASS (322/322). Button key events (5 new button tests passing), hittest_morph now PASS, unloadmovie/method/num now PASS, loadvariables2 now PASS, tab_ordering_automatic_basic/reverse now PASS, target_clip_removed now PASS.
 
 ## Crashes and Errors (8 tests)
 
@@ -70,6 +70,7 @@ Last updated: 2026-02-26
 | `mouse_events_visible_enabled` | 12/12 ✅ | Button _visible/_enabled gating + middle mouse button |
 | `click_block` | 5/5 ✅ | Sprite display list bounds computation for hit testing |
 | `tell_target` | 37/37 ✅ | Base clip tracking + SetTarget rewrite |
+| `path_string` | 322/322 ✅ | _level0 scope chain fix, root MC var priority in GetMember, slash-path SetVariable |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -150,7 +151,7 @@ Last updated: 2026-02-26
 ## Recommended Work Order (updated 2026-02-26)
 
 ### Highest ROI — unblocked, high line-count impact
-1. **TELLTARGET_PLAN Phase 2** — dot-path GetVariable, eval(). `path_string` alone is 322 lines (38/322). Also unlocks THIS_BINDING `this_scoping` (10 lines), `string_paths_other` (31/36→36), `string_paths_hidden` (34/54), `tell_target_invalid` (4/6→6)
+1. **TELLTARGET_PLAN Phase 2 remaining** — eval() function, colon-variable syntax. Unlocks `string_paths_eval` (0/4), `string_paths_variable_scopes` (0/5), `string_paths_variable_alias` (2/4). Also unlocks THIS_BINDING `this_scoping` (10 lines)
 2. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83 (+15 lines)
 3. **SELECTION_PLAN** — `selection` at 435/455 (95.6%), getBeginIndex/getCaretIndex/getEndIndex need actual selection tracking (+20 lines)
 4. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (+2 lines)
@@ -190,6 +191,11 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
 
-### Plans moved this session (2026-02-26)
+### Recent session notes (2026-02-27)
+- **path_string 322/322 PASS**: Fixed via _level0 scope chain behavior, root MC var priority in GetMember/GetVariable, slash-path SetVariable. Key insight: Ruffle's own-properties-before-children order for root MC.
+- **resolve_different_root regression**: output_mismatch (0/2) → segfault. Likely from new `var_map` access in GetMember for loaded movie contexts. Low priority.
+- **root_global_parent**: gained 1 line (1/6 → 2/6) from root MC var priority fix.
+
+### Plans moved (2026-02-26)
 - **Moved to complete/**: LOADVARIABLES_PLAN (3/4 pass, remaining needs log_fetch), MOVIECLIPLOADER_PLAN (8/16 pass, remaining unfeasible/blocked), TIMER_PLAN (core done, remaining blocked), PROTOTYPE_OBJECT_PLAN (11/12 pass, remaining blocked on recompiler bug)
 - **Moved to blocked/**: CLONE_DUPLICATE_PLAN (Phase 1 done, remaining blocked on TEXTFIELD+MOUSE+REGISTERCLASS), ROOT_REPLACEMENT_PLAN (1/4 pass, remaining blocked on MTASC/cross-version), SWF_VERSION_SEMANTICS_PLAN (3/5 pass, remaining blocked on loadMovie)

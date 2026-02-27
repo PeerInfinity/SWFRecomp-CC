@@ -1,7 +1,7 @@
 # TellTarget / Target Path Resolution Implementation Plan
 <!-- TESTS: tell_target, tell_target_invalid, tell_target_invalid_swf6, target_clip_swf5, target_clip_swf6, target_clip_removed, path_string, slash_syntax, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes, removed_base_clip_tell_target, removed_target_clip_scope -->
 
-Last updated: 2026-02-26
+Last updated: 2026-02-27
 
 ## Status: PHASE 2 IN PROGRESS
 
@@ -22,9 +22,16 @@ Last updated: 2026-02-26
 
 ### What's New (Phase 2 progress)
 - **actionGetMember `_root` builtin**: MC property `_root` returns root_movieclip (enables `mc._root` access)
-- **actionGetMember root MC global var check**: For root MC, checks global var_map after dynamic_props (non-MOVIECLIP values from global vars shadow child clips)
+- **actionGetMember root MC global var check**: For root MC, checks global var_map after dynamic_props but before child instance names. Non-underscore own properties shadow child clips (matching Ruffle's own-properties-before-children order). Uses `hashmap_get` (read-only, no create-on-access side effects).
 - **actionGetVariable non-string handling**: NULL/UNDEFINED on stack → returns undefined; other types → convertString with string_id=0
+- **actionGetVariable _level0 scope chain fix**: Inside function scopes, `_levelN` path targets return undefined (Ruffle scope chain behavior — _levelN relies on StageObject properties which don't exist on function local ScriptObject scopes)
+- **actionGetVariable dot-path root MC var check**: For paths targeting root MC, checks var_map before falling through to GetMember (own timeline variables take priority over child clips)
 - **actionSetVariable slash-path walk**: For slash-containing paths, walks segments using Ruffle-compatible tokenization (dots NOT delimiters once slash is seen); tries MC child lookup, then falls back to GetMember (dynamic properties)
+
+### Key Architectural Discoveries (Phase 2)
+1. **_level0 vs _root in Ruffle's resolve_target_path**: `_root` has special first-element handling (always resolves regardless of scope object type). `_level0` has NO special handling — it relies on `object.get("_level0")` which only works on StageObject (MovieClip scope objects), not on plain ScriptObjects (function local scopes).
+2. **Root MC property priority**: In Ruffle, own properties (variables set via SetVariable on root timeline) are stored on root MC's ScriptObject and checked BEFORE display list children. `get(root, "clip1")` returns the variable value, not the child MC.
+3. **Dual variable storage sync**: Our var_array (by constant pool string_id, O(1)) syncs to var_map (hashmap) in actionSetVariable. The `hashmap_get` function is the read-only alternative to `getVariable()` (which has create-on-access semantics and allocates empty entries as side effects).
 
 ### What's Implemented (Phase 1)
 - **g_base_clip tracking**: New static in action.c, set/restored by `exec_sprite_frame` and `process_sprite_init_at_depth` in tag.c
@@ -34,11 +41,11 @@ Last updated: 2026-02-26
 - **Child MC lookup in actionGetVariable**: `resolveSlashPathToMC` for non-root contexts
 - **Scope isolation**: Inside non-root context, variables resolve to clip's dynamic_props then _global
 
-### Still Missing (Phase 2+)
-- Proper dot-path GetVariable resolution (first segment MC vs variable priority)
-- `eval()` function
-- Colon-variable syntax in GetVariable for non-slash paths
-- Removed clip edge cases (Phase 3)
+### Still Missing (Phase 2 remaining + Phase 3)
+- `eval()` function — needed for `string_paths_eval` (0/4), `string_paths_eval2` (1/7), `string_paths_variable_scopes` (0/5), `string_paths_reference_launder` (0/2)
+- Colon-variable syntax in GetVariable for non-slash paths — `clip2:val` should read variable `val` on clip `clip2`
+- `resolve_different_root` regression: segfault (was output_mismatch 0/2). Likely from new `var_map` access in GetMember on loaded movie context. Low priority (loadMovie test, 2 lines).
+- Removed clip edge cases (Phase 3): `removed_target_clip_scope` (0/35), `removed_base_clip_tell_target` (0/2)
 
 ## Overview (original)
 
@@ -100,7 +107,7 @@ Internal MovieClip `target` fields use slash-path format: `"/"` for root, `"/cli
 | removed_base_clip_tell_target | 2 | 0/2 (0%) | Base clip removed during tellTarget |
 | removed_target_clip_scope | 35 | 0/35 (0%) | Scope resolution after removeMovieClip |
 
-**Total: ~20 tests, currently ~93/531 lines matching (~18%)**
+**Total: ~20 tests, currently ~430/531 lines matching (~81%)** (path_string 322/322 was the bulk of Phase 2 gains)
 
 ---
 
@@ -414,14 +421,18 @@ if (colon) {
 - `set('this:bar', 10)` → sets `bar` on `this` (current clip)
 - `set('this/clip5:foo', 8)` → sets `foo` on clip5 via `this`
 
-### Phase 2 Tests Fixed
+### Phase 2 Tests — Actual Results vs Estimates
 
-- **string_paths_basic**: 2/4 → 4/4 (eval + path resolution)
-- **string_paths_eval**: 0/4 → ~3/4 (eval function; eval2 needs loadMovie)
-- **string_paths_variable_scopes**: 0/5 → ~5/5 (this, _root resolution)
-- **string_paths_variable_alias**: 2/4 → 4/4
-- **string_paths_reference_launder**: 0/2 → ~2/2
-- **string_paths_hidden**: 34/54 → ~50/54 (improved path resolution)
+**Already done (path_string focus):**
+- **path_string**: 38/322 → **322/322 PASS** ✅ (was the main target — _level0 scoping, root MC var priority, slash-path SetVariable)
+- **root_global_parent**: 1/6 → 2/6 (+1 line, from root MC var priority fix)
+
+**Still estimated (eval + colon-variable syntax not yet done):**
+- **string_paths_eval**: 0/4 → ~3/4 (needs eval function; eval2 needs loadMovie)
+- **string_paths_variable_scopes**: 0/5 → ~5/5 (needs eval + this/root resolution)
+- **string_paths_variable_alias**: 2/4 → 4/4 (needs eval)
+- **string_paths_reference_launder**: 0/2 → ~2/2 (needs eval)
+- **string_paths_hidden**: 34/54 → ~50/54 (may benefit from eval + colon-variable)
 
 ### Verification
 
