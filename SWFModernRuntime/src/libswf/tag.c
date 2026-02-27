@@ -328,6 +328,11 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 // ---------------------------------------------------------------------------
 // Helper 1: Advance sprite timelines recursively
 // ---------------------------------------------------------------------------
+// When > 0, advance_sprite_frames defers nested recursion for normal-play
+// sprites (goto paths still recurse immediately).  The deferred recursion is
+// performed by advance_nested_sprite_frames() after the root frame script.
+int g_advance_defer_nested = 0;
+
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
@@ -532,8 +537,10 @@ void advance_sprite_frames(SWFAppContext* app_context)
 #endif
 
 		// Recurse: advance nested sprites within this sprite's display list.
-		// Set g_current_context to this sprite's MC so nested exec_sprite_frame
-		// calls use the correct parent for child MC creation.
+		// When g_advance_defer_nested is set (top-level call from swf_core.c),
+		// skip recursion here — it will be done by advance_nested_sprite_frames()
+		// after the root frame script, matching Ruffle's execution order.
+		if (!g_advance_defer_nested)
 		{
 			MovieClip* sprite_mc = NULL;
 #ifndef NO_GRAPHICS
@@ -565,6 +572,67 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// Advance frame (loop back to 0); guard against 0-frame sprites
 		if (ch->sprite_frame_count > 0)
 			obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
+	}
+}
+
+// Deferred recursion pass: for each root-level sprite, swap into its display
+// list and call advance_sprite_frames (which will now recurse normally since
+// g_advance_defer_nested is 0).
+void advance_nested_sprite_frames(SWFAppContext* app_context)
+{
+#ifdef NO_GRAPHICS
+	if (catch_up_mode) return;
+#endif
+
+	for (size_t i = max_depth; i >= 1; --i)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+		if (obj->sprite_display_list == NULL) continue;
+
+		// Swap to sprite's display list context
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+
+		display_list = obj->sprite_display_list;
+		max_depth = obj->sprite_max_depth;
+		display_list_capacity = obj->sprite_dl_capacity;
+
+		// Set context to this sprite's MC for correct child resolution
+		MovieClip* sprite_mc = NULL;
+#ifndef NO_GRAPHICS
+		{
+			extern MovieClip root_movieclip;
+			MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+			if (obj->instance_name != NULL)
+				sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_recurse);
+		}
+#else
+		{
+			extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+			if (obj->instance_name != NULL)
+				sprite_mc = actionFindMovieClipByName(obj->instance_name);
+		}
+#endif
+		MovieClip* saved_ctx = g_current_context;
+		if (sprite_mc) actionSetCurrentContext(sprite_mc);
+
+		// Now recurse (g_advance_defer_nested is 0, so full recursion happens)
+		advance_sprite_frames(app_context);
+
+		actionSetCurrentContext(saved_ctx);
+
+		// Save back
+		obj->sprite_display_list = display_list;
+		obj->sprite_max_depth = max_depth;
+		obj->sprite_dl_capacity = display_list_capacity;
+
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
 	}
 }
 

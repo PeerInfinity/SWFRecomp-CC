@@ -492,9 +492,14 @@ void swfStart(SWFAppContext* app_context)
 		// the same tick (matching Flash/Ruffle's frame-then-event execution order).
 		if (current_frame < g_frame_count)
 		{
-			// Advance child sprite timelines BEFORE running frame tags/scripts
-			// (Flash executes child frame advancement before parent DoAction)
+			// Two-phase sprite advancement matching Ruffle's execution order:
+			// Phase 1: Advance root-level sprites (defer nested child recursion)
+			// Phase 2: Run root frame script
+			// Phase 3: Advance nested children of sprites
+			extern int g_advance_defer_nested;
+			g_advance_defer_nested = 1;
 			advance_sprite_frames(app_context);
+			g_advance_defer_nested = 0;
 			// Only run the root frame function if the root timeline is playing
 			if (is_playing || manual_next_frame)
 			{
@@ -520,6 +525,12 @@ void swfStart(SWFAppContext* app_context)
 				actionDispatchEnterFrameHandlers(app_context);
 				actionDispatchRootVarMapEnterFrame(app_context);
 			}
+			// Phase 3: advance nested sprite children (deferred from Phase 1)
+			advance_nested_sprite_frames(app_context);
+			// (clip action ENTER_FRAME dispatch is a known gap for 1-frame sprites
+			// on subsequent ticks — see issue_1104. Proper fix needs Ruffle's
+			// action-queue model where events are queued during run_frame_avm1
+			// and executed after all clips in the global exec list are processed.)
 		}
 		else
 		{
@@ -530,7 +541,12 @@ void swfStart(SWFAppContext* app_context)
 			    && !actionHasEnterFrameHandlers()
 			    && !hasPlayingSprites()
 			    && !hasActiveTimers()) break;
-			advance_sprite_frames(app_context);
+			{
+				extern int g_advance_defer_nested;
+				g_advance_defer_nested = 1;
+				advance_sprite_frames(app_context);
+				g_advance_defer_nested = 0;
+			}
 			actionDispatchEnterFrameHandlers(app_context);
 			actionDispatchRootVarMapEnterFrame(app_context);
 			// Dispatch onClipEvent(enterFrame) clip actions
@@ -544,6 +560,7 @@ void swfStart(SWFAppContext* app_context)
 						_obj->clip_actions[_a].action(app_context);
 				}
 			}
+			advance_nested_sprite_frames(app_context);
 		}
 
 		// Deliver queued input events for this tick (after frame scripts ran)

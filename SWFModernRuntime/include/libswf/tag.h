@@ -117,6 +117,10 @@ size_t ng_getCharIdByMC(MovieClip* mc);
 #ifdef NO_GRAPHICS
 // Advance sprite timelines (replaces old ng_advanceSprites; called by swf_core.c)
 void advance_sprite_frames(SWFAppContext* app_context);
+// Advance only nested sprites within root-level sprites (deferred recursion).
+// Call after advance_sprite_frames and the root frame script to match Ruffle's
+// execution order: root-level sprites → root → nested children.
+void advance_nested_sprite_frames(SWFAppContext* app_context);
 // Returns 1 if any multi-frame sprite at root level is still playing
 int hasPlayingSprites(void);
 // Currently-executing sprite DisplayObject (set by advance_sprite_frames)

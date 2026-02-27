@@ -313,6 +313,13 @@ static u32 scope_depth = 0;
 static ActionVar g_this_stack[MAX_THIS_DEPTH];
 static u32 g_this_depth = 0;
 
+// Tracks the scope object on which the last GetVariable found a value via a WITH scope.
+// Used by CallFunction to determine the correct `this` binding when a function is
+// found on a WITH scope target (Ruffle: CallableValue::Callable(scope_obj, fn)).
+// Reset to {.type = ACTION_STACK_VALUE_UNDEFINED} after each GetVariable call.
+static ActionVar g_last_callable_this = {0};
+static int g_last_callable_this_set = 0;
+
 // Super context stack — tracks prototype chain depth for super() resolution.
 // Ruffle model: super is a virtual (this, depth) pair. Depth indicates how many
 // __proto__ levels to skip when resolving super properties/constructors.
@@ -15582,6 +15589,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 void actionGetVariable(SWFAppContext* app_context)
 {
+	// Clear callable_this tracking — will be set if value is found on a WITH scope
+	g_last_callable_this_set = 0;
+
 	// If stack top is not a string, convert it first (handles double GetVariable pattern
 	// where first GetVariable returns a non-string like MOVIECLIP or OBJECT)
 	if (STACK_TOP_TYPE != ACTION_STACK_VALUE_STRING)
@@ -15915,11 +15925,33 @@ void actionGetVariable(SWFAppContext* app_context)
 				else if (prop_struct->getter != NULL)
 				{
 					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)scope_chain[i]);
+					// Track with-scope callable this for CallFunction
+					if (scope_is_with[i]) {
+						if (scope_mc[i] != NULL) {
+							g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+							g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
+						} else {
+							g_last_callable_this.type = ACTION_STACK_VALUE_OBJECT;
+							g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
+						}
+						g_last_callable_this_set = 1;
+					}
 					pushVar(app_context, &result);
 					return;
 				}
 				else
 				{
+					// Track with-scope callable this for CallFunction
+					if (scope_is_with[i]) {
+						if (scope_mc[i] != NULL) {
+							g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+							g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
+						} else {
+							g_last_callable_this.type = ACTION_STACK_VALUE_OBJECT;
+							g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
+						}
+						g_last_callable_this_set = 1;
+					}
 					pushVar(app_context, &prop_struct->value);
 					return;
 				}
@@ -26874,6 +26906,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	if (!builtin_handled)
 	{
 		ASFunction* func = lookupFunctionByName(func_name, func_name_len);
+		// Track whether function was found on a WITH scope object (for this binding)
+		ActionVar callable_this = {0};
+		int has_callable_this = 0;
 
 		// Try slash-path resolution: /:foo -> foo (Flash 4 root variable syntax)
 		if (func == NULL && func_name_len > 2 && func_name[0] == '/' && func_name[1] == ':')
@@ -26882,6 +26917,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		}
 
 		// Try scope chain + global variable lookup (for functions stored via DefineLocal)
+		int cf_var_found_not_func = 0;  // variable found but not callable
 		if (func == NULL)
 		{
 			// Use preserved string_id so var_array path is taken when available,
@@ -26892,6 +26928,19 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			{
 				func = (ASFunction*) STACK_TOP_VALUE;
 				POP();
+				// If the function was found on a WITH scope, use that scope's
+				// object as 'this' (Ruffle: CallableValue::Callable(scope_obj, fn))
+				if (g_last_callable_this_set) {
+					callable_this = g_last_callable_this;
+					has_callable_this = 1;
+				}
+			}
+			else if (STACK_TOP_TYPE != ACTION_STACK_VALUE_UNDEFINED)
+			{
+				// Variable was found but is not a function — stop looking
+				// (Ruffle: UnCallable path still calls the value but it's a no-op)
+				POP();
+				cf_var_found_not_func = 1;
 			}
 			else
 			{
@@ -26900,7 +26949,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		}
 
 		// Try current MovieClip's dynamic_props (functions set via clip.run = func)
-		if (func == NULL && g_current_context != NULL && g_current_context->dynamic_props != NULL)
+		if (func == NULL && !cf_var_found_not_func && g_current_context != NULL && g_current_context->dynamic_props != NULL)
 		{
 			ActionVar* dp = getProperty((ASObject*)g_current_context->dynamic_props, func_name, func_name_len);
 			if (dp != NULL && dp->type == ACTION_STACK_VALUE_FUNCTION)
@@ -26910,7 +26959,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		}
 
 		// Try dot-path resolution: _root.foo -> resolve path to function variable
-		if (func == NULL && memchr(func_name, '.', func_name_len) != NULL)
+		if (func == NULL && !cf_var_found_not_func && memchr(func_name, '.', func_name_len) != NULL)
 		{
 			// Resolve the full path via GetVariable (handles dots recursively)
 			PUSH_STR(func_name, func_name_len);
@@ -26944,6 +26993,23 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// SWF5 does NOT have closures — functions execute in the caller's context.
 			MovieClip* saved_cf_context = g_current_context;
 			DisplayObject* saved_cf_sprite = g_current_sprite_obj;
+			// Save scope chain: SWF6+ functions start with a fresh scope chain
+			// (only captured scopes + local scope), not inheriting the caller's scopes.
+			// We save the entire scope chain state because the function will overwrite
+			// the global scope_chain array positions during its execution.
+			u32 saved_scope_depth_cf = scope_depth;
+			ASObject* saved_scope_chain_cf[MAX_SCOPE_DEPTH];
+			u8 saved_scope_is_with_cf[MAX_SCOPE_DEPTH];
+			MovieClip* saved_scope_mc_cf[MAX_SCOPE_DEPTH];
+			if (g_swf_version >= 6)
+			{
+				for (u32 si = 0; si < scope_depth; si++) {
+					saved_scope_chain_cf[si] = scope_chain[si];
+					saved_scope_is_with_cf[si] = scope_is_with[si];
+					saved_scope_mc_cf[si] = scope_mc[si];
+				}
+				scope_depth = 0;
+			}
 			if (g_swf_version >= 6 && func->base_clip != NULL)
 			{
 				actionSetCurrentContext(func->base_clip);
@@ -26997,10 +27063,15 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						// When 'this' is accessible by name (not preloaded/suppressed),
 						// push to g_this_stack AND set on scope chain.
 						// When preloaded/suppressed, inherit parent's this (Ruffle behavior).
-						extern MovieClip root_movieclip;
 						ActionVar this_var = {0};
-						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-						this_var.data.numeric_value = (u64)&root_movieclip;
+						if (has_callable_this) {
+							// Function found on WITH scope — use scope object as this
+							this_var = callable_this;
+						} else {
+							extern MovieClip root_movieclip;
+							this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+							this_var.data.numeric_value = (u64)&root_movieclip;
+						}
 						setProperty(app_context, local_scope, "this", 4, &this_var);
 						if (g_this_depth < MAX_THIS_DEPTH) {
 							g_this_stack[g_this_depth] = this_var;
@@ -27064,12 +27135,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ASObject* local_scope = allocObject(app_context, 8);
 
 				// Push 'this' binding for type 1 functions (DefineFunction)
-				// In Flash, 'this' defaults to _level0 (root movieclip) for plain calls
+				// In Flash, 'this' defaults to _level0 (root movieclip) for plain calls,
+				// unless the function was found on a WITH scope object (then this = that object)
 				u32 saved_this_depth_t1 = g_this_depth;
 				if (g_this_depth < MAX_THIS_DEPTH) {
-					extern MovieClip root_movieclip;
-					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-					g_this_stack[g_this_depth].data.numeric_value = (u64)&root_movieclip;
+					if (has_callable_this) {
+						g_this_stack[g_this_depth] = callable_this;
+					} else {
+						extern MovieClip root_movieclip;
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)&root_movieclip;
+					}
 					g_this_depth++;
 				}
 
@@ -27221,7 +27297,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			g_call_depth--;
 
-			// Restore caller's context
+			// Restore caller's scope chain and context
+			if (g_swf_version >= 6)
+			{
+				for (u32 si = 0; si < saved_scope_depth_cf; si++) {
+					scope_chain[si] = saved_scope_chain_cf[si];
+					scope_is_with[si] = saved_scope_is_with_cf[si];
+					scope_mc[si] = saved_scope_mc_cf[si];
+				}
+			}
+			scope_depth = saved_scope_depth_cf;
 			actionSetCurrentContext(saved_cf_context);
 			g_current_sprite_obj = saved_cf_sprite;
 		}
