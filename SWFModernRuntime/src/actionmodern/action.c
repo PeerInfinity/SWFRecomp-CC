@@ -5862,7 +5862,7 @@ ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;
 
 // MovieClip prototype method stubs (static storage)
-#define MC_METHOD_COUNT 20
+#define MC_METHOD_COUNT 26
 static ASFunction g_mc_method_funcs[MC_METHOD_COUNT];
 
 static void initMovieClipPrototype(SWFAppContext* app_context)
@@ -5904,6 +5904,12 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		{"stopDrag", 8},
 		{"swapDepths", 10},
 		{"getTextSnapshot", 15},
+		{"gotoAndStop", 11},
+		{"gotoAndPlay", 11},
+		{"stop", 4},
+		{"play", 4},
+		{"prevFrame", 9},
+		{"nextFrame", 9},
 	};
 
 	memset(g_mc_method_funcs, 0, sizeof(g_mc_method_funcs));
@@ -15983,6 +15989,18 @@ void actionGetVariable(SWFAppContext* app_context)
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)tobj);
 				return;
 			}
+			// Check MovieClip.prototype for methods (gotoAndStop, etc.)
+			if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+				ActionVar* mc_proto_prop = getPropertyWithPrototype(
+					g_movieclip_constructor.prototype_obj, var_name, var_name_len);
+				if (mc_proto_prop != NULL) {
+					g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+					g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
+					g_last_callable_this_set = 1;
+					pushVar(app_context, mc_proto_prop);
+					return;
+				}
+			}
 		}
 	}
 
@@ -21369,6 +21387,108 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				if (_setter_prop != NULL && _setter_prop->getter != NULL) {
 					return;  // Read-only virtual property
+				}
+			}
+			// Check watch table for MC property watchers
+			if (g_watch_count > 0 && !g_execution_halted)
+			{
+				for (int _wi = 0; _wi < g_watch_count; _wi++)
+				{
+					if (g_watch_table[_wi].obj == NULL &&
+					    g_watch_table[_wi].mc == mc &&
+					    g_watch_table[_wi].prop_name_len == prop_name_len &&
+					    strncmp(g_watch_table[_wi].prop_name, prop_name, prop_name_len) == 0)
+					{
+						ASFunction* _wf = g_watch_table[_wi].watcher_func;
+						if (_wf != NULL)
+						{
+							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
+							{
+								u32 _pname_u16_len;
+								uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
+								ActionVar _pname_arg = {0};
+								_pname_arg.type = ACTION_STACK_VALUE_STRING;
+								_pname_arg.str_size = _pname_u16_len;
+								_pname_arg.data.string_data.heap_ptr = _pname_u16;
+								_pname_arg.data.string_data.owns_memory = true;
+								// Old value: use undefined (MC virtual properties like "text"
+								// are stored in dynamic_props by init, but Flash/Ruffle
+								// treats them as virtual getter/setter — old value is
+								// undefined until explicitly set by ActionScript)
+								ActionVar _old_val = {0};
+								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
+								ActionVar _wargs[4] = { _pname_arg, _old_val, value_var, g_watch_table[_wi].user_data };
+								ActionVar* _wregs = NULL;
+								if (_wf->register_count > 0)
+									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
+								ASObject* _wscope = allocObject(app_context, 4);
+								// Set this = mc on the watcher scope
+								ActionVar _wthis = {0};
+								_wthis.type = ACTION_STACK_VALUE_MOVIECLIP;
+								_wthis.data.numeric_value = (u64)mc;
+								setProperty(app_context, _wscope, "this", 4, &_wthis);
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = 0;
+									scope_mc[scope_depth] = NULL;
+									scope_chain[scope_depth++] = _wscope;
+								}
+								g_call_depth++;
+								MovieClip* _wsaved = g_current_context;
+								actionSetCurrentContext(mc);
+								ActionVar _wret = _wf->advanced_func(app_context, _wargs, 4, _wregs, (void*)mc);
+								actionSetCurrentContext(_wsaved);
+								g_call_depth--;
+								if (scope_depth > 0) scope_depth--;
+								releaseObject(app_context, _wscope);
+								if (_wregs != NULL) FREE(_wregs);
+								if (_pname_arg.data.string_data.owns_memory)
+									FREE(_pname_arg.data.string_data.heap_ptr);
+								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
+									value_var = _wret;
+							}
+							else if (_wf->function_type == 1 && _wf->simple_func != NULL)
+							{
+								// Type 1 watcher: push args on stack, call, use return value
+								u32 _pname_u16_len;
+								uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
+								ActionVar _pname_arg = {0};
+								_pname_arg.type = ACTION_STACK_VALUE_STRING;
+								_pname_arg.str_size = _pname_u16_len;
+								_pname_arg.data.string_data.heap_ptr = _pname_u16;
+								_pname_arg.data.string_data.owns_memory = true;
+								ActionVar _old_val = {0};
+								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
+								// Push 3 params: prop (bottom), oldVal, newVal (top)
+								pushVar(app_context, &_pname_arg);
+								pushVar(app_context, &_old_val);
+								pushVar(app_context, &value_var);
+								// Create local scope with this = mc
+								ASObject* _wscope = allocObject(app_context, 4);
+								ActionVar _wthis = {0};
+								_wthis.type = ACTION_STACK_VALUE_MOVIECLIP;
+								_wthis.data.numeric_value = (u64)mc;
+								setProperty(app_context, _wscope, "this", 4, &_wthis);
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = 0;
+									scope_mc[scope_depth] = NULL;
+									scope_chain[scope_depth++] = _wscope;
+								}
+								g_call_depth++;
+								MovieClip* _wsaved = g_current_context;
+								actionSetCurrentContext(mc);
+								ActionVar _wret = ((ActionVar(*)(SWFAppContext*))_wf->simple_func)(app_context);
+								actionSetCurrentContext(_wsaved);
+								g_call_depth--;
+								if (scope_depth > 0) scope_depth--;
+								releaseObject(app_context, _wscope);
+								if (_pname_arg.data.string_data.owns_memory)
+									FREE(_pname_arg.data.string_data.heap_ptr);
+								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
+									value_var = _wret;
+							}
+						}
+						break;
+					}
 				}
 			}
 			// Store in dynamic_props
@@ -26902,6 +27022,89 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		builtin_handled = 1;
 	}
 
+	// MC navigation methods called via CallFunction (from WITH scope or dot/slash path).
+	// e.g. with(instance1) { gotoAndStop(3); } or CallFunction("_root.mc.gotoAndStop", 1, 3)
+	if (!builtin_handled)
+	{
+		int _is_mc_nav = 0;
+		int _mc_nav_play = 0;
+		const char* _mc_nav_name = func_name;
+		u32 _mc_nav_name_len = func_name_len;
+		u32 _mc_nav_container_len = 0;
+
+		// For dot/slash paths, extract method name (after last dot/slash)
+		const char* _mc_last_sep = NULL;
+		for (const char* _mcp = func_name; _mcp < func_name + func_name_len; _mcp++) {
+			if (*_mcp == '.' || *_mcp == '/') _mc_last_sep = _mcp;
+		}
+		if (_mc_last_sep != NULL) {
+			_mc_nav_container_len = (u32)(_mc_last_sep - func_name);
+			_mc_nav_name = _mc_last_sep + 1;
+			_mc_nav_name_len = func_name_len - _mc_nav_container_len - 1;
+		}
+
+		if (_mc_nav_name_len == 11 && strncmp(_mc_nav_name, "gotoAndStop", 11) == 0) { _is_mc_nav = 1; _mc_nav_play = 0; }
+		else if (_mc_nav_name_len == 11 && strncmp(_mc_nav_name, "gotoAndPlay", 11) == 0) { _is_mc_nav = 1; _mc_nav_play = 1; }
+		else if (_mc_nav_name_len == 4 && strncmp(_mc_nav_name, "stop", 4) == 0) { _is_mc_nav = 2; }
+		else if (_mc_nav_name_len == 4 && strncmp(_mc_nav_name, "play", 4) == 0) { _is_mc_nav = 3; }
+		else if (_mc_nav_name_len == 9 && strncmp(_mc_nav_name, "prevFrame", 9) == 0) { _is_mc_nav = 4; }
+		else if (_mc_nav_name_len == 9 && strncmp(_mc_nav_name, "nextFrame", 9) == 0) { _is_mc_nav = 5; }
+
+		if (_is_mc_nav)
+		{
+			// Resolve target MC: from dot/slash path container, or from WITH scope chain
+			MovieClip* _mc_target = NULL;
+			if (_mc_nav_container_len > 0) {
+				// Resolve container path (e.g. "_root.instance1" from "_root.instance1.gotoAndStop")
+				PUSH_STR(func_name, _mc_nav_container_len);
+				actionGetVariable(app_context);
+				if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP)
+					_mc_target = (MovieClip*)STACK_TOP_VALUE;
+				POP();
+			} else {
+				// Search WITH scope chain for innermost MovieClip
+				for (int _si = scope_depth - 1; _si >= 0; _si--) {
+					if (scope_is_with[_si] && scope_mc[_si] != NULL) {
+						_mc_target = scope_mc[_si];
+						break;
+					}
+				}
+				// Fallback to current context
+				if (_mc_target == NULL) _mc_target = g_current_context;
+			}
+
+			if (_mc_target != NULL) {
+				if (_is_mc_nav == 1 && num_args >= 1) {
+					// gotoAndStop / gotoAndPlay
+					s32 _gf = (s32)varToDouble(&args[0]);
+					if (_gf > 0) {
+						u16 _gf0 = (u16)(_gf - 1);
+#ifdef NO_GRAPHICS
+						extern MovieClip root_movieclip;
+						if (_mc_target == &root_movieclip) {
+							actionGotoFrame(app_context, _gf0);
+							if (_mc_nav_play) is_playing = 1; else is_playing = 0;
+						} else {
+							ng_gotoFrameByMC(app_context, _mc_target, _gf0, _mc_nav_play);
+						}
+#endif
+					}
+				} else if (_is_mc_nav == 2) {
+					// stop — no-op for dynamic clips (they don't advance)
+				} else if (_is_mc_nav == 3) {
+					// play — no-op for dynamic clips
+				} else if (_is_mc_nav == 4) {
+					// prevFrame
+				} else if (_is_mc_nav == 5) {
+					// nextFrame
+				}
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				builtin_handled = 1;
+			}
+		}
+	}
+
 	// If not a built-in function, look up user-defined functions
 	if (!builtin_handled)
 	{
@@ -26958,8 +27161,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 		}
 
-		// Try dot-path resolution: _root.foo -> resolve path to function variable
-		if (func == NULL && !cf_var_found_not_func && memchr(func_name, '.', func_name_len) != NULL)
+		// Try dot-path or slash-path resolution: _root.foo -> resolve path to function variable
+		if (func == NULL && !cf_var_found_not_func &&
+		    (memchr(func_name, '.', func_name_len) != NULL || memchr(func_name, '/', func_name_len) != NULL))
 		{
 			// Resolve the full path via GetVariable (handles dots recursively)
 			PUSH_STR(func_name, func_name_len);
@@ -26970,6 +27174,26 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ASFunction* resolved = (ASFunction*) STACK_TOP_VALUE;
 				POP();
 				func = resolved;
+				// Resolve container as callable_this for MC method dispatch
+				if (!has_callable_this) {
+					// Find last dot or slash to split container.method
+					const char* _dp_last = func_name;
+					for (const char* _dp = func_name; _dp < func_name + func_name_len; _dp++) {
+						if (*_dp == '.' || *_dp == '/') _dp_last = _dp;
+					}
+					if (_dp_last > func_name) {
+						u32 _dp_clen = (u32)(_dp_last - func_name);
+						PUSH_STR(func_name, _dp_clen);
+						actionGetVariable(app_context);
+						if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP ||
+						    STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT) {
+							popVar(app_context, &callable_this);
+							has_callable_this = 1;
+						} else {
+							POP();
+						}
+					}
+				}
 			}
 			else
 			{
@@ -32620,6 +32844,84 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			_hop_ret.type = ACTION_STACK_VALUE_BOOLEAN;
 			_hop_ret.data.numeric_value = _hop_result;
 			pushVar(app_context, &_hop_ret);
+			return;
+		}
+		else if (method_name_len == 5 && strncmp(method_name, "watch", 5) == 0)
+		{
+			// mc.watch(prop, fn [, userData]) — register a property watcher on MovieClip
+			ActionVar _w_ret = {0};
+			_w_ret.type = ACTION_STACK_VALUE_BOOLEAN;
+			_w_ret.data.numeric_value = 0;
+			if (num_args >= 2 && args[1].type == ACTION_STACK_VALUE_FUNCTION) {
+				char _w_prop[64] = {0};
+				u32 _w_prop_len = 0;
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _wu16 = varGetU16Ptr(&args[0]);
+					if (_wu16 != NULL)
+						_w_prop_len = (u32)u16_to_utf8(_wu16, args[0].str_size, _w_prop, (int)(sizeof(_w_prop) - 1));
+				}
+				ASFunction* _w_func = (ASFunction*) args[1].data.numeric_value;
+				ActionVar _w_ud = {0};
+				_w_ud.type = ACTION_STACK_VALUE_UNDEFINED;
+				if (num_args >= 3) _w_ud = args[2];
+				// Update existing or add new watch entry (mc-based, not obj-based)
+				int _w_found = 0;
+				for (int _wi = 0; _wi < g_watch_count; _wi++) {
+					if (g_watch_table[_wi].obj == NULL &&
+					    g_watch_table[_wi].mc == mc &&
+					    g_watch_table[_wi].prop_name_len == _w_prop_len &&
+					    strncmp(g_watch_table[_wi].prop_name, _w_prop, _w_prop_len) == 0) {
+						g_watch_table[_wi].watcher_func = _w_func;
+						g_watch_table[_wi].user_data = _w_ud;
+						_w_ret.data.numeric_value = 1;
+						_w_found = 1;
+						break;
+					}
+				}
+				if (!_w_found && g_watch_count < MAX_WATCH_ENTRIES) {
+					g_watch_table[g_watch_count].obj = NULL;
+					g_watch_table[g_watch_count].mc = mc;
+					strncpy(g_watch_table[g_watch_count].prop_name, _w_prop, sizeof(g_watch_table[0].prop_name) - 1);
+					g_watch_table[g_watch_count].prop_name_len = _w_prop_len;
+					g_watch_table[g_watch_count].watcher_func = _w_func;
+					g_watch_table[g_watch_count].user_data = _w_ud;
+					g_watch_count++;
+					_w_ret.data.numeric_value = 1;
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &_w_ret);
+			return;
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "unwatch", 7) == 0)
+		{
+			// mc.unwatch(prop) — remove a property watcher from MovieClip
+			ActionVar _uw_ret = {0};
+			_uw_ret.type = ACTION_STACK_VALUE_BOOLEAN;
+			_uw_ret.data.numeric_value = 0;
+			if (num_args >= 1) {
+				char _uw_prop[64] = {0};
+				u32 _uw_prop_len = 0;
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _uwu16 = varGetU16Ptr(&args[0]);
+					if (_uwu16 != NULL)
+						_uw_prop_len = (u32)u16_to_utf8(_uwu16, args[0].str_size, _uw_prop, (int)(sizeof(_uw_prop) - 1));
+				}
+				for (int _uwi = 0; _uwi < g_watch_count; _uwi++) {
+					if (g_watch_table[_uwi].obj == NULL &&
+					    g_watch_table[_uwi].mc == mc &&
+					    g_watch_table[_uwi].prop_name_len == _uw_prop_len &&
+					    strncmp(g_watch_table[_uwi].prop_name, _uw_prop, _uw_prop_len) == 0) {
+						for (int _uwj = _uwi; _uwj < g_watch_count - 1; _uwj++)
+							g_watch_table[_uwj] = g_watch_table[_uwj + 1];
+						g_watch_count--;
+						_uw_ret.data.numeric_value = 1;
+						break;
+					}
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &_uw_ret);
 			return;
 		}
 		else

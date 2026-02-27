@@ -1,27 +1,32 @@
 # Object.watch / Object.unwatch Implementation Plan
 <!-- TESTS: watch, watch_textfield, watch_virtual_property, watch_virtual_property_proto -->
 
-Last updated: 2026-02-22
+Last updated: 2026-02-27
 
-## Status: PHASE 1 COMPLETE (3/4 tests passing)
+## Status: PHASE 2 COMPLETE (4/4 tests passing)
 
-### CI Results (2026-02-22)
+### CI Results (2026-02-27)
 
 | Test | CI Status | Notes |
 |------|-----------|-------|
 | watch | **PASS** ✅ | Core watch/unwatch fully working |
-| watch_textfield | output_mismatch | Watch callback not fired on TextField.text assignment (MC built-in property path) |
+| watch_textfield | **PASS** ✅ | Watch callback on TextField.text via MC watch dispatch |
 | watch_virtual_property | output_mismatch | addProperty interaction not working (known_failure even in Ruffle) |
 | watch_virtual_property_proto | **PASS** ✅ | Watch on prototype chain properties working |
 
 ### Implementation Summary
 - **Data structure**: Global `WatchEntry g_watch_table[MAX_WATCH_ENTRIES]` (pragmatic alternative to per-object approach proposed below)
-- **Registration**: `builtin_object_watch()` and `builtin_object_unwatch()` on Object.prototype
-- **Invocation**: Watch callbacks fire in `actionSetVariable()` (timeline variables) and `actionSetMember()` (object properties)
-- **Missing**: Watch check in MovieClip built-in property assignment path (explains watch_textfield failure)
+- **Registration**: `builtin_object_watch()` and `builtin_object_unwatch()` on Object.prototype; MC-specific `watch`/`unwatch` dispatch in `actionCallMethod` MOVIECLIP section
+- **Invocation**: Watch callbacks fire in `actionSetVariable()` (timeline variables), `actionSetMember()` (object properties), and `actionSetMember()` MC path (MovieClip properties)
+
+### What Was Fixed (2026-02-27)
+1. **MC watch/unwatch dispatch in actionCallMethod**: Added `watch` and `unwatch` method handling to the MOVIECLIP section of `actionCallMethod`, registering MC-based watch entries (obj=NULL, mc=target)
+2. **MC watch table check in actionSetMember**: Added watch callback invocation before `dynamic_props` storage in the MOVIECLIP SetMember path
+3. **Type 1 watcher support**: Both type 1 (DefineFunction) and type 2 (DefineFunction2) watchers work on MCs, with proper this-binding (this = MC), scope management, and context switching
+4. **Missing tags in watch_textfield**: Added DefineEditText + PlaceObject2 to test's tagMain.c (recompiler didn't generate these)
+5. **MC old value semantics**: MC watcher oldVal is `undefined` (matches Flash/Ruffle — text field properties are virtual getter/setter on prototype, not stored values)
 
 ### Remaining Work
-- **watch_textfield**: Add watch table check in the MC built-in property set path (where `.text`, `._x`, etc. are assigned directly) — small fix
 - **watch_virtual_property**: addProperty registration doesn't invoke watches — low priority (known_failure in Ruffle)
 
 ## Overview (original)

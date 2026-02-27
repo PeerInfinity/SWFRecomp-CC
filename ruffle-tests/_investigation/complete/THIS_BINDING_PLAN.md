@@ -1,19 +1,19 @@
 # This Binding Implementation Plan
 <!-- TESTS: this_swf5, this_swf6, this_scoping, mutable_this, swf5_no_closure -->
 
-Last updated: 2026-02-24
+Last updated: 2026-02-27
 
-## Status: PHASES 1-4 COMPLETE — 4/5 tests passing
+## Status: FULLY COMPLETE — 5/5 tests passing ✅
 
-### Test Results (commit 33edeb1a)
+### Test Results
 
 | Test | SWF Ver | Match | Expected | Status |
 |------|---------|-------|----------|--------|
-| this_swf5 | 5 | 41/41 | 41 | **PASS** |
-| this_swf6 | 6 | 41/41 | 41 | **PASS** |
-| this_scoping | 15 | 42/52 | 52 | FAIL — Phase 5 (WITH scope this) + Phase 6 (gotoAndStop via string) |
-| mutable_this | 15 | 18/18 | 18 | **PASS** |
-| swf5_no_closure | 5 | 20/20 | 20 | **PASS** |
+| this_swf5 | 5 | 41/41 | 41 | **PASS** ✅ |
+| this_swf6 | 6 | 41/41 | 41 | **PASS** ✅ |
+| this_scoping | 15 | 52/52 | 52 | **PASS** ✅ |
+| mutable_this | 15 | 18/18 | 18 | **PASS** ✅ |
+| swf5_no_closure | 5 | 20/20 | 20 | **PASS** ✅ |
 
 ### Related tests (no regression)
 - `this_swf7` — still PASS (41/41)
@@ -26,11 +26,12 @@ Last updated: 2026-02-24
 4. **Phase 4**: MC dynamic_props method call path now creates local scope with `this = mc`, restores captured scopes, switches `g_current_context` to MC for variable resolution.
 5. **Extra**: `actionNewObject` type 2 constructor path now creates local scope with `this` and manages scope chain. Fixed `[object Object]` toString threshold from `< 6` to `< 5`. Initialized `g_current_context` to `&root_movieclip` at startup.
 
-### Remaining: this_scoping (42/52)
+### Previously Remaining: this_scoping — NOW FIXED
 
-- Lines 10-12: `this.bar` vs `bar` inside `with(mc)` — `this.bar` should resolve from the function's `this` object, not the with-target. Requires Phase 5 (WITH scope `this` resolution).
-- Line 20: Variable `foobar` leaking from wrong scope
-- Lines 37-52: `gotoAndStop` via string path resolution — Phase 6, separate infrastructure
+**Fix (2026-02-27)**: MC navigation methods (`gotoAndStop`, `gotoAndPlay`, etc.) called via `CallFunction` (from WITH scope or dot/slash path) now dispatch correctly to the target MovieClip. Three changes:
+1. `ng_gotoFrameByMC` in tag_stubs.c: handles dynamically created MCs (no display list entry) by just updating `currentframe`
+2. MC navigation method dispatch in `actionCallFunction`: intercepts `gotoAndStop`/`gotoAndPlay`/`stop`/`play`/`prevFrame`/`nextFrame` before generic function lookup, resolves target MC from WITH scope chain or dot/slash path container
+3. MC method stubs on `MovieClip.prototype`: added `gotoAndStop`, `gotoAndPlay`, `stop`, `play`, `prevFrame`, `nextFrame` to prototype (+ `actionGetVariable` scope chain check for MC prototype methods)
 
 ---
 

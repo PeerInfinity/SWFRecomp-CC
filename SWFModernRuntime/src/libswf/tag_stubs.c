@@ -852,7 +852,16 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 	if (!mc->name || mc->name[0] == '\0') return 0;
 
 	size_t depth = ng_findDisplayEntryByName(mc->name);
-	if (depth == SIZE_MAX) return 0;
+	if (depth == SIZE_MAX)
+	{
+		// Dynamically created MCs (createEmptyMovieClip) aren't in the display list.
+		// For these, just update currentframe and play state — they have no frame scripts.
+		u16 clamped = frame;
+		if (mc->totalframes > 0 && clamped >= (u16)mc->totalframes)
+			clamped = (u16)(mc->totalframes - 1);
+		mc->currentframe = (int)clamped + 1;  // 1-indexed
+		return 1;
+	}
 
 	DisplayObject* obj = &display_list[depth];
 	if (obj->char_id == 0) return 0;

@@ -6,7 +6,7 @@ Last updated: 2026-02-27
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: nan_scale now PASS (9/9). execution_order4 improved 7→8/12 (nested sprite init fix). movieclip_getbounds 190/192 added to ACCEPTED_DIFFS (morph bounds precision, 0.0001px beyond epsilon).
+- **Recent gains (this session)**: watch_textfield now PASS (12/12). this_scoping now PASS (52/52). execution_order4 now PASS (13/13). nan_scale now PASS (9/9). movieclip_getbounds 190/192 added to ACCEPTED_DIFFS (morph bounds precision, 0.0001px beyond epsilon).
 - **Recent gains (previous sessions)**: clip_constructors now PASS (8/8). issue_768 now PASS (3/3). rewind_depth now PASS (30/30). execution_order4 improved (nested sprite parent context). tell_target_invalid now PASS (6/6). tell_target_invalid_swf6 now PASS (5/5). placeobject_occupied_depth regression fixed. stage_object_children now PASS (83/83). selection now PASS (454/454). place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). And many more.
 
 ## Crashes and Errors (8 tests)
@@ -76,6 +76,9 @@ Last updated: 2026-02-27
 | `place_and_lookup` | 30/30 ✅ | ng_isScriptableChar helper, var_map enumeration on root MC, video auto-naming fix |
 | `tab_ordering_children` | 208/208 ✅ | Bonus from video auto-naming fix (instance counter no longer increments for unnamed videos) |
 | `selection` | 454/454 ✅ | Selection index tracking + replaceSel implementation |
+| `this_scoping` | 52/52 ✅ | MC nav methods via CallFunction (WITH scope + dot/slash path) + dynamic MC gotoAndStop |
+| `execution_order4` | 13/13 ✅ | Nested sprite parent context + child init ordering + WITH scope resolution |
+| `watch_textfield` | 12/12 ✅ | MC watch/unwatch dispatch + watch table check in MC SetMember + missing tags in tagMain.c |
 | `property_invalid_base_clip` | 36/36 ✅ | Was already passing (stale docs) |
 | `tell_target_invalid_swf6` | 5/5 ✅ | hasPlayingSprites + forward goto catch_up_mode in advance_sprite_frames |
 | `tell_target_invalid` | 6/6 ✅ | SetTarget2(undefined) SWF7+ → target_clip=None; GotoFrame2 target_clip_or_root; sprite preservation during root loop-back |
@@ -119,7 +122,7 @@ Last updated: 2026-02-27
 | ENUMERATION_PLAN | **FULLY COMPLETE** | 5/5 pass | — |
 | XML_PLAN | **ALL PHASES COMPLETE** | 26/26 active tests pass ✅ | xml_to_string now PASS, xml_child_nodes_edge_cases now PASS |
 | ARRAY_METHODS_PLAN | **FULLY COMPLETE** | All tests pass | — |
-| OBJECT_WATCH_PLAN | **Phase 1 DONE** | 3/4 pass | `watch_textfield` needs MC watcher in SetMember |
+| OBJECT_WATCH_PLAN | **Phase 2 DONE** | 4/4 pass (watch_textfield ✅) | `watch_virtual_property` known_failure in Ruffle |
 | GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 18/30 pass + place_and_lookup ✅ (globals_swf5-8, math_min_max, is_finite×2, parse_int, parse_float, primitive_type_globals, printjob×3, sound×2, localconnection, context_menu, context_menu_item) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
@@ -149,13 +152,13 @@ Last updated: 2026-02-27
 | UNLOAD_PLAN | **MOSTLY DONE** | 4/6 pass (unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload (36/52), unload_nested_child (0/5) |
 | BUTTON_PLAN | **12/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅ (visible gating on keyPress) | Remaining 2: button_keypress_vs_textinput (TF onChanged), root_button_mode (loadMovie) |
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4 blocked on loadMovie + per-function version tracking |
-| THIS_BINDING_PLAN | **Phases 1-4 DONE** | 4/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅) | this_scoping 42/52 — Phase 6 blocked on TELLTARGET Phase 2 |
+| THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events |
 
 ## Recommended Work Order (updated 2026-02-26)
 
 ### Highest ROI — unblocked, high line-count impact
-1. **TELLTARGET_PLAN Phase 2 remaining** — ~~eval()~~ (not needed: Flash compiles eval to GetVariable). ~~shape display objects~~ done (`string_paths_hidden` 54/54 PASS). Remaining: colon-variable syntax. THIS_BINDING `this_scoping` (10 lines) still blocked by separate `this` binding issue.
+1. **TELLTARGET_PLAN Phase 2 remaining** — ~~eval()~~ (not needed). ~~shape display objects~~ done. ~~this_scoping~~ DONE ✅. Remaining: colon-variable syntax.
 2. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83 (+15 lines)
 3. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (+2 lines)
 
@@ -168,7 +171,7 @@ Last updated: 2026-02-27
 ### Lower ROI or partially blocked
 9. **OOP_SUPER_EXTENDS_PLAN** — `super_edge_cases` 33/39, remaining 6 lines blocked by SUPER-as-__proto__ (makeSuperWith pattern)
 10. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8), low overall ROI
-11. **OBJECT_WATCH_PLAN** — `watch_textfield` small fix (1 test, few lines)
+11. **OBJECT_WATCH_PLAN** — ~~`watch_textfield` small fix~~ DONE ✅ (4/4 pass). Only `watch_virtual_property` remains (known_failure in Ruffle)
 
 ### super_edge_cases Blockers (33/39 — 6 lines remaining)
 
@@ -189,17 +192,21 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - ~~**CLOSURE_CAPTURE_PLAN**~~ — **RESOLVED** (moved to complete/). Remaining focus test failures blocked by FOCUS_SYSTEM_PLAN.
 - ~~**MOUSE_EVENTS_PLAN**~~ — **RESOLVED** (moved to complete/). Core mouse events done (5/5 pass). Advanced features still needed: text field hit-testing (blocks FOCUS_SYSTEM_PLAN), rollover/rollout dispatch (blocks focus_mouse_rollout), recursive clip event dispatch (blocks clip_event_propagation_order).
 - **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests). Itself blocked by text field hit-testing and event pumping model differences.
-- **TELLTARGET_PLAN** blocks: THIS_BINDING_PLAN Phase 6 (this_scoping remaining 10 lines). Phase 2 is HIGH ROI and unblocked.
+- ~~**TELLTARGET_PLAN**~~ — **RESOLVED** as blocker for THIS_BINDING_PLAN (this_scoping fix was MC nav dispatch, not TELLTARGET). Remaining TELLTARGET work is colon-variable syntax.
 - **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (on_construct), TIMER_PLAN (timer_run_actions)
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
+
+### Session notes (2026-02-27 late)
+- **this_scoping 52/52 PASS**: MC navigation methods (`gotoAndStop`, `gotoAndPlay`, `stop`, `play`, `prevFrame`, `nextFrame`) called via `CallFunction` (from WITH scope or dot/slash path like `_root.instance1.gotoAndStop`) now dispatch correctly. Three changes: (1) `ng_gotoFrameByMC` handles dynamically created MCs, (2) MC nav dispatch in `actionCallFunction` before generic lookup, (3) MC method stubs on `MovieClip.prototype` + scope chain prototype check in `actionGetVariable`.
+- **THIS_BINDING_PLAN moved to complete/**: All 5/5 tests now pass. The this_scoping fix was actually about MC method dispatch via CallFunction, not TELLTARGET as previously thought.
 
 ### Recent session notes (2026-02-27 evening)
 - **placeobject_occupied_depth regression fix**: Root timeline loop-back sprite preservation was too broad — also fired for same-frame duplicate placements. Fixed by adding `place_gen != g_place_gen` guard.
 - **clip_constructors 8/8 PASS**: registerClass type 1 constructor wasn't pushing MOVIECLIP `this` onto `g_this_stack`. `GetVariable("this")` returned OBJECT from caller's context instead. Also needed proper local scope + captured scopes + base_clip for type 1 path.
 - **issue_768 3/3 PASS**: Root MC `_parent` was falling through to prototype chain (finding `MovieClip.prototype._parent = "bad parent"`). Added `_parent` check in special-variables block, guarded to only apply at root context.
 - **rewind_depth 30/30 PASS**: Bonus from sprite preservation fix in previous session (preserved sprites during root timeline loop-back).
-- **execution_order4 7→10/12**: Nested sprite parent context was wrong — `exec_sprite_frame` always used `root_movieclip` as parent for child MC creation. Fixed to use `g_current_context`, and set context to parent sprite's MC before recursive `advance_sprite_frames` calls. Remaining 2 lines need child init frame ordering (frame 0 "frame 1" output before root frame script).
+- **execution_order4 7→13/13 PASS**: Nested sprite parent context was wrong — `exec_sprite_frame` always used `root_movieclip` as parent for child MC creation. Fixed to use `g_current_context`, and set context to parent sprite's MC before recursive `advance_sprite_frames` calls. Final fix was child init ordering and WITH scope resolution (commit 0f54eedb).
 
 ### Previous session notes (2026-02-26)
 - **place_and_lookup 30/30 PASS**: Four fixes: (1) `ng_isScriptableChar()` helper in tag_stubs.c for canonical scriptable check (sprite/button/textfield/video). (2) Updated 4 non-scriptable check sites in action.c to use it. (3) var_map enumeration on root MC in `actionEnumerate2` (for timeline vars like `doPrint`). (4) Videos don't get auto instance names (removed `is_video` from auto-naming condition).
