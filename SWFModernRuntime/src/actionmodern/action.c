@@ -587,7 +587,7 @@ typedef struct ASFunction {
 } ASFunction;
 
 // Function registry
-#define MAX_FUNCTIONS 256
+#define MAX_FUNCTIONS 512
 static ASFunction* function_registry[MAX_FUNCTIONS];
 static u32 function_count = 0;
 
@@ -1811,6 +1811,13 @@ static double date_get_time(ASObject* obj) {
 	return NAN;
 }
 
+// Check if an object has native Date backing (__date_time__ property exists)
+static int date_has_backing(void* this_obj) {
+	if (this_obj == NULL) return 0;
+	ActionVar* v = getProperty((ASObject*)this_obj, "__date_time__", 13);
+	return (v != NULL);
+}
+
 static void date_set_time(SWFAppContext* ctx, ASObject* obj, double t) {
 	ActionVar v = {0};
 	v.type = ACTION_STACK_VALUE_F64;
@@ -1835,7 +1842,7 @@ static ActionVar date_return_string(SWFAppContext* app_context, const char* str,
 
 static ActionVar builtin_date_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)args; (void)arg_count; (void)registers;
-	if (this_obj == NULL) return date_return_string(app_context, "Invalid Date", 12);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 
@@ -1877,7 +1884,7 @@ static ActionVar builtin_date_toString(SWFAppContext* app_context, ActionVar* ar
 
 static ActionVar builtin_date_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)app_context; (void)args; (void)arg_count; (void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	double t = date_get_time((ASObject*)this_obj);
 	return mathReturnDouble(t);
 }
@@ -1925,7 +1932,7 @@ static double date_to_integer(double x) {
 #define DATE_GETTER(name, expr_local, expr_utc, is_utc) \
 static ActionVar builtin_date_##name(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) { \
 	(void)app_context; (void)args; (void)arg_count; (void)registers; \
-	if (this_obj == NULL) return mathReturnDouble(NAN); \
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; } \
 	double t = date_get_time((ASObject*)this_obj); \
 	if (isnan(t) || !isfinite(t)) return mathReturnDouble(NAN); \
 	if (is_utc) { return mathReturnDouble(expr_utc); } \
@@ -1944,7 +1951,7 @@ DATE_GETTER(getMilliseconds, date_ms_from_time_safe(lt), date_ms_from_time_safe(
 // getTime returns raw UTC timestamp (even Infinity)
 static ActionVar builtin_date_getTime(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)app_context; (void)args; (void)arg_count; (void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	double t = date_get_time((ASObject*)this_obj);
 	return mathReturnDouble(t);
 }
@@ -1961,7 +1968,7 @@ DATE_GETTER(getUTCMilliseconds, 0, date_ms_from_time_safe(t), 1)
 // getTimezoneOffset: returns -(offset_ms / 60000)
 static ActionVar builtin_date_getTimezoneOffset(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)app_context; (void)args; (void)arg_count; (void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	double t = date_get_time((ASObject*)this_obj);
 	if (isnan(t) || !isfinite(t)) return mathReturnDouble(NAN);
 	date_ensure_tza();
@@ -1979,7 +1986,7 @@ static double date_time_clip(double t) {
 // setFullYear(year [, month [, day]])
 static ActionVar builtin_date_setFullYear(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -1995,7 +2002,7 @@ static ActionVar builtin_date_setFullYear(SWFAppContext* app_context, ActionVar*
 // setMonth(month [, day])
 static ActionVar builtin_date_setMonth(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2011,7 +2018,7 @@ static ActionVar builtin_date_setMonth(SWFAppContext* app_context, ActionVar* ar
 // setDate(day)
 static ActionVar builtin_date_setDate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2025,7 +2032,7 @@ static ActionVar builtin_date_setDate(SWFAppContext* app_context, ActionVar* arg
 // setHours(hour [, min [, sec [, ms]]])
 static ActionVar builtin_date_setHours(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2042,7 +2049,7 @@ static ActionVar builtin_date_setHours(SWFAppContext* app_context, ActionVar* ar
 // setMinutes(min [, sec [, ms]])
 static ActionVar builtin_date_setMinutes(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2061,7 +2068,7 @@ static ActionVar builtin_date_setMinutes(SWFAppContext* app_context, ActionVar* 
 // setSeconds(sec [, ms])
 static ActionVar builtin_date_setSeconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2076,7 +2083,7 @@ static ActionVar builtin_date_setSeconds(SWFAppContext* app_context, ActionVar* 
 // setMilliseconds(ms)
 static ActionVar builtin_date_setMilliseconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2090,7 +2097,7 @@ static ActionVar builtin_date_setMilliseconds(SWFAppContext* app_context, Action
 // setTime(ms) — sets the raw UTC timestamp
 static ActionVar builtin_date_setTime(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double ms = (arg_count >= 1) ? date_arg_to_double(app_context, &args[0]) : NAN;
 	if (isfinite(ms)) ms = trunc(ms);
@@ -2102,7 +2109,7 @@ static ActionVar builtin_date_setTime(SWFAppContext* app_context, ActionVar* arg
 // setYear(year [, month [, day]]) — legacy: year 0-99 → 1900+year
 static ActionVar builtin_date_setYear(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2123,7 +2130,7 @@ static ActionVar builtin_date_setYear(SWFAppContext* app_context, ActionVar* arg
 // setUTCFullYear(year [, month [, day]])
 static ActionVar builtin_date_setUTCFullYear(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2138,7 +2145,7 @@ static ActionVar builtin_date_setUTCFullYear(SWFAppContext* app_context, ActionV
 // setUTCMonth(month [, day])
 static ActionVar builtin_date_setUTCMonth(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2153,7 +2160,7 @@ static ActionVar builtin_date_setUTCMonth(SWFAppContext* app_context, ActionVar*
 // setUTCDate(day)
 static ActionVar builtin_date_setUTCDate(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2166,7 +2173,7 @@ static ActionVar builtin_date_setUTCDate(SWFAppContext* app_context, ActionVar* 
 // setUTCHours(hour [, min [, sec [, ms]]])
 static ActionVar builtin_date_setUTCHours(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2182,7 +2189,7 @@ static ActionVar builtin_date_setUTCHours(SWFAppContext* app_context, ActionVar*
 // setUTCMinutes(min [, sec [, ms]])
 static ActionVar builtin_date_setUTCMinutes(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2200,7 +2207,7 @@ static ActionVar builtin_date_setUTCMinutes(SWFAppContext* app_context, ActionVa
 // setUTCSeconds(sec [, ms])
 static ActionVar builtin_date_setUTCSeconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2214,7 +2221,7 @@ static ActionVar builtin_date_setUTCSeconds(SWFAppContext* app_context, ActionVa
 // setUTCMilliseconds(ms)
 static ActionVar builtin_date_setUTCMilliseconds(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers;
-	if (this_obj == NULL) return mathReturnDouble(NAN);
+	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	ASObject* obj = (ASObject*)this_obj;
 	double t = date_get_time(obj);
 	if (isnan(t)) { date_set_time(app_context, obj, NAN); return mathReturnDouble(NAN); }
@@ -2263,6 +2270,7 @@ static ActionVar builtin_date_UTC(SWFAppContext* app_context, ActionVar* args, u
 static ASObject* date_construct(SWFAppContext* app_context, ActionVar* args, u32 arg_count) {
 	initDatePrototype(app_context);
 	ASObject* date = allocObject(app_context, 4);
+	date->native_type = NATIVE_DATE;
 
 	// Set __proto__ to Date.prototype
 	ActionVar proto_var = {0};
@@ -2310,13 +2318,62 @@ static ASObject* date_construct(SWFAppContext* app_context, ActionVar* args, u32
 }
 
 // Date constructor callback (for advanced_func)
+// Called when super() targets Date — e.g. from __initializeNative or subclassing.
+// If the object already has native backing (native_type != 0), this is a no-op
+// (native objects cannot be re-initialized as Date). Otherwise, sets __date_time__
+// to make the object behave as a Date.
 static ActionVar builtin_date_constructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
-	(void)registers; (void)this_obj;
-	// This is called when Date is used as a constructor via the prototype-based path
-	// The actual construction happens in actionNewObject / actionNewMethod
-	// Return undefined — the caller uses 'this' object
+	(void)registers;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	if (this_obj == NULL) return ret;
+
+	ASObject* obj = (ASObject*)this_obj;
+
+	// If object already has native backing from a different type, don't re-initialize
+	if (obj->native_type != NATIVE_NONE && obj->native_type != NATIVE_DATE) {
+		return ret;
+	}
+
+	// Already a Date — don't re-initialize (double-construct protection)
+	if (obj->native_type == NATIVE_DATE) {
+		return ret;
+	}
+
+	// Non-native object: initialize as Date
+	obj->native_type = NATIVE_DATE;
+
+	double t;
+	if (arg_count == 0) {
+#ifdef MOCK_DATE_TIME
+		t = (double)(MOCK_DATE_TIME);
+#else
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		t = (double)ts.tv_sec * 1000.0 + (double)(ts.tv_nsec / 1000000);
+#endif
+	} else if (arg_count == 1) {
+		t = date_arg_to_double(app_context, &args[0]);
+	} else {
+		double year_d = date_arg_to_double(app_context, &args[0]);
+		int32_t yi = (int32_t)year_d;
+		double year = (double)yi;
+		if (yi < 100) year = 1900.0 + year;
+		double month = date_arg_to_double(app_context, &args[1]);
+		double day   = (arg_count >= 3) ? date_arg_to_double(app_context, &args[2]) : 1.0;
+		double hour  = (arg_count >= 4) ? date_arg_to_double(app_context, &args[3]) : 0.0;
+		double min_v = (arg_count >= 5) ? date_arg_to_double(app_context, &args[4]) : 0.0;
+		double sec   = (arg_count >= 6) ? date_arg_to_double(app_context, &args[5]) : 0.0;
+		double ms    = (arg_count >= 7) ? date_arg_to_double(app_context, &args[6]) : 0.0;
+		month = trunc(month);
+		day = trunc(day); hour = trunc(hour); min_v = trunc(min_v); sec = trunc(sec); ms = trunc(ms);
+		double d = date_make_day(year, month, day);
+		double time_v = date_make_time(hour, min_v, sec, ms);
+		t = date_local_to_utc(date_make_date(d, time_v));
+	}
+
+	date_set_time(app_context, obj, t);
 	return ret;
 }
 
@@ -3175,6 +3232,7 @@ static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc
 	initTransformFuncs();
 
 	ASObject* transform = allocObject(app_context, 8);
+	transform->native_type = NATIVE_TRANSFORM;
 	setObjectProto(app_context, transform);
 
 	// Store MC reference as "__mc__" property (MOVIECLIP type)
@@ -5380,6 +5438,8 @@ static ActionVar colorTransformConstructor(SWFAppContext* app_context, ActionVar
 	ASObject* obj = (ASObject*)this_obj;
 	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (!obj) return undef;
+
+	obj->native_type = NATIVE_COLORTRANSFORM;
 
 	double rMult = (arg_count > 0) ? varToDoubleSimple(&args[0]) : 1.0;
 	double gMult = (arg_count > 1) ? varToDoubleSimple(&args[1]) : 1.0;
@@ -9005,6 +9065,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* props = (ASObject*) mc->dynamic_props;
+				props->native_type = NATIVE_TEXTFIELD;
 
 				// Set __proto__ to TextField.prototype
 				initTextFieldPrototype(app_context);
@@ -18057,7 +18118,7 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 					type_str = "object";
 					break;
 				}
-				if (mc && mc->ng_textfield_idx >= 0)
+				if (mc && MC_IS_TEXTFIELD(mc))
 				{
 					type_str = "object";
 					break;
@@ -20085,6 +20146,13 @@ void actionInitArray(SWFAppContext* app_context)
 		// Could also handle ACTION_STACK_VALUE_OBJECT here if needed
 	}
 
+	// Mark as native array for __initializeNative detection
+	if (arr->props == NULL) {
+		arr->props = allocObject(app_context, 4);
+		retainObject(arr->props);
+	}
+	arr->props->native_type = NATIVE_ARRAY;
+
 	// 4. Push array reference to stack
 	PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 }
@@ -21941,7 +22009,9 @@ void actionGetMember(SWFAppContext* app_context)
 					break;
 				}
 				ActionVar* _np = getProperty(_cur, "__proto__", 9);
-				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
+				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) {
+					break;
+				}
 				ASObject* _next = (ASObject*) _np->data.numeric_value;
 				if (_next == obj) { g_execution_halted = 1; break; }
 				_cur = _next;
@@ -22762,12 +22832,12 @@ void actionNewObject(SWFAppContext* app_context)
 	if (strcmp(ctor_name, "Array") == 0)
 	{
 		// Handle Array constructor
+		ASArray* arr;
 		if (num_args == 0)
 		{
 			// new Array() - empty array
-			ASArray* arr = allocArray(app_context, 4);
+			arr = allocArray(app_context, 4);
 			arr->length = 0;
-			new_obj = arr;
 		}
 		else if (num_args == 1 &&
 		         (args[0].type == ACTION_STACK_VALUE_F32 ||
@@ -22783,15 +22853,14 @@ void actionNewObject(SWFAppContext* app_context)
 			u32 alloc_size = 0;
 			if (signed_len > 0)
 				alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
-			ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
+			arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
 			// new Array(n): elements stay as HOLE (don't enumerate, but join as "undefined")
 			arr->length = length;
-			new_obj = arr;
 		}
 		else
 		{
 			// new Array(elem1, elem2, ...) - array with elements
-			ASArray* arr = allocArray(app_context, num_args);
+			arr = allocArray(app_context, num_args);
 			arr->length = num_args;
 			for (u32 i = 0; i < num_args; i++)
 			{
@@ -22806,8 +22875,14 @@ void actionNewObject(SWFAppContext* app_context)
 					retainArray((ASArray*) args[i].data.numeric_value);
 				}
 			}
-			new_obj = arr;
 		}
+		// Pre-create props with native_type for __initializeNative detection
+		if (arr->props == NULL) {
+			arr->props = allocObject(app_context, 4);
+			retainObject(arr->props);
+		}
+		arr->props->native_type = NATIVE_ARRAY;
+		new_obj = arr;
 		obj_type = ACTION_STACK_VALUE_ARRAY;
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) new_obj);
 		return;
@@ -22952,6 +23027,7 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle String constructor
 		// new String() or new String(value)
 		ASObject* str_obj = allocObject(app_context, 8);
+		str_obj->native_type = NATIVE_STRING;
 
 		// Set __proto__ to String.prototype for instanceof support
 		PUSH_STR("String", 6);
@@ -23051,6 +23127,7 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle Number constructor
 		// new Number() or new Number(value)
 		ASObject* num_obj = allocObject(app_context, 4);
+		num_obj->native_type = NATIVE_NUMBER;
 
 		// Set __proto__ to Number.prototype for instanceof support
 		PUSH_STR("Number", 6);
@@ -23145,6 +23222,7 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle Boolean constructor
 		// new Boolean() or new Boolean(value)
 		ASObject* bool_obj = allocObject(app_context, 4);
+		bool_obj->native_type = NATIVE_BOOLEAN;
 
 		// Set __proto__ to Boolean.prototype for instanceof support
 		PUSH_STR("Boolean", 7);
@@ -23224,9 +23302,15 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 	else if (strcmp(ctor_name, "TextField") == 0)
 	{
+		// In SWF6, new TextField() returns undefined (TextField isn't constructable)
+		if (EFFECTIVE_SWF_VERSION() < 7) {
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
 		// Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype
 		ASObject* tf_obj = allocObject(app_context, 4);
+		tf_obj->native_type = NATIVE_TEXTFIELD;
 		initTextFieldPrototype(app_context);
 		if (g_textfield_constructor.prototype_obj != NULL)
 		{
@@ -23306,6 +23390,7 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle TextFormat constructor — new TextFormat(font?, size?, color?, bold?, italic?, underline?, align?, leftMargin?, rightMargin?, indent?, leading?)
 		initTextFormatPrototype(app_context);
 		ASObject* tf_obj = allocObject(app_context, 24);
+		tf_obj->native_type = NATIVE_TEXTFORMAT;
 		if (g_textformat_constructor.prototype_obj != NULL) {
 			ActionVar proto_var = {0};
 			proto_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -23417,6 +23502,7 @@ void actionNewObject(SWFAppContext* app_context)
 		// Handle XML constructor — new XML(source?)
 		initXMLPrototype(app_context);
 		ASObject* xml_doc = xml_create_document(app_context);
+		xml_doc->native_type = NATIVE_XML;
 		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
 		{
 			char _xml_ctor_buf[4096];
@@ -23470,6 +23556,10 @@ void actionNewObject(SWFAppContext* app_context)
 			nodeValueLen = 0;
 		}
 		ASObject* node = xml_create_node(app_context, nodeType, nodeName, nodeNameLen, nodeValue, nodeValueLen);
+		// XMLNode is native only with 2+ args (nodeType AND value)
+		if (num_args >= 2) {
+			node->native_type = NATIVE_XMLNODE;
+		}
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) node);
 		return;
 	}
@@ -23497,6 +23587,145 @@ void actionNewObject(SWFAppContext* app_context)
 		// Call constructor to initialize properties
 		colorConstructor(app_context, args, num_args, NULL, color_obj);
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)color_obj);
+		return;
+	}
+	// ---- Stub constructors with native_type (for __initializeNative detection) ----
+	// These are classes that exist on _global as function stubs.
+	// We need explicit handling to set native_type correctly.
+	else if (strcmp(ctor_name, "Sound") == 0 ||
+	         strcmp(ctor_name, "LoadVars") == 0 ||
+	         strcmp(ctor_name, "LocalConnection") == 0 ||
+	         strcmp(ctor_name, "MovieClipLoader") == 0 ||
+	         strcmp(ctor_name, "PrintJob") == 0 ||
+	         strcmp(ctor_name, "Button") == 0)
+	{
+		// Native-backed stub constructors
+		ASObject* obj = allocObject(app_context, 4);
+		if (strcmp(ctor_name, "Sound") == 0) obj->native_type = NATIVE_SOUND;
+		else if (strcmp(ctor_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
+		else if (strcmp(ctor_name, "LocalConnection") == 0) obj->native_type = NATIVE_LOCALCONNECTION;
+		else if (strcmp(ctor_name, "MovieClipLoader") == 0) obj->native_type = NATIVE_MOVIECLIPLOADER;
+		else if (strcmp(ctor_name, "PrintJob") == 0) obj->native_type = NATIVE_PRINTJOB;
+		else if (strcmp(ctor_name, "Button") == 0) obj->native_type = NATIVE_BUTTON;
+
+		// Set __proto__ from the stub constructor's prototype
+		PUSH_STR(ctor_name, ctor_name_len);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+			ASFunction* ctor = (ASFunction*)STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL) {
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+			}
+			ActionVar pv = {0};
+			pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)ctor->prototype_obj;
+			setProperty(app_context, obj, "__proto__", 9, &pv);
+		}
+		POP();
+
+		// Sound constructor: initialize volume
+		if (strcmp(ctor_name, "Sound") == 0) {
+			ActionVar vol = {0};
+			vol.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &vol.data.numeric_value) = 100.0;
+			setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
+		}
+
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "Camera") == 0 ||
+	         strcmp(ctor_name, "ContextMenu") == 0 ||
+	         strcmp(ctor_name, "ContextMenuItem") == 0 ||
+	         strcmp(ctor_name, "Microphone") == 0 ||
+	         strcmp(ctor_name, "MovieClip") == 0 ||
+	         strcmp(ctor_name, "NetStream") == 0 ||
+	         strcmp(ctor_name, "Video") == 0 ||
+	         strcmp(ctor_name, "XMLSocket") == 0)
+	{
+		// Non-native stub constructors (native_type stays NATIVE_NONE)
+		ASObject* obj = allocObject(app_context, 4);
+
+		// Set __proto__ from the stub constructor's prototype
+		PUSH_STR(ctor_name, ctor_name_len);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+			ASFunction* ctor = (ASFunction*)STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL) {
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+			}
+			ActionVar pv = {0};
+			pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)ctor->prototype_obj;
+			setProperty(app_context, obj, "__proto__", 9, &pv);
+		}
+		POP();
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "TextSnapshot") == 0)
+	{
+		// TextSnapshot: native only when first arg is a MovieClip, and exactly 1 arg
+		ASObject* obj = allocObject(app_context, 4);
+		if (num_args == 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+			MovieClip* arg_mc = (MovieClip*) args[0].data.numeric_value;
+			// Only native when the arg is an actual MovieClip (not button/textfield)
+			if (arg_mc && !arg_mc->is_button_mc && !MC_IS_TEXTFIELD(arg_mc)) {
+				obj->native_type = NATIVE_TEXTSNAPSHOT;
+			}
+		}
+
+		// Set __proto__
+		PUSH_STR("TextSnapshot", 12);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+			ASFunction* ctor = (ASFunction*)STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL) {
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+			}
+			ActionVar pv = {0};
+			pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)ctor->prototype_obj;
+			setProperty(app_context, obj, "__proto__", 9, &pv);
+		}
+		POP();
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "NetConnection") == 0)
+	{
+		// NetConnection: non-native, with isConnected = false
+		ASObject* obj = allocObject(app_context, 4);
+
+		PUSH_STR("NetConnection", 13);
+		actionGetVariable(app_context);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+			ASFunction* ctor = (ASFunction*)STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL) {
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+			}
+			ActionVar pv = {0};
+			pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)ctor->prototype_obj;
+			setProperty(app_context, obj, "__proto__", 9, &pv);
+		}
+		POP();
+
+		// Set isConnected = false
+		ActionVar bv = {0};
+		bv.type = ACTION_STACK_VALUE_BOOLEAN;
+		bv.data.numeric_value = 0;
+		setProperty(app_context, obj, "isConnected", 11, &bv);
+
+		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
 		return;
 	}
 		else
@@ -24176,7 +24405,9 @@ void actionNewMethod(SWFAppContext* app_context)
 					if (mfunc != NULL && mfunc->name[0] != '\0' && mfunc->simple_func == NULL && mfunc->advanced_func == NULL)
 					{
 						// Built-in constructor stub (registered on _global) — use name for dispatch
+						// Also set user_ctor_func so unhandled stubs fall through to object creation
 						ctor_name = mfunc->name;
+						user_ctor_func = mfunc;
 					}
 					else
 					{
@@ -24420,6 +24651,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			if (valid)
 			{
 				ASObject* bmp = allocObject(app_context, 4);
+				bmp->native_type = NATIVE_BITMAPDATA;
 				setObjectProto(app_context, bmp);
 				// Store width/height as properties
 				ActionVar wv = {0}; wv.type = ACTION_STACK_VALUE_F64;
@@ -24454,11 +24686,33 @@ void actionNewMethod(SWFAppContext* app_context)
 			pushUndefined(app_context);
 		}
 	}
+	else if (ctor_name != NULL && (strcmp(ctor_name, "TextRenderer") == 0 ||
+	                                strcmp(ctor_name, "ExternalInterface") == 0))
+	{
+		// Static-only classes — cannot be instantiated
+		pushUndefined(app_context);
+	}
 	else if (user_ctor_func != NULL)
 	{
 		// User-defined constructor function from object property
 		// Create new object for 'this' context
 		ASObject* new_obj_inst = allocObject(app_context, 8);
+
+		// Set native_type for flash.* package native-backed classes
+		if (ctor_name != NULL) {
+			// All filter subclasses are native (BitmapFilter base class is NOT native)
+			if ((strcmp(ctor_name, "BevelFilter") == 0) ||
+				(strcmp(ctor_name, "BlurFilter") == 0) ||
+				(strcmp(ctor_name, "ColorMatrixFilter") == 0) ||
+				(strcmp(ctor_name, "ConvolutionFilter") == 0) ||
+				(strcmp(ctor_name, "DisplacementMapFilter") == 0) ||
+				(strcmp(ctor_name, "DropShadowFilter") == 0) ||
+				(strcmp(ctor_name, "GlowFilter") == 0) ||
+				(strcmp(ctor_name, "GradientBevelFilter") == 0) ||
+				(strcmp(ctor_name, "GradientGlowFilter") == 0)) {
+				new_obj_inst->native_type = NATIVE_FILTER;
+			}
+		}
 
 		// Set up prototype chain (new_obj.__proto__ = func.prototype)
 		if (user_ctor_func->prototype_obj == NULL)
@@ -24525,7 +24779,7 @@ void actionNewMethod(SWFAppContext* app_context)
 
 			if (registers != NULL) FREE(registers);
 		}
-		else
+		else if (user_ctor_func->simple_func != NULL)
 		{
 			// Simple DefineFunction (type 1)
 			// Push arguments onto stack for the function
@@ -24536,6 +24790,12 @@ void actionNewMethod(SWFAppContext* app_context)
 
 			// Call simple function (cast to correct return type — generated functions return ActionVar)
 			return_value = ((ActionVar(*)(SWFAppContext*))user_ctor_func->simple_func)(app_context);
+		}
+		else
+		{
+			// Stub constructor with no body — just create the object (no-op constructor)
+			return_value.type = ACTION_STACK_VALUE_UNDEFINED;
+			return_value.data.numeric_value = 0;
 		}
 
 		popSuperContext();
@@ -26715,6 +26975,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				retainObject((ASObject*) child->dynamic_props);
 			}
 			ASObject* props = (ASObject*) child->dynamic_props;
+			props->native_type = NATIVE_TEXTFIELD;
 
 			initTextFieldPrototype(app_context);
 			if (g_textfield_constructor.prototype_obj != NULL) {
@@ -30464,6 +30725,52 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
+		// Check arr->props (and prototype chain) for user-defined method BEFORE built-in dispatch
+		ActionVar* user_method_prop = NULL;
+		if (arr->props != NULL) {
+			user_method_prop = getPropertyWithPrototype(arr->props, method_name, method_name_len);
+		}
+		if (user_method_prop != NULL && user_method_prop->type == ACTION_STACK_VALUE_FUNCTION) {
+			// User-defined method on array — invoke it with arr->props as 'this' (ASObject*)
+			ASFunction* func = lookupFunctionFromVar(user_method_prop);
+			ASObject* this_obj_for_arr = arr->props;
+			if (func != NULL && func->function_type == 2 && func->advanced_func != NULL) {
+				pushSuperContext((void*)this_obj_for_arr, 1);
+				ASObject* local_scope = allocObject(app_context, 8);
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
+					scope_chain[scope_depth++] = local_scope;
+				}
+				g_call_depth++;
+				ActionVar result = func->advanced_func(app_context, args, num_args, NULL, (void*)this_obj_for_arr);
+				g_call_depth--;
+				if (scope_depth > 0) scope_depth--;
+				releaseObject(app_context, local_scope);
+				popSuperContext();
+				if (args != NULL) FREE(args);
+				pushVar(app_context, &result);
+			} else if (func != NULL && func->function_type == 1 && func->simple_func != NULL) {
+				pushSuperContext((void*)this_obj_for_arr, 1);
+				ActionVar this_var = {0};
+				this_var.type = ACTION_STACK_VALUE_OBJECT;
+				this_var.data.numeric_value = (u64)this_obj_for_arr;
+				setVariableByName("this", &this_var);
+				for (u32 i = 0; i < num_args; i++)
+					pushVar(app_context, &args[i]);
+				if (args != NULL) FREE(args);
+				g_call_depth++;
+				ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				g_call_depth--;
+				popSuperContext();
+				pushVar(app_context, &result);
+			} else {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+			}
+			return;
+		}
+
 		int handled = callArrayMethod(app_context, arr,
 		                               method_name, method_name_len,
 		                               args, num_args);
@@ -33073,7 +33380,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 						} else if (func->advanced_func != NULL) {
 							// Type 2: pass args array
-							result = func->advanced_func(app_context, args, num_args, NULL, (void*)&this_var);
+							// Use g_event_this_mc so generated preload_this code picks up MC type correctly
+							// (passing mc directly as this_obj would make it ACTION_STACK_VALUE_OBJECT)
+							MovieClip* saved_event_this_cm = g_event_this_mc;
+							g_event_this_mc = mc;
+							result = func->advanced_func(app_context, args, num_args, NULL, NULL);
+							g_event_this_mc = saved_event_this_cm;
 							if (args != NULL) FREE(args);
 						} else {
 							result.type = ACTION_STACK_VALUE_UNDEFINED;
@@ -33648,7 +33960,11 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 		g_call_depth++;
 		g_prev_executing_func = prev_func;
 		g_current_executing_func = func;
-		ActionVar result = func->advanced_func(app_context, NULL, 0, registers, (void*)&this_var);
+		// Use g_event_this_mc so generated preload_this code picks up MC type correctly
+		MovieClip* saved_event_this_handler = g_event_this_mc;
+		g_event_this_mc = mc;
+		ActionVar result = func->advanced_func(app_context, NULL, 0, registers, NULL);
+		g_event_this_mc = saved_event_this_handler;
 		(void)result;
 		g_current_executing_func = prev_func;
 		g_call_depth--;

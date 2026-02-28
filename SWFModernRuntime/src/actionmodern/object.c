@@ -131,6 +131,9 @@ ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity)
 	obj->interface_count = 0;
 	obj->interfaces = NULL;
 
+	// Initialize native type (NATIVE_NONE = pure ActionScript object)
+	obj->native_type = NATIVE_NONE;
+
 	// Allocate property array
 	if (initial_capacity > 0)
 	{

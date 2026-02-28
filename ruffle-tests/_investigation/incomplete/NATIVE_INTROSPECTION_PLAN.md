@@ -1,24 +1,22 @@
 # Native Object/Function Introspection Implementation Plan
 <!-- TESTS: native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, native_double_construct, as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, extends_chain, extends_native_type, super_edge_cases, as2_super_via_manual_prototype, globals_swf5, globals_swf6, globals_swf7, globals_swf8, bitmap_filters -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-28
 
 ## Overview
 
 This category covers 5 tests that probe the internal "native-ness" of built-in Flash objects, test subclassing of native types, and verify double-construction behavior. These are meta-tests — they don't test a single feature but rather the overall fidelity of the built-in class system.
 
-**Current state**: All 5 tests produce 0% matching lines. The `native_objects_swfN` tests produce no output at all (the `getNativeStatus` function crashes or silently fails early). The `native_subclasses` test runs but `super()` calls don't work ("Unsupported number of args: undefined"). The `native_double_construct` test runs partially but `BlurFilter` constructor doesn't initialize properties.
-
-**Key insight**: These tests have enormous dependency surfaces. The `native_objects` tests call `new ClassName()` on 50+ classes and the `native_subclasses` test subclasses 27 classes. Rather than trying to implement every class just for these tests, the plan focuses on the **infrastructure** that makes native introspection work, with stub class registrations to get tests running now and full implementations coming incrementally from other feature categories.
+**Current state**: Phases 0-2 complete. All 3 `native_objects_swfN` tests pass (252/252 lines = 100%). The remaining 2 tests (`native_subclasses`, `native_double_construct`) require implementing filter constructor property initialization when called via `super()` — this is blocked on having real constructor bodies for filter/native classes.
 
 ## Tests
 
 | Test | Lines | Current | Description |
 |------|-------|---------|-------------|
-| native_objects_swf6 | 84 | 0/84 (0%) | Check native status of every built-in class (SWF6) |
-| native_objects_swf7 | 84 | 0/84 (0%) | Same for SWF7 (adds `new TextField(): native`) |
-| native_objects_swf8 | 84 | 0/84 (0%) | Same for SWF8 (adds flash.* packages with native filters) |
-| native_subclasses | 192 | 0/192 (0%) | Subclass 27 built-in classes and verify behavior |
+| native_objects_swf6 | 84 | 84/84 (100%) | Check native status of every built-in class (SWF6) |
+| native_objects_swf7 | 84 | 84/84 (100%) | Same for SWF7 (adds `new TextField(): native`) |
+| native_objects_swf8 | 84 | 84/84 (100%) | Same for SWF8 (adds flash.* packages with native filters) |
+| native_subclasses | 192 | ~165/221 (lines shifted) | Subclass 27 built-in classes and verify behavior |
 | native_double_construct | 12 | 4/12 (33%) | Call super() twice on BlurFilter — second call is no-op |
 
 **Note**: The `native_objects_swfN` tests have `known_failure = true` in their test.toml, but our `verify_output.py` runner does not check this flag, so they count as regular failures.
@@ -143,140 +141,36 @@ Missing constructors needed:
 
 ## Implementation Plan
 
-### Phase 0: Fix Zero-Output Crash in native_objects Tests
+### Phase 0: Fix Zero-Output Crash in native_objects Tests — COMPLETED
 
-**Goal**: Get the `native_objects` tests to run to completion and produce 84 lines of output.
+Fixed heap-use-after-free segfault and Date methods to return undefined via `date_has_backing()`. Tests now produce full 84-line output.
 
-The tests currently produce zero output. The `getNativeStatus({})` call on the very first test case fails silently. The most likely causes:
-1. Setting `obj.__initializeNative = function() { ... }` via SetMember on a plain object fails
-2. Inside the anonymous function, setting `this.__proto__` via SetMember fails or corrupts memory
-3. Looking up `Date` via GetVariable fails (Date constructor is a stub, prototype may be missing)
-4. `Date.prototype` is undefined/missing, causing crash when used as `__proto__`
+### Phase 1: Register Missing Stub Constructors — COMPLETED
 
-**Tasks**:
-1. Debug why `getNativeStatus({})` produces no output — add DEBUG traces or run under valgrind
-2. Ensure `__proto__` assignment works via `actionSetMember` on any ASObject
-3. Ensure Date constructor exists as a global with a valid `.prototype` object
-4. Ensure method calls on objects with swapped `__proto__` don't crash
+Added stub constructors for all missing classes: Sound, LoadVars, LocalConnection, MovieClipLoader, PrintJob, Button (native); Camera, ContextMenu, ContextMenuItem, Microphone, MovieClip, NetStream, Video, XMLSocket (non-native); TextSnapshot (conditional); NetConnection (with isConnected=false). Also handled flash.* package constructor dispatch via actionNewMethod for filter classes. TextRenderer and ExternalInterface correctly return undefined (static-only).
 
-**Expected result**: Tests produce 84 lines. The "non-object" lines (typeof checks) should mostly match. The "native"/"non-native" lines will all be wrong (probably all "non-native" since __initializeNative is a no-op).
+### Phase 2: Native Backing + __initializeNative Detection — COMPLETED
 
-**Tests impacted**: native_objects_swf6/7/8 (0% → ~25-30% — the ~20 "non-object" lines should match)
+Added `NativeType` enum and `native_type` u8 field to `ASObject` in `object.h`. Set `native_type` at construction time for all native-backed types:
+- **allocObject**: initializes to `NATIVE_NONE` (critical since malloc doesn't zero)
+- **Array**: `NATIVE_ARRAY` on `arr->props` (used as `this_obj` in method calls)
+- **String/Number/Boolean**: set in actionNewObject
+- **Date**: set in both `date_construct()` and `builtin_date_constructor()`
+- **TextField**: set on `dynamic_props` for both timeline and createTextField
+- **TextFormat**: set in actionNewObject
+- **XML/XMLNode**: set in actionNewObject (XMLNode only with 2+ args)
+- **Sound/LoadVars/LocalConnection/MovieClipLoader/PrintJob/Button**: set in stub constructors
+- **TextSnapshot**: conditional (only with MovieClip arg that's not a button/textfield)
+- **BitmapData**: set in actionNewObject/actionNewMethod
+- **ColorTransform**: set in `colorTransformConstructor()`
+- **Transform**: set in `createTransformObject()`
+- **Filters**: set via ctor_name matching in `user_ctor_func` path (all except BitmapFilter base)
 
-### Phase 1: Register Missing Stub Constructors
+Detection mechanism: `builtin_date_constructor` checks `native_type` — if non-NONE and non-DATE, returns without initializing (getDate returns undefined → "native"). If NATIVE_NONE, initializes as Date (getDate returns NaN → "non-native").
 
-**Goal**: Make `new ClassName()` return a proper object for all classes the tests check.
+Also increased `MAX_FUNCTIONS` from 256 to 512 (50+ `__initializeNative` calls each register a DefineFunction2). Fixed `actionTypeof` to use `MC_IS_TEXTFIELD()` for dynamic textfields (ng_textfield_idx == -2).
 
-For native_objects tests, many lines fail simply because the constructor doesn't exist (so `new ClassName()` returns undefined → `"non-object: undefined"`). We need stub constructors that:
-1. Return an object (not undefined)
-2. Set `__proto__` to the constructor's `.prototype`
-3. Set the correct `typeof` (always "object" for constructors)
-
-**Classes to add as stubs** (constructors that just create an empty object with correct prototype):
-
-| Class | Expected Result | Notes |
-|-------|----------------|-------|
-| Button | native | Constructor exists in globals |
-| Camera | non-native | |
-| ContextMenu | non-native | |
-| ContextMenuItem | non-native | With optional args |
-| LoadVars | native | |
-| LocalConnection | native | |
-| Microphone | non-native | |
-| MovieClipLoader | native | |
-| NetStream | non-native | |
-| NetConnection | non-native (not constructed directly) | Used as arg to NetStream |
-| PrintJob | native | |
-| Sound | native | With optional target arg |
-| TextSnapshot | varies | native only with MovieClip arg |
-| Video | non-native | |
-| XMLSocket | non-native | |
-
-**flash.* package stubs** (SWF8 only):
-
-| Class | Expected Result | Notes |
-|-------|----------------|-------|
-| flash.filters.BevelFilter | native | |
-| flash.filters.BitmapFilter | non-native | Base class |
-| flash.filters.BlurFilter | native | Also needed for native_double_construct |
-| flash.filters.ColorMatrixFilter | native | With optional matrix arg |
-| flash.filters.ConvolutionFilter | native | With optional args |
-| flash.filters.DisplacementMapFilter | native | With optional args |
-| flash.filters.DropShadowFilter | native | |
-| flash.filters.GlowFilter | native | |
-| flash.filters.GradientBevelFilter | native | |
-| flash.filters.GradientGlowFilter | native | |
-| flash.geom.Transform | native (with MovieClip arg) | Returns undefined without arg |
-| flash.text.TextRenderer | non-object: undefined | |
-| flash.net.FileReference | (native_subclasses only) | |
-| TextField.StyleSheet | (native_subclasses only) | |
-
-**Implementation approach**: Add these to the lazy-init block in `actionGetVariable` / `actionNewObject` in `action.c`. Each stub:
-```c
-case "LoadVars":
-    obj = allocObject(app_context, 0);
-    // Set __proto__ to LoadVars.prototype
-    // Mark as native_type = NATIVE_LOADVARS (for Phase 2)
-    break;
-```
-
-**Expected result**: The `non-object: undefined` lines for SWF8 flash.* classes now become correct `native`/`non-native` results (once Phase 2 implements the detection). For SWF6/7, these lines already match (`non-object: undefined`) since flash.* doesn't exist.
-
-**Tests impacted**:
-- native_objects_swf6/7: Improved (stubs for non-flash classes)
-- native_objects_swf8: Significantly improved (flash.* stubs)
-- native_subclasses: Can now create instances of all 27 classes
-- Also helps: globals_swf5/6/7/8 tests (12 tests in "Global Built-in Functions" category), bitmap_filters test, sound_props tests
-
-### Phase 2: Native Backing + __initializeNative Detection
-
-**Goal**: Implement the native/non-native detection that `getNativeStatus` probes.
-
-**Design**: Add a `native_type` enum field to `ASObject`:
-
-```c
-// Native type enum (0 = none/pure-AS)
-enum NativeType {
-    NATIVE_NONE = 0,
-    NATIVE_ARRAY = 1,
-    NATIVE_STRING = 2,
-    NATIVE_NUMBER = 3,
-    NATIVE_BOOLEAN = 4,
-    NATIVE_DATE = 5,
-    NATIVE_SOUND = 6,
-    NATIVE_XML = 7,
-    NATIVE_XMLNODE = 8,
-    NATIVE_TEXTFIELD = 9,
-    NATIVE_TEXTFORMAT = 10,
-    NATIVE_BITMAPDATA = 11,
-    NATIVE_LOADVARS = 12,
-    NATIVE_LOCALCONNECTION = 13,
-    NATIVE_MOVIECLIPLOADER = 14,
-    NATIVE_PRINTJOB = 15,
-    NATIVE_BUTTON = 16,
-    NATIVE_TEXTSNAPSHOT = 17,
-    NATIVE_COLORTRANSFORM = 18,
-    NATIVE_TRANSFORM = 19,
-    NATIVE_BLUR_FILTER = 20,
-    NATIVE_BEVEL_FILTER = 21,
-    // ... etc for all native-backed types
-};
-```
-
-When `actionNewObject` creates an instance of a native-backed class, it sets `obj->native_type` to the appropriate enum value.
-
-**`__initializeNative()` behavior**: The exact semantics depend on how the `getNativeStatus` algorithm works. Two possible approaches:
-
-**Approach A — Faithful simulation**: `__initializeNative()` on a native object re-runs the native initialization based on `__constructor__`. If the object already has native backing and the target constructor is different, the re-initialization fails (double-construct protection). This matches how Flash Player works but requires understanding the exact detection algorithm.
-
-**Approach B — Pragmatic shortcut**: Since the test checks a fixed set of classes with deterministic output, we can make `__initializeNative()` simply report whether the object has native backing. The `getNativeStatus` function's proto-swap-to-Date trick is the detection mechanism — we just need `obj.getDate()` to return undefined for native objects (because their native type isn't Date) and... also undefined for non-native objects. The distinction must come from somewhere else.
-
-**Research needed**: Before implementing this phase, we need to trace the exact `getNativeStatus` algorithm step-by-step to understand how it distinguishes native from non-native. The decompiled bytecode is complex. Options:
-1. Run the test in Ruffle with debug output to see the detection flow
-2. Read Ruffle's `__initializeNative` implementation
-3. Build a simple test case and trace through manually
-
-**Tests impacted**: native_objects_swf6/7/8 (→ ~80-90% once detection works correctly)
+**Result**: native_objects_swf6/7/8 all 100% (252/252 lines).
 
 ### Phase 3: super() Call Mechanism — **RESOLVED**
 

@@ -6,8 +6,8 @@ Last updated: 2026-02-28
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.
-- **Recent gains (previous session)**: Fixed objectToPrimitive ASArray crash, deferred unloadMovie state, per-MC byte_size, SWF_URL test name. movieclip_library_state_values segfault→77/78. Recompiler nested function ordering fix (Phase 1 skip + Phase 2 stringstream buffering).
+- **Recent gains (this session)**: native_objects_swf6/7/8 all PASS (252/252). Added NativeType enum, native_type tracking, stub constructors for 15+ classes, filter constructor dispatch via actionNewMethod.
+- **Recent gains (previous session)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.
 - **Recent gains (previous sessions)**: watch_textfield PASS (12/12). this_scoping PASS (52/52). execution_order4 PASS (13/13). nan_scale PASS (9/9). clip_constructors PASS (8/8). issue_768 PASS (3/3). rewind_depth PASS (30/30). tell_target_invalid PASS (6/6). tell_target_invalid_swf6 PASS (5/5). stage_object_children PASS (83/83). selection PASS (454/454). place_and_lookup PASS (30/30). tab_ordering_children PASS (208/208). And many more.
 
 ## Crashes and Errors (8 tests)
@@ -16,9 +16,9 @@ Last updated: 2026-02-28
 |------|--------|-------|-------|
 | funky_function_calls | segfault | 9/56 | Function call edge cases |
 | goto_methods | ~~segfault~~ PASS | 41/41 ✅ | Fixed: MC dispatch, ECMAScript ToInt32, sprite labels |
-| native_objects_swf6 | segfault | 0/84 | Crashes constructing native Flash classes (filters, geom, etc.) |
-| native_objects_swf7 | segfault | 0/84 | Same root cause as swf6 |
-| native_objects_swf8 | segfault | 0/84 | Same root cause as swf6 |
+| native_objects_swf6 | ~~segfault~~ PASS | 84/84 ✅ | NativeType tracking, stub constructors, Date re-init blocking |
+| native_objects_swf7 | ~~segfault~~ PASS | 84/84 ✅ | Same fix as swf6 |
+| native_objects_swf8 | ~~segfault~~ PASS | 84/84 ✅ | + flash.* filter dispatch, TextRenderer/Transform |
 | movieclip_invalid_get_bounds_6 | runtime_error | 0/0 | FrameLabelEntry typedef fixed; now hits runtime error |
 | movieclip_invalid_get_bounds_7 | runtime_error | 0/0 | Same as _6 |
 | timeout | timeout | 0/0 | Infinite loop — needs script execution timeout mechanism |
