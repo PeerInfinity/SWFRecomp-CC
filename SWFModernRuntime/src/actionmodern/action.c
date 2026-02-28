@@ -23302,11 +23302,9 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 	else if (strcmp(ctor_name, "TextField") == 0)
 	{
-		// In SWF6, new TextField() returns undefined (TextField isn't constructable)
-		if (EFFECTIVE_SWF_VERSION() < 7) {
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			return;
-		}
+		// Note: native_objects_swf6 (known_failure in Ruffle) expects undefined here,
+		// but textfield_props_swf6 (fully passing) expects an object. We follow the
+		// passing test — new TextField() always creates an object.
 		// Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype
 		ASObject* tf_obj = allocObject(app_context, 4);
@@ -23590,83 +23588,6 @@ void actionNewObject(SWFAppContext* app_context)
 		return;
 	}
 	// ---- Stub constructors with native_type (for __initializeNative detection) ----
-	// These are classes that exist on _global as function stubs.
-	// We need explicit handling to set native_type correctly.
-	else if (strcmp(ctor_name, "Sound") == 0 ||
-	         strcmp(ctor_name, "LoadVars") == 0 ||
-	         strcmp(ctor_name, "LocalConnection") == 0 ||
-	         strcmp(ctor_name, "MovieClipLoader") == 0 ||
-	         strcmp(ctor_name, "PrintJob") == 0 ||
-	         strcmp(ctor_name, "Button") == 0)
-	{
-		// Native-backed stub constructors
-		ASObject* obj = allocObject(app_context, 4);
-		if (strcmp(ctor_name, "Sound") == 0) obj->native_type = NATIVE_SOUND;
-		else if (strcmp(ctor_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
-		else if (strcmp(ctor_name, "LocalConnection") == 0) obj->native_type = NATIVE_LOCALCONNECTION;
-		else if (strcmp(ctor_name, "MovieClipLoader") == 0) obj->native_type = NATIVE_MOVIECLIPLOADER;
-		else if (strcmp(ctor_name, "PrintJob") == 0) obj->native_type = NATIVE_PRINTJOB;
-		else if (strcmp(ctor_name, "Button") == 0) obj->native_type = NATIVE_BUTTON;
-
-		// Set __proto__ from the stub constructor's prototype
-		PUSH_STR(ctor_name, ctor_name_len);
-		actionGetVariable(app_context);
-		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
-			ASFunction* ctor = (ASFunction*)STACK_TOP_VALUE;
-			if (ctor->prototype_obj == NULL) {
-				ctor->prototype_obj = allocObject(app_context, 4);
-				retainObject(ctor->prototype_obj);
-				setObjectProto(app_context, ctor->prototype_obj);
-			}
-			ActionVar pv = {0};
-			pv.type = ACTION_STACK_VALUE_OBJECT;
-			pv.data.numeric_value = (u64)ctor->prototype_obj;
-			setProperty(app_context, obj, "__proto__", 9, &pv);
-		}
-		POP();
-
-		// Sound constructor: initialize volume
-		if (strcmp(ctor_name, "Sound") == 0) {
-			ActionVar vol = {0};
-			vol.type = ACTION_STACK_VALUE_F64;
-			VAL(double, &vol.data.numeric_value) = 100.0;
-			setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
-		}
-
-		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
-		return;
-	}
-	else if (strcmp(ctor_name, "Camera") == 0 ||
-	         strcmp(ctor_name, "ContextMenu") == 0 ||
-	         strcmp(ctor_name, "ContextMenuItem") == 0 ||
-	         strcmp(ctor_name, "Microphone") == 0 ||
-	         strcmp(ctor_name, "MovieClip") == 0 ||
-	         strcmp(ctor_name, "NetStream") == 0 ||
-	         strcmp(ctor_name, "Video") == 0 ||
-	         strcmp(ctor_name, "XMLSocket") == 0)
-	{
-		// Non-native stub constructors (native_type stays NATIVE_NONE)
-		ASObject* obj = allocObject(app_context, 4);
-
-		// Set __proto__ from the stub constructor's prototype
-		PUSH_STR(ctor_name, ctor_name_len);
-		actionGetVariable(app_context);
-		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
-			ASFunction* ctor = (ASFunction*)STACK_TOP_VALUE;
-			if (ctor->prototype_obj == NULL) {
-				ctor->prototype_obj = allocObject(app_context, 4);
-				retainObject(ctor->prototype_obj);
-				setObjectProto(app_context, ctor->prototype_obj);
-			}
-			ActionVar pv = {0};
-			pv.type = ACTION_STACK_VALUE_OBJECT;
-			pv.data.numeric_value = (u64)ctor->prototype_obj;
-			setProperty(app_context, obj, "__proto__", 9, &pv);
-		}
-		POP();
-		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
-		return;
-	}
 	else if (strcmp(ctor_name, "TextSnapshot") == 0)
 	{
 		// TextSnapshot: native only when first arg is a MovieClip, and exactly 1 arg
@@ -23768,6 +23689,16 @@ void actionNewObject(SWFAppContext* app_context)
 			// Create new object to serve as 'this'
 			ASObject* obj = allocObject(app_context, 8);
 			new_obj = obj;
+
+			// Set native_type for native-backed stub constructors
+			if (ctor_name != NULL) {
+				if (strcmp(ctor_name, "Sound") == 0) obj->native_type = NATIVE_SOUND;
+				else if (strcmp(ctor_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
+				else if (strcmp(ctor_name, "LocalConnection") == 0) obj->native_type = NATIVE_LOCALCONNECTION;
+				else if (strcmp(ctor_name, "MovieClipLoader") == 0) obj->native_type = NATIVE_MOVIECLIPLOADER;
+				else if (strcmp(ctor_name, "PrintJob") == 0) obj->native_type = NATIVE_PRINTJOB;
+				else if (strcmp(ctor_name, "Button") == 0) obj->native_type = NATIVE_BUTTON;
+			}
 
 			// Set __proto__ to constructor's prototype (for prototype chain inheritance)
 			// Lazily create prototype if it doesn't exist yet
@@ -24698,7 +24629,7 @@ void actionNewMethod(SWFAppContext* app_context)
 		// Create new object for 'this' context
 		ASObject* new_obj_inst = allocObject(app_context, 8);
 
-		// Set native_type for flash.* package native-backed classes
+		// Set native_type for native-backed classes (flash.* filters and global stubs)
 		if (ctor_name != NULL) {
 			// All filter subclasses are native (BitmapFilter base class is NOT native)
 			if ((strcmp(ctor_name, "BevelFilter") == 0) ||
@@ -24712,6 +24643,13 @@ void actionNewMethod(SWFAppContext* app_context)
 				(strcmp(ctor_name, "GradientGlowFilter") == 0)) {
 				new_obj_inst->native_type = NATIVE_FILTER;
 			}
+			// Global stub constructors with native backing
+			else if (strcmp(ctor_name, "Sound") == 0) new_obj_inst->native_type = NATIVE_SOUND;
+			else if (strcmp(ctor_name, "LoadVars") == 0) new_obj_inst->native_type = NATIVE_LOADVARS;
+			else if (strcmp(ctor_name, "LocalConnection") == 0) new_obj_inst->native_type = NATIVE_LOCALCONNECTION;
+			else if (strcmp(ctor_name, "MovieClipLoader") == 0) new_obj_inst->native_type = NATIVE_MOVIECLIPLOADER;
+			else if (strcmp(ctor_name, "PrintJob") == 0) new_obj_inst->native_type = NATIVE_PRINTJOB;
+			else if (strcmp(ctor_name, "Button") == 0) new_obj_inst->native_type = NATIVE_BUTTON;
 		}
 
 		// Set up prototype chain (new_obj.__proto__ = func.prototype)
