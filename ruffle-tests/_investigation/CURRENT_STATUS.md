@@ -6,8 +6,9 @@ Last updated: 2026-02-28
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: native_objects_swf6/7/8 all PASS (252/252). Added NativeType enum, native_type tracking, stub constructors for 15+ classes, filter constructor dispatch via actionNewMethod.
-- **Recent gains (previous session)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.
+- **Recent gains (this session)**: super_edge_cases PASS (39/39). resolveProtoVar() unwraps SUPER values stored in __proto__ during prototype chain traversal.
+- **Recent gains (previous session)**: native_objects_swf6/7/8 all PASS (252/252). Added NativeType enum, native_type tracking, stub constructors for 15+ classes, filter constructor dispatch via actionNewMethod.
+- **Recent gains (earlier sessions)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.
 - **Recent gains (previous sessions)**: watch_textfield PASS (12/12). this_scoping PASS (52/52). execution_order4 PASS (13/13). nan_scale PASS (9/9). clip_constructors PASS (8/8). issue_768 PASS (3/3). rewind_depth PASS (30/30). tell_target_invalid PASS (6/6). tell_target_invalid_swf6 PASS (5/5). stage_object_children PASS (83/83). selection PASS (454/454). place_and_lookup PASS (30/30). tab_ordering_children PASS (208/208). And many more.
 
 ## Crashes and Errors (8 tests)
@@ -100,7 +101,7 @@ Last updated: 2026-02-28
 |------|-------|-------|
 | `movieclip_library_state_values` | **77/78 (98.7%)** | Fixed: segfault, unloadMovie state, byte_size, URL. Remaining: _xmouse default (accepted diff) |
 | `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
-| `super_edge_cases` | 33/39 (84.6%) | makeSuperWith: SUPER value as __proto__ (3 lines), addProperty virtual __constructor__ (3 lines) |
+| `super_edge_cases` | **39/39 PASS** ✅ | Fixed: resolveProtoVar() unwraps SUPER values stored in __proto__ |
 | `function_base_clip_readded` | 10/12 (83.3%) | _parent resolution after removal+re-add |
 | `stage_object_children` | **83/83 PASS** ✅ | Was 68/83, now fixed (likely from path resolution changes) |
 | `function_base_clip_removed` | 21/26 (80.8%) | base_clip after function definer removed |
@@ -140,7 +141,7 @@ Last updated: 2026-02-28
 | STAGE_FRAME_PROPS_PLAN | **Phases 1,5 DONE** | Several stages pass | Phase 2 (shape bounds), Phase 3 (content bounds) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
-| OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 33/39 — remaining 6 lines = makeSuperWith (SUPER as __proto__) + addProperty virtual __constructor__; `funky_function_calls` segfaults |
+| OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
 | REGISTERCLASS_PLAN | **Phases 0-4 PARTIAL** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅, on_construct ✅ | Phase 4 partial: constructors fire at tagSetInstanceName, initVarArray ordering fixed. register_and_init_order 76/233. Remaining: `this._name` returns undefined (preloaded this is OBJECT not MOVIECLIP), deep child access, attachMovie ctor path |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **Phases 0-2 COMPLETE** | 3/5 pass (native_objects_swf6/7/8 ✅) | native_subclasses/native_double_construct need filter constructor property init via super() |
@@ -173,23 +174,9 @@ Last updated: 2026-02-28
 8. **UNLOAD_PLAN** — `unload` at 18/52 (+34 lines), `unload_nested_child` at 0/5
 
 ### Lower ROI or partially blocked
-9. **OOP_SUPER_EXTENDS_PLAN** — `super_edge_cases` 33/39, remaining 6 lines blocked by SUPER-as-__proto__ (makeSuperWith pattern)
+9. ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **DONE** ✅ `super_edge_cases` 39/39 PASS. `interface_implements_op` blocked by MTASC class infra.
 10. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8), low overall ROI
 11. **OBJECT_WATCH_PLAN** — ~~`watch_textfield` small fix~~ DONE ✅ (4/4 pass). Only `watch_virtual_property` remains (known_failure in Ruffle)
-
-### super_edge_cases Blockers (33/39 — 6 lines remaining)
-
-Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
-
-**Lines 34-36: `makeSuperWith` pattern — SUPER value as `__proto__`**
-- `makeSuperWith(obj.__proto__)` creates a helper with `getSuper: function() { return super; }`, calls it, and stores the returned SUPER value as `obj.__proto__`
-- When super() runs, `walkProtoChain(this, depth)` calls `getProperty(current, "__proto__")` which returns an `ACTION_STACK_VALUE_SUPER` (type 16) instead of an OBJECT — so the chain walk returns NULL
-- Fix requires: `walkProtoChain` (or `findPropertyStructWithPrototype`) to resolve SUPER values stored as `__proto__` into actual prototype chain objects
-- Impact: 3 lines (34-36)
-
-**Fixed (previously blocking)**:
-- ~~Lines 27-31: addProperty-based virtual `__constructor__`~~ — **FIXED**: replaced `getPropertyWithPrototype` with `findPropertyStructWithPrototype` + getter invocation at all 3 super() `__constructor__` lookup sites
-- ~~Lines 37-39: `_root` as `__proto__`~~ — **Now passes** (these lines output correctly once prior addProperty lines were fixed)
 
 ### Dependency Blockers (plans blocking other plans)
 - ~~**TIMER_PLAN**~~ — **RESOLVED** (moved to complete/). set_interval ✅. timer_run_actions blocked on REGISTERCLASS_PLAN; timeout deferred.
@@ -199,7 +186,7 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - ~~**TELLTARGET_PLAN**~~ — **RESOLVED** as blocker for THIS_BINDING_PLAN (this_scoping fix was MC nav dispatch, not TELLTARGET). Remaining TELLTARGET work is colon-variable syntax.
 - **REGISTERCLASS_PLAN** blocks: CLONE_DUPLICATE_PLAN (register_and_init_order), TIMER_PLAN (timer_run_actions). ~~MOVIECLIP_PLAN Phase 6 (clip_constructors)~~ ✅ done. ~~on_construct~~ ✅ done.
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
-- **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
+- ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **RESOLVED** (moved to blocked/). 7/8 pass. `super_edge_cases` 39/39 ✅ (resolveProtoVar fix). `interface_implements_op` blocked by REGISTERCLASS_PLAN (MTASC class constructors).
 
 ### Session notes (2026-02-27 continued)
 - **Recompiler initVarArray ordering fix**: `initVarArray(MAX_STRING_ID)` was emitted AFTER DoInitAction scripts in `tagInit`. DoInitAction scripts using `DefineLocal` fell through to `getVariableById()` with `var_array_size=0`, silently failing. Classes "a", "b", "c" never registered (only "aa" which used a global function). Fix: separate `tag_init_scripts` stringstream in SWF class; tagInit now emits definitions → initVarArray → DoInitAction calls. **All tests with DoInitAction + DefineLocal need re-recompilation** (delete RecompiledTags/ to force).
