@@ -181,3 +181,4 @@ xml_attributes_read
 # or internally inconsistent expected output (Ruffle test generation bugs).
 array_sort
 date
+movieclip_library_state_values
