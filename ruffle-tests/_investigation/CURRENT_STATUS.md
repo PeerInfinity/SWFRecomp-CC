@@ -142,7 +142,7 @@ Last updated: 2026-02-28
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
-| REGISTERCLASS_PLAN | **Phases 0-4 PARTIAL** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅, on_construct ✅ | Phase 4 partial: constructors fire at tagSetInstanceName, initVarArray ordering fixed. register_and_init_order 76/233. Remaining: `this._name` returns undefined (preloaded this is OBJECT not MOVIECLIP), deep child access, attachMovie ctor path |
+| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 10/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅) | register_class 26/67, register_and_init_order ~76/233, register_class_swf6/do_init_action_child blocked by loadMovie, register_class_with_sound blocked by Sound class |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **Phases 0-2 COMPLETE** | 3/5 pass (native_objects_swf6/7/8 ✅) | native_subclasses/native_double_construct need filter constructor property init via super() |
 | TELLTARGET_PLAN | **Phase 2 IN PROGRESS** | tell_target ✅, slash_syntax ✅, string_paths_basic ✅, string_paths_variable_alias ✅, target_clip_removed ✅, path_string ✅ (322/322), string_paths_hidden ✅ (54/54), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅ | ~~eval()~~ not needed. ~~shape path components~~ done. Remaining: colon-variable syntax |
@@ -168,7 +168,7 @@ Last updated: 2026-02-28
 3. ~~**movieclip_getbounds**~~ — added to ACCEPTED_DIFFS (morph bounds precision)
 
 ### Medium ROI — feature phases with multiple test payoff
-5. **REGISTERCLASS_PLAN Phases 4-5** — constructor dispatch on timeline placement. Unlocks `register_and_init_order`, `register_class`, `timer_run_actions`. ~~`on_construct`~~ ✅ done.
+5. ~~**REGISTERCLASS_PLAN Phases 4-5**~~ — **DONE** → blocked/. 10/15 pass. register_class 26/67 (default MC prototype fix). Remaining blocked by loadMovie, Sound class, sprite init ordering.
 6. **TEXTFIELD_PLAN Phase 4-5** — scroll properties + HTML text. 25/66 pass; ~10 more tests actionable
 7. **GLOBALS_PLAN** — Phase 7 DONE. Phase 8 BLOCKED by enumeration order mismatch + 20 missing Ruffle-specific globals (ASnative, ASconstructor, etc.)
 8. **UNLOAD_PLAN** — `unload` at 18/52 (+34 lines), `unload_nested_child` at 0/5
@@ -184,9 +184,14 @@ Last updated: 2026-02-28
 - ~~**MOUSE_EVENTS_PLAN**~~ — **RESOLVED** (moved to complete/). Core mouse events done (5/5 pass). Advanced features still needed: text field hit-testing (blocks FOCUS_SYSTEM_PLAN), rollover/rollout dispatch (blocks focus_mouse_rollout), recursive clip event dispatch (blocks clip_event_propagation_order).
 - **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests). Itself blocked by text field hit-testing and event pumping model differences.
 - ~~**TELLTARGET_PLAN**~~ — **RESOLVED** as blocker for THIS_BINDING_PLAN (this_scoping fix was MC nav dispatch, not TELLTARGET). Remaining TELLTARGET work is colon-variable syntax.
-- **REGISTERCLASS_PLAN** blocks: CLONE_DUPLICATE_PLAN (register_and_init_order), TIMER_PLAN (timer_run_actions). ~~MOVIECLIP_PLAN Phase 6 (clip_constructors)~~ ✅ done. ~~on_construct~~ ✅ done.
+- ~~**REGISTERCLASS_PLAN**~~ — **RESOLVED** (moved to blocked/). 10/15 pass. All implementable phases done. Remaining blocked by loadMovie (3 tests), sprite init ordering (register_and_init_order), Sound class (register_class_with_sound).
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
 - ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **RESOLVED** (moved to blocked/). 7/8 pass. `super_edge_cases` 39/39 ✅ (resolveProtoVar fix). `interface_implements_op` blocked by REGISTERCLASS_PLAN (MTASC class constructors).
+
+### Session notes (2026-02-28)
+- **register_class 0→26/67**: Two fixes: (1) Both attachMovie paths (CallFunction + CallMethod) now set `mc.__proto__ = MovieClip.prototype` when no registered class exists, fixing `mc.__proto__ === MovieClip.prototype` StrictEquals check. (2) `Object.registerClass(sym, undefined)` now unregisters correctly (was only handling NULL, not UNDEFINED).
+- **REGISTERCLASS_PLAN moved to blocked/**: All implementable phases complete. 10/15 tests pass. Remaining 5 tests blocked by: loadMovie/child SWF loading (register_class lines 31+, register_class_swf6, do_init_action_child), sprite initialization ordering (register_and_init_order lines 133+), Sound class (register_class_with_sound), deep child access during constructor (register_and_init_order line 35).
+- **No regressions**: Verified 12 important tests still pass after changes.
 
 ### Session notes (2026-02-27 continued)
 - **Recompiler initVarArray ordering fix**: `initVarArray(MAX_STRING_ID)` was emitted AFTER DoInitAction scripts in `tagInit`. DoInitAction scripts using `DefineLocal` fell through to `getVariableById()` with `var_array_size=0`, silently failing. Classes "a", "b", "c" never registered (only "aa" which used a global function). Fix: separate `tag_init_scripts` stringstream in SWF class; tagInit now emits definitions → initVarArray → DoInitAction calls. **All tests with DoInitAction + DefineLocal need re-recompilation** (delete RecompiledTags/ to force).
