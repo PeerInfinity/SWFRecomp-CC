@@ -1,12 +1,13 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-27
+Last updated: 2026-02-28
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: Fixed objectToPrimitive ASArray crash, deferred unloadMovie state, per-MC byte_size, SWF_URL test name. movieclip_library_state_values segfault→77/78. Recompiler nested function ordering fix (Phase 1 skip + Phase 2 stringstream buffering).
+- **Recent gains (this session)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.
+- **Recent gains (previous session)**: Fixed objectToPrimitive ASArray crash, deferred unloadMovie state, per-MC byte_size, SWF_URL test name. movieclip_library_state_values segfault→77/78. Recompiler nested function ordering fix (Phase 1 skip + Phase 2 stringstream buffering).
 - **Recent gains (previous sessions)**: watch_textfield PASS (12/12). this_scoping PASS (52/52). execution_order4 PASS (13/13). nan_scale PASS (9/9). clip_constructors PASS (8/8). issue_768 PASS (3/3). rewind_depth PASS (30/30). tell_target_invalid PASS (6/6). tell_target_invalid_swf6 PASS (5/5). stage_object_children PASS (83/83). selection PASS (454/454). place_and_lookup PASS (30/30). tab_ordering_children PASS (208/208). And many more.
 
 ## Crashes and Errors (8 tests)
@@ -63,6 +64,8 @@ Last updated: 2026-02-27
 | `add_property` | 15/15 ✅ | addProperty on Arrays (getter/setter for length and indexed props) |
 | `as_set_prop_flags` | 79/79 ✅ | ASSetPropFlags valueOf/toString coercion on arguments |
 | `init_object_order` | 15/15 ✅ | attachMovie initObject addProperty setter invocation |
+| `create_empty_movie_clip` | 3/3 ✅ | mc_enterframe_eligible flag prevents onEnterFrame on creation tick |
+| `movieclip_init_object` | 5/5 ✅ | Sync registered class constructor during attachMovie (not deferred) |
 | `goto_frame` | 12/12 ✅ | _currentframe sync during natural frame advance |
 | `goto_frame2` | 44/44 ✅ | GotoFrame2 rewrite: wrapping arithmetic, label lookup, scene_bias fix, deferred script queue |
 | `goto_label` | 13/13 ✅ | Frame label support (recompiler already had it, needed --recompile) |
@@ -127,7 +130,7 @@ Last updated: 2026-02-27
 | GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 18/30 pass + place_and_lookup ✅ (globals_swf5-8, math_min_max, is_finite×2, parse_int, parse_float, primitive_type_globals, printjob×3, sound×2, localconnection, context_menu, context_menu_item) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
-| MOVIECLIP_PLAN | **Phases 1-5, 7-9 DONE** | 17 tests pass ✅ | Phase 6 (events) |
+| MOVIECLIP_PLAN | **ALL PHASES DONE** → `blocked/` | 27 tests pass ✅ (create_empty_movie_clip, movieclip_init_object newly fixed) | Remaining blocked: child DoInitAction (recompiler), mouse events, loadMovie, pixel hitTest |
 | CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 3/8 pass + clip_events ✅ | Blocked on TEXTFIELD, MOUSE_EVENTS, REGISTERCLASS |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
 | PARSING_FUNCTIONS_PLAN | **FULLY COMPLETE** | 3/3 pass (parse_int, parse_float, parsefloat_swf5) ✅ | — |
