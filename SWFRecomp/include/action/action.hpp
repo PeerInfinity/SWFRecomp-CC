@@ -132,7 +132,7 @@ namespace SWFRecomp
 
 		SWFAction();
 
-		void parseActions(Context& context, char*& action_buffer, ofstream& out_script);
+		void parseActions(Context& context, char*& action_buffer, ostream& out_script);
 		void declareVariable(Context& context, char* var_name);
 		void declareString(Context& context, char* str);
 		void declareEmptyString(Context& context, size_t size);

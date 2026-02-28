@@ -111,7 +111,7 @@ namespace SWFRecomp
 
 	}
 	
-	void SWFAction::parseActions(Context& context, char*& action_buffer, ofstream& out_script)
+	void SWFAction::parseActions(Context& context, char*& action_buffer, ostream& out_script)
 	{
 		parse_depth++;
 
@@ -194,6 +194,18 @@ namespace SWFRecomp
 					labels.insert(p1_finally_start);
 				}
 				labels.insert(p1_after_end);
+				break;
+			}
+
+			case SWF_ACTION_DEFINE_FUNCTION:   // 0x9B
+			case SWF_ACTION_DEFINE_FUNCTION2:  // 0x8E
+			{
+				// The 'length' field covers the function header (name, params, code_size).
+				// code_size is always the last 2 bytes of the header.
+				// The function BODY is code_size additional bytes AFTER the header
+				// that we must skip so Phase 1 doesn't try to scan them as top-level actions.
+				u16 code_size = (u8)action_buffer[length - 2] | ((u8)action_buffer[length - 1] << 8);
+				action_buffer += code_size;  // skip body; generic += length below skips header
 				break;
 			}
 
@@ -1304,8 +1316,14 @@ namespace SWFRecomp
 
 			// Add function declaration to header (uses app_context)
 			context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);" << endl;
-				// Generate function definition in out_script_defs
-				context.out_script_defs << endl << endl
+
+				// Buffer entire function definition in a stringstream so that
+				// nested function definitions (written to context.out_script_defs)
+				// appear BEFORE this function in the output file.
+				stringstream func_def;
+
+				// Generate function definition
+				func_def << endl << endl
 					<< "// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl
 					<< "ActionVar " << func_id << "(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)" << endl
 					<< "{" << endl
@@ -1387,8 +1405,8 @@ namespace SWFRecomp
 				// Initialize local registers to undefined
 				if (actual_reg_count > 0)
 				{
-					context.out_script_defs << "\tActionVar regs[" << actual_reg_count << "];" << endl;
-					context.out_script_defs << "\tfor (int _ri = 0; _ri < " << actual_reg_count << "; _ri++) { regs[_ri].type = ACTION_STACK_VALUE_UNDEFINED; regs[_ri].data.numeric_value = 0; regs[_ri].str_size = 0; }" << endl;
+					func_def << "\tActionVar regs[" << actual_reg_count << "];" << endl;
+					func_def << "\tfor (int _ri = 0; _ri < " << actual_reg_count << "; _ri++) { regs[_ri].type = ACTION_STACK_VALUE_UNDEFINED; regs[_ri].data.numeric_value = 0; regs[_ri].str_size = 0; }" << endl;
 				}
 
 				// Preload special variables into registers
@@ -1398,37 +1416,37 @@ namespace SWFRecomp
 				{
 					if (!suppress_this)
 					{
-						context.out_script_defs << "\t// Preload 'this' into register " << next_reg << endl;
-						context.out_script_defs << "\tif (this_obj != NULL) {" << endl;
-						context.out_script_defs << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-						context.out_script_defs << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
-						context.out_script_defs << "\t} else {" << endl;
-						context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
-						context.out_script_defs << "\t\textern MovieClip* g_event_this_mc;" << endl;
-						context.out_script_defs << "\t\tif (g_event_this_mc != NULL) {" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)g_event_this_mc;" << endl;
-						context.out_script_defs << "\t\t\tg_event_this_mc = NULL;" << endl;
-						context.out_script_defs << "\t\t} else {" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
-						context.out_script_defs << "\t\t}" << endl;
-						context.out_script_defs << "\t}" << endl;
+						func_def << "\t// Preload 'this' into register " << next_reg << endl;
+						func_def << "\tif (this_obj != NULL) {" << endl;
+						func_def << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+						func_def << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
+						func_def << "\t} else {" << endl;
+						func_def << "\t\textern MovieClip root_movieclip;" << endl;
+						func_def << "\t\textern MovieClip* g_event_this_mc;" << endl;
+						func_def << "\t\tif (g_event_this_mc != NULL) {" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)g_event_this_mc;" << endl;
+						func_def << "\t\t\tg_event_this_mc = NULL;" << endl;
+						func_def << "\t\t} else {" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+						func_def << "\t\t}" << endl;
+						func_def << "\t}" << endl;
 					}
 					next_reg++;
 				}
 
 				if (preload_arguments)
 				{
-					context.out_script_defs << "\t// Preload 'arguments' into register " << next_reg << endl;
-					context.out_script_defs << "\t// Create arguments array object" << endl;
-					context.out_script_defs << "\tASArray* arguments_array = allocArray(app_context, arg_count);" << endl;
-					context.out_script_defs << "\tfor (u32 i = 0; i < arg_count; i++) {" << endl;
-					context.out_script_defs << "\t\tsetArrayElement(app_context, arguments_array, i, &args[i]);" << endl;
-					context.out_script_defs << "\t}" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_ARRAY;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)arguments_array;" << endl;
-					context.out_script_defs << "\tswf_setup_arguments_props(app_context, arguments_array);" << endl;
+					func_def << "\t// Preload 'arguments' into register " << next_reg << endl;
+					func_def << "\t// Create arguments array object" << endl;
+					func_def << "\tASArray* arguments_array = allocArray(app_context, arg_count);" << endl;
+					func_def << "\tfor (u32 i = 0; i < arg_count; i++) {" << endl;
+					func_def << "\t\tsetArrayElement(app_context, arguments_array, i, &args[i]);" << endl;
+					func_def << "\t}" << endl;
+					func_def << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_ARRAY;" << endl;
+					func_def << "\tregs[" << next_reg << "].data.numeric_value = (u64)arguments_array;" << endl;
+					func_def << "\tswf_setup_arguments_props(app_context, arguments_array);" << endl;
 					next_reg++;
 				}
 
@@ -1436,29 +1454,29 @@ namespace SWFRecomp
 				{
 					if (!suppress_super)
 					{
-						context.out_script_defs << "\t// Preload 'super' into register " << next_reg << endl;
-						context.out_script_defs << "\t{" << endl;
-						context.out_script_defs << "\t\tu64 _super_this; u32 _super_depth;" << endl;
-						context.out_script_defs << "\t\tactionGetCurrentSuperInfo(&_super_this, &_super_depth);" << endl;
-						context.out_script_defs << "\t\tif (_super_this) {" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_SUPER;" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = _super_this;" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].str_size = _super_depth;" << endl;
-						context.out_script_defs << "\t\t} else {" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
-						context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = 0;" << endl;
-						context.out_script_defs << "\t\t}" << endl;
-						context.out_script_defs << "\t}" << endl;
+						func_def << "\t// Preload 'super' into register " << next_reg << endl;
+						func_def << "\t{" << endl;
+						func_def << "\t\tu64 _super_this; u32 _super_depth;" << endl;
+						func_def << "\t\tactionGetCurrentSuperInfo(&_super_this, &_super_depth);" << endl;
+						func_def << "\t\tif (_super_this) {" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_SUPER;" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = _super_this;" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].str_size = _super_depth;" << endl;
+						func_def << "\t\t} else {" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = 0;" << endl;
+						func_def << "\t\t}" << endl;
+						func_def << "\t}" << endl;
 					}
 					next_reg++;
 				}
 
 				if (preload_root)
 				{
-					context.out_script_defs << "\t// Preload '_root' into register " << next_reg << endl;
-					context.out_script_defs << "\textern MovieClip root_movieclip;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+					func_def << "\t// Preload '_root' into register " << next_reg << endl;
+					func_def << "\textern MovieClip root_movieclip;" << endl;
+					func_def << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					func_def << "\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
 					next_reg++;
 				}
 
@@ -1467,43 +1485,43 @@ namespace SWFRecomp
 				// causing _global to shift into _parent's register slot
 				if (preload_parent && preload_global)
 				{
-					context.out_script_defs << "\t// Preload '_parent' and '_global' (runtime register assignment)" << endl;
-					context.out_script_defs << "\t{" << endl;
-					context.out_script_defs << "\t\textern MovieClip* g_current_context;" << endl;
-					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
-					context.out_script_defs << "\t\textern ASObject* global_object;" << endl;
-					context.out_script_defs << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
-					context.out_script_defs << "\t\tint _pr = " << next_reg << ";" << endl;
-					context.out_script_defs << "\t\tif (_ctx->parent != NULL) {" << endl;
-					context.out_script_defs << "\t\t\tregs[_pr].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-					context.out_script_defs << "\t\t\tregs[_pr].data.numeric_value = (u64)_ctx->parent;" << endl;
-					context.out_script_defs << "\t\t\t_pr++;" << endl;
-					context.out_script_defs << "\t\t}" << endl;
-					context.out_script_defs << "\t\tregs[_pr].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-					context.out_script_defs << "\t\tregs[_pr].data.numeric_value = (u64)global_object;" << endl;
-					context.out_script_defs << "\t}" << endl;
+					func_def << "\t// Preload '_parent' and '_global' (runtime register assignment)" << endl;
+					func_def << "\t{" << endl;
+					func_def << "\t\textern MovieClip* g_current_context;" << endl;
+					func_def << "\t\textern MovieClip root_movieclip;" << endl;
+					func_def << "\t\textern ASObject* global_object;" << endl;
+					func_def << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
+					func_def << "\t\tint _pr = " << next_reg << ";" << endl;
+					func_def << "\t\tif (_ctx->parent != NULL) {" << endl;
+					func_def << "\t\t\tregs[_pr].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					func_def << "\t\t\tregs[_pr].data.numeric_value = (u64)_ctx->parent;" << endl;
+					func_def << "\t\t\t_pr++;" << endl;
+					func_def << "\t\t}" << endl;
+					func_def << "\t\tregs[_pr].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					func_def << "\t\tregs[_pr].data.numeric_value = (u64)global_object;" << endl;
+					func_def << "\t}" << endl;
 					next_reg += 2;
 				}
 				else if (preload_parent)
 				{
-					context.out_script_defs << "\t// Preload '_parent' into register " << next_reg << endl;
-					context.out_script_defs << "\t{" << endl;
-					context.out_script_defs << "\t\textern MovieClip* g_current_context;" << endl;
-					context.out_script_defs << "\t\textern MovieClip root_movieclip;" << endl;
-					context.out_script_defs << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
-					context.out_script_defs << "\t\tif (_ctx->parent != NULL) {" << endl;
-					context.out_script_defs << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-					context.out_script_defs << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)_ctx->parent;" << endl;
-					context.out_script_defs << "\t\t}" << endl;
-					context.out_script_defs << "\t}" << endl;
+					func_def << "\t// Preload '_parent' into register " << next_reg << endl;
+					func_def << "\t{" << endl;
+					func_def << "\t\textern MovieClip* g_current_context;" << endl;
+					func_def << "\t\textern MovieClip root_movieclip;" << endl;
+					func_def << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
+					func_def << "\t\tif (_ctx->parent != NULL) {" << endl;
+					func_def << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
+					func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)_ctx->parent;" << endl;
+					func_def << "\t\t}" << endl;
+					func_def << "\t}" << endl;
 					next_reg++;
 				}
 				else if (preload_global)
 				{
-					context.out_script_defs << "\t// Preload '_global' into register " << next_reg << endl;
-					context.out_script_defs << "\textern ASObject* global_object;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
-					context.out_script_defs << "\tregs[" << next_reg << "].data.numeric_value = (u64)global_object;" << endl;
+					func_def << "\t// Preload '_global' into register " << next_reg << endl;
+					func_def << "\textern ASObject* global_object;" << endl;
+					func_def << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
+					func_def << "\tregs[" << next_reg << "].data.numeric_value = (u64)global_object;" << endl;
 					next_reg++;
 				}
 
@@ -1513,21 +1531,23 @@ namespace SWFRecomp
 					if (params[i].first == 0)
 					{
 						// Variable parameter
-						context.out_script_defs << "\tif (" << i << " < arg_count) {" << endl;
-						context.out_script_defs << "\t\tsetVariableByName(\"" << params[i].second << "\", &args[" << i << "]);" << endl;
-						context.out_script_defs << "\t}" << endl;
+						func_def << "\tif (" << i << " < arg_count) {" << endl;
+						func_def << "\t\tsetVariableByName(\"" << params[i].second << "\", &args[" << i << "]);" << endl;
+						func_def << "\t}" << endl;
 					}
 					else
 					{
 						// Register parameter
-						context.out_script_defs << "\tif (" << i << " < arg_count) {" << endl;
-						context.out_script_defs << "\t\tregs[" << (int)params[i].first << "] = args[" << i << "];" << endl;
-						context.out_script_defs << "\t}" << endl;
+						func_def << "\tif (" << i << " < arg_count) {" << endl;
+						func_def << "\t\tregs[" << (int)params[i].first << "] = args[" << i << "];" << endl;
+						func_def << "\t}" << endl;
 					}
 				}
 
-				// Parse function body recursively
-				context.out_script_defs << endl << "\t// Function body (" << code_size << " bytes)" << endl;
+				// Parse function body recursively into func_def so that
+				// nested function definitions go to context.out_script_defs (before us)
+				// while our body opcodes stay in the correct function scope.
+				func_def << endl << "\t// Function body (" << code_size << " bytes)" << endl;
 
 				// Save the function body boundaries
 				char* func_body_start = action_buffer;
@@ -1546,7 +1566,7 @@ namespace SWFRecomp
 				context.function2_register_count = (int)register_count;
 
 				char* temp_ptr = temp_buffer;
-				parseActions(context, temp_ptr, context.out_script_defs);
+				parseActions(context, temp_ptr, func_def);
 				free(temp_buffer);
 
 				// Restore previous state
@@ -1556,12 +1576,17 @@ namespace SWFRecomp
 				// Advance the actual buffer past the function body
 				action_buffer = func_body_end;
 
-				context.out_script_defs << endl << "\t// Return undefined if no explicit return" << endl;
-				context.out_script_defs << "\tActionVar ret;" << endl;
-				context.out_script_defs << "\tret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
-				context.out_script_defs << "\tret.data.numeric_value = 0;" << endl;
-				context.out_script_defs << "\treturn ret;" << endl;
-				context.out_script_defs << "}" << endl;
+				func_def << endl << "\t// Return undefined if no explicit return" << endl;
+				func_def << "\tActionVar ret;" << endl;
+				func_def << "\tret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+				func_def << "\tret.data.numeric_value = 0;" << endl;
+				func_def << "\treturn ret;" << endl;
+				func_def << "}" << endl;
+
+				// Flush the complete function definition to out_script_defs.
+				// Nested function defs have already been written there by recursive calls,
+				// so this function appears AFTER its dependencies.
+				context.out_script_defs << func_def.str();
 
 				// Generate runtime call to register function
 				out_script << "\t// DefineFunction2: " << (name_len > 0 ? func_name : "(anonymous)") << endl;
@@ -1994,8 +2019,12 @@ namespace SWFRecomp
 				// Add function declaration to header (uses app_context)
 				context.out_script_decls << endl << "ActionVar " << func_id << "(SWFAppContext* app_context);" << endl;
 
+				// Buffer entire function definition in a stringstream so that
+				// nested function definitions appear BEFORE this function in the output.
+				stringstream func_def;
+
 				// Generate function definition (returns ActionVar for consistency with DefineFunction2)
-				context.out_script_defs << endl << endl
+				func_def << endl << endl
 					<< "// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl
 					<< "ActionVar " << func_id << "(SWFAppContext* app_context)" << endl
 					<< "{" << endl
@@ -2006,19 +2035,21 @@ namespace SWFRecomp
 				// Pop them in reverse order and set as local variables
 				if (params.size() > 0)
 				{
-					context.out_script_defs << "\t// Bind " << params.size() << " parameter(s) from stack" << endl;
-					context.out_script_defs << "\t{" << endl;
+					func_def << "\t// Bind " << params.size() << " parameter(s) from stack" << endl;
+					func_def << "\t{" << endl;
 					for (int i = (int)params.size() - 1; i >= 0; i--)
 					{
-						context.out_script_defs << "\t\tActionVar _param_" << i << ";" << endl;
-						context.out_script_defs << "\t\tpopVar(app_context, &_param_" << i << ");" << endl;
-						context.out_script_defs << "\t\tsetVariableByName(\"" << params[i] << "\", &_param_" << i << ");" << endl;
+						func_def << "\t\tActionVar _param_" << i << ";" << endl;
+						func_def << "\t\tpopVar(app_context, &_param_" << i << ");" << endl;
+						func_def << "\t\tsetVariableByName(\"" << params[i] << "\", &_param_" << i << ");" << endl;
 					}
-					context.out_script_defs << "\t}" << endl;
+					func_def << "\t}" << endl;
 				}
 
-				// Parse function body recursively
-				context.out_script_defs << endl << "\t// Function body (" << code_size << " bytes)" << endl;
+				// Parse function body recursively into func_def so that
+				// nested function definitions go to context.out_script_defs (before us)
+				// while our body opcodes stay in the correct function scope.
+				func_def << endl << "\t// Function body (" << code_size << " bytes)" << endl;
 
 				char* func_body_start = action_buffer;
 				char* func_body_end = action_buffer + code_size;
@@ -2029,16 +2060,20 @@ namespace SWFRecomp
 				temp_buffer[code_size] = 0x00;
 
 				char* temp_ptr = temp_buffer;
-				parseActions(context, temp_ptr, context.out_script_defs);
+				parseActions(context, temp_ptr, func_def);
 				free(temp_buffer);
 
 				action_buffer = func_body_end;
 
 				// Default return for functions without explicit Return action
-				context.out_script_defs << "\tActionVar _default_ret = {0};" << endl;
-				context.out_script_defs << "\t_default_ret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
-				context.out_script_defs << "\treturn _default_ret;" << endl;
-				context.out_script_defs << "}" << endl;
+				func_def << "\tActionVar _default_ret = {0};" << endl;
+				func_def << "\t_default_ret.type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+				func_def << "\treturn _default_ret;" << endl;
+				func_def << "}" << endl;
+
+				// Flush the complete function definition to out_script_defs.
+				// Nested function defs have already been written there by recursive calls.
+				context.out_script_defs << func_def.str();
 
 				// Generate runtime call to register function
 				out_script << "\t// DefineFunction: " << (name_len > 0 ? func_name : "(anonymous)") << endl;

@@ -2,9 +2,11 @@
 
 #include <fstream>
 #include <cstdint>
+#include <sstream>
 
 using std::string;
 using std::ofstream;
+using std::ostream;
 
 namespace SWFRecomp
 {
