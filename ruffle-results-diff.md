@@ -1,28 +1,31 @@
 # Ruffle Test Results Diff
 
-**Previous:** `afdc8bfb7512` (2026-02-28T03:42:01.317758+00:00)
-**Current:** `6744f84efd63` (2026-02-28T04:02:04.282299+00:00)
+**Previous:** `6744f84efd63` (2026-02-28T04:02:04.282299+00:00)
+**Current:** `eb4a18cc7c07` (2026-02-28T05:09:42.682994+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 397 | 398 | +1 |
+| Passing | 398 | 400 | +2 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 64.1% | 64.3% | +0.2% |
-| Mismatched lines | 31384 | 31380 | -4 |
-|   Decreased | | | -5 |
-|   Increased | | | +1 |
+| Pass rate | 64.3% | 64.6% | +0.3% |
+| Mismatched lines | 31380 | 31354 | -26 |
+|   Decreased | | | -32 |
+|   Increased | | | +6 |
 
-## Newly Passing (1)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `movieclip_default_state` | output_mismatch | 68/69 | 69/69 |
+| `create_empty_movie_clip` | output_mismatch | 3/3 | 3/3 |
+| `movieclip_init_object` | output_mismatch | 1/5 | 5/5 |
 
-## Line Count Changed (2)
+## Line Count Changed (4)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `mcl_events_swf_version` | output_mismatch | 28/232 | 32/232 | -4 |
-| `movieclip_library_state_values` | output_mismatch | 77/78 | 76/78 | +1 |
+| `register_and_init_order` | output_mismatch | 127/231 | 142/231 | -15 |
+| `register_class` | output_mismatch | 7/66 | 16/66 | -9 |
+| `register_class_with_sound` | output_mismatch | 1/11 | 5/11 | -4 |
+| `register_class_swf6` | output_mismatch | 7/37 | 1/37 | +6 |
