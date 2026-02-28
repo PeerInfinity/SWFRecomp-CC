@@ -1,34 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `5e876a36fdb8` (2026-02-28T02:14:59.106804+00:00)
-**Current:** `e9ba1a00e14d` (2026-02-28T02:32:32.470911+00:00)
+**Previous:** `e9ba1a00e14d` (2026-02-28T02:32:32.470911+00:00)
+**Current:** `afdc8bfb7512` (2026-02-28T03:42:01.317758+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 393 | 398 | +5 |
+| Passing | 398 | 397 | -1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 63.5% | 64.3% | +0.8% |
-| Mismatched lines | 31420 | 31388 | -32 |
-|   Decreased | | | -44 |
-|   Increased | | | +12 |
+| Pass rate | 64.3% | 64.1% | -0.2% |
+| Mismatched lines | 31388 | 31384 | -4 |
+|   Decreased | | | -9 |
+|   Increased | | | +5 |
 
-## Newly Passing (5)
+## Newly Failing (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `click_block` | output_mismatch | 1/5 | 5/5 |
-| `movieclip_depth_methods` | output_mismatch | 86/98 | 98/98 |
-| `remove_movie_clip` | output_mismatch | 22/29 | 29/29 |
-| `transform` | output_mismatch | 66/70 | 70/70 |
-| `with` | output_mismatch | 48/49 | 49/49 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `movieclip_default_state` | output_mismatch | 69/69 | 68/69 |
 
-## Line Count Changed (4)
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `movieclip_library_state_values` | segfault | output_mismatch | 68/78 | 77/78 |
+
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `focus_mouse` | output_mismatch | 8/45 | 20/45 | -12 |
-| `unload` | output_mismatch | 32/52 | 36/52 | -4 |
-| `focus_mouse_rollout` | output_mismatch | 0/4 | 0/4 | 0 |
-| `movieclip_hittest_shapeflag` | output_mismatch | 278/338 | 266/338 | +12 |
+| `mcl_events_swf_version` | output_mismatch | 32/232 | 28/232 | +4 |
