@@ -6,7 +6,7 @@ Last updated: 2026-02-27
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: Recompiler initVarArray ordering fix (emit before DoInitAction scripts). RegisterClass constructors now fire at tagSetInstanceName time (before DoAction) with recursive child firing. register_and_init_order 0→76/233. All known-passing tests verified no regression.
+- **Recent gains (this session)**: Fixed objectToPrimitive ASArray crash, deferred unloadMovie state, per-MC byte_size, SWF_URL test name. movieclip_library_state_values segfault→77/78. Recompiler nested function ordering fix (Phase 1 skip + Phase 2 stringstream buffering).
 - **Recent gains (previous sessions)**: watch_textfield PASS (12/12). this_scoping PASS (52/52). execution_order4 PASS (13/13). nan_scale PASS (9/9). clip_constructors PASS (8/8). issue_768 PASS (3/3). rewind_depth PASS (30/30). tell_target_invalid PASS (6/6). tell_target_invalid_swf6 PASS (5/5). stage_object_children PASS (83/83). selection PASS (454/454). place_and_lookup PASS (30/30). tab_ordering_children PASS (208/208). And many more.
 
 ## Crashes and Errors (8 tests)
@@ -95,7 +95,7 @@ Last updated: 2026-02-27
 ### 80-90%
 | Test | Match | Issue |
 |------|-------|-------|
-| `movieclip_library_state_values` | 69/78 (88.5%) | Library sprite default state values; segfaults after line 73 |
+| `movieclip_library_state_values` | **77/78 (98.7%)** | Fixed: segfault, unloadMovie state, byte_size, URL. Remaining: _xmouse default (accepted diff) |
 | `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
 | `super_edge_cases` | 33/39 (84.6%) | makeSuperWith: SUPER value as __proto__ (3 lines), addProperty virtual __constructor__ (3 lines) |
 | `function_base_clip_readded` | 10/12 (83.3%) | _parent resolution after removal+re-add |

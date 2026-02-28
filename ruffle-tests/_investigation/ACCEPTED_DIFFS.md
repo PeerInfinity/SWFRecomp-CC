@@ -175,6 +175,30 @@ our error is 0.0001 pixels beyond the test's epsilon tolerance.
 
 ---
 
+## Category 5: Test Harness Limitations
+
+Expected output depends on Ruffle's test runner infrastructure (viewport geometry,
+default mouse position, etc.) that our native test harness does not replicate.
+
+### `movieclip_library_state_values` — Default mouse position (1 diff line)
+
+**Example diff:**
+```
+- _xmouse = 21
++ _xmouse = 0
+```
+
+Ruffle's test runner positions the virtual mouse at a non-zero coordinate derived from
+the viewport/stage geometry mapping. Our native test harness initializes the mouse at
+(0, 0). The test has no `viewport_dimensions` in test.toml and no mouse input events —
+the value 21 is purely a Ruffle test infrastructure artifact, not a test assertion about
+mouse behavior.
+
+**Decision:** Accept 1 diff line. Low priority; would need to reverse-engineer Ruffle's
+default mouse position formula (viewport center → stage coordinates → _xmouse).
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
@@ -186,3 +210,4 @@ our error is 0.0001 pixels beyond the test's epsilon tolerance.
 | `array_sort` | Flash quirk (non-ASCII CASEINSENSITIVE ordering) | 1 | Accept; locale-dependent, not reproducible |
 | `array_sort` | Flash quirk (sortOn multi-key DESCENDING flag) | 2 | Accept; undocumented Flash internals |
 | `movieclip_getbounds` | Float precision (morph getBounds matrix) | 2 | Accept; 0.0001px beyond epsilon |
+| `movieclip_library_state_values` | Test harness limitation (default mouse position) | 1 | Accept; Ruffle infrastructure artifact |

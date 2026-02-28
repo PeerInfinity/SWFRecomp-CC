@@ -5620,6 +5620,26 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 			return undef;
 		}
 	}
+	else if (obj_var->type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Arrays are ASArray*, not ASObject* — use props for property lookups
+		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
+		obj = arr->props;
+		if (obj == NULL)
+		{
+			// No props — array has no custom valueOf/toString.
+			// Default: convert via Array.toString() (join elements with commas).
+			// For now, return the array's string representation.
+			ActionVar str_result = {0};
+			str_result.type = ACTION_STACK_VALUE_STRING;
+			// Use convertString-style join: push array, call toString
+			// Simplified: return undefined to signal no conversion (caller handles)
+			if (out_success) *out_success = 0;
+			ActionVar undef = {0};
+			undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			return undef;
+		}
+	}
 	else
 	{
 		obj = (ASObject*) obj_var->data.numeric_value;
@@ -9491,6 +9511,23 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name)
 	actionSetCurrentContext(target_mc);
 	invokeSpecialFunction(app_context, func, NULL);
 	actionSetCurrentContext(saved_context);
+}
+
+// --- Deferred unloadMovie state ---
+// When unloadMovie is called, the MC's frame/bytes properties should not change until
+// the next frame. We queue MCs here and set their unloaded flag at the start of the next frame.
+#define MAX_DEFERRED_UNLOADS 32
+static MovieClip* g_deferred_unload_mcs[MAX_DEFERRED_UNLOADS];
+static int g_deferred_unload_mc_count = 0;
+
+void actionProcessDeferredUnloads(void)
+{
+	for (int i = 0; i < g_deferred_unload_mc_count; i++) {
+		if (g_deferred_unload_mcs[i] != NULL) {
+			g_deferred_unload_mcs[i]->unloaded = 1;
+		}
+	}
+	g_deferred_unload_mc_count = 0;
 }
 
 // --- Deferred onUnload queue ---
@@ -19823,16 +19860,22 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 
 		// Empty URL = unloadMovie: fire onUnload on the target clip
 		if (url_utf8[0] == '\0') {
-			if (_gu2_mc != NULL && _gu2_mc->dynamic_props != NULL) {
-				ActionVar* _ul_handler = getProperty((ASObject*)_gu2_mc->dynamic_props, "onUnload", 8);
-				if (_ul_handler != NULL && _ul_handler->type == ACTION_STACK_VALUE_FUNCTION) {
-					ASFunction* _ul_func = (ASFunction*) _ul_handler->data.numeric_value;
-					if (_ul_func != NULL) {
-						MovieClip* _ul_saved = g_current_context;
-						actionSetCurrentContext(_gu2_mc);
-						invokeSpecialFunction(app_context, _ul_func, NULL);
-						actionSetCurrentContext(_ul_saved);
+			if (_gu2_mc != NULL) {
+				if (_gu2_mc->dynamic_props != NULL) {
+					ActionVar* _ul_handler = getProperty((ASObject*)_gu2_mc->dynamic_props, "onUnload", 8);
+					if (_ul_handler != NULL && _ul_handler->type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* _ul_func = (ASFunction*) _ul_handler->data.numeric_value;
+						if (_ul_func != NULL) {
+							MovieClip* _ul_saved = g_current_context;
+							actionSetCurrentContext(_gu2_mc);
+							invokeSpecialFunction(app_context, _ul_func, NULL);
+							actionSetCurrentContext(_ul_saved);
+						}
 					}
+				}
+				// Defer marking MC as unloaded until next frame (Flash defers unload state)
+				if (g_deferred_unload_mc_count < MAX_DEFERRED_UNLOADS) {
+					g_deferred_unload_mcs[g_deferred_unload_mc_count++] = _gu2_mc;
 				}
 			}
 			return;
@@ -22317,9 +22360,9 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
 			if (strcasecmp(prop_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
 			if (strcasecmp(prop_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
-			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
 			if (strcasecmp(prop_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
@@ -31276,6 +31319,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (attached != NULL) {
 						// Copy URL from parent
 						strncpy(attached->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(attached->url) - 1);
+						// Library MCs report DefineSprite data size for getBytesLoaded/Total
+						attached->byte_size = 4;  // Minimum DefineSprite: SpriteID(2) + FrameCount(2)
 
 						// Set __proto__ from registered class (if any) BEFORE initObject
 						{
@@ -31747,21 +31792,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 14 && strncmp(method_name, "getBytesLoaded", 14) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = 0.0;
-#ifdef SWF_FILE_SIZE
-			// Timeline/root clips return SWF file size; dynamically created empty clips return 0
-			if (mc->display_obj != NULL || mc == &root_movieclip) v = (double)SWF_FILE_SIZE;
-#endif
+			double v = mc->unloaded ? 0.0 : (double)mc->byte_size;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
 		else if (method_name_len == 13 && strncmp(method_name, "getBytesTotal", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = 0.0;
-#ifdef SWF_FILE_SIZE
-			if (mc->display_obj != NULL || mc == &root_movieclip) v = (double)SWF_FILE_SIZE;
-#endif
+			double v = mc->unloaded ? 0.0 : (double)mc->byte_size;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}

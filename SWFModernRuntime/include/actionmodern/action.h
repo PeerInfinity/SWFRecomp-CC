@@ -44,6 +44,8 @@ struct MovieClip {
 	u8 is_button_mc;       // 1 if this MC represents a SWF button (affects _parent resolution in SWF5)
 	int depth;             // ActionScript display depth (-16384 for _root, SWF_depth-16384 for timeline clips, AS-space for dynamic clips)
 	u8 depth_swapped;      // 1 if depth was changed by swapDepths (prevents display list overwrite in actionGetMember)
+	u8 unloaded;           // 1 if unloadMovie was called on this MC (frame/bytes properties return 0)
+	u32 byte_size;         // getBytesLoaded/getBytesTotal value (0 = dynamic/attached clip)
 #ifdef NO_GRAPHICS
 	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)

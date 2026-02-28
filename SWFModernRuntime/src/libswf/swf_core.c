@@ -459,6 +459,9 @@ void swfStart(SWFAppContext* app_context)
 	strncpy(root_movieclip.url, SWF_URL, sizeof(root_movieclip.url) - 1);
 	root_movieclip.url[sizeof(root_movieclip.url) - 1] = '\0';
 #endif
+#ifdef SWF_FILE_SIZE
+	root_movieclip.byte_size = SWF_FILE_SIZE;
+#endif
 
 	tagInit(app_context);
 
@@ -480,6 +483,10 @@ void swfStart(SWFAppContext* app_context)
 	while (tick_count < max_ticks)
 	{
 		tick_count++;
+
+		// Process deferred unloadMovie state (MC properties change on next frame)
+		extern void actionProcessDeferredUnloads(void);
+		actionProcessDeferredUnloads();
 
 		// Reset per-tick edge flags
 		app_context->mouse.moved = 0;
