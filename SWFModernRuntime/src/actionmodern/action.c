@@ -770,6 +770,55 @@ static ActionVar builtin_stub_method(SWFAppContext* app_context, ActionVar* args
 	return ret;
 }
 
+// Sound.getVolume() - returns the __volume__ property (default 100)
+static ActionVar builtin_sound_getVolume(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar* vol = getPropertyWithPrototype(obj, "__volume__", 10);
+	if (vol != NULL) {
+		ret = *vol;
+	}
+	return ret;
+}
+
+// Sound.setVolume(vol) - sets the __volume__ property
+static ActionVar builtin_sound_setVolume(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar vol_var = {0};
+	vol_var.type = ACTION_STACK_VALUE_F64;
+	if (arg_count >= 1) {
+		// Convert arg to number: use varToDoubleSimple (valueOf not called in Flash for setVolume)
+		double d = 0.0;
+		if (args[0].type == ACTION_STACK_VALUE_F64) d = VAL(double, &args[0].data.numeric_value);
+		else if (args[0].type == ACTION_STACK_VALUE_F32) d = (double)VAL(float, &args[0].data.numeric_value);
+		else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN) d = args[0].data.numeric_value ? 1.0 : 0.0;
+		else if (args[0].type == ACTION_STACK_VALUE_STRING) {
+			// Attempt parse
+			const uint16_t* u16 = varGetU16Ptr(&args[0]);
+			if (u16 != NULL && args[0].str_size > 0) {
+				char buf[64]; u16_to_utf8(u16, args[0].str_size, buf, sizeof(buf));
+				d = strtod(buf, NULL);
+			}
+		}
+		int32_t vol = (int32_t)d;  // NaN→INT_MIN on x86 (UB, matches Flash)
+		VAL(double, &vol_var.data.numeric_value) = (double)vol;
+	} else {
+		// Flash: setVolume() with no args sets volume to 0
+		VAL(double, &vol_var.data.numeric_value) = 0.0;
+	}
+	setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol_var, PROPERTY_FLAGS_DONTENUM);
+	return ret;
+}
+
 // Forward declarations for copy functions
 static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
 
@@ -5594,6 +5643,39 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 	else
 	{
 		obj = (ASObject*) obj_var->data.numeric_value;
+	}
+
+	// NATIVE_ARRAY objects: toString = join(",") using indexed properties
+	if (obj_var->type == ACTION_STACK_VALUE_OBJECT && obj->native_type == NATIVE_ARRAY) {
+		if (found) *found = 1;
+		ActionVar* len_prop = getProperty(obj, "length", 6);
+		int obj_len = (len_prop != NULL) ? (int)varToDoubleSimple(len_prop) : 0;
+		u32 buf_cap = 256;
+		char* buf = (char*) HALLOC(buf_cap);
+		u32 buf_len = 0;
+		for (int i = 0; i < obj_len; i++) {
+			if (i > 0) {
+				while (buf_len + 2 > buf_cap) { buf_cap *= 2; buf = (char*)realloc(buf, buf_cap); }
+				buf[buf_len++] = ',';
+			}
+			char idx[16];
+			int idx_len = snprintf(idx, sizeof(idx), "%d", i);
+			ActionVar* elem = getProperty(obj, idx, idx_len);
+			char elem_str[256];
+			int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+			while (buf_len + (u32)elen + 1 > buf_cap) { buf_cap *= 2; buf = (char*)realloc(buf, buf_cap); }
+			memcpy(buf + buf_len, elem_str, elen);
+			buf_len += elen;
+		}
+		buf[buf_len] = '\0';
+		u32 u16_len;
+		uint16_t* u16_result = utf8_to_u16(app_context, buf, buf_len, &u16_len);
+		ActionVar result = {0};
+		result.type = ACTION_STACK_VALUE_STRING;
+		result.str_size = u16_len;
+		result.data.string_data.heap_ptr = u16_result;
+		result.data.string_data.owns_memory = true;
+		return result;
 	}
 
 	// Arrays only check own properties for toString (not inherited from Object.prototype)
@@ -11107,14 +11189,10 @@ static int isDateObjectSWF6(ActionVar* obj_var)
 {
 	if (g_swf_version < 6) return 0;
 	if (obj_var->type != ACTION_STACK_VALUE_OBJECT) return 0;
-	if (g_date_prototype == NULL) return 0;
 	ASObject* obj = (ASObject*) obj_var->data.numeric_value;
 	if (obj == NULL) return 0;
-	ActionVar* proto_prop = getProperty(obj, "__proto__", 9);
-	if (proto_prop == NULL) return 0;
-	if (proto_prop->type != ACTION_STACK_VALUE_OBJECT) return 0;
-	ASObject* proto = (ASObject*) proto_prop->data.numeric_value;
-	return (proto == g_date_prototype);
+	// Check native_type for Date (handles subclasses where __proto__ is intermediate)
+	return (obj->native_type == NATIVE_DATE);
 }
 
 void actionAdd2(SWFAppContext* app_context, char* str_buffer)
@@ -14867,10 +14945,34 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "getPan", 6, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "getTransform", 12, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getVolume", 9, mflags);
+	// getVolume - real implementation that reads __volume__
+	{
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "getVolume", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_getVolume;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "getVolume", 9, &fv, mflags);
+		}
+	}
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setPan", 6, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setTransform", 12, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "setVolume", 9, mflags);
+	// setVolume - real implementation that writes __volume__
+	{
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "setVolume", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_setVolume;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "setVolume", 9, &fv, mflags);
+		}
+	}
 	addStubMethodToProto(app_context, ctor->prototype_obj, "stop", 4, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "attachSound", 11, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "start", 5, mflags);
@@ -23692,7 +23794,11 @@ void actionNewObject(SWFAppContext* app_context)
 
 			// Set native_type for native-backed stub constructors
 			if (ctor_name != NULL) {
-				if (strcmp(ctor_name, "Sound") == 0) obj->native_type = NATIVE_SOUND;
+				if (strcmp(ctor_name, "Sound") == 0) {
+					obj->native_type = NATIVE_SOUND;
+					ActionVar vol = makeF64(100.0);
+					setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
+				}
 				else if (strcmp(ctor_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
 				else if (strcmp(ctor_name, "LocalConnection") == 0) obj->native_type = NATIVE_LOCALCONNECTION;
 				else if (strcmp(ctor_name, "MovieClipLoader") == 0) obj->native_type = NATIVE_MOVIECLIPLOADER;
@@ -24644,7 +24750,11 @@ void actionNewMethod(SWFAppContext* app_context)
 				new_obj_inst->native_type = NATIVE_FILTER;
 			}
 			// Global stub constructors with native backing
-			else if (strcmp(ctor_name, "Sound") == 0) new_obj_inst->native_type = NATIVE_SOUND;
+			else if (strcmp(ctor_name, "Sound") == 0) {
+				new_obj_inst->native_type = NATIVE_SOUND;
+				ActionVar vol = makeF64(100.0);
+				setPropertyWithFlags(app_context, new_obj_inst, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
+			}
 			else if (strcmp(ctor_name, "LoadVars") == 0) new_obj_inst->native_type = NATIVE_LOADVARS;
 			else if (strcmp(ctor_name, "LocalConnection") == 0) new_obj_inst->native_type = NATIVE_LOCALCONNECTION;
 			else if (strcmp(ctor_name, "MovieClipLoader") == 0) new_obj_inst->native_type = NATIVE_MOVIECLIPLOADER;
@@ -25857,6 +25967,459 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	}
 }
 
+// invokeNativeSuperConstructor: handles super() calls to stub constructors (no simple_func/advanced_func).
+// Dispatches by constructor name to initialize properties on the this_obj.
+// Returns 1 if handled (recognized stub), 0 if not.
+// Sets *out_result to the value that super() should return.
+static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* ctor,
+                                         void* this_obj, ActionVar* args, u32 num_args,
+                                         ActionVar* out_result)
+{
+	const char* name = ctor->name;
+	if (name[0] == '\0') return 0;
+	ASObject* obj = (ASObject*)this_obj;
+	if (obj == NULL) return 0;
+
+	// Helper to ensure wrapper valueOf/toString funcs are initialized
+	#define ENSURE_WRAPPER_FUNCS() do { \
+		if (!g_wrapper_funcs_init) { \
+			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction)); \
+			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255); \
+			g_wrapper_valueOf_func.function_type = 2; \
+			g_wrapper_valueOf_func.param_count = 0; \
+			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf; \
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_wrapper_valueOf_func; \
+			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction)); \
+			strncpy(g_prim_wrapper_toString_func.name, "toString", 255); \
+			g_prim_wrapper_toString_func.function_type = 2; \
+			g_prim_wrapper_toString_func.param_count = 0; \
+			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString; \
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_prim_wrapper_toString_func; \
+			g_wrapper_funcs_init = 1; \
+		} \
+	} while(0)
+
+	#define INSTALL_WRAPPER_FUNCS(obj_ptr) do { \
+		ENSURE_WRAPPER_FUNCS(); \
+		ActionVar _wvo = {0}; _wvo.type = ACTION_STACK_VALUE_FUNCTION; \
+		VAL(u64, &_wvo.data.numeric_value) = (u64)&g_wrapper_valueOf_func; \
+		setPropertyWithFlags(app_context, obj_ptr, "valueOf", 7, &_wvo, PROPERTY_FLAGS_DONTENUM); \
+		ActionVar _wts = {0}; _wts.type = ACTION_STACK_VALUE_FUNCTION; \
+		VAL(u64, &_wts.data.numeric_value) = (u64)&g_prim_wrapper_toString_func; \
+		setPropertyWithFlags(app_context, obj_ptr, "toString", 8, &_wts, PROPERTY_FLAGS_DONTENUM); \
+	} while(0)
+
+	// Default result: undefined
+	out_result->type = ACTION_STACK_VALUE_UNDEFINED;
+	out_result->data.numeric_value = 0;
+	out_result->str_size = 0;
+
+	// --- Boolean ---
+	if (strcmp(name, "Boolean") == 0) {
+		if (obj->native_type != NATIVE_NONE) return 1;
+		obj->native_type = NATIVE_BOOLEAN;
+		ActionVar value_var;
+		value_var.type = ACTION_STACK_VALUE_BOOLEAN;
+		value_var.data.numeric_value = 0;
+		value_var.str_size = 0;
+		if (num_args > 0) {
+			u64 bv = 0;
+			if (args[0].type == ACTION_STACK_VALUE_F32)
+				bv = (VAL(float, &args[0].data.numeric_value) != 0.0f) ? 1 : 0;
+			else if (args[0].type == ACTION_STACK_VALUE_F64)
+				bv = (VAL(double, &args[0].data.numeric_value) != 0.0) ? 1 : 0;
+			else if (args[0].type == ACTION_STACK_VALUE_STRING)
+				bv = (args[0].str_size > 0) ? 1 : 0;
+			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
+				bv = args[0].data.numeric_value ? 1 : 0;
+			else if (args[0].type == ACTION_STACK_VALUE_OBJECT || args[0].type == ACTION_STACK_VALUE_ARRAY ||
+			         args[0].type == ACTION_STACK_VALUE_FUNCTION || args[0].type == ACTION_STACK_VALUE_MOVIECLIP)
+				bv = 1;
+			value_var.data.numeric_value = bv;
+		}
+		setPropertyWithFlags(app_context, obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
+		INSTALL_WRAPPER_FUNCS(obj);
+		// Return value is the object itself (traces as "true"/"false" via valueOf)
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- Number ---
+	if (strcmp(name, "Number") == 0) {
+		if (obj->native_type != NATIVE_NONE) return 1;
+		obj->native_type = NATIVE_NUMBER;
+		ActionVar value_var;
+		value_var.type = ACTION_STACK_VALUE_F32;
+		value_var.data.numeric_value = 0;
+		value_var.str_size = 0;
+		VAL(float, &value_var.data.numeric_value) = 0.0f;
+		if (num_args > 0) {
+			if (args[0].type == ACTION_STACK_VALUE_F32 || args[0].type == ACTION_STACK_VALUE_F64)
+				value_var = args[0];
+			else if (args[0].type == ACTION_STACK_VALUE_STRING) {
+				char tmp[256];
+				const uint16_t* u16 = varGetU16Ptr(&args[0]);
+				u16_to_utf8(u16, args[0].str_size, tmp, sizeof(tmp));
+				double num = atof(tmp);
+				value_var.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &value_var.data.numeric_value) = num;
+			} else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN) {
+				value_var.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &value_var.data.numeric_value) = args[0].data.numeric_value ? 1.0 : 0.0;
+			}
+		}
+		setPropertyWithFlags(app_context, obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
+		INSTALL_WRAPPER_FUNCS(obj);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- String ---
+	if (strcmp(name, "String") == 0) {
+		if (obj->native_type != NATIVE_NONE) return 1;
+		obj->native_type = NATIVE_STRING;
+		ActionVar value_var = {0};
+		value_var.type = ACTION_STACK_VALUE_STRING;
+		if (num_args > 0) {
+			if (args[0].type == ACTION_STACK_VALUE_STRING) {
+				value_var = args[0];
+			} else {
+				char str_buf[256];
+				int len = varToStringBuf(app_context, &args[0], str_buf, sizeof(str_buf));
+				u32 u16_len;
+				uint16_t* u16 = ascii_to_u16(app_context, str_buf, len, &u16_len);
+				value_var.str_size = u16_len;
+				value_var.data.string_data.heap_ptr = u16;
+				value_var.data.string_data.owns_memory = true;
+			}
+		}
+		setPropertyWithFlags(app_context, obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
+		{
+			u32 slen = (value_var.type == ACTION_STACK_VALUE_STRING) ? value_var.str_size : 0;
+			ActionVar len_var = makeF64((double)slen);
+			setPropertyWithFlags(app_context, obj, "length", 6, &len_var, PROPERTY_FLAG_WRITABLE);
+		}
+		INSTALL_WRAPPER_FUNCS(obj);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- Array ---
+	if (strcmp(name, "Array") == 0) {
+		// For Array subclassing, store elements as indexed properties on the object
+		// and set a length property. NATIVE_ARRAY enables shift/join/toString on ASObject.
+		if (obj->native_type != NATIVE_NONE) return 1;
+		obj->native_type = NATIVE_ARRAY;
+		ActionVar len_var = makeF64((double)num_args);
+		setProperty(app_context, obj, "length", 6, &len_var);
+		for (u32 i = 0; i < num_args; i++) {
+			char idx_buf[16];
+			int idx_len = snprintf(idx_buf, sizeof(idx_buf), "%u", i);
+			setProperty(app_context, obj, idx_buf, idx_len, &args[i]);
+		}
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- Function ---
+	if (strcmp(name, "Function") == 0) {
+		// super() on Function returns the first argument (function body string)
+		if (num_args > 0) {
+			*out_result = args[0];
+		} else {
+			out_result->type = ACTION_STACK_VALUE_OBJECT;
+			out_result->data.numeric_value = (u64)obj;
+		}
+		return 1;
+	}
+
+	// --- Date ---
+	if (strcmp(name, "Date") == 0) {
+		// Call the real Date constructor which initializes in-place
+		builtin_date_constructor(app_context, args, num_args, NULL, this_obj);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- Sound ---
+	if (strcmp(name, "Sound") == 0) {
+		if (obj->native_type == NATIVE_NONE)
+			obj->native_type = NATIVE_SOUND;
+		// Set default volume = 100
+		ActionVar vol = makeF64(100.0);
+		setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- TextFormat ---
+	if (strcmp(name, "TextFormat") == 0) {
+		if (obj->native_type == NATIVE_NONE)
+			obj->native_type = NATIVE_TEXTFORMAT;
+		// Set constructor arguments: font, size (simplified — just store first two args)
+		if (num_args > 0 && args[0].type != ACTION_STACK_VALUE_NULL && args[0].type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, obj, "font", 4, &args[0]);
+		if (num_args > 1 && args[1].type != ACTION_STACK_VALUE_NULL && args[1].type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, obj, "size", 4, &args[1]);
+		if (num_args > 2 && args[2].type != ACTION_STACK_VALUE_NULL && args[2].type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, obj, "color", 5, &args[2]);
+		if (num_args > 3 && args[3].type != ACTION_STACK_VALUE_NULL && args[3].type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, obj, "bold", 4, &args[3]);
+		if (num_args > 4 && args[4].type != ACTION_STACK_VALUE_NULL && args[4].type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, obj, "italic", 6, &args[4]);
+		if (num_args > 5 && args[5].type != ACTION_STACK_VALUE_NULL && args[5].type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, obj, "underline", 9, &args[5]);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- BitmapData ---
+	if (strcmp(name, "BitmapData") == 0) {
+		if (obj->native_type == NATIVE_NONE)
+			obj->native_type = NATIVE_BITMAPDATA;
+		if (num_args > 0) {
+			ActionVar w = makeF64(varToDoubleSimple(&args[0]));
+			setProperty(app_context, obj, "width", 5, &w);
+		}
+		if (num_args > 1) {
+			ActionVar h = makeF64(varToDoubleSimple(&args[1]));
+			setProperty(app_context, obj, "height", 6, &h);
+		}
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- XML ---
+	if (strcmp(name, "XML") == 0) {
+		initXMLPrototype(app_context);
+		obj->native_type = NATIVE_XML;
+		// Initialize XML document properties on the existing object
+		ActionVar nt = makeF64(1.0);
+		setProperty(app_context, obj, "nodeType", 8, &nt);
+		xml_set_null(app_context, obj, "nodeName", 8);
+		xml_set_null(app_context, obj, "nodeValue", 9);
+		xml_set_null(app_context, obj, "parentNode", 10);
+		xml_set_null(app_context, obj, "firstChild", 10);
+		xml_set_null(app_context, obj, "lastChild", 9);
+		xml_set_null(app_context, obj, "previousSibling", 15);
+		xml_set_null(app_context, obj, "nextSibling", 11);
+		ASArray* children = allocArray(app_context, 0);
+		ActionVar cn = {0}; cn.type = ACTION_STACK_VALUE_ARRAY;
+		cn.data.numeric_value = (u64)children;
+		setProperty(app_context, obj, "childNodes", 10, &cn);
+		ASObject* attrs = allocObject(app_context, 4);
+		xml_set_obj(app_context, obj, "attributes", 10, attrs);
+		ASObject* idmap = allocObject(app_context, 4);
+		xml_set_obj(app_context, obj, "idMap", 5, idmap);
+		xml_set_str(app_context, obj, "contentType", 11, "application/x-www-form-urlencoded", 33);
+		ActionVar sv = makeF64(0.0);
+		setProperty(app_context, obj, "status", 6, &sv);
+		// Parse source string if provided
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+			char xml_buf[4096];
+			const uint16_t* xml_u16 = varGetU16Ptr(&args[0]);
+			u16_to_utf8(xml_u16, args[0].str_size, xml_buf, sizeof(xml_buf));
+			u32 src_len = (u32)strlen(xml_buf);
+			xml_parse_into(app_context, obj, xml_buf, src_len);
+		}
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- XMLNode ---
+	if (strcmp(name, "XMLNode") == 0) {
+		initXMLPrototype(app_context);
+		int nodeType = 1;
+		if (num_args > 0) nodeType = (int)varToDoubleSimple(&args[0]);
+		ActionVar nt_var = makeF64((double)nodeType);
+		setProperty(app_context, obj, "nodeType", 8, &nt_var);
+
+		if (num_args > 1) {
+			if (nodeType == 1) {
+				// Element: second arg is nodeName
+				setProperty(app_context, obj, "nodeName", 8, &args[1]);
+			} else {
+				setProperty(app_context, obj, "nodeValue", 9, &args[1]);
+			}
+		}
+		if (num_args >= 2)
+			obj->native_type = NATIVE_XMLNODE;
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- ColorTransform ---
+	if (strcmp(name, "ColorTransform") == 0) {
+		// Call the real ColorTransform constructor
+		colorTransformConstructor(app_context, args, num_args, NULL, this_obj);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- NetConnection ---
+	if (strcmp(name, "NetConnection") == 0) {
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
+		setProperty(app_context, obj, "isConnected", 11, &bv);
+		// NetConnection super() returns undefined
+		return 1;
+	}
+
+	// --- Filters: BlurFilter, BevelFilter, GlowFilter, DropShadowFilter ---
+	if (strcmp(name, "BlurFilter") == 0) {
+		// Use convertFloat for valueOf support on args (side effects run even on double-construct)
+		double bx = 4.0, by = 4.0, quality = 1.0;
+		if (num_args > 0) { pushVar(app_context, &args[0]); convertFloat(app_context); ActionVar tmp; popVar(app_context, &tmp); bx = VAL(double, &tmp.data.numeric_value); }
+		if (num_args > 1) { pushVar(app_context, &args[1]); convertFloat(app_context); ActionVar tmp; popVar(app_context, &tmp); by = VAL(double, &tmp.data.numeric_value); }
+		if (num_args > 2) { pushVar(app_context, &args[2]); convertFloat(app_context); ActionVar tmp; popVar(app_context, &tmp); quality = VAL(double, &tmp.data.numeric_value); }
+		// Double-construct protection: skip property init if already native
+		if (obj->native_type != NATIVE_NONE) {
+			out_result->type = ACTION_STACK_VALUE_OBJECT;
+			out_result->data.numeric_value = (u64)obj;
+			return 1;
+		}
+		obj->native_type = NATIVE_FILTER;
+		ActionVar v;
+		v = makeF64(bx); setProperty(app_context, obj, "blurX", 5, &v);
+		v = makeF64(by); setProperty(app_context, obj, "blurY", 5, &v);
+		v = makeF64(quality); setProperty(app_context, obj, "quality", 7, &v);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "BevelFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		double dist = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
+		double angle = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
+		ActionVar v;
+		v = makeF64(dist); setProperty(app_context, obj, "distance", 8, &v);
+		v = makeF64(angle); setProperty(app_context, obj, "angle", 5, &v);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "GlowFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		double color = (num_args > 0) ? varToDoubleSimple(&args[0]) : 16711680.0;
+		double alpha = (num_args > 1) ? varToDoubleSimple(&args[1]) : 1.0;
+		ActionVar v;
+		v = makeF64(color); setProperty(app_context, obj, "color", 5, &v);
+		v = makeF64(alpha); setProperty(app_context, obj, "alpha", 5, &v);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "DropShadowFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		double dist = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
+		double angle = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
+		ActionVar v;
+		v = makeF64(dist); setProperty(app_context, obj, "distance", 8, &v);
+		v = makeF64(angle); setProperty(app_context, obj, "angle", 5, &v);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "GradientBevelFilter") == 0 || strcmp(name, "GradientGlowFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		double dist = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
+		double angle = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
+		ActionVar v;
+		v = makeF64(dist); setProperty(app_context, obj, "distance", 8, &v);
+		v = makeF64(angle); setProperty(app_context, obj, "angle", 5, &v);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "ColorMatrixFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		// First arg is the matrix array
+		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_ARRAY) {
+			setProperty(app_context, obj, "matrix", 6, &args[0]);
+		}
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "DisplacementMapFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		// mapBitmap (first arg), mapPoint (second arg — default is Point(0,0))
+		if (num_args > 0 && args[0].type != ACTION_STACK_VALUE_NULL && args[0].type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, obj, "mapBitmap", 9, &args[0]);
+		// mapPoint defaults to Point(0,0)
+		{
+			ActionVar zero = makeF64(0.0);
+			ASObject* pt = createPointObj(app_context, &zero, &zero);
+			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)pt;
+			setProperty(app_context, obj, "mapPoint", 8, &pv);
+		}
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "ConvolutionFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		if (num_args > 0) {
+			ActionVar mx = makeF64(varToDoubleSimple(&args[0]));
+			setProperty(app_context, obj, "matrixX", 7, &mx);
+		}
+		if (num_args > 1) {
+			ActionVar my = makeF64(varToDoubleSimple(&args[1]));
+			setProperty(app_context, obj, "matrixY", 7, &my);
+		}
+		// Third arg onwards is the matrix array — but ConvolutionFilter takes it as a single array arg
+		if (num_args > 2 && args[2].type == ACTION_STACK_VALUE_ARRAY) {
+			setProperty(app_context, obj, "matrix", 6, &args[2]);
+		}
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- Transform ---
+	if (strcmp(name, "Transform") == 0) {
+		if (obj->native_type == NATIVE_NONE)
+			obj->native_type = NATIVE_TRANSFORM;
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	// --- Classes that return undefined from super() ---
+	if (strcmp(name, "NetStream") == 0 || strcmp(name, "XMLSocket") == 0 ||
+	    strcmp(name, "SharedObject") == 0 || strcmp(name, "FileReference") == 0 ||
+	    strcmp(name, "MovieClip") == 0) {
+		// super() returns undefined
+		return 1;
+	}
+
+	// --- Classes that return [object Object] from super() ---
+	if (strcmp(name, "LocalConnection") == 0 || strcmp(name, "StyleSheet") == 0) {
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
+	#undef ENSURE_WRAPPER_FUNCS
+	#undef INSTALL_WRAPPER_FUNCS
+
+	return 0; // Not recognized
+}
+
 void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
@@ -25949,6 +26512,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					g_call_depth++;
 					((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
 					g_call_depth--;
+				}
+				else if (parent_ctor->simple_func == NULL && parent_ctor->advanced_func == NULL) {
+					ActionVar _nsc_result = {0};
+					invokeNativeSuperConstructor(app_context, parent_ctor, this_obj, args, num_args, &_nsc_result);
 				}
 
 				popSuperContext();
@@ -27883,10 +28450,31 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 			buf[pos] = '\0';
 			return pos;
 		}
-		case ACTION_STACK_VALUE_OBJECT:
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			if (v->type == ACTION_STACK_VALUE_OBJECT && v->data.numeric_value != 0) {
+			// MovieClip: convert to target path string
+			MovieClip* mc = (MovieClip*) v->data.numeric_value;
+			extern MovieClip root_movieclip;
+			if (mc != NULL && mc->depth == INT_MIN)
+				return 0; // Dead MC: empty string
+			if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0') {
+				const char* tgt = mc->target;
+				if (tgt[0] == '/' && tgt[1] == '\0')
+					return snprintf(buf, buf_size, "_level0");
+				if (tgt[0] == '/') {
+					char tmp[200];
+					strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
+					tmp[sizeof(tmp) - 1] = '\0';
+					for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
+					return snprintf(buf, buf_size, "_level0.%s", tmp);
+				}
+				return snprintf(buf, buf_size, "_level0.%s", mc->name);
+			}
+			return snprintf(buf, buf_size, "_level0");
+		}
+		case ACTION_STACK_VALUE_OBJECT:
+		{
+			if (v->data.numeric_value != 0) {
 				ASObject* obj = (ASObject*) v->data.numeric_value;
 				if (isXMLNodeInstance(obj)) {
 					int ts_found = 0;
@@ -29936,6 +30524,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
 				g_call_depth--;
 			}
+			else if (parent_ctor->simple_func == NULL && parent_ctor->advanced_func == NULL) {
+				ActionVar _nsc_result = {0};
+				invokeNativeSuperConstructor(app_context, parent_ctor, this_obj, args, num_args, &_nsc_result);
+			}
 
 			popSuperContext();
 		}
@@ -30051,10 +30643,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_call_depth++;
 					ctor_result = ((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
 					g_call_depth--;
+				} else if (parent_ctor->simple_func == NULL && parent_ctor->advanced_func == NULL) {
+					invokeNativeSuperConstructor(app_context, parent_ctor, super_this, args, num_args, &ctor_result);
 				}
 				popSuperContext();
 			}
 			if (args != NULL) FREE(args);
+			// If a real constructor (advanced_func) returned undefined, return the this object
+			// (matches Flash behavior where super() in a constructor returns this)
+			if (ctor_result.type == ACTION_STACK_VALUE_UNDEFINED && super_this != NULL &&
+			    parent_ctor != NULL && (parent_ctor->advanced_func != NULL || parent_ctor->simple_func != NULL)) {
+				ctor_result.type = ACTION_STACK_VALUE_OBJECT;
+				ctor_result.data.numeric_value = (u64)super_this;
+			}
 			pushVar(app_context, &ctor_result);
 			return;
 		}
@@ -30277,6 +30878,113 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 			return;
+		}
+
+		// NATIVE_ARRAY objects: dispatch Array methods using indexed string properties
+		if (obj->native_type == NATIVE_ARRAY) {
+			ActionVar* len_prop = getProperty(obj, "length", 6);
+			int obj_len = (len_prop != NULL) ? (int)varToDoubleSimple(len_prop) : 0;
+
+			if (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) {
+				if (obj_len <= 0) {
+					pushUndefined(app_context);
+				} else {
+					// Get element 0
+					ActionVar* e0 = getProperty(obj, "0", 1);
+					if (e0 != NULL) pushVar(app_context, e0);
+					else pushUndefined(app_context);
+					// Shift all elements down
+					for (int i = 0; i < obj_len - 1; i++) {
+						char src_idx[16], dst_idx[16];
+						int src_len = snprintf(src_idx, sizeof(src_idx), "%d", i + 1);
+						int dst_len = snprintf(dst_idx, sizeof(dst_idx), "%d", i);
+						ActionVar* src = getProperty(obj, src_idx, src_len);
+						if (src != NULL) setProperty(app_context, obj, dst_idx, dst_len, src);
+					}
+					// Delete last element and update length
+					char last_idx[16];
+					int last_len = snprintf(last_idx, sizeof(last_idx), "%d", obj_len - 1);
+					deleteProperty(app_context, obj, last_idx, last_len);
+					ActionVar new_len = makeF64((double)(obj_len - 1));
+					setProperty(app_context, obj, "length", 6, &new_len);
+				}
+				if (args != NULL) FREE(args);
+				return;
+			}
+			if (method_name_len == 4 && strncmp(method_name, "join", 4) == 0) {
+				// Join indexed properties with separator
+				const char* sep = ",";
+				char sep_buf[64];
+				if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* u16 = varGetU16Ptr(&args[0]);
+					if (u16) {
+						int sl = u16_to_utf8(u16, args[0].str_size, sep_buf, sizeof(sep_buf));
+						sep_buf[sl] = '\0';
+						sep = sep_buf;
+					}
+				}
+				u32 buf_cap = 256;
+				char* buf = (char*) HALLOC(buf_cap);
+				u32 buf_len = 0;
+				for (int i = 0; i < obj_len; i++) {
+					if (i > 0) {
+						u32 sl = (u32)strlen(sep);
+						while (buf_len + sl + 1 > buf_cap) { buf_cap *= 2; buf = (char*)realloc(buf, buf_cap); }
+						memcpy(buf + buf_len, sep, sl);
+						buf_len += sl;
+					}
+					char idx[16];
+					int idx_len = snprintf(idx, sizeof(idx), "%d", i);
+					ActionVar* elem = getProperty(obj, idx, idx_len);
+					char elem_str[256];
+					int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+					while (buf_len + (u32)elen + 1 > buf_cap) { buf_cap *= 2; buf = (char*)realloc(buf, buf_cap); }
+					memcpy(buf + buf_len, elem_str, elen);
+					buf_len += elen;
+				}
+				buf[buf_len] = '\0';
+				u32 u16_len;
+				uint16_t* u16_result = utf8_to_u16(app_context, buf, buf_len, &u16_len);
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_STRING;
+				result.str_size = u16_len;
+				result.data.string_data.heap_ptr = u16_result;
+				result.data.string_data.owns_memory = true;
+				pushVar(app_context, &result);
+				if (args != NULL) FREE(args);
+				return;
+			}
+			if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0) {
+				// toString = join(",")
+				u32 buf_cap = 256;
+				char* buf = (char*) HALLOC(buf_cap);
+				u32 buf_len = 0;
+				for (int i = 0; i < obj_len; i++) {
+					if (i > 0) {
+						while (buf_len + 2 > buf_cap) { buf_cap *= 2; buf = (char*)realloc(buf, buf_cap); }
+						buf[buf_len++] = ',';
+					}
+					char idx[16];
+					int idx_len = snprintf(idx, sizeof(idx), "%d", i);
+					ActionVar* elem = getProperty(obj, idx, idx_len);
+					char elem_str[256];
+					int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+					while (buf_len + (u32)elen + 1 > buf_cap) { buf_cap *= 2; buf = (char*)realloc(buf, buf_cap); }
+					memcpy(buf + buf_len, elem_str, elen);
+					buf_len += elen;
+				}
+				buf[buf_len] = '\0';
+				u32 u16_len;
+				uint16_t* u16_result = utf8_to_u16(app_context, buf, buf_len, &u16_len);
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_STRING;
+				result.str_size = u16_len;
+				result.data.string_data.heap_ptr = u16_result;
+				result.data.string_data.owns_memory = true;
+				pushVar(app_context, &result);
+				if (args != NULL) FREE(args);
+				return;
+			}
 		}
 
 		// Look up the method property (with prototype chain support) and track search depth
@@ -31141,10 +31849,88 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (mfunc->register_count > 0)
 						registers = (ActionVar*) HCALLOC(mfunc->register_count, sizeof(ActionVar));
 
+					// Set up scope chain (local scope + arguments) like the Object method path
+					ASObject* local_scope_fm = allocObject(app_context, 8);
+					retainObject(local_scope_fm);
+
+					// Restore captured scopes
+					u32 captured_count_fm = mfunc->captured_scope_count;
+					for (u32 ci = 0; ci < captured_count_fm; ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = mfunc->captured_scope_is_with[ci];
+							scope_mc[scope_depth] = mfunc->captured_scope_mc[ci];
+							scope_chain[scope_depth++] = mfunc->captured_scope[ci];
+						}
+					}
+
+					// Push local scope
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = local_scope_fm;
+					}
+
+					ASFunction* prev_exec_fm = g_current_executing_func;
+
+					// Set up this/arguments/super based on flags
+					u32 saved_this_depth_fm = g_this_depth;
+					{
+						u16 f2flags = mfunc->flags;
+						int f2_preload_this  = (f2flags & 0x0001);
+						int f2_suppress_this = (f2flags & 0x0002);
+						int f2_preload_args  = (f2flags & 0x0004);
+						int f2_suppress_args = (f2flags & 0x0008);
+						int f2_preload_super = (f2flags & 0x0010);
+						int f2_suppress_super= (f2flags & 0x0020);
+						if (!f2_preload_this && !f2_suppress_this) {
+							ActionVar this_var_fm = {0};
+							this_var_fm.type = ACTION_STACK_VALUE_OBJECT;
+							this_var_fm.data.numeric_value = (u64)func->own_props;
+							setProperty(app_context, local_scope_fm, "this", 4, &this_var_fm);
+							if (g_this_depth < MAX_THIS_DEPTH) {
+								g_this_stack[g_this_depth] = this_var_fm;
+								g_this_depth++;
+							}
+						}
+						if (!f2_preload_args && !f2_suppress_args) {
+							ASArray* arguments_arr_fm = allocArray(app_context, num_args);
+							for (u32 i = 0; i < num_args; i++)
+								setArrayElement(app_context, arguments_arr_fm, i, &args[i]);
+							setupArgumentsProps(app_context, arguments_arr_fm, mfunc, prev_exec_fm);
+							ActionVar args_var_fm = {0};
+							args_var_fm.type = ACTION_STACK_VALUE_ARRAY;
+							args_var_fm.data.numeric_value = (u64)arguments_arr_fm;
+							setProperty(app_context, local_scope_fm, "arguments", 9, &args_var_fm);
+						}
+						if (!f2_preload_super && !f2_suppress_super && hasSuperContext()) {
+							ActionVar super_var_fm = {0};
+							super_var_fm.type = ACTION_STACK_VALUE_SUPER;
+							super_var_fm.data.numeric_value = (u64)getSuperThis();
+							super_var_fm.str_size = (u32)getSuperDepth();
+							setProperty(app_context, local_scope_fm, "super", 5, &super_var_fm);
+						}
+					}
+
+					// Switch context to base_clip for SWF6+
+					MovieClip* prev_ctx_fm = g_current_context;
+					if (g_swf_version >= 6 && mfunc->base_clip != NULL)
+						g_current_context = mfunc->base_clip;
+
+					g_prev_executing_func = prev_exec_fm;
+					g_current_executing_func = mfunc;
 					g_call_depth++;
 					ActionVar result = mfunc->advanced_func(app_context, args, num_args, registers, (void*) func->own_props);
 					g_call_depth--;
+					g_current_executing_func = prev_exec_fm;
+					g_current_context = prev_ctx_fm;
+					g_this_depth = saved_this_depth_fm;
 
+					// Pop local scope + captured scopes
+					for (u32 ci = 0; ci < captured_count_fm + 1; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
+
+					releaseObject(app_context, local_scope_fm);
 					if (registers != NULL) FREE(registers);
 					if (args != NULL) FREE(args);
 					pushVar(app_context, &result);

@@ -182,3 +182,4 @@ xml_attributes_read
 array_sort
 date
 movieclip_library_state_values
+native_subclasses

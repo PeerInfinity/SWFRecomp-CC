@@ -53,3 +53,4 @@ Two investigation docs track cases where test diffs are permanent or intentional
 - If you discover a test diff where our output matches Flash's documented/known behavior but Ruffle's expected output reflects Ruffle's own divergent implementation → add it to `RUFFLE_VS_FLASH_DIFFERENCES.md`.
 - Always include: test name, example diff, explanation of why it's unfixable/intentional, and the decision.
 - Update the summary table in `ACCEPTED_DIFFS.md` when adding new entries.
+- When adding a test to `ACCEPTED_DIFFS.md`, also add it to `ruffle-tests/ignored_tests.txt` so it is excluded from filtered results.

@@ -44,6 +44,18 @@ calculation accumulates floating-point rounding error, producing a fractional of
 instead of the exact integer −345. This is a precision artefact with no clean fix short
 of special-casing the offset calculation for extreme values.
 
+### `native_subclasses` — Date toString timezone (1 diff line)
+
+**Example diff:**
+```
+- super(123456): Thu Jan 1 05:47:03 GMT+0545 1970
++ super(123456): Wed Dec 31 16:02:03 GMT-0800 1969
+```
+
+The expected output was generated on a machine in the `GMT+0545` timezone (Nepal). Our CI
+and dev machines produce a different timezone offset (e.g. `GMT-0800` for US Pacific).
+Date.toString() is inherently timezone-dependent and no portable fix is possible.
+
 ---
 
 ## Category 2: Internally Inconsistent Expected Output
