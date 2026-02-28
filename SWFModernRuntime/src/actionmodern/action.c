@@ -657,8 +657,8 @@ static ActionVar actionObjectRegisterClass(SWFAppContext* app_context, ActionVar
 	symbol_buf[sym_len] = '\0';
 	POP();
 
-	// Second arg: null = unregister, function = register, anything else = false
-	if (args[1].type == ACTION_STACK_VALUE_NULL)
+	// Second arg: null/undefined = unregister, function = register, anything else = false
+	if (args[1].type == ACTION_STACK_VALUE_NULL || args[1].type == ACTION_STACK_VALUE_UNDEFINED)
 	{
 		// Unregister
 		registerClassForSymbol(symbol_buf, NULL);
@@ -27749,12 +27749,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Constructor invocation happens in ng_fire_pending_attach_inits (deferred)
 					{
 						void* reg_ctor = lookupRegisteredClass(_am_buf1);
+						if (attached->dynamic_props == NULL) {
+							attached->dynamic_props = (void*) allocObject(app_context, 8);
+							retainObject((ASObject*) attached->dynamic_props);
+						}
 						if (reg_ctor != NULL) {
 							ASFunction* ctor_func = (ASFunction*)reg_ctor;
-							if (attached->dynamic_props == NULL) {
-								attached->dynamic_props = (void*) allocObject(app_context, 8);
-								retainObject((ASObject*) attached->dynamic_props);
-							}
 							if (ctor_func->prototype_obj == NULL) {
 								ctor_func->prototype_obj = allocObject(app_context, 4);
 								retainObject(ctor_func->prototype_obj);
@@ -27768,6 +27768,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							proto_var.type = ACTION_STACK_VALUE_OBJECT;
 							proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
 							setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+						} else {
+							// No registered class — set default __proto__ to MovieClip.prototype
+							extern ASFunction g_movieclip_constructor;
+							extern int g_movieclip_constructor_init;
+							if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+								ActionVar proto_var = {0};
+								proto_var.type = ACTION_STACK_VALUE_OBJECT;
+								proto_var.data.numeric_value = (u64) g_movieclip_constructor.prototype_obj;
+								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+							}
 						}
 					}
 					// Apply initObject if present (checks addProperty setters on prototype chain)
@@ -32386,13 +32396,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 						// Set __proto__ from registered class (if any) BEFORE initObject
 						{
+							if (attached->dynamic_props == NULL) {
+								attached->dynamic_props = (void*) allocObject(app_context, 8);
+								retainObject((ASObject*) attached->dynamic_props);
+							}
 							void* reg_ctor = lookupRegisteredClass(linkage_id);
 							if (reg_ctor != NULL) {
 								ASFunction* ctor_func = (ASFunction*)reg_ctor;
-								if (attached->dynamic_props == NULL) {
-									attached->dynamic_props = (void*) allocObject(app_context, 8);
-									retainObject((ASObject*) attached->dynamic_props);
-								}
 								if (ctor_func->prototype_obj == NULL) {
 									ctor_func->prototype_obj = allocObject(app_context, 4);
 									retainObject(ctor_func->prototype_obj);
@@ -32406,6 +32416,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								proto_var.type = ACTION_STACK_VALUE_OBJECT;
 								proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
 								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+							} else {
+								// No registered class — set default __proto__ to MovieClip.prototype
+								extern ASFunction g_movieclip_constructor;
+								extern int g_movieclip_constructor_init;
+								if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+									ActionVar proto_var = {0};
+									proto_var.type = ACTION_STACK_VALUE_OBJECT;
+									proto_var.data.numeric_value = (u64) g_movieclip_constructor.prototype_obj;
+									setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+								}
 							}
 						}
 
