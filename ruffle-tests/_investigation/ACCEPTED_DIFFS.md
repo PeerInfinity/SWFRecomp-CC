@@ -197,6 +197,25 @@ mouse behavior.
 **Decision:** Accept 1 diff line. Low priority; would need to reverse-engineer Ruffle's
 default mouse position formula (viewport center → stage coordinates → _xmouse).
 
+### `movieclip_library_state_values` — VFS URL path format (1 diff line)
+
+**Example diff:**
+```
+- _url = movieclip_library_state_values/test.swf
++ _url = /test.swf
+```
+
+Ruffle's test runner uses `file:///test.swf` as the movie URL (VfsPath root is the
+test directory, so `as_str()` returns `/test.swf`). Most tests with `_url` output expect
+`/test.swf`, consistent with this. However, `movieclip_library_state_values`'s expected
+output uniquely expects `movieclip_library_state_values/test.swf`, suggesting this test's
+expected output was generated with a different VFS root (parent of test directory rather
+than test directory itself). Using `file:///{test_name}/test.swf` to match this one test
+would break `movieclip_default_state` and other tests.
+
+**Decision:** Accept 1 diff line. Use `file:///test.swf` (matches majority of tests).
+The anomalous expected output is likely a Ruffle test-generation artifact.
+
 ---
 
 ## Summary Table
@@ -211,3 +230,4 @@ default mouse position formula (viewport center → stage coordinates → _xmous
 | `array_sort` | Flash quirk (sortOn multi-key DESCENDING flag) | 2 | Accept; undocumented Flash internals |
 | `movieclip_getbounds` | Float precision (morph getBounds matrix) | 2 | Accept; 0.0001px beyond epsilon |
 | `movieclip_library_state_values` | Test harness limitation (default mouse position) | 1 | Accept; Ruffle infrastructure artifact |
+| `movieclip_library_state_values` | Test harness limitation (VFS URL path format) | 1 | Accept; anomalous expected output |

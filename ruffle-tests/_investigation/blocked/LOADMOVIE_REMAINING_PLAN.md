@@ -41,7 +41,7 @@ diff is `_xmouse` (mouse position not simulated in test harness).
 | loadmovienum_cross_version_prototype | output_mismatch | 1/9 | _level2 + cross-version __proto__ |
 | mcl_events_swf_version | output_mismatch | 28/232 | Child _url, version, sequential loading |
 | movieclip_state_values | output_mismatch | 3/114 | Failed load state (-1 values), setInterval |
-| movieclip_library_state_values | output_mismatch | **77/78** | _xmouse only (see below) |
+| movieclip_library_state_values | output_mismatch | **76/78** | _xmouse + _url (see below) |
 
 ---
 
@@ -122,21 +122,30 @@ which we don't implement for failed loads.
 
 ---
 
-### 5. movieclip_library_state_values (78 lines) — NEAR PASS (77/78)
+### 5. movieclip_library_state_values (78 lines) — NEAR PASS (76/78)
 
-**Current output** (77/78 match): All properties correct except `_xmouse`.
+**Current output** (76/78 match): All properties correct except `_xmouse` and `_url`.
 
-**Remaining diff**:
+**Remaining diffs**:
 ```
 - _xmouse = 21
 + _xmouse = 0
+
+- _url = movieclip_library_state_values/test.swf
++ _url = /test.swf
 ```
 
-**Root cause**: Ruffle's test runner positions the virtual mouse at a non-zero location
-(related to viewport geometry). Our test harness initializes mouse at (0,0). The expected
-value `21` comes from Ruffle's default stage-to-viewport mapping. This test has no
-`viewport_dimensions` in test.toml and no mouse input events, so the mouse position is
-purely a Ruffle test infrastructure artifact.
+**Root causes**:
+- `_xmouse`: Ruffle's test runner positions the virtual mouse at a non-zero location
+  (related to viewport geometry). Our test harness initializes mouse at (0,0). The expected
+  value `21` comes from Ruffle's default stage-to-viewport mapping. This test has no
+  `viewport_dimensions` in test.toml and no mouse input events, so the mouse position is
+  purely a Ruffle test infrastructure artifact.
+- `_url`: This test's expected output uniquely expects `movieclip_library_state_values/test.swf`
+  while all other tests expect `/test.swf` (from `file:///test.swf`). Ruffle's test runner
+  uses `file:///test.swf` (VfsPath root = test directory). This test's expected output
+  appears to have been generated with a different VFS root. Using `file:///{test_name}/test.swf`
+  to match this test would break `movieclip_default_state` and other tests.
 
 **Fixes applied**:
 - Fixed `objectToPrimitive` ASArray→ASObject crash (was casting ASArray* to ASObject*,
@@ -145,12 +154,6 @@ purely a Ruffle test infrastructure artifact.
   until the frame after unloadMovie is called)
 - Per-MC `byte_size` for `getBytesLoaded()`/`getBytesTotal()` (library MCs return 4, not
   the main SWF file size)
-- Fixed `SWF_URL` to include test directory name (`file:///{test_name}/test.swf`)
-
-**What would fix _xmouse**: Set initial mouse position in test harness. Ruffle's default
-appears to set it based on viewport/stage geometry. Would need to determine Ruffle's exact
-formula and replicate it in `swfStart()` or `verify_output.py`. Low priority — the value
-21 is an incidental default, not a test assertion about mouse behavior.
 
 ---
 
@@ -158,7 +161,7 @@ formula and replicate it in `swfStart()` or `verify_output.py`. Low priority —
 
 | Test | Priority | Feasibility | Blocker Category |
 |------|----------|-------------|------------------|
-| movieclip_library_state_values | **DONE** (77/78) | _xmouse cosmetic | Mouse position default |
+| movieclip_library_state_values | **DONE** (76/78) | _xmouse + _url cosmetic | Test harness artifacts |
 | loadmovie_var_persistence | **LOW** | Deep infrastructure (loadMovie scope semantics) | LOADMOVIE_PLAN |
 | mcl_events_swf_version | **LOW** | Multiple infrastructure gaps | LOADMOVIE_PLAN |
 | loadmovienum_cross_version_prototype | **LOW** | Deep infrastructure (cross-version) | GLOBALS_PLAN |
