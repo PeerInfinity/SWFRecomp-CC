@@ -172,9 +172,11 @@ Also increased `MAX_FUNCTIONS` from 256 to 512 (50+ `__initializeNative` calls e
 
 **Result**: native_objects_swf6/7/8 all 100% (252/252 lines).
 
-### Phase 3: super() Call Mechanism — **RESOLVED**
+### Phase 3: super() Call Mechanism — **RESOLVED** (core mechanism)
 
-**Status**: super() is now fully implemented via OOP_SUPER_EXTENDS_PLAN (completed 2026-02). Depth-based super tracking with `g_super_this_stack`/`g_super_depth_stack`, `walkProtoChain`, and all three call patterns (A/B/C) work. 6/8 OOP tests pass. This phase can be skipped.
+**Status**: super() is now fully implemented via OOP_SUPER_EXTENDS_PLAN (completed 2026-02). Depth-based super tracking with `g_super_this_stack`/`g_super_depth_stack`, `walkProtoChain`, and all three call patterns (A/B/C) work. 6/8 OOP tests pass.
+
+**BLOCKED**: `native_subclasses` requires `arguments.slice()` in function scope to extract super() args. The `arguments` variable is not yet available as an Array in function local scope.
 
 **Goal**: Make `super(args...)` work for subclassing built-in types.
 
