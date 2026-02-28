@@ -6,8 +6,8 @@ Last updated: 2026-02-27
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: watch_textfield now PASS (12/12). this_scoping now PASS (52/52). execution_order4 now PASS (13/13). nan_scale now PASS (9/9). movieclip_getbounds 190/192 added to ACCEPTED_DIFFS (morph bounds precision, 0.0001px beyond epsilon).
-- **Recent gains (previous sessions)**: clip_constructors now PASS (8/8). issue_768 now PASS (3/3). rewind_depth now PASS (30/30). execution_order4 improved (nested sprite parent context). tell_target_invalid now PASS (6/6). tell_target_invalid_swf6 now PASS (5/5). placeobject_occupied_depth regression fixed. stage_object_children now PASS (83/83). selection now PASS (454/454). place_and_lookup now PASS (30/30). tab_ordering_children now PASS (208/208). And many more.
+- **Recent gains (this session)**: on_construct now PASS (25/25) — was SEGFAULT. register_and_init_order no longer segfaults (now output_mismatch). Prototype chain variable resolution via registerClass now works.
+- **Recent gains (previous sessions)**: watch_textfield PASS (12/12). this_scoping PASS (52/52). execution_order4 PASS (13/13). nan_scale PASS (9/9). clip_constructors PASS (8/8). issue_768 PASS (3/3). rewind_depth PASS (30/30). tell_target_invalid PASS (6/6). tell_target_invalid_swf6 PASS (5/5). stage_object_children PASS (83/83). selection PASS (454/454). place_and_lookup PASS (30/30). tab_ordering_children PASS (208/208). And many more.
 
 ## Crashes and Errors (8 tests)
 
@@ -82,6 +82,7 @@ Last updated: 2026-02-27
 | `property_invalid_base_clip` | 36/36 ✅ | Was already passing (stale docs) |
 | `tell_target_invalid_swf6` | 5/5 ✅ | hasPlayingSprites + forward goto catch_up_mode in advance_sprite_frames |
 | `tell_target_invalid` | 6/6 ✅ | SetTarget2(undefined) SWF7+ → target_clip=None; GotoFrame2 target_clip_or_root; sprite preservation during root loop-back |
+| `on_construct` | 25/25 ✅ | RegisterClass prototype setup before on(construct), g_event_this_mc for type 2 constructors, pending instance name, prototype chain variable resolution |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -137,7 +138,7 @@ Last updated: 2026-02-27
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **Core complete** | 6/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅) | `super_edge_cases` 33/39 — remaining 6 lines = makeSuperWith (SUPER as __proto__) + addProperty virtual __constructor__; `funky_function_calls` segfaults |
-| REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
+| REGISTERCLASS_PLAN | **Phases 0-3 DONE** | register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, empty_movieclip_can_attach_movies ✅, register_class_return_value ✅, on_construct ✅ | Phases 4-5: constructor dispatch timing, per-call vs end-of-frame |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | Not started | 0/5 | native_objects_swf6/7/8 segfault |
 | TELLTARGET_PLAN | **Phase 2 IN PROGRESS** | tell_target ✅, slash_syntax ✅, string_paths_basic ✅, string_paths_variable_alias ✅, target_clip_removed ✅, path_string ✅ (322/322), string_paths_hidden ✅ (54/54), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅ | ~~eval()~~ not needed. ~~shape path components~~ done. Remaining: colon-variable syntax |
@@ -149,7 +150,7 @@ Last updated: 2026-02-27
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
-| UNLOAD_PLAN | **MOSTLY DONE** | 4/6 pass (unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload (36/52), unload_nested_child (0/5) |
+| UNLOAD_PLAN | **MOSTLY DONE** | 4/6 pass (unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload (18/52), unload_nested_child (0/5) |
 | BUTTON_PLAN | **12/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅ (visible gating on keyPress) | Remaining 2: button_keypress_vs_textinput (TF onChanged), root_button_mode (loadMovie) |
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4 blocked on loadMovie + per-function version tracking |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
@@ -159,14 +160,14 @@ Last updated: 2026-02-27
 
 ### Highest ROI — unblocked, high line-count impact
 1. **TELLTARGET_PLAN Phase 2 remaining** — ~~eval()~~ (not needed). ~~shape display objects~~ done. ~~this_scoping~~ DONE ✅. Remaining: colon-variable syntax.
-2. **STAGE_PLAN Phase 4** (_level addressing) — `stage_object_children` 68→~78/83 (+15 lines)
-3. **movieclip_getbounds** — 189/191, morph shape bounds rounding issue (+2 lines)
+2. ~~**STAGE_PLAN Phase 4**~~ — stage_object_children already PASS ✅
+3. ~~**movieclip_getbounds**~~ — added to ACCEPTED_DIFFS (morph bounds precision)
 
 ### Medium ROI — feature phases with multiple test payoff
-5. **REGISTERCLASS_PLAN Phases 4-5** — constructor dispatch on timeline placement. Unlocks `clip_constructors` (6/8→8), `on_construct`, and partially `timer_run_actions`
+5. **REGISTERCLASS_PLAN Phases 4-5** — constructor dispatch on timeline placement. Unlocks `register_and_init_order`, `register_class`, `timer_run_actions`. ~~`on_construct`~~ ✅ done.
 6. **TEXTFIELD_PLAN Phase 4-5** — scroll properties + HTML text. 25/66 pass; ~10 more tests actionable
 7. **GLOBALS_PLAN** — Phase 7 DONE. Phase 8 BLOCKED by enumeration order mismatch + 20 missing Ruffle-specific globals (ASnative, ASconstructor, etc.)
-8. **UNLOAD_PLAN** — `unload` at 36/52 (+16 lines), `unload_nested_child` at 0/5
+8. **UNLOAD_PLAN** — `unload` at 18/52 (+34 lines), `unload_nested_child` at 0/5
 
 ### Lower ROI or partially blocked
 9. **OOP_SUPER_EXTENDS_PLAN** — `super_edge_cases` 33/39, remaining 6 lines blocked by SUPER-as-__proto__ (makeSuperWith pattern)
@@ -193,9 +194,14 @@ Lines 1-33 match. Lines 34-39 fail (shifted output). Remaining failures:
 - ~~**MOUSE_EVENTS_PLAN**~~ — **RESOLVED** (moved to complete/). Core mouse events done (5/5 pass). Advanced features still needed: text field hit-testing (blocks FOCUS_SYSTEM_PLAN), rollover/rollout dispatch (blocks focus_mouse_rollout), recursive clip event dispatch (blocks clip_event_propagation_order).
 - **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests). Itself blocked by text field hit-testing and event pumping model differences.
 - ~~**TELLTARGET_PLAN**~~ — **RESOLVED** as blocker for THIS_BINDING_PLAN (this_scoping fix was MC nav dispatch, not TELLTARGET). Remaining TELLTARGET work is colon-variable syntax.
-- **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (on_construct), TIMER_PLAN (timer_run_actions)
+- **REGISTERCLASS_PLAN** blocks: MOVIECLIP_PLAN Phase 6 (clip_constructors), CLONE_DUPLICATE_PLAN (~~on_construct~~ ✅ done, register_and_init_order), TIMER_PLAN (timer_run_actions)
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
 - **OOP_SUPER_EXTENDS_PLAN** — core super() done; remaining 6 lines in `super_edge_cases` blocked by SUPER-as-__proto__ resolution (makeSuperWith pattern)
+
+### Session notes (2026-02-27 night)
+- **on_construct 25/25 PASS** (was SEGFAULT): Four fixes: (1) `actionInvokeRegisteredClassConstructor` type 2 path used `g_event_this_mc` instead of passing MC as `this_obj` (generated code typed it as OBJECT causing segfault). (2) Recompiler emits `tagSetInstanceName` BEFORE `tagPlaceObject2WithClipActions` when clip actions present; `g_pending_instance_name` mechanism passes name to `ng_on_place_object2`. (3) `actionSetupRegisteredClassPrototype` sets `__proto__`/`__constructor__` before on(construct) fires. (4) `actionGetVariable` g_current_context path uses `getPropertyWithPrototype` instead of `getProperty` for prototype chain variable resolution.
+- **register_and_init_order**: Fixed segfault (same root cause as on_construct). Now output_mismatch — constructors don't fire at timeline placement time (needs REGISTERCLASS_PLAN Phases 4-5).
+- **OBJECT_WATCH_PLAN moved to complete/**: All 4/4 tests pass.
 
 ### Session notes (2026-02-27 late)
 - **this_scoping 52/52 PASS**: MC navigation methods (`gotoAndStop`, `gotoAndPlay`, `stop`, `play`, `prevFrame`, `nextFrame`) called via `CallFunction` (from WITH scope or dot/slash path like `_root.instance1.gotoAndStop`) now dispatch correctly. Three changes: (1) `ng_gotoFrameByMC` handles dynamically created MCs, (2) MC nav dispatch in `actionCallFunction` before generic lookup, (3) MC method stubs on `MovieClip.prototype` + scope chain prototype check in `actionGetVariable`.

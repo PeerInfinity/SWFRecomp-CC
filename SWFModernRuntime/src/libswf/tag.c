@@ -1904,6 +1904,11 @@ static void init_cx_fields(DisplayObject* obj)
 static ClipAction* g_pending_clip_actions = NULL;
 static size_t g_pending_clip_action_count = 0;
 
+// Pending instance name — set by tagSetInstanceName before tagPlaceObject2 when the
+// recompiler emits SetInstanceName after PlaceObject2. Consumed by ng_on_place_object2
+// to avoid auto-assigning "instanceN" when the real name is known.
+const char* g_pending_instance_name = NULL;
+
 // Recursively fire CLIP_EVENT_CONSTRUCT for child sprite display list entries
 // that had CONSTRUCT deferred (placed during eager init with catch_up_mode=1).
 static void fire_deferred_construct(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
@@ -2208,6 +2213,15 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		MovieClip* saved_ctx = g_current_context;
 		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
 		if (_mc) actionSetCurrentContext(_mc);
+		// Set __proto__ to registered class prototype BEFORE on(construct) fires
+		// so prototype properties are accessible in the handler
+		{
+			extern const char* ng_lookupExportName(size_t char_id);
+			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+			const char* _exp = ng_lookupExportName(display_list[depth].char_id);
+			if (_exp != NULL && _mc != NULL)
+				actionSetupRegisteredClassPrototype(app_context, _exp, _mc);
+		}
 		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
 			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
 				display_list[depth].clip_actions[a].action(app_context);
@@ -2412,6 +2426,15 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		MovieClip* saved_ctx = g_current_context;
 		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
 		if (_mc) actionSetCurrentContext(_mc);
+		// Set __proto__ to registered class prototype BEFORE on(construct) fires
+		// so prototype properties are accessible in the handler
+		{
+			extern const char* ng_lookupExportName(size_t char_id);
+			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+			const char* _exp = ng_lookupExportName(display_list[depth].char_id);
+			if (_exp != NULL && _mc != NULL)
+				actionSetupRegisteredClassPrototype(app_context, _exp, _mc);
+		}
 		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
 			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
 				display_list[depth].clip_actions[a].action(app_context);
@@ -2848,6 +2871,14 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 #ifdef NO_GRAPHICS
 	// In script_only_mode (Phase 2), display list is already set up from Phase 1 — skip.
 	if (g_script_only_mode) return;
+
+	// If the display entry doesn't exist yet (tagSetInstanceName called before tagPlaceObject2),
+	// store as pending so ng_on_place_object2 uses it instead of auto-assigning "instanceN".
+	if (depth > max_depth || display_list[depth].char_id == 0)
+	{
+		g_pending_instance_name = name;
+		return;
+	}
 #endif
 	if (depth <= max_depth)
 	{

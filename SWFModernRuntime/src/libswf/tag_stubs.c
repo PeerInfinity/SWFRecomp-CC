@@ -740,12 +740,23 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 	// Auto-assign instance name for scriptable characters if not already named
 	// (mirrors Flash Player behavior: sprites/buttons/textfields get "instance1", "instance2", etc.)
 	// Note: videos are scriptable but do NOT get auto-instance-names (Ruffle behavior).
-	if ((is_sprite || is_button || is_tf) && obj->instance_name == NULL)
+	// If g_pending_instance_name is set (from tagSetInstanceName before tagPlaceObject2),
+	// use it instead of auto-assigning, so CLIP_EVENT_CONSTRUCT fires with the correct name.
 	{
-		char auto_name[32];
-		snprintf(auto_name, sizeof(auto_name), "instance%u", ng_auto_instance_counter++);
-		obj->instance_name = strdup(auto_name);
-		obj->instance_name_owned = 1;
+		extern const char* g_pending_instance_name;
+		if (g_pending_instance_name != NULL && (is_sprite || is_button || is_tf))
+		{
+			obj->instance_name = (char*)g_pending_instance_name;
+			obj->instance_name_owned = 0;
+			g_pending_instance_name = NULL;
+		}
+		else if ((is_sprite || is_button || is_tf) && obj->instance_name == NULL)
+		{
+			char auto_name[32];
+			snprintf(auto_name, sizeof(auto_name), "instance%u", ng_auto_instance_counter++);
+			obj->instance_name = strdup(auto_name);
+			obj->instance_name_owned = 1;
+		}
 	}
 
 	// Initialize textfield variable binding

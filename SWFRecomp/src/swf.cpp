@@ -2981,6 +2981,17 @@ namespace SWFRecomp
 				}
 				else if (clip_action_count > 0)
 				{
+					// When clip actions are present, emit instance name BEFORE placement
+					// so CLIP_EVENT_CONSTRUCT fires with the correct name (not auto "instanceN").
+					if (!instance_name_str.empty())
+					{
+						std::string escaped_name = "";
+						for (char c : instance_name_str) {
+							if (c == '"' || c == '\\') escaped_name += '\\';
+							escaped_name += c;
+						}
+						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
+					}
 					context.tag_main << "\t" << "tagPlaceObject2WithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
 				}
 				else
@@ -2988,8 +2999,9 @@ namespace SWFRecomp
 					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ");" << endl;
 				}
 
-				// Emit instance name if present
-				if (!instance_name_str.empty())
+				// Emit instance name if present (for non-clip-action case,
+				// or redundantly for clip-action case where it was already emitted above)
+				if (!instance_name_str.empty() && clip_action_count == 0)
 				{
 					// Escape quotes in the name for C string
 					std::string escaped_name = "";

@@ -16024,11 +16024,11 @@ void actionGetVariable(SWFAppContext* app_context)
 	ActionVar* var = NULL;
 	if (g_current_context != NULL && g_current_context != &root_movieclip)
 	{
-		// Check target clip's dynamic properties
+		// Check target clip's dynamic properties (with prototype chain for registerClass)
 		if (g_current_context->dynamic_props != NULL)
 		{
 			ASObject* clip_props = (ASObject*) g_current_context->dynamic_props;
-			ActionVar* prop = getProperty(clip_props, var_name, var_name_len);
+			ActionVar* prop = getPropertyWithPrototype(clip_props, var_name, var_name_len);
 			if (prop != NULL)
 			{
 				PUSH_VAR(prop);
@@ -23738,7 +23738,9 @@ void actionNewObject(SWFAppContext* app_context)
 // Invoke the registered class constructor on a timeline-placed movieclip.
 // Called from tag.c during sprite init when the sprite's export name has a registered class.
 // Sets __proto__ to ctor.prototype, then calls the constructor with mc as 'this'.
-void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
+// Set __proto__ and __constructor__ for a registered class, WITHOUT calling the constructor.
+// This should be called before on(construct) clip events fire so prototype properties are accessible.
+void actionSetupRegisteredClassPrototype(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
 {
 	if (export_name == NULL || mc == NULL) return;
 	void* raw_ctor = lookupRegisteredClass(export_name);
@@ -23746,7 +23748,6 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 
 	ASFunction* ctor_func = (ASFunction*)raw_ctor;
 
-	// Ensure the MC has dynamic_props for property storage
 	if (mc->dynamic_props == NULL)
 	{
 		mc->dynamic_props = allocObject(app_context, 8);
@@ -23754,7 +23755,6 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 	}
 	ASObject* obj = (ASObject*)mc->dynamic_props;
 
-	// Set __proto__ to constructor's prototype
 	if (ctor_func->prototype_obj == NULL)
 	{
 		ctor_func->prototype_obj = allocObject(app_context, 4);
@@ -23773,8 +23773,6 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
 		setProperty(app_context, obj, "__proto__", 9, &proto_var);
 	}
-
-	// Set __constructor__ on the instance
 	{
 		ActionVar ctor_inst_var;
 		ctor_inst_var.type = ACTION_STACK_VALUE_FUNCTION;
@@ -23782,6 +23780,20 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		ctor_inst_var.data.numeric_value = (u64) ctor_func;
 		setPropertyWithFlags(app_context, obj, "__constructor__", 15, &ctor_inst_var, PROPERTY_FLAGS_DONTENUM);
 	}
+}
+
+void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
+{
+	if (export_name == NULL || mc == NULL) return;
+	void* raw_ctor = lookupRegisteredClass(export_name);
+	if (raw_ctor == NULL) return;
+
+	ASFunction* ctor_func = (ASFunction*)raw_ctor;
+
+	// Ensure __proto__/__constructor__ are set (may already be done by actionSetupRegisteredClassPrototype)
+	actionSetupRegisteredClassPrototype(app_context, export_name, mc);
+
+	ASObject* obj = (ASObject*)mc->dynamic_props;
 
 	// Push super context for constructor call
 	pushSuperContext((void*)obj, 1);
@@ -23885,7 +23897,12 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		}
 
 		g_call_depth++;
-		ctor_func->advanced_func(app_context, NULL, 0, registers, (void*)mc);
+		// Use g_event_this_mc so generated preload_this code picks up MC type correctly
+		// (passing mc as this_obj would make it ACTION_STACK_VALUE_OBJECT in generated code)
+		MovieClip* saved_event_this = g_event_this_mc;
+		g_event_this_mc = mc;
+		ctor_func->advanced_func(app_context, NULL, 0, registers, NULL);
+		g_event_this_mc = saved_event_this;
 		g_call_depth--;
 
 		if (saved_base != NULL)
