@@ -264,6 +264,10 @@ void actionResetRegisters(void);
 // Super context for OOP constructor/method chains
 void actionGetCurrentSuperInfo(u64* out_this, u32* out_depth);
 
+// Resolve a __proto__ ActionVar to an ASObject* (returned as void*).
+// Handles OBJECT (direct cast) and SUPER (unwrap via proto chain walk).
+void* resolveProtoVar(ActionVar* proto_var);
+
 void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*func)(SWFAppContext*), u32 param_count);
 void actionCall(SWFAppContext* app_context);
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer);

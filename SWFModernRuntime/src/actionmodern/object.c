@@ -335,14 +335,12 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 
 		// Property not found on this object - walk up to __proto__
 		ActionVar* proto_var = getProperty(current, "__proto__", 9);
-		if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT)
+		ASObject* next = resolveProtoVar(proto_var);
+		if (next == NULL)
 		{
-			// No __proto__ property or not an object - end of chain
+			// No __proto__ property or not resolvable - end of chain
 			break;
 		}
-
-		// Move to next object in prototype chain
-		ASObject* next = (ASObject*) proto_var->data.numeric_value;
 
 		// Cycle detection: if we'd revisit the original object, it's circular
 		if (next == obj)
@@ -394,10 +392,9 @@ ASProperty* findPropertyStructWithPrototype(ASObject* obj, const char* name, u32
 
 		// Walk up __proto__
 		ActionVar* proto_var = getProperty(current, "__proto__", 9);
-		if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT)
+		ASObject* next = resolveProtoVar(proto_var);
+		if (next == NULL)
 			break;
-
-		ASObject* next = (ASObject*) proto_var->data.numeric_value;
 		if (next == obj)
 		{
 			g_execution_halted = 1;

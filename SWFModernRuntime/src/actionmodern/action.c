@@ -353,6 +353,9 @@ static u8 getSuperDepth(void) {
 	return g_super_stack_pos > 0 ? g_super_depth_stack[g_super_stack_pos - 1] : 0;
 }
 
+// Forward declare resolveProtoVar (defined below walkProtoChain)
+void* resolveProtoVar(ActionVar* proto_var);
+
 // Walk the __proto__ chain from 'this_obj' by 'depth' levels.
 // Returns the prototype object at that depth, or NULL if chain is too short.
 static ASObject* walkProtoChain(void* this_obj, u8 depth) {
@@ -360,12 +363,21 @@ static ASObject* walkProtoChain(void* this_obj, u8 depth) {
 	ASObject* current = (ASObject*) this_obj;
 	for (u8 i = 0; i < depth; i++) {
 		ActionVar* proto_var = getProperty(current, "__proto__", 9);
-		if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT ||
-		    proto_var->data.numeric_value == 0)
-			return NULL;
-		current = (ASObject*) proto_var->data.numeric_value;
+		current = (ASObject*) resolveProtoVar(proto_var);
+		if (current == NULL) return NULL;
 	}
 	return current;
+}
+
+// Resolve a __proto__ ActionVar to an ASObject* (returned as void*).
+// OBJECT → direct cast. SUPER → unwrap by walking this_ptr's proto chain.
+void* resolveProtoVar(ActionVar* proto_var) {
+	if (proto_var == NULL || proto_var->data.numeric_value == 0) return NULL;
+	if (proto_var->type == ACTION_STACK_VALUE_OBJECT)
+		return (void*) proto_var->data.numeric_value;
+	if (proto_var->type == ACTION_STACK_VALUE_SUPER)
+		return (void*) walkProtoChain((void*) proto_var->data.numeric_value, (u8) proto_var->str_size);
+	return NULL;
 }
 
 // Get the "super proto" — the prototype where super methods are searched.
@@ -383,10 +395,7 @@ static ASObject* getSuperSearchStart(void) {
 	ASObject* base = getSuperBaseProto();
 	if (base == NULL) return NULL;
 	ActionVar* proto_var = getProperty(base, "__proto__", 9);
-	if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT ||
-	    proto_var->data.numeric_value == 0)
-		return NULL;
-	return (ASObject*) proto_var->data.numeric_value;
+	return (ASObject*) resolveProtoVar(proto_var);
 }
 
 // Forward declarations for MC property helpers (defined in WITH section)
@@ -20693,8 +20702,8 @@ void actionSetMember(SWFAppContext* app_context)
 							break; // stop traversal (found or hidden)
 						}
 						ActionVar* _np = getProperty(_cur, "__proto__", 9);
-						if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
-						ASObject* _next = (ASObject*) _np->data.numeric_value;
+						ASObject* _next = resolveProtoVar(_np);
+						if (_next == NULL) break;
 						if (_next == obj) break;
 						_cur = _next;
 						setter_search_depth++;
@@ -22111,10 +22120,8 @@ void actionGetMember(SWFAppContext* app_context)
 					break;
 				}
 				ActionVar* _np = getProperty(_cur, "__proto__", 9);
-				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) {
-					break;
-				}
-				ASObject* _next = (ASObject*) _np->data.numeric_value;
+				ASObject* _next = resolveProtoVar(_np);
+				if (_next == NULL) break;
 				if (_next == obj) { g_execution_halted = 1; break; }
 				_cur = _next;
 				prop_search_depth++;
