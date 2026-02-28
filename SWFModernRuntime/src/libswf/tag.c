@@ -2933,7 +2933,9 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		// Recursively fire constructors for child sprites placed during eager init.
 		// This ensures child constructors fire right after the parent constructor,
 		// matching Flash's execution order.
-		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
+		// Only do this when the parent was a registered class sprite with children.
+		if (display_list[depth].constructor_invoked
+		    && display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
 		{
 			extern const char* ng_lookupExportName(size_t char_id);
 			extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
