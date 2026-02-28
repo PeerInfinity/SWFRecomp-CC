@@ -1,13 +1,13 @@
 # RegisterClass and Export/Registration Implementation Plan
 <!-- TESTS: register_class_return_value, register_class, register_class_swf6, register_class_with_sound, register_and_init_order, register_globals_across_frames, register_underflow, attach_movie, attach_movie_stop, export_assets, clip_constructors, on_construct, movieclip_init_object, empty_movieclip_can_attach_movies, do_init_action_child -->
 
-Last updated: 2026-02-25
+Last updated: 2026-02-27
 
 ## Overview
 
 This plan covers implementing `Object.registerClass()`, the ExportAssets tag (tag 56), and the `attachMovie()` method — the three interconnected features that form Flash's "library symbol instantiation" system. Together they enable defining a class, associating it with a library symbol, and creating instances at runtime.
 
-**Current state**: None of these features are implemented. The recompiler recognizes the ExportAssets tag but discards its data. The runtime has `attachMovie` registered as a stub method name on `MovieClip.prototype` but no handler. `Object.registerClass` is not defined anywhere.
+**Current state**: Phases 0-3 complete. Phase 4 partially implemented — constructor invocation on timeline placement works (fires at tagSetInstanceName time, before DoAction scripts), but several MC property resolution issues remain (second `this._name` returning undefined in method calls, deep child property access). The recompiler was also fixed to emit `initVarArray` before DoInitAction scripts (was causing DefineLocal to fail in DoInitAction, preventing class registration).
 
 **Note on test names**: Two tests in the "register_*" group are actually about the ActionScript VM register file, not `Object.registerClass()`:
 - `register_underflow` — DefineFunction2 register count scoping (69% passing, needs register fix)
@@ -21,11 +21,11 @@ These are addressed in Phase 0 as quick wins before the main RegisterClass work.
 
 | Test | Lines | Current | Description |
 |------|-------|---------|-------------|
-| register_class_return_value | 12 | 0/12 | Object.registerClass() return values |
-| register_class | 68 | 0/68 | Full registerClass + attachMovie pipeline |
+| register_class_return_value | 12 | **12/12 PASS** ✅ | Object.registerClass() return values |
+| register_class | 68 | ~12/68 | Full registerClass + attachMovie pipeline (constructors not firing via attachMovie path) |
 | register_class_swf6 | ~68 | 0/? | SWF6 case-insensitive registerClass |
 | register_class_with_sound | 10 | 0/10 | RegisterClass with Sound (known_failure in Ruffle) |
-| register_and_init_order | 233 | 0/233 | DoInitAction + registerClass execution ordering |
+| register_and_init_order | 233 | ~76/233 | DoInitAction + registerClass execution ordering (constructors fire but MC property issues remain) |
 | register_globals_across_frames | 12 | **12/12 PASS** ✅ | VM register reset between frames |
 | register_underflow | 26 | **26/26 PASS** ✅ | DefineFunction2 register count underflow |
 
@@ -33,13 +33,13 @@ These are addressed in Phase 0 as quick wins before the main RegisterClass work.
 
 | Test | Lines | Current | Why |
 |------|-------|---------|-----|
-| attach_movie | 59 | **PASS** ✅ | Now passing in CI (was 43/59) |
-| attach_movie_stop | 3 | 1/3 | Needs attachMovie |
-| export_assets | 3 | 2/3 | Needs ExportAssets + attachMovie |
-| clip_constructors | 8 | 0/8 | Needs registerClass + constructor invocation |
-| on_construct | 25 | 0/25 | Needs onConstruct event + registerClass |
+| attach_movie | 59 | **PASS** ✅ | Passing |
+| attach_movie_stop | 3 | **PASS** ✅ | Passing |
+| export_assets | 3 | **PASS** ✅ | Passing |
+| clip_constructors | 8 | **8/8 PASS** ✅ | Passing (type 1 constructor this binding fix) |
+| on_construct | 25 | **25/25 PASS** ✅ | Passing |
 | movieclip_init_object | 5 | 0/5 | Needs attachMovie initObject |
-| empty_movieclip_can_attach_movies | 11 | **PASS** ✅ | Now passing in CI (was 8/11) |
+| empty_movieclip_can_attach_movies | 11 | **PASS** ✅ | Passing |
 
 ---
 
@@ -452,9 +452,19 @@ python3 ruffle-tests/verify_output.py --test=register_class_return_value --diff 
 
 ---
 
-## Phase 4: Constructor Invocation on Placement
+## Phase 4: Constructor Invocation on Placement (**PARTIALLY DONE**)
 
 **Goal**: When a MovieClip with a registered class is instantiated (via `attachMovie` or timeline placement), invoke the registered constructor with `this` = the clip instance.
+
+**Status (2026-02-27)**: Timeline placement constructor invocation implemented. Two key fixes:
+1. **Recompiler**: `initVarArray(MAX_STRING_ID)` now emitted BEFORE DoInitAction scripts in tagInit (was after, causing DefineLocal to fail during DoInitAction). New `tag_init_scripts` stringstream in swf.hpp separates init scripts from tag definitions.
+2. **Runtime**: Constructor invocation added to `tagSetInstanceName()` in tag.c — fires after instance name is set but before DoAction scripts. Child sprite constructors fire recursively after parent constructor.
+
+**Remaining issues**:
+- `this._name` returns "undefined" for the second access in constructors (when accessed via method call, the `this_obj` is passed as OBJECT type instead of MOVIECLIP, so MC builtins like `_name` aren't found)
+- Deep child property access (`this.box.box`) sometimes returns undefined during early initialization
+- `attachMovie` path doesn't invoke constructors yet (register_class test)
+- Tests that don't use `tagSetInstanceName` (auto-named sprites) still invoke constructors from `process_sprite_init_at_depth` during tagShowFrame (existing behavior)
 
 ### What the tests expect
 

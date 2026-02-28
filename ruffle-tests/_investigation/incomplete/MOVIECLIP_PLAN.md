@@ -1,7 +1,7 @@
 # MovieClip Features Implementation Plan
 <!-- TESTS: movieclip_default_state, movieclip_blend_mode_property, movieclip_focusenabled, movieclip_lockroot, movieclip_depth_methods, movieclip_get_instance_at_depth, create_empty_movie_clip, default_names, place_and_lookup, placeobject_occupied_depth, attach_movie, attach_movie_stop, export_assets, movieclip_init_object, empty_movieclip_can_attach_movies, duplicate_movie_clip, clone_sprite_types, remove_movie_clip, rewind_depth, clip_events, clip_event_propagation_order, on_construct, clip_constructors, do_init_action_child, execution_order4, movieclip_getbounds, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8, movieclip_hittest, movieclip_hittest_shapeflag, local_to_global, custom_clip_methods, movieclip_state_values, movieclip_library_state_values, movieclip_methods_with_loaded_image, movieclip_create_text_field, movieclip_gettextsnapshot, movieclip_setmask, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, unload, unload_clip_event, unload_nested_child, removed_base_clip_tell_target, removed_clip_halts_script, removed_target_clip_scope, stage_object_children, swf7_case_sensitive, movieclip_name_from_timeline, register_class, register_and_init_order -->
 
-Last updated: 2026-02-22
+Last updated: 2026-02-27
 
 ## Status: Phases 1-5, 7-9 MOSTLY COMPLETE
 
@@ -20,9 +20,9 @@ Last updated: 2026-02-22
 | 3 | createEmptyMovieClip + display list | **DONE** ✅ | create_empty_movie_clip PASS |
 | 4 | ExportAssets + attachMovie | **MOSTLY DONE** ✅ | attach_movie PASS, attach_movie_stop PASS, export_assets PASS, empty_movieclip_can_attach_movies PASS |
 | 5 | duplicateMovieClip + removeMovieClip | **DONE** ✅ | duplicate_movie_clip PASS, remove_movie_clip PASS, clone_sprite_types PASS |
-| 6 | Clip events + construction order | NOT STARTED | clip_events, on_construct |
-| 7 | getBounds / getRect | **MOSTLY DONE** ✅ | movieclip_getbounds 189/191 (98.95%) |
-| 8 | hitTest | NOT STARTED | movieclip_hittest partial |
+| 6 | Clip events + construction order | **PARTIALLY DONE** | clip_events ✅, on_construct ✅, clip_constructors ✅, clip_event_propagation_order blocked |
+| 7 | getBounds / getRect | **MOSTLY DONE** ✅ | movieclip_getbounds 190/192 (morph bounds rounding in ACCEPTED_DIFFS) |
+| 8 | hitTest | **MOSTLY DONE** ✅ | movieclip_hittest PASS, movieclip_hittest_shapeflag 266/338 |
 | 9 | localToGlobal / globalToLocal + others | **DONE** ✅ | local_to_global PASS |
 
 ### CI Results (2026-02-22)
@@ -47,7 +47,12 @@ Last updated: 2026-02-22
 | empty_movieclip_can_attach_movies | **PASS** ✅ | Was 8/11, now fully passing |
 | movieclip_lockroot | output_mismatch | Needs child sprite script execution |
 | default_names | output_mismatch | Still failing |
-| place_and_lookup | output_mismatch | Still failing |
+| place_and_lookup | **PASS** ✅ | Fixed (ng_isScriptableChar + var_map enumeration) |
+| rewind_depth | **PASS** ✅ | Fixed (sprite preservation during root loop-back) |
+| clip_events | **PASS** ✅ | Fixed (clip event dispatch) |
+| on_construct | **PASS** ✅ | Fixed (RegisterClass prototype + on(construct)) |
+| clip_constructors | **PASS** ✅ | Fixed (type 1 constructor this binding) |
+| execution_order4 | **PASS** ✅ | Fixed (nested sprite parent context) |
 | custom_clip_methods | output_mismatch | Needs multi-frame + registerClass |
 | movieclip_init_object | output_mismatch | Needs Object.registerClass |
 

@@ -519,12 +519,6 @@ namespace SWFRecomp
 			tag_init << endl << "\tfinalizeBitmaps();";
 		}
 
-		// Initialize variable array if string constants were used
-		if (action.next_str_i > 0)
-		{
-			tag_init << endl << "\tinitVarArray(MAX_STRING_ID);";
-		}
-
 		context.tag_main << "};" << endl
 						 << endl;
 
@@ -556,8 +550,17 @@ namespace SWFRecomp
 		}
 
 		context.tag_main << "void tagInit(SWFAppContext* app_context)" << endl
-						 << "{"
-						 << tag_init.str() << endl
+						 << "{";
+		// Emit tag definitions (sprites, exports, bitmaps, etc.)
+		context.tag_main << tag_init.str();
+		// Initialize variable array BEFORE DoInitAction scripts so they can use
+		// string ID-based variables (DefineLocal, GetVariable)
+		if (action.next_str_i > 0)
+		{
+			context.tag_main << endl << "\tinitVarArray(MAX_STRING_ID);";
+		}
+		// Emit DoInitAction script calls (after initVarArray)
+		context.tag_main << tag_init_scripts.str() << endl
 						 << "}";
 		
 		context.out_draws << endl << endl;
@@ -2207,8 +2210,8 @@ namespace SWFRecomp
 
 				out_script << "}";
 
-				// Emit call in tagInit (runs once at startup)
-				tag_init << endl << "\t" << func_name << "(app_context);";
+				// Emit call in tagInit (runs once at startup, after initVarArray)
+				tag_init_scripts << endl << "\t" << func_name << "(app_context);";
 
 				// Mark this init script as non-timeline (called from tagInit, not frame functions)
 				non_timeline_scripts.insert(next_script_i - 1);

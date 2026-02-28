@@ -251,6 +251,8 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			display_list_capacity = saved_cap;
 
 			// Invoke registered class constructor if this sprite has an exported symbol with a registered class
+			// Skip if already invoked during eager init in tagPlaceObject2 (constructor_invoked flag)
+			if (!obj->constructor_invoked)
 			{
 				extern const char* ng_lookupExportName(size_t char_id);
 				extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
@@ -2137,6 +2139,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	display_list[depth].place_gen = g_place_gen;
+	display_list[depth].constructor_invoked = 0;
 	init_cx_fields(&display_list[depth]);
 
 	if (depth > max_depth)
@@ -2233,6 +2236,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
 		}
 	}
+
 #else
 	(void)app_context;
 #endif
@@ -2351,6 +2355,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	display_list[depth].place_gen = g_place_gen;
+	display_list[depth].constructor_invoked = 0;
 	init_cx_fields(&display_list[depth]);
 
 	if (depth > max_depth)
@@ -2446,6 +2451,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
 		}
 	}
+
 #else
 	(void)app_context;
 #endif
@@ -2898,6 +2904,80 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		}
 		display_list[depth].instance_name = (char*)name;
 		display_list[depth].instance_name_owned = 0;
+
+#ifdef NO_GRAPHICS
+		// Invoke registered class constructor now that the instance name is set.
+		// This fires after tagPlaceObject2 (which did eager init) but before DoAction scripts.
+		if (!catch_up_mode && display_list[depth].sprite_needs_init
+		    && !display_list[depth].constructor_invoked
+		    && display_list[depth].char_id != 0
+		    && dictionary[display_list[depth].char_id].type == CHAR_TYPE_SPRITE)
+		{
+			extern const char* ng_lookupExportName(size_t char_id);
+			extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
+			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+			const char* _exp_ctor = ng_lookupExportName(display_list[depth].char_id);
+			if (_exp_ctor != NULL) {
+				extern MovieClip root_movieclip;
+				extern MovieClip* g_current_context;
+				MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* _ctor_mc = actionFindOrCreateMovieClip(app_context, name, _parent_mc);
+				if (_ctor_mc != NULL) {
+					actionSetupRegisteredClassPrototype(app_context, _exp_ctor, _ctor_mc);
+					actionInvokeRegisteredClassConstructor(app_context, _exp_ctor, _ctor_mc);
+					display_list[depth].constructor_invoked = 1;
+				}
+			}
+		}
+
+		// Recursively fire constructors for child sprites placed during eager init.
+		// This ensures child constructors fire right after the parent constructor,
+		// matching Flash's execution order.
+		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
+		{
+			extern const char* ng_lookupExportName(size_t char_id);
+			extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
+			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+			extern MovieClip* g_current_context;
+
+			DisplayObject* saved_dl = display_list;
+			size_t saved_max = max_depth;
+			size_t saved_cap = display_list_capacity;
+			display_list = saved_dl[depth].sprite_display_list;
+			max_depth = saved_dl[depth].sprite_max_depth;
+			display_list_capacity = saved_dl[depth].sprite_dl_capacity;
+
+			MovieClip* _child_parent = actionFindOrCreateMovieClip(app_context, name,
+				g_current_context ? g_current_context : &root_movieclip);
+			for (size_t ci = 1; ci <= max_depth; ci++)
+			{
+				DisplayObject* cobj = &display_list[ci];
+				if (cobj->char_id == 0 || cobj->constructor_invoked) continue;
+				if (dictionary[cobj->char_id].type != CHAR_TYPE_SPRITE) continue;
+
+				const char* _child_exp = ng_lookupExportName(cobj->char_id);
+				if (_child_exp == NULL) continue;
+
+				MovieClip* _child_mc = (cobj->instance_name != NULL)
+					? actionFindOrCreateMovieClip(app_context, cobj->instance_name, _child_parent)
+					: NULL;
+				if (_child_mc != NULL) {
+					actionSetupRegisteredClassPrototype(app_context, _child_exp, _child_mc);
+					actionInvokeRegisteredClassConstructor(app_context, _child_exp, _child_mc);
+					cobj->constructor_invoked = 1;
+				}
+			}
+
+			// Save back (realloc possible)
+			saved_dl[depth].sprite_display_list = display_list;
+			saved_dl[depth].sprite_max_depth = max_depth;
+			saved_dl[depth].sprite_dl_capacity = display_list_capacity;
+
+			display_list = saved_dl;
+			max_depth = saved_max;
+			display_list_capacity = saved_cap;
+		}
+#endif
 	}
 }
 

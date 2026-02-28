@@ -166,7 +166,8 @@ namespace SWFRecomp
 		std::set<size_t> non_timeline_scripts;
 		
 		std::stringstream tag_init;
-		
+		std::stringstream tag_init_scripts;  // DoInitAction calls (emitted after initVarArray)
+
 		std::stringstream shape_data;
 		size_t current_tri;
 		std::stringstream transform_data;

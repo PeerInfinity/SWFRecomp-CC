@@ -1,23 +1,23 @@
 # Clone/Duplicate MovieClip Implementation Plan
 <!-- TESTS: duplicate_movie_clip, clone_sprite_types, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, clip_events, clip_event_propagation_order, on_construct -->
 
-Last updated: 2026-02-25
+Last updated: 2026-02-27
 
 ## Overview
 
 Clone/Duplicate MovieClip covers 5 failing Ruffle tests. The core feature is `ActionCloneSprite` (opcode 0x24), which duplicates an existing display list object, giving the copy a new name and depth. The AS2 method wrapper is `MovieClip.duplicateMovieClip(name, depth, initObj)`.
 
-**Current state (as of 2026-02-25)**:
+**Current state (as of 2026-02-27)**:
 - `duplicate_movie_clip` (21/21) ✅ — DONE
-- `clone_sprite_types` (25/25) ✅ — DONE (locally passing; CI results pending — fix committed f81910c1)
+- `clone_sprite_types` (25/25) ✅ — DONE
 - `clone_sprite_edittext` (MISMATCH ~15-20/95) — BLOCKED: TextField clone init + position reading
 - `clone_sprite_edittext_dynamic` (MISMATCH ~15-20/87) — BLOCKED: same
 - `duplicate_movie_clip_drawing` (2 lines off) — DEFERRED: needs Drawing API _width/_height from drawn content
-- `clip_events` ✅ — NOW PASSING in CI (was SEGFAULT, fixed by prior commits)
+- `clip_events` ✅ — PASS (fixed by prior commits)
 - `clip_event_propagation_order` (0/17) — BLOCKED: needs mouse events (MOUSE_EVENTS_PLAN) + recursive clip event dispatch
-- `on_construct` (0/25) — BLOCKED: needs CLIP_EVENT_CONSTRUCT dispatch + RegisterClass (REGISTERCLASS_PLAN)
+- `on_construct` (25/25) ✅ — DONE (RegisterClass prototype setup + on(construct) event dispatch)
 
-Phase 1 is fully complete. Phase 2 is blocked on TextField clone infrastructure. Bonus clip event tests have recompiler bugs and missing event types.
+Phase 1 is fully complete. Phase 2 is blocked on TextField clone infrastructure. `on_construct` now PASS (25/25) — RegisterClass prototype setup + on(construct) event dispatch implemented. `clip_event_propagation_order` still blocked on mouse events.
 
 **Key implementation notes discovered during Phase 1**:
 - `duplicateMovieClip` registers clones via `setVariableByName` so `GetVariable("clip")` works

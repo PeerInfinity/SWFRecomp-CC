@@ -167,6 +167,7 @@ typedef struct DisplayObject
 	// Clip event interaction state
 	u8 clip_mc_pressed;     // 1 if CLIP_EVENT_PRESS was fired for this clip (awaiting RELEASE/RELEASE_OUTSIDE)
 	u8 enterframe_eligible; // 1 if AS2 onEnterFrame should fire this tick (set by init/advance, cleared after dispatch)
+	u8 constructor_invoked; // 1 if registered class constructor was already invoked during eager init
 } DisplayObject;
 
 typedef struct KeyState {
