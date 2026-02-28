@@ -2968,6 +2968,16 @@ namespace SWFRecomp
 				}
 				else if (has_ratio && clip_action_count > 0)
 				{
+					// When clip actions are present, emit instance name BEFORE placement
+					if (!instance_name_str.empty())
+					{
+						std::string escaped_name = "";
+						for (char c : instance_name_str) {
+							if (c == '"' || c == '\\') escaped_name += '\\';
+							escaped_name += c;
+						}
+						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
+					}
 					context.tag_main << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
 				}
 				else if (has_ratio)
@@ -3921,6 +3931,16 @@ namespace SWFRecomp
 							}
 							else if (has_ratio && clip_action_count > 0)
 							{
+								// When clip actions are present, emit instance name BEFORE placement
+								if (!sp_instance_name.empty())
+								{
+									std::string escaped = "";
+									for (char c : sp_instance_name) {
+										if (c == '"' || c == '\\') escaped += '\\';
+										escaped += c;
+									}
+									sprite_definitions << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped << "\");" << endl;
+								}
 								sprite_definitions << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, "
 												   << to_string(depth) << ", "
 												   << to_string(char_id) << ", "
@@ -3951,6 +3971,16 @@ namespace SWFRecomp
 							}
 							else if (clip_action_count > 0)
 							{
+								// When clip actions are present, emit instance name BEFORE placement
+								if (!sp_instance_name.empty())
+								{
+									std::string escaped = "";
+									for (char c : sp_instance_name) {
+										if (c == '"' || c == '\\') escaped += '\\';
+										escaped += c;
+									}
+									sprite_definitions << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped << "\");" << endl;
+								}
 								sprite_definitions << "\t" << "tagPlaceObject2WithClipActions(app_context, "
 												   << to_string(depth) << ", "
 												   << to_string(char_id) << ", "
@@ -3970,8 +4000,8 @@ namespace SWFRecomp
 												   << to_string(clip_depth_val) << ");" << endl;
 							}
 
-							// Emit instance name if present
-							if (!sp_instance_name.empty())
+							// Emit instance name if present (skip if already emitted for clip-action case)
+							if (!sp_instance_name.empty() && clip_action_count == 0)
 							{
 								std::string escaped = "";
 								for (char c : sp_instance_name) {
