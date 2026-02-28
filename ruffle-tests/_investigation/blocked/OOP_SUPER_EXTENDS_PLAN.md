@@ -1,22 +1,22 @@
 # OOP / Super / Extends / Interfaces Implementation Plan
 <!-- TESTS: as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, as2_super_via_manual_prototype, extends_chain, extends_native_type, super_edge_cases, interface_implements_op -->
 
-Last updated: 2026-02-25
+Last updated: 2026-02-28
 
-## Status: CORE COMPLETE (6/8 tests passing)
+## Status: 7/8 PASS — remaining test blocked
 
-### CI Results (2026-02-25)
+### Test Results (2026-02-28)
 
-| Test | CI Status | Notes |
-|------|-----------|-------|
+| Test | Status | Notes |
+|------|--------|-------|
 | as2_oop | **PASS** ✅ | ImplementsOp/InstanceOf/CastOp working |
 | extends_native_type | **PASS** ✅ | Flash.geom native extends working |
 | as2_super_and_this_v6 | **PASS** ✅ | GetVariable("super"), CallFunction("super") working |
 | as2_super_and_this_v8 | **PASS** ✅ | SWF8 super + this binding working |
 | as2_super_via_manual_prototype | **PASS** ✅ | Manual proto chains with super working |
 | extends_chain | **PASS** ✅ | super(), super.method(), constructor chaining working |
-| super_edge_cases | output_mismatch 33/39 | Remaining: makeSuperWith SUPER-as-__proto__ (3 lines), shifted output (3 lines) |
-| interface_implements_op | output_mismatch | Complex interface cases, MovieClipLoader dependency |
+| super_edge_cases | **PASS** ✅ | makeSuperWith SUPER-as-__proto__ fixed via resolveProtoVar() |
+| interface_implements_op | **BLOCKED** | All instanceof checks receive obj_type=UNDEFINED — blocked by MTASC class infrastructure (REGISTERCLASS_PLAN) |
 
 ### What's Implemented
 - **actionExtends**: Correctly sets up prototype chains ✅
@@ -24,6 +24,7 @@ Last updated: 2026-02-25
 - **actionImplementsOp**: Fully implemented with transitive interface checks ✅
 - **actionCastOp**: Fully implemented ✅
 - **extends_native_type**: flash.geom types can be extended ✅
+- **SUPER-as-__proto__ resolution**: `resolveProtoVar()` helper unwraps both OBJECT and SUPER type values during prototype chain traversal ✅
 - **Super keyword**: Depth-based super system fully implemented ✅
   - `ACTION_STACK_VALUE_SUPER` type (type 16) with (this, depth) pair
   - `g_super_this_stack`/`g_super_depth_stack` with push/pop/get accessors
@@ -34,9 +35,15 @@ Last updated: 2026-02-25
   - `__constructor__` lookup with addProperty getter invocation ✅
   - Constructor return value capture ✅
 
-### Remaining Gaps
-- **super_edge_cases** (33/39): `makeSuperWith` pattern stores SUPER value as `__proto__` — `walkProtoChain` returns NULL when encountering type 16 instead of OBJECT
-- **interface_implements_op**: Partially blocked by MovieClipLoader dependency
+### Remaining: interface_implements_op (BLOCKED)
+
+**Root cause**: This is a MTASC-compiled test. `Test.main()` creates objects via `new MyClass()`, but all resulting objects have type UNDEFINED instead of OBJECT. The MTASC class constructors don't produce proper objects because the DoInitAction class infrastructure is incomplete.
+
+**Specific blockers** (all from REGISTERCLASS_PLAN):
+- MTASC class constructor dispatch (`new MyClass()` returns undefined)
+- NoisyString extends native String type
+- Lazy interface registration via toString callbacks
+- MovieClipLoader dependency (cross-SWF loading)
 
 ## Overview (original)
 
