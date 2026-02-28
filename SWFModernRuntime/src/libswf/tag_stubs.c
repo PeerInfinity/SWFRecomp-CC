@@ -490,11 +490,9 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
 
-		// Invoke registered class constructor after frame script runs
-		if (g_pending_attach_inits[i].export_name[0] != '\0' && mc != NULL) {
-			extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
-			actionInvokeRegisteredClassConstructor(app_context, g_pending_attach_inits[i].export_name, mc);
-		}
+		// NOTE: Registered class constructor is now fired synchronously during
+		// attachMovie (in action.c), not deferred here. This ensures the constructor
+		// runs before attachMovie returns to the caller script.
 	}
 	g_pending_attach_init_count = 0;
 }

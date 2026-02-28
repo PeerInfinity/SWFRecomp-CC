@@ -57,6 +57,7 @@ struct MovieClip {
 	// AS2 event dispatch state
 	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
+	u8 mc_enterframe_eligible; // 0 on creation tick, set to 1 on next tick so onEnterFrame doesn't fire on creation frame
 #endif
 };
 

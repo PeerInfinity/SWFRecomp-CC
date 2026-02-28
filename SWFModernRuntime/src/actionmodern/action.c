@@ -8319,6 +8319,7 @@ MovieClip root_movieclip = {
 	.draw_has_bounds = 0,
 	.mc_mouse_inside = 0,
 	.mc_as_pressed = 0,
+	.mc_enterframe_eligible = 1,  // Root is always eligible
 #endif
 };
 
@@ -8858,6 +8859,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->draw_has_bounds = 0;
 	mc->mc_mouse_inside = 0;
 	mc->mc_as_pressed = 0;
+	mc->mc_enterframe_eligible = 0;
 	mc->display_obj = NULL;
 #endif
 
@@ -14352,6 +14354,10 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
 			if (!dobj->enterframe_eligible) continue;
 			dobj->enterframe_eligible = 0; // consume
+		} else {
+			// Dynamic MCs (createEmptyMovieClip, etc.) without display_obj:
+			// Skip on creation tick, allow on subsequent ticks.
+			if (!mc->mc_enterframe_eligible) continue;
 		}
 
 		ASObject* props = (ASObject*) mc->dynamic_props;
@@ -14412,6 +14418,16 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 					actionSetCurrentContext(saved_ctx);
 				}
 			}
+		}
+	}
+
+	// Mark all dynamic MCs (without display_obj) as eligible for next tick's enterFrame.
+	// This ensures MCs created by createEmptyMovieClip don't fire onEnterFrame on
+	// their creation tick, but do fire on all subsequent ticks.
+	for (int _ef_i = 0; _ef_i < child_mc_count; _ef_i++) {
+		MovieClip* _ef_mc = child_mc_cache[_ef_i];
+		if (_ef_mc != NULL && _ef_mc->display_obj == NULL) {
+			_ef_mc->mc_enterframe_eligible = 1;
 		}
 	}
 }
@@ -27006,6 +27022,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, (ASObject*) mc->dynamic_props,
 						_am_buf2, (u32)strlen(_am_buf2), &mc_var);
 					setVariableByName(_am_buf2, &mc_var);
+					// Fire registered class constructor synchronously during attachMovie
+					// (Flash fires it before returning to caller script)
+					{
+						void* _am_reg_ctor = lookupRegisteredClass(_am_buf1);
+						if (_am_reg_ctor != NULL) {
+							actionInvokeRegisteredClassConstructor(app_context, _am_buf1, attached);
+						}
+					}
 					if (args != NULL) FREE(args);
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
 				} else {
@@ -31383,6 +31407,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							else if (child_mc_count < MAX_CHILD_MOVIECLIPS) child_mc_cache[child_mc_count++] = attached;
 						}
 
+						// Fire registered class constructor synchronously
+						{
+							void* _am_reg_ctor2 = lookupRegisteredClass(linkage_id);
+							if (_am_reg_ctor2 != NULL) {
+								actionInvokeRegisteredClassConstructor(app_context, linkage_id, attached);
+							}
+						}
 						if (args != NULL) FREE(args);
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
 						return;
