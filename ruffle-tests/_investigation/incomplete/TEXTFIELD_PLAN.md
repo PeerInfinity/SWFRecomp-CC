@@ -3,7 +3,7 @@
 
 Last updated: 2026-03-01
 
-## Status: Phases 1-2 COMPLETE, Phase 3 COMPLETE, Phase 5 PARTIAL, textWidth/textHeight DONE, autoSize DONE
+## Status: Phases 1-3 COMPLETE, Phase 4 COMPLETE, Phase 5 PARTIAL, Phase 6 MOSTLY COMPLETE
 
 ### Implementation Commits
 - `8811360` — Phase 1: TextField constructor, prototype, and DefineEditText property expansion
@@ -17,15 +17,18 @@ Last updated: 2026-03-01
 - `51acce6` — Fix edittext_newline_stripping: multiline fields get trailing '\n' (no variable binding)
 - `235fd38` — Fix edittext_html_align_swf7/swf8: HTML-aware alignment in getNewTextFormat/getTextFormat
 - `fa0f235` — Implement textWidth/textHeight via font metrics pipeline (edittext_font_size 30/30)
-- (pending) — Fix indent s16, autoSize, getBounds for text fields, ng_compute returns twips
+- `03bf116` — Fix indent s16, autoSize, getBounds for text fields, ng_compute returns twips
+- `3395c87` — Fix text field metrics: builtin Noto Sans, SWF8 trailing space trimming, align propagation
 
-### Current Test Results (36 passing, many partially passing)
+### Current Test Results (42 passing, several partially passing)
 
 | Test | Lines | Status | Phase |
 |------|-------|--------|-------|
 | text_format | 1146/1146 | **PASS** | 2 |
 | text_format_rounding_swf7 | 840/840 | **PASS** | 2 |
 | text_format_rounding_swf8 | 840/840 | **PASS** | 2 |
+| edittext_align_trailing_spaces_swf7 | 576/576 | **PASS** | 6 |
+| edittext_align_trailing_spaces_swf8 | 576/576 | **PASS** | 6 |
 | edittext_default_format_font_style | 335/335 | **PASS** | 2 |
 | edittext_antialiastype | 296/296 | **PASS** | 1 |
 | edittext_default_format | 221/221 | **PASS** | 2 |
@@ -41,8 +44,10 @@ Last updated: 2026-03-01
 | edittext_align | 60/60 | **PASS** | 6 |
 | textfield_properties | 44/44 | **PASS** | 1 |
 | edittext_tag_indent | 31/31 | **PASS** | 6 |
+| edittext_hscroll | 27/27 | **PASS** | 4 |
 | text_format_display | 21/21 | **PASS** | 2 |
 | edittext_autosize_setter | 20/20 | **PASS** | 3 |
+| edittext_letter_spacing | 15/15 | **PASS** | 6 |
 | edittext_underline | 4/4 | **PASS** | 6 |
 | textfield_background_color | 11/11 | **PASS** | 1 |
 | textfield_border_color | 11/11 | **PASS** | 1 |
@@ -61,18 +66,19 @@ Last updated: 2026-03-01
 | textfield_cache_as_bitmap | 6/6 | **PASS** | 1 |
 | edittext_html_entity | 4/4 | **PASS** | 5 |
 | textsnapshot_props_swf6 | 56/56 | **PASS** | 7 |
+| edittext_scroll | 52/54 | 96% | 4 |
 
 ### Phase Completion
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | TextField constructor and prototype | **DONE** |
-| 2 | TextFormat class | **DONE** |
-| 3 | Variable binding + width/height/autoSize | **DONE** (variable binding, width/height, newline stripping, autoSize, getBounds for text fields) |
-| 4 | Scroll properties | **PARTIAL** (scroll/maxscroll/bottomScroll work; hscroll setter incomplete) |
-| 5 | HTML text support | **PARTIAL** (align fixed; htmlText roundtrip, color, condenseWhite pending) |
-| 6 | Text layout formatting properties | **PARTIAL** (align, margins, indent, underline pass; bullet, letter_spacing, trailing_spaces need work) |
-| 7 | StyleSheet + TextSnapshot | **PARTIAL** (textsnapshot_props pass) |
+| 1 | TextField constructor and prototype | **DONE** (15 tests) |
+| 2 | TextFormat class | **DONE** (8 tests) |
+| 3 | Variable binding + width/height/autoSize | **DONE** (6 tests) |
+| 4 | Scroll properties | **DONE** (hscroll 27/27, scroll 52/54) |
+| 5 | HTML text support | **PARTIAL** (align + entity pass; htmlText roundtrip, color, condenseWhite, swf6/7/8 need HTML parser) |
+| 6 | Text layout formatting properties | **DONE** (align, margins, indent, underline, letter_spacing, trailing_spaces_swf7/swf8 all PASS; bullet/tabstops deferred) |
+| 7 | StyleSheet + TextSnapshot | **PARTIAL** (textsnapshot_props pass; stylesheet/textsnapshot content pending) |
 
 ---
 
