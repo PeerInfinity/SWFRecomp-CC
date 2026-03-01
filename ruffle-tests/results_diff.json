@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-01T18:20:05.430319+00:00",
-    "old_git_sha": "ec4f995579cb49c0482163934ac1a5185625c5d1",
-    "new_timestamp": "2026-03-01T19:53:06.503447+00:00",
-    "new_git_sha": "52e47dd26a7835ab08b43949814afa72eef0580d",
+    "old_timestamp": "2026-03-01T19:53:06.503447+00:00",
+    "old_git_sha": "52e47dd26a7835ab08b43949814afa72eef0580d",
+    "new_timestamp": "2026-03-01T20:37:03.063445+00:00",
+    "new_git_sha": "3a734264f8107bbc34f5413723215edf7b442c7c",
     "partial": false,
     "same_commit": false
   },
@@ -11,17 +11,17 @@
     "old_pass": 421,
     "old_total": 619,
     "old_pass_rate": 68.0,
-    "new_pass": 421,
+    "new_pass": 422,
     "new_total": 619,
-    "new_pass_rate": 68.0,
-    "old_mismatched_lines": 29231,
-    "new_mismatched_lines": 29221,
-    "increased_mismatches": 6,
-    "decreased_mismatches": 16,
+    "new_pass_rate": 68.2,
+    "old_mismatched_lines": 29221,
+    "new_mismatched_lines": 29195,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 26,
     "newly_passing": 1,
-    "newly_failing": 1,
-    "status_changed": 2,
-    "unchanged": 616,
+    "newly_failing": 0,
+    "status_changed": 1,
+    "unchanged": 617,
     "added": 0,
     "removed": 0
   },
@@ -29,17 +29,17 @@
     {
       "test": "conflicting_instance_names",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 23,
         "expected_lines": 23,
-        "matching_lines": 23
+        "matching_lines": 19
       },
       "new_lines": {
         "actual_lines": 23,
         "expected_lines": 23,
-        "matching_lines": 19
+        "matching_lines": 23
       }
     },
     {
@@ -50,28 +50,12 @@
       "old_lines": {
         "actual_lines": 338,
         "expected_lines": 338,
-        "matching_lines": 266
+        "matching_lines": 264
       },
       "new_lines": {
         "actual_lines": 338,
         "expected_lines": 338,
-        "matching_lines": 264
-      }
-    },
-    {
-      "test": "unload",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 36
-      },
-      "new_lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
+        "matching_lines": 286
       }
     }
   ]
