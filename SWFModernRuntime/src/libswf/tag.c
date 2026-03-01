@@ -1862,7 +1862,7 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,
-    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    u8 align, u16 left_margin, u16 right_margin, s16 indent, s16 leading,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {

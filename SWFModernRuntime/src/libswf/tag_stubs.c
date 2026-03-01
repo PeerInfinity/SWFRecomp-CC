@@ -112,7 +112,8 @@ static struct {
 	u16 font_height;
 	s16 max_length;
 	u8 align;
-	u16 left_margin, right_margin, indent;
+	u16 left_margin, right_margin;
+	s16 indent;
 	s16 leading;
 	char variable_name[256];
 	u16 flags;
@@ -319,7 +320,7 @@ void ng_record_button(size_t char_id)
 void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,
-    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    u8 align, u16 left_margin, u16 right_margin, s16 indent, s16 leading,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
@@ -682,7 +683,7 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 				cur_width_twips += (int)((float)adv * (float)font_height / (float)em);
 		}
 		if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
-		return max_width_twips / 20;
+		return max_width_twips;
 	}
 
 	// Word-wrap mode: split into hard lines, wrap each, track max width
@@ -703,11 +704,11 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 			line_start = i + 1;
 		}
 	}
-	return max_width_twips / 20;
+	return max_width_twips;
 }
 
 // Compute textHeight for a string using font metrics.
-// Returns height in pixels (truncated to int, matching Flash behavior).
+// Returns height in twips (callers divide by 20 for pixels).
 // font_height is in twips, leading_twips is the DefineEditText leading value in twips.
 int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
@@ -768,8 +769,82 @@ int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const 
 	int leading_count = line_count > 1 ? line_count - 1 : 1;
 	int total_twips = line_count * (ascent_twips + descent_twips) + leading_count * (int)leading_twips;
 
-	// trunc_to_pixel: floor(twips / 20)
-	return total_twips / 20;
+	return total_twips;
+}
+
+// Compute total line count for text (same line counting logic as ng_computeTextHeight).
+int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips)
+{
+	int fi = ng_find_font(font_id);
+	if (fi < 0 || !ng_fonts[fi].has_metrics) return 1;
+
+	int em = ng_fonts[fi].em_square;
+	if (em <= 0) em = 1024;
+
+	int line_count = 1;
+	if (text != NULL && text_len > 0) {
+		if (!word_wrap || field_width_twips <= 0) {
+			for (size_t i = 0; i < text_len; i++) {
+				if (text[i] == '\r') {
+					line_count++;
+					if (i + 1 < text_len && text[i + 1] == '\n') i++;
+				} else if (text[i] == '\n') {
+					line_count++;
+				}
+			}
+		} else {
+			line_count = 0;
+			size_t line_start = 0;
+			for (size_t i = 0; i <= text_len; i++) {
+				int is_end = (i == text_len);
+				int is_newline = (!is_end && (text[i] == '\r' || text[i] == '\n'));
+				if (is_end || is_newline) {
+					int dummy_w = 0;
+					line_count += ng_wrap_count_lines(fi, em, font_height,
+					    text + line_start, i - line_start,
+					    field_width_twips, swf_version,
+					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w);
+					if (is_newline) {
+						if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
+					}
+					line_start = i + 1;
+				}
+			}
+			if (line_count == 0) line_count = 1;
+		}
+	}
+	return line_count;
+}
+
+// Compute how many lines fit in the visible area of a text field.
+// field_height_pixels is mc->height. Returns at least 1.
+int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, float field_height_pixels)
+{
+	int fi = ng_find_font(font_id);
+	if (fi < 0 || !ng_fonts[fi].has_metrics) return 1;
+
+	int em = ng_fonts[fi].em_square;
+	if (em <= 0) em = 1024;
+
+	int ascent_twips = (int)((float)ng_fonts[fi].ascent * (float)font_height / (float)em);
+	int descent_twips = (int)((float)ng_fonts[fi].descent * (float)font_height / (float)em);
+	int line_height_twips = ascent_twips + descent_twips + (int)leading_twips;
+	if (line_height_twips <= 0) return 1;
+
+	// Available height in twips minus 2*GUTTER (40 twips each side = 80 twips total)
+	int avail_twips = (int)(field_height_pixels * 20.0f) - 80;
+	if (avail_twips <= 0) return 1;
+
+	// First line takes ascent+descent, each subsequent line adds line_height
+	// visible = 1 + floor((avail - first_line) / line_height)
+	int first_line_twips = ascent_twips + descent_twips;
+	if (avail_twips < first_line_twips) return 1;
+
+	int remaining = avail_twips - first_line_twips;
+	int extra_lines = remaining / line_height_twips;
+	return 1 + extra_lines;
 }
 
 void ng_record_video(SWFAppContext* app_context, u16 char_id)
@@ -2399,7 +2474,7 @@ u16 ng_getTextFieldRightMargin(int tf_idx)
 	return ng_textfields[tf_idx].right_margin;
 }
 
-u16 ng_getTextFieldIndent(int tf_idx)
+s16 ng_getTextFieldIndent(int tf_idx)
 {
 	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
 	return ng_textfields[tf_idx].indent;

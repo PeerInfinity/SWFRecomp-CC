@@ -46,7 +46,7 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,
-    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    u8 align, u16 left_margin, u16 right_margin, s16 indent, s16 leading,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char* grid_fit_type, float thickness, float sharpness);
@@ -158,7 +158,7 @@ s16 ng_getTextFieldMaxLength(int tf_idx);
 u8 ng_getTextFieldAlign(int tf_idx);
 u16 ng_getTextFieldLeftMargin(int tf_idx);
 u16 ng_getTextFieldRightMargin(int tf_idx);
-u16 ng_getTextFieldIndent(int tf_idx);
+s16 ng_getTextFieldIndent(int tf_idx);
 s16 ng_getTextFieldLeading(int tf_idx);
 const char* ng_getTextFieldVariableName(int tf_idx);
 void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* ymax);
@@ -224,7 +224,7 @@ void ng_record_button(size_t char_id);
 void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,
-    u8 align, u16 left_margin, u16 right_margin, u16 indent, s16 leading,
+    u8 align, u16 left_margin, u16 right_margin, s16 indent, s16 leading,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void ng_record_csm(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
@@ -239,6 +239,10 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
     int left_margin_twips, int right_margin_twips, int indent_twips);
+int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips);
+int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, float field_height_pixels);
 u16 ng_findFontIdByName(const char* name);
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
 // Look up exported symbol by linkage name. Returns char_id or (size_t)-1 if not found.

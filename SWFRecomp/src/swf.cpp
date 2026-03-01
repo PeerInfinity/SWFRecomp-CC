@@ -1971,7 +1971,8 @@ namespace SWFRecomp
 				u8 r = 0, g = 0, b = 0, a = 255;
 				s16 max_length = -1;
 				u8 align = 0;
-				u16 left_margin = 0, right_margin = 0, indent = 0;
+				u16 left_margin = 0, right_margin = 0;
+				s16 indent = 0;
 				s16 leading = 0;
 
 				if (has_font)
@@ -2022,7 +2023,7 @@ namespace SWFRecomp
 					align = (u8) tag.fields[0].value;
 					left_margin = (u16) tag.fields[1].value;
 					right_margin = (u16) tag.fields[2].value;
-					indent = (u16) tag.fields[3].value;
+					indent = (s16) tag.fields[3].value;
 					leading = (s16) tag.fields[4].value;
 				}
 

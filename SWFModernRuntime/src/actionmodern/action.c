@@ -6987,10 +6987,11 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 	VAL(double, &val.data.numeric_value) = rm_px;
 	setProperty(app_context, tf_obj, "rightMargin", 11, &val);
 
-	// indent (twips → pixels)
+	// indent (twips → pixels, truncated to integer)
 	double indent_px = 0.0;
 	if (tf_idx >= 0) {
-		indent_px = (double)ng_getTextFieldIndent(tf_idx) / 20.0;
+		s16 indent_twips = ng_getTextFieldIndent(tf_idx);
+		indent_px = (indent_twips >= 0) ? floor((double)indent_twips / 20.0) : -floor((double)(-indent_twips) / 20.0);
 	}
 	VAL(double, &val.data.numeric_value) = indent_px;
 	setProperty(app_context, tf_obj, "indent", 6, &val);
@@ -9081,6 +9082,14 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
 }
 
 static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
+#ifdef NO_GRAPHICS
+static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc);
+static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
+	char* utf8_buf, u16* out_font_id, u16* out_font_height, s16* out_leading,
+	int* out_word_wrap, int* out_field_width_twips,
+	int* out_left_margin_twips, int* out_right_margin_twips, int* out_indent_twips);
+static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc);
+#endif
 
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	(void)app_context;  // used only in NO_GRAPHICS for TextField init
@@ -21465,7 +21474,7 @@ void actionSetMember(SWFAppContext* app_context)
 			}
 			// TextField autoSize setter coercion
 			if (prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0
-				&& mc->ng_textfield_idx >= 0)
+				&& MC_IS_TEXTFIELD(mc))
 			{
 				// Coerce value to one of: "left", "right", "center", "none" (as UTF-16)
 				const uint16_t* _as_result = u16_none;
@@ -21536,23 +21545,69 @@ void actionSetMember(SWFAppContext* app_context)
 			}
 			// TextField scroll setter: coerce to int, clamp to [1, maxscroll]
 			if (prop_name_len == 6 && strncmp(prop_name, "scroll", 6) == 0
-				&& mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
+				&& MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL)
+			{
+				double dval = varToDoubleSimple(&value_var);
+				int32_t ival;
+				// Flash overflow: values >= ~767100486418433.0 or NaN/negative → 1
+				static const double SCROLL_OVERFLOW_LIMIT = 767100486418433.0;
+				if (isnan(dval) || dval < 0.0 || dval >= SCROLL_OVERFLOW_LIMIT
+					|| value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+					ival = 1;
+				else {
+					// Truncate to integer, clamp to int32 range (large positives clamp to maxscroll below)
+					int64_t i64 = (int64_t)dval;
+					if (i64 > 0x7FFFFFFF) i64 = 0x7FFFFFFF;
+					if (i64 < 1) i64 = 1;
+					ival = (int32_t)i64;
+				}
+				// Dynamically compute maxscroll from text content
+#ifdef NO_GRAPHICS
+				int32_t max_scroll = recomputeMaxScroll(app_context, mc);
+#else
+				int32_t max_scroll = 1;
+				ASObject* _sc_props = (ASObject*) mc->dynamic_props;
+				ActionVar* ms_var = getProperty(_sc_props, "maxscroll", 9);
+				if (ms_var && (ms_var->type == ACTION_STACK_VALUE_F64 || ms_var->type == ACTION_STACK_VALUE_F32))
+					max_scroll = (int32_t)varToDoubleSimple(ms_var);
+#endif
+				if (max_scroll < 1) max_scroll = 1;
+				if (ival < 1) ival = 1;
+				if (ival > max_scroll) ival = max_scroll;
+				value_var.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &value_var.data.numeric_value) = (double)ival;
+			}
+			// TextField hscroll setter: coerce to int, clamp to [0, maxhscroll]
+			if (prop_name_len == 7 && strncmp(prop_name, "hscroll", 7) == 0
+				&& MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL)
 			{
 				double dval = varToDoubleSimple(&value_var);
 				int32_t ival;
 				if (isnan(dval) || value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
-					ival = 1; // null/undefined/NaN → 1
+					ival = 0;
 				else
-					ival = (int32_t)dval; // truncate
-				// Clamp to [1, maxscroll]
-				ASObject* props = (ASObject*) mc->dynamic_props;
-				ActionVar* ms_var = getProperty(props, "maxscroll", 9);
-				int32_t max_scroll = 1;
-				if (ms_var && (ms_var->type == ACTION_STACK_VALUE_F64 || ms_var->type == ACTION_STACK_VALUE_F32))
-					max_scroll = (int32_t)varToDoubleSimple(ms_var);
-				if (max_scroll < 1) max_scroll = 1;
-				if (ival < 1) ival = 1;
-				if (ival > max_scroll) ival = max_scroll;
+					ival = (int32_t)dval; // int32 truncation (2147483648 wraps to negative)
+#ifdef NO_GRAPHICS
+				// Compute maxhscroll dynamically
+				char _hs_utf8[4096];
+				u16 _hs_fid, _hs_fh; s16 _hs_ld;
+				int _hs_ww, _hs_fwt, _hs_lm, _hs_rm, _hs_ind;
+				size_t _hs_len = extractTextFieldParams(app_context, mc, _hs_utf8,
+					&_hs_fid, &_hs_fh, &_hs_ld, &_hs_ww, &_hs_fwt, &_hs_lm, &_hs_rm, &_hs_ind);
+				int _hs_tw = ng_computeTextWidth(_hs_fid, _hs_fh, _hs_utf8, _hs_len,
+					0, 0, g_swf_version, 0, 0, 0) / 20;
+				int _hs_vw = (int)mc->width - 4;
+				int32_t max_hscroll = _hs_tw - _hs_vw;
+				if (max_hscroll < 0) max_hscroll = 0;
+#else
+				int32_t max_hscroll = 0;
+				ASObject* _hs_props = (ASObject*)mc->dynamic_props;
+				ActionVar* _mhs_var = getProperty(_hs_props, "maxhscroll", 10);
+				if (_mhs_var && (_mhs_var->type == ACTION_STACK_VALUE_F64 || _mhs_var->type == ACTION_STACK_VALUE_F32))
+					max_hscroll = (int32_t)varToDoubleSimple(_mhs_var);
+#endif
+				if (ival < 0) ival = 0;
+				if (ival > max_hscroll) ival = max_hscroll;
 				value_var.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &value_var.data.numeric_value) = (double)ival;
 			}
@@ -21759,6 +21814,16 @@ void actionSetMember(SWFAppContext* app_context)
 				retainObject((ASObject*) mc->dynamic_props);
 			}
 			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
+#ifdef NO_GRAPHICS
+			// Trigger autoSize recalculation when autoSize, text, or htmlText changes
+			if (MC_IS_TEXTFIELD(mc) && (
+				(prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0) ||
+				(prop_name_len == 4 && strncmp(prop_name, "text", 4) == 0) ||
+				(prop_name_len == 8 && strncmp(prop_name, "htmlText", 8) == 0)))
+			{
+				applyAutoSize(app_context, mc);
+			}
+#endif
 			// Only propagate to global variable table for root movieclip
 			// (timeline variables on root are also accessible as globals)
 			// Child MC properties must NOT leak into global scope.
@@ -22149,15 +22214,280 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 	}
 
 	if (is_width) {
-		*out_result = (double)ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
+		*out_result = (double)(ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
-		    left_margin_twips, right_margin_twips, indent_twips);
+		    left_margin_twips, right_margin_twips, indent_twips) / 20);
 	} else {
-		*out_result = (double)ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
+		*out_result = (double)(ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
-		    left_margin_twips, right_margin_twips, indent_twips);
+		    left_margin_twips, right_margin_twips, indent_twips) / 20);
 	}
 	return 1;
+}
+
+// Extract font/text/wrap parameters from a textfield MC into provided vars.
+// Returns text length (utf8_len), fills other out params. utf8_buf must be >= 4096.
+static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
+	char* utf8_buf, u16* out_font_id, u16* out_font_height, s16* out_leading,
+	int* out_word_wrap, int* out_field_width_twips,
+	int* out_left_margin_twips, int* out_right_margin_twips, int* out_indent_twips)
+{
+	size_t utf8_len = 0;
+	ActionVar* text_prop = getProperty((ASObject*)mc->dynamic_props, "text", 4);
+	if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* txt_u16 = varGetU16Ptr(text_prop);
+		u32 txt_u16_len = text_prop->str_size;
+		int is_html_field = 0;
+		if (mc->ng_textfield_idx >= 0) {
+			u16 tf_flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+			is_html_field = (tf_flags & 0x0040) != 0;
+		}
+		if (is_html_field) {
+			int has_tags = 0;
+			for (u32 ti = 0; ti < txt_u16_len; ti++) {
+				if (txt_u16[ti] == '<') { has_tags = 1; break; }
+			}
+			if (has_tags) {
+				u32 stripped_len;
+				uint16_t* stripped = strip_html_tags_u16(app_context, txt_u16, txt_u16_len, &stripped_len);
+				utf8_len = u16_to_utf8(stripped, stripped_len, utf8_buf, 4096);
+			} else {
+				utf8_len = u16_to_utf8(txt_u16, txt_u16_len, utf8_buf, 4096);
+			}
+		} else {
+			utf8_len = u16_to_utf8(txt_u16, txt_u16_len, utf8_buf, 4096);
+		}
+	}
+
+	u16 font_id = 0, font_height = 0;
+	s16 leading = 0;
+	ActionVar* fid_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_fontId", 10);
+	ActionVar* fh_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_fontHeight", 14);
+	if (fh_prop != NULL && fh_prop->type == ACTION_STACK_VALUE_F64) {
+		double fh; memcpy(&fh, &fh_prop->data.numeric_value, sizeof(double));
+		font_height = (u16)fh;
+	}
+	if (fid_prop != NULL && fid_prop->type == ACTION_STACK_VALUE_F64) {
+		double fid; memcpy(&fid, &fid_prop->data.numeric_value, sizeof(double));
+		font_id = (u16)fid;
+	}
+	if (font_height == 0 && mc->ng_textfield_idx >= 0)
+		font_height = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
+	if (font_id == 0 && mc->ng_textfield_idx >= 0)
+		font_id = ng_getTextFieldFontId(mc->ng_textfield_idx);
+	ActionVar* leading_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_leading", 11);
+	if (leading_prop != NULL && leading_prop->type == ACTION_STACK_VALUE_F64) {
+		double ld; memcpy(&ld, &leading_prop->data.numeric_value, sizeof(double));
+		leading = (s16)ld;
+	} else if (mc->ng_textfield_idx >= 0) {
+		leading = ng_getTextFieldLeading(mc->ng_textfield_idx);
+	} else {
+		leading = 40;
+	}
+
+	int word_wrap = 0, field_width_twips = 0;
+	int left_margin_twips = 0, right_margin_twips = 0, indent_twips = 0;
+	if (mc->dynamic_props) {
+		ActionVar* ww_prop = getProperty((ASObject*)mc->dynamic_props, "wordWrap", 8);
+		if (ww_prop != NULL && ww_prop->type == ACTION_STACK_VALUE_BOOLEAN && ww_prop->data.numeric_value)
+			word_wrap = 1;
+	}
+	if (word_wrap) {
+		field_width_twips = (int)(mc->width * 20.0f) - 80;
+		if (field_width_twips < 0) field_width_twips = 0;
+		ActionVar* lm_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_leftMargin", 14);
+		if (lm_prop != NULL && lm_prop->type == ACTION_STACK_VALUE_F64) {
+			double lm; memcpy(&lm, &lm_prop->data.numeric_value, sizeof(double));
+			left_margin_twips = (int)(lm * 20.0);
+		} else if (mc->ng_textfield_idx >= 0) {
+			left_margin_twips = (int)ng_getTextFieldLeftMargin(mc->ng_textfield_idx);
+		}
+		ActionVar* rm_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_rightMargin", 15);
+		if (rm_prop != NULL && rm_prop->type == ACTION_STACK_VALUE_F64) {
+			double rm; memcpy(&rm, &rm_prop->data.numeric_value, sizeof(double));
+			right_margin_twips = (int)(rm * 20.0);
+		} else if (mc->ng_textfield_idx >= 0) {
+			right_margin_twips = (int)ng_getTextFieldRightMargin(mc->ng_textfield_idx);
+		}
+		ActionVar* ind_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_indent", 10);
+		if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
+			double ind; memcpy(&ind, &ind_prop->data.numeric_value, sizeof(double));
+			indent_twips = (int)(ind * 20.0);
+		} else if (mc->ng_textfield_idx >= 0) {
+			indent_twips = (int)ng_getTextFieldIndent(mc->ng_textfield_idx);
+		}
+		int block_indent_twips = 0;
+		ActionVar* bi_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_blockIndent", 15);
+		if (bi_prop != NULL && bi_prop->type == ACTION_STACK_VALUE_F64) {
+			double bi; memcpy(&bi, &bi_prop->data.numeric_value, sizeof(double));
+			block_indent_twips = (int)(bi * 20.0);
+		}
+		left_margin_twips += block_indent_twips;
+	}
+
+	*out_font_id = font_id;
+	*out_font_height = font_height;
+	*out_leading = leading;
+	*out_word_wrap = word_wrap;
+	*out_field_width_twips = field_width_twips;
+	*out_left_margin_twips = left_margin_twips;
+	*out_right_margin_twips = right_margin_twips;
+	*out_indent_twips = indent_twips;
+	return utf8_len;
+}
+
+// Apply autoSize: recalculate field width/height/x based on text content.
+// Called when text, textFormat, or autoSize property changes.
+static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || !MC_IS_TEXTFIELD(mc) || mc->dynamic_props == NULL) return;
+
+	// Check autoSize mode
+	ActionVar* as_prop = getProperty((ASObject*)mc->dynamic_props, "autoSize", 8);
+	if (as_prop == NULL || as_prop->type != ACTION_STACK_VALUE_STRING) return;
+	const uint16_t* as_u16 = varGetU16Ptr(as_prop);
+	if (as_u16 == NULL || as_prop->str_size < 1) return;
+
+	// Determine mode: 0=none, 1=left, 2=center, 3=right
+	int mode = 0;
+	char as_buf[16];
+	u16_to_utf8(as_u16, as_prop->str_size, as_buf, sizeof(as_buf));
+	if (strcasecmp(as_buf, "left") == 0) mode = 1;
+	else if (strcasecmp(as_buf, "center") == 0) mode = 2;
+	else if (strcasecmp(as_buf, "right") == 0) mode = 3;
+	if (mode == 0) return; // "none" — no auto-sizing
+
+	// Extract text field parameters for raw twips computation
+	char _as_utf8[4096];
+	u16 _as_fid, _as_fh; s16 _as_ld;
+	int _as_ww, _as_fwt, _as_lm, _as_rm, _as_ind;
+	size_t _as_len = extractTextFieldParams(app_context, mc, _as_utf8,
+		&_as_fid, &_as_fh, &_as_ld, &_as_ww, &_as_fwt, &_as_lm, &_as_rm, &_as_ind);
+
+	// Compute raw text width and height in twips
+	int tw_twips = ng_computeTextWidth(_as_fid, _as_fh, _as_utf8, _as_len,
+		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind);
+	int th_twips = ng_computeTextHeight(_as_fid, _as_fh, _as_ld, _as_utf8, _as_len,
+		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind);
+
+	// Compute new dimensions in twips for clean integer arithmetic
+	// Padding: 2px gutter on each side = 80 twips total
+	int new_width_twips = tw_twips + 80;
+	int new_height_twips = th_twips + 80;
+
+	// Convert twips to pixels via double (preserving Twips precision)
+	double new_width_px = (double)new_width_twips / 20.0;
+	double new_height_px = (double)new_height_twips / 20.0;
+
+	// Store original x in twips for clean arithmetic
+	int orig_x_twips = (int)(mc->x * 20.0f);
+	int orig_width_twips = (int)(mc->width * 20.0f);
+
+	// Width: only auto-size if NOT word-wrapped
+	if (!_as_ww) {
+		mc->width = (float)new_width_px;
+	}
+
+	// Height: always auto-size
+	mc->height = (float)new_height_px;
+
+	// X adjustment based on mode (using twips for clean arithmetic)
+	int final_width_twips = (int)(mc->width * 20.0f);
+	int width_change_twips = final_width_twips - orig_width_twips;
+	if (mode == 2) {
+		// Center: split the width change equally on both sides
+		int new_x_twips = orig_x_twips - width_change_twips / 2;
+		mc->x = (float)((double)new_x_twips / 20.0);
+	} else if (mode == 3) {
+		// Right: right edge stays fixed, x moves left
+		int new_x_twips = orig_x_twips - width_change_twips;
+		mc->x = (float)((double)new_x_twips / 20.0);
+	}
+	// Left: x stays the same (no adjustment needed)
+}
+
+// Dynamically compute maxscroll and bottomScroll for a textfield MC.
+// Returns 1 if prop_name matched (maxscroll or bottomScroll), 0 otherwise.
+static __attribute__((noinline)) int computeScrollProperty(
+	SWFAppContext* app_context, MovieClip* mc,
+	const char* prop_name, u32 prop_name_len, double* out_result)
+{
+	int is_maxscroll = (prop_name_len == 9 && memcmp(prop_name, "maxscroll", 9) == 0);
+	int is_bottomscroll = (prop_name_len == 12 && memcmp(prop_name, "bottomScroll", 12) == 0);
+	int is_maxhscroll = (prop_name_len == 10 && memcmp(prop_name, "maxhscroll", 10) == 0);
+	if (!is_maxscroll && !is_bottomscroll && !is_maxhscroll) return 0;
+
+	char utf8[4096];
+	u16 font_id, font_height;
+	s16 leading;
+	int word_wrap, field_width_twips;
+	int left_margin_twips, right_margin_twips, indent_twips;
+	size_t utf8_len = extractTextFieldParams(app_context, mc, utf8,
+		&font_id, &font_height, &leading,
+		&word_wrap, &field_width_twips,
+		&left_margin_twips, &right_margin_twips, &indent_twips);
+
+	if (is_maxhscroll) {
+		// maxhscroll = max(0, textWidth - visible_width_px)
+		// visible_width_px = field_width - 2*gutter(2px) = field_width - 4
+		int text_w = ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
+			0, 0, g_swf_version, 0, 0, 0) / 20; // non-wrap to get full text width (twips→px)
+		int visible_w = (int)mc->width - 4; // subtract 2*gutter (2px each side)
+		int maxhscroll = text_w - visible_w;
+		if (maxhscroll < 0) maxhscroll = 0;
+		*out_result = (double)maxhscroll;
+		return 1;
+	}
+
+	int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
+		word_wrap, field_width_twips, g_swf_version,
+		left_margin_twips, right_margin_twips, indent_twips);
+	int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
+
+	int maxscroll = total_lines - visible_lines + 1;
+	if (maxscroll < 1) maxscroll = 1;
+
+	if (is_maxscroll) {
+		*out_result = (double)maxscroll;
+	} else {
+		// bottomScroll = scroll + visible_lines - 1, clamped to total_lines
+		ASObject* props = (ASObject*)mc->dynamic_props;
+		ActionVar* scroll_var = getProperty(props, "scroll", 6);
+		int scroll = 1;
+		if (scroll_var && (scroll_var->type == ACTION_STACK_VALUE_F64 || scroll_var->type == ACTION_STACK_VALUE_F32)) {
+			scroll = (int)varToDoubleSimple(scroll_var);
+			if (scroll < 1) scroll = 1;
+			if (scroll > maxscroll) scroll = maxscroll;
+		}
+		int bottom = scroll + visible_lines - 1;
+		if (bottom > total_lines) bottom = total_lines;
+		if (bottom < 1) bottom = 1;
+		*out_result = (double)bottom;
+	}
+	return 1;
+}
+
+// Recompute maxscroll for a textfield MC. Used by scroll setter.
+static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc)
+{
+	char utf8[4096];
+	u16 font_id, font_height;
+	s16 leading;
+	int word_wrap, field_width_twips;
+	int left_margin_twips, right_margin_twips, indent_twips;
+	size_t utf8_len = extractTextFieldParams(app_context, mc, utf8,
+		&font_id, &font_height, &leading,
+		&word_wrap, &field_width_twips,
+		&left_margin_twips, &right_margin_twips, &indent_twips);
+
+	int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
+		word_wrap, field_width_twips, g_swf_version,
+		left_margin_twips, right_margin_twips, indent_twips);
+	int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
+
+	int maxscroll = total_lines - visible_lines + 1;
+	if (maxscroll < 1) maxscroll = 1;
+	return maxscroll;
 }
 #endif
 
@@ -22770,12 +23100,17 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 		}
 
-		// Dynamically compute textWidth/textHeight for TextField MovieClips
+		// Dynamically compute textWidth/textHeight/maxscroll/bottomScroll for TextField MovieClips
 #ifdef NO_GRAPHICS
 		if (mc != NULL && MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL) {
 			double _tw_result = -999.0;
 			int _tw_matched = computeTextFieldDimension(app_context, mc, prop_name, prop_name_len, &_tw_result);
 			if (_tw_matched) {
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_tw_result));
+				return;
+			}
+			int _sc_matched = computeScrollProperty(app_context, mc, prop_name, prop_name_len, &_tw_result);
+			if (_sc_matched) {
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_tw_result));
 				return;
 			}
@@ -32890,6 +33225,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
+			applyAutoSize(app_context, mc);
 #endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -32969,6 +33305,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_blockIndent", 15, &margin_val);
 				}
 			}
+			applyAutoSize(app_context, mc);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 #else
@@ -33025,6 +33362,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, tf, "color", 5, tc_prop);
 				}
 			}
+			// Override indent from setTextFormat/setNewTextFormat
+			if (mc->dynamic_props != NULL) {
+				ActionVar* ind_prop = getProperty((ASObject*) mc->dynamic_props, "_tf_indent", 10);
+				if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
+					setProperty(app_context, tf, "indent", 6, ind_prop);
+				}
+			}
 			if (args != NULL) FREE(args);
 			ActionVar result = {0};
 			result.type = ACTION_STACK_VALUE_OBJECT;
@@ -33063,6 +33407,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
 				if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
 					setProperty(app_context, tf, "color", 5, tc_prop);
+				}
+			}
+			// Override indent from setTextFormat/setNewTextFormat
+			if (mc->dynamic_props != NULL) {
+				ActionVar* ind_prop = getProperty((ASObject*) mc->dynamic_props, "_tf_indent", 10);
+				if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
+					setProperty(app_context, tf, "indent", 6, ind_prop);
 				}
 			}
 			if (args != NULL) FREE(args);
@@ -33411,7 +33762,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// getBounds(targetCoordSpace) / getRect(targetCoordSpace)
 			// Returns {xMin, yMin, xMax, yMax} in the target's coordinate space.
 			// Empty clips return sentinel values.
-
 			// Resolve target MovieClip
 			MovieClip* target_mc = mc;  // default: own coordinate space
 			int target_resolved = (num_args == 0); // no arg = self (valid)
@@ -33551,6 +33901,42 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					} else {
 						if (dxmin<lxmin) lxmin=dxmin; if (dxmax>lxmax) lxmax=dxmax;
 						if (dymin<lymin) lymin=dymin; if (dymax>lymax) lymax=dymax;
+					}
+				}
+
+				// Include text field bounds (this MC is a text field)
+				if (mc != NULL && MC_IS_TEXTFIELD(mc) && !has_bounds) {
+					// Text field's own bounds in parent space (twips)
+					// Round to nearest twip to match Ruffle's integer Twips model
+					lxmin = round((double)mc->x * 20.0);
+					lymin = round((double)mc->y * 20.0);
+					lxmax = round((double)mc->x * 20.0) + round((double)mc->width * 20.0);
+					lymax = round((double)mc->y * 20.0) + round((double)mc->height * 20.0);
+					has_bounds = 1;
+				}
+
+				// Include child MovieClip bounds (text fields created via createTextField)
+				if (mc != NULL && !has_bounds) {
+					extern MovieClip* child_mc_cache[];
+					extern int child_mc_count;
+					for (int ci = 0; ci < child_mc_count; ci++) {
+						MovieClip* child = child_mc_cache[ci];
+						if (child == NULL || child->parent != mc) continue;
+						if (!MC_IS_TEXTFIELD(child)) continue;
+						double cxmin = round((double)child->x * 20.0);
+						double cymin = round((double)child->y * 20.0);
+						double cxmax = round((double)child->x * 20.0) + round((double)child->width * 20.0);
+						double cymax = round((double)child->y * 20.0) + round((double)child->height * 20.0);
+						if (!has_bounds) {
+							lxmin = cxmin; lymin = cymin;
+							lxmax = cxmax; lymax = cymax;
+							has_bounds = 1;
+						} else {
+							if (cxmin < lxmin) lxmin = cxmin;
+							if (cymin < lymin) lymin = cymin;
+							if (cxmax > lxmax) lxmax = cxmax;
+							if (cymax > lymax) lymax = cymax;
+						}
 					}
 				}
 
