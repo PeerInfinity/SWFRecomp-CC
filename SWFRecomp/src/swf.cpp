@@ -464,10 +464,11 @@ namespace SWFRecomp
 			}
 			catch (const std::exception& e)
 			{
-				fprintf(stderr, "Warning: tag %d failed: %s", tag.code, e.what());
-				// Skip past the tag data to continue parsing
-				cur_pos = tag_data_end;
+				fprintf(stderr, "Warning: tag %d failed: %s\n", tag.code, e.what());
 			}
+			// Always advance cur_pos to the end of the tag data,
+			// even if the tag handler didn't consume all bytes
+			cur_pos = tag_data_end;
 			tag.clearFields();
 		}
 		
@@ -1606,6 +1607,10 @@ namespace SWFRecomp
 					// Skip any remaining data (bounds table, kerning, etc.)
 					cur_pos = font_tag_start + font_tag_length;
 				}
+
+				// Always skip to end of font tag data (handles 0-glyph fonts,
+				// remaining bounds/kerning tables, etc.)
+				cur_pos = font_tag_start + font_tag_length;
 
 				// Emit tagDefineFontInfo for NO_GRAPHICS runtime
 				if (font_names.find(font_id) != font_names.end()) {
