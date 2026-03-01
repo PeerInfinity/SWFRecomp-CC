@@ -1,18 +1,27 @@
 # Stage Object Properties Implementation Plan
 <!-- TESTS: stage_object_properties, stage_object_properties_swf6, stage_object_children, stage_object_enumerate, stage_display_state, stage_property_representation, stage_scale_mode -->
 
-Last updated: 2026-02-14
+Last updated: 2026-02-28
+
+## Status: COMPLETE
+
+All 7 tests pass (7/7 = 100%):
+- `stage_object_properties` — 241/241 PASS
+- `stage_object_properties_swf6` — 231/231 PASS
+- `stage_object_children` — 83/83 PASS
+- `stage_object_enumerate` — 4/4 PASS
+- `stage_display_state` — 16/16 PASS
+- `stage_property_representation` — 586/586 PASS
+- `stage_scale_mode` — 39/39 PASS
+
+All phases were implemented in previous sessions. Verified 2026-02-28.
 
 ## Overview
 
-The "Stage Object Properties" category in FAILING_TESTS_BY_FEATURE.md covers 7 tests. Despite the category name, these tests actually cover **two distinct features**:
+The "Stage Object Properties" category covers 7 tests with **two distinct features**:
 
 1. **Flash `Stage` global object** (2 tests): `stage_display_state`, `stage_scale_mode`
 2. **MovieClip display properties** (5 tests): `stage_object_properties`, `stage_object_properties_swf6`, `stage_object_children`, `stage_object_enumerate`, `stage_property_representation`
-
-The MovieClip property tests are already partially supported (68% on stage_object_properties/swf6, 82% on stage_object_children) — they need bug fixes for precision, _width/_height↔scale interaction, rotation wrapping, _level addressing, and child enumeration. The Stage global tests are 0% because the Stage object doesn't exist yet.
-
-**Blocking issue**: All 7 tests currently fail with `COMPILE_FAIL` due to missing UTF-16 string function source files in `verify_output.py`'s `compile_native()`. This must be fixed first before any test output can be evaluated.
 
 ---
 

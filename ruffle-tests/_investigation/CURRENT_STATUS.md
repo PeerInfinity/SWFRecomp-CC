@@ -137,7 +137,7 @@ Last updated: 2026-02-28
 | PARSING_FUNCTIONS_PLAN | **FULLY COMPLETE** | 3/3 pass (parse_int, parse_float, parsefloat_swf5) ✅ | — |
 | COLOR_OBJECT_PLAN | **COMPLETE** | extends_native_type ✅ | — |
 | GEOMETRY_CLASSES_PLAN | **COMPLETE** | transform, local_to_global partial | — |
-| STAGE_PLAN | **Phases 1,2,5,7 DONE** | stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅ | Phase 4 (_level addressing), Phase 8 (children) |
+| STAGE_PLAN | **FULLY COMPLETE** → `complete/` | 7/7 pass: stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅, stage_object_children ✅ | — |
 | STAGE_FRAME_PROPS_PLAN | **Phases 1-8 COMPLETE** → `blocked/` | 7/9 pass (stage_property_representation ✅, stage_object_enumerate ✅, stage_display_state ✅, stage_scale_mode ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅, stage_object_children ✅) | Phase 9 blocked: mouse input simulation for "Pressed shape1" (frame_size_translated_positive/negative at 20/21) |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
