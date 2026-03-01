@@ -235,13 +235,16 @@ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
     const u16* code_table, const s16* advance_table, size_t glyph_count);
 int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
-    int left_margin_twips, int right_margin_twips, int indent_twips, int align);
+    int left_margin_twips, int right_margin_twips, int indent_twips, int align,
+    int letter_spacing_twips);
 int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
-    int left_margin_twips, int right_margin_twips, int indent_twips);
+    int left_margin_twips, int right_margin_twips, int indent_twips,
+    int letter_spacing_twips);
 int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
-    int left_margin_twips, int right_margin_twips, int indent_twips);
+    int left_margin_twips, int right_margin_twips, int indent_twips,
+    int letter_spacing_twips);
 int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, float field_height_pixels);
 u16 ng_findFontIdByName(const char* name);
 void ng_record_video(SWFAppContext* app_context, u16 char_id);

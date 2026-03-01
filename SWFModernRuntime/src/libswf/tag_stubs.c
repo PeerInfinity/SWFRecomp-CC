@@ -101,6 +101,42 @@ static struct {
 } ng_fonts[MAX_FONTS_NG];
 static size_t ng_font_count = 0;
 
+// Built-in Noto Sans fallback font for createTextField (no embedded font).
+// Ruffle uses Noto Sans as its device font; these metrics are from the actual
+// Noto Sans Regular TTF (notosans.subset.ttf from Ruffle core/assets).
+// Covers ASCII 32-126 (95 glyphs), ascent=1069, descent=293, leading=0, em=1000.
+static const u16 builtin_noto_sans_codes[] = {
+	32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,
+	48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,
+	64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,
+	80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,
+	96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,
+	112,113,114,115,116,117,118,119,120,121,122,123,124,125,126
+};
+static const s16 builtin_noto_sans_advances[] = {
+	260,269,408,646,572,831,732,225,300,300,551,572,268,322,268,372,
+	572,572,572,572,572,572,572,572,572,572,268,268,572,572,572,434,
+	899,639,650,632,730,556,519,728,741,339,273,619,524,907,760,781,
+	605,781,622,549,556,731,600,930,586,566,572,329,372,329,572,444,
+	281,561,615,480,615,564,344,615,618,258,258,534,258,935,618,605,
+	615,615,413,479,361,618,508,786,529,510,470,380,551,380,572
+};
+#define BUILTIN_NOTO_SANS_GLYPH_COUNT 95
+#define BUILTIN_NOTO_SANS_ASCENT 1069
+#define BUILTIN_NOTO_SANS_DESCENT 293
+#define BUILTIN_NOTO_SANS_LEADING 0
+#define BUILTIN_NOTO_SANS_EM 1000
+// Index reserved for built-in font (never a real SWF font_id)
+#define BUILTIN_FONT_IDX (-2)
+
+// Look up glyph advance in the built-in Noto Sans fallback font.
+static s16 builtin_font_glyph_advance(u16 code_point)
+{
+	if (code_point >= 32 && code_point <= 126)
+		return builtin_noto_sans_advances[code_point - 32];
+	return -1;
+}
+
 // TextField property registry (properties of DefineEditText characters)
 #define MAX_TEXTFIELDS_NG 64
 static struct {
@@ -430,11 +466,56 @@ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
 	}
 }
 
+// Ensure the built-in Noto Sans fallback is registered.
+// Called lazily when font_id=0 is requested and no font with id 0 exists.
+static int ng_builtin_font_registered = 0;
+static void ng_ensure_builtin_font(void)
+{
+	if (ng_builtin_font_registered) return;
+	ng_builtin_font_registered = 1;
+	if (ng_font_count >= MAX_FONTS_NG) return;
+	size_t idx = ng_font_count++;
+	ng_fonts[idx].font_id = 0;
+	strncpy(ng_fonts[idx].name, "Noto Sans", sizeof(ng_fonts[idx].name) - 1);
+	ng_fonts[idx].bold = 0;
+	ng_fonts[idx].italic = 0;
+	ng_fonts[idx].has_metrics = 1;
+	ng_fonts[idx].ascent = BUILTIN_NOTO_SANS_ASCENT;
+	ng_fonts[idx].descent = BUILTIN_NOTO_SANS_DESCENT;
+	ng_fonts[idx].leading = BUILTIN_NOTO_SANS_LEADING;
+	ng_fonts[idx].em_square = BUILTIN_NOTO_SANS_EM;
+	ng_fonts[idx].glyph_count = BUILTIN_NOTO_SANS_GLYPH_COUNT;
+	for (size_t j = 0; j < BUILTIN_NOTO_SANS_GLYPH_COUNT; j++) {
+		ng_fonts[idx].code_table[j] = builtin_noto_sans_codes[j];
+		ng_fonts[idx].advance_table[j] = builtin_noto_sans_advances[j];
+	}
+}
+
 // Find the font entry index for a given font_id. Returns -1 if not found.
+// When font_id=0 is requested and no explicit font 0 exists, lazily registers
+// the built-in Noto Sans fallback (used by createTextField with no embedded font).
 static int ng_find_font(u16 font_id)
 {
 	for (size_t i = 0; i < ng_font_count; i++)
 		if (ng_fonts[i].font_id == font_id) return (int)i;
+	if (font_id == 0) {
+		ng_ensure_builtin_font();
+		for (size_t i = 0; i < ng_font_count; i++)
+			if (ng_fonts[i].font_id == 0) return (int)i;
+	}
+	return -1;
+}
+
+// Find a font with metrics. If the given font_id has no metrics, fall back to
+// the built-in Noto Sans font (device font substitute). Returns -1 if none found.
+static int ng_find_font_with_metrics(u16 font_id)
+{
+	int fi = ng_find_font(font_id);
+	if (fi >= 0 && ng_fonts[fi].has_metrics) return fi;
+	// Font exists but has no metrics — fall back to built-in Noto Sans
+	ng_ensure_builtin_font();
+	for (size_t i = 0; i < ng_font_count; i++)
+		if (ng_fonts[i].font_id == 0 && ng_fonts[i].has_metrics) return (int)i;
 	return -1;
 }
 
@@ -469,16 +550,21 @@ static u16 ng_decode_utf8_char(const char* text, size_t text_len, size_t* pos)
 
 // Measure width of a UTF-8 substring in twips using font glyph advances.
 static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
-    const char* text, size_t start, size_t end)
+    const char* text, size_t start, size_t end, int letter_spacing_twips)
 {
 	int w = 0;
+	int char_count = 0;
 	size_t i = start;
 	while (i < end) {
 		u16 cp = ng_decode_utf8_char(text, end, &i);
 		s16 adv = ng_font_glyph_advance(font_idx, cp);
 		if (adv >= 0)
 			w += (int)((float)adv * (float)font_height / (float)em);
+		char_count++;
 	}
+	// Letter spacing is added after each character (including the last)
+	if (letter_spacing_twips != 0 && char_count > 0)
+		w += letter_spacing_twips * char_count;
 	return w;
 }
 
@@ -494,7 +580,7 @@ static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
 static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
     const char* text, size_t text_len, int field_width_twips, int swf_version,
     int left_margin_twips, int right_margin_twips, int indent_twips,
-    int* max_width_out, int* max_width_full_out)
+    int* max_width_out, int* max_width_full_out, int letter_spacing_twips)
 {
 	if (text_len == 0) {
 		*max_width_out = 0;
@@ -579,7 +665,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 		}
 
 		// Measure the segment
-		int seg_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, seg_end);
+		int seg_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, seg_end, letter_spacing_twips);
 
 		// For SWF8: compute trimmed width (trailing spaces don't count for measurement)
 		int seg_trimmed_w = seg_w;
@@ -589,7 +675,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 			while (trimmed_end > seg_start && (unsigned char)text[trimmed_end - 1] == ' ')
 				trimmed_end--;
 			if (trimmed_end < seg_end)
-				seg_trimmed_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, trimmed_end);
+				seg_trimmed_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, trimmed_end, letter_spacing_twips);
 		}
 
 		// Check if segment fits on current line
@@ -629,7 +715,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 				size_t tmp = seg_start;
 				ng_decode_utf8_char(text, seg_end, &tmp);
 				last_fitting_pos = tmp;
-				last_fitting_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, last_fitting_pos);
+				last_fitting_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, last_fitting_pos, letter_spacing_twips);
 			}
 			if (last_fitting_w > max_line_w) max_line_w = last_fitting_w;
 			// Start new line with remainder (subsequent lines don't have indent)
@@ -667,23 +753,42 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 // space width (matching Ruffle's fixup_line behavior where only non-left alignment trims).
 int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
-    int left_margin_twips, int right_margin_twips, int indent_twips, int align)
+    int left_margin_twips, int right_margin_twips, int indent_twips, int align,
+    int letter_spacing_twips)
 {
-	int fi = ng_find_font(font_id);
-	if (fi < 0 || !ng_fonts[fi].has_metrics || text == NULL || text_len == 0) return 0;
+	int fi = ng_find_font_with_metrics(font_id);
+	if (fi < 0 || text == NULL || text_len == 0) return 0;
 
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
 
 	if (!word_wrap || field_width_twips <= 0) {
 		// No wrap: measure each hard line, return max width
+		// SWF8+: non-left alignment trims trailing spaces from textWidth
+		int trim_trailing = (swf_version >= 8 && align != 0);
 		int max_width_twips = 0;
 		int cur_width_twips = 0;
+		int cur_trimmed_twips = 0; // width excluding trailing spaces
+		int char_count = 0;
+		int trimmed_char_count = 0;
+		int in_trailing_spaces = 0;
 		for (size_t i = 0; i < text_len; ) {
 			unsigned char c = (unsigned char)text[i];
 			if (c == '\r' || c == '\n') {
-				if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
+				int w = cur_width_twips;
+				if (letter_spacing_twips != 0 && char_count > 0)
+					w += letter_spacing_twips * char_count;
+				if (trim_trailing) {
+					w = cur_trimmed_twips;
+					if (letter_spacing_twips != 0 && trimmed_char_count > 0)
+						w += letter_spacing_twips * trimmed_char_count;
+				}
+				if (w > max_width_twips) max_width_twips = w;
 				cur_width_twips = 0;
+				cur_trimmed_twips = 0;
+				char_count = 0;
+				trimmed_char_count = 0;
+				in_trailing_spaces = 0;
 				if (c == '\r' && i + 1 < text_len && text[i + 1] == '\n') i += 2; else i++;
 				continue;
 			}
@@ -691,8 +796,26 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 			s16 adv = ng_font_glyph_advance(fi, code_point);
 			if (adv >= 0)
 				cur_width_twips += (int)((float)adv * (float)font_height / (float)em);
+			char_count++;
+			if (trim_trailing) {
+				if (code_point == ' ') {
+					in_trailing_spaces = 1;
+				} else {
+					in_trailing_spaces = 0;
+					cur_trimmed_twips = cur_width_twips;
+					trimmed_char_count = char_count;
+				}
+			}
 		}
-		if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
+		int w = cur_width_twips;
+		if (letter_spacing_twips != 0 && char_count > 0)
+			w += letter_spacing_twips * char_count;
+		if (trim_trailing) {
+			w = cur_trimmed_twips;
+			if (letter_spacing_twips != 0 && trimmed_char_count > 0)
+				w += letter_spacing_twips * trimmed_char_count;
+		}
+		if (w > max_width_twips) max_width_twips = w;
 		return max_width_twips;
 	}
 
@@ -710,7 +833,7 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 			ng_wrap_count_lines(fi, em, font_height, text + line_start, i - line_start,
 			    field_width_twips, swf_version,
 			    left_margin_twips, right_margin_twips, indent_twips,
-			    &line_max_w, &line_max_w_full);
+			    &line_max_w, &line_max_w_full, letter_spacing_twips);
 			int w = use_full ? line_max_w_full : line_max_w;
 			if (w > max_width_twips) max_width_twips = w;
 			if (is_newline) {
@@ -727,10 +850,11 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 // font_height is in twips, leading_twips is the DefineEditText leading value in twips.
 int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
-    int left_margin_twips, int right_margin_twips, int indent_twips)
+    int left_margin_twips, int right_margin_twips, int indent_twips,
+    int letter_spacing_twips)
 {
-	int fi = ng_find_font(font_id);
-	if (fi < 0 || !ng_fonts[fi].has_metrics) return 0;
+	int fi = ng_find_font_with_metrics(font_id);
+	if (fi < 0) return 0;
 
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
@@ -740,9 +864,12 @@ int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const 
 	int ascent_twips = (int)((float)ng_fonts[fi].ascent * (float)font_height / (float)em);
 	int descent_twips = (int)((float)ng_fonts[fi].descent * (float)font_height / (float)em);
 
-	// Count lines (empty text = 1 line)
+	// Empty text = 0 height (Ruffle skips empty last line for non-input fields)
+	if (text == NULL || text_len == 0) return 0;
+
+	// Count lines
 	int line_count = 1;
-	if (text != NULL && text_len > 0) {
+	{
 		if (!word_wrap || field_width_twips <= 0) {
 			// No wrap: count hard lines only
 			for (size_t i = 0; i < text_len; i++) {
@@ -765,7 +892,8 @@ int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const 
 					line_count += ng_wrap_count_lines(fi, em, font_height,
 					    text + line_start, i - line_start,
 					    field_width_twips, swf_version,
-					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w, NULL);
+					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w, NULL,
+					    letter_spacing_twips);
 					if (is_newline) {
 						if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
 					}
@@ -790,10 +918,11 @@ int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const 
 // Compute total line count for text (same line counting logic as ng_computeTextHeight).
 int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
-    int left_margin_twips, int right_margin_twips, int indent_twips)
+    int left_margin_twips, int right_margin_twips, int indent_twips,
+    int letter_spacing_twips)
 {
-	int fi = ng_find_font(font_id);
-	if (fi < 0 || !ng_fonts[fi].has_metrics) return 1;
+	int fi = ng_find_font_with_metrics(font_id);
+	if (fi < 0) return 1;
 
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
@@ -820,7 +949,8 @@ int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size
 					line_count += ng_wrap_count_lines(fi, em, font_height,
 					    text + line_start, i - line_start,
 					    field_width_twips, swf_version,
-					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w, NULL);
+					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w, NULL,
+					    letter_spacing_twips);
 					if (is_newline) {
 						if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
 					}
@@ -837,8 +967,8 @@ int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size
 // field_height_pixels is mc->height. Returns at least 1.
 int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, float field_height_pixels)
 {
-	int fi = ng_find_font(font_id);
-	if (fi < 0 || !ng_fonts[fi].has_metrics) return 1;
+	int fi = ng_find_font_with_metrics(font_id);
+	if (fi < 0) return 1;
 
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;

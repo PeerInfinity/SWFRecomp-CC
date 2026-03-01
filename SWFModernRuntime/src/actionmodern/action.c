@@ -9084,6 +9084,7 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
 static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
 #ifdef NO_GRAPHICS
 static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc);
+static int getLetterSpacingTwips(MovieClip* mc);
 static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 	char* utf8_buf, u16* out_font_id, u16* out_font_height, s16* out_leading,
 	int* out_word_wrap, int* out_field_width_twips,
@@ -21690,7 +21691,7 @@ void actionSetMember(SWFAppContext* app_context)
 				size_t _hs_len = extractTextFieldParams(app_context, mc, _hs_utf8,
 					&_hs_fid, &_hs_fh, &_hs_ld, &_hs_ww, &_hs_fwt, &_hs_lm, &_hs_rm, &_hs_ind);
 				int _hs_tw = ng_computeTextWidth(_hs_fid, _hs_fh, _hs_utf8, _hs_len,
-					0, 0, g_swf_version, 0, 0, 0, 0) / 20;
+					0, 0, g_swf_version, 0, 0, 0, 0, getLetterSpacingTwips(mc)) / 20;
 				int _hs_vw = (int)mc->width - 4;
 				int32_t max_hscroll = _hs_tw - _hs_vw;
 				if (max_hscroll < 0) max_hscroll = 0;
@@ -22317,15 +22318,30 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 			if (align_prop->str_size == 6 && au[0] == 'c') align = 1;       // "center"
 			else if (align_prop->str_size == 5 && au[0] == 'r') align = 2;  // "right"
 		}
+		int ls_twips = getLetterSpacingTwips(mc);
 		*out_result = (double)(ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
-		    left_margin_twips, right_margin_twips, indent_twips, align) / 20);
+		    left_margin_twips, right_margin_twips, indent_twips, align, ls_twips) / 20);
 	} else {
+		int ls_twips = getLetterSpacingTwips(mc);
 		*out_result = (double)(ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
-		    left_margin_twips, right_margin_twips, indent_twips) / 20);
+		    left_margin_twips, right_margin_twips, indent_twips, ls_twips) / 20);
 	}
 	return 1;
+}
+
+// Read letter spacing in twips from a textfield MC's TextFormat properties.
+static int getLetterSpacingTwips(MovieClip* mc)
+{
+	if (!mc->dynamic_props) return 0;
+	ActionVar* ls_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_letterSpacing", 17);
+	if (ls_prop != NULL && ls_prop->type == ACTION_STACK_VALUE_F64) {
+		double ls; memcpy(&ls, &ls_prop->data.numeric_value, sizeof(double));
+		if (!isnan(ls) && !isinf(ls))
+			return (int)(ls * 20.0); // pixels to twips
+	}
+	return 0;
 }
 
 // Extract font/text/wrap parameters from a textfield MC into provided vars.
@@ -22378,6 +22394,8 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 		font_height = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
 	if (font_id == 0 && mc->ng_textfield_idx >= 0)
 		font_id = ng_getTextFieldFontId(mc->ng_textfield_idx);
+	// createTextField defaults: 12px Noto Sans (font_id=0 triggers built-in fallback)
+	if (font_height == 0) font_height = 240; // 12px = 240 twips
 	ActionVar* leading_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_leading", 11);
 	if (leading_prop != NULL && leading_prop->type == ACTION_STACK_VALUE_F64) {
 		double ld; memcpy(&ld, &leading_prop->data.numeric_value, sizeof(double));
@@ -22385,7 +22403,7 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 	} else if (mc->ng_textfield_idx >= 0) {
 		leading = ng_getTextFieldLeading(mc->ng_textfield_idx);
 	} else {
-		leading = 40;
+		leading = 0; // createTextField default: no leading (matches Ruffle TextFormat default)
 	}
 
 	int word_wrap = 0, field_width_twips = 0;
@@ -22468,13 +22486,23 @@ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc)
 		&_as_fid, &_as_fh, &_as_ld, &_as_ww, &_as_fwt, &_as_lm, &_as_rm, &_as_ind);
 
 	// Compute raw text width and height in twips
-	// For autoSize, always use trimmed width (exclude trailing spaces) — pass align=1
-	// to force trimmed mode. The textWidth property uses actual alignment, but autoSize
-	// field sizing always trims trailing spaces (matches Ruffle behavior).
+	// SWF<=7: autoSize always trims trailing spaces (pass align=1 to force trim).
+	// SWF>=8: autoSize uses actual text alignment (left keeps trailing spaces, others trim).
+	int _as_align = 1; // default: force trim (SWF<=7 behavior)
+	if (g_swf_version >= 8) {
+		_as_align = 0; // default left (no trim)
+		ActionVar* _aa_prop = getProperty((ASObject*)mc->dynamic_props, "align", 5);
+		if (_aa_prop != NULL && _aa_prop->type == ACTION_STACK_VALUE_STRING && _aa_prop->str_size > 0) {
+			const uint16_t* _aa_u16 = varGetU16Ptr(_aa_prop);
+			if (_aa_prop->str_size == 6 && _aa_u16[0] == 'c') _as_align = 1;       // center
+			else if (_aa_prop->str_size == 5 && _aa_u16[0] == 'r') _as_align = 2;   // right
+		}
+	}
+	int _as_ls = getLetterSpacingTwips(mc);
 	int tw_twips = ng_computeTextWidth(_as_fid, _as_fh, _as_utf8, _as_len,
-		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, 1);
+		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, _as_align, _as_ls);
 	int th_twips = ng_computeTextHeight(_as_fid, _as_fh, _as_ld, _as_utf8, _as_len,
-		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind);
+		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, _as_ls);
 
 	// Compute new dimensions in twips for clean integer arithmetic
 	// Padding: 2px gutter on each side = 80 twips total
@@ -22533,11 +22561,13 @@ static __attribute__((noinline)) int computeScrollProperty(
 		&word_wrap, &field_width_twips,
 		&left_margin_twips, &right_margin_twips, &indent_twips);
 
+	int ls_twips = getLetterSpacingTwips(mc);
+
 	if (is_maxhscroll) {
 		// maxhscroll = max(0, textWidth - visible_width_px)
 		// visible_width_px = field_width - 2*gutter(2px) = field_width - 4
 		int text_w = ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
-			0, 0, g_swf_version, 0, 0, 0, 0) / 20; // non-wrap to get full text width (twips→px)
+			0, 0, g_swf_version, 0, 0, 0, 0, ls_twips) / 20; // non-wrap to get full text width (twips→px)
 		int visible_w = (int)mc->width - 4; // subtract 2*gutter (2px each side)
 		int maxhscroll = text_w - visible_w;
 		if (maxhscroll < 0) maxhscroll = 0;
@@ -22547,7 +22577,7 @@ static __attribute__((noinline)) int computeScrollProperty(
 
 	int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
 		word_wrap, field_width_twips, g_swf_version,
-		left_margin_twips, right_margin_twips, indent_twips);
+		left_margin_twips, right_margin_twips, indent_twips, ls_twips);
 	int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
 
 	int maxscroll = total_lines - visible_lines + 1;
@@ -22588,7 +22618,7 @@ static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc)
 
 	int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
 		word_wrap, field_width_twips, g_swf_version,
-		left_margin_twips, right_margin_twips, indent_twips);
+		left_margin_twips, right_margin_twips, indent_twips, getLetterSpacingTwips(mc));
 	int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
 
 	int maxscroll = total_lines - visible_lines + 1;
@@ -33336,6 +33366,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						margin_val.data.numeric_value = bi_prop->data.numeric_value;
 						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_blockIndent", 15, &margin_val);
 					}
+					ActionVar* ls_prop = getProperty(fmt_obj, "letterSpacing", 13);
+					if (ls_prop != NULL && ls_prop->type == ACTION_STACK_VALUE_F64) {
+						margin_val.data.numeric_value = ls_prop->data.numeric_value;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_letterSpacing", 17, &margin_val);
+					}
 				}
 			}
 			applyAutoSize(app_context, mc);
@@ -33416,6 +33451,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (bi_prop != NULL && bi_prop->type == ACTION_STACK_VALUE_F64) {
 					margin_val.data.numeric_value = bi_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_blockIndent", 15, &margin_val);
+				}
+				ActionVar* ls_prop = getProperty(fmt_obj, "letterSpacing", 13);
+				if (ls_prop != NULL && ls_prop->type == ACTION_STACK_VALUE_F64) {
+					margin_val.data.numeric_value = ls_prop->data.numeric_value;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_letterSpacing", 17, &margin_val);
+				}
+				// Store text alignment from TextFormat
+				ActionVar* al_prop = getProperty(fmt_obj, "align", 5);
+				if (al_prop != NULL && al_prop->type == ACTION_STACK_VALUE_STRING && al_prop->str_size > 0 && mc->dynamic_props) {
+					setProperty(app_context, (ASObject*)mc->dynamic_props, "align", 5, al_prop);
 				}
 			}
 			applyAutoSize(app_context, mc);
