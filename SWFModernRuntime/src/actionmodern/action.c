@@ -32843,7 +32843,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 			// Determine selection range — use global indices if this MC is focused, else position 0
 			int sel_begin = 0, sel_end = 0;
-			if (mc == g_focused_mc && g_selection_begin >= 0 && g_selection_end >= 0) {
+			if (mc == g_focused_mc && g_tf_select_all) {
+				sel_begin = 0;
+				sel_end = (int)old_u16_len;
+			} else if (mc == g_focused_mc && g_selection_begin >= 0 && g_selection_end >= 0) {
 				sel_begin = g_selection_begin;
 				sel_end = g_selection_end;
 			}
@@ -32890,6 +32893,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_selection_begin = new_caret;
 				g_selection_end = new_caret;
 				g_selection_caret = new_caret;
+				g_tf_select_all = 0;
 			}
 
 			// Sync to variable binding
@@ -35213,7 +35217,16 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	}
 	if (new_mc == NULL) return ret;
 	if (!mc_is_focusable_by_setfocus(new_mc)) return ret;
-	if (new_mc == g_focused_mc) { ret.data.numeric_value = 1; return ret; }
+	if (new_mc == g_focused_mc) {
+		// Re-focusing the same text field re-selects all text
+		if (MC_IS_TEXTFIELD(new_mc)) {
+			g_tf_select_all = 1;
+			g_selection_begin = -1;
+			g_selection_caret = -1;
+			g_selection_end = -1;
+		}
+		ret.data.numeric_value = 1; return ret;
+	}
 	queue_deferred_roll(g_focused_mc, new_mc);
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 	ret.data.numeric_value = 1;
