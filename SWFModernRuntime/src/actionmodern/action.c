@@ -10194,9 +10194,10 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 	}
 
 	// For textfields (static or dynamic), use stored width/height directly
+	// Re-round to twips to recover exact double from float storage
 	if (MC_IS_TEXTFIELD(mc)) {
-		*out_nat_w = (double)mc->width;
-		*out_nat_h = (double)mc->height;
+		*out_nat_w = round((double)mc->width * 20.0) / 20.0;
+		*out_nat_h = round((double)mc->height * 20.0) / 20.0;
 		return (*out_nat_w > 0.0 || *out_nat_h > 0.0) ? 1 : 0;
 	}
 
@@ -10287,8 +10288,9 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 	if (mc == NULL) return;
 #ifdef NO_GRAPHICS
 	// TextFields (static or dynamic) store _width as a direct dimension, not via xscale.
+	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
-		mc->width = (float)v;
+		mc->width = (float)(floor(fabs(v) * 20.0) / 20.0);
 		return;
 	}
 	double nat_w = 0, nat_h = 0;
@@ -10338,8 +10340,9 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 	if (mc == NULL) return;
 #ifdef NO_GRAPHICS
 	// TextFields (static or dynamic) store _height as a direct dimension, not via yscale.
+	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
-		mc->height = (float)v;
+		mc->height = (float)(floor(fabs(v) * 20.0) / 20.0);
 		return;
 	}
 	double nat_w = 0, nat_h = 0;
@@ -17447,8 +17450,8 @@ void actionSetVariable(SWFAppContext* app_context)
 			handled = 1; }
 		else if (strcasecmp(var_name, "_alpha") == 0) { mc->alpha = fval; handled = 1; }
 		else if (strcasecmp(var_name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; handled = 1; }
-		else if (strcasecmp(var_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); handled = 1; }
-		else if (strcasecmp(var_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); handled = 1; }
+		else if (strcasecmp(var_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); handled = 1; }
+		else if (strcasecmp(var_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); handled = 1; }
 		else if (strcasecmp(var_name, "_quality") == 0)
 		{
 			char buf[16];
@@ -20965,14 +20968,15 @@ void actionSetMember(SWFAppContext* app_context)
 #ifdef NO_GRAPHICS
 					mc->as_set_flags |= 1;
 #endif
-					mc->x = fval; return;
+					// Flash stores positions in twips (1/20 pixel), truncating fractional twips
+					mc->x = (float)(floor(dval * 20.0) / 20.0); return;
 				}
 				if (strcasecmp(prop_name, "_y") == 0) {
 					if (dval_invalid) return;
 #ifdef NO_GRAPHICS
 					mc->as_set_flags |= 2;
 #endif
-					mc->y = fval; return;
+					mc->y = (float)(floor(dval * 20.0) / 20.0); return;
 				}
 				if (strcasecmp(prop_name, "_xscale") == 0) {
 					if (dval_invalid) return;
@@ -21049,8 +21053,8 @@ void actionSetMember(SWFAppContext* app_context)
 					mc->visible = (vis_d != 0.0) ? 1 : 0;
 					return;
 				}
-				if (strcasecmp(prop_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); return; }
-				if (strcasecmp(prop_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); return; }
+				if (strcasecmp(prop_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); return; }
+				if (strcasecmp(prop_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); return; }
 				if (strcasecmp(prop_name, "_quality") == 0)
 				{
 					char buf[16];
@@ -22533,6 +22537,11 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 #endif
+				// TextFields: return twip-snapped value as F64 for full precision
+				if (MC_IS_TEXTFIELD(mc)) {
+					double dx = round((double)mc->x * 20.0) / 20.0;
+					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dx)); return;
+				}
 				float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_y") == 0) {
 #ifdef NO_GRAPHICS
@@ -22548,6 +22557,10 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 #endif
+				if (MC_IS_TEXTFIELD(mc)) {
+					double dy = round((double)mc->y * 20.0) / 20.0;
+					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dy)); return;
+				}
 				float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_xscale") == 0) {
 #ifdef NO_GRAPHICS
@@ -27482,17 +27495,23 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				inst_name = _ctf_name_buf;
 			}
 			int depth_val = (int) varToDouble(&args[1]);
-			double x = varToDouble(&args[2]);
-			double y = varToDouble(&args[3]);
-			double w = varToDouble(&args[4]);
-			double h = varToDouble(&args[5]);
+			double x = varToDoubleSimple(&args[2]);
+			double y = varToDoubleSimple(&args[3]);
+			double w = varToDoubleSimple(&args[4]);
+			double h = varToDoubleSimple(&args[5]);
 			(void)depth_val;
 
+			// Flash truncates createTextField coordinates to integers (NaN/Inf → 0)
+			int xi = (isnan(x) || isinf(x)) ? 0 : (int)x;
+			int yi = (isnan(y) || isinf(y)) ? 0 : (int)y;
+			int wi = (isnan(w) || isinf(w)) ? 0 : (int)w;
+			int hi = (isnan(h) || isinf(h)) ? 0 : (int)h;
+
 			MovieClip* child = createMovieClip(inst_name, mc);
-			child->x = (float) x;
-			child->y = (float) y;
-			child->width = (float) w;
-			child->height = (float) h;
+			child->x = (float) xi;
+			child->y = (float) yi;
+			child->width = (float) abs(wi);
+			child->height = (float) abs(hi);
 			child->ng_textfield_idx = -2; // dynamically created textfield
 
 			if (child->dynamic_props == NULL) {
@@ -27636,17 +27655,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				child_mc_cache[child_mc_count++] = child;
 			}
 
-			// Return target path
-			ActionVar result = {0};
-			result.type = ACTION_STACK_VALUE_STRING;
-			{
-				u32 _tgt_u16_len;
-				uint16_t* _tgt_u16 = ascii_to_u16(app_context, child->target, (int)strlen(child->target), &_tgt_u16_len);
-				result.str_size = _tgt_u16_len;
-				VAL(u64, &result.data.numeric_value) = (u64)_tgt_u16;
-				if (args != NULL) FREE(args);
-				pushVar(app_context, &result);
-			}
+			// Return MovieClip reference (Flash returns the MC, not a string path)
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
 		} else {
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -32200,19 +32211,25 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					u16_to_utf8(_mctf_name_u16, args[0].str_size, _mctf_name_buf, sizeof(_mctf_name_buf));
 					inst_name = _mctf_name_buf;
 				}
-				int depth_val = (int) varToDouble(&args[1]);
-				double x = varToDouble(&args[2]);
-				double y = varToDouble(&args[3]);
-				double w = varToDouble(&args[4]);
-				double h = varToDouble(&args[5]);
+				int depth_val = (int) varToDoubleSimple(&args[1]);
+				double x = varToDoubleSimple(&args[2]);
+				double y = varToDoubleSimple(&args[3]);
+				double w = varToDoubleSimple(&args[4]);
+				double h = varToDoubleSimple(&args[5]);
 				(void)depth_val;
+
+				// Flash truncates createTextField coordinates to integers (NaN/Inf → 0)
+				int xi = (isnan(x) || isinf(x)) ? 0 : (int)x;
+				int yi = (isnan(y) || isinf(y)) ? 0 : (int)y;
+				int wi = (isnan(w) || isinf(w)) ? 0 : (int)w;
+				int hi = (isnan(h) || isinf(h)) ? 0 : (int)h;
 
 				// Create a child MovieClip for the text field
 				MovieClip* child = createMovieClip(inst_name, mc);
-				child->x = (float) x;
-				child->y = (float) y;
-				child->width = (float) w;
-				child->height = (float) h;
+				child->x = (float) xi;
+				child->y = (float) yi;
+				child->width = (float) abs(wi);
+				child->height = (float) abs(hi);
 				child->ng_textfield_idx = -2; // dynamically created textfield (no static metadata, but still a TF)
 
 				// Set up dynamic_props with TextField defaults
@@ -32354,17 +32371,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					child_mc_cache[child_mc_count++] = child;
 				}
 
-				// Return the target path of the new text field
+				// Return MovieClip reference (Flash returns the MC, not a string path)
 				if (args != NULL) FREE(args);
-				ActionVar result = {0};
-				result.type = ACTION_STACK_VALUE_STRING;
-				{
-					u32 _tgt_u16_len;
-					uint16_t* _tgt_u16 = ascii_to_u16(app_context, child->target, (int)strlen(child->target), &_tgt_u16_len);
-					result.str_size = _tgt_u16_len;
-					VAL(u64, &result.data.numeric_value) = (u64)_tgt_u16;
-					pushVar(app_context, &result);
-				}
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
 			} else {
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
