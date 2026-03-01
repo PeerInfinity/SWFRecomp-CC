@@ -220,6 +220,19 @@ namespace SWFRecomp
 		// Frame label storage: label name -> frame number
 		std::unordered_map<std::string, size_t> frame_labels;
 
+		// Track clip_actions variable names per depth for remove+replace optimization.
+		// Maps SWF depth → { clip_actions_var_name, clip_action_count }.
+		// Updated on PlaceObject2WithClipActions, cleared on RemoveObject2 (when not replaced).
+		struct DepthClipInfo {
+			std::string var_name;
+			size_t count;
+		};
+		std::unordered_map<u16, DepthClipInfo> depth_clip_actions;
+
+		// Buffered RemoveObject2 calls in the current frame (for remove+replace detection).
+		// Key: depth. Value: true if buffered.
+		std::set<u16> buffered_removes;
+
 		SWFAction action;
 
 		SWFTag RGB;

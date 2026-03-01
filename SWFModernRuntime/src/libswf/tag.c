@@ -1910,6 +1910,7 @@ static size_t g_pending_clip_action_count = 0;
 // recompiler emits SetInstanceName after PlaceObject2. Consumed by ng_on_place_object2
 // to avoid auto-assigning "instanceN" when the real name is known.
 const char* g_pending_instance_name = NULL;
+int g_skip_pending_removal_mc = 0;  // When set, findOrCreateMovieClip skips pending_removal MCs
 
 // Recursively fire CLIP_EVENT_CONSTRUCT for child sprite display list entries
 // that had CONSTRUCT deferred (placed during eager init with catch_up_mode=1).
@@ -2475,18 +2476,60 @@ void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t dept
 // Replace an existing clip at `depth` in the same frame: does NOT fire CLIP_EVENT_UNLOAD
 // for the old clip's actions. Instead, saves them as accumulated_clip_actions on the new
 // entry so they fire (before new_clip_actions) when the new entry is eventually removed.
+// The old MC gets its depth transformed and is marked for deferred invalidation (persists one frame).
 void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio,
     ClipAction* old_clip_actions, size_t old_clip_action_count,
     ClipAction* new_clip_actions, size_t new_clip_action_count)
 {
-	// Fire AS-set onUnload for the old clip (not clip events — those are deferred to next removal)
 #ifdef NO_GRAPHICS
-	if (depth <= max_depth && display_list[depth].char_id != 0)
-		ng_on_remove_object(app_context, depth);
+	char* saved_name = display_list[depth].instance_name;
+	if (saved_name != NULL) {
+		// Check if old MC has unload handler (clip_actions UNLOAD or AS-level onUnload).
+		// Only persist the old MC if it does; otherwise invalidate immediately.
+		int has_unload = 0;
+		for (size_t ca = 0; ca < old_clip_action_count; ca++) {
+			if (old_clip_actions[ca].event_flags & 0x4) {
+				has_unload = 1;
+				break;
+			}
+		}
+		if (!has_unload)
+			has_unload = actionMCHasOnUnloadProperty(saved_name);
+
+		if (has_unload) {
+			actionMarkMCPendingRemoval(app_context, saved_name, (int)depth);
+		} else {
+			actionInvalidateCachedMovieClip(app_context, saved_name);
+		}
+	}
+
+	// Set the old instance name as pending so ng_on_place_object2 picks it up
+	// for the new MC (tagPlaceObject2Ratio clears instance_name to NULL).
+	if (saved_name != NULL) {
+		extern const char* g_pending_instance_name;
+		g_pending_instance_name = saved_name;
+	}
+
+	// Tell findOrCreateMovieClip to skip the old MC (with pending_removal)
+	// so a fresh MC is created for the new display entry.
+	g_skip_pending_removal_mc = 1;
 #endif
+
 	// Place the new clip (clears all fields including clip_actions)
 	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio);
+
+#ifdef NO_GRAPHICS
+	// Ensure the NEW clip MC is created in the cache so actionMarkMCPendingRemoval
+	// can find it when this entry is later removed from the display list.
+	// Keep g_skip_pending_removal_mc=1 so we create a fresh MC (not reuse the old one).
+	if (display_list[depth].instance_name != NULL) {
+		extern MovieClip root_movieclip;
+		actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+	}
+	g_skip_pending_removal_mc = 0;
+#endif
+
 	// Set new clip actions
 	display_list[depth].clip_actions = new_clip_actions;
 	display_list[depth].clip_action_count = new_clip_action_count;

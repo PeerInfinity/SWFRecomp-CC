@@ -741,6 +741,15 @@ namespace SWFRecomp
 
 			case SWF_TAG_SHOW_FRAME:
 			{
+				// Flush any buffered RemoveObject2 calls that weren't consumed
+				// by a subsequent PlaceObject2 at the same depth.
+				for (u16 rd : buffered_removes)
+				{
+					context.tag_main << "\t" << "tagRemoveObject2(app_context, " << to_string(rd) << ");" << endl;
+					depth_clip_actions.erase(rd);
+				}
+				buffered_removes.clear();
+
 				while (last_queued_script < next_script_i)
 				{
 					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
@@ -3012,10 +3021,53 @@ namespace SWFRecomp
 					}
 				}
 
+				// Check for buffered RemoveObject2 at this depth (remove+replace pattern).
+				// If the old placement had clip_actions and the new one also has clip_actions,
+				// emit tagReplaceObject2RatioWithClipActions to accumulate old clip actions
+				// instead of firing them prematurely.
+				bool is_replace = false;
+				std::string old_ca_var;
+				size_t old_ca_count = 0;
+				if (buffered_removes.count((u16)depth) && depth_clip_actions.count((u16)depth))
+				{
+					old_ca_var = depth_clip_actions[(u16)depth].var_name;
+					old_ca_count = depth_clip_actions[(u16)depth].count;
+					buffered_removes.erase((u16)depth);
+					depth_clip_actions.erase((u16)depth);
+					is_replace = true;
+				}
+				else if (buffered_removes.count((u16)depth))
+				{
+					// Depth was removed but had no old clip_actions — flush the remove
+					context.tag_main << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
+					buffered_removes.erase((u16)depth);
+				}
+
 				// Emit the place call
 				if (blend_mode_val > 1)
 				{
 					context.tag_main << "\t" << "tagPlaceObject3(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(blend_mode_val) << ");" << endl;
+				}
+				else if (is_replace && clip_action_count > 0)
+				{
+					// Remove+replace at same depth with clip_actions on both old and new.
+					// Emit tagReplaceObject2RatioWithClipActions to accumulate old clip
+					// actions instead of firing them during the remove.
+					if (!instance_name_str.empty())
+					{
+						std::string escaped_name = "";
+						for (char c : instance_name_str) {
+							if (c == '"' || c == '\\') escaped_name += '\\';
+							escaped_name += c;
+						}
+						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
+					}
+					context.tag_main << "\t" << "tagReplaceObject2RatioWithClipActions(app_context, "
+						<< to_string(depth) << ", " << to_string(char_id) << ", "
+						<< to_string(transform_id) << ", " << to_string(cxform_id) << ", "
+						<< to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", "
+						<< old_ca_var << ", " << to_string(old_ca_count) << ", "
+						<< clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
 				}
 				else if (has_ratio && clip_action_count > 0)
 				{
@@ -3058,6 +3110,16 @@ namespace SWFRecomp
 				else
 				{
 					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ");" << endl;
+				}
+
+				// Track clip_actions per depth for future remove+replace detection
+				if (clip_action_count > 0)
+				{
+					depth_clip_actions[(u16)depth] = { clip_actions_var, clip_action_count };
+				}
+				else
+				{
+					depth_clip_actions.erase((u16)depth);
 				}
 
 				// Emit instance name if present (for non-clip-action case,
@@ -3131,7 +3193,19 @@ namespace SWFRecomp
 
 				u16 depth = (u16) tag.fields[0].value;
 
-				context.tag_main << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
+				// If this depth had clip_actions from a prior placement, buffer
+				// the removal. A subsequent PlaceObject2 at the same depth in
+				// this frame will emit tagReplaceObject2RatioWithClipActions
+				// instead of separate remove+place (so UNLOAD clip events are
+				// accumulated, not fired prematurely).
+				if (depth_clip_actions.count(depth))
+				{
+					buffered_removes.insert(depth);
+				}
+				else
+				{
+					context.tag_main << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
+				}
 
 				break;
 			}

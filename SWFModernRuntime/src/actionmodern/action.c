@@ -9097,8 +9097,12 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 	int is_new = 0;
 
 	// Check cache first (case-insensitive for SWF<=6 via swf_name_match)
+	// When g_skip_pending_removal_mc is set (during tagReplaceObject2), skip MCs
+	// with pending_removal so a fresh MC is created for the new display entry.
+	extern int g_skip_pending_removal_mc;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
+		    !(g_skip_pending_removal_mc && child_mc_cache[i]->pending_removal) &&
 		    swf_name_match(child_mc_cache[i]->name, instance_name) &&
 		    child_mc_cache[i]->parent == parent) {
 			mc = child_mc_cache[i];
@@ -9633,18 +9637,78 @@ MovieClip* actionFindMovieClipByName(const char* instance_name) {
 void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name)
 {
 	for (int i = 0; i < child_mc_count; i++) {
-		if (child_mc_cache[i] != NULL && strcmp(child_mc_cache[i]->name, name) == 0) {
-			// Just clear the pointer — the ASObject will leak but avoids
-			// double-free issues with shared __proto__ references
+		if (child_mc_cache[i] != NULL &&
+		    !child_mc_cache[i]->pending_removal &&
+		    child_mc_cache[i]->depth != INT_MIN &&
+		    strcmp(child_mc_cache[i]->name, name) == 0) {
 			child_mc_cache[i]->dynamic_props = NULL;
 			child_mc_cache[i]->ng_textfield_idx = -1;
+			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead
 			break;
 		}
 	}
 }
 
+// Mark a MovieClip for deferred removal: transform its depth to the "removed" zone
+// (depth = -(internal_depth) - 1 - 16384) and set pending_removal flag.
+// The MC persists for one more frame so scripts can still access it.
+// Called by ng_on_remove_object instead of actionInvalidateCachedMovieClip.
+void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, int swf_depth)
+{
+	(void)app_context;
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL &&
+		    !child_mc_cache[i]->pending_removal &&
+		    child_mc_cache[i]->depth != INT_MIN &&
+		    strcmp(child_mc_cache[i]->name, name) == 0) {
+			MovieClip* mc = child_mc_cache[i];
+			// Transform depth: -(internal_depth) - 1, then subtract AVM_DEPTH_BIAS for AS-facing
+			mc->depth = -(int)swf_depth - 1 - 16384;
+			mc->pending_removal = 1;
+			mc->display_obj = NULL;  // Detach from display list entry
+			break;
+		}
+	}
+}
+
+// Check if a named MC has an AS-level onUnload property on its dynamic_props.
+// Used by ng_on_remove_object to decide whether to persist the MC after removal.
+int actionMCHasOnUnloadProperty(const char* name)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL &&
+		    !child_mc_cache[i]->pending_removal &&
+		    child_mc_cache[i]->depth != INT_MIN &&
+		    strcmp(child_mc_cache[i]->name, name) == 0) {
+			MovieClip* mc = child_mc_cache[i];
+			if (mc->dynamic_props != NULL) {
+				ActionVar* handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+				if (handler != NULL && handler->type == ACTION_STACK_VALUE_FUNCTION)
+					return 1;
+			}
+			return 0;
+		}
+	}
+	return 0;
+}
+
+// Finalize pending removals: invalidate MCs that were marked for removal in a previous frame.
+// Called once per frame from the frame loop to clean up MCs after one frame of persistence.
+void actionFinalizePendingRemovals(SWFAppContext* app_context)
+{
+	(void)app_context;
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL && child_mc_cache[i]->pending_removal) {
+			child_mc_cache[i]->dynamic_props = NULL;
+			child_mc_cache[i]->ng_textfield_idx = -1;
+			child_mc_cache[i]->pending_removal = 0;
+			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead so name lookups skip it
+		}
+	}
+}
+
 // Fire the AS-set onUnload handler on a MovieClip being removed from the display list.
-// Called by ng_on_remove_object (tag_stubs.c) BEFORE actionInvalidateCachedMovieClip,
+// Called by ng_on_remove_object (tag_stubs.c) BEFORE actionMarkMCPendingRemoval,
 // so that dynamic_props is still intact when we look up the handler.
 // This is SYNCHRONOUS — used for timeline clips removed by tagRemoveObject2.
 void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name)
@@ -9652,10 +9716,13 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name)
 	if (instance_name == NULL || instance_name[0] == '\0') return;
 	if (g_execution_halted) return;
 
-	// Find the MC by name in the cache
+	// Find the live MC by name (skip pending/dead MCs with same name)
 	MovieClip* target_mc = NULL;
 	for (int i = 0; i < child_mc_count; i++) {
-		if (child_mc_cache[i] != NULL && strcmp(child_mc_cache[i]->name, instance_name) == 0) {
+		if (child_mc_cache[i] != NULL &&
+		    !child_mc_cache[i]->pending_removal &&
+		    child_mc_cache[i]->depth != INT_MIN &&
+		    strcmp(child_mc_cache[i]->name, instance_name) == 0) {
 			target_mc = child_mc_cache[i];
 			break;
 		}
@@ -17145,6 +17212,23 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 			}
 #else
+			// Check pending_removal MCs first — in Flash/Ruffle, removed MCs at
+			// negative depths come before live MCs in the depth-sorted lookup.
+			// Pending_removal MCs persist for one frame after removal.
+			{
+				int found_pending = 0;
+				for (int _pri = 0; _pri < child_mc_count; _pri++) {
+					if (child_mc_cache[_pri] != NULL &&
+					    child_mc_cache[_pri]->pending_removal &&
+					    swf_name_match(child_mc_cache[_pri]->name, name_buf)) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc_cache[_pri]);
+						found_pending = 1;
+						break;
+					}
+				}
+				if (found_pending) return;
+			}
+
 			size_t child_depth = ng_findDisplayEntryByName(name_buf);
 			if (child_depth != SIZE_MAX)
 			{
@@ -23007,6 +23091,13 @@ void actionGetMember(SWFAppContext* app_context)
 			// Case-insensitive comparison for built-in MC properties
 			if (strcasecmp(prop_name, "_x") == 0) {
 #ifdef NO_GRAPHICS
+				if (mc->pending_removal) {
+					// Pending_removal MC: compute x from last known transform for full double precision
+					extern float transform_data[][16];
+					double _dx = (double)transform_data[mc->last_transform_id][12] / 20.0;
+					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
+					return;
+				}
 				syncTransformIfNeeded(mc);
 				if (!(mc->as_set_flags & 1)) {
 					size_t _dep = ng_findDisplayEntryByName(mc->name);

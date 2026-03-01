@@ -499,6 +499,10 @@ void swfStart(SWFAppContext* app_context)
 		app_context->mouse.released = 0;
 		app_context->keys.last_key_down = -1;
 
+		// Finalize MCs that were marked for pending removal in the previous frame.
+		// They persisted for one frame (scripts could still access them); now invalidate.
+		actionFinalizePendingRemovals(app_context);
+
 		// Frame-first: advance sprites and run frame scripts before delivering events.
 		// This ensures that listeners registered in frame scripts receive events from
 		// the same tick (matching Flash/Ruffle's frame-then-event execution order).

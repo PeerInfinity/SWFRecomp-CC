@@ -1,12 +1,13 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-02-28
+Last updated: 2026-03-01
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: Tab ordering: 13/16 pass. tab_ordering_events PASS (150/150), tab_ordering_tabbable PASS (47/47), tab_ordering_movieclip_enabled_default PASS (462/462). Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions.
+- **Recent gains (this session)**: unload test PASS (52/52). Pending removal mechanism: MCs with unload handlers persist for one frame after removal with depth-transformed negative depth. Recompiler-side remove+replace detection via buffered_removes. Conditional persistence based on UNLOAD clip_actions or AS-level onUnload property.
+- **Recent gains (previous session)**: Tab ordering: 13/16 pass. tab_ordering_events PASS (150/150), tab_ordering_tabbable PASS (47/47), tab_ordering_movieclip_enabled_default PASS (462/462). Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions.
 - **Recent gains (previous session)**: super_edge_cases PASS (39/39). resolveProtoVar() unwraps SUPER values stored in __proto__ during prototype chain traversal.
 - **Recent gains (previous session)**: native_objects_swf6/7/8 all PASS (252/252). Added NativeType enum, native_type tracking, stub constructors for 15+ classes, filter constructor dispatch via actionNewMethod.
 - **Recent gains (earlier sessions)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.

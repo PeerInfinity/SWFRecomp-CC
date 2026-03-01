@@ -45,6 +45,7 @@ struct MovieClip {
 	int depth;             // ActionScript display depth (-16384 for _root, SWF_depth-16384 for timeline clips, AS-space for dynamic clips)
 	u8 depth_swapped;      // 1 if depth was changed by swapDepths (prevents display list overwrite in actionGetMember)
 	u8 unloaded;           // 1 if unloadMovie was called on this MC (frame/bytes properties return 0)
+	u8 pending_removal;    // 1 if MC was removed from display list but persists for one more frame (depth transformed)
 	u32 byte_size;         // getBytesLoaded/getBytesTotal value (0 = dynamic/attached clip)
 #ifdef NO_GRAPHICS
 	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)
@@ -82,6 +83,12 @@ MovieClip* actionGetBaseClip(void);
 MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
 // Invalidate cached MovieClip when removed from display list
 void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name);
+// Mark MC for deferred removal: transform depth and set pending_removal flag
+void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, int swf_depth);
+// Finalize pending removals: invalidate MCs marked for removal in a previous frame
+void actionFinalizePendingRemovals(SWFAppContext* app_context);
+// Check if a named MC has an AS-level onUnload property
+int actionMCHasOnUnloadProperty(const char* name);
 // Fire the AS-set onUnload handler on a MovieClip being removed (call BEFORE Invalidate)
 void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name);
 // Fire all pending deferred onUnload handlers (queued by removeMovieClip); call from tagShowFrame
