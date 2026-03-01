@@ -2,43 +2,44 @@
 
 <!-- TESTS: stage_property_representation, frame_size_translated_positive, frame_size_translated_negative, stage_scale_mode, stage_display_state, stage_object_properties, stage_object_properties_swf6, stage_object_enumerate, stage_object_children -->
 
-Last updated: 2026-02-22
+Last updated: 2026-02-28
 
-## Status: PARTIALLY IMPLEMENTED
+## Status: BLOCKED (Phases 1-8 COMPLETE, Phase 9 blocked on mouse input infrastructure)
 
-Stage object properties (align, scaleMode, displayState, width, height) are now registered and functional. Several tests have improved significantly.
+All implementable phases are complete. 7/9 tests fully pass. The remaining 2 tests (`frame_size_translated_positive`, `frame_size_translated_negative`) each miss 1 line ("Pressed shape1") which requires mouse input simulation infrastructure (Phase 9).
 
-### CI Results (2026-02-22)
+### Test Results (2026-02-28, verified locally)
 
-| Test | CI Status | Notes |
-|------|-----------|-------|
-| `stage_property_representation` | **PASS** ✅ | Was 0% — F64 bug fixed, Stage properties implemented |
-| `stage_object_enumerate` | **PASS** ✅ | Was 20% — Stage enumeration working |
+| Test | Status | Notes |
+|------|--------|-------|
+| `stage_property_representation` | **PASS** ✅ | F64 bug fixed, Stage properties implemented |
+| `stage_object_enumerate` | **PASS** ✅ | Stage enumeration working |
 | `stage_display_state` | **PASS** ✅ | displayState + onFullScreen callback working |
-| `stage_scale_mode` | **PASS** ✅ (uncommitted) | onResize broadcast + viewport dims + broadcastMessage MC variable fallback |
-| `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
-| `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
-| `stage_object_properties` | 226/241 (93.8%) | _width/_height↔scale coupling, rotation, original bounds |
-| `stage_object_properties_swf6` | 214/231 (92.6%) | Same issues |
-| `stage_object_children` | 68/83 (81.9%) | _level addressing, child vs property priority |
+| `stage_scale_mode` | **PASS** ✅ | onResize broadcast + viewport dims + broadcastMessage MC variable fallback |
+| `stage_object_properties` | **PASS** ✅ | _width/_height, scale, rotation, sprite context all working |
+| `stage_object_properties_swf6` | **PASS** ✅ | Same as above |
+| `stage_object_children` | **PASS** ✅ | _level addressing, child enumeration working |
+| `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — blocked on Phase 9 (mouse input) |
+| `frame_size_translated_negative` | 20/21 (95.2%) | Same — blocked on Phase 9 (mouse input) |
 
-### What's Implemented
-- **Stage singleton** (`g_stage_obj`): Registered with width/height (FRAME_WIDTH/FRAME_HEIGHT), quality, showMenu
-- **Stage.align**: Normalizes to uppercase L/T/R/B chars, deduplicates, canonical order
-- **Stage.scaleMode**: Validates "showAll"/"noScale"/"exactFit"/"noBorder" (case-insensitive), updates width/height on change
-- **Stage.displayState**: Validates "normal"/"fullScreen" (case-insensitive)
-- **AsBroadcaster**: Stage has addListener/removeListener/broadcastMessage
-- **Stage.onResize**: Fires via broadcastMessage when scaleMode changes
-- **Stage.onFullScreen**: Fires via broadcastMessage when displayState changes
-- **Viewport dimensions**: Passed via -DVIEWPORT_WIDTH/-DVIEWPORT_HEIGHT from test.toml
-- **actionSetProperty F64 bug**: Fixed — F64 values now read correctly as doubles
+### Blocker: Phase 9 — Mouse Input Simulation
 
-### Remaining Work
-- Shape bounds tracking in NO_GRAPHICS mode (Phase 2)
-- Root `_width`/`_height` from children bounds union (Phase 3)
-- `_yscale` precision differences / width↔scale coupling (Phase 4)
-- Stage children enumeration order (Phase 8)
-- _level0/_flash0 addressing (Phase 4 of STAGE_PLAN)
+The remaining 1 line in each `frame_size_translated_*` test requires:
+1. `verify_output.py` to parse `input.json` and pass mouse events to the runtime
+2. Shape hit-testing infrastructure in NO_GRAPHICS mode
+3. `onPress` callback dispatch when a click hits a named shape
+
+This is a significant cross-cutting infrastructure change. It is shared with other blocked plans (HIT_TESTING_PLAN, INPUT_EVENTS_PLAN) and should be addressed as part of a broader mouse event infrastructure effort.
+
+### What's Implemented (Phases 1-8)
+- **Phase 1**: actionSetProperty F64 bug fixed — F64 values read correctly as doubles
+- **Phase 2**: Shape bounds tracking in NO_GRAPHICS mode — `ng_char_bounds` table populated from `tagDefineShape`
+- **Phase 3**: Content bounds for `_root._width/_height` — computed from children bounds union
+- **Phase 4**: Scale/rotation extracted from PlaceObject transform matrix
+- **Phase 5**: Stage singleton (`g_stage_obj`) with align, scaleMode, displayState, width/height, quality, showMenu, onResize/onFullScreen broadcast
+- **Phase 6**: Sprite context tracking — `getMovieClipByTarget("")` uses `g_current_context`
+- **Phase 7**: `_visible` returns boolean (true/false) instead of float (1/0)
+- **Phase 8**: Stage children enumeration + _level0/_flash0 addressing
 
 ---
 
