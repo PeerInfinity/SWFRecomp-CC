@@ -34943,7 +34943,48 @@ static int mc_is_focusable_by_setfocus(MovieClip* mc)
 static int mc_is_tabbable(MovieClip* mc)
 {
 	if (mc == NULL || !mc->visible) return 0;
-	// Check explicit tabEnabled override in dynamic_props
+
+	// Dynamic/ReadOnly text fields are NEVER tabbable (even with tabEnabled=true).
+	// Flash only allows input text fields to receive Tab focus.
+	int is_textfield = (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2);
+	if (is_textfield) {
+		int is_input = 0;
+		// Check runtime "type" property first (AS can change type dynamically).
+		// The type property is stored as a u16 string pointer — u16_input or u16_dynamic.
+		if (mc->dynamic_props != NULL) {
+			ActionVar* tp = getProperty((ASObject*)mc->dynamic_props, "type", 4);
+			if (tp != NULL && tp->type == ACTION_STACK_VALUE_STRING) {
+				u64 ptr = tp->data.numeric_value;
+				if (ptr == (u64)(uintptr_t)u16_input) is_input = 1;
+				// u16_dynamic or any other value → not input
+			} else if (mc->ng_textfield_idx >= 0) {
+				// No type property set — use SWF flags
+				u16 flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+				is_input = !(flags & 0x0008);  // ReadOnly = not input
+			}
+		} else if (mc->ng_textfield_idx >= 0) {
+			u16 flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+			is_input = !(flags & 0x0008);
+		}
+		if (!is_input) return 0;
+
+		// Input text field: check explicit tabEnabled override
+		if (mc->dynamic_props != NULL) {
+			ActionVar* te = getProperty((ASObject*)mc->dynamic_props, "tabEnabled", 10);
+			if (te != NULL && te->type != ACTION_STACK_VALUE_UNDEFINED) {
+				if (te->type == ACTION_STACK_VALUE_BOOLEAN) return (int)te->data.numeric_value;
+				if (te->type == ACTION_STACK_VALUE_NULL) return 0;
+				if (te->type == ACTION_STACK_VALUE_F64) {
+					double d; memcpy(&d, &te->data.numeric_value, 8);
+					return (d != 0.0 && d == d);
+				}
+				return 0;
+			}
+		}
+		return 1;  // Input text fields are tabbable by default
+	}
+
+	// Check explicit tabEnabled override for non-text-field objects
 	if (mc->dynamic_props != NULL) {
 		ActionVar* te = getProperty((ASObject*)mc->dynamic_props, "tabEnabled", 10);
 		if (te != NULL && te->type != ACTION_STACK_VALUE_UNDEFINED) {
@@ -34958,10 +34999,25 @@ static int mc_is_tabbable(MovieClip* mc)
 	}
 	// Default: buttons are tabbable
 	if (mc->is_button_mc) return 1;
-	// Default: input text fields (not ReadOnly flag 0x0008) are tabbable
-	if (mc->ng_textfield_idx >= 0) {
-		u16 flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
-		if (!(flags & 0x0008)) return 1;
+	// MovieClips with explicit tabIndex are tabbable (needed for custom tab order)
+	if (mc->dynamic_props != NULL) {
+		ActionVar* ti = getProperty((ASObject*)mc->dynamic_props, "tabIndex", 8);
+		if (ti != NULL && ti->type != ACTION_STACK_VALUE_UNDEFINED) return 1;
+	}
+	// MovieClips with mouse interaction handlers are implicitly tabbable (button mode).
+	// Having the property at all (even if undefined) counts — only `delete` removes it.
+	if (mc->dynamic_props != NULL) {
+		static const char* mouse_handlers[] = {
+			"onPress", "onRelease", "onReleaseOutside",
+			"onRollOut", "onRollOver", "onDragOut", "onDragOver",
+			NULL
+		};
+		static const int handler_lens[] = {7, 9, 16, 9, 10, 9, 10};
+		for (int i = 0; mouse_handlers[i]; i++) {
+			ActionVar* h = getProperty((ASObject*)mc->dynamic_props,
+				mouse_handlers[i], handler_lens[i]);
+			if (h != NULL) return 1;  // Property exists (even if undefined)
+		}
 	}
 	return 0;
 }
@@ -35311,8 +35367,8 @@ static void tab_collect_recursive(
 		if (mc_is_tabbable(mc) && *count < max)
 			out[(*count)++] = mc;
 
-		// Recurse into sprite children if tabChildren=true
-		if (is_sprite &&
+		// Recurse into sprite children if tabChildren=true AND parent is visible
+		if (is_sprite && mc->visible &&
 		    dl[d].sprite_display_list != NULL && dl[d].sprite_max_depth > 0) {
 			if (mc_get_tab_children(mc)) {
 				tab_collect_recursive(app_context,
