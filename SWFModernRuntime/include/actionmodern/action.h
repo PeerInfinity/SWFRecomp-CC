@@ -81,16 +81,16 @@ void actionSetBaseClip(MovieClip* mc);
 MovieClip* actionGetBaseClip(void);
 // Create or find a cached MovieClip by instance name
 MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
-// Invalidate cached MovieClip when removed from display list
-void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name);
+// Invalidate cached MovieClip when removed from display list (swf_depth for disambiguation)
+void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name, int swf_depth);
 // Mark MC for deferred removal: transform depth and set pending_removal flag
 void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, int swf_depth);
 // Finalize pending removals: invalidate MCs marked for removal in a previous frame
 void actionFinalizePendingRemovals(SWFAppContext* app_context);
-// Check if a named MC has an AS-level onUnload property
-int actionMCHasOnUnloadProperty(const char* name);
+// Check if a named MC at given depth has an AS-level onUnload property
+int actionMCHasOnUnloadProperty(const char* name, int swf_depth);
 // Fire the AS-set onUnload handler on a MovieClip being removed (call BEFORE Invalidate)
-void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name);
+void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, int swf_depth);
 // Fire all pending deferred onUnload handlers (queued by removeMovieClip); call from tagShowFrame
 void actionFirePendingUnloads(SWFAppContext* app_context);
 // Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame

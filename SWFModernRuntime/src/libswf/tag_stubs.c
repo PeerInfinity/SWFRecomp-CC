@@ -1270,7 +1270,7 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 	if (depth > max_depth || display_list[depth].char_id == 0) return;
 	if (display_list[depth].instance_name != NULL) {
 		// Fire AS-set onUnload handler
-		actionFireOnUnload(app_context, display_list[depth].instance_name);
+		actionFireOnUnload(app_context, display_list[depth].instance_name, (int)depth);
 		// Only persist the MC (pending_removal) if it has an unload handler:
 		// either clip_actions with UNLOAD event (0x4) or AS-level onUnload property.
 		// MCs without unload handlers are immediately invalidated.
@@ -1293,12 +1293,12 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 		}
 		// Check AS-level onUnload property
 		if (!has_unload) {
-			has_unload = actionMCHasOnUnloadProperty(display_list[depth].instance_name);
+			has_unload = actionMCHasOnUnloadProperty(display_list[depth].instance_name, (int)depth);
 		}
 		if (has_unload) {
 			actionMarkMCPendingRemoval(app_context, display_list[depth].instance_name, (int)depth);
 		} else {
-			actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name);
+			actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name, (int)depth);
 		}
 	}
 }

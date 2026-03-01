@@ -2495,12 +2495,12 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 			}
 		}
 		if (!has_unload)
-			has_unload = actionMCHasOnUnloadProperty(saved_name);
+			has_unload = actionMCHasOnUnloadProperty(saved_name, (int)depth);
 
 		if (has_unload) {
 			actionMarkMCPendingRemoval(app_context, saved_name, (int)depth);
 		} else {
-			actionInvalidateCachedMovieClip(app_context, saved_name);
+			actionInvalidateCachedMovieClip(app_context, saved_name, (int)depth);
 		}
 	}
 

@@ -9102,6 +9102,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 	extern int g_skip_pending_removal_mc;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
+		    child_mc_cache[i]->depth != INT_MIN &&
 		    !(g_skip_pending_removal_mc && child_mc_cache[i]->pending_removal) &&
 		    swf_name_match(child_mc_cache[i]->name, instance_name) &&
 		    child_mc_cache[i]->parent == parent) {
@@ -9634,12 +9635,15 @@ MovieClip* actionFindMovieClipByName(const char* instance_name) {
 
 // Invalidate cached MovieClip when a display entry is removed (e.g., tagRemoveObject2).
 // Clears dynamic_props so the MC starts fresh if re-placed with the same name.
-void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name)
+// swf_depth disambiguates when multiple MCs share the same name.
+void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name, int swf_depth)
 {
+	int as_depth = swf_depth - 16384;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
+		    child_mc_cache[i]->depth == as_depth &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
 			child_mc_cache[i]->dynamic_props = NULL;
 			child_mc_cache[i]->ng_textfield_idx = -1;
@@ -9656,10 +9660,12 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, int swf_depth)
 {
 	(void)app_context;
+	int as_depth = swf_depth - 16384;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
+		    child_mc_cache[i]->depth == as_depth &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
 			MovieClip* mc = child_mc_cache[i];
 			// Transform depth: -(internal_depth) - 1, then subtract AVM_DEPTH_BIAS for AS-facing
@@ -9673,12 +9679,15 @@ void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, in
 
 // Check if a named MC has an AS-level onUnload property on its dynamic_props.
 // Used by ng_on_remove_object to decide whether to persist the MC after removal.
-int actionMCHasOnUnloadProperty(const char* name)
+// swf_depth disambiguates when multiple MCs share the same name.
+int actionMCHasOnUnloadProperty(const char* name, int swf_depth)
 {
+	int as_depth = swf_depth - 16384;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
+		    child_mc_cache[i]->depth == as_depth &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
 			MovieClip* mc = child_mc_cache[i];
 			if (mc->dynamic_props != NULL) {
@@ -9711,17 +9720,19 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 // Called by ng_on_remove_object (tag_stubs.c) BEFORE actionMarkMCPendingRemoval,
 // so that dynamic_props is still intact when we look up the handler.
 // This is SYNCHRONOUS — used for timeline clips removed by tagRemoveObject2.
-void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name)
+void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, int swf_depth)
 {
 	if (instance_name == NULL || instance_name[0] == '\0') return;
 	if (g_execution_halted) return;
 
-	// Find the live MC by name (skip pending/dead MCs with same name)
+	// Find the live MC by name+depth (skip pending/dead MCs with same name)
+	int as_depth = swf_depth - 16384;
 	MovieClip* target_mc = NULL;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
+		    child_mc_cache[i]->depth == as_depth &&
 		    strcmp(child_mc_cache[i]->name, instance_name) == 0) {
 			target_mc = child_mc_cache[i];
 			break;
