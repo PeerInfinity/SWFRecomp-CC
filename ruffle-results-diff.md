@@ -1,33 +1,38 @@
 # Ruffle Test Results Diff
 
-**Previous:** `0158f0323c09` (2026-03-01T03:26:45.458486+00:00)
-**Current:** `817fdfb4dc79` (2026-03-01T03:35:55.068700+00:00)
+**Previous:** `817fdfb4dc79` (2026-03-01T03:35:55.068700+00:00)
+**Current:** `fa0f23599ac9` (2026-03-01T04:39:45.856190+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 413 | 413 | 0 |
+| Passing | 413 | 414 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 66.7% | 66.7% | 0% |
-| Mismatched lines | 29696 | 29692 | -4 |
-|   Decreased | | | -6 |
-|   Increased | | | +2 |
+| Pass rate | 66.7% | 66.9% | +0.2% |
+| Mismatched lines | 29692 | 29382 | -310 |
+|   Decreased | | | -310 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `edittext_programmatic_focus` | output_mismatch | 7/12 | 12/12 |
+| `edittext_font_size` | output_mismatch | 15/45 | 45/45 |
 
-## Newly Failing (1)
+## Status Changed (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `selection` | output_mismatch | 454/454 | 452/454 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `movieclip_hittest_shapeflag` | output_mismatch | compile_fail | 266/338 | - |
 
-## Line Count Changed (1)
+## Line Count Changed (7)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `edittext_tab_focus` | output_mismatch | 9/13 | 10/13 | -1 |
+| `edittext_align_trailing_spaces_swf7` | output_mismatch | 264/576 | 396/576 | -132 |
+| `edittext_align_trailing_spaces_swf8` | output_mismatch | 288/576 | 324/576 | -36 |
+| `edittext_align` | output_mismatch | 36/60 | 52/60 | -16 |
+| `edittext_tab_stops` | output_mismatch | 36/60 | 45/60 | -9 |
+| `edittext_text_height_leading` | output_mismatch | 10/20 | 16/20 | -6 |
+| `edittext_newlines` | output_mismatch | 18/30 | 23/30 | -5 |
+| `edittext_autosize` | output_mismatch | 44/71 | 48/71 | -4 |
