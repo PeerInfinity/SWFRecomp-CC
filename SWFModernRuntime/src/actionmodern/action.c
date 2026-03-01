@@ -21595,7 +21595,7 @@ void actionSetMember(SWFAppContext* app_context)
 				size_t _hs_len = extractTextFieldParams(app_context, mc, _hs_utf8,
 					&_hs_fid, &_hs_fh, &_hs_ld, &_hs_ww, &_hs_fwt, &_hs_lm, &_hs_rm, &_hs_ind);
 				int _hs_tw = ng_computeTextWidth(_hs_fid, _hs_fh, _hs_utf8, _hs_len,
-					0, 0, g_swf_version, 0, 0, 0) / 20;
+					0, 0, g_swf_version, 0, 0, 0, 0) / 20;
 				int _hs_vw = (int)mc->width - 4;
 				int32_t max_hscroll = _hs_tw - _hs_vw;
 				if (max_hscroll < 0) max_hscroll = 0;
@@ -22214,9 +22214,17 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 	}
 
 	if (is_width) {
+		// Determine text alignment: 0=left (default), 1=center, 2=right
+		int align = 0;
+		ActionVar* align_prop = getProperty((ASObject*)mc->dynamic_props, "align", 5);
+		if (align_prop != NULL && align_prop->type == ACTION_STACK_VALUE_STRING && align_prop->str_size > 0) {
+			const uint16_t* au = varGetU16Ptr(align_prop);
+			if (align_prop->str_size == 6 && au[0] == 'c') align = 1;       // "center"
+			else if (align_prop->str_size == 5 && au[0] == 'r') align = 2;  // "right"
+		}
 		*out_result = (double)(ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
-		    left_margin_twips, right_margin_twips, indent_twips) / 20);
+		    left_margin_twips, right_margin_twips, indent_twips, align) / 20);
 	} else {
 		*out_result = (double)(ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
@@ -22365,8 +22373,11 @@ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc)
 		&_as_fid, &_as_fh, &_as_ld, &_as_ww, &_as_fwt, &_as_lm, &_as_rm, &_as_ind);
 
 	// Compute raw text width and height in twips
+	// For autoSize, always use trimmed width (exclude trailing spaces) — pass align=1
+	// to force trimmed mode. The textWidth property uses actual alignment, but autoSize
+	// field sizing always trims trailing spaces (matches Ruffle behavior).
 	int tw_twips = ng_computeTextWidth(_as_fid, _as_fh, _as_utf8, _as_len,
-		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind);
+		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, 1);
 	int th_twips = ng_computeTextHeight(_as_fid, _as_fh, _as_ld, _as_utf8, _as_len,
 		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind);
 
@@ -22431,7 +22442,7 @@ static __attribute__((noinline)) int computeScrollProperty(
 		// maxhscroll = max(0, textWidth - visible_width_px)
 		// visible_width_px = field_width - 2*gutter(2px) = field_width - 4
 		int text_w = ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
-			0, 0, g_swf_version, 0, 0, 0) / 20; // non-wrap to get full text width (twips→px)
+			0, 0, g_swf_version, 0, 0, 0, 0) / 20; // non-wrap to get full text width (twips→px)
 		int visible_w = (int)mc->width - 4; // subtract 2*gutter (2px each side)
 		int maxhscroll = text_w - visible_w;
 		if (maxhscroll < 0) maxhscroll = 0;
