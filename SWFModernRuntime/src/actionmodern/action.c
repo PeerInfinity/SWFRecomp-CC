@@ -15036,6 +15036,7 @@ static void initLocalConnectionPrototype(SWFAppContext* app_context, ASFunction*
 }
 
 // TextSnapshot.prototype: 9 methods (NOT DONT_ENUM — unusual for built-in)
+// Methods are tagged VERSION_6 (flash_flags=0x0080): hidden in SWF5, visible in SWF6+
 static void initTextSnapshotPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
 	if (ctor->prototype_obj != NULL) return;
@@ -15048,15 +15049,20 @@ static void initTextSnapshotPrototype(SWFAppContext* app_context, ASFunction* ct
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
 	// TextSnapshot methods are NOT DONT_ENUM (enumerable + writable + configurable)
 	const u8 mflags = PROPERTY_FLAGS_DEFAULT;
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getCount", 8, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "setSelected", 11, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getSelected", 11, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getText", 7, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getSelectedText", 15, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "hitTestTextNearPos", 18, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "findText", 8, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "setSelectColor", 14, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getTextRunInfo", 14, mflags);
+	static const char* ts_methods[] = {
+		"getCount", "setSelected", "getSelected", "getText",
+		"getSelectedText", "hitTestTextNearPos", "findText",
+		"setSelectColor", "getTextRunInfo"
+	};
+	static const u32 ts_method_lens[] = { 8, 11, 11, 7, 15, 18, 8, 14, 14 };
+	ASObject* proto = ctor->prototype_obj;
+	for (int i = 0; i < 9; i++) {
+		addStubMethodToProto(app_context, proto, ts_methods[i], ts_method_lens[i], mflags);
+		// Set VERSION_6 flag: property hidden in SWF5, visible in SWF6+
+		if (proto->num_used > 0) {
+			proto->properties[proto->num_used - 1].flash_flags = 0x0080;
+		}
+	}
 }
 
 // Camera: static methods (get, names) + 6 prototype methods
