@@ -233,8 +233,12 @@ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, i
 void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s16* advance_table, size_t glyph_count);
-int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len);
-int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len);
+int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips);
+int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips);
 u16 ng_findFontIdByName(const char* name);
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
 // Look up exported symbol by linkage name. Returns char_id or (size_t)-1 if not found.

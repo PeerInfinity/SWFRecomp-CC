@@ -22101,10 +22101,61 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 		leading = 40;
 	}
 
+	// Check wordWrap property on the textfield's dynamic_props
+	int word_wrap = 0;
+	int field_width_twips = 0;
+	int left_margin_twips = 0, right_margin_twips = 0, indent_twips = 0;
+	if (mc->dynamic_props) {
+		ActionVar* ww_prop = getProperty((ASObject*)mc->dynamic_props, "wordWrap", 8);
+		if (ww_prop != NULL && ww_prop->type == ACTION_STACK_VALUE_BOOLEAN && ww_prop->data.numeric_value)
+			word_wrap = 1;
+	}
+	if (word_wrap) {
+		// field_width_twips = textfield width in twips minus 2*GUTTER (40 twips each side)
+		field_width_twips = (int)(mc->width * 20.0f) - 80;
+		if (field_width_twips < 0) field_width_twips = 0;
+
+		// Get margins and indent from TextFormat (stored as pixels on dynamic_props via _tf_ prefix or defaults)
+		// Check for setTextFormat overrides first, then static textfield values
+		ActionVar* lm_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_leftMargin", 14);
+		if (lm_prop != NULL && lm_prop->type == ACTION_STACK_VALUE_F64) {
+			double lm; memcpy(&lm, &lm_prop->data.numeric_value, sizeof(double));
+			left_margin_twips = (int)(lm * 20.0);
+		} else if (mc->ng_textfield_idx >= 0) {
+			left_margin_twips = (int)ng_getTextFieldLeftMargin(mc->ng_textfield_idx);
+		}
+		ActionVar* rm_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_rightMargin", 15);
+		if (rm_prop != NULL && rm_prop->type == ACTION_STACK_VALUE_F64) {
+			double rm; memcpy(&rm, &rm_prop->data.numeric_value, sizeof(double));
+			right_margin_twips = (int)(rm * 20.0);
+		} else if (mc->ng_textfield_idx >= 0) {
+			right_margin_twips = (int)ng_getTextFieldRightMargin(mc->ng_textfield_idx);
+		}
+		ActionVar* ind_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_indent", 10);
+		if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
+			double ind; memcpy(&ind, &ind_prop->data.numeric_value, sizeof(double));
+			indent_twips = (int)(ind * 20.0);
+		} else if (mc->ng_textfield_idx >= 0) {
+			indent_twips = (int)ng_getTextFieldIndent(mc->ng_textfield_idx);
+		}
+		// blockIndent adds to the left offset (same as left_margin in Ruffle's layout)
+		int block_indent_twips = 0;
+		ActionVar* bi_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_blockIndent", 15);
+		if (bi_prop != NULL && bi_prop->type == ACTION_STACK_VALUE_F64) {
+			double bi; memcpy(&bi, &bi_prop->data.numeric_value, sizeof(double));
+			block_indent_twips = (int)(bi * 20.0);
+		}
+		left_margin_twips += block_indent_twips;
+	}
+
 	if (is_width) {
-		*out_result = (double)ng_computeTextWidth(font_id, font_height, utf8, utf8_len);
+		*out_result = (double)ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
+		    word_wrap, field_width_twips, g_swf_version,
+		    left_margin_twips, right_margin_twips, indent_twips);
 	} else {
-		*out_result = (double)ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len);
+		*out_result = (double)ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
+		    word_wrap, field_width_twips, g_swf_version,
+		    left_margin_twips, right_margin_twips, indent_twips);
 	}
 	return 1;
 }
@@ -32814,6 +32865,29 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						VAL(double, &ld_val.data.numeric_value) = (double)ld_twips;
 						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_leading", 11, &ld_val);
 					}
+					// Store margins and indent (pixels) from TextFormat for word-wrap
+					ActionVar margin_val = {0};
+					margin_val.type = ACTION_STACK_VALUE_F64;
+					ActionVar* lm_prop = getProperty(fmt_obj, "leftMargin", 10);
+					if (lm_prop != NULL && lm_prop->type == ACTION_STACK_VALUE_F64) {
+						margin_val.data.numeric_value = lm_prop->data.numeric_value;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_leftMargin", 14, &margin_val);
+					}
+					ActionVar* rm_prop = getProperty(fmt_obj, "rightMargin", 11);
+					if (rm_prop != NULL && rm_prop->type == ACTION_STACK_VALUE_F64) {
+						margin_val.data.numeric_value = rm_prop->data.numeric_value;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_rightMargin", 15, &margin_val);
+					}
+					ActionVar* ind_prop = getProperty(fmt_obj, "indent", 6);
+					if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
+						margin_val.data.numeric_value = ind_prop->data.numeric_value;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_indent", 10, &margin_val);
+					}
+					ActionVar* bi_prop = getProperty(fmt_obj, "blockIndent", 11);
+					if (bi_prop != NULL && bi_prop->type == ACTION_STACK_VALUE_F64) {
+						margin_val.data.numeric_value = bi_prop->data.numeric_value;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_blockIndent", 15, &margin_val);
+					}
 				}
 			}
 #endif
@@ -32870,6 +32944,29 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ld_val.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &ld_val.data.numeric_value) = (double)ld_twips;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_leading", 11, &ld_val);
+				}
+				// Store margins and indent (pixels) from TextFormat for word-wrap
+				ActionVar margin_val = {0};
+				margin_val.type = ACTION_STACK_VALUE_F64;
+				ActionVar* lm_prop = getProperty(fmt_obj, "leftMargin", 10);
+				if (lm_prop != NULL && lm_prop->type == ACTION_STACK_VALUE_F64) {
+					margin_val.data.numeric_value = lm_prop->data.numeric_value;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_leftMargin", 14, &margin_val);
+				}
+				ActionVar* rm_prop = getProperty(fmt_obj, "rightMargin", 11);
+				if (rm_prop != NULL && rm_prop->type == ACTION_STACK_VALUE_F64) {
+					margin_val.data.numeric_value = rm_prop->data.numeric_value;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_rightMargin", 15, &margin_val);
+				}
+				ActionVar* ind_prop = getProperty(fmt_obj, "indent", 6);
+				if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
+					margin_val.data.numeric_value = ind_prop->data.numeric_value;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_indent", 10, &margin_val);
+				}
+				ActionVar* bi_prop = getProperty(fmt_obj, "blockIndent", 11);
+				if (bi_prop != NULL && bi_prop->type == ACTION_STACK_VALUE_F64) {
+					margin_val.data.numeric_value = bi_prop->data.numeric_value;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_blockIndent", 15, &margin_val);
 				}
 			}
 			if (args != NULL) FREE(args);

@@ -448,10 +448,215 @@ static s16 ng_font_glyph_advance(int font_idx, u16 code_point)
 	return -1;
 }
 
+// Decode one UTF-8 character from text[*pos], advance *pos past it.
+// Returns the Unicode code point (or the raw byte for invalid sequences).
+static u16 ng_decode_utf8_char(const char* text, size_t text_len, size_t* pos)
+{
+	unsigned char c = (unsigned char)text[*pos];
+	u16 cp = c;
+	if (c >= 0xC0 && c < 0xE0 && *pos + 1 < text_len) {
+		cp = ((c & 0x1F) << 6) | ((unsigned char)text[*pos + 1] & 0x3F);
+		*pos += 2;
+	} else if (c >= 0xE0 && c < 0xF0 && *pos + 2 < text_len) {
+		cp = ((c & 0x0F) << 12) | (((unsigned char)text[*pos + 1] & 0x3F) << 6) | ((unsigned char)text[*pos + 2] & 0x3F);
+		*pos += 3;
+	} else {
+		*pos += 1;
+	}
+	return cp;
+}
+
+// Measure width of a UTF-8 substring in twips using font glyph advances.
+static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
+    const char* text, size_t start, size_t end)
+{
+	int w = 0;
+	size_t i = start;
+	while (i < end) {
+		u16 cp = ng_decode_utf8_char(text, end, &i);
+		s16 adv = ng_font_glyph_advance(font_idx, cp);
+		if (adv >= 0)
+			w += (int)((float)adv * (float)font_height / (float)em);
+	}
+	return w;
+}
+
+// Word-wrap a single hard line (no \n or \r) and return the number of visual lines
+// and the max line width in twips.
+// Algorithm matches Ruffle's line_wrapping.rs:
+// - SWF>=8: break after space runs (space→non-space), after hyphens
+// - SWF<=7: break after every space, around hyphens
+// - If segment doesn't fit and not start-of-line: wrap to new line
+// - If at start-of-line: force-break (min 1 char for SWF8)
+static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
+    const char* text, size_t text_len, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips,
+    int* max_width_out)
+{
+	if (text_len == 0) {
+		*max_width_out = 0;
+		return 1;
+	}
+
+	int line_count = 1;
+	// First line has indent offset; available width reduced by margins
+	int base_avail = field_width_twips - left_margin_twips - right_margin_twips;
+	if (base_avail < 0) base_avail = 0;
+	int first_line_offset = indent_twips > 0 ? indent_twips : 0;
+	int cur_avail = base_avail - first_line_offset;  // available width for current line
+	if (cur_avail < 0) cur_avail = 0;
+	int cur_line_w = 0;       // current line cursor position in twips (including trailing spaces)
+	int trimmed_line_w = 0;   // current line width excluding trailing spaces (SWF8)
+	int max_line_w = 0;       // max trimmed line width across all lines
+	int is_swf8 = (swf_version >= 8);
+
+	// Walk through text finding segments between break points.
+	// A "segment" is the text from the last break point (or start) to the next break point.
+	size_t seg_start = 0;  // byte offset of current segment start
+
+	while (seg_start < text_len) {
+		// Find next break point starting from seg_start
+		size_t seg_end = text_len;  // default: rest of line
+		size_t i = seg_start;
+
+		if (is_swf8) {
+			// SWF8: break after space runs (space→non-space transition) and after hyphens
+			int in_spaces = 0;
+			while (i < text_len) {
+				unsigned char c = (unsigned char)text[i];
+				if (c == ' ') {
+					in_spaces = 1;
+					i++;
+				} else if (in_spaces) {
+					// Transition from space to non-space: break here (after the spaces)
+					seg_end = i;
+					break;
+				} else if (c == '-') {
+					// Break after hyphen
+					// Advance past the hyphen (possibly multi-byte, but '-' is ASCII)
+					i++;
+					seg_end = i;
+					break;
+				} else {
+					// Advance past this character (may be multi-byte UTF-8)
+					if (c >= 0xC0 && c < 0xE0) i += 2;
+					else if (c >= 0xE0 && c < 0xF0) i += 3;
+					else if (c >= 0xF0) i += 4;
+					else i++;
+					in_spaces = 0;
+				}
+			}
+		} else {
+			// SWF<=7: break after every space, before and after hyphens
+			while (i < text_len) {
+				unsigned char c = (unsigned char)text[i];
+				if (c == ' ') {
+					i++;
+					seg_end = i;
+					break;
+				} else if (c == '-') {
+					if (i == seg_start) {
+						// At segment start: include the hyphen, break after it
+						i++;
+						seg_end = i;
+					} else {
+						// Break before hyphen
+						seg_end = i;
+					}
+					break;
+				} else {
+					if (c >= 0xC0 && c < 0xE0) i += 2;
+					else if (c >= 0xE0 && c < 0xF0) i += 3;
+					else if (c >= 0xF0) i += 4;
+					else i++;
+				}
+			}
+		}
+
+		// Measure the segment
+		int seg_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, seg_end);
+
+		// For SWF8: compute trimmed width (trailing spaces don't count for measurement)
+		int seg_trimmed_w = seg_w;
+		if (is_swf8) {
+			// Trim trailing spaces from segment for measurement
+			size_t trimmed_end = seg_end;
+			while (trimmed_end > seg_start && (unsigned char)text[trimmed_end - 1] == ' ')
+				trimmed_end--;
+			if (trimmed_end < seg_end)
+				seg_trimmed_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, trimmed_end);
+		}
+
+		// Check if segment fits on current line
+		int test_w = cur_line_w + (is_swf8 ? seg_trimmed_w : seg_w);
+		if (test_w <= cur_avail) {
+			// Fits: advance cursor by full segment width (including trailing spaces)
+			cur_line_w += seg_w;
+			if (is_swf8) {
+				// Trimmed width: cursor excluding trailing spaces
+				trimmed_line_w = cur_line_w - (seg_w - seg_trimmed_w);
+			} else {
+				trimmed_line_w = cur_line_w;
+			}
+			if (trimmed_line_w > max_line_w) max_line_w = trimmed_line_w;
+			seg_start = seg_end;
+		} else if (cur_line_w == 0) {
+			// Doesn't fit and we're at start of line: force-break within segment
+			size_t char_pos = seg_start;
+			int char_w = 0;
+			int last_fitting_pos = seg_start;
+			int last_fitting_w = 0;
+			while (char_pos < seg_end) {
+				size_t next_pos = char_pos;
+				u16 cp = ng_decode_utf8_char(text, seg_end, &next_pos);
+				s16 adv = ng_font_glyph_advance(font_idx, cp);
+				int gw = (adv >= 0) ? (int)((float)adv * (float)font_height / (float)em) : 0;
+				if (char_w + gw > cur_avail && last_fitting_pos > seg_start)
+					break;
+				char_w += gw;
+				last_fitting_pos = next_pos;
+				last_fitting_w = char_w;
+				if (is_swf8 && last_fitting_pos > seg_start && char_w > cur_avail)
+					break;
+			}
+			if (last_fitting_pos == seg_start) {
+				size_t tmp = seg_start;
+				ng_decode_utf8_char(text, seg_end, &tmp);
+				last_fitting_pos = tmp;
+				last_fitting_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, last_fitting_pos);
+			}
+			if (last_fitting_w > max_line_w) max_line_w = last_fitting_w;
+			// Start new line with remainder (subsequent lines don't have indent)
+			line_count++;
+			cur_line_w = 0;
+			trimmed_line_w = 0;
+			cur_avail = base_avail;
+			seg_start = last_fitting_pos;
+		} else {
+			// Doesn't fit but we have content on line: wrap to new line, retry this segment
+			// Record trimmed width for the line being ended
+			if (trimmed_line_w > max_line_w) max_line_w = trimmed_line_w;
+			line_count++;
+			cur_line_w = 0;
+			trimmed_line_w = 0;
+			cur_avail = base_avail;  // subsequent lines don't have indent
+			// Don't advance seg_start — retry this segment on new line
+		}
+	}
+
+	// Final line's trimmed width (already tracked via trimmed_line_w in the fits path)
+	if (trimmed_line_w > max_line_w) max_line_w = trimmed_line_w;
+
+	*max_width_out = max_line_w;
+	return line_count;
+}
+
 // Compute textWidth for a string using font metrics.
 // Returns width in pixels (truncated to int, matching Flash behavior).
 // font_height is in twips.
-int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len)
+int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips)
 {
 	int fi = ng_find_font(font_id);
 	if (fi < 0 || !ng_fonts[fi].has_metrics || text == NULL || text_len == 0) return 0;
@@ -459,43 +664,54 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
 
-	// Measure each line in twips, return max width in pixels (trunc_to_pixel)
+	if (!word_wrap || field_width_twips <= 0) {
+		// No wrap: measure each hard line, return max width
+		int max_width_twips = 0;
+		int cur_width_twips = 0;
+		for (size_t i = 0; i < text_len; ) {
+			unsigned char c = (unsigned char)text[i];
+			if (c == '\r' || c == '\n') {
+				if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
+				cur_width_twips = 0;
+				if (c == '\r' && i + 1 < text_len && text[i + 1] == '\n') i += 2; else i++;
+				continue;
+			}
+			u16 code_point = ng_decode_utf8_char(text, text_len, &i);
+			s16 adv = ng_font_glyph_advance(fi, code_point);
+			if (adv >= 0)
+				cur_width_twips += (int)((float)adv * (float)font_height / (float)em);
+		}
+		if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
+		return max_width_twips / 20;
+	}
+
+	// Word-wrap mode: split into hard lines, wrap each, track max width
 	int max_width_twips = 0;
-	int cur_width_twips = 0;
-	for (size_t i = 0; i < text_len; i++) {
-		unsigned char c = (unsigned char)text[i];
-		if (c == '\r' || c == '\n') {
-			if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
-			cur_width_twips = 0;
-			// Skip \r\n pair
-			if (c == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
-			continue;
-		}
-		// Decode UTF-8 code point
-		u16 code_point = c;
-		if (c >= 0xC0 && c < 0xE0 && i + 1 < text_len) {
-			code_point = ((c & 0x1F) << 6) | ((unsigned char)text[i + 1] & 0x3F);
-			i++;
-		} else if (c >= 0xE0 && c < 0xF0 && i + 2 < text_len) {
-			code_point = ((c & 0x0F) << 12) | (((unsigned char)text[i + 1] & 0x3F) << 6) | ((unsigned char)text[i + 2] & 0x3F);
-			i += 2;
-		}
-		s16 adv = ng_font_glyph_advance(fi, code_point);
-		if (adv >= 0) {
-			// advance_twips = advance_em * font_height_twips / em_square
-			cur_width_twips += (int)((float)adv * (float)font_height / (float)em);
+	size_t line_start = 0;
+	for (size_t i = 0; i <= text_len; i++) {
+		int is_end = (i == text_len);
+		int is_newline = (!is_end && (text[i] == '\r' || text[i] == '\n'));
+		if (is_end || is_newline) {
+			int line_max_w = 0;
+			ng_wrap_count_lines(fi, em, font_height, text + line_start, i - line_start,
+			    field_width_twips, swf_version,
+			    left_margin_twips, right_margin_twips, indent_twips, &line_max_w);
+			if (line_max_w > max_width_twips) max_width_twips = line_max_w;
+			if (is_newline) {
+				if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
+			}
+			line_start = i + 1;
 		}
 	}
-	if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
-
-	// trunc_to_pixel: floor(twips / 20)
 	return max_width_twips / 20;
 }
 
 // Compute textHeight for a string using font metrics.
 // Returns height in pixels (truncated to int, matching Flash behavior).
 // font_height is in twips, leading_twips is the DefineEditText leading value in twips.
-int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len)
+int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips)
 {
 	int fi = ng_find_font(font_id);
 	if (fi < 0 || !ng_fonts[fi].has_metrics) return 0;
@@ -510,25 +726,47 @@ int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const 
 
 	// Count lines (empty text = 1 line)
 	int line_count = 1;
-	if (text != NULL) {
-		for (size_t i = 0; i < text_len; i++) {
-			if (text[i] == '\r') {
-				line_count++;
-				if (i + 1 < text_len && text[i + 1] == '\n') i++;
-			} else if (text[i] == '\n') {
-				line_count++;
+	if (text != NULL && text_len > 0) {
+		if (!word_wrap || field_width_twips <= 0) {
+			// No wrap: count hard lines only
+			for (size_t i = 0; i < text_len; i++) {
+				if (text[i] == '\r') {
+					line_count++;
+					if (i + 1 < text_len && text[i + 1] == '\n') i++;
+				} else if (text[i] == '\n') {
+					line_count++;
+				}
 			}
+		} else {
+			// Word-wrap: split into hard lines, wrap each, sum visual line counts
+			line_count = 0;
+			size_t line_start = 0;
+			for (size_t i = 0; i <= text_len; i++) {
+				int is_end = (i == text_len);
+				int is_newline = (!is_end && (text[i] == '\r' || text[i] == '\n'));
+				if (is_end || is_newline) {
+					int dummy_w = 0;
+					line_count += ng_wrap_count_lines(fi, em, font_height,
+					    text + line_start, i - line_start,
+					    field_width_twips, swf_version,
+					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w);
+					if (is_newline) {
+						if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
+					}
+					line_start = i + 1;
+				}
+			}
+			if (line_count == 0) line_count = 1;
 		}
 	}
 
-	// Ruffle model: first line gets leading added to its height.
-	// text_size_height = ascent + descent + leading (first line)
-	//                  + (line_count - 1) * (ascent + descent + leading) (subsequent lines)
-	// = line_count * (ascent + descent) + line_count * leading
-	// Actually: first line always gets leading, subsequent lines also get leading
-	// So total_twips = line_count * (ascent + descent + leading)
-	// But the last line in Ruffle also gets leading (from fixup_line).
-	int total_twips = line_count * (ascent_twips + descent_twips + (int)leading_twips);
+	// Ruffle model: first line always gets leading, subsequent lines add leading
+	// between them. The last line does NOT add trailing leading.
+	// Formula: line_count * (ascent + descent) + max(line_count - 1, 1) * leading
+	// This means: single line still includes leading (first-line rule),
+	// multi-line adds leading between lines but not after the last.
+	int leading_count = line_count > 1 ? line_count - 1 : 1;
+	int total_twips = line_count * (ascent_twips + descent_twips) + leading_count * (int)leading_twips;
 
 	// trunc_to_pixel: floor(twips / 20)
 	return total_twips / 20;
