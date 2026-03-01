@@ -1,28 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `03bf11667c6a` (2026-03-01T17:25:18.544676+00:00)
-**Current:** `ec4f995579cb` (2026-03-01T18:20:05.430319+00:00)
+**Previous:** `ec4f995579cb` (2026-03-01T18:20:05.430319+00:00)
+**Current:** `52e47dd26a78` (2026-03-01T19:53:06.503447+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 420 | 421 | +1 |
+| Passing | 421 | 421 | 0 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 67.9% | 68.0% | +0.1% |
-| Mismatched lines | 29234 | 29231 | -3 |
-|   Decreased | | | -4 |
-|   Increased | | | +1 |
+| Pass rate | 68.0% | 68.0% | 0% |
+| Mismatched lines | 29231 | 29221 | -10 |
+|   Decreased | | | -16 |
+|   Increased | | | +6 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `edittext_leading` | output_mismatch | 6/9 | 9/9 |
+| `unload` | output_mismatch | 36/52 | 52/52 |
 
-## Line Count Changed (2)
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `conflicting_instance_names` | output_mismatch | 23/23 | 19/23 |
+
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `edittext_letter_spacing` | output_mismatch | 13/15 | 14/15 | -1 |
-| `edittext_newlines` | output_mismatch | 24/30 | 23/30 | +1 |
+| `movieclip_hittest_shapeflag` | output_mismatch | 266/338 | 264/338 | +2 |
