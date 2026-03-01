@@ -401,6 +401,11 @@ static void input_events_pump_tick(SWFAppContext* app_context)
         }
         input_events_deliver(app_context, ev);
         g_event_pos++;
+        // Flush deferred rollOver/rollOut events between each event delivery.
+        // Selection.setFocus() called from event handlers (e.g., Key listener
+        // doing programmatic focus cycling) queues rollOver/rollOut that must
+        // fire before the next event (e.g., KeyUp) is processed.
+        actionFlushDeferredRollEvents(app_context);
     }
 }
 
@@ -569,6 +574,11 @@ void swfStart(SWFAppContext* app_context)
 			}
 			advance_nested_sprite_frames(app_context);
 		}
+
+		// Flush deferred rollOver/rollOut events from Selection.setFocus() calls
+		// that occurred during frame scripts. These fire asynchronously (after script
+		// completes) but before input events are processed.
+		actionFlushDeferredRollEvents(app_context);
 
 		// Deliver queued input events for this tick (after frame scripts ran)
 		if (g_events) {

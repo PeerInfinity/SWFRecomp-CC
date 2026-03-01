@@ -14844,6 +14844,19 @@ static const char* normalizeStageScaleMode(const char* input, u32 input_len)
 
 // Currently focused MovieClip (NULL = no focus)
 static MovieClip* g_focused_mc = NULL;
+// "Hovered" MC for rollOver/rollOut dispatch (analogous to Ruffle's mouse_data.hovered)
+static MovieClip* g_tab_hovered_mc = NULL;
+
+// Deferred rollOver/rollOut queue — when Selection.setFocus() changes focus,
+// rollOver/rollOut events are queued and fire asynchronously (after script completes).
+// During Tab focus changes, they fire synchronously (handled inline in actionAdvanceTabFocus).
+#define MAX_DEFERRED_ROLLOVERS 32
+typedef struct {
+	MovieClip* mc;
+	int is_rollout;  // 1 = rollOut, 0 = rollOver
+} DeferredRollEntry;
+static DeferredRollEntry g_deferred_roll_queue[MAX_DEFERRED_ROLLOVERS];
+static int g_deferred_roll_count = 0;
 
 // Clipboard buffer for SetClipboardText / TextControl operations
 static char g_clipboard_text[1024] = {0};
@@ -35052,6 +35065,59 @@ static int mc_get_explicit_tab_index(MovieClip* mc)
 	return idx;
 }
 
+// Queue deferred rollOver/rollOut for a focus transition (called from Selection.setFocus).
+// Text fields are excluded from rollOver/rollOut (Flash behavior).
+static void queue_deferred_roll(MovieClip* old_mc, MovieClip* new_mc)
+{
+	int old_is_tf = (old_mc != NULL &&
+	    (old_mc->ng_textfield_idx >= 0 || old_mc->ng_textfield_idx == -2));
+	int new_is_tf = (new_mc != NULL &&
+	    (new_mc->ng_textfield_idx >= 0 || new_mc->ng_textfield_idx == -2));
+	// Queue rollOut on old (if not text field)
+	if (!old_is_tf && old_mc != NULL && g_deferred_roll_count < MAX_DEFERRED_ROLLOVERS) {
+		// If old is a button, queue button DoAction rollOut first (fires before AS2 handler)
+		if (old_mc->is_button_mc && g_deferred_roll_count + 1 < MAX_DEFERRED_ROLLOVERS) {
+			// Use is_rollout=2 to signal "button DoAction rollOut"
+			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){old_mc, 2};
+		}
+		g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){old_mc, 1};
+	}
+	// Queue rollOver on new (if not text field)
+	if (!new_is_tf && new_mc != NULL && g_deferred_roll_count < MAX_DEFERRED_ROLLOVERS) {
+		// If new is a button, queue button DoAction rollOver first
+		if (new_mc->is_button_mc && g_deferred_roll_count + 1 < MAX_DEFERRED_ROLLOVERS) {
+			// Use is_rollout=3 to signal "button DoAction rollOver"
+			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){new_mc, 3};
+		}
+		g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){new_mc, 0};
+	}
+}
+
+// Flush the deferred rollOver/rollOut queue. Called after script execution completes.
+void actionFlushDeferredRollEvents(SWFAppContext* app_context)
+{
+	if (g_deferred_roll_count == 0) return;
+	int count = g_deferred_roll_count;
+	g_deferred_roll_count = 0;  // Reset before processing to prevent re-entrancy
+	for (int i = 0; i < count; i++) {
+		MovieClip* mc = g_deferred_roll_queue[i].mc;
+		int kind = g_deferred_roll_queue[i].is_rollout;
+		if (kind == 2) {
+			// Button DoAction rollOut
+			ng_simulateButtonTransition(app_context, mc, 0x0002);
+		} else if (kind == 3) {
+			// Button DoAction rollOver
+			ng_simulateButtonTransition(app_context, mc, 0x0001);
+		} else if (kind == 1) {
+			// AS2 onRollOut
+			mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9);
+		} else {
+			// AS2 onRollOver
+			mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10);
+		}
+	}
+}
+
 // Fire focus change events and update g_focused_mc.
 // Fires: old_mc.onKillFocus(), new_mc.onSetFocus(), Selection.broadcastMessage("onSetFocus").
 static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc)
@@ -35111,8 +35177,10 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	}
 	// setFocus(null or undefined) — clear focus
 	if (arg->type == ACTION_STACK_VALUE_NULL || arg->type == ACTION_STACK_VALUE_UNDEFINED) {
-		if (g_focused_mc != NULL)
+		if (g_focused_mc != NULL) {
+			queue_deferred_roll(g_focused_mc, NULL);
 			selection_do_focus_change(app_context, g_focused_mc, NULL);
+		}
 		ret.data.numeric_value = 1;
 		return ret;
 	}
@@ -35131,6 +35199,7 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	if (new_mc == NULL) return ret;
 	if (!mc_is_focusable_by_setfocus(new_mc)) return ret;
 	if (new_mc == g_focused_mc) { ret.data.numeric_value = 1; return ret; }
+	queue_deferred_roll(g_focused_mc, new_mc);
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 	ret.data.numeric_value = 1;
 	return ret;
@@ -35459,8 +35528,9 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 			}
 			tab_order[j+1] = key;
 		}
-		// Remove duplicates: when two items have the same 6y+x, keep only the first
-		// (which is the first found in depth-first-depth-order traversal).
+		// Dedup: remove consecutive items with same 6*y+x sort key.
+		// After stable sort, items with the same key are grouped; keep only the first
+		// (earliest in depth-first traversal order), matching Ruffle's dedup_by_key.
 		int dedup_count = 0;
 		for (int i = 0; i < tab_count; i++) {
 			if (dedup_count > 0) {
@@ -35492,11 +35562,25 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 	}
 	MovieClip* new_mc = tab_order[next_pos];
 	if (new_mc == g_focused_mc) return;
-	// Tab focus triggers onRollOut on old MC and onRollOver on new MC
-	if (g_focused_mc != NULL)
+	// Tab focus triggers rollOut on old MC and rollOver on new MC.
+	// Order: button DoAction rollOut → AS2 onRollOut → button DoAction rollOver → AS2 onRollOver
+	// Text fields (EditText) do NOT participate in rollOver/rollOut during Tab focus changes.
+	int old_is_textfield = (g_focused_mc != NULL &&
+	    (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2));
+	int new_is_textfield = (new_mc != NULL &&
+	    (new_mc->ng_textfield_idx >= 0 || new_mc->ng_textfield_idx == -2));
+	if (!old_is_textfield && g_focused_mc != NULL) {
+		// Button DoAction rollOut fires BEFORE AS2 onRollOut
+		if (g_focused_mc->is_button_mc)
+			ng_simulateButtonTransition(app_context, g_focused_mc, 0x0002);
 		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9);
-	if (new_mc != NULL)
+	}
+	if (!new_is_textfield && new_mc != NULL) {
+		// Button DoAction rollOver fires BEFORE AS2 onRollOver
+		if (new_mc->is_button_mc)
+			ng_simulateButtonTransition(app_context, new_mc, 0x0001);
 		mc_call_as2_handler_ng(app_context, new_mc, "onRollOver", 10);
+	}
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 }
 
@@ -35511,6 +35595,8 @@ void* actionGetFocusedMC(void) { return (void*)g_focused_mc; }
 void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code)
 {
 	if (g_focused_mc == NULL) return;
+	// Text fields don't dispatch onKeyDown to the focused MC
+	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyDown", 9);
 
 	// Enter/Space on focused MC with onPress → simulated press+release
@@ -35541,6 +35627,8 @@ void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code)
 {
 	if (g_focused_mc == NULL) return;
 	if (key_code != 13 && key_code != 32) return;
+	// Text fields don't receive simulated press/release from Enter/Space
+	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
 	// Check _focusrect — when false, Enter/Space do NOT simulate press/release.
 	// _focusrect is a stage-level property stored on root_movieclip.
 	extern MovieClip root_movieclip;
@@ -35568,6 +35656,8 @@ void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code)
 {
 	(void)key_code;
 	if (g_focused_mc == NULL) return;
+	// Text fields don't dispatch onKeyUp to the focused MC
+	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyUp", 7);
 }
 
