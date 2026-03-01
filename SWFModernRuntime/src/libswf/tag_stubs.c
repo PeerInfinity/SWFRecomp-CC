@@ -81,13 +81,23 @@ static int ng_find_video(size_t char_id)
 	return 0;
 }
 
-// Font info registry (font name, bold, italic)
+// Font info registry (font name, bold, italic, metrics)
 #define MAX_FONTS_NG 32
+#define MAX_FONT_GLYPHS 512
 static struct {
 	u16 font_id;
 	char name[128];
 	int bold;
 	int italic;
+	// Font metrics (from DefineFont2/3 layout section)
+	int has_metrics;
+	s16 ascent;    // in EM units
+	s16 descent;   // in EM units
+	s16 leading;   // in EM units
+	int em_square; // EM square size (typically 1024 for DefineFont2, 20480 for DefineFont3)
+	u16 code_table[MAX_FONT_GLYPHS];   // glyph index → Unicode code point
+	s16 advance_table[MAX_FONT_GLYPHS]; // glyph index → advance width (EM units)
+	size_t glyph_count;
 } ng_fonts[MAX_FONTS_NG];
 static size_t ng_font_count = 0;
 
@@ -393,6 +403,135 @@ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, i
 	ng_fonts[ng_font_count].bold = bold;
 	ng_fonts[ng_font_count].italic = italic;
 	ng_font_count++;
+}
+
+void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
+    s16 ascent, s16 descent, s16 leading, int em_square,
+    const u16* code_table, const s16* advance_table, size_t glyph_count)
+{
+	(void)app_context;
+	// Find existing font entry
+	for (size_t i = 0; i < ng_font_count; i++) {
+		if (ng_fonts[i].font_id == font_id) {
+			ng_fonts[i].has_metrics = 1;
+			ng_fonts[i].ascent = ascent;
+			ng_fonts[i].descent = descent;
+			ng_fonts[i].leading = leading;
+			ng_fonts[i].em_square = em_square;
+			size_t count = glyph_count < MAX_FONT_GLYPHS ? glyph_count : MAX_FONT_GLYPHS;
+			ng_fonts[i].glyph_count = count;
+			for (size_t j = 0; j < count; j++) {
+				ng_fonts[i].code_table[j] = code_table[j];
+				ng_fonts[i].advance_table[j] = advance_table[j];
+			}
+			return;
+		}
+	}
+}
+
+// Find the font entry index for a given font_id. Returns -1 if not found.
+static int ng_find_font(u16 font_id)
+{
+	for (size_t i = 0; i < ng_font_count; i++)
+		if (ng_fonts[i].font_id == font_id) return (int)i;
+	return -1;
+}
+
+// Look up glyph advance for a Unicode code point in a font.
+// Returns the advance in EM units, or -1 if not found.
+static s16 ng_font_glyph_advance(int font_idx, u16 code_point)
+{
+	for (size_t j = 0; j < ng_fonts[font_idx].glyph_count; j++) {
+		if (ng_fonts[font_idx].code_table[j] == code_point)
+			return ng_fonts[font_idx].advance_table[j];
+	}
+	return -1;
+}
+
+// Compute textWidth for a string using font metrics.
+// Returns width in pixels (truncated to int, matching Flash behavior).
+// font_height is in twips.
+int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len)
+{
+	int fi = ng_find_font(font_id);
+	if (fi < 0 || !ng_fonts[fi].has_metrics || text == NULL || text_len == 0) return 0;
+
+	int em = ng_fonts[fi].em_square;
+	if (em <= 0) em = 1024;
+
+	// Measure each line in twips, return max width in pixels (trunc_to_pixel)
+	int max_width_twips = 0;
+	int cur_width_twips = 0;
+	for (size_t i = 0; i < text_len; i++) {
+		unsigned char c = (unsigned char)text[i];
+		if (c == '\r' || c == '\n') {
+			if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
+			cur_width_twips = 0;
+			// Skip \r\n pair
+			if (c == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
+			continue;
+		}
+		// Decode UTF-8 code point
+		u16 code_point = c;
+		if (c >= 0xC0 && c < 0xE0 && i + 1 < text_len) {
+			code_point = ((c & 0x1F) << 6) | ((unsigned char)text[i + 1] & 0x3F);
+			i++;
+		} else if (c >= 0xE0 && c < 0xF0 && i + 2 < text_len) {
+			code_point = ((c & 0x0F) << 12) | (((unsigned char)text[i + 1] & 0x3F) << 6) | ((unsigned char)text[i + 2] & 0x3F);
+			i += 2;
+		}
+		s16 adv = ng_font_glyph_advance(fi, code_point);
+		if (adv >= 0) {
+			// advance_twips = advance_em * font_height_twips / em_square
+			cur_width_twips += (int)((float)adv * (float)font_height / (float)em);
+		}
+	}
+	if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
+
+	// trunc_to_pixel: floor(twips / 20)
+	return max_width_twips / 20;
+}
+
+// Compute textHeight for a string using font metrics.
+// Returns height in pixels (truncated to int, matching Flash behavior).
+// font_height is in twips, leading_twips is the DefineEditText leading value in twips.
+int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len)
+{
+	int fi = ng_find_font(font_id);
+	if (fi < 0 || !ng_fonts[fi].has_metrics) return 0;
+
+	int em = ng_fonts[fi].em_square;
+	if (em <= 0) em = 1024;
+
+	// Compute ascent and descent in twips (using Ruffle's integer truncation: (f32 * scale) as i32)
+	// scale = font_height_twips / em_square
+	int ascent_twips = (int)((float)ng_fonts[fi].ascent * (float)font_height / (float)em);
+	int descent_twips = (int)((float)ng_fonts[fi].descent * (float)font_height / (float)em);
+
+	// Count lines (empty text = 1 line)
+	int line_count = 1;
+	if (text != NULL) {
+		for (size_t i = 0; i < text_len; i++) {
+			if (text[i] == '\r') {
+				line_count++;
+				if (i + 1 < text_len && text[i + 1] == '\n') i++;
+			} else if (text[i] == '\n') {
+				line_count++;
+			}
+		}
+	}
+
+	// Ruffle model: first line gets leading added to its height.
+	// text_size_height = ascent + descent + leading (first line)
+	//                  + (line_count - 1) * (ascent + descent + leading) (subsequent lines)
+	// = line_count * (ascent + descent) + line_count * leading
+	// Actually: first line always gets leading, subsequent lines also get leading
+	// So total_twips = line_count * (ascent + descent + leading)
+	// But the last line in Ruffle also gets leading (from fixup_line).
+	int total_twips = line_count * (ascent_twips + descent_twips + (int)leading_twips);
+
+	// trunc_to_pixel: floor(twips / 20)
+	return total_twips / 20;
 }
 
 void ng_record_video(SWFAppContext* app_context, u16 char_id)
@@ -2073,6 +2212,14 @@ const char* ng_getFontName(u16 font_id)
 	for (size_t i = 0; i < ng_font_count; i++)
 		if (ng_fonts[i].font_id == font_id) return ng_fonts[i].name;
 	return "";
+}
+
+// Find a font_id by name (case-insensitive). Returns 0 if not found.
+u16 ng_findFontIdByName(const char* name)
+{
+	for (size_t i = 0; i < ng_font_count; i++)
+		if (strcasecmp(ng_fonts[i].name, name) == 0) return ng_fonts[i].font_id;
+	return 0;
 }
 
 int ng_getFontBold(u16 font_id)

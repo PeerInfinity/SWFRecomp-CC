@@ -22026,6 +22026,90 @@ void actionDelete(SWFAppContext* app_context)
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 }
 
+#ifdef NO_GRAPHICS
+// Separate noinline function to prevent GCC -O2 from misoptimizing the
+// textWidth/textHeight computation when inlined into the large actionGetMember.
+static __attribute__((noinline)) int computeTextFieldDimension(
+	SWFAppContext* app_context, MovieClip* mc,
+	const char* prop_name, u32 prop_name_len, double* out_result)
+{
+	int is_width = (prop_name_len == 9 && memcmp(prop_name, "textWidth", 9) == 0);
+	int is_height = (prop_name_len == 10 && memcmp(prop_name, "textHeight", 10) == 0);
+	if (!is_width && !is_height) return 0;
+
+	// Get the plain text content
+	ActionVar* text_prop = getProperty((ASObject*)mc->dynamic_props, "text", 4);
+	char utf8[4096];
+	size_t utf8_len = 0;
+	if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* txt_u16 = varGetU16Ptr(text_prop);
+		u32 txt_u16_len = text_prop->str_size;
+
+		// Check if this is an HTML field — if so, strip tags for measurement
+		int is_html_field = 0;
+		if (mc->ng_textfield_idx >= 0) {
+			u16 tf_flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
+			is_html_field = (tf_flags & 0x0040) != 0;
+		}
+		if (is_html_field) {
+			int has_tags = 0;
+			for (u32 ti = 0; ti < txt_u16_len; ti++) {
+				if (txt_u16[ti] == '<') { has_tags = 1; break; }
+			}
+			if (has_tags) {
+				u32 stripped_len;
+				uint16_t* stripped = strip_html_tags_u16(app_context, txt_u16, txt_u16_len, &stripped_len);
+				utf8_len = u16_to_utf8(stripped, stripped_len, utf8, sizeof(utf8));
+			} else {
+				utf8_len = u16_to_utf8(txt_u16, txt_u16_len, utf8, sizeof(utf8));
+			}
+		} else {
+			utf8_len = u16_to_utf8(txt_u16, txt_u16_len, utf8, sizeof(utf8));
+		}
+	}
+
+	// Get font info — check setTextFormat overrides first, then static
+	u16 font_id = 0;
+	u16 font_height = 0;
+	s16 leading = 0;
+	ActionVar* fid_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_fontId", 10);
+	ActionVar* fh_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_fontHeight", 14);
+	if (fh_prop != NULL && fh_prop->type == ACTION_STACK_VALUE_F64) {
+		double fh; memcpy(&fh, &fh_prop->data.numeric_value, sizeof(double));
+		font_height = (u16)fh;
+	}
+	if (fid_prop != NULL && fid_prop->type == ACTION_STACK_VALUE_F64) {
+		double fid; memcpy(&fid, &fid_prop->data.numeric_value, sizeof(double));
+		font_id = (u16)fid;
+	}
+	// Fall back to static textfield info
+	if (font_height == 0 && mc->ng_textfield_idx >= 0) {
+		font_height = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
+	}
+	if (font_id == 0 && mc->ng_textfield_idx >= 0) {
+		font_id = ng_getTextFieldFontId(mc->ng_textfield_idx);
+	}
+	// Check for leading override from setTextFormat/setNewTextFormat
+	ActionVar* leading_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_leading", 11);
+	if (leading_prop != NULL && leading_prop->type == ACTION_STACK_VALUE_F64) {
+		double ld; memcpy(&ld, &leading_prop->data.numeric_value, sizeof(double));
+		leading = (s16)ld;
+	} else if (mc->ng_textfield_idx >= 0) {
+		leading = ng_getTextFieldLeading(mc->ng_textfield_idx);
+	} else {
+		// Dynamic text fields (createTextField) default to 40 twips (2px) leading
+		leading = 40;
+	}
+
+	if (is_width) {
+		*out_result = (double)ng_computeTextWidth(font_id, font_height, utf8, utf8_len);
+	} else {
+		*out_result = (double)ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len);
+	}
+	return 1;
+}
+#endif
+
 void actionGetMember(SWFAppContext* app_context)
 {
 	// 1. Convert and pop property name (top of stack)
@@ -22634,6 +22718,18 @@ void actionGetMember(SWFAppContext* app_context)
 				return;
 			}
 		}
+
+		// Dynamically compute textWidth/textHeight for TextField MovieClips
+#ifdef NO_GRAPHICS
+		if (mc != NULL && MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL) {
+			double _tw_result = -999.0;
+			int _tw_matched = computeTextFieldDimension(app_context, mc, prop_name, prop_name_len, &_tw_result);
+			if (_tw_matched) {
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_tw_result));
+				return;
+			}
+		}
+#endif
 
 		// Check user-defined dynamic properties (walks __proto__ chain for TextField prototype)
 		if (mc != NULL && mc->dynamic_props != NULL)
@@ -32675,6 +32771,52 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// setTextFormat(fmt) / setTextFormat(begin, fmt) / setTextFormat(begin, end, fmt)
 			// In Flash, setTextFormat does NOT change the textColor property
+#ifdef NO_GRAPHICS
+			// Extract font info from the TextFormat for textWidth/textHeight computation
+			{
+				ActionVar* fmt_arg = NULL;
+				if (num_args == 1) fmt_arg = &args[0];
+				else if (num_args == 2) fmt_arg = &args[1];
+				else if (num_args >= 3) fmt_arg = &args[2];
+				if (fmt_arg != NULL && fmt_arg->type == ACTION_STACK_VALUE_OBJECT && fmt_arg->data.numeric_value != 0) {
+					ASObject* fmt_obj = (ASObject*) fmt_arg->data.numeric_value;
+					// Store font size from TextFormat
+					ActionVar* sz_prop = getProperty(fmt_obj, "size", 4);
+					if (sz_prop != NULL && sz_prop->type == ACTION_STACK_VALUE_F64) {
+						double sz; memcpy(&sz, &sz_prop->data.numeric_value, sizeof(double));
+						if (!isnan(sz) && !isinf(sz) && sz > 0) {
+							u16 fh = (u16)(sz * 20.0);
+							ActionVar fh_val = {0};
+							fh_val.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &fh_val.data.numeric_value) = (double)fh;
+							if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_fontHeight", 14, &fh_val);
+						}
+					}
+					// Store font name → resolve to font_id
+					ActionVar* font_prop = getProperty(fmt_obj, "font", 4);
+					if (font_prop != NULL && font_prop->type == ACTION_STACK_VALUE_STRING && font_prop->str_size > 0) {
+						char _font_name[128];
+						size_t _fn_len = u16_to_utf8(varGetU16Ptr(font_prop), font_prop->str_size, _font_name, sizeof(_font_name));
+						_font_name[_fn_len < 127 ? _fn_len : 127] = '\0';
+						u16 found_fid = ng_findFontIdByName(_font_name);
+						ActionVar fid_val = {0};
+						fid_val.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_fontId", 10, &fid_val);
+					}
+					// Store leading (in twips) from TextFormat
+					ActionVar* ld_prop = getProperty(fmt_obj, "leading", 7);
+					if (ld_prop != NULL && ld_prop->type == ACTION_STACK_VALUE_F64) {
+						double ld; memcpy(&ld, &ld_prop->data.numeric_value, sizeof(double));
+						s16 ld_twips = (s16)(ld * 20.0);
+						ActionVar ld_val = {0};
+						ld_val.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &ld_val.data.numeric_value) = (double)ld_twips;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_leading", 11, &ld_val);
+					}
+				}
+			}
+#endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
@@ -32683,9 +32825,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 #ifdef NO_GRAPHICS
 			// setNewTextFormat(fmt): set the default format for newly-typed text
-			// For now, apply color to textColor if the field has no text
 			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 				ASObject* fmt_obj = (ASObject*) args[0].data.numeric_value;
+				// Apply color to textColor
 				ActionVar* color_prop = getProperty(fmt_obj, "color", 5);
 				if (color_prop != NULL && color_prop->type == ACTION_STACK_VALUE_F64 && mc->dynamic_props != NULL) {
 					double c; memcpy(&c, &color_prop->data.numeric_value, sizeof(double));
@@ -32694,6 +32836,40 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					cv.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &cv.data.numeric_value) = (double)color_u32;
 					setProperty(app_context, (ASObject*)mc->dynamic_props, "textColor", 9, &cv);
+				}
+				// Store font size from TextFormat for textWidth/textHeight computation
+				ActionVar* sz_prop = getProperty(fmt_obj, "size", 4);
+				if (sz_prop != NULL && sz_prop->type == ACTION_STACK_VALUE_F64) {
+					double sz; memcpy(&sz, &sz_prop->data.numeric_value, sizeof(double));
+					if (!isnan(sz) && !isinf(sz) && sz > 0) {
+						u16 fh = (u16)(sz * 20.0);
+						ActionVar fh_val = {0};
+						fh_val.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &fh_val.data.numeric_value) = (double)fh;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_fontHeight", 14, &fh_val);
+					}
+				}
+				// Store font name → resolve to font_id
+				ActionVar* font_prop = getProperty(fmt_obj, "font", 4);
+				if (font_prop != NULL && font_prop->type == ACTION_STACK_VALUE_STRING && font_prop->str_size > 0) {
+					char _font_name[128];
+					size_t _fn_len = u16_to_utf8(varGetU16Ptr(font_prop), font_prop->str_size, _font_name, sizeof(_font_name));
+					_font_name[_fn_len < 127 ? _fn_len : 127] = '\0';
+					u16 found_fid = ng_findFontIdByName(_font_name);
+					ActionVar fid_val = {0};
+					fid_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_fontId", 10, &fid_val);
+				}
+				// Store leading (in twips) from TextFormat
+				ActionVar* ld_prop = getProperty(fmt_obj, "leading", 7);
+				if (ld_prop != NULL && ld_prop->type == ACTION_STACK_VALUE_F64) {
+					double ld; memcpy(&ld, &ld_prop->data.numeric_value, sizeof(double));
+					s16 ld_twips = (s16)(ld * 20.0);
+					ActionVar ld_val = {0};
+					ld_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &ld_val.data.numeric_value) = (double)ld_twips;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_leading", 11, &ld_val);
 				}
 			}
 			if (args != NULL) FREE(args);

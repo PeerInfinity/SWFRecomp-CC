@@ -1584,13 +1584,16 @@ namespace SWFRecomp
 					// Read layout section if present
 					if (has_layout && num_entries > 0)
 					{
-						// FontAscent(SI16), FontDescent(SI16), FontLeading(SI16) — skip
+						// FontAscent(SI16), FontDescent(SI16), FontLeading(SI16)
 						tag.clearFields();
 						tag.setFieldCount(3);
 						tag.configureNextField(SWF_FIELD_SI16);
 						tag.configureNextField(SWF_FIELD_SI16);
 						tag.configureNextField(SWF_FIELD_SI16);
 						tag.parseFields(cur_pos);
+						font_ascent[font_id] = (s16) tag.fields[0].value;
+						font_descent[font_id] = (s16) tag.fields[1].value;
+						font_leading[font_id] = (s16) tag.fields[2].value;
 
 						// Advance table: num_entries SI16 values
 						font_advance_tables[font_id].resize(num_entries);
@@ -1636,6 +1639,45 @@ namespace SWFRecomp
 							 << (is_bold ? "1" : "0") << ", "
 							 << (is_italic ? "1" : "0")
 							 << ");";
+
+					// Emit font metrics (advance table + ascent/descent/leading) if available
+					if (font_advance_tables.count(font_id) && font_advance_tables[font_id].size() > 0 &&
+						font_code_tables.count(font_id)) {
+						auto& advances = font_advance_tables[font_id];
+						auto& codes = font_code_tables[font_id];
+						s16 ascent = font_ascent.count(font_id) ? font_ascent[font_id] : 0;
+						s16 descent = font_descent.count(font_id) ? font_descent[font_id] : 0;
+						s16 leading = font_leading.count(font_id) ? font_leading[font_id] : 0;
+						float em_sq = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
+
+						// Emit static arrays for code table and advance table
+						tag_init << endl
+								 << "\t" << "{" << endl
+								 << "\t\t" << "static const u16 font_" << font_id << "_codes[] = {";
+						for (size_t i = 0; i < codes.size(); i++) {
+							if (i > 0) tag_init << ",";
+							tag_init << (u16)codes[i];
+						}
+						tag_init << "};" << endl
+								 << "\t\t" << "static const s16 font_" << font_id << "_advances[] = {";
+						for (size_t i = 0; i < advances.size(); i++) {
+							if (i > 0) tag_init << ",";
+							tag_init << advances[i];
+						}
+						tag_init << "};" << endl
+								 << "\t\t" << "tagDefineFontMetrics("
+								 << "app_context, "
+								 << to_string(font_id) << ", "
+								 << to_string(ascent) << ", "
+								 << to_string(descent) << ", "
+								 << to_string(leading) << ", "
+								 << to_string((int)em_sq) << ", "
+								 << "font_" << font_id << "_codes, "
+								 << "font_" << font_id << "_advances, "
+								 << to_string(codes.size())
+								 << ");" << endl
+								 << "\t" << "}";
+					}
 				}
 
 				break;

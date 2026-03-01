@@ -3004,6 +3004,19 @@ void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name
 #endif
 }
 
+void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
+    s16 ascent, s16 descent, s16 leading, int em_square,
+    const u16* code_table, const s16* advance_table, size_t glyph_count)
+{
+#ifdef NO_GRAPHICS
+	ng_record_font_metrics(app_context, font_id, ascent, descent, leading, em_square,
+	    code_table, advance_table, glyph_count);
+#else
+	(void)app_context; (void)font_id; (void)ascent; (void)descent; (void)leading;
+	(void)em_square; (void)code_table; (void)advance_table; (void)glyph_count;
+#endif
+}
+
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
 {
 #ifdef NO_GRAPHICS

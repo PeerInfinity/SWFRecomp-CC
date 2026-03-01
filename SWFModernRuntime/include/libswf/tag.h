@@ -91,6 +91,9 @@ void tagSoundStreamBlock(SWFAppContext* app_context,
 void tagStopAllSounds(SWFAppContext* app_context);
 void tagScriptLimits(u16 max_recursion, u16 timeout);
 void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
+void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
+    s16 ascent, s16 descent, s16 leading, int em_square,
+    const u16* code_table, const s16* advance_table, size_t glyph_count);
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id);
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
 
@@ -227,6 +230,12 @@ void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
 void ng_record_csm(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
     float thickness, float sharpness);
 void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
+void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
+    s16 ascent, s16 descent, s16 leading, int em_square,
+    const u16* code_table, const s16* advance_table, size_t glyph_count);
+int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len);
+int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const char* text, size_t text_len);
+u16 ng_findFontIdByName(const char* name);
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
 // Look up exported symbol by linkage name. Returns char_id or (size_t)-1 if not found.
 size_t ng_lookupExport(const char* name);
