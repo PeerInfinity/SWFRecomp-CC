@@ -6,7 +6,8 @@ Last updated: 2026-02-28
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: super_edge_cases PASS (39/39). resolveProtoVar() unwraps SUPER values stored in __proto__ during prototype chain traversal.
+- **Recent gains (this session)**: Tab ordering: 13/16 pass. tab_ordering_events PASS (150/150), tab_ordering_tabbable PASS (47/47), tab_ordering_movieclip_enabled_default PASS (462/462). Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions.
+- **Recent gains (previous session)**: super_edge_cases PASS (39/39). resolveProtoVar() unwraps SUPER values stored in __proto__ during prototype chain traversal.
 - **Recent gains (previous session)**: native_objects_swf6/7/8 all PASS (252/252). Added NativeType enum, native_type tracking, stub constructors for 15+ classes, filter constructor dispatch via actionNewMethod.
 - **Recent gains (earlier sessions)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.
 - **Recent gains (previous sessions)**: watch_textfield PASS (12/12). this_scoping PASS (52/52). execution_order4 PASS (13/13). nan_scale PASS (9/9). clip_constructors PASS (8/8). issue_768 PASS (3/3). rewind_depth PASS (30/30). tell_target_invalid PASS (6/6). tell_target_invalid_swf6 PASS (5/5). stage_object_children PASS (83/83). selection PASS (454/454). place_and_lookup PASS (30/30). tab_ordering_children PASS (208/208). And many more.
@@ -87,6 +88,9 @@ Last updated: 2026-02-28
 | `tell_target_invalid_swf6` | 5/5 ✅ | hasPlayingSprites + forward goto catch_up_mode in advance_sprite_frames |
 | `tell_target_invalid` | 6/6 ✅ | SetTarget2(undefined) SWF7+ → target_clip=None; GotoFrame2 target_clip_or_root; sprite preservation during root loop-back |
 | `on_construct` | 25/25 ✅ | RegisterClass prototype setup before on(construct), g_event_this_mc for type 2 constructors, pending instance name, prototype chain variable resolution |
+| `tab_ordering_tabbable` | 47/47 ✅ | Dynamic TF tabbability (u16 type pointer), MC button mode, invisible parent children |
+| `tab_ordering_events` | 150/150 ✅ | Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions |
+| `tab_ordering_movieclip_enabled_default` | 462/462 ✅ | MC tabIndex + mouse handler implicit tabbability |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -110,8 +114,8 @@ Last updated: 2026-02-28
 | Test | Match | Issue |
 |------|-------|-------|
 | `edittext_restrict` | 147/191 (77.0%) | TextField.restrict pattern matching |
-| `tab_ordering_tabbable` | 36/47 (76.6%) | Tab navigation (improved from 33/47) |
-| `tab_ordering_automatic_order_same_position` | 9/12 (75.0%) | Tab navigation |
+| `tab_ordering_tabbable` | **47/47 PASS** ✅ | Dynamic TF tabbability, MC button mode, invisible parent children |
+| `tab_ordering_automatic_order_same_position` | 9/12 (75.0%) | Needs highlight bounds for position sort |
 | `add_property` | **15/15 PASS** ✅ | addProperty on Arrays (getter/setter for length and indexed props) |
 
 ### FrameLabelEntry compile_fail (FIXED)

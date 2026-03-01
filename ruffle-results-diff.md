@@ -1,20 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `28fd597f1652` (2026-02-28T23:01:16.668911+00:00)
-**Current:** `e3d8b2af9443` (2026-02-28T23:53:22.289252+00:00)
+**Previous:** `e3d8b2af9443` (2026-02-28T23:53:22.289252+00:00)
+**Current:** `b88bd40e96cc` (2026-03-01T01:12:50.871323+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 405 | 405 | 0 |
+| Passing | 405 | 407 | +2 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 65.4% | 65.4% | 0% |
-| Mismatched lines | 30810 | 30788 | -22 |
-|   Decreased | | | -22 |
+| Pass rate | 65.4% | 65.8% | +0.4% |
+| Mismatched lines | 30788 | 30378 | -410 |
+|   Decreased | | | -410 |
 
-## Line Count Changed (1)
+## Newly Passing (2)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `register_class` | output_mismatch | 16/66 | 38/66 | -22 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `tab_ordering_movieclip_enabled_default` | output_mismatch | 63/462 | 462/462 |
+| `tab_ordering_tabbable` | output_mismatch | 36/47 | 47/47 |
