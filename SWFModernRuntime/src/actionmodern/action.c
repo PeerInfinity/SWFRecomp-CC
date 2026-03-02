@@ -10313,6 +10313,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	int last_break_was_p = 0; // Track if the last \x01 break was from </p> (for double-close detection)
 	int consumed_p = 0; // Track </p> breaks consumed inside LI context (suppresses matching outer </p>)
 	int nested_p_ignored = 0; // Track nested <p> tags ignored inside in_paragraph (so corresponding </p> are suppressed)
+	int saved_p_align = -1; // Alignment from <p> auto-closed by <li> (restored on post-LI </p>)
 	u32 i = 0;
 	while (i < html_len) {
 		// SWF<=7: When entering a new text node (after a tag), check if the entire
@@ -10400,6 +10401,12 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 							tag_sp--; if (fmt_sp > 0) fmt_sp--;
 						} else if (!last_break_was_p) {
 							ADD_TAG_BREAK(0);
+							// Post-LI </p> break: reset color to defaults
+							table->runs[table->run_count - 1].color = defaults->color;
+							if (saved_p_align >= 0) {
+								table->runs[table->run_count - 1].align = saved_p_align;
+								saved_p_align = -1;
+							}
 							last_break_was_p = 1;
 							tag_sp--; if (fmt_sp > 0) fmt_sp--;
 						} else {
@@ -10420,14 +10427,24 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				} else {
 					// Unmatched </p>: produces a break UNLESS the previous break was also from </p>
 					if (!last_break_was_p) {
-						// If there are LI tags on the stack, this </p> produces an LI break
-						int has_li_on_stack = 0;
-						for (int si = tag_sp - 1; si >= 0; si--) {
-							if (tag_type_stack[si] == TF_TAG_LI) { has_li_on_stack = 1; break; }
+						// Check consumed_p credit (from </p> inside LI that produced its own break)
+						if (consumed_p > 0) {
+							consumed_p--;
+							last_break_was_p = 1;
+						} else {
+							// If there are LI tags on the stack, this </p> produces an LI break
+							int has_li_on_stack = 0;
+							for (int si = tag_sp - 1; si >= 0; si--) {
+								if (tag_type_stack[si] == TF_TAG_LI) { has_li_on_stack = 1; break; }
+							}
+							ADD_TAG_BREAK(has_li_on_stack ? 1 : 0);
+							if (saved_p_align >= 0) {
+								table->runs[table->run_count - 1].align = saved_p_align;
+								saved_p_align = -1;
+							}
+							last_break_was_p = 1;
+							consumed_p++; // This </p> break also consumes a P level
 						}
-						ADD_TAG_BREAK(has_li_on_stack ? 1 : 0);
-						last_break_was_p = 1;
-						consumed_p++; // This </p> break also consumes a P level
 					}
 				}
 			} else if (!is_close && tf_tag_is(tname, tname_len, "li")) {
@@ -10437,6 +10454,8 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				if (in_paragraph && has_content_since_break) {
 					// Auto-close the current paragraph (has content)
 					if (tag_sp > 0 && (tag_type_stack[tag_sp - 1] == TF_TAG_P || tag_type_stack[tag_sp - 1] == TF_TAG_LI)) {
+						if (tag_type_stack[tag_sp - 1] == TF_TAG_P)
+							saved_p_align = fmt_stack[fmt_sp].align;
 						ADD_TAG_BREAK(cur_para_type);
 						in_paragraph = 0;
 						last_break_was_p = 0;
@@ -10520,11 +10539,25 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_FONT &&
 				    tag_text_len_stack[tag_sp - 1] == table->text_len &&
 				    !tag_had_ws_stripped[tag_sp - 1]) {
+					// Empty font tag: marker with inner format
 					if (fmt_sp > 0 && table->run_count < TF_MAX_RUNS) {
 						TFRun* r = &table->runs[table->run_count];
 						*r = fmt_stack[fmt_sp];
 						r->start = table->text_len;
 						r->length = 0;
+						table->run_count++;
+					}
+				} else if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_FONT &&
+				           fmt_sp > 0 &&
+				           fmt_stack[fmt_sp].color != fmt_stack[fmt_sp - 1].color &&
+				           in_paragraph && cur_para_type == 1) {
+					// Non-empty font that changed color inside LI: revert marker with parent color
+					if (table->run_count < TF_MAX_RUNS) {
+						TFRun* r = &table->runs[table->run_count];
+						*r = fmt_stack[fmt_sp - 1];
+						r->start = table->text_len;
+						r->length = 0;
+						r->para_type = 2; // Flag: revert marker (don't skip at LI boundary)
 						table->run_count++;
 					}
 				}
@@ -11177,7 +11210,8 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 				if (mr->start < ps || mr->start > pe) continue;
 				// Skip markers exactly at paragraph boundary if next break is LI
 				// (<li> auto-close drops markers from the closed scope)
-				if (mr->start == pe && pe < table->text_len) {
+				// Exception: revert markers (para_type==2) are kept at LI boundaries
+				if (mr->start == pe && pe < table->text_len && mr->para_type != 2) {
 					// Check if the break at pe was created by an LI
 					int is_li_break = 0;
 					for (u32 bri = 0; bri < table->run_count; bri++) {
