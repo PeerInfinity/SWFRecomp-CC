@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-02T18:44:33.235578+00:00",
-    "old_git_sha": "afb3880d788d7f0a73132768a67d6be87a656ff5",
-    "new_timestamp": "2026-03-02T20:00:51.385324+00:00",
-    "new_git_sha": "6067e7da2dbd0891611d69d123422e1ad466a692",
+    "old_timestamp": "2026-03-02T20:00:51.385324+00:00",
+    "old_git_sha": "6067e7da2dbd0891611d69d123422e1ad466a692",
+    "new_timestamp": "2026-03-02T22:04:13.820153+00:00",
+    "new_git_sha": "8dfb5c276a7e715207ed46332f06d00d01d3cd8c",
     "partial": false,
     "same_commit": false
   },
@@ -14,50 +14,18 @@
     "new_pass": 426,
     "new_total": 619,
     "new_pass_rate": 68.8,
-    "old_mismatched_lines": 23537,
-    "new_mismatched_lines": 23422,
+    "old_mismatched_lines": 23422,
+    "new_mismatched_lines": 23326,
     "increased_mismatches": 0,
-    "decreased_mismatches": 115,
+    "decreased_mismatches": 96,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 616,
+    "status_changed": 1,
+    "unchanged": 617,
     "added": 0,
     "removed": 0
   },
   "changes": [
-    {
-      "test": "edittext_html_condensewhite_swf7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 311,
-        "expected_lines": 311,
-        "matching_lines": 205
-      },
-      "new_lines": {
-        "actual_lines": 311,
-        "expected_lines": 311,
-        "matching_lines": 308
-      }
-    },
-    {
-      "test": "edittext_html_swf7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 5377,
-        "expected_lines": 5377,
-        "matching_lines": 5368
-      },
-      "new_lines": {
-        "actual_lines": 5377,
-        "expected_lines": 5377,
-        "matching_lines": 5374
-      }
-    },
     {
       "test": "edittext_html_swf8",
       "change_type": "changed",
@@ -66,13 +34,25 @@
       "old_lines": {
         "actual_lines": 5377,
         "expected_lines": 5377,
-        "matching_lines": 5324
+        "matching_lines": 5330
       },
       "new_lines": {
         "actual_lines": 5377,
         "expected_lines": 5377,
-        "matching_lines": 5330
+        "matching_lines": 5374
       }
+    },
+    {
+      "test": "movieclip_hittest_shapeflag",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 338,
+        "expected_lines": 338,
+        "matching_lines": 286
+      },
+      "new_lines": null
     }
   ]
 }
