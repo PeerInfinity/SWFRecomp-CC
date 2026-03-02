@@ -11000,7 +11000,11 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			TF_EMIT(buf, bp, bsz, "<LI>");
 		} else {
 			const char* an[] = {"LEFT", "RIGHT", "CENTER", "JUSTIFY"};
-			int ai = pfmt.align; if (ai < 0 || ai > 3) ai = 0;
+			// For non-empty paragraphs, use the first content run's alignment.
+			// This handles SWF8 whitespace preservation where leading whitespace
+			// before <p align="right"> creates content with LEFT alignment.
+			int ai = (prcnt > 0) ? pruns[0]->align : pfmt.align;
+			if (ai < 0 || ai > 3) ai = 0;
 			TF_EMIT(buf, bp, bsz, "<P ALIGN=\"");
 			TF_EMIT(buf, bp, bsz, an[ai]);
 			TF_EMIT(buf, bp, bsz, "\">");
