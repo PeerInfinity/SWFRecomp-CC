@@ -152,8 +152,8 @@ Last updated: 2026-03-01
 | NATIVE_INTROSPECTION_PLAN | **Phases 0-2 COMPLETE** | 3/5 pass (native_objects_swf6/7/8 ✅) | native_subclasses/native_double_construct need filter constructor property init via super() |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 14/22 pass (tell_target ✅, tell_target_invalid ✅, tell_target_invalid_swf6 ✅, slash_syntax ✅, string_paths_basic ✅, string_paths_variable_alias ✅, target_clip_removed ✅, path_string ✅ (322/322), string_paths_hidden ✅ (54/54), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅, lock_root ✅) | Remaining 8 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), MC removal lifecycle (string_paths_other, removed_target_clip_scope, removed_base_clip_tell_target), unload timing (string_paths_unload), Ruffle known_failure (string_paths_reference_launder) |
 | TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
-| FOCUS_SYSTEM_PLAN | **3/6 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining blocked by mouse events + key dispatch ordering (closure bug resolved) |
-| TAB_ORDERING_PLAN | **PARTIAL** | 2/7 pass (tab_ordering_automatic_basic, tab_ordering_reverse ✅) | Tab key focus navigation, blocked by FOCUS_SYSTEM_PLAN |
+| FOCUS_SYSTEM_PLAN | **3/7 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining 4 blocked by mouse events + text field hit-testing + event pumping model |
+| TAB_ORDERING_PLAN | **13/16 PASS** → `blocked/` | tab_ordering_automatic_basic, tab_ordering_reverse, tab_ordering_children ✅, tab_ordering_events ✅, tab_ordering_tabbable ✅, tab_ordering_movieclip_enabled_default ✅, ... | Remaining 3 blocked: same_position (highlight bounds), events_mouse (mouse state machine), edittext_tab_focus (caret tracking) |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
 | LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 23/49 pass | Phase 6 (cross-version globals) blocked; remaining blocked on RegisterClass, DoInitAction, display list, mouse events |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
@@ -180,7 +180,7 @@ Last updated: 2026-03-01
 
 ### Lower ROI or partially blocked
 9. ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **DONE** ✅ `super_edge_cases` 39/39 PASS. `interface_implements_op` blocked by MTASC class infra.
-10. **NATIVE_INTROSPECTION_PLAN** — fix 3 segfaults (native_objects_swf6/7/8), low overall ROI
+10. ~~**NATIVE_INTROSPECTION_PLAN**~~ — **Phases 0-2 DONE** ✅ (native_objects_swf6/7/8 all PASS). Remaining: native_subclasses (arguments.slice()), native_double_construct (filter constructor super())
 11. **OBJECT_WATCH_PLAN** — ~~`watch_textfield` small fix~~ DONE ✅ (4/4 pass). Only `watch_virtual_property` remains (known_failure in Ruffle)
 
 ### Dependency Blockers (plans blocking other plans)
@@ -188,7 +188,7 @@ Last updated: 2026-03-01
 - ~~**CLOSURE_CAPTURE_PLAN**~~ — **RESOLVED** (moved to complete/). Remaining focus test failures blocked by FOCUS_SYSTEM_PLAN.
 - ~~**MOUSE_EVENTS_PLAN**~~ — **RESOLVED** (moved to complete/). Core mouse events done (5/5 pass). Advanced features still needed: text field hit-testing (blocks FOCUS_SYSTEM_PLAN), rollover/rollout dispatch (blocks focus_mouse_rollout), recursive clip event dispatch (blocks clip_event_propagation_order).
 - **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests). Itself blocked by text field hit-testing and event pumping model differences.
-- ~~**TELLTARGET_PLAN**~~ — **RESOLVED** (moved to blocked/). 14/22 pass. All implementable phases done. Remaining blocked by button dispatch (1 test), loadMovie (1), onEnterFrame per-tick (1), MC removal lifecycle (3), unload (1), Ruffle known_failure (1).
+- ~~**TELLTARGET_PLAN**~~ — **RESOLVED** (moved to blocked/). 14/22 pass. All implementable phases done. Remaining blocked by button dispatch (1 test), loadMovie (1), variable-table vs dynamic_props disconnect for onEnterFrame (1), MC removal lifecycle (3), unload (1), Ruffle known_failure (1).
 - ~~**REGISTERCLASS_PLAN**~~ — **RESOLVED** (moved to blocked/). 10/15 pass. All implementable phases done. Remaining blocked by loadMovie (3 tests), sprite init ordering (register_and_init_order), Sound class (register_class_with_sound).
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
 - ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **RESOLVED** (moved to blocked/). 7/8 pass. `super_edge_cases` 39/39 ✅ (resolveProtoVar fix). `interface_implements_op` blocked by REGISTERCLASS_PLAN (MTASC class constructors).

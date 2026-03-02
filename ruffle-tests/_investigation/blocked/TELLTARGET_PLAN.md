@@ -72,7 +72,7 @@ All remaining test failures are blocked on other subsystems. No further TellTarg
 |------|-------|----------------|
 | `string_paths_eval` | 2/8 | onPress button dispatch fires twice (BUTTON_PLAN / clip event dispatch) |
 | `string_paths_eval2` | 5/7 | loadMovie — loaded clip properties not available (LOADMOVIE_PLAN) |
-| `string_paths_variable_scopes` | 0/5 | onEnterFrame per-tick dispatch not implemented (CLIP_EVENTS) |
+| `string_paths_variable_scopes` | 0/5 | onEnterFrame per-tick dispatch exists but handler set via SetVariable on root MC not found by dispatcher (variable-table vs dynamic_props disconnect) |
 | `string_paths_reference_launder` | 0/2 | MC lifecycle after remove+recreate. `known_failure = true` in Ruffle itself |
 | `string_paths_unload` | 0/1 | unload timing (UNLOAD_PLAN) |
 | `string_paths_other` | 30/36 | MC removal/re-creation eval edge cases — eval on removed clips returns stale refs |
