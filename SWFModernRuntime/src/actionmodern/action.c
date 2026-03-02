@@ -10318,7 +10318,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	while (i < html_len) {
 		// SWF<=7: When entering a new text node (after a tag), check if the entire
 		// text node (up to next '<') is whitespace-only. If so, skip it.
-		if (swf_version <= 7 && !condense_white && after_tag && html[i] != '<') {
+		if (swf_version <= 7 && after_tag && html[i] != '<') {
 			u32 tn_end = i;
 			int tn_all_ws = 1;
 			while (tn_end < html_len && html[tn_end] != '<') {
@@ -10698,7 +10698,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	// If entire content is whitespace-only (spaces + \n), produce empty.
 	// Tag breaks (\x01) are structural and should not trigger clearing,
 	// because <p></p> in multiline still needs to produce a paragraph.
-	if (swf_version <= 7 && !condense_white) {
+	if (swf_version <= 7) {
 		int all_ws = 1;
 		for (u32 ti = 0; ti < table->text_len; ti++) {
 			char c = table->text[ti];
@@ -10901,6 +10901,10 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 	if (pcnt > 1 && p_starts[pcnt-1] == p_ends[pcnt-1]) {
 		pcnt--;
 	}
+
+	// Carry-over: track last zero-length font marker across paragraphs
+	TFRun prev_para_marker;
+	int has_prev_para_marker = 0;
 
 	// Emit each paragraph
 	for (u32 pi = 0; pi < pcnt; pi++) {
@@ -11246,6 +11250,36 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 					if (mk) { snprintf(ab, sizeof(ab), " KERNING=\"%d\"", last_marker->kerning); TF_EMIT(buf, bp, bsz, ab); }
 					TF_EMIT(buf, bp, bsz, "></FONT>");
 				}
+			}
+			// Carry-over: if no marker in this paragraph, emit previous paragraph's marker
+			if (!last_marker && has_prev_para_marker) {
+				TFRun* pm = &prev_para_marker;
+				int mf = (strcmp(pm->font_name, CTX.font_name) != 0);
+				int ms = (pm->font_height != CTX.font_height);
+				int mc = (pm->color != CTX.color);
+				int ml2 = (pm->letter_spacing != CTX.letter_spacing);
+				int mk2 = (pm->kerning != CTX.kerning);
+				if (mf || ms || mc || ml2 || mk2) {
+					TF_EMIT(buf, bp, bsz, "<FONT");
+					char ab[256];
+					if (mf) { snprintf(ab, sizeof(ab), " FACE=\"%s\"", pm->font_name); TF_EMIT(buf, bp, bsz, ab); }
+					if (ms) { snprintf(ab, sizeof(ab), " SIZE=\"%d\"", pm->font_height / 20); TF_EMIT(buf, bp, bsz, ab); }
+					if (mc) { snprintf(ab, sizeof(ab), " COLOR=\"#%06X\"", pm->color & 0xFFFFFF); TF_EMIT(buf, bp, bsz, ab); }
+					if (ml2) {
+						int lsv = pm->letter_spacing / 100;
+						int lsf = (pm->letter_spacing < 0 ? -pm->letter_spacing : pm->letter_spacing) % 100;
+						if (lsf == 0) snprintf(ab, sizeof(ab), " LETTERSPACING=\"%d\"", lsv);
+						else snprintf(ab, sizeof(ab), " LETTERSPACING=\"%d.%02d\"", lsv, lsf);
+						TF_EMIT(buf, bp, bsz, ab);
+					}
+					if (mk2) { snprintf(ab, sizeof(ab), " KERNING=\"%d\"", pm->kerning); TF_EMIT(buf, bp, bsz, ab); }
+					TF_EMIT(buf, bp, bsz, "></FONT>");
+				}
+			}
+			// Save marker for carry-over to next paragraph
+			if (last_marker) {
+				prev_para_marker = *last_marker;
+				has_prev_para_marker = 1;
 			}
 		}
 

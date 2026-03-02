@@ -9,106 +9,43 @@
 | `edittext_html_align_swf7` | — | 0 | PASS |
 | `edittext_html_align_swf8` | — | 0 | PASS |
 | `edittext_html_entity` | — | 0 | PASS |
-| `edittext_html_swf7` | 5377 | 55 | 99% match |
-| `edittext_html_swf8` | 5377 | 143 | 97% match |
+| `edittext_html_swf7` | 5377 | 7 | 99.9% match |
+| `edittext_html_swf8` | 5377 | 95 | 98.2% match |
 | `edittext_html_swf6` | 5377 | 2955 | 45% match |
-| `edittext_html_condensewhite_swf7` | 311 | 213 | 31% match |
+| `edittext_html_condensewhite_swf7` | 311 | 7 | 97.7% match |
 | `edittext_html_condensewhite_swf8` | 311 | 269 | 14% match |
 
-**Previously attempted and reverted**: Trailing color revert markers via broad `</font>` close detection caused massive regression (55→133). The behavior is context-dependent and needs a more surgical approach.
+**History:**
+- Initial broad `</font>` revert markers caused 55→133 regression (reverted). Surgical approach in `afb3880d` fixed 36 lines (55→19 for swf7, 125→107 for swf8) with no regressions.
+- condenseWhite fix + serializer font marker carry-over: swf7 19→7, condensewhite_swf7 213→7, swf8 107→95.
 
 ---
 
-## Part A: edittext_html_swf7 (55 diff lines remaining)
+## Part A: edittext_html_swf7 (7 diff lines remaining)
 
-The 55 remaining diffs fall into 6 categories. Each appears 3 times in the test (the test runs the same HTML inputs with 3 different default format configurations: section 1 with SIZE=6 COLOR=#000000, section 2 with SIZE=12 COLOR=#CC00CC, section 3 with SIZE=12 COLOR=#000000 + TEXTFORMAT RIGHTMARGIN=2 LEADING=2).
+The 7 remaining diffs are all A6 (font size pop behavior), appearing 3 times (one per test section).
 
-### A1. Trailing color revert marker in `</p>` paragraphs (6 diff lines)
+### ~~A1. Trailing color revert marker carry-over across paragraphs (6 diff lines)~~ — FIXED
 
-**Lines:** 910, 916, 2701, 2707, 4492, 4498
+**Fixed by adding `prev_para_marker` carry-over in `tf_serialize_html()`.** When a paragraph ends with a zero-length font marker, it's saved and re-emitted in subsequent paragraphs that don't have their own marker. Also fixed 12 bonus diff lines in swf8.
 
-**HTML input examples:**
-- `<p>test<font color="#121212"></font><p>test<font color="#131313"></font><p>test<font color="#141414"></font></p></p></p><p>test</p>` (line 907)
-- `<p>test<font color="#121212"></font><p>test</p><font color="#131313"><p>test</p></font>` (line 913)
+### ~~A2. Trailing color revert marker in `</li>` paragraphs (6 diff lines)~~ — FIXED
 
-**Expected (Flash):** Second paragraph ends with `<FONT COLOR="#141414"></FONT>` or `<FONT COLOR="#121212"></FONT>` before `</FONT></P>`
-**Got:** Second paragraph ends with just `</FONT></P>` — missing trailing color revert marker.
+**Fixed in `afb3880d`.** Added `</font>` color revert markers for non-empty fonts that changed color inside LI paragraphs. Uses `para_type=2` flag to bypass the serializer's LI boundary skip logic. Parser creates zero-length marker with parent scope's color; serializer already handles zero-length font markers.
 
-**Root cause:** When `<font color>` creates a color scope and `</font>` closes it, Flash emits a zero-length `<FONT COLOR>` tag at the point where the color reverts. This only happens in multiline mode and only when the color actually changes from a nested `<font>`. Our parser doesn't create these "revert" markers.
+### ~~A3. Alignment inheritance after `</li>` auto-close (3 diff lines)~~ — FIXED
 
-**Difficulty:** Hard. The previous attempt to create revert markers on every `</font>` close that changed color caused a 78-line regression. The behavior is context-dependent:
-- Occurs in multiline `</p>` paragraphs but NOT in singleline
-- Occurs when `</font>` closes a color change
-- Does NOT occur for other attributes (bold, size, etc.)
-- The revert color is the color from the *closed* font scope, not the parent scope
-- Needs to interact correctly with the nested-`<p>` suppression logic
+**Fixed in `afb3880d`.** Added `saved_p_align` variable. When `<li>` auto-closes a `<p>`, the P's alignment is saved before popping. The saved alignment is applied to post-LI `</p>` break runs in both the matching-P/!in_paragraph path and the unmatched `</p>` path.
 
-**Approach:** Create zero-length color revert marker runs at `</font>` close ONLY when:
-1. The closed font changed color
-2. We're inside a paragraph (not at top level)
-3. Serialize these markers only in multiline mode
+### ~~A4. Color leak from `</li>` to subsequent `</p>` paragraph (3 diff lines)~~ — FIXED
 
-### A2. Trailing color revert marker in `</li>` paragraphs (6 diff lines)
+**Fixed in `afb3880d`.** Post-LI `</p>` break runs in the matching-P/!in_paragraph path now reset color to `defaults->color` instead of inheriting from the current (font-colored) scope.
 
-**Lines:** 1084, 1597, 2875, 3388, 4666, 5179
+### ~~A5. `<li><p><li>` nesting produces extra LI paragraph (3 + 3 diff lines)~~ — FIXED
 
-**HTML input:** `<li><font color="#010101">text</font></li>` (lines 1081, 1594)
+**Fixed in `afb3880d`.** Added `consumed_p` check in the unmatched `</p>` path: when a `</p>` inside an LI already produced a break via the `in_paragraph` path (incrementing `consumed_p`), the outer `</p>` now checks `consumed_p` before producing a break. The check is inside the `!last_break_was_p` guard to avoid prematurely consuming credits when `last_break_was_p` would already suppress the break. Also fixed 6 bonus lines at 1500/1501, 3291/3292, 5082/5083 (the `<p><li><p><li>test</li></p></li></p>` variant).
 
-**Expected (Flash):** `<LI>..text<FONT COLOR="#000000"></FONT>..</LI>` — trailing color revert to default color
-**Got:** `<!-- the same -->` (singleline and multiline identical, no revert marker)
-
-**Root cause:** Same as A1 but in LI context. When `<font color="#010101">` wraps text inside `<li>`, Flash's multiline output includes a trailing `<FONT COLOR="#000000"></FONT>` (or `<FONT COLOR="#CC00CC"></FONT>` for section 2) that reverts to the default/outer color.
-
-**Difficulty:** Medium. This is the simpler case of the color revert problem — it's always just one `</font>` at the end of an LI.
-
-**Approach:** Tied to A1 — both need the same "color revert marker on `</font>`" mechanism.
-
-### A3. Alignment inheritance after `</li>` auto-close (3 diff lines)
-
-**Lines:** 808, 2599, 4390
-
-**HTML input:** `<p align="right">text<li></li></p>` (line 805)
-
-**Expected (Flash):** `...<P ALIGN="RIGHT">...` for the trailing empty P paragraph
-**Got:** `...<P ALIGN="LEFT">...`
-
-**Root cause:** When `<li>` auto-closes the `<p align="right">`, it pops the P's format scope (which carried align=RIGHT). The `</p>` then creates a break with the default alignment (LEFT). Flash apparently remembers the P's alignment even after `<li>` auto-closes it.
-
-**Difficulty:** Medium. Need to track the "last P alignment" separately from the format stack so that when `</p>` fires after a `</li>`, the subsequent P paragraph inherits the original alignment.
-
-**Approach:** When `<li>` auto-closes a `<p>`, stash the P's alignment in a variable. When an unmatched `</p>` creates a break after an LI paragraph, use the stashed alignment instead of the current scope alignment.
-
-### A4. Color leak from `</li>` to subsequent `</p>` paragraph (3 diff lines)
-
-**Lines:** 1270, 3061, 4852
-
-**HTML input:** `<font color="#010101"><textformat rightmargin="3"><p><li></li></p></textformat></font>` (line 1267)
-
-**Expected (Flash):** LI has COLOR="#010101", P has COLOR="#000000" (default)
-**Got:** Both LI and P have COLOR="#010101"
-
-**Root cause:** The `</p>` break paragraph inherits the color from the enclosing `<font color="#010101">` scope. Flash apparently resets color to the field's default color when creating a P paragraph after an LI.
-
-**Difficulty:** Hard. This is a subtle interaction between font color scopes, LI auto-close, and P paragraph creation. May be related to A3 (alignment inheritance).
-
-**Approach:** When creating the post-LI P paragraph (from unmatched `</p>`), reset color to the field's default color rather than inheriting from the current scope.
-
-### A5. `<li><p><li>` nesting produces extra LI paragraph (3 + 3 diff lines)
-
-**Lines:** 1536+1537, 3327+3328, 5118+5119
-
-**HTML input:** `<li><p><li><p>test</p></li></p></li>` (line 1533)
-
-**Expected (Flash):** 3 paragraphs (LI "test" + 2 empty LIs), text="test\r\r\r"
-**Got:** 4 paragraphs (LI "test" + 3 empty LIs), text="test\r\r\r\r"
-
-**Root cause:** The `</p></li></p></li>` close sequence creates one extra paragraph break. Our nested-`<p>` suppression (`nested_p_ignored`) only handles `<p>` inside `<p>`, not `<p>` inside `<li>`. The `</p>` inside `</li>` is being treated as a break when it should be suppressed.
-
-**Difficulty:** Medium. Need to extend the nested paragraph suppression to handle `<p>` inside `<li>` in certain contexts.
-
-**Approach:** When `<p>` is ignored inside `<li>` (because a paragraph is already open), track it the same way as nested `<p>` inside `<p>`. The corresponding `</p>` should be suppressed.
-
-### A6. Font size doesn't pop on `</font>` in singleline mode (3 diff lines)
+### A6. Font size doesn't pop on `</font>` in singleline mode (3 diff lines) — BLOCKED
 
 **Lines:** 1778, 3569, 5360
 
@@ -132,9 +69,9 @@ Needs more investigation with additional test cases from the expected output to 
 
 ---
 
-## Part B: edittext_html_swf8 (143 diff lines)
+## Part B: edittext_html_swf8 (95 diff lines)
 
-SWF8 shares most diffs with SWF7 (the same 55 lines from Part A appear in the SWF8 output range 1-5377 too). The additional ~88 diffs are SWF8-specific:
+SWF8 shares most diffs with SWF7 (the Part A fixes reduced SWF8 from 125→95). The remaining ~95 SWF8-specific diffs are:
 
 ### B1. SWF8 whitespace preservation in text nodes
 
@@ -142,9 +79,9 @@ SWF8 preserves whitespace-only text content that SWF7 strips. Our parser's SWF7 
 - Lines like `<P ALIGN="RIGHT">` vs `<P ALIGN="LEFT">` — alignment not propagating correctly in whitespace-preserved paragraphs
 - Empty `<a href>` tags being stripped when they should be preserved in SWF8
 
-### B2. Trailing color revert markers (same as A1/A2 but in SWF8 context)
+### B2. ~~Trailing color revert markers (same as A1 but in SWF8 context)~~ — PARTIALLY FIXED
 
-Same 6+6 trailing color revert issues as SWF7.
+A1 carry-over fix also improved SWF8 by 12 diff lines. Some SWF8-specific marker issues remain (first paragraph markers not being emitted).
 
 ### B3. `</font>` color behavior with default color (SWF8-specific)
 
@@ -154,7 +91,7 @@ Lines 263, 635, 745, 751, 757: Font color not resetting correctly on `</font>` i
 
 Lines 1280-1300: `<a href="http://example.com">` wrapping empty content should produce `<A HREF="..." TARGET="..."></A>` in output, but we're stripping it.
 
-**Approach for SWF8:** Fix the SWF7 issues first (Part A), then tackle SWF8-specific whitespace and `<a>` preservation issues. Many SWF8 fixes will be incremental.
+**Approach for SWF8:** Fix A6 first (if possible), then tackle SWF8-specific whitespace and `<a>` preservation issues. Many SWF8 fixes will be incremental.
 
 ---
 
@@ -178,46 +115,31 @@ Lines 143-175: Complex interactions between singleline/multiline and how `<p>` a
 
 ---
 
-## Part D: edittext_html_condensewhite (swf7: 213 diffs, swf8: 269 diffs)
+## Part D: edittext_html_condensewhite (swf7: 7 diffs, swf8: 269 diffs)
 
-The condenseWhite tests need implementation of whitespace collapsing rules:
+### ~~D1. Whitespace-only content handling~~ — FIXED
 
-### D1. Whitespace-only content handling
+**Fixed by removing `!condense_white` guard from whitespace-only text node pre-scan and post-processing.** The SWF7 pre-scan (line ~10321) already correctly strips whitespace-only text nodes; it was gated behind `!condense_white` which disabled it for condenseWhite=true. Removing the guard brought condensewhite_swf7 from 213→7 diff lines.
 
-Lines 7-40 (swf7): `condenseWhite` should collapse whitespace to nothing, but we produce a single space ` `. The SWF7 rule should strip whitespace-only text nodes entirely when condenseWhite is true.
+### D2. Remaining condensewhite_swf7 diffs (7 lines)
 
-### D2. Trailing space after content
+The 7 remaining lines in condensewhite_swf7 are multiline paragraph whitespace issues — runs of spaces within content paragraphs where condenseWhite should collapse but doesn't. Needs investigation of condense_white in the text run processing, not just the pre-scan.
 
-Lines 85-86 (swf7): `<b>test</b>` followed by whitespace should not have a trailing space when condenseWhite is true. We produce `<B>test</B> ` with trailing space.
+### D3. condensewhite_swf8 (269 diffs)
 
-### D3. condenseWhite is NOT just whitespace stripping
-
-The `condenseWhite` flag affects the HTML *parser*, not just the output:
-- Replace `\t`, `\r`, `\n` with spaces in text content
-- Collapse runs of whitespace to single space
-- SWF7: strip whitespace-only text nodes
-- SWF8: preserve some whitespace differently
-
-**Approach for condenseWhite:**
-1. Implement condenseWhite logic in `tf_parse_html()`:
-   - When condenseWhite flag is set, collapse whitespace in text nodes
-   - SWF7: discard whitespace-only text nodes entirely
-   - SWF8: collapse but don't discard
-2. The condenseWhite flag is already read from the MC properties — just need to apply it during parsing
-3. Test with `edittext_html_condensewhite_swf7` first, then swf8
+SWF8 condenseWhite has different rules from SWF7. The pre-scan fix is gated on `swf_version <= 7` so it doesn't affect SWF8. SWF8 condenseWhite needs separate investigation.
 
 ---
 
 ## Priority Order
 
-1. **A5: `<li><p><li>` nesting** (6 diff lines) — Most tractable, extends existing `nested_p_ignored` mechanism
-2. **A3: Alignment inheritance after `</li>`** (3 diff lines) — Medium difficulty, clear root cause
-3. **A1+A2: Trailing color revert markers** (12 diff lines) — Hardest of the fixable issues, needs surgical approach
-4. **A4: Color leak from `</li>` to `</p>`** (3 diff lines) — May be fixed as side-effect of A1+A2
-5. **D1-D3: condenseWhite implementation** (213+ diff lines) — Big win for test count
-6. **B1-B4: SWF8-specific issues** (88 diff lines) — After SWF7 is stable
-7. **A6: Font size pop behavior** (3 diff lines) — Risky to change, may break other things
-8. **C1-C3: SWF6 paragraph model** (2955 diff lines) — Largest effort, lowest priority
+1. ~~**A1-A5: All fixed**~~
+2. ~~**D1: condenseWhite whitespace stripping**~~ — FIXED (213→7 diffs)
+3. **A6: Font size pop behavior** (3 diff lines) — Blocked, needs investigation
+4. **D2: Remaining condensewhite_swf7** (7 diff lines) — Small, investigate
+5. **B1-B4: SWF8-specific issues** (~95 diff lines) — After SWF7 is stable
+6. **D3: condensewhite_swf8** (269 diff lines) — Separate SWF8 rules
+7. **C1-C3: SWF6 paragraph model** (2955 diff lines) — Largest effort, lowest priority
 
 ## Regression Guard
 
