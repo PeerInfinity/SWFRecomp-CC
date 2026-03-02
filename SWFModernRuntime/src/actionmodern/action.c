@@ -11012,17 +11012,22 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 		else {
 			// For empty paragraphs, check for zero-length marker runs
 			// (from empty <font> tags like <font color="#111111"></font>)
+			// In singleline mode, skip the marker scan: merged tag breaks contain
+			// zero-length markers that shouldn't affect the outer font. The pfmt
+			// (from the \n break) already has the correct text field defaults.
 			ofont = pfmt;
-			for (u32 ri = 0; ri < table->run_count; ri++) {
-				TFRun* r = &table->runs[ri];
-				if (r->length == 0 && r->start >= ps && r->start <= pe) {
-					// Use the marker run's font attributes for the outer FONT
-					ofont.color = r->color;
-					strncpy(ofont.font_name, r->font_name, 63); ofont.font_name[63] = '\0';
-					ofont.font_height = r->font_height;
-					ofont.letter_spacing = r->letter_spacing;
-					ofont.kerning = r->kerning;
-					break;
+			if (is_multiline) {
+				for (u32 ri = 0; ri < table->run_count; ri++) {
+					TFRun* r = &table->runs[ri];
+					if (r->length == 0 && r->start >= ps && r->start <= pe) {
+						// Use the marker run's font attributes for the outer FONT
+						ofont.color = r->color;
+						strncpy(ofont.font_name, r->font_name, 63); ofont.font_name[63] = '\0';
+						ofont.font_height = r->font_height;
+						ofont.letter_spacing = r->letter_spacing;
+						ofont.kerning = r->kerning;
+						break;
+					}
 				}
 			}
 		}
