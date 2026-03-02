@@ -11040,8 +11040,12 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			if (!emit_biu && pfmt.para_type == 1 && (pfmt.bold || pfmt.italic || pfmt.underline)) {
 				emit_biu = 1;
 			}
-			// Empty LI paragraphs emit <A HREF> if the format has an href
-			int emit_href = (pfmt.para_type == 1 && pfmt.href[0] != '\0');
+			// Empty paragraphs emit <A HREF> if the format has an href.
+			// LI paragraphs (para_type==1) always emit it.
+			// P paragraphs only emit when the break was a content newline (p_break_kind==1),
+			// which happens when \n in anchor scope creates the paragraph boundary.
+			// Tag breaks from </p> structural closes should NOT emit <A>.
+			int emit_href = (pfmt.href[0] != '\0' && (pfmt.para_type == 1 || p_break_kind[pi] == 1));
 			if (emit_href) {
 				char atag[512];
 				snprintf(atag, sizeof(atag), "<A HREF=\"%s\" TARGET=\"%s\">", pfmt.href, pfmt.href_target);
