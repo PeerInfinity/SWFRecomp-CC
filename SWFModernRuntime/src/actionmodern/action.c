@@ -9090,6 +9090,33 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 	int* out_word_wrap, int* out_field_width_twips,
 	int* out_left_margin_twips, int* out_right_margin_twips, int* out_indent_twips);
 static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc);
+
+// Forward declarations for HTML text format run system
+typedef struct TFRun_s {
+	u32 start; u32 length;
+	u8 align; u8 para_type;
+	s16 left_margin; s16 right_margin; s16 indent; s16 block_indent; s16 leading;
+	u32 color; s16 font_height; s16 letter_spacing; u8 kerning;
+	u8 bold; u8 italic; u8 underline;
+	char font_name[64]; char href[256]; char href_target[64];
+	char tabstops[128]; // Comma-separated tab stop values, empty = none
+} TFRun;
+#define TF_MAX_RUNS   512
+#define TF_MAX_TABLES  32
+typedef struct {
+	MovieClip* mc;
+	TFRun runs[TF_MAX_RUNS];
+	u32 run_count;
+	char text[16384];
+	u32 text_len;
+} TFRunTable;
+static TFRunTable* tf_get_table(MovieClip* mc);
+static TFRunTable* tf_find_table(MovieClip* mc);
+static void tf_get_defaults(MovieClip* mc, TFRun* def);
+static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
+                         const TFRun* defaults, int condense_white, int swf_version, int is_multiline);
+static char* tf_serialize_html(TFRunTable* table, int is_multiline);
+static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size, int is_multiline);
 #endif
 
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
@@ -9221,62 +9248,35 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				}
 				if (init_text_ml) free(init_text_ml);
 				setProperty(app_context, props, "text", 4, &text_val);
-				// htmlText — for HTML fields, wrap with <P ALIGN><FONT> tags
+				// htmlText — parse HTML and build format runs for proper serialization
 				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
-				ActionVar html_text_val = {0};
-				html_text_val.type = ACTION_STACK_VALUE_STRING;
 				if (tf_flags & 0x0040) {
-					// HTML field: wrap content with Flash-style markup
-					const char* align_names[] = {"LEFT", "RIGHT", "CENTER", "JUSTIFY"};
-					u8 align_idx = ng_getTextFieldAlign(tf_idx);
-					const char* align_name = (align_idx < 4) ? align_names[align_idx] : "LEFT";
-					u16 fid = ng_getTextFieldFontId(tf_idx);
-					const char* font_name = ng_getFontName(fid);
-					if (font_name[0] == '\0') font_name = "Times New Roman";
-					u16 raw_height = ng_getTextFieldFontHeight(tf_idx);
-					int font_size = (raw_height > 0) ? (raw_height / 20) : 12;
-					u32 text_color = ng_getTextFieldColorByIdx(tf_idx);
-					// Convert inline tags to uppercase (Flash convention)
-					size_t raw_len = strlen(raw_html);
-					char* upper_html = (char*) malloc(raw_len + 1);
-					memcpy(upper_html, raw_html, raw_len + 1);
-					for (size_t ci = 0; ci + 2 < raw_len; ci++) {
-						if (upper_html[ci] == '<') {
-							if (upper_html[ci+1] == 'b' && (upper_html[ci+2] == '>' || upper_html[ci+2] == ' '))
-								upper_html[ci+1] = 'B';
-							else if (upper_html[ci+1] == 'i' && (upper_html[ci+2] == '>' || upper_html[ci+2] == ' '))
-								upper_html[ci+1] = 'I';
-							else if (upper_html[ci+1] == 'u' && (upper_html[ci+2] == '>' || upper_html[ci+2] == ' '))
-								upper_html[ci+1] = 'U';
-							else if (upper_html[ci+1] == '/' && ci + 3 < raw_len) {
-								if (upper_html[ci+2] == 'b' && upper_html[ci+3] == '>')
-									upper_html[ci+2] = 'B';
-								else if (upper_html[ci+2] == 'i' && upper_html[ci+3] == '>')
-									upper_html[ci+2] = 'I';
-								else if (upper_html[ci+2] == 'u' && upper_html[ci+3] == '>')
-									upper_html[ci+2] = 'U';
-							}
-						}
-					}
-					// Build wrapped HTML string
-					size_t buf_size = raw_len + 256;
-					char* wrapped = (char*) malloc(buf_size);
-					snprintf(wrapped, buf_size,
-						"<P ALIGN=\"%s\"><FONT FACE=\"%s\" SIZE=\"%d\" COLOR=\"#%06X\" LETTERSPACING=\"0\" KERNING=\"0\">%s</FONT></P>",
-						align_name, font_name, font_size, text_color, upper_html);
-					free(upper_html);
-					u32 _wr_u16_len;
-					uint16_t* _wr_u16 = utf8_to_u16(app_context, wrapped, (u32)strlen(wrapped), &_wr_u16_len);
-					free(wrapped);
-					html_text_val.str_size = _wr_u16_len;
-					VAL(u64, &html_text_val.data.numeric_value) = (u64)_wr_u16;
+					// HTML field: parse into format runs
+					TFRunTable* _init_table = tf_get_table(mc);
+					TFRun _init_def;
+					tf_get_defaults(mc, &_init_def);
+					u32 _init_raw_len = (u32)strlen(raw_html);
+					int _init_multiline = (tf_flags & 0x0002) != 0;
+					tf_parse_html(_init_table, raw_html, _init_raw_len, &_init_def, 0, g_swf_version, _init_multiline);
+					// Serialize to canonical HTML for storage
+					char* _init_html = tf_serialize_html(_init_table, _init_multiline);
+					ActionVar html_text_val = {0};
+					html_text_val.type = ACTION_STACK_VALUE_STRING;
+					u32 _init_u16_len;
+					uint16_t* _init_u16 = utf8_to_u16(app_context, _init_html, (u32)strlen(_init_html), &_init_u16_len);
+					free(_init_html);
+					html_text_val.str_size = _init_u16_len;
+					VAL(u64, &html_text_val.data.numeric_value) = (u64)_init_u16;
+					setProperty(app_context, props, "htmlText", 8, &html_text_val);
 				} else {
+					ActionVar html_text_val = {0};
+					html_text_val.type = ACTION_STACK_VALUE_STRING;
 					u32 _rh_u16_len;
 					uint16_t* _rh_u16 = utf8_to_u16(app_context, raw_html, (u32)strlen(raw_html), &_rh_u16_len);
 					html_text_val.str_size = _rh_u16_len;
 					VAL(u64, &html_text_val.data.numeric_value) = (u64)_rh_u16;
+					setProperty(app_context, props, "htmlText", 8, &html_text_val);
 				}
-				setProperty(app_context, props, "htmlText", 8, &html_text_val);
 				// textColor (from DefineEditText)
 				u32 tc = ng_getTextFieldColor(depth);
 				ActionVar color_val = {0};
@@ -10010,6 +10010,1259 @@ static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t*
 	*out_len = di;
 	return dst;
 }
+
+// =============================================
+// HTML Text Format Run System (definitions — types declared above)
+// =============================================
+#ifdef NO_GRAPHICS
+static TFRunTable g_tf_run_tables[TF_MAX_TABLES];
+
+static TFRunTable* tf_get_table(MovieClip* mc) {
+	for (int i = 0; i < TF_MAX_TABLES; i++) {
+		if (g_tf_run_tables[i].mc == mc) return &g_tf_run_tables[i];
+	}
+	for (int i = 0; i < TF_MAX_TABLES; i++) {
+		if (g_tf_run_tables[i].mc == NULL) {
+			g_tf_run_tables[i].mc = mc;
+			g_tf_run_tables[i].run_count = 0;
+			g_tf_run_tables[i].text_len = 0;
+			g_tf_run_tables[i].text[0] = '\0';
+			return &g_tf_run_tables[i];
+		}
+	}
+	// Evict oldest
+	g_tf_run_tables[0].mc = mc;
+	g_tf_run_tables[0].run_count = 0;
+	g_tf_run_tables[0].text_len = 0;
+	g_tf_run_tables[0].text[0] = '\0';
+	return &g_tf_run_tables[0];
+}
+
+static TFRunTable* tf_find_table(MovieClip* mc) {
+	for (int i = 0; i < TF_MAX_TABLES; i++) {
+		if (g_tf_run_tables[i].mc == mc) return &g_tf_run_tables[i];
+	}
+	return NULL;
+}
+
+// Get default format from MC's textfield metadata
+static void tf_get_defaults(MovieClip* mc, TFRun* def) {
+	memset(def, 0, sizeof(TFRun));
+	def->color = 0x000000;
+	def->font_height = 12 * 20; // 12px default
+	strcpy(def->font_name, "Times New Roman");
+	if (mc->ng_textfield_idx >= 0) {
+		u16 fid = ng_getTextFieldFontId(mc->ng_textfield_idx);
+		const char* fn = ng_getFontName(fid);
+		if (fn[0] != '\0') {
+			strncpy(def->font_name, fn, 63);
+			def->font_name[63] = '\0';
+		}
+		u16 fh = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
+		if (fh > 0) def->font_height = fh;
+		u32 tc = ng_getTextFieldColorByIdx(mc->ng_textfield_idx);
+		def->color = tc & 0x00FFFFFF;
+		def->align = ng_getTextFieldAlign(mc->ng_textfield_idx);
+		s16 leading_twips = ng_getTextFieldLeading(mc->ng_textfield_idx);
+		def->leading = leading_twips / 20; // twips → pixels
+		u16 lm = ng_getTextFieldLeftMargin(mc->ng_textfield_idx);
+		def->left_margin = (s16)(lm / 20);
+		u16 rm = ng_getTextFieldRightMargin(mc->ng_textfield_idx);
+		def->right_margin = (s16)(rm / 20);
+		s16 indent = ng_getTextFieldIndent(mc->ng_textfield_idx);
+		def->indent = indent / 20;
+	}
+}
+
+// =============================================
+// HTML Entity decoding helper
+// =============================================
+static int tf_decode_entity(const char* src, u32 src_len, u32 pos, char* out, u32* out_bytes, u32* consumed) {
+	// Returns 1 if entity decoded, 0 if not.
+	// src[pos] == '&'
+	u32 si = pos + 1;
+	if (si >= src_len) return 0;
+	if (si + 3 <= src_len && strncmp(&src[si], "amp;", 4) == 0) { out[0] = '&'; *out_bytes = 1; *consumed = 5; return 1; }
+	if (si + 2 <= src_len && strncmp(&src[si], "lt;", 3) == 0) { out[0] = '<'; *out_bytes = 1; *consumed = 4; return 1; }
+	if (si + 2 <= src_len && strncmp(&src[si], "gt;", 3) == 0) { out[0] = '>'; *out_bytes = 1; *consumed = 4; return 1; }
+	if (si + 4 <= src_len && strncmp(&src[si], "apos;", 5) == 0) { out[0] = '\''; *out_bytes = 1; *consumed = 6; return 1; }
+	if (si + 4 <= src_len && strncmp(&src[si], "quot;", 5) == 0) { out[0] = '"'; *out_bytes = 1; *consumed = 6; return 1; }
+	if (si + 4 <= src_len && strncmp(&src[si], "nbsp;", 5) == 0) { out[0] = (char)0xC2; out[1] = (char)0xA0; *out_bytes = 2; *consumed = 6; return 1; }
+	if (src[si] == '#') {
+		si++;
+		int codepoint = 0;
+		if (si < src_len && (src[si] == 'x' || src[si] == 'X')) {
+			si++;
+			while (si < src_len && src[si] != ';') {
+				char c = src[si];
+				if (c >= '0' && c <= '9') codepoint = codepoint * 16 + (c - '0');
+				else if (c >= 'a' && c <= 'f') codepoint = codepoint * 16 + (c - 'a' + 10);
+				else if (c >= 'A' && c <= 'F') codepoint = codepoint * 16 + (c - 'A' + 10);
+				else break;
+				si++;
+			}
+		} else {
+			while (si < src_len && src[si] != ';') {
+				if (src[si] >= '0' && src[si] <= '9')
+					codepoint = codepoint * 10 + (src[si] - '0');
+				else break;
+				si++;
+			}
+		}
+		if (si < src_len && src[si] == ';') {
+			u32 ob = 0;
+			if (codepoint < 0x80) { out[ob++] = (char)codepoint; }
+			else if (codepoint < 0x800) { out[ob++] = (char)(0xC0|(codepoint>>6)); out[ob++] = (char)(0x80|(codepoint&0x3F)); }
+			else if (codepoint < 0x10000) { out[ob++] = (char)(0xE0|(codepoint>>12)); out[ob++] = (char)(0x80|((codepoint>>6)&0x3F)); out[ob++] = (char)(0x80|(codepoint&0x3F)); }
+			else { out[ob++] = (char)(0xF0|(codepoint>>18)); out[ob++] = (char)(0x80|((codepoint>>12)&0x3F)); out[ob++] = (char)(0x80|((codepoint>>6)&0x3F)); out[ob++] = (char)(0x80|(codepoint&0x3F)); }
+			*out_bytes = ob;
+			*consumed = (si - pos) + 1;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// =============================================
+// Font color attribute parsing (Flash rules)
+// =============================================
+static int tf_parse_font_color(const char* val, u32 val_len, u32* out_color) {
+	// Must start with #
+	if (val_len == 0 || val[0] != '#') return 0;
+	u32 i = 1;
+	// Skip whitespace/tabs after #
+	while (i < val_len && (val[i] == ' ' || val[i] == '\t')) i++;
+	// Read hex digits
+	char hex_buf[128];
+	u32 hex_count = 0;
+	while (i < val_len && hex_count < 127) {
+		char c = val[i];
+		if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			hex_buf[hex_count++] = (c >= 'A' && c <= 'F') ? (c + 32) : c;
+			i++;
+		} else break;
+	}
+	if (hex_count == 0) return 0; // "#g" → no hex digits after whitespace
+	// If >6 hex chars: take last 6
+	u32 start = (hex_count > 6) ? (hex_count - 6) : 0;
+	u32 take = hex_count - start;
+	u32 color = 0;
+	for (u32 j = start; j < hex_count; j++) {
+		char c = hex_buf[j];
+		color = color * 16 + ((c >= 'a') ? (c - 'a' + 10) : (c - '0'));
+	}
+	(void)take;
+	*out_color = color;
+	return 1;
+}
+
+// =============================================
+// HTML Parser — tf_parse_html()
+// =============================================
+
+// Parser state for attribute extraction
+static int tf_get_attr(const char* tag_content, u32 tag_len, const char* attr_name, char* val_buf, u32 val_buf_size) {
+	// Case-insensitive attribute search
+	u32 attr_len = (u32)strlen(attr_name);
+	for (u32 i = 0; i + attr_len < tag_len; i++) {
+		int match = 1;
+		for (u32 j = 0; j < attr_len; j++) {
+			char a = tag_content[i+j], b = attr_name[j];
+			if (a >= 'A' && a <= 'Z') a += 32;
+			if (b >= 'A' && b <= 'Z') b += 32;
+			if (a != b) { match = 0; break; }
+		}
+		if (match && i + attr_len < tag_len && tag_content[i + attr_len] == '=') {
+			u32 vi = i + attr_len + 1;
+			char quote = 0;
+			if (vi < tag_len && (tag_content[vi] == '"' || tag_content[vi] == '\'')) {
+				quote = tag_content[vi]; vi++;
+			}
+			u32 vo = 0;
+			while (vi < tag_len && vo < val_buf_size - 1) {
+				if (quote && tag_content[vi] == quote) break;
+				if (!quote && (tag_content[vi] == ' ' || tag_content[vi] == '>')) break;
+				val_buf[vo++] = tag_content[vi++];
+			}
+			val_buf[vo] = '\0';
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Case-insensitive tag name match
+static int tf_tag_is(const char* tag, u32 tag_len, const char* name) {
+	u32 name_len = (u32)strlen(name);
+	if (tag_len < name_len) return 0;
+	for (u32 i = 0; i < name_len; i++) {
+		char a = tag[i], b = name[i];
+		if (a >= 'A' && a <= 'Z') a += 32;
+		if (b >= 'A' && b <= 'Z') b += 32;
+		if (a != b) return 0;
+	}
+	if (tag_len == name_len) return 1;
+	if (tag[name_len] == ' ' || tag[name_len] == '>' || tag[name_len] == '/' || tag[name_len] == '\t' || tag[name_len] == '\n' || tag[name_len] == '\r') return 1;
+	return 0;
+}
+
+// tf_parse_html: parse HTML string into format runs
+// Internal text uses: '\n' for content newlines (bare \n in HTML),
+//   '\x01' for tag paragraph breaks (</p>, </li>)
+//   '\x02' for <br> paragraph breaks (preserves B/I/U in empty paragraphs)
+#define IS_PARA_BREAK(c) ((c) == '\x01' || (c) == '\x02' || (c) == '\n')
+// condense_white: 1 = condenseWhite mode, 0 = normal
+// swf_version: affects whitespace handling
+// Returns 1 on success.
+static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
+                         const TFRun* defaults, int condense_white, int swf_version, int is_multiline) {
+	(void)is_multiline;
+	table->run_count = 0;
+	table->text_len = 0;
+	table->text[0] = '\0';
+
+	#define TF_PARSE_STACK_MAX 32
+	TFRun fmt_stack[TF_PARSE_STACK_MAX];
+	int fmt_sp = 0;
+	fmt_stack[0] = *defaults;
+
+	#define TF_TAG_FONT  1
+	#define TF_TAG_B     2
+	#define TF_TAG_I     3
+	#define TF_TAG_U     4
+	#define TF_TAG_A     5
+	#define TF_TAG_TF    6
+	#define TF_TAG_P     7
+	#define TF_TAG_LI    8
+	int tag_type_stack[TF_PARSE_STACK_MAX];
+	u32 tag_text_len_stack[TF_PARSE_STACK_MAX]; // text_len when tag was opened
+	u8 tag_had_ws_stripped[TF_PARSE_STACK_MAX]; // 1 if whitespace was stripped inside this tag
+	int tag_sp = 0;
+
+	u32 run_text_start = 0;
+	int in_paragraph = 0;
+	u8 cur_para_type = 0;
+
+	#define FLUSH_RUN() do { \
+		if (table->text_len > run_text_start) { \
+			if (table->run_count < TF_MAX_RUNS) { \
+				TFRun* r = &table->runs[table->run_count]; \
+				*r = fmt_stack[fmt_sp]; \
+				r->start = run_text_start; \
+				r->length = table->text_len - run_text_start; \
+				table->run_count++; \
+			} \
+			run_text_start = table->text_len; \
+		} \
+	} while(0)
+
+	#define ADD_CH(c) do { \
+		if (table->text_len < sizeof(table->text) - 1) { \
+			table->text[table->text_len++] = (c); \
+			table->text[table->text_len] = '\0'; \
+		} \
+	} while(0)
+
+	// Add a paragraph break marker (tag-based: </p>, </li>, <br>)
+	// Uses \x01 to distinguish from content \n
+	#define ADD_TAG_BREAK(ptype) do { \
+		FLUSH_RUN(); \
+		ADD_CH('\x01'); \
+		if (table->run_count < TF_MAX_RUNS) { \
+			TFRun* r = &table->runs[table->run_count]; \
+			*r = fmt_stack[fmt_sp]; \
+			r->start = table->text_len - 1; \
+			r->length = 1; \
+			r->para_type = (ptype); \
+			table->run_count++; \
+		} \
+		run_text_start = table->text_len; \
+	} while(0)
+
+	// Add a <br> break (\x02 marker — like tag break but preserves B/I/U in empty para)
+	#define ADD_BR_BREAK(ptype) do { \
+		FLUSH_RUN(); \
+		ADD_CH('\x02'); \
+		if (table->run_count < TF_MAX_RUNS) { \
+			TFRun* r = &table->runs[table->run_count]; \
+			*r = fmt_stack[fmt_sp]; \
+			r->start = table->text_len - 1; \
+			r->length = 1; \
+			r->para_type = (ptype); \
+			table->run_count++; \
+		} \
+		run_text_start = table->text_len; \
+	} while(0)
+
+	// Add a content newline (\n in HTML content)
+	#define ADD_CONTENT_NL() do { \
+		FLUSH_RUN(); \
+		ADD_CH('\n'); \
+		if (table->run_count < TF_MAX_RUNS) { \
+			TFRun* r = &table->runs[table->run_count]; \
+			*r = fmt_stack[fmt_sp]; \
+			r->start = table->text_len - 1; \
+			r->length = 1; \
+			r->para_type = cur_para_type; \
+			table->run_count++; \
+		} \
+		run_text_start = table->text_len; \
+	} while(0)
+
+	int after_tag = 1; // Start as "after tag" (beginning of input acts like after a tag)
+	int last_break_was_p = 0; // Track if the last \x01 break was from </p> (for double-close detection)
+	int consumed_p = 0; // Track </p> breaks consumed inside LI context (suppresses matching outer </p>)
+	int nested_p_ignored = 0; // Track nested <p> tags ignored inside in_paragraph (so corresponding </p> are suppressed)
+	u32 i = 0;
+	while (i < html_len) {
+		// SWF<=7: When entering a new text node (after a tag), check if the entire
+		// text node (up to next '<') is whitespace-only. If so, skip it.
+		if (swf_version <= 7 && !condense_white && after_tag && html[i] != '<') {
+			u32 tn_end = i;
+			int tn_all_ws = 1;
+			while (tn_end < html_len && html[tn_end] != '<') {
+				char tc = html[tn_end];
+				if (tc != ' ' && tc != '\t' && tc != '\r' && tc != '\n') {
+					if (tc == '&') {
+						// Entity = non-whitespace
+						tn_all_ws = 0;
+						break;
+					}
+					tn_all_ws = 0;
+					break;
+				}
+				tn_end++;
+			}
+			if (tn_all_ws) {
+				// Mark all tags on the stack as having had whitespace stripped
+				for (int tsi = 0; tsi < tag_sp; tsi++)
+					tag_had_ws_stripped[tsi] = 1;
+				i = tn_end; // Skip entire whitespace-only text node
+				continue;
+			}
+			after_tag = 0;
+		}
+		if (html[i] == '<') {
+			u32 tag_start = i + 1;
+			u32 tag_end = tag_start;
+			while (tag_end < html_len && html[tag_end] != '>') tag_end++;
+			if (tag_end >= html_len) { i++; continue; }
+
+			const char* tag = &html[tag_start];
+			u32 tag_len = tag_end - tag_start;
+			i = tag_end + 1;
+
+			int is_close = (tag_len > 0 && tag[0] == '/');
+			const char* tname = is_close ? tag + 1 : tag;
+			u32 tname_len = is_close ? tag_len - 1 : tag_len;
+			int self_close = (tag_len > 0 && tag[tag_len - 1] == '/');
+			if (self_close && tname_len > 0) tname_len--;
+
+			if (!is_close && tf_tag_is(tname, tname_len, "br")) {
+				ADD_BR_BREAK(cur_para_type);
+				last_break_was_p = 0;
+			} else if (!is_close && tf_tag_is(tname, tname_len, "p")) {
+				if (!in_paragraph) {
+					// <p> opens a new paragraph. Bare content before it is included
+					// in the new paragraph (no auto-close break).
+					FLUSH_RUN();
+					if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+					if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_P; }
+					char av[64];
+					if (tf_get_attr(tname, tname_len, "align", av, sizeof(av))) {
+						if (strcasecmp(av, "left") == 0) fmt_stack[fmt_sp].align = 0;
+						else if (strcasecmp(av, "right") == 0) fmt_stack[fmt_sp].align = 1;
+						else if (strcasecmp(av, "center") == 0) fmt_stack[fmt_sp].align = 2;
+						else if (strcasecmp(av, "justify") == 0) fmt_stack[fmt_sp].align = 3;
+					}
+					in_paragraph = 1;
+					cur_para_type = 0;
+				} else {
+					// Nested <p> inside <p>/<li>: ignore (no break, no stack push)
+					// Only track nesting for <p> inside <p> (not <p> inside <li>)
+					if (cur_para_type == 0) nested_p_ignored++;
+				}
+			} else if (is_close && tf_tag_is(tname, tname_len, "p")) {
+				// Check if there's a matching <p> on the tag stack
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_P) {
+					if (in_paragraph) {
+						// Normal close: matching P while inside a paragraph
+						ADD_TAG_BREAK(0);
+						in_paragraph = 0;
+						last_break_was_p = 1;
+						tag_sp--; if (fmt_sp > 0) fmt_sp--;
+					} else {
+						// Matching P but !in_paragraph (e.g. after </li> closed it)
+						// Treat like unmatched — use consumed_p/last_break_was_p
+						if (consumed_p > 0) {
+							consumed_p--;
+							last_break_was_p = 1;
+							tag_sp--; if (fmt_sp > 0) fmt_sp--;
+						} else if (!last_break_was_p) {
+							ADD_TAG_BREAK(0);
+							last_break_was_p = 1;
+							tag_sp--; if (fmt_sp > 0) fmt_sp--;
+						} else {
+							// Suppressed (consecutive </p>)
+							tag_sp--; if (fmt_sp > 0) fmt_sp--;
+						}
+					}
+				} else if (in_paragraph) {
+					// Inside <li> but no matching <p> — </p> produces a break
+					// but does NOT pop the LI from the stack (so </li> can still close it)
+					ADD_TAG_BREAK(cur_para_type);
+					in_paragraph = 0;
+					last_break_was_p = 1;
+					consumed_p++; // This </p> "consumed" a P level
+				} else if (nested_p_ignored > 0) {
+					// Unmatched </p> corresponding to an ignored nested <p>: suppress
+					nested_p_ignored--;
+				} else {
+					// Unmatched </p>: produces a break UNLESS the previous break was also from </p>
+					if (!last_break_was_p) {
+						// If there are LI tags on the stack, this </p> produces an LI break
+						int has_li_on_stack = 0;
+						for (int si = tag_sp - 1; si >= 0; si--) {
+							if (tag_type_stack[si] == TF_TAG_LI) { has_li_on_stack = 1; break; }
+						}
+						ADD_TAG_BREAK(has_li_on_stack ? 1 : 0);
+						last_break_was_p = 1;
+						consumed_p++; // This </p> break also consumes a P level
+					}
+				}
+			} else if (!is_close && tf_tag_is(tname, tname_len, "li")) {
+				// Check if there's content since the last break
+				int has_content_since_break = (table->text_len > 0 &&
+					!IS_PARA_BREAK(table->text[table->text_len - 1]));
+				if (in_paragraph && has_content_since_break) {
+					// Auto-close the current paragraph (has content)
+					if (tag_sp > 0 && (tag_type_stack[tag_sp - 1] == TF_TAG_P || tag_type_stack[tag_sp - 1] == TF_TAG_LI)) {
+						ADD_TAG_BREAK(cur_para_type);
+						in_paragraph = 0;
+						last_break_was_p = 0;
+						tag_sp--; if (fmt_sp > 0) fmt_sp--;
+					}
+				} else if (!in_paragraph && has_content_since_break) {
+					// Bare content before <li>: produce implicit break
+					FLUSH_RUN();
+					ADD_TAG_BREAK(cur_para_type);
+					last_break_was_p = 0;
+				}
+				// If inside empty <li>, just push another LI (nesting) without auto-close
+				FLUSH_RUN();
+				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_LI; }
+				in_paragraph = 1;
+				cur_para_type = 1;
+			} else if (is_close && tf_tag_is(tname, tname_len, "li")) {
+				// </li> always produces a break
+				ADD_TAG_BREAK(1);
+				in_paragraph = 0;
+				last_break_was_p = 0;
+				cur_para_type = 0; // After </li>, bare content goes into P type
+				// Find the nearest TF_TAG_LI on the tag stack and pop down to it
+				// Count P tags popped through (they're consumed by the LI structure)
+				int found_li = -1;
+				for (int si = tag_sp - 1; si >= 0; si--) {
+					if (tag_type_stack[si] == TF_TAG_LI) { found_li = si; break; }
+				}
+				if (found_li >= 0) {
+					for (int si = tag_sp - 1; si > found_li; si--) {
+						if (tag_type_stack[si] == TF_TAG_P) consumed_p++;
+					}
+					while (tag_sp > found_li) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+				}
+			} else if (!is_close && tf_tag_is(tname, tname_len, "font")) {
+				FLUSH_RUN();
+				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_FONT; }
+				char av[256];
+				if (tf_get_attr(tname, tname_len, "face", av, sizeof(av))) {
+					strncpy(fmt_stack[fmt_sp].font_name, av, 63);
+					fmt_stack[fmt_sp].font_name[63] = '\0';
+				}
+				if (tf_get_attr(tname, tname_len, "size", av, sizeof(av))) {
+					int is_relative = (av[0] == '+' || av[0] == '-');
+					// Check if this is actually a number (atoi("not a number")=0 but shouldn't change size)
+					const char* digit_start = is_relative ? av + 1 : av;
+					if (*digit_start >= '0' && *digit_start <= '9') {
+						int sz = atoi(av);
+						if (is_relative) {
+							// Relative size: add to current
+							int cur_px = fmt_stack[fmt_sp].font_height / 20;
+							sz = cur_px + sz;
+						}
+						if (sz > 127) sz = 127; // Flash clamps to 127
+						if (sz > 0) fmt_stack[fmt_sp].font_height = (s16)(sz * 20);
+						else if (sz == 0 && !is_relative) ; // absolute 0 → ignore
+						else if (sz <= 0) fmt_stack[fmt_sp].font_height = 1 * 20; // min 1
+					}
+				}
+				if (tf_get_attr(tname, tname_len, "color", av, sizeof(av))) {
+					u32 c;
+					if (tf_parse_font_color(av, (u32)strlen(av), &c))
+						fmt_stack[fmt_sp].color = c;
+				}
+				if (tf_get_attr(tname, tname_len, "letterspacing", av, sizeof(av))) {
+					double ls = atof(av);
+					fmt_stack[fmt_sp].letter_spacing = (s16)(ls * 100);
+				}
+				if (tf_get_attr(tname, tname_len, "kerning", av, sizeof(av))) {
+					// SWF<=7: kerning attribute from <font> tags is ignored (forced to default)
+					if (swf_version >= 8)
+						fmt_stack[fmt_sp].kerning = (atoi(av) != 0) ? 1 : 0;
+				}
+			} else if (is_close && tf_tag_is(tname, tname_len, "font")) {
+				FLUSH_RUN();
+				// If this font tag had no content (empty: <font ...></font>),
+				// create a zero-length marker run to capture its formatting.
+				// Don't create markers for tags whose content was whitespace-stripped.
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_FONT &&
+				    tag_text_len_stack[tag_sp - 1] == table->text_len &&
+				    !tag_had_ws_stripped[tag_sp - 1]) {
+					if (fmt_sp > 0 && table->run_count < TF_MAX_RUNS) {
+						TFRun* r = &table->runs[table->run_count];
+						*r = fmt_stack[fmt_sp];
+						r->start = table->text_len;
+						r->length = 0;
+						table->run_count++;
+					}
+				}
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_FONT) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+			} else if (!is_close && tf_tag_is(tname, tname_len, "b")) {
+				FLUSH_RUN();
+				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_B; }
+				fmt_stack[fmt_sp].bold = 1;
+			} else if (is_close && tf_tag_is(tname, tname_len, "b")) {
+				FLUSH_RUN();
+				// Create zero-length B marker for <b> tags containing only breaks (e.g. <b><br></b>).
+				// Truly empty <b></b> tags don't get markers.
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_B &&
+				    !tag_had_ws_stripped[tag_sp - 1]) {
+					u32 tl = tag_text_len_stack[tag_sp - 1];
+					if (tl < table->text_len) {
+						// Tag has content — check if it's only break markers
+						int only_breaks = 1;
+						for (u32 ci = tl; ci < table->text_len; ci++) {
+							if (!IS_PARA_BREAK(table->text[ci])) { only_breaks = 0; break; }
+						}
+						if (only_breaks && fmt_sp > 0 && table->run_count < TF_MAX_RUNS) {
+							TFRun* r = &table->runs[table->run_count];
+							*r = fmt_stack[fmt_sp];
+							// Place marker at position of the first break (associated with preceding paragraph)
+							r->start = tl;
+							r->length = 0;
+							table->run_count++;
+						}
+					}
+				}
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_B) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+			} else if (!is_close && tf_tag_is(tname, tname_len, "i")) {
+				FLUSH_RUN();
+				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_I; }
+				fmt_stack[fmt_sp].italic = 1;
+			} else if (is_close && tf_tag_is(tname, tname_len, "i")) {
+				FLUSH_RUN();
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_I) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+			} else if (!is_close && tf_tag_is(tname, tname_len, "u")) {
+				FLUSH_RUN();
+				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_U; }
+				fmt_stack[fmt_sp].underline = 1;
+			} else if (is_close && tf_tag_is(tname, tname_len, "u")) {
+				FLUSH_RUN();
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_U) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+			} else if (!is_close && tf_tag_is(tname, tname_len, "a")) {
+				FLUSH_RUN();
+				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_A; }
+				char av[256];
+				if (tf_get_attr(tname, tname_len, "href", av, sizeof(av))) {
+					strncpy(fmt_stack[fmt_sp].href, av, 255);
+					fmt_stack[fmt_sp].href[255] = '\0';
+				}
+				if (tf_get_attr(tname, tname_len, "target", av, sizeof(av))) {
+					strncpy(fmt_stack[fmt_sp].href_target, av, 63);
+					fmt_stack[fmt_sp].href_target[63] = '\0';
+				}
+			} else if (is_close && tf_tag_is(tname, tname_len, "a")) {
+				FLUSH_RUN();
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_A) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+			} else if (!is_close && tf_tag_is(tname, tname_len, "textformat")) {
+				FLUSH_RUN();
+				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_TF; }
+				char av[64];
+				if (tf_get_attr(tname, tname_len, "leading", av, sizeof(av)))
+					fmt_stack[fmt_sp].leading = (s16)atoi(av);
+				if (tf_get_attr(tname, tname_len, "leftmargin", av, sizeof(av)))
+					fmt_stack[fmt_sp].left_margin = (s16)atoi(av);
+				if (tf_get_attr(tname, tname_len, "rightmargin", av, sizeof(av)))
+					fmt_stack[fmt_sp].right_margin = (s16)atoi(av);
+				if (tf_get_attr(tname, tname_len, "indent", av, sizeof(av)))
+					fmt_stack[fmt_sp].indent = (s16)atoi(av);
+				if (tf_get_attr(tname, tname_len, "blockindent", av, sizeof(av)))
+					fmt_stack[fmt_sp].block_indent = (s16)atoi(av);
+				if (tf_get_attr(tname, tname_len, "tabstops", av, sizeof(av))) {
+					strncpy(fmt_stack[fmt_sp].tabstops, av, 127);
+					fmt_stack[fmt_sp].tabstops[127] = '\0';
+				}
+			} else if (is_close && tf_tag_is(tname, tname_len, "textformat")) {
+				FLUSH_RUN();
+				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_TF) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+			}
+			after_tag = 1;
+		} else {
+			char c = html[i];
+
+			if (c == '&') {
+				char decoded[8];
+				u32 out_bytes = 0, consumed = 0;
+				if (tf_decode_entity(html, html_len, i, decoded, &out_bytes, &consumed)) {
+					for (u32 j = 0; j < out_bytes; j++)
+						ADD_CH(decoded[j]);
+					i += consumed;
+					continue;
+				}
+			}
+
+			if (condense_white && (c == '\t' || c == '\r' || c == '\n')) {
+				c = ' ';
+			}
+
+			if (c == '\n' && !condense_white) {
+				// Content newline → paragraph break (always)
+				// Note: SWF<=7 whitespace-only text nodes are already handled
+				// by the pre-scan at the top of the loop, so standalone \n between
+				// tags is filtered there, not here.
+				ADD_CONTENT_NL();
+				i++;
+				continue;
+			}
+
+			if (c == '\r') { i++; continue; } // Skip bare \r
+
+			if (condense_white && c == ' ') {
+				// Collapse consecutive whitespace
+				while (i + 1 < html_len) {
+					char next = html[i + 1];
+					if (next == ' ' || next == '\t' || next == '\r' || next == '\n') i++;
+					else break;
+				}
+			}
+
+			ADD_CH(c);
+			last_break_was_p = 0;
+			i++;
+		}
+	}
+
+	FLUSH_RUN();
+
+	// SWF<=7 whitespace-only post-processing:
+	// If entire content is whitespace-only (spaces + \n), produce empty.
+	// Tag breaks (\x01) are structural and should not trigger clearing,
+	// because <p></p> in multiline still needs to produce a paragraph.
+	if (swf_version <= 7 && !condense_white) {
+		int all_ws = 1;
+		for (u32 ti = 0; ti < table->text_len; ti++) {
+			char c = table->text[ti];
+			if (c == '\x01' || c == '\x02') continue; // skip structural markers
+			if (c != ' ' && c != '\n' && c != '\r' && c != '\t') {
+				all_ws = 0;
+				break;
+			}
+		}
+		if (all_ws) {
+			// Check if there are any tag breaks — if so, keep them (for multiline)
+			int has_tag_breaks = 0;
+			for (u32 ti = 0; ti < table->text_len; ti++) {
+				if (table->text[ti] == '\x01' || table->text[ti] == '\x02') { has_tag_breaks = 1; break; }
+			}
+			if (!has_tag_breaks) {
+				// Pure whitespace with no structure — clear completely
+				table->text_len = 0;
+				table->text[0] = '\0';
+				table->run_count = 0;
+			} else {
+				// Has structure (tag breaks) but content is whitespace-only.
+				// Strip the whitespace but keep the tag breaks and zero-length markers.
+				// Use a temp buffer to avoid overwriting runs we still need to scan.
+				u32 orig_run_count = table->run_count;
+				TFRun tmp_runs[TF_MAX_RUNS];
+				u32 new_len = 0;
+				u32 new_run_count = 0;
+				for (u32 ti = 0; ti < table->text_len; ti++) {
+					if (table->text[ti] == '\x01' || table->text[ti] == '\x02') {
+						// Preserve zero-length marker runs at this position first
+						for (u32 ri = 0; ri < orig_run_count; ri++) {
+							if (table->runs[ri].start == ti && table->runs[ri].length == 0) {
+								tmp_runs[new_run_count] = table->runs[ri];
+								tmp_runs[new_run_count].start = new_len;
+								new_run_count++;
+								if (new_run_count >= TF_MAX_RUNS) break;
+							}
+						}
+						table->text[new_len] = table->text[ti];
+						// Preserve the break marker run
+						for (u32 ri = 0; ri < orig_run_count; ri++) {
+							if (table->runs[ri].start == ti && table->runs[ri].length == 1) {
+								tmp_runs[new_run_count] = table->runs[ri];
+								tmp_runs[new_run_count].start = new_len;
+								new_run_count++;
+								break;
+							}
+						}
+						new_len++;
+					}
+				}
+				table->text[new_len] = '\0';
+				table->text_len = new_len;
+				memcpy(table->runs, tmp_runs, new_run_count * sizeof(TFRun));
+				table->run_count = new_run_count;
+			}
+		}
+	}
+
+	#undef FLUSH_RUN
+	#undef ADD_CH
+	#undef ADD_TAG_BREAK
+	#undef ADD_CONTENT_NL
+	#undef TF_PARSE_STACK_MAX
+	return 1;
+}
+
+// =============================================
+// HTML Serializer — tf_serialize_html()
+// =============================================
+
+// Emit helpers (local to serializer)
+#define TF_EMIT(buf, bp, bsz, s) do { \
+	const char* _s = (s); \
+	while (*_s && (bp) < (bsz) - 1) (buf)[(bp)++] = *_s++; \
+} while(0)
+#define TF_EMIT_CHAR(buf, bp, bsz, c) do { if ((bp) < (bsz) - 1) (buf)[(bp)++] = (c); } while(0)
+
+// Emit outer FONT tag
+static void tf_emit_outer_font(char* buf, u32* bp, u32 bsz, const TFRun* font) {
+	char tag[512];
+	int font_size = font->font_height / 20;
+	int ls_val = font->letter_spacing / 100;
+	int ls_frac = (font->letter_spacing < 0 ? -font->letter_spacing : font->letter_spacing) % 100;
+	if (ls_frac == 0)
+		snprintf(tag, sizeof(tag),
+			"<FONT FACE=\"%s\" SIZE=\"%d\" COLOR=\"#%06X\" LETTERSPACING=\"%d\" KERNING=\"%d\">",
+			font->font_name, font_size, font->color & 0xFFFFFF, ls_val, font->kerning);
+	else
+		snprintf(tag, sizeof(tag),
+			"<FONT FACE=\"%s\" SIZE=\"%d\" COLOR=\"#%06X\" LETTERSPACING=\"%d.%02d\" KERNING=\"%d\">",
+			font->font_name, font_size, font->color & 0xFFFFFF, ls_val, ls_frac, font->kerning);
+	TF_EMIT(buf, *bp, bsz, tag);
+}
+
+// Serialize format runs to canonical Flash HTML.
+// is_multiline: controls whether tag-based paragraph breaks (\x01) create separate <P> blocks.
+// Content newlines (\n) always create separate <P> blocks.
+static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
+	if (table->run_count == 0 || table->text_len == 0) return strdup("");
+
+	u32 bsz = 65536;
+	char* buf = (char*) malloc(bsz);
+	u32 bp = 0;
+
+	// Build paragraph list.
+	// Paragraph boundaries: \n (content) and \x01 (tag-based).
+	// In single-line mode, \x01 merges paragraphs (no break), \n creates breaks.
+	// In multiline mode, both create breaks.
+	u32 p_starts[1024], p_ends[1024];
+	u8 p_types[1024]; // para_type from the break marker run
+	u8 p_break_kind[1024]; // 0=none, 1=content_nl, 2=tag_break
+	u32 pcnt = 0;
+
+	// For single-line mode: track para_type from tag breaks during merging.
+	// Use the break marker type from the first non-empty content segment.
+	u8 sl_para_type = 0;
+	int sl_found_content = 0;
+
+	u32 pstart = 0;
+	for (u32 ti = 0; ti <= table->text_len; ti++) {
+		if (ti == table->text_len || IS_PARA_BREAK(table->text[ti])) {
+			int is_tag_break = (ti < table->text_len && (table->text[ti] == '\x01' || table->text[ti] == '\x02'));
+			int is_content_nl = (ti < table->text_len && table->text[ti] == '\n');
+
+			if (!is_multiline && is_tag_break) {
+				// Single-line: tag breaks merge paragraphs. Don't create a break.
+				// Track para_type from the first break marker that has content before it.
+				if (!sl_found_content) {
+					// Check if there's non-break content between pstart and ti
+					int has_content = 0;
+					for (u32 ci = pstart; ci < ti; ci++) {
+						if (!IS_PARA_BREAK(table->text[ci])) {
+							has_content = 1;
+							break;
+						}
+					}
+					if (has_content) {
+						sl_found_content = 1;
+						// Get para_type from this break marker
+						for (u32 ri = 0; ri < table->run_count; ri++) {
+							if (table->runs[ri].start == ti && table->runs[ri].length == 1) {
+								sl_para_type = table->runs[ri].para_type;
+								break;
+							}
+						}
+					} else {
+						// No content yet — remember latest break's type as fallback
+						for (u32 ri = 0; ri < table->run_count; ri++) {
+							if (table->runs[ri].start == ti && table->runs[ri].length == 1) {
+								sl_para_type = table->runs[ri].para_type;
+								break;
+							}
+						}
+					}
+				}
+				continue;
+			}
+
+			if (pcnt < 1024) {
+				p_starts[pcnt] = pstart;
+				p_ends[pcnt] = ti;
+				p_types[pcnt] = 0; // default
+				p_break_kind[pcnt] = is_content_nl ? 1 : (is_tag_break ? 2 : 0);
+				// Get para_type from the break marker run
+				for (u32 ri = 0; ri < table->run_count; ri++) {
+					if (table->runs[ri].start == ti && table->runs[ri].length == 1) {
+						p_types[pcnt] = table->runs[ri].para_type;
+						break;
+					}
+				}
+				// For single-line, apply the tracked para_type from merged tag breaks
+				if (!is_multiline && sl_found_content) {
+					p_types[pcnt] = sl_para_type;
+				} else if (!is_multiline && !sl_found_content) {
+					// Check if current segment has content for the end-of-text case
+					int has_content = 0;
+					for (u32 ci = pstart; ci < ti; ci++) {
+						if (!IS_PARA_BREAK(table->text[ci])) {
+							has_content = 1;
+							break;
+						}
+					}
+					if (has_content && sl_para_type != 0) {
+						p_types[pcnt] = sl_para_type;
+					}
+				}
+				pcnt++;
+			}
+			pstart = ti + 1;
+			// Reset single-line tracking for next paragraph (after content \n break)
+			sl_found_content = 0;
+			sl_para_type = 0;
+		}
+	}
+
+	// Skip trailing empty paragraph (content newline at end of input)
+	// e.g., "test\n" → 2 paragraphs ["test", ""], skip the empty trailing one
+	if (pcnt > 1 && p_starts[pcnt-1] == p_ends[pcnt-1]) {
+		pcnt--;
+	}
+
+	// Emit each paragraph
+	for (u32 pi = 0; pi < pcnt; pi++) {
+		u32 ps = p_starts[pi], pe = p_ends[pi];
+
+		// Collect content runs for this paragraph (exclude \n and \x01 marker runs)
+		TFRun* pruns[TF_MAX_RUNS];
+		u32 prstarts[TF_MAX_RUNS], prlens[TF_MAX_RUNS], prcnt = 0;
+
+		for (u32 ri = 0; ri < table->run_count; ri++) {
+			TFRun* r = &table->runs[ri];
+			u32 rs = r->start, re = rs + r->length;
+			if (re <= ps || rs >= pe) continue;
+			// Skip \n and \x01/\x02 marker runs
+			if (r->length == 1 && IS_PARA_BREAK(table->text[rs])) continue;
+			u32 cs = (rs < ps) ? ps : rs;
+			u32 ce = (re > pe) ? pe : re;
+			if (ce > cs) {
+				pruns[prcnt] = r;
+				prstarts[prcnt] = cs;
+				prlens[prcnt] = ce - cs;
+				prcnt++;
+			}
+		}
+
+		// In single-line mode, skip empty paragraphs (no content runs)
+		// These arise from <p></p> tag pairs where the tag break was skipped
+		if (!is_multiline && prcnt == 0 && p_break_kind[pi] != 1) {
+			// Only skip if not a content-NL-created paragraph
+			// Check if there's actually any non-marker text in this range
+			int has_real_text = 0;
+			for (u32 ci = ps; ci < pe; ci++) {
+				if (!IS_PARA_BREAK(table->text[ci])) {
+					has_real_text = 1;
+					break;
+				}
+			}
+			if (!has_real_text) continue;
+		}
+
+		// Get paragraph-level format
+		TFRun pfmt;
+		int have_pfmt = 0;
+		// From the break marker run at pe
+		for (u32 ri = 0; ri < table->run_count; ri++) {
+			if (table->runs[ri].start == pe && table->runs[ri].length == 1) {
+				pfmt = table->runs[ri];
+				have_pfmt = 1;
+				break;
+			}
+		}
+		if (!have_pfmt) {
+			if (prcnt > 0) pfmt = *pruns[0];
+			else if (table->run_count > 0) pfmt = table->runs[0];
+			else continue;
+		}
+
+		// TEXTFORMAT wrapper — use content run's attrs when content exists.
+		// The content run's TEXTFORMAT scope reflects the actual <textformat> tags
+		// wrapping the content, while the break marker may be at a different scope level
+		// (e.g. break created by <li> after <textformat> opened).
+		TFRun tf_src = pfmt;
+		if (prcnt > 0) {
+			TFRun* cr = pruns[0];
+			// Content runs determine TEXTFORMAT attrs (they carry the actual scope)
+			tf_src.leading = cr->leading;
+			tf_src.left_margin = cr->left_margin;
+			tf_src.right_margin = cr->right_margin;
+			tf_src.indent = cr->indent;
+			tf_src.block_indent = cr->block_indent;
+			if (cr->tabstops[0] != '\0') strncpy(tf_src.tabstops, cr->tabstops, 127);
+			else tf_src.tabstops[0] = '\0';
+		}
+		int need_tf = (tf_src.leading != 0 || tf_src.left_margin != 0 || tf_src.right_margin != 0 ||
+		               tf_src.indent != 0 || tf_src.block_indent != 0 || tf_src.tabstops[0] != '\0');
+		if (need_tf) {
+			TF_EMIT(buf, bp, bsz, "<TEXTFORMAT");
+			char ab[256];
+			if (tf_src.left_margin != 0) { snprintf(ab, sizeof(ab), " LEFTMARGIN=\"%d\"", tf_src.left_margin); TF_EMIT(buf, bp, bsz, ab); }
+			if (tf_src.right_margin != 0) { snprintf(ab, sizeof(ab), " RIGHTMARGIN=\"%d\"", tf_src.right_margin); TF_EMIT(buf, bp, bsz, ab); }
+			if (tf_src.indent != 0) { snprintf(ab, sizeof(ab), " INDENT=\"%d\"", tf_src.indent); TF_EMIT(buf, bp, bsz, ab); }
+			if (tf_src.block_indent != 0) { snprintf(ab, sizeof(ab), " BLOCKINDENT=\"%d\"", tf_src.block_indent); TF_EMIT(buf, bp, bsz, ab); }
+			if (tf_src.leading != 0) { snprintf(ab, sizeof(ab), " LEADING=\"%d\"", tf_src.leading); TF_EMIT(buf, bp, bsz, ab); }
+			if (tf_src.tabstops[0] != '\0') { snprintf(ab, sizeof(ab), " TABSTOPS=\"%s\"", tf_src.tabstops); TF_EMIT(buf, bp, bsz, ab); }
+			TF_EMIT(buf, bp, bsz, ">");
+		}
+
+		// P/LI tag — use p_types[] which accounts for single-line merging
+		u8 para_type_out = p_types[pi];
+		if (para_type_out == 1) {
+			TF_EMIT(buf, bp, bsz, "<LI>");
+		} else {
+			const char* an[] = {"LEFT", "RIGHT", "CENTER", "JUSTIFY"};
+			int ai = pfmt.align; if (ai < 0 || ai > 3) ai = 0;
+			TF_EMIT(buf, bp, bsz, "<P ALIGN=\"");
+			TF_EMIT(buf, bp, bsz, an[ai]);
+			TF_EMIT(buf, bp, bsz, "\">");
+		}
+
+		// Outer FONT
+		TFRun ofont;
+		if (prcnt > 0) ofont = *pruns[0];
+		else {
+			// For empty paragraphs, check for zero-length marker runs
+			// (from empty <font> tags like <font color="#111111"></font>)
+			ofont = pfmt;
+			for (u32 ri = 0; ri < table->run_count; ri++) {
+				TFRun* r = &table->runs[ri];
+				if (r->length == 0 && r->start >= ps && r->start <= pe) {
+					// Use the marker run's font attributes for the outer FONT
+					ofont.color = r->color;
+					strncpy(ofont.font_name, r->font_name, 63); ofont.font_name[63] = '\0';
+					ofont.font_height = r->font_height;
+					ofont.letter_spacing = r->letter_spacing;
+					ofont.kerning = r->kerning;
+					break;
+				}
+			}
+		}
+		tf_emit_outer_font(buf, &bp, bsz, &ofont);
+
+		// Content runs
+		if (prcnt == 0) {
+			// Empty paragraph — emit B/I/U for:
+			// 1. Content breaks (\n) and <br> breaks (\x02) — from pfmt
+			// 2. Tag breaks (\x01) in LI paragraphs where BIU comes from enclosing tags
+			// 3. Zero-length BIU markers from <b>/<i>/<u> tags wrapping only breaks
+			int emit_biu = (pe < table->text_len && (table->text[pe] == '\n' || table->text[pe] == '\x02'));
+			// For LI paragraphs with tag breaks: check if the break run has BIU formatting
+			// (from enclosing <b>/<i>/<u> tags wrapping the <li>)
+			if (!emit_biu && pfmt.para_type == 1 && (pfmt.bold || pfmt.italic || pfmt.underline)) {
+				emit_biu = 1;
+			}
+			// Empty LI paragraphs emit <A HREF> if the format has an href
+			int emit_href = (pfmt.para_type == 1 && pfmt.href[0] != '\0');
+			if (emit_href) {
+				char atag[512];
+				snprintf(atag, sizeof(atag), "<A HREF=\"%s\" TARGET=\"%s\">", pfmt.href, pfmt.href_target);
+				TF_EMIT(buf, bp, bsz, atag);
+			}
+			if (emit_biu) {
+				if (pfmt.bold) TF_EMIT(buf, bp, bsz, "<B>");
+				if (pfmt.italic) TF_EMIT(buf, bp, bsz, "<I>");
+				if (pfmt.underline) TF_EMIT(buf, bp, bsz, "<U>");
+				if (pfmt.underline) TF_EMIT(buf, bp, bsz, "</U>");
+				if (pfmt.italic) TF_EMIT(buf, bp, bsz, "</I>");
+				if (pfmt.bold) TF_EMIT(buf, bp, bsz, "</B>");
+			}
+			if (emit_href) TF_EMIT(buf, bp, bsz, "</A>");
+		}
+		// Hierarchical FONT nesting with run merging
+		// Flash nests inner FONTs: each specifies only what changes from parent context.
+		// Track a font context stack for proper nesting.
+		#define FONT_CTX_MAX 16
+		struct { char font_name[64]; s16 font_height; u32 color; s16 letter_spacing; u8 kerning; } font_ctx[FONT_CTX_MAX];
+		int font_ctx_sp = 0;
+		// Initialize with outer font context
+		strncpy(font_ctx[0].font_name, ofont.font_name, 63); font_ctx[0].font_name[63] = '\0';
+		font_ctx[0].font_height = ofont.font_height;
+		font_ctx[0].color = ofont.color;
+		font_ctx[0].letter_spacing = ofont.letter_spacing;
+		font_ctx[0].kerning = ofont.kerning;
+
+		for (u32 ri = 0; ri < prcnt; ) {
+			TFRun* r = pruns[ri];
+
+			// Find extent of this format group (runs with identical full format)
+			u32 group_end = ri + 1;
+			while (group_end < prcnt) {
+				TFRun* nr = pruns[group_end];
+				if (strcmp(r->font_name, nr->font_name) != 0 ||
+				    r->font_height != nr->font_height ||
+				    r->color != nr->color ||
+				    r->letter_spacing != nr->letter_spacing ||
+				    r->kerning != nr->kerning ||
+				    r->bold != nr->bold ||
+				    r->italic != nr->italic ||
+				    r->underline != nr->underline ||
+				    strcmp(r->href, nr->href) != 0)
+					break;
+				group_end++;
+			}
+
+			// Check if current run's FONT attrs match the current context
+			#define CTX font_ctx[font_ctx_sp]
+			int nf = (strcmp(r->font_name, CTX.font_name) != 0);
+			int ns = (r->font_height != CTX.font_height);
+			int nc = (r->color != CTX.color);
+			int nl = (r->letter_spacing != CTX.letter_spacing);
+			int nk = (r->kerning != CTX.kerning);
+			int need_font_change = (nf || ns || nc || nl || nk);
+
+			if (need_font_change) {
+				// Check if run matches any ancestor context (to pop back)
+				int found_ancestor = -1;
+				for (int ai = font_ctx_sp - 1; ai >= 0; ai--) {
+					if (strcmp(r->font_name, font_ctx[ai].font_name) == 0 &&
+					    r->font_height == font_ctx[ai].font_height &&
+					    r->color == font_ctx[ai].color &&
+					    r->letter_spacing == font_ctx[ai].letter_spacing &&
+					    r->kerning == font_ctx[ai].kerning) {
+						found_ancestor = ai;
+						break;
+					}
+				}
+
+				if (found_ancestor >= 0) {
+					// Close inner FONTs back to ancestor level
+					while (font_ctx_sp > found_ancestor) {
+						TF_EMIT(buf, bp, bsz, "</FONT>");
+						font_ctx_sp--;
+					}
+				} else {
+					// Open new inner FONT with changed attrs (relative to current context)
+					if (font_ctx_sp < FONT_CTX_MAX - 1) {
+						font_ctx_sp++;
+						// Copy current context
+						font_ctx[font_ctx_sp] = font_ctx[font_ctx_sp - 1];
+					}
+					TF_EMIT(buf, bp, bsz, "<FONT");
+					char ab[256];
+					if (nf) {
+						snprintf(ab, sizeof(ab), " FACE=\"%s\"", r->font_name); TF_EMIT(buf, bp, bsz, ab);
+						strncpy(font_ctx[font_ctx_sp].font_name, r->font_name, 63);
+					}
+					if (ns) {
+						snprintf(ab, sizeof(ab), " SIZE=\"%d\"", r->font_height / 20); TF_EMIT(buf, bp, bsz, ab);
+						font_ctx[font_ctx_sp].font_height = r->font_height;
+					}
+					if (nc) {
+						snprintf(ab, sizeof(ab), " COLOR=\"#%06X\"", r->color & 0xFFFFFF); TF_EMIT(buf, bp, bsz, ab);
+						font_ctx[font_ctx_sp].color = r->color;
+					}
+					if (nl) {
+						int lsv = r->letter_spacing / 100;
+						int lsf = (r->letter_spacing < 0 ? -r->letter_spacing : r->letter_spacing) % 100;
+						if (lsf == 0) snprintf(ab, sizeof(ab), " LETTERSPACING=\"%d\"", lsv);
+						else snprintf(ab, sizeof(ab), " LETTERSPACING=\"%d.%02d\"", lsv, lsf);
+						TF_EMIT(buf, bp, bsz, ab);
+						font_ctx[font_ctx_sp].letter_spacing = r->letter_spacing;
+					}
+					if (nk) {
+						snprintf(ab, sizeof(ab), " KERNING=\"%d\"", r->kerning); TF_EMIT(buf, bp, bsz, ab);
+						font_ctx[font_ctx_sp].kerning = r->kerning;
+					}
+					TF_EMIT(buf, bp, bsz, ">");
+				}
+			}
+
+			int need_a = (r->href[0] != '\0');
+
+			if (need_a) {
+				char atag[512];
+				snprintf(atag, sizeof(atag), "<A HREF=\"%s\" TARGET=\"%s\">", r->href, r->href_target);
+				TF_EMIT(buf, bp, bsz, atag);
+			}
+
+			if (r->bold) TF_EMIT(buf, bp, bsz, "<B>");
+			if (r->italic) TF_EMIT(buf, bp, bsz, "<I>");
+			if (r->underline) TF_EMIT(buf, bp, bsz, "<U>");
+
+			// Emit text for all runs in this group
+			for (u32 gi = ri; gi < group_end; gi++) {
+				u32 rstart = prstarts[gi], rlen = prlens[gi];
+				for (u32 ci = 0; ci < rlen; ci++) {
+					char tc = table->text[rstart + ci];
+					if (tc == '&') TF_EMIT(buf, bp, bsz, "&amp;");
+					else if (tc == '<') TF_EMIT(buf, bp, bsz, "&lt;");
+					else if (tc == '>') TF_EMIT(buf, bp, bsz, "&gt;");
+					else TF_EMIT_CHAR(buf, bp, bsz, tc);
+				}
+			}
+
+			if (r->underline) TF_EMIT(buf, bp, bsz, "</U>");
+			if (r->italic) TF_EMIT(buf, bp, bsz, "</I>");
+			if (r->bold) TF_EMIT(buf, bp, bsz, "</B>");
+			if (need_a) TF_EMIT(buf, bp, bsz, "</A>");
+
+			ri = group_end;
+		}
+		// Emit trailing zero-length B/I/U markers (empty/break-only B/I/U tags)
+		// These appear as <B></B>, <I></I>, <U></U> after content in the paragraph.
+		if (prcnt > 0 && is_multiline) {
+			TFRun* last_biu_marker = NULL;
+			for (u32 mi = 0; mi < table->run_count; mi++) {
+				TFRun* mr = &table->runs[mi];
+				if (mr->length != 0) continue;
+				if (mr->start < ps || mr->start > pe) continue;
+				if (mr->bold || mr->italic || mr->underline) last_biu_marker = mr;
+			}
+			if (last_biu_marker) {
+				// Only emit if the last content run doesn't already have B/I/U
+				TFRun* last_content = pruns[prcnt - 1];
+				if (last_biu_marker->bold && !last_content->bold) { TF_EMIT(buf, bp, bsz, "<B></B>"); }
+				if (last_biu_marker->italic && !last_content->italic) { TF_EMIT(buf, bp, bsz, "<I></I>"); }
+				if (last_biu_marker->underline && !last_content->underline) { TF_EMIT(buf, bp, bsz, "<U></U>"); }
+			}
+		}
+		// Emit trailing zero-length FONT marker (empty <font> tags in the paragraph)
+		// In multiline mode only. Flash emits the LAST zero-length font marker
+		// in a non-empty paragraph as a trailing <FONT COLOR="..."></FONT>.
+		if (prcnt > 0 && is_multiline) {
+			TFRun* last_marker = NULL;
+			for (u32 mi = 0; mi < table->run_count; mi++) {
+				TFRun* mr = &table->runs[mi];
+				if (mr->length != 0) continue;
+				if (mr->start < ps || mr->start > pe) continue;
+				// Skip markers exactly at paragraph boundary if next break is LI
+				// (<li> auto-close drops markers from the closed scope)
+				if (mr->start == pe && pe < table->text_len) {
+					// Check if the break at pe was created by an LI
+					int is_li_break = 0;
+					for (u32 bri = 0; bri < table->run_count; bri++) {
+						if (table->runs[bri].start == pe && table->runs[bri].length == 1 &&
+						    table->runs[bri].para_type == 1) {
+							is_li_break = 1; break;
+						}
+					}
+					if (is_li_break) continue;
+				}
+				last_marker = mr;
+			}
+			if (last_marker) {
+				int mf = (strcmp(last_marker->font_name, CTX.font_name) != 0);
+				int ms = (last_marker->font_height != CTX.font_height);
+				int mc = (last_marker->color != CTX.color);
+				int ml2 = (last_marker->letter_spacing != CTX.letter_spacing);
+				int mk = (last_marker->kerning != CTX.kerning);
+				if (mf || ms || mc || ml2 || mk) {
+					TF_EMIT(buf, bp, bsz, "<FONT");
+					char ab[256];
+					if (mf) { snprintf(ab, sizeof(ab), " FACE=\"%s\"", last_marker->font_name); TF_EMIT(buf, bp, bsz, ab); }
+					if (ms) { snprintf(ab, sizeof(ab), " SIZE=\"%d\"", last_marker->font_height / 20); TF_EMIT(buf, bp, bsz, ab); }
+					if (mc) { snprintf(ab, sizeof(ab), " COLOR=\"#%06X\"", last_marker->color & 0xFFFFFF); TF_EMIT(buf, bp, bsz, ab); }
+					if (ml2) {
+						int lsv = last_marker->letter_spacing / 100;
+						int lsf = (last_marker->letter_spacing < 0 ? -last_marker->letter_spacing : last_marker->letter_spacing) % 100;
+						if (lsf == 0) snprintf(ab, sizeof(ab), " LETTERSPACING=\"%d\"", lsv);
+						else snprintf(ab, sizeof(ab), " LETTERSPACING=\"%d.%02d\"", lsv, lsf);
+						TF_EMIT(buf, bp, bsz, ab);
+					}
+					if (mk) { snprintf(ab, sizeof(ab), " KERNING=\"%d\"", last_marker->kerning); TF_EMIT(buf, bp, bsz, ab); }
+					TF_EMIT(buf, bp, bsz, "></FONT>");
+				}
+			}
+		}
+
+		// Close any remaining inner FONTs
+		while (font_ctx_sp > 0) {
+			TF_EMIT(buf, bp, bsz, "</FONT>");
+			font_ctx_sp--;
+		}
+		#undef CTX
+		#undef FONT_CTX_MAX
+
+		TF_EMIT(buf, bp, bsz, "</FONT>");
+		if (para_type_out == 1) TF_EMIT(buf, bp, bsz, "</LI>");
+		else TF_EMIT(buf, bp, bsz, "</P>");
+		if (need_tf) TF_EMIT(buf, bp, bsz, "</TEXTFORMAT>");
+	}
+
+	buf[bp] = '\0';
+	char* result = strdup(buf);
+	free(buf);
+	return result;
+}
+
+#undef TF_EMIT
+#undef TF_EMIT_CHAR
+
+// Get plain text from format runs.
+// In text output: \n → \r (paragraph separator in Flash text).
+// \x01 (tag breaks) → \r in multiline, nothing in single-line.
+static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size, int is_multiline) {
+	u32 oi = 0;
+	for (u32 i = 0; i < table->text_len && oi < out_buf_size - 1; i++) {
+		char c = table->text[i];
+		if (c == '\n') {
+			// Content newline: always produces \r
+			out_buf[oi++] = '\r';
+		} else if (c == '\x01' || c == '\x02') {
+			// Tag paragraph break: \r only in multiline
+			if (is_multiline) out_buf[oi++] = '\r';
+		} else {
+			out_buf[oi++] = c;
+		}
+	}
+	out_buf[oi] = '\0';
+}
+
+// Condense-white post-processing (placeholder)
+static void tf_condense_white(TFRunTable* table, int swf_version) {
+	(void)table; (void)swf_version;
+}
+#endif // NO_GRAPHICS
 
 // Sync variable → all text fields bound to var_name
 // Called when a variable is set via SetVariable/DefineLocal/etc.
@@ -21406,9 +22659,71 @@ void actionSetMember(SWFAppContext* app_context)
 #ifdef NO_GRAPHICS
 				// Sync text → variable binding
 				ng_syncTextToVar(app_context, mc, &value_var);
+				// When text is set on HTML field, create a single default-format run
+				if (MC_IS_TEXTFIELD(mc) && value_var.type == ACTION_STACK_VALUE_STRING) {
+					ActionVar* _ts_html = getProperty(props, "html", 4);
+					int _ts_is_html = 0;
+					if (_ts_html != NULL && _ts_html->type == ACTION_STACK_VALUE_BOOLEAN && _ts_html->data.numeric_value)
+						_ts_is_html = 1;
+					if (_ts_is_html) {
+						const uint16_t* _ts_u16 = varGetU16Ptr(&value_var);
+						char _ts_buf[16384];
+						if (_ts_u16 && value_var.str_size > 0)
+							u16_to_utf8(_ts_u16, value_var.str_size, _ts_buf, sizeof(_ts_buf));
+						else
+							_ts_buf[0] = '\0';
+						u32 _ts_len = (u32)strlen(_ts_buf);
+						TFRunTable* _ts_table = tf_get_table(mc);
+						TFRun _ts_def;
+						tf_get_defaults(mc, &_ts_def);
+						ActionVar* _ts_tc = getProperty(props, "textColor", 9);
+						if (_ts_tc != NULL && _ts_tc->type == ACTION_STACK_VALUE_F64) {
+							double _tcd; memcpy(&_tcd, &_ts_tc->data.numeric_value, sizeof(double));
+							_ts_def.color = (u32)_tcd & 0x00FFFFFF;
+						}
+						// Store text without \r→\n conversion for now — just create runs
+						_ts_table->run_count = 0;
+						_ts_table->text_len = 0;
+						// Convert \r to \n for internal storage
+						u32 ti = 0;
+						for (u32 si = 0; si < _ts_len && ti < sizeof(_ts_table->text) - 1; si++) {
+							if (_ts_buf[si] == '\r') _ts_table->text[ti++] = '\n';
+							else _ts_table->text[ti++] = _ts_buf[si];
+						}
+						_ts_table->text[ti] = '\0';
+						_ts_table->text_len = ti;
+						// Create one run per paragraph
+						u32 pstart = 0;
+						for (u32 pi = 0; pi <= ti; pi++) {
+							if (pi == ti || _ts_table->text[pi] == '\n') {
+								// Content run for this paragraph
+								if (pi > pstart) {
+									if (_ts_table->run_count < TF_MAX_RUNS) {
+										TFRun* r = &_ts_table->runs[_ts_table->run_count];
+										*r = _ts_def;
+										r->start = pstart;
+										r->length = pi - pstart;
+										_ts_table->run_count++;
+									}
+								}
+								// \n separator run
+								if (pi < ti && _ts_table->text[pi] == '\n') {
+									if (_ts_table->run_count < TF_MAX_RUNS) {
+										TFRun* r = &_ts_table->runs[_ts_table->run_count];
+										*r = _ts_def;
+										r->start = pi;
+										r->length = 1;
+										_ts_table->run_count++;
+									}
+								}
+								pstart = pi + 1;
+							}
+						}
+					}
+				}
 #endif
 			}
-			// TextField htmlText: decode HTML entities and strip tags → update text + length
+			// TextField htmlText: parse HTML into format runs, extract plain text
 			if (strcmp(prop_name, "htmlText") == 0 && mc->dynamic_props != NULL
 				&& value_var.type == ACTION_STACK_VALUE_STRING)
 			{
@@ -21419,90 +22734,45 @@ void actionSetMember(SWFAppContext* app_context)
 				{
 					// Convert UTF-16 input to UTF-8
 					const uint16_t* _ht_u16 = varGetU16Ptr(&value_var);
-					char _ht_buf[4096];
+					char _ht_buf[16384];
 					if (_ht_u16 && value_var.str_size > 0)
 						u16_to_utf8(_ht_u16, value_var.str_size, _ht_buf, sizeof(_ht_buf));
 					else
 						_ht_buf[0] = '\0';
 					u32 src_len = (u32)strlen(_ht_buf);
-					// Strip tags and decode entities into a buffer
-					char* decoded = (char*)malloc(src_len + 1);
-					u32 di = 0;
-					int in_tag = 0;
-					for (u32 si = 0; si < src_len; ) {
-						if (_ht_buf[si] == '<') { in_tag = 1; si++; continue; }
-						if (_ht_buf[si] == '>') { in_tag = 0; si++; continue; }
-						if (in_tag) { si++; continue; }
-						if (_ht_buf[si] == '&') {
-							if (si + 5 <= src_len && strncmp(&_ht_buf[si], "&amp;", 5) == 0) {
-								decoded[di++] = '&'; si += 5;
-							} else if (si + 4 <= src_len && strncmp(&_ht_buf[si], "&lt;", 4) == 0) {
-								decoded[di++] = '<'; si += 4;
-							} else if (si + 4 <= src_len && strncmp(&_ht_buf[si], "&gt;", 4) == 0) {
-								decoded[di++] = '>'; si += 4;
-							} else if (si + 6 <= src_len && strncmp(&_ht_buf[si], "&apos;", 6) == 0) {
-								decoded[di++] = '\''; si += 6;
-							} else if (si + 6 <= src_len && strncmp(&_ht_buf[si], "&quot;", 6) == 0) {
-								decoded[di++] = '"'; si += 6;
-							} else if (si + 6 <= src_len && strncmp(&_ht_buf[si], "&nbsp;", 6) == 0) {
-								// Non-breaking space: U+00A0 in UTF-8 = 0xC2 0xA0
-								decoded[di++] = (char)0xC2;
-								decoded[di++] = (char)0xA0;
-								si += 6;
-							} else if (si + 2 < src_len && _ht_buf[si+1] == '#') {
-								u32 j = si + 2;
-								int codepoint = 0;
-								if (j < src_len && _ht_buf[j] == 'x') {
-									j++;
-									while (j < src_len && _ht_buf[j] != ';') {
-										char c = _ht_buf[j];
-										if (c >= '0' && c <= '9') codepoint = codepoint * 16 + (c - '0');
-										else if (c >= 'a' && c <= 'f') codepoint = codepoint * 16 + (c - 'a' + 10);
-										else if (c >= 'A' && c <= 'F') codepoint = codepoint * 16 + (c - 'A' + 10);
-										else break;
-										j++;
-									}
-								} else {
-									while (j < src_len && _ht_buf[j] != ';') {
-										if (_ht_buf[j] >= '0' && _ht_buf[j] <= '9')
-											codepoint = codepoint * 10 + (_ht_buf[j] - '0');
-										else break;
-										j++;
-									}
-								}
-								if (j < src_len && _ht_buf[j] == ';') {
-									j++;
-									if (codepoint < 0x80) {
-										decoded[di++] = (char)codepoint;
-									} else if (codepoint < 0x800) {
-										decoded[di++] = (char)(0xC0 | (codepoint >> 6));
-										decoded[di++] = (char)(0x80 | (codepoint & 0x3F));
-									} else if (codepoint < 0x10000) {
-										decoded[di++] = (char)(0xE0 | (codepoint >> 12));
-										decoded[di++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
-										decoded[di++] = (char)(0x80 | (codepoint & 0x3F));
-									} else {
-										decoded[di++] = (char)(0xF0 | (codepoint >> 18));
-										decoded[di++] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
-										decoded[di++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
-										decoded[di++] = (char)(0x80 | (codepoint & 0x3F));
-									}
-									si = j;
-								} else {
-									decoded[di++] = _ht_buf[si++];
-								}
-							} else {
-								decoded[di++] = _ht_buf[si++];
-							}
-						} else {
-							decoded[di++] = _ht_buf[si++];
-						}
+
+					// Check condenseWhite flag
+					int condense_white = 0;
+					ActionVar* cw_prop = getProperty(props, "condenseWhite", 13);
+					if (cw_prop != NULL && cw_prop->type == ACTION_STACK_VALUE_BOOLEAN && cw_prop->data.numeric_value)
+						condense_white = 1;
+
+					// Check multiline
+					int is_multiline = 0;
+					ActionVar* ml_prop = getProperty(props, "multiline", 9);
+					if (ml_prop != NULL && ml_prop->type == ACTION_STACK_VALUE_BOOLEAN && ml_prop->data.numeric_value)
+						is_multiline = 1;
+
+					// Parse HTML into format runs
+					TFRunTable* table = tf_get_table(mc);
+					TFRun defaults;
+					tf_get_defaults(mc, &defaults);
+					// Override defaults from textColor
+					ActionVar* tc_prop = getProperty(props, "textColor", 9);
+					if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
+						double tc_d; memcpy(&tc_d, &tc_prop->data.numeric_value, sizeof(double));
+						defaults.color = (u32)tc_d & 0x00FFFFFF;
 					}
-					decoded[di] = '\0';
-					// Convert decoded UTF-8 → UTF-16 and store as text
+					tf_parse_html(table, _ht_buf, src_len, &defaults, condense_white, g_swf_version, is_multiline);
+
+					// Extract plain text (with \r as paragraph separator for storage)
+					char plain_buf[16384];
+					tf_get_plain_text(table, plain_buf, sizeof(plain_buf), is_multiline);
+					u32 plain_len = (u32)strlen(plain_buf);
+
+					// Convert plain text to UTF-16 and store as "text"
 					u32 text_u16_len = 0;
-					uint16_t* text_u16 = utf8_to_u16(app_context, decoded, di, &text_u16_len);
-					free(decoded);
+					uint16_t* text_u16 = utf8_to_u16(app_context, plain_buf, plain_len, &text_u16_len);
 					ActionVar text_val = {0};
 					text_val.type = ACTION_STACK_VALUE_STRING;
 					text_val.str_size = text_u16_len;
@@ -23267,6 +24537,25 @@ void actionGetMember(SWFAppContext* app_context)
 			if (prop != NULL)
 			{
 #ifdef NO_GRAPHICS
+				// TextField htmlText getter: re-serialize from format runs
+				if (prop_name_len == 8 && memcmp(prop_name, "htmlText", 8) == 0 &&
+				    MC_IS_TEXTFIELD(mc))
+				{
+					TFRunTable* _ht_table = tf_find_table(mc);
+					if (_ht_table != NULL) {
+						// Table exists = content was parsed. Empty run_count means empty result.
+						int _ht_multiline = 0;
+						ActionVar* _ht_ml = getProperty((ASObject*) mc->dynamic_props, "multiline", 9);
+						if (_ht_ml != NULL && _ht_ml->type == ACTION_STACK_VALUE_BOOLEAN && _ht_ml->data.numeric_value)
+							_ht_multiline = 1;
+						char* html_str = tf_serialize_html(_ht_table, _ht_multiline);
+						u32 _hs_u16_len;
+						uint16_t* _hs_u16 = utf8_to_u16(app_context, html_str, (u32)strlen(html_str), &_hs_u16_len);
+						free(html_str);
+						PUSH_U16(_hs_u16, _hs_u16_len);
+						return;
+					}
+				}
 				// TextField "text" property: for HTML text fields with variable binding,
 				// the variable stores raw HTML but .text should return stripped plain text.
 				if (prop_name_len == 4 && memcmp(prop_name, "text", 4) == 0 &&
@@ -29417,7 +30706,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 
 		// Build joined string as UTF-8
 		u32 buf_cap = 256;
-		char* buf = (char*) HALLOC(buf_cap);
+		char* buf = (char*) malloc(buf_cap);
 		u32 buf_len = 0;
 
 		int32_t signed_join_len = (int32_t) arr->length;
@@ -29437,35 +30726,50 @@ static int callArrayMethod(SWFAppContext* app_context,
 				buf_len += sep_len;
 			}
 			ActionVar* elem = getArrayElement(arr, i);
-			char elem_str[256];
-			int elen = 0;
-			// For objects, call toString via prototype chain (produces "[object Object]")
-			if (elem != NULL && elem->type == ACTION_STACK_VALUE_OBJECT && elem->data.numeric_value != 0) {
-				int ts_found = 0;
-				ActionVar ts = objectCallToString(app_context, elem, &ts_found);
-				if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
-					const uint16_t* u16 = varGetU16Ptr(&ts);
-					if (u16)
-						elen = u16_to_utf8(u16, ts.str_size, elem_str, sizeof(elem_str));
+			// For STRING type, append UTF-16 data directly to avoid buffer truncation
+			if (elem != NULL && elem->type == ACTION_STACK_VALUE_STRING) {
+				const uint16_t* u16 = varGetU16Ptr(elem);
+				if (u16 != NULL && elem->str_size > 0) {
+					u32 needed = elem->str_size * 4 + 1;
+					while (buf_len + needed > buf_cap) {
+						buf_cap *= 2;
+						buf = (char*) realloc(buf, buf_cap);
+					}
+					int elen = u16_to_utf8(u16, elem->str_size, buf + buf_len, needed);
+					buf_len += elen;
 				}
-				if (elen == 0)
-					elen = snprintf(elem_str, sizeof(elem_str), "[type Object]");
 			} else {
-				elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+				char elem_str[256];
+				int elen = 0;
+				// For objects, call toString via prototype chain (produces "[object Object]")
+				if (elem != NULL && elem->type == ACTION_STACK_VALUE_OBJECT && elem->data.numeric_value != 0) {
+					int ts_found = 0;
+					ActionVar ts = objectCallToString(app_context, elem, &ts_found);
+					if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
+						const uint16_t* u16 = varGetU16Ptr(&ts);
+						if (u16)
+							elen = u16_to_utf8(u16, ts.str_size, elem_str, sizeof(elem_str));
+					}
+					if (elen == 0)
+						elen = snprintf(elem_str, sizeof(elem_str), "[type Object]");
+				} else {
+					elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+				}
+				while (buf_len + elen + 1 > buf_cap)
+				{
+					buf_cap *= 2;
+					buf = (char*) realloc(buf, buf_cap);
+				}
+				memcpy(buf + buf_len, elem_str, elen);
+				buf_len += elen;
 			}
-			while (buf_len + elen + 1 > buf_cap)
-			{
-				buf_cap *= 2;
-				buf = (char*) realloc(buf, buf_cap);
-			}
-			memcpy(buf + buf_len, elem_str, elen);
-			buf_len += elen;
 		}
 		buf[buf_len] = '\0';
 
 		// Convert result to UTF-16
 		u32 u16_len;
 		uint16_t* u16_result = utf8_to_u16(app_context, buf, buf_len, &u16_len);
+		free(buf);
 		ActionVar result = {0};
 		result.type = ACTION_STACK_VALUE_STRING;
 		result.str_size = u16_len;
@@ -33373,6 +34677,194 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
+			// Modify format runs for HTML text field
+			{
+				TFRunTable* run_table = tf_find_table(mc);
+				if (run_table != NULL && run_table->run_count > 0) {
+					// Parse begin/end/fmt args
+					ActionVar* fmt_arg = NULL;
+					u32 tf_begin = 0, tf_end = run_table->text_len;
+					if (num_args == 1) {
+						fmt_arg = &args[0];
+					} else if (num_args == 2) {
+						double bi = varToDouble(&args[0]);
+						tf_begin = (u32)(bi < 0 ? 0 : bi);
+						fmt_arg = &args[1];
+					} else if (num_args >= 3) {
+						double bi = varToDouble(&args[0]);
+						double ei = varToDouble(&args[1]);
+						tf_begin = (u32)(bi < 0 ? 0 : bi);
+						tf_end = (u32)(ei < 0 ? 0 : ei);
+						fmt_arg = &args[2];
+					}
+					if (tf_end > run_table->text_len) tf_end = run_table->text_len;
+					if (tf_begin >= tf_end) goto stf_done;
+					if (fmt_arg == NULL || fmt_arg->type != ACTION_STACK_VALUE_OBJECT || fmt_arg->data.numeric_value == 0) goto stf_done;
+					ASObject* fmt_obj = (ASObject*) fmt_arg->data.numeric_value;
+
+					// Map plain text indices to internal text indices
+					// Plain text counts non-break chars. Internal text has \x01/\x02 breaks.
+					// Build a mapping: plain_idx -> internal_idx
+					u32 plain_idx = 0;
+					u32 map_begin = run_table->text_len, map_end = run_table->text_len;
+					for (u32 ti = 0; ti < run_table->text_len; ti++) {
+						char c = run_table->text[ti];
+						if (c == '\x01' || c == '\x02') continue; // skip structural markers
+						if (plain_idx == tf_begin) map_begin = ti;
+						plain_idx++;
+						if (plain_idx == tf_end) { map_end = ti + 1; break; }
+					}
+					if (plain_idx <= tf_begin) goto stf_done; // begin beyond text
+					if (map_end > run_table->text_len) map_end = run_table->text_len;
+
+					// Split runs at map_begin and map_end boundaries
+					for (int pass = 0; pass < 2; pass++) {
+						u32 split_pos = (pass == 0) ? map_begin : map_end;
+						for (u32 ri = 0; ri < run_table->run_count; ri++) {
+							TFRun* r = &run_table->runs[ri];
+							if (r->length == 0) continue;
+							u32 rs = r->start, re = rs + r->length;
+							if (split_pos > rs && split_pos < re) {
+								// Split this run into two
+								if (run_table->run_count < TF_MAX_RUNS) {
+									// Shift runs after ri to make room
+									for (u32 si = run_table->run_count; si > ri + 1; si--)
+										run_table->runs[si] = run_table->runs[si - 1];
+									// Second half
+									run_table->runs[ri + 1] = *r;
+									run_table->runs[ri + 1].start = split_pos;
+									run_table->runs[ri + 1].length = re - split_pos;
+									// First half
+									r->length = split_pos - rs;
+									run_table->run_count++;
+								}
+								break;
+							}
+						}
+					}
+
+					// Apply TextFormat properties to runs in [map_begin, map_end)
+					// Read all properties from fmt_obj
+					ActionVar* p_bold = getProperty(fmt_obj, "bold", 4);
+					ActionVar* p_italic = getProperty(fmt_obj, "italic", 6);
+					ActionVar* p_underline = getProperty(fmt_obj, "underline", 9);
+					ActionVar* p_color = getProperty(fmt_obj, "color", 5);
+					ActionVar* p_font = getProperty(fmt_obj, "font", 4);
+					ActionVar* p_size = getProperty(fmt_obj, "size", 4);
+					ActionVar* p_align = getProperty(fmt_obj, "align", 5);
+					ActionVar* p_leading = getProperty(fmt_obj, "leading", 7);
+					ActionVar* p_lm = getProperty(fmt_obj, "leftMargin", 10);
+					ActionVar* p_rm = getProperty(fmt_obj, "rightMargin", 11);
+					ActionVar* p_indent = getProperty(fmt_obj, "indent", 6);
+					ActionVar* p_bi = getProperty(fmt_obj, "blockIndent", 11);
+					ActionVar* p_ls = getProperty(fmt_obj, "letterSpacing", 13);
+					ActionVar* p_kerning = getProperty(fmt_obj, "kerning", 7);
+
+					char font_name_buf[64]; font_name_buf[0] = '\0';
+					if (p_font != NULL && p_font->type == ACTION_STACK_VALUE_STRING && p_font->str_size > 0) {
+						size_t fnl = u16_to_utf8(varGetU16Ptr(p_font), p_font->str_size, font_name_buf, sizeof(font_name_buf));
+						font_name_buf[fnl < 63 ? fnl : 63] = '\0';
+					}
+
+					for (u32 ri = 0; ri < run_table->run_count; ri++) {
+						TFRun* r = &run_table->runs[ri];
+						if (r->length == 0) continue;
+						u32 rs = r->start, re = rs + r->length;
+						// Check overlap with [map_begin, map_end)
+						if (re <= map_begin || rs >= map_end) continue;
+						// Skip break markers
+						if (r->length == 1 && (run_table->text[rs] == '\x01' || run_table->text[rs] == '\x02')) {
+							// Apply paragraph-level properties (align, leading, margins) to break markers too
+							if (p_align != NULL && p_align->type == ACTION_STACK_VALUE_STRING && p_align->str_size > 0) {
+								char ab[16]; size_t abl = u16_to_utf8(varGetU16Ptr(p_align), p_align->str_size, ab, sizeof(ab));
+								ab[abl < 15 ? abl : 15] = '\0';
+								if (strcasecmp(ab, "left") == 0) r->align = 0;
+								else if (strcasecmp(ab, "right") == 0) r->align = 1;
+								else if (strcasecmp(ab, "center") == 0) r->align = 2;
+								else if (strcasecmp(ab, "justify") == 0) r->align = 3;
+							}
+							if (p_leading != NULL && p_leading->type == ACTION_STACK_VALUE_F64) {
+								double v; memcpy(&v, &p_leading->data.numeric_value, sizeof(double));
+								r->leading = (s16)v;
+							}
+							if (p_lm != NULL && p_lm->type == ACTION_STACK_VALUE_F64) {
+								double v; memcpy(&v, &p_lm->data.numeric_value, sizeof(double));
+								r->left_margin = (s16)v;
+							}
+							if (p_rm != NULL && p_rm->type == ACTION_STACK_VALUE_F64) {
+								double v; memcpy(&v, &p_rm->data.numeric_value, sizeof(double));
+								r->right_margin = (s16)v;
+							}
+							if (p_indent != NULL && p_indent->type == ACTION_STACK_VALUE_F64) {
+								double v; memcpy(&v, &p_indent->data.numeric_value, sizeof(double));
+								r->indent = (s16)v;
+							}
+							if (p_bi != NULL && p_bi->type == ACTION_STACK_VALUE_F64) {
+								double v; memcpy(&v, &p_bi->data.numeric_value, sizeof(double));
+								r->block_indent = (s16)v;
+							}
+							continue;
+						}
+
+						// Apply character-level properties
+						if (p_bold != NULL && p_bold->type == ACTION_STACK_VALUE_BOOLEAN)
+							r->bold = p_bold->data.numeric_value ? 1 : 0;
+						if (p_italic != NULL && p_italic->type == ACTION_STACK_VALUE_BOOLEAN)
+							r->italic = p_italic->data.numeric_value ? 1 : 0;
+						if (p_underline != NULL && p_underline->type == ACTION_STACK_VALUE_BOOLEAN)
+							r->underline = p_underline->data.numeric_value ? 1 : 0;
+						if (p_color != NULL && p_color->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_color->data.numeric_value, sizeof(double));
+							r->color = (u32)v & 0x00FFFFFF;
+						}
+						if (font_name_buf[0] != '\0') {
+							strncpy(r->font_name, font_name_buf, 63);
+							r->font_name[63] = '\0';
+						}
+						if (p_size != NULL && p_size->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_size->data.numeric_value, sizeof(double));
+							if (!isnan(v) && !isinf(v) && v > 0)
+								r->font_height = (s16)(v * 20);
+						}
+						if (p_ls != NULL && p_ls->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_ls->data.numeric_value, sizeof(double));
+							r->letter_spacing = (s16)(v * 100);
+						}
+						if (p_kerning != NULL && p_kerning->type == ACTION_STACK_VALUE_BOOLEAN)
+							r->kerning = p_kerning->data.numeric_value ? 1 : 0;
+						// Paragraph-level: align, leading, margins
+						if (p_align != NULL && p_align->type == ACTION_STACK_VALUE_STRING && p_align->str_size > 0) {
+							char ab[16]; size_t abl = u16_to_utf8(varGetU16Ptr(p_align), p_align->str_size, ab, sizeof(ab));
+							ab[abl < 15 ? abl : 15] = '\0';
+							if (strcasecmp(ab, "left") == 0) r->align = 0;
+							else if (strcasecmp(ab, "right") == 0) r->align = 1;
+							else if (strcasecmp(ab, "center") == 0) r->align = 2;
+							else if (strcasecmp(ab, "justify") == 0) r->align = 3;
+						}
+						if (p_leading != NULL && p_leading->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_leading->data.numeric_value, sizeof(double));
+							r->leading = (s16)v;
+						}
+						if (p_lm != NULL && p_lm->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_lm->data.numeric_value, sizeof(double));
+							r->left_margin = (s16)v;
+						}
+						if (p_rm != NULL && p_rm->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_rm->data.numeric_value, sizeof(double));
+							r->right_margin = (s16)v;
+						}
+						if (p_indent != NULL && p_indent->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_indent->data.numeric_value, sizeof(double));
+							r->indent = (s16)v;
+						}
+						if (p_bi != NULL && p_bi->type == ACTION_STACK_VALUE_F64) {
+							double v; memcpy(&v, &p_bi->data.numeric_value, sizeof(double));
+							r->block_indent = (s16)v;
+						}
+					}
+				}
+			}
+			stf_done:
 			applyAutoSize(app_context, mc);
 #endif
 			if (args != NULL) FREE(args);
@@ -33525,6 +35017,75 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar* ind_prop = getProperty((ASObject*) mc->dynamic_props, "_tf_indent", 10);
 				if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
 					setProperty(app_context, tf, "indent", 6, ind_prop);
+				}
+			}
+			// Override properties from HTML format runs if available
+			{
+				TFRunTable* run_table = tf_find_table(mc);
+				if (run_table != NULL && run_table->run_count > 0 && has_text) {
+					// Determine query position from begin_idx arg
+					u32 query_pos = 0;
+					if (num_args >= 1) {
+						double bi = varToDouble(&args[0]);
+						if (bi > 0) query_pos = (u32)bi;
+					}
+					// Find the format run containing query_pos
+					TFRun* found_run = NULL;
+					for (u32 ri = 0; ri < run_table->run_count; ri++) {
+						TFRun* r = &run_table->runs[ri];
+						if (r->length == 0) continue; // skip markers
+						if (query_pos >= r->start && query_pos < r->start + r->length) {
+							// Skip break marker characters
+							if (r->length == 1 && r->start < run_table->text_len &&
+							    (run_table->text[r->start] == '\x01' || run_table->text[r->start] == '\x02'))
+								continue;
+							found_run = r;
+							break;
+						}
+					}
+					if (found_run != NULL) {
+						// Override color from format run
+						ActionVar color_val = {0};
+						color_val.type = ACTION_STACK_VALUE_F64;
+						color_val.data.numeric_value = *(u64*)&(double){(double)found_run->color};
+						setProperty(app_context, tf, "color", 5, &color_val);
+						// Override font attributes
+						if (found_run->font_name[0] != '\0') {
+							u32 fn_u16_len;
+							const uint16_t* fn_u16 = utf8_to_u16(app_context, found_run->font_name,
+								(u32)strlen(found_run->font_name), &fn_u16_len);
+							ActionVar font_val = {0};
+							font_val.type = ACTION_STACK_VALUE_STRING;
+							font_val.str_size = fn_u16_len;
+							font_val.data.string_data.heap_ptr = (uint16_t*)fn_u16;
+							font_val.data.string_data.owns_memory = 0;
+							setProperty(app_context, tf, "font", 4, &font_val);
+						}
+						{
+							ActionVar size_val = {0};
+							size_val.type = ACTION_STACK_VALUE_F64;
+							size_val.data.numeric_value = *(u64*)&(double){(double)(found_run->font_height / 20)};
+							setProperty(app_context, tf, "size", 4, &size_val);
+						}
+						{
+							ActionVar bold_val = {0};
+							bold_val.type = ACTION_STACK_VALUE_BOOLEAN;
+							bold_val.data.numeric_value = found_run->bold;
+							setProperty(app_context, tf, "bold", 4, &bold_val);
+						}
+						{
+							ActionVar italic_val = {0};
+							italic_val.type = ACTION_STACK_VALUE_BOOLEAN;
+							italic_val.data.numeric_value = found_run->italic;
+							setProperty(app_context, tf, "italic", 6, &italic_val);
+						}
+						{
+							ActionVar underline_val = {0};
+							underline_val.type = ACTION_STACK_VALUE_BOOLEAN;
+							underline_val.data.numeric_value = found_run->underline;
+							setProperty(app_context, tf, "underline", 9, &underline_val);
+						}
+					}
 				}
 			}
 			if (args != NULL) FREE(args);
