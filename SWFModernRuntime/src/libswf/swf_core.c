@@ -280,13 +280,13 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMouseDown(app_context);
         // Global AS2 mc.onMouseDown dispatch to all sprite MCs
         actionDispatchMCMouseDown(app_context);
+        // Mouse click focus acquisition (before press dispatch so focus traces precede onPress)
+        actionMouseClickFocus(app_context);
         // Run per-event button state machine (processes OverUpToOverDown = press)
         ng_update_button_states(app_context);
         dispatch_clip_event_press(app_context);
         // Dispatch AS2 onPress to dynamic MCs
         actionDispatchMCPress(app_context);
-        // Mouse click focus acquisition
-        actionMouseClickFocus(app_context);
         break;
     case EV_MOUSE_UP_LEFT:
         ms->stage_x = ev->x * 20.0f;

@@ -37102,6 +37102,28 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	}
 
 #ifdef NO_GRAPHICS
+	// Text field bounds from DefineEditText tag data
+	if (!has_bounds && mc->ng_textfield_idx >= 0) {
+		extern void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* ymax);
+		s32 tf_xmin, tf_xmax, tf_ymin, tf_ymax;
+		ng_getTextFieldBounds(mc->ng_textfield_idx, &tf_xmin, &tf_xmax, &tf_ymin, &tf_ymax);
+		bxmin = (float)tf_xmin / 20.0f;
+		bxmax = (float)tf_xmax / 20.0f;
+		bymin = (float)tf_ymin / 20.0f;
+		bymax = (float)tf_ymax / 20.0f;
+		has_bounds = 1;
+	}
+	// Dynamic text field bounds from _width/_height properties
+	if (!has_bounds && mc->ng_textfield_idx == -2 && mc->dynamic_props != NULL) {
+		ActionVar* wp = getProperty((ASObject*)mc->dynamic_props, "_width", 6);
+		ActionVar* hp = getProperty((ASObject*)mc->dynamic_props, "_height", 7);
+		if (wp != NULL && hp != NULL) {
+			bxmin = 0; bymin = 0;
+			bxmax = (float)varToDouble(wp);
+			bymax = (float)varToDouble(hp);
+			has_bounds = 1;
+		}
+	}
 	// Also compute bounds from the MC's sprite display list children.
 	// This handles shapes placed by tagPlaceObject2 (not the Drawing API).
 	extern int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
@@ -37289,6 +37311,8 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		// Text fields don't receive onPress/onRelease — clicking them acquires focus instead
+		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
 
 		float x1, y1, x2, y2;
 		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
@@ -37311,6 +37335,11 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || !mc->mc_as_pressed) continue;
+		// Text fields don't receive onRelease/onReleaseOutside
+		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) {
+			mc->mc_as_pressed = 0;
+			continue;
+		}
 
 		float x1, y1, x2, y2;
 		int have_bounds = mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2);
@@ -37336,6 +37365,8 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		// Text fields don't receive roll events (onRollOver/onRollOut/onDragOver/onDragOut)
+		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
 
 		float x1, y1, x2, y2;
 		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
