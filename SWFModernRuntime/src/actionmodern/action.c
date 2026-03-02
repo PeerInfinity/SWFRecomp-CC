@@ -35005,13 +35005,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 			ASObject* tf = createTextFormatFromField(app_context, tf_idx, has_text, 0, html_align_override);
-			// Override color with current textColor from dynamic_props
-			if (has_text && mc->dynamic_props != NULL) {
-				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
-				if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
-					setProperty(app_context, tf, "color", 5, tc_prop);
-				}
-			}
 			// Override indent from setTextFormat/setNewTextFormat
 			if (mc->dynamic_props != NULL) {
 				ActionVar* ind_prop = getProperty((ASObject*) mc->dynamic_props, "_tf_indent", 10);
@@ -35067,25 +35060,51 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							size_val.data.numeric_value = *(u64*)&(double){(double)(found_run->font_height / 20)};
 							setProperty(app_context, tf, "size", 4, &size_val);
 						}
-						{
+						// For bold/italic/underline: if getTextFormat() has no args (whole text),
+						// check if all runs agree; if mixed, keep null from createTextFormatFromField
+						int biu_uniform_bold = 1, biu_uniform_italic = 1, biu_uniform_underline = 1;
+						if (num_args < 1) {
+							u8 ref_bold = found_run->bold;
+							u8 ref_italic = found_run->italic;
+							u8 ref_underline = found_run->underline;
+							for (u32 ri = 0; ri < run_table->run_count; ri++) {
+								TFRun* r = &run_table->runs[ri];
+								if (r->length == 0) continue;
+								if (r->length == 1 && r->start < run_table->text_len &&
+								    (run_table->text[r->start] == '\x01' || run_table->text[r->start] == '\x02'))
+									continue;
+								if (r->bold != ref_bold) biu_uniform_bold = 0;
+								if (r->italic != ref_italic) biu_uniform_italic = 0;
+								if (r->underline != ref_underline) biu_uniform_underline = 0;
+							}
+						}
+						if (biu_uniform_bold) {
 							ActionVar bold_val = {0};
 							bold_val.type = ACTION_STACK_VALUE_BOOLEAN;
 							bold_val.data.numeric_value = found_run->bold;
 							setProperty(app_context, tf, "bold", 4, &bold_val);
 						}
-						{
+						if (biu_uniform_italic) {
 							ActionVar italic_val = {0};
 							italic_val.type = ACTION_STACK_VALUE_BOOLEAN;
 							italic_val.data.numeric_value = found_run->italic;
 							setProperty(app_context, tf, "italic", 6, &italic_val);
 						}
-						{
+						if (biu_uniform_underline) {
 							ActionVar underline_val = {0};
 							underline_val.type = ACTION_STACK_VALUE_BOOLEAN;
 							underline_val.data.numeric_value = found_run->underline;
 							setProperty(app_context, tf, "underline", 9, &underline_val);
 						}
 					}
+				}
+			}
+			// Override color with current textColor from dynamic_props
+			// Only for whole-text getTextFormat() (no args) — range queries use format run colors
+			if (num_args < 1 && mc->dynamic_props != NULL) {
+				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
+				if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
+					setProperty(app_context, tf, "color", 5, tc_prop);
 				}
 			}
 			if (args != NULL) FREE(args);
