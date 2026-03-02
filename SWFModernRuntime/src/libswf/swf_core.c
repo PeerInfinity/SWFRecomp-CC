@@ -4,6 +4,16 @@
 #include <string.h>
 #include <stdio.h>
 #include <swf.h>
+#include "constants.h"
+
+// Frame rect offset — defaults to 0 for SWFs with origin at (0,0).
+// Generated constants.h defines these for SWFs with translated frame rects.
+#ifndef FRAME_X_MIN_TWIPS
+#define FRAME_X_MIN_TWIPS 0
+#endif
+#ifndef FRAME_Y_MIN_TWIPS
+#define FRAME_Y_MIN_TWIPS 0
+#endif
 #include <tag.h>
 #include <action.h>
 #include <variables.h>
@@ -245,11 +255,11 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
     MouseState* ms = &app_context->mouse;
     switch (ev->type) {
     case EV_MOUSE_MOVE:
-        ms->stage_x = ev->x * 20.0f;
-        ms->stage_y = ev->y * 20.0f;
+        ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
+        ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
         ms->moved = 1;
-        root_movieclip.xmouse = ev->x;
-        root_movieclip.ymouse = ev->y;
+        root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
+        root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
         // Update virtual drag position while dragging
         if (is_dragging) {
             g_drag_virt_x = ms->stage_x;
@@ -267,14 +277,14 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMCMouseMoveGlobal(app_context);
         break;
     case EV_MOUSE_DOWN_LEFT:
-        ms->stage_x = ev->x * 20.0f;
-        ms->stage_y = ev->y * 20.0f;
+        ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
+        ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
         ms->button_down = 1;
         ms->clicked = 1;
         // Key code 1 = VK_LBUTTON: toggle on mouse down
         app_context->keys.toggled[1] ^= 1;
-        root_movieclip.xmouse = ev->x;
-        root_movieclip.ymouse = ev->y;
+        root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
+        root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
         // Dispatch onClipEvent(mouseDown) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_DOWN);
         // Broadcast Mouse.onMouseDown to Mouse listeners
@@ -290,12 +300,12 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMCPress(app_context);
         break;
     case EV_MOUSE_UP_LEFT:
-        ms->stage_x = ev->x * 20.0f;
-        ms->stage_y = ev->y * 20.0f;
+        ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
+        ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
         ms->button_down = 0;
         ms->released = 1;
-        root_movieclip.xmouse = ev->x;
-        root_movieclip.ymouse = ev->y;
+        root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
+        root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
         // Dispatch onClipEvent(mouseUp) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_UP);
         // Broadcast Mouse.onMouseUp to Mouse listeners
@@ -309,10 +319,10 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMCRelease(app_context);
         break;
     case EV_MOUSE_DOWN_MIDDLE:
-        ms->stage_x = ev->x * 20.0f;
-        ms->stage_y = ev->y * 20.0f;
-        root_movieclip.xmouse = ev->x;
-        root_movieclip.ymouse = ev->y;
+        ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
+        ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
+        root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
+        root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
         // Middle mouse button = VK_MBUTTON = key code 4
         app_context->keys.down[4] = 1;
         app_context->keys.toggled[4] ^= 1;
@@ -322,10 +332,10 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMCMouseDown(app_context);
         break;
     case EV_MOUSE_UP_MIDDLE:
-        ms->stage_x = ev->x * 20.0f;
-        ms->stage_y = ev->y * 20.0f;
-        root_movieclip.xmouse = ev->x;
-        root_movieclip.ymouse = ev->y;
+        ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
+        ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
+        root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
+        root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
         app_context->keys.down[4] = 0;
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_UP);
         actionDispatchMouseUp(app_context);

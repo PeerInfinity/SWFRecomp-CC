@@ -257,12 +257,16 @@ namespace SWFRecomp
 		std::string width_twips = to_string(FRAME_WIDTH);
 		std::string height_twips = to_string(FRAME_HEIGHT);
 		std::string swf_frame_count = to_string(header.frame_count);
+		std::string frame_xmin_twips = to_string(header.frame_size.xmin);
+		std::string frame_ymin_twips = to_string(header.frame_size.ymin);
 		context.swf_version = header.version;
 
 		context.constants_header << "#define FRAME_WIDTH " << width << endl
 								 << "#define FRAME_HEIGHT " << height << endl
 								 << "#define FRAME_WIDTH_TWIPS " << width_twips << endl
 								 << "#define FRAME_HEIGHT_TWIPS " << height_twips << endl
+								 << "#define FRAME_X_MIN_TWIPS " << frame_xmin_twips << endl
+								 << "#define FRAME_Y_MIN_TWIPS " << frame_ymin_twips << endl
 								 << "#define SWF_FRAME_COUNT " << swf_frame_count << endl
 								 << "#define SWF_VERSION " << to_string((int)header.version) << endl << endl
 								 << "extern const float stage_to_ndc[16];";
