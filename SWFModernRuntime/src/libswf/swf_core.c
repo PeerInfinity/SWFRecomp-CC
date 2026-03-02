@@ -174,6 +174,7 @@ typedef struct {
 static InputEvent* g_events = NULL;
 static size_t g_event_count = 0;
 static size_t g_event_pos = 0;
+static int g_key_press_consumed = 0;  // Set when button keyPress handles KEY_DOWN; gates TEXT_INPUT
 
 void input_events_load(const char* path)
 {
@@ -346,6 +347,7 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         // Broadcast onKeyDown to Key listeners, then check button key conditions
         actionDispatchKeyDown(app_context);
         int key_press_handled = dispatch_button_key_actions(app_context, ev->code);
+        g_key_press_consumed = key_press_handled;
         // Fire onPress/onRelease on focused MC for Enter/Space — but ONLY if
         // no button keyPress condition handled the event (Ruffle behavior).
         if (!key_press_handled)
@@ -365,6 +367,15 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchKeyUpToFocused(app_context, ev->code);
         // Broadcast onKeyUp to Key listeners
         actionDispatchKeyUp(app_context);
+        break;
+    case EV_TEXT_INPUT:
+        // If a button keyPress already consumed this key, suppress the text input
+        if (g_key_press_consumed) {
+            g_key_press_consumed = 0;
+            break;
+        }
+        g_key_press_consumed = 0;
+        actionTextFieldInput(app_context, ev->code);
         break;
     case EV_TEXT_CONTROL:
         if (strcmp(ev->ctrl, "Paste") == 0)

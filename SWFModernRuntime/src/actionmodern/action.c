@@ -38510,6 +38510,116 @@ void actionTextControlPaste(SWFAppContext* app_context)
 	g_tf_select_all = 0;
 }
 
+void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
+{
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	// Encode codepoint to UTF-8
+	char ch_utf8[8];
+	size_t ch_len = 0;
+	if (codepoint < 0x80) {
+		ch_utf8[0] = (char)codepoint;
+		ch_len = 1;
+	} else if (codepoint < 0x800) {
+		ch_utf8[0] = (char)(0xC0 | (codepoint >> 6));
+		ch_utf8[1] = (char)(0x80 | (codepoint & 0x3F));
+		ch_len = 2;
+	} else if (codepoint < 0x10000) {
+		ch_utf8[0] = (char)(0xE0 | (codepoint >> 12));
+		ch_utf8[1] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+		ch_utf8[2] = (char)(0x80 | (codepoint & 0x3F));
+		ch_len = 3;
+	} else {
+		ch_utf8[0] = (char)(0xF0 | (codepoint >> 18));
+		ch_utf8[1] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+		ch_utf8[2] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+		ch_utf8[3] = (char)(0x80 | (codepoint & 0x3F));
+		ch_len = 4;
+	}
+	ch_utf8[ch_len] = '\0';
+
+	// Apply restrict filter if set
+	ActionVar* restrict_prop = getProperty(props, "restrict", 8);
+	if (restrict_prop != NULL && restrict_prop->type == ACTION_STACK_VALUE_STRING
+	    && restrict_prop->str_size > 0) {
+		const uint16_t* r_u16 = varGetU16Ptr(restrict_prop);
+		char restrict_utf8[256];
+		if (r_u16 != NULL) {
+			u16_to_utf8(r_u16, restrict_prop->str_size, restrict_utf8, (int)sizeof(restrict_utf8));
+			char restricted[8];
+			size_t new_len = apply_restrict_filter(ch_utf8, ch_len, restrict_utf8, restricted, sizeof(restricted));
+			if (new_len == 0) return;  // Character filtered out
+			memcpy(ch_utf8, restricted, new_len);
+			ch_len = new_len;
+			ch_utf8[ch_len] = '\0';
+		}
+	}
+
+	// Get existing text
+	char existing[2048] = {0};
+	size_t existing_len = 0;
+	if (!g_tf_select_all) {
+		ActionVar* text_prop = getProperty(props, "text", 4);
+		if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
+			const uint16_t* t_u16 = varGetU16Ptr(text_prop);
+			if (t_u16 != NULL)
+				existing_len = (size_t)u16_to_utf8(t_u16, text_prop->str_size, existing, (int)sizeof(existing));
+		}
+	}
+
+	// Build result: existing + new char
+	char result[2048];
+	size_t result_len = 0;
+	if (existing_len > 0) {
+		memcpy(result, existing, existing_len);
+		result_len = existing_len;
+	}
+	if (result_len + ch_len < sizeof(result)) {
+		memcpy(result + result_len, ch_utf8, ch_len);
+		result_len += ch_len;
+	}
+	result[result_len] = '\0';
+
+	// Apply maxChars truncation
+	ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
+	int max_chars = -1;
+	if (maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
+		double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
+		if (d > 0 && d == d) max_chars = (int)d;
+	}
+
+	// Convert to UTF-16
+	u32 u16_len = 0;
+	uint16_t* u16_result = utf8_to_u16(app_context, result, (u32)result_len, &u16_len);
+
+	if (max_chars > 0 && (int)u16_len > max_chars) {
+		u16_len = (u32)max_chars;
+		u16_result[u16_len] = 0;
+	}
+
+	// Set text property
+	ActionVar new_text = {0};
+	new_text.type = ACTION_STACK_VALUE_STRING;
+	new_text.data.numeric_value = (u64)(uintptr_t)u16_result;
+	new_text.str_size = u16_len;
+	setProperty(app_context, props, "text", 4, &new_text);
+
+	// Update length property
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)u16_len;
+	setProperty(app_context, props, "length", 6, &len_val);
+
+	// Sync to variable binding
+	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+	g_tf_select_all = 0;
+
+	// Fire onChanged callback
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9);
+}
+
 // ==================================================================
 // Timer System Implementation (setInterval / setTimeout / clearInterval)
 // ==================================================================
