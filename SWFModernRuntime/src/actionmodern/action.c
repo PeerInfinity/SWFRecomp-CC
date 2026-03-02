@@ -35101,7 +35101,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			// Override color with current textColor from dynamic_props
 			// Only for whole-text getTextFormat() (no args) — range queries use format run colors
-			if (num_args < 1 && mc->dynamic_props != NULL) {
+			// Only when field has text (empty fields return null for color)
+			if (num_args < 1 && has_text && mc->dynamic_props != NULL) {
 				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
 				if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
 					setProperty(app_context, tf, "color", 5, tc_prop);
