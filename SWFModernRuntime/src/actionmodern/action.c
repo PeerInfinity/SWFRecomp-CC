@@ -9109,6 +9109,7 @@ typedef struct {
 	u32 run_count;
 	char text[16384];
 	u32 text_len;
+	int swf_version; // SWF version (set by parser, used by serializer)
 } TFRunTable;
 static TFRunTable* tf_get_table(MovieClip* mc);
 static TFRunTable* tf_find_table(MovieClip* mc);
@@ -10220,6 +10221,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	table->run_count = 0;
 	table->text_len = 0;
 	table->text[0] = '\0';
+	table->swf_version = swf_version;
 
 	#define TF_PARSE_STACK_MAX 32
 	TFRun fmt_stack[TF_PARSE_STACK_MAX];
@@ -11204,8 +11206,9 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			}
 		}
 		// Emit trailing zero-length FONT marker (empty <font> tags in the paragraph)
-		// In multiline mode only. Flash emits the LAST zero-length font marker
-		// in a non-empty paragraph as a trailing <FONT COLOR="..."></FONT>.
+		// In multiline mode (all SWF versions) and singleline mode (SWF8+).
+		// Flash emits the LAST zero-length font marker in a non-empty paragraph
+		// as a trailing <FONT COLOR="..."></FONT>.
 		if (prcnt > 0 && is_multiline) {
 			TFRun* last_marker = NULL;
 			for (u32 mi = 0; mi < table->run_count; mi++) {
@@ -11280,6 +11283,17 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			if (last_marker) {
 				prev_para_marker = *last_marker;
 				has_prev_para_marker = 1;
+			}
+		}
+
+		// SWF8+: emit color revert marker when the last content font color
+		// differs from the paragraph break format color (font reverted on </font> close).
+		// Only for paragraphs ending with a real content-NL break (not end-of-input).
+		if (table->swf_version >= 8 && prcnt > 0 && p_break_kind[pi] == 1) {
+			if (CTX.color != pfmt.color) {
+				char ab[256];
+				snprintf(ab, sizeof(ab), "<FONT COLOR=\"#%06X\"></FONT>", pfmt.color & 0xFFFFFF);
+				TF_EMIT(buf, bp, bsz, ab);
 			}
 		}
 
