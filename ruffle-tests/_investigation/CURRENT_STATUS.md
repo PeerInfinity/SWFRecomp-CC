@@ -1,15 +1,16 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-01
+Last updated: 2026-03-02
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: unload test PASS (52/52). Pending removal mechanism: MCs with unload handlers persist for one frame after removal with depth-transformed negative depth. Recompiler-side remove+replace detection via buffered_removes. Conditional persistence based on UNLOAD clip_actions or AS-level onUnload property.
-- **Recent gains (previous session)**: Tab ordering: 13/16 pass. tab_ordering_events PASS (150/150), tab_ordering_tabbable PASS (47/47), tab_ordering_movieclip_enabled_default PASS (462/462). Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions.
-- **Recent gains (previous session)**: super_edge_cases PASS (39/39). resolveProtoVar() unwraps SUPER values stored in __proto__ during prototype chain traversal.
-- **Recent gains (previous session)**: native_objects_swf6/7/8 all PASS (252/252). Added NativeType enum, native_type tracking, stub constructors for 15+ classes, filter constructor dispatch via actionNewMethod.
+- **Recent gains (this session)**: Cross-version SWF isolation Phases 1/4/6 DONE. `do_init_action_child` 12/12 PASS. ImportAssets2 (tag 71) support added. Per-MC `swf_version` field for `getSWFVersion()`. Phase 6 variable clearing (dynamic_props clear on reload) at all 5 load sites.
+- **Recent gains (previous session)**: unload test PASS (52/52). Pending removal mechanism.
+- **Recent gains (previous session)**: Tab ordering: 13/16 pass.
+- **Recent gains (previous session)**: super_edge_cases PASS (39/39).
+- **Recent gains (previous session)**: native_objects_swf6/7/8 all PASS (252/252).
 - **Recent gains (earlier sessions)**: create_empty_movie_clip PASS (mc_enterframe_eligible). movieclip_init_object PASS (sync constructor during attachMovie). MOVIECLIP_PLAN moved to blocked/ — 27 tests pass, all remaining blocked.
 - **Recent gains (previous sessions)**: watch_textfield PASS (12/12). this_scoping PASS (52/52). execution_order4 PASS (13/13). nan_scale PASS (9/9). clip_constructors PASS (8/8). issue_768 PASS (3/3). rewind_depth PASS (30/30). tell_target_invalid PASS (6/6). tell_target_invalid_swf6 PASS (5/5). stage_object_children PASS (83/83). selection PASS (454/454). place_and_lookup PASS (30/30). tab_ordering_children PASS (208/208). And many more.
 
@@ -89,6 +90,8 @@ Last updated: 2026-03-01
 | `tell_target_invalid_swf6` | 5/5 ✅ | hasPlayingSprites + forward goto catch_up_mode in advance_sprite_frames |
 | `tell_target_invalid` | 6/6 ✅ | SetTarget2(undefined) SWF7+ → target_clip=None; GotoFrame2 target_clip_or_root; sprite preservation during root loop-back |
 | `on_construct` | 25/25 ✅ | RegisterClass prototype setup before on(construct), g_event_this_mc for type 2 constructors, pending instance name, prototype chain variable resolution |
+| `do_init_action_child` | 12/12 ✅ | Cross-version Phase 1+4 + ImportAssets2 |
+| `do_init_action` | PASS ✅ | DoInitAction context switch |
 | `tab_ordering_tabbable` | 47/47 ✅ | Dynamic TF tabbability (u16 type pointer), MC button mode, invisible parent children |
 | `tab_ordering_events` | 150/150 ✅ | Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions |
 | `tab_ordering_movieclip_enabled_default` | 462/462 ✅ | MC tabIndex + mouse handler implicit tabbability |
@@ -147,7 +150,7 @@ Last updated: 2026-03-01
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
-| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 10/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅) | register_class 26/67, register_and_init_order ~76/233, register_class_swf6/do_init_action_child blocked by loadMovie, register_class_with_sound blocked by Sound class |
+| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 11/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅) | register_class 26/67, register_and_init_order ~76/233, register_class_swf6 blocked by cross-version _global, register_class_with_sound blocked by Sound class |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **Phases 0-2 COMPLETE** | 3/5 pass (native_objects_swf6/7/8 ✅) | native_subclasses/native_double_construct need filter constructor property init via super() |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 14/22 pass (tell_target ✅, tell_target_invalid ✅, tell_target_invalid_swf6 ✅, slash_syntax ✅, string_paths_basic ✅, string_paths_variable_alias ✅, target_clip_removed ✅, path_string ✅ (322/322), string_paths_hidden ✅ (54/54), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅, lock_root ✅) | Remaining 8 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), MC removal lifecycle (string_paths_other, removed_target_clip_scope, removed_base_clip_tell_target), unload timing (string_paths_unload), Ruffle known_failure (string_paths_reference_launder) |
@@ -155,7 +158,7 @@ Last updated: 2026-03-01
 | FOCUS_SYSTEM_PLAN | **3/7 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining 4 blocked by mouse events + text field hit-testing + event pumping model |
 | TAB_ORDERING_PLAN | **13/16 PASS** → `blocked/` | tab_ordering_automatic_basic, tab_ordering_reverse, tab_ordering_children ✅, tab_ordering_events ✅, tab_ordering_tabbable ✅, tab_ordering_movieclip_enabled_default ✅, ... | Remaining 3 blocked: same_position (highlight bounds), events_mouse (mouse state machine), edittext_tab_focus (caret tracking) |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
-| LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 23/49 pass | Phase 6 (cross-version globals) blocked; remaining blocked on RegisterClass, DoInitAction, display list, mouse events |
+| LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 23/49 pass | Phase 6 (cross-version globals) needs per-version _global (Phase 2 of CROSS_VERSION_ISOLATION_PLAN); remaining blocked on RegisterClass, display list, mouse events |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
