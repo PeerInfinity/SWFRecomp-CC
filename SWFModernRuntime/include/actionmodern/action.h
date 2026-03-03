@@ -28,6 +28,7 @@ struct MovieClip {
 	int framesloaded;
 	char name[256];
 	char target[256];
+	char original_target[256]; // Target path from creation time (never updated by _name changes, used for removed MC toString)
 	char droptarget[256];
 	char url[512];
 	// SWF 4+ properties

@@ -9045,6 +9045,10 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 		}
 	}
 
+	// Save original target path (used for removed MC toString — never updated by _name changes)
+	strncpy(mc->original_target, mc->target, sizeof(mc->original_target));
+	mc->original_target[sizeof(mc->original_target) - 1] = '\0';
+
 	return mc;
 }
 
@@ -9075,6 +9079,7 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
     MovieClip* mc = (MovieClip*)HCALLOC(1, sizeof(MovieClip));
     snprintf(mc->name, sizeof(mc->name), "_level%d", level_num);
     snprintf(mc->target, sizeof(mc->target), "_level%d", level_num);
+    strncpy(mc->original_target, mc->target, sizeof(mc->original_target));
     g_levels[level_num] = mc;
     // Register in child_mc_cache so lookups find it
     if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
@@ -11991,9 +11996,66 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			extern MovieClip root_movieclip;
 			if (mc != NULL && mc->depth == INT_MIN)
 			{
-				// Removed/dead MovieClip: toString returns empty string
-				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
-				STACK_TOP_N = 0;
+				// Removed/dead MovieClip: Ruffle's MovieClipReference behavior.
+				// Try to resolve the stored path from root. If a LIVE clip exists
+				// at that path (even a different clip), return the stored path.
+				// If no clip found at the path, return empty string.
+				int dead_mc_found_live = 0;
+				const char* tgt = mc->original_target;
+				if (tgt[0] == '/' && tgt[1] != '\0') {
+					// Strip leading "/" to get path segments
+					const char* path_start = tgt + 1;
+					// Try resolveSlashPathToMC first (handles display list entries)
+					u32 path_len = (u32)strlen(path_start);
+					MovieClip* resolved = resolveSlashPathToMC(app_context, path_start, path_len, &root_movieclip);
+					if (resolved != NULL && resolved != &root_movieclip && resolved->depth != INT_MIN) {
+						dead_mc_found_live = 1;
+					}
+					// Also search MC cache for dynamic MCs (createEmptyMovieClip)
+					// which may not be in the display list
+					if (!dead_mc_found_live) {
+						extern MovieClip* child_mc_cache[];
+						extern int child_mc_count;
+						// For single-segment paths (no '/' in path_start), check
+						// MC cache for a live MC with matching name under root
+						if (memchr(path_start, '/', path_len) == NULL) {
+							for (int i = 0; i < child_mc_count; i++) {
+								MovieClip* c = child_mc_cache[i];
+								if (c == NULL || c == mc) continue;
+								if (c->depth == INT_MIN) continue;
+								if (c->parent == &root_movieclip &&
+								    strncmp(c->name, path_start, path_len) == 0 &&
+								    c->name[path_len] == '\0') {
+									dead_mc_found_live = 1;
+									break;
+								}
+							}
+						}
+					}
+				}
+				if (dead_mc_found_live) {
+					// A live clip exists at the stored path — return cached path
+					static char mc_rm_path_buf[256];
+					if (tgt[0] == '/' && tgt[1] == '\0') {
+						strncpy(mc_rm_path_buf, "_level0", sizeof(mc_rm_path_buf));
+					} else if (tgt[0] == '/') {
+						char tmp[200];
+						strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
+						tmp[sizeof(tmp) - 1] = '\0';
+						for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
+						snprintf(mc_rm_path_buf, sizeof(mc_rm_path_buf), "_level0.%s", tmp);
+					} else {
+						snprintf(mc_rm_path_buf, sizeof(mc_rm_path_buf), "_level0.%s", tgt);
+					}
+					u32 u16_len;
+					uint16_t* u16 = ascii_to_u16(app_context, mc_rm_path_buf, (int)strlen(mc_rm_path_buf), &u16_len);
+					VAL(u64, &STACK_TOP_VALUE) = (u64) u16;
+					STACK_TOP_N = u16_len;
+				} else {
+					// No clip at stored path — return empty string
+					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
+					STACK_TOP_N = 0;
+				}
 			}
 			else if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0')
 			{
@@ -14175,17 +14237,19 @@ void actionTrace(SWFAppContext* app_context)
 		{
 			// MovieClip traces as its full dot-path ("_level0", "_level0.a", "_level0.a.b")
 			// mc->target holds slash-notation: "/", "/a", "/a/b" — convert to dot notation.
+			// For removed MCs (depth==INT_MIN), use original_target (creation-time path).
 			MovieClip* mc = (MovieClip*) STACK_TOP_VALUE;
 			extern MovieClip root_movieclip;
-			if (mc == NULL || mc == &root_movieclip || mc->target[0] == '\0' ||
-			    (mc->target[0] == '/' && mc->target[1] == '\0'))
+			const char* trace_target = (mc != NULL && mc->depth == INT_MIN) ? mc->original_target : mc->target;
+			if (mc == NULL || mc == &root_movieclip || trace_target[0] == '\0' ||
+			    (trace_target[0] == '/' && trace_target[1] == '\0'))
 			{
 				printf("_level0\n");
 			}
-			else if (strncmp(mc->target, "_level", 6) == 0)
+			else if (strncmp(trace_target, "_level", 6) == 0)
 			{
 				// _level targets already have their full path (e.g. "_level1")
-				printf("%s\n", mc->target);
+				printf("%s\n", trace_target);
 			}
 			else
 			{
@@ -14194,7 +14258,7 @@ void actionTrace(SWFAppContext* app_context)
 				// 2. Walk target+1, replacing '/' with '.'
 				char dot_path[512];
 				int pos = snprintf(dot_path, sizeof(dot_path), "_level0.");
-				const char* p = mc->target + 1;  // skip leading '/'
+				const char* p = trace_target + 1;  // skip leading '/'
 				while (*p && pos < (int)sizeof(dot_path) - 1)
 				{
 					dot_path[pos++] = (*p == '/') ? '.' : *p;
@@ -17570,6 +17634,13 @@ void actionGetVariable(SWFAppContext* app_context)
 
 					const char* rest = first_sep + 1;
 					u32 rest_len = var_name_len - first_len - 1;
+					// Trailing separator with empty property → undefined
+					// e.g. "clipInstance2." → rest_len is 0, should be undefined
+					if (rest_len == 0) {
+						POP();
+						PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+						return;
+					}
 					while (rest_len > 0) {
 						const char* next_sep = NULL;
 						for (u32 ri = 0; ri < rest_len; ri++) {
@@ -17837,7 +17908,11 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 			}
 		}
-		// Fall through to global variable table (for actionDefineLocal vars outside functions)
+		// Non-root scope exhausted: clip props, MC builtins, children, _global all failed.
+		// Do NOT fall through to global variable table — that holds root timeline vars
+		// which are not part of the non-root MC's scope chain.
+		// Skip directly to special variable checks (_root, _level0, constructors, etc.)
+		goto check_special_vars;
 	}
 
 	if (var == NULL)
@@ -17901,6 +17976,7 @@ void actionGetVariable(SWFAppContext* app_context)
 		// into child scope, causing case-insensitive collisions (SWF6).
 	}
 
+check_special_vars:
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 	{
 		// Check special variables (SWF5+ only — SWF4 has no built-in constants)
@@ -28041,6 +28117,16 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 		func_var.str_size = 0;
 		func_var.data.numeric_value = (u64) as_func;
 		setVariableByName(name, &func_var);
+		// Also store on MC's dynamic_props when in non-root context
+		// (matches DefineLocal behavior — non-root scope stores on the MC)
+		extern MovieClip root_movieclip;
+		if (g_current_context != NULL && g_current_context != &root_movieclip) {
+			MovieClip* ctx = g_current_context;
+			if (ctx->dynamic_props == NULL) {
+				ctx->dynamic_props = (void*)allocObject(app_context, 8);
+			}
+			setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
+		}
 	} else {
 		// Anonymous function: push to stack
 		PUSH(ACTION_STACK_VALUE_FUNCTION, (u64) as_func);
@@ -28107,6 +28193,16 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 		func_var.str_size = 0;
 		func_var.data.numeric_value = (u64) as_func;
 		setVariableByName(name, &func_var);
+		// Also store on MC's dynamic_props when in non-root context
+		// (matches DefineLocal behavior — non-root scope stores on the MC)
+		extern MovieClip root_movieclip;
+		if (g_current_context != NULL && g_current_context != &root_movieclip) {
+			MovieClip* ctx = g_current_context;
+			if (ctx->dynamic_props == NULL) {
+				ctx->dynamic_props = (void*)allocObject(app_context, 8);
+			}
+			setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
+		}
 	} else {
 		// Anonymous function: push to stack
 		PUSH(ACTION_STACK_VALUE_FUNCTION, (u64) as_func);
@@ -30609,8 +30705,20 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 			// MovieClip: convert to target path string
 			MovieClip* mc = (MovieClip*) v->data.numeric_value;
 			extern MovieClip root_movieclip;
-			if (mc != NULL && mc->depth == INT_MIN)
-				return 0; // Dead MC: empty string
+			if (mc != NULL && mc->depth == INT_MIN) {
+				// Removed MC: use creation-time path (matches Ruffle's MovieClipReference caching)
+				const char* tgt = mc->original_target;
+				if (tgt[0] == '\0' || (tgt[0] == '/' && tgt[1] == '\0'))
+					return snprintf(buf, buf_size, "_level0");
+				if (tgt[0] == '/') {
+					char tmp[200];
+					strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
+					tmp[sizeof(tmp) - 1] = '\0';
+					for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
+					return snprintf(buf, buf_size, "_level0.%s", tmp);
+				}
+				return snprintf(buf, buf_size, "_level0.%s", tgt);
+			}
 			if (mc != NULL && mc != &root_movieclip && mc->name[0] != '\0') {
 				const char* tgt = mc->target;
 				if (tgt[0] == '/' && tgt[1] == '\0')
