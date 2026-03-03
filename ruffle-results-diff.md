@@ -1,30 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b2e7ee8d460f` (2026-03-03T00:14:59.302242+00:00)
-**Current:** `e7fd91f17ebf` (2026-03-03T02:05:23.380994+00:00)
+**Previous:** `e7fd91f17ebf` (2026-03-03T02:05:23.380994+00:00)
+**Current:** `245c5872b9e9` (2026-03-03T02:23:34.818471+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 431 | 432 | +1 |
+| Passing | 432 | 433 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 69.6% | 69.8% | +0.2% |
-| Mismatched lines | 23343 | 23329 | -14 |
-|   Decreased | | | -16 |
-|   Increased | | | +2 |
+| Pass rate | 69.8% | 70.0% | +0.2% |
+| Mismatched lines | 23329 | 23326 | -3 |
+|   Decreased | | | -3 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `do_init_action_child` | output_mismatch | 6/12 | 12/12 |
+| `string_paths_eval2` | output_mismatch | 5/7 | 7/7 |
 
-## Line Count Changed (4)
+## Status Changed (2)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `movieclip_invalid_get_bounds_3` | runtime_error | output_mismatch | 2/13 | 2/13 |
+| `movieclip_invalid_get_bounds_4` | runtime_error | output_mismatch | 2/13 | 2/13 |
+
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `loadmovienum_cross_version_prototype` | output_mismatch | 1/9 | 6/9 | -5 |
-| `mcl_events_swf_version` | output_mismatch | 32/232 | 37/232 | -5 |
-| `resolve_different_root` | output_mismatch | 0/2 | 0/2 | 0 |
-| `global_swf6_7_8` | output_mismatch | 11/15 | 9/15 | +2 |
+| `loadmovie_var_persistence` | output_mismatch | 4/8 | 5/8 | -1 |
