@@ -593,6 +593,11 @@ typedef struct ASFunction {
 	// SWF6+: GotoFrame/GetProperty("") operate on base_clip, not caller's context
 	// SWF5: base_clip is not used (functions execute in caller's context)
 	MovieClip* base_clip;
+
+	// SWF version at function definition time (Phase 3: per-function version tracking)
+	// When called, g_swf_version is switched to this value so version-dependent
+	// behavior matches the SWF where the function was originally defined.
+	u16 swf_version;
 } ASFunction;
 
 // Function registry
@@ -6044,6 +6049,26 @@ static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
 
 // Forward declaration
 static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_version);
+
+// Phase 3: Per-function version context switching helpers.
+// Built-in functions have swf_version=0 (zero-initialized statics) → no switch.
+// User-defined functions have swf_version set at definition time → switch to their version.
+static inline void switchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** saved_global)
+{
+	*saved_ver = g_swf_version;
+	*saved_global = global_object;
+	if (func->swf_version != 0) {
+		g_swf_version = func->swf_version;
+		int vg = versionGroup(g_swf_version);
+		if (vg == 0 && g_global_legacy) global_object = g_global_legacy;
+		else if (vg == 1 && g_global_modern) global_object = g_global_modern;
+	}
+}
+static inline void restoreFunctionVersion(int saved_ver, ASObject* saved_global)
+{
+	g_swf_version = saved_ver;
+	global_object = saved_global;
+}
 
 // MovieClip constructor function (for MovieClip.prototype access)
 ASFunction g_movieclip_constructor;
@@ -28496,6 +28521,9 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	// Capture the defining MovieClip as base_clip (SWF6+ closure context)
 	as_func->base_clip = g_current_context;
 
+	// Capture SWF version at definition time (Phase 3: per-function version tracking)
+	as_func->swf_version = (u16)g_swf_version;
+
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
 	// SWF5 does NOT support closures — only SWF6+ captures the scope chain.
@@ -28571,6 +28599,9 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 
 	// Capture the defining MovieClip as base_clip (SWF6+ closure context)
 	as_func->base_clip = g_current_context;
+
+	// Capture SWF version at definition time (Phase 3: per-function version tracking)
+	as_func->swf_version = (u16)g_swf_version;
 
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
@@ -29151,6 +29182,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Push new super context: depth + 1 (one level deeper for nested super() calls)
 				pushSuperContext(this_obj, depth + 1);
 
+				// Phase 3: switch to parent constructor's SWF version
+				int _sc_saved_ver = 0; ASObject* _sc_saved_global = NULL;
+				switchToFunctionVersion(parent_ctor, &_sc_saved_ver, &_sc_saved_global);
+
 				if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL)
 				{
 					ActionVar registers[256] = {0};
@@ -29175,6 +29210,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					invokeNativeSuperConstructor(app_context, parent_ctor, this_obj, args, num_args, &_nsc_result);
 				}
 
+				restoreFunctionVersion(_sc_saved_ver, _sc_saved_global);
 				popSuperContext();
 			}
 		}
@@ -30732,6 +30768,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// SWF5 does NOT have closures — functions execute in the caller's context.
 			MovieClip* saved_cf_context = g_current_context;
 			DisplayObject* saved_cf_sprite = g_current_sprite_obj;
+			// Phase 3: switch to function's SWF version for correct version-dependent behavior
+			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL;
+			switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global);
 			// Save scope chain: SWF6+ functions start with a fresh scope chain
 			// (only captured scopes + local scope), not inheriting the caller's scopes.
 			// We save the entire scope chain state because the function will overwrite
@@ -31048,6 +31087,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			scope_depth = saved_scope_depth_cf;
 			actionSetCurrentContext(saved_cf_context);
 			g_current_sprite_obj = saved_cf_sprite;
+			// Phase 3: restore caller's SWF version
+			restoreFunctionVersion(_cf_saved_ver, _cf_saved_global);
 		}
 		else
 		{
@@ -33722,6 +33763,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// This allows GetVariable("super") inside the function to resolve correctly.
 				pushSuperContext((void*)obj, method_search_depth);
 
+				// Phase 3: switch to function's SWF version
+				int _om2_saved_ver = 0; ASObject* _om2_saved_global = NULL;
+				switchToFunctionVersion(func, &_om2_saved_ver, &_om2_saved_global);
+
 				// Switch base_clip context for SWF6+ closures
 				MovieClip* saved_ctx_om2 = g_current_context;
 				if (g_swf_version >= 6 && func->base_clip != NULL) {
@@ -33816,6 +33861,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				releaseObject(app_context, local_scope);
 				g_this_depth = saved_this_depth_am2;
 				popSuperContext();
+				restoreFunctionVersion(_om2_saved_ver, _om2_saved_global);
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
 
@@ -33826,6 +33872,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Invoke simple function (DefineFunction type 1) as method
 				// Push super context for SWF6+
 				pushSuperContext((void*)obj, method_search_depth);
+
+				// Phase 3: switch to function's SWF version
+				int _om1_saved_ver = 0; ASObject* _om1_saved_global = NULL;
+				switchToFunctionVersion(func, &_om1_saved_ver, &_om1_saved_global);
 
 				// Switch base_clip context for SWF6+ closures
 				MovieClip* saved_ctx_om1 = g_current_context;
@@ -33884,6 +33934,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				releaseObject(app_context, local_scope_am1);
 				g_this_depth = saved_this_depth_am1;
 				popSuperContext();
+				restoreFunctionVersion(_om1_saved_ver, _om1_saved_global);
 
 				pushVar(app_context, &result);
 			}

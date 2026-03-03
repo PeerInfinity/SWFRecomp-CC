@@ -27,8 +27,8 @@ This is the single largest cross-cutting blocker, affecting 9+ blocked plans.
 | `swf_version_cross_movie` | 0/? | Per-function version tracking |
 | `cross_movie_this` | 0/? | Cross-movie context + version |
 | `do_init_action_child` | **12/12 PASS** | DoInitAction in child context (Phase 1+4+ImportAssets2) |
-| `global_swf5_6_7_8_9` | partial | Per-version _global objects |
-| `global_swf6_7_8` | partial | Per-version _global objects |
+| `global_swf5_6_7_8_9` | 1031/1145 | Per-version globals (Phase 2+3 done; remaining needs per-movie globals) |
+| `global_swf6_7_8` | **15/15 PASS** | Per-version globals (Phase 2 complete) |
 | `loadmovienum_cross_version_prototype` | 5/9 | Cross-version prototype isolation (needs Phase 2) |
 | `mcl_events_swf_version` | 37/232 | MCL + per-version constructors (needs chained MCL callbacks) |
 
@@ -111,185 +111,58 @@ Sites updated: actionGetURL level load, actionGetURL named clip load, MCL deferr
 
 ---
 
-## Phase 2: Per-Version Global Object (Medium)
+## Phase 2: Per-Version Global Object — COMPLETED
 
-**Goal:** SWF7+ loaded movies get their own `_global` with version-appropriate constructors. SWF1-6 movies share one global.
+**Status:** DONE. Two-group model: SWF 1-6 share `g_global_legacy`, SWF 7+ share `g_global_modern`.
 
-### Ruffle's Model
-- SWF versions 1-6 share a single `_global` object
-- SWF version 7 gets its own `_global`
-- SWF version 8 gets its own `_global`
-- SWF version 9+ gets its own `_global`
-- Each `_global` is populated with constructors appropriate for that version
+**Implementation (Primary/Secondary model):**
+- First-initialized SWF version determines the "primary" group; the other is "secondary"
+- `ensureSecondaryGlobalInit()` creates a full secondary `_global` with:
+  - Distinct constructor ASFunction instances (Object, Array, String, Number, Boolean, Function, MovieClip, TextField, TextFormat, XML, XMLNode, Date, Error, 18 stub ctors)
+  - Each constructor gets a fresh `prototype_obj` (not shared with primary)
+  - Secondary Object.prototype is standalone (no `__proto__`) to prevent instanceof cross-contamination
+  - Secondary Array.prototype chains to secondary Object.prototype
+  - Shared singletons (Math, Key, Mouse, Selection, Stage, Accessibility) are NOT duplicated
+- All 6 child SWF load sites save/restore `global_object` during init
+- `actionGetVariable("_global")` returns version-appropriate global
+- `actionInitObject` uses `getVersionedObjectProto()` for `__proto__`
+- `actionInitArray` sets `__proto__` to `getVersionedArrayProto()`
 
-### Implementation
-
-#### 2a. Global object table
-
-Replace single `global_object` with a version-keyed table:
-
-```c
-#define MAX_SWF_VERSION 12
-static ASObject* g_global_objects[MAX_SWF_VERSION + 1] = {0};  // index = swf_version
-static ASObject* g_shared_global_v6 = NULL;  // Shared by SWF 1-6
-
-static ASObject* getGlobalForVersion(int version) {
-    if (version <= 6) {
-        if (!g_shared_global_v6) {
-            g_shared_global_v6 = createGlobalObject(6);
-        }
-        return g_shared_global_v6;
-    }
-    if (!g_global_objects[version]) {
-        g_global_objects[version] = createGlobalObject(version);
-    }
-    return g_global_objects[version];
-}
-```
-
-#### 2b. Version-gated constructor population
-
-Extract the constructor population from `actionGetGlobalObject()` into `createGlobalObject(int version)`:
-
-```c
-static ASObject* createGlobalObject(int version) {
-    ASObject* obj = createASObject(64);
-
-    // Always available (all versions)
-    registerBuiltin(obj, "Object", ...);
-    registerBuiltin(obj, "Array", ...);
-    registerBuiltin(obj, "String", ...);
-    registerBuiltin(obj, "Number", ...);
-    registerBuiltin(obj, "Boolean", ...);
-
-    if (version >= 6) {
-        registerBuiltin(obj, "Date", ...);
-        registerBuiltin(obj, "TextField", ...);
-        registerBuiltin(obj, "TextFormat", ...);
-        // ... more v6+ constructors
-    }
-    if (version >= 7) {
-        registerBuiltin(obj, "XML", ...);
-        registerBuiltin(obj, "XMLNode", ...);
-        // ... more v7+ constructors
-    }
-    if (version >= 8) {
-        registerBuiltin(obj, "TextRenderer", ...);
-        // ... more v8+ constructors
-    }
-
-    return obj;
-}
-```
-
-#### 2c. Global resolution update
-
-In `actionGetVariable()`, when resolving `_global`:
-```c
-if (strcmp(var_name, "_global") == 0) {
-    // Use current version's global
-    return getGlobalForVersion(g_swf_version);
-}
-```
-
-Also update scope chain fallback (lines 17760-17787) to use versioned global.
-
-#### 2d. Track active global per MovieClip
-
-Each MC needs to know which global it belongs to. Options:
-- **Option A:** Store `swf_version` on each MovieClip, derive global from version
-- **Option B:** Store `ASObject* mc_global` pointer directly on MovieClip
-
-Option A is simpler since MovieClip already has space, and the version→global mapping is cheap.
-
-Add to the MovieClip struct or display object:
-```c
-u16 mc_swf_version;  // SWF version this MC belongs to
-```
-
-Set during `loadMovie`:
-```c
-target_mc->mc_swf_version = entry->swf_version;
-```
-
-### Files to Modify
-- `action.c`: replace `global_object` with version table, extract `createGlobalObject()`
-- `action.c`: update `actionGetVariable("_global")` to use versioned lookup
-- `swf.h` or display object struct: add `mc_swf_version` field
-- `action.c`: `actionGetURL2()` — set `mc_swf_version` on target MC
+**Results:**
+- `global_swf6_7_8`: 11/15 → **15/15 PASS**
+- `global_swf5_6_7_8_9`: 798/1145 → **1031/1145** (+233 lines)
+- All 9 regression guard tests: PASS
+- Remaining failures in global_swf5_6_7_8_9 are due to Phase 3 (per-function version tracking)
 
 ---
 
-## Phase 3: Per-Function SWF Version Tracking (Medium-Large)
+## Phase 3: Per-Function SWF Version Tracking — PARTIALLY DONE
 
-**Goal:** Functions remember and execute with the SWF version they were defined in.
+**Status:** Core infrastructure implemented. `swf_version` field added to ASFunction, set at definition time, and version context switching added at main call sites. All regression tests pass.
 
-### Implementation
+**Implementation completed:**
+- `u16 swf_version` field on ASFunction struct (after `base_clip`)
+- Set at definition time in `actionDefineFunction()` and `actionDefineFunction2()` via `as_func->swf_version = (u16)g_swf_version`
+- `switchToFunctionVersion()`/`restoreFunctionVersion()` helper functions (after versioned global declarations)
+- Built-in functions have `swf_version=0` (zero-initialized statics) → no version switch
+- Version switching at 4 call sites:
+  1. `actionCallFunction()` — main dispatch (type 1 + type 2)
+  2. `actionCallFunction()` — super() constructor path
+  3. `actionCallMethod()` — OBJECT type 2 (advanced function) path
+  4. `actionCallMethod()` — OBJECT type 1 (simple function) path
 
-#### 3a. Add version field to ASFunction
+**Remaining call sites NOT yet instrumented:**
+- `actionCallMethod()` — MOVIECLIP user-defined method paths
+- `actionNewMethod()` / `actionNewObject()` — constructor calls
+- `invokePropertyGetter()` / `invokePropertySetter()` — addProperty callbacks
+- `invokeResolveFunction()` — __resolve hook
+- `fireTimerCallback()` — timer callbacks
+- `actionDispatchEnterFrameHandlers()` — enterFrame callbacks
+- Various event dispatch functions (mouse, key, focus)
 
-```c
-typedef struct ASFunction {
-    // ... existing fields ...
-    MovieClip* base_clip;
-    u16 swf_version;       // NEW: SWF version at definition time
-} ASFunction;
-```
+**Results:** No change in `global_swf5_6_7_8_9` score (still 1031/1145). The remaining 114 failures are NOT caused by missing per-function version tracking — they require **per-movie `_global` isolation** (see Blocking Issue below).
 
-#### 3b. Set version at definition time
-
-In `actionDefineFunction()` and `actionDefineFunction2()`:
-```c
-func->swf_version = (u16)g_swf_version;
-```
-
-For built-in functions created during global init:
-```c
-func->swf_version = version;  // Use the version passed to createGlobalObject()
-```
-
-#### 3c. Version context switch on function calls
-
-In `actionCallFunction()` and `actionCallMethod()`, where closure context is already switched:
-
-```c
-// Existing closure context switch (SWF6+)
-if (func->base_clip) {
-    saved_context = g_current_context;
-    g_current_context = func->base_clip;
-}
-
-// NEW: version context switch
-int saved_version = g_swf_version;
-g_swf_version = func->swf_version;
-
-// ... execute function ...
-
-// Restore
-g_swf_version = saved_version;
-if (saved_context) g_current_context = saved_context;
-```
-
-This must be done in ALL function call sites:
-1. `actionCallFunction()` — both simple and advanced paths
-2. `actionCallMethod()` — all method dispatch paths (OBJECT, MOVIECLIP, STRING, etc.)
-3. `actionNewMethod()` / `actionNewObject()` — constructor calls
-4. `invokePropertyGetter()` / `invokePropertySetter()` — addProperty callbacks
-5. `invokeResolveFunction()` — __resolve hook
-6. `fireTimerCallback()` — timer callbacks
-7. `actionDispatchEnterFrameHandlers()` — enterFrame callbacks
-8. Various event dispatch functions (mouse, key, focus)
-
-#### 3d. Audit version-dependent sites
-
-All 86 `g_swf_version` checks will automatically use the function's version because `g_swf_version` is a global that's swapped. However, verify no caching or pre-computed version-dependent values exist.
-
-### Risk
-Medium — touching all function call sites is error-prone. Need comprehensive regression testing.
-
-### Files to Modify
-- `action.c`: ASFunction struct + all definition sites + all call sites
-- `action.c`: timer, enterFrame, event dispatch — version save/restore
+**Blocking Issue:** Ruffle gives each SWF7+ child movie its OWN `_global` (per-movie, not per-version-group). Our two-group model (legacy SWF1-6 / modern SWF7+) is too coarse. In the test, SWF5 child stores `this.global2 = _global` → should be `undefined` (SWF5 has no `_global` in scope via `getGlobal()` closure). SWF7/8/9 children each need distinct `_global` objects with separate constructor instances. This requires per-movie global tracking, likely keyed by MovieClip or movie entry, not just version group.
 
 ---
 
@@ -336,13 +209,13 @@ This depends on Phases 1-2 (version tracking and context). Should be straightfor
 | Phase | Status | Impact |
 |-------|--------|--------|
 | Phase 1: Version restoration | **DONE** | Child SWF inits with correct version |
-| Phase 2: Per-version global | TODO | 4+ tests, version-appropriate constructors |
-| Phase 3: Per-function version | TODO | All cross-version function calls |
+| Phase 2: Per-version global | **DONE** | global_swf6_7_8 PASS, +233 lines on global_swf5_6_7_8_9 |
+| Phase 3: Per-function version | **PARTIAL** | Core infra done (4 call sites), remaining 114 failures blocked on per-movie globals |
 | Phase 4: DoInitAction context | **DONE** | do_init_action_child 12/12, ImportAssets2 |
-| Phase 5: RegisterClass isolation | TODO (needs Phase 2+3) | 3 tests |
+| Phase 5: RegisterClass isolation | TODO (needs per-movie globals) | 3 tests |
 | Phase 6: Variable clearing + per-MC version | **DONE** | getSWFVersion per-MC, dynamic_props clear on reload |
 
-**Next:** Phase 2 → 3 → 5. Phase 2 is next highest impact (unblocks global isolation tests). Phase 3 is most invasive but necessary for full correctness.
+**Blocked on:** Per-movie `_global` isolation. The two-group model (SWF1-6 share legacy, SWF7+ share modern) is insufficient. Ruffle gives each loaded SWF7+ movie its own `_global` with distinct constructor instances. This is a significant architectural change requiring per-movie global tracking (keyed by MovieClip or MovieEntry, not version group). The remaining 114 failures in `global_swf5_6_7_8_9` and likely most of `mcl_events_swf_version` depend on this.
 
 ---
 
