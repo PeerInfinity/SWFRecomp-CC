@@ -23264,6 +23264,29 @@ void actionSetMember(SWFAppContext* app_context)
 				value_var.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &value_var.data.numeric_value) = (double)ival;
 			}
+			// TextField restrict setter: coerce to string or null
+			if (prop_name_len == 8 && strncmp(prop_name, "restrict", 8) == 0
+				&& MC_IS_TEXTFIELD(mc))
+			{
+				if (value_var.type == ACTION_STACK_VALUE_NULL ||
+				    value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+					// null/undefined → store as NULL (no restriction)
+					value_var.type = ACTION_STACK_VALUE_NULL;
+					value_var.str_size = 0;
+					value_var.data.numeric_value = 0;
+				} else if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size == 0) {
+					// Empty string → store as NULL (no restriction)
+					value_var.type = ACTION_STACK_VALUE_NULL;
+					value_var.data.numeric_value = 0;
+				} else if (value_var.type != ACTION_STACK_VALUE_STRING) {
+					// Non-string types (boolean, number, object) → coerce to string
+					char _rc_buf[17];
+					pushVar(app_context, &value_var);
+					convertString(app_context, _rc_buf);
+					popVar(app_context, &value_var);
+				}
+				// Non-empty STRING values pass through unchanged
+			}
 			// transform property: copy transform state from src MC to this MC
 			if (prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
 			{
@@ -38648,36 +38671,209 @@ void actionTextControlCut(SWFAppContext* app_context)
 	g_tf_select_all = 0;
 }
 
-// Apply restrict filter: for each char in input, check against restrict string.
-// If tolower(input_char) matches tolower(restrict_char), output the restrict_char.
-// Returns number of bytes written to output (not including NUL).
+// ==================== TextField.restrict pattern filter ====================
+// Flash restrict syntax: character ranges (a-z), negation (^), escapes (\-),
+// case conversion (ASCII only).
+
+typedef struct { uint32_t start; uint32_t end; } RestrictInterval;
+
+typedef struct {
+	RestrictInterval allowed[128];
+	int allowed_count;
+	RestrictInterval disallowed[128];
+	int disallowed_count;
+} RestrictPattern;
+
+static void restrict_add_interval(RestrictInterval* list, int* count, uint32_t start, uint32_t end)
+{
+	if (*count < 128) {
+		list[*count].start = start;
+		list[*count].end = end;
+		(*count)++;
+	}
+}
+
+// Decode one UTF-8 codepoint from buf, return codepoint and advance *pos by bytes consumed.
+static uint32_t restrict_utf8_decode(const char* buf, size_t len, size_t* pos)
+{
+	const unsigned char* p = (const unsigned char*)buf + *pos;
+	size_t remaining = len - *pos;
+	if (remaining == 0) return 0;
+	uint32_t c = p[0];
+	if (c < 0x80) { (*pos)++; return c; }
+	if ((c & 0xE0) == 0xC0 && remaining >= 2 && (p[1] & 0xC0) == 0x80) {
+		*pos += 2; return ((c & 0x1F) << 6) | (p[1] & 0x3F);
+	}
+	if ((c & 0xF0) == 0xE0 && remaining >= 3 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+		*pos += 3; return ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+	}
+	if ((c & 0xF8) == 0xF0 && remaining >= 4 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+		*pos += 4; return ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+	}
+	(*pos)++; return 0xFFFD;
+}
+
+// Encode one codepoint to UTF-8. Returns bytes written.
+static int restrict_utf8_encode(uint32_t cp, char* buf, size_t max)
+{
+	if (cp < 0x80 && max >= 1) { buf[0] = (char)cp; return 1; }
+	if (cp < 0x800 && max >= 2) { buf[0] = (char)(0xC0 | (cp >> 6)); buf[1] = (char)(0x80 | (cp & 0x3F)); return 2; }
+	if (cp < 0x10000 && max >= 3) { buf[0] = (char)(0xE0 | (cp >> 12)); buf[1] = (char)(0x80 | ((cp >> 6) & 0x3F)); buf[2] = (char)(0x80 | (cp & 0x3F)); return 3; }
+	if (cp <= 0x10FFFF && max >= 4) { buf[0] = (char)(0xF0 | (cp >> 18)); buf[1] = (char)(0x80 | ((cp >> 12) & 0x3F)); buf[2] = (char)(0x80 | ((cp >> 6) & 0x3F)); buf[3] = (char)(0x80 | (cp & 0x3F)); return 4; }
+	return 0;
+}
+
+// Process one literal character in the restrict pattern parser.
+static void restrict_process_char(RestrictPattern* pat, uint32_t cp,
+                                   int64_t* last_char, int* expect_range_end, int now_allowing)
+{
+	RestrictInterval* list = now_allowing ? pat->allowed : pat->disallowed;
+	int* count = now_allowing ? &pat->allowed_count : &pat->disallowed_count;
+
+	if (*expect_range_end) {
+		// Complete the range
+		uint32_t start = (uint32_t)*last_char;
+		if (start <= cp) {
+			restrict_add_interval(list, count, start, cp);
+		} else {
+			// Inverted range: just the start char
+			restrict_add_interval(list, count, start, start);
+		}
+		*last_char = -1;
+		*expect_range_end = 0;
+	} else {
+		// Flush previous pending char if any
+		if (*last_char >= 0) {
+			restrict_add_interval(list, count, (uint32_t)*last_char, (uint32_t)*last_char);
+		}
+		*last_char = (int64_t)cp;
+	}
+}
+
+// Parse a restrict pattern string into allow/disallow interval lists.
+static void restrict_parse_pattern(const char* str, size_t len, RestrictPattern* pat)
+{
+	pat->allowed_count = 0;
+	pat->disallowed_count = 0;
+
+	int now_allowing = 1;
+	int64_t last_char = -1;
+	int expect_range_end = 0;
+
+	size_t i = 0;
+	while (i < len) {
+		uint32_t cp = restrict_utf8_decode(str, len, &i);
+
+		if (cp == '\\') {
+			if (i >= len) break; // Truncated escape at end → ignore
+			uint32_t escaped = restrict_utf8_decode(str, len, &i);
+			restrict_process_char(pat, escaped, &last_char, &expect_range_end, now_allowing);
+			continue;
+		}
+
+		if (cp == '^') {
+			// Flush pending char or incomplete range
+			if (last_char >= 0) {
+				RestrictInterval* list = now_allowing ? pat->allowed : pat->disallowed;
+				int* count = now_allowing ? &pat->allowed_count : &pat->disallowed_count;
+				restrict_add_interval(list, count, (uint32_t)last_char, (uint32_t)last_char);
+				last_char = -1;
+			}
+			expect_range_end = 0;
+			// If switching from allow mode with empty allow list, implicitly allow all
+			if (now_allowing && pat->allowed_count == 0) {
+				restrict_add_interval(pat->allowed, &pat->allowed_count, 0, 0x10FFFF);
+			}
+			now_allowing = !now_allowing;
+			continue;
+		}
+
+		if (cp == '-') {
+			if (expect_range_end) {
+				// Double dash: flush start as single, start new left-truncated range
+				if (last_char >= 0) {
+					RestrictInterval* list = now_allowing ? pat->allowed : pat->disallowed;
+					int* count = now_allowing ? &pat->allowed_count : &pat->disallowed_count;
+					restrict_add_interval(list, count, (uint32_t)last_char, (uint32_t)last_char);
+				}
+				last_char = 0;
+				expect_range_end = 1;
+			} else if (last_char < 0) {
+				// Left-truncated range
+				last_char = 0;
+				expect_range_end = 1;
+			} else {
+				// Normal range start
+				expect_range_end = 1;
+			}
+			continue;
+		}
+
+		// Regular character
+		restrict_process_char(pat, cp, &last_char, &expect_range_end, now_allowing);
+	}
+
+	// End: flush remaining state
+	if (last_char >= 0) {
+		RestrictInterval* list = now_allowing ? pat->allowed : pat->disallowed;
+		int* count = now_allowing ? &pat->allowed_count : &pat->disallowed_count;
+		restrict_add_interval(list, count, (uint32_t)last_char, (uint32_t)last_char);
+	}
+}
+
+static int restrict_char_in_intervals(uint32_t cp, const RestrictInterval* list, int count)
+{
+	for (int i = 0; i < count; i++) {
+		if (cp >= list[i].start && cp <= list[i].end) return 1;
+	}
+	return 0;
+}
+
+static int restrict_allows_char(const RestrictPattern* pat, uint32_t cp)
+{
+	return restrict_char_in_intervals(cp, pat->allowed, pat->allowed_count)
+	    && !restrict_char_in_intervals(cp, pat->disallowed, pat->disallowed_count);
+}
+
+// Filter one codepoint through the restrict pattern (with ASCII-only case conversion).
+// Returns the allowed codepoint, or 0 if rejected.
+static uint32_t restrict_filter_char(const RestrictPattern* pat, uint32_t cp)
+{
+	// Try as-is
+	if (restrict_allows_char(pat, cp)) return cp;
+	// ASCII-only case conversion
+	if (cp >= 'a' && cp <= 'z') {
+		uint32_t upper = cp - 32;
+		if (restrict_allows_char(pat, upper)) return upper;
+	} else if (cp >= 'A' && cp <= 'Z') {
+		uint32_t lower = cp + 32;
+		if (restrict_allows_char(pat, lower)) return lower;
+	}
+	return 0; // Rejected
+}
+
+// Apply restrict filter to a UTF-8 input string. Returns bytes written to output (not including NUL).
 static size_t apply_restrict_filter(const char* input, size_t input_len,
                                      const char* restrict_str, char* output, size_t max_out)
 {
-	size_t out_pos = 0;
-	size_t restrict_len = strlen(restrict_str);
+	RestrictPattern pat;
+	restrict_parse_pattern(restrict_str, strlen(restrict_str), &pat);
 
-	for (size_t i = 0; i < input_len && out_pos < max_out - 1; i++) {
-		unsigned char ic = (unsigned char)input[i];
-		// For multi-byte UTF-8, pass through bytes that aren't ASCII
-		if (ic >= 0x80) {
-			output[out_pos++] = (char)ic;
-			continue;
+	// If pattern has no allowed intervals at all, block everything
+	if (pat.allowed_count == 0 && pat.disallowed_count == 0) {
+		output[0] = '\0';
+		return 0;
+	}
+
+	size_t out_pos = 0;
+	size_t i = 0;
+	while (i < input_len && out_pos + 4 < max_out) {
+		uint32_t cp = restrict_utf8_decode(input, input_len, &i);
+		uint32_t filtered = restrict_filter_char(&pat, cp);
+		if (filtered != 0) {
+			int enc_len = restrict_utf8_encode(filtered, output + out_pos, max_out - out_pos);
+			out_pos += (size_t)enc_len;
 		}
-		char ic_lower = (ic >= 'A' && ic <= 'Z') ? (char)(ic + 32) : (char)ic;
-		int found = 0;
-		for (size_t r = 0; r < restrict_len; r++) {
-			unsigned char rc = (unsigned char)restrict_str[r];
-			if (rc >= 0x80) continue;
-			char rc_lower = (rc >= 'A' && rc <= 'Z') ? (char)(rc + 32) : (char)rc;
-			if (ic_lower == rc_lower) {
-				output[out_pos++] = (char)rc;
-				found = 1;
-				break;
-			}
-		}
-		// If not found in restrict, the character is dropped
-		(void)found;
 	}
 	output[out_pos] = '\0';
 	return out_pos;

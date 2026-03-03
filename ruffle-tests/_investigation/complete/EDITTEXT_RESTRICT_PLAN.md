@@ -1,10 +1,28 @@
-# EditText Restrict Plan
+# EditText Restrict Plan — COMPLETE
 
-## Overview
+## Status: COMPLETE (2026-03-03)
 
-`TextField.restrict` controls which characters can be entered into an editable text field. It uses a pattern syntax with character ranges, negation, and escapes. The current implementation does naive literal matching instead of proper pattern parsing.
+**Test:** `edittext_restrict` — **191/191 PASS** (was 145/191)
 
-**Test:** `edittext_restrict` — 147/191 (77% match)
+## Changes Made
+
+1. **Replaced `apply_restrict_filter()`** in `action.c` with proper pattern parser:
+   - `restrict_parse_pattern()`: Single-pass parser handling ranges (`a-z`), negation (`^`), escapes (`\\-`), left-truncated ranges (`-b` = `\0`..`b`), inverted ranges (`z-a` = just `z`), multiple dashes, Unicode codepoint ranges
+   - `restrict_filter_char()`: ASCII-only case conversion (a-z ↔ A-Z), matching Flash behavior
+   - `restrict_utf8_decode()`/`restrict_utf8_encode()`: UTF-8 codepoint helpers for Unicode-aware processing
+
+2. **Added restrict property setter coercion** in `actionSetMember` textfield handler:
+   - `null`/`undefined` → stored as NULL (no restriction)
+   - Empty string `""` → stored as NULL (no restriction)
+   - Non-string types (boolean, number, object) → coerced to string via `convertString`
+   - Non-empty strings → stored as-is
+
+## Key Design Decisions
+
+- **ASCII-only case conversion**: Flash only does a-z ↔ A-Z for restrict. Unicode case pairs (ą/Ą, δ/Δ) are NOT converted. Verified against all test patterns.
+- **Interval-based allow/disallow lists**: Pattern parsed into `RestrictInterval` arrays (start/end codepoint pairs). Character is allowed if it appears in any allowed interval AND not in any disallowed interval.
+- **Caret semantics**: First `^` with empty allow list → implicit allow-all `[0, 0x10FFFF]`. Subsequent carets flip between allow/disallow mode.
+- **Dash semantics**: `-` at start (left-truncated) → range from `\0`. `-` at end (right-truncated) → just the left char. Multiple dashes → each pair flush/restart.
 
 **Standalone feature** — no cross-plan dependencies. Self-contained in `action.c`.
 
