@@ -1052,11 +1052,14 @@ static size_t g_pending_attach_init_count = 0;
 void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 {
 	for (size_t i = 0; i < g_pending_attach_init_count; i++) {
-		// Set context to the attached clip for correct variable resolution
+		// Set context and base clip to the attached clip for correct variable resolution
 		MovieClip* saved_ctx = g_current_context;
+		extern void actionSetBaseClip(MovieClip* mc);
+		extern MovieClip* actionGetBaseClip(void);
+		MovieClip* saved_base = actionGetBaseClip();
 		MovieClip* mc = actionFindOrCreateMovieClip(
 			app_context, g_pending_attach_inits[i].instance_name, &root_movieclip);
-		if (mc) actionSetCurrentContext(mc);
+		if (mc) { actionSetCurrentContext(mc); actionSetBaseClip(mc); }
 
 		// Save display list state and switch to the MC's sprite display list
 		DisplayObject* saved_dl = display_list;
@@ -1099,6 +1102,7 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 
 		// Restore
 		actionSetCurrentContext(saved_ctx);
+		actionSetBaseClip(saved_base);
 		g_current_sprite_obj = saved_sprite_obj;
 		g_settarget_explicit_root = saved_settarget;
 		display_list = saved_dl;
@@ -1174,6 +1178,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		// Create a display object for the attached clip to hold its children
 		if (new_mc->display_obj == NULL) {
 			DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
+			dobj->char_id = char_id;
 			dobj->sprite_dl_capacity = 64;
 			dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
 			dobj->sprite_max_depth = 0;

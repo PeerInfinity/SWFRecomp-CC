@@ -9840,6 +9840,33 @@ static void queueOnUnload(ASFunction* func, MovieClip* mc)
 	}
 }
 
+// Recursively queue onUnload handlers for children of a removed MovieClip.
+// When a parent MC is removed, all its children are also removed and their
+// onUnload handlers should fire. Children are NOT marked as removed here
+// so their path data remains accessible during the deferred onUnload callback.
+// They become unreachable since their parent is removed.
+static void queueChildOnUnloads(MovieClip* parent_mc)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* child = child_mc_cache[i];
+		if (child == NULL || child->depth == INT_MIN) continue;
+		if (child->parent != parent_mc) continue;
+
+		// Check for onUnload handler on this child
+		if (child->dynamic_props != NULL) {
+			ActionVar* handler = getProperty((ASObject*)child->dynamic_props, "onUnload", 8);
+			if (handler != NULL && handler->type == ACTION_STACK_VALUE_FUNCTION) {
+				ASFunction* func = (ASFunction*) handler->data.numeric_value;
+				if (func != NULL)
+					queueOnUnload(func, child);
+			}
+		}
+
+		// Recursively process grandchildren
+		queueChildOnUnloads(child);
+	}
+}
+
 // Fire all queued onUnload handlers (called from tagShowFrame in tag.c).
 void actionFirePendingUnloads(SWFAppContext* app_context)
 {
@@ -9848,8 +9875,16 @@ void actionFirePendingUnloads(SWFAppContext* app_context)
 	for (int i = 0; i < count; i++) {
 		if (g_execution_halted) break;
 		MovieClip* saved = g_current_context;
-		actionSetCurrentContext(g_pending_unloads[i].mc);
+		MovieClip* mc = g_pending_unloads[i].mc;
+		actionSetCurrentContext(mc);
+		// Push 'this' = the unloading MC so GetVariable("this") finds it
+		if (g_this_depth < MAX_SCOPE_DEPTH) {
+			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+			g_this_stack[g_this_depth].data.numeric_value = (u64)(uintptr_t)mc;
+			g_this_depth++;
+		}
 		invokeSpecialFunction(app_context, g_pending_unloads[i].func, NULL);
+		if (g_this_depth > 0) g_this_depth--;
 		actionSetCurrentContext(saved);
 	}
 }
@@ -18097,6 +18132,11 @@ void actionGetVariable(SWFAppContext* app_context)
 				pushVar(app_context, &g_this_stack[g_this_depth - 1]);
 				return;
 			}
+			// Root level with SetTarget active: "this" returns base clip, not target
+			if (g_base_clip != NULL && g_current_context != g_base_clip) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)(uintptr_t)g_base_clip);
+				return;
+			}
 			// Root level — fall through to scope chain / variable table
 			// (root "this" is mutable via SetVariable and stored in var table)
 		}
@@ -19849,11 +19889,12 @@ void actionSetTarget2(SWFAppContext* app_context)
 	{
 		MovieClip* mc = (MovieClip*) VAL(u64, &STACK_TOP_VALUE);
 		POP();
-		if (mc != NULL)
+		if (mc != NULL && mc->depth != INT_MIN)
 			setCurrentContext(mc);
 		else {
-			// NULL MovieClip → reset to base clip
+			// NULL or removed MovieClip → reset to base clip
 			MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
+			if (base->depth == INT_MIN) base = &root_movieclip;
 			setCurrentContext(base);
 		}
 		return;
@@ -21882,29 +21923,67 @@ void actionCall(SWFAppContext* app_context)
 	ActionVar frame_var;
 	popVar(app_context, &frame_var);
 
-	if (frame_var.type == ACTION_STACK_VALUE_F32) {
-		// Numeric frame
-		float frame_float;
-		memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
+	// Determine frame functions to use: sprite context or root timeline
+	frame_func* call_funcs = g_frame_funcs;
+	size_t call_count = g_frame_count;
+#ifdef NO_GRAPHICS
+	// If current context is a sprite (not root), use the sprite's frame functions
+	MovieClip* call_ctx = g_base_clip ? g_base_clip : g_current_context;
+	if (call_ctx != NULL && call_ctx != &root_movieclip &&
+	    call_ctx->depth != INT_MIN && call_ctx->display_obj != NULL) {
+		extern Character* dictionary;
+		DisplayObject* dobj = (DisplayObject*)call_ctx->display_obj;
+		if (dobj->char_id > 0) {
+			Character* ch = &dictionary[dobj->char_id];
+			if (ch->type == CHAR_TYPE_SPRITE && ch->sprite_frame_funcs != NULL) {
+				call_funcs = ch->sprite_frame_funcs;
+				call_count = ch->sprite_frame_count;
+			}
+		}
+	}
+#endif
 
-		// Handle negative frames (ignore)
-		s32 frame_num = (s32)frame_float;
+	if (frame_var.type == ACTION_STACK_VALUE_F32 || frame_var.type == ACTION_STACK_VALUE_F64) {
+		// Numeric frame (1-based in Flash, convert to 0-based index)
+		double frame_double;
+		if (frame_var.type == ACTION_STACK_VALUE_F32) {
+			float frame_float;
+			memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
+			frame_double = (double)frame_float;
+		} else {
+			memcpy(&frame_double, &frame_var.data.numeric_value, sizeof(double));
+		}
+
+		// Convert 1-based frame number to 0-based index
+		s32 frame_num = (s32)frame_double - 1;
 		if (frame_num < 0) {
 			return;
 		}
 
 		// Validate frame is in range
-		if (g_frame_funcs && (size_t)frame_num < g_frame_count) {
-			// Save quit_swf state to prevent frame from terminating execution
+		if (call_funcs && (size_t)frame_num < call_count) {
+			// Save frame navigation state — call() only runs DoAction,
+			// must not affect the calling timeline's navigation
+			extern size_t next_frame;
+			extern int manual_next_frame;
+			extern int is_playing;
+			extern int catch_up_mode;
+			extern int g_in_action_call;
 			int saved_quit_swf = quit_swf;
+			size_t saved_next_frame = next_frame;
+			int saved_manual = manual_next_frame;
+			int saved_playing = is_playing;
+			int saved_catchup = catch_up_mode;
+			int saved_in_call = g_in_action_call;
 			quit_swf = 0;
-
-			// Call the frame function (executes frame actions)
-			// Note: This calls the full frame function including ShowFrame
-			g_frame_funcs[frame_num](app_context);
-
-			// Restore quit_swf state (only quit if we were already quitting)
+			g_in_action_call = 1;
+			call_funcs[frame_num](app_context);
 			quit_swf = saved_quit_swf;
+			next_frame = saved_next_frame;
+			manual_next_frame = saved_manual;
+			is_playing = saved_playing;
+			catch_up_mode = saved_catchup;
+			g_in_action_call = saved_in_call;
 		}
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
@@ -21944,7 +22023,8 @@ void actionCall(SWFAppContext* app_context)
 		long frame_num = strtol(frame_part, &endptr, 10);
 
 		if (endptr != frame_part && *endptr == '\0') {
-			// It's a numeric frame
+			// It's a numeric frame (1-based, convert to 0-based index)
+			frame_num -= 1;
 			if (frame_num < 0) {
 				return;
 			}
@@ -21952,31 +22032,36 @@ void actionCall(SWFAppContext* app_context)
 			if (target) {
 				// Target path specified - not yet implemented (requires MovieClip tree traversal)
 			} else {
-				// Main timeline - can execute
-				if (g_frame_funcs && (size_t)frame_num < g_frame_count) {
-					// Save quit_swf state to prevent frame from terminating execution
+				if (call_funcs && (size_t)frame_num < call_count) {
+					extern size_t next_frame;
+					extern int manual_next_frame;
+					extern int is_playing;
+					extern int catch_up_mode;
+					extern int g_in_action_call;
 					int saved_quit_swf = quit_swf;
+					size_t saved_next_frame = next_frame;
+					int saved_manual = manual_next_frame;
+					int saved_playing = is_playing;
+					int saved_catchup = catch_up_mode;
+					int saved_in_call = g_in_action_call;
 					quit_swf = 0;
-
-					// Call the frame function (executes frame actions)
-					g_frame_funcs[frame_num](app_context);
-
-					// Restore quit_swf state
+					g_in_action_call = 1;
+					call_funcs[frame_num](app_context);
 					quit_swf = saved_quit_swf;
+					next_frame = saved_next_frame;
+					manual_next_frame = saved_manual;
+					is_playing = saved_playing;
+					catch_up_mode = saved_catchup;
+					g_in_action_call = saved_in_call;
 				}
 			}
 		} else {
 			// It's a frame label - not yet implemented
-			// Note: Frame label lookup requires:
-			// - Frame label registry (mapping labels to frame numbers)
-			// - SWFRecomp to parse FrameLabel tags (tag type 43) and generate the registry
-			// - MovieClip context switching for target paths
 		}
 	}
 	else {
 		// Undefined or invalid type - ignore
 	}
-	// If frame not found or invalid, do nothing (per SWF spec)
 }
 
 /**
@@ -27837,6 +27922,8 @@ void actionRemoveSprite(SWFAppContext* app_context)
 						queueOnUnload(_rs_func, _rs_mc);
 				}
 			}
+			// Recursively queue onUnload handlers for children
+			queueChildOnUnloads(_rs_mc);
 			// Clear from parent's dynamic_props
 			MovieClip* _rs_parent = _rs_mc->parent ? _rs_mc->parent : &root_movieclip;
 			if (_rs_parent->dynamic_props != NULL && _rs_mc->name[0]) {
@@ -27858,6 +27945,21 @@ void actionRemoveSprite(SWFAppContext* app_context)
 					child_mc_cache[_rs_j] = NULL;
 					break;
 				}
+			}
+			// If the removed MC is the current SetTarget target, fall back to base clip
+			if (g_current_context == _rs_mc) {
+				MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
+				setCurrentContext(base);
+#ifdef NO_GRAPHICS
+				{
+					extern int g_settarget_explicit_root;
+					extern int g_settarget_invalid;
+					extern int g_settarget_none;
+					g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
+					g_settarget_invalid = 0;
+					g_settarget_none = 0;
+				}
+#endif
 			}
 		}
 	}
@@ -27891,6 +27993,10 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 
 	// Empty string or NULL means return to base clip (the clip whose script is running)
 	if (!target_name || strlen(target_name) == 0) {
+		// If base clip is removed, fall back to root
+		if (base->depth == INT_MIN) {
+			base = &root_movieclip;
+		}
 		setCurrentContext(base);
 #ifdef NO_GRAPHICS
 		g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
@@ -27923,7 +28029,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	{
 		u32 tn_len = (u32)strlen(target_name);
 		MovieClip* target_mc = resolveFlashPathToMC(app_context, target_name, tn_len, base, 0);
-		if (target_mc) {
+		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
@@ -27939,7 +28045,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		// Simple bare name — resolve as child of base clip
 		// Try resolveSlashPathToMC (handles single-segment names and _parent)
 		MovieClip* target_mc = resolveSlashPathToMC(app_context, target_name, (u32)strlen(target_name), base);
-		if (target_mc) {
+		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
@@ -27960,7 +28066,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 
 		// Try getMovieClipByTarget for _level0.path style
 		target_mc = getMovieClipByTarget(target_name);
-		if (target_mc) {
+		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
 #ifdef NO_GRAPHICS
 			g_settarget_explicit_root = 0;
@@ -37097,6 +37203,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							queueOnUnload(_rmc_func, mc);
 					}
 				}
+				// Recursively queue onUnload handlers for children
+				queueChildOnUnloads(mc);
 				// Clear the variable from parent's dynamic_props
 				MovieClip* _rmc_parent = mc->parent ? mc->parent : &root_movieclip;
 				if (_rmc_parent->dynamic_props != NULL && mc->name[0]) {

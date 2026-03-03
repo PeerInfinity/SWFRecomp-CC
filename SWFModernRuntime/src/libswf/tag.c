@@ -1149,10 +1149,15 @@ static void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	}
 }
 
+// Flag to suppress tagShowFrame side effects during actionCall invocations.
+// call() only runs DoAction scripts, not timeline management tags.
+int g_in_action_call = 0;
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
 	if (g_tag_skip_mode) return;
+	if (g_in_action_call) return;
 	// --- Fire deferred onUnload handlers from removeMovieClip ---
 	// These are queued mid-script and fire between frames, matching Flash behavior.
 	actionFirePendingUnloads(app_context);
