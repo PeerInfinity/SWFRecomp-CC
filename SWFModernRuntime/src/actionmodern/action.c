@@ -33199,6 +33199,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// This allows GetVariable("super") inside the function to resolve correctly.
 				pushSuperContext((void*)obj, method_search_depth);
 
+				// Switch base_clip context for SWF6+ closures
+				MovieClip* saved_ctx_om2 = g_current_context;
+				if (g_swf_version >= 6 && func->base_clip != NULL) {
+					MovieClip* bc = (MovieClip*)func->base_clip;
+					if (bc->depth != INT_MIN)
+						g_current_context = bc;
+				}
+
 				// Push a local scope so GetVariable("this"/"super"/"arguments") can
 				// resolve them when neither preload nor suppress is set (flags == 0 bits).
 				ASObject* local_scope = allocObject(app_context, 8);
@@ -33280,6 +33288,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_current_executing_func = prev_executing_func_am2;
 				g_call_depth--;
 
+				g_current_context = saved_ctx_om2;
 				if (scope_depth > 0) scope_depth--;
 				releaseObject(app_context, local_scope);
 				g_this_depth = saved_this_depth_am2;
@@ -33294,6 +33303,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Invoke simple function (DefineFunction type 1) as method
 				// Push super context for SWF6+
 				pushSuperContext((void*)obj, method_search_depth);
+
+				// Switch base_clip context for SWF6+ closures
+				MovieClip* saved_ctx_om1 = g_current_context;
+				if (g_swf_version >= 6 && func->base_clip != NULL) {
+					MovieClip* bc = (MovieClip*)func->base_clip;
+					if (bc->depth != INT_MIN)
+						g_current_context = bc;
+				}
+
 				// Create local scope with arguments object for proper arguments.callee/caller
 				ASFunction* prev_executing_func_am1 = g_current_executing_func;
 				ASObject* local_scope_am1 = allocObject(app_context, 8);
@@ -33338,6 +33356,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_current_executing_func = prev_executing_func_am1;
 				g_call_depth--;
 
+				g_current_context = saved_ctx_om1;
 				if (scope_depth > 0) scope_depth--;
 				releaseObject(app_context, local_scope_am1);
 				g_this_depth = saved_this_depth_am1;
@@ -36749,11 +36768,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 						// SWF6+ closure: switch to function's base_clip
 						// SWF5: no closures — execute in receiver's context (mc)
+						// If base_clip is removed (depth==INT_MIN), fall back to receiver MC
 						MovieClip* saved_cm_context = g_current_context;
 						DisplayObject* saved_cm_sprite = g_current_sprite_obj;
 						if (g_swf_version >= 6 && func->base_clip != NULL)
 						{
-							actionSetCurrentContext(func->base_clip);
+							MovieClip* _bc = (MovieClip*)func->base_clip;
+							if (_bc->depth != INT_MIN)
+								actionSetCurrentContext(func->base_clip);
+							else
+								actionSetCurrentContext(mc);
 							g_current_sprite_obj = NULL;
 						}
 						else if (g_swf_version < 6 && mc != NULL)

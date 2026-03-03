@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <limits.h>
 
 // ---------------------------------------------------------------------------
 // Global display state — defined here in NO_GRAPHICS (swf.c provides in GRAPHICS)
@@ -230,9 +231,23 @@ static void clone_depth_evict(int swf_depth)
 	{
 		if (g_clone_depth_table[i].swf_depth == swf_depth)
 		{
+			// Mark old MC as removed (depth = INT_MIN) and clear from child_mc_cache
+			const char* old_name = g_clone_depth_table[i].name;
+			size_t name_len = strlen(old_name);
+			{
+				extern MovieClip* child_mc_cache[];
+				extern int child_mc_count;
+				for (int ci = 0; ci < child_mc_count; ci++) {
+					if (child_mc_cache[ci] != NULL &&
+					    strcmp(child_mc_cache[ci]->name, old_name) == 0) {
+						child_mc_cache[ci]->depth = INT_MIN;
+						child_mc_cache[ci] = NULL;
+						break;
+					}
+				}
+			}
 			// Set global variable to undefined so GetVariable returns undefined
-			size_t name_len = strlen(g_clone_depth_table[i].name);
-			ActionVar* old_var = getVariable((char*)g_clone_depth_table[i].name, name_len);
+			ActionVar* old_var = getVariable((char*)old_name, name_len);
 			if (old_var != NULL)
 			{
 				if (old_var->type == ACTION_STACK_VALUE_STRING &&

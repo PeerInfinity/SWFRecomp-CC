@@ -1492,7 +1492,7 @@ namespace SWFRecomp
 					func_def << "\t\textern ASObject* global_object;" << endl;
 					func_def << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
 					func_def << "\t\tint _pr = " << next_reg << ";" << endl;
-					func_def << "\t\tif (_ctx->parent != NULL) {" << endl;
+					func_def << "\t\tif (_ctx->parent != NULL && _ctx->parent->depth != INT_MIN) {" << endl;
 					func_def << "\t\t\tregs[_pr].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
 					func_def << "\t\t\tregs[_pr].data.numeric_value = (u64)_ctx->parent;" << endl;
 					func_def << "\t\t\t_pr++;" << endl;
@@ -1509,7 +1509,7 @@ namespace SWFRecomp
 					func_def << "\t\textern MovieClip* g_current_context;" << endl;
 					func_def << "\t\textern MovieClip root_movieclip;" << endl;
 					func_def << "\t\tMovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;" << endl;
-					func_def << "\t\tif (_ctx->parent != NULL) {" << endl;
+					func_def << "\t\tif (_ctx->parent != NULL && _ctx->parent->depth != INT_MIN) {" << endl;
 					func_def << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
 					func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)_ctx->parent;" << endl;
 					func_def << "\t\t}" << endl;

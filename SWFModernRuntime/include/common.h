@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 
 #define THROW *((u32*) 0) = 0;
 #define EXC(str) fprintf(stderr, str); THROW;
