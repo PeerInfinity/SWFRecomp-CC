@@ -14518,6 +14518,13 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		ng_gotoFrameCurrentSprite(frame);
 		return;
 	}
+	// base_clip or SetTarget context is a non-root MC but we're not inside
+	// a sprite's tag execution (e.g., function called with base_clip context).
+	// Navigate the MC's sprite directly.
+	if (g_current_context != NULL && g_current_context != &root_movieclip) {
+		ng_gotoFrameByMC(app_context, g_current_context, frame, 0);
+		return;
+	}
 #endif
 
 	extern size_t current_frame;
@@ -14860,6 +14867,12 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 			g_deferred_goto_play = 1;
 		}
 		else if (ng_isInsideSprite()) { ng_playCurrentSprite(); }
+		else if (g_current_context != NULL && g_current_context != &root_movieclip) {
+			// base_clip context: set play on the MC's sprite display entry
+			size_t _pd = ng_findDisplayEntryByName(g_current_context->name);
+			if (_pd != SIZE_MAX)
+				display_list[_pd].sprite_is_playing = 1;
+		}
 		else
 #endif
 		is_playing = 1;
@@ -17908,11 +17921,16 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 			}
 		}
-		// Non-root scope exhausted: clip props, MC builtins, children, _global all failed.
-		// Do NOT fall through to global variable table — that holds root timeline vars
-		// which are not part of the non-root MC's scope chain.
-		// Skip directly to special variable checks (_root, _level0, constructors, etc.)
-		goto check_special_vars;
+		// Scope isolation: non-removed child MCs should NOT see root timeline vars.
+		// In Ruffle, each clip has its own StageObject scope; root-level variables
+		// are not visible from child clips. Skip global variable table for live MCs.
+		//
+		// Exception: REMOVED MCs (depth==INT_MIN) get a fallback to root (matching
+		// Ruffle's resolve_recursive removed-clip fallback at scope.rs:156-166).
+		if (g_current_context->depth != INT_MIN) {
+			goto check_special_vars;
+		}
+		// Removed MC: fall through to global variable table (root fallback)
 	}
 
 	if (var == NULL)

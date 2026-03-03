@@ -1128,6 +1128,13 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// Create MC for the attached clip (reset position/scale to defaults for re-attach)
 	MovieClip* new_mc = actionFindOrCreateMovieClip(app_context, new_name, parent);
 	if (new_mc == NULL) return NULL;
+
+	// Remove any existing clone at this SWF depth BEFORE setting depth/props.
+	// clone_depth_evict may set depth=INT_MIN on the old MC at this depth,
+	// which could be the same struct if actionFindOrCreateMovieClip reused it.
+	int swf_depth = as_depth + 16384;
+	clone_depth_register(swf_depth, new_name);
+
 	new_mc->depth = as_depth;
 	new_mc->x = 0.0f;
 	new_mc->y = 0.0f;
@@ -1143,10 +1150,6 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 #ifdef NO_GRAPHICS
 	new_mc->as_set_flags = 0;
 #endif
-
-	// Remove any existing clone at this SWF depth
-	int swf_depth = as_depth + 16384;
-	clone_depth_register(swf_depth, new_name);
 
 	// Register as a variable so GetVariable finds it
 	ActionVar mc_var = {0};
