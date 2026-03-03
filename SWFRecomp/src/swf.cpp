@@ -3303,6 +3303,31 @@ namespace SWFRecomp
 				break;
 			}
 
+			case SWF_TAG_IMPORT_ASSETS:
+			case SWF_TAG_IMPORT_ASSETS_2:
+			{
+				// ImportAssets / ImportAssets2: imports symbols from another SWF.
+				// At runtime, the imported SWF's init function (DoInitAction scripts)
+				// must be executed in the current context.
+				// Format: URL(string) + [reserved(2) for ImportAssets2] + Count(UI16) + entries
+				char* import_start = cur_pos;
+				std::string import_url(cur_pos);
+				cur_pos += import_url.length() + 1;  // +1 for null terminator
+				if (tag.code == SWF_TAG_IMPORT_ASSETS_2) {
+					cur_pos += 2;  // Skip reserved bytes
+				}
+				u16 import_count = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+				cur_pos += 2;
+				// Skip import entries (tag(UI16) + name(string) per entry)
+				for (int i = 0; i < import_count; i++) {
+					cur_pos += 2;  // tag ID
+					cur_pos += strlen(cur_pos) + 1;  // name + null
+				}
+				// Emit a runtime call to load the imported SWF's init function
+				tag_init_scripts << endl << "\tactionImportAssets(app_context, \"" << import_url << "\");";
+				break;
+			}
+
 			case SWF_TAG_CSM_TEXT_SETTINGS:
 			{
 				// Parse CSMTextSettings: TextID(UI16), UseFlashType(UB[2]), GridFit(UB[3]), Reserved(UB[3]), Thickness(F32), Sharpness(F32), Reserved(UI8)

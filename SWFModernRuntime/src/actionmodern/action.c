@@ -15027,10 +15027,19 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		parseAndSetFlashVars(app_context, url_mut, mc);
 		MovieEntry* entry = findMovieEntry(url_mut);
 		if (entry != NULL && mc != NULL) {
+			// Set child SWF URL on target MC
+			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+			// Switch to child's SWF version during init
+			int _saved_ver = g_swf_version;
+			g_swf_version = entry->swf_version;
+			MovieClip* _saved_ctx = g_current_context;
+			actionSetCurrentContext(mc);
 			entry->init_func(app_context);
 			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 				entry->frame_funcs[0](app_context);
 			}
+			actionSetCurrentContext(_saved_ctx);
+			g_swf_version = _saved_ver;
 		}
 		return;
 	}
@@ -15070,11 +15079,20 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		url_mut2[sizeof(url_mut2) - 1] = '\0';
 		parseAndSetFlashVars(app_context, url_mut2, mc);
 		MovieEntry* entry = findMovieEntry(url_mut2);
-		if (entry != NULL) {
+		if (entry != NULL && mc != NULL) {
+			// Set child SWF URL on target MC
+			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+			// Switch to child's SWF version during init
+			int _saved_ver = g_swf_version;
+			g_swf_version = entry->swf_version;
+			MovieClip* _saved_ctx = g_current_context;
+			actionSetCurrentContext(mc);
 			entry->init_func(app_context);
 			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 				entry->frame_funcs[0](app_context);
 			}
+			actionSetCurrentContext(_saved_ctx);
+			g_swf_version = _saved_ver;
 		}
 		return;
 	}
@@ -15628,6 +15646,24 @@ static ActionVar builtin_mcl_getProgress(SWFAppContext* app_context, ActionVar* 
 
 // Fire all queued MCL load events (called from tagShowFrame).
 // Sequence per Flash/Ruffle spec:
+// ImportAssets: load an imported SWF's init function (DoInitAction scripts)
+// in the current context. Called from recompiled code when an ImportAssets2 tag
+// references another SWF file.
+void actionImportAssets(SWFAppContext* app_context, const char* url)
+{
+	extern MovieEntry* findMovieEntry(const char* filename);
+	MovieEntry* entry = findMovieEntry(url);
+	if (entry == NULL) return;
+
+	// Save/restore SWF version around imported SWF init
+	int _saved_ver = g_swf_version;
+	g_swf_version = entry->swf_version;
+
+	entry->init_func(app_context);
+
+	g_swf_version = _saved_ver;
+}
+
 // 1. For each load (FIFO): fire onLoadStart, onLoadProgress, onLoadComplete
 // 2. For each load (FIFO): run child movie init+frame0
 // 3. For each load (LIFO): fire onLoadInit
@@ -15639,6 +15675,13 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
     for (int i = 0; i < count; i++) loads[i] = g_pending_mcl_loads[i];
     g_pending_mcl_load_count = 0;
+
+    // Pre-phase: Set child SWF URLs on target MCs (before events fire, so mc._url is correct)
+    for (int i = 0; i < count; i++) {
+        if (loads[i].entry != NULL && loads[i].target != NULL) {
+            snprintf(loads[i].target->url, sizeof(loads[i].target->url), "file:///%s", loads[i].entry->filename);
+        }
+    }
 
     // Phase 1: Fire onLoadStart, onLoadProgress, onLoadComplete for each load (FIFO)
     for (int i = 0; i < count; i++) {
@@ -15692,8 +15735,10 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 root_movieclip.framesloaded = loads[i].entry->frame_count;
                 root_movieclip.currentframe = 1;
             }
-            // Run child in target MC context so this/getVariable resolve correctly
+            // Run child in target MC context with child's SWF version
             MovieClip* _saved_ctx = g_current_context;
+            int _saved_ver = g_swf_version;
+            g_swf_version = loads[i].entry->swf_version;
             if (loads[i].target != NULL) actionSetCurrentContext(loads[i].target);
             loads[i].entry->init_func(app_context);
             if (loads[i].entry->frame_count > 0 && loads[i].entry->frame_funcs != NULL
@@ -15701,6 +15746,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 loads[i].entry->frame_funcs[0](app_context);
             }
             actionSetCurrentContext(_saved_ctx);
+            g_swf_version = _saved_ver;
         }
     }
 
@@ -21585,14 +21631,21 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				root_movieclip.framesloaded = entry->frame_count;
 				root_movieclip.currentframe = 1;
 			}
-			// Run child in target MC context so this/getVariable resolve correctly
+			// Set child SWF URL on target MC
+			if (_gu2_mc != NULL) {
+				snprintf(_gu2_mc->url, sizeof(_gu2_mc->url), "file:///%s", entry->filename);
+			}
+			// Run child in target MC context with child's SWF version
 			MovieClip* _saved_ctx = g_current_context;
+			int _saved_ver = g_swf_version;
+			g_swf_version = entry->swf_version;
 			if (_gu2_mc != NULL) actionSetCurrentContext(_gu2_mc);
 			entry->init_func(app_context);
 			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 				entry->frame_funcs[0](app_context);
 			}
 			actionSetCurrentContext(_saved_ctx);
+			g_swf_version = _saved_ver;
 		}
 		return;
 	}
@@ -33065,14 +33118,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			ASObject* _search = obj;
 			int _max_d = 256;
+			int _debug_steps = 0;
 			while (_search != NULL && _max_d-- > 0) {
 				ActionVar* _mv = getProperty(_search, method_name, method_name_len);
 				if (_mv != NULL) { method_prop = _mv; break; }
 				ActionVar* _np = getProperty(_search, "__proto__", 9);
-				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) break;
+				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) {
+					break;
+				}
 				_search = (ASObject*) _np->data.numeric_value;
 				if (_search == obj) break; // cycle
 				method_search_depth++;
+				_debug_steps++;
 			}
 		}
 		// Clamp depth to at least 1 (Ruffle: depth.max(1))
@@ -36456,11 +36513,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					parseAndSetFlashVars(app_context, _lm_url, mc);
 					MovieEntry* entry = findMovieEntry(_lm_url);
 					if (entry != NULL && mc != NULL) {
-						// Run the child movie's init and frame 0
+						// Set child SWF URL on target MC
+						snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+						// Run the child movie's init and frame 0 with child's SWF version
+						int _saved_ver = g_swf_version;
+						g_swf_version = entry->swf_version;
+						MovieClip* _saved_ctx = g_current_context;
+						actionSetCurrentContext(mc);
 						entry->init_func(app_context);
 						if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 							entry->frame_funcs[0](app_context);
 						}
+						actionSetCurrentContext(_saved_ctx);
+						g_swf_version = _saved_ver;
 					}
 				}
 			}

@@ -95,6 +95,8 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, i
 void actionFirePendingUnloads(SWFAppContext* app_context);
 // Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame
 void actionFirePendingLoadInits(SWFAppContext* app_context);
+// ImportAssets: load an imported SWF's init function in the current context
+void actionImportAssets(SWFAppContext* app_context, const char* url);
 // Query button MC state for the button state machine in tag.c
 // Returns mc->visible for the named button MC (1=visible, 0=hidden; defaults to 1 if MC not found)
 int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name);
