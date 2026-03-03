@@ -14,15 +14,16 @@ Advanced mouse event infrastructure needed to unblock focus, tab ordering, hit t
 - TELLTARGET_PLAN (string_paths_eval — button dispatch)
 
 **Tests directly unblocked:**
-| Test | Current | Expected | Blocker |
-|------|---------|----------|---------|
-| `focus_mouse` | 0/46 | Phase 1+2 | TF hit-testing + roll dispatch |
-| `focus_mouse_rollout` | 0/5 | Phase 2 | Roll dispatch on focus change |
-| `focus_keyboard_press` | 0/61 | Phase 2+3 | SetFocus/KillFocus + button key sim |
-| `tab_ordering_events_mouse` | 0/65 | Phase 2+3 | Roll dispatch during Tab + event order |
-| `frame_size_translated_positive` | 20/21 | Phase 4 | Named shape onPress |
-| `frame_size_translated_negative` | 20/21 | Phase 4 | Named shape onPress |
-| `tab_ordering_automatic_order_same_position` | 9/12 | Phase 5 | Highlight bounds sort |
+| Test | Before | After | Status |
+|------|--------|-------|--------|
+| `focus_mouse` | 8/45 | **45/45** | PASS (Phase 1) |
+| `button_keypress_vs_textinput` | 3/4 | **4/4** | PASS (Phase 6) |
+| `frame_size_translated_positive` | 20/21 | **21/21** | PASS (Phase 4) |
+| `frame_size_translated_negative` | 20/21 | **21/21** | PASS (Phase 4) |
+| `focus_mouse_rollout` | 1/4 | 3/4 | Blocked (Phase 2) |
+| `focus_keyboard_press` | 5/60 | ~5/60 | Blocked (Phase 2+3) |
+| `tab_ordering_events_mouse` | 19/65 | ~19/65 | Blocked (Phase 2+3) |
+| `tab_ordering_automatic_order_same_position` | 9/12 | 9/12 | Blocked (Phase 5) |
 
 ---
 
@@ -337,20 +338,30 @@ text.onChanged                  // 'b' typed into text field triggers onChanged
 
 ---
 
-## Implementation Priority
+## Implementation Status
 
-| Phase | Effort | Tests Unblocked | Lines Gained | Priority |
-|-------|--------|----------------|-------------|----------|
-| Phase 1: TF hit-testing | Small | focus_mouse (partial) | ~30 | High |
-| Phase 2: Roll dispatch + focus events | Medium | focus_mouse_rollout, focus_mouse (rest) | ~50 | High |
-| Phase 3: Button key sim + Tab rolls | Medium | focus_keyboard_press, tab_ordering_events_mouse | ~126 | High |
-| Phase 4: Shape scriptability | Medium | frame_size_translated_+/- | 2 | Low |
-| Phase 5: Highlight bounds | Medium | tab_ordering_same_position | 3 | Low |
-| Phase 6: TF onChanged | Small | button_keypress_vs_textinput | 1 | Low |
+| Phase | Status | Tests | Result |
+|-------|--------|-------|--------|
+| Phase 1: TF hit-testing | **DONE** | focus_mouse | 45/45 PASS |
+| Phase 4: Frame rect offset | **DONE** | frame_size_translated_positive | 21/21 PASS |
+| Phase 4: Frame rect offset | **DONE** | frame_size_translated_negative | 21/21 PASS |
+| Phase 6: TF onChanged | **DONE** | button_keypress_vs_textinput | 4/4 PASS |
+| Phase 2: Roll dispatch + focus events | **BLOCKED** | focus_mouse_rollout | 3/4 |
+| Phase 2+3: Key sim + Tab rolls | **BLOCKED** | focus_keyboard_press | ~5/60 |
+| Phase 3: Tab roll events | **BLOCKED** | tab_ordering_events_mouse | ~19/65 |
+| Phase 5: Highlight bounds | **BLOCKED** | tab_ordering_automatic_order_same_position | 9/12 |
 
-**Recommended order:** Phase 1 → 2 → 3 (cascading dependencies), then 6, 4, 5.
+### Completed Changes
+- **Phase 1** (commit e7974be4): Text field bounds in `mc_get_pixel_aabb_ng`, text field exclusion from MC press/release/roll events, focus event ordering fix.
+- **Phase 4** (commit 12d7c2c2): Recompiler emits `FRAME_X_MIN_TWIPS`/`FRAME_Y_MIN_TWIPS`, runtime adds offset to mouse coordinates. Also added `#include "constants.h"` to `swf_core.c`.
+- **Phase 6** (commit c6722fa5): `EV_TEXT_INPUT` handler with button keyPress suppression gate, `actionTextFieldInput()` function with restrict filter/maxChars/onChanged callback.
 
-Phases 1-3 are the highest ROI — they collectively unblock ~206 test output lines across 4 tests.
+### Remaining Blockers
+**Phase 2** requires: Dynamic MC rollover/rollout tracking (`g_hovered_mc`), `onRollOver`/`onRollOut` dispatch during mouse move, `onSetFocus`/`onKillFocus` MC handlers (distinct from Selection broadcast), deferred roll event queue completion. This is a medium-large effort (~100-150 lines of new dispatch logic).
+
+**Phase 3** requires Phase 2 and additionally: Enter/Space key simulation on focused MC (onPress/onRelease), correct event ordering during Tab (rollout → rollover → killfocus → setfocus), integration with button state machine. Large effort.
+
+**Phase 5** requires: Recursive visual bounds computation through sprite display lists (current sort uses registration point, needs to use "highlight bounds" top-left). Medium effort but requires understanding Ruffle's exact sort algorithm for nested clips.
 
 ---
 
