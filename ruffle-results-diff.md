@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d13982ddd567` (2026-03-03T03:27:12.388892+00:00)
-**Current:** `6877ca0e4c33` (2026-03-03T04:25:27.752350+00:00)
+**Previous:** `6877ca0e4c33` (2026-03-03T04:25:27.752350+00:00)
+**Current:** `33e19e866ba6` (2026-03-03T05:37:38.645166+00:00)
 
 ## Summary
 
@@ -10,26 +10,35 @@
 | Passing | 434 | 434 | 0 |
 | Total | 619 | 619 | 0 |
 | Pass rate | 70.1% | 70.1% | 0% |
-| Mismatched lines | 23318 | 23318 | 0 |
-|   Decreased | | | -4 |
-|   Increased | | | +4 |
+| Mismatched lines | 23318 | 23304 | -14 |
+|   Decreased | | | -16 |
+|   Increased | | | +2 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `function_base_clip_removed` | output_mismatch | 22/25 | 25/25 |
+| `string_paths_other` | output_mismatch | 30/36 | 36/36 |
 
 ## Newly Failing (1)
 
 | Test | New Status | Lines (prev) | Lines (now) |
 |------|-----------|--------------|-------------|
-| `attach_movie` | output_mismatch | 59/59 | 56/59 |
+| `target_clip_removed` | output_mismatch | 5/5 | 4/5 |
 
-## Line Count Changed (3)
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `function_base_clip` | output_mismatch | segfault | 1/8 | 7/8 |
+
+## Line Count Changed (6)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `function_base_clip_readded` | output_mismatch | 9/11 | 10/11 | -1 |
-| `global_instance_decls` | output_mismatch | 1/758 | 1/758 | 0 |
-| `removed_target_clip_scope` | output_mismatch | 24/35 | 23/35 | +1 |
+| `movieclip_lockroot` | output_mismatch | 16/29 | 19/29 | -3 |
+| `call` | output_mismatch | 4/63 | 5/63 | -1 |
+| `custom_clip_methods` | output_mismatch | 0/4 | 0/4 | 0 |
+| `movieclip_invalid_get_bounds_5` | output_mismatch | 2/11 | 2/11 | 0 |
+| `removed_clip_halts_script` | output_mismatch | 1/15 | 1/15 | 0 |
+| `movieclip_gettextsnapshot` | output_mismatch | 7/112 | 6/112 | +1 |
