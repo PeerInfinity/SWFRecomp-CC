@@ -17770,7 +17770,8 @@ void actionGetVariable(SWFAppContext* app_context)
 	// Inside tellTarget (non-root context): use target clip's variable scope
 	// instead of the global variable table (which holds root timeline vars)
 	ActionVar* var = NULL;
-	if (g_current_context != NULL && g_current_context != &root_movieclip)
+	if (g_current_context != NULL && g_current_context != &root_movieclip
+	    && g_current_context->depth != INT_MIN) // Skip removed MCs — fall through to root scope
 	{
 		// Check target clip's dynamic properties (with prototype chain for registerClass)
 		if (g_current_context->dynamic_props != NULL)
@@ -19148,6 +19149,19 @@ void actionSetVariable(SWFAppContext* app_context)
 			}
 		}
 		hashmap_set(var_map, _sv_key, var_name_len, (uintptr_t)var);
+	}
+
+	// Also propagate to root MC dynamic_props (mirrors SetMember bidirectional behavior).
+	// SetMember on root MC propagates to var_map (line ~23377); this is the reverse:
+	// SetVariable on root MC propagates to dynamic_props so that dispatch functions
+	// (e.g., actionDispatchEnterFrameHandlers) that check dynamic_props can find handlers.
+	{
+		extern MovieClip root_movieclip;
+		if (root_movieclip.dynamic_props != NULL) {
+			ActionVar _dp_val;
+			peekVar(app_context, &_dp_val);
+			setProperty(app_context, (ASObject*) root_movieclip.dynamic_props, var_name, var_name_len, &_dp_val);
+		}
 	}
 
 #ifdef NO_GRAPHICS

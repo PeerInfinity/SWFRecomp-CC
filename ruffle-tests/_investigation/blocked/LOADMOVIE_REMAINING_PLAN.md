@@ -38,8 +38,8 @@ diff is `_xmouse` (mouse position not simulated in test harness).
 | Test | Status | Match | Blocker |
 |------|--------|-------|---------|
 | loadmovie_var_persistence | output_mismatch | 3/8 | DefineLocal scope in loaded movie |
-| loadmovienum_cross_version_prototype | output_mismatch | 1/9 | _level2 + cross-version __proto__ |
-| mcl_events_swf_version | output_mismatch | 28/232 | Child _url, version, sequential loading |
+| loadmovienum_cross_version_prototype | output_mismatch | 5/9 | Per-version MovieClip.prototype + delete onEnterFrame |
+| mcl_events_swf_version | output_mismatch | 37/232 | Sequential MCL loading, onLoadInit |
 | movieclip_state_values | output_mismatch | 3/114 | Failed load state (-1 values), setInterval |
 | movieclip_library_state_values | output_mismatch | **76/78** | _xmouse + _url (see below) |
 
@@ -75,18 +75,19 @@ trace). Likely blocked by: second loadClip into same target MC not re-initializi
 
 ---
 
-### 2. loadmovienum_cross_version_prototype (10 lines) — BLOCKED
+### 2. loadmovienum_cross_version_prototype (9 lines) — PARTIALLY BLOCKED
 
-**Current output** (1/9 match): Only "Test (SWF6): Loading target.swf into _level2" prints.
+**Current output** (5/9 match): Lines 1-2 and 4-5 and 7 pass. Remaining:
+- Line 3: `testProp = FROM_SWF6` instead of empty — per-version MovieClip.prototype needed
+- Line 6: `__proto__ === MovieClip.prototype: false` instead of `true` — per-version prototype
+- Line 9: `testProp = FROM_SWF6` instead of empty — same as line 3
+- Lines 10-15: Extra output from `delete current.onEnterFrame` not stopping enterFrame dispatch
 
-**Root cause**: Multiple deep infrastructure gaps:
-1. `loadMovieNum` into `_level2` doesn't execute the child SWF's scripts
-2. `getSWFVersion()` on loaded MC doesn't return child version
-3. `__proto__ === MovieClip.prototype` comparison requires MovieClip.prototype as a real
-   object and version-dependent case sensitivity for `__proto__`
-4. Unload state revert not implemented
+**Progress**: Phases 1/4/6 of CROSS_VERSION_ISOLATION_PLAN done. `getSWFVersion()` now
+returns per-MC version. Phase 6 variable clearing implemented. Remaining diffs need Phase 2
+(per-version `_global` with separate `MovieClip.prototype` per version).
 
-**Dependency**: GLOBALS_PLAN (cross-version), PROTOTYPE_OBJECT_PLAN (__proto__/prototype)
+**Dependency**: CROSS_VERSION_ISOLATION_PLAN Phase 2 (per-version _global)
 
 ---
 

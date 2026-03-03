@@ -1075,6 +1075,9 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 			dobj->sprite_display_list = display_list;
 			dobj->sprite_max_depth = max_depth;
 			dobj->sprite_dl_capacity = display_list_capacity;
+			// Mark eligible for AS2 onEnterFrame dispatch on the init tick
+			// (mirrors process_sprite_init_at_depth which sets this for timeline sprites)
+			dobj->enterframe_eligible = 1;
 		} else {
 			free(display_list);
 		}
