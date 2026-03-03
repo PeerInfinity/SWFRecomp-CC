@@ -6028,6 +6028,23 @@ static ActionVar builtin_math_random(SWFAppContext* app_context, ActionVar* args
 // This is initialized on first use and persists for the lifetime of the runtime
 ASObject* global_object = NULL;
 
+// Per-version-group globals: SWF 1-6 share one, SWF 7+ share another
+static ASObject* g_global_legacy = NULL;  // SWF 1-6
+static ASObject* g_global_modern = NULL;  // SWF 7+
+static int g_primary_version_group = -1;  // 0=legacy, 1=modern (first initialized)
+
+// Per-version-group Object.prototype and Array.prototype for user-created objects
+static ASObject* g_object_proto_legacy = NULL;
+static ASObject* g_object_proto_modern = NULL;
+static ASObject* g_array_proto_legacy = NULL;
+static ASObject* g_array_proto_modern = NULL;
+static int g_secondary_global_init = 0;
+
+static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
+
+// Forward declaration
+static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_version);
+
 // MovieClip constructor function (for MovieClip.prototype access)
 ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;
@@ -15115,9 +15132,13 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			// Set child SWF URL and version on target MC
 			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
-			// Switch to child's SWF version during init
+			// Switch to child's SWF version during init (with versioned global)
 			int _saved_ver = g_swf_version;
+			ASObject* _saved_global = global_object;
 			g_swf_version = entry->swf_version;
+			ensureSecondaryGlobalInit(app_context, entry->swf_version);
+			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 			MovieClip* _saved_ctx = g_current_context;
 			actionSetCurrentContext(mc);
 			entry->init_func(app_context);
@@ -15126,6 +15147,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			}
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
+			global_object = _saved_global;
 		}
 		return;
 	}
@@ -15175,9 +15197,13 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			// Set child SWF URL and version on target MC
 			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
-			// Switch to child's SWF version during init
+			// Switch to child's SWF version during init (with versioned global)
 			int _saved_ver = g_swf_version;
+			ASObject* _saved_global = global_object;
 			g_swf_version = entry->swf_version;
+			ensureSecondaryGlobalInit(app_context, entry->swf_version);
+			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 			MovieClip* _saved_ctx = g_current_context;
 			actionSetCurrentContext(mc);
 			entry->init_func(app_context);
@@ -15186,6 +15212,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			}
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
+			global_object = _saved_global;
 		}
 		return;
 	}
@@ -15748,13 +15775,18 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 	MovieEntry* entry = findMovieEntry(url);
 	if (entry == NULL) return;
 
-	// Save/restore SWF version around imported SWF init
+	// Save/restore SWF version around imported SWF init (with versioned global)
 	int _saved_ver = g_swf_version;
+	ASObject* _saved_global = global_object;
 	g_swf_version = entry->swf_version;
+	ensureSecondaryGlobalInit(app_context, entry->swf_version);
+	if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+	else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 
 	entry->init_func(app_context);
 
 	g_swf_version = _saved_ver;
+	global_object = _saved_global;
 }
 
 // 1. For each load (FIFO): fire onLoadStart, onLoadProgress, onLoadComplete
@@ -15830,10 +15862,14 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 root_movieclip.framesloaded = loads[i].entry->frame_count;
                 root_movieclip.currentframe = 1;
             }
-            // Run child in target MC context with child's SWF version
+            // Run child in target MC context with child's SWF version (with versioned global)
             MovieClip* _saved_ctx = g_current_context;
             int _saved_ver = g_swf_version;
+            ASObject* _saved_global = global_object;
             g_swf_version = loads[i].entry->swf_version;
+            ensureSecondaryGlobalInit(app_context, loads[i].entry->swf_version);
+            if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+            else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
             if (loads[i].target != NULL) actionSetCurrentContext(loads[i].target);
             loads[i].entry->init_func(app_context);
             if (loads[i].entry->frame_count > 0 && loads[i].entry->frame_funcs != NULL
@@ -15842,6 +15878,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             }
             actionSetCurrentContext(_saved_ctx);
             g_swf_version = _saved_ver;
+            global_object = _saved_global;
         }
     }
 
@@ -17416,6 +17453,314 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	}
 
 	g_global_init_done = 1;
+
+	// Tag primary version group and set versioned global pointers
+	g_primary_version_group = versionGroup(g_swf_version);
+	if (g_primary_version_group == 0) {
+		g_global_legacy = global_object;
+		g_object_proto_legacy = g_object_prototype;
+		g_array_proto_legacy = g_array_prototype;
+	} else {
+		g_global_modern = global_object;
+		g_object_proto_modern = g_object_prototype;
+		g_array_proto_modern = g_array_prototype;
+	}
+}
+
+// Copy all properties from src to dst, preserving flags
+static void copyObjectProperties(SWFAppContext* app_context, ASObject* dst, ASObject* src)
+{
+	if (src == NULL || dst == NULL) return;
+	for (u32 i = 0; i < src->num_used; i++)
+	{
+		ASProperty* p = &src->properties[i];
+		setPropertyWithFlags(app_context, dst, p->name, p->name_length, &p->value, p->flags);
+	}
+}
+
+// Create a new constructor ASFunction that is a distinct instance but points to the same C code
+static ASFunction* createConstructorCopy(SWFAppContext* app_context, ASFunction* src,
+                                          ASObject* new_object_proto)
+{
+	ASFunction* copy = (ASFunction*) malloc(sizeof(ASFunction));
+	if (!copy) return NULL;
+	memcpy(copy, src, sizeof(ASFunction));
+	// Clear prototype_obj — it will be lazily created as a new instance
+	// (with __proto__ pointing to the secondary Object.prototype)
+	copy->prototype_obj = NULL;
+	// Clear own_props — fresh instance
+	copy->own_props = NULL;
+	return copy;
+}
+
+// Create a fresh Object.prototype for the secondary version group
+// This is standalone (no __proto__ chain to the primary Object.prototype)
+static ASObject* createSecondaryObjectPrototype(SWFAppContext* app_context)
+{
+	ASObject* proto = allocObject(app_context, 12);
+	if (!proto) return NULL;
+	retainObject(proto);
+	// Copy all methods from the primary Object.prototype
+	if (g_object_prototype != NULL)
+		copyObjectProperties(app_context, proto, g_object_prototype);
+	// Note: NO __proto__ set — this is the root of the secondary prototype chain
+	return proto;
+}
+
+// Create a fresh Array.prototype for the secondary version group
+static ASObject* createSecondaryArrayPrototype(SWFAppContext* app_context, ASObject* sec_obj_proto)
+{
+	ASObject* proto = allocObject(app_context, 8);
+	if (!proto) return NULL;
+	retainObject(proto);
+	// Set __proto__ to secondary Object.prototype
+	ActionVar pv = {0};
+	pv.type = ACTION_STACK_VALUE_OBJECT;
+	pv.data.numeric_value = (u64)sec_obj_proto;
+	setPropertyWithFlags(app_context, proto, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+	// Copy methods from primary Array.prototype
+	if (g_array_prototype != NULL)
+		copyObjectProperties(app_context, proto, g_array_prototype);
+	return proto;
+}
+
+// Set __proto__ to a specific object (not the shared g_object_prototype)
+static void setProtoTo(SWFAppContext* app_context, ASObject* obj, ASObject* proto)
+{
+	ActionVar pv = {0};
+	pv.type = ACTION_STACK_VALUE_OBJECT;
+	pv.data.numeric_value = (u64)proto;
+	setPropertyWithFlags(app_context, obj, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+}
+
+// Create the secondary version's _global object with all constructors
+static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_version)
+{
+	int vg = versionGroup(target_version);
+	if (vg == g_primary_version_group) return; // same group, no secondary needed
+
+	// Check if already initialized
+	ASObject** target_global = (vg == 0) ? &g_global_legacy : &g_global_modern;
+	if (*target_global != NULL) return;
+
+	// Ensure primary is initialized first
+	ensureGlobalInit(app_context);
+
+	// Create secondary Object.prototype (standalone, not chained to primary)
+	ASObject* sec_obj_proto = createSecondaryObjectPrototype(app_context);
+	ASObject* sec_arr_proto = createSecondaryArrayPrototype(app_context, sec_obj_proto);
+
+	// Store the secondary prototypes
+	if (vg == 0) {
+		g_object_proto_legacy = sec_obj_proto;
+		g_array_proto_legacy = sec_arr_proto;
+	} else {
+		g_object_proto_modern = sec_obj_proto;
+		g_array_proto_modern = sec_arr_proto;
+	}
+
+	// Create secondary _global object
+	ASObject* sec_global = allocObject(app_context, 64);
+	retainObject(sec_global);
+
+	// Create separate constructors for core types
+	// Object constructor — needs prototype_obj set to sec_obj_proto
+	ASFunction* sec_obj_ctor = (ASFunction*) malloc(sizeof(ASFunction));
+	memset(sec_obj_ctor, 0, sizeof(ASFunction));
+	strncpy(sec_obj_ctor->name, "Object", 255);
+	sec_obj_ctor->function_type = 1;
+	sec_obj_ctor->prototype_obj = sec_obj_proto;
+	retainObject(sec_obj_proto);
+	// Set constructor back-reference on prototype
+	{
+		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+		cv.data.numeric_value = (u64)sec_obj_ctor;
+		setPropertyWithFlags(app_context, sec_obj_proto, "constructor", 11, &cv, PROPERTY_FLAGS_DONTENUM);
+	}
+	// Register Object.registerClass on secondary Object — copy from primary global's Object
+	sec_obj_ctor->own_props = allocObject(app_context, 4);
+	retainObject(sec_obj_ctor->own_props);
+	{
+		// Find registerClass from the primary global's Object constructor
+		ActionVar* pri_obj_var = getProperty(global_object, "Object", 6);
+		if (pri_obj_var && pri_obj_var->type == ACTION_STACK_VALUE_FUNCTION) {
+			ASFunction* pri_obj_func = (ASFunction*) pri_obj_var->data.numeric_value;
+			if (pri_obj_func && pri_obj_func->own_props) {
+				ActionVar* rc = getProperty(pri_obj_func->own_props, "registerClass", 13);
+				if (rc) setProperty(app_context, sec_obj_ctor->own_props, "registerClass", 13, rc);
+			}
+		}
+	}
+
+	// Array constructor — needs prototype_obj set to sec_arr_proto
+	ASFunction* sec_arr_ctor = (ASFunction*) malloc(sizeof(ASFunction));
+	memset(sec_arr_ctor, 0, sizeof(ASFunction));
+	strncpy(sec_arr_ctor->name, "Array", 255);
+	sec_arr_ctor->function_type = 1;
+	sec_arr_ctor->prototype_obj = sec_arr_proto;
+	retainObject(sec_arr_proto);
+	{
+		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+		cv.data.numeric_value = (u64)sec_arr_ctor;
+		setPropertyWithFlags(app_context, sec_arr_proto, "constructor", 11, &cv, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	// Other core constructors — fresh instances, lazy prototype creation
+	const char* ctor_names[] = {"String", "Number", "Boolean", "Function"};
+	int ctor_name_lens[] = {6, 6, 7, 8};
+	int num_extra = (target_version >= 6) ? 4 : 3; // Function is SWF6+ only
+	ASFunction* sec_extra_ctors[4];
+	for (int i = 0; i < num_extra; i++) {
+		sec_extra_ctors[i] = (ASFunction*) malloc(sizeof(ASFunction));
+		memset(sec_extra_ctors[i], 0, sizeof(ASFunction));
+		strncpy(sec_extra_ctors[i]->name, ctor_names[i], 255);
+		sec_extra_ctors[i]->function_type = 1;
+	}
+
+	// MovieClip constructor — separate instance
+	ASFunction* sec_mc_ctor = createConstructorCopy(app_context, &g_movieclip_constructor, sec_obj_proto);
+	// Create prototype for secondary MC constructor with same methods
+	if (g_movieclip_constructor.prototype_obj != NULL) {
+		sec_mc_ctor->prototype_obj = allocObject(app_context, 32);
+		retainObject(sec_mc_ctor->prototype_obj);
+		setProtoTo(app_context, sec_mc_ctor->prototype_obj, sec_obj_proto);
+		copyObjectProperties(app_context, sec_mc_ctor->prototype_obj, g_movieclip_constructor.prototype_obj);
+		// Fix constructor back-reference
+		ActionVar mcv = {0}; mcv.type = ACTION_STACK_VALUE_FUNCTION;
+		mcv.data.numeric_value = (u64)sec_mc_ctor;
+		setPropertyWithFlags(app_context, sec_mc_ctor->prototype_obj, "constructor", 11, &mcv, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	// TextField, TextFormat — separate instances
+	ASFunction* sec_tf_ctor = createConstructorCopy(app_context, &g_textfield_constructor, sec_obj_proto);
+	ASFunction* sec_tfmt_ctor = createConstructorCopy(app_context, &g_textformat_constructor, sec_obj_proto);
+
+	// XML, XMLNode, Date, Error
+	ASFunction* sec_xml_ctor = createConstructorCopy(app_context, &g_xml_constructor, sec_obj_proto);
+	ASFunction* sec_xmlnode_ctor = createConstructorCopy(app_context, &g_xmlnode_constructor, sec_obj_proto);
+	ASFunction* sec_date_ctor = createConstructorCopy(app_context, &g_date_constructor, sec_obj_proto);
+
+	// Error, ASSetPropFlags, ASnative — fresh instances
+	ASFunction* sec_error_ctor = (ASFunction*) malloc(sizeof(ASFunction));
+	memset(sec_error_ctor, 0, sizeof(ASFunction));
+	strncpy(sec_error_ctor->name, "Error", 255);
+	sec_error_ctor->function_type = 1;
+
+	// Stub constructors — fresh instances
+	ASFunction* sec_stub_ctors[18];
+	static const char* stub_names[18] = {
+		"AsBroadcaster", "Button", "Camera", "Color",
+		"ContextMenu", "ContextMenuItem", "LoadVars",
+		"LocalConnection", "Microphone", "MovieClipLoader",
+		"NetConnection", "NetStream", "PrintJob", "SharedObject",
+		"Sound", "TextSnapshot", "Video", "XMLSocket"
+	};
+	static const int stub_name_lens[18] = {
+		13, 6, 6, 5, 11, 15, 8,
+		15, 10, 15, 13, 9, 8, 12,
+		5, 12, 5, 9
+	};
+	for (int i = 0; i < 18; i++) {
+		sec_stub_ctors[i] = createConstructorCopy(app_context, &g_stub_ctors[i], sec_obj_proto);
+	}
+
+	// Register all constructors on the secondary _global
+	{
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		// Object, Array
+		fv.data.numeric_value = (u64)sec_obj_ctor;
+		setProperty(app_context, sec_global, "Object", 6, &fv);
+		fv.data.numeric_value = (u64)sec_arr_ctor;
+		setProperty(app_context, sec_global, "Array", 5, &fv);
+		// String, Number, Boolean, Function
+		for (int i = 0; i < num_extra; i++) {
+			fv.data.numeric_value = (u64)sec_extra_ctors[i];
+			setProperty(app_context, sec_global, ctor_names[i], ctor_name_lens[i], &fv);
+		}
+		// MovieClip, TextField, TextFormat
+		fv.data.numeric_value = (u64)sec_mc_ctor;
+		setProperty(app_context, sec_global, "MovieClip", 9, &fv);
+		fv.data.numeric_value = (u64)sec_tf_ctor;
+		setProperty(app_context, sec_global, "TextField", 9, &fv);
+		fv.data.numeric_value = (u64)sec_tfmt_ctor;
+		setProperty(app_context, sec_global, "TextFormat", 10, &fv);
+		// XML, XMLNode, Date, Error
+		fv.data.numeric_value = (u64)sec_xml_ctor;
+		setProperty(app_context, sec_global, "XML", 3, &fv);
+		fv.data.numeric_value = (u64)sec_xmlnode_ctor;
+		setProperty(app_context, sec_global, "XMLNode", 7, &fv);
+		fv.data.numeric_value = (u64)sec_date_ctor;
+		setProperty(app_context, sec_global, "Date", 4, &fv);
+		fv.data.numeric_value = (u64)sec_error_ctor;
+		setProperty(app_context, sec_global, "Error", 5, &fv);
+		// Stub constructors
+		for (int i = 0; i < 18; i++) {
+			fv.data.numeric_value = (u64)sec_stub_ctors[i];
+			setProperty(app_context, sec_global, stub_names[i], stub_name_lens[i], &fv);
+		}
+	}
+
+	// Register shared singleton objects on secondary global (same instances)
+	{
+		struct { const char* name; int len; ASObject* obj; } singletons[] = {
+			{"Math", 4, g_math_object},
+			{"Accessibility", 13, g_accessibility_obj},
+			{"Key", 3, g_key_obj},
+			{"Mouse", 5, g_mouse_obj},
+			{"Selection", 9, g_selection_obj},
+			{"Stage", 5, g_stage_obj},
+		};
+		for (int i = 0; i < 6; i++) {
+			if (singletons[i].obj != NULL) {
+				ActionVar ov = {0};
+				ov.type = ACTION_STACK_VALUE_OBJECT;
+				ov.data.numeric_value = (u64)singletons[i].obj;
+				setProperty(app_context, sec_global, singletons[i].name, singletons[i].len, &ov);
+			}
+		}
+	}
+
+	// Copy ASSetPropFlags and ASnative from primary global
+	{
+		ActionVar* aspf = getProperty(global_object, "ASSetPropFlags", 14);
+		if (aspf) setProperty(app_context, sec_global, "ASSetPropFlags", 14, aspf);
+		ActionVar* an = getProperty(global_object, "ASnative", 8);
+		if (an) setProperty(app_context, sec_global, "ASnative", 8, an);
+	}
+
+	// Set valueOf on secondary _global to undefined (matches primary)
+	{
+		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED;
+		setProperty(app_context, sec_global, "valueOf", 7, &uv);
+	}
+
+	*target_global = sec_global;
+	g_secondary_global_init = 1;
+}
+
+// Get the Object.prototype for the current SWF version (for user-created objects)
+static ASObject* getVersionedObjectProto(SWFAppContext* app_context)
+{
+	int vg = versionGroup(g_swf_version);
+	ASObject* proto = (vg == 0) ? g_object_proto_legacy : g_object_proto_modern;
+	if (proto != NULL) return proto;
+	// Fallback: use the primary g_object_prototype
+	return getObjectPrototype(app_context);
+}
+
+// Get the Array.prototype for the current SWF version (for user-created objects)
+static ASObject* getVersionedArrayProto(SWFAppContext* app_context)
+{
+	int vg = versionGroup(g_swf_version);
+	ASObject* proto = (vg == 0) ? g_array_proto_legacy : g_array_proto_modern;
+	if (proto != NULL) return proto;
+	// Fallback: use the primary g_array_prototype
+	if (g_array_prototype == NULL) {
+		g_array_prototype = allocObject(app_context, 4);
+		retainObject(g_array_prototype);
+		setObjectProto(app_context, g_array_prototype);
+	}
+	return g_array_prototype;
 }
 
 void actionGetVariable(SWFAppContext* app_context)
@@ -18154,7 +18499,14 @@ check_special_vars:
 		else if (var_name_len == 7 && strncmp(var_name, "_global", 7) == 0)
 		{
 			ensureGlobalInit(app_context);
-			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)global_object);
+			// Return the version-appropriate _global object
+			ASObject* active_global = global_object;
+			int vg = versionGroup(g_swf_version);
+			if (vg == 0 && g_global_legacy != NULL)
+				active_global = g_global_legacy;
+			else if (vg == 1 && g_global_modern != NULL)
+				active_global = g_global_modern;
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)active_global);
 			return;
 		}
 		else if (var_name_len == 5 && strncmp(var_name, "Array", 5) == 0)
@@ -21774,10 +22126,14 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				snprintf(_gu2_mc->url, sizeof(_gu2_mc->url), "file:///%s", entry->filename);
 				_gu2_mc->swf_version = (u16)entry->swf_version;
 			}
-			// Run child in target MC context with child's SWF version
+			// Run child in target MC context with child's SWF version (with versioned global)
 			MovieClip* _saved_ctx = g_current_context;
 			int _saved_ver = g_swf_version;
+			ASObject* _saved_global = global_object;
 			g_swf_version = entry->swf_version;
+			ensureSecondaryGlobalInit(app_context, entry->swf_version);
+			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 			if (_gu2_mc != NULL) actionSetCurrentContext(_gu2_mc);
 			entry->init_func(app_context);
 			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
@@ -21785,6 +22141,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			}
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
+			global_object = _saved_global;
 		}
 		return;
 	}
@@ -21930,6 +22287,17 @@ void actionInitArray(SWFAppContext* app_context)
 		retainObject(arr->props);
 	}
 	arr->props->native_type = NATIVE_ARRAY;
+
+	// Set __proto__ on array props to versioned Array.prototype
+	{
+		ASObject* ver_arr_proto = getVersionedArrayProto(app_context);
+		if (ver_arr_proto != NULL) {
+			ActionVar pv = {0};
+			pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)ver_arr_proto;
+			setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+		}
+	}
 
 	// 4. Push array reference to stack
 	PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
@@ -23662,10 +24030,16 @@ void actionInitObject(SWFAppContext* app_context)
 		setProperty(app_context, obj, name, name_length, &value);
 	}
 
-	// Set __proto__ to Object.prototype — but only if user didn't already set __proto__
+	// Set __proto__ to Object.prototype — use versioned prototype if available
 	ActionVar* existing_proto = getProperty(obj, "__proto__", 9);
 	if (existing_proto == NULL)
-		setObjectProto(app_context, obj);
+	{
+		ASObject* ver_proto = getVersionedObjectProto(app_context);
+		if (ver_proto != NULL && ver_proto != g_object_prototype)
+			setProtoTo(app_context, obj, ver_proto);
+		else
+			setObjectProto(app_context, obj);
+	}
 	else
 	{
 		// User set __proto__ manually — mark it as non-enumerable
@@ -36735,9 +37109,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Set child SWF URL and version on target MC
 						snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
 						mc->swf_version = (u16)entry->swf_version;
-						// Run the child movie's init and frame 0 with child's SWF version
+						// Run the child movie's init and frame 0 with child's SWF version (with versioned global)
 						int _saved_ver = g_swf_version;
+						ASObject* _saved_global = global_object;
 						g_swf_version = entry->swf_version;
+						ensureSecondaryGlobalInit(app_context, entry->swf_version);
+						if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+						else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 						MovieClip* _saved_ctx = g_current_context;
 						actionSetCurrentContext(mc);
 						entry->init_func(app_context);
@@ -36746,6 +37124,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 						actionSetCurrentContext(_saved_ctx);
 						g_swf_version = _saved_ver;
+						global_object = _saved_global;
 					}
 				}
 			}
