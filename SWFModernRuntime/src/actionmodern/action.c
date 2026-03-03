@@ -17893,16 +17893,11 @@ void actionGetVariable(SWFAppContext* app_context)
 				return;
 			}
 		}
-		// Also check root if current context is different
-		if (ctx_mc != &root_movieclip && root_movieclip.dynamic_props != NULL)
-		{
-			ActionVar* root_prop = getProperty((ASObject*)root_movieclip.dynamic_props, var_name, var_name_len);
-			if (root_prop != NULL)
-			{
-				PUSH_VAR(root_prop);
-				return;
-			}
-		}
+		// Note: Do NOT check root_movieclip.dynamic_props here for non-root contexts.
+		// In Flash, GetVariable in a SetTarget/child context resolves against the
+		// target clip's scope, NOT the root timeline. Checking root dp would leak
+		// root-level properties (like child MCs created by createEmptyMovieClip)
+		// into child scope, causing case-insensitive collisions (SWF6).
 	}
 
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
