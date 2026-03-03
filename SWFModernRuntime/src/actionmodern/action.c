@@ -19220,7 +19220,22 @@ void actionDefineLocal(SWFAppContext* app_context)
 		}
 	}
 
-	// No function scope - fall back to global variable
+	// No function scope — for loaded child SWFs (non-root context), write to the
+	// target MC's dynamic_props so variables are accessible as MC properties.
+	extern MovieClip root_movieclip;
+	if (g_current_context != NULL && g_current_context != &root_movieclip) {
+		MovieClip* mc = g_current_context;
+		if (mc->dynamic_props == NULL) {
+			mc->dynamic_props = (void*)allocObject(app_context, 8);
+		}
+		ActionVar value_var;
+		peekVar(app_context, &value_var);
+		setProperty(app_context, (ASObject*)mc->dynamic_props, var_name, var_name_len, &value_var);
+		POP_2();
+		return;
+	}
+
+	// Root MC: fall back to global variable table
 	ActionVar* var;
 	if (string_id != 0)
 	{
