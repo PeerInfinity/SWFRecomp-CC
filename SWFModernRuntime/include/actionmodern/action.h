@@ -47,6 +47,7 @@ struct MovieClip {
 	u8 unloaded;           // 1 if unloadMovie was called on this MC (frame/bytes properties return 0)
 	u8 pending_removal;    // 1 if MC was removed from display list but persists for one more frame (depth transformed)
 	u32 byte_size;         // getBytesLoaded/getBytesTotal value (0 = dynamic/attached clip)
+	u16 swf_version;       // SWF version of the movie loaded into this MC (for getSWFVersion)
 #ifdef NO_GRAPHICS
 	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)

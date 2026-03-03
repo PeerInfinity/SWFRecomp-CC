@@ -9003,6 +9003,8 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->is_button_mc = 0;
 	mc->depth = 0;
 	mc->depth_swapped = 0;
+	// Inherit SWF version from parent; overridden by loadMovie
+	mc->swf_version = parent ? parent->swf_version : (u16)g_swf_version;
 #ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
 	mc->as_set_flags = 0;
@@ -15024,11 +15026,18 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		strncpy(url_mut, url, sizeof(url_mut) - 1);
 		url_mut[sizeof(url_mut) - 1] = '\0';
 		MovieClip* mc = getOrCreateLevel(app_context, level_num);
+		// Clear dynamic_props when loading new content (Phase 6: variable clearing)
+		if (mc != NULL && mc->dynamic_props != NULL) {
+			releaseObject(app_context, (ASObject*)mc->dynamic_props);
+			mc->dynamic_props = NULL;
+		}
+		if (mc != NULL) mc->unloaded = 0;
 		parseAndSetFlashVars(app_context, url_mut, mc);
 		MovieEntry* entry = findMovieEntry(url_mut);
 		if (entry != NULL && mc != NULL) {
-			// Set child SWF URL on target MC
+			// Set child SWF URL and version on target MC
 			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+			mc->swf_version = (u16)entry->swf_version;
 			// Switch to child's SWF version during init
 			int _saved_ver = g_swf_version;
 			g_swf_version = entry->swf_version;
@@ -15077,11 +15086,18 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		char url_mut2[512];
 		strncpy(url_mut2, url, sizeof(url_mut2) - 1);
 		url_mut2[sizeof(url_mut2) - 1] = '\0';
+		// Clear dynamic_props when loading new content (Phase 6: variable clearing)
+		if (mc != NULL && mc->dynamic_props != NULL) {
+			releaseObject(app_context, (ASObject*)mc->dynamic_props);
+			mc->dynamic_props = NULL;
+		}
+		if (mc != NULL) mc->unloaded = 0;
 		parseAndSetFlashVars(app_context, url_mut2, mc);
 		MovieEntry* entry = findMovieEntry(url_mut2);
 		if (entry != NULL && mc != NULL) {
-			// Set child SWF URL on target MC
+			// Set child SWF URL and version on target MC
 			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+			mc->swf_version = (u16)entry->swf_version;
 			// Switch to child's SWF version during init
 			int _saved_ver = g_swf_version;
 			g_swf_version = entry->swf_version;
@@ -15676,10 +15692,12 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     for (int i = 0; i < count; i++) loads[i] = g_pending_mcl_loads[i];
     g_pending_mcl_load_count = 0;
 
-    // Pre-phase: Set child SWF URLs on target MCs (before events fire, so mc._url is correct)
+    // Pre-phase: Set child SWF URLs and versions on target MCs (before events fire, so mc._url is correct)
     for (int i = 0; i < count; i++) {
         if (loads[i].entry != NULL && loads[i].target != NULL) {
+            // Note: dynamic_props clearing already happened in actionLoadClip before FlashVars were set
             snprintf(loads[i].target->url, sizeof(loads[i].target->url), "file:///%s", loads[i].entry->filename);
+            loads[i].target->swf_version = (u16)loads[i].entry->swf_version;
         }
     }
 
@@ -16943,6 +16961,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// Initialize _level0 to root_movieclip
 	g_levels[0] = &root_movieclip;
+	root_movieclip.swf_version = (u16)g_swf_version;
 
 	if (global_object == NULL)
 	{
@@ -21599,11 +21618,12 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 
 		MovieEntry* entry = findMovieEntry(url_utf8);
 		if (entry != NULL) {
-			// Clear target MC's dynamic properties before loading new content
+			// Clear dynamic_props when loading new content (Phase 6: variable clearing)
 			if (_gu2_mc != NULL && _gu2_mc->dynamic_props != NULL) {
 				releaseObject(app_context, (ASObject*)_gu2_mc->dynamic_props);
 				_gu2_mc->dynamic_props = NULL;
 			}
+			if (_gu2_mc != NULL) _gu2_mc->unloaded = 0;
 			// Set FlashVars AFTER clearing (so they survive into the child SWF)
 			if (_gu2_query != NULL && *_gu2_query != '\0') {
 				parseURLEncodedVars(app_context, _gu2_query, _gu2_mc);
@@ -21631,9 +21651,10 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				root_movieclip.framesloaded = entry->frame_count;
 				root_movieclip.currentframe = 1;
 			}
-			// Set child SWF URL on target MC
+			// Set child SWF URL and version on target MC
 			if (_gu2_mc != NULL) {
 				snprintf(_gu2_mc->url, sizeof(_gu2_mc->url), "file:///%s", entry->filename);
+				_gu2_mc->swf_version = (u16)entry->swf_version;
 			}
 			// Run child in target MC context with child's SWF version
 			MovieClip* _saved_ctx = g_current_context;
@@ -35421,7 +35442,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 13 && strncmp(method_name, "getSWFVersion", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = (double)g_swf_version;
+			double v = mc->swf_version ? (double)mc->swf_version : (double)g_swf_version;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
@@ -36509,12 +36530,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 				} else {
+					// Clear dynamic_props when loading new content (Phase 6: variable clearing)
+					if (mc != NULL && mc->dynamic_props != NULL) {
+						releaseObject(app_context, (ASObject*)mc->dynamic_props);
+						mc->dynamic_props = NULL;
+					}
+					if (mc != NULL) mc->unloaded = 0;
 					// Strip query string (FlashVars) and set on target MC
 					parseAndSetFlashVars(app_context, _lm_url, mc);
 					MovieEntry* entry = findMovieEntry(_lm_url);
 					if (entry != NULL && mc != NULL) {
-						// Set child SWF URL on target MC
+						// Set child SWF URL and version on target MC
 						snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+						mc->swf_version = (u16)entry->swf_version;
 						// Run the child movie's init and frame 0 with child's SWF version
 						int _saved_ver = g_swf_version;
 						g_swf_version = entry->swf_version;
