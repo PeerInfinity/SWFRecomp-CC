@@ -18132,11 +18132,6 @@ void actionGetVariable(SWFAppContext* app_context)
 				pushVar(app_context, &g_this_stack[g_this_depth - 1]);
 				return;
 			}
-			// Root level with SetTarget active: "this" returns base clip, not target
-			if (g_base_clip != NULL && g_current_context != g_base_clip) {
-				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)(uintptr_t)g_base_clip);
-				return;
-			}
 			// Root level — fall through to scope chain / variable table
 			// (root "this" is mutable via SetVariable and stored in var table)
 		}
@@ -27945,21 +27940,6 @@ void actionRemoveSprite(SWFAppContext* app_context)
 					child_mc_cache[_rs_j] = NULL;
 					break;
 				}
-			}
-			// If the removed MC is the current SetTarget target, fall back to base clip
-			if (g_current_context == _rs_mc) {
-				MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
-				setCurrentContext(base);
-#ifdef NO_GRAPHICS
-				{
-					extern int g_settarget_explicit_root;
-					extern int g_settarget_invalid;
-					extern int g_settarget_none;
-					g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
-					g_settarget_invalid = 0;
-					g_settarget_none = 0;
-				}
-#endif
 			}
 		}
 	}
