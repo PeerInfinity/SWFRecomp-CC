@@ -56,6 +56,7 @@ enum NativeType {
 	NATIVE_COLORTRANSFORM = 18,
 	NATIVE_TRANSFORM = 19,
 	NATIVE_FILTER = 20,
+	NATIVE_STYLESHEET = 21,
 };
 
 typedef struct ASObject

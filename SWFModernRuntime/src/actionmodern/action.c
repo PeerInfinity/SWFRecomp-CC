@@ -6368,6 +6368,9 @@ static int isNativeTextFieldProperty(const char* name, u32 len) {
 	return 0;
 }
 
+static void initStyleSheetPrototype(SWFAppContext* app_context); // forward decl
+static ASFunction g_stylesheet_constructor_global; // forward decl
+
 static void initTextFieldPrototype(SWFAppContext* app_context)
 {
 	if (g_textfield_constructor_init) return;
@@ -6476,10 +6479,7 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 	// Register TextField.StyleSheet as a property on the constructor (SWF7+)
 	if (g_swf_version >= 7)
 	{
-		static ASFunction g_stylesheet_ctor;
-		memset(&g_stylesheet_ctor, 0, sizeof(ASFunction));
-		strncpy(g_stylesheet_ctor.name, "StyleSheet", 255);
-		g_stylesheet_ctor.function_type = 1;
+		initStyleSheetPrototype(app_context);
 		if (g_textfield_constructor.own_props == NULL)
 		{
 			g_textfield_constructor.own_props = allocObject(app_context, 4);
@@ -6487,11 +6487,743 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 		}
 		ActionVar ss_val = {0};
 		ss_val.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &ss_val.data.numeric_value) = (u64)&g_stylesheet_ctor;
+		VAL(u64, &ss_val.data.numeric_value) = (u64)&g_stylesheet_constructor_global;
 		setProperty(app_context, g_textfield_constructor.own_props, "StyleSheet", 10, &ss_val);
 	}
 
 	g_textfield_constructor_init = 1;
+}
+
+// ============================================================
+// StyleSheet Implementation
+// ============================================================
+static ASFunction g_stylesheet_constructor_global;
+static int g_stylesheet_constructor_init = 0;
+static ASObject* g_stylesheet_prototype = NULL;
+static ASFunction g_ss_methods[8]; // transform, setStyle, getStyle, getStyleNames, clear, parseCSS, load, parse
+
+static void initTextFormatPrototype(SWFAppContext* app_context); // forward decl
+static ASFunction g_textformat_constructor; // forward decl
+
+// Helper: create a fresh TextFormat object with all null props + display="block", kerning=false
+static ASObject* createBlankTextFormat(SWFAppContext* app_context) {
+	initTextFormatPrototype(app_context);
+	ASObject* tf = allocObject(app_context, 24);
+	tf->native_type = NATIVE_TEXTFORMAT;
+	if (g_textformat_constructor.prototype_obj != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64)g_textformat_constructor.prototype_obj;
+		setProperty(app_context, tf, "__proto__", 9, &pv);
+		for (u32 i = 0; i < tf->num_used; i++) {
+			if (strcmp(tf->properties[i].name, "__proto__") == 0) {
+				tf->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+				break;
+			}
+		}
+	}
+	// Initialize all properties to null
+	ActionVar null_val = {0};
+	null_val.type = ACTION_STACK_VALUE_NULL;
+	static const char* ss_tf_props[] = {
+		"font", "size", "color", "bold", "italic", "underline",
+		"align", "leftMargin", "rightMargin", "indent", "leading",
+		"blockIndent", "bullet", "kerning", "letterSpacing", "tabStops",
+		"url", "target", "display"
+	};
+	static const u32 ss_tf_lens[] = {
+		4, 4, 5, 4, 6, 9, 5, 10, 11, 6, 7, 11, 6, 7, 13, 8, 3, 6, 7
+	};
+	for (int i = 0; i < 19; i++) {
+		setProperty(app_context, tf, ss_tf_props[i], ss_tf_lens[i], &null_val);
+	}
+	// display = "block"
+	static const uint16_t blk[] = {'b','l','o','c','k',0};
+	ActionVar dv = {0};
+	dv.type = ACTION_STACK_VALUE_STRING;
+	dv.data.numeric_value = (u64)blk;
+	dv.str_size = 5;
+	setProperty(app_context, tf, "display", 7, &dv);
+	// kerning = false
+	ActionVar kv = {0};
+	kv.type = ACTION_STACK_VALUE_BOOLEAN;
+	kv.data.numeric_value = 0;
+	setProperty(app_context, tf, "kerning", 7, &kv);
+	return tf;
+}
+
+// StyleSheet.transform(style) — converts CSS object properties to TextFormat
+static ActionVar stylesheetTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	// If no args, null, or undefined → return null
+	if (arg_count == 0) { result.type = ACTION_STACK_VALUE_NULL; return result; }
+	ActionVar* style = &args[0];
+	if (style->type == ACTION_STACK_VALUE_NULL || style->type == ACTION_STACK_VALUE_UNDEFINED) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+
+	// Create a TextFormat object
+	ASObject* tf = createBlankTextFormat(app_context);
+
+	// If style is not an object, return the default TextFormat
+	ASObject* style_obj = NULL;
+	if (style->type == ACTION_STACK_VALUE_OBJECT && style->data.numeric_value != 0) {
+		style_obj = (ASObject*)style->data.numeric_value;
+	} else {
+		// Non-object/non-null → return blank TextFormat
+		result.type = ACTION_STACK_VALUE_OBJECT;
+		result.data.numeric_value = (u64)tf;
+		return result;
+	}
+
+	// Map CSS properties to TextFormat properties
+	// color: "#RRGGBB" → integer
+	ActionVar* cv = getProperty(style_obj, "color", 5);
+	if (cv != NULL && cv->type == ACTION_STACK_VALUE_STRING && cv->str_size > 0) {
+		const uint16_t* u16 = varGetU16Ptr(cv);
+		if (u16 && u16[0] == '#' && cv->str_size == 7) {
+			// Parse #RRGGBB
+			u32 color = 0;
+			for (int i = 1; i <= 6; i++) {
+				color <<= 4;
+				uint16_t c = u16[i];
+				if (c >= '0' && c <= '9') color |= (c - '0');
+				else if (c >= 'a' && c <= 'f') color |= (c - 'a' + 10);
+				else if (c >= 'A' && c <= 'F') color |= (c - 'A' + 10);
+			}
+			ActionVar cval = {0};
+			cval.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &cval.data.numeric_value) = (double)color;
+			setProperty(app_context, tf, "color", 5, &cval);
+		}
+		// else: non-#RRGGBB color → leave as null
+	}
+
+	// fontSize → size (numeric)
+	ActionVar* fsv = getProperty(style_obj, "fontSize", 8);
+	if (fsv != NULL && fsv->type != ACTION_STACK_VALUE_NULL && fsv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		setProperty(app_context, tf, "size", 4, fsv);
+	}
+
+	// fontFamily → font
+	ActionVar* ffv = getProperty(style_obj, "fontFamily", 10);
+	if (ffv != NULL && ffv->type != ACTION_STACK_VALUE_NULL && ffv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		// false and 0 → null (don't set)
+		int skip = 0;
+		if (ffv->type == ACTION_STACK_VALUE_BOOLEAN && ffv->data.numeric_value == 0) skip = 1;
+		if (ffv->type == ACTION_STACK_VALUE_F64 && VAL(double, &ffv->data.numeric_value) == 0.0) skip = 1;
+		if (ffv->type == ACTION_STACK_VALUE_F32 && VAL(float, &ffv->data.numeric_value) == 0.0f) skip = 1;
+		if (ffv->type == ACTION_STACK_VALUE_STRING && ffv->str_size == 0) skip = 1;
+		if (!skip) setProperty(app_context, tf, "font", 4, ffv);
+	}
+
+	// textAlign → align
+	ActionVar* tav = getProperty(style_obj, "textAlign", 9);
+	if (tav != NULL && tav->type != ACTION_STACK_VALUE_NULL && tav->type != ACTION_STACK_VALUE_UNDEFINED) {
+		setProperty(app_context, tf, "align", 5, tav);
+	}
+
+	// fontWeight → bold: "bold" → true, else → null
+	ActionVar* fwv = getProperty(style_obj, "fontWeight", 10);
+	if (fwv != NULL && fwv->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(fwv);
+		if (u16 && fwv->str_size == 4 && u16[0] == 'b' && u16[1] == 'o' && u16[2] == 'l' && u16[3] == 'd') {
+			ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 1;
+			setProperty(app_context, tf, "bold", 4, &bv);
+		}
+	}
+
+	// fontStyle → italic: "italic" → true, else → null
+	ActionVar* fsiv = getProperty(style_obj, "fontStyle", 9);
+	if (fsiv != NULL && fsiv->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(fsiv);
+		if (u16 && fsiv->str_size == 6 && u16[0] == 'i' && u16[1] == 't' && u16[2] == 'a' && u16[3] == 'l' && u16[4] == 'i' && u16[5] == 'c') {
+			ActionVar iv = {0}; iv.type = ACTION_STACK_VALUE_BOOLEAN; iv.data.numeric_value = 1;
+			setProperty(app_context, tf, "italic", 6, &iv);
+		}
+	}
+
+	// textDecoration → underline: "underline" → true, else → null
+	ActionVar* tdv = getProperty(style_obj, "textDecoration", 14);
+	if (tdv != NULL && tdv->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(tdv);
+		if (u16 && tdv->str_size == 9 && u16[0] == 'u' && u16[1] == 'n' && u16[2] == 'd' && u16[3] == 'e' && u16[4] == 'r' && u16[5] == 'l' && u16[6] == 'i' && u16[7] == 'n' && u16[8] == 'e') {
+			ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_BOOLEAN; uv.data.numeric_value = 1;
+			setProperty(app_context, tf, "underline", 9, &uv);
+		}
+	}
+
+	// marginLeft → leftMargin (numeric)
+	ActionVar* mlv = getProperty(style_obj, "marginLeft", 10);
+	if (mlv != NULL && mlv->type != ACTION_STACK_VALUE_NULL && mlv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		setProperty(app_context, tf, "leftMargin", 10, mlv);
+	}
+
+	// marginRight → rightMargin (numeric)
+	ActionVar* mrv = getProperty(style_obj, "marginRight", 11);
+	if (mrv != NULL && mrv->type != ACTION_STACK_VALUE_NULL && mrv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		setProperty(app_context, tf, "rightMargin", 11, mrv);
+	}
+
+	// indent / textIndent → indent (numeric)
+	ActionVar* indv = getProperty(style_obj, "textIndent", 10);
+	if (indv == NULL || indv->type == ACTION_STACK_VALUE_NULL || indv->type == ACTION_STACK_VALUE_UNDEFINED)
+		indv = getProperty(style_obj, "indent", 6);
+	if (indv != NULL && indv->type != ACTION_STACK_VALUE_NULL && indv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		setProperty(app_context, tf, "indent", 6, indv);
+	}
+
+	// leading → leading (numeric)
+	ActionVar* ldv = getProperty(style_obj, "leading", 7);
+	if (ldv != NULL && ldv->type != ACTION_STACK_VALUE_NULL && ldv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		setProperty(app_context, tf, "leading", 7, ldv);
+	}
+
+	// letterSpacing → letterSpacing (numeric)
+	ActionVar* lsv = getProperty(style_obj, "letterSpacing", 13);
+	if (lsv != NULL && lsv->type != ACTION_STACK_VALUE_NULL && lsv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		setProperty(app_context, tf, "letterSpacing", 13, lsv);
+	}
+
+	// kerning → kerning (boolean: "true" → true, else → false)
+	ActionVar* krv = getProperty(style_obj, "kerning", 7);
+	if (krv != NULL && krv->type != ACTION_STACK_VALUE_NULL && krv->type != ACTION_STACK_VALUE_UNDEFINED) {
+		ActionVar kbv = {0};
+		kbv.type = ACTION_STACK_VALUE_BOOLEAN;
+		if (krv->type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* u16 = varGetU16Ptr(krv);
+			kbv.data.numeric_value = (u16 && krv->str_size == 4 && u16[0] == 't' && u16[1] == 'r' && u16[2] == 'u' && u16[3] == 'e') ? 1 : 0;
+		} else if (krv->type == ACTION_STACK_VALUE_BOOLEAN) {
+			kbv.data.numeric_value = krv->data.numeric_value;
+		} else {
+			kbv.data.numeric_value = 0;
+		}
+		setProperty(app_context, tf, "kerning", 7, &kbv);
+	}
+
+	// display → display (string: "inline", "block", "none"; default="block")
+	ActionVar* dpv = getProperty(style_obj, "display", 7);
+	if (dpv != NULL && dpv->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(dpv);
+		if (u16 && dpv->str_size == 6 && u16[0] == 'i' && u16[1] == 'n' && u16[2] == 'l' && u16[3] == 'i' && u16[4] == 'n' && u16[5] == 'e') {
+			setProperty(app_context, tf, "display", 7, dpv);
+		} else if (u16 && dpv->str_size == 4 && u16[0] == 'n' && u16[1] == 'o' && u16[2] == 'n' && u16[3] == 'e') {
+			setProperty(app_context, tf, "display", 7, dpv);
+		}
+		// else: unknown display value → keep default "block"
+	}
+
+	result.type = ACTION_STACK_VALUE_OBJECT;
+	result.data.numeric_value = (u64)tf;
+	return result;
+}
+
+// Helper: call this.transform(value) virtually (allows subclass override)
+static ActionVar callStyleSheetTransform(SWFAppContext* app_context, ASObject* ss_obj, ActionVar* value) {
+	// Look up "transform" on the object (may be overridden by user code)
+	ActionVar* tfm = getPropertyWithPrototype(ss_obj, "transform", 9);
+	if (tfm && tfm->type == ACTION_STACK_VALUE_FUNCTION && tfm->data.numeric_value) {
+		ASFunction* func = (ASFunction*)tfm->data.numeric_value;
+		ActionVar arg = value ? *value : (ActionVar){0};
+		if (!value) arg.type = ACTION_STACK_VALUE_UNDEFINED;
+		if (func->function_type == 2 && func->advanced_func) {
+			// Set up scope chain + captured scopes for user overrides
+			ASObject* local_scope = allocObject(app_context, 4);
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = 0;
+				scope_mc[scope_depth] = NULL;
+				scope_chain[scope_depth++] = local_scope;
+			}
+			// Restore captured scopes
+			int _css_pushed = 0;
+			for (int _cs = 0; _cs < func->captured_scope_count; _cs++) {
+				if (func->captured_scope[_cs] != NULL && scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 1;
+					scope_mc[scope_depth] = func->captured_scope_mc[_cs];
+					scope_chain[scope_depth++] = func->captured_scope[_cs];
+					_css_pushed++;
+				}
+			}
+			// Set this variable in scope
+			ActionVar this_var = {0};
+			this_var.type = ACTION_STACK_VALUE_OBJECT;
+			this_var.data.numeric_value = (u64)ss_obj;
+			setVariableByName("this", &this_var);
+
+			g_call_depth++;
+			ActionVar result = func->advanced_func(app_context, &arg, 1, NULL, ss_obj);
+			g_call_depth--;
+
+			// Pop captured scopes + local scope
+			for (int _cs = 0; _cs < _css_pushed; _cs++) {
+				if (scope_depth > 0) scope_depth--;
+			}
+			if (scope_depth > 0) scope_depth--;
+			releaseObject(app_context, local_scope);
+			return result;
+		} else if (func->function_type == 1 && func->simple_func) {
+			// Type 1 function — push arg onto stack
+			if (value) {
+				pushVar(app_context, value);
+			} else {
+				ActionVar udef = {0}; udef.type = ACTION_STACK_VALUE_UNDEFINED;
+				pushVar(app_context, &udef);
+			}
+			g_call_depth++;
+			ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+			g_call_depth--;
+			return result;
+		}
+	}
+	// Fallback: call native transform
+	ActionVar arg = value ? *value : (ActionVar){0};
+	if (!value) arg.type = ACTION_STACK_VALUE_UNDEFINED;
+	return stylesheetTransform(app_context, &arg, 1, NULL, ss_obj);
+}
+
+// Ensure _css and _styles exist on the object
+static void ensureStyleSheetInternals(SWFAppContext* app_context, ASObject* ss_obj) {
+	ActionVar* css_var = getProperty(ss_obj, "_css", 4);
+	if (css_var == NULL || css_var->type != ACTION_STACK_VALUE_OBJECT) {
+		ASObject* css_obj = allocObject(app_context, 8);
+		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_OBJECT; cv.data.numeric_value = (u64)css_obj;
+		setProperty(app_context, ss_obj, "_css", 4, &cv);
+	}
+	ActionVar* styles_var = getProperty(ss_obj, "_styles", 7);
+	if (styles_var == NULL || styles_var->type != ACTION_STACK_VALUE_OBJECT) {
+		ASObject* styles_obj = allocObject(app_context, 8);
+		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_OBJECT; sv.data.numeric_value = (u64)styles_obj;
+		setProperty(app_context, ss_obj, "_styles", 7, &sv);
+	}
+}
+
+// StyleSheet.setStyle(selector, styleObj)
+static ActionVar stylesheetSetStyle(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* ss_obj = (ASObject*)this_obj;
+	if (ss_obj == NULL || arg_count < 2) return result;
+
+	// Get selector name
+	ActionVar* sel_arg = &args[0];
+	if (sel_arg->type != ACTION_STACK_VALUE_STRING) return result;
+	char sel_buf[256];
+	u32 sel_len = (u32)u16_to_utf8(varGetU16Ptr(sel_arg), sel_arg->str_size, sel_buf, sizeof(sel_buf));
+
+	ActionVar* value = &args[1];
+
+	// Call this.transform(value) — virtual dispatch for ALL value types
+	// Non-object values are passed as null to transform (Flash behavior)
+	ActionVar null_tf_arg = {0}; null_tf_arg.type = ACTION_STACK_VALUE_NULL;
+	ActionVar* tf_arg = (value->type == ACTION_STACK_VALUE_OBJECT) ? value : &null_tf_arg;
+	ActionVar tf_result = callStyleSheetTransform(app_context, ss_obj, tf_arg);
+
+	ensureStyleSheetInternals(app_context, ss_obj);
+	ActionVar* css_var = getProperty(ss_obj, "_css", 4);
+	ActionVar* styles_var = getProperty(ss_obj, "_styles", 7);
+
+	if (value->type == ACTION_STACK_VALUE_OBJECT && value->data.numeric_value != 0) {
+		// Shallow clone the CSS object for _css storage
+		ASObject* orig = (ASObject*)value->data.numeric_value;
+		ASObject* clone = allocObject(app_context, orig->num_used + 4);
+		for (u32 ci = 0; ci < orig->num_used; ci++) {
+			ASProperty* sp = &orig->properties[ci];
+			setPropertyWithFlags(app_context, clone, sp->name, sp->name_length, &sp->value, sp->flags);
+		}
+		ActionVar clone_var = {0}; clone_var.type = ACTION_STACK_VALUE_OBJECT;
+		clone_var.data.numeric_value = (u64)clone;
+
+		if (css_var && css_var->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* css_obj = (ASObject*)css_var->data.numeric_value;
+			setProperty(app_context, css_obj, sel_buf, sel_len, &clone_var);
+		}
+		if (styles_var && styles_var->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* styles_obj = (ASObject*)styles_var->data.numeric_value;
+			setProperty(app_context, styles_obj, sel_buf, sel_len, &tf_result);
+		}
+	} else {
+		// Non-object values: store null in _css, don't store in _styles
+		ActionVar null_var = {0}; null_var.type = ACTION_STACK_VALUE_NULL;
+		if (css_var && css_var->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* css_obj = (ASObject*)css_var->data.numeric_value;
+			setProperty(app_context, css_obj, sel_buf, sel_len, &null_var);
+		}
+	}
+
+	return result;
+}
+
+// StyleSheet.getStyle(selector) — returns raw CSS object or null
+static ActionVar stylesheetGetStyle(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers; (void)app_context;
+	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_NULL;
+	ASObject* ss_obj = (ASObject*)this_obj;
+	if (ss_obj == NULL || arg_count < 1) return result;
+
+	ActionVar* sel_arg = &args[0];
+	if (sel_arg->type != ACTION_STACK_VALUE_STRING) return result;
+	char sel_buf[256];
+	u32 sel_len = (u32)u16_to_utf8(varGetU16Ptr(sel_arg), sel_arg->str_size, sel_buf, sizeof(sel_buf));
+
+	ActionVar* css_var = getProperty(ss_obj, "_css", 4);
+	if (css_var == NULL || css_var->type != ACTION_STACK_VALUE_OBJECT) return result;
+	ASObject* css_obj = (ASObject*)css_var->data.numeric_value;
+	ActionVar* val = getProperty(css_obj, sel_buf, sel_len);
+	if (val != NULL && val->type == ACTION_STACK_VALUE_OBJECT) return *val;
+	return result; // null
+}
+
+// StyleSheet.getStyleNames() — returns Array of selector names
+static ActionVar stylesheetGetStyleNames(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* ss_obj = (ASObject*)this_obj;
+	if (ss_obj == NULL) return result;
+
+	ActionVar* css_var = getProperty(ss_obj, "_css", 4);
+	if (css_var == NULL || css_var->type != ACTION_STACK_VALUE_OBJECT) return result;
+	ASObject* css_obj = (ASObject*)css_var->data.numeric_value;
+
+	// Create an array with all selector names
+	ASObject* arr = allocObject(app_context, css_obj->num_used + 4);
+	arr->native_type = NATIVE_ARRAY;
+	setObjectProto(app_context, arr);
+	u32 idx = 0;
+	for (u32 i = 0; i < css_obj->num_used; i++) {
+		if (css_obj->properties[i].name[0] == '\0') continue;
+		if (strcmp(css_obj->properties[i].name, "__proto__") == 0) continue;
+		char idx_str[12];
+		int idx_len = snprintf(idx_str, sizeof(idx_str), "%u", idx);
+		// Convert property name to u16 string
+		const char* pname = css_obj->properties[i].name;
+		u32 pname_len = (u32)strlen(pname);
+		u32 u16_name_len;
+		uint16_t* u16_name = utf8_to_u16(app_context, pname, pname_len, &u16_name_len);
+		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
+		sv.data.numeric_value = (u64)u16_name;
+		sv.str_size = u16_name_len;
+		setProperty(app_context, arr, idx_str, (u32)idx_len, &sv);
+		idx++;
+	}
+	// Set length
+	ActionVar len_val = {0}; len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)idx;
+	setProperty(app_context, arr, "length", 6, &len_val);
+
+	result.type = ACTION_STACK_VALUE_OBJECT;
+	result.data.numeric_value = (u64)arr;
+	return result;
+}
+
+// StyleSheet.clear()
+static ActionVar stylesheetClear(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* ss_obj = (ASObject*)this_obj;
+	if (ss_obj == NULL) return result;
+
+	// Replace _css and _styles with new empty objects
+	ASObject* new_css = allocObject(app_context, 4);
+	ASObject* new_styles = allocObject(app_context, 4);
+	ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_OBJECT; cv.data.numeric_value = (u64)new_css;
+	ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_OBJECT; sv.data.numeric_value = (u64)new_styles;
+	setProperty(app_context, ss_obj, "_css", 4, &cv);
+	setProperty(app_context, ss_obj, "_styles", 7, &sv);
+	return result;
+}
+
+// StyleSheet.parseCSS(cssText) — parse CSS text and add styles
+// Flash CSS parser: property name scan does NOT stop at }, {, or ; — only at : and whitespace.
+// Body delimited by first { and matching }; property names can span past } characters.
+static ActionVar stylesheetParseCSS(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)registers;
+	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_BOOLEAN; result.data.numeric_value = 0; // false
+	ASObject* ss_obj = (ASObject*)this_obj;
+	if (ss_obj == NULL || arg_count < 1) return result;
+
+	ActionVar* css_arg = &args[0];
+	if (css_arg->type != ACTION_STACK_VALUE_STRING) return result;
+
+	const uint16_t* src = varGetU16Ptr(css_arg);
+	u32 src_len = css_arg->str_size;
+	if (src == NULL || src_len == 0) return result;
+
+	// Convert u16 to utf8 for parsing
+	char* css_text = (char*)malloc(src_len * 4 + 1);
+	u32 text_len = (u32)u16_to_utf8(src, src_len, css_text, src_len * 4 + 1);
+
+#define IS_CSS_WS(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
+
+	typedef struct { char name[256]; u32 name_len; ASObject* style; } ParsedRule;
+	ParsedRule parsed_rules[64];
+	u32 rule_count = 0;
+	int parse_valid = 1;
+
+	u32 pos = 0;
+	while (pos < text_len && parse_valid) {
+		// Skip whitespace
+		while (pos < text_len && IS_CSS_WS(css_text[pos])) pos++;
+		if (pos >= text_len) break;
+
+		// Find selector: everything up to first '{'
+		u32 sel_start = pos;
+		while (pos < text_len && css_text[pos] != '{') pos++;
+		if (pos >= text_len) { parse_valid = 0; break; }
+
+		u32 sel_end = pos;
+		while (sel_end > sel_start && IS_CSS_WS(css_text[sel_end - 1])) sel_end--;
+
+		pos++; // skip '{'
+		u32 bp = pos; // body parsing position
+
+		// Parse properties: scan for ':' in remaining text (past }, {, ; chars)
+		ASObject* style_obj = allocObject(app_context, 8);
+		int has_error = 0;
+		int block_closed = 0;
+		int props_parsed = 0;
+
+		while (!has_error && !block_closed) {
+			// Skip whitespace
+			while (bp < text_len && IS_CSS_WS(css_text[bp])) bp++;
+			if (bp >= text_len) break; // EOF
+			if (css_text[bp] == '}') { bp++; block_closed = 1; break; }
+
+			// Scan for ':' (does NOT stop at }, {, ;, or anything else)
+			u32 colon_pos = bp;
+			while (colon_pos < text_len && css_text[colon_pos] != ':') colon_pos++;
+
+			if (colon_pos >= text_len) {
+				// No ':' found in remaining text
+				// Find the next '}' if any
+				u32 brace = bp;
+				while (brace < text_len && css_text[brace] != '}') brace++;
+				u32 check_end = (brace < text_len) ? brace : text_len;
+
+				// Check if content between bp and check_end has non-whitespace → error
+				int has_nonws = 0;
+				for (u32 i = bp; i < check_end; i++) {
+					if (!IS_CSS_WS(css_text[i])) { has_nonws = 1; break; }
+				}
+				if (has_nonws) { has_error = 1; }
+				if (brace < text_len) { bp = brace + 1; block_closed = 1; }
+				else bp = text_len;
+				break;
+			}
+
+			// ':' found at colon_pos
+			// Property name: from bp to colon_pos
+			u32 name_start = bp;
+			u32 name_end = colon_pos;
+
+			// Check for internal spaces in property name
+			// Rule: trailing spaces before ':' are OK, internal spaces (space then non-space before ':') are error
+			{
+				u32 fs = name_start;
+				while (fs < name_end && css_text[fs] != ' ' && css_text[fs] != '\t') fs++;
+				if (fs < name_end) {
+					// Space found at fs — skip all whitespace
+					u32 after_ws = fs;
+					while (after_ws < name_end && (css_text[after_ws] == ' ' || css_text[after_ws] == '\t')) after_ws++;
+					if (after_ws < name_end) {
+						// Non-whitespace after space before colon → internal space → error
+						has_error = 1; break;
+					}
+					// Trailing spaces only → OK (name includes them)
+				}
+			}
+
+			u32 pn_len = name_end - name_start;
+
+			// Convert CSS dash-names to camelCase
+			char camel_name[256];
+			u32 ci2 = 0, co2 = 0;
+			while (ci2 < pn_len && co2 < sizeof(camel_name) - 1) {
+				if (css_text[name_start + ci2] == '-') {
+					if (ci2 + 1 < pn_len && css_text[name_start + ci2 + 1] == '-') {
+						camel_name[co2++] = '-';
+						ci2 += 2;
+					} else if (ci2 > 0 && ci2 + 1 < pn_len) {
+						ci2++;
+						char c = css_text[name_start + ci2];
+						if (c >= 'a' && c <= 'z') c -= 32;
+						camel_name[co2++] = c;
+						ci2++;
+					} else {
+						camel_name[co2++] = css_text[name_start + ci2];
+						ci2++;
+					}
+				} else {
+					camel_name[co2++] = css_text[name_start + ci2];
+					ci2++;
+				}
+			}
+			camel_name[co2] = '\0';
+			u32 camel_len = co2;
+
+			bp = colon_pos + 1; // skip ':'
+
+			// Skip leading whitespace from value
+			while (bp < text_len && IS_CSS_WS(css_text[bp])) bp++;
+
+			// Scan value until ';' or '}'
+			u32 val_start = bp;
+			while (bp < text_len && css_text[bp] != ';' && css_text[bp] != '}') bp++;
+			u32 val_end = bp;
+
+			if (bp < text_len && css_text[bp] == ';') {
+				bp++; // skip ';'
+			} else if (bp < text_len && css_text[bp] == '}') {
+				bp++; block_closed = 1;
+			} else {
+				// EOF without ';' or '}' → error (unclosed value)
+				has_error = 1; break;
+			}
+
+			// Store property on style object
+			u32 vlen = val_end - val_start;
+			u32 u16_vlen;
+			uint16_t* u16_val = utf8_to_u16(app_context, css_text + val_start, vlen, &u16_vlen);
+			ActionVar pval = {0}; pval.type = ACTION_STACK_VALUE_STRING;
+			pval.data.numeric_value = (u64)u16_val;
+			pval.str_size = u16_vlen;
+			if (camel_len > 0) {
+				setProperty(app_context, style_obj, camel_name, camel_len, &pval);
+			}
+			props_parsed++;
+		}
+
+		if (has_error) { parse_valid = 0; releaseObject(app_context, style_obj); break; }
+
+		// Advance pos past body
+		pos = bp;
+
+		// Selector validation and storage
+		if (sel_end <= sel_start) continue;
+
+		// Split selectors by comma
+		u32 s = sel_start;
+		while (s < sel_end) {
+			u32 se = s;
+			while (se < sel_end && css_text[se] != ',') se++;
+
+			u32 ss = s;
+			while (ss < se && IS_CSS_WS(css_text[ss])) ss++;
+			u32 sse = se;
+			while (sse > ss && IS_CSS_WS(css_text[sse - 1])) sse--;
+
+			if (sse > ss) {
+				char sel_name[256];
+				u32 sel_name_len = sse - ss;
+				if (sel_name_len >= sizeof(sel_name)) sel_name_len = sizeof(sel_name) - 1;
+				memcpy(sel_name, css_text + ss, sel_name_len);
+				sel_name[sel_name_len] = '\0';
+
+				// Check for spaces in selector name
+				int has_space = 0;
+				for (u32 ci = 0; ci < sel_name_len; ci++) {
+					if (sel_name[ci] == ' ' || sel_name[ci] == '\t') { has_space = 1; break; }
+				}
+				if (has_space) { parse_valid = 0; break; }
+
+				if (rule_count < 64) {
+					memcpy(parsed_rules[rule_count].name, sel_name, sel_name_len + 1);
+					parsed_rules[rule_count].name_len = sel_name_len;
+					parsed_rules[rule_count].style = style_obj;
+					retainObject(style_obj); // shared across comma-separated selectors
+					rule_count++;
+				}
+			}
+			s = se + 1;
+		}
+		releaseObject(app_context, style_obj); // balance the initial alloc
+	}
+
+#undef IS_CSS_WS
+
+	// Phase 2: Apply rules only if parse was fully valid
+	if (parse_valid && rule_count > 0) {
+		ensureStyleSheetInternals(app_context, ss_obj);
+		for (u32 ri = 0; ri < rule_count; ri++) {
+			ActionVar style_val = {0}; style_val.type = ACTION_STACK_VALUE_OBJECT;
+			style_val.data.numeric_value = (u64)parsed_rules[ri].style;
+
+			ActionVar tf_result = callStyleSheetTransform(app_context, ss_obj, &style_val);
+
+			ActionVar* css_prop = getProperty(ss_obj, "_css", 4);
+			ActionVar* styles_prop = getProperty(ss_obj, "_styles", 7);
+			if (css_prop && css_prop->type == ACTION_STACK_VALUE_OBJECT) {
+				ASObject* css_o = (ASObject*)css_prop->data.numeric_value;
+				setProperty(app_context, css_o, parsed_rules[ri].name, parsed_rules[ri].name_len, &style_val);
+			}
+			if (styles_prop && styles_prop->type == ACTION_STACK_VALUE_OBJECT) {
+				ASObject* styles_o = (ASObject*)styles_prop->data.numeric_value;
+				setProperty(app_context, styles_o, parsed_rules[ri].name, parsed_rules[ri].name_len, &tf_result);
+			}
+		}
+		result.data.numeric_value = 1; // true
+	}
+
+	free(css_text);
+	return result;
+}
+
+// StyleSheet.load(url) — stub
+static ActionVar stylesheetLoad(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_UNDEFINED;
+	return result;
+}
+
+static void initStyleSheetPrototype(SWFAppContext* app_context) {
+	if (g_stylesheet_constructor_init) return;
+
+	memset(&g_stylesheet_constructor_global, 0, sizeof(ASFunction));
+	strncpy(g_stylesheet_constructor_global.name, "StyleSheet", 255);
+	g_stylesheet_constructor_global.function_type = 1;
+	g_stylesheet_constructor_global.param_count = 0;
+
+	// Create prototype
+	g_stylesheet_prototype = allocObject(app_context, 16);
+
+	// Set __proto__ to Object.prototype
+	extern ASObject* g_object_prototype;
+	if (g_object_prototype != NULL) {
+		ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64)g_object_prototype;
+		setProperty(app_context, g_stylesheet_prototype, "__proto__", 9, &pv);
+	}
+
+	// Register methods on prototype with DONT_ENUM | DONT_DELETE | READ_ONLY flags (=0x00)
+	registerGeomMethod(&g_ss_methods[0], "transform",     (Function2Ptr)stylesheetTransform,     app_context, g_stylesheet_prototype);
+	registerGeomMethod(&g_ss_methods[1], "setStyle",      (Function2Ptr)stylesheetSetStyle,      app_context, g_stylesheet_prototype);
+	registerGeomMethod(&g_ss_methods[2], "getStyle",      (Function2Ptr)stylesheetGetStyle,      app_context, g_stylesheet_prototype);
+	registerGeomMethod(&g_ss_methods[3], "getStyleNames", (Function2Ptr)stylesheetGetStyleNames, app_context, g_stylesheet_prototype);
+	registerGeomMethod(&g_ss_methods[4], "clear",         (Function2Ptr)stylesheetClear,         app_context, g_stylesheet_prototype);
+	registerGeomMethod(&g_ss_methods[5], "parseCSS",      (Function2Ptr)stylesheetParseCSS,      app_context, g_stylesheet_prototype);
+	registerGeomMethod(&g_ss_methods[6], "load",          (Function2Ptr)stylesheetLoad,          app_context, g_stylesheet_prototype);
+	// "parse" is an alias for parseCSS
+	registerGeomMethod(&g_ss_methods[7], "parse",         (Function2Ptr)stylesheetParseCSS,      app_context, g_stylesheet_prototype);
+
+	// Set flags to DONT_ENUM | DONT_DELETE | READ_ONLY (= 0, no flags set)
+	for (u32 i = 0; i < g_stylesheet_prototype->num_used; i++) {
+		char* pname = g_stylesheet_prototype->properties[i].name;
+		if (strcmp(pname, "__proto__") == 0) {
+			g_stylesheet_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+			continue;
+		}
+		// Clear all flags for methods
+		g_stylesheet_prototype->properties[i].flags = 0;
+	}
+
+	g_stylesheet_constructor_global.prototype_obj = g_stylesheet_prototype;
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_stylesheet_constructor_global;
+
+	g_stylesheet_constructor_init = 1;
 }
 
 // ============================================================
@@ -23160,12 +23892,14 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
-			// Check WRITABLE flag — if property exists on prototype chain but is read-only, skip
+			// Check WRITABLE flag — only on OWN properties (not prototype chain).
+			// Flash allows creating a new property on an instance even if the
+			// same-named property on the prototype is read-only.
 			{
-				ASProperty* wp = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
+				ASProperty* wp = findPropertyRaw(obj, prop_name, prop_name_len);
 				if (wp != NULL && !(wp->flags & PROPERTY_FLAG_WRITABLE))
 				{
-					return;  // Read-only property — silently ignore
+					return;  // Read-only own property — silently ignore
 				}
 			}
 			// XML nodeName: setting to non-string is a no-op (Flash behavior)
@@ -27533,6 +28267,29 @@ void actionNewMethod(SWFAppContext* app_context)
 			}
 		}
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		// Handle FUNCTION type (e.g., new TextField.StyleSheet())
+		// Look up method on the function's own_props
+		ASFunction* parent_func = (ASFunction*) obj_var.data.numeric_value;
+		if (parent_func != NULL && parent_func->own_props != NULL)
+		{
+			ActionVar* method_prop = getPropertyWithPrototype(parent_func->own_props, method_name, method_name_len);
+			if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				ASFunction* mfunc = (ASFunction*) method_prop->data.numeric_value;
+				if (mfunc != NULL && mfunc->name[0] != '\0' && mfunc->simple_func == NULL && mfunc->advanced_func == NULL)
+				{
+					ctor_name = mfunc->name;
+					user_ctor_func = mfunc;
+				}
+				else
+				{
+					user_ctor_func = mfunc;
+				}
+			}
+		}
+	}
 
 	// 6. Create new object based on constructor name
 	void* new_obj = NULL;
@@ -29525,8 +30282,17 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		return 1;
 	}
 
+	// --- StyleSheet ---
+	if (strcmp(name, "StyleSheet") == 0) {
+		if (obj->native_type == NATIVE_NONE)
+			obj->native_type = NATIVE_STYLESHEET;
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+
 	// --- Classes that return [object Object] from super() ---
-	if (strcmp(name, "LocalConnection") == 0 || strcmp(name, "StyleSheet") == 0) {
+	if (strcmp(name, "LocalConnection") == 0) {
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
