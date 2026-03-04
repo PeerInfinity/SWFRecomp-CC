@@ -572,6 +572,18 @@ namespace SWFRecomp
 		
 		context.out_draws << endl << endl;
 		
+		// Build text_data from deferred glyph entries (font_code_tables now fully populated)
+		for (auto& entry : text_glyph_entries) {
+			u16 fid = entry.first;
+			u32 glyph_index = entry.second;
+			u32 char_code = glyph_index;  // fallback to glyph index
+			auto fct_it = font_code_tables.find(fid);
+			if (fct_it != font_code_tables.end() && glyph_index < fct_it->second.size()) {
+				char_code = (u32) fct_it->second[glyph_index];
+			}
+			text_data << "\t" << to_string(char_code) << "," << endl;
+		}
+
 		context.out_draws << "u32 shape_data[" << to_string(current_tri ? 3*current_tri : 1) << "][4] =" << endl
 						  << "{" << endl
 						  << (current_tri ? shape_data.str() : "\t0\n")
@@ -1916,7 +1928,8 @@ namespace SWFRecomp
 						u32 glyph_index = (u32) tag.fields[0].value;
 						u32 advance = (u32) tag.fields[1].value;
 
-						text_data << "\t" << to_string(glyph_index) << "," << endl;
+						// Store for deferred char code lookup (font may not be parsed yet)
+						text_glyph_entries.push_back({font_id, glyph_index});
 
 						temp_matrix.translate_x += advance;
 						recompileMatrix(temp_matrix, transform_data);
@@ -2128,7 +2141,8 @@ namespace SWFRecomp
 
 						u32 glyph_index = git->second;
 
-						text_data << "\t" << to_string(glyph_index) << "," << endl;
+						// Store for deferred char code lookup
+						text_glyph_entries.push_back({font_id, glyph_index});
 
 						// Advance by per-glyph width if available, otherwise full EM
 						s32 advance = (s32) em;

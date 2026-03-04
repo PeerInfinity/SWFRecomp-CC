@@ -1903,11 +1903,22 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
-	dictionary[char_id].type = CHAR_TYPE_TEXT;
-	dictionary[char_id].text_start = text_start;
-	dictionary[char_id].text_size = text_size;
-	dictionary[char_id].transform_start = transform_start;
-	dictionary[char_id].cxform_id = cxform_id;
+	if (dictionary[char_id].type == CHAR_TYPE_TEXT) {
+		// Accumulate: extend text range to cover this additional text record
+		size_t old_start = dictionary[char_id].text_start;
+		size_t old_end = old_start + dictionary[char_id].text_size;
+		size_t new_end = text_start + text_size;
+		if (text_start < old_start) old_start = text_start;
+		if (new_end > old_end) old_end = new_end;
+		dictionary[char_id].text_start = old_start;
+		dictionary[char_id].text_size = old_end - old_start;
+	} else {
+		dictionary[char_id].type = CHAR_TYPE_TEXT;
+		dictionary[char_id].text_start = text_start;
+		dictionary[char_id].text_size = text_size;
+		dictionary[char_id].transform_start = transform_start;
+		dictionary[char_id].cxform_id = cxform_id;
+	}
 }
 
 void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,

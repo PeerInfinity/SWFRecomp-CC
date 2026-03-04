@@ -2854,6 +2854,67 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	_clone_mc_var.data.numeric_value = (u64)clone_mc;
 	setVariableByName(target_name, &_clone_mc_var);
 
+	// If source is a sprite, run frame 0 to populate clone's sprite_display_list.
+	// After cloning, clear the source MC's display_obj so TextSnapshot of source
+	// returns empty (Flash behavior: text "moves" from source to clone).
+	if (src_depth != SIZE_MAX)
+	{
+		size_t cid = display_list[src_depth].char_id;
+		if (dictionary[cid].type == CHAR_TYPE_SPRITE)
+		{
+			frame_func* funcs = dictionary[cid].sprite_frame_funcs;
+			size_t frame_count = dictionary[cid].sprite_frame_count;
+			if (funcs != NULL && frame_count > 0 && funcs[0] != NULL)
+			{
+				DisplayObject* saved_dl  = display_list;
+				size_t         saved_max = max_depth;
+				size_t         saved_cap = display_list_capacity;
+				MovieClip*     saved_ctx = NULL;
+				DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+				int            saved_catch_up = catch_up_mode;
+
+				// Create display_obj for clone to hold its children
+				if (clone_mc->display_obj == NULL) {
+					DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
+					dobj->char_id = cid;
+					dobj->sprite_dl_capacity = 64;
+					dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+					dobj->sprite_max_depth = 0;
+					clone_mc->display_obj = dobj;
+				}
+
+				DisplayObject* dobj = (DisplayObject*)clone_mc->display_obj;
+				display_list = dobj->sprite_display_list;
+				max_depth = dobj->sprite_max_depth;
+				display_list_capacity = dobj->sprite_dl_capacity;
+
+				saved_ctx = g_current_context;
+				actionSetCurrentContext(clone_mc);
+				g_current_sprite_obj = NULL;
+
+				catch_up_mode = 1;
+				funcs[0](app_context);
+				catch_up_mode = saved_catch_up;
+
+				actionSetCurrentContext(saved_ctx);
+				g_current_sprite_obj = saved_sprite_obj;
+
+				dobj->sprite_display_list = display_list;
+				dobj->sprite_max_depth = max_depth;
+				dobj->sprite_dl_capacity = display_list_capacity;
+
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
+
+			// Clear source MC's display_obj so new TextSnapshot(source) returns empty
+			if (src_mc != NULL) {
+				src_mc->display_obj = NULL;
+			}
+		}
+	}
+
 	return clone_mc;
 }
 
@@ -2951,6 +3012,61 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 	_dup_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 	_dup_mc_var.data.numeric_value = (u64)clone_mc;
 	setVariableByName(target_name, &_dup_mc_var);
+
+	// If source is a sprite, run frame 0 to populate clone's sprite_display_list
+	// (so children like text objects are available for TextSnapshot etc.)
+	if (src_depth != SIZE_MAX)
+	{
+		extern size_t display_list_capacity;
+		size_t cid = display_list[src_depth].char_id;
+		if (dictionary[cid].type == CHAR_TYPE_SPRITE)
+		{
+			frame_func* funcs = dictionary[cid].sprite_frame_funcs;
+			size_t frame_count = dictionary[cid].sprite_frame_count;
+			if (funcs != NULL && frame_count > 0 && funcs[0] != NULL)
+			{
+				DisplayObject* saved_dl  = display_list;
+				size_t         saved_max = max_depth;
+				size_t         saved_cap = display_list_capacity;
+				MovieClip*     saved_ctx = NULL;
+				DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+				int            saved_catch_up = catch_up_mode;
+
+				if (clone_mc->display_obj == NULL) {
+					DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
+					dobj->char_id = cid;
+					dobj->sprite_dl_capacity = 64;
+					dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+					dobj->sprite_max_depth = 0;
+					clone_mc->display_obj = dobj;
+				}
+
+				DisplayObject* dobj = (DisplayObject*)clone_mc->display_obj;
+				display_list = dobj->sprite_display_list;
+				max_depth = dobj->sprite_max_depth;
+				display_list_capacity = dobj->sprite_dl_capacity;
+
+				saved_ctx = g_current_context;
+				actionSetCurrentContext(clone_mc);
+				g_current_sprite_obj = NULL;
+
+				catch_up_mode = 1;
+				funcs[0](app_context);
+				catch_up_mode = saved_catch_up;
+
+				actionSetCurrentContext(saved_ctx);
+				g_current_sprite_obj = saved_sprite_obj;
+
+				dobj->sprite_display_list = display_list;
+				dobj->sprite_max_depth = max_depth;
+				dobj->sprite_dl_capacity = display_list_capacity;
+
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
+		}
+	}
 
 	return clone_mc;
 }

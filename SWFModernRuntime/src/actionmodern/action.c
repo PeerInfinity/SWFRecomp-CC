@@ -787,6 +787,296 @@ static ActionVar builtin_stub_method(SWFAppContext* app_context, ActionVar* args
 // Forward declaration needed by builtin_sound_getTransform (defined later in file)
 static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
 
+// --- TextSnapshot helpers ---
+
+// Forward declaration for convertFloat (needed by tsArgToDouble)
+static ActionStackValueType convertFloat(SWFAppContext* app_context);
+
+// Coerce an ActionVar to double (for TextSnapshot arg coercion)
+// Handles objects via valueOf by pushing to stack and calling convertFloat
+static double tsArgToDouble_ctx(SWFAppContext* app_context, ActionVar* arg)
+{
+	if (arg->type == ACTION_STACK_VALUE_F64) return VAL(double, &arg->data.numeric_value);
+	if (arg->type == ACTION_STACK_VALUE_F32) return (double)VAL(float, &arg->data.numeric_value);
+	if (arg->type == ACTION_STACK_VALUE_BOOLEAN) return arg->data.numeric_value ? 1.0 : 0.0;
+	if (arg->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(arg);
+		if (u16 && arg->str_size > 0) {
+			char buf[64]; u16_to_utf8(u16, arg->str_size, buf, sizeof(buf));
+			return strtod(buf, NULL);
+		}
+		return 0.0;
+	}
+	if (arg->type == ACTION_STACK_VALUE_OBJECT || arg->type == ACTION_STACK_VALUE_ARRAY) {
+		// Push to stack and call convertFloat for valueOf coercion
+		PUSH(arg->type, arg->data.numeric_value);
+		STACK_TOP_N = arg->str_size;
+		convertFloat(app_context);
+		double result = 0.0;
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F64) result = VAL(double, &STACK_TOP_VALUE);
+		else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32) result = (double)VAL(float, &STACK_TOP_VALUE);
+		POP();
+		return result;
+	}
+	return 0.0;  // undefined, null
+}
+
+// Check if an ActionVar is truthy (for TextSnapshot boolean args)
+static int tsArgTruthy(ActionVar* arg)
+{
+	if (arg->type == ACTION_STACK_VALUE_OBJECT || arg->type == ACTION_STACK_VALUE_FUNCTION ||
+	    arg->type == ACTION_STACK_VALUE_MOVIECLIP || arg->type == ACTION_STACK_VALUE_ARRAY)
+		return 1;
+	if (arg->type == ACTION_STACK_VALUE_BOOLEAN) return arg->data.numeric_value ? 1 : 0;
+	if (arg->type == ACTION_STACK_VALUE_F64) {
+		double v = VAL(double, &arg->data.numeric_value);
+		return (v != 0.0 && v == v) ? 1 : 0;
+	}
+	if (arg->type == ACTION_STACK_VALUE_F32) {
+		float v = VAL(float, &arg->data.numeric_value);
+		return (v != 0.0f && v == v) ? 1 : 0;
+	}
+	if (arg->type == ACTION_STACK_VALUE_STRING) return (arg->str_size > 0) ? 1 : 0;
+	return 0;  // undefined, null
+}
+
+// Capture text content from a MovieClip's display list into a TextSnapshot object.
+// Stores "__ts_text__" (UTF-16), "__ts_count__" (F64), "__ts_nl__" (UTF-16, '0'/'1' per char).
+static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, MovieClip* mc)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern Character* dictionary;
+	extern u32 text_data[];
+
+	DisplayObject* dl = NULL;
+	size_t dl_max = 0;
+	if (mc == &root_movieclip) {
+		dl = display_list;
+		dl_max = max_depth;
+	} else if (mc->display_obj != NULL) {
+		DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+		if (dobj->sprite_display_list) {
+			dl = dobj->sprite_display_list;
+			dl_max = dobj->sprite_max_depth;
+		}
+	}
+
+	// Walk display list in depth order, collect text from CHAR_TYPE_TEXT entries
+	uint16_t text_buf[4096];
+	uint16_t nl_buf[4096];  // '0' or '1' per character
+	size_t text_len = 0;
+	int first_entry = 1;
+
+	if (dl != NULL) {
+		for (size_t d = 1; d <= dl_max && text_len < 4090; d++) {
+			if (dl[d].char_id == 0) continue;
+			size_t cid = dl[d].char_id;
+			if (dictionary[cid].type != CHAR_TYPE_TEXT) continue;
+
+			size_t ts = dictionary[cid].text_start;
+			size_t tsz = dictionary[cid].text_size;
+
+			for (size_t j = 0; j < tsz && text_len < 4090; j++) {
+				u32 code = text_data[ts + j];
+				nl_buf[text_len] = (j == 0 && !first_entry) ? '1' : '0';
+				text_buf[text_len] = (uint16_t)code;
+				text_len++;
+			}
+			if (tsz > 0) first_entry = 0;
+		}
+	}
+
+	// Store text as UTF-16 string property
+	ActionVar tv = {0};
+	tv.type = ACTION_STACK_VALUE_STRING;
+	tv.str_size = (u32)text_len;
+	tv.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (text_len + 1) * sizeof(uint16_t));
+	memcpy(tv.data.string_data.heap_ptr, text_buf, text_len * sizeof(uint16_t));
+	tv.data.string_data.heap_ptr[text_len] = 0;
+	tv.data.string_data.owns_memory = true;
+	setProperty(app_context, ts_obj, "__ts_text__", 11, &tv);
+
+	// Store count
+	ActionVar cv = {0};
+	cv.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &cv.data.numeric_value) = (double)text_len;
+	setProperty(app_context, ts_obj, "__ts_count__", 12, &cv);
+
+	// Store newline-before flags as UTF-16 string of '0'/'1'
+	ActionVar nv = {0};
+	nv.type = ACTION_STACK_VALUE_STRING;
+	nv.str_size = (u32)text_len;
+	nv.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (text_len + 1) * sizeof(uint16_t));
+	memcpy(nv.data.string_data.heap_ptr, nl_buf, text_len * sizeof(uint16_t));
+	nv.data.string_data.heap_ptr[text_len] = 0;
+	nv.data.string_data.owns_memory = true;
+	setProperty(app_context, ts_obj, "__ts_nl__", 9, &nv);
+}
+
+// TextSnapshot.getCount() — returns character count
+static ActionVar builtin_ts_getCount(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = (ASObject*)this_obj;
+	if (!obj) return ret;
+	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
+	if (cv && cv->type == ACTION_STACK_VALUE_F64) {
+		ret.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &ret.data.numeric_value) = VAL(double, &cv->data.numeric_value);
+	}
+	return ret;
+}
+
+// TextSnapshot.getText(start, end[, includeNewlines]) — extract substring
+static ActionVar builtin_ts_getText(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 2 || arg_count > 3) return ret;
+
+	ASObject* obj = (ASObject*)this_obj;
+	if (!obj) return ret;
+
+	ActionVar* tv = getProperty(obj, "__ts_text__", 11);
+	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
+	ActionVar* nv = getProperty(obj, "__ts_nl__", 9);
+	if (!tv || tv->type != ACTION_STACK_VALUE_STRING || !cv || cv->type != ACTION_STACK_VALUE_F64)
+		return ret;
+
+	const uint16_t* text = varGetU16Ptr(tv);
+	int count = (int)VAL(double, &cv->data.numeric_value);
+	const uint16_t* nl_flags = (nv && nv->type == ACTION_STACK_VALUE_STRING) ? varGetU16Ptr(nv) : NULL;
+	if (!text || count == 0) return ret;
+
+	int start = (int)tsArgToDouble_ctx(app_context, &args[0]);
+	int end = (int)tsArgToDouble_ctx(app_context, &args[1]);
+	int include_nl = (arg_count >= 3) ? tsArgTruthy(&args[2]) : 0;
+
+	// Clamp
+	if (start < 0) start = 0;
+	if (start >= count) start = count - 1;
+	if (end < 0) end = 0;
+	if (end > count) end = count;
+
+	// Build result
+	uint16_t result[8192];
+	size_t rlen = 0;
+
+	if (start < end) {
+		for (int i = start; i < end && rlen < 8190; i++) {
+			if (include_nl && nl_flags && nl_flags[i] == '1')
+				result[rlen++] = '\n';
+			result[rlen++] = text[i];
+		}
+	} else {
+		// start >= end: return single char at position start
+		if (include_nl && nl_flags && nl_flags[start] == '1')
+			result[rlen++] = '\n';
+		result[rlen++] = text[start];
+	}
+
+	ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = (u32)rlen;
+	ret.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (rlen + 1) * sizeof(uint16_t));
+	memcpy(ret.data.string_data.heap_ptr, result, rlen * sizeof(uint16_t));
+	ret.data.string_data.heap_ptr[rlen] = 0;
+	ret.data.string_data.owns_memory = true;
+	return ret;
+}
+
+// TextSnapshot.findText(startIndex, textToFind, caseSensitive) — search for text
+static ActionVar builtin_ts_findText(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count != 3) return ret;
+
+	ASObject* obj = (ASObject*)this_obj;
+	if (!obj) return ret;
+
+	ActionVar* tv = getProperty(obj, "__ts_text__", 11);
+	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
+	if (!tv || tv->type != ACTION_STACK_VALUE_STRING || !cv || cv->type != ACTION_STACK_VALUE_F64)
+		return ret;
+
+	const uint16_t* text = varGetU16Ptr(tv);
+	int count = (int)VAL(double, &cv->data.numeric_value);
+	if (!text) return ret;
+
+	int start_idx = (int)tsArgToDouble_ctx(app_context, &args[0]);
+
+	// Get search text — coerce to string via stack if needed (handles objects with toString)
+	const uint16_t* search = NULL;
+	u32 search_len = 0;
+	int search_pushed = 0;
+	if (args[1].type == ACTION_STACK_VALUE_STRING) {
+		search = varGetU16Ptr(&args[1]);
+		search_len = args[1].str_size;
+	} else if (args[1].type == ACTION_STACK_VALUE_OBJECT || args[1].type == ACTION_STACK_VALUE_ARRAY ||
+	           args[1].type == ACTION_STACK_VALUE_F64 || args[1].type == ACTION_STACK_VALUE_F32 ||
+	           args[1].type == ACTION_STACK_VALUE_BOOLEAN) {
+		// Push to stack and call convertString for coercion
+		PUSH(args[1].type, args[1].data.numeric_value);
+		STACK_TOP_N = args[1].str_size;
+		char tmp[256];
+		convertString(app_context, tmp);
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STRING) {
+			search = varGetU16Ptr((ActionVar*)(STACK + SP));
+			search_len = STACK_TOP_N;
+			search_pushed = 1;
+		} else {
+			POP();
+		}
+	}
+
+	int case_sensitive = tsArgTruthy(&args[2]);
+
+	// Empty search string → -1
+	if (search_len == 0 || !search) {
+		if (search_pushed) POP();
+		ret.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &ret.data.numeric_value) = -1.0;
+		return ret;
+	}
+
+	// Negative or out-of-bounds start → -1
+	if (start_idx < 0 || start_idx >= count) {
+		if (search_pushed) POP();
+		ret.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &ret.data.numeric_value) = -1.0;
+		return ret;
+	}
+
+	// Search
+	ret.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &ret.data.numeric_value) = -1.0;
+
+	for (int i = start_idx; i <= count - (int)search_len; i++) {
+		int match = 1;
+		for (u32 j = 0; j < search_len; j++) {
+			uint16_t a = text[i + j];
+			uint16_t b = search[j];
+			if (!case_sensitive) {
+				if (a >= 'A' && a <= 'Z') a += 32;
+				if (b >= 'A' && b <= 'Z') b += 32;
+			}
+			if (a != b) { match = 0; break; }
+		}
+		if (match) {
+			VAL(double, &ret.data.numeric_value) = (double)i;
+			break;
+		}
+	}
+
+	if (search_pushed) POP();
+	return ret;
+}
+
 // Helper: resolve Sound this_obj, falling back to g_event_this_mc->dynamic_props
 // when called from MOVIECLIP method dispatch (which passes this_obj=NULL)
 static ASObject* resolveSoundThis(void* this_obj)
@@ -17872,19 +18162,37 @@ static void initTextSnapshotPrototype(SWFAppContext* app_context, ASFunction* ct
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
 	// TextSnapshot methods are NOT DONT_ENUM (enumerable + writable + configurable)
 	const u8 mflags = PROPERTY_FLAGS_DEFAULT;
-	static const char* ts_methods[] = {
-		"getCount", "setSelected", "getSelected", "getText",
-		"getSelectedText", "hitTestTextNearPos", "findText",
-		"setSelectColor", "getTextRunInfo"
-	};
-	static const u32 ts_method_lens[] = { 8, 11, 11, 7, 15, 18, 8, 14, 14 };
 	ASObject* proto = ctor->prototype_obj;
-	for (int i = 0; i < 9; i++) {
-		addStubMethodToProto(app_context, proto, ts_methods[i], ts_method_lens[i], mflags);
-		// Set VERSION_6 flag: property hidden in SWF5, visible in SWF6+
-		if (proto->num_used > 0) {
-			proto->properties[proto->num_used - 1].flash_flags = 0x0080;
+
+	// Real implementations for getCount, getText, findText
+	struct { const char* name; u32 len; Function2Ptr func; } real_methods[] = {
+		{"getCount", 8, (Function2Ptr) builtin_ts_getCount},
+		{"getText", 7, (Function2Ptr) builtin_ts_getText},
+		{"findText", 8, (Function2Ptr) builtin_ts_findText},
+	};
+	for (int i = 0; i < 3; i++) {
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, real_methods[i].name, 255);
+			fn->function_type = 2;
+			fn->advanced_func = real_methods[i].func;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, proto, real_methods[i].name, real_methods[i].len, &fv, mflags);
+			if (proto->num_used > 0) proto->properties[proto->num_used - 1].flash_flags = 0x0080;
 		}
+	}
+
+	// Remaining stub methods
+	static const char* stub_methods[] = {
+		"setSelected", "getSelected", "getSelectedText",
+		"hitTestTextNearPos", "setSelectColor", "getTextRunInfo"
+	};
+	static const u32 stub_lens[] = { 11, 11, 15, 18, 14, 14 };
+	for (int i = 0; i < 6; i++) {
+		addStubMethodToProto(app_context, proto, stub_methods[i], stub_lens[i], mflags);
+		if (proto->num_used > 0) proto->properties[proto->num_used - 1].flash_flags = 0x0080;
 	}
 }
 
@@ -27864,12 +28172,13 @@ void actionNewObject(SWFAppContext* app_context)
 	else if (strcmp(ctor_name, "TextSnapshot") == 0)
 	{
 		// TextSnapshot: native only when first arg is a MovieClip, and exactly 1 arg
-		ASObject* obj = allocObject(app_context, 4);
+		ASObject* obj = allocObject(app_context, 8);
 		if (num_args == 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 			MovieClip* arg_mc = (MovieClip*) args[0].data.numeric_value;
 			// Only native when the arg is an actual MovieClip (not button/textfield)
 			if (arg_mc && !arg_mc->is_button_mc && !MC_IS_TEXTFIELD(arg_mc)) {
 				obj->native_type = NATIVE_TEXTSNAPSHOT;
+				textSnapshotCapture(app_context, obj, arg_mc);
 			}
 		}
 
@@ -37661,25 +37970,25 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 15 && strncmp(method_name, "getTextSnapshot", 15) == 0)
 		{
-			// Return a TextSnapshot stub object with getCount() → 0
+			// Return a TextSnapshot object capturing text from this MC's display list
 			if (args != NULL) FREE(args);
-			ASObject* ts = allocObject(app_context, 4);
+			ASObject* ts = allocObject(app_context, 8);
 			retainObject(ts);
-			// Create a getCount function that returns 0
-			static ASFunction ts_getCount_func;
-			static int ts_init = 0;
-			if (!ts_init) {
-				memset(&ts_getCount_func, 0, sizeof(ASFunction));
-				strncpy(ts_getCount_func.name, "getCount", 255);
-				ts_getCount_func.function_type = 2;
-				ts_getCount_func.advanced_func = builtin_return_zero;
-				ts_getCount_func.register_count = 0;
-				ts_init = 1;
+			ts->native_type = NATIVE_TEXTSNAPSHOT;
+			textSnapshotCapture(app_context, ts, mc);
+			// Set __proto__ to TextSnapshot.prototype
+			PUSH_STR("TextSnapshot", 12);
+			actionGetVariable(app_context);
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+				ASFunction* ts_ctor = (ASFunction*)STACK_TOP_VALUE;
+				if (ts_ctor->prototype_obj) {
+					ActionVar pv = {0};
+					pv.type = ACTION_STACK_VALUE_OBJECT;
+					pv.data.numeric_value = (u64)ts_ctor->prototype_obj;
+					setProperty(app_context, ts, "__proto__", 9, &pv);
+				}
 			}
-			ActionVar fn_val = {0};
-			fn_val.type = ACTION_STACK_VALUE_FUNCTION;
-			fn_val.data.numeric_value = (u64)&ts_getCount_func;
-			setProperty(app_context, ts, "getCount", 8, &fn_val);
+			POP();
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)ts);
 			return;
 		}
