@@ -7063,7 +7063,18 @@ static ActionVar stylesheetGetStyleNames(SWFAppContext* app_context, ActionVar* 
 	if (ss_obj == NULL) return result;
 
 	ActionVar* css_var = getProperty(ss_obj, "_css", 4);
-	if (css_var == NULL || css_var->type != ACTION_STACK_VALUE_OBJECT) return result;
+	if (css_var == NULL || css_var->type != ACTION_STACK_VALUE_OBJECT) {
+		// Return empty array when no _css exists
+		ASObject* empty_arr = allocObject(app_context, 4);
+		empty_arr->native_type = NATIVE_ARRAY;
+		setObjectProto(app_context, empty_arr);
+		ActionVar len_val = {0}; len_val.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &len_val.data.numeric_value) = 0.0;
+		setProperty(app_context, empty_arr, "length", 6, &len_val);
+		result.type = ACTION_STACK_VALUE_OBJECT;
+		result.data.numeric_value = (u64)empty_arr;
+		return result;
+	}
 	ASObject* css_obj = (ASObject*)css_var->data.numeric_value;
 
 	// Create an array with all selector names
@@ -10232,6 +10243,7 @@ typedef struct {
 	char text[16384];
 	u32 text_len;
 	int swf_version; // SWF version (set by parser, used by serializer)
+	u8 from_html_text; // 1 if content was set via htmlText, 0 if via text
 } TFRunTable;
 static TFRunTable* tf_get_table(MovieClip* mc);
 static TFRunTable* tf_find_table(MovieClip* mc);
@@ -10376,6 +10388,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				if (tf_flags & 0x0040) {
 					// HTML field: parse into format runs
 					TFRunTable* _init_table = tf_get_table(mc);
+					_init_table->from_html_text = 1; // Initialized from HTML
 					TFRun _init_def;
 					tf_get_defaults(mc, &_init_def);
 					u32 _init_raw_len = (u32)strlen(raw_html);
@@ -11185,6 +11198,7 @@ static TFRunTable* tf_get_table(MovieClip* mc) {
 			g_tf_run_tables[i].run_count = 0;
 			g_tf_run_tables[i].text_len = 0;
 			g_tf_run_tables[i].text[0] = '\0';
+			g_tf_run_tables[i].from_html_text = 0;
 			return &g_tf_run_tables[i];
 		}
 	}
@@ -24070,14 +24084,12 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
-			// Check WRITABLE flag — only on OWN properties (not prototype chain).
-			// Flash allows creating a new property on an instance even if the
-			// same-named property on the prototype is read-only.
+			// Check WRITABLE flag — if property exists on prototype chain but is read-only, skip
 			{
-				ASProperty* wp = findPropertyRaw(obj, prop_name, prop_name_len);
+				ASProperty* wp = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
 				if (wp != NULL && !(wp->flags & PROPERTY_FLAG_WRITABLE))
 				{
-					return;  // Read-only own property — silently ignore
+					return;  // Read-only property — silently ignore
 				}
 			}
 			// XML nodeName: setting to non-string is a no-op (Flash behavior)
@@ -24626,6 +24638,29 @@ void actionSetMember(SWFAppContext* app_context)
 #ifdef NO_GRAPHICS
 				// Sync text → variable binding
 				ng_syncTextToVar(app_context, mc, &value_var);
+				// Sync text → htmlText (they should stay in sync)
+				if (MC_IS_TEXTFIELD(mc) && value_var.type == ACTION_STACK_VALUE_STRING) {
+					// Clear raw-content flag (text setter path)
+					ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
+					setProperty(app_context, props, "_tf_raw_content", 15, &_rc_zero);
+					setProperty(app_context, props, "htmlText", 8, &value_var);
+					// When stylesheet active, strip HTML tags from text value
+					ActionVar* _ts_ss = getProperty(props, "styleSheet", 10);
+					if (_ts_ss != NULL && _ts_ss->type == ACTION_STACK_VALUE_OBJECT) {
+						const uint16_t* _ts_su16 = varGetU16Ptr(&value_var);
+						u32 _ts_slen = value_var.str_size;
+						int _ts_has_tags = 0;
+						for (u32 _ts_i = 0; _ts_i < _ts_slen; _ts_i++) {
+							if (_ts_su16[_ts_i] == '<') { _ts_has_tags = 1; break; }
+						}
+						if (_ts_has_tags) {
+							u32 _ts_stripped_len;
+							uint16_t* _ts_stripped = strip_html_tags_u16(app_context, _ts_su16, _ts_slen, &_ts_stripped_len);
+							value_var.str_size = _ts_stripped_len;
+							VAL(u64, &value_var.data.numeric_value) = (u64)_ts_stripped;
+						}
+					}
+				}
 				// When text is set on HTML field, create a single default-format run
 				if (MC_IS_TEXTFIELD(mc) && value_var.type == ACTION_STACK_VALUE_STRING) {
 					ActionVar* _ts_html = getProperty(props, "html", 4);
@@ -24641,6 +24676,7 @@ void actionSetMember(SWFAppContext* app_context)
 							_ts_buf[0] = '\0';
 						u32 _ts_len = (u32)strlen(_ts_buf);
 						TFRunTable* _ts_table = tf_get_table(mc);
+						_ts_table->from_html_text = 0; // Content set via .text, not .htmlText
 						TFRun _ts_def;
 						tf_get_defaults(mc, &_ts_def);
 						ActionVar* _ts_tc = getProperty(props, "textColor", 9);
@@ -24699,6 +24735,9 @@ void actionSetMember(SWFAppContext* app_context)
 				ActionVar* html_flag = getProperty(props, "html", 4);
 				if (html_flag != NULL && html_flag->type == ACTION_STACK_VALUE_BOOLEAN && html_flag->data.numeric_value)
 				{
+					// Clear raw-content flag (HTML parsing path)
+					ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
+					setProperty(app_context, props, "_tf_raw_content", 15, &_rc_zero);
 					// Convert UTF-16 input to UTF-8
 					const uint16_t* _ht_u16 = varGetU16Ptr(&value_var);
 					char _ht_buf[16384];
@@ -24722,6 +24761,7 @@ void actionSetMember(SWFAppContext* app_context)
 
 					// Parse HTML into format runs
 					TFRunTable* table = tf_get_table(mc);
+					table->from_html_text = 1; // Content set via .htmlText
 					TFRun defaults;
 					tf_get_defaults(mc, &defaults);
 					// Override defaults from textColor
@@ -24752,40 +24792,59 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				else
 				{
-					// Non-HTML field: strip tags and store as text
-					const uint16_t* _ht_u16 = varGetU16Ptr(&value_var);
-					char _ht_buf[16384];
-					if (_ht_u16 && value_var.str_size > 0)
-						u16_to_utf8(_ht_u16, value_var.str_size, _ht_buf, sizeof(_ht_buf));
-					else
-						_ht_buf[0] = '\0';
-					// Simple tag stripping: remove <...> sequences
-					char plain_buf[16384];
-					u32 pi = 0;
-					for (u32 si = 0; _ht_buf[si] && pi < sizeof(plain_buf) - 1; si++) {
-						if (_ht_buf[si] == '<') {
-							while (_ht_buf[si] && _ht_buf[si] != '>') si++;
-							if (!_ht_buf[si]) break;
-						} else if (_ht_buf[si] == '\n') {
-							plain_buf[pi++] = '\r'; // \n → \r for internal storage
-						} else if (_ht_buf[si] == '\r') {
-							// skip bare \r
-						} else {
-							plain_buf[pi++] = _ht_buf[si];
+					// Non-HTML field: check if stylesheet is active
+					ActionVar* _ht_ss = getProperty(props, "styleSheet", 10);
+					int _ht_has_ss = (_ht_ss != NULL && _ht_ss->type == ACTION_STACK_VALUE_OBJECT);
+					if (_ht_has_ss) {
+						// Clear raw-content flag (stylesheet-active path)
+						ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
+						setProperty(app_context, props, "_tf_raw_content", 15, &_rc_zero);
+						// Stylesheet active: strip tags and store as text
+						const uint16_t* _ht_u16 = varGetU16Ptr(&value_var);
+						char _ht_buf[16384];
+						if (_ht_u16 && value_var.str_size > 0)
+							u16_to_utf8(_ht_u16, value_var.str_size, _ht_buf, sizeof(_ht_buf));
+						else
+							_ht_buf[0] = '\0';
+						// Simple tag stripping: remove <...> sequences
+						char plain_buf[16384];
+						u32 pi = 0;
+						for (u32 si = 0; _ht_buf[si] && pi < sizeof(plain_buf) - 1; si++) {
+							if (_ht_buf[si] == '<') {
+								while (_ht_buf[si] && _ht_buf[si] != '>') si++;
+								if (!_ht_buf[si]) break;
+							} else if (_ht_buf[si] == '\n') {
+								plain_buf[pi++] = '\r'; // \n → \r for internal storage
+							} else if (_ht_buf[si] == '\r') {
+								// skip bare \r
+							} else {
+								plain_buf[pi++] = _ht_buf[si];
+							}
 						}
+						plain_buf[pi] = '\0';
+						u32 text_u16_len = 0;
+						uint16_t* text_u16 = utf8_to_u16(app_context, plain_buf, pi, &text_u16_len);
+						ActionVar text_val = {0};
+						text_val.type = ACTION_STACK_VALUE_STRING;
+						text_val.str_size = text_u16_len;
+						VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
+						setProperty(app_context, props, "text", 4, &text_val);
+						ActionVar len_val = {0};
+						len_val.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &len_val.data.numeric_value) = (double)text_u16_len;
+						setProperty(app_context, props, "length", 6, &len_val);
+					} else {
+						// No stylesheet: text and htmlText are synonyms
+						// Set raw-content flag (content set without HTML parsing or stylesheet)
+						ActionVar _rc_one = {0}; _rc_one.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &_rc_one.data.numeric_value) = 1.0;
+						setProperty(app_context, props, "_tf_raw_content", 15, &_rc_one);
+						setProperty(app_context, props, "text", 4, &value_var);
+						ActionVar len_val = {0};
+						len_val.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &len_val.data.numeric_value) = (double)value_var.str_size;
+						setProperty(app_context, props, "length", 6, &len_val);
 					}
-					plain_buf[pi] = '\0';
-					u32 text_u16_len = 0;
-					uint16_t* text_u16 = utf8_to_u16(app_context, plain_buf, pi, &text_u16_len);
-					ActionVar text_val = {0};
-					text_val.type = ACTION_STACK_VALUE_STRING;
-					text_val.str_size = text_u16_len;
-					VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
-					setProperty(app_context, props, "text", 4, &text_val);
-					ActionVar len_val = {0};
-					len_val.type = ACTION_STACK_VALUE_F64;
-					VAL(double, &len_val.data.numeric_value) = (double)text_u16_len;
-					setProperty(app_context, props, "length", 6, &len_val);
 				}
 			}
 			// TextField variable: changing binding breaks old, creates new
@@ -24842,6 +24901,52 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 #endif
 			}
+			// TextField styleSheet setter: on removal, sync text/htmlText to stripped plain text
+#ifdef NO_GRAPHICS
+			if (prop_name_len == 10 && strncmp(prop_name, "styleSheet", 10) == 0
+				&& MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL)
+			{
+				// Check if we're REMOVING the stylesheet (setting to null/undefined/non-object)
+				int _ss_removing = (value_var.type != ACTION_STACK_VALUE_OBJECT);
+				// Check if there was a stylesheet before
+				ASObject* _ss_props = (ASObject*) mc->dynamic_props;
+				ActionVar* _ss_old = getProperty(_ss_props, "styleSheet", 10);
+				int _ss_had_old = (_ss_old != NULL && _ss_old->type == ACTION_STACK_VALUE_OBJECT);
+				if (_ss_removing && _ss_had_old) {
+					// Clear raw-content flag on stylesheet removal
+					ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
+					setProperty(app_context, _ss_props, "_tf_raw_content", 15, &_rc_zero);
+					// Removing stylesheet: get current text, strip tags, set both text and htmlText
+					ActionVar* _ss_text = getProperty(_ss_props, "text", 4);
+					if (_ss_text != NULL && _ss_text->type == ACTION_STACK_VALUE_STRING) {
+						const uint16_t* _ss_u16 = varGetU16Ptr(_ss_text);
+						u32 _ss_len = _ss_text->str_size;
+						int _ss_has_tags = 0;
+						for (u32 _ss_i = 0; _ss_i < _ss_len; _ss_i++) {
+							if (_ss_u16[_ss_i] == '<') { _ss_has_tags = 1; break; }
+						}
+						if (_ss_has_tags) {
+							u32 _ss_stripped_len;
+							uint16_t* _ss_stripped = strip_html_tags_u16(app_context, _ss_u16, _ss_len, &_ss_stripped_len);
+							ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
+							sv.str_size = _ss_stripped_len;
+							VAL(u64, &sv.data.numeric_value) = (u64)_ss_stripped;
+							setProperty(app_context, _ss_props, "text", 4, &sv);
+							setProperty(app_context, _ss_props, "htmlText", 8, &sv);
+						} else {
+							// No tags — just sync htmlText = text
+							setProperty(app_context, _ss_props, "htmlText", 8, _ss_text);
+						}
+					}
+					// Clear TFRunTable
+					TFRunTable* _ss_table = tf_find_table(mc);
+					if (_ss_table != NULL) {
+						_ss_table->mc = NULL;
+						_ss_table->run_count = 0;
+					}
+				}
+			}
+#endif
 			// TextField autoSize setter coercion
 			if (prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0
 				&& MC_IS_TEXTFIELD(mc))
@@ -26588,16 +26693,87 @@ void actionGetMember(SWFAppContext* app_context)
 						PUSH_U16(_hs_u16, _hs_u16_len);
 						return;
 					}
+					// No format table: check if stylesheet active + raw content flag
+					// When htmlText was set without a stylesheet, then a stylesheet was
+					// assigned later, Flash re-formats the raw text as HTML.
+					ASObject* _ht_dprops = (ASObject*) mc->dynamic_props;
+					ActionVar* _ht_ss = getProperty(_ht_dprops, "styleSheet", 10);
+					ActionVar* _ht_rc = getProperty(_ht_dprops, "_tf_raw_content", 15);
+					if (_ht_ss != NULL && _ht_ss->type == ACTION_STACK_VALUE_OBJECT &&
+					    _ht_rc != NULL && _ht_rc->type == ACTION_STACK_VALUE_F64) {
+						double _rc_d; memcpy(&_rc_d, &_ht_rc->data.numeric_value, sizeof(double));
+						if (_rc_d == 1.0) {
+							// Get text content
+							ActionVar* _ht_text = getProperty(_ht_dprops, "text", 4);
+							char _ht_buf[16384];
+							_ht_buf[0] = '\0';
+							if (_ht_text != NULL && _ht_text->type == ACTION_STACK_VALUE_STRING) {
+								const uint16_t* _ht_u16 = varGetU16Ptr(_ht_text);
+								if (_ht_u16 && _ht_text->str_size > 0)
+									u16_to_utf8(_ht_u16, _ht_text->str_size, _ht_buf, sizeof(_ht_buf));
+							}
+							// Get default format + overrides from setNewTextFormat
+							TFRun _ht_def;
+							tf_get_defaults(mc, &_ht_def);
+							ActionVar* _ht_fh = getProperty(_ht_dprops, "_tf_fontHeight", 14);
+							if (_ht_fh != NULL && _ht_fh->type == ACTION_STACK_VALUE_F64) {
+								double fh; memcpy(&fh, &_ht_fh->data.numeric_value, sizeof(double));
+								_ht_def.font_height = (s16)fh;
+							}
+							ActionVar* _ht_fid = getProperty(_ht_dprops, "_tf_fontId", 10);
+							if (_ht_fid != NULL && _ht_fid->type == ACTION_STACK_VALUE_F64) {
+								double fid_d; memcpy(&fid_d, &_ht_fid->data.numeric_value, sizeof(double));
+								u16 fid = (u16)fid_d;
+								const char* fn = ng_getFontName(fid);
+								if (fn[0] != '\0') {
+									strncpy(_ht_def.font_name, fn, 63);
+									_ht_def.font_name[63] = '\0';
+								}
+							}
+							ActionVar* _ht_tc = getProperty(_ht_dprops, "textColor", 9);
+							if (_ht_tc != NULL && _ht_tc->type == ACTION_STACK_VALUE_F64) {
+								double tc; memcpy(&tc, &_ht_tc->data.numeric_value, sizeof(double));
+								_ht_def.color = (u32)tc & 0x00FFFFFF;
+							}
+							// Generate <P ALIGN="..."><FONT ...>entity_escaped_text</FONT></P>
+							char html_out[32768];
+							u32 hp = 0;
+							const char* _an[] = {"LEFT", "RIGHT", "CENTER", "JUSTIFY"};
+							int ai = _ht_def.align;
+							if (ai < 0 || ai > 3) ai = 0;
+							int fsz = _ht_def.font_height / 20;
+							int ls_val = _ht_def.letter_spacing / 100;
+							hp += snprintf(html_out + hp, sizeof(html_out) - hp,
+								"<P ALIGN=\"%s\"><FONT FACE=\"%s\" SIZE=\"%d\" COLOR=\"#%06X\" LETTERSPACING=\"%d\" KERNING=\"%d\">",
+								_an[ai], _ht_def.font_name, fsz,
+								_ht_def.color & 0xFFFFFF, ls_val, _ht_def.kerning);
+							for (u32 ci = 0; _ht_buf[ci] && hp < sizeof(html_out) - 20; ci++) {
+								switch (_ht_buf[ci]) {
+									case '<': hp += snprintf(html_out + hp, sizeof(html_out) - hp, "&lt;"); break;
+									case '>': hp += snprintf(html_out + hp, sizeof(html_out) - hp, "&gt;"); break;
+									case '&': hp += snprintf(html_out + hp, sizeof(html_out) - hp, "&amp;"); break;
+									case '"': hp += snprintf(html_out + hp, sizeof(html_out) - hp, "&quot;"); break;
+									default: html_out[hp++] = _ht_buf[ci]; break;
+								}
+							}
+							hp += snprintf(html_out + hp, sizeof(html_out) - hp, "</FONT></P>");
+							html_out[hp] = '\0';
+							u32 _ho_u16_len;
+							uint16_t* _ho_u16 = utf8_to_u16(app_context, html_out, hp, &_ho_u16_len);
+							PUSH_U16(_ho_u16, _ho_u16_len);
+							return;
+						}
+					}
 				}
 				// TextField "text" property: for HTML text fields with variable binding,
 				// the variable stores raw HTML but .text should return stripped plain text.
+				// Strip when content was set via .htmlText (from_html_text flag).
 				if (prop_name_len == 4 && memcmp(prop_name, "text", 4) == 0 &&
-				    mc->ng_textfield_idx >= 0 && prop->type == ACTION_STACK_VALUE_STRING)
+				    MC_IS_TEXTFIELD(mc) && prop->type == ACTION_STACK_VALUE_STRING)
 				{
-					u16 _gm_tf_flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
-					int _gm_is_html = (_gm_tf_flags & 0x0040) != 0;
-					if (_gm_is_html) {
-						// Check if the text contains HTML tags
+					TFRunTable* _gm_table = tf_find_table(mc);
+					if (_gm_table != NULL && _gm_table->from_html_text) {
+						// Content was set via htmlText — strip tags for .text getter
 						const uint16_t* _gm_u16 = varGetU16Ptr(prop);
 						u32 _gm_len = prop->str_size;
 						int has_tags = 0;
@@ -26610,6 +26786,15 @@ void actionGetMember(SWFAppContext* app_context)
 							PUSH_U16(_gm_stripped, _gm_stripped_len);
 							return;
 						}
+					}
+				}
+				// TextField styleSheet getter: only return OBJECT type values
+				if (prop_name_len == 10 && memcmp(prop_name, "styleSheet", 10) == 0 &&
+				    MC_IS_TEXTFIELD(mc))
+				{
+					if (prop->type != ACTION_STACK_VALUE_OBJECT) {
+						PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+						return;
 					}
 				}
 #endif
