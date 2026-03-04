@@ -344,6 +344,9 @@ void actionFlushDeferredRollEvents(SWFAppContext* app_context);
 // for any MovieClip that has the property set. Iterates cache in reverse creation order
 // (front-to-back: higher depth fires first) to match Flash's dispatch order.
 void actionDispatchEnterFrameHandlers(SWFAppContext* app_context);
+// Mark dynamic MCs (createEmptyMovieClip, no display_obj) as eligible for next tick's enterFrame.
+// Called after frame processing to ensure MCs created mid-script get marked on the same tick.
+void actionMarkDynamicMCsEnterFrameEligible(void);
 // Dispatch root timeline onEnterFrame stored in var_map (DefineFunction/SetVariable path).
 void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context);
 // Dispatch _root.onLoad (fires once after first frame completes).

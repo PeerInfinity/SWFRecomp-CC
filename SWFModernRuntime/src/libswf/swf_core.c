@@ -610,6 +610,12 @@ void swfStart(SWFAppContext* app_context)
 			advance_nested_sprite_frames(app_context);
 		}
 
+		// Mark dynamic MCs (createEmptyMovieClip) as eligible for next tick's enterFrame.
+		// Must happen every tick AFTER the frame function returns, so that MCs created
+		// by DoAction scripts get marked even when the pre-DoAction tagFlushPendingEnterFrame
+		// already consumed the dispatch for this tick.
+		actionMarkDynamicMCsEnterFrameEligible();
+
 		// Flush deferred rollOver/rollOut events from Selection.setFocus() calls
 		// that occurred during frame scripts. These fire asynchronously (after script
 		// completes) but before input events are processed.

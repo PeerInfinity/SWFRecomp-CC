@@ -16417,6 +16417,15 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 	// Mark all dynamic MCs (without display_obj) as eligible for next tick's enterFrame.
 	// This ensures MCs created by createEmptyMovieClip don't fire onEnterFrame on
 	// their creation tick, but do fire on all subsequent ticks.
+	actionMarkDynamicMCsEnterFrameEligible();
+}
+
+// Mark all dynamic MCs (without display_obj) as eligible for next tick's enterFrame.
+// Extracted so it can also be called from swf_core.c after the frame function returns,
+// ensuring MCs created by DoAction scripts get marked even when the pre-DoAction
+// tagFlushPendingEnterFrame already consumed the dispatch for that tick.
+void actionMarkDynamicMCsEnterFrameEligible(void)
+{
 	for (int _ef_i = 0; _ef_i < child_mc_count; _ef_i++) {
 		MovieClip* _ef_mc = child_mc_cache[_ef_i];
 		if (_ef_mc != NULL && _ef_mc->display_obj == NULL) {
