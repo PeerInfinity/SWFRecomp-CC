@@ -6552,6 +6552,105 @@ static ASObject* createBlankTextFormat(SWFAppContext* app_context) {
 	return tf;
 }
 
+// Helper: parse suffixed number from ActionVar as i32 (like Flash parseInt, stops at non-digit)
+// NaN results → 0
+static int32_t css_parse_i32(ActionVar* val) {
+	if (val->type == ACTION_STACK_VALUE_F64) {
+		double d = VAL(double, &val->data.numeric_value);
+		if (isnan(d) || isinf(d)) return 0;
+		return (int32_t)d;
+	}
+	if (val->type == ACTION_STACK_VALUE_F32) {
+		float f = VAL(float, &val->data.numeric_value);
+		if (isnanf(f) || isinff(f)) return 0;
+		return (int32_t)f;
+	}
+	if (val->type != ACTION_STACK_VALUE_STRING) return 0;
+	const uint16_t* u16 = varGetU16Ptr(val);
+	u32 len = val->str_size;
+	if (u16 == NULL || len == 0) return 0;
+	u32 pos = 0;
+	while (pos < len && (u16[pos] == ' ' || u16[pos] == '\t' || u16[pos] == '\n' || u16[pos] == '\r')) pos++;
+	if (pos >= len) return 0;
+	int neg = 0;
+	if (u16[pos] == '-') { neg = 1; pos++; }
+	else if (u16[pos] == '+') { pos++; }
+	if (pos >= len || u16[pos] < '0' || u16[pos] > '9') return 0;
+	int64_t result = 0;
+	while (pos < len && u16[pos] >= '0' && u16[pos] <= '9') {
+		result = result * 10 + (u16[pos] - '0');
+		pos++;
+	}
+	if (neg) result = -result;
+	return (int32_t)result;
+}
+
+// Helper: parse suffixed number from ActionVar as f64 (NaN stays NaN)
+static double css_parse_f64(ActionVar* val) {
+	if (val->type == ACTION_STACK_VALUE_F64) {
+		double d = VAL(double, &val->data.numeric_value);
+		if (isnan(d) || isinf(d)) return NAN;
+		return (double)(int32_t)d;
+	}
+	if (val->type == ACTION_STACK_VALUE_F32) {
+		float f = VAL(float, &val->data.numeric_value);
+		if (isnanf(f) || isinff(f)) return (double)NAN;
+		return (double)(int32_t)f;
+	}
+	if (val->type != ACTION_STACK_VALUE_STRING) return NAN;
+	const uint16_t* u16 = varGetU16Ptr(val);
+	u32 len = val->str_size;
+	if (u16 == NULL || len == 0) return NAN;
+	u32 pos = 0;
+	while (pos < len && (u16[pos] == ' ' || u16[pos] == '\t' || u16[pos] == '\n' || u16[pos] == '\r')) pos++;
+	if (pos >= len) return NAN;
+	int neg = 0;
+	if (u16[pos] == '-') { neg = 1; pos++; }
+	else if (u16[pos] == '+') { pos++; }
+	if (pos >= len || u16[pos] < '0' || u16[pos] > '9') return NAN;
+	int64_t result = 0;
+	while (pos < len && u16[pos] >= '0' && u16[pos] <= '9') {
+		result = result * 10 + (u16[pos] - '0');
+		pos++;
+	}
+	if (neg) result = -result;
+	return (double)result;
+}
+
+// Helper: ActionScript truthiness check for CSS transform
+static int css_is_truthy(ActionVar* val) {
+	switch (val->type) {
+		case ACTION_STACK_VALUE_NULL:
+		case ACTION_STACK_VALUE_UNDEFINED:
+			return 0;
+		case ACTION_STACK_VALUE_BOOLEAN:
+			return val->data.numeric_value != 0;
+		case ACTION_STACK_VALUE_F64: {
+			double d = VAL(double, &val->data.numeric_value);
+			return !isnan(d) && d != 0.0;
+		}
+		case ACTION_STACK_VALUE_F32: {
+			float f = VAL(float, &val->data.numeric_value);
+			return !isnanf(f) && f != 0.0f;
+		}
+		case ACTION_STACK_VALUE_STRING:
+			return val->str_size > 0;
+		default:
+			return 1;
+	}
+}
+
+// Helper: check if UTF-16 string matches ASCII keyword (case-sensitive)
+static int css_str_eq(ActionVar* val, const char* kw, u32 kw_len) {
+	if (val->type != ACTION_STACK_VALUE_STRING || val->str_size != kw_len) return 0;
+	const uint16_t* u16 = varGetU16Ptr(val);
+	if (!u16) return 0;
+	for (u32 i = 0; i < kw_len; i++) {
+		if (u16[i] != (uint16_t)(unsigned char)kw[i]) return 0;
+	}
+	return 1;
+}
+
 // StyleSheet.transform(style) — converts CSS object properties to TextFormat
 static ActionVar stylesheetTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	(void)registers; (void)this_obj;
@@ -6566,27 +6665,36 @@ static ActionVar stylesheetTransform(SWFAppContext* app_context, ActionVar* args
 		return result;
 	}
 
-	// Create a TextFormat object
+	// Create a TextFormat object with defaults
 	ASObject* tf = createBlankTextFormat(app_context);
+	// Set display="block" default
+	{
+		u32 u16l;
+		uint16_t* u16s = utf8_to_u16(app_context, "block", 5, &u16l);
+		ActionVar dv = {0}; dv.type = ACTION_STACK_VALUE_STRING; dv.str_size = u16l; dv.data.numeric_value = (u64)u16s;
+		setProperty(app_context, tf, "display", 7, &dv);
+	}
+	// Set kerning=false default
+	{
+		ActionVar kv = {0}; kv.type = ACTION_STACK_VALUE_BOOLEAN; kv.data.numeric_value = 0;
+		setProperty(app_context, tf, "kerning", 7, &kv);
+	}
 
 	// If style is not an object, return the default TextFormat
 	ASObject* style_obj = NULL;
 	if (style->type == ACTION_STACK_VALUE_OBJECT && style->data.numeric_value != 0) {
 		style_obj = (ASObject*)style->data.numeric_value;
 	} else {
-		// Non-object/non-null → return blank TextFormat
 		result.type = ACTION_STACK_VALUE_OBJECT;
 		result.data.numeric_value = (u64)tf;
 		return result;
 	}
 
-	// Map CSS properties to TextFormat properties
-	// color: "#RRGGBB" → integer
+	// --- color: "#RRGGBB" → integer ---
 	ActionVar* cv = getProperty(style_obj, "color", 5);
 	if (cv != NULL && cv->type == ACTION_STACK_VALUE_STRING && cv->str_size > 0) {
 		const uint16_t* u16 = varGetU16Ptr(cv);
 		if (u16 && u16[0] == '#' && cv->str_size == 7) {
-			// Parse #RRGGBB
 			u32 color = 0;
 			for (int i = 1; i <= 6; i++) {
 				color <<= 4;
@@ -6595,126 +6703,196 @@ static ActionVar stylesheetTransform(SWFAppContext* app_context, ActionVar* args
 				else if (c >= 'a' && c <= 'f') color |= (c - 'a' + 10);
 				else if (c >= 'A' && c <= 'F') color |= (c - 'A' + 10);
 			}
-			ActionVar cval = {0};
-			cval.type = ACTION_STACK_VALUE_F64;
+			ActionVar cval = {0}; cval.type = ACTION_STACK_VALUE_F64;
 			VAL(double, &cval.data.numeric_value) = (double)color;
 			setProperty(app_context, tf, "color", 5, &cval);
 		}
-		// else: non-#RRGGBB color → leave as null
 	}
 
-	// fontSize → size (numeric)
+	// --- fontSize → size: parse as i32, must be > 0 ---
 	ActionVar* fsv = getProperty(style_obj, "fontSize", 8);
-	if (fsv != NULL && fsv->type != ACTION_STACK_VALUE_NULL && fsv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		setProperty(app_context, tf, "size", 4, fsv);
+	if (fsv != NULL) {
+		int32_t size = css_parse_i32(fsv);
+		if (size > 0) {
+			ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &sv.data.numeric_value) = (double)size;
+			setProperty(app_context, tf, "size", 4, &sv);
+		}
 	}
 
-	// fontFamily → font
+	// --- fontFamily → font: truthiness gate, STRING → font list parse ---
 	ActionVar* ffv = getProperty(style_obj, "fontFamily", 10);
-	if (ffv != NULL && ffv->type != ACTION_STACK_VALUE_NULL && ffv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		// false and 0 → null (don't set)
-		int skip = 0;
-		if (ffv->type == ACTION_STACK_VALUE_BOOLEAN && ffv->data.numeric_value == 0) skip = 1;
-		if (ffv->type == ACTION_STACK_VALUE_F64 && VAL(double, &ffv->data.numeric_value) == 0.0) skip = 1;
-		if (ffv->type == ACTION_STACK_VALUE_F32 && VAL(float, &ffv->data.numeric_value) == 0.0f) skip = 1;
-		if (ffv->type == ACTION_STACK_VALUE_STRING && ffv->str_size == 0) skip = 1;
-		if (!skip) setProperty(app_context, tf, "font", 4, ffv);
+	if (ffv != NULL && css_is_truthy(ffv)) {
+		if (ffv->type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* u16 = varGetU16Ptr(ffv);
+			u32 len = ffv->str_size;
+			if (u16 && len > 0) {
+				// Parse font list: split by comma, trim leading spaces per item, remove empty items
+				uint16_t* res = (uint16_t*)malloc((len + 1) * sizeof(uint16_t));
+				u32 rlen = 0;
+				u32 pos = 0;
+				int first = 1;
+				while (pos <= len) {
+					u32 item_start = pos;
+					while (pos < len && u16[pos] != ',') pos++;
+					u32 item_end = pos;
+					while (item_start < item_end && u16[item_start] == ' ') item_start++;
+					if (item_start < item_end) {
+						if (!first) res[rlen++] = ',';
+						first = 0;
+						memcpy(res + rlen, u16 + item_start, (item_end - item_start) * sizeof(uint16_t));
+						rlen += item_end - item_start;
+					}
+					pos++;
+				}
+				// Create string ActionVar from processed font list
+				char utf8_buf[1024];
+				u32 utf8_len = (u32)u16_to_utf8(res, rlen, utf8_buf, sizeof(utf8_buf));
+				char* utf8_heap = (char*)malloc(utf8_len + 1);
+				memcpy(utf8_heap, utf8_buf, utf8_len);
+				utf8_heap[utf8_len] = '\0';
+				uint16_t* u16_heap = (uint16_t*)malloc((rlen + 1) * sizeof(uint16_t));
+				memcpy(u16_heap, res, rlen * sizeof(uint16_t));
+				u16_heap[rlen] = 0;
+				ActionVar fval = {0}; fval.type = ACTION_STACK_VALUE_STRING; fval.str_size = rlen;
+				fval.data.numeric_value = (u64)u16_heap;
+				setProperty(app_context, tf, "font", 4, &fval);
+				free(res);
+				free(utf8_heap);
+			}
+		} else {
+			// Non-string truthy value: set directly (trace coercion handles toString)
+			setProperty(app_context, tf, "font", 4, ffv);
+		}
 	}
 
-	// textAlign → align
-	ActionVar* tav = getProperty(style_obj, "textAlign", 9);
-	if (tav != NULL && tav->type != ACTION_STACK_VALUE_NULL && tav->type != ACTION_STACK_VALUE_UNDEFINED) {
-		setProperty(app_context, tf, "align", 5, tav);
+	// --- fontStyle → italic: "normal"→false, "italic"→true ---
+	ActionVar* fsiv = getProperty(style_obj, "fontStyle", 9);
+	if (fsiv != NULL && fsiv->type == ACTION_STACK_VALUE_STRING) {
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN;
+		if (css_str_eq(fsiv, "italic", 6)) {
+			bv.data.numeric_value = 1;
+			setProperty(app_context, tf, "italic", 6, &bv);
+		} else if (css_str_eq(fsiv, "normal", 6)) {
+			bv.data.numeric_value = 0;
+			setProperty(app_context, tf, "italic", 6, &bv);
+		}
 	}
 
-	// fontWeight → bold: "bold" → true, else → null
+	// --- fontWeight → bold: "bold"→true, "normal"→false ---
 	ActionVar* fwv = getProperty(style_obj, "fontWeight", 10);
 	if (fwv != NULL && fwv->type == ACTION_STACK_VALUE_STRING) {
-		const uint16_t* u16 = varGetU16Ptr(fwv);
-		if (u16 && fwv->str_size == 4 && u16[0] == 'b' && u16[1] == 'o' && u16[2] == 'l' && u16[3] == 'd') {
-			ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 1;
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN;
+		if (css_str_eq(fwv, "bold", 4)) {
+			bv.data.numeric_value = 1;
+			setProperty(app_context, tf, "bold", 4, &bv);
+		} else if (css_str_eq(fwv, "normal", 6)) {
+			bv.data.numeric_value = 0;
 			setProperty(app_context, tf, "bold", 4, &bv);
 		}
 	}
 
-	// fontStyle → italic: "italic" → true, else → null
-	ActionVar* fsiv = getProperty(style_obj, "fontStyle", 9);
-	if (fsiv != NULL && fsiv->type == ACTION_STACK_VALUE_STRING) {
-		const uint16_t* u16 = varGetU16Ptr(fsiv);
-		if (u16 && fsiv->str_size == 6 && u16[0] == 'i' && u16[1] == 't' && u16[2] == 'a' && u16[3] == 'l' && u16[4] == 'i' && u16[5] == 'c') {
-			ActionVar iv = {0}; iv.type = ACTION_STACK_VALUE_BOOLEAN; iv.data.numeric_value = 1;
-			setProperty(app_context, tf, "italic", 6, &iv);
-		}
-	}
-
-	// textDecoration → underline: "underline" → true, else → null
+	// --- textDecoration → underline: "underline"→true, "none"→false ---
 	ActionVar* tdv = getProperty(style_obj, "textDecoration", 14);
 	if (tdv != NULL && tdv->type == ACTION_STACK_VALUE_STRING) {
-		const uint16_t* u16 = varGetU16Ptr(tdv);
-		if (u16 && tdv->str_size == 9 && u16[0] == 'u' && u16[1] == 'n' && u16[2] == 'd' && u16[3] == 'e' && u16[4] == 'r' && u16[5] == 'l' && u16[6] == 'i' && u16[7] == 'n' && u16[8] == 'e') {
-			ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_BOOLEAN; uv.data.numeric_value = 1;
-			setProperty(app_context, tf, "underline", 9, &uv);
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN;
+		if (css_str_eq(tdv, "underline", 9)) {
+			bv.data.numeric_value = 1;
+			setProperty(app_context, tf, "underline", 9, &bv);
+		} else if (css_str_eq(tdv, "none", 4)) {
+			bv.data.numeric_value = 0;
+			setProperty(app_context, tf, "underline", 9, &bv);
 		}
 	}
 
-	// marginLeft → leftMargin (numeric)
-	ActionVar* mlv = getProperty(style_obj, "marginLeft", 10);
-	if (mlv != NULL && mlv->type != ACTION_STACK_VALUE_NULL && mlv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		setProperty(app_context, tf, "leftMargin", 10, mlv);
-	}
-
-	// marginRight → rightMargin (numeric)
-	ActionVar* mrv = getProperty(style_obj, "marginRight", 11);
-	if (mrv != NULL && mrv->type != ACTION_STACK_VALUE_NULL && mrv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		setProperty(app_context, tf, "rightMargin", 11, mrv);
-	}
-
-	// indent / textIndent → indent (numeric)
-	ActionVar* indv = getProperty(style_obj, "textIndent", 10);
-	if (indv == NULL || indv->type == ACTION_STACK_VALUE_NULL || indv->type == ACTION_STACK_VALUE_UNDEFINED)
-		indv = getProperty(style_obj, "indent", 6);
-	if (indv != NULL && indv->type != ACTION_STACK_VALUE_NULL && indv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		setProperty(app_context, tf, "indent", 6, indv);
-	}
-
-	// leading → leading (numeric)
-	ActionVar* ldv = getProperty(style_obj, "leading", 7);
-	if (ldv != NULL && ldv->type != ACTION_STACK_VALUE_NULL && ldv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		setProperty(app_context, tf, "leading", 7, ldv);
-	}
-
-	// letterSpacing → letterSpacing (numeric)
-	ActionVar* lsv = getProperty(style_obj, "letterSpacing", 13);
-	if (lsv != NULL && lsv->type != ACTION_STACK_VALUE_NULL && lsv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		setProperty(app_context, tf, "letterSpacing", 13, lsv);
-	}
-
-	// kerning → kerning (boolean: "true" → true, else → false)
+	// --- kerning: string "true"→true, else parse as i32 != 0 ---
 	ActionVar* krv = getProperty(style_obj, "kerning", 7);
-	if (krv != NULL && krv->type != ACTION_STACK_VALUE_NULL && krv->type != ACTION_STACK_VALUE_UNDEFINED) {
-		ActionVar kbv = {0};
-		kbv.type = ACTION_STACK_VALUE_BOOLEAN;
-		if (krv->type == ACTION_STACK_VALUE_STRING) {
-			const uint16_t* u16 = varGetU16Ptr(krv);
-			kbv.data.numeric_value = (u16 && krv->str_size == 4 && u16[0] == 't' && u16[1] == 'r' && u16[2] == 'u' && u16[3] == 'e') ? 1 : 0;
-		} else if (krv->type == ACTION_STACK_VALUE_BOOLEAN) {
-			kbv.data.numeric_value = krv->data.numeric_value;
+	if (krv != NULL) {
+		ActionVar kbv = {0}; kbv.type = ACTION_STACK_VALUE_BOOLEAN;
+		if (css_str_eq(krv, "true", 4)) {
+			kbv.data.numeric_value = 1;
 		} else {
-			kbv.data.numeric_value = 0;
+			kbv.data.numeric_value = (css_parse_i32(krv) != 0) ? 1 : 0;
 		}
 		setProperty(app_context, tf, "kerning", 7, &kbv);
 	}
 
-	// display → display (string: "inline", "block", "none"; default="block")
+	// --- leading: truthiness gate + parse as i32 ---
+	ActionVar* ldv = getProperty(style_obj, "leading", 7);
+	if (ldv != NULL && css_is_truthy(ldv)) {
+		int32_t v = css_parse_i32(ldv);
+		ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &nv.data.numeric_value) = (double)v;
+		setProperty(app_context, tf, "leading", 7, &nv);
+	}
+
+	// --- letterSpacing: truthiness gate + parse as f64 (NaN stays NaN) ---
+	ActionVar* lsv = getProperty(style_obj, "letterSpacing", 13);
+	if (lsv != NULL && css_is_truthy(lsv)) {
+		double v = css_parse_f64(lsv);
+		ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &nv.data.numeric_value) = v;
+		setProperty(app_context, tf, "letterSpacing", 13, &nv);
+	}
+
+	// --- marginLeft → leftMargin: truthiness gate + parse as i32 + max(0) ---
+	ActionVar* mlv = getProperty(style_obj, "marginLeft", 10);
+	if (mlv != NULL && css_is_truthy(mlv)) {
+		int32_t v = css_parse_i32(mlv);
+		if (v < 0) v = 0;
+		ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &nv.data.numeric_value) = (double)v;
+		setProperty(app_context, tf, "leftMargin", 10, &nv);
+	}
+
+	// --- marginRight → rightMargin: truthiness gate + parse as i32 + max(0) ---
+	ActionVar* mrv = getProperty(style_obj, "marginRight", 11);
+	if (mrv != NULL && css_is_truthy(mrv)) {
+		int32_t v = css_parse_i32(mrv);
+		if (v < 0) v = 0;
+		ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &nv.data.numeric_value) = (double)v;
+		setProperty(app_context, tf, "rightMargin", 11, &nv);
+	}
+
+	// --- textIndent → indent: truthiness gate + parse as i32 ---
+	ActionVar* indv = getProperty(style_obj, "textIndent", 10);
+	if (indv != NULL && css_is_truthy(indv)) {
+		int32_t v = css_parse_i32(indv);
+		ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &nv.data.numeric_value) = (double)v;
+		setProperty(app_context, tf, "indent", 6, &nv);
+	}
+
+	// --- textAlign → align: case-insensitive match, lowercase output ---
+	ActionVar* tav = getProperty(style_obj, "textAlign", 9);
+	if (tav != NULL && tav->type == ACTION_STACK_VALUE_STRING && tav->str_size > 0 && tav->str_size <= 16) {
+		const uint16_t* u16 = varGetU16Ptr(tav);
+		if (u16) {
+			uint16_t lower[16];
+			u32 len = tav->str_size;
+			for (u32 i = 0; i < len; i++)
+				lower[i] = (u16[i] >= 'A' && u16[i] <= 'Z') ? u16[i] + 32 : u16[i];
+			const char* align_str = NULL; u32 align_len = 0;
+			if (len == 4 && lower[0]=='l' && lower[1]=='e' && lower[2]=='f' && lower[3]=='t') { align_str = "left"; align_len = 4; }
+			else if (len == 6 && lower[0]=='c' && lower[1]=='e' && lower[2]=='n' && lower[3]=='t' && lower[4]=='e' && lower[5]=='r') { align_str = "center"; align_len = 6; }
+			else if (len == 5 && lower[0]=='r' && lower[1]=='i' && lower[2]=='g' && lower[3]=='h' && lower[4]=='t') { align_str = "right"; align_len = 5; }
+			else if (len == 7 && lower[0]=='j' && lower[1]=='u' && lower[2]=='s' && lower[3]=='t' && lower[4]=='i' && lower[5]=='f' && lower[6]=='y') { align_str = "justify"; align_len = 7; }
+			if (align_str) {
+				u32 u16al;
+				uint16_t* u16a = utf8_to_u16(app_context, align_str, align_len, &u16al);
+				ActionVar av = {0}; av.type = ACTION_STACK_VALUE_STRING; av.str_size = u16al; av.data.numeric_value = (u64)u16a;
+				setProperty(app_context, tf, "align", 5, &av);
+			}
+		}
+	}
+
+	// --- display: case-sensitive match "inline"/"none", else keep "block" default ---
 	ActionVar* dpv = getProperty(style_obj, "display", 7);
 	if (dpv != NULL && dpv->type == ACTION_STACK_VALUE_STRING) {
-		const uint16_t* u16 = varGetU16Ptr(dpv);
-		if (u16 && dpv->str_size == 6 && u16[0] == 'i' && u16[1] == 'n' && u16[2] == 'l' && u16[3] == 'i' && u16[4] == 'n' && u16[5] == 'e') {
-			setProperty(app_context, tf, "display", 7, dpv);
-		} else if (u16 && dpv->str_size == 4 && u16[0] == 'n' && u16[1] == 'o' && u16[2] == 'n' && u16[3] == 'e') {
+		if (css_str_eq(dpv, "inline", 6) || css_str_eq(dpv, "none", 4)) {
 			setProperty(app_context, tf, "display", 7, dpv);
 		}
-		// else: unknown display value → keep default "block"
 	}
 
 	result.type = ACTION_STACK_VALUE_OBJECT;
