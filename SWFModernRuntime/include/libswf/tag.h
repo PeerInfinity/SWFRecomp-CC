@@ -33,6 +33,7 @@ int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 #endif
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
+void tagFlushPendingEnterFrame(SWFAppContext* app_context);
 
 // Tag functions needed by both graphics and trace (NO_GRAPHICS) builds.
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id, size_t shape_offset, size_t shape_size,

@@ -261,22 +261,10 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 					actionInvokeRegisteredClassConstructor(app_context, export_name, child_mc);
 			}
 
-			// Fire CLIP_EVENT_ENTER_FRAME after initialization (children first via recursive init above)
-			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
-			{
-				MovieClip* saved_ctx3 = g_current_context;
-				MovieClip* mc3 = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-				if (mc3) actionSetCurrentContext(mc3);
-				for (size_t a = 0; a < obj->clip_action_count; a++)
-				{
-					if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME)
-						obj->clip_actions[a].action(app_context);
-				}
-				actionSetCurrentContext(saved_ctx3);
-			}
-
-			// Mark eligible for AS2 onEnterFrame dispatch on the init tick
-			obj->enterframe_eligible = 1;
+			// Mark as freshly initialized (=1); upgraded to 2 after first tagShowFrame
+			// so per-tick clip event ENTER_FRAME and AS2 onEnterFrame fire on
+			// subsequent ticks only (Ruffle model: init tick fires LOAD, not EnterFrame).
+			obj->sprite_initialized = 1;
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON && ch->button_state_funcs != NULL)
 		{
@@ -475,6 +463,12 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			obj->enterframe_eligible = 1;
 			continue; // Manual nav done, skip normal advancement
 		}
+
+		// Set enterframe_eligible for ALL initialized sprites, even stopped/1-frame.
+		// This ensures per-tick clip event ENTER_FRAME and AS2 onEnterFrame fire
+		// for sprites that don't advance (matching Ruffle's unconditional model).
+		if (obj->sprite_initialized >= 2)
+			obj->enterframe_eligible = 1;
 
 		// Only advance if playing
 		if (!obj->sprite_is_playing) continue;
@@ -1109,14 +1103,29 @@ void ng_update_button_states(SWFAppContext* app_context)
 		&found_hover);
 }
 
+// Recursively upgrade sprite_initialized from 1 (this tick) to 2 (ready for per-tick dispatch).
+void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
+{
+	for (size_t i = 1; i <= dl_max; ++i)
+	{
+		if (dl[i].sprite_initialized == 1)
+			dl[i].sprite_initialized = 2;
+		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0)
+			upgrade_sprite_initialized(dl[i].sprite_display_list, dl[i].sprite_max_depth);
+	}
+}
+
 // Recursively dispatch CLIP_EVENT_ENTER_FRAME: children before parents.
-static void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
+void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
 	for (size_t i = 1; i <= dl_max; ++i)
 	{
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
+		// Skip sprites not yet fully initialized (init'd this tick = 1, or not init'd = 0)
+		if (obj->sprite_initialized < 2) continue;
 
 		// Recurse into sprite children first (depth-first, children before parents)
 		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
@@ -1137,16 +1146,35 @@ static void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
 			if (mc) actionSetCurrentContext(mc);
 		}
-		int fired = 0;
 		for (size_t a = 0; a < obj->clip_action_count; a++)
 		{
 			if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME) {
 				obj->clip_actions[a].action(app_context);
-				fired++;
 			}
 		}
 		actionSetCurrentContext(saved_ctx);
 	}
+}
+
+// --- Deferred ENTER_FRAME flush ---
+// Set by swf_core.c before the root frame function. Cleared by tagFlushPendingEnterFrame.
+// Ensures ENTER_FRAME fires between RemoveObject and DoAction (matching Flash ordering).
+int g_enterframe_flush_pending = 0;
+
+void tagFlushPendingEnterFrame(SWFAppContext* app_context)
+{
+	if (!g_enterframe_flush_pending) return;
+	g_enterframe_flush_pending = 0;
+
+	// Dispatch clip event ENTER_FRAME (recursive, children before parents).
+	// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
+	{
+		extern MovieClip root_movieclip;
+		dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
+	}
+	// Dispatch AS2 mc.onEnterFrame property handlers
+	actionDispatchEnterFrameHandlers(app_context);
+	actionDispatchRootVarMapEnterFrame(app_context);
 }
 
 // Flag to suppress tagShowFrame side effects during actionCall invocations.
@@ -1177,12 +1205,6 @@ void tagShowFrame(SWFAppContext* app_context)
 		extern void ng_sync_root_display_obj(void);
 		ng_sync_root_display_obj();
 
-		// Record MC count before sprite/button init — MCs created during init
-		// should not fire onEnterFrame on their placement frame.
-		extern int child_mc_count;
-		extern int g_enterframe_new_mc_start;
-		int mc_count_before = child_mc_count;
-
 		int saved_catch_up = catch_up_mode;
 		catch_up_mode = 0;
 		process_sprite_needs_init(app_context, &root_movieclip);
@@ -1197,11 +1219,17 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Fire deferred onLoadInit handlers from MovieClipLoader.loadClip
 		actionFirePendingLoadInits(app_context);
 
-		// Dispatch AS2 mc.onEnterFrame property handlers, but skip MCs
-		// created during process_sprite_needs_init (they fire next frame).
-		g_enterframe_new_mc_start = mc_count_before;
-		actionDispatchEnterFrameHandlers(app_context);
-		g_enterframe_new_mc_start = -1;  // reset skip threshold
+		// Fallback: flush pending ENTER_FRAME if not already flushed by a
+		// tagFlushPendingEnterFrame call (emitted before DoAction by the recompiler).
+		// For frames with no DoAction, this ensures ENTER_FRAME still fires.
+		tagFlushPendingEnterFrame(app_context);
+
+		// Upgrade sprite_initialized from 1 (this tick) to 2 (ready for per-tick dispatch).
+		// Must recurse into nested sprite display lists.
+		{
+			void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max);
+			upgrade_sprite_initialized(display_list, max_depth);
+		}
 
 		// After the first tagShowFrame, root's enterFrame becomes eligible.
 		// On the first frame, root fires LOAD (its frame script), not enterFrame.

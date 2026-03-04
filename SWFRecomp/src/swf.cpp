@@ -480,6 +480,8 @@ namespace SWFRecomp
 		// If we exited the tag loop early (cur_pos past end), close the current frame function
 		if (tag.code != 0)
 		{
+			// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
+			context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
 			// Emit any queued script calls (skip sprite/clip/button-owned scripts)
 			while (last_queued_script < next_script_i)
 			{
@@ -702,6 +704,8 @@ namespace SWFRecomp
 		{
 			case SWF_TAG_END_TAG:
 			{
+				// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
+				context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
 				// Emit any queued script calls (skip sprite/clip/button-owned scripts)
 				while (last_queued_script < next_script_i)
 				{
@@ -754,6 +758,8 @@ namespace SWFRecomp
 				}
 				buffered_removes.clear();
 
+				// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
+				context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
 				while (last_queued_script < next_script_i)
 				{
 					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())

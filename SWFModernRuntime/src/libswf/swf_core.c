@@ -531,13 +531,25 @@ void swfStart(SWFAppContext* app_context)
 		{
 			// Two-phase sprite advancement matching Ruffle's execution order:
 			// Phase 1: Advance root-level sprites (defer nested child recursion)
-			// Phase 2: Run root frame script
+			// Phase 2: Run root frame script (EnterFrame flushes between RemoveObject & DoAction)
 			// Phase 3: Advance nested children of sprites
 			extern int g_advance_defer_nested;
 			g_advance_defer_nested = 1;
 			advance_sprite_frames(app_context);
 			g_advance_defer_nested = 0;
-			// Only run the root frame function if the root timeline is playing
+
+			// Mark ENTER_FRAME dispatch as pending. The actual dispatch happens in
+			// tagFlushPendingEnterFrame() which is called:
+			//   1. By the recompiler-emitted code right before each DoAction (after RemoveObject)
+			//   2. As fallback in tagShowFrame (for frames with no DoAction)
+			// This ensures ENTER_FRAME fires after RemoveObject (skip removed clips)
+			// but before DoAction (matching Flash's per-frame lifecycle ordering).
+			{
+				extern int g_enterframe_flush_pending;
+				g_enterframe_flush_pending = 1;
+			}
+
+			// Run root frame function if the root timeline is playing
 			if (is_playing || manual_next_frame)
 			{
 				// If a deferred root goto is pending (from a sprite script targeting root),
@@ -555,19 +567,16 @@ void swfStart(SWFAppContext* app_context)
 					break;
 				}
 			}
-			else
+			// Fallback: if root is stopped (no frame function ran), flush pending
+			// ENTER_FRAME directly. Without this, dynamic MCs (createEmptyMovieClip)
+			// with onEnterFrame handlers would never get dispatched while root is stopped.
 			{
-				// Root stopped but still within frame list — dispatch enterFrame
-				// handlers for this tick (tagShowFrame would normally do this).
-				actionDispatchEnterFrameHandlers(app_context);
-				actionDispatchRootVarMapEnterFrame(app_context);
+				extern int g_enterframe_flush_pending;
+				if (g_enterframe_flush_pending)
+					tagFlushPendingEnterFrame(app_context);
 			}
 			// Phase 3: advance nested sprite children (deferred from Phase 1)
 			advance_nested_sprite_frames(app_context);
-			// (clip action ENTER_FRAME dispatch is a known gap for 1-frame sprites
-			// on subsequent ticks — see issue_1104. Proper fix needs Ruffle's
-			// action-queue model where events are queued during run_frame_avm1
-			// and executed after all clips in the global exec list are processed.)
 		}
 		else
 		{
@@ -584,19 +593,14 @@ void swfStart(SWFAppContext* app_context)
 				advance_sprite_frames(app_context);
 				g_advance_defer_nested = 0;
 			}
+			// Dispatch clip event ENTER_FRAME (recursive, children before parents)
+			{
+				extern MovieClip root_movieclip;
+				extern void dispatch_enterframe_clip_actions(SWFAppContext*, DisplayObject*, size_t, MovieClip*);
+				dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
+			}
 			actionDispatchEnterFrameHandlers(app_context);
 			actionDispatchRootVarMapEnterFrame(app_context);
-			// Dispatch onClipEvent(enterFrame) clip actions
-			for (size_t _fi = 1; _fi <= max_depth; _fi++)
-			{
-				DisplayObject* _obj = &display_list[_fi];
-				if (_obj->char_id == 0 || _obj->clip_action_count == 0) continue;
-				for (size_t _a = 0; _a < _obj->clip_action_count; _a++)
-				{
-					if (_obj->clip_actions[_a].event_flags & CLIP_EVENT_ENTER_FRAME)
-						_obj->clip_actions[_a].action(app_context);
-				}
-			}
 			advance_nested_sprite_frames(app_context);
 		}
 
