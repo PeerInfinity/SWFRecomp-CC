@@ -22135,7 +22135,7 @@ void actionImplementsOp(SWFAppContext* app_context)
  * @param stack Pointer to the runtime stack
  * @param sp Pointer to stack pointer
  */
-void actionCall(SWFAppContext* app_context)
+int actionCall(SWFAppContext* app_context)
 {
 	// Access global frame info (set by swfStart)
 	extern frame_func* g_frame_funcs;
@@ -22156,9 +22156,12 @@ void actionCall(SWFAppContext* app_context)
 	// Determine frame functions to use: sprite context or root timeline
 	frame_func* call_funcs = g_frame_funcs;
 	size_t call_count = g_frame_count;
+	MovieClip* call_ctx = NULL;
 #ifdef NO_GRAPHICS
 	// If current context is a sprite (not root), use the sprite's frame functions
-	MovieClip* call_ctx = g_base_clip ? g_base_clip : g_current_context;
+	// Use g_current_context (affected by tellTarget), NOT g_base_clip.
+	// Ruffle: target_clip_or_root() — the clip set by SetTarget, or root.
+	call_ctx = g_current_context ? g_current_context : &root_movieclip;
 	if (call_ctx != NULL && call_ctx != &root_movieclip &&
 	    call_ctx->depth != INT_MIN && call_ctx->display_obj != NULL) {
 		extern Character* dictionary;
@@ -22173,6 +22176,44 @@ void actionCall(SWFAppContext* app_context)
 	}
 #endif
 
+	// Helper: execute a frame function with state save/restore.
+	// Sets g_tag_skip_mode=1 so only DoAction scripts run (tags are skipped).
+	// This matches Ruffle's call() which only runs actions_on_frame, not tag processing.
+	// ctx_mc: if non-NULL, switch g_current_context to this MC during execution
+	#define CALL_FRAME_FUNC(funcs, idx, ctx_mc) do { \
+		extern size_t next_frame; \
+		extern int manual_next_frame; \
+		extern int is_playing; \
+		extern int catch_up_mode; \
+		extern int g_in_action_call; \
+		extern int g_tag_skip_mode; \
+		int _saved_quit = quit_swf; \
+		size_t _saved_nf = next_frame; \
+		int _saved_man = manual_next_frame; \
+		int _saved_play = is_playing; \
+		int _saved_cu = catch_up_mode; \
+		int _saved_ic = g_in_action_call; \
+		int _saved_ts = g_tag_skip_mode; \
+		MovieClip* _saved_ctx = g_current_context; \
+		quit_swf = 0; \
+		g_in_action_call = 1; \
+		g_tag_skip_mode = 1; \
+		if ((ctx_mc) != NULL) setCurrentContext((MovieClip*)(ctx_mc)); \
+		(funcs)[(idx)](app_context); \
+		quit_swf = _saved_quit; \
+		next_frame = _saved_nf; \
+		manual_next_frame = _saved_man; \
+		is_playing = _saved_play; \
+		catch_up_mode = _saved_cu; \
+		g_in_action_call = _saved_ic; \
+		g_tag_skip_mode = _saved_ts; \
+		g_current_context = _saved_ctx; \
+	} while(0)
+
+	// Helper: check if base_clip was removed after call() execution
+	// (Ruffle: continue_if_base_clip_exists — if removed, caller should terminate)
+	MovieClip* _call_base = g_base_clip ? g_base_clip : g_current_context;
+
 	if (frame_var.type == ACTION_STACK_VALUE_F32 || frame_var.type == ACTION_STACK_VALUE_F64) {
 		// Numeric frame (1-based in Flash, convert to 0-based index)
 		double frame_double;
@@ -22184,36 +22225,17 @@ void actionCall(SWFAppContext* app_context)
 			memcpy(&frame_double, &frame_var.data.numeric_value, sizeof(double));
 		}
 
-		// Convert 1-based frame number to 0-based index
-		s32 frame_num = (s32)frame_double - 1;
-		if (frame_num < 0) {
-			return;
+		// Convert 1-based frame number to 0-based index using wrapping u32 arithmetic
+		// (Ruffle: f64_to_wrapping_u32 — cast as u32 which wraps large values)
+		u32 frame_u32 = (u32)(s64)frame_double;  // wrapping cast
+		if (frame_u32 == 0) {
+			return 0;  // frame 0 (1-based) is invalid
 		}
+		u32 frame_num = frame_u32 - 1;
 
 		// Validate frame is in range
 		if (call_funcs && (size_t)frame_num < call_count) {
-			// Save frame navigation state — call() only runs DoAction,
-			// must not affect the calling timeline's navigation
-			extern size_t next_frame;
-			extern int manual_next_frame;
-			extern int is_playing;
-			extern int catch_up_mode;
-			extern int g_in_action_call;
-			int saved_quit_swf = quit_swf;
-			size_t saved_next_frame = next_frame;
-			int saved_manual = manual_next_frame;
-			int saved_playing = is_playing;
-			int saved_catchup = catch_up_mode;
-			int saved_in_call = g_in_action_call;
-			quit_swf = 0;
-			g_in_action_call = 1;
-			call_funcs[frame_num](app_context);
-			quit_swf = saved_quit_swf;
-			next_frame = saved_next_frame;
-			manual_next_frame = saved_manual;
-			is_playing = saved_playing;
-			catch_up_mode = saved_catchup;
-			g_in_action_call = saved_in_call;
+			CALL_FRAME_FUNC(call_funcs, frame_num, call_ctx);
 		}
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_STRING) {
@@ -22227,7 +22249,7 @@ void actionCall(SWFAppContext* app_context)
 		const char* frame_str = _ac_buf;
 
 		if (frame_str[0] == '\0') {
-			return;
+			return 0;
 		}
 
 		// Parse target path if present (format: "target:frame" or "/target:frame")
@@ -22248,6 +22270,45 @@ void actionCall(SWFAppContext* app_context)
 			}
 		}
 
+		// Resolve target MC if path specified
+		frame_func* target_funcs = call_funcs;
+		size_t target_count = call_count;
+		size_t target_char_id = 0;  // for sprite label lookup
+		MovieClip* call_target_mc = NULL;  // MC to switch context to during call
+#ifdef NO_GRAPHICS
+		if (target) {
+			// Resolve slash path to MovieClip
+			MovieClip* start_mc_for_resolve = (target[0] == '/') ? &root_movieclip : (call_ctx ? call_ctx : &root_movieclip);
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, target, (u32)strlen(target), start_mc_for_resolve);
+			call_target_mc = target_mc;
+			if (target_mc != NULL && target_mc != &root_movieclip &&
+			    target_mc->depth != INT_MIN && target_mc->display_obj != NULL) {
+				extern Character* dictionary;
+				DisplayObject* dobj = (DisplayObject*)target_mc->display_obj;
+				if (dobj->char_id > 0) {
+					Character* ch = &dictionary[dobj->char_id];
+					if (ch->type == CHAR_TYPE_SPRITE && ch->sprite_frame_funcs != NULL) {
+						target_funcs = ch->sprite_frame_funcs;
+						target_count = ch->sprite_frame_count;
+						target_char_id = dobj->char_id;
+					}
+				}
+			} else if (target_mc == &root_movieclip) {
+				target_funcs = g_frame_funcs;
+				target_count = g_frame_count;
+				target_char_id = 0;
+			} else {
+				// Target not found - no-op
+				return 0;
+			}
+		} else if (call_ctx != NULL && call_ctx != &root_movieclip &&
+		           call_ctx->display_obj != NULL) {
+			// No explicit target - use call context's char_id for label lookup
+			DisplayObject* dobj = (DisplayObject*)call_ctx->display_obj;
+			if (dobj->char_id > 0) target_char_id = dobj->char_id;
+		}
+#endif
+
 		// Check if frame_part is numeric or a label
 		char* endptr;
 		long frame_num = strtol(frame_part, &endptr, 10);
@@ -22256,42 +22317,41 @@ void actionCall(SWFAppContext* app_context)
 			// It's a numeric frame (1-based, convert to 0-based index)
 			frame_num -= 1;
 			if (frame_num < 0) {
-				return;
+				return 0;
 			}
 
-			if (target) {
-				// Target path specified - not yet implemented (requires MovieClip tree traversal)
-			} else {
-				if (call_funcs && (size_t)frame_num < call_count) {
-					extern size_t next_frame;
-					extern int manual_next_frame;
-					extern int is_playing;
-					extern int catch_up_mode;
-					extern int g_in_action_call;
-					int saved_quit_swf = quit_swf;
-					size_t saved_next_frame = next_frame;
-					int saved_manual = manual_next_frame;
-					int saved_playing = is_playing;
-					int saved_catchup = catch_up_mode;
-					int saved_in_call = g_in_action_call;
-					quit_swf = 0;
-					g_in_action_call = 1;
-					call_funcs[frame_num](app_context);
-					quit_swf = saved_quit_swf;
-					next_frame = saved_next_frame;
-					manual_next_frame = saved_manual;
-					is_playing = saved_playing;
-					catch_up_mode = saved_catchup;
-					g_in_action_call = saved_in_call;
-				}
+			if (target_funcs && (size_t)frame_num < target_count) {
+				CALL_FRAME_FUNC(target_funcs, frame_num, call_target_mc ? call_target_mc : call_ctx);
 			}
 		} else {
-			// It's a frame label - not yet implemented
+			// Frame label lookup
+			int label_frame = -1;
+#ifdef NO_GRAPHICS
+			if (target_char_id > 0) {
+				extern int ng_findSpriteLabelFrame(size_t char_id, const char* label);
+				label_frame = ng_findSpriteLabelFrame(target_char_id, frame_part);
+			} else {
+				label_frame = findFrameByLabel(frame_part);
+			}
+#else
+			label_frame = findFrameByLabel(frame_part);
+#endif
+			if (label_frame >= 0 && target_funcs && (size_t)label_frame < target_count) {
+				CALL_FRAME_FUNC(target_funcs, label_frame, call_target_mc ? call_target_mc : call_ctx);
+			}
 		}
 	}
 	else {
 		// Undefined or invalid type - ignore
 	}
+
+	#undef CALL_FRAME_FUNC
+
+	// Check if base_clip was removed — if so, caller should terminate
+	if (_call_base != NULL && _call_base != &root_movieclip && _call_base->depth == INT_MIN) {
+		return 1;
+	}
+	return 0;
 }
 
 /**

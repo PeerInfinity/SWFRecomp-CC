@@ -280,7 +280,7 @@ void actionGetCurrentSuperInfo(u64* out_this, u32* out_depth);
 void* resolveProtoVar(ActionVar* proto_var);
 
 void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*func)(SWFAppContext*), u32 param_count);
-void actionCall(SWFAppContext* app_context);
+int actionCall(SWFAppContext* app_context);
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer);
 void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_target_flag, u8 load_variables_flag);
 void actionSetMember(SWFAppContext* app_context);

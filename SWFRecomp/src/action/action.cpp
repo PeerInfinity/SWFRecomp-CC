@@ -1933,8 +1933,14 @@ namespace SWFRecomp
 
 				case SWF_ACTION_CALL:
 				{
-					out_script << "\t" << "// Call" << endl
-							   << "\t" << "actionCall(app_context);" << endl;
+					out_script << "\t" << "// Call" << endl;
+					if (parse_depth > 1) {
+						// Inside a DefineFunction body (returns ActionVar)
+						out_script << "\t" << "if (actionCall(app_context)) { ActionVar _cr = {0}; _cr.type = ACTION_STACK_VALUE_UNDEFINED; return _cr; }" << endl;
+					} else {
+						// Top-level frame script (void function)
+						out_script << "\t" << "if (actionCall(app_context)) return;" << endl;
+					}
 
 					break;
 				}
