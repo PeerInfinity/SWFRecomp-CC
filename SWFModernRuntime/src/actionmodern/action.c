@@ -10402,9 +10402,10 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	int saved_p_align = -1; // Alignment from <p> auto-closed by <li> (restored on post-LI </p>)
 	u32 i = 0;
 	while (i < html_len) {
-		// SWF<=7: When entering a new text node (after a tag), check if the entire
+		// When entering a new text node (after a tag), check if the entire
 		// text node (up to next '<') is whitespace-only. If so, skip it.
-		if (swf_version <= 7 && after_tag && html[i] != '<') {
+		// SWF<=7: always applies. SWF8+: only when condenseWhite is active.
+		if ((swf_version <= 7 || condense_white) && after_tag && html[i] != '<') {
 			u32 tn_end = i;
 			int tn_all_ws = 1;
 			while (tn_end < html_len && html[tn_end] != '<') {
@@ -10599,8 +10600,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 						}
 						if (sz > 127) sz = 127; // Flash clamps to 127
 						if (sz > 0) fmt_stack[fmt_sp].font_height = (s16)(sz * 20);
-						else if (sz == 0 && !is_relative) ; // absolute 0 → ignore
-						else if (sz <= 0) fmt_stack[fmt_sp].font_height = 1 * 20; // min 1
+						else fmt_stack[fmt_sp].font_height = 1 * 20; // min 1 (size 0 and negative)
 					}
 				}
 				if (tf_get_attr(tname, tname_len, "color", av, sizeof(av))) {
@@ -14257,6 +14257,10 @@ void actionTrace(SWFAppContext* app_context)
 			{
 				char utf8_buf[4096];
 				int utf8_len = u16_to_utf8(u16, u16_len, utf8_buf, sizeof(utf8_buf));
+				// Replace \r with \n in output (Flash uses \r internally as line separator)
+				for (int ti = 0; ti < utf8_len; ti++) {
+					if (utf8_buf[ti] == '\r') utf8_buf[ti] = '\n';
+				}
 				fwrite(utf8_buf, 1, utf8_len, stdout);
 			}
 			printf("\n");
@@ -23533,6 +23537,43 @@ void actionSetMember(SWFAppContext* app_context)
 					// Convert plain text to UTF-16 and store as "text"
 					u32 text_u16_len = 0;
 					uint16_t* text_u16 = utf8_to_u16(app_context, plain_buf, plain_len, &text_u16_len);
+					ActionVar text_val = {0};
+					text_val.type = ACTION_STACK_VALUE_STRING;
+					text_val.str_size = text_u16_len;
+					VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
+					setProperty(app_context, props, "text", 4, &text_val);
+					ActionVar len_val = {0};
+					len_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &len_val.data.numeric_value) = (double)text_u16_len;
+					setProperty(app_context, props, "length", 6, &len_val);
+				}
+				else
+				{
+					// Non-HTML field: strip tags and store as text
+					const uint16_t* _ht_u16 = varGetU16Ptr(&value_var);
+					char _ht_buf[16384];
+					if (_ht_u16 && value_var.str_size > 0)
+						u16_to_utf8(_ht_u16, value_var.str_size, _ht_buf, sizeof(_ht_buf));
+					else
+						_ht_buf[0] = '\0';
+					// Simple tag stripping: remove <...> sequences
+					char plain_buf[16384];
+					u32 pi = 0;
+					for (u32 si = 0; _ht_buf[si] && pi < sizeof(plain_buf) - 1; si++) {
+						if (_ht_buf[si] == '<') {
+							while (_ht_buf[si] && _ht_buf[si] != '>') si++;
+							if (!_ht_buf[si]) break;
+						} else if (_ht_buf[si] == '\n') {
+							plain_buf[pi++] = '\r'; // \n → \r for internal storage
+						} else if (_ht_buf[si] == '\r') {
+							// skip bare \r
+						} else {
+							plain_buf[pi++] = _ht_buf[si];
+						}
+					}
+					plain_buf[pi] = '\0';
+					u32 text_u16_len = 0;
+					uint16_t* text_u16 = utf8_to_u16(app_context, plain_buf, pi, &text_u16_len);
 					ActionVar text_val = {0};
 					text_val.type = ACTION_STACK_VALUE_STRING;
 					text_val.str_size = text_u16_len;
@@ -38666,6 +38707,7 @@ static ActionVar builtin_selection_setSelection(SWFAppContext* app_context, Acti
 	g_selection_begin = (a <= b) ? a : b;
 	g_selection_end = (a <= b) ? b : a;
 	g_selection_caret = b;  // caret tracks second arg (or textLen for 1-arg form)
+	g_tf_select_all = 0;  // explicit setSelection overrides select-all
 	return ret;
 }
 
