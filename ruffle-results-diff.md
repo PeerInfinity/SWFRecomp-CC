@@ -1,27 +1,38 @@
 # Ruffle Test Results Diff
 
-**Previous:** `dd1d31e45545` (2026-03-04T18:32:35.009525+00:00)
-**Current:** `ff133f9dde75` (2026-03-04T19:17:10.708070+00:00)
+**Previous:** `ff133f9dde75` (2026-03-04T19:17:10.708070+00:00)
+**Current:** `a50d38f8e84b` (2026-03-04T21:19:14.827281+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 445 | 446 | +1 |
+| Passing | 446 | 445 | -1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 71.9% | 72.1% | +0.2% |
-| Mismatched lines | 22376 | 22327 | -49 |
-|   Decreased | | | -50 |
-|   Increased | | | +1 |
+| Pass rate | 72.1% | 71.9% | -0.2% |
+| Mismatched lines | 22327 | 21694 | -633 |
+|   Decreased | | | -648 |
+|   Increased | | | +15 |
 
-## Newly Passing (1)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `call` | output_mismatch | 13/63 | 63/63 |
+| `stylesheet` | output_mismatch | 15/283 | 283/283 |
+| `stylesheet_transform` | output_mismatch | 375/750 | 750/750 |
 
-## Line Count Changed (1)
+## Newly Failing (3)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `printjob_props_swf5` | output_mismatch | 45/45 | 40/45 |
+| `printjob_props_swf6` | output_mismatch | 45/45 | 40/45 |
+| `printjob_props_swf7` | output_mismatch | 45/45 | 40/45 |
+
+## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `removed_target_clip_scope` | output_mismatch | 12/35 | 11/35 | +1 |
+| `edittext_stylesheet` | output_mismatch | 298/325 | 301/325 | -3 |
+| `clone_sprite_edittext` | output_mismatch | 25/94 | 26/94 | -1 |
+| `clone_sprite_edittext_dynamic` | output_mismatch | 51/86 | 52/86 | -1 |
