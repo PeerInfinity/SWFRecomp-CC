@@ -11,7 +11,7 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 
 ## Final Test Results (15 tests)
 
-### Passing (11/15)
+### Passing (12/15)
 
 | Test | Lines | Result |
 |------|-------|--------|
@@ -27,13 +27,13 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 | empty_movieclip_can_attach_movies | 11 | **PASS** |
 | do_init_action_child | 12 | **12/12 PASS** ✅ (cross-version Phase 1+4 + ImportAssets2) |
 
-### Failing (4/15)
+### Failing (3/15)
 
 | Test | Lines | Match | Blocker |
 |------|-------|-------|---------|
 | register_class | 67 | 26/67 | Lines 27-29: button MC typeof. Lines 31+: child SWF loading (loadMovie) |
 | register_class_swf6 | 37 | 2/37 | Entirely depends on child SWF loading |
-| register_class_with_sound | 11 | 5/11 | Needs Sound class implementation |
+| register_class_with_sound | 11 | 11/11 | **PASS** (fixed by Sound Phase 0) |
 | register_and_init_order | 233 | ~76/233 | Line 35: deep child access during constructor. Lines 133+: child sprite constructor ordering |
 
 ## What Was Implemented
@@ -90,10 +90,9 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 **Root cause**: When constructor fires at tagSetInstanceName, only the immediate children's display list is populated. Grandchildren haven't been placed yet because their parent sprite hasn't executed its tags.
 **Difficulty**: HIGH — would require recursive tag execution for child sprites before constructor invocation.
 
-### 4. Sound Class Implementation
-**Blocks**: register_class_with_sound (6 lines)
-**What's needed**: Sound constructor, Sound.attachSound(), Sound.start(), Sound.stop(). The test registers a class for a sound symbol.
-**Plan**: Part of GLOBALS_PLAN (Sound class stub exists but is minimal)
+### 4. Sound Class Implementation — RESOLVED
+**Was blocking**: register_class_with_sound (6 lines) — now PASS (11/11)
+**Fixed by**: Sound Phase 0 (getPan/setPan/getTransform/setTransform, checkInstanceOf for registerClass MCs)
 
 ### 5. Button MC typeof
 **Blocks**: register_class (lines 27-29, 3 lines)

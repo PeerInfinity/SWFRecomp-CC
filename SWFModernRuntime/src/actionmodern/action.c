@@ -784,14 +784,67 @@ static ActionVar builtin_stub_method(SWFAppContext* app_context, ActionVar* args
 	return ret;
 }
 
+// Forward declaration needed by builtin_sound_getTransform (defined later in file)
+static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
+
+// Helper: resolve Sound this_obj, falling back to g_event_this_mc->dynamic_props
+// when called from MOVIECLIP method dispatch (which passes this_obj=NULL)
+static ASObject* resolveSoundThis(void* this_obj)
+{
+	if (this_obj != NULL) return (ASObject*)this_obj;
+	extern MovieClip* g_event_this_mc;
+	if (g_event_this_mc != NULL && g_event_this_mc->dynamic_props != NULL)
+		return (ASObject*)g_event_this_mc->dynamic_props;
+	return NULL;
+}
+
+// Helper: convert ActionVar to int32 for Sound methods using clamp_to_i32 semantics
+// (matches Ruffle: if in [INT32_MIN, INT32_MAX] → cast, else → INT32_MIN. NaN → INT32_MIN)
+static int32_t soundArgToInt32(ActionVar* arg)
+{
+	double d = 0.0;
+	if (arg->type == ACTION_STACK_VALUE_F64) d = VAL(double, &arg->data.numeric_value);
+	else if (arg->type == ACTION_STACK_VALUE_F32) d = (double)VAL(float, &arg->data.numeric_value);
+	else if (arg->type == ACTION_STACK_VALUE_BOOLEAN) d = arg->data.numeric_value ? 1.0 : 0.0;
+	else if (arg->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(arg);
+		if (u16 != NULL && arg->str_size > 0) {
+			char buf[64]; u16_to_utf8(u16, arg->str_size, buf, sizeof(buf));
+			d = strtod(buf, NULL);
+		}
+	}
+	// clamp_to_i32: NaN and out-of-range values → INT32_MIN
+	if (d >= (double)INT32_MIN && d <= (double)INT32_MAX) return (int32_t)d;
+	return INT32_MIN;
+}
+
+// Helper: read internal sound transform property as int32
+static int32_t readSoundProp(ASObject* obj, const char* name, u32 len)
+{
+	ActionVar* v = getPropertyWithPrototype(obj, name, len);
+	if (v == NULL) return 0;
+	if (v->type == ACTION_STACK_VALUE_F64) return (int32_t)VAL(double, &v->data.numeric_value);
+	if (v->type == ACTION_STACK_VALUE_F32) return (int32_t)VAL(float, &v->data.numeric_value);
+	return 0;
+}
+
+// Helper: write internal sound transform property
+static void writeSoundProp(SWFAppContext* app_context, ASObject* obj, const char* name, u32 len, int32_t val)
+{
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &v.data.numeric_value) = (double)val;
+	setPropertyWithFlags(app_context, obj, name, len, &v, PROPERTY_FLAGS_DONTENUM);
+}
+
 // Sound.getVolume() - returns the __volume__ property (default 100)
 static ActionVar builtin_sound_getVolume(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)args; (void)arg_count; (void)registers;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
-	if (this_obj == NULL) return ret;
-	ASObject* obj = (ASObject*)this_obj;
+	ASObject* obj = resolveSoundThis(this_obj);
+	if (obj == NULL) return ret;
 	ActionVar* vol = getPropertyWithPrototype(obj, "__volume__", 10);
 	if (vol != NULL) {
 		ret = *vol;
@@ -805,31 +858,141 @@ static ActionVar builtin_sound_setVolume(SWFAppContext* app_context, ActionVar* 
 	(void)registers;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
-	if (this_obj == NULL) return ret;
-	ASObject* obj = (ASObject*)this_obj;
+	ASObject* obj = resolveSoundThis(this_obj);
+	if (obj == NULL) return ret;
 	ActionVar vol_var = {0};
 	vol_var.type = ACTION_STACK_VALUE_F64;
 	if (arg_count >= 1) {
-		// Convert arg to number: use varToDoubleSimple (valueOf not called in Flash for setVolume)
-		double d = 0.0;
-		if (args[0].type == ACTION_STACK_VALUE_F64) d = VAL(double, &args[0].data.numeric_value);
-		else if (args[0].type == ACTION_STACK_VALUE_F32) d = (double)VAL(float, &args[0].data.numeric_value);
-		else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN) d = args[0].data.numeric_value ? 1.0 : 0.0;
-		else if (args[0].type == ACTION_STACK_VALUE_STRING) {
-			// Attempt parse
-			const uint16_t* u16 = varGetU16Ptr(&args[0]);
-			if (u16 != NULL && args[0].str_size > 0) {
-				char buf[64]; u16_to_utf8(u16, args[0].str_size, buf, sizeof(buf));
-				d = strtod(buf, NULL);
-			}
-		}
-		int32_t vol = (int32_t)d;  // NaN→INT_MIN on x86 (UB, matches Flash)
+		int32_t vol = soundArgToInt32(&args[0]);
 		VAL(double, &vol_var.data.numeric_value) = (double)vol;
 	} else {
 		// Flash: setVolume() with no args sets volume to 0
 		VAL(double, &vol_var.data.numeric_value) = 0.0;
 	}
 	setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol_var, PROPERTY_FLAGS_DONTENUM);
+	return ret;
+}
+
+// Sound.getPan() - returns pan value derived from ll/rr transform
+static ActionVar builtin_sound_getPan(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = resolveSoundThis(this_obj);
+	if (obj == NULL) return ret;
+	int32_t ll = readSoundProp(obj, "__ll__", 6);
+	int32_t rr = readSoundProp(obj, "__rr__", 6);
+	// Ruffle formula: if ll != 100: pan = 100 - abs(ll); else: pan = abs(rr) - 100
+	int32_t pan;
+	if (ll != 100) {
+		pan = 100 - (ll < 0 ? -ll : ll);
+	} else {
+		pan = (rr < 0 ? -rr : rr) - 100;
+	}
+	ret.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &ret.data.numeric_value) = (double)pan;
+	return ret;
+}
+
+// Sound.setPan(pan) - sets stereo pan by adjusting ll/rr
+static ActionVar builtin_sound_setPan(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = resolveSoundThis(this_obj);
+	if (obj == NULL) return ret;
+	if (arg_count < 1) return ret;
+	int32_t pan = soundArgToInt32(&args[0]);
+	// Ruffle formula for setPan:
+	// If pan >= 0: ll = 100 - pan, rr = 100
+	// If pan < 0:  ll = 100, rr = 100 + pan
+	// lr = 0, rl = 0 always
+	int32_t ll, rr;
+	if (pan >= 0) {
+		ll = 100 - pan;
+		rr = 100;
+	} else {
+		ll = 100;
+		rr = 100 + pan;
+	}
+	writeSoundProp(app_context, obj, "__ll__", 6, ll);
+	writeSoundProp(app_context, obj, "__lr__", 6, 0);
+	writeSoundProp(app_context, obj, "__rl__", 6, 0);
+	writeSoundProp(app_context, obj, "__rr__", 6, rr);
+	return ret;
+}
+
+// Sound.getTransform() - returns transform object {ll, lr, rl, rr}
+static ActionVar builtin_sound_getTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = resolveSoundThis(this_obj);
+	if (obj == NULL) return ret;
+	ASObject* result = allocObject(app_context, 8);
+	setObjectProto(app_context, result);
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__ll__", 6);
+	setProperty(app_context, result, "ll", 2, &v);
+	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__lr__", 6);
+	setProperty(app_context, result, "lr", 2, &v);
+	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__rl__", 6);
+	setProperty(app_context, result, "rl", 2, &v);
+	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__rr__", 6);
+	setProperty(app_context, result, "rr", 2, &v);
+	ret.type = ACTION_STACK_VALUE_OBJECT;
+	ret.data.numeric_value = (u64)result;
+	return ret;
+}
+
+// Sound.setTransform(transformObj) - sets stereo transform from object with ll/lr/rl/rr
+static ActionVar builtin_sound_setTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = resolveSoundThis(this_obj);
+	if (obj == NULL) return ret;
+	if (arg_count < 1) return ret;
+	// Argument must be an object; read ll, lr, rl, rr properties
+	ASObject* tfm = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_OBJECT)
+		tfm = (ASObject*) args[0].data.numeric_value;
+	if (tfm == NULL) return ret;
+	// Only update OWN properties on the transform object (has_own_property, not prototype chain)
+	ActionVar* p;
+	p = getProperty(tfm, "ll", 2);
+	if (p != NULL) {
+		double d = 0.0;
+		if (p->type == ACTION_STACK_VALUE_F64) d = VAL(double, &p->data.numeric_value);
+		else if (p->type == ACTION_STACK_VALUE_F32) d = (double)VAL(float, &p->data.numeric_value);
+		writeSoundProp(app_context, obj, "__ll__", 6, ecmaToInt32(d));
+	}
+	p = getProperty(tfm, "lr", 2);
+	if (p != NULL) {
+		double d = 0.0;
+		if (p->type == ACTION_STACK_VALUE_F64) d = VAL(double, &p->data.numeric_value);
+		else if (p->type == ACTION_STACK_VALUE_F32) d = (double)VAL(float, &p->data.numeric_value);
+		writeSoundProp(app_context, obj, "__lr__", 6, ecmaToInt32(d));
+	}
+	p = getProperty(tfm, "rl", 2);
+	if (p != NULL) {
+		double d = 0.0;
+		if (p->type == ACTION_STACK_VALUE_F64) d = VAL(double, &p->data.numeric_value);
+		else if (p->type == ACTION_STACK_VALUE_F32) d = (double)VAL(float, &p->data.numeric_value);
+		writeSoundProp(app_context, obj, "__rl__", 6, ecmaToInt32(d));
+	}
+	p = getProperty(tfm, "rr", 2);
+	if (p != NULL) {
+		double d = 0.0;
+		if (p->type == ACTION_STACK_VALUE_F64) d = VAL(double, &p->data.numeric_value);
+		else if (p->type == ACTION_STACK_VALUE_F32) d = (double)VAL(float, &p->data.numeric_value);
+		writeSoundProp(app_context, obj, "__rr__", 6, ecmaToInt32(d));
+	}
 	return ret;
 }
 
@@ -16646,8 +16809,32 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 
 	// Core methods (SWF5+)
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getPan", 6, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getTransform", 12, mflags);
+	// getPan - real implementation
+	{
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "getPan", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_getPan;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "getPan", 6, &fv, mflags);
+		}
+	}
+	// getTransform - real implementation
+	{
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "getTransform", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_getTransform;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "getTransform", 12, &fv, mflags);
+		}
+	}
 	// getVolume - real implementation that reads __volume__
 	{
 		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
@@ -16661,8 +16848,32 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 			setPropertyWithFlags(app_context, ctor->prototype_obj, "getVolume", 9, &fv, mflags);
 		}
 	}
-	addStubMethodToProto(app_context, ctor->prototype_obj, "setPan", 6, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "setTransform", 12, mflags);
+	// setPan - real implementation
+	{
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "setPan", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_setPan;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "setPan", 6, &fv, mflags);
+		}
+	}
+	// setTransform - real implementation
+	{
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "setTransform", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_setTransform;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "setTransform", 12, &fv, mflags);
+		}
+	}
 	// setVolume - real implementation that writes __volume__
 	{
 		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
@@ -20485,7 +20696,7 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 		return 0;
 	}
 
-	// MovieClip special case: check against MovieClip.prototype chain
+	// MovieClip special case: check against MC's __proto__ chain
 	if (obj_var->type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
 		// Get constructor's prototype
@@ -20500,9 +20711,19 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 				ctor_proto = (ASObject*) cpv->data.numeric_value;
 		}
 		if (ctor_proto == NULL) return 0;
-		// Walk MovieClip.prototype chain: MC.__proto__ = MovieClip.prototype
-		extern ASFunction g_movieclip_constructor;
-		ASObject* mc_proto = g_movieclip_constructor.prototype_obj;
+		// Walk the MC's actual __proto__ chain from dynamic_props (supports registerClass)
+		MovieClip* _iof_mc = (MovieClip*) obj_var->data.numeric_value;
+		ASObject* mc_proto = NULL;
+		if (_iof_mc != NULL && _iof_mc->dynamic_props != NULL) {
+			ActionVar* _dp_proto = getProperty((ASObject*)_iof_mc->dynamic_props, "__proto__", 9);
+			if (_dp_proto && _dp_proto->type == ACTION_STACK_VALUE_OBJECT)
+				mc_proto = (ASObject*) _dp_proto->data.numeric_value;
+		}
+		// Fallback: if no dynamic_props __proto__, use MovieClip.prototype
+		if (mc_proto == NULL) {
+			extern ASFunction g_movieclip_constructor;
+			mc_proto = g_movieclip_constructor.prototype_obj;
+		}
 		int depth = 0;
 		while (mc_proto != NULL && depth < 100) {
 			if (mc_proto == ctor_proto) return 1;
@@ -26581,6 +26802,10 @@ void actionNewObject(SWFAppContext* app_context)
 					obj->native_type = NATIVE_SOUND;
 					ActionVar vol = makeF64(100.0);
 					setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
+					writeSoundProp(app_context, obj, "__ll__", 6, 100);
+					writeSoundProp(app_context, obj, "__lr__", 6, 0);
+					writeSoundProp(app_context, obj, "__rl__", 6, 0);
+					writeSoundProp(app_context, obj, "__rr__", 6, 100);
 				}
 				else if (strcmp(ctor_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
 				else if (strcmp(ctor_name, "LocalConnection") == 0) obj->native_type = NATIVE_LOCALCONNECTION;
@@ -27537,6 +27762,10 @@ void actionNewMethod(SWFAppContext* app_context)
 				new_obj_inst->native_type = NATIVE_SOUND;
 				ActionVar vol = makeF64(100.0);
 				setPropertyWithFlags(app_context, new_obj_inst, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
+				writeSoundProp(app_context, new_obj_inst, "__ll__", 6, 100);
+				writeSoundProp(app_context, new_obj_inst, "__lr__", 6, 0);
+				writeSoundProp(app_context, new_obj_inst, "__rl__", 6, 0);
+				writeSoundProp(app_context, new_obj_inst, "__rr__", 6, 100);
 			}
 			else if (strcmp(ctor_name, "LoadVars") == 0) new_obj_inst->native_type = NATIVE_LOADVARS;
 			else if (strcmp(ctor_name, "LocalConnection") == 0) new_obj_inst->native_type = NATIVE_LOCALCONNECTION;
@@ -28968,9 +29197,13 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	if (strcmp(name, "Sound") == 0) {
 		if (obj->native_type == NATIVE_NONE)
 			obj->native_type = NATIVE_SOUND;
-		// Set default volume = 100
+		// Set default volume = 100 and stereo transform
 		ActionVar vol = makeF64(100.0);
 		setPropertyWithFlags(app_context, obj, "__volume__", 10, &vol, PROPERTY_FLAGS_DONTENUM);
+		writeSoundProp(app_context, obj, "__ll__", 6, 100);
+		writeSoundProp(app_context, obj, "__lr__", 6, 0);
+		writeSoundProp(app_context, obj, "__rl__", 6, 0);
+		writeSoundProp(app_context, obj, "__rr__", 6, 100);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;

@@ -6,7 +6,8 @@ Last updated: 2026-03-03
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: TEXTFIELD_PLAN → blocked/: 45/57 pass. Fixed: font size 0 clamping (edittext_html_swf7/swf8 PASS), htmlText non-HTML setter (edittext_newline_stripping PASS), trace \r→\n conversion, condenseWhite SWF8 whitespace stripping, Selection.setSelection g_tf_select_all fix.
+- **Recent gains (this session)**: SOUND_CLASS_PLAN Phase 0 DONE → blocked/. register_class_with_sound now PASS (11/11). sound 622/628. Fixed: checkInstanceOf for registerClass MCs, Sound getPan/setPan/getTransform/setTransform, resolveSoundThis for MC dispatch, clamp_to_i32/ecmaToInt32 coercions, own-property-only check in setTransform.
+- **Recent gains (previous session)**: TEXTFIELD_PLAN → blocked/: 45/57 pass. Fixed: font size 0 clamping (edittext_html_swf7/swf8 PASS), htmlText non-HTML setter (edittext_newline_stripping PASS), trace \r→\n conversion, condenseWhite SWF8 whitespace stripping, Selection.setSelection g_tf_select_all fix.
 - **Recent gains (previous session)**: Cross-version SWF isolation Phases 1/4/6 DONE. `do_init_action_child` 12/12 PASS. ImportAssets2 (tag 71) support added. Per-MC `swf_version` field for `getSWFVersion()`. Phase 6 variable clearing (dynamic_props clear on reload) at all 5 load sites.
 - **Recent gains (previous session)**: unload test PASS (52/52). Pending removal mechanism.
 - **Recent gains (previous session)**: Tab ordering: 13/16 pass.
@@ -95,6 +96,7 @@ Last updated: 2026-03-03
 | `tell_target_invalid_swf6` | 5/5 ✅ | hasPlayingSprites + forward goto catch_up_mode in advance_sprite_frames |
 | `tell_target_invalid` | 6/6 ✅ | SetTarget2(undefined) SWF7+ → target_clip=None; GotoFrame2 target_clip_or_root; sprite preservation during root loop-back |
 | `on_construct` | 25/25 ✅ | RegisterClass prototype setup before on(construct), g_event_this_mc for type 2 constructors, pending instance name, prototype chain variable resolution |
+| `register_class_with_sound` | 11/11 ✅ | Sound Phase 0 (getPan/setPan/getTransform/setTransform) + checkInstanceOf for registerClass MCs |
 | `do_init_action_child` | 12/12 ✅ | Cross-version Phase 1+4 + ImportAssets2 |
 | `do_init_action` | PASS ✅ | DoInitAction context switch |
 | `tab_ordering_tabbable` | 47/47 ✅ | Dynamic TF tabbability (u16 type pointer), MC button mode, invisible parent children |
@@ -145,6 +147,7 @@ Last updated: 2026-03-03
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
 | TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 PARTIAL** → `blocked/` | 45/57 pass | Remaining blocked: font metrics (scroll/newlines/bullet), SWF6 HTML paragraph semantics, TextSnapshot (needs recompiler DefineText), StyleSheet (needs CSS parser) |
 | MOVIECLIP_PLAN | **ALL PHASES DONE** → `blocked/` | 27 tests pass ✅ (create_empty_movie_clip, movieclip_init_object newly fixed) | Remaining blocked: child DoInitAction (recompiler), mouse events, loadMovie, pixel hitTest |
+| SOUND_CLASS_PLAN | **Phase 0 COMPLETE** → `blocked/` | register_class_with_sound PASS, sound 622/628 | Blocked on attachSound/shared transform model |
 | CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 3/8 pass + clip_events ✅ | Blocked on TEXTFIELD, MOUSE_EVENTS, REGISTERCLASS |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
 | PARSING_FUNCTIONS_PLAN | **FULLY COMPLETE** | 3/3 pass (parse_int, parse_float, parsefloat_swf5) ✅ | — |
