@@ -586,12 +586,18 @@ void swfStart(SWFAppContext* app_context)
 			if (quit_swf && !(g_events && g_event_pos < g_event_count)
 			    && !actionHasEnterFrameHandlers()
 			    && !hasPlayingSprites()
-			    && !hasActiveTimers()) break;
+			    && !hasActiveTimers()
+			    && !hasClipEnterFrameHandlers()) break;
 			{
 				extern int g_advance_defer_nested;
 				g_advance_defer_nested = 1;
 				advance_sprite_frames(app_context);
 				g_advance_defer_nested = 0;
+			}
+			// Set enterframe_eligible for all initialized sprites (recursive into buttons)
+			{
+				extern void set_enterframe_eligible_recursive(DisplayObject*, size_t);
+				set_enterframe_eligible_recursive(display_list, max_depth);
 			}
 			// Dispatch clip event ENTER_FRAME (recursive, children before parents)
 			{
@@ -757,7 +763,7 @@ void swfStart(SWFAppContext* app_context)
 			// Past the end of the frame list — only continue if events, timers, or handlers remain
 			if (hasActiveTimers()) continue;
 			if (g_events && g_event_pos < g_event_count) continue;
-			if (actionHasEnterFrameHandlers() || hasPlayingSprites()) continue;
+			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
 			break;
 		}
 		else if (manual_next_frame)
@@ -783,7 +789,7 @@ void swfStart(SWFAppContext* app_context)
 			// Root stopped but timers are active — keep ticking
 			if (hasActiveTimers()) continue;
 			// Root stopped but onEnterFrame handlers still registered — keep ticking
-			if (actionHasEnterFrameHandlers()) continue;
+			if (actionHasEnterFrameHandlers() || hasClipEnterFrameHandlers()) continue;
 			// Truly stopped — but continue if events remain
 			if (g_events && g_event_pos < g_event_count) continue;
 			break;

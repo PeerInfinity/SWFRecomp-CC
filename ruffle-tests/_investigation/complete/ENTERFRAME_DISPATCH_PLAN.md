@@ -23,6 +23,17 @@ INITIALIZED model: init tick fires LOAD only, subsequent ticks fire ENTER_FRAME.
 | execution_order4 | PASS | PASS |
 | set_interval | PASS | PASS |
 | unload | PASS | PASS |
+| bad_placeobject_clipaction | 2/2 | 2/2 PASS (regression fixed) |
+| button_order | 2/2 | 2/2 PASS (regression fixed) |
+| movieclip_in_removed_button | 4/4 | 4/4 PASS (regression fixed) |
+| issue_2870 | 2/3 | 1/3 (known: loadMovie timing change) |
+
+### Regression Fix (follow-up commit)
+
+Three issues found in CI that required fixes:
+1. **Break condition**: `hasClipEnterFrameHandlers()` added to loop exit conditions so clip action ENTER_FRAME keeps the loop alive
+2. **Button children**: `set_enterframe_eligible_recursive()` walks all display lists including button children (advance_sprite_frames only iterates root-level sprites)
+3. **Removal gating**: Reverted to consumed `enterframe_eligible` flag instead of `sprite_initialized >= 2` — the recursive walk skips removed parents (char_id=0), so children's flags aren't set
 
 ### Implementation
 

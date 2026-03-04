@@ -127,6 +127,8 @@ void advance_sprite_frames(SWFAppContext* app_context);
 void advance_nested_sprite_frames(SWFAppContext* app_context);
 // Returns 1 if any multi-frame sprite at root level is still playing
 int hasPlayingSprites(void);
+// Returns 1 if any initialized sprite has CLIP_EVENT_ENTER_FRAME clip actions
+int hasClipEnterFrameHandlers(void);
 // Currently-executing sprite DisplayObject (set by advance_sprite_frames)
 extern DisplayObject* g_current_sprite_obj;
 

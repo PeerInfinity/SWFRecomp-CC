@@ -1156,6 +1156,22 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	}
 }
 
+// Recursively set enterframe_eligible=1 for all display entries with sprite_initialized >= 2.
+// Walks into sprite and button child display lists. This ensures button children get the flag
+// (advance_sprite_frames only iterates root-level sprites, missing button children).
+// When a parent is removed (char_id=0), the walk skips it → children don't get the flag.
+void set_enterframe_eligible_recursive(DisplayObject* dl, size_t dl_max)
+{
+	for (size_t i = 1; i <= dl_max; i++)
+	{
+		if (dl[i].char_id == 0) continue;
+		if (dl[i].sprite_initialized >= 2)
+			dl[i].enterframe_eligible = 1;
+		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0)
+			set_enterframe_eligible_recursive(dl[i].sprite_display_list, dl[i].sprite_max_depth);
+	}
+}
+
 // --- Deferred ENTER_FRAME flush ---
 // Set by swf_core.c before the root frame function. Cleared by tagFlushPendingEnterFrame.
 // Ensures ENTER_FRAME fires between RemoveObject and DoAction (matching Flash ordering).
@@ -1166,6 +1182,8 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	if (!g_enterframe_flush_pending) return;
 	g_enterframe_flush_pending = 0;
 
+	// Set enterframe_eligible for all initialized sprites (recursive into buttons)
+	set_enterframe_eligible_recursive(display_list, max_depth);
 	// Dispatch clip event ENTER_FRAME (recursive, children before parents).
 	// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
 	{
@@ -3127,6 +3145,30 @@ int hasPlayingSprites(void)
 			return 1;
 	}
 	return 0;
+}
+
+// Check if any display_list entry (recursive) has CLIP_EVENT_ENTER_FRAME clip actions
+// and is initialized (sprite_initialized >= 2). Used to keep the frame loop alive.
+static int hasClipEnterFrameHandlers_impl(DisplayObject* dl, size_t dl_max)
+{
+	for (size_t i = 1; i <= dl_max; i++)
+	{
+		if (dl[i].char_id == 0) continue;
+		if (dl[i].sprite_initialized < 2) continue;
+		if (dl[i].clip_action_count > 0)
+		{
+			for (size_t a = 0; a < dl[i].clip_action_count; a++)
+				if (dl[i].clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME) return 1;
+		}
+		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0)
+			if (hasClipEnterFrameHandlers_impl(dl[i].sprite_display_list, dl[i].sprite_max_depth))
+				return 1;
+	}
+	return 0;
+}
+int hasClipEnterFrameHandlers(void)
+{
+	return hasClipEnterFrameHandlers_impl(display_list, max_depth);
 }
 
 // Run deferred sprite-init with optional frame filter.

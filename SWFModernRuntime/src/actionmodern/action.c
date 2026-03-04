@@ -16338,10 +16338,11 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
 		// Skip MCs placed in the current frame's process_sprite_needs_init
 		if (g_enterframe_new_mc_start >= 0 && i >= g_enterframe_new_mc_start) continue;
-		// Skip sprite-backed MCs whose timeline didn't advance this tick.
-		// enterframe_eligible is set by process_sprite_needs_init (init tick)
-		// or advance_sprite_frames (subsequent ticks). 1-frame sprites that
-		// don't advance won't have the flag set, matching Flash behavior.
+		// Skip sprite-backed MCs whose enterframe_eligible flag is not set.
+		// The flag is set each tick by set_enterframe_eligible_recursive()
+		// (which walks ALL display lists including button children) and consumed here.
+		// This ensures: 1) init tick skipped (sprite_initialized < 2 → flag not set),
+		// 2) removed buttons' children skipped (parent char_id=0 → walk skips them).
 		if (mc->display_obj != NULL) {
 			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
 			if (!dobj->enterframe_eligible) continue;
