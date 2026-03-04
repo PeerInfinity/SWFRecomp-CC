@@ -1,22 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `8f807f41b78e` (2026-03-04T05:14:25.035074+00:00)
-**Current:** `0a34aa61d108` (2026-03-04T06:01:49.547925+00:00)
+**Previous:** `0a34aa61d108` (2026-03-04T06:01:49.547925+00:00)
+**Current:** `dd1d31e45545` (2026-03-04T18:32:35.009525+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 441 | 444 | +3 |
+| Passing | 444 | 445 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 71.2% | 71.7% | +0.5% |
-| Mismatched lines | 22383 | 22377 | -6 |
-|   Decreased | | | -6 |
+| Pass rate | 71.7% | 71.9% | +0.2% |
+| Mismatched lines | 22377 | 22376 | -1 |
+|   Decreased | | | -1 |
 
-## Newly Passing (3)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `bad_placeobject_clipaction` | output_mismatch | 1/2 | 2/2 |
-| `button_order` | output_mismatch | 0/2 | 2/2 |
-| `movieclip_in_removed_button` | output_mismatch | 1/4 | 4/4 |
+| `create_empty_movie_clip` | output_mismatch | 2/3 | 3/3 |
