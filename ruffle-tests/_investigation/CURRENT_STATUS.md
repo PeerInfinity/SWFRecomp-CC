@@ -6,7 +6,8 @@ Last updated: 2026-03-03
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: SOUND_CLASS_PLAN Phase 0 DONE → blocked/. register_class_with_sound now PASS (11/11). sound 622/628. Fixed: checkInstanceOf for registerClass MCs, Sound getPan/setPan/getTransform/setTransform, resolveSoundThis for MC dispatch, clamp_to_i32/ecmaToInt32 coercions, own-property-only check in setTransform.
+- **Recent gains (this session)**: TEXTSNAPSHOT_PLAN COMPLETE → complete/. All 4 TextSnapshot tests PASS: textsnapshot_gettext (55/55), textsnapshot_findtext (44/44), textsnapshot_text_order (1/1), textsnapshot_available_text (20/20). Recompiler deferred char code emission + runtime textSnapshotCapture + getCount/getText/findText + clone display list init.
+- **Recent gains (previous session)**: SOUND_CLASS_PLAN Phase 0 DONE → blocked/. register_class_with_sound now PASS (11/11). sound 622/628. Fixed: checkInstanceOf for registerClass MCs, Sound getPan/setPan/getTransform/setTransform, resolveSoundThis for MC dispatch, clamp_to_i32/ecmaToInt32 coercions, own-property-only check in setTransform.
 - **Recent gains (previous session)**: TEXTFIELD_PLAN → blocked/: 45/57 pass. Fixed: font size 0 clamping (edittext_html_swf7/swf8 PASS), htmlText non-HTML setter (edittext_newline_stripping PASS), trace \r→\n conversion, condenseWhite SWF8 whitespace stripping, Selection.setSelection g_tf_select_all fix.
 - **Recent gains (previous session)**: Cross-version SWF isolation Phases 1/4/6 DONE. `do_init_action_child` 12/12 PASS. ImportAssets2 (tag 71) support added. Per-MC `swf_version` field for `getSWFVersion()`. Phase 6 variable clearing (dynamic_props clear on reload) at all 5 load sites.
 - **Recent gains (previous session)**: unload test PASS (52/52). Pending removal mechanism.
@@ -145,7 +146,7 @@ Last updated: 2026-03-03
 | OBJECT_WATCH_PLAN | **Phase 2 DONE** | 4/4 pass (watch_textfield ✅) | `watch_virtual_property` known_failure in Ruffle |
 | GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 23/30 pass (18 original + native_objects_swf6/7/8 ✅, as_set_prop_flags ✅, global_swf6_7_8 ✅) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
-| TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 PARTIAL** → `blocked/` | 45/57 pass | Remaining blocked: font metrics (scroll/newlines/bullet), SWF6 HTML paragraph semantics, TextSnapshot (needs recompiler DefineText), StyleSheet (needs CSS parser) |
+| TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 PARTIAL** → `blocked/` | 45/57 pass | Remaining blocked: font metrics (scroll/newlines/bullet), SWF6 HTML paragraph semantics, StyleSheet (needs CSS parser). TextSnapshot now DONE (separate plan) |
 | MOVIECLIP_PLAN | **ALL PHASES DONE** → `blocked/` | 27 tests pass ✅ (create_empty_movie_clip, movieclip_init_object newly fixed) | Remaining blocked: child DoInitAction (recompiler), mouse events, loadMovie, pixel hitTest |
 | SOUND_CLASS_PLAN | **Phase 0 COMPLETE** → `blocked/` | register_class_with_sound PASS, sound 622/628 | Blocked on attachSound/shared transform model |
 | CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 3/8 pass + clip_events ✅ | Blocked on TEXTFIELD, MOUSE_EVENTS, REGISTERCLASS |
@@ -182,7 +183,7 @@ Last updated: 2026-03-03
 1. **SOUND_CLASS_PLAN Phase 0** — getTransform/getPan/setPan/setTransform (~60 lines). Fixes register_class_with_sound (+6 lines). Unblocks REGISTERCLASS_PLAN.
 2. **ENTERFRAME_DISPATCH_PLAN Phases 1-2** — Per-tick onEnterFrame (~40 lines). Fixes issue_1104 (+1), string_paths_variable_scopes (+5). Architectural correctness.
 3. **CALL_SEMANTICS_PLAN Phases 0-1** — Early-termination on base clip removal (~15 lines + recompile). Improves removed_target_clip_scope. Unblocks MC_REMOVAL_LIFECYCLE.
-4. **TEXTSNAPSHOT_PLAN Phases 0-2** — Recompiler char codes + runtime methods (~175 lines). Fixes 4 tests (~90 lines).
+4. ~~**TEXTSNAPSHOT_PLAN Phases 0-2**~~ — **DONE** → `complete/`. All 4 tests PASS.
 5. **STYLESHEET_PLAN** — Large feature (~390 lines), single test. **Deferred** — low ROI.
 
 ### Previously actionable — now done or blocked
