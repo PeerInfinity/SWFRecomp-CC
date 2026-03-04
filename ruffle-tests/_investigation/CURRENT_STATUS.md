@@ -1,12 +1,13 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-02
+Last updated: 2026-03-03
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: Cross-version SWF isolation Phases 1/4/6 DONE. `do_init_action_child` 12/12 PASS. ImportAssets2 (tag 71) support added. Per-MC `swf_version` field for `getSWFVersion()`. Phase 6 variable clearing (dynamic_props clear on reload) at all 5 load sites.
+- **Recent gains (this session)**: TEXTFIELD_PLAN → blocked/: 45/57 pass. Fixed: font size 0 clamping (edittext_html_swf7/swf8 PASS), htmlText non-HTML setter (edittext_newline_stripping PASS), trace \r→\n conversion, condenseWhite SWF8 whitespace stripping, Selection.setSelection g_tf_select_all fix.
+- **Recent gains (previous session)**: Cross-version SWF isolation Phases 1/4/6 DONE. `do_init_action_child` 12/12 PASS. ImportAssets2 (tag 71) support added. Per-MC `swf_version` field for `getSWFVersion()`. Phase 6 variable clearing (dynamic_props clear on reload) at all 5 load sites.
 - **Recent gains (previous session)**: unload test PASS (52/52). Pending removal mechanism.
 - **Recent gains (previous session)**: Tab ordering: 13/16 pass.
 - **Recent gains (previous session)**: super_edge_cases PASS (39/39).
@@ -83,6 +84,10 @@ Last updated: 2026-03-02
 | `place_and_lookup` | 30/30 ✅ | ng_isScriptableChar helper, var_map enumeration on root MC, video auto-naming fix |
 | `tab_ordering_children` | 208/208 ✅ | Bonus from video auto-naming fix (instance counter no longer increments for unnamed videos) |
 | `selection` | 454/454 ✅ | Selection index tracking + replaceSel implementation |
+| `edittext_html_swf7` | 5377/5377 ✅ | Font size 0 clamping to minimum 1 |
+| `edittext_html_swf8` | 5377/5377 ✅ | Same font size fix as swf7 |
+| `edittext_newline_stripping` | 64/64 ✅ | htmlText setter for non-HTML fields + trace \r→\n |
+| `edittext_default_format_empty` | 100/100 ✅ | Already fixed (condenseWhite + format handling) |
 | `this_scoping` | 52/52 ✅ | MC nav methods via CallFunction (WITH scope + dot/slash path) + dynamic MC gotoAndStop |
 | `execution_order4` | 13/13 ✅ | Nested sprite parent context + child init ordering + WITH scope resolution |
 | `watch_textfield` | 12/12 ✅ | MC watch/unwatch dispatch + watch table check in MC SetMember + missing tags in tagMain.c |
@@ -108,11 +113,11 @@ Last updated: 2026-03-02
 | Test | Match | Issue |
 |------|-------|-------|
 | `movieclip_library_state_values` | **77/78 (98.7%)** | Fixed: segfault, unloadMovie state, byte_size, URL. Remaining: _xmouse default (accepted diff) |
-| `string_paths_other` | 31/36 (86.1%) | MC removal/re-creation slash path resolution |
+| `string_paths_other` | **36/36 PASS** ✅ | MC removal/re-creation slash path resolution (MC_REMOVAL_LIFECYCLE Phase 3) |
 | `super_edge_cases` | **39/39 PASS** ✅ | Fixed: resolveProtoVar() unwraps SUPER values stored in __proto__ |
-| `function_base_clip_readded` | 10/12 (83.3%) | _parent resolution after removal+re-add |
+| `function_base_clip_readded` | 11/12 (91.7%) | Dead base_clip re-resolution needed (MC_REMOVAL_LIFECYCLE Phase 2) |
 | `stage_object_children` | **83/83 PASS** ✅ | Was 68/83, now fixed (likely from path resolution changes) |
-| `function_base_clip_removed` | 21/26 (80.8%) | base_clip after function definer removed |
+| `function_base_clip_removed` | **26/26 PASS** ✅ | base_clip removal detection (MC_REMOVAL_LIFECYCLE Phase 1) |
 
 ### 70-80%
 | Test | Match | Issue |
@@ -136,9 +141,9 @@ Last updated: 2026-03-02
 | XML_PLAN | **ALL PHASES COMPLETE** | 26/26 active tests pass ✅ | xml_to_string now PASS, xml_child_nodes_edge_cases now PASS |
 | ARRAY_METHODS_PLAN | **FULLY COMPLETE** | All tests pass | — |
 | OBJECT_WATCH_PLAN | **Phase 2 DONE** | 4/4 pass (watch_textfield ✅) | `watch_virtual_property` known_failure in Ruffle |
-| GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 18/30 pass + place_and_lookup ✅ (globals_swf5-8, math_min_max, is_finite×2, parse_int, parse_float, primitive_type_globals, printjob×3, sound×2, localconnection, context_menu, context_menu_item) | Phase 8 blocked: enumeration order + 20 missing globals |
+| GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 23/30 pass (18 original + native_objects_swf6/7/8 ✅, as_set_prop_flags ✅, global_swf6_7_8 ✅) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
-| TEXTFIELD_PLAN | **Phases 1-3 DONE, Phase 5 PARTIAL** | 25+ tests pass | Phase 4 (scroll), Phase 5 (htmlText), Phase 6 (layout) |
+| TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 PARTIAL** → `blocked/` | 45/57 pass | Remaining blocked: font metrics (scroll/newlines/bullet), SWF6 HTML paragraph semantics, TextSnapshot (needs recompiler DefineText), StyleSheet (needs CSS parser) |
 | MOVIECLIP_PLAN | **ALL PHASES DONE** → `blocked/` | 27 tests pass ✅ (create_empty_movie_clip, movieclip_init_object newly fixed) | Remaining blocked: child DoInitAction (recompiler), mouse events, loadMovie, pixel hitTest |
 | CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 3/8 pass + clip_events ✅ | Blocked on TEXTFIELD, MOUSE_EVENTS, REGISTERCLASS |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
@@ -150,41 +155,46 @@ Last updated: 2026-03-02
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
-| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 11/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅) | register_class 26/67, register_and_init_order ~76/233, register_class_swf6 blocked by cross-version _global, register_class_with_sound blocked by Sound class |
+| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 11/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅) | register_class 26/67, register_and_init_order ~76/233, register_class_swf6 blocked by cross-version _global, register_class_with_sound blocked by Sound class. do_init_action_child now PASS via cross-version Phase 1+4 |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **Phases 0-2 COMPLETE** | 3/5 pass (native_objects_swf6/7/8 ✅) | native_subclasses/native_double_construct need filter constructor property init via super() |
-| TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 14/22 pass (tell_target ✅, tell_target_invalid ✅, tell_target_invalid_swf6 ✅, slash_syntax ✅, string_paths_basic ✅, string_paths_variable_alias ✅, target_clip_removed ✅, path_string ✅ (322/322), string_paths_hidden ✅ (54/54), target_clip_swf5/6 ✅, target_path ✅, get_variable_in_scope ✅, lock_root ✅) | Remaining 8 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), MC removal lifecycle (string_paths_other, removed_target_clip_scope, removed_base_clip_tell_target), unload timing (string_paths_unload), Ruffle known_failure (string_paths_reference_launder) |
+| TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 16/37), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
 | TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
 | FOCUS_SYSTEM_PLAN | **3/7 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining 4 blocked by mouse events + text field hit-testing + event pumping model |
 | TAB_ORDERING_PLAN | **13/16 PASS** → `blocked/` | tab_ordering_automatic_basic, tab_ordering_reverse, tab_ordering_children ✅, tab_ordering_events ✅, tab_ordering_tabbable ✅, tab_ordering_movieclip_enabled_default ✅, ... | Remaining 3 blocked: same_position (highlight bounds), events_mouse (mouse state machine), edittext_tab_focus (caret tracking) |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
-| LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 23/49 pass | Phase 6 (cross-version globals) needs per-version _global (Phase 2 of CROSS_VERSION_ISOLATION_PLAN); remaining blocked on RegisterClass, display list, mouse events |
+| LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 24/49 pass (loadmovie_flashvars ✅, do_init_action_child ✅, global_swf6_7_8 ✅ newly fixed) | Phase 6 (cross-version globals) needs per-version _global (Phase 2 of CROSS_VERSION_ISOLATION_PLAN); remaining blocked on RegisterClass, display list, mouse events |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
-| UNLOAD_PLAN | **MOSTLY DONE** | 4/6 pass (unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload (18/52), unload_nested_child (0/5) |
+| UNLOAD_PLAN | **MOSTLY DONE** | 5/6 pass (unload 52/52 ✅, unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload_nested_child (0/5) |
 | BUTTON_PLAN | **12/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅ (visible gating on keyPress) | Remaining 2: button_keypress_vs_textinput (TF onChanged), root_button_mode (loadMovie) |
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4 blocked on loadMovie + per-function version tracking |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events |
 
-## Recommended Work Order (updated 2026-02-26)
+## Recommended Work Order (updated 2026-03-03)
 
-### Highest ROI — unblocked, high line-count impact
-1. ~~**TELLTARGET_PLAN Phase 2 remaining**~~ — **DONE** → `blocked/`. 14/22 pass. All remaining blocked on other subsystems (button dispatch, loadMovie, onEnterFrame, MC removal lifecycle, unload).
-2. ~~**STAGE_PLAN Phase 4**~~ — stage_object_children already PASS ✅
-3. ~~**movieclip_getbounds**~~ — added to ACCEPTED_DIFFS (morph bounds precision)
+### Actionable — New plans in incomplete/
+1. **SOUND_CLASS_PLAN Phase 0** — getTransform/getPan/setPan/setTransform (~60 lines). Fixes register_class_with_sound (+6 lines). Unblocks REGISTERCLASS_PLAN.
+2. **ENTERFRAME_DISPATCH_PLAN Phases 1-2** — Per-tick onEnterFrame (~40 lines). Fixes issue_1104 (+1), string_paths_variable_scopes (+5). Architectural correctness.
+3. **CALL_SEMANTICS_PLAN Phases 0-1** — Early-termination on base clip removal (~15 lines + recompile). Improves removed_target_clip_scope. Unblocks MC_REMOVAL_LIFECYCLE.
+4. **TEXTSNAPSHOT_PLAN Phases 0-2** — Recompiler char codes + runtime methods (~175 lines). Fixes 4 tests (~90 lines).
+5. **STYLESHEET_PLAN** — Large feature (~390 lines), single test. **Deferred** — low ROI.
 
-### Medium ROI — feature phases with multiple test payoff
-5. ~~**REGISTERCLASS_PLAN Phases 4-5**~~ — **DONE** → blocked/. 10/15 pass. register_class 26/67 (default MC prototype fix). Remaining blocked by loadMovie, Sound class, sprite init ordering.
-6. **TEXTFIELD_PLAN Phase 4-5** — scroll properties + HTML text. 25/66 pass; ~10 more tests actionable
-7. **GLOBALS_PLAN** — Phase 7 DONE. Phase 8 BLOCKED by enumeration order mismatch + 20 missing Ruffle-specific globals (ASnative, ASconstructor, etc.)
-8. **UNLOAD_PLAN** — `unload` at 18/52 (+34 lines), `unload_nested_child` at 0/5
+### Previously actionable — now done or blocked
+6. ~~**TELLTARGET_PLAN Phase 2 remaining**~~ — **DONE** → `blocked/`. 16/22 pass.
+7. ~~**STAGE_PLAN Phase 4**~~ — stage_object_children already PASS ✅
+8. ~~**movieclip_getbounds**~~ — added to ACCEPTED_DIFFS (morph bounds precision)
+9. ~~**REGISTERCLASS_PLAN Phases 4-5**~~ — **DONE** → blocked/. 11/15 pass.
+10. ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **DONE** ✅. 7/8 pass.
+11. ~~**NATIVE_INTROSPECTION_PLAN**~~ — **Phases 0-2 DONE** ✅. Remaining: native_subclasses, native_double_construct.
 
-### Lower ROI or partially blocked
-9. ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **DONE** ✅ `super_edge_cases` 39/39 PASS. `interface_implements_op` blocked by MTASC class infra.
-10. ~~**NATIVE_INTROSPECTION_PLAN**~~ — **Phases 0-2 DONE** ✅ (native_objects_swf6/7/8 all PASS). Remaining: native_subclasses (arguments.slice()), native_double_construct (filter constructor super())
-11. **OBJECT_WATCH_PLAN** — ~~`watch_textfield` small fix~~ DONE ✅ (4/4 pass). Only `watch_virtual_property` remains (known_failure in Ruffle)
+### Existing blocked work (from blocked/ plans)
+12. **MOUSE_EVENTS_ADVANCED Phase 2** — Roll dispatch + focus events (~100-150 lines). Unblocks focus_mouse_rollout, partially focus_keyboard_press. Highest-impact blocked plan work.
+13. **TEXTFIELD_PLAN remaining** — scroll, condenseWhite, SWF6 HTML. 45/57 pass.
+14. **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
+15. **LOADMOVIE_PLAN Phase 6** — Per-movie `_global` isolation. Largest cross-cutting blocker.
 
 ### Dependency Blockers (plans blocking other plans)
 - ~~**TIMER_PLAN**~~ — **RESOLVED** (moved to complete/). set_interval ✅. timer_run_actions blocked on REGISTERCLASS_PLAN; timeout deferred.

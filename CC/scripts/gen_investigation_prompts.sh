@@ -45,6 +45,8 @@ Then follow these steps in order:
 4. **Implement:** Work through the remaining items one at a time. After each change, run the affected tests to verify progress. Commit working changes.
 
 5. **Stop when:** the plan is fully passing, or you hit a blocker — in which case document the blocker in the plan file before stopping. If there are remaining failures, and the plan to fix them is blocked, then move the document to ruffle-tests/_investigation/blocked/  If the plan is complete and all the tests pass, then move the document to ruffle-tests/_investigation/complete/
+
+You don't need to run all of the tests manually.  You can check the latest results from ruffle-tests/results.json
 EOF
 }
 

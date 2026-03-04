@@ -1,9 +1,9 @@
 # TellTarget / Target Path Resolution Implementation Plan
 <!-- TESTS: tell_target, tell_target_invalid, tell_target_invalid_swf6, target_clip_swf5, target_clip_swf6, target_clip_removed, path_string, slash_syntax, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes, removed_base_clip_tell_target, removed_target_clip_scope -->
 
-Last updated: 2026-02-28
+Last updated: 2026-03-03
 
-## Status: PHASES 1-2 COMPLETE — REMAINING BLOCKED (14/22 tests PASS)
+## Status: PHASES 1-2 COMPLETE — REMAINING BLOCKED (16/22 tests PASS)
 
 ### Results (2026-02-28 — verified locally)
 - `tell_target` ✅ — **37/37 PASS**
@@ -20,16 +20,16 @@ Last updated: 2026-02-28
 - `string_paths_hidden` ✅ — **54/54 PASS**
 - `string_paths_variable_alias` ✅ — **4/4 PASS**
 - `lock_root` ✅ — PASS
-- `string_paths_other` — 30/36 (blocked: MC removal/re-creation eval edge cases)
+- `string_paths_other` ✅ — **36/36 PASS** (MC_REMOVAL_LIFECYCLE Phase 3)
+- `string_paths_unload` ✅ — **1/1 PASS** (MC_REMOVAL_LIFECYCLE Phase 5)
 - `string_paths_eval` — 2/8 (blocked: onPress button dispatch fires twice)
 - `string_paths_eval2` — 5/7 (blocked: loadMovie — loaded clip property access)
 - `string_paths_variable_scopes` — 0/5 (blocked: onEnterFrame per-tick dispatch not implemented)
 - `string_paths_reference_launder` — 0/2 (blocked: `known_failure` in Ruffle itself)
-- `string_paths_unload` — 0/1 (blocked: unload timing)
-- `removed_target_clip_scope` — ~20/35 (blocked: removed clip scope fallback)
-- `removed_base_clip_tell_target` — 0/2 (blocked: removed base clip validity tracking)
+- `removed_target_clip_scope` — 16/37 (blocked: call() early-termination + SetTarget scope with removed MCs — MC_REMOVAL_LIFECYCLE Phase 4)
+- `removed_base_clip_tell_target` — 0/2 (blocked: Ruffle-specific trace message, possibly ACCEPTED_DIFFS)
 
-**Summary: 14/22 tests fully passing. Remaining 8 tests all blocked on other subsystems.**
+**Summary: 16/22 tests fully passing (updated 2026-03-03). Remaining 6 tests all blocked on other subsystems.**
 
 ### What's New (Phase 2 progress)
 - **actionGetMember `_root` builtin**: MC property `_root` returns root_movieclip (enables `mc._root` access)

@@ -2,7 +2,7 @@
 
 <!-- TESTS: register_class_return_value, register_class, register_class_swf6, register_class_with_sound, register_and_init_order, register_globals_across_frames, register_underflow, attach_movie, attach_movie_stop, export_assets, clip_constructors, on_construct, movieclip_init_object, empty_movieclip_can_attach_movies, do_init_action_child -->
 
-Last updated: 2026-02-28
+Last updated: 2026-03-03
 Status: **BLOCKED** — moved to blocked/
 
 ## Summary
@@ -11,7 +11,7 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 
 ## Final Test Results (15 tests)
 
-### Passing (10/15)
+### Passing (11/15)
 
 | Test | Lines | Result |
 |------|-------|--------|
@@ -25,8 +25,9 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 | on_construct | 25 | **25/25 PASS** |
 | movieclip_init_object | 5 | **5/5 PASS** |
 | empty_movieclip_can_attach_movies | 11 | **PASS** |
+| do_init_action_child | 12 | **12/12 PASS** ✅ (cross-version Phase 1+4 + ImportAssets2) |
 
-### Failing (5/15)
+### Failing (4/15)
 
 | Test | Lines | Match | Blocker |
 |------|-------|-------|---------|
@@ -34,7 +35,6 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 | register_class_swf6 | 37 | 2/37 | Entirely depends on child SWF loading |
 | register_class_with_sound | 11 | 5/11 | Needs Sound class implementation |
 | register_and_init_order | 233 | ~76/233 | Line 35: deep child access during constructor. Lines 133+: child sprite constructor ordering |
-| do_init_action_child | 12 | 3/12 | Needs child SWF loading (loadMovie/MovieClipLoader) |
 
 ## What Was Implemented
 

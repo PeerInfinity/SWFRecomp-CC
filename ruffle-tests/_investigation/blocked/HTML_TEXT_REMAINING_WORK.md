@@ -9,8 +9,8 @@
 | `edittext_html_align_swf7` | — | 0 | PASS |
 | `edittext_html_align_swf8` | — | 0 | PASS |
 | `edittext_html_entity` | — | 0 | PASS |
-| `edittext_html_swf7` | 5377 | 3 | 99.94% match |
-| `edittext_html_swf8` | 5377 | 3 | 99.94% match |
+| `edittext_html_swf7` | 5377 | 0 | **PASS** ✅ (font size 0 clamping fix) |
+| `edittext_html_swf8` | 5377 | 0 | **PASS** ✅ (font size 0 clamping fix) |
 | `edittext_html_swf6` | 5377 | ~1480 | ~72% match |
 | `edittext_html_condensewhite_swf7` | 311 | 3 | 99.0% match |
 | `edittext_html_condensewhite_swf8` | 311 | ~134 | ~57% match |
@@ -30,7 +30,7 @@ The 3 remaining diffs are all A6 (font size pop behavior), appearing once per te
 
 See previous entries for details.
 
-### A6. Font size doesn't pop on `</font>` in singleline mode (3 diff lines) — BLOCKED
+### ~~A6. Font size doesn't pop on `</font>` in singleline mode (3 diff lines)~~ — FIXED
 
 **Lines:** 1778, 3569, 5360
 
@@ -72,9 +72,9 @@ Needs more investigation with additional test cases from the expected output to 
 
 **Fixed by extending empty paragraph `<A>` emission to P paragraphs with content NL breaks.** Changed condition from `pfmt.para_type == 1` (LI only) to `pfmt.para_type == 1 || p_break_kind[pi] == 1` (LI + content NL breaks). Tag breaks from `</p>` structural closes (p_break_kind==2) correctly do not emit anchors. Fixed 18 diff lines.
 
-### B5. Font size pop (same as A6) — BLOCKED
+### ~~B5. Font size pop (same as A6)~~ — FIXED
 
-Same 3 lines as A6 (1778, 3569, 5360). Shared root cause.
+Same fix as A6 — font size 0 clamping to minimum 1. All 3 diff lines resolved.
 
 ---
 
@@ -107,7 +107,7 @@ SWF8 condenseWhite has different rules from SWF7. Needs separate investigation.
 1. ~~**A1-A5: All fixed**~~
 2. ~~**D1: condenseWhite whitespace stripping**~~ — FIXED
 3. ~~**B1-B4: SWF8-specific issues**~~ — ALL FIXED (47→3 mismatches)
-4. **A6/B5: Font size pop behavior** (3 diff lines each) — BLOCKED, needs investigation
+4. ~~**A6/B5: Font size pop behavior**~~ — FIXED (font size 0 clamping)
 5. **D2: Remaining condensewhite_swf7** (3 diff lines) — Small, investigate
 6. **D3: condensewhite_swf8** (~134 diff lines) — Separate SWF8 rules
 7. **C1-C3: SWF6 paragraph model** (~1480 diff lines) — Largest effort, lowest priority
