@@ -2027,24 +2027,228 @@ static ActionVar builtin_math_nan_stub(SWFAppContext* app_context, ActionVar* ar
 	return mathReturnDouble(NAN);
 }
 
+// --- ASnative class 100: Global functions (escape, unescape, parseInt, parseFloat, trace) ---
+
+static ActionVar asnative_100_escape(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 1) return result;
+	// Coerce arg to string via stack
+	pushVar(app_context, &args[0]);
+	char sbuf[17];
+	convertString(app_context, sbuf);
+	const uint16_t* u16 = (const uint16_t*)STACK_TOP_VALUE;
+	u32 u16_len = STACK_TOP_N;
+	char utf8_buf[4096];
+	int utf8_len = u16_to_utf8(u16, u16_len, utf8_buf, sizeof(utf8_buf));
+	char* buf = (char*) HALLOC(utf8_len * 3 + 1);
+	u32 out = 0;
+	for (int i = 0; i < utf8_len; i++)
+	{
+		unsigned char c = (unsigned char) utf8_buf[i];
+		if (c == 0) break;
+		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+			buf[out++] = c;
+		else {
+			buf[out++] = '%';
+			buf[out++] = "0123456789ABCDEF"[c >> 4];
+			buf[out++] = "0123456789ABCDEF"[c & 0x0F];
+		}
+	}
+	buf[out] = '\0';
+	POP();
+	u32 res_u16_len;
+	uint16_t* u16_result = ascii_to_u16(app_context, buf, out, &res_u16_len);
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.str_size = res_u16_len;
+	result.data.string_data.heap_ptr = u16_result;
+	result.data.string_data.owns_memory = true;
+	return result;
+}
+
+static ActionVar asnative_100_unescape(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 1) return result;
+	pushVar(app_context, &args[0]);
+	char sbuf[17];
+	convertString(app_context, sbuf);
+	const uint16_t* u16 = (const uint16_t*)STACK_TOP_VALUE;
+	u32 u16_len = STACK_TOP_N;
+	char utf8_buf[4096];
+	int utf8_len = u16_to_utf8(u16, u16_len, utf8_buf, sizeof(utf8_buf));
+	char* buf = (char*) HALLOC(utf8_len + 1);
+	u32 out = 0;
+	for (int i = 0; i < utf8_len; )
+	{
+		if (utf8_buf[i] == '%') {
+			if (i + 5 < utf8_len && utf8_buf[i+1] == 'u' &&
+			    isxdigit((unsigned char)utf8_buf[i+2]) && isxdigit((unsigned char)utf8_buf[i+3]) &&
+			    isxdigit((unsigned char)utf8_buf[i+4]) && isxdigit((unsigned char)utf8_buf[i+5])) {
+				buf[out++] = utf8_buf[i+2]; buf[out++] = utf8_buf[i+3];
+				buf[out++] = utf8_buf[i+4]; buf[out++] = utf8_buf[i+5];
+				i += 6; continue;
+			}
+			if (i + 2 < utf8_len &&
+			    isxdigit((unsigned char)utf8_buf[i+1]) && isxdigit((unsigned char)utf8_buf[i+2])) {
+				char hex[3] = { utf8_buf[i+1], utf8_buf[i+2], 0 };
+				unsigned long val = strtoul(hex, NULL, 16);
+				buf[out++] = (char) val;
+				i += 3; continue;
+			}
+			i++;
+			if (i < utf8_len) { int fh = isxdigit((unsigned char)utf8_buf[i]); i++; if (fh && i < utf8_len) i++; }
+			continue;
+		}
+		if (utf8_buf[i] == '+') { buf[out++] = ' '; i++; }
+		else { buf[out++] = utf8_buf[i++]; }
+	}
+	buf[out] = '\0';
+	POP();
+	u32 res_u16_len;
+	uint16_t* u16_result = utf8_to_u16(app_context, buf, out, &res_u16_len);
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.str_size = res_u16_len;
+	result.data.string_data.heap_ptr = u16_result;
+	result.data.string_data.owns_memory = true;
+	return result;
+}
+
+static ActionVar asnative_100_trace(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count > 0) {
+		pushVar(app_context, &args[0]);
+		actionTrace(app_context);
+	} else {
+		printf("undefined\n");
+	}
+	return undef;
+}
+
+// Class 100 function table: (0=escape, 1=unescape, 4=trace)
+// parseInt(2) and parseFloat(3) are complex and not needed for current tests.
+#define ASNATIVE_100_COUNT 5
+static ASFunction g_asnative_100_funcs[ASNATIVE_100_COUNT];
+static int g_asnative_100_init = 0;
+
+static void init_asnative_100(void)
+{
+	if (g_asnative_100_init) return;
+	struct { const char* name; Function2Ptr func; } table[] = {
+		{"escape",     (Function2Ptr)asnative_100_escape},
+		{"unescape",   (Function2Ptr)asnative_100_unescape},
+		{"parseInt",   NULL},  // placeholder
+		{"parseFloat", NULL},  // placeholder
+		{"trace",      (Function2Ptr)asnative_100_trace},
+	};
+	for (int i = 0; i < ASNATIVE_100_COUNT; i++) {
+		memset(&g_asnative_100_funcs[i], 0, sizeof(ASFunction));
+		strncpy(g_asnative_100_funcs[i].name, table[i].name, 255);
+		g_asnative_100_funcs[i].function_type = 2;
+		g_asnative_100_funcs[i].advanced_func = table[i].func;
+		if (table[i].func && function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_asnative_100_funcs[i];
+	}
+	g_asnative_100_init = 1;
+}
+
+// --- ASnative class 2: ASNew (constructor context detection) ---
+
+// Constructor call context tracking stack
+#define MAX_CTOR_CONTEXT_DEPTH 64
+static u8 g_ctor_context_stack[MAX_CTOR_CONTEXT_DEPTH];
+static int g_ctor_context_sp = 0;
+
+static void pushCtorContext(u8 is_constructor) {
+	if (g_ctor_context_sp < MAX_CTOR_CONTEXT_DEPTH)
+		g_ctor_context_stack[g_ctor_context_sp++] = is_constructor;
+}
+static void popCtorContext(void) {
+	if (g_ctor_context_sp > 0)
+		g_ctor_context_sp--;
+}
+static u8 isInCtorContext(void) {
+	return (g_ctor_context_sp > 0) ? g_ctor_context_stack[g_ctor_context_sp - 1] : 0;
+}
+
+static ActionVar asnative_2_asnew(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_BOOLEAN;
+	result.data.numeric_value = isInCtorContext() ? 1 : 0;
+	return result;
+}
+
+static ASFunction g_asnative_2_asnew;
+static int g_asnative_2_init = 0;
+
+static void init_asnative_2(void)
+{
+	if (g_asnative_2_init) return;
+	memset(&g_asnative_2_asnew, 0, sizeof(ASFunction));
+	strncpy(g_asnative_2_asnew.name, "ASnew", 255);
+	g_asnative_2_asnew.function_type = 2;
+	g_asnative_2_asnew.advanced_func = (Function2Ptr)asnative_2_asnew;
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_asnative_2_asnew;
+	g_asnative_2_init = 1;
+}
+
 // ASnative(class_id, method_index) — returns a native method by numeric address.
-// Currently handles class 200 (Math): returns the Math function at the given index,
-// or a NaN stub (with valueOf coercion side-effects) for out-of-range indices.
+// Handles class 2 (ASNew), class 100 (global functions), class 200 (Math).
 static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
 	ActionVar undef = {0};
 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
-	if (arg_count < 2) return undef;
+	if (arg_count != 2) return undef;
 
-	int class_id     = (int)mathArgToDouble(&args[0]);
-	int method_index = (int)mathArgToDouble(&args[1]);
+	// Coerce both args via valueOf (handles objects with valueOf, strings, etc.)
+	coerceMathArgs(app_context, args, 2, 2);
+	double class_d = mathArgToDouble(&args[0]);
+	double method_d = mathArgToDouble(&args[1]);
+
+	// ECMAScript ToUint32 wrapping for both arguments
+	u32 class_id = ecmaToUint32(class_d);
+	u32 method_u32 = ecmaToUint32(method_d);
+	// Saturate method index to u16 (values >= 65536 → 65535, which maps to nothing)
+	u16 method_index = (method_u32 <= 0xFFFF) ? (u16)method_u32 : 0xFFFF;
+
+	if (class_id == 2) {
+		init_asnative_2();
+		if (method_index == 0) {
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_FUNCTION;
+			VAL(u64, &result.data.numeric_value) = (u64)&g_asnative_2_asnew;
+			return result;
+		}
+		return undef;
+	}
+
+	if (class_id == 100) {
+		init_asnative_100();
+		if (method_index < ASNATIVE_100_COUNT && g_asnative_100_funcs[method_index].advanced_func != NULL) {
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_FUNCTION;
+			VAL(u64, &result.data.numeric_value) = (u64)&g_asnative_100_funcs[method_index];
+			return result;
+		}
+		return undef;
+	}
 
 	if (class_id == 200) {
 		// Math class: ensure the Math object and its function table are ready
 		initMathObject(app_context);
 		// Valid indices 0–17 map directly to g_math_funcs[]
-		if (method_index >= 0 && method_index < 18) {
+		if (method_index < 18) {
 			ActionVar result = {0};
 			result.type = ACTION_STACK_VALUE_FUNCTION;
 			VAL(u64, &result.data.numeric_value) = (u64)&g_math_funcs[method_index];
@@ -28491,8 +28695,10 @@ void actionNewObject(SWFAppContext* app_context)
 					}
 
 					g_call_depth++;
+					pushCtorContext(1);
 					ActionVar return_value;
 					return_value = ((ActionVar(*)(SWFAppContext*))ctor_func->simple_func)(app_context);
+					popCtorContext();
 					g_call_depth--;
 
 					// Per ECMAScript spec: if constructor returns object, use it
@@ -28554,7 +28760,9 @@ void actionNewObject(SWFAppContext* app_context)
 				if (ctor_func->advanced_func != NULL)
 				{
 					g_call_depth++;
+					pushCtorContext(1);
 					ActionVar return_value = ctor_func->advanced_func(app_context, args, num_args, registers, obj);
+					popCtorContext();
 					g_call_depth--;
 
 					// Check if constructor returned an object (override default behavior)
@@ -28786,7 +28994,9 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		this_var.data.numeric_value = (u64) mc;
 		setVariableByName("this", &this_var);
 		g_call_depth++;
+		pushCtorContext(1);
 		((ActionVar(*)(SWFAppContext*))ctor_func->simple_func)(app_context);
+		popCtorContext();
 		g_call_depth--;
 		g_this_depth = saved_this_depth;
 		if (saved_base != NULL)
@@ -28843,12 +29053,14 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		}
 
 		g_call_depth++;
+		pushCtorContext(1);
 		// Use g_event_this_mc so generated preload_this code picks up MC type correctly
 		// (passing mc as this_obj would make it ACTION_STACK_VALUE_OBJECT in generated code)
 		MovieClip* saved_event_this = g_event_this_mc;
 		g_event_this_mc = mc;
 		ctor_func->advanced_func(app_context, NULL, 0, registers, NULL);
 		g_event_this_mc = saved_event_this;
+		popCtorContext();
 		g_call_depth--;
 
 		if (saved_base != NULL)
@@ -28898,10 +29110,14 @@ void actionNewMethod(SWFAppContext* app_context)
 	// Pop in order: method_name, object, num_args, then args
 
 	// 1. Pop method name (string)
+	// Check for UNDEFINED before convertString — SWF >= 7 converts undefined
+	// to "undefined" which would prevent the blank-method-name constructor path.
+	int method_is_empty = (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED);
 	char str_buffer[17];
 	convertString(app_context, str_buffer);
 	char _nm_buf[512];
-	u32 method_name_len = (u32)u16_to_utf8((const uint16_t*)STACK_TOP_VALUE, STACK_TOP_N, _nm_buf, sizeof(_nm_buf));
+	u32 method_name_len = method_is_empty ? 0 :
+		(u32)u16_to_utf8((const uint16_t*)STACK_TOP_VALUE, STACK_TOP_N, _nm_buf, sizeof(_nm_buf));
 	const char* method_name = _nm_buf;
 	POP();
 
@@ -28999,7 +29215,9 @@ void actionNewMethod(SWFAppContext* app_context)
 					}
 
 					// Call with 'this' context set to new object
+					pushCtorContext(1);
 					return_value = func->advanced_func(app_context, args, num_args, registers, new_obj);
+					popCtorContext();
 
 					// Pop local scope
 					if (scope_depth > 0) {
@@ -29019,7 +29237,9 @@ void actionNewMethod(SWFAppContext* app_context)
 					}
 
 					// Call simple function (cast to correct return type — generated functions return ActionVar)
+					pushCtorContext(1);
 					return_value = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					popCtorContext();
 				}
 
 				// According to SWF spec: constructor return value should be discarded
@@ -29465,7 +29685,9 @@ void actionNewMethod(SWFAppContext* app_context)
 			}
 
 			// Call with 'this' context set to new object
+			pushCtorContext(1);
 			return_value = user_ctor_func->advanced_func(app_context, args, num_args, registers, new_obj_inst);
+			popCtorContext();
 
 			// Pop local scope
 			if (scope_depth > 0) {
@@ -29485,7 +29707,9 @@ void actionNewMethod(SWFAppContext* app_context)
 			}
 
 			// Call simple function (cast to correct return type — generated functions return ActionVar)
+			pushCtorContext(1);
 			return_value = ((ActionVar(*)(SWFAppContext*))user_ctor_func->simple_func)(app_context);
+			popCtorContext();
 		}
 		else
 		{
@@ -32905,7 +33129,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 				g_prev_executing_func = prev_executing_func;
 				g_current_executing_func = func;
+				// Only push constructor context for bytecode functions (register_count > 0).
+				// Native Function2Ptr wrappers (register_count == 0) should see through
+				// to the enclosing bytecode frame's constructor context.
+				int is_bytecode_func = (func->register_count > 0);
+				if (is_bytecode_func) pushCtorContext(0);
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+				if (is_bytecode_func) popCtorContext();
 				g_current_executing_func = prev_executing_func;
 
 				// Pop local scope + captured scopes from scope chain
@@ -33080,7 +33310,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Call the simple function (cast to correct return type — generated functions return ActionVar)
 					g_prev_executing_func = prev_executing_func_t1;
 					g_current_executing_func = func;
+					pushCtorContext(0);
 					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					popCtorContext();
 					g_current_executing_func = prev_executing_func_t1;
 
 					// Pop local scope + captured scopes + this binding from scope chain
@@ -35496,8 +35728,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 
 				// No 'this' binding for direct function call (pass NULL)
+				int _cm_is_bytecode = (func->register_count > 0);
 				g_call_depth++;
+				if (_cm_is_bytecode) pushCtorContext(0);
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+				if (_cm_is_bytecode) popCtorContext();
 				g_call_depth--;
 
 				if (registers != NULL) FREE(registers);
@@ -35517,8 +35752,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 
 				g_call_depth++;
+				pushCtorContext(0);
 				ActionVar result;
 				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				popCtorContext();
 				g_call_depth--;
 
 				pushVar(app_context, &result);
