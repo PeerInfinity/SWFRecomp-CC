@@ -18221,36 +18221,46 @@ static void initTextSnapshotPrototype(SWFAppContext* app_context, ASFunction* ct
 	const u8 mflags = PROPERTY_FLAGS_DEFAULT;
 	ASObject* proto = ctor->prototype_obj;
 
-	// Real implementations for getCount, getText, findText
-	struct { const char* name; u32 len; Function2Ptr func; } real_methods[] = {
-		{"getCount", 8, (Function2Ptr) builtin_ts_getCount},
-		{"getText", 7, (Function2Ptr) builtin_ts_getText},
-		{"findText", 8, (Function2Ptr) builtin_ts_findText},
-	};
-	for (int i = 0; i < 3; i++) {
-		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
-			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
-			memset(fn, 0, sizeof(ASFunction));
-			strncpy(fn->name, real_methods[i].name, 255);
-			fn->function_type = 2;
-			fn->advanced_func = real_methods[i].func;
-			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
-			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
-			setPropertyWithFlags(app_context, proto, real_methods[i].name, real_methods[i].len, &fv, mflags);
-			if (proto->num_used > 0) proto->properties[proto->num_used - 1].flash_flags = 0x0080;
-		}
-	}
+	// Register all methods in Flash's property insertion order.
+	// Flash enumerates in reverse insertion order, so first registered = last in for-in.
+	// Expected for-in: getTextRunInfo, setSelectColor, findText, hitTestTextNearPos,
+	//                  getSelectedText, getText, getSelected, setSelected, getCount
+	// So registration order (first→last): getCount, setSelected, getSelected, getText,
+	//                                     getSelectedText, hitTestTextNearPos, findText,
+	//                                     setSelectColor, getTextRunInfo
 
-	// Remaining stub methods
-	static const char* stub_methods[] = {
-		"setSelected", "getSelected", "getSelectedText",
-		"hitTestTextNearPos", "setSelectColor", "getTextRunInfo"
-	};
-	static const u32 stub_lens[] = { 11, 11, 15, 18, 14, 14 };
-	for (int i = 0; i < 6; i++) {
-		addStubMethodToProto(app_context, proto, stub_methods[i], stub_lens[i], mflags);
-		if (proto->num_used > 0) proto->properties[proto->num_used - 1].flash_flags = 0x0080;
-	}
+	// Helper: register a real (implemented) method
+	#define TS_REAL_METHOD(name_str, name_len, func_ptr) do { \
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) { \
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++]; \
+			memset(fn, 0, sizeof(ASFunction)); \
+			strncpy(fn->name, name_str, 255); \
+			fn->function_type = 2; \
+			fn->advanced_func = (Function2Ptr) func_ptr; \
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn; \
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn; \
+			setPropertyWithFlags(app_context, proto, name_str, name_len, &fv, mflags); \
+			if (proto->num_used > 0) proto->properties[proto->num_used - 1].flash_flags = 0x0080; \
+		} \
+	} while(0)
+
+	#define TS_STUB_METHOD(name_str, name_len) do { \
+		addStubMethodToProto(app_context, proto, name_str, name_len, mflags); \
+		if (proto->num_used > 0) proto->properties[proto->num_used - 1].flash_flags = 0x0080; \
+	} while(0)
+
+	TS_REAL_METHOD("getCount",           8, builtin_ts_getCount);
+	TS_STUB_METHOD("setSelected",       11);
+	TS_STUB_METHOD("getSelected",       11);
+	TS_REAL_METHOD("getText",            7, builtin_ts_getText);
+	TS_STUB_METHOD("getSelectedText",   15);
+	TS_STUB_METHOD("hitTestTextNearPos",18);
+	TS_REAL_METHOD("findText",           8, builtin_ts_findText);
+	TS_STUB_METHOD("setSelectColor",    14);
+	TS_STUB_METHOD("getTextRunInfo",    14);
+
+	#undef TS_REAL_METHOD
+	#undef TS_STUB_METHOD
 }
 
 // Camera: static methods (get, names) + 6 prototype methods
@@ -24515,9 +24525,11 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
-			// Check WRITABLE flag — if property exists on prototype chain but is read-only, skip
+			// Check WRITABLE flag — only on OWN properties (not prototype chain).
+			// Flash allows creating a new property on an instance even if the
+			// same-named property on the prototype is read-only.
 			{
-				ASProperty* wp = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
+				ASProperty* wp = findPropertyRaw(obj, prop_name, prop_name_len);
 				if (wp != NULL && !(wp->flags & PROPERTY_FLAG_WRITABLE))
 				{
 					return;  // Read-only property — silently ignore
@@ -27196,29 +27208,10 @@ void actionGetMember(SWFAppContext* app_context)
 						}
 					}
 				}
-				// TextField "text" property: for HTML text fields with variable binding,
-				// the variable stores raw HTML but .text should return stripped plain text.
-				// Strip when content was set via .htmlText (from_html_text flag).
-				if (prop_name_len == 4 && memcmp(prop_name, "text", 4) == 0 &&
-				    MC_IS_TEXTFIELD(mc) && prop->type == ACTION_STACK_VALUE_STRING)
-				{
-					TFRunTable* _gm_table = tf_find_table(mc);
-					if (_gm_table != NULL && _gm_table->from_html_text) {
-						// Content was set via htmlText — strip tags for .text getter
-						const uint16_t* _gm_u16 = varGetU16Ptr(prop);
-						u32 _gm_len = prop->str_size;
-						int has_tags = 0;
-						for (u32 _gm_i = 0; _gm_i < _gm_len; _gm_i++) {
-							if (_gm_u16[_gm_i] == '<') { has_tags = 1; break; }
-						}
-						if (has_tags) {
-							u32 _gm_stripped_len;
-							uint16_t* _gm_stripped = strip_html_tags_u16(app_context, _gm_u16, _gm_len, &_gm_stripped_len);
-							PUSH_U16(_gm_stripped, _gm_stripped_len);
-							return;
-						}
-					}
-				}
+				// Note: getter-side HTML tag stripping for .text was removed.
+				// The htmlText setter (tf_parse_html + tf_get_plain_text) already
+				// converts to plain text, so stripping here would incorrectly
+				// remove literal '<'/'>' from entity-decoded content (e.g. &lt;p&gt;).
 				// TextField styleSheet getter: only return OBJECT type values
 				if (prop_name_len == 10 && memcmp(prop_name, "styleSheet", 10) == 0 &&
 				    MC_IS_TEXTFIELD(mc))
@@ -35531,7 +35524,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
-
 		if (obj == NULL)
 		{
 			// Null object - push undefined
@@ -36245,7 +36237,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				void* this_obj = NULL;
 				if (num_args >= 1) {
 					if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
-						g_event_this_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
+						MovieClip* call_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
+						g_event_this_mc = call_mc;
+						// For type-2 functions, pass dynamic_props as ASObject*
+						if (call_mc && call_mc->dynamic_props)
+							this_obj = (void*) call_mc->dynamic_props;
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
 					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
@@ -36419,9 +36415,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			{
 				// Extract thisArg — use g_event_this_mc for MovieClip to preserve type info
 				void* this_obj = NULL;
+				MovieClip* apply_this_mc = NULL;
 				if (num_args >= 1) {
 					if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
-						g_event_this_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
+						apply_this_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
+						g_event_this_mc = apply_this_mc;
+						// For type-2 functions, pass dynamic_props as ASObject*
+						if (apply_this_mc && apply_this_mc->dynamic_props)
+							this_obj = (void*) apply_this_mc->dynamic_props;
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
 					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
@@ -36600,14 +36601,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 					pushVar(app_context, &result);
 				}
-				else if (func->function_type == 1 && func->simple_func == NULL && this_obj != NULL)
+				else if (func->function_type == 1 && func->simple_func == NULL && (this_obj != NULL || apply_this_mc != NULL))
 				{
 					// Built-in MC method (e.g., removeMovieClip) applied to a target
 					if (apply_args != NULL) FREE(apply_args);
 					if (args != NULL) FREE(args);
 #ifdef NO_GRAPHICS
 					if (strcmp(func->name, "removeMovieClip") == 0) {
-						MovieClip* _apply_mc = (MovieClip*)this_obj;
+						MovieClip* _apply_mc = apply_this_mc ? apply_this_mc : (MovieClip*)this_obj;
 						#ifndef AVM_MAX_REMOVE_DEPTH
 						#define AVM_MAX_REMOVE_DEPTH 2130690032
 						#endif
