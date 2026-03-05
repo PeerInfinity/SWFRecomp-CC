@@ -1,24 +1,24 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-05T03:27:37.970336+00:00",
-    "old_git_sha": "5b87539d7f0f904629b28291ee0aedfb8f2c6232",
-    "new_timestamp": "2026-03-05T04:15:19.402342+00:00",
-    "new_git_sha": "d3c5020af4e2dee11b4a2abf25b9b54dca745762",
+    "old_timestamp": "2026-03-05T04:15:19.402342+00:00",
+    "old_git_sha": "d3c5020af4e2dee11b4a2abf25b9b54dca745762",
+    "new_timestamp": "2026-03-05T05:08:47.601436+00:00",
+    "new_git_sha": "168c0745d9498215983b2157f36f5babc26e1897",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 453,
+    "old_pass": 457,
     "old_total": 619,
-    "old_pass_rate": 73.2,
-    "new_pass": 457,
+    "old_pass_rate": 73.8,
+    "new_pass": 460,
     "new_total": 619,
-    "new_pass_rate": 73.8,
-    "old_mismatched_lines": 21405,
-    "new_mismatched_lines": 21389,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 16,
-    "newly_passing": 4,
+    "new_pass_rate": 74.3,
+    "old_mismatched_lines": 21389,
+    "new_mismatched_lines": 21544,
+    "increased_mismatches": 218,
+    "decreased_mismatches": 63,
+    "newly_passing": 3,
     "newly_failing": 0,
     "status_changed": 4,
     "unchanged": 615,
@@ -27,67 +27,67 @@
   },
   "changes": [
     {
-      "test": "issue_3522",
+      "test": "asnative",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 1
+        "actual_lines": 31,
+        "expected_lines": 34,
+        "matching_lines": 19
       },
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
       }
     },
     {
-      "test": "printjob_props_swf5",
+      "test": "asnew",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 40
+        "actual_lines": 18,
+        "expected_lines": 34,
+        "matching_lines": 10
       },
       "new_lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 45
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
       }
     },
     {
-      "test": "printjob_props_swf6",
+      "test": "bitmap_filters",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "segfault",
       "old_lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 40
+        "actual_lines": 548,
+        "expected_lines": 548,
+        "matching_lines": 279
       },
       "new_lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 45
+        "actual_lines": 116,
+        "expected_lines": 548,
+        "matching_lines": 61
       }
     },
     {
-      "test": "printjob_props_swf7",
+      "test": "object_resolve",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 40
+        "actual_lines": 30,
+        "expected_lines": 38,
+        "matching_lines": 14
       },
       "new_lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 45
+        "actual_lines": 38,
+        "expected_lines": 38,
+        "matching_lines": 38
       }
     }
   ]
