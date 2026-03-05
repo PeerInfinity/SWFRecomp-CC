@@ -11015,14 +11015,24 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					}
 
 					if (text_from_var != NULL) {
+						// For HTML text fields, strip HTML tags from variable value
+						int _tfv_is_html = (tf_flags & 0x0040) != 0;
+						const uint16_t* _tfv_store = text_from_var;
+						u32 _tfv_store_len = tfv_len;
+						if (_tfv_is_html) {
+							u32 _tfv_stripped_len;
+							uint16_t* _tfv_stripped = strip_html_tags_u16(app_context, text_from_var, tfv_len, &_tfv_stripped_len);
+							_tfv_store = _tfv_stripped;
+							_tfv_store_len = _tfv_stripped_len;
+						}
 						ActionVar tfv_val = {0};
 						tfv_val.type = ACTION_STACK_VALUE_STRING;
-						tfv_val.str_size = tfv_len;
-						VAL(u64, &tfv_val.data.numeric_value) = (u64)text_from_var;
+						tfv_val.str_size = _tfv_store_len;
+						VAL(u64, &tfv_val.data.numeric_value) = (u64)_tfv_store;
 						setProperty(app_context, props, "text", 4, &tfv_val);
 						ActionVar tfv_len_val = {0};
 						tfv_len_val.type = ACTION_STACK_VALUE_F64;
-						VAL(double, &tfv_len_val.data.numeric_value) = (double)tfv_len;
+						VAL(double, &tfv_len_val.data.numeric_value) = (double)_tfv_store_len;
 						setProperty(app_context, props, "length", 6, &tfv_len_val);
 					}
 				}
@@ -24525,14 +24535,23 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
-			// Check WRITABLE flag — only on OWN properties (not prototype chain).
-			// Flash allows creating a new property on an instance even if the
-			// same-named property on the prototype is read-only.
+			// Check WRITABLE flag — check prototype chain for read-only data properties.
+			// If found on prototype and not writable, block the write (ECMAScript [[Set]] semantics).
+			// Own read-only properties also block writes.
 			{
-				ASProperty* wp = findPropertyRaw(obj, prop_name, prop_name_len);
+				ASProperty* wp = findPropertyStructWithPrototype(obj, prop_name, prop_name_len);
 				if (wp != NULL && !(wp->flags & PROPERTY_FLAG_WRITABLE))
 				{
-					return;  // Read-only property — silently ignore
+					// Allow write if the read-only prototype property is a function
+					// (Flash allows overriding prototype methods on instances)
+					if (wp->value.type == ACTION_STACK_VALUE_FUNCTION)
+					{
+						// Fall through — allow creating own property
+					}
+					else
+					{
+						return;  // Read-only data property — silently ignore
+					}
 				}
 			}
 			// XML nodeName: setting to non-string is a no-op (Flash behavior)
@@ -27209,9 +27228,11 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 				// Note: getter-side HTML tag stripping for .text was removed.
-				// The htmlText setter (tf_parse_html + tf_get_plain_text) already
-				// converts to plain text, so stripping here would incorrectly
-				// remove literal '<'/'>' from entity-decoded content (e.g. &lt;p&gt;).
+				// All code paths that store the text property now properly strip
+				// HTML at write time (htmlText setter, variable binding init/sync).
+				// Stripping at read time would incorrectly remove literal '<'/'>'
+				// from entity-decoded content (e.g. &lt;p&gt;) and from stylesheet-
+				// generated font/span tags that are intentionally stored.
 				// TextField styleSheet getter: only return OBJECT type values
 				if (prop_name_len == 10 && memcmp(prop_name, "styleSheet", 10) == 0 &&
 				    MC_IS_TEXTFIELD(mc))
