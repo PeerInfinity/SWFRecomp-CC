@@ -622,6 +622,7 @@ static ASFunction g_object_isPropertyEnumerable_func;
 static ASFunction g_object_isPrototypeOf_func;
 static ASFunction g_object_watch_func;
 static ASFunction g_object_unwatch_func;
+static ASFunction g_object_addProperty_func;
 static ASFunction g_wrapper_toString_func;
 static int g_wrapper_toString_init = 0;
 
@@ -1797,6 +1798,61 @@ static ActionVar builtin_object_unwatch(SWFAppContext* app_context, ActionVar* a
 			ret.data.numeric_value = 1;
 			return ret;
 		}
+	}
+	return ret;
+}
+
+// Built-in Object.prototype.addProperty(name, getter, setter)
+// Callable via Function.call: Object.addProperty.call(target, name, getter, setter)
+static ActionVar builtin_object_addProperty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0; // false by default
+
+	if (this_obj == NULL || arg_count < 3) return ret;
+	if (args[0].type != ACTION_STACK_VALUE_STRING) return ret;
+
+	ASObject* obj = (ASObject*) this_obj;
+
+	char _addprop_buf[512];
+	const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+	u16_to_utf8(_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
+	const char* prop_name = _addprop_buf;
+	u32 prop_name_len = (u32)strlen(prop_name);
+
+	ASFunction* getter = NULL;
+	if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
+		getter = (ASFunction*) args[1].data.numeric_value;
+	ASFunction* setter = NULL;
+	if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
+		setter = (ASFunction*) args[2].data.numeric_value;
+
+	// Find or create property on the target object
+	ASProperty* prop = NULL;
+	for (u32 i = 0; i < obj->num_used; i++) {
+		if (obj->properties[i].name_length == prop_name_len &&
+		    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0) {
+			prop = &obj->properties[i];
+			break;
+		}
+	}
+	if (prop == NULL) {
+		ActionVar marker = {0};
+		marker.type = ACTION_STACK_VALUE_UNDEFINED;
+		setProperty(app_context, obj, prop_name, prop_name_len, &marker);
+		for (u32 i = 0; i < obj->num_used; i++) {
+			if (obj->properties[i].name_length == prop_name_len &&
+			    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0) {
+				prop = &obj->properties[i];
+				break;
+			}
+		}
+	}
+	if (prop != NULL) {
+		prop->getter = (void*) getter;
+		prop->setter = (void*) setter;
+		ret.data.numeric_value = 1; // true
 	}
 	return ret;
 }
@@ -3493,6 +3549,21 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		unwatch_var.data.numeric_value = (u64) &g_object_unwatch_func;
 		setProperty(app_context, g_object_prototype, "unwatch", 7, &unwatch_var);
 
+		// Set up addProperty function (type-2: needs this_obj + args)
+		memset(&g_object_addProperty_func, 0, sizeof(ASFunction));
+		strncpy(g_object_addProperty_func.name, "addProperty", 255);
+		g_object_addProperty_func.function_type = 2;
+		g_object_addProperty_func.param_count = 3;
+		g_object_addProperty_func.register_count = 0;
+		g_object_addProperty_func.advanced_func = (Function2Ptr) builtin_object_addProperty;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_addProperty_func;
+		ActionVar addprop_var;
+		addprop_var.type = ACTION_STACK_VALUE_FUNCTION;
+		addprop_var.str_size = 0;
+		addprop_var.data.numeric_value = (u64) &g_object_addProperty_func;
+		setProperty(app_context, g_object_prototype, "addProperty", 11, &addprop_var);
+
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
 			g_object_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
@@ -3715,6 +3786,93 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 }
 
 // Find __resolve method by walking prototype chain (raw lookup, no addProperty getters).
+// Auto-box a primitive value to a wrapper object using the current global constructor.
+// When a monkey-patched constructor (user function) is found on _global for
+// Boolean/Number/String, creates a wrapper ASObject, sets __proto__ and __constructor__,
+// calls the constructor, and mutates obj_var from primitive to OBJECT type.
+// Returns 1 if boxing occurred, 0 if not (constructor not found or is built-in stub).
+static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, ASObject* active_global)
+{
+	if (obj_var->type != ACTION_STACK_VALUE_BOOLEAN &&
+	    obj_var->type != ACTION_STACK_VALUE_F32 &&
+	    obj_var->type != ACTION_STACK_VALUE_F64 &&
+	    obj_var->type != ACTION_STACK_VALUE_STRING)
+		return 0;
+
+	const char* ctor_name = NULL;
+	u32 ctor_name_len = 0;
+	if (obj_var->type == ACTION_STACK_VALUE_BOOLEAN) { ctor_name = "Boolean"; ctor_name_len = 7; }
+	else if (obj_var->type == ACTION_STACK_VALUE_F32 || obj_var->type == ACTION_STACK_VALUE_F64) { ctor_name = "Number"; ctor_name_len = 6; }
+	else { ctor_name = "String"; ctor_name_len = 6; }
+
+	ASFunction* box_ctor = NULL;
+	if (active_global != NULL) {
+		ASProperty* gp = findPropertyStructWithPrototype(active_global, ctor_name, ctor_name_len);
+		if (gp != NULL) {
+			ActionVar ctor_val;
+			if (gp->getter != NULL) {
+				ctor_val = invokePropertyGetter(app_context, (ASFunction*)gp->getter, (void*)active_global);
+			} else {
+				ctor_val = gp->value;
+			}
+			if (ctor_val.type == ACTION_STACK_VALUE_FUNCTION) {
+				ASFunction* cf = (ASFunction*) ctor_val.data.numeric_value;
+				// Only auto-box if constructor is a user-defined function (callable code)
+				// Built-in stubs have advanced_func=NULL and simple_func=NULL
+				if (cf != NULL && (cf->advanced_func != NULL || cf->simple_func != NULL))
+					box_ctor = cf;
+			}
+		}
+	}
+
+	if (box_ctor == NULL) return 0;
+
+	// Create wrapper object: new Constructor(primitive_value)
+	ASObject* wrapper = allocObject(app_context, 4);
+	retainObject(wrapper);
+	if (box_ctor->prototype_obj != NULL) {
+		ActionVar proto_val = {0};
+		proto_val.type = ACTION_STACK_VALUE_OBJECT;
+		proto_val.data.numeric_value = (u64) box_ctor->prototype_obj;
+		setProperty(app_context, wrapper, "__proto__", 9, &proto_val);
+	} else if (box_ctor->own_props != NULL) {
+		// Check for non-object prototype stored in own_props (e.g., func.prototype = true)
+		ActionVar* stored_proto = getProperty(box_ctor->own_props, "prototype", 9);
+		if (stored_proto != NULL && stored_proto->type != ACTION_STACK_VALUE_UNDEFINED)
+			setProperty(app_context, wrapper, "__proto__", 9, stored_proto);
+	}
+	ActionVar ctor_ref = {0};
+	ctor_ref.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_ref.data.numeric_value = (u64) box_ctor;
+	setProperty(app_context, wrapper, "__constructor__", 15, &ctor_ref);
+
+	// Call the constructor with wrapper as 'this' and primitive value as argument
+	ActionVar box_args[1];
+	box_args[0] = *obj_var;
+	if (box_ctor->function_type == 2 && box_ctor->advanced_func != NULL) {
+		pushSuperContext((void*)wrapper, 1);
+		ActionVar registers[256] = {0};
+		g_call_depth++;
+		box_ctor->advanced_func(app_context, box_args, 1, registers, (void*)wrapper);
+		g_call_depth--;
+		popSuperContext();
+	} else if (box_ctor->function_type == 1 && box_ctor->simple_func != NULL) {
+		ActionVar this_var = {0};
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64) wrapper;
+		setVariableByName("this", &this_var);
+		pushVar(app_context, &box_args[0]);
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))box_ctor->simple_func)(app_context);
+		g_call_depth--;
+	}
+
+	// Replace obj_var with the wrapper object
+	obj_var->type = ACTION_STACK_VALUE_OBJECT;
+	obj_var->data.numeric_value = (u64) wrapper;
+	return 1;
+}
+
 // Returns ASFunction* if a callable __resolve is found, NULL otherwise.
 // Semantics: FUNCTION type → return it; OBJECT type → block (return NULL, sets *blocked=1);
 // all other types (number, string, movieclip, etc.) → skip, continue up chain.
@@ -6806,6 +6964,14 @@ static ASObject* g_array_proto_modern = NULL;
 static int g_secondary_global_init = 0;
 
 static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
+
+// Get the version-appropriate _global object (same as actionGetVariable("_global"))
+static inline ASObject* getActiveGlobal(void) {
+	ASObject* ag = global_object;
+	if (g_swf_version <= 6 && g_global_legacy != NULL) ag = g_global_legacy;
+	else if (g_swf_version > 6 && g_global_modern != NULL) ag = g_global_modern;
+	return ag;
+}
 
 // Forward declaration
 static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_version);
@@ -20505,6 +20671,8 @@ check_special_vars:
 				// Add registerClass as a static method on Object (own_props)
 				g_object_constructor.own_props = allocObject(app_context, 4);
 				retainObject(g_object_constructor.own_props);
+				// Set __proto__ to Object.prototype so Object.addProperty etc. resolve
+				setObjectProto(app_context, g_object_constructor.own_props);
 				registerGeomMethod(&g_registerClass_func, "registerClass",
 					(Function2Ptr)actionObjectRegisterClass, app_context,
 					g_object_constructor.own_props);
@@ -22571,6 +22739,146 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 	return 0;
 }
 
+// Coercing version of instance_of: auto-boxes cls and cls.prototype via tryAutoBoxPrimitive.
+// Matches Ruffle's instance_of semantics: if obj is primitive → false.
+// Otherwise, coerces cls and cls.prototype to objects, then walks __proto__ chain.
+static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, ActionVar* ctor_var)
+{
+	// Primitives are never instances
+	if (obj_var->type == ACTION_STACK_VALUE_STRING ||
+	    obj_var->type == ACTION_STACK_VALUE_F32 ||
+	    obj_var->type == ACTION_STACK_VALUE_F64 ||
+	    obj_var->type == ACTION_STACK_VALUE_BOOLEAN ||
+	    obj_var->type == ACTION_STACK_VALUE_UNDEFINED ||
+	    obj_var->type == ACTION_STACK_VALUE_NULL)
+	{
+		return 0;
+	}
+
+	// Coerce cls to object (may trigger constructor side-effects like NoisyString traces)
+	// This must happen BEFORE any early returns, because the side effects are expected.
+	ActionVar cls_coerced = *ctor_var;
+	if (cls_coerced.type == ACTION_STACK_VALUE_STRING ||
+	    cls_coerced.type == ACTION_STACK_VALUE_BOOLEAN ||
+	    cls_coerced.type == ACTION_STACK_VALUE_F32 ||
+	    cls_coerced.type == ACTION_STACK_VALUE_F64)
+	{
+		tryAutoBoxPrimitive(app_context, &cls_coerced, getActiveGlobal());
+	}
+
+	// Get cls.prototype and coerce it
+	ASObject* proto_target = NULL;
+	if (cls_coerced.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* cf = (ASFunction*) cls_coerced.data.numeric_value;
+		if (cf != NULL) proto_target = cf->prototype_obj;
+	}
+	else if (cls_coerced.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// MovieClip used as class — check dynamic_props for "prototype"
+		// Dead MCs have no valid prototype
+		MovieClip* cls_mc = (MovieClip*) cls_coerced.data.numeric_value;
+		if (cls_mc != NULL && cls_mc->depth != INT_MIN && cls_mc->dynamic_props != NULL) {
+			ActionVar* cpv = getProperty((ASObject*)cls_mc->dynamic_props, "prototype", 9);
+			if (cpv != NULL && cpv->type == ACTION_STACK_VALUE_OBJECT)
+				proto_target = (ASObject*) cpv->data.numeric_value;
+		}
+	}
+	else if (cls_coerced.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASObject* co = (ASObject*) cls_coerced.data.numeric_value;
+		if (co != NULL) {
+			ActionVar* cpv = getProperty(co, "prototype", 9);
+			if (cpv != NULL) {
+				if (cpv->type == ACTION_STACK_VALUE_OBJECT)
+					proto_target = (ASObject*) cpv->data.numeric_value;
+				else if (cpv->type == ACTION_STACK_VALUE_STRING ||
+				         cpv->type == ACTION_STACK_VALUE_BOOLEAN ||
+				         cpv->type == ACTION_STACK_VALUE_F32 ||
+				         cpv->type == ACTION_STACK_VALUE_F64)
+				{
+					// Coerce prototype value (e.g., prototype: "right" → NoisyString trace)
+					ActionVar proto_coerced = *cpv;
+					tryAutoBoxPrimitive(app_context, &proto_coerced, getActiveGlobal());
+					if (proto_coerced.type == ACTION_STACK_VALUE_OBJECT)
+						proto_target = (ASObject*) proto_coerced.data.numeric_value;
+				}
+			}
+		}
+	}
+
+	if (proto_target == NULL) return 0;
+
+	// Dead MovieClips are never instances (checked AFTER cls coercion for side effects)
+	if (obj_var->type == ACTION_STACK_VALUE_MOVIECLIP) {
+		MovieClip* mc = (MovieClip*) obj_var->data.numeric_value;
+		if (mc == NULL || mc->depth == INT_MIN) return 0;
+	}
+
+	// Walk obj's __proto__ chain checking against proto_target
+	// Handle MovieClip case
+	if (obj_var->type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		MovieClip* mc = (MovieClip*) obj_var->data.numeric_value;
+		ASObject* mc_proto = NULL;
+		if (mc != NULL && mc->dynamic_props != NULL) {
+			ActionVar* dp = getProperty((ASObject*)mc->dynamic_props, "__proto__", 9);
+			if (dp && dp->type == ACTION_STACK_VALUE_OBJECT)
+				mc_proto = (ASObject*) dp->data.numeric_value;
+		}
+		if (mc_proto == NULL) {
+			extern ASFunction g_movieclip_constructor;
+			mc_proto = g_movieclip_constructor.prototype_obj;
+		}
+		int depth = 0;
+		while (mc_proto != NULL && depth < 100) {
+			if (mc_proto == proto_target) return 1;
+			for (u32 ii = 0; ii < mc_proto->interface_count; ii++) {
+				if (checkInterfaceTransitive(mc_proto->interfaces[ii], proto_target, 0))
+					return 1;
+			}
+			ActionVar* next = getProperty(mc_proto, "__proto__", 9);
+			if (next && next->type == ACTION_STACK_VALUE_OBJECT)
+				mc_proto = (ASObject*) next->data.numeric_value;
+			else break;
+			depth++;
+		}
+		return 0;
+	}
+
+	// Get obj as ASObject
+	ASObject* obj = NULL;
+	if (obj_var->type == ACTION_STACK_VALUE_OBJECT)
+		obj = (ASObject*) obj_var->data.numeric_value;
+	else if (obj_var->type == ACTION_STACK_VALUE_FUNCTION) {
+		ASFunction* f = (ASFunction*) obj_var->data.numeric_value;
+		obj = f ? f->own_props : NULL;
+	} else if (obj_var->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
+		obj = arr ? arr->props : NULL;
+	}
+	if (obj == NULL) return 0;
+
+	// Walk __proto__ chain
+	ActionVar* current_proto_var = getProperty(obj, "__proto__", 9);
+	int depth = 0;
+	while (current_proto_var != NULL && depth < 100) {
+		depth++;
+		if (current_proto_var->type == ACTION_STACK_VALUE_OBJECT) {
+			ASObject* current_proto = (ASObject*) current_proto_var->data.numeric_value;
+			if (current_proto == proto_target) return 1;
+			for (u32 ii = 0; ii < current_proto->interface_count; ii++) {
+				if (checkInterfaceTransitive(current_proto->interfaces[ii], proto_target, 0))
+					return 1;
+			}
+			current_proto_var = getProperty(current_proto, "__proto__", 9);
+		} else {
+			break;
+		}
+	}
+	return 0;
+}
+
 void actionCastOp(SWFAppContext* app_context)
 {
 	// CastOp implementation (ActionScript 2.0 cast operator)
@@ -22585,8 +22893,19 @@ void actionCastOp(SWFAppContext* app_context)
 	ActionVar ctor_var;
 	popVar(app_context, &ctor_var);
 
+	// Flash side-effect: if obj is primitive, auto-box it (discard result, keep trace)
+	if (obj_var.type == ACTION_STACK_VALUE_STRING ||
+	    obj_var.type == ACTION_STACK_VALUE_BOOLEAN ||
+	    obj_var.type == ACTION_STACK_VALUE_F32 ||
+	    obj_var.type == ACTION_STACK_VALUE_F64)
+	{
+		ActionVar tmp = obj_var;
+		tryAutoBoxPrimitive(app_context, &tmp, getActiveGlobal());
+		// discard tmp — only side effects (constructor traces) matter
+	}
+
 	// Check if object is an instance of constructor using prototype chain + interfaces
-	if (checkInstanceOf(&obj_var, &ctor_var))
+	if (instanceOfCoercing(app_context, &obj_var, &ctor_var))
 	{
 		// Cast succeeds - push the object back
 		pushVar(app_context, &obj_var);
@@ -22685,8 +23004,8 @@ void actionInstanceOf(SWFAppContext* app_context)
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
 
-	// Check if object is an instance of constructor using prototype chain + interfaces
-	int result = checkInstanceOf(&obj_var, &constr_var);
+	// Use coercing version: auto-boxes cls and cls.prototype (produces side-effect traces)
+	int result = instanceOfCoercing(app_context, &obj_var, &constr_var);
 
 	// Push result as boolean
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result ? 1 : 0);
@@ -25081,6 +25400,20 @@ void actionSetMember(SWFAppContext* app_context)
 					func->prototype_obj = new_proto;
 				}
 			}
+			else
+			{
+				// Non-object prototype (e.g., true, 42, "string"): clear prototype_obj,
+				// store in own_props so GetMember can return the actual value
+				if (func->prototype_obj != NULL) {
+					releaseObject(app_context, func->prototype_obj);
+					func->prototype_obj = NULL;
+				}
+				if (func->own_props == NULL) {
+					func->own_props = allocObject(app_context, 4);
+					retainObject(func->own_props);
+				}
+				setProperty(app_context, func->own_props, "prototype", 9, &value_var);
+			}
 		}
 		else if (func != NULL)
 		{
@@ -26898,6 +27231,17 @@ void actionGetMember(SWFAppContext* app_context)
 		return;
 	}
 
+	// Auto-box primitives for property access (monkey-patched constructors)
+	if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN ||
+	    obj_var.type == ACTION_STACK_VALUE_F32 ||
+	    obj_var.type == ACTION_STACK_VALUE_F64 ||
+	    obj_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		tryAutoBoxPrimitive(app_context, &obj_var, getActiveGlobal());
+		// If boxed, obj_var is now OBJECT — fall through to OBJECT handler
+		// If not boxed, fall through to the original type-specific handlers
+	}
+
 	// Handle different object types
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
@@ -27216,21 +27560,35 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Lazily create prototype object on first access
-				if (func->prototype_obj == NULL)
+				// Check if prototype was set to a non-object value (stored in own_props)
+				int _non_obj_proto = 0;
+				if (func->prototype_obj == NULL && func->own_props != NULL)
 				{
-					func->prototype_obj = allocObject(app_context, 4);
-					retainObject(func->prototype_obj);
-					// Set Object.prototype as __proto__ for prototype chain
-					setObjectProto(app_context, func->prototype_obj);
-					// Set constructor property pointing back to the function
-					ActionVar ctor_var;
-					ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-					ctor_var.str_size = 0;
-					ctor_var.data.numeric_value = (u64) func;
-					setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
+					ActionVar* stored = getProperty(func->own_props, "prototype", 9);
+					if (stored != NULL && stored->type != ACTION_STACK_VALUE_UNDEFINED)
+					{
+						pushVar(app_context, stored);
+						_non_obj_proto = 1;
+					}
 				}
-				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+				if (!_non_obj_proto)
+				{
+					// Lazily create prototype object on first access
+					if (func->prototype_obj == NULL)
+					{
+						func->prototype_obj = allocObject(app_context, 4);
+						retainObject(func->prototype_obj);
+						// Set Object.prototype as __proto__ for prototype chain
+						setObjectProto(app_context, func->prototype_obj);
+						// Set constructor property pointing back to the function
+						ActionVar ctor_var;
+						ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+						ctor_var.str_size = 0;
+						ctor_var.data.numeric_value = (u64) func;
+						setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
+					}
+					PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+				}
 			}
 		}
 		else if (func != NULL)
@@ -35714,6 +36072,25 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
+	// 4b. Primitive auto-boxing for CallMethod: if receiver is a primitive (BOOLEAN, F32, F64, STRING)
+	// and the corresponding global constructor has been replaced with a user function, auto-box.
+	if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN ||
+	    obj_var.type == ACTION_STACK_VALUE_F32 ||
+	    obj_var.type == ACTION_STACK_VALUE_F64 ||
+	    obj_var.type == ACTION_STACK_VALUE_STRING)
+	{
+		if (!tryAutoBoxPrimitive(app_context, &obj_var, getActiveGlobal())) {
+			// No user constructor — for non-string primitives, use _global as receiver
+			if (obj_var.type != ACTION_STACK_VALUE_STRING) {
+				extern ASObject* global_object;
+				if (global_object != NULL) {
+					obj_var.type = ACTION_STACK_VALUE_OBJECT;
+					obj_var.data.numeric_value = (u64) global_object;
+				}
+			}
+		}
+	}
+
 	// 5a. Handle SUPER type BEFORE empty-method check — super() and super.method()
 	// must be dispatched via the SUPER handler, not the generic empty-method path.
 	if (obj_var.type == ACTION_STACK_VALUE_SUPER)
@@ -35915,7 +36292,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
-	// 6b. Look up the method on the object and invoke it
+	// 6. Look up the method on the object and invoke it
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
@@ -36645,9 +37022,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Flash: undefined/null thisArg → global object
 						this_obj = (void*) global_object;
 					} else {
-						// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
-						g_override_this = args[0];
-						g_override_this_set = 1;
+						// Primitive thisArg — auto-box if constructor was replaced
+						if (tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal())) {
+							this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+						} else {
+							// No user constructor — use _global as this
+							this_obj = (void*) global_object;
+						}
 					}
 				}
 
@@ -36834,9 +37215,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Flash: undefined/null thisArg → global object
 						this_obj = (void*) global_object;
 					} else {
-						// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
-						g_override_this = args[0];
-						g_override_this_set = 1;
+						// Primitive thisArg — auto-box if constructor was replaced
+						if (tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal())) {
+							this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+						} else {
+							this_obj = (void*) global_object;
+						}
 					}
 				}
 
