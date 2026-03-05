@@ -1409,6 +1409,12 @@ namespace SWFRecomp
 					func_def << "\tfor (int _ri = 0; _ri < " << actual_reg_count << "; _ri++) { regs[_ri].type = ACTION_STACK_VALUE_UNDEFINED; regs[_ri].data.numeric_value = 0; regs[_ri].str_size = 0; }" << endl;
 				}
 
+				// Save and clear g_override_this at function entry to prevent leaking to nested calls
+				func_def << "\textern ActionVar g_override_this;" << endl;
+				func_def << "\textern int g_override_this_set;" << endl;
+				func_def << "\tint _ot_flag = g_override_this_set; g_override_this_set = 0;" << endl;
+				func_def << "\tActionVar _ot_val; if (_ot_flag) _ot_val = g_override_this;" << endl;
+
 				// Preload special variables into registers
 				next_reg = 1; // Reset for actual emission
 
@@ -1417,11 +1423,8 @@ namespace SWFRecomp
 					if (!suppress_this)
 					{
 						func_def << "\t// Preload 'this' into register " << next_reg << endl;
-						func_def << "\textern ActionVar g_override_this;" << endl;
-						func_def << "\textern int g_override_this_set;" << endl;
-						func_def << "\tif (g_override_this_set) {" << endl;
-						func_def << "\t\tregs[" << next_reg << "] = g_override_this;" << endl;
-						func_def << "\t\tg_override_this_set = 0;" << endl;
+						func_def << "\tif (_ot_flag) {" << endl;
+						func_def << "\t\tregs[" << next_reg << "] = _ot_val;" << endl;
 						func_def << "\t} else if (this_obj != NULL) {" << endl;
 						func_def << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
 						func_def << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;

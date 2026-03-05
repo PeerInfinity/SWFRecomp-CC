@@ -35739,6 +35739,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_override_this_set = 1;
 
 				int _cm_is_bytecode = (func->register_count > 0);
+				if (!_cm_is_bytecode) g_override_this_set = 0; // C functions don't consume the flag; clear to prevent leaking to nested calls
 				g_call_depth++;
 				if (_cm_is_bytecode) pushCtorContext(0);
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
@@ -36547,6 +36548,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ActionVar* registers = NULL;
 					if (func->register_count > 0)
 						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+					else if (g_override_this_set)
+						g_override_this_set = 0; // C functions don't consume the flag; clear to prevent leaking
 
 					ASFunction* prev_executing_func_call = g_current_executing_func;
 					g_call_depth++;
@@ -36569,6 +36572,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_current_context = func->base_clip;
 
 					ActionVar result = func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
+					g_override_this_set = 0; // clear in case function didn't consume it
 
 					g_current_context = prev_ctx_call;
 					for (u32 ci = 0; ci < captured_count; ci++) {
@@ -36628,6 +36632,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					g_current_executing_func = prev_executing_func_call;
 					g_call_depth--;
+					g_override_this_set = 0; // clear in case function didn't consume it
 
 					g_current_context = prev_ctx_call;
 					for (u32 ci = 0; ci < captured_count; ci++) {
@@ -36787,6 +36792,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ActionVar* registers = NULL;
 					if (func->register_count > 0)
 						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+					else if (g_override_this_set)
+						g_override_this_set = 0; // C functions don't consume the flag; clear to prevent leaking
 
 					ASFunction* prev_executing_func_ap2 = g_current_executing_func;
 					g_call_depth++;
@@ -36809,6 +36816,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_current_context = func->base_clip;
 
 					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
+					g_override_this_set = 0; // clear in case function didn't consume it
 
 					g_current_context = prev_ctx_ap2;
 					for (u32 ci = 0; ci < captured_count_ap2; ci++) {
@@ -36868,6 +36876,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					g_current_executing_func = prev_executing_func_ap;
 					g_call_depth--;
+					g_override_this_set = 0; // clear in case function didn't consume it
 
 					g_current_context = prev_ctx_ap1;
 					for (u32 ci = 0; ci < captured_count_ap1; ci++) {
