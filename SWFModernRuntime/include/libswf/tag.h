@@ -253,6 +253,8 @@ u16 ng_findFontIdByName(const char* name);
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
 // Look up exported symbol by linkage name. Returns char_id or (size_t)-1 if not found.
 size_t ng_lookupExport(const char* name);
+// Look up sound duration in ms by char_id. Returns -1 if not found.
+int32_t ng_getSoundDuration(u16 char_id);
 // Attach a library symbol by char_id. Returns created MC, or NULL if not sprite.
 MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent);
 // Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)

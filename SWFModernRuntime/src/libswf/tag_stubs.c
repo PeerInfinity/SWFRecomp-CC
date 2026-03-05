@@ -214,6 +214,32 @@ const char* ng_lookupExportName(size_t char_id)
 }
 
 // ---------------------------------------------------------------------------
+// Sound metadata registry (DefineSound → attachSound/getDuration linkage)
+// ---------------------------------------------------------------------------
+#define MAX_SOUND_METADATA 128
+static struct {
+	u16 char_id;
+	u8 rate;       // 0=5.5kHz, 1=11kHz, 2=22kHz, 3=44kHz
+	u32 sample_count;
+} g_sound_metadata[MAX_SOUND_METADATA];
+static size_t g_sound_metadata_count = 0;
+
+// Look up duration in ms for a sound char_id. Returns -1 if not found.
+int32_t ng_getSoundDuration(u16 char_id)
+{
+	for (size_t i = 0; i < g_sound_metadata_count; i++) {
+		if (g_sound_metadata[i].char_id == char_id) {
+			// Duration = sample_count * 1000 / sample_rate (truncated)
+			static const u32 rates[] = { 5512, 11025, 22050, 44100 };
+			u32 sr = rates[g_sound_metadata[i].rate & 3];
+			double dur = (double)g_sound_metadata[i].sample_count * 1000.0 / (double)sr;
+			return (int32_t)(dur + 0.5);
+		}
+	}
+	return -1;
+}
+
+// ---------------------------------------------------------------------------
 // Clone depth table — tracks which variable name occupies each SWF depth for
 // script-created clones (CloneSprite / duplicateMovieClip). When a new clone
 // takes an occupied SWF depth, the old variable is set to undefined so that
@@ -3088,8 +3114,15 @@ void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
 	u8 format, u8 rate, u8 sample_size, u8 stereo,
 	u32 sample_count, const u8* data, size_t data_size)
 {
-	(void)app_context; (void)sound_id; (void)format; (void)rate;
-	(void)sample_size; (void)stereo; (void)sample_count; (void)data; (void)data_size;
+	(void)app_context; (void)format; (void)sample_size; (void)stereo;
+	(void)data; (void)data_size;
+	// Store metadata for attachSound/getDuration
+	if (g_sound_metadata_count < MAX_SOUND_METADATA) {
+		g_sound_metadata[g_sound_metadata_count].char_id = sound_id;
+		g_sound_metadata[g_sound_metadata_count].rate = rate;
+		g_sound_metadata[g_sound_metadata_count].sample_count = sample_count;
+		g_sound_metadata_count++;
+	}
 }
 
 void tagStartSound(SWFAppContext* app_context, u16 sound_id,
