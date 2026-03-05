@@ -7,6 +7,7 @@ Last updated: 2026-03-04
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
 - **Recent gains (this session)**: FUNCTION_EDGE_CASES Phase 1+2 done. function_as_function PASS (36/36). funky_function_calls segfault fixed → 52/56 (93%). Fixed: MovieClip thisArg via g_event_this_mc, undefined/null thisArg → global_object, global object "undefined" stringification, captured scope + base_clip in apply handler, array-like objects in apply().
+- **Recent gains (this session)**: ASNATIVE_ASNEW_PLAN COMPLETE → complete/. asnative (34/34), asnew (34/34). ASnative class 100/2/200 dispatch, ASNew constructor context tracking, actionNewMethod SWF8 undefined method name fix.
 - **Recent gains (this session)**: ASBROADCASTER_PLAN COMPLETE → complete/. as_broadcaster (41/41), as_broadcaster_undef (90/90). AsBroadcaster.initialize(), addListener/removeListener abstract equality (null==undefined), broadcastMessage method name coercion + true return value.
 - **Recent gains (previous session)**: TEXTSNAPSHOT_PLAN COMPLETE → complete/. All 4 TextSnapshot tests PASS: textsnapshot_gettext (55/55), textsnapshot_findtext (44/44), textsnapshot_text_order (1/1), textsnapshot_available_text (20/20). Recompiler deferred char code emission + runtime textSnapshotCapture + getCount/getText/findText + clone display list init.
 - **Recent gains (previous session)**: SOUND_CLASS_PLAN Phase 0 DONE → blocked/. register_class_with_sound now PASS (11/11). sound 622/628. Fixed: checkInstanceOf for registerClass MCs, Sound getPan/setPan/getTransform/setTransform, resolveSoundThis for MC dispatch, clamp_to_i32/ecmaToInt32 coercions, own-property-only check in setTransform.
@@ -173,6 +174,7 @@ Last updated: 2026-03-04
 | LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 24/49 pass (loadmovie_flashvars ✅, do_init_action_child ✅, global_swf6_7_8 ✅ newly fixed) | Phase 6 (cross-version globals) needs per-version _global (Phase 2 of CROSS_VERSION_ISOLATION_PLAN); remaining blocked on RegisterClass, display list, mouse events |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
+| ASNATIVE_ASNEW_PLAN | **COMPLETE** → `complete/` | asnative 34/34 ✅, asnew 34/34 ✅ | — |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **MOSTLY DONE** | 5/6 pass (unload 52/52 ✅, unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload_nested_child (0/5) |
 | BUTTON_PLAN | **12/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅ (visible gating on keyPress) | Remaining 2: button_keypress_vs_textinput (TF onChanged), root_button_mode (loadMovie) |
@@ -208,7 +210,7 @@ Last updated: 2026-03-04
 13. **TEXTFIELD_PLAN remaining** — scroll, condenseWhite, SWF6 HTML. 49/57 pass (TextSnapshot DONE).
 14. **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
 15. **LOADMOVIE_PLAN Phase 6** — Per-movie `_global` isolation. Largest cross-cutting blocker.
-16. **ASNATIVE_ASNEW_PLAN** — Native function dispatch table (~100 lines). 2 tests, 68 expected lines. Needs dispatch table mapping.
+16. ~~**ASNATIVE_ASNEW_PLAN**~~ — **DONE** → `complete/`. asnative 34/34 ✅, asnew 34/34 ✅.
 17. **TYPE_COERCION_ADVANCED_PLAN** — Primitive boxing + instanceof coercions (~100 lines). 2 tests, 217 expected lines. Complex.
 18. **FUNCTION_EDGE_CASES_PLAN Phase 2** — funky_function_calls segfault investigation.
 
