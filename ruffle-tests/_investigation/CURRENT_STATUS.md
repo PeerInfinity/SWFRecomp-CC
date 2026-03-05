@@ -165,7 +165,7 @@ Last updated: 2026-03-04
 | OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
 | REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 13/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅, register_class_with_sound ✅) | register_class 26/67 (loadMovie), register_and_init_order ~76/233 (sprite init ordering) |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
-| NATIVE_INTROSPECTION_PLAN | **Phases 0-2 COMPLETE** | 3/5 pass (native_objects_swf6/7/8 ✅) | native_subclasses/native_double_construct need filter constructor property init via super() |
+| NATIVE_INTROSPECTION_PLAN | **ALL PHASES COMPLETE** → `complete/` | 4/5 pass (native_objects_swf7/8 ✅, native_double_construct ✅, native_subclasses 190/191 ✅) | native_objects_swf6 83/84 (1 line Ruffle vs Flash diff, ignored); native_subclasses 1 line timezone diff (ignored) |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 16/37), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
 | TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
 | FOCUS_SYSTEM_PLAN | **3/7 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining 4 blocked by mouse events + text field hit-testing + event pumping model |
@@ -203,7 +203,7 @@ Last updated: 2026-03-04
 8. ~~**movieclip_getbounds**~~ — added to ACCEPTED_DIFFS (morph bounds precision)
 9. ~~**REGISTERCLASS_PLAN Phases 4-5**~~ — **DONE** → blocked/. 11/15 pass.
 10. ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **DONE** ✅. 7/8 pass.
-11. ~~**NATIVE_INTROSPECTION_PLAN**~~ — **Phases 0-2 DONE** ✅. Remaining: native_subclasses, native_double_construct.
+11. ~~**NATIVE_INTROSPECTION_PLAN**~~ — **ALL PHASES COMPLETE** → `complete/`. 4/5 pass, remaining 2 diffs are accepted (timezone + Ruffle vs Flash).
 
 ### Existing blocked work (from blocked/ plans)
 12. **MOUSE_EVENTS_ADVANCED Phase 2** — Roll dispatch + focus events (~100-150 lines). Unblocks focus_mouse_rollout, partially focus_keyboard_press. Highest-impact blocked plan work.

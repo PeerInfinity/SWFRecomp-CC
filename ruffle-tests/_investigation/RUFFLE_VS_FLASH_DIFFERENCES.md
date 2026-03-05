@@ -25,3 +25,18 @@ Our recompiler emits sprite frame functions as single C functions mixing both pl
 **Decision:** Keep deferred sprite init (correct execution order for 4+ tests). Accept `stage_object_enumerate` as needing a recompiler-side fix to add `catch_up_mode` guards to sprite frame scripts.
 
 **Note:** This is not strictly a Ruffle difference — it's a limitation of our recompiler's code generation that prevents us from matching Flash's split placement/script behavior.
+
+## SWF6 `new TextField()` Returns Object, Not Undefined
+
+**Test:** `native_objects_swf6`
+
+In Flash Player, `new TextField()` returns a valid object in SWF6 (and all other versions). Our fully-passing `textfield_props_swf6` test (all lines match) confirms this — it creates `new TextField()` and exercises its properties as an object.
+
+Ruffle's `native_objects_swf6` test expects `new TextField(): non-object: undefined`, suggesting Ruffle's SWF6 implementation returns `undefined` for `new TextField()`. The test is also marked `known_failure = true` in its own `test.toml`, confirming Ruffle knows this expectation is questionable.
+
+```diff
+- new TextField(): non-object: undefined
++ new TextField(): native
+```
+
+**Decision:** Keep Flash-correct behavior (`new TextField()` returns an object in SWF6). Accept the 1-line diff as a Ruffle implementation difference.

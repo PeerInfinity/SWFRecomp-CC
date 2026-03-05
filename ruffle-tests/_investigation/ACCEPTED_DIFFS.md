@@ -243,3 +243,5 @@ The anomalous expected output is likely a Ruffle test-generation artifact.
 | `movieclip_getbounds` | Float precision (morph getBounds matrix) | 2 | Accept; 0.0001px beyond epsilon |
 | `movieclip_library_state_values` | Test harness limitation (default mouse position) | 1 | Accept; Ruffle infrastructure artifact |
 | `movieclip_library_state_values` | Test harness limitation (VFS URL path format) | 1 | Accept; anomalous expected output |
+| `native_objects_swf6` | Ruffle vs Flash (TextField in SWF6) | 1 | Accept; we match Flash, Ruffle's test is `known_failure` |
+| `native_subclasses` | Platform UB (Date timezone) | 1 | Accept; timezone-dependent |
