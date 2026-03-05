@@ -10738,6 +10738,7 @@ typedef struct {
 	u32 text_len;
 	int swf_version; // SWF version (set by parser, used by serializer)
 	u8 from_html_text; // 1 if content was set via htmlText, 0 if via text
+	u8 condense_white; // 1 if condenseWhite was active during parsing
 } TFRunTable;
 static TFRunTable* tf_get_table(MovieClip* mc);
 static TFRunTable* tf_find_table(MovieClip* mc);
@@ -11897,6 +11898,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	table->text_len = 0;
 	table->text[0] = '\0';
 	table->swf_version = swf_version;
+	table->condense_white = condense_white ? 1 : 0;
 
 	#define TF_PARSE_STACK_MAX 32
 	TFRun fmt_stack[TF_PARSE_STACK_MAX];
@@ -11987,6 +11989,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	} while(0)
 
 	int after_tag = 1; // Start as "after tag" (beginning of input acts like after a tag)
+	int cw8_para_start = (condense_white && swf_version >= 8) ? 1 : 0; // SWF8 condenseWhite: strip leading ws per paragraph
 	int last_break_was_p = 0; // Track if the last \x01 break was from </p> (for double-close detection)
 	int consumed_p = 0; // Track </p> breaks consumed inside LI context (suppresses matching outer </p>)
 	int nested_p_ignored = 0; // Track nested <p> tags ignored inside in_paragraph (so corresponding </p> are suppressed)
@@ -12361,9 +12364,12 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 					if (next == ' ' || next == '\t' || next == '\r' || next == '\n') i++;
 					else break;
 				}
+				// SWF8 condenseWhite: skip leading whitespace at paragraph start
+				if (cw8_para_start) { i++; continue; }
 			}
 
 			ADD_CH(c);
+			if (c != ' ') cw8_para_start = 0;
 			last_break_was_p = 0;
 			i++;
 		}
