@@ -28,7 +28,7 @@ Last updated: 2026-02-28
 
 ### Test Results (2026-02-28, local verification)
 
-**23 PASS** out of 38 plan tests (+ deferred tests):
+**27 PASS** out of 38 plan tests (+ deferred tests):
 
 | Test | Status | Notes |
 |------|--------|-------|
@@ -59,6 +59,8 @@ Last updated: 2026-02-28
 | swf7_case_sensitive | **PASS** ✅ | |
 | movieclip_name_from_timeline | **PASS** ✅ | |
 | unload_clip_event | **PASS** ✅ | |
+| do_init_action_child | **PASS** ✅ | Fixed via cross-version Phase 1+4 + ImportAssets2 |
+| unload | **PASS** ✅ | 52/52 via pending removal mechanism |
 
 ### Remaining failures — all blocked
 
@@ -67,7 +69,6 @@ Last updated: 2026-02-28
 | movieclip_lockroot | 16/29 | Blocked: child clips need multi-SWF script execution (loadMovie semantics) |
 | default_names | ~12/52 | Blocked: instance counter off-by-1 + missing child sprite init ordering |
 | clip_event_propagation_order | 1/17 | Blocked: needs onMouseMove/Down/Up dispatch through clip hierarchy (MOUSE_EVENTS) |
-| do_init_action_child | 3/12 | Blocked: recompiler doesn't emit DoInitAction for child sprites |
 | custom_clip_methods | 0/4 | Blocked: needs global→MC method dispatch + multi-frame child sprite execution |
 | movieclip_getbounds | 190/192 | 2 lines in ACCEPTED_DIFFS (morph bounds rounding) |
 | movieclip_invalid_get_bounds_1-5,8 | various | Blocked: need loadMovie for multi-SWF child bounds tests |

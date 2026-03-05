@@ -13579,9 +13579,20 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_type_Object;
 				STACK_TOP_N = 13;
 			} else {
-				// No toString method: "[object Object]"
-				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
-				STACK_TOP_N = 15;
+				// No toString method found.
+				// Flash: global object stringifies as "undefined"
+				if ((void*)_cs_obj.data.numeric_value == (void*)global_object) {
+					if (g_swf_version >= 7) {
+						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
+						STACK_TOP_N = 9;
+					} else {
+						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
+						STACK_TOP_N = 0;
+					}
+				} else {
+					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
+					STACK_TOP_N = 15;
+				}
 			}
 			break;
 		}
@@ -16673,15 +16684,27 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 // to identify which broadcaster object they operate on.
 // ============================================================================
 
+// AS2 abstract equality for listener dedup/remove: null == undefined.
+static int listenerAbstractEq(ActionVar* a, ActionVar* b) {
+    int a_nullish = (a->type == ACTION_STACK_VALUE_NULL || a->type == ACTION_STACK_VALUE_UNDEFINED);
+    int b_nullish = (b->type == ACTION_STACK_VALUE_NULL || b->type == ACTION_STACK_VALUE_UNDEFINED);
+    if (a_nullish && b_nullish) return 1;
+    if (a_nullish || b_nullish) return 0;
+    if (a->type != b->type) return 0;
+    return a->data.numeric_value == b->data.numeric_value;
+}
+
 static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
     ASObject* receiver = (ASObject*) this_obj;
     if (!receiver) receiver = g_c_function_this_obj;
-    if (!receiver || arg_count < 1) {
-        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
-        return r;
-    }
+
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_BOOLEAN;
+    VAL(u64, &result.data.numeric_value) = 1;
+
+    if (!receiver) return result;
 
     // Get or create _listeners array on receiver
     ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
@@ -16697,30 +16720,23 @@ static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, Act
         setProperty(app_context, receiver, "_listeners", 10, &av);
     }
 
-    // For non-null/undefined listeners, check for duplicates first
-    ActionVar* new_listener = &args[0];
-    if (new_listener->type != ACTION_STACK_VALUE_NULL &&
-        new_listener->type != ACTION_STACK_VALUE_UNDEFINED) {
-        for (u32 i = 0; i < arr->length; i++) {
-            ActionVar* elem = getArrayElement(arr, i);
-            if (elem && elem->type == new_listener->type &&
-                elem->data.numeric_value == new_listener->data.numeric_value) {
-                // Duplicate found - return true without re-adding
-                ActionVar result = {0};
-                result.type = ACTION_STACK_VALUE_BOOLEAN;
-                VAL(u64, &result.data.numeric_value) = 1;
-                return result;
-            }
+    // Listener is args[0], or undefined if no args
+    ActionVar undef_listener = {0};
+    undef_listener.type = ACTION_STACK_VALUE_UNDEFINED;
+    ActionVar* new_listener = (arg_count >= 1) ? &args[0] : &undef_listener;
+
+    // Dedup using abstract equality (null == undefined in AS2)
+    for (u32 i = 0; i < arr->length; i++) {
+        ActionVar* elem = getArrayElement(arr, i);
+        if (elem && listenerAbstractEq(elem, new_listener)) {
+            // Match found — replace entry (e.g. undefined→null) and return
+            setArrayElement(app_context, arr, i, new_listener);
+            return result;
         }
     }
 
-    // Add listener (null/undefined are added without duplicate check)
-    u32 len = arr->length;
-    setArrayElement(app_context, arr, len, new_listener);
-
-    ActionVar result = {0};
-    result.type = ACTION_STACK_VALUE_BOOLEAN;
-    VAL(u64, &result.data.numeric_value) = 1;
+    // Not found — append
+    setArrayElement(app_context, arr, arr->length, new_listener);
     return result;
 }
 
@@ -16730,43 +16746,38 @@ static ActionVar builtin_broadcaster_removeListener(SWFAppContext* app_context, 
     (void)registers;
     ASObject* receiver = (ASObject*) this_obj;
     if (!receiver) receiver = g_c_function_this_obj;
-    if (!receiver || arg_count < 1) {
-        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 0;
-        return r;
-    }
+
+    ActionVar false_result = {0};
+    false_result.type = ACTION_STACK_VALUE_BOOLEAN;
+    VAL(u64, &false_result.data.numeric_value) = 0;
+
+    if (!receiver) return false_result;
 
     ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
-    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) {
-        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 0;
-        return r;
-    }
+    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) return false_result;
     ASArray* arr = (ASArray*) listeners_prop->data.numeric_value;
-    if (!arr) {
-        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 0;
-        return r;
-    }
+    if (!arr) return false_result;
 
-    // Find and remove listener (shift remaining elements)
-    u64 target_addr = args[0].data.numeric_value;
-    int found = 0;
+    // Target is args[0], or undefined if no args
+    ActionVar undef_target = {0};
+    undef_target.type = ACTION_STACK_VALUE_UNDEFINED;
+    ActionVar* target = (arg_count >= 1) ? &args[0] : &undef_target;
+
+    // Find and remove using abstract equality (null == undefined)
     for (u32 i = 0; i < arr->length; i++) {
         ActionVar* elem = getArrayElement(arr, i);
-        if (elem && elem->type == args[0].type && elem->data.numeric_value == target_addr) {
-            // Shift elements down
+        if (elem && listenerAbstractEq(elem, target)) {
             for (u32 j = i; j + 1 < arr->length; j++) {
                 ActionVar* next = getArrayElement(arr, j + 1);
                 if (next) setArrayElement(app_context, arr, j, next);
             }
             arr->length--;
-            found = 1;
-            break;
+            ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
+            return r;
         }
     }
 
-    ActionVar result = {0};
-    result.type = ACTION_STACK_VALUE_BOOLEAN;
-    VAL(u64, &result.data.numeric_value) = found ? 1 : 0;
-    return result;
+    return false_result;
 }
 
 static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -16779,23 +16790,34 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
     if (!receiver) receiver = g_c_function_this_obj;
     if (!receiver || arg_count < 1) return undef;
 
-    // Convert method name (args[0]) from UTF-16 to UTF-8
+    // Convert method name to UTF-8 string. Push to stack and use convertString.
+    pushVar(app_context, &args[0]);
+    convertString(app_context, NULL);
+    // Read back the UTF-16 result from stack top
     char method_name[256];
     method_name[0] = '\0';
-    if (args[0].type == ACTION_STACK_VALUE_STRING) {
-        const uint16_t* u16 = (const uint16_t*)(uintptr_t)args[0].data.numeric_value;
-        u16_to_utf8(u16, args[0].str_size, method_name, sizeof(method_name));
-    } else {
-        return undef;  // method name must be a string
+    if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STRING) {
+        const uint16_t* u16 = (const uint16_t*)(uintptr_t)STACK_TOP_VALUE;
+        u32 u16_len = STACK_TOP_N;
+        u16_to_utf8(u16, u16_len, method_name, sizeof(method_name));
     }
+    // Pop the converted value
+    POP();
+
     int method_name_len = (int)strlen(method_name);
-    if (method_name_len == 0) return undef;
 
     // Get the _listeners array
     ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
-    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) return undef;
+    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) {
+        // Return true even if no _listeners (event name was valid)
+        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
+        return r;
+    }
     ASArray* arr = (ASArray*)(uintptr_t)listeners_prop->data.numeric_value;
-    if (!arr || arr->length == 0) return undef;
+    if (!arr || arr->length == 0) {
+        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
+        return r;
+    }
 
     // Extra args to pass to the method (args[1..])
     u32 extra_count = arg_count > 1 ? arg_count - 1 : 0;
@@ -16808,6 +16830,7 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
 
         ASObject* listener_obj = NULL;
         MovieClip* listener_mc = NULL;
+        ASFunction* listener_func = NULL;
         if (elem->type == ACTION_STACK_VALUE_OBJECT) {
             listener_obj = (ASObject*)(uintptr_t)elem->data.numeric_value;
         } else if (elem->type == ACTION_STACK_VALUE_MOVIECLIP) {
@@ -16815,29 +16838,40 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             if (listener_mc && listener_mc->dynamic_props)
                 listener_obj = (ASObject*) listener_mc->dynamic_props;
         } else if (elem->type == ACTION_STACK_VALUE_FUNCTION) {
-            // Function used as listener — look up method on its own_props
-            ASFunction* f = lookupFunctionFromVar(elem);
-            if (f && f->own_props)
-                listener_obj = f->own_props;
+            listener_func = lookupFunctionFromVar(elem);
+            if (listener_func && listener_func->own_props)
+                listener_obj = listener_func->own_props;
+        } else {
+            continue; // skip null/undefined/primitive listeners
         }
 
-        ActionVar* method_prop = NULL;
-        if (listener_obj)
-            method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
-        // If not found on dynamic_props, check the MC's variable system
-        // (in Flash, root-level DefineFunction stores vars that are accessible as MC properties)
-        if ((!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) && listener_mc) {
-            method_prop = getVariable(method_name, method_name_len);
+        ASFunction* func = NULL;
+
+        if (method_name_len == 0) {
+            // Empty method name: call listener as a function directly
+            if (listener_func) {
+                func = listener_func;
+            } else {
+                continue; // non-function listeners can't be called
+            }
+        } else {
+            // Look up method by name on listener
+            ActionVar* method_prop = NULL;
+            if (listener_obj)
+                method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
+            if ((!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) && listener_mc) {
+                method_prop = getVariable(method_name, method_name_len);
+            }
+            if (!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
+            func = lookupFunctionFromVar(method_prop);
         }
-        if (!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
-        ASFunction* func = lookupFunctionFromVar(method_prop);
+
         if (!func) continue;
 
         if (func->function_type == 2 && func->advanced_func != NULL) {
             ActionVar* regs = NULL;
             if (func->register_count > 0)
                 regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-            // Restore captured scope chain entries (closure support)
             u8 bm_captured = func->captured_scope_count;
             for (u8 ci = 0; ci < bm_captured; ci++) {
                 if (scope_depth < MAX_SCOPE_DEPTH) {
@@ -16847,13 +16881,11 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                 }
             }
             func->advanced_func(app_context, extra_args, extra_count, regs, listener_obj);
-            // Pop captured scopes
             for (u8 ci = 0; ci < bm_captured; ci++) {
                 if (scope_depth > 0) scope_depth--;
             }
             if (regs) FREE(regs);
         } else if (func->function_type == 1 && func->simple_func != NULL) {
-            // Restore captured scope chain entries (closure support)
             u8 bm_captured_t1 = func->captured_scope_count;
             for (u8 ci = 0; ci < bm_captured_t1; ci++) {
                 if (scope_depth < MAX_SCOPE_DEPTH) {
@@ -16862,7 +16894,6 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                     scope_chain[scope_depth++] = func->captured_scope[ci];
                 }
             }
-            // Push 'this' binding via g_this_stack (same as actionCallFunction type 1)
             u32 saved_this_depth_bm_t1 = g_this_depth;
             if (g_this_depth < MAX_THIS_DEPTH) {
                 g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
@@ -16873,14 +16904,16 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                 pushVar(app_context, &extra_args[j]);
             ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
             g_this_depth = saved_this_depth_bm_t1;
-            // Pop captured scopes
             for (u8 ci = 0; ci < bm_captured_t1; ci++) {
                 if (scope_depth > 0) scope_depth--;
             }
         }
     }
 
-    return undef;
+    ActionVar true_result = {0};
+    true_result.type = ACTION_STACK_VALUE_BOOLEAN;
+    VAL(u64, &true_result.data.numeric_value) = 1;
+    return true_result;
 }
 
 // Static function objects for AsBroadcaster methods
@@ -17850,6 +17883,30 @@ static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
 
     fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
     setProperty(app_context, obj, "broadcastMessage", 16, &fv);
+}
+
+// AsBroadcaster.initialize(obj) — static method callable from AS2.
+// Installs _listeners, addListener, removeListener, broadcastMessage on the target.
+static ActionVar builtin_asbroadcaster_initialize(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers; (void)this_obj;
+    ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (arg_count < 1) return undef;
+
+    ASObject* target = NULL;
+    if (args[0].type == ACTION_STACK_VALUE_OBJECT || args[0].type == ACTION_STACK_VALUE_ARRAY) {
+        target = (ASObject*)(uintptr_t)args[0].data.numeric_value;
+    } else if (args[0].type == ACTION_STACK_VALUE_FUNCTION) {
+        ASFunction* f = lookupFunctionFromVar(&args[0]);
+        if (f && f->own_props) target = f->own_props;
+    } else if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+        MovieClip* mc = (MovieClip*)(uintptr_t)args[0].data.numeric_value;
+        if (mc && mc->dynamic_props) target = (ASObject*) mc->dynamic_props;
+    }
+    if (!target) return undef;
+
+    installAsBroadcaster(app_context, target);
+    return undef;
 }
 
 // Stub constructors: classes that need to exist as globals with a prototype
@@ -18897,7 +18954,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			memset(&g_ab_initialize_func, 0, sizeof(ASFunction));
 			strncpy(g_ab_initialize_func.name, "initialize", 255);
 			g_ab_initialize_func.function_type = 2;
-			g_ab_initialize_func.advanced_func = (Function2Ptr) builtin_stub_method;
+			g_ab_initialize_func.advanced_func = (Function2Ptr) builtin_asbroadcaster_initialize;
 			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_ab_initialize_func;
 			fv.data.numeric_value = (u64)&g_ab_initialize_func;
 			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "initialize", 10, &fv, PROPERTY_FLAG_WRITABLE);
@@ -21158,6 +21215,35 @@ void actionDefineLocal(SWFAppContext* app_context)
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[var_name_sp + 16]), _dl_u16_len, _dl_buf, sizeof(_dl_buf));
 	char* var_name = _dl_buf;
 
+	// Handle slash-path variable names (e.g., "/:abc" → set abc on root, "/clip/:def" → set def on clip)
+	{
+		const char* colon = NULL;
+		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
+			if (var_name[ci] == ':') { colon = var_name + ci; break; }
+		}
+		if (colon != NULL) {
+			u32 path_len = (u32)(colon - var_name);
+			const char* prop_name = colon + 1;
+			u32 prop_len = var_name_len - path_len - 1;
+			if (prop_len > 0) {
+				extern MovieClip root_movieclip;
+				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, path_len, ctx, 1);
+				if (target_mc != NULL) {
+					ActionVar value_var;
+					peekVar(app_context, &value_var);
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+					PUSH_STR(prop_name, prop_len);
+					pushVar(app_context, &value_var);
+					actionSetMember(app_context);
+					POP_2();
+					return;
+				}
+			}
+			// Path resolution failed — fall through to normal scope chain
+		}
+	}
+
 	// DefineLocal: walk scope chain from innermost to outermost.
 	// For 'with' scopes: if the object DIRECTLY owns the property, set it there.
 	// For function scopes: always set there (create if needed).
@@ -21294,6 +21380,43 @@ void actionDeclareLocal(SWFAppContext* app_context)
 	u32 _dcl_u16_len = VAL(u32, &STACK[SP + 8]);
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[SP + 16]), _dcl_u16_len, _dcl_buf, sizeof(_dcl_buf));
 	char* var_name = _dcl_buf;
+
+	// Handle slash-path variable names (e.g., "/:ghi" → declare ghi on root)
+	// DeclareLocal (var with no value) only creates the property if it doesn't already exist.
+	{
+		const char* colon = NULL;
+		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
+			if (var_name[ci] == ':') { colon = var_name + ci; break; }
+		}
+		if (colon != NULL) {
+			u32 path_len = (u32)(colon - var_name);
+			const char* prop_name = colon + 1;
+			u32 prop_len = var_name_len - path_len - 1;
+			if (prop_len > 0) {
+				extern MovieClip root_movieclip;
+				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, path_len, ctx, 1);
+				if (target_mc != NULL) {
+					// Only set to undefined if property doesn't already exist
+					if (target_mc->dynamic_props != NULL) {
+						ActionVar* existing = getProperty((ASObject*)target_mc->dynamic_props, prop_name, prop_len);
+						if (existing != NULL) {
+							POP();
+							return;  // Already exists — no-op
+						}
+					}
+					ActionVar undefined_var = {0};
+					undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+					PUSH_STR(prop_name, prop_len);
+					pushVar(app_context, &undefined_var);
+					actionSetMember(app_context);
+					POP();
+					return;
+				}
+			}
+		}
+	}
 
 	// DeclareLocal: same logic as DefineLocal but with undefined value.
 	// For with scopes: set if object directly owns property.
@@ -32441,6 +32564,22 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		builtin_handled = 1;
 	}
 
+	// Function() called as a function (not new): returns first arg, or a bare Object if no args.
+	if (!builtin_handled && func_name_len == 8 && strncmp(func_name, "Function", 8) == 0)
+	{
+		if (num_args >= 1) {
+			pushVar(app_context, &args[0]);
+		} else {
+			ASObject* obj = allocObject(app_context, 0);
+			ActionVar r = {0};
+			r.type = ACTION_STACK_VALUE_OBJECT;
+			r.data.numeric_value = (u64)obj;
+			pushVar(app_context, &r);
+		}
+		if (args) FREE(args);
+		builtin_handled = 1;
+	}
+
 	// MC navigation methods called via CallFunction (from WITH scope or dot/slash path).
 	// e.g. with(instance1) { gotoAndStop(3); } or CallFunction("_root.mc.gotoAndStop", 1, 3)
 	if (!builtin_handled)
@@ -36102,11 +36241,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Function.call(thisArg, arg1, arg2, ...)
 			if (func != NULL)
 			{
-				// Extract thisArg
+				// Extract thisArg — use g_event_this_mc for MovieClip to preserve type info
 				void* this_obj = NULL;
-				if (num_args >= 1 && (args[0].type == ACTION_STACK_VALUE_OBJECT ||
-				                      args[0].type == ACTION_STACK_VALUE_MOVIECLIP))
-					this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+				if (num_args >= 1) {
+					if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+						g_event_this_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
+					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
+					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
+						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+					} else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
+					           args[0].type == ACTION_STACK_VALUE_NULL) {
+						// Flash: undefined/null thisArg → global object
+						this_obj = (void*) global_object;
+					}
+				}
 
 				// Build call_args array from args[1..n]
 				u32 call_arg_count = num_args > 1 ? num_args - 1 : 0;
@@ -36269,11 +36417,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Function.apply(thisArg, argsArray)
 			if (func != NULL)
 			{
-				// Extract thisArg
+				// Extract thisArg — use g_event_this_mc for MovieClip to preserve type info
 				void* this_obj = NULL;
-				if (num_args >= 1 && (args[0].type == ACTION_STACK_VALUE_OBJECT ||
-				                      args[0].type == ACTION_STACK_VALUE_MOVIECLIP))
-					this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+				if (num_args >= 1) {
+					if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+						g_event_this_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
+					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
+					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
+						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+					} else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
+					           args[0].type == ACTION_STACK_VALUE_NULL) {
+						// Flash: undefined/null thisArg → global object
+						this_obj = (void*) global_object;
+					}
+				}
 
 				// Extract arguments from array
 				ActionVar* apply_args = NULL;
@@ -36302,6 +36459,43 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 				}
+				else if (num_args >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT)
+				{
+					// Flash accepts array-like objects (with length + numeric indices) for apply()
+					ASObject* obj = (ASObject*)(uintptr_t) args[1].data.numeric_value;
+					if (obj != NULL)
+					{
+						ActionVar* len_prop = getPropertyWithPrototype(obj, "length", 6);
+						if (len_prop != NULL)
+						{
+							pushVar(app_context, len_prop);
+							convertFloat(app_context);
+							ActionVar len_val;
+							popVar(app_context, &len_val);
+							double len_d = (len_val.type == ACTION_STACK_VALUE_F64)
+								? VAL(double, &len_val.data.numeric_value)
+								: (double)VAL(float, &len_val.data.numeric_value);
+							if (len_d > 0 && len_d < 256)
+							{
+								apply_arg_count = (u32) len_d;
+								apply_args = (ActionVar*) HALLOC(sizeof(ActionVar) * apply_arg_count);
+								for (u32 i = 0; i < apply_arg_count; i++)
+								{
+									char idx_buf[12];
+									snprintf(idx_buf, sizeof(idx_buf), "%u", i);
+									ActionVar* elem = getPropertyWithPrototype(obj, idx_buf, strlen(idx_buf));
+									if (elem != NULL)
+										apply_args[i] = *elem;
+									else
+									{
+										apply_args[i].type = ACTION_STACK_VALUE_UNDEFINED;
+										apply_args[i].data.numeric_value = 0;
+									}
+								}
+							}
+						}
+					}
+				}
 
 				if (g_call_depth >= g_max_call_depth - 1)
 				{
@@ -36320,7 +36514,29 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_call_depth++;
 					g_prev_executing_func = prev_executing_func_ap2;
 					g_current_executing_func = func;
+
+					// Restore captured scope chain if any
+					u32 captured_count_ap2 = func->captured_scope_count;
+					for (u32 ci = 0; ci < captured_count_ap2; ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = 1;
+							scope_mc[scope_depth] = func->captured_scope_mc[ci];
+							scope_chain[scope_depth++] = func->captured_scope[ci];
+						}
+					}
+
+					// Switch context to base_clip for SWF6+
+					MovieClip* prev_ctx_ap2 = g_current_context;
+					if (g_swf_version >= 6 && func->base_clip != NULL)
+						g_current_context = func->base_clip;
+
 					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
+
+					g_current_context = prev_ctx_ap2;
+					for (u32 ci = 0; ci < captured_count_ap2; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
+
 					g_current_executing_func = prev_executing_func_ap2;
 					g_call_depth--;
 
@@ -36345,6 +36561,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					args_var_ap.type = ACTION_STACK_VALUE_ARRAY;
 					args_var_ap.data.numeric_value = (u64)arguments_arr_ap;
 					setProperty(app_context, local_scope_ap, "arguments", 9, &args_var_ap);
+
+					// Restore captured scope chain
+					u32 captured_count_ap1 = func->captured_scope_count;
+					for (u32 ci = 0; ci < captured_count_ap1; ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = 1;
+							scope_mc[scope_depth] = func->captured_scope_mc[ci];
+							scope_chain[scope_depth++] = func->captured_scope[ci];
+						}
+					}
 					if (scope_depth < MAX_SCOPE_DEPTH) {
 						scope_is_with[scope_depth] = 0;
 						scope_mc[scope_depth] = NULL;
@@ -36354,6 +36580,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (apply_args != NULL) FREE(apply_args);
 					if (args != NULL) FREE(args);
 
+					MovieClip* prev_ctx_ap1 = g_current_context;
+					if (g_swf_version >= 6 && func->base_clip != NULL)
+						g_current_context = func->base_clip;
+
 					g_call_depth++;
 					g_prev_executing_func = prev_executing_func_ap;
 					g_current_executing_func = func;
@@ -36361,6 +36591,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_current_executing_func = prev_executing_func_ap;
 					g_call_depth--;
 
+					g_current_context = prev_ctx_ap1;
+					for (u32 ci = 0; ci < captured_count_ap1; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
 					if (scope_depth > 0) scope_depth--;
 					releaseObject(app_context, local_scope_ap);
 
@@ -39176,6 +39410,79 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			if (args != NULL) FREE(args);
 			pushVar(app_context, &_uw_ret);
+			return;
+		}
+		else if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
+		{
+			// addProperty(name, getter, setter) on MovieClip — install virtual getter/setter on dynamic_props
+			u64 result = 0; // boolean false
+			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
+			                      args[0].type == ACTION_STACK_VALUE_F64 ||
+			                      args[0].type == ACTION_STACK_VALUE_F32))
+			{
+				char _addprop_buf[512];
+				const char* _ap_name;
+				u32 _ap_name_len;
+				if (args[0].type == ACTION_STACK_VALUE_STRING)
+				{
+					const uint16_t* _addprop_u16 = varGetU16Ptr(&args[0]);
+					u16_to_utf8(_addprop_u16, args[0].str_size, _addprop_buf, sizeof(_addprop_buf));
+					_ap_name = _addprop_buf;
+					_ap_name_len = (u32)strlen(_ap_name);
+				}
+				else
+				{
+					double d = varToDouble(&args[0]);
+					s64 as_int = (s64)d;
+					if ((double)as_int == d)
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%lld", (long long)as_int);
+					else
+						snprintf(_addprop_buf, sizeof(_addprop_buf), "%.15g", d);
+					_ap_name = _addprop_buf;
+					_ap_name_len = (u32)strlen(_addprop_buf);
+				}
+
+				ASFunction* _ap_getter = NULL;
+				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
+					_ap_getter = (ASFunction*) args[1].data.numeric_value;
+				ASFunction* _ap_setter = NULL;
+				if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
+					_ap_setter = (ASFunction*) args[2].data.numeric_value;
+
+				// Ensure dynamic_props exists
+				if (mc->dynamic_props == NULL) {
+					mc->dynamic_props = (void*) allocObject(app_context, 8);
+					retainObject((ASObject*) mc->dynamic_props);
+				}
+				ASObject* _ap_obj = (ASObject*) mc->dynamic_props;
+				ASProperty* _ap_prop = NULL;
+				for (u32 i = 0; i < _ap_obj->num_used; i++) {
+					if (_ap_obj->properties[i].name_length == _ap_name_len &&
+					    strncmp(_ap_obj->properties[i].name, _ap_name, _ap_name_len) == 0) {
+						_ap_prop = &_ap_obj->properties[i];
+						break;
+					}
+				}
+				if (_ap_prop == NULL) {
+					ActionVar marker = {0};
+					marker.type = ACTION_STACK_VALUE_UNDEFINED;
+					setProperty(app_context, _ap_obj, _ap_name, _ap_name_len, &marker);
+					for (u32 i = 0; i < _ap_obj->num_used; i++) {
+						if (_ap_obj->properties[i].name_length == _ap_name_len &&
+						    strncmp(_ap_obj->properties[i].name, _ap_name, _ap_name_len) == 0) {
+							_ap_prop = &_ap_obj->properties[i];
+							break;
+						}
+					}
+				}
+				if (_ap_prop != NULL) {
+					_ap_prop->getter = (void*)_ap_getter;
+					_ap_prop->setter = (void*)_ap_setter;
+					result = 1; // boolean true
+				}
+			}
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 			return;
 		}
 		else

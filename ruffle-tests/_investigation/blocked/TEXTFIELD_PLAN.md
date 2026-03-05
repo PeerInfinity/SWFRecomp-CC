@@ -5,7 +5,7 @@ Last updated: 2026-03-03
 
 ## Status: Phases 1-6 DONE, Phase 5 MOSTLY DONE, Phase 7 PARTIAL → BLOCKED
 
-**45 tests passing, 12 tests failing (all blocked on deep features)**
+**49 tests passing, 8 tests failing (all blocked on deep features)**
 
 ### Implementation Commits
 - `8811360` — Phase 1: TextField constructor, prototype, and DefineEditText property expansion
@@ -23,7 +23,7 @@ Last updated: 2026-03-03
 - `3395c87` — Fix text field metrics: builtin Noto Sans, SWF8 trailing space trimming, align propagation
 - `0eefc289` — Fix font size clamping, htmlText non-HTML setter, trace \r→\n, Selection.setSelection, condenseWhite SWF8
 
-### Current Test Results (45 passing, 12 failing)
+### Current Test Results (49 passing, 8 failing)
 
 | Test | Lines | Status | Phase |
 |------|-------|--------|-------|
@@ -72,8 +72,12 @@ Last updated: 2026-03-03
 | edittext_html_entity | 4/4 | **PASS** | 5 |
 | textfield_maxchars | 3/3 | **PASS** | 1 |
 | text_format_font_max_length | 2/2 | **PASS** | 2 |
+| textsnapshot_gettext | 55/55 | **PASS** | 7 |
+| textsnapshot_findtext | 44/44 | **PASS** | 7 |
+| textsnapshot_available_text | 20/20 | **PASS** | 7 |
+| textsnapshot_text_order | 1/1 | **PASS** | 7 |
 
-### Remaining Failing Tests (12 tests — all blocked)
+### Remaining Failing Tests (8 tests — all blocked)
 
 | Test | Match | Blocker |
 |------|-------|---------|
@@ -87,10 +91,6 @@ Last updated: 2026-03-03
 | edittext_bullet | 18/30 | textWidth/textHeight with bullet indent (font metrics / layout) |
 | edittext_tab_stops | 45/60 | Tab stop width computation (in ignored_tests.txt) |
 | edittext_stylesheet | 204/325 | StyleSheet class needs CSS parser + style application |
-| textsnapshot_available_text | 10/20 | TextSnapshot.getText() needs DefineText text extraction from recompiler |
-| textsnapshot_findtext | 5/44 | TextSnapshot.findText() needs getText() implementation |
-| textsnapshot_gettext | 4/55 | TextSnapshot.getText() needs DefineText text extraction from recompiler |
-| textsnapshot_text_order | 0/1 | TextSnapshot text extraction not implemented |
 
 ### Phase Completion
 
@@ -102,7 +102,7 @@ Last updated: 2026-03-03
 | 4 | Scroll properties | **DONE** (hscroll 27/27, scroll 52/54) |
 | 5 | HTML text support | **MOSTLY DONE** (7/10 pass; SWF6 + condenseWhite blocked) |
 | 6 | Text layout formatting properties | **DONE** (8 tests pass; bullet/tabstops blocked on font metrics) |
-| 7 | StyleSheet + TextSnapshot | **PARTIAL** (textsnapshot_props pass; content tests blocked) |
+| 7 | StyleSheet + TextSnapshot | **MOSTLY DONE** (textsnapshot_props + all 4 content tests PASS via TEXTSNAPSHOT_PLAN; stylesheet blocked) |
 
 ### Blockers
 
@@ -112,7 +112,7 @@ Last updated: 2026-03-03
 
 3. **condenseWhite leading whitespace** (blocks: edittext_html_condensewhite_swf8): SWF8 condenseWhite needs paragraph-level leading whitespace stripping, which differs from SWF7's text-node-level approach.
 
-4. **TextSnapshot content extraction** (blocks: textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_text_order): Requires DefineText tag text content to be extracted by the recompiler and stored in a way accessible in NO_GRAPHICS mode. Currently only DefineEditText stores text.
+4. ~~**TextSnapshot content extraction**~~ — **RESOLVED** (TEXTSNAPSHOT_PLAN complete → all 4 content tests PASS)
 
 5. **StyleSheet CSS parser** (blocks: edittext_stylesheet): Needs CSS parsing, style-to-TextFormat conversion, and integration with HTML rendering when assigned to textField.styleSheet.
 

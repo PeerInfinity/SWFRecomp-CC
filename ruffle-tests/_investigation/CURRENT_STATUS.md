@@ -1,12 +1,14 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-03
+Last updated: 2026-03-04
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: TEXTSNAPSHOT_PLAN COMPLETE → complete/. All 4 TextSnapshot tests PASS: textsnapshot_gettext (55/55), textsnapshot_findtext (44/44), textsnapshot_text_order (1/1), textsnapshot_available_text (20/20). Recompiler deferred char code emission + runtime textSnapshotCapture + getCount/getText/findText + clone display list init.
+- **Recent gains (this session)**: FUNCTION_EDGE_CASES Phase 1+2 done. function_as_function PASS (36/36). funky_function_calls segfault fixed → 52/56 (93%). Fixed: MovieClip thisArg via g_event_this_mc, undefined/null thisArg → global_object, global object "undefined" stringification, captured scope + base_clip in apply handler, array-like objects in apply().
+- **Recent gains (this session)**: ASBROADCASTER_PLAN COMPLETE → complete/. as_broadcaster (41/41), as_broadcaster_undef (90/90). AsBroadcaster.initialize(), addListener/removeListener abstract equality (null==undefined), broadcastMessage method name coercion + true return value.
+- **Recent gains (previous session)**: TEXTSNAPSHOT_PLAN COMPLETE → complete/. All 4 TextSnapshot tests PASS: textsnapshot_gettext (55/55), textsnapshot_findtext (44/44), textsnapshot_text_order (1/1), textsnapshot_available_text (20/20). Recompiler deferred char code emission + runtime textSnapshotCapture + getCount/getText/findText + clone display list init.
 - **Recent gains (previous session)**: SOUND_CLASS_PLAN Phase 0 DONE → blocked/. register_class_with_sound now PASS (11/11). sound 622/628. Fixed: checkInstanceOf for registerClass MCs, Sound getPan/setPan/getTransform/setTransform, resolveSoundThis for MC dispatch, clamp_to_i32/ecmaToInt32 coercions, own-property-only check in setTransform.
 - **Recent gains (previous session)**: TEXTFIELD_PLAN → blocked/: 45/57 pass. Fixed: font size 0 clamping (edittext_html_swf7/swf8 PASS), htmlText non-HTML setter (edittext_newline_stripping PASS), trace \r→\n conversion, condenseWhite SWF8 whitespace stripping, Selection.setSelection g_tf_select_all fix.
 - **Recent gains (previous session)**: Cross-version SWF isolation Phases 1/4/6 DONE. `do_init_action_child` 12/12 PASS. ImportAssets2 (tag 71) support added. Per-MC `swf_version` field for `getSWFVersion()`. Phase 6 variable clearing (dynamic_props clear on reload) at all 5 load sites.
@@ -21,7 +23,7 @@ Last updated: 2026-03-03
 
 | Test | Status | Match | Notes |
 |------|--------|-------|-------|
-| funky_function_calls | segfault | 9/56 | Function call edge cases |
+| funky_function_calls | ~~segfault~~ mismatch | 52/56 | Fixed: MC thisArg, global stringification, apply scope/args |
 | goto_methods | ~~segfault~~ PASS | 41/41 ✅ | Fixed: MC dispatch, ECMAScript ToInt32, sprite labels |
 | native_objects_swf6 | ~~segfault~~ PASS | 84/84 ✅ | NativeType tracking, stub constructors, Date re-init blocking |
 | native_objects_swf7 | ~~segfault~~ PASS | 84/84 ✅ | Same fix as swf6 |
@@ -103,6 +105,7 @@ Last updated: 2026-03-03
 | `tab_ordering_tabbable` | 47/47 ✅ | Dynamic TF tabbability (u16 type pointer), MC button mode, invisible parent children |
 | `tab_ordering_events` | 150/150 ✅ | Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions |
 | `tab_ordering_movieclip_enabled_default` | 462/462 ✅ | MC tabIndex + mouse handler implicit tabbability |
+| `root_onload` | PASS ✅ | Root MC onLoad dispatch (was compile_fail, now fixed) |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -146,10 +149,10 @@ Last updated: 2026-03-03
 | OBJECT_WATCH_PLAN | **Phase 2 DONE** | 4/4 pass (watch_textfield ✅) | `watch_virtual_property` known_failure in Ruffle |
 | GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 23/30 pass (18 original + native_objects_swf6/7/8 ✅, as_set_prop_flags ✅, global_swf6_7_8 ✅) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
-| TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 PARTIAL** → `blocked/` | 45/57 pass | Remaining blocked: font metrics (scroll/newlines/bullet), SWF6 HTML paragraph semantics, StyleSheet (needs CSS parser). TextSnapshot now DONE (separate plan) |
-| MOVIECLIP_PLAN | **ALL PHASES DONE** → `blocked/` | 27 tests pass ✅ (create_empty_movie_clip, movieclip_init_object newly fixed) | Remaining blocked: child DoInitAction (recompiler), mouse events, loadMovie, pixel hitTest |
+| TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 MOSTLY DONE** → `blocked/` | 49/57 pass (TextSnapshot DONE via separate plan) | Remaining blocked: font metrics (scroll/newlines/bullet), SWF6 HTML paragraph semantics, StyleSheet (needs CSS parser) |
+| MOVIECLIP_PLAN | **ALL PHASES DONE** → `blocked/` | 27 tests pass ✅ (incl. do_init_action_child ✅, unload ✅) | Remaining blocked: mouse events, loadMovie, pixel hitTest |
 | SOUND_CLASS_PLAN | **Phase 0 COMPLETE** → `blocked/` | register_class_with_sound PASS, sound 622/628 | Blocked on attachSound/shared transform model |
-| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 3/8 pass + clip_events ✅ | Blocked on TEXTFIELD, MOUSE_EVENTS, REGISTERCLASS |
+| CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 4/8 pass (duplicate_movie_clip ✅, clone_sprite_types ✅, clip_events ✅, on_construct ✅) | Blocked on TEXTFIELD, MOUSE_EVENTS |
 | WITH_SCOPE_PLAN | **FULLY COMPLETE** | `with_variable_scopes`, `with` pass ✅ | — |
 | PARSING_FUNCTIONS_PLAN | **FULLY COMPLETE** | 3/3 pass (parse_int, parse_float, parsefloat_swf5) ✅ | — |
 | COLOR_OBJECT_PLAN | **COMPLETE** | extends_native_type ✅ | — |
@@ -159,7 +162,7 @@ Last updated: 2026-03-03
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
-| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 11/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅) | register_class 26/67, register_and_init_order ~76/233, register_class_swf6 blocked by cross-version _global, register_class_with_sound blocked by Sound class. do_init_action_child now PASS via cross-version Phase 1+4 |
+| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 13/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅, register_class_with_sound ✅) | register_class 26/67 (loadMovie), register_and_init_order ~76/233 (sprite init ordering) |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **Phases 0-2 COMPLETE** | 3/5 pass (native_objects_swf6/7/8 ✅) | native_subclasses/native_double_construct need filter constructor property init via super() |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 16/37), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
@@ -179,12 +182,18 @@ Last updated: 2026-03-03
 
 ## Recommended Work Order (updated 2026-03-03)
 
-### Actionable — New plans in incomplete/
-1. **SOUND_CLASS_PLAN Phase 0** — getTransform/getPan/setPan/setTransform (~60 lines). Fixes register_class_with_sound (+6 lines). Unblocks REGISTERCLASS_PLAN.
-2. **ENTERFRAME_DISPATCH_PLAN Phases 1-2** — Per-tick onEnterFrame (~40 lines). Fixes issue_1104 (+1), string_paths_variable_scopes (+5). Architectural correctness.
-3. **CALL_SEMANTICS_PLAN Phases 0-1** — Early-termination on base clip removal (~15 lines + recompile). Improves removed_target_clip_scope. Unblocks MC_REMOVAL_LIFECYCLE.
-4. ~~**TEXTSNAPSHOT_PLAN Phases 0-2**~~ — **DONE** → `complete/`. All 4 tests PASS.
-5. **STYLESHEET_PLAN** — Large feature (~390 lines), single test. **Deferred** — low ROI.
+### Actionable — Quick wins from new plans
+1. **ASBROADCASTER_PLAN** — _listeners array + addListener/removeListener return values (~60 lines). 2 tests, 131 expected lines. Self-contained, no external dependencies.
+2. **FUNCTION_EDGE_CASES_PLAN Phase 1** — Function() call handler (~15 lines). Fixes function_as_function (36 lines). Self-contained.
+3. **UNCOVERED_SMALL_TESTS Group A** — issue_3169, get_bytes_total, sandbox_type_remote (~25 lines total, 9 expected lines gained). Quick stub fixes.
+4. **define_local_with_paths** — Slash-path DefineLocal (~20 lines, 34 expected lines). Moderate.
+5. **gettextextent** — TextFormat.getTextExtent() (~40 lines, 25 expected lines). Uses existing font metrics pipeline.
+
+### Previously actionable — now done
+6. ~~**SOUND_CLASS_PLAN Phase 0**~~ — **DONE** → blocked/. register_class_with_sound PASS.
+7. ~~**ENTERFRAME_DISPATCH_PLAN**~~ — **DONE** → complete/. issue_1104, string_paths_variable_scopes PASS.
+8. ~~**TEXTSNAPSHOT_PLAN**~~ — **DONE** → complete/. All 4 tests PASS.
+9. ~~**STYLESHEET_PLAN**~~ — Deferred (large feature, single test, low ROI).
 
 ### Previously actionable — now done or blocked
 6. ~~**TELLTARGET_PLAN Phase 2 remaining**~~ — **DONE** → `blocked/`. 16/22 pass.
@@ -196,9 +205,12 @@ Last updated: 2026-03-03
 
 ### Existing blocked work (from blocked/ plans)
 12. **MOUSE_EVENTS_ADVANCED Phase 2** — Roll dispatch + focus events (~100-150 lines). Unblocks focus_mouse_rollout, partially focus_keyboard_press. Highest-impact blocked plan work.
-13. **TEXTFIELD_PLAN remaining** — scroll, condenseWhite, SWF6 HTML. 45/57 pass.
+13. **TEXTFIELD_PLAN remaining** — scroll, condenseWhite, SWF6 HTML. 49/57 pass (TextSnapshot DONE).
 14. **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
 15. **LOADMOVIE_PLAN Phase 6** — Per-movie `_global` isolation. Largest cross-cutting blocker.
+16. **ASNATIVE_ASNEW_PLAN** — Native function dispatch table (~100 lines). 2 tests, 68 expected lines. Needs dispatch table mapping.
+17. **TYPE_COERCION_ADVANCED_PLAN** — Primitive boxing + instanceof coercions (~100 lines). 2 tests, 217 expected lines. Complex.
+18. **FUNCTION_EDGE_CASES_PLAN Phase 2** — funky_function_calls segfault investigation.
 
 ### Dependency Blockers (plans blocking other plans)
 - ~~**TIMER_PLAN**~~ — **RESOLVED** (moved to complete/). set_interval ✅. timer_run_actions blocked on REGISTERCLASS_PLAN; timeout deferred.

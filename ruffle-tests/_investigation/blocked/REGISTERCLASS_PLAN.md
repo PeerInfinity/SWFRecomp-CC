@@ -11,7 +11,7 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 
 ## Final Test Results (15 tests)
 
-### Passing (12/15)
+### Passing (13/15)
 
 | Test | Lines | Result |
 |------|-------|--------|
@@ -26,14 +26,13 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 | movieclip_init_object | 5 | **5/5 PASS** |
 | empty_movieclip_can_attach_movies | 11 | **PASS** |
 | do_init_action_child | 12 | **12/12 PASS** ✅ (cross-version Phase 1+4 + ImportAssets2) |
+| register_class_with_sound | 11 | **11/11 PASS** ✅ (fixed by Sound Phase 0) |
 
-### Failing (3/15)
+### Failing (2/15)
 
 | Test | Lines | Match | Blocker |
 |------|-------|-------|---------|
 | register_class | 67 | 26/67 | Lines 27-29: button MC typeof. Lines 31+: child SWF loading (loadMovie) |
-| register_class_swf6 | 37 | 2/37 | Entirely depends on child SWF loading |
-| register_class_with_sound | 11 | 11/11 | **PASS** (fixed by Sound Phase 0) |
 | register_and_init_order | 233 | ~76/233 | Line 35: deep child access during constructor. Lines 133+: child sprite constructor ordering |
 
 ## What Was Implemented
@@ -74,9 +73,10 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 ## Remaining Blockers
 
 ### 1. Child SWF Loading (loadMovie)
-**Blocks**: register_class (lines 31+), register_class_swf6 (all), do_init_action_child (9 lines)
+**Blocks**: register_class (lines 31+), register_class_swf6 (all)
 **What's needed**: The ability to load external `.swf` files at runtime (`loadMovie`, `MovieClipLoader.loadClip`). The register_class test loads `child.swf` and `child_swf6.swf` which contain their own registerClass calls and prototype checks.
 **Plan**: LOADMOVIE_PLAN (already in blocked/)
+**Note**: do_init_action_child is now PASS (12/12) via cross-version Phase 1+4 + ImportAssets2
 
 ### 2. Sprite Initialization Ordering
 **Blocks**: register_and_init_order (lines 133+)
