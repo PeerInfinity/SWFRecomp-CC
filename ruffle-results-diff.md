@@ -1,27 +1,34 @@
 # Ruffle Test Results Diff
 
-**Previous:** `0ad48a643ef2` (2026-03-05T17:58:36.538960+00:00)
-**Current:** `0f59569503a9` (2026-03-05T19:12:52.592953+00:00)
+**Previous:** `0f59569503a9` (2026-03-05T19:12:52.592953+00:00)
+**Current:** `af0303883e72` (2026-03-05T20:45:05.086080+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 461 | 462 | +1 |
+| Passing | 462 | 457 | -5 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 74.5% | 74.6% | +0.1% |
-| Mismatched lines | 21499 | 21494 | -5 |
-|   Decreased | | | -6 |
-|   Increased | | | +1 |
+| Pass rate | 74.6% | 73.8% | -0.8% |
+| Mismatched lines | 21494 | 21832 | +338 |
+|   Decreased | | | -74 |
+|   Increased | | | +412 |
 
-## Newly Passing (1)
+## Newly Failing (5)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `sound` | output_mismatch | 622/628 | 628/628 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `edittext_html_color` | output_mismatch | 114/114 | 38/114 |
+| `funky_function_calls` | output_mismatch | 56/56 | 52/56 |
+| `parse_int` | output_mismatch | 64/64 | 1/64 |
+| `primitive_type_globals` | output_mismatch | 557/557 | 326/557 |
+| `swf4_actions_coercion_order` | output_mismatch | 158/158 | 137/158 |
 
-## Line Count Changed (1)
+## Line Count Changed (4)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `swf6_global_funcs` | output_mismatch | 77/232 | 76/232 | +1 |
+| `instanceof_coercions` | output_mismatch | 12/88 | 86/88 | -74 |
+| `interface_implements_op` | output_mismatch | 1/47 | 0/47 | +1 |
+| `movieclip_library_state_values` | output_mismatch | 76/78 | 71/78 | +5 |
+| `coerce_to_object_monkeypatch` | output_mismatch | 16/129 | 5/129 | +11 |
