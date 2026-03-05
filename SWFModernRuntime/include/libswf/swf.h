@@ -94,6 +94,7 @@ typedef struct Character
 		{
 			frame_func* sprite_frame_funcs;
 			size_t sprite_frame_count;
+			size_t sprite_byte_size;
 		};
 		// DefineButton
 		struct

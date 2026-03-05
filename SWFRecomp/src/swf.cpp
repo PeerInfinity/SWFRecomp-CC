@@ -3441,7 +3441,8 @@ namespace SWFRecomp
 				tag_init << endl << "\t" << "tagDefineSprite(app_context, "
 								 << to_string(sprite_id) << ", "
 								 << sp << "_frame_funcs, "
-								 << to_string(sprite_frame_count_declared) << ");";
+								 << to_string(sprite_frame_count_declared) << ", "
+								 << to_string(tag.length >= 4 ? tag.length - 4 : 0) << ");";
 
 				// Parse sprite sub-tags and generate sprite frame functions
 				size_t sprite_frame_i = 0;

@@ -75,7 +75,12 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth);
-void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count);
+void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count, size_t byte_size);
+// Backwards-compatible macro: old 4-arg calls get byte_size=0
+#define tagDefineSprite_5(ctx, cid, fn, fc, bs) tagDefineSpriteEx(ctx, cid, fn, fc, bs)
+#define tagDefineSprite_4(ctx, cid, fn, fc)     tagDefineSpriteEx(ctx, cid, fn, fc, 0)
+#define tagDefineSprite_GET(_1, _2, _3, _4, _5, NAME, ...) NAME
+#define tagDefineSprite(...) tagDefineSprite_GET(__VA_ARGS__, tagDefineSprite_5, tagDefineSprite_4)(__VA_ARGS__)
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count);
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height);
 void finalizeBitmaps();
@@ -116,6 +121,8 @@ int ng_findSpriteLabelFrame(size_t char_id, const char* label);
 int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int play);
 // Get the character ID for a MovieClip's display entry.
 size_t ng_getCharIdByMC(MovieClip* mc);
+// Get the DefineSprite tag data size for a sprite character.
+size_t ng_getSpriteByteSize(size_t char_id);
 
 // NO_GRAPHICS helpers for sprite timeline control from action.c
 #ifdef NO_GRAPHICS

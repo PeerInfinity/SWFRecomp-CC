@@ -2768,7 +2768,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 #endif
 }
 
-void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count)
+void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count, size_t byte_size)
 {
 	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
@@ -2776,6 +2776,7 @@ void tagDefineSprite(SWFAppContext* app_context, size_t char_id, frame_func* fun
 	dictionary[char_id].type = CHAR_TYPE_SPRITE;
 	dictionary[char_id].sprite_frame_funcs = funcs;
 	dictionary[char_id].sprite_frame_count = frame_count;
+	dictionary[char_id].sprite_byte_size = byte_size;
 }
 
 // Per-sprite frame label storage (separate from Character union)

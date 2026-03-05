@@ -780,9 +780,18 @@ def compile_native(test_dir, num_frames, build_dir):
     if has_data_files:
         extra_defines.append("-DHAS_DATA_FILES")
     # Pass SWF file size for getBytesLoaded/getBytesTotal
+    # Use the uncompressed size from the SWF header (bytes 4-7), not the file system size,
+    # because Flash reports the uncompressed size for compressed (CWS/ZWS) SWFs.
     test_swf = test_dir / "test.swf"
     if test_swf.exists():
-        extra_defines.append(f"-DSWF_FILE_SIZE={test_swf.stat().st_size}")
+        import struct
+        with open(test_swf, "rb") as swf_f:
+            swf_header = swf_f.read(8)
+        if len(swf_header) >= 8:
+            swf_file_size = struct.unpack("<I", swf_header[4:8])[0]
+        else:
+            swf_file_size = test_swf.stat().st_size
+        extra_defines.append(f"-DSWF_FILE_SIZE={swf_file_size}")
     # Pass movie URL matching Ruffle's VFS format (file:///test.swf)
     extra_defines.append('-DSWF_URL="file:///test.swf"')
     try:

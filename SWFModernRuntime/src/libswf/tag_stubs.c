@@ -1650,6 +1650,13 @@ int ng_isSpriteAtDepth(size_t depth)
 	return (dictionary[cid].type == CHAR_TYPE_SPRITE);
 }
 
+size_t ng_getSpriteByteSize(size_t char_id)
+{
+	if (char_id == 0 || char_id >= INITIAL_DICTIONARY_CAPACITY) return 0;
+	if (dictionary[char_id].type != CHAR_TYPE_SPRITE) return 0;
+	return dictionary[char_id].sprite_byte_size;
+}
+
 int ng_isButtonAtDepth(size_t depth)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return 0;

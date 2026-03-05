@@ -11075,6 +11075,15 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 		if (depth != SIZE_MAX) {
 			// Sync ActionScript depth: SWF depth - 16384
 			mc->depth = (int)depth - 16384;
+			// Set byte_size from sprite's DefineSprite tag data size (for getBytesLoaded/Total)
+			if (is_new && mc->byte_size == 0) {
+				extern DisplayObject* display_list;
+				size_t cid = display_list[depth].char_id;
+				if (cid != 0) {
+					size_t sbs = ng_getSpriteByteSize(cid);
+					if (sbs > 0) mc->byte_size = (u32)sbs;
+				}
+			}
 			float init_x, init_y;
 			if (ng_getTransformXY(depth, &init_x, &init_y)) {
 				mc->x = init_x;
@@ -21744,7 +21753,8 @@ void actionDefineLocal(SWFAppContext* app_context)
 	char* var_name = _dl_buf;
 
 	// Handle slash-path variable names (e.g., "/:abc" → set abc on root, "/clip/:def" → set def on clip)
-	{
+	// Only at timeline level — inside functions, DefineLocal stores with the literal name
+	if (g_call_depth == 0) {
 		const char* colon = NULL;
 		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
 			if (var_name[ci] == ':') { colon = var_name + ci; break; }
@@ -21767,8 +21777,69 @@ void actionDefineLocal(SWFAppContext* app_context)
 					POP_2();
 					return;
 				}
+				// MC resolution failed — try resolving slash path via GetVariable
+				// Convert slash path like "/ruffle" to GetVariable path "ruffle"
+				// (leading "/" resolves from root, segments separated by "/")
+				if (path_len > 0) {
+					PUSH_STR(var_name, path_len);
+					actionGetVariable(app_context);
+					u8 resolved_type = STACK_TOP_TYPE;
+					if (resolved_type == ACTION_STACK_VALUE_OBJECT ||
+					    resolved_type == ACTION_STACK_VALUE_MOVIECLIP) {
+						ActionVar obj_var;
+						peekVar(app_context, &obj_var);
+						POP();
+						ActionVar value_var;
+						peekVar(app_context, &value_var);
+						pushVar(app_context, &obj_var);
+						PUSH_STR(prop_name, prop_len);
+						pushVar(app_context, &value_var);
+						actionSetMember(app_context);
+						POP_2();
+						return;
+					}
+					POP();
+				}
 			}
 			// Path resolution failed — fall through to normal scope chain
+		}
+	}
+
+	// Handle dot-path variable names (e.g., "_root.o" → set "o" on _root MC)
+	// Only at timeline level — inside functions, DefineLocal stores with the literal name
+	if (g_call_depth == 0) {
+		const char* last_dot = NULL;
+		for (int di = (int)var_name_len - 1; di >= 0; di--) {
+			if (var_name[di] == '.') { last_dot = var_name + di; break; }
+		}
+		if (last_dot != NULL) {
+			u32 obj_path_len = (u32)(last_dot - var_name);
+			const char* prop_name = last_dot + 1;
+			u32 prop_len = var_name_len - obj_path_len - 1;
+			if (prop_len > 0 && obj_path_len > 0) {
+				// Resolve the left side via GetVariable
+				PUSH_STR(var_name, obj_path_len);
+				actionGetVariable(app_context);
+				u8 obj_type = STACK_TOP_TYPE;
+				if (obj_type == ACTION_STACK_VALUE_MOVIECLIP ||
+				    obj_type == ACTION_STACK_VALUE_OBJECT) {
+					// Save the resolved object
+					ActionVar obj_var;
+					peekVar(app_context, &obj_var);
+					POP();
+
+					ActionVar value_var;
+					peekVar(app_context, &value_var);
+
+					pushVar(app_context, &obj_var);
+					PUSH_STR(prop_name, prop_len);
+					pushVar(app_context, &value_var);
+					actionSetMember(app_context);
+					POP_2();
+					return;
+				}
+				POP(); // pop unresolved variable
+			}
 		}
 	}
 
@@ -21911,7 +21982,8 @@ void actionDeclareLocal(SWFAppContext* app_context)
 
 	// Handle slash-path variable names (e.g., "/:ghi" → declare ghi on root)
 	// DeclareLocal (var with no value) only creates the property if it doesn't already exist.
-	{
+	// Only at timeline level — inside functions, DeclareLocal stores with the literal name
+	if (g_call_depth == 0) {
 		const char* colon = NULL;
 		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
 			if (var_name[ci] == ':') { colon = var_name + ci; break; }
@@ -21942,6 +22014,40 @@ void actionDeclareLocal(SWFAppContext* app_context)
 					POP();
 					return;
 				}
+			}
+		}
+	}
+
+	// Handle dot-path variable names (e.g., "_root.mno" → declare "mno" on _root MC)
+	// Only at timeline level — inside functions, DeclareLocal stores with the literal name
+	if (g_call_depth == 0) {
+		const char* last_dot = NULL;
+		for (int di = (int)var_name_len - 1; di >= 0; di--) {
+			if (var_name[di] == '.') { last_dot = var_name + di; break; }
+		}
+		if (last_dot != NULL) {
+			u32 obj_path_len = (u32)(last_dot - var_name);
+			const char* prop_name = last_dot + 1;
+			u32 prop_len = var_name_len - obj_path_len - 1;
+			if (prop_len > 0 && obj_path_len > 0) {
+				PUSH_STR(var_name, obj_path_len);
+				actionGetVariable(app_context);
+				u8 obj_type = STACK_TOP_TYPE;
+				if (obj_type == ACTION_STACK_VALUE_MOVIECLIP ||
+				    obj_type == ACTION_STACK_VALUE_OBJECT) {
+					ActionVar obj_var;
+					peekVar(app_context, &obj_var);
+					POP();
+					ActionVar undefined_var = {0};
+					undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
+					pushVar(app_context, &obj_var);
+					PUSH_STR(prop_name, prop_len);
+					pushVar(app_context, &undefined_var);
+					actionSetMember(app_context);
+					POP();
+					return;
+				}
+				POP();
 			}
 		}
 	}
@@ -31266,7 +31372,26 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 		func_var.type = ACTION_STACK_VALUE_FUNCTION;
 		func_var.str_size = 0;
 		func_var.data.numeric_value = (u64) as_func;
+
+		// Handle slash-path function names (e.g., "/:f1" → store as "f1")
+		const char* resolved_name = name;
+		{
+			const char* _fn_colon = NULL;
+			u32 nlen = (u32)strlen(name);
+			for (int ci = (int)nlen - 1; ci >= 0; ci--) {
+				if (name[ci] == ':') { _fn_colon = name + ci; break; }
+			}
+			if (_fn_colon != NULL) {
+				resolved_name = _fn_colon + 1;
+				strncpy(as_func->name, resolved_name, 255);
+				as_func->name[255] = '\0';
+			}
+		}
+
 		setVariableByName(name, &func_var);
+		if (resolved_name != name && strlen(resolved_name) > 0) {
+			setVariableByName(resolved_name, &func_var);
+		}
 		// Also store on MC's dynamic_props when in non-root context
 		// (matches DefineLocal behavior — non-root scope stores on the MC)
 		extern MovieClip root_movieclip;
@@ -31345,7 +31470,26 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 		func_var.type = ACTION_STACK_VALUE_FUNCTION;
 		func_var.str_size = 0;
 		func_var.data.numeric_value = (u64) as_func;
+
+		// Handle slash-path function names (e.g., "/:f1" → store as "f1")
+		const char* resolved_name = name;
+		{
+			const char* _fn_colon = NULL;
+			u32 nlen = (u32)strlen(name);
+			for (int ci = (int)nlen - 1; ci >= 0; ci--) {
+				if (name[ci] == ':') { _fn_colon = name + ci; break; }
+			}
+			if (_fn_colon != NULL) {
+				resolved_name = _fn_colon + 1;
+				strncpy(as_func->name, resolved_name, 255);
+				as_func->name[255] = '\0';
+			}
+		}
+
 		setVariableByName(name, &func_var);
+		if (resolved_name != name && strlen(resolved_name) > 0) {
+			setVariableByName(resolved_name, &func_var);
+		}
 		// Also store on MC's dynamic_props when in non-root context
 		// (matches DefineLocal behavior — non-root scope stores on the MC)
 		extern MovieClip root_movieclip;
@@ -33333,6 +33477,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		else if (_mc_nav_name_len == 4 && strncmp(_mc_nav_name, "play", 4) == 0) { _is_mc_nav = 3; }
 		else if (_mc_nav_name_len == 9 && strncmp(_mc_nav_name, "prevFrame", 9) == 0) { _is_mc_nav = 4; }
 		else if (_mc_nav_name_len == 9 && strncmp(_mc_nav_name, "nextFrame", 9) == 0) { _is_mc_nav = 5; }
+		else if (_mc_nav_name_len == 14 && strncmp(_mc_nav_name, "getBytesLoaded", 14) == 0) { _is_mc_nav = 6; }
+		else if (_mc_nav_name_len == 13 && strncmp(_mc_nav_name, "getBytesTotal", 13) == 0) { _is_mc_nav = 7; }
 
 		if (_is_mc_nav)
 		{
@@ -33381,10 +33527,18 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// prevFrame
 				} else if (_is_mc_nav == 5) {
 					// nextFrame
+				} else if (_is_mc_nav == 6 || _is_mc_nav == 7) {
+					// getBytesLoaded / getBytesTotal
+					if (args != NULL) FREE(args);
+					double v = _mc_target->unloaded ? 0.0 : (double)_mc_target->byte_size;
+					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+					builtin_handled = 1;
 				}
-				if (args != NULL) FREE(args);
-				pushUndefined(app_context);
-				builtin_handled = 1;
+				if (!builtin_handled) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					builtin_handled = 1;
+				}
 			}
 		}
 	}
