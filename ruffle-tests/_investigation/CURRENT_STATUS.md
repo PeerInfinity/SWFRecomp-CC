@@ -1,12 +1,13 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-04
+Last updated: 2026-03-05
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: FUNCTION_EDGE_CASES Phase 1+2 done. function_as_function PASS (36/36). funky_function_calls segfault fixed → 52/56 (93%). Fixed: MovieClip thisArg via g_event_this_mc, undefined/null thisArg → global_object, global object "undefined" stringification, captured scope + base_clip in apply handler, array-like objects in apply().
+- **Recent gains (this session)**: TYPE_COERCION_ADVANCED Phases 1-3 done. instanceof_coercions 86/88 (97.7%), coerce_to_object_monkeypatch partially blocked by closure capture. Implemented: tryAutoBoxPrimitive, instanceOfCoercing, Object.addProperty built-in, non-object prototype handling, getActiveGlobal.
+- **Recent gains (previous session)**: FUNCTION_EDGE_CASES Phase 1+2 done. function_as_function PASS (36/36). funky_function_calls segfault fixed → 52/56 (93%). Fixed: MovieClip thisArg via g_event_this_mc, undefined/null thisArg → global_object, global object "undefined" stringification, captured scope + base_clip in apply handler, array-like objects in apply().
 - **Recent gains (this session)**: ASNATIVE_ASNEW_PLAN COMPLETE → complete/. asnative (34/34), asnew (34/34). ASnative class 100/2/200 dispatch, ASNew constructor context tracking, actionNewMethod SWF8 undefined method name fix.
 - **Recent gains (this session)**: ASBROADCASTER_PLAN COMPLETE → complete/. as_broadcaster (41/41), as_broadcaster_undef (90/90). AsBroadcaster.initialize(), addListener/removeListener abstract equality (null==undefined), broadcastMessage method name coercion + true return value.
 - **Recent gains (previous session)**: TEXTSNAPSHOT_PLAN COMPLETE → complete/. All 4 TextSnapshot tests PASS: textsnapshot_gettext (55/55), textsnapshot_findtext (44/44), textsnapshot_text_order (1/1), textsnapshot_available_text (20/20). Recompiler deferred char code emission + runtime textSnapshotCapture + getCount/getText/findText + clone display list init.
@@ -111,6 +112,7 @@ Last updated: 2026-03-04
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
+| `instanceof_coercions` | 86/88 (97.7%) | 2 edge cases: super.prototype in getter, ASSetPropFlags 0x2000 mask |
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 190/192 (99.0%) | Morph shape bounds interpolation rounding — 2 lines added to ACCEPTED_DIFFS |
 | `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
@@ -211,7 +213,7 @@ Last updated: 2026-03-04
 14. **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
 15. **LOADMOVIE_PLAN Phase 6** — Per-movie `_global` isolation. Largest cross-cutting blocker.
 16. ~~**ASNATIVE_ASNEW_PLAN**~~ — **DONE** → `complete/`. asnative 34/34 ✅, asnew 34/34 ✅.
-17. **TYPE_COERCION_ADVANCED_PLAN** — Primitive boxing + instanceof coercions (~100 lines). 2 tests, 217 expected lines. Complex.
+17. ~~**TYPE_COERCION_ADVANCED_PLAN**~~ — **DONE** → `blocked/`. instanceof_coercions 86/88 (97.7%). coerce_to_object_monkeypatch blocked by closure variable capture.
 18. **FUNCTION_EDGE_CASES_PLAN Phase 2** — funky_function_calls segfault investigation.
 
 ### Dependency Blockers (plans blocking other plans)
