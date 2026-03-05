@@ -36074,21 +36074,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 	// 4b. Primitive auto-boxing for CallMethod: if receiver is a primitive (BOOLEAN, F32, F64, STRING)
 	// and the corresponding global constructor has been replaced with a user function, auto-box.
+	// If no user constructor, leave as-is — the existing primitive method handlers will take over.
 	if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN ||
 	    obj_var.type == ACTION_STACK_VALUE_F32 ||
 	    obj_var.type == ACTION_STACK_VALUE_F64 ||
 	    obj_var.type == ACTION_STACK_VALUE_STRING)
 	{
-		if (!tryAutoBoxPrimitive(app_context, &obj_var, getActiveGlobal())) {
-			// No user constructor — for non-string primitives, use _global as receiver
-			if (obj_var.type != ACTION_STACK_VALUE_STRING) {
-				extern ASObject* global_object;
-				if (global_object != NULL) {
-					obj_var.type = ACTION_STACK_VALUE_OBJECT;
-					obj_var.data.numeric_value = (u64) global_object;
-				}
-			}
-		}
+		tryAutoBoxPrimitive(app_context, &obj_var, getActiveGlobal());
 	}
 
 	// 5a. Handle SUPER type BEFORE empty-method check — super() and super.method()
@@ -37026,8 +37018,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						if (tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal())) {
 							this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
 						} else {
-							// No user constructor — use _global as this
-							this_obj = (void*) global_object;
+							// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
+							g_override_this = args[0];
+							g_override_this_set = 1;
 						}
 					}
 				}
