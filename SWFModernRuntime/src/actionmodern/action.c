@@ -37134,6 +37134,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
+		// Array.valueOf() — return the array itself (before prototype check to preserve type)
+		if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0) {
+			if (args != NULL) FREE(args);
+			pushVar(app_context, &obj_var);
+			return;
+		}
+
 		// Check arr->props (and prototype chain) for user-defined method BEFORE built-in dispatch
 		ActionVar* user_method_prop = NULL;
 		if (arr->props != NULL) {
