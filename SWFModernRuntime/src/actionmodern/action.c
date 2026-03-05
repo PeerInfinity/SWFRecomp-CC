@@ -8919,6 +8919,82 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 }
 #endif
 
+static ASFunction g_textformat_fn_getTextExtent;
+
+static ActionVar textFormatGetTextExtent(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	ASObject* tf_obj = (ASObject*)this_obj;
+	if (tf_obj == NULL || arg_count < 1) return result;
+
+	// Get text argument (first arg) — convert to UTF-8
+	char text_buf[2048];
+	int text_len = varToStringBuf(app_context, &args[0], text_buf, sizeof(text_buf));
+	if (text_len < 0) text_len = 0;
+
+	// Get font name from TextFormat "font" property
+	ActionVar* font_prop = getProperty(tf_obj, "font", 4);
+	u16 font_id = 0; // default: builtin Noto Sans
+	if (font_prop != NULL && font_prop->type == ACTION_STACK_VALUE_STRING && font_prop->str_size > 0) {
+		char font_buf[256];
+		int flen = varToStringBuf(app_context, font_prop, font_buf, sizeof(font_buf));
+		if (flen > 0) font_id = ng_findFontIdByName(font_buf);
+	}
+
+	// Get font size from TextFormat "size" property (default 12)
+	double font_size = 12.0;
+	ActionVar* size_prop = getProperty(tf_obj, "size", 4);
+	if (size_prop != NULL && size_prop->type != ACTION_STACK_VALUE_UNDEFINED &&
+	    size_prop->type != ACTION_STACK_VALUE_NULL) {
+		font_size = varToDoubleSimple(size_prop);
+		if (isnan(font_size) || font_size <= 0) font_size = 12.0;
+	}
+
+	// Get optional width argument (second arg)
+	double width_px = -1.0;
+	if (arg_count >= 2 && args[1].type != ACTION_STACK_VALUE_UNDEFINED &&
+	    args[1].type != ACTION_STACK_VALUE_NULL) {
+		double w = varToDoubleSimple(&args[1]);
+		if (w > 0 && !isnan(w) && !isinf(w)) width_px = w;
+	}
+
+	// Compute metrics
+	double ascent, descent, width, height, tf_height, tf_width;
+	ng_getTextExtent(font_id, font_size, text_buf, (size_t)text_len, width_px,
+	    &ascent, &descent, &width, &height, &tf_height, &tf_width);
+
+	// Create result object (no prototype per Ruffle)
+	ASObject* res = allocObject(app_context, 8);
+
+	ActionVar val = {0};
+
+	val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &val.data.numeric_value) = ascent;
+	setProperty(app_context, res, "ascent", 6, &val);
+
+	VAL(double, &val.data.numeric_value) = descent;
+	setProperty(app_context, res, "descent", 7, &val);
+
+	VAL(double, &val.data.numeric_value) = width;
+	setProperty(app_context, res, "width", 5, &val);
+
+	VAL(double, &val.data.numeric_value) = height;
+	setProperty(app_context, res, "height", 6, &val);
+
+	VAL(double, &val.data.numeric_value) = tf_height;
+	setProperty(app_context, res, "textFieldHeight", 15, &val);
+
+	VAL(double, &val.data.numeric_value) = tf_width;
+	setProperty(app_context, res, "textFieldWidth", 14, &val);
+
+	result.type = ACTION_STACK_VALUE_OBJECT;
+	result.data.numeric_value = (u64)res;
+	return result;
+}
+
 static void initTextFormatPrototype(SWFAppContext* app_context) {
 	if (g_textformat_constructor_init) return;
 
@@ -8939,6 +9015,10 @@ static void initTextFormatPrototype(SWFAppContext* app_context) {
 		proto_val.data.numeric_value = (u64) g_object_prototype;
 		setProperty(app_context, proto, "__proto__", 9, &proto_val);
 	}
+
+	// Register getTextExtent method on prototype
+	registerGeomMethod(&g_textformat_fn_getTextExtent, "getTextExtent",
+	    (Function2Ptr)textFormatGetTextExtent, app_context, proto);
 
 	if (function_count < MAX_FUNCTIONS)
 		function_registry[function_count++] = &g_textformat_constructor;

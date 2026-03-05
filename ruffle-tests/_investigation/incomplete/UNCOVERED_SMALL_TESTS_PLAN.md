@@ -1,7 +1,7 @@
 # Uncovered Small/Miscellaneous Tests Catalog
 <!-- TESTS: define_local_with_paths, device_font_spacing, gettextextent, get_bytes_total, geturl, issue_2030, issue_2084, issue_3169, resolve_different_root, root_global_parent, root_onload, sandbox_type_remote, string_paths_keyevents, string_paths_timer, displacementmapfilter_mappoint_throw_error, localconnection -->
 
-Last updated: 2026-03-04
+Last updated: 2026-03-05
 
 ## Status: BLOCKED — catalog of individual uncovered tests, grouped by blocker
 
@@ -16,11 +16,11 @@ This document catalogs 16 failing tests that don't fit into any existing plan's 
 | Test | Lines | Current | Issue | Effort |
 |------|-------|---------|-------|--------|
 | root_onload | 2 | **PASS** ✅ | Was compile_fail, now passes | DONE |
-| define_local_with_paths | 55 | ~21/55 (38%) | Slash-path `var /:abc` DefineLocal to root variables | ~20 lines |
-| issue_3169 | 2 | 0/2 | addProperty setter not invoked during `this.foo = val` inside function | ~10 lines |
-| get_bytes_total | 4 | 0/4 | getBytesLoaded/getBytesTotal return undefined on root MC | ~10 lines |
-| sandbox_type_remote | 3 | 1/3 | flash.system.Security.sandboxType property missing | ~5 lines |
-| gettextextent | 56 | ~31/56 (55%) | TextFormat.getTextExtent() method not implemented | ~40 lines |
+| issue_3169 | 2 | **PASS** ✅ | Was 0/2, now passes in CI | DONE |
+| get_bytes_total | 4 | **PASS** ✅ | getBytesLoaded/getBytesTotal implemented | DONE |
+| gettextextent | 56 | **PASS** ✅ | TextFormat.getTextExtent() implemented | DONE |
+| define_local_with_paths | 55 | ~51/55 (93%) | Slash-path `var /:abc` DefineLocal mostly working; 3 edge cases remain | ~51 lines gained |
+| sandbox_type_remote | 3 | 1/3 | Lines 2-3 need loadMovie infra (multi-SWF) | BLOCKED |
 | device_font_spacing | 91 | ~46/91 (51%) | Text metrics accuracy with device fonts + letter spacing | TEXTFIELD blocker |
 
 #### define_local_with_paths (55 lines)
@@ -123,11 +123,10 @@ Tests `getURL()` with POST parameters and traces the request. Needs network requ
 
 ### Priority Summary
 
-| Priority | Test | Effort | Lines Gained |
+| Priority | Test | Status | Lines Gained |
 |----------|------|--------|-------------|
-| **Quick wins** | issue_3169, get_bytes_total, sandbox_type_remote | ~25 lines | 9 |
-| **Medium** | define_local_with_paths | ~20 lines | 34 |
-| **Medium** | gettextextent | ~40 lines | 25 |
+| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent | PASS | 64 |
+| **Mostly done** | define_local_with_paths | 51/55 (3 edge cases blocked) | 51 |
+| **Blocked (loadMovie)** | sandbox_type_remote, resolve_different_root, root_global_parent, issue_2030, issue_2084 | blocked by loadMovie | 0 |
 | **Investigate** | string_paths_timer (segfault) | ? | ? |
-| **Blocked** | resolve_different_root, root_global_parent, issue_2030, issue_2084 | blocked by loadMovie | 28 |
-| **Low priority** | localconnection, geturl, string_paths_keyevents | complex/blocked | 586 |
+| **Low priority** | localconnection, geturl, string_paths_keyevents, device_font_spacing, displacementmapfilter_mappoint_throw_error | complex/blocked | 0 |

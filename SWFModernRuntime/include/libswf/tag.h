@@ -257,6 +257,9 @@ int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size
     int letter_spacing_twips);
 int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, float field_height_pixels);
 u16 ng_findFontIdByName(const char* name);
+void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
+    double width_px, double* out_ascent, double* out_descent,
+    double* out_width, double* out_height, double* out_tf_height, double* out_tf_width);
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
 // Look up exported symbol by linkage name. Returns char_id or (size_t)-1 if not found.
 size_t ng_lookupExport(const char* name);

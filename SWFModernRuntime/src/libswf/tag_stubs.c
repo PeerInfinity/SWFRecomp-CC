@@ -1033,6 +1033,63 @@ int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, floa
 	return 1 + extra_lines;
 }
 
+// Compute TextFormat.getTextExtent() metrics.
+// font_id: font to use (0 = builtin Noto Sans). font_size_px: font size in pixels.
+// text/text_len: the string to measure. width_px: optional wrap width (-1 = no wrap).
+// All output values in pixels (f64).
+void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
+    double width_px, double* out_ascent, double* out_descent,
+    double* out_width, double* out_height, double* out_tf_height, double* out_tf_width)
+{
+	int fi = ng_find_font_with_metrics(font_id);
+	if (fi < 0) {
+		*out_ascent = *out_descent = *out_width = *out_height = *out_tf_height = *out_tf_width = 0;
+		return;
+	}
+
+	int em = ng_fonts[fi].em_square;
+	if (em <= 0) em = 1024;
+
+	u16 font_height = (u16)(font_size_px * 20.0); // twips
+	int ascent_twips = (int)((float)ng_fonts[fi].ascent * (float)font_height / (float)em);
+	int descent_twips = (int)((float)ng_fonts[fi].descent * (float)font_height / (float)em);
+
+	*out_ascent = (double)ascent_twips / 20.0;
+	*out_descent = (double)descent_twips / 20.0;
+
+	int has_wrap = (width_px > 0);
+	int field_width_twips = has_wrap ? (int)(width_px * 20.0) : 0;
+	// Subtract gutter (2px each side = 80 twips total) from field width for content area
+	int content_width_twips = has_wrap ? (field_width_twips - 80) : 0;
+
+	// Compute text width (max line width in twips)
+	int width_twips = ng_computeTextWidth(font_id, font_height, text, text_len,
+	    has_wrap, content_width_twips, 8, 0, 0, 0, 0, 0);
+
+	*out_width = (double)width_twips / 20.0;
+
+	// Compute height: line_count * (ascent + descent + leading)
+	// For getTextExtent, leading = 0 (TextFormat default)
+	int line_height_twips = ascent_twips + descent_twips;
+	int line_count = 1;
+	if (text != NULL && text_len > 0) {
+		line_count = ng_computeTextLineCount(font_id, font_height, text, text_len,
+		    has_wrap, content_width_twips, 8, 0, 0, 0, 0);
+	}
+	int height_twips = line_count * line_height_twips;
+	*out_height = (double)height_twips / 20.0;
+
+	// textFieldHeight = height + 4 (2px gutter on each side)
+	*out_tf_height = *out_height + 4.0;
+
+	// textFieldWidth = specified width, or text width + 4
+	if (has_wrap) {
+		*out_tf_width = width_px;
+	} else {
+		*out_tf_width = *out_width + 4.0;
+	}
+}
+
 void ng_record_video(SWFAppContext* app_context, u16 char_id)
 {
 	(void)app_context;
