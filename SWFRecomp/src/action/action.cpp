@@ -1417,7 +1417,12 @@ namespace SWFRecomp
 					if (!suppress_this)
 					{
 						func_def << "\t// Preload 'this' into register " << next_reg << endl;
-						func_def << "\tif (this_obj != NULL) {" << endl;
+						func_def << "\textern ActionVar g_override_this;" << endl;
+						func_def << "\textern int g_override_this_set;" << endl;
+						func_def << "\tif (g_override_this_set) {" << endl;
+						func_def << "\t\tregs[" << next_reg << "] = g_override_this;" << endl;
+						func_def << "\t\tg_override_this_set = 0;" << endl;
+						func_def << "\t} else if (this_obj != NULL) {" << endl;
 						func_def << "\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_OBJECT;" << endl;
 						func_def << "\t\tregs[" << next_reg << "].data.numeric_value = (u64)this_obj;" << endl;
 						func_def << "\t} else {" << endl;
@@ -1428,8 +1433,9 @@ namespace SWFRecomp
 						func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)g_event_this_mc;" << endl;
 						func_def << "\t\t\tg_event_this_mc = NULL;" << endl;
 						func_def << "\t\t} else {" << endl;
+						func_def << "\t\t\textern MovieClip* g_current_context;" << endl;
 						func_def << "\t\t\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-						func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+						func_def << "\t\t\tregs[" << next_reg << "].data.numeric_value = (u64)(g_current_context ? g_current_context : &root_movieclip);" << endl;
 						func_def << "\t\t}" << endl;
 						func_def << "\t}" << endl;
 					}

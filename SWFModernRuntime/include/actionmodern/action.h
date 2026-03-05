@@ -75,6 +75,11 @@ extern MovieClip* g_current_context;
 // path consumes this (sets it to NULL after reading).
 extern MovieClip* g_event_this_mc;
 
+// Override 'this' — passes arbitrary ActionVar as 'this' to DefineFunction2.
+// Used for primitive thisArg in call/apply and undefined this in empty-method-name calls.
+extern ActionVar g_override_this;
+extern int g_override_this_set;
+
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);
 // Set/get the base clip (the clip whose timeline code is executing).

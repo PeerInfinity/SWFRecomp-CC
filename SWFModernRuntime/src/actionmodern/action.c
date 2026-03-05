@@ -13532,6 +13532,11 @@ MovieClip* g_current_context = NULL;
 // DefineFunction2 with this_obj=NULL. Consumed by generated code.
 MovieClip* g_event_this_mc = NULL;
 
+// Override 'this' — for passing arbitrary ActionVar (primitive, undefined) as 'this'
+// to DefineFunction2 when void* this_obj can't represent the value.
+ActionVar g_override_this = {0};
+int g_override_this_set = 0;
+
 // Base clip: the MovieClip whose timeline code is currently executing.
 // actionSetTarget("") resets to g_base_clip (not root) so nested tellTarget
 // blocks return to the correct parent clip context.
@@ -35727,13 +35732,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 				}
 
-				// No 'this' binding for direct function call (pass NULL)
+				// No 'this' binding for empty-method-name call: this = undefined
+				g_override_this.type = ACTION_STACK_VALUE_UNDEFINED;
+				g_override_this.data.numeric_value = 0;
+				g_override_this.str_size = 0;
+				g_override_this_set = 1;
+
 				int _cm_is_bytecode = (func->register_count > 0);
 				g_call_depth++;
 				if (_cm_is_bytecode) pushCtorContext(0);
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
 				if (_cm_is_bytecode) popCtorContext();
 				g_call_depth--;
+				g_override_this_set = 0;
 
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
@@ -36507,6 +36518,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					           args[0].type == ACTION_STACK_VALUE_NULL) {
 						// Flash: undefined/null thisArg → global object
 						this_obj = (void*) global_object;
+					} else {
+						// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
+						g_override_this = args[0];
+						g_override_this_set = 1;
 					}
 				}
 
@@ -36688,6 +36703,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					           args[0].type == ACTION_STACK_VALUE_NULL) {
 						// Flash: undefined/null thisArg → global object
 						this_obj = (void*) global_object;
+					} else {
+						// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
+						g_override_this = args[0];
+						g_override_this_set = 1;
 					}
 				}
 
