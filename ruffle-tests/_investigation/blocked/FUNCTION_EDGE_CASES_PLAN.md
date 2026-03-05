@@ -57,6 +57,16 @@ Added `ActionVar g_override_this` + `int g_override_this_set` globals. When set,
 
 Result: funky_function_calls **56/56 PASS**
 
+#### Phase 3b: g_override_this Leak Fix — COMPLETE
+
+The `g_override_this_set` global flag leaked through C functions (Function2Ptr with `register_count=0`, like Math builtins) to nested generated function calls (like valueOf). When Math.pow was called via empty-method-name path, the flag stayed set during Math.pow's execution, and valueOf's generated preload-this code incorrectly used UNDEFINED as `this` instead of the object passed via `this_obj`.
+
+**Fix (two-pronged):**
+1. **Recompiler**: Generated DefineFunction2 entry code now saves-and-clears the flag immediately (before register init), making it function-local. Preload-this uses saved local variables.
+2. **Runtime**: Clear `g_override_this_set` before invoking C functions (`register_count=0`) in empty-method-name, call(), and apply() paths. Also added cleanup after type-1 function calls.
+
+Fixes regression: math_swf6, math_swf7, math_swf8 all PASS again.
+
 #### Phase 4: asfunction Protocol — BLOCKED
 
 Requires user interaction simulation (clicking on a link in a TextField). The `asfunction:` protocol triggers ActionScript function calls when the user clicks hyperlinks. This is fundamentally untestable without mouse event simulation infrastructure.
