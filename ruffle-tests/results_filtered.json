@@ -1,19 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-03-06T02:28:30.127611+00:00",
-    "git_sha": "b7965a8fc0af7088db45a1686065e86077414353",
-    "duration_seconds": 8343.83,
+    "timestamp": "2026-03-06T03:19:20.773294+00:00",
+    "git_sha": "4eb4f907d64bc938d053cfb182c7376a64d2dfd7",
+    "duration_seconds": 8355.64,
     "total_available": 619,
     "shards": 10,
-    "ignored_count": 145,
+    "ignored_count": 144,
     "filtered": true
   },
-  "total": 474,
-  "pass": 393,
-  "fail": 81,
-  "pass_rate": 82.9,
+  "total": 475,
+  "pass": 400,
+  "fail": 75,
+  "pass_rate": 84.2,
   "breakdown": {
-    "output_mismatch": 76,
+    "output_mismatch": 70,
     "runtime_error": 2,
     "compile_fail": 1,
     "segfault": 2
@@ -27,7 +27,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.0,
+      "duration": 14.51,
       "status": "pass"
     },
     {
@@ -38,7 +38,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 12.59,
+      "duration": 13.26,
       "status": "pass"
     },
     {
@@ -49,19 +49,22 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 12.58,
+      "duration": 13.33,
       "status": "pass"
     },
     {
       "test": "add2",
       "num_frames": 1,
       "lines": {
-        "actual_lines": 354,
+        "actual_lines": 358,
         "expected_lines": 354,
-        "matching_lines": 354
+        "matching_lines": 31
       },
-      "duration": 12.69,
-      "status": "pass"
+      "duration": 13.51,
+      "status": "output_mismatch",
+      "detail": "327 line(s) differ (actual=358, expected=354)",
+      "actual_output": "objValue1.toString\nobjValue2.toString\nobjValue3.toString\nobjValue4.toString\n// 0 + 0\n0\n// 0 + 0\n0\n\n// 1 + 2\n3\n// 2 + 1\n3\n\n// NaN + 1\nNaN\n// 1 + NaN\nNaN\n\n// NaN + NaN\nNaN\n// NaN + NaN\nNaN\n\n// Infinity + Infinity\nInfinity\n// Infinity + Infinity\nInfinity\n\n// Infinity + -Infinity\nNaN\n// -Infinity + Infinity\nNaN\n\n// false + false\n0\n// false + false\n0\n\n// true + false\n1\n// false + true\n1\n\n// true + true\n2\n// true + true\n2\n\n// true + false\n... (308 lines after) ...",
+      "expected_output": "// 0 + 0\n0\n// 0 + 0\n0\n\n// 1 + 2\n3\n// 2 + 1\n3\n\n// NaN + 1\nNaN\n// 1 + NaN\nNaN\n\n// NaN + NaN\nNaN\n// NaN + NaN\nNaN\n\n// Infinity + Infinity\nInfinity\n// Infinity + Infinity\nInfinity\n\n// Infinity + -Infinity\nNaN\n// -Infinity + Infinity\nNaN\n\n// false + false\n0\n// false + false\n0\n\n// true + false\n1\n// false + true\n1\n\n// true + true\n2\n// true + true\n2\n\n// true + false\n1\n// false + true\n1\n\n... (304 lines after) ..."
     },
     {
       "test": "add_property",
@@ -71,7 +74,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 12.49,
+      "duration": 13.41,
       "status": "pass"
     },
     {
@@ -82,7 +85,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 12.45,
+      "duration": 13.28,
       "status": "pass"
     },
     {
@@ -93,7 +96,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 12.59,
+      "duration": 13.36,
       "status": "pass"
     },
     {
@@ -104,7 +107,7 @@
         "expected_lines": 127,
         "matching_lines": 127
       },
-      "duration": 12.82,
+      "duration": 13.21,
       "status": "pass"
     },
     {
@@ -115,7 +118,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 12.6,
+      "duration": 13.33,
       "status": "pass"
     },
     {
@@ -126,7 +129,7 @@
         "expected_lines": 98,
         "matching_lines": 98
       },
-      "duration": 12.65,
+      "duration": 13.48,
       "status": "pass"
     },
     {
@@ -137,7 +140,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 12.61,
+      "duration": 13.39,
       "status": "pass"
     },
     {
@@ -148,7 +151,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.67,
+      "duration": 13.28,
       "status": "pass"
     },
     {
@@ -159,7 +162,7 @@
         "expected_lines": 42,
         "matching_lines": 42
       },
-      "duration": 12.66,
+      "duration": 13.26,
       "status": "pass"
     },
     {
@@ -170,7 +173,7 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 12.61,
+      "duration": 13.31,
       "status": "pass"
     },
     {
@@ -181,7 +184,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.61,
+      "duration": 13.29,
       "status": "pass"
     },
     {
@@ -192,7 +195,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 12.69,
+      "duration": 13.34,
       "status": "pass"
     },
     {
@@ -203,7 +206,7 @@
         "expected_lines": 443,
         "matching_lines": 443
       },
-      "duration": 12.7,
+      "duration": 13.37,
       "status": "pass"
     },
     {
@@ -214,7 +217,7 @@
         "expected_lines": 207,
         "matching_lines": 207
       },
-      "duration": 12.78,
+      "duration": 13.44,
       "status": "pass"
     },
     {
@@ -225,7 +228,7 @@
         "expected_lines": 209,
         "matching_lines": 209
       },
-      "duration": 12.72,
+      "duration": 13.49,
       "status": "pass"
     },
     {
@@ -236,7 +239,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 12.57,
+      "duration": 13.32,
       "status": "pass"
     },
     {
@@ -247,7 +250,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 12.57,
+      "duration": 13.31,
       "status": "pass"
     },
     {
@@ -258,7 +261,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 12.82,
+      "duration": 13.55,
       "status": "pass"
     },
     {
@@ -269,7 +272,7 @@
         "expected_lines": 97,
         "matching_lines": 97
       },
-      "duration": 12.84,
+      "duration": 13.59,
       "status": "pass"
     },
     {
@@ -280,7 +283,7 @@
         "expected_lines": 85,
         "matching_lines": 85
       },
-      "duration": 12.84,
+      "duration": 13.52,
       "status": "pass"
     },
     {
@@ -291,7 +294,7 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 12.87,
+      "duration": 13.5,
       "status": "pass"
     },
     {
@@ -302,7 +305,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 12.67,
+      "duration": 13.29,
       "status": "pass"
     },
     {
@@ -313,7 +316,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 12.61,
+      "duration": 13.3,
       "status": "pass"
     },
     {
@@ -324,7 +327,7 @@
         "expected_lines": 89,
         "matching_lines": 89
       },
-      "duration": 12.73,
+      "duration": 13.32,
       "status": "pass"
     },
     {
@@ -335,7 +338,7 @@
         "expected_lines": 79,
         "matching_lines": 79
       },
-      "duration": 12.74,
+      "duration": 13.36,
       "status": "pass"
     },
     {
@@ -346,7 +349,7 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 12.64,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -357,7 +360,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.62,
+      "duration": 13.23,
       "status": "pass"
     },
     {
@@ -368,7 +371,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.56,
+      "duration": 13.19,
       "status": "pass"
     },
     {
@@ -379,7 +382,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.57,
+      "duration": 13.24,
       "status": "pass"
     },
     {
@@ -390,7 +393,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.65,
+      "duration": 13.24,
       "status": "pass"
     },
     {
@@ -401,7 +404,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.65,
+      "duration": 13.22,
       "status": "pass"
     },
     {
@@ -412,7 +415,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 12.59,
+      "duration": 13.32,
       "status": "pass"
     },
     {
@@ -423,7 +426,7 @@
         "expected_lines": 11,
         "matching_lines": 0
       },
-      "duration": 12.67,
+      "duration": 13.36,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=0, expected=11)",
       "actual_output": "",
@@ -437,7 +440,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 12.54,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -448,7 +451,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 12.64,
+      "duration": 13.35,
       "status": "pass"
     },
     {
@@ -459,7 +462,7 @@
         "expected_lines": 59,
         "matching_lines": 59
       },
-      "duration": 12.61,
+      "duration": 13.44,
       "status": "pass"
     },
     {
@@ -470,7 +473,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.6,
+      "duration": 13.69,
       "status": "pass"
     },
     {
@@ -481,7 +484,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.55,
+      "duration": 13.63,
       "status": "pass"
     },
     {
@@ -492,7 +495,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.46,
+      "duration": 13.34,
       "status": "pass"
     },
     {
@@ -503,7 +506,7 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 14.98,
+      "duration": 16.23,
       "status": "pass"
     },
     {
@@ -514,7 +517,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.79,
+      "duration": 13.7,
       "status": "pass"
     },
     {
@@ -525,7 +528,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.77,
+      "duration": 13.66,
       "status": "pass"
     },
     {
@@ -536,7 +539,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.59,
+      "duration": 13.37,
       "status": "pass"
     },
     {
@@ -547,7 +550,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 12.57,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -558,7 +561,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 13.31,
+      "duration": 14.19,
       "status": "pass"
     },
     {
@@ -569,7 +572,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.93,
+      "duration": 13.82,
       "status": "pass"
     },
     {
@@ -580,7 +583,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.83,
+      "duration": 13.53,
       "status": "pass"
     },
     {
@@ -591,7 +594,7 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 15.03,
+      "duration": 16.12,
       "status": "pass"
     },
     {
@@ -602,7 +605,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 13.51,
+      "duration": 12.98,
       "status": "pass"
     },
     {
@@ -613,7 +616,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 12.89,
+      "duration": 12.84,
       "status": "pass"
     },
     {
@@ -624,7 +627,7 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 15.38,
+      "duration": 15.36,
       "status": "pass"
     },
     {
@@ -635,7 +638,7 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 12.98,
+      "duration": 13.52,
       "status": "pass"
     },
     {
@@ -646,7 +649,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 12.77,
+      "duration": 13.57,
       "status": "pass"
     },
     {
@@ -657,7 +660,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.71,
+      "duration": 13.46,
       "status": "pass"
     },
     {
@@ -668,7 +671,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.88,
+      "duration": 13.25,
       "status": "pass"
     },
     {
@@ -679,7 +682,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 13.04,
+      "duration": 13.49,
       "status": "pass"
     },
     {
@@ -690,7 +693,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 12.79,
+      "duration": 13.23,
       "status": "pass"
     },
     {
@@ -701,7 +704,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 12.69,
+      "duration": 13.16,
       "status": "pass"
     },
     {
@@ -712,7 +715,7 @@
         "expected_lines": 63,
         "matching_lines": 63
       },
-      "duration": 12.96,
+      "duration": 13.41,
       "status": "pass"
     },
     {
@@ -723,7 +726,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.79,
+      "duration": 13.11,
       "status": "pass"
     },
     {
@@ -734,7 +737,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 12.84,
+      "duration": 12.88,
       "status": "pass"
     },
     {
@@ -745,7 +748,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.67,
+      "duration": 12.82,
       "status": "pass"
     },
     {
@@ -756,7 +759,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 12.88,
+      "duration": 12.96,
       "status": "pass"
     },
     {
@@ -767,7 +770,7 @@
         "expected_lines": 17,
         "matching_lines": 0
       },
-      "duration": 13.08,
+      "duration": 12.96,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=0, expected=17)",
       "actual_output": "",
@@ -781,7 +784,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 13.02,
+      "duration": 13.23,
       "status": "pass"
     },
     {
@@ -792,7 +795,7 @@
         "expected_lines": 94,
         "matching_lines": 26
       },
-      "duration": 12.92,
+      "duration": 13.12,
       "status": "output_mismatch",
       "detail": "68 line(s) differ (actual=94, expected=94)",
       "actual_output": "text1._x: 0 -> 0;\ntext1._y: 0 -> 0;\ntext1._width: 5 -> 12;\ntext1._height: 6 -> 14;\ntext1.multiline: false -> undefined;\ntext1.password: false -> undefined;\ntext1.text:  -> undefined;\ntext1.textColor: 0 -> undefined;\ntext1.autoSize: none -> undefined;\ntext1.background: false -> undefined;\ntext1.backgroundColor: 16777215 -> undefined;\ntext1.selectable: true -> undefined;\ntext1.embedFonts: false -> undefined;\ntext1.wordWrap: false -> undefined;\ntext1.getNewTextFormat().align: left -> left;\ntext1.getNewTextFormat().bold: false -> false;\ntext1.getNewTextFormat().color: 0 -> 0;\ntext1.getNewTextFormat().indent: 0 -> 0;\ntext1.getNewTextFormat().leading: 0 -> 0;\ntext1.getNewTextFormat().leftMargin: 0 -> 0;\ntext1.getNewTextFormat().rightMargin: 0 -> 0;\ntext1.getNewTextFormat().size: 12 -> 12;\ntext2._x: 0 -> 0;\ntext2._y: 0 -> 0;\ntext2._width: 19 -> 12;\ntext2.multiline: true -> undefined;\ntext2.password: false -> undefined;\ntext2.textColor: 16711680 -> undefined;\ntext2.autoSize: right -> undefined;\ntext2.background: true -> undefined;\ntext2.backgroundColor: 5 -> undefined;\ntext2.selectable: false -> undefined;\ntext2.embedFonts: true -> undefined;\ntext2.wordWrap: true -> undefined;\ntext2._alpha: 0.5 -> 0.5;\ntext2.antiAliasType: advanced -> undefined;\ntext2.autoSize: right -> undefined;\ntext2.background: true -> undefined;\ntext2.backgroundColor: 5 -> undefined;\ntext2.border: true -> undefined;\ntext2.borderColor: 6 -> undefined;\ntext2.condenseWhite: true -> undefined;\ntext2.embedFonts: true -> undefined;\ntext2.filters: [object Object] -> ;\ntext2.gridFitType: subpixel -> undefined;\ntext2.hscroll: 10 -> undefined;\ntext2.html: false -> undefined;\ntext2.htmlText: <TEXTFORMAT LEFTMARGIN=\"1\" RIGHTMARGIN=\"2\" INDENT=\"3\" LEADING=\"4\"><P ALIGN=\"LEFT\"><FONT FACE=\"Times New Roman\" SIZE=\"12\" COLOR=\"#FF0000\" LETTERSPACING=\"0\" KERNING=\"0\">initial</FONT></P></TEXTFORMAT> -> undefined;\ntext2.maxChars: 24 -> undefined;\ntext2.multiline: true -> undefined;\n... (44 lines after) ...",
@@ -806,10 +809,10 @@
         "expected_lines": 86,
         "matching_lines": 52
       },
-      "duration": 13.08,
+      "duration": 13.03,
       "status": "output_mismatch",
       "detail": "34 line(s) differ (actual=86, expected=86)",
-      "actual_output": "... (7 lines before) ...\ntext1.getNewTextFormat().indent: 0 -> 0;\ntext1.getNewTextFormat().leading: 0 -> 0;\ntext1.getNewTextFormat().leftMargin: 0 -> 0;\ntext1.getNewTextFormat().rightMargin: 0 -> 0;\ntext1.getNewTextFormat().size: 12 -> 12;\ntext2._x: -226 -> -226;\ntext2._y: 16 -> 16;\ntext2._width: 19 -> 0;\ntext2._height: 20.3 -> 0;\ntext2._alpha: 0.5 -> 0.5;\ntext2.antiAliasType: advanced -> undefined;\ntext2.autoSize: right -> undefined;\ntext2.background: true -> undefined;\ntext2.backgroundColor: 5 -> undefined;\ntext2.border: true -> undefined;\ntext2.borderColor: 6 -> undefined;\ntext2.condenseWhite: true -> undefined;\ntext2.embedFonts: true -> undefined;\ntext2.filters: [object Object] -> ;\ntext2.gridFitType: subpixel -> undefined;\ntext2._height: 20.3 -> 0;\ntext2.hscroll: 0 -> undefined;\ntext2.html: true -> undefined;\ntext2.html: true -> undefined;\ntext2.htmlText: <P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">asdfghjkl</FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">jasdhhjasd</FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">ajshdjhasd</FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">jashdasjdh</FONT></P> -> undefined;\ntext2.maxChars: 24 -> undefined;\ntext2.multiline: true -> undefined;\ntext2._name: text2 -> text2_clone;\ntext2.scroll: 1 -> undefined;\ntext2.styleSheet: [object Object] -> undefined;\ntext2._width: 19 -> 0;\ntext2.getNewTextFormat().align: left -> left;\ntext2.getNewTextFormat().bold: false -> false;\ntext2.getNewTextFormat().color: 0 -> 0;\ntext2.getNewTextFormat().indent: 0 -> 0;\ntext2.getNewTextFormat().leading: 0 -> 0;\ntext2.getNewTextFormat().leftMargin: 0 -> 0;\ntext2.getNewTextFormat().rightMargin: 0 -> 0;\ntext2.getNewTextFormat().size: 12 -> 12;\ntext3._x: 1 -> 1;\ntext3._y: 2 -> 2;\ntext3._width: 12 -> 0;\ntext3._height: 13 -> 0;\ntext3.password: true -> undefined;\ntext3.restrict: asd -> undefined;\ntext3.selectable: false -> undefined;\ntext3.sharpness: 500 -> undefined;\ntext3.tabEnabled: true -> undefined;\ntext3.tabIndex: 5 -> undefined;\ntext3.text: x -> undefined;\n... (29 lines after) ...",
+      "actual_output": "... (7 lines before) ...\ntext1.getNewTextFormat().indent: 0 -> 0;\ntext1.getNewTextFormat().leading: 0 -> 0;\ntext1.getNewTextFormat().leftMargin: 0 -> 0;\ntext1.getNewTextFormat().rightMargin: 0 -> 0;\ntext1.getNewTextFormat().size: 12 -> 12;\ntext2._x: -228.3 -> -228.300003051758;\ntext2._y: 16 -> 16;\ntext2._width: 19 -> 0;\ntext2._height: 20.3 -> 0;\ntext2._alpha: 0.5 -> 0.5;\ntext2.antiAliasType: advanced -> undefined;\ntext2.autoSize: right -> undefined;\ntext2.background: true -> undefined;\ntext2.backgroundColor: 5 -> undefined;\ntext2.border: true -> undefined;\ntext2.borderColor: 6 -> undefined;\ntext2.condenseWhite: true -> undefined;\ntext2.embedFonts: true -> undefined;\ntext2.filters: [object Object] -> ;\ntext2.gridFitType: subpixel -> undefined;\ntext2._height: 20.3 -> 0;\ntext2.hscroll: 0 -> undefined;\ntext2.html: true -> undefined;\ntext2.html: true -> undefined;\ntext2.htmlText: <P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">asdfghjkl</FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">jasdhhjasd</FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">ajshdjhasd</FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">jashdasjdh</FONT></P> -> undefined;\ntext2.maxChars: 24 -> undefined;\ntext2.multiline: true -> undefined;\ntext2._name: text2 -> text2_clone;\ntext2.scroll: 1 -> undefined;\ntext2.styleSheet: [object Object] -> undefined;\ntext2._width: 19 -> 0;\ntext2.getNewTextFormat().align: left -> left;\ntext2.getNewTextFormat().bold: false -> false;\ntext2.getNewTextFormat().color: 0 -> 0;\ntext2.getNewTextFormat().indent: 0 -> 0;\ntext2.getNewTextFormat().leading: 0 -> 0;\ntext2.getNewTextFormat().leftMargin: 0 -> 0;\ntext2.getNewTextFormat().rightMargin: 0 -> 0;\ntext2.getNewTextFormat().size: 12 -> 12;\ntext3._x: 1 -> 1;\ntext3._y: 2 -> 2;\ntext3._width: 12 -> 0;\ntext3._height: 13 -> 0;\ntext3.password: true -> undefined;\ntext3.restrict: asd -> undefined;\ntext3.selectable: false -> undefined;\ntext3.sharpness: 500 -> undefined;\ntext3.tabEnabled: true -> undefined;\ntext3.tabIndex: 5 -> undefined;\ntext3.text: x -> undefined;\n... (29 lines after) ...",
       "expected_output": "... (7 lines before) ...\ntext1.getNewTextFormat().indent: 0 -> 0;\ntext1.getNewTextFormat().leading: 0 -> 0;\ntext1.getNewTextFormat().leftMargin: 0 -> 0;\ntext1.getNewTextFormat().rightMargin: 0 -> 0;\ntext1.getNewTextFormat().size: 12 -> 12;\ntext2._x: 19 -> -4;\ntext2._y: 16 -> 16;\ntext2._width: 4 -> 0;\ntext2._height: 4 -> 0;\ntext2._alpha: 0.390625 -> 0.390625;\ntext2.antiAliasType: advanced -> normal;\ntext2.autoSize: right -> none;\ntext2.background: true -> false;\ntext2.backgroundColor: 5 -> 16777215;\ntext2.border: true -> false;\ntext2.borderColor: 6 -> 0;\ntext2.condenseWhite: true -> false;\ntext2.embedFonts: true -> false;\ntext2.filters: [object Object] -> ;\ntext2.gridFitType: subpixel -> pixel;\ntext2._height: 4 -> 0;\ntext2.hscroll: 0 -> 0;\ntext2.html: true -> false;\ntext2.html: true -> false;\ntext2.htmlText: <P ALIGN=\"LEFT\"><FONT FACE=\"X\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">asdfghjkljasdhhjasdajshdjhasdjashdasjdh</FONT></P> -> ;\ntext2.maxChars: 24 -> null;\ntext2.multiline: true -> false;\ntext2._name: text2 -> text2_clone;\ntext2.scroll: 1 -> 1;\ntext2.styleSheet: [object Object] -> undefined;\ntext2._width: 4 -> 0;\ntext2.getNewTextFormat().align: left -> left;\ntext2.getNewTextFormat().bold: false -> false;\ntext2.getNewTextFormat().color: 0 -> 0;\ntext2.getNewTextFormat().indent: 0 -> 0;\ntext2.getNewTextFormat().leading: 0 -> 0;\ntext2.getNewTextFormat().leftMargin: 0 -> 0;\ntext2.getNewTextFormat().rightMargin: 0 -> 0;\ntext2.getNewTextFormat().size: 12 -> 12;\ntext3._x: 1 -> 1;\ntext3._y: 2 -> 2;\ntext3._width: 12 -> 0;\ntext3._height: 13 -> 0;\ntext3.password: true -> false;\ntext3.restrict: asd -> null;\ntext3.selectable: false -> true;\ntext3.sharpness: 500 -> 0;\ntext3.tabEnabled: true -> undefined;\ntext3.tabIndex: 5 -> undefined;\ntext3.text: x -> ;\n... (29 lines after) ..."
     },
     {
@@ -820,7 +823,7 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 12.89,
+      "duration": 12.74,
       "status": "pass"
     },
     {
@@ -831,7 +834,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 12.87,
+      "duration": 12.88,
       "status": "pass"
     },
     {
@@ -842,7 +845,7 @@
         "expected_lines": 129,
         "matching_lines": 17
       },
-      "duration": 13.25,
+      "duration": 13.16,
       "status": "output_mismatch",
       "detail": "114 line(s) differ (actual=131, expected=129)",
       "actual_output": "Monkey-patching-globals...\nTesting primitive coercions...\n\n// true coerced to 'this'\nundefined getter called!\n  coerced: true\n  typeof: boolean\nundefined getter called!\n  typeof __proto__: undefined\nundefined getter called!\n  className: undefined\n// true.className\nundefined getter called!\n  className: undefined\n\n// 42 coerced to 'this'\nundefined getter called!\n  coerced: 42\n  typeof: number\nundefined getter called!\n  typeof __proto__: undefined\nundefined getter called!\n  className: undefined\n// 42.className\nundefined getter called!\n  className: undefined\n\n// hello coerced to 'this'\nundefined getter called!\n  coerced: hello\n  typeof: string\nundefined getter called!\n  typeof __proto__: undefined\nundefined getter called!\n  className: undefined\n// hello.className\nundefined getter called!\n  className: undefined\n\n// \"world\".length\nundefined getter called!\nresult: 5\n// \"callme\"()\nundefined getter called!\nresult: undefined\n// new \"callme\"()\nresult: undefined\n\nTesting loookup logic...\n\n... (81 lines after) ...",
@@ -856,7 +859,7 @@
         "expected_lines": 17,
         "matching_lines": 7
       },
-      "duration": 12.88,
+      "duration": 12.87,
       "status": "output_mismatch",
       "detail": "10 line(s) differ (actual=13, expected=17)",
       "actual_output": "... (2 lines before) ...\nobj1 as num: 1\ntoString called!\n[obj as string]\n\n// obj2: methods as properties\nobj2 as num: NaN\n[type Object]\n\n// obj3: methods through __resolve\nobj3 as num: NaN\n[type Object]",
@@ -870,7 +873,7 @@
         "expected_lines": 57,
         "matching_lines": 57
       },
-      "duration": 13.06,
+      "duration": 12.99,
       "status": "pass"
     },
     {
@@ -881,7 +884,7 @@
         "expected_lines": 48,
         "matching_lines": 48
       },
-      "duration": 13.04,
+      "duration": 12.91,
       "status": "pass"
     },
     {
@@ -903,7 +906,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.73,
+      "duration": 12.82,
       "status": "pass"
     },
     {
@@ -914,7 +917,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 12.9,
+      "duration": 12.8,
       "status": "pass"
     },
     {
@@ -925,7 +928,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 12.95,
+      "duration": 12.87,
       "status": "pass"
     },
     {
@@ -936,7 +939,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.85,
+      "duration": 12.8,
       "status": "pass"
     },
     {
@@ -947,7 +950,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 12.81,
+      "duration": 12.99,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=4)",
       "actual_output": "timeline frame 2\nchild stopped via child_function\ntimeline frame 3",
@@ -961,7 +964,7 @@
         "expected_lines": 52,
         "matching_lines": 15
       },
-      "duration": 12.89,
+      "duration": 12.84,
       "status": "output_mismatch",
       "detail": "37 line(s) differ (actual=48, expected=52)",
       "actual_output": "... (8 lines before) ...\n\nSymbol frame 1 (instance1)\nSymbol frame 1 (instance2)\n/// Children frame 1 (children)\n\nSymbol frame 1 (instance4)\nSymbol frame 1 (instance5)\nSymbol frame 1 (instance6)\n/// Children frame 1 (children2)\n\n/// Root frame 2\n/// Root frame 3\n/// Children frame 1 (instance12)\n\nSymbol frame 1 (instance13)\nSymbol frame 1 (instance14)\n/// Root frame 1 ()\n\n// instance1\nundefined\n\n// instance2\nundefined\n\n\nSymbol frame 1 (instance15)\nSymbol frame 1 (instance16)\n/// Children frame 1 (children)\n\nSymbol frame 1 (instance18)\nSymbol frame 1 (instance19)\nSymbol frame 1 (instance20)\n/// Children frame 1 (children2)\n\n/// Root frame 2\n/// Root frame 3\n/// Children frame 1 (instance26)\n\nSymbol frame 1 (instance27)\nSymbol frame 1 (instance28)",
@@ -975,7 +978,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 12.73,
+      "duration": 12.74,
       "status": "pass"
     },
     {
@@ -986,7 +989,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 12.64,
+      "duration": 12.8,
       "status": "pass"
     },
     {
@@ -997,7 +1000,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.75,
+      "duration": 12.81,
       "status": "pass"
     },
     {
@@ -1008,7 +1011,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.8,
+      "duration": 12.79,
       "status": "pass"
     },
     {
@@ -1019,7 +1022,7 @@
         "expected_lines": 27,
         "matching_lines": 2
       },
-      "duration": 12.92,
+      "duration": 12.83,
       "status": "output_mismatch",
       "detail": "25 line(s) differ (actual=23, expected=27)",
       "actual_output": "DefineLocal runs virtual setter: \nprop1: 10\n\nDefineLocal overwrites prototype non-virtual property: \nprop2: 10\n\nDefineLocal runs prototype virtual setter: \nprop3: 10\n\nDefineLocal2 already defined:\nprop4: prop4\n\nDefineLocal2 already defined on prototype:\nprop5: prop5\n\nDefineLocal2 not already defined:\nprop6: undefined\nhasOwnProperty('prop6'): false\n\nInside function\n\nprop1: func1\nprop3: undefined",
@@ -1033,7 +1036,7 @@
         "expected_lines": 54,
         "matching_lines": 51
       },
-      "duration": 12.75,
+      "duration": 12.93,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=54, expected=54)",
       "actual_output": "... (4 lines before) ...\n0\n\n_root.ruffle = {};\n\n// var /ruffle/:def = 'DEF'\n0\n\n// var abc = 'XYZ';\n// /:abc + abc\nABCXYZ\n\n// var /:ghi;\n// _root.hasOwnProperty('ghi')\ntrue\n\n// var _root.ghi = 'GHI';\n// var /:ghi\nGHIGHI\n\n// Inside with({})\n\n// var /:jkl = 'JKL'\nJKLJKL\n\n// Inside function\n\n// ghi - defined outside function\nGHIGHI\n\n// var _root.v123 = '123'\n0\n\n// Inside function -> with({})\n\n// var /:v456 = '456'\n0\n\n// Inside function -> tellTarget(_root)\n// var /:v789 = '789'\n0\n\n// Outside function - tracing all variables defined inside function\n0\n\n// _root.hasOwnProperty('mno') - defined inside function\nfalse\n\n// var /:pqr = 'PQR';\n// this['/:pqr']\nundefined",
@@ -1047,7 +1050,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.82,
+      "duration": 12.87,
       "status": "pass"
     },
     {
@@ -1056,10 +1059,13 @@
       "lines": {
         "actual_lines": 91,
         "expected_lines": 91,
-        "matching_lines": 91
+        "matching_lines": 47
       },
-      "duration": 12.96,
-      "status": "pass"
+      "duration": 12.94,
+      "status": "output_mismatch",
+      "detail": "44 line(s) differ (actual=91, expected=91)",
+      "actual_output": "_level0.device\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n48\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n17\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n48\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n91\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n134\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n44\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n39\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n72\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n115\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n158\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n31\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n62\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n97\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n140\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n183\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n56\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n79\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n122\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n165\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n208\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n80\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n103\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n146\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n189\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n... (41 lines after) ...",
+      "expected_output": "_level0.device\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n51\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n43\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n51\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n94\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"2\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n137\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n74\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n45\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n78\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n121\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"3\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n164\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n61\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n62\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n95\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n138\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"4\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n181\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n60\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n92\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n126\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n169\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"5\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n212\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"-2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n85\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"-1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n108\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n151\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"1\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n194\n<TEXTFORMAT LEADING=\"2\"><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"2\" KERNING=\"0\">THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</FONT></P></TEXTFORMAT>\n... (41 lines after) ..."
     },
     {
       "test": "displacementmapfilter_mappoint_throw_error",
@@ -1069,7 +1075,7 @@
         "expected_lines": 13,
         "matching_lines": 0
       },
-      "duration": 12.81,
+      "duration": 12.88,
       "status": "output_mismatch",
       "detail": "13 line(s) differ (actual=13, expected=13)",
       "actual_output": "Set: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: true\nSet: false",
@@ -1083,7 +1089,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.67,
+      "duration": 12.74,
       "status": "pass"
     },
     {
@@ -1094,7 +1100,7 @@
         "expected_lines": 107,
         "matching_lines": 107
       },
-      "duration": 12.67,
+      "duration": 12.8,
       "status": "pass"
     },
     {
@@ -1105,7 +1111,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.71,
+      "duration": 12.76,
       "status": "pass"
     },
     {
@@ -1116,19 +1122,22 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.85,
+      "duration": 12.96,
       "status": "pass"
     },
     {
       "test": "duplicate_movie_clip",
       "num_frames": 1,
       "lines": {
-        "actual_lines": 20,
+        "actual_lines": 21,
         "expected_lines": 20,
-        "matching_lines": 20
+        "matching_lines": 14
       },
-      "duration": 12.83,
-      "status": "pass"
+      "duration": 12.84,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=21, expected=20)",
+      "actual_output": "... (8 lines before) ...\n1\nundefined\n_level0.clip2\nundefined\ntarget.toString() called\ntarget.toString() called\ndepth.valueOf() called\ndepth.valueOf() called\ntarget.toString() called\nload: src\nload: clip1\nload: clip2\nload: clip4",
+      "expected_output": "... (8 lines before) ...\n1\nundefined\n_level0.clip2\nundefined\ntarget.toString() called\ndepth.valueOf() called\ndepth.valueOf() called\ntarget.toString() called\nload: src\nload: clip1\nload: clip2\nload: clip4"
     },
     {
       "test": "duplicate_movie_clip_drawing",
@@ -1150,13 +1159,10 @@
       "lines": {
         "actual_lines": 60,
         "expected_lines": 60,
-        "matching_lines": 52
+        "matching_lines": 60
       },
-      "duration": 13.01,
-      "status": "output_mismatch",
-      "detail": "8 line(s) differ (actual=60, expected=60)",
-      "actual_output": "//Creating left aligned text w/ wordwrap, multiline\n//field.textWidth\n156\n//field.textHeight\n18\n//Creating center aligned text w/ wordwrap, multiline\n//field.textWidth\n156\n//field.textHeight\n18\n//Creating right aligned text w/ wordwrap, multiline\n//field.textWidth\n156\n//field.textHeight\n18\n//Creating justified text w/ wordwrap, multiline\n//field.textWidth\n156\n//field.textHeight\n18\n//Creating left aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n399\n//field.textHeight\n89\n//Creating center aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n396\n//field.textHeight\n89\n//Creating right aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n396\n//field.textHeight\n89\n//Creating justified text w/ wordwrap, multiline & long text\n//field.textWidth\n399\n//field.textHeight\n89\n//Creating left aligned text w/ NO wordwrap, multiline & long text\n//field.textWidth\n1738\n//field.textHeight\n18\n//Creating center aligned text w/ NO wordwrap, multiline & long text\n//field.textWidth\n1738\n//field.textHeight\n18\n... (10 lines after) ...",
-      "expected_output": "//Creating left aligned text w/ wordwrap, multiline\n//field.textWidth\n158\n//field.textHeight\n18\n//Creating center aligned text w/ wordwrap, multiline\n//field.textWidth\n158\n//field.textHeight\n18\n//Creating right aligned text w/ wordwrap, multiline\n//field.textWidth\n158\n//field.textHeight\n18\n//Creating justified text w/ wordwrap, multiline\n//field.textWidth\n158\n//field.textHeight\n18\n//Creating left aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n393\n//field.textHeight\n89\n//Creating center aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n390\n//field.textHeight\n89\n//Creating right aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n390\n//field.textHeight\n89\n//Creating justified text w/ wordwrap, multiline & long text\n//field.textWidth\n390\n//field.textHeight\n89\n//Creating left aligned text w/ NO wordwrap, multiline & long text\n//field.textWidth\n1759\n//field.textHeight\n18\n//Creating center aligned text w/ NO wordwrap, multiline & long text\n//field.textWidth\n1759\n//field.textHeight\n18\n... (10 lines after) ..."
+      "duration": 12.9,
+      "status": "pass"
     },
     {
       "test": "edittext_align_trailing_spaces_swf7",
@@ -1164,13 +1170,10 @@
       "lines": {
         "actual_lines": 576,
         "expected_lines": 576,
-        "matching_lines": 360
+        "matching_lines": 576
       },
-      "duration": 12.79,
-      "status": "output_mismatch",
-      "detail": "216 line(s) differ (actual=576, expected=576)",
-      "actual_output": "... (190 lines before) ...\n  width, height: 34, 24\n  textWidth: 30\nnone, left \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 42\nnone, right \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 42\nnone, center \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 42\nleft, left \"aa \"\n  x, y: 0, 0\n  width, height: 46, 24\n  textWidth: 42\nleft, right \"aa \"\n  x, y: 0, 0\n  width, height: 46, 24\n  textWidth: 42\nleft, center \"aa \"\n  x, y: 0, 0\n  width, height: 46, 24\n  textWidth: 42\nright, left \"aa \"\n  x, y: -45, 0\n  width, height: 46, 24\n  textWidth: 42\nright, right \"aa \"\n  x, y: -45, 0\n  width, height: 46, 24\n  textWidth: 42\nright, center \"aa \"\n  x, y: -45, 0\n  width, height: 46, 24\n  textWidth: 42\ncenter, left \"aa \"\n  x, y: -22.5, 0\n  width, height: 46, 24\n  textWidth: 42\ncenter, right \"aa \"\n  x, y: -22.5, 0\n  width, height: 46, 24\n  textWidth: 42\ncenter, center \"aa \"\n  x, y: -22.5, 0\n  width, height: 46, 24\n  textWidth: 42\n... (336 lines after) ...",
-      "expected_output": "... (190 lines before) ...\n  width, height: 34, 24\n  textWidth: 30\nnone, left \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 41\nnone, right \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 41\nnone, center \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 41\nleft, left \"aa \"\n  x, y: 0, 0\n  width, height: 45.9, 24\n  textWidth: 41\nleft, right \"aa \"\n  x, y: 0, 0\n  width, height: 45.9, 24\n  textWidth: 41\nleft, center \"aa \"\n  x, y: 0, 0\n  width, height: 45.9, 24\n  textWidth: 41\nright, left \"aa \"\n  x, y: -44.9, 0\n  width, height: 45.9, 24\n  textWidth: 41\nright, right \"aa \"\n  x, y: -44.9, 0\n  width, height: 45.9, 24\n  textWidth: 41\nright, center \"aa \"\n  x, y: -44.9, 0\n  width, height: 45.9, 24\n  textWidth: 41\ncenter, left \"aa \"\n  x, y: -22.45, 0\n  width, height: 45.9, 24\n  textWidth: 41\ncenter, right \"aa \"\n  x, y: -22.45, 0\n  width, height: 45.9, 24\n  textWidth: 41\ncenter, center \"aa \"\n  x, y: -22.45, 0\n  width, height: 45.9, 24\n  textWidth: 41\n... (336 lines after) ..."
+      "duration": 12.86,
+      "status": "pass"
     },
     {
       "test": "edittext_align_trailing_spaces_swf8",
@@ -1178,13 +1181,10 @@
       "lines": {
         "actual_lines": 576,
         "expected_lines": 576,
-        "matching_lines": 360
+        "matching_lines": 576
       },
-      "duration": 12.75,
-      "status": "output_mismatch",
-      "detail": "216 line(s) differ (actual=576, expected=576)",
-      "actual_output": "... (190 lines before) ...\n  width, height: 4, 24\n  textWidth: 0\nnone, left \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 42\nnone, right \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 32\nnone, center \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 32\nleft, left \"aa \"\n  x, y: 0, 0\n  width, height: 46, 24\n  textWidth: 42\nleft, right \"aa \"\n  x, y: 0, 0\n  width, height: 36, 24\n  textWidth: 32\nleft, center \"aa \"\n  x, y: 0, 0\n  width, height: 36, 24\n  textWidth: 32\nright, left \"aa \"\n  x, y: -45, 0\n  width, height: 46, 24\n  textWidth: 42\nright, right \"aa \"\n  x, y: -35, 0\n  width, height: 36, 24\n  textWidth: 32\nright, center \"aa \"\n  x, y: -35, 0\n  width, height: 36, 24\n  textWidth: 32\ncenter, left \"aa \"\n  x, y: -22.5, 0\n  width, height: 46, 24\n  textWidth: 42\ncenter, right \"aa \"\n  x, y: -17.5, 0\n  width, height: 36, 24\n  textWidth: 32\ncenter, center \"aa \"\n  x, y: -17.5, 0\n  width, height: 36, 24\n  textWidth: 32\n... (336 lines after) ...",
-      "expected_output": "... (190 lines before) ...\n  width, height: 4, 24\n  textWidth: 0\nnone, left \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 41\nnone, right \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 31\nnone, center \"aa \"\n  x, y: 0, 0\n  width, height: 1, 1\n  textWidth: 31\nleft, left \"aa \"\n  x, y: 0, 0\n  width, height: 45.9, 24\n  textWidth: 41\nleft, right \"aa \"\n  x, y: 0, 0\n  width, height: 35.9, 24\n  textWidth: 31\nleft, center \"aa \"\n  x, y: 0, 0\n  width, height: 35.9, 24\n  textWidth: 31\nright, left \"aa \"\n  x, y: -44.9, 0\n  width, height: 45.9, 24\n  textWidth: 41\nright, right \"aa \"\n  x, y: -34.9, 0\n  width, height: 35.9, 24\n  textWidth: 31\nright, center \"aa \"\n  x, y: -34.9, 0\n  width, height: 35.9, 24\n  textWidth: 31\ncenter, left \"aa \"\n  x, y: -22.45, 0\n  width, height: 45.9, 24\n  textWidth: 41\ncenter, right \"aa \"\n  x, y: -17.45, 0\n  width, height: 35.9, 24\n  textWidth: 31\ncenter, center \"aa \"\n  x, y: -17.45, 0\n  width, height: 35.9, 24\n  textWidth: 31\n... (336 lines after) ..."
+      "duration": 12.83,
+      "status": "pass"
     },
     {
       "test": "edittext_antialiastype",
@@ -1194,7 +1194,7 @@
         "expected_lines": 296,
         "matching_lines": 296
       },
-      "duration": 15.06,
+      "duration": 13.42,
       "status": "pass"
     },
     {
@@ -1203,13 +1203,10 @@
       "lines": {
         "actual_lines": 71,
         "expected_lines": 71,
-        "matching_lines": 56
+        "matching_lines": 71
       },
-      "duration": 12.96,
-      "status": "output_mismatch",
-      "detail": "15 line(s) differ (actual=71, expected=71)",
-      "actual_output": "... (3 lines before) ...\n//my_txt1._width\n100\n//my_txt1._width + my_txt1._x\n150\n//my_txt1.textWidth\n197\n// xMin:\n50\n// xMax:\n150\n// yMin:\n40\n// yMax:\n70\n\n// autosize left\n//my_txt2._x\n50\n//my_txt2._width\n201\n//my_txt2._width + my_txt2._x\n251\n//my_txt2.textWidth\n197\n// xMin:\n50\n// xMax:\n251\n// yMin:\n80\n// yMax:\n102.3\n\n// autosize center\n//my_txt3._x\n-0.5\n//my_txt3._width\n201\n//my_txt3._width + my_txt3._x\n200.5\n//my_txt3.textWidth\n197\n// xMin:\n-0.5\n// xMax:\n200.5\n// yMin:\n120\n// yMax:\n142.3\n... (18 lines after) ...",
-      "expected_output": "... (3 lines before) ...\n//my_txt1._width\n100\n//my_txt1._width + my_txt1._x\n150\n//my_txt1.textWidth\n195\n// xMin:\n50\n// xMax:\n150\n// yMin:\n40\n// yMax:\n70\n\n// autosize left\n//my_txt2._x\n50\n//my_txt2._width\n199.9\n//my_txt2._width + my_txt2._x\n249.9\n//my_txt2.textWidth\n195\n// xMin:\n50\n// xMax:\n249.9\n// yMin:\n80\n// yMax:\n102.3\n\n// autosize center\n//my_txt3._x\n0.05\n//my_txt3._width\n199.9\n//my_txt3._width + my_txt3._x\n199.95\n//my_txt3.textWidth\n195\n// xMin:\n0.05\n// xMax:\n199.95\n// yMin:\n120\n// yMax:\n142.3\n... (18 lines after) ..."
+      "duration": 12.89,
+      "status": "pass"
     },
     {
       "test": "edittext_autosize_setter",
@@ -1230,10 +1227,10 @@
         "expected_lines": 30,
         "matching_lines": 18
       },
-      "duration": 13.01,
+      "duration": 12.97,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=30, expected=30)",
-      "actual_output": "//Bullet-bearing HTML\n//field.textWidth\n161\n//field.textHeight\n130\n//Bullet-bearing HTML with left margin\n//field.textWidth\n148\n//field.textHeight\n146\n//Bullet-bearing HTML with indent\n//field.textWidth\n161\n//field.textHeight\n130\n//Bullet-bearing HTML with block indent\n//field.textWidth\n148\n//field.textHeight\n146\n//Bullet-bearing HTML with right margin\n//field.textWidth\n148\n//field.textHeight\n146\n//Bullet-bearing HTML with right margin and explicit newlines\n//field.textWidth\n148\n//field.textHeight\n146",
+      "actual_output": "//Bullet-bearing HTML\n//field.textWidth\n164\n//field.textHeight\n130\n//Bullet-bearing HTML with left margin\n//field.textWidth\n145\n//field.textHeight\n146\n//Bullet-bearing HTML with indent\n//field.textWidth\n160\n//field.textHeight\n146\n//Bullet-bearing HTML with block indent\n//field.textWidth\n145\n//field.textHeight\n146\n//Bullet-bearing HTML with right margin\n//field.textWidth\n145\n//field.textHeight\n146\n//Bullet-bearing HTML with right margin and explicit newlines\n//field.textWidth\n142\n//field.textHeight\n146",
       "expected_output": "//Bullet-bearing HTML\n//field.textWidth\n125\n//field.textHeight\n160\n//Bullet-bearing HTML with left margin\n//field.textWidth\n96\n//field.textHeight\n179\n//Bullet-bearing HTML with indent\n//field.textWidth\n124\n//field.textHeight\n160\n//Bullet-bearing HTML with block indent\n//field.textWidth\n96\n//field.textHeight\n179\n//Bullet-bearing HTML with right margin\n//field.textWidth\n96\n//field.textHeight\n179\n//Bullet-bearing HTML with right margin and explicit newlines\n//field.textWidth\n96\n//field.textHeight\n197"
     },
     {
@@ -1255,7 +1252,7 @@
         "expected_lines": 100,
         "matching_lines": 97
       },
-      "duration": 12.83,
+      "duration": 12.85,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=100, expected=100)",
       "actual_output": "... (22 lines before) ...\n  align = null;\n  blockIndent = null;\n  bold = null;\n  bullet = null;\n  color = null;\n  display = null;\n  font = null;\n  indent = null;\n  italic = null;\n  leading = null;\n  leftMargin = null;\n  letterSpacing = null;\n  rightMargin = null;\n  size = null;\n  tabStops = null;\n  target = null;\n  underline = null;\n  url = null;\ntext.getTextFormat()\n  size = 12;\n  align = left;\n  blockIndent = 0;\n  bold = false;\n  bullet = false;\n  color = 0;\n  display = block;\n  font = Times New Roman;\n  indent = 0;\n  italic = false;\n  leading = 0;\n  leftMargin = 0;\n  letterSpacing = 0;\n  rightMargin = 0;\n  size = 12;\n  tabStops = ;\n  target = ;\n  underline = false;\n  url = ;\ntext.getTextFormat(0,0)\n  size = null;\n  align = null;\n  blockIndent = null;\n  bold = null;\n  bullet = null;\n  color = null;\n  display = null;\n  font = null;\n  indent = null;\n  italic = null;\n  leading = null;\n... (28 lines after) ...",
@@ -1269,7 +1266,7 @@
         "expected_lines": 335,
         "matching_lines": 335
       },
-      "duration": 12.82,
+      "duration": 12.88,
       "status": "pass"
     },
     {
@@ -1278,13 +1275,10 @@
       "lines": {
         "actual_lines": 45,
         "expected_lines": 45,
-        "matching_lines": 40
+        "matching_lines": 45
       },
       "duration": 12.99,
-      "status": "output_mismatch",
-      "detail": "5 line(s) differ (actual=45, expected=45)",
-      "actual_output": "//Creating left aligned text @ 10px\nW: 8\nH: 15\n//Creating left aligned text @ 12px\nW: 9\nH: 18\n//Creating left aligned text @ 20px\nW: 16\nH: 29\n//Creating left aligned text @ 30px\nW: 23\nH: 42\n//Creating left aligned text @ 100px\nW: 78\nH: 138\n//Creating left aligned text 'Qe' @ 10px\nW: 14\nH: 15\n//Creating left aligned text 'Qe' @ 12px\nW: 16\nH: 18\n//Creating left aligned text 'Qe' @ 20px\nW: 27\nH: 29\n//Creating left aligned text 'Qe' @ 30px\nW: 40\nH: 42\n//Creating left aligned text 'Qe' @ 100px\nW: 134\nH: 138\n//Creating left aligned text 'Q e' @ 10px\nW: 17\nH: 15\n//Creating left aligned text 'Q e' @ 12px\nW: 19\nH: 18\n//Creating left aligned text 'Q e' @ 20px\nW: 32\nH: 29\n//Creating left aligned text 'Q e' @ 30px\nW: 48\nH: 42\n//Creating left aligned text 'Q e' @ 100px\nW: 160\nH: 138",
-      "expected_output": "//Creating left aligned text @ 10px\nW: 7\nH: 15\n//Creating left aligned text @ 12px\nW: 9\nH: 18\n//Creating left aligned text @ 20px\nW: 15\nH: 29\n//Creating left aligned text @ 30px\nW: 23\nH: 42\n//Creating left aligned text @ 100px\nW: 78\nH: 138\n//Creating left aligned text 'Qe' @ 10px\nW: 13\nH: 15\n//Creating left aligned text 'Qe' @ 12px\nW: 16\nH: 18\n//Creating left aligned text 'Qe' @ 20px\nW: 26\nH: 29\n//Creating left aligned text 'Qe' @ 30px\nW: 40\nH: 42\n//Creating left aligned text 'Qe' @ 100px\nW: 134\nH: 138\n//Creating left aligned text 'Q e' @ 10px\nW: 15\nH: 15\n//Creating left aligned text 'Q e' @ 12px\nW: 19\nH: 18\n//Creating left aligned text 'Q e' @ 20px\nW: 32\nH: 29\n//Creating left aligned text 'Q e' @ 30px\nW: 48\nH: 42\n//Creating left aligned text 'Q e' @ 100px\nW: 160\nH: 138"
+      "status": "pass"
     },
     {
       "test": "edittext_hscroll",
@@ -1294,7 +1288,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 12.9,
+      "duration": 12.8,
       "status": "pass"
     },
     {
@@ -1305,7 +1299,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 12.95,
+      "duration": 13.02,
       "status": "pass"
     },
     {
@@ -1316,7 +1310,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 13.0,
+      "duration": 13.03,
       "status": "pass"
     },
     {
@@ -1327,7 +1321,7 @@
         "expected_lines": 114,
         "matching_lines": 114
       },
-      "duration": 12.88,
+      "duration": 12.94,
       "status": "pass"
     },
     {
@@ -1338,7 +1332,7 @@
         "expected_lines": 311,
         "matching_lines": 308
       },
-      "duration": 12.99,
+      "duration": 12.97,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=311, expected=311)",
       "actual_output": "... (230 lines before) ...\n  HTML get ml: <!-- the same -->\n  Text get:     test \\r\n===============\n  HTML set:    a b \u00a0c \u0001 \u0002 \u0003 d\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a b \u00a0c \u0001 \u0002 \u0003 d</FONT></P>\n  Text get:    a b \u00a0c   \u0003 d\n  HTML get ml: <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a b \u00a0c </FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"> </FONT></P><P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"> \u0003 d</FONT></P>\n  Text get:    a b \u00a0c \\r \\r \u0003 d\n===============\n  HTML set:    a \u0004 \u0005 \u0006 \u0007 b\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a \u0004 \u0005 \u0006 \u0007 b</FONT></P>\n  Text get:    a \u0004 \u0005 \u0006 \u0007 b\n  HTML get ml: <!-- the same -->\n  Text get:    a \u0004 \u0005 \u0006 \u0007 b\n===============\n  HTML set:    a \b \t \\n \u000b b\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a \b \u000b b</FONT></P>\n  Text get:    a \b \u000b b\n  HTML get ml: <!-- the same -->\n  Text get:    a \b \u000b b\n===============\n  HTML set:    a \f \\r \u000e \u000f b\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a \f \u000e \u000f b</FONT></P>\n  Text get:    a \f \u000e \u000f b\n  HTML get ml: <!-- the same -->\n  Text get:    a \f \u000e \u000f b\n===============\n  HTML set:    a \u0010 \u0011 \u0012 \u0013 b\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a \u0010 \u0011 \u0012 \u0013 b</FONT></P>\n  Text get:    a \u0010 \u0011 \u0012 \u0013 b\n  HTML get ml: <!-- the same -->\n  Text get:    a \u0010 \u0011 \u0012 \u0013 b\n===============\n  HTML set:    a \u0014 \u0015 \u0016 \u0017 b\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a \u0014 \u0015 \u0016 \u0017 b</FONT></P>\n  Text get:    a \u0014 \u0015 \u0016 \u0017 b\n  HTML get ml: <!-- the same -->\n  Text get:    a \u0014 \u0015 \u0016 \u0017 b\n===============\n  HTML set:    a \u0018 \u0019 b\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">a \u0018 \u0019 b</FONT></P>\n  Text get:    a \u0018 \u0019 b\n  HTML get ml: <!-- the same -->\n  Text get:    a \u0018 \u0019 b\n===============\n  HTML set:      <p>  test  </p>  \n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"> test </FONT></P>\n  Text get:     test \n  HTML get ml: <!-- the same -->\n  Text get:     test \\r\n... (31 lines after) ...",
@@ -1352,7 +1346,7 @@
         "expected_lines": 311,
         "matching_lines": 288
       },
-      "duration": 13.02,
+      "duration": 13.07,
       "status": "output_mismatch",
       "detail": "23 line(s) differ (actual=311, expected=311)",
       "actual_output": "... (79 lines before) ...\n  Text get:    test test \n  HTML get ml: <!-- the same -->\n  Text get:    test test \n===============\n  HTML set:    <b>test</b> \\n\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"><B>test</B></FONT></P>\n  Text get:    test\n  HTML get ml: <!-- the same -->\n  Text get:    test\n===============\n  HTML set:    \\n <p>t\\ne s\tt </p> \\n\n  HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">t e s t </FONT></P>\n  Text get:    t e s t \n  HTML get ml: <!-- the same -->\n  Text get:    t e s t \\r\n===============\n  HTML set:    <li>test</li>\\n\n  HTML get:    <LI><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">test</FONT></LI>\n  Text get:    test\n  HTML get ml: <!-- the same -->\n  Text get:    test\\r\n===============\n  HTML set:    <b> \\n </b>\n  HTML get:    \n  Text get:    \n  HTML get ml: <!-- the same -->\n  Text get:    \n===============\n  HTML set:    <b></b>\\n\n  HTML get:    \n  Text get:    \n  HTML get ml: <!-- the same -->\n  Text get:    \n===============\n  HTML set:    <b> </b>\n  HTML get:    \n  Text get:    \n  HTML get ml: <!-- the same -->\n  Text get:    \n===============\n  HTML set:     <b> </b> \n  HTML get:    \n  Text get:    \n  HTML get ml: <!-- the same -->\n  Text get:    \n===============\n  HTML set:     <p> </p> \n  HTML get:    \n  Text get:    \n  HTML get ml: <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"></FONT></P>\n... (182 lines after) ...",
@@ -1366,7 +1360,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.95,
+      "duration": 12.91,
       "status": "pass"
     },
     {
@@ -1377,7 +1371,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 12.78,
+      "duration": 12.92,
       "status": "pass"
     },
     {
@@ -1388,7 +1382,7 @@
         "expected_lines": 5377,
         "matching_lines": 3900
       },
-      "duration": 13.68,
+      "duration": 13.73,
       "status": "output_mismatch",
       "detail": "1477 line(s) differ (actual=5377, expected=5377)",
       "actual_output": "==== textInitialValue\n  is multiline: false\n  HTML get: <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">line 1line 2<FONT COLOR=\"#AAAAAA\"><B>text</B></FONT></FONT></P>\n==== textPlain\nis multiline: true\nis multiline after disabling: false\nis multiline after enabling: true\n==== whitespace only\n    HTML set:    \\n\n    HTML get:    \n    Text get:    \n    HTML get ml: <!-- the same -->\n    Text get:    \n    ===============\n    HTML set:    \\n\\n\n    HTML get:    \n    Text get:    \n    HTML get ml: <!-- the same -->\n    Text get:    \n    ===============\n    HTML set:     \n    HTML get:    \n    Text get:    \n    HTML get ml: <!-- the same -->\n    Text get:    \n    ===============\n    HTML set:      \n    HTML get:    \n    Text get:    \n    HTML get ml: <!-- the same -->\n    Text get:    \n    ===============\n    HTML set:     \\n\n    HTML get:    \n    Text get:    \n    HTML get ml: <!-- the same -->\n    Text get:    \n    ===============\n    HTML set:    \\n \n    HTML get:    \n    Text get:    \n    HTML get ml: <!-- the same -->\n    Text get:    \n    ===============\n==== behaviors of newlines and whitespace\n    HTML set:     test \n    HTML get:    <P ALIGN=\"LEFT\"><FONT FACE=\"Noto Sans\" SIZE=\"6\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"> test </FONT></P>\n    Text get:     test \n    HTML get ml: <!-- the same -->\n    Text get:     test \n... (5327 lines after) ...",
@@ -1402,7 +1396,7 @@
         "expected_lines": 5377,
         "matching_lines": 5377
       },
-      "duration": 13.85,
+      "duration": 13.7,
       "status": "pass"
     },
     {
@@ -1413,7 +1407,7 @@
         "expected_lines": 5377,
         "matching_lines": 5377
       },
-      "duration": 13.8,
+      "duration": 13.95,
       "status": "pass"
     },
     {
@@ -1422,13 +1416,10 @@
       "lines": {
         "actual_lines": 9,
         "expected_lines": 9,
-        "matching_lines": 6
+        "matching_lines": 9
       },
-      "duration": 12.86,
-      "status": "output_mismatch",
-      "detail": "3 line(s) differ (actual=9, expected=9)",
-      "actual_output": "//Creating left aligned text w/ wordwrap, multiline & long text\nW: 398\nH: 54\n//Creating left aligned text w/ wordwrap, multiline, 5px leading & long text\nW: 398\nH: 69\n//Creating left aligned text w/ wordwrap, multiline, 12px leading & long text\nW: 398\nH: 90",
-      "expected_output": "//Creating left aligned text w/ wordwrap, multiline & long text\nW: 388\nH: 54\n//Creating left aligned text w/ wordwrap, multiline, 5px leading & long text\nW: 388\nH: 69\n//Creating left aligned text w/ wordwrap, multiline, 12px leading & long text\nW: 388\nH: 90"
+      "duration": 13.12,
+      "status": "pass"
     },
     {
       "test": "edittext_letter_spacing",
@@ -1436,13 +1427,10 @@
       "lines": {
         "actual_lines": 15,
         "expected_lines": 15,
-        "matching_lines": 14
+        "matching_lines": 15
       },
-      "duration": 12.91,
-      "status": "output_mismatch",
-      "detail": "1 line(s) differ (actual=15, expected=15)",
-      "actual_output": "//Creating left aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n398\n//field.textHeight\n60\n//Creating left aligned text w/ wordwrap, multiline, 0.1px letter spacing & long text\n//field.textWidth\n398\n//field.textHeight\n60\n//Creating left aligned text w/ wordwrap, multiline, 0.5px letter spacing & long text\n//field.textWidth\n398\n//field.textHeight\n60",
-      "expected_output": "//Creating left aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n388\n//field.textHeight\n60\n//Creating left aligned text w/ wordwrap, multiline, 0.1px letter spacing & long text\n//field.textWidth\n397\n//field.textHeight\n60\n//Creating left aligned text w/ wordwrap, multiline, 0.5px letter spacing & long text\n//field.textWidth\n398\n//field.textHeight\n75"
+      "duration": 12.95,
+      "status": "pass"
     },
     {
       "test": "edittext_margins",
@@ -1450,13 +1438,10 @@
       "lines": {
         "actual_lines": 25,
         "expected_lines": 25,
-        "matching_lines": 20
+        "matching_lines": 25
       },
-      "duration": 12.89,
-      "status": "output_mismatch",
-      "detail": "5 line(s) differ (actual=25, expected=25)",
-      "actual_output": "//Creating left aligned indented text w/ wordwrap, multiline & long text\n//field.textWidth\n364\n//field.textHeight\n75\n//Creating center aligned indented text w/ wordwrap, multiline & long text\n//field.textWidth\n361\n//field.textHeight\n75\n//Creating right aligned indented text w/ wordwrap, multiline & long text\n//field.textWidth\n361\n//field.textHeight\n75\n//Creating justified indented text w/ wordwrap, multiline & long text\n//field.textWidth\n364\n//field.textHeight\n75\n//Creating marginless text w/ wordwrap, multiline & long text\n//field.textWidth\n382\n//field.textHeight\n75",
-      "expected_output": "//Creating left aligned indented text w/ wordwrap, multiline & long text\n//field.textWidth\n370\n//field.textHeight\n75\n//Creating center aligned indented text w/ wordwrap, multiline & long text\n//field.textWidth\n367\n//field.textHeight\n75\n//Creating right aligned indented text w/ wordwrap, multiline & long text\n//field.textWidth\n367\n//field.textHeight\n75\n//Creating justified indented text w/ wordwrap, multiline & long text\n//field.textWidth\n367\n//field.textHeight\n75\n//Creating marginless text w/ wordwrap, multiline & long text\n//field.textWidth\n376\n//field.textHeight\n60"
+      "duration": 12.86,
+      "status": "pass"
     },
     {
       "test": "edittext_newline_stripping",
@@ -1466,7 +1451,7 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 17.51,
+      "duration": 17.48,
       "status": "pass"
     },
     {
@@ -1475,12 +1460,12 @@
       "lines": {
         "actual_lines": 30,
         "expected_lines": 30,
-        "matching_lines": 20
+        "matching_lines": 23
       },
-      "duration": 12.93,
+      "duration": 12.97,
       "status": "output_mismatch",
-      "detail": "10 line(s) differ (actual=30, expected=30)",
-      "actual_output": "//Sample text with wordwrap\n//field.textWidth\n166\n//field.textHeight\n89\n//Sample text without wordwrap\n//field.textWidth\n373\n//field.textHeight\n18\n//Newline-having text with wordwrap\n//field.textWidth\n166\n//field.textHeight\n144\n//Newline-having text without wordwrap\n//field.textWidth\n246\n//field.textHeight\n71\n//Newline-having HTML with wordwrap\n//field.textWidth\n166\n//field.textHeight\n144\n//Newline-having HTML without wordwrap\n//field.textWidth\n730\n//field.textHeight\n18",
+      "detail": "7 line(s) differ (actual=30, expected=30)",
+      "actual_output": "//Sample text with wordwrap\n//field.textWidth\n166\n//field.textHeight\n107\n//Sample text without wordwrap\n//field.textWidth\n380\n//field.textHeight\n18\n//Newline-having text with wordwrap\n//field.textWidth\n166\n//field.textHeight\n162\n//Newline-having text without wordwrap\n//field.textWidth\n251\n//field.textHeight\n71\n//Newline-having HTML with wordwrap\n//field.textWidth\n166\n//field.textHeight\n162\n//Newline-having HTML without wordwrap\n//field.textWidth\n741\n//field.textHeight\n18",
       "expected_output": "//Sample text with wordwrap\n//field.textWidth\n163\n//field.textHeight\n52\n//Sample text without wordwrap\n//field.textWidth\n380\n//field.textHeight\n18\n//Newline-having text with wordwrap\n//field.textWidth\n163\n//field.textHeight\n126\n//Newline-having text without wordwrap\n//field.textWidth\n251\n//field.textHeight\n89\n//Newline-having HTML with wordwrap\n//field.textWidth\n164\n//field.textHeight\n107\n//Newline-having HTML without wordwrap\n//field.textWidth\n741\n//field.textHeight\n18"
     },
     {
@@ -1491,7 +1476,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.8,
+      "duration": 12.85,
       "status": "pass"
     },
     {
@@ -1502,7 +1487,7 @@
         "expected_lines": 54,
         "matching_lines": 52
       },
-      "duration": 12.9,
+      "duration": 12.86,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=54, expected=54)",
       "actual_output": "... (46 lines before) ...\n// right_text.bottomScroll\n2\n\n// text box with multiple font combinations\n// funny_fonts.maxscroll\n2\n// funny_fonts.bottomScroll\n3",
@@ -1516,7 +1501,7 @@
         "expected_lines": 325,
         "matching_lines": 325
       },
-      "duration": 13.41,
+      "duration": 13.48,
       "status": "pass"
     },
     {
@@ -1527,7 +1512,7 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 12.83,
+      "duration": 13.12,
       "status": "pass"
     },
     {
@@ -1538,7 +1523,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 12.93,
+      "duration": 13.23,
       "status": "pass"
     },
     {
@@ -1547,13 +1532,10 @@
       "lines": {
         "actual_lines": 40,
         "expected_lines": 40,
-        "matching_lines": 36
+        "matching_lines": 40
       },
-      "duration": 12.95,
-      "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=40, expected=40)",
-      "actual_output": "//Creating left aligned text w/ wordwrap, multiline\n//field.textWidth\n249\n//field.textHeight\n52\n//Creating center aligned text w/ wordwrap, multiline\n//field.textWidth\n246\n//field.textHeight\n52\n//Creating right aligned text w/ wordwrap, multiline\n//field.textWidth\n246\n//field.textHeight\n52\n//Creating justified text w/ wordwrap, multiline\n//field.textWidth\n249\n//field.textHeight\n52\n//Creating left aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n242\n//field.textHeight\n144\n//Creating center aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n239\n//field.textHeight\n144\n//Creating right aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n239\n//field.textHeight\n144\n//Creating justified text w/ wordwrap, multiline & long text\n//field.textWidth\n242\n//field.textHeight\n144",
-      "expected_output": "//Creating left aligned text w/ wordwrap, multiline\n//field.textWidth\n241\n//field.textHeight\n52\n//Creating center aligned text w/ wordwrap, multiline\n//field.textWidth\n237\n//field.textHeight\n52\n//Creating right aligned text w/ wordwrap, multiline\n//field.textWidth\n237\n//field.textHeight\n52\n//Creating justified text w/ wordwrap, multiline\n//field.textWidth\n237\n//field.textHeight\n52\n//Creating left aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n245\n//field.textHeight\n144\n//Creating center aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n241\n//field.textHeight\n144\n//Creating right aligned text w/ wordwrap, multiline & long text\n//field.textWidth\n241\n//field.textHeight\n144\n//Creating justified text w/ wordwrap, multiline & long text\n//field.textWidth\n241\n//field.textHeight\n144"
+      "duration": 13.12,
+      "status": "pass"
     },
     {
       "test": "edittext_width_height",
@@ -1563,7 +1545,7 @@
         "expected_lines": 103,
         "matching_lines": 103
       },
-      "duration": 12.93,
+      "duration": 13.08,
       "status": "pass"
     },
     {
@@ -1574,7 +1556,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 12.82,
+      "duration": 13.02,
       "status": "pass"
     },
     {
@@ -1585,7 +1567,7 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 12.89,
+      "duration": 13.09,
       "status": "pass"
     },
     {
@@ -1596,7 +1578,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 12.8,
+      "duration": 13.12,
       "status": "pass"
     },
     {
@@ -1607,7 +1589,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 14.57,
+      "duration": 14.78,
       "status": "pass"
     },
     {
@@ -1618,7 +1600,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 14.49,
+      "duration": 14.61,
       "status": "pass"
     },
     {
@@ -1629,7 +1611,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 14.55,
+      "duration": 14.46,
       "status": "pass"
     },
     {
@@ -1640,7 +1622,7 @@
         "expected_lines": 665,
         "matching_lines": 665
       },
-      "duration": 13.57,
+      "duration": 13.59,
       "status": "pass"
     },
     {
@@ -1651,7 +1633,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 12.86,
+      "duration": 12.93,
       "status": "pass"
     },
     {
@@ -1662,7 +1644,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 12.88,
+      "duration": 12.84,
       "status": "pass"
     },
     {
@@ -1673,7 +1655,7 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 12.89,
+      "duration": 12.87,
       "status": "pass"
     },
     {
@@ -1684,7 +1666,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 12.73,
+      "duration": 12.79,
       "status": "pass"
     },
     {
@@ -1695,7 +1677,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 12.96,
+      "duration": 12.94,
       "status": "pass"
     },
     {
@@ -1706,7 +1688,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 12.93,
+      "duration": 12.82,
       "status": "pass"
     },
     {
@@ -1717,7 +1699,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.84,
+      "duration": 12.78,
       "status": "pass"
     },
     {
@@ -1728,7 +1710,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.96,
+      "duration": 12.9,
       "status": "pass"
     },
     {
@@ -1739,7 +1721,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.75,
+      "duration": 12.77,
       "status": "pass"
     },
     {
@@ -1750,7 +1732,7 @@
         "expected_lines": 134,
         "matching_lines": 134
       },
-      "duration": 13.26,
+      "duration": 13.14,
       "status": "pass"
     },
     {
@@ -1761,7 +1743,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 12.92,
+      "duration": 12.76,
       "status": "pass"
     },
     {
@@ -1770,13 +1752,21 @@
       "lines": {
         "actual_lines": 26,
         "expected_lines": 26,
-        "matching_lines": 0
+        "matching_lines": 26
       },
-      "duration": 14.2,
-      "status": "output_mismatch",
-      "detail": "26 line(s) differ (actual=26, expected=26)",
-      "actual_output": "undefined (undefined)\ntrue -> undefined (undefined)\nfalse -> undefined (undefined)\nnull -> undefined (undefined)\nundefined -> undefined (undefined)\n[object Object] -> undefined (undefined)\n4 -> undefined (undefined)\n-2 -> undefined (undefined)\nInfinity -> undefined (undefined)\n-Infinity -> undefined (undefined)\nNaN -> undefined (undefined)\n -> undefined (undefined)\ntest -> undefined (undefined)\n\u00b2\u00ab\u00a2\u00b7\u014b\u0153\u2019\u0105\u015b\u201e -> undefined (undefined)\n`~!@#$%^&*()_+-=[]{}\\|;':\",./<>? -> undefined (undefined)\n< -> undefined (undefined)\n> -> undefined (undefined)\n& -> undefined (undefined)\n; -> undefined (undefined)\n' -> undefined (undefined)\n\" -> undefined (undefined)\n&amp; -> undefined (undefined)\n&quot; -> undefined (undefined)\n&apos; -> undefined (undefined)\n&lt; -> undefined (undefined)\n&gt; -> undefined (undefined)",
-      "expected_output": "null (null)\ntrue -> true (string)\nfalse -> false (string)\nnull -> null (string)\nundefined -> undefined (string)\n[object Object] -> [object Object] (string)\n4 -> 4 (string)\n-2 -> -2 (string)\nInfinity -> Infinity (string)\n-Infinity -> -Infinity (string)\nNaN -> NaN (string)\n -> null (null)\ntest -> test (string)\n\u00b2\u00ab\u00a2\u00b7\u014b\u0153\u2019\u0105\u015b\u201e -> \u00b2\u00ab\u00a2\u00b7\u014b\u0153\u2019\u0105\u015b\u201e (string)\n`~!@#$%^&*()_+-=[]{}\\|;':\",./<>? -> `~!@#$%^&amp;*()_+-=[]{}\\|;&apos;:&quot;,./&lt;&gt;? (string)\n< -> &lt; (string)\n> -> &gt; (string)\n& -> &amp; (string)\n; -> ; (string)\n' -> &apos; (string)\n\" -> &quot; (string)\n&amp; -> &amp;amp; (string)\n&quot; -> &amp;quot; (string)\n&apos; -> &amp;apos; (string)\n&lt; -> &amp;lt; (string)\n&gt; -> &amp;gt; (string)"
+      "duration": 12.91,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_jsquotestring",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 12.82,
+      "status": "pass"
     },
     {
       "test": "external_interface_toxml_array",
@@ -1786,7 +1776,7 @@
         "expected_lines": 25,
         "matching_lines": 5
       },
-      "duration": 15.22,
+      "duration": 12.84,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=25, expected=25)",
       "actual_output": " (object):\n  _arrayToXML:  -> undefined (undefined)\n  _argumentsToXML:  -> undefined (undefined)\n  _objectToXML:  -> undefined (undefined)\n  _toXML:  -> undefined (undefined)\n (string):\n  _arrayToXML:  -> undefined (undefined)\n  _argumentsToXML:  -> undefined (undefined)\n  _objectToXML:  -> undefined (undefined)\n  _toXML:  -> undefined (undefined)\n (object):\n  _arrayToXML:  -> undefined (undefined)\n  _argumentsToXML:  -> undefined (undefined)\n  _objectToXML:  -> undefined (undefined)\n  _toXML:  -> undefined (undefined)\nhello (object):\n  _arrayToXML: hello -> undefined (undefined)\n  _argumentsToXML: hello -> undefined (undefined)\n  _objectToXML: hello -> undefined (undefined)\n  _toXML: hello -> undefined (undefined)\n[object Object] (object):\n  _arrayToXML: [object Object] -> undefined (undefined)\n  _argumentsToXML: [object Object] -> undefined (undefined)\n  _objectToXML: [object Object] -> undefined (undefined)\n  _toXML: [object Object] -> undefined (undefined)",
@@ -1800,7 +1790,7 @@
         "expected_lines": 179,
         "matching_lines": 35
       },
-      "duration": 14.83,
+      "duration": 13.01,
       "status": "output_mismatch",
       "detail": "144 line(s) differ (actual=179, expected=179)",
       "actual_output": "  _arrayToXML: undefined (undefined)\n  _argumentsToXML: undefined (undefined)\n  _objectToXML: undefined (undefined)\n  _toXML: undefined (undefined)\ntrue (boolean):\n  _arrayToXML: true -> undefined (undefined)\n  _argumentsToXML: true -> undefined (undefined)\n  _objectToXML: true -> undefined (undefined)\n  _toXML: true -> undefined (undefined)\nfalse (boolean):\n  _arrayToXML: false -> undefined (undefined)\n  _argumentsToXML: false -> undefined (undefined)\n  _objectToXML: false -> undefined (undefined)\n  _toXML: false -> undefined (undefined)\nnull (null):\n  _arrayToXML: null -> undefined (undefined)\n  _argumentsToXML: null -> undefined (undefined)\n  _objectToXML: null -> undefined (undefined)\n  _toXML: null -> undefined (undefined)\nundefined (undefined):\n  _arrayToXML: undefined -> undefined (undefined)\n  _argumentsToXML: undefined -> undefined (undefined)\n  _objectToXML: undefined -> undefined (undefined)\n  _toXML: undefined -> undefined (undefined)\n[object Object] (object):\n  _arrayToXML: [object Object] -> undefined (undefined)\n  _argumentsToXML: [object Object] -> undefined (undefined)\n  _objectToXML: [object Object] -> undefined (undefined)\n  _toXML: [object Object] -> undefined (undefined)\n4 (number):\n  _arrayToXML: 4 -> undefined (undefined)\n  _argumentsToXML: 4 -> undefined (undefined)\n  _objectToXML: 4 -> undefined (undefined)\n  _toXML: 4 -> undefined (undefined)\n-2 (number):\n  _arrayToXML: -2 -> undefined (undefined)\n  _argumentsToXML: -2 -> undefined (undefined)\n  _objectToXML: -2 -> undefined (undefined)\n  _toXML: -2 -> undefined (undefined)\nInfinity (number):\n  _arrayToXML: Infinity -> undefined (undefined)\n  _argumentsToXML: Infinity -> undefined (undefined)\n  _objectToXML: Infinity -> undefined (undefined)\n  _toXML: Infinity -> undefined (undefined)\n-Infinity (number):\n  _arrayToXML: -Infinity -> undefined (undefined)\n  _argumentsToXML: -Infinity -> undefined (undefined)\n  _objectToXML: -Infinity -> undefined (undefined)\n  _toXML: -Infinity -> undefined (undefined)\nNaN (number):\n... (129 lines after) ...",
@@ -1812,13 +1802,10 @@
       "lines": {
         "actual_lines": 40,
         "expected_lines": 40,
-        "matching_lines": 0
+        "matching_lines": 40
       },
-      "duration": 14.32,
-      "status": "output_mismatch",
-      "detail": "40 line(s) differ (actual=40, expected=40)",
-      "actual_output": "undefined (undefined)\ntrue -> undefined (undefined)\nfalse -> undefined (undefined)\nnull -> undefined (undefined)\nundefined -> undefined (undefined)\n[object Object] -> undefined (undefined)\n4 -> undefined (undefined)\n-2 -> undefined (undefined)\nInfinity -> undefined (undefined)\n-Infinity -> undefined (undefined)\nNaN -> undefined (undefined)\n -> undefined (undefined)\ntest -> undefined (undefined)\n\u00b2\u00ab\u00a2\u00b7\u014b\u0153\u2019\u0105\u015b\u201e -> undefined (undefined)\n`~!@#$%^&*()_+-=[]{}\\|;':\",./<>? -> undefined (undefined)\n< -> undefined (undefined)\n> -> undefined (undefined)\n& -> undefined (undefined)\n; -> undefined (undefined)\n' -> undefined (undefined)\n\" -> undefined (undefined)\na&amp;b -> undefined (undefined)\na&quot;b -> undefined (undefined)\na&apos;b -> undefined (undefined)\na&lt;b -> undefined (undefined)\na&gt;b -> undefined (undefined)\na&Lt;b -> undefined (undefined)\na&lT;b -> undefined (undefined)\na&LT;b -> undefined (undefined)\na&Gt;b -> undefined (undefined)\na&gT;b -> undefined (undefined)\na&GT;b -> undefined (undefined)\na&Apos;b -> undefined (undefined)\na&Quot;b -> undefined (undefined)\na&Amp;b -> undefined (undefined)\na&Amp;b -> undefined (undefined)\na&QUOT;b -> undefined (undefined)\na&#x0020;b -> undefined (undefined)\n&amp;gt; -> undefined (undefined)\n&amp;amp; -> undefined (undefined)",
-      "expected_output": "null (null)\ntrue -> true (string)\nfalse -> false (string)\nnull -> null (string)\nundefined -> undefined (string)\n[object Object] -> [object Object] (string)\n4 -> 4 (string)\n-2 -> -2 (string)\nInfinity -> Infinity (string)\n-Infinity -> -Infinity (string)\nNaN -> NaN (string)\n -> null (null)\ntest -> test (string)\n\u00b2\u00ab\u00a2\u00b7\u014b\u0153\u2019\u0105\u015b\u201e -> \u00b2\u00ab\u00a2\u00b7\u014b\u0153\u2019\u0105\u015b\u201e (string)\n`~!@#$%^&*()_+-=[]{}\\|;':\",./<>? -> `~!@#$%^&*()_+-=[]{}\\|;':\",./<>? (string)\n< -> < (string)\n> -> > (string)\n& -> & (string)\n; -> ; (string)\n' -> ' (string)\n\" -> \" (string)\na&amp;b -> a&b (string)\na&quot;b -> a\"b (string)\na&apos;b -> a'b (string)\na&lt;b -> a<b (string)\na&gt;b -> a>b (string)\na&Lt;b -> a&Lt;b (string)\na&lT;b -> a&lT;b (string)\na&LT;b -> a&LT;b (string)\na&Gt;b -> a&Gt;b (string)\na&gT;b -> a&gT;b (string)\na&GT;b -> a&GT;b (string)\na&Apos;b -> a&Apos;b (string)\na&Quot;b -> a&Quot;b (string)\na&Amp;b -> a&Amp;b (string)\na&Amp;b -> a&Amp;b (string)\na&QUOT;b -> a&QUOT;b (string)\na&#x0020;b -> a&#x0020;b (string)\n&amp;gt; -> &gt; (string)\n&amp;amp; -> &amp; (string)"
+      "duration": 12.9,
+      "status": "pass"
     },
     {
       "test": "focusrect_mouse_swf8",
@@ -1828,7 +1815,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.39,
+      "duration": 13.72,
       "status": "pass"
     },
     {
@@ -1839,7 +1826,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 14.33,
+      "duration": 13.78,
       "status": "pass"
     },
     {
@@ -1850,7 +1837,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 15.19,
+      "duration": 13.53,
       "status": "pass"
     },
     {
@@ -1861,7 +1848,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 14.52,
+      "duration": 13.33,
       "status": "pass"
     },
     {
@@ -1872,7 +1859,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 14.97,
+      "duration": 12.97,
       "status": "pass"
     },
     {
@@ -1883,7 +1870,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 14.95,
+      "duration": 12.89,
       "status": "pass"
     },
     {
@@ -1894,7 +1881,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 15.47,
+      "duration": 12.91,
       "status": "pass"
     },
     {
@@ -1905,7 +1892,7 @@
         "expected_lines": 11,
         "matching_lines": 10
       },
-      "duration": 15.08,
+      "duration": 12.89,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=11, expected=11)",
       "actual_output": "... (5 lines before) ...\nthis == undefined\n_parent == undefined\n\n/// test called!\nthis == undefined\n_parent == undefined",
@@ -1919,7 +1906,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 15.22,
+      "duration": 12.93,
       "status": "pass"
     },
     {
@@ -1930,7 +1917,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 14.25,
+      "duration": 12.91,
       "status": "pass"
     },
     {
@@ -1941,7 +1928,7 @@
         "expected_lines": 56,
         "matching_lines": 54
       },
-      "duration": 14.87,
+      "duration": 12.92,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=56, expected=56)",
       "actual_output": "... (15 lines before) ...\nArgument 1: undefined\nThis: _level0\nIs it the global object: false\nArgument 0: Apply w/ Root\nArgument 1: undefined\nThis: undefined\nIs it the global object: true\nArgument 0: Apply w/ Primitive\nArgument 1: undefined\nThis: undefined\nIs it the global object: true\nArgument 0: Call w/ Undefined\nArgument 1: undefined\nThis: undefined\nIs it the global object: true\nArgument 0: Call w/ Global\nArgument 1: undefined\nThis: _level0\nIs it the global object: false\nArgument 0: Call w/ Parent\nArgument 1: undefined\nThis: _level0\nIs it the global object: false\nArgument 0: Call w/ Root\nArgument 1: 2\nThis: 123\nIs it the global object: false\nArgument 0: Call w/ Primitive\nArgument 1: undefined\nThis: undefined\nIs it the global object: true\nArgument 0: Fake arguments object\nArgument 1: 5\nThis: undefined\nIs it the global object: false\nArgument 0: undefined\nArgument 1: undefined\nLet's try some things that don't work\nundefined\nundefined\nThose do NOT generate errors on FP7/AS2.",
@@ -1955,7 +1942,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 13.67,
+      "duration": 12.86,
       "status": "pass"
     },
     {
@@ -1966,7 +1953,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 15.67,
+      "duration": 13.03,
       "status": "pass"
     },
     {
@@ -1977,7 +1964,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 14.46,
+      "duration": 12.89,
       "status": "pass"
     },
     {
@@ -1988,7 +1975,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.48,
+      "duration": 13.02,
       "status": "pass"
     },
     {
@@ -1999,7 +1986,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 13.92,
+      "duration": 12.82,
       "status": "pass"
     },
     {
@@ -2010,7 +1997,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 14.98,
+      "duration": 12.99,
       "status": "pass"
     },
     {
@@ -2021,7 +2008,7 @@
         "expected_lines": 7,
         "matching_lines": 0
       },
-      "duration": 14.2,
+      "duration": 12.88,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=0, expected=7)",
       "actual_output": "",
@@ -2035,7 +2022,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.41,
+      "duration": 12.83,
       "status": "pass"
     },
     {
@@ -2046,7 +2033,7 @@
         "expected_lines": 758,
         "matching_lines": 1
       },
-      "duration": 16.02,
+      "duration": 13.35,
       "status": "output_mismatch",
       "detail": "757 line(s) differ (actual=327, expected=758)",
       "actual_output": "_global.TextSnapshot, instance=[[object Object]], type=[object]\n_global.PrintJob, instance=[[object Object]], type=[object]\n_global.MovieClipLoader, instance=[[object Object]], type=[object]\n_global.LocalConnection, instance=[[object Object]], type=[object]\n_global.textRenderer, instance=[[object Object]], type=[object]\n_global.flash.automation.Configuration, instance=[[object Object]], type=[object]\n_global.flash.automation.ActionGenerator, instance=[[object Object]], type=[object]\n_global.flash.automation.StageCapture, instance=[[object Object]], type=[object]\n_global.flash.external.ExternalInterface, instance=[[object Object]], type=[object]\n_global.flash.net.FileReferenceList, instance=[[object Object]], type=[object]\n_global.flash.net.FileReference, instance=[[object Object]], type=[object]\n_global.flash.geom.Transform, instance=[[object Object]], type=[object]\n_global.flash.geom.ColorTransform, instance=[[object Object]], type=[object]\n_global.flash.geom.Matrix, instance=[[object Object]], type=[object]\n_global.flash.geom.Matrix, instance=[(a=1, b=undefined, c=undefined, d=undefined, tx=undefined, ty=undefined)], type=[object]\n  __proto__, READ_ONLY, DONT_DELETE, type=[object]\n  __constructor__, READ_ONLY, DONT_DELETE, type=[function]\n  a, READ_ONLY, DONT_DELETE, type=[number]\n  b, READ_ONLY, DONT_DELETE, type=[undefined]\n  c, READ_ONLY, DONT_DELETE, type=[undefined]\n  d, READ_ONLY, DONT_DELETE, type=[undefined]\n  tx, READ_ONLY, DONT_DELETE, type=[undefined]\n  ty, READ_ONLY, DONT_DELETE, type=[undefined]\n  toString, READ_ONLY, DONT_DELETE, type=[function]\n  clone, READ_ONLY, DONT_DELETE, type=[function]\n  identity, READ_ONLY, DONT_DELETE, type=[function]\n  scale, READ_ONLY, DONT_DELETE, type=[function]\n  rotate, READ_ONLY, DONT_DELETE, type=[function]\n  translate, READ_ONLY, DONT_DELETE, type=[function]\n  concat, READ_ONLY, DONT_DELETE, type=[function]\n  invert, READ_ONLY, DONT_DELETE, type=[function]\n  createBox, READ_ONLY, DONT_DELETE, type=[function]\n  createGradientBox, READ_ONLY, DONT_DELETE, type=[function]\n  transformPoint, READ_ONLY, DONT_DELETE, type=[function]\n  deltaTransformPoint, READ_ONLY, DONT_DELETE, type=[function]\n_global.flash.geom.Matrix, instance=[(a=1, b=2, c=3, d=4, tx=undefined, ty=undefined)], type=[object]\n  __proto__, READ_ONLY, DONT_DELETE, type=[object]\n  __constructor__, READ_ONLY, DONT_DELETE, type=[function]\n  a, READ_ONLY, DONT_DELETE, type=[number]\n  b, READ_ONLY, DONT_DELETE, type=[number]\n  c, READ_ONLY, DONT_DELETE, type=[number]\n  d, READ_ONLY, DONT_DELETE, type=[number]\n  tx, READ_ONLY, DONT_DELETE, type=[undefined]\n  ty, READ_ONLY, DONT_DELETE, type=[undefined]\n  toString, READ_ONLY, DONT_DELETE, type=[function]\n  clone, READ_ONLY, DONT_DELETE, type=[function]\n  identity, READ_ONLY, DONT_DELETE, type=[function]\n  scale, READ_ONLY, DONT_DELETE, type=[function]\n  rotate, READ_ONLY, DONT_DELETE, type=[function]\n  translate, READ_ONLY, DONT_DELETE, type=[function]\n... (277 lines after) ...",
@@ -2060,7 +2047,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.36,
+      "duration": 12.94,
       "status": "pass"
     },
     {
@@ -2071,7 +2058,7 @@
         "expected_lines": 4497,
         "matching_lines": 11
       },
-      "duration": 15.77,
+      "duration": 13.16,
       "status": "output_mismatch",
       "detail": "4486 line(s) differ (actual=685, expected=4497)",
       "actual_output": "Testing _global.valueOf\nTesting _global.isFinite\nTesting _global.isFinite.prototype\n  constructor, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\nTesting _global.isNaN\nTesting _global.isNaN.prototype\n  constructor, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\nTesting _global.Stage\n  showMenu, own, type=[boolean]\n  quality, own, type=[string]\n  height, own, READ_ONLY, type=[number]\n  width, own, READ_ONLY, type=[number]\n  displayState, own, READ_ONLY, type=[string]\n  scaleMode, own, READ_ONLY, type=[string]\n  align, own, READ_ONLY, type=[string]\n  broadcastMessage, own, type=[function]\n  removeListener, own, type=[function]\n  addListener, own, type=[function]\n  _listeners, own, type=[object]\n  toString, own, type=[function]\n  __proto__, own, type=[object]\nTesting _global.Stage.showMenu\nTesting _global.Stage.quality\nTesting _global.Stage.height\nTesting _global.Stage.width\nTesting _global.Stage.displayState\nTesting _global.Stage.scaleMode\nTesting _global.Stage.align\nTesting _global.Stage.broadcastMessage\nTesting _global.Stage.broadcastMessage.prototype\n  constructor, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\nTesting _global.Stage.removeListener\nTesting _global.Stage.removeListener.prototype\n  constructor, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\nTesting _global.Stage.addListener\nTesting _global.Stage.addListener.prototype\n  constructor, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\nTesting _global.Stage._listeners\nTesting _global.Stage.toString\nTesting _global.Stage.toString.prototype\n  constructor, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\nTesting _global.Selection\n  setSelection, own, type=[function]\n  getEndIndex, own, type=[function]\n... (635 lines after) ...",
@@ -2085,7 +2072,7 @@
         "expected_lines": 4158,
         "matching_lines": 1
       },
-      "duration": 14.35,
+      "duration": 13.14,
       "status": "output_mismatch",
       "detail": "4157 line(s) differ (actual=309, expected=4158)",
       "actual_output": "Testing _global.valueOf\nTesting _global.isFinite\nTesting _global.isFinite.prototype\nTesting _global.isNaN\nTesting _global.isNaN.prototype\nTesting _global.Stage.showMenu\nTesting _global.Stage.quality\nTesting _global.Stage.height\nTesting _global.Stage.width\nTesting _global.Stage.displayState\nTesting _global.Stage.scaleMode\nTesting _global.Stage.align\nTesting _global.Stage.broadcastMessage\nTesting _global.Stage.broadcastMessage.prototype\nTesting _global.Stage.removeListener\nTesting _global.Stage.removeListener.prototype\nTesting _global.Stage.addListener\nTesting _global.Stage.addListener.prototype\nTesting _global.Stage._listeners\nTesting _global.Stage.toString\nTesting _global.Stage.toString.prototype\nTesting _global.Stage\nTesting _global.Selection.setSelection\nTesting _global.Selection.setSelection.prototype\nTesting _global.Selection.getEndIndex\nTesting _global.Selection.getEndIndex.prototype\nTesting _global.Selection.getCaretIndex\nTesting _global.Selection.getCaretIndex.prototype\nTesting _global.Selection.getBeginIndex\nTesting _global.Selection.getBeginIndex.prototype\nTesting _global.Selection.getFocus\nTesting _global.Selection.getFocus.prototype\nTesting _global.Selection.setFocus\nTesting _global.Selection.setFocus.prototype\nTesting _global.Selection.broadcastMessage\nTesting _global.Selection.broadcastMessage.prototype\nTesting _global.Selection.removeListener\nTesting _global.Selection.removeListener.prototype\nTesting _global.Selection.addListener\nTesting _global.Selection.addListener.prototype\nTesting _global.Selection._listeners\nTesting _global.Selection.toString\nTesting _global.Selection.toString.prototype\nTesting _global.Selection\nTesting _global.Mouse.broadcastMessage\nTesting _global.Mouse.broadcastMessage.prototype\nTesting _global.Mouse.removeListener\nTesting _global.Mouse.removeListener.prototype\nTesting _global.Mouse.addListener\nTesting _global.Mouse.addListener.prototype\n... (259 lines after) ...",
@@ -2099,7 +2086,7 @@
         "expected_lines": 1145,
         "matching_lines": 1031
       },
-      "duration": 16.87,
+      "duration": 13.69,
       "status": "output_mismatch",
       "detail": "114 line(s) differ (actual=1145, expected=1145)",
       "actual_output": "... (10 lines before) ...\n  s1.aFunction:       [type Function]\n  s1.anObjectClass:   [type Function]\n  s1.aMovieClipClass: [type Function]\n  s1.aBooleanClass:   [type Function]\n  typeof s1.global:          object\n  typeof s1.global2:         object\n  typeof s1.anObject:        object\n  typeof s1.anArray:         object\n  typeof s1.aFunction:       function\n  typeof s1.anObjectClass:   function\n  typeof s1.aMovieClipClass: function\n  typeof s1.aBooleanClass:   function\n  typeof s1.global.prototype:          undefined\n  typeof s1.global2.prototype:         undefined\n  typeof s1.anObject.prototype:        undefined\n  typeof s1.anArray.prototype:         undefined\n  typeof s1.aFunction.prototype:       object\n  typeof s1.anObjectClass.prototype:   object\n  typeof s1.aMovieClipClass.prototype: object\n  typeof s1.aBooleanClass.prototype:   object\n  true instanceof s1.aBooleanClass:    false\n  _root instanceof s1.aMovieClipClass: false\n  {} instanceof s1.anObjectClass:      false\nTesting SWF6\n  s1.global:          undefined\n  s1.global2:         undefined\n  s1.anObject:        [object Object]\n  s1.anArray:         1,2,3\n  s1.aFunction:       [type Function]\n  s1.anObjectClass:   [type Function]\n  s1.aMovieClipClass: [type Function]\n  s1.aBooleanClass:   [type Function]\n  typeof s1.global:          object\n  typeof s1.global2:         object\n  typeof s1.anObject:        object\n  typeof s1.anArray:         object\n  typeof s1.aFunction:       function\n  typeof s1.anObjectClass:   function\n  typeof s1.aMovieClipClass: function\n  typeof s1.aBooleanClass:   function\n  typeof s1.global.prototype:          undefined\n  typeof s1.global2.prototype:         undefined\n  typeof s1.anObject.prototype:        undefined\n  typeof s1.anArray.prototype:         undefined\n  typeof s1.aFunction.prototype:       object\n  typeof s1.anObjectClass.prototype:   object\n  typeof s1.aMovieClipClass.prototype: object\n  typeof s1.aBooleanClass.prototype:   object\n  true instanceof s1.aBooleanClass:    false\n  _root instanceof s1.aMovieClipClass: false\n... (1085 lines after) ...",
@@ -2113,7 +2100,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 14.73,
+      "duration": 13.38,
       "status": "pass"
     },
     {
@@ -2124,7 +2111,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 16.23,
+      "duration": 13.34,
       "status": "pass"
     },
     {
@@ -2135,7 +2122,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 14.15,
+      "duration": 13.19,
       "status": "pass"
     },
     {
@@ -2146,7 +2133,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 15.44,
+      "duration": 13.25,
       "status": "pass"
     },
     {
@@ -2157,7 +2144,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 14.75,
+      "duration": 13.31,
       "status": "pass"
     },
     {
@@ -2168,7 +2155,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 14.92,
+      "duration": 13.28,
       "status": "pass"
     },
     {
@@ -2179,7 +2166,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 14.94,
+      "duration": 13.57,
       "status": "pass"
     },
     {
@@ -2190,7 +2177,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 14.4,
+      "duration": 13.07,
       "status": "pass"
     },
     {
@@ -2201,7 +2188,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.87,
+      "duration": 12.74,
       "status": "pass"
     },
     {
@@ -2212,7 +2199,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.86,
+      "duration": 12.63,
       "status": "pass"
     },
     {
@@ -2223,7 +2210,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.89,
+      "duration": 12.69,
       "status": "pass"
     },
     {
@@ -2234,7 +2221,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 13.01,
+      "duration": 12.81,
       "status": "pass"
     },
     {
@@ -2245,7 +2232,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 13.33,
+      "duration": 13.15,
       "status": "pass"
     },
     {
@@ -2256,7 +2243,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.82,
+      "duration": 12.86,
       "status": "pass"
     },
     {
@@ -2267,7 +2254,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 12.98,
+      "duration": 12.84,
       "status": "pass"
     },
     {
@@ -2278,7 +2265,7 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 12.98,
+      "duration": 12.75,
       "status": "pass"
     },
     {
@@ -2289,7 +2276,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.89,
+      "duration": 12.69,
       "status": "pass"
     },
     {
@@ -2300,7 +2287,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.89,
+      "duration": 12.67,
       "status": "pass"
     },
     {
@@ -2311,7 +2298,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.84,
+      "duration": 12.66,
       "status": "pass"
     },
     {
@@ -2322,7 +2309,7 @@
         "expected_lines": 1175,
         "matching_lines": 1175
       },
-      "duration": 14.69,
+      "duration": 14.55,
       "status": "pass"
     },
     {
@@ -2333,7 +2320,7 @@
         "expected_lines": 1175,
         "matching_lines": 1175
       },
-      "duration": 14.68,
+      "duration": 14.52,
       "status": "pass"
     },
     {
@@ -2344,7 +2331,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.74,
+      "duration": 12.62,
       "status": "pass"
     },
     {
@@ -2355,7 +2342,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.73,
+      "duration": 12.62,
       "status": "pass"
     },
     {
@@ -2366,7 +2353,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 12.81,
+      "duration": 12.67,
       "status": "pass"
     },
     {
@@ -2377,7 +2364,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 12.96,
+      "duration": 12.84,
       "status": "pass"
     },
     {
@@ -2388,7 +2375,7 @@
         "expected_lines": 70,
         "matching_lines": 70
       },
-      "duration": 12.86,
+      "duration": 12.7,
       "status": "pass"
     },
     {
@@ -2399,7 +2386,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 12.87,
+      "duration": 12.67,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -2413,7 +2400,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.92,
+      "duration": 12.77,
       "status": "pass"
     },
     {
@@ -2424,7 +2411,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.74,
+      "duration": 12.64,
       "status": "pass"
     },
     {
@@ -2435,7 +2422,7 @@
         "expected_lines": 131,
         "matching_lines": 131
       },
-      "duration": 12.85,
+      "duration": 12.68,
       "status": "pass"
     },
     {
@@ -2446,7 +2433,7 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 12.89,
+      "duration": 12.61,
       "status": "pass"
     },
     {
@@ -2457,7 +2444,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.83,
+      "duration": 12.57,
       "status": "pass"
     },
     {
@@ -2468,7 +2455,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.77,
+      "duration": 12.62,
       "status": "pass"
     },
     {
@@ -2479,7 +2466,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 12.87,
+      "duration": 12.75,
       "status": "pass"
     },
     {
@@ -2490,7 +2477,7 @@
         "expected_lines": 88,
         "matching_lines": 86
       },
-      "duration": 13.19,
+      "duration": 12.94,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=88, expected=88)",
       "actual_output": "... (34 lines before) ...\ntypeof cast: null\n// obj: { __proto__: X }, class: { __proto__: { prototype: X }}\ninstanceof: false\ntypeof cast: null\n// obj: {}, class: super { prototype: ... }\n.prototype is: undefined\ninstanceof: false\ntypeof cast: null\n// obj: {}, class: { prototype(SWFv9): ... }\n.prototype is: SWFv9 proto\n\"SWFv9 proto\" coerced to NoisyString!\ninstanceof: false\n\"SWFv9 proto\" coerced to NoisyString!\ntypeof cast: null\n\n// obj: movieclip, class: \"right\"\n\"right\" coerced to NoisyString!\ninstanceof: false\n\"right\" coerced to NoisyString!\ntypeof cast: null\n// obj: movieclip, class: Object\ninstanceof: true\ntypeof cast: movieclip\n// obj: movieclip, class: { prototype: \"proto\" }\n\"proto\" coerced to NoisyString!\ninstanceof: false\n\"proto\" coerced to NoisyString!\ntypeof cast: null\n// obj: {}, class: MovieClip { prototype: Object.prototype }\ninstanceof: true\ntypeof cast: object\n// obj: { __proto__: movieclip }, class: { prototype: movieclip }\ninstanceof: false\ntypeof cast: null\n// kill movieclip\n// obj: movieclip, class: \"right\"\n\"right\" coerced to NoisyString!\ninstanceof: false\n\"right\" coerced to NoisyString!\ntypeof cast: null\n// obj: movieclip, class: Object\ninstanceof: false\ntypeof cast: null\n// obj: movieclip, class: { prototype: \"proto\" }\n\"proto\" coerced to NoisyString!\ninstanceof: false\n\"proto\" coerced to NoisyString!\ntypeof cast: null\n// obj: {}, class: MovieClip { prototype: Object.prototype }\ninstanceof: false\n... (4 lines after) ...",
@@ -2504,7 +2491,7 @@
         "expected_lines": 47,
         "matching_lines": 0
       },
-      "duration": 13.24,
+      "duration": 13.16,
       "status": "output_mismatch",
       "detail": "47 line(s) differ (actual=46, expected=47)",
       "actual_output": "InterfaceA.prototype is: [object Object]\n\n// MyClass implements <nothing>\nobj instanceof InterfaceA: false\n// MyClass implements InterfaceA\nobj instanceof InterfaceA: true\nobj instanceof fake InterfaceA: true\nobj instanceof { __proto__: InterfaceA }: false\nin swf6 { obj instanceof InterfaceA }: true\n// MyClass implements InterfaceB\nobj instanceof InterfaceA: false\nobj instanceof InterfaceB: true\n// InterfaceA implements NestedInterfaceA\nobj instanceof NestedInterfaceA: false\n// NestedInterfaceA extends X\nobj instance of X: false\n\n// MyClass2 implements InterfaceInt, InterfaceString, InterfaceRoot, FakeInterfaceA, McInterfaceB\nobj instanceof InterfaceInt: false\n\"hello\" coerced to NoisyString!\nobj instanceof InterfaceString: false\nobj instanceof InterfaceRoot: false\nobj instanceof InterfaceA: false\nobj instanceof FakeInterfaceA: false\nobj instanceof InterfaceB: false\nobj instanceof McInterfaceB: false\n\n// null implements MyClass\n// \"left\" implements MyClass3\n// \"left\" implements \"right\"\n// MyClass3 implements \"right\", InterfaceA\nobj instanceof NoisyString: false\nobj instanceof InterfaceA: false\n\n// MyClass4 implements undefined\nobj instanceof undefined: false\n// MyClass4 implements InterfaceA\nobj instanceof InterfaceA: true\n\n\"trigger\" coerced to NoisyString!\nLazily: MyClass5 implements LazyInterfaceA!\nobj instanceof LazyInterfaceA: false\n\n// MyClass6 implements LazyInterfaceB\n// LazyInterfaceB.prototype = {}\nobj instanceof LazyInterfaceB: false",
@@ -2518,7 +2505,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 12.85,
+      "duration": 12.65,
       "status": "pass"
     },
     {
@@ -2529,7 +2516,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 12.89,
+      "duration": 12.63,
       "status": "pass"
     },
     {
@@ -2540,7 +2527,7 @@
         "expected_lines": 89,
         "matching_lines": 89
       },
-      "duration": 12.82,
+      "duration": 12.66,
       "status": "pass"
     },
     {
@@ -2551,7 +2538,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.77,
+      "duration": 12.61,
       "status": "pass"
     },
     {
@@ -2562,7 +2549,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.88,
+      "duration": 12.62,
       "status": "pass"
     },
     {
@@ -2573,7 +2560,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.81,
+      "duration": 12.63,
       "status": "pass"
     },
     {
@@ -2584,7 +2571,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.84,
+      "duration": 12.7,
       "status": "pass"
     },
     {
@@ -2595,7 +2582,7 @@
         "expected_lines": 4,
         "matching_lines": 2
       },
-      "duration": 12.76,
+      "duration": 12.63,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=4, expected=4)",
       "actual_output": "// mc._width\n0\n// mc._height\n0",
@@ -2609,7 +2596,7 @@
         "expected_lines": 16,
         "matching_lines": 0
       },
-      "duration": 12.98,
+      "duration": 12.88,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=0, expected=16)",
       "actual_output": "",
@@ -2623,7 +2610,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 12.71,
+      "duration": 12.62,
       "status": "pass"
     },
     {
@@ -2634,7 +2621,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 12.81,
+      "duration": 12.74,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=2, expected=3)",
       "actual_output": "child\nload",
@@ -2648,7 +2635,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.84,
+      "duration": 12.68,
       "status": "pass"
     },
     {
@@ -2659,7 +2646,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.73,
+      "duration": 12.63,
       "status": "pass"
     },
     {
@@ -2670,7 +2657,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.89,
+      "duration": 12.62,
       "status": "pass"
     },
     {
@@ -2681,7 +2668,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.78,
+      "duration": 12.58,
       "status": "pass"
     },
     {
@@ -2692,7 +2679,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.83,
+      "duration": 12.6,
       "status": "pass"
     },
     {
@@ -2703,7 +2690,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.94,
+      "duration": 12.61,
       "status": "pass"
     },
     {
@@ -2714,7 +2701,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.9,
+      "duration": 12.71,
       "status": "pass"
     },
     {
@@ -2725,7 +2712,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 12.76,
+      "duration": 12.68,
       "status": "pass"
     },
     {
@@ -2736,7 +2723,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 12.73,
+      "duration": 12.68,
       "status": "pass"
     },
     {
@@ -2747,7 +2734,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 14.76,
+      "duration": 14.72,
       "status": "pass"
     },
     {
@@ -2758,7 +2745,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 14.82,
+      "duration": 14.72,
       "status": "pass"
     },
     {
@@ -2769,7 +2756,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 14.75,
+      "duration": 14.66,
       "status": "pass"
     },
     {
@@ -2780,7 +2767,7 @@
         "expected_lines": 902,
         "matching_lines": 902
       },
-      "duration": 13.86,
+      "duration": 13.79,
       "status": "pass"
     },
     {
@@ -2791,7 +2778,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 12.76,
+      "duration": 12.66,
       "status": "pass"
     },
     {
@@ -2802,7 +2789,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 12.83,
+      "duration": 12.66,
       "status": "pass"
     },
     {
@@ -2813,7 +2800,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 12.95,
+      "duration": 14.03,
       "status": "pass"
     },
     {
@@ -2824,7 +2811,7 @@
         "expected_lines": 579,
         "matching_lines": 74
       },
-      "duration": 13.58,
+      "duration": 14.33,
       "status": "output_mismatch",
       "detail": "505 line(s) differ (actual=261, expected=579)",
       "actual_output": "-- start test: A message to nowhere! --\n\n\n-- end frame: A message to nowhere! --\n\n\n-- end test: A message to nowhere! --\n\n\n-- start test: Both receivers try to connect to the same channel --\n\n\n-- end frame: Both receivers try to connect to the same channel --\n\n\n-- end test: Both receivers try to connect to the same channel --\n\n\n-- start test: A message to an unimplemented function --\n\n\n-- end frame: A message to an unimplemented function --\n\n\n-- end test: A message to an unimplemented function --\n\n\n-- start test: Receiver tries to connect elsewhere, but can't --\n\n\n-- end frame: Receiver tries to connect elsewhere, but can't --\n\n\n-- end test: Receiver tries to connect elsewhere, but can't --\n\n\n-- start test: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- end frame: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- end test: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- start test: Sender calls test() on 'channel' --\n\n\n-- end frame: Sender calls test() on 'channel' --\n\n... (211 lines after) ...",
@@ -2838,7 +2825,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 12.85,
+      "duration": 13.84,
       "status": "pass"
     },
     {
@@ -2849,7 +2836,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.83,
+      "duration": 13.66,
       "status": "pass"
     },
     {
@@ -2860,7 +2847,7 @@
         "expected_lines": 90,
         "matching_lines": 90
       },
-      "duration": 12.78,
+      "duration": 13.57,
       "status": "pass"
     },
     {
@@ -2871,7 +2858,7 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 12.96,
+      "duration": 13.67,
       "status": "pass"
     },
     {
@@ -2882,7 +2869,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 12.86,
+      "duration": 13.76,
       "status": "pass"
     },
     {
@@ -2893,7 +2880,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.9,
+      "duration": 13.64,
       "status": "pass"
     },
     {
@@ -2904,7 +2891,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.84,
+      "duration": 13.5,
       "status": "pass"
     },
     {
@@ -2915,7 +2902,7 @@
         "expected_lines": 101,
         "matching_lines": 101
       },
-      "duration": 12.9,
+      "duration": 13.51,
       "status": "pass"
     },
     {
@@ -2926,7 +2913,7 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 13.29,
+      "duration": 14.11,
       "status": "pass"
     },
     {
@@ -2937,7 +2924,7 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 13.31,
+      "duration": 13.88,
       "status": "pass"
     },
     {
@@ -2948,7 +2935,7 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 13.1,
+      "duration": 13.44,
       "status": "pass"
     },
     {
@@ -2959,7 +2946,7 @@
         "expected_lines": 171,
         "matching_lines": 171
       },
-      "duration": 13.15,
+      "duration": 13.52,
       "status": "pass"
     },
     {
@@ -2970,7 +2957,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 13.43,
+      "duration": 14.33,
       "status": "pass"
     },
     {
@@ -2981,7 +2968,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 13.02,
+      "duration": 13.78,
       "status": "pass"
     },
     {
@@ -2992,7 +2979,7 @@
         "expected_lines": 90,
         "matching_lines": 90
       },
-      "duration": 12.93,
+      "duration": 13.59,
       "status": "pass"
     },
     {
@@ -3003,7 +2990,7 @@
         "expected_lines": 69,
         "matching_lines": 69
       },
-      "duration": 13.06,
+      "duration": 13.82,
       "status": "pass"
     },
     {
@@ -3014,7 +3001,7 @@
         "expected_lines": 98,
         "matching_lines": 98
       },
-      "duration": 13.02,
+      "duration": 13.88,
       "status": "pass"
     },
     {
@@ -3025,7 +3012,7 @@
         "expected_lines": 99,
         "matching_lines": 99
       },
-      "duration": 12.94,
+      "duration": 13.7,
       "status": "pass"
     },
     {
@@ -3036,7 +3023,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 12.92,
+      "duration": 13.76,
       "status": "pass"
     },
     {
@@ -3047,7 +3034,7 @@
         "expected_lines": 191,
         "matching_lines": 189
       },
-      "duration": 13.07,
+      "duration": 14.24,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=191, expected=191)",
       "actual_output": "... (20 lines before) ...\n-100\n50\n-154.95\n\n// clip.clip.getBounds(clip)\n72.4624092102051\n-57.2769470214844\n94.3815071105957\n-35.3553771972656\n\n// clip.clip.getBounds(_root)\n304.954756949516\n99.9963962975889\n261.950241629779\n99.9498921295628\n\n// clip.clip.getBounds(clip2)\n469.52768246896\n210.044837496125\n145.745072181714\n-124.63533818\n\n// clip4.getBounds(_root)\n380.2\n330.2\n286.2\n236.2\n\n// clip.getBounds('/')\n354.919766235352\n50.0149932861328\n308.412800598145\n3.50802764892578\n\n// clip.getBounds('/clip')\n68.2\n-35.35\n76.7\n-35.35\n\n// clip.getBounds('clip:clip')\n521.865266928488\n-99.9511255968007\n99.9651616417572\n-204.932633464244\n\n// clip3.getBounds(undefined)\n68\n-89.3\n50\n... (121 lines after) ...",
@@ -3061,7 +3048,7 @@
         "expected_lines": 112,
         "matching_lines": 6
       },
-      "duration": 13.08,
+      "duration": 14.35,
       "status": "output_mismatch",
       "detail": "106 line(s) differ (actual=42, expected=112)",
       "actual_output": "/////// Within /\nthis.getTextSnapshot=[type Function] (function)\n_root.getTextSnapshot=[type Function] (function)\n_root.child.getTextSnapshot=[type Function] (function)\nthis.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\n_root.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\n_root.child.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\nclip1.getTextSnapshot=[type Function] (function)\nclip1.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\nclip2.getTextSnapshot=[type Function] (function)\nclip2.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\n/////// Within /child\nthis.getTextSnapshot=[type Function] (function)\n_root.getTextSnapshot=[type Function] (function)\n_root.child.getTextSnapshot=[type Function] (function)\nthis.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\n_root.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\n_root.child.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\nclip1.getTextSnapshot=undefined (undefined)\nclip1.getTextSnapshot()=undefined (undefined)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false\nclip2.getTextSnapshot=[type Function] (function)\nclip2.getTextSnapshot()=[object Object] (object)\nis _global.TextSnapshot: false\nis oldTextSnapshot: false",
@@ -3075,7 +3062,7 @@
         "expected_lines": 92,
         "matching_lines": 92
       },
-      "duration": 12.96,
+      "duration": 13.7,
       "status": "pass"
     },
     {
@@ -3086,7 +3073,7 @@
         "expected_lines": 338,
         "matching_lines": 286
       },
-      "duration": 14.19,
+      "duration": 14.93,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=338, expected=338)",
       "actual_output": "... (13 lines before) ...\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\nfalse\n// _level0.clip.hitTest(NaN, NaN, true)\nfalse\n\n// donut, root transformed\n// _level0.clip.hitTest(400, 400, true)\nfalse\n// _level0.clip.hitTest(250, 250, true)\nfalse\n// _level0.clip.hitTest(550, 250, true)\nfalse\n// _level0.clip.hitTest(250, 550, true)\nfalse\n// _level0.clip.hitTest(550, 550, true)\nfalse\n// _level0.clip.hitTest(400, 500, true)\ntrue\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\nfalse\n\n// strokes\n// _level0.clip.hitTest(400, 50, true)\ntrue\n// _level0.clip.hitTest(50, 400, true)\nfalse\n// _level0.clip.hitTest(750, 400, true)\nfalse\n// _level0.clip.hitTest(400, 750, true)\nfalse\n// _level0.clip.hitTest(575, 575, true)\ntrue\n// _level0.clip.hitTest(400, 350, true)\ntrue\n// _level0.clip.hitTest(350, 400, true)\ntrue\n// _level0.clip.hitTest(390, 200, true)\ntrue\n// _level0.clip.hitTest(400, 270, true)\nfalse\n// _level0.clip.hitTest(400, 200, true)\ntrue\n... (275 lines after) ...",
@@ -3100,7 +3087,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.9,
+      "duration": 13.69,
       "status": "pass"
     },
     {
@@ -3111,7 +3098,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 12.93,
+      "duration": 13.69,
       "status": "pass"
     },
     {
@@ -3122,7 +3109,7 @@
         "expected_lines": 75,
         "matching_lines": 4
       },
-      "duration": 13.43,
+      "duration": 14.14,
       "status": "output_mismatch",
       "detail": "71 line(s) differ (actual=5, expected=75)",
       "actual_output": "Test file 1\nChild (7) loaded\nChild (7) 6710886.4\n\nTest file 2",
@@ -3136,7 +3123,7 @@
         "expected_lines": 75,
         "matching_lines": 5
       },
-      "duration": 13.4,
+      "duration": 14.09,
       "status": "output_mismatch",
       "detail": "70 line(s) differ (actual=5, expected=75)",
       "actual_output": "Test file 1\nChild (7) loaded\nChild (7) 6710886.4\n\nTest file 2",
@@ -3150,7 +3137,7 @@
         "expected_lines": 13,
         "matching_lines": 2
       },
-      "duration": 13.14,
+      "duration": 14.25,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=8, expected=13)",
       "actual_output": "Test file 1\nParent (7) 6710886.4\nChild (8) loaded\nParent (7) undefined\nParent (7) undefined\nChild (8) 6710886.4\nParent (7) 6710886.4\nParent (7) 6710886.4",
@@ -3164,7 +3151,7 @@
         "expected_lines": 13,
         "matching_lines": 2
       },
-      "duration": 13.55,
+      "duration": 14.05,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=8, expected=13)",
       "actual_output": "Test file 1\nParent (7) 6710886.4\nChild (8) loaded\nParent (7) undefined\nParent (7) undefined\nChild (8) 6710886.4\nParent (7) 6710886.4\nParent (7) 6710886.4",
@@ -3178,7 +3165,7 @@
         "expected_lines": 11,
         "matching_lines": 2
       },
-      "duration": 13.04,
+      "duration": 13.54,
       "status": "output_mismatch",
       "detail": "9 line(s) differ (actual=5, expected=11)",
       "actual_output": "Test file 1\nParent (7) 6710886.4\nChild (8) 6710886.35\nParent (7) undefined\nParent (7) undefined",
@@ -3189,7 +3176,7 @@
       "num_frames": 30,
       "status": "runtime_error",
       "detail": "exit code -6",
-      "duration": 36.51,
+      "duration": 37.56,
       "lines": {
         "actual_lines": 1,
         "expected_lines": 10,
@@ -3201,7 +3188,7 @@
       "num_frames": 30,
       "status": "runtime_error",
       "detail": "exit code -6",
-      "duration": 36.42,
+      "duration": 38.1,
       "lines": {
         "actual_lines": 1,
         "expected_lines": 10,
@@ -3216,7 +3203,7 @@
         "expected_lines": 11,
         "matching_lines": 4
       },
-      "duration": 13.01,
+      "duration": 13.57,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=5, expected=11)",
       "actual_output": "Test file 1\n8LTrace8 loaded\nTrace8 loaded\n8LTrace8 finished\n8LTrace8 finished",
@@ -3230,7 +3217,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 13.23,
+      "duration": 13.87,
       "status": "pass"
     },
     {
@@ -3241,7 +3228,7 @@
         "expected_lines": 29,
         "matching_lines": 19
       },
-      "duration": 13.04,
+      "duration": 13.71,
       "status": "output_mismatch",
       "detail": "10 line(s) differ (actual=29, expected=29)",
       "actual_output": "... (12 lines before) ...\nParent: setting _lockroot to \"foo\" sets it to true.\nParent: setting _lockroot to \"\" sets it to false.\nParent: setting _lockroot to \"0\" sets it to true.\nParent: setting _lockroot to [object Object] sets it to true.\nChild: level is _level0.child1, root is _level0, _lockroot is false, parent is _level0\nChild: level is _level0.child2, root is _level0, _lockroot is true, parent is _level0\nChild: level is _level0.child3, root is _level0, _lockroot is true, parent is _level0\nChild: level is _level0.child1.child1, root is _level0, _lockroot is false, parent is _level0.child1\nChild: level is _level0.child1.child2, root is _level0, _lockroot is true, parent is _level0.child1\nChild: level is _level0.child1.child3, root is _level0, _lockroot is true, parent is _level0.child1\nChild: level is _level0.child2.child1, root is _level0, _lockroot is false, parent is _level0.child2\nChild: level is _level0.child2.child2, root is _level0, _lockroot is true, parent is _level0.child2\nChild: level is _level0.child2.child3, root is _level0, _lockroot is true, parent is _level0.child2\nChild: level is _level0.child3.child1, root is _level0, _lockroot is false, parent is _level0.child3\nChild: level is _level0.child3.child2, root is _level0, _lockroot is true, parent is _level0.child3\nChild: level is _level0.child3.child3, root is _level0, _lockroot is true, parent is _level0.child3\nAll tests done.",
@@ -3255,7 +3242,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 12.78,
+      "duration": 13.4,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=0, expected=4)",
       "actual_output": "",
@@ -3269,7 +3256,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 12.73,
+      "duration": 13.53,
       "status": "pass"
     },
     {
@@ -3280,7 +3267,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 12.73,
+      "duration": 13.54,
       "status": "pass"
     },
     {
@@ -3291,7 +3278,7 @@
         "expected_lines": 14,
         "matching_lines": 2
       },
-      "duration": 12.89,
+      "duration": 13.48,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=14, expected=14)",
       "actual_output": "undefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined\nundefined",
@@ -3305,7 +3292,7 @@
         "expected_lines": 114,
         "matching_lines": 3
       },
-      "duration": 13.91,
+      "duration": 14.33,
       "status": "output_mismatch",
       "detail": "111 line(s) differ (actual=7, expected=114)",
       "actual_output": "Test 1 (Offline; Link doesn't exist)\nloadMovie command issued.\nBoth targets have the same props.\nError: _framesloaded must be -1.\nError: No error has occurred.\n\nError: Test number undefined does not exist.",
@@ -3319,7 +3306,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 12.81,
+      "duration": 13.4,
       "status": "pass"
     },
     {
@@ -3330,7 +3317,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 12.96,
+      "duration": 13.64,
       "status": "pass"
     },
     {
@@ -3341,7 +3328,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 12.95,
+      "duration": 13.44,
       "status": "pass"
     },
     {
@@ -3352,7 +3339,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.87,
+      "duration": 13.22,
       "status": "pass"
     },
     {
@@ -3363,7 +3350,7 @@
         "expected_lines": 84,
         "matching_lines": 84
       },
-      "duration": 13.31,
+      "duration": 13.97,
       "status": "pass"
     },
     {
@@ -3374,7 +3361,7 @@
         "expected_lines": 84,
         "matching_lines": 84
       },
-      "duration": 13.23,
+      "duration": 13.99,
       "status": "pass"
     },
     {
@@ -3385,7 +3372,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.77,
+      "duration": 13.28,
       "status": "pass"
     },
     {
@@ -3396,7 +3383,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.69,
+      "duration": 13.34,
       "status": "pass"
     },
     {
@@ -3407,7 +3394,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 12.76,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -3418,7 +3405,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.67,
+      "duration": 13.46,
       "status": "pass"
     },
     {
@@ -3429,7 +3416,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 12.68,
+      "duration": 13.6,
       "status": "pass"
     },
     {
@@ -3440,7 +3427,7 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 12.69,
+      "duration": 13.7,
       "status": "pass"
     },
     {
@@ -3451,7 +3438,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 12.65,
+      "duration": 13.59,
       "status": "pass"
     },
     {
@@ -3462,7 +3449,7 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 12.92,
+      "duration": 13.79,
       "status": "pass"
     },
     {
@@ -3473,7 +3460,7 @@
         "expected_lines": 74,
         "matching_lines": 74
       },
-      "duration": 12.77,
+      "duration": 13.58,
       "status": "pass"
     },
     {
@@ -3484,7 +3471,7 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 12.9,
+      "duration": 13.95,
       "status": "pass"
     },
     {
@@ -3495,7 +3482,7 @@
         "expected_lines": 62,
         "matching_lines": 62
       },
-      "duration": 12.74,
+      "duration": 13.52,
       "status": "pass"
     },
     {
@@ -3506,7 +3493,7 @@
         "expected_lines": 68,
         "matching_lines": 68
       },
-      "duration": 12.82,
+      "duration": 13.5,
       "status": "pass"
     },
     {
@@ -3517,7 +3504,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 12.86,
+      "duration": 13.47,
       "status": "pass"
     },
     {
@@ -3528,7 +3515,7 @@
         "expected_lines": 74,
         "matching_lines": 74
       },
-      "duration": 12.83,
+      "duration": 13.6,
       "status": "pass"
     },
     {
@@ -3539,19 +3526,22 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 13.04,
+      "duration": 13.72,
       "status": "pass"
     },
     {
       "test": "path_string",
       "num_frames": 1,
       "lines": {
-        "actual_lines": 322,
+        "actual_lines": 323,
         "expected_lines": 322,
-        "matching_lines": 322
+        "matching_lines": 280
       },
-      "duration": 12.93,
-      "status": "pass"
+      "duration": 13.55,
+      "status": "output_mismatch",
+      "detail": "43 line(s) differ (actual=323, expected=322)",
+      "actual_output": "... (275 lines before) ...\nundefined\n// tellTarget(undefined) { trace(_name); }\nTarget not found: Target=\"clip1 var\" Base=\"_level0\"\nundefined\n\ntoString\n// get(o)\ntoString\nclip1 var\n// tellTarget(undefined) { trace(_name); }\ntoString\nclip1\n\n// get(null)\nundefined\n// tellTarget(undefined) { trace(_name); }\nTarget not found: Target=\"null\" Base=\"_level0\"\nundefined\n\n// set('clip5/foo', 1)\n1\n\n// set('clip5/:foo', 2)\n2\n\n// set('clip5::foo', 3)\n3\n\n// set('clip5/_parent.foo', 4)\n4\n\n// set('clip5._root.clip5.foo', 5)\n5\n\n// set('clip5/_root._root.foo', 6)\n6\n\n// set('clip5/...foo', 7)\n7\n\n// set('this:bar', 10)\n10\n\n// set('this/clip5:foo', 8)\n8\n\n// set('this/clip5', 11)\n11",
+      "expected_output": "... (275 lines before) ...\nundefined\n// tellTarget(undefined) { trace(_name); }\nTarget not found: Target=\"clip1 var\" Base=\"_level0\"\nundefined\n\n// get(o)\ntoString\nclip1 var\n// tellTarget(undefined) { trace(_name); }\ntoString\nclip1\n\n// get(null)\nundefined\n// tellTarget(undefined) { trace(_name); }\nTarget not found: Target=\"null\" Base=\"_level0\"\nundefined\n\n// set('clip5/foo', 1)\n1\n\n// set('clip5/:foo', 2)\n2\n\n// set('clip5::foo', 3)\n3\n\n// set('clip5/_parent.foo', 4)\n4\n\n// set('clip5._root.clip5.foo', 5)\n5\n\n// set('clip5/_root._root.foo', 6)\n6\n\n// set('clip5/...foo', 7)\n7\n\n// set('this:bar', 10)\n10\n\n// set('this/clip5:foo', 8)\n8\n\n// set('this/clip5', 11)\n11"
     },
     {
       "test": "place_and_lookup",
@@ -3561,7 +3551,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 12.74,
+      "duration": 13.37,
       "status": "pass"
     },
     {
@@ -3572,7 +3562,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 12.78,
+      "duration": 13.19,
       "status": "pass"
     },
     {
@@ -3583,7 +3573,7 @@
         "expected_lines": 175,
         "matching_lines": 175
       },
-      "duration": 13.07,
+      "duration": 13.9,
       "status": "pass"
     },
     {
@@ -3594,7 +3584,7 @@
         "expected_lines": 37,
         "matching_lines": 37
       },
-      "duration": 12.73,
+      "duration": 13.72,
       "status": "pass"
     },
     {
@@ -3605,7 +3595,7 @@
         "expected_lines": 557,
         "matching_lines": 557
       },
-      "duration": 13.08,
+      "duration": 13.85,
       "status": "pass"
     },
     {
@@ -3616,7 +3606,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 12.76,
+      "duration": 13.54,
       "status": "pass"
     },
     {
@@ -3627,7 +3617,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 12.85,
+      "duration": 13.87,
       "status": "pass"
     },
     {
@@ -3638,7 +3628,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 12.76,
+      "duration": 13.48,
       "status": "pass"
     },
     {
@@ -3649,7 +3639,7 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 12.77,
+      "duration": 13.38,
       "status": "pass"
     },
     {
@@ -3660,7 +3650,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 12.77,
+      "duration": 13.18,
       "status": "pass"
     },
     {
@@ -3671,7 +3661,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 12.75,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -3682,7 +3672,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 12.79,
+      "duration": 13.16,
       "status": "pass"
     },
     {
@@ -3693,7 +3683,7 @@
         "expected_lines": 745,
         "matching_lines": 745
       },
-      "duration": 13.49,
+      "duration": 14.05,
       "status": "pass"
     },
     {
@@ -3704,7 +3694,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.67,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -3715,7 +3705,7 @@
         "expected_lines": 231,
         "matching_lines": 146
       },
-      "duration": 13.28,
+      "duration": 13.86,
       "status": "output_mismatch",
       "detail": "85 line(s) differ (actual=194, expected=231)",
       "actual_output": "... (29 lines before) ...\n\n// trace(this.box.custom)\nundefined\n\n// trace(this.box.box)\nundefined\n\na constructor() end\n\n\naaclass constructor\n\n// trace(this._name)\nbox\n\n// trace(this.__constructor__)\n[type Function]\n\n// trace(this.__constructor__ === aaclass)\ntrue\n\naaclass test()\n\n// trace(this._name)\nbox\n\n// trace(this.box)\n_level0.a.box.box\n\naaclass test() end\naaclass constructor end\n\n\nb constructor()\n\n// trace(this._name)\nb\n\n// trace(this._name)\nb\n\n// trace(this.box)\n_level0.b.box\n\n// trace(this.custom)\ntrue\n\nb constructor() end\n\n\n... (115 lines after) ...",
@@ -3729,7 +3719,7 @@
         "expected_lines": 66,
         "matching_lines": 38
       },
-      "duration": 13.02,
+      "duration": 13.65,
       "status": "output_mismatch",
       "detail": "28 line(s) differ (actual=47, expected=66)",
       "actual_output": "... (22 lines before) ...\n// typeof mc\nmovieclip\nPrototype check passed\n\n// typeof mc\nundefined\nPrototype check failed!\n\nIn child\nIn CustomClass constructor\n// typeof mc\nmovieclip\nPrototype check passed\n\n// typeof mc\nmovieclip\nPrototype check passed\n\n// typeof mc\nmovieclip\nPrototype check failed!\n\n// typeof mc\nmovieclip\nPrototype check passed",
@@ -3743,7 +3733,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 12.86,
+      "duration": 13.5,
       "status": "pass"
     },
     {
@@ -3754,7 +3744,7 @@
         "expected_lines": 37,
         "matching_lines": 1
       },
-      "duration": 12.94,
+      "duration": 13.51,
       "status": "output_mismatch",
       "detail": "36 line(s) differ (actual=9, expected=37)",
       "actual_output": "In child\nIn CustomClass constructor\n// typeof mc\nmovieclip\nPrototype check failed!\n\n// typeof mc\nmovieclip\nPrototype check failed!",
@@ -3768,7 +3758,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 12.87,
+      "duration": 13.37,
       "status": "pass"
     },
     {
@@ -3779,7 +3769,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 12.94,
+      "duration": 14.43,
       "status": "pass"
     },
     {
@@ -3790,7 +3780,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 12.83,
+      "duration": 13.09,
       "status": "pass"
     },
     {
@@ -3801,7 +3791,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 12.9,
+      "duration": 13.1,
       "status": "pass"
     },
     {
@@ -3812,7 +3802,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 12.79,
+      "duration": 13.1,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=1, expected=2)",
       "actual_output": "BAD",
@@ -3826,7 +3816,7 @@
         "expected_lines": 15,
         "matching_lines": 1
       },
-      "duration": 13.24,
+      "duration": 13.8,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=23, expected=15)",
       "actual_output": "clip 1\nclip 1 BAD\nclip 1\nclip 1 BAD\nclip 2\nclip 2 BAD\nclip 4\nclip 4 BAD\ndone\nclip 5\nclip 5 OK\nclip 5 BAD\nclip 6\nclip 6 OK\nclip 6 OK2\nclip 6 BAD\nclip 7\nclip 7 OK\nclip 7 BAD\nclip 8\nclip 8 OK\nclip 8 OK2\nclip 8 BAD",
@@ -3840,7 +3830,7 @@
         "expected_lines": 35,
         "matching_lines": 11
       },
-      "duration": 12.9,
+      "duration": 13.31,
       "status": "output_mismatch",
       "detail": "26 line(s) differ (actual=37, expected=35)",
       "actual_output": "base1 frame 1 start\nscope = /base1\n// Removing only target clip:\nscope = /target1\n// removeMovieClip(_root.target1);\nscope = /\n// call(2);\nroot frame 2 start/end\n// Removing only base clip:\nscope = /target_fixed\n// removeMovieClip(this);\nscope = /\n// Calling with a removed base clip:\nscope = /base1\n// call(2);\nbase1 frame 2 start/end\nThis should be unreachable\nbase1 frame 1 end\n\nbase2 frame 1 start\nscope = /base2\n// Removing base clip with target clip as its child:\nscope = /base2\n// removeMovieClip(this);\nscope = /\nbase2 frame 1 end\n\nbase3 frame 1 start\n// Removing clip that is both base and target:\nassignment = unchanged\n// removeMovieClip(this);\n// assignment = \"changed\";\nassignment = changed\n_root.base3.assignment = undefined\n_root.assignment = \n_global.assignment = undefined\nbase3 frame 1 end",
@@ -3854,7 +3844,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 12.85,
+      "duration": 13.14,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -3868,7 +3858,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 12.86,
+      "duration": 13.13,
       "status": "pass"
     },
     {
@@ -3879,7 +3869,7 @@
         "expected_lines": 10,
         "matching_lines": 0
       },
-      "duration": 12.81,
+      "duration": 12.99,
       "status": "output_mismatch",
       "detail": "10 line(s) differ (actual=0, expected=10)",
       "actual_output": "",
@@ -3893,7 +3883,7 @@
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 12.78,
+      "duration": 12.95,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=6, expected=6)",
       "actual_output": "false\ntrue\nfalse\ntrue\nfalse\nfalse",
@@ -3903,8 +3893,8 @@
       "test": "root_onload",
       "num_frames": 1,
       "status": "compile_fail",
-      "detail": "/tmp/swf_verify_w7bz81g6/data_registry.c:5:48: error: expected expression before \u2018,\u2019 token",
-      "duration": 13.06
+      "detail": "/tmp/swf_verify_outmiaqi/data_registry.c:5:48: error: expected expression before \u2018,\u2019 token",
+      "duration": 13.0
     },
     {
       "test": "sandbox_type_local_file",
@@ -3914,7 +3904,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.92,
+      "duration": 12.96,
       "status": "pass"
     },
     {
@@ -3925,7 +3915,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.8,
+      "duration": 12.94,
       "status": "pass"
     },
     {
@@ -3936,7 +3926,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 12.74,
+      "duration": 13.11,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=1, expected=3)",
       "actual_output": "Current sandbox type: localWithNetwork",
@@ -3950,7 +3940,7 @@
         "expected_lines": 454,
         "matching_lines": 454
       },
-      "duration": 12.9,
+      "duration": 13.33,
       "status": "pass"
     },
     {
@@ -3961,7 +3951,7 @@
         "expected_lines": 27,
         "matching_lines": 15
       },
-      "duration": 12.82,
+      "duration": 13.18,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=23, expected=27)",
       "actual_output": "Setting text\ntext.onSetFocus: undefined\nSelection.onSetFocus: null -> _level0.text\nSetting text\nSetting button\ntext.onKillFocus: undefined\nbutton.onSetFocus: undefined\nSelection.onSetFocus: _level0.text -> _level0.button\nSetting button\nSetting clip\nbutton.onKillFocus: undefined\nclip.onSetFocus: undefined\nSelection.onSetFocus: _level0.button -> _level0.clip\nSetting clip\nSetting null\nclip.onKillFocus: undefined\nSelection.onSetFocus: _level0.clip -> null\nSetting null\nDone\nbutton.onRollOver\nbutton.onRollOut\nclip.onRollOver\nclip.onRollOut",
@@ -3975,7 +3965,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 12.93,
+      "duration": 13.28,
       "status": "pass"
     },
     {
@@ -3986,7 +3976,7 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 12.89,
+      "duration": 13.03,
       "status": "pass"
     },
     {
@@ -3997,7 +3987,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.73,
+      "duration": 12.69,
       "status": "pass"
     },
     {
@@ -4008,7 +3998,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 12.72,
+      "duration": 12.9,
       "status": "pass"
     },
     {
@@ -4019,7 +4009,7 @@
         "expected_lines": 628,
         "matching_lines": 628
       },
-      "duration": 13.03,
+      "duration": 13.3,
       "status": "pass"
     },
     {
@@ -4030,7 +4020,7 @@
         "expected_lines": 68,
         "matching_lines": 68
       },
-      "duration": 12.87,
+      "duration": 13.28,
       "status": "pass"
     },
     {
@@ -4041,7 +4031,7 @@
         "expected_lines": 68,
         "matching_lines": 68
       },
-      "duration": 12.9,
+      "duration": 13.57,
       "status": "pass"
     },
     {
@@ -4052,7 +4042,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.8,
+      "duration": 14.08,
       "status": "pass"
     },
     {
@@ -4063,7 +4053,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 12.79,
+      "duration": 13.64,
       "status": "pass"
     },
     {
@@ -4074,7 +4064,7 @@
         "expected_lines": 83,
         "matching_lines": 83
       },
-      "duration": 12.79,
+      "duration": 13.47,
       "status": "pass"
     },
     {
@@ -4085,7 +4075,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.75,
+      "duration": 13.37,
       "status": "pass"
     },
     {
@@ -4096,7 +4086,7 @@
         "expected_lines": 241,
         "matching_lines": 241
       },
-      "duration": 13.09,
+      "duration": 13.83,
       "status": "pass"
     },
     {
@@ -4107,7 +4097,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 12.72,
+      "duration": 13.17,
       "status": "pass"
     },
     {
@@ -4118,7 +4108,7 @@
         "expected_lines": 231,
         "matching_lines": 231
       },
-      "duration": 13.11,
+      "duration": 13.37,
       "status": "pass"
     },
     {
@@ -4129,7 +4119,7 @@
         "expected_lines": 586,
         "matching_lines": 586
       },
-      "duration": 12.78,
+      "duration": 13.15,
       "status": "pass"
     },
     {
@@ -4140,7 +4130,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 12.84,
+      "duration": 13.15,
       "status": "pass"
     },
     {
@@ -4151,7 +4141,7 @@
         "expected_lines": 902,
         "matching_lines": 902
       },
-      "duration": 14.22,
+      "duration": 14.66,
       "status": "pass"
     },
     {
@@ -4162,19 +4152,22 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 12.79,
+      "duration": 13.34,
       "status": "pass"
     },
     {
       "test": "string_coercion",
       "num_frames": 1,
       "lines": {
-        "actual_lines": 117,
+        "actual_lines": 118,
         "expected_lines": 117,
-        "matching_lines": 117
+        "matching_lines": 107
       },
-      "duration": 13.03,
-      "status": "pass"
+      "duration": 13.79,
+      "status": "output_mismatch",
+      "detail": "11 line(s) differ (actual=118, expected=117)",
+      "actual_output": "... (98 lines before) ...\ntrue\ntrue\ntrue\ntoString call tests\ntoString was here\ntoString was here\nXs\ntoString was here\nsX\nNaN\nNaN\nNaN\nFunction toString tests\n[type Function]\n[type Function]\n[type Function]\nFunction string tests, toString deleted\n[type Function]\nundefined\n[type Function]",
+      "expected_output": "... (98 lines before) ...\ntrue\ntrue\ntrue\ntoString call tests\ntoString was here\nXs\ntoString was here\nsX\nNaN\nNaN\nNaN\nFunction toString tests\n[type Function]\n[type Function]\n[type Function]\nFunction string tests, toString deleted\n[type Function]\nundefined\n[type Function]"
     },
     {
       "test": "string_methods",
@@ -4184,7 +4177,7 @@
         "expected_lines": 285,
         "matching_lines": 285
       },
-      "duration": 13.31,
+      "duration": 13.92,
       "status": "pass"
     },
     {
@@ -4195,7 +4188,7 @@
         "expected_lines": 240,
         "matching_lines": 240
       },
-      "duration": 12.91,
+      "duration": 13.88,
       "status": "pass"
     },
     {
@@ -4206,7 +4199,7 @@
         "expected_lines": 275,
         "matching_lines": 275
       },
-      "duration": 13.22,
+      "duration": 14.75,
       "status": "pass"
     },
     {
@@ -4217,7 +4210,7 @@
         "expected_lines": 95,
         "matching_lines": 95
       },
-      "duration": 12.81,
+      "duration": 14.29,
       "status": "pass"
     },
     {
@@ -4228,7 +4221,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.7,
+      "duration": 14.12,
       "status": "pass"
     },
     {
@@ -4239,7 +4232,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 12.7,
+      "duration": 14.55,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=8, expected=4)",
       "actual_output": "_level0.f1\nhi\n_level0.f1\nbye\n_level0.f1\nundefined\n_level0.f1\nbye",
@@ -4253,7 +4246,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 12.81,
+      "duration": 14.57,
       "status": "pass"
     },
     {
@@ -4264,7 +4257,7 @@
         "expected_lines": 54,
         "matching_lines": 54
       },
-      "duration": 12.76,
+      "duration": 14.34,
       "status": "pass"
     },
     {
@@ -4275,7 +4268,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.72,
+      "duration": 13.31,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=0)",
       "actual_output": "Keypress",
@@ -4289,7 +4282,7 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 12.78,
+      "duration": 13.49,
       "status": "pass"
     },
     {
@@ -4300,7 +4293,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 12.8,
+      "duration": 13.39,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=2, expected=2)",
       "actual_output": "0\nundefined",
@@ -4311,7 +4304,7 @@
       "num_frames": 1,
       "status": "segfault",
       "detail": "SIGSEGV",
-      "duration": 14.77
+      "duration": 15.82
     },
     {
       "test": "string_paths_unload",
@@ -4321,7 +4314,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 12.92,
+      "duration": 13.91,
       "status": "pass"
     },
     {
@@ -4332,7 +4325,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.75,
+      "duration": 13.07,
       "status": "pass"
     },
     {
@@ -4343,7 +4336,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 12.82,
+      "duration": 13.02,
       "status": "pass"
     },
     {
@@ -4354,7 +4347,7 @@
         "expected_lines": 283,
         "matching_lines": 283
       },
-      "duration": 13.53,
+      "duration": 13.75,
       "status": "pass"
     },
     {
@@ -4365,7 +4358,7 @@
         "expected_lines": 750,
         "matching_lines": 750
       },
-      "duration": 13.43,
+      "duration": 13.57,
       "status": "pass"
     },
     {
@@ -4376,7 +4369,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 12.9,
+      "duration": 13.01,
       "status": "pass"
     },
     {
@@ -4387,7 +4380,7 @@
         "expected_lines": 96,
         "matching_lines": 96
       },
-      "duration": 12.82,
+      "duration": 12.98,
       "status": "pass"
     },
     {
@@ -4398,7 +4391,7 @@
         "expected_lines": 158,
         "matching_lines": 158
       },
-      "duration": 12.88,
+      "duration": 12.98,
       "status": "pass"
     },
     {
@@ -4409,7 +4402,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.73,
+      "duration": 12.82,
       "status": "pass"
     },
     {
@@ -4420,7 +4413,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 13.63,
+      "duration": 13.34,
       "status": "pass"
     },
     {
@@ -4431,7 +4424,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 13.44,
+      "duration": 12.69,
       "status": "pass"
     },
     {
@@ -4442,7 +4435,7 @@
         "expected_lines": 232,
         "matching_lines": 232
       },
-      "duration": 13.66,
+      "duration": 12.95,
       "status": "pass"
     },
     {
@@ -4453,7 +4446,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 13.64,
+      "duration": 12.85,
       "status": "pass"
     },
     {
@@ -4464,7 +4457,7 @@
         "expected_lines": 42,
         "matching_lines": 42
       },
-      "duration": 13.43,
+      "duration": 12.65,
       "status": "pass"
     },
     {
@@ -4475,7 +4468,7 @@
         "expected_lines": 232,
         "matching_lines": 232
       },
-      "duration": 13.62,
+      "duration": 12.73,
       "status": "pass"
     },
     {
@@ -4486,7 +4479,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 13.42,
+      "duration": 12.64,
       "status": "pass"
     },
     {
@@ -4497,7 +4490,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 13.58,
+      "duration": 12.74,
       "status": "pass"
     },
     {
@@ -4508,7 +4501,7 @@
         "expected_lines": 232,
         "matching_lines": 232
       },
-      "duration": 13.56,
+      "duration": 12.71,
       "status": "pass"
     },
     {
@@ -4519,7 +4512,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 13.43,
+      "duration": 13.35,
       "status": "pass"
     },
     {
@@ -4530,7 +4523,7 @@
         "expected_lines": 5,
         "matching_lines": 4
       },
-      "duration": 13.62,
+      "duration": 12.82,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=5, expected=5)",
       "actual_output": "root frame 1\nchild frame 1 start\nundefined\nchild frame 1 end\nroot frame 2",
@@ -4544,7 +4537,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 13.44,
+      "duration": 13.1,
       "status": "pass"
     },
     {
@@ -4555,7 +4548,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 13.5,
+      "duration": 13.09,
       "status": "pass"
     },
     {
@@ -4566,7 +4559,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 13.54,
+      "duration": 12.85,
       "status": "pass"
     },
     {
@@ -4577,7 +4570,7 @@
         "expected_lines": 37,
         "matching_lines": 37
       },
-      "duration": 13.63,
+      "duration": 12.88,
       "status": "pass"
     },
     {
@@ -4588,7 +4581,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 13.48,
+      "duration": 13.04,
       "status": "pass"
     },
     {
@@ -4599,7 +4592,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 13.56,
+      "duration": 13.12,
       "status": "pass"
     },
     {
@@ -4610,7 +4603,7 @@
         "expected_lines": 1146,
         "matching_lines": 1146
       },
-      "duration": 13.73,
+      "duration": 13.6,
       "status": "pass"
     },
     {
@@ -4621,7 +4614,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 13.43,
+      "duration": 12.9,
       "status": "pass"
     },
     {
@@ -4632,7 +4625,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 13.54,
+      "duration": 12.81,
       "status": "pass"
     },
     {
@@ -4643,7 +4636,7 @@
         "expected_lines": 840,
         "matching_lines": 840
       },
-      "duration": 13.57,
+      "duration": 12.95,
       "status": "pass"
     },
     {
@@ -4654,7 +4647,7 @@
         "expected_lines": 840,
         "matching_lines": 840
       },
-      "duration": 13.65,
+      "duration": 13.06,
       "status": "pass"
     },
     {
@@ -4665,7 +4658,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 13.53,
+      "duration": 12.84,
       "status": "pass"
     },
     {
@@ -4676,7 +4669,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 13.53,
+      "duration": 12.9,
       "status": "pass"
     },
     {
@@ -4687,7 +4680,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.49,
+      "duration": 12.72,
       "status": "pass"
     },
     {
@@ -4698,7 +4691,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 13.54,
+      "duration": 12.8,
       "status": "pass"
     },
     {
@@ -4709,7 +4702,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 13.59,
+      "duration": 12.77,
       "status": "pass"
     },
     {
@@ -4720,7 +4713,7 @@
         "expected_lines": 175,
         "matching_lines": 175
       },
-      "duration": 13.77,
+      "duration": 12.89,
       "status": "pass"
     },
     {
@@ -4731,7 +4724,7 @@
         "expected_lines": 210,
         "matching_lines": 210
       },
-      "duration": 13.64,
+      "duration": 12.88,
       "status": "pass"
     },
     {
@@ -4742,7 +4735,7 @@
         "expected_lines": 210,
         "matching_lines": 210
       },
-      "duration": 13.62,
+      "duration": 12.86,
       "status": "pass"
     },
     {
@@ -4753,7 +4746,7 @@
         "expected_lines": 210,
         "matching_lines": 210
       },
-      "duration": 13.71,
+      "duration": 12.86,
       "status": "pass"
     },
     {
@@ -4764,7 +4757,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 13.56,
+      "duration": 12.71,
       "status": "pass"
     },
     {
@@ -4775,7 +4768,7 @@
         "expected_lines": 81,
         "matching_lines": 81
       },
-      "duration": 13.71,
+      "duration": 12.81,
       "status": "pass"
     },
     {
@@ -4786,7 +4779,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 13.67,
+      "duration": 12.88,
       "status": "pass"
     },
     {
@@ -4797,7 +4790,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 13.77,
+      "duration": 13.14,
       "status": "pass"
     },
     {
@@ -4808,7 +4801,7 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 13.7,
+      "duration": 13.32,
       "status": "pass"
     },
     {
@@ -4819,7 +4812,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 13.59,
+      "duration": 12.81,
       "status": "pass"
     },
     {
@@ -4830,7 +4823,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 13.38,
+      "duration": 13.01,
       "status": "pass"
     },
     {
@@ -4841,7 +4834,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.4,
+      "duration": 12.7,
       "status": "pass"
     },
     {
@@ -4852,7 +4845,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 13.57,
+      "duration": 12.87,
       "status": "pass"
     },
     {
@@ -4863,7 +4856,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 13.47,
+      "duration": 12.86,
       "status": "pass"
     },
     {
@@ -4874,7 +4867,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 13.38,
+      "duration": 12.7,
       "status": "pass"
     },
     {
@@ -4885,7 +4878,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 13.68,
+      "duration": 12.71,
       "status": "pass"
     },
     {
@@ -4896,7 +4889,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 13.7,
+      "duration": 13.09,
       "status": "pass"
     },
     {
@@ -4904,7 +4897,7 @@
       "num_frames": 1,
       "status": "segfault",
       "detail": "SIGSEGV",
-      "duration": 15.38,
+      "duration": 15.48,
       "lines": {
         "actual_lines": 1,
         "expected_lines": 18,
@@ -4930,7 +4923,7 @@
         "expected_lines": 70,
         "matching_lines": 70
       },
-      "duration": 13.38,
+      "duration": 13.36,
       "status": "pass"
     },
     {
@@ -4941,7 +4934,7 @@
         "expected_lines": 118,
         "matching_lines": 118
       },
-      "duration": 13.45,
+      "duration": 13.26,
       "status": "pass"
     },
     {
@@ -4952,7 +4945,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 13.19,
+      "duration": 13.12,
       "status": "pass"
     },
     {
@@ -4963,7 +4956,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 13.36,
+      "duration": 13.15,
       "status": "pass"
     },
     {
@@ -4974,7 +4967,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 13.28,
+      "duration": 13.18,
       "status": "pass"
     },
     {
@@ -4985,7 +4978,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.3,
+      "duration": 13.16,
       "status": "pass"
     },
     {
@@ -4996,7 +4989,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.38,
+      "duration": 13.24,
       "status": "pass"
     },
     {
@@ -5007,7 +5000,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 13.35,
+      "duration": 13.23,
       "status": "pass"
     },
     {
@@ -5018,7 +5011,7 @@
         "expected_lines": 43,
         "matching_lines": 43
       },
-      "duration": 13.47,
+      "duration": 13.2,
       "status": "pass"
     },
     {
@@ -5029,7 +5022,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 13.62,
+      "duration": 13.32,
       "status": "pass"
     },
     {
@@ -5040,7 +5033,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 13.38,
+      "duration": 13.2,
       "status": "pass"
     },
     {
@@ -5051,7 +5044,7 @@
         "expected_lines": 5,
         "matching_lines": 0
       },
-      "duration": 13.74,
+      "duration": 13.29,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=0, expected=5)",
       "actual_output": "",
@@ -5065,7 +5058,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 13.43,
+      "duration": 13.21,
       "status": "pass"
     },
     {
@@ -5076,7 +5069,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 13.55,
+      "duration": 13.41,
       "status": "pass"
     },
     {
@@ -5087,7 +5080,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 13.43,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -5098,7 +5091,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 13.35,
+      "duration": 13.3,
       "status": "pass"
     },
     {
@@ -5109,7 +5102,7 @@
         "expected_lines": 117,
         "matching_lines": 117
       },
-      "duration": 13.66,
+      "duration": 13.48,
       "status": "pass"
     },
     {
@@ -5120,7 +5113,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 13.38,
+      "duration": 13.19,
       "status": "pass"
     },
     {
@@ -5131,7 +5124,7 @@
         "expected_lines": 60,
         "matching_lines": 9
       },
-      "duration": 13.47,
+      "duration": 13.28,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=52, expected=60)",
       "actual_output": "// watch(\"variable\", plusOne)\ntrue\n\n// addProperty(\"variable\", getter, setter)\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// unwatch(\"variable\")\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// watch(\"variable\", plusOne)\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// delete(variable)\n\n... (2 lines after) ...",
@@ -5145,7 +5138,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 13.58,
+      "duration": 13.19,
       "status": "pass"
     },
     {
@@ -5156,7 +5149,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 13.51,
+      "duration": 13.22,
       "status": "pass"
     },
     {
@@ -5167,7 +5160,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 13.49,
+      "duration": 13.13,
       "status": "pass"
     },
     {
@@ -5178,7 +5171,7 @@
         "expected_lines": 43,
         "matching_lines": 43
       },
-      "duration": 13.56,
+      "duration": 13.29,
       "status": "pass"
     },
     {
@@ -5189,7 +5182,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 13.45,
+      "duration": 13.4,
       "status": "pass"
     },
     {
@@ -5200,7 +5193,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 13.37,
+      "duration": 13.27,
       "status": "pass"
     },
     {
@@ -5211,7 +5204,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 13.41,
+      "duration": 13.22,
       "status": "pass"
     },
     {
@@ -5222,7 +5215,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 13.42,
+      "duration": 13.24,
       "status": "pass"
     },
     {
@@ -5233,7 +5226,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 13.4,
+      "duration": 13.21,
       "status": "pass"
     },
     {
@@ -5244,7 +5237,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 13.38,
+      "duration": 13.21,
       "status": "pass"
     },
     {
@@ -5255,7 +5248,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 13.45,
+      "duration": 13.23,
       "status": "pass"
     },
     {
@@ -5266,7 +5259,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 13.4,
+      "duration": 13.28,
       "status": "pass"
     },
     {
@@ -5277,7 +5270,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 13.33,
+      "duration": 13.32,
       "status": "pass"
     },
     {
@@ -5288,7 +5281,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 13.46,
+      "duration": 13.24,
       "status": "pass"
     },
     {
@@ -5299,7 +5292,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 13.48,
+      "duration": 13.29,
       "status": "pass"
     },
     {
@@ -5310,7 +5303,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 13.43,
+      "duration": 13.2,
       "status": "pass"
     },
     {
@@ -5321,7 +5314,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 13.59,
+      "duration": 13.24,
       "status": "pass"
     },
     {
@@ -5332,7 +5325,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 13.44,
+      "duration": 13.18,
       "status": "pass"
     },
     {
@@ -5343,7 +5336,7 @@
         "expected_lines": 62,
         "matching_lines": 62
       },
-      "duration": 13.4,
+      "duration": 13.16,
       "status": "pass"
     },
     {
@@ -5354,7 +5347,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 13.34,
+      "duration": 13.16,
       "status": "pass"
     },
     {
@@ -5365,7 +5358,7 @@
         "expected_lines": 203,
         "matching_lines": 203
       },
-      "duration": 13.39,
+      "duration": 13.26,
       "status": "pass"
     },
     {
@@ -5376,7 +5369,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 13.32,
+      "duration": 13.18,
       "status": "pass"
     },
     {
@@ -5387,7 +5380,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 13.4,
+      "duration": 13.23,
       "status": "pass"
     },
     {
@@ -5398,7 +5391,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 13.41,
+      "duration": 13.26,
       "status": "pass"
     },
     {
@@ -5409,7 +5402,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 13.37,
+      "duration": 13.13,
       "status": "pass"
     },
     {
@@ -5420,7 +5413,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 13.33,
+      "duration": 13.25,
       "status": "pass"
     },
     {
@@ -5431,7 +5424,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.37,
+      "duration": 13.3,
       "status": "pass"
     },
     {
@@ -5442,7 +5435,7 @@
         "expected_lines": 23,
         "matching_lines": 23
       },
-      "duration": 13.47,
+      "duration": 13.34,
       "status": "pass"
     },
     {
@@ -5453,7 +5446,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.46,
+      "duration": 13.4,
       "status": "pass"
     }
   ]
