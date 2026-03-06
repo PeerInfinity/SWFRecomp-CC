@@ -2337,6 +2337,458 @@ static ASFunction g_ei_escapeXML_func;
 static ASFunction g_ei_unescapeXML_func;
 static ASFunction g_ei_jsQuoteString_func;
 
+// --- ExternalInterface Phase 2: XML serialization ---
+
+// Shared XML escape helper (reused by _toXML for string values)
+static int ei_xml_escape_buf(const char* input, int input_len, char* out, int out_size)
+{
+	int olen = 0;
+	for (int i = 0; i < input_len && olen < out_size - 10; i++) {
+		char c = input[i];
+		if (c == '&') { memcpy(out + olen, "&amp;", 5); olen += 5; }
+		else if (c == '<') { memcpy(out + olen, "&lt;", 4); olen += 4; }
+		else if (c == '>') { memcpy(out + olen, "&gt;", 4); olen += 4; }
+		else if (c == '"') { memcpy(out + olen, "&quot;", 6); olen += 6; }
+		else if (c == '\'') { memcpy(out + olen, "&apos;", 6); olen += 6; }
+		else { out[olen++] = c; }
+	}
+	out[olen] = '\0';
+	return olen;
+}
+
+// Forward declarations for mutual recursion
+static int ei_toXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size);
+static int ei_arrayToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size);
+static int ei_argumentsToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size);
+static int ei_objectToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size);
+
+static int ei_toXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size)
+{
+	if (!val || val->type == ACTION_STACK_VALUE_UNDEFINED || val->type == ACTION_STACK_VALUE_HOLE)
+		return snprintf(buf, buf_size, "<undefined/>");
+	if (val->type == ACTION_STACK_VALUE_NULL)
+		return snprintf(buf, buf_size, "<null/>");
+	if (val->type == ACTION_STACK_VALUE_BOOLEAN)
+		return snprintf(buf, buf_size, val->data.numeric_value ? "<true/>" : "<false/>");
+	if (val->type == ACTION_STACK_VALUE_F32 || val->type == ACTION_STACK_VALUE_F64) {
+		char nbuf[64];
+		int nlen = varToStringBuf(app_context, val, nbuf, sizeof(nbuf));
+		return snprintf(buf, buf_size, "<number>%.*s</number>", nlen, nbuf);
+	}
+	if (val->type == ACTION_STACK_VALUE_STRING) {
+		char sbuf[2048];
+		int slen = varToStringBuf(app_context, val, sbuf, sizeof(sbuf) - 1);
+		sbuf[slen] = '\0';
+		char escaped[4096];
+		int elen = ei_xml_escape_buf(sbuf, slen, escaped, sizeof(escaped));
+		if (elen == 0)
+			return snprintf(buf, buf_size, "<string>null</string>");
+		return snprintf(buf, buf_size, "<string>%s</string>", escaped);
+	}
+	if (val->type == ACTION_STACK_VALUE_FUNCTION)
+		return snprintf(buf, buf_size, "<null/>");
+	if (val->type == ACTION_STACK_VALUE_ARRAY)
+		return ei_arrayToXML_buf(app_context, val, buf, buf_size);
+	if (val->type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* obj = (ASObject*) val->data.numeric_value;
+		if (obj) {
+			// Check for .length property — if present, treat as array
+			ASProperty* len_prop = findPropertyStructWithPrototype(obj, "length", 6);
+			if (len_prop)
+				return ei_arrayToXML_buf(app_context, val, buf, buf_size);
+		}
+		return ei_objectToXML_buf(app_context, val, buf, buf_size);
+	}
+	return snprintf(buf, buf_size, "<undefined/>");
+}
+
+static int ei_arrayToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size)
+{
+	int pos = 0;
+	pos += snprintf(buf + pos, buf_size - pos, "<array>");
+	if (val && val->type == ACTION_STACK_VALUE_STRING) {
+		// String: iterate 0..length-1, each produces <undefined/>
+		int length = val->str_size;
+		for (int i = 0; i < length && pos < buf_size - 60; i++)
+			pos += snprintf(buf + pos, buf_size - pos, "<property id=\"%d\"><undefined/></property>", i);
+	} else if (val && val->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* arr = (ASArray*) val->data.numeric_value;
+		if (arr) {
+			for (u32 i = 0; i < arr->length && pos < buf_size - 100; i++) {
+				pos += snprintf(buf + pos, buf_size - pos, "<property id=\"%u\">", i);
+				ActionVar* elem = getArrayElement(arr, i);
+				pos += ei_toXML_buf(app_context, elem, buf + pos, buf_size - pos);
+				pos += snprintf(buf + pos, buf_size - pos, "</property>");
+			}
+		}
+	} else if (val && val->type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* obj = (ASObject*) val->data.numeric_value;
+		if (obj) {
+			ASProperty* len_prop = findPropertyStructWithPrototype(obj, "length", 6);
+			if (len_prop) {
+				double d = 0;
+				if (len_prop->value.type == ACTION_STACK_VALUE_F32)
+					d = (double)VAL(float, &len_prop->value.data.numeric_value);
+				else if (len_prop->value.type == ACTION_STACK_VALUE_F64)
+					d = VAL(double, &len_prop->value.data.numeric_value);
+				else if (len_prop->value.type == ACTION_STACK_VALUE_BOOLEAN)
+					d = (double)len_prop->value.data.numeric_value;
+				int length = (int)d;
+				for (int i = 0; i < length && pos < buf_size - 100; i++) {
+					pos += snprintf(buf + pos, buf_size - pos, "<property id=\"%d\">", i);
+					char idx_str[16];
+					int idx_len = snprintf(idx_str, sizeof(idx_str), "%d", i);
+					ActionVar* elem_val = getPropertyWithPrototype(obj, idx_str, idx_len);
+					pos += ei_toXML_buf(app_context, elem_val, buf + pos, buf_size - pos);
+					pos += snprintf(buf + pos, buf_size - pos, "</property>");
+				}
+			}
+		}
+	}
+	pos += snprintf(buf + pos, buf_size - pos, "</array>");
+	return pos;
+}
+
+static int ei_argumentsToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size)
+{
+	int pos = 0;
+	pos += snprintf(buf + pos, buf_size - pos, "<arguments>");
+	if (val && val->type == ACTION_STACK_VALUE_STRING) {
+		int length = val->str_size;
+		for (int i = 1; i < length && pos < buf_size - 30; i++)
+			pos += snprintf(buf + pos, buf_size - pos, "<undefined/>");
+	} else if (val && val->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* arr = (ASArray*) val->data.numeric_value;
+		if (arr) {
+			for (u32 i = 1; i < arr->length && pos < buf_size - 100; i++) {
+				ActionVar* elem = getArrayElement(arr, i);
+				pos += ei_toXML_buf(app_context, elem, buf + pos, buf_size - pos);
+			}
+		}
+	} else if (val && val->type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* obj = (ASObject*) val->data.numeric_value;
+		if (obj) {
+			ASProperty* len_prop = findPropertyStructWithPrototype(obj, "length", 6);
+			if (len_prop) {
+				double d = 0;
+				if (len_prop->value.type == ACTION_STACK_VALUE_F32)
+					d = (double)VAL(float, &len_prop->value.data.numeric_value);
+				else if (len_prop->value.type == ACTION_STACK_VALUE_F64)
+					d = VAL(double, &len_prop->value.data.numeric_value);
+				else if (len_prop->value.type == ACTION_STACK_VALUE_BOOLEAN)
+					d = (double)len_prop->value.data.numeric_value;
+				int length = (int)d;
+				for (int i = 1; i < length && pos < buf_size - 100; i++) {
+					char idx_str[16];
+					int idx_len = snprintf(idx_str, sizeof(idx_str), "%d", i);
+					ActionVar* elem_val = getPropertyWithPrototype(obj, idx_str, idx_len);
+					pos += ei_toXML_buf(app_context, elem_val, buf + pos, buf_size - pos);
+				}
+			}
+		}
+	}
+	pos += snprintf(buf + pos, buf_size - pos, "</arguments>");
+	return pos;
+}
+
+static int ei_objectToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size)
+{
+	int pos = 0;
+	pos += snprintf(buf + pos, buf_size - pos, "<object>");
+	if (val && val->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* arr = (ASArray*) val->data.numeric_value;
+		if (arr) {
+			if (arr->enum_keys && arr->enum_count > 0) {
+				// Enumerate in reverse insertion order (for-in order)
+				for (int i = (int)arr->enum_count - 1; i >= 0 && pos < buf_size - 200; i--) {
+					const char* key = arr->enum_keys[i];
+					u32 key_len = (u32)strlen(key);
+					if (key_len == 9 && strncmp(key, "__proto__", 9) == 0) continue;
+					ActionVar* val_ptr = NULL;
+					int is_num = (key_len > 0 && key_len <= 10 && key[0] >= '0' && key[0] <= '9');
+					if (is_num) {
+						u64 idx_val = 0;
+						for (u32 j = 0; j < key_len; j++) {
+							if (key[j] < '0' || key[j] > '9') { is_num = 0; break; }
+							idx_val = idx_val * 10 + (key[j] - '0');
+						}
+						if (is_num && idx_val < arr->length && idx_val < arr->capacity) {
+							val_ptr = &arr->elements[(u32)idx_val];
+							if (val_ptr->type == ACTION_STACK_VALUE_HOLE) val_ptr = NULL;
+						}
+					}
+					if (!val_ptr && arr->props)
+						val_ptr = getPropertyWithPrototype(arr->props, key, key_len);
+					if (!val_ptr) continue;
+					pos += snprintf(buf + pos, buf_size - pos, "<property id=\"");
+					if (pos + (int)key_len < buf_size - 50) {
+						memcpy(buf + pos, key, key_len);
+						pos += key_len;
+					}
+					pos += snprintf(buf + pos, buf_size - pos, "\">");
+					pos += ei_toXML_buf(app_context, val_ptr, buf + pos, buf_size - pos);
+					pos += snprintf(buf + pos, buf_size - pos, "</property>");
+				}
+			} else {
+				// No enum_keys (e.g., InitArray) — iterate elements in reverse for-in order
+				for (int i = (int)arr->length - 1; i >= 0 && pos < buf_size - 200; i--) {
+					if ((u32)i >= arr->capacity) continue;
+					ActionVar* val_ptr = &arr->elements[i];
+					if (val_ptr->type == ACTION_STACK_VALUE_HOLE) continue;
+					pos += snprintf(buf + pos, buf_size - pos, "<property id=\"%d\">", i);
+					pos += ei_toXML_buf(app_context, val_ptr, buf + pos, buf_size - pos);
+					pos += snprintf(buf + pos, buf_size - pos, "</property>");
+				}
+			}
+		}
+	} else if (val && (val->type == ACTION_STACK_VALUE_OBJECT || val->type == ACTION_STACK_VALUE_MOVIECLIP)) {
+		ASObject* obj = (ASObject*) val->data.numeric_value;
+		if (obj) {
+			// Enumerate own properties in reverse (for-in order)
+			for (int i = (int)obj->num_used - 1; i >= 0 && pos < buf_size - 200; i--) {
+				if (!(obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE)) continue;
+				const char* pn = obj->properties[i].name;
+				u32 pn_len = obj->properties[i].name_length;
+				if (pn_len == 9 && strncmp(pn, "__proto__", 9) == 0) continue;
+				pos += snprintf(buf + pos, buf_size - pos, "<property id=\"");
+				if (pos + (int)pn_len < buf_size - 50) {
+					memcpy(buf + pos, pn, pn_len);
+					pos += pn_len;
+				}
+				pos += snprintf(buf + pos, buf_size - pos, "\">");
+				pos += ei_toXML_buf(app_context, &obj->properties[i].value, buf + pos, buf_size - pos);
+				pos += snprintf(buf + pos, buf_size - pos, "</property>");
+			}
+		}
+	}
+	pos += snprintf(buf + pos, buf_size - pos, "</object>");
+	return pos;
+}
+
+// Function2Ptr handlers for ExternalInterface Phase 2
+static ActionVar actionEI_toXML(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	char buf[16384];
+	int len = ei_toXML_buf(app_context, arg_count >= 1 ? &args[0] : NULL, buf, sizeof(buf));
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	u16* u16str = utf8_to_u16(app_context, buf, len, &u16len);
+	result.str_size = u16len;
+	VAL(u64, &result.data.numeric_value) = (u64)u16str;
+	return result;
+}
+
+static ActionVar actionEI_arrayToXML(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	char buf[16384];
+	int len = ei_arrayToXML_buf(app_context, arg_count >= 1 ? &args[0] : NULL, buf, sizeof(buf));
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	u16* u16str = utf8_to_u16(app_context, buf, len, &u16len);
+	result.str_size = u16len;
+	VAL(u64, &result.data.numeric_value) = (u64)u16str;
+	return result;
+}
+
+static ActionVar actionEI_argumentsToXML(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	char buf[16384];
+	int len = ei_argumentsToXML_buf(app_context, arg_count >= 1 ? &args[0] : NULL, buf, sizeof(buf));
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	u16* u16str = utf8_to_u16(app_context, buf, len, &u16len);
+	result.str_size = u16len;
+	VAL(u64, &result.data.numeric_value) = (u64)u16str;
+	return result;
+}
+
+static ActionVar actionEI_objectToXML(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	char buf[16384];
+	int len = ei_objectToXML_buf(app_context, arg_count >= 1 ? &args[0] : NULL, buf, sizeof(buf));
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	u16* u16str = utf8_to_u16(app_context, buf, len, &u16len);
+	result.str_size = u16len;
+	VAL(u64, &result.data.numeric_value) = (u64)u16str;
+	return result;
+}
+
+static ASFunction g_ei_toXML_func;
+static ASFunction g_ei_arrayToXML_func;
+static ASFunction g_ei_argumentsToXML_func;
+static ASFunction g_ei_objectToXML_func;
+
+// --- ExternalInterface Phase 3: XML-to-Value deserialization ---
+
+// Helper: get nodeName from an object as UTF-8 string.
+// Returns length, or -1 if no valid string nodeName found.
+// Handles STRING type and NATIVE_STRING wrapper objects.
+static int ei_get_nodeName(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size)
+{
+	if (!val || (val->type != ACTION_STACK_VALUE_OBJECT && val->type != ACTION_STACK_VALUE_ARRAY))
+		return -1;
+	ASObject* obj = (val->type == ACTION_STACK_VALUE_OBJECT) ? (ASObject*)val->data.numeric_value : NULL;
+	if (!obj) return -1;
+	ActionVar* nn = getPropertyWithPrototype(obj, "nodeName", 8);
+	if (!nn) return -1;
+	if (nn->type == ACTION_STACK_VALUE_STRING) {
+		int len = varToStringBuf(app_context, nn, buf, buf_size);
+		buf[len] = '\0';
+		return len;
+	}
+	if (nn->type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* nn_obj = (ASObject*)nn->data.numeric_value;
+		if (nn_obj && nn_obj->native_type == NATIVE_STRING) {
+			// String wrapper: get valueOf_value
+			ActionVar* vv = getPropertyWithPrototype(nn_obj, "valueOf_value", 13);
+			if (vv && vv->type == ACTION_STACK_VALUE_STRING)
+				return varToStringBuf(app_context, vv, buf, buf_size);
+		}
+	}
+	return -1;
+}
+
+// Helper: get firstChild from an object, convert to string via toString
+static int ei_get_firstChild_str(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size)
+{
+	if (!val || val->type != ACTION_STACK_VALUE_OBJECT) return snprintf(buf, buf_size, "undefined");
+	ASObject* obj = (ASObject*)val->data.numeric_value;
+	if (!obj) return snprintf(buf, buf_size, "undefined");
+	ActionVar* fc = getPropertyWithPrototype(obj, "firstChild", 10);
+	if (!fc) return snprintf(buf, buf_size, "undefined");
+	return varToStringBuf(app_context, fc, buf, buf_size);
+}
+
+// Helper: decimal-only parseFloat (rejects "Infinity", "NaN", hex, trailing content)
+static double ei_parseFloat_strict(const char* str, int len)
+{
+	const char* p = str;
+	const char* end = str + len;
+	// Trim leading whitespace
+	while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == '\f')) p++;
+	if (p >= end) return NAN;
+	const char* start = p;
+	if (p < end && (*p == '+' || *p == '-')) p++;
+	const char* digit_start = p;
+	while (p < end && *p >= '0' && *p <= '9') p++;
+	int digits_before = (int)(p - digit_start);
+	int digits_after = 0;
+	if (p < end && *p == '.') {
+		p++;
+		const char* frac_start = p;
+		while (p < end && *p >= '0' && *p <= '9') p++;
+		digits_after = (int)(p - frac_start);
+	}
+	if (digits_before == 0 && digits_after == 0) return NAN;
+	if (p < end && (*p == 'e' || *p == 'E')) {
+		p++;
+		if (p < end && (*p == '+' || *p == '-')) p++;
+		while (p < end && *p >= '0' && *p <= '9') p++;
+	}
+	if (p != end) return NAN; // trailing content → NaN
+	char* endptr;
+	double d = strtod(start, &endptr);
+	return d;
+}
+
+static ActionVar actionEI_toAS(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 1) return result;
+
+	char name[256];
+	int name_len = ei_get_nodeName(app_context, &args[0], name, sizeof(name) - 1);
+	if (name_len < 0) return result;
+	name[name_len] = '\0';
+
+	if (name_len == 4 && strncmp(name, "null", 4) == 0) {
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+	if (name_len == 4 && strncmp(name, "true", 4) == 0) {
+		result.type = ACTION_STACK_VALUE_BOOLEAN;
+		result.data.numeric_value = 1;
+		return result;
+	}
+	if (name_len == 5 && strncmp(name, "false", 5) == 0) {
+		result.type = ACTION_STACK_VALUE_BOOLEAN;
+		result.data.numeric_value = 0;
+		return result;
+	}
+	if (name_len == 9 && strncmp(name, "undefined", 9) == 0) {
+		return result; // already UNDEFINED
+	}
+	if (name_len == 6 && strncmp(name, "string", 6) == 0) {
+		char sbuf[2048];
+		int slen = ei_get_firstChild_str(app_context, &args[0], sbuf, sizeof(sbuf) - 1);
+		sbuf[slen] = '\0';
+		result.type = ACTION_STACK_VALUE_STRING;
+		u32 u16len = 0;
+		u16* u16str = utf8_to_u16(app_context, sbuf, slen, &u16len);
+		result.str_size = u16len;
+		VAL(u64, &result.data.numeric_value) = (u64)u16str;
+		return result;
+	}
+	if (name_len == 6 && strncmp(name, "number", 6) == 0) {
+		char nbuf[256];
+		int nlen = ei_get_firstChild_str(app_context, &args[0], nbuf, sizeof(nbuf) - 1);
+		nbuf[nlen] = '\0';
+		double d = ei_parseFloat_strict(nbuf, nlen);
+		result.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &result.data.numeric_value) = d;
+		return result;
+	}
+	return result;
+}
+
+static ActionVar actionEI_arrayToAS(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ASArray* arr = allocArray(app_context, 4);
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_ARRAY;
+	VAL(u64, &result.data.numeric_value) = (u64)arr;
+	return result;
+}
+
+static ActionVar actionEI_argumentsToAS(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ASArray* arr = allocArray(app_context, 4);
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_ARRAY;
+	VAL(u64, &result.data.numeric_value) = (u64)arr;
+	return result;
+}
+
+static ActionVar actionEI_objectToAS(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ASObject* obj = allocObject(app_context, 4);
+	retainObject(obj);
+	setObjectProto(app_context, obj);
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_OBJECT;
+	VAL(u64, &result.data.numeric_value) = (u64)obj;
+	return result;
+}
+
+static ASFunction g_ei_toAS_func;
+static ASFunction g_ei_arrayToAS_func;
+static ASFunction g_ei_argumentsToAS_func;
+static ASFunction g_ei_objectToAS_func;
+
 // --- ASnative class 100: Global functions (escape, unescape, parseInt, parseFloat, trace) ---
 
 static ActionVar asnative_100_escape(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -21263,7 +21715,7 @@ check_special_vars:
 				MAKE_PKG(external_obj, flash_object, "external", 8, 4);
 				MAKE_STUB_CTOR(fc_ExternalInterface, "ExternalInterface");
 				// Add static methods on ExternalInterface
-				fc_ExternalInterface.own_props = allocObject(app_context, 8);
+				fc_ExternalInterface.own_props = allocObject(app_context, 16);
 				retainObject(fc_ExternalInterface.own_props);
 				{
 					memset(&g_ei_escapeXML_func, 0, sizeof(ASFunction));
@@ -21289,6 +21741,72 @@ check_special_vars:
 					_ev.type = ACTION_STACK_VALUE_FUNCTION;
 					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_jsQuoteString_func;
 					setProperty(app_context, fc_ExternalInterface.own_props, "_jsQuoteString", 14, &_ev);
+
+					// Phase 2: XML serialization methods
+					memset(&g_ei_toXML_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_toXML_func.name, "_toXML", 255);
+					g_ei_toXML_func.function_type = 2;
+					g_ei_toXML_func.advanced_func = (Function2Ptr)actionEI_toXML;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_toXML_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_toXML", 6, &_ev);
+
+					memset(&g_ei_arrayToXML_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_arrayToXML_func.name, "_arrayToXML", 255);
+					g_ei_arrayToXML_func.function_type = 2;
+					g_ei_arrayToXML_func.advanced_func = (Function2Ptr)actionEI_arrayToXML;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_arrayToXML_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_arrayToXML", 11, &_ev);
+
+					memset(&g_ei_argumentsToXML_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_argumentsToXML_func.name, "_argumentsToXML", 255);
+					g_ei_argumentsToXML_func.function_type = 2;
+					g_ei_argumentsToXML_func.advanced_func = (Function2Ptr)actionEI_argumentsToXML;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_argumentsToXML_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_argumentsToXML", 15, &_ev);
+
+					memset(&g_ei_objectToXML_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_objectToXML_func.name, "_objectToXML", 255);
+					g_ei_objectToXML_func.function_type = 2;
+					g_ei_objectToXML_func.advanced_func = (Function2Ptr)actionEI_objectToXML;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_objectToXML_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_objectToXML", 12, &_ev);
+
+					// Phase 3: XML-to-AS deserialization methods
+					memset(&g_ei_toAS_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_toAS_func.name, "_toAS", 255);
+					g_ei_toAS_func.function_type = 2;
+					g_ei_toAS_func.advanced_func = (Function2Ptr)actionEI_toAS;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_toAS_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_toAS", 5, &_ev);
+
+					memset(&g_ei_arrayToAS_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_arrayToAS_func.name, "_arrayToAS", 255);
+					g_ei_arrayToAS_func.function_type = 2;
+					g_ei_arrayToAS_func.advanced_func = (Function2Ptr)actionEI_arrayToAS;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_arrayToAS_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_arrayToAS", 10, &_ev);
+
+					memset(&g_ei_argumentsToAS_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_argumentsToAS_func.name, "_argumentsToAS", 255);
+					g_ei_argumentsToAS_func.function_type = 2;
+					g_ei_argumentsToAS_func.advanced_func = (Function2Ptr)actionEI_argumentsToAS;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_argumentsToAS_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_argumentsToAS", 14, &_ev);
+
+					memset(&g_ei_objectToAS_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_objectToAS_func.name, "_objectToAS", 255);
+					g_ei_objectToAS_func.function_type = 2;
+					g_ei_objectToAS_func.advanced_func = (Function2Ptr)actionEI_objectToAS;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_objectToAS_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_objectToAS", 11, &_ev);
 				}
 				SET_CTOR_PROP(external_obj, "ExternalInterface", 17, fc_ExternalInterface);
 

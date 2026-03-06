@@ -3,18 +3,18 @@
 
 Last updated: 2026-03-05
 
-## Status: INCOMPLETE — 0/7 tests passing, Phases 1-3 actionable (6 tests, 645 lines)
+## Status: COMPLETE (Phases 1-3) — 6/7 tests passing (645 lines). Phase 4 BLOCKED.
 
 ### Test Inventory
 
 | Test | Lines | Current | Phase | Effort |
 |------|-------|---------|-------|--------|
-| external_interface_escapexml | 26 | 0/26 | Phase 1 | Easy |
-| external_interface_unescapexml | 40 | 0/40 | Phase 1 | Easy |
-| external_interface_jsquotestring | 21 | 0/21 (ignored) | Phase 1 | Easy |
-| external_interface_toxml_basic | 179 | 35/179 | Phase 2 | Medium |
-| external_interface_toxml_array | 25 | 5/25 | Phase 2 | Medium |
-| external_interface_toas_basic | 354 | 1/354 (ignored) | Phase 3 | Medium-Hard |
+| external_interface_escapexml | 26 | **26/26 PASS** | Phase 1 | Done |
+| external_interface_unescapexml | 40 | **40/40 PASS** | Phase 1 | Done |
+| external_interface_jsquotestring | 21 | **21/21 PASS** | Phase 1 | Done |
+| external_interface_toxml_basic | 179 | **179/179 PASS** | Phase 2 | Done |
+| external_interface_toxml_array | 25 | **25/25 PASS** | Phase 2 | Done |
+| external_interface_toas_basic | 354 | **354/354 PASS** | Phase 3 | Done |
 | external_interface | 84 | 11/84 (ignored) | Phase 4 | BLOCKED |
 
 ### Overview
