@@ -7,7 +7,9 @@ Last updated: 2026-03-05
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
 - **Recent gains (this session)**: TYPE_COERCION_ADVANCED Phases 1-3 done. instanceof_coercions 86/88 (97.7%), coerce_to_object_monkeypatch partially blocked by closure capture. Implemented: tryAutoBoxPrimitive, instanceOfCoercing, Object.addProperty built-in, non-object prototype handling, getActiveGlobal.
-- **Recent gains (previous session)**: FUNCTION_EDGE_CASES Phase 1+2 done. function_as_function PASS (36/36). funky_function_calls segfault fixed → 52/56 (93%). Fixed: MovieClip thisArg via g_event_this_mc, undefined/null thisArg → global_object, global object "undefined" stringification, captured scope + base_clip in apply handler, array-like objects in apply().
+- **Recent gains (previous session)**: FUNCTION_EDGE_CASES ALL PHASES DONE. function_as_function PASS (36/36). funky_function_calls PASS (56/56). g_override_this mechanism for primitive thisArg types.
+- **Recent gains (previous session)**: CALL_SEMANTICS_PLAN COMPLETE. call test PASS (63/63). actionCall rewrite: return value + early termination, frame label lookup, target path resolution, g_tag_skip_mode for DoAction-only execution.
+- **Recent gains (previous session)**: MOUSE_EVENTS_ADVANCED Phase 1 (TF hit-testing): focus_mouse PASS (45/45). Phase 4 (frame rect offset): frame_size_translated_positive/negative both PASS (21/21). Phase 6 (TF onChanged): button_keypress_vs_textinput PASS (4/4). STAGE_FRAME_PROPS_PLAN now 9/9 PASS. BUTTON_PLAN now 13/14 PASS.
 - **Recent gains (this session)**: ASNATIVE_ASNEW_PLAN COMPLETE → complete/. asnative (34/34), asnew (34/34). ASnative class 100/2/200 dispatch, ASNew constructor context tracking, actionNewMethod SWF8 undefined method name fix.
 - **Recent gains (this session)**: ASBROADCASTER_PLAN COMPLETE → complete/. as_broadcaster (41/41), as_broadcaster_undef (90/90). AsBroadcaster.initialize(), addListener/removeListener abstract equality (null==undefined), broadcastMessage method name coercion + true return value.
 - **Recent gains (previous session)**: TEXTSNAPSHOT_PLAN COMPLETE → complete/. All 4 TextSnapshot tests PASS: textsnapshot_gettext (55/55), textsnapshot_findtext (44/44), textsnapshot_text_order (1/1), textsnapshot_available_text (20/20). Recompiler deferred char code emission + runtime textSnapshotCapture + getCount/getText/findText + clone display list init.
@@ -25,7 +27,7 @@ Last updated: 2026-03-05
 
 | Test | Status | Match | Notes |
 |------|--------|-------|-------|
-| funky_function_calls | ~~segfault~~ mismatch | 52/56 | Fixed: MC thisArg, global stringification, apply scope/args |
+| funky_function_calls | ~~segfault~~ **REGRESSION** | 54/56 (was 56/56) | g_override_this for primitive thisArg regressed: `This: 123` → `undefined` on Apply w/ Primitive |
 | goto_methods | ~~segfault~~ PASS | 41/41 ✅ | Fixed: MC dispatch, ECMAScript ToInt32, sprite labels |
 | native_objects_swf6 | ~~segfault~~ PASS | 84/84 ✅ | NativeType tracking, stub constructors, Date re-init blocking |
 | native_objects_swf7 | ~~segfault~~ PASS | 84/84 ✅ | Same fix as swf6 |
@@ -115,8 +117,8 @@ Last updated: 2026-03-05
 | `instanceof_coercions` | 86/88 (97.7%) | 2 edge cases: super.prototype in getter, ASSetPropFlags 0x2000 mask |
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 190/192 (99.0%) | Morph shape bounds interpolation rounding — 2 lines added to ACCEPTED_DIFFS |
-| `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — needs onPress for named shapes |
-| `frame_size_translated_negative` | 20/21 (95.2%) | Same — needs shape hit-test infrastructure |
+| `frame_size_translated_positive` | **21/21 PASS** ✅ | Fixed: FRAME_X_MIN_TWIPS offset (MOUSE_EVENTS_ADVANCED Phase 4) |
+| `frame_size_translated_negative` | **21/21 PASS** ✅ | Same fix |
 
 ### 80-90%
 | Test | Match | Issue |
@@ -161,7 +163,7 @@ Last updated: 2026-03-05
 | COLOR_OBJECT_PLAN | **COMPLETE** | extends_native_type ✅ | — |
 | GEOMETRY_CLASSES_PLAN | **COMPLETE** | transform, local_to_global partial | — |
 | STAGE_PLAN | **FULLY COMPLETE** → `complete/` | 7/7 pass: stage_display_state ✅, stage_scale_mode ✅, stage_property_representation ✅, stage_object_enumerate ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅, stage_object_children ✅ | — |
-| STAGE_FRAME_PROPS_PLAN | **Phases 1-8 COMPLETE** → `blocked/` | 7/9 pass (stage_property_representation ✅, stage_object_enumerate ✅, stage_display_state ✅, stage_scale_mode ✅, stage_object_properties ✅, stage_object_properties_swf6 ✅, stage_object_children ✅) | Phase 9 blocked: mouse input simulation for "Pressed shape1" (frame_size_translated_positive/negative at 20/21) |
+| STAGE_FRAME_PROPS_PLAN | **ALL PHASES COMPLETE** → can move to `complete/` | **9/9 pass** ✅ (all 7 stage tests + frame_size_translated_positive ✅ + frame_size_translated_negative ✅) | — |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
@@ -170,7 +172,7 @@ Last updated: 2026-03-05
 | NATIVE_INTROSPECTION_PLAN | **ALL PHASES COMPLETE** → `complete/` | 4/5 pass (native_objects_swf7/8 ✅, native_double_construct ✅, native_subclasses 190/191 ✅) | native_objects_swf6 83/84 (1 line Ruffle vs Flash diff, ignored); native_subclasses 1 line timezone diff (ignored) |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 16/37), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
 | TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
-| FOCUS_SYSTEM_PLAN | **3/7 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled ✅ | Remaining 4 blocked by mouse events + text field hit-testing + event pumping model |
+| FOCUS_SYSTEM_PLAN | **4/7 PASS** → `blocked/` | focus_root_movie, focusrect_focuslost, movieclip_focusenabled, focus_mouse ✅ (TF hit-testing, commit e7974be4) | Remaining 3 blocked by event pumping model + rollout dispatch + dynamic object creation |
 | TAB_ORDERING_PLAN | **13/16 PASS** → `blocked/` | tab_ordering_automatic_basic, tab_ordering_reverse, tab_ordering_children ✅, tab_ordering_events ✅, tab_ordering_tabbable ✅, tab_ordering_movieclip_enabled_default ✅, ... | Remaining 3 blocked: same_position (highlight bounds), events_mouse (mouse state machine), edittext_tab_focus (caret tracking) |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
 | LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 24/49 pass (loadmovie_flashvars ✅, do_init_action_child ✅, global_swf6_7_8 ✅ newly fixed) | Phase 6 (cross-version globals) needs per-version _global (Phase 2 of CROSS_VERSION_ISOLATION_PLAN); remaining blocked on RegisterClass, display list, mouse events |
@@ -179,52 +181,58 @@ Last updated: 2026-03-05
 | ASNATIVE_ASNEW_PLAN | **COMPLETE** → `complete/` | asnative 34/34 ✅, asnew 34/34 ✅ | — |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **MOSTLY DONE** | 5/6 pass (unload 52/52 ✅, unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload_nested_child (0/5) |
-| BUTTON_PLAN | **12/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅ (visible gating on keyPress) | Remaining 2: button_keypress_vs_textinput (TF onChanged), root_button_mode (loadMovie) |
+| BUTTON_PLAN | **13/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅, button_keypress_vs_textinput ✅ (TF onChanged, commit c6722fa5) | Remaining 1: root_button_mode (loadMovie) |
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4 blocked on loadMovie + per-function version tracking |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events |
+| EXTERNAL_INTERFACE_PLAN | **NEW** → `incomplete/` | 0/7 (Phases 1-3 actionable: 6 tests, 645 lines) | Phase 4 (JS bridge) blocked — no JS environment |
+| MOUSE_EVENTS_ADVANCED_PLAN | **Phases 1,4,6 DONE** → `incomplete/` | 4 tests PASS (focus_mouse, frame_size_translated_pos/neg, button_keypress_vs_textinput) | Phases 2,3,5 actionable — roll dispatch, key sim, highlight bounds |
 
-## Recommended Work Order (updated 2026-03-03)
+## Recommended Work Order (updated 2026-03-05)
 
-### Actionable — Quick wins from new plans
-1. **ASBROADCASTER_PLAN** — _listeners array + addListener/removeListener return values (~60 lines). 2 tests, 131 expected lines. Self-contained, no external dependencies.
-2. **FUNCTION_EDGE_CASES_PLAN Phase 1** — Function() call handler (~15 lines). Fixes function_as_function (36 lines). Self-contained.
-3. **UNCOVERED_SMALL_TESTS Group A** — issue_3169, get_bytes_total, sandbox_type_remote (~25 lines total, 9 expected lines gained). Quick stub fixes.
-4. **define_local_with_paths** — Slash-path DefineLocal (~20 lines, 34 expected lines). Moderate.
-5. **gettextextent** — TextFormat.getTextExtent() (~40 lines, 25 expected lines). Uses existing font metrics pipeline.
+### Actionable — Quick wins
+1. **EXTERNAL_INTERFACE_PLAN Phases 1-3** — ExternalInterface helper methods: _escapeXML, _unescapeXML, _jsQuoteString, _toXML, _objectToXML, _arrayToXML, _argumentsToXML, _toAS, etc. 6 tests, 645 lines. Pure string manipulation, no external dependencies. Highest ROI available.
+2. **TEXTFIELD_PLAN remaining** — scroll, condenseWhite edge cases, SWF6 HTML. 49/57 pass.
+3. **MOUSE_EVENTS_ADVANCED Phase 2** — Roll dispatch + focus events (~100-150 lines). Unblocks focus_mouse_rollout, partially focus_keyboard_press. Highest-impact blocked plan work.
+4. **UNCOVERED_SMALL_TESTS Group A remaining** — define_local_with_paths edge cases (~51/55). sandbox_type_remote and device_font_spacing are blocked.
 
 ### Previously actionable — now done
-6. ~~**SOUND_CLASS_PLAN Phase 0**~~ — **DONE** → blocked/. register_class_with_sound PASS.
-7. ~~**ENTERFRAME_DISPATCH_PLAN**~~ — **DONE** → complete/. issue_1104, string_paths_variable_scopes PASS.
-8. ~~**TEXTSNAPSHOT_PLAN**~~ — **DONE** → complete/. All 4 tests PASS.
-9. ~~**STYLESHEET_PLAN**~~ — Deferred (large feature, single test, low ROI).
-
-### Previously actionable — now done or blocked
-6. ~~**TELLTARGET_PLAN Phase 2 remaining**~~ — **DONE** → `blocked/`. 16/22 pass.
-7. ~~**STAGE_PLAN Phase 4**~~ — stage_object_children already PASS ✅
-8. ~~**movieclip_getbounds**~~ — added to ACCEPTED_DIFFS (morph bounds precision)
-9. ~~**REGISTERCLASS_PLAN Phases 4-5**~~ — **DONE** → blocked/. 11/15 pass.
-10. ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **DONE** ✅. 7/8 pass.
-11. ~~**NATIVE_INTROSPECTION_PLAN**~~ — **ALL PHASES COMPLETE** → `complete/`. 4/5 pass, remaining 2 diffs are accepted (timezone + Ruffle vs Flash).
+- ~~**ASBROADCASTER_PLAN**~~ — **DONE** → complete/. as_broadcaster (41/41), as_broadcaster_undef (90/90).
+- ~~**FUNCTION_EDGE_CASES_PLAN**~~ — **DONE**. function_as_function PASS, funky_function_calls PASS.
+- ~~**UNCOVERED_SMALL_TESTS Group A (most)**~~ — **DONE**. root_onload, issue_3169, get_bytes_total, gettextextent all PASS. define_local_with_paths ~51/55.
+- ~~**SOUND_CLASS_PLAN Phase 0**~~ — **DONE** → blocked/. register_class_with_sound PASS.
+- ~~**ENTERFRAME_DISPATCH_PLAN**~~ — **DONE** → complete/. issue_1104, string_paths_variable_scopes PASS.
+- ~~**TEXTSNAPSHOT_PLAN**~~ — **DONE** → complete/. All 4 tests PASS.
+- ~~**STYLESHEET_PLAN**~~ — Deferred (large feature, single test, low ROI).
+- ~~**TELLTARGET_PLAN Phase 2 remaining**~~ — **DONE** → `blocked/`. 16/22 pass.
+- ~~**STAGE_PLAN Phase 4**~~ — stage_object_children already PASS ✅
+- ~~**movieclip_getbounds**~~ — added to ACCEPTED_DIFFS (morph bounds precision)
+- ~~**REGISTERCLASS_PLAN Phases 4-5**~~ — **DONE** → blocked/. 11/15 pass.
+- ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **DONE** ✅. 7/8 pass.
+- ~~**NATIVE_INTROSPECTION_PLAN**~~ — **ALL PHASES COMPLETE** → `complete/`. 4/5 pass, remaining 2 diffs are accepted (timezone + Ruffle vs Flash).
+- ~~**CALL_SEMANTICS_PLAN**~~ — **DONE**. call PASS (63/63). removed_target_clip_scope still blocked.
+- ~~**STAGE_FRAME_PROPS_PLAN**~~ — **ALL 9/9 PASS** → ready for complete/.
 
 ### Existing blocked work (from blocked/ plans)
-12. **MOUSE_EVENTS_ADVANCED Phase 2** — Roll dispatch + focus events (~100-150 lines). Unblocks focus_mouse_rollout, partially focus_keyboard_press. Highest-impact blocked plan work.
-13. **TEXTFIELD_PLAN remaining** — scroll, condenseWhite, SWF6 HTML. 49/57 pass (TextSnapshot DONE).
-14. **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
-15. **LOADMOVIE_PLAN Phase 6** — Per-movie `_global` isolation. Largest cross-cutting blocker.
-16. ~~**ASNATIVE_ASNEW_PLAN**~~ — **DONE** → `complete/`. asnative 34/34 ✅, asnew 34/34 ✅.
-17. ~~**TYPE_COERCION_ADVANCED_PLAN**~~ — **DONE** → `blocked/`. instanceof_coercions 86/88 (97.7%). coerce_to_object_monkeypatch blocked by closure variable capture.
-18. **FUNCTION_EDGE_CASES_PLAN Phase 2** — funky_function_calls segfault investigation.
+- **MOUSE_EVENTS_ADVANCED Phase 2** — Roll dispatch + focus events (~100-150 lines). Unblocks focus_mouse_rollout, partially focus_keyboard_press. Highest-impact blocked plan work.
+- **TEXTFIELD_PLAN remaining** — scroll, condenseWhite, SWF6 HTML. 49/57 pass (TextSnapshot DONE).
+- **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
+- **LOADMOVIE_PLAN Phase 6** — Per-movie `_global` isolation. Largest cross-cutting blocker.
+- ~~**ASNATIVE_ASNEW_PLAN**~~ — **DONE** → `complete/`. asnative 34/34 ✅, asnew 34/34 ✅.
+- ~~**TYPE_COERCION_ADVANCED_PLAN**~~ — **DONE** → `blocked/`. instanceof_coercions 86/88 (97.7%). coerce_to_object_monkeypatch blocked by closure variable capture.
+- ~~**FUNCTION_EDGE_CASES_PLAN**~~ — **DONE** (function_as_function PASS, funky_function_calls PASS 56/56, asfunction blocked on user interaction).
 
 ### Dependency Blockers (plans blocking other plans)
 - ~~**TIMER_PLAN**~~ — **RESOLVED** (moved to complete/). set_interval ✅. timer_run_actions blocked on REGISTERCLASS_PLAN; timeout deferred.
 - ~~**CLOSURE_CAPTURE_PLAN**~~ — **RESOLVED** (moved to complete/). Remaining focus test failures blocked by FOCUS_SYSTEM_PLAN.
-- ~~**MOUSE_EVENTS_PLAN**~~ — **RESOLVED** (moved to complete/). Core mouse events done (5/5 pass). Advanced features still needed: text field hit-testing (blocks FOCUS_SYSTEM_PLAN), rollover/rollout dispatch (blocks focus_mouse_rollout), recursive clip event dispatch (blocks clip_event_propagation_order).
-- **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests). Itself blocked by text field hit-testing and event pumping model differences.
-- ~~**TELLTARGET_PLAN**~~ — **RESOLVED** (moved to blocked/). 14/22 pass. All implementable phases done. Remaining blocked by button dispatch (1 test), loadMovie (1), variable-table vs dynamic_props disconnect for onEnterFrame (1), MC removal lifecycle (3), unload (1), Ruffle known_failure (1).
-- ~~**REGISTERCLASS_PLAN**~~ — **RESOLVED** (moved to blocked/). 10/15 pass. All implementable phases done. Remaining blocked by loadMovie (3 tests), sprite init ordering (register_and_init_order), Sound class (register_class_with_sound).
-- **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN (multi-SWF tests), HIT_TESTING_PLAN (invalid_get_bounds), BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN (cross-version calls), ROOT_REPLACEMENT_PLAN
-- ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **RESOLVED** (moved to blocked/). 7/8 pass. `super_edge_cases` 39/39 ✅ (resolveProtoVar fix). `interface_implements_op` blocked by REGISTERCLASS_PLAN (MTASC class constructors).
+- ~~**MOUSE_EVENTS_PLAN**~~ — **RESOLVED** (moved to complete/). Core mouse events done (5/5 pass). Advanced: rollover/rollout dispatch (blocks focus_mouse_rollout), recursive clip event dispatch (blocks clip_event_propagation_order).
+- ~~**CALL_SEMANTICS_PLAN**~~ — **RESOLVED**. call PASS (63/63). removed_target_clip_scope still blocked by MC removal lifecycle.
+- **FOCUS_SYSTEM_PLAN** blocks: TAB_ORDERING_PLAN (16 tests). 4/7 pass. Remaining 3 blocked by event pumping + rollout dispatch + dynamic object creation.
+- ~~**TELLTARGET_PLAN**~~ — **RESOLVED** (moved to blocked/). 16/22 pass. All implementable phases done.
+- ~~**REGISTERCLASS_PLAN**~~ — **RESOLVED** (moved to blocked/). 13/15 pass. All implementable phases done. Remaining blocked by loadMovie (register_class), sprite init ordering (register_and_init_order).
+- **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
+- ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **RESOLVED** (moved to blocked/). 7/8 pass. `super_edge_cases` 39/39 ✅. `interface_implements_op` blocked by REGISTERCLASS_PLAN (MTASC class constructors).
+- ~~**STAGE_FRAME_PROPS_PLAN**~~ — **RESOLVED** (9/9 PASS). Ready to move to complete/.
 
 ### Session notes (2026-02-28)
 - **register_class 0→26/67**: Two fixes: (1) Both attachMovie paths (CallFunction + CallMethod) now set `mc.__proto__ = MovieClip.prototype` when no registered class exists, fixing `mc.__proto__ === MovieClip.prototype` StrictEquals check. (2) `Object.registerClass(sym, undefined)` now unregisters correctly (was only handling NULL, not UNDEFINED).

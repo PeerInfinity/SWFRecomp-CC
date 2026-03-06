@@ -4,11 +4,11 @@
 
 Last updated: 2026-02-28
 
-## Status: BLOCKED (Phases 1-8 COMPLETE, Phase 9 blocked on mouse input infrastructure)
+## Status: ALL PHASES COMPLETE — 9/9 tests PASS
 
-All implementable phases are complete. 7/9 tests fully pass. The remaining 2 tests (`frame_size_translated_positive`, `frame_size_translated_negative`) each miss 1 line ("Pressed shape1") which requires mouse input simulation infrastructure (Phase 9).
+All phases are complete including Phase 9 (mouse input for named shapes). All 9 tests fully pass.
 
-### Test Results (2026-02-28, verified locally)
+### Test Results (2026-03-05)
 
 | Test | Status | Notes |
 |------|--------|-------|
@@ -19,17 +19,10 @@ All implementable phases are complete. 7/9 tests fully pass. The remaining 2 tes
 | `stage_object_properties` | **PASS** ✅ | _width/_height, scale, rotation, sprite context all working |
 | `stage_object_properties_swf6` | **PASS** ✅ | Same as above |
 | `stage_object_children` | **PASS** ✅ | _level addressing, child enumeration working |
-| `frame_size_translated_positive` | 20/21 (95.2%) | Missing "Pressed shape1" — blocked on Phase 9 (mouse input) |
-| `frame_size_translated_negative` | 20/21 (95.2%) | Same — blocked on Phase 9 (mouse input) |
+| `frame_size_translated_positive` | **PASS** ✅ | Fixed: FRAME_X_MIN_TWIPS/FRAME_Y_MIN_TWIPS offset (commit 12d7c2c2) |
+| `frame_size_translated_negative` | **PASS** ✅ | Same fix as positive |
 
-### Blocker: Phase 9 — Mouse Input Simulation
-
-The remaining 1 line in each `frame_size_translated_*` test requires:
-1. `verify_output.py` to parse `input.json` and pass mouse events to the runtime
-2. Shape hit-testing infrastructure in NO_GRAPHICS mode
-3. `onPress` callback dispatch when a click hits a named shape
-
-This is a significant cross-cutting infrastructure change. It is shared with other blocked plans (HIT_TESTING_PLAN, INPUT_EVENTS_PLAN) and should be addressed as part of a broader mouse event infrastructure effort.
+**Note:** This plan can be moved to `complete/`.
 
 ### What's Implemented (Phases 1-8)
 - **Phase 1**: actionSetProperty F64 bug fixed — F64 values read correctly as doubles

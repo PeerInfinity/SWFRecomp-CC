@@ -29,6 +29,7 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 static double varToDoubleSimple(ActionVar* v);
 static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVar* b, int flags);
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found);
+static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args);
@@ -2184,6 +2185,88 @@ static ActionVar builtin_math_nan_stub(SWFAppContext* app_context, ActionVar* ar
 	(void)registers; (void)this_obj;
 	coerceMathArgs(app_context, args, arg_count, 2);
 	return mathReturnDouble(NAN);
+}
+
+// --- isNaN / isFinite as first-class function objects ---
+// These need to be accessible via GetVariable("isNaN") etc., not just inline call handlers.
+
+static ASFunction g_isNaN_func;
+static ASFunction g_isFinite_func;
+static int g_isNaN_isFinite_init = 0;
+
+// Helper: convert ActionVar to double with strict string parsing (entire string must be numeric).
+// Used by isNaN/isFinite where "123abc" should be NaN (unlike Number("123abc") which returns 123).
+static double varToDoubleStrict(SWFAppContext* app_context, ActionVar* v)
+{
+	if (v == NULL) return NAN;
+	switch (v->type) {
+		case ACTION_STACK_VALUE_F32: return (double) VAL(float, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_F64: return VAL(double, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_BOOLEAN: return v->data.numeric_value ? 1.0 : 0.0;
+		case ACTION_STACK_VALUE_NULL: return NAN;
+		case ACTION_STACK_VALUE_STRING: {
+			const uint16_t* u16 = varGetU16Ptr(v);
+			if (u16 == NULL || v->str_size == 0) return NAN;
+			char tmp[512];
+			int len = u16_to_utf8(u16, v->str_size, tmp, sizeof(tmp) - 1);
+			tmp[len] = '\0';
+			if (len == 0) return NAN;
+			char* endp = NULL;
+			double d = strtod(tmp, &endp);
+			// Strict: entire string must be consumed
+			if (endp != tmp + len) return NAN;
+			return d;
+		}
+		case ACTION_STACK_VALUE_OBJECT: {
+			int _vof_f = 0;
+			ActionVar vo = objectCallValueOf(app_context, v, &_vof_f);
+			if (vo.type == ACTION_STACK_VALUE_F32)
+				return (double)VAL(float, &vo.data.numeric_value);
+			if (vo.type == ACTION_STACK_VALUE_F64)
+				return VAL(double, &vo.data.numeric_value);
+			return NAN;
+		}
+		default: return NAN; // undefined → NaN
+	}
+}
+
+static ActionVar builtin_isNaN(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_BOOLEAN;
+	if (arg_count == 0) { result.data.numeric_value = 1; return result; }
+	double val = varToDoubleStrict(app_context, &args[0]);
+	result.data.numeric_value = (val != val) ? 1ULL : 0ULL;
+	return result;
+}
+
+static ActionVar builtin_isFinite(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_BOOLEAN;
+	if (arg_count == 0) { result.data.numeric_value = 0; return result; }
+	double val = varToDoubleStrict(app_context, &args[0]);
+	int is_finite = (val == val && val != INFINITY && val != -INFINITY);
+	result.data.numeric_value = is_finite ? 1ULL : 0ULL;
+	return result;
+}
+
+static void init_isNaN_isFinite(void)
+{
+	if (g_isNaN_isFinite_init) return;
+	memset(&g_isNaN_func, 0, sizeof(ASFunction));
+	strncpy(g_isNaN_func.name, "isNaN", 255);
+	g_isNaN_func.function_type = 2;
+	g_isNaN_func.advanced_func = (Function2Ptr)builtin_isNaN;
+
+	memset(&g_isFinite_func, 0, sizeof(ASFunction));
+	strncpy(g_isFinite_func.name, "isFinite", 255);
+	g_isFinite_func.function_type = 2;
+	g_isFinite_func.advanced_func = (Function2Ptr)builtin_isFinite;
+
+	g_isNaN_isFinite_init = 1;
 }
 
 // --- ASnative class 100: Global functions (escape, unescape, parseInt, parseFloat, trace) ---
@@ -19634,6 +19717,20 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	initVideoPrototype(app_context, &g_stub_ctors[16]);
 	initXMLSocketPrototype(app_context, &g_stub_ctors[17]);
 
+	// ---- isNaN / isFinite on _global ----
+	init_isNaN_isFinite();
+	{
+		ActionVar isnan_val = {0};
+		isnan_val.type = ACTION_STACK_VALUE_FUNCTION;
+		isnan_val.data.numeric_value = (u64)&g_isNaN_func;
+		setProperty(app_context, global_object, "isNaN", 5, &isnan_val);
+
+		ActionVar isfin_val = {0};
+		isfin_val.type = ACTION_STACK_VALUE_FUNCTION;
+		isfin_val.data.numeric_value = (u64)&g_isFinite_func;
+		setProperty(app_context, global_object, "isFinite", 8, &isfin_val);
+	}
+
 	// ---- valueOf on _global ----
 	{
 		ActionVar undef_val = {0};
@@ -20872,6 +20969,18 @@ check_special_vars:
 				g_boolean_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_boolean_constructor);
+			return;
+		}
+		else if (var_name_len == 5 && strncmp(var_name, "isNaN", 5) == 0)
+		{
+			init_isNaN_isFinite();
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_isNaN_func);
+			return;
+		}
+		else if (var_name_len == 8 && strncmp(var_name, "isFinite", 8) == 0)
+		{
+			init_isNaN_isFinite();
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_isFinite_func);
 			return;
 		}
 		else if (var_name_len == 5 && strncmp(var_name, "Error", 5) == 0)
@@ -26092,6 +26201,47 @@ void actionSetMember(SWFAppContext* app_context)
 						defaults.color = (u32)tc_d & 0x00FFFFFF;
 					}
 					tf_parse_html(table, _ht_buf, src_len, &defaults, condense_white, g_swf_version, is_multiline);
+
+					// Sync font height and letter spacing from the first content run
+					// so that textWidth/textHeight computation uses the HTML-specified values.
+					if (table->run_count > 0) {
+						TFRun* first_run = &table->runs[0];
+						// Find first run with content (skip zero-length marker runs)
+						for (u32 _ri = 0; _ri < table->run_count; _ri++) {
+							if (table->runs[_ri].length > 0 || _ri == table->run_count - 1) {
+								first_run = &table->runs[_ri];
+								break;
+							}
+						}
+						if (first_run->font_height > 0) {
+							ActionVar fh_val = {0};
+							fh_val.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &fh_val.data.numeric_value) = (double)first_run->font_height;
+							setProperty(app_context, props, "_tf_fontHeight", 14, &fh_val);
+						}
+						// Sync letter spacing (stored as hundredths in TFRun, pixels in _tf_letterSpacing)
+						{
+							ActionVar ls_val = {0};
+							ls_val.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &ls_val.data.numeric_value) = (double)first_run->letter_spacing / 100.0;
+							setProperty(app_context, props, "_tf_letterSpacing", 17, &ls_val);
+						}
+						// Sync font name -> font_id
+						if (first_run->font_name[0] != '\0') {
+							u16 found_fid = ng_findFontIdByName(first_run->font_name);
+							ActionVar fid_val = {0};
+							fid_val.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+							setProperty(app_context, props, "_tf_fontId", 10, &fid_val);
+						}
+						// Sync leading
+						{
+							ActionVar ld_val = {0};
+							ld_val.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &ld_val.data.numeric_value) = (double)first_run->leading;
+							setProperty(app_context, props, "_tf_leading", 11, &ld_val);
+						}
+					}
 
 					// Extract plain text (with \r as paragraph separator for storage)
 					char plain_buf[16384];
@@ -32826,7 +32976,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		double result = 0.0;
 		if (num_args >= 1)
 		{
-			result = varToDouble(&args[0]);
+			result = varToDoubleSimple(&args[0]);
 		}
 		// else Number() → 0
 		if (args != NULL) FREE(args);
@@ -33966,7 +34116,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						// Number() → primitive number: 0 if no args, else toNumber(arg)
 						double _nc_result = 0.0;
 						if (num_args >= 1 && args != NULL)
-							_nc_result = varToDouble(&args[0]);
+							_nc_result = varToDoubleSimple(&args[0]);
 						if (args != NULL) FREE(args);
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_nc_result));
 					}

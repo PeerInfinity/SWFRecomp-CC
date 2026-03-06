@@ -3,9 +3,9 @@
 
 Last updated: 2026-02-25
 
-## Status: 12/14 PASSING — remaining 2 blocked on infrastructure
+## Status: 13/14 PASSING — remaining 1 blocked on loadMovie infrastructure
 
-### Results (2026-02-26)
+### Results (2026-03-05)
 - `button_children` — **PASS** ✅
 - `button_goto` — **PASS** ✅
 - `button_key_events` — **PASS** ✅ (fixed: keyPress condition mapping, propagation, Tab onKeyDown)
@@ -18,7 +18,7 @@ Last updated: 2026-02-25
 - `button_v5` — **PASS** ✅
 - `button_v6` — **PASS** ✅
 - `movieclip_in_removed_button` — **PASS** ✅ (fixed: enterFrame children-before-root, root first-frame skip, stopped-MC enterFrame dispatch)
-- `button_keypress_vs_textinput` — FAIL (3/4) (blocked: TextField text input → onChanged callback not implemented)
+- `button_keypress_vs_textinput` — **PASS** ✅ (fixed: EV_TEXT_INPUT handler + actionTextFieldInput + onChanged callback, commit c6722fa5)
 - `root_button_mode` — FAIL (0/10) (blocked: loadMovie + createEmptyMovieClip at runtime)
 
 ### Recent fixes (2026-02-25)
@@ -34,9 +34,8 @@ Last updated: 2026-02-25
 - **Resolve hit shape through button chain**: When a button's `hit_char_id` points to another button (not a shape), `resolve_hit_shape` follows the chain to find the ultimate hit shape. This fixes button 6 whose hit record is button 5 → shape 4.
 - **Button-parent context for actions**: Button actions run in their parent MC's context (matching Ruffle's "actions relative to parent" model). For nested buttons, if the parent is a button MC (not a sprite), `g_current_sprite_obj` is set to prevent GotoFrame from navigating the root timeline — matching Ruffle where GotoFrame on a button parent is a no-op.
 
-### Blockers for remaining 2 tests
-1. **button_keypress_vs_textinput**: TextField text input (`TextInput` event) should trigger `text.onChanged` callback. Missing: TextInput event → TextField character insertion → onChanged dispatch.
-2. **root_button_mode**: Needs `createEmptyMovieClip` and `loadMovie` at runtime (entirely separate feature set).
+### Blocker for remaining 1 test
+1. **root_button_mode**: Needs `createEmptyMovieClip` and `loadMovie` at runtime (entirely separate feature set).
 
 ---
 

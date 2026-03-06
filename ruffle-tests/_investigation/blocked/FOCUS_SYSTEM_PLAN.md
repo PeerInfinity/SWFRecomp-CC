@@ -3,19 +3,19 @@
 
 Last updated: 2026-02-25
 
-## Status: BLOCKED — 3/7 tests passing
+## Status: BLOCKED — 4/7 tests passing
 
-### Passing tests (3)
+### Passing tests (4)
 - `focus_root_movie` — Root MC rejection in `mc_is_focusable_by_setfocus`
 - `focusrect_focuslost` — Tab-triggered onRollOut/onRollOver + window focus lost handling
 - `movieclip_focusenabled` — Dot-path resolution in `getMovieClipByTarget` + string focusEnabled + button-handler focusability
+- `focus_mouse` — **45/45 PASS** ✅ (text field hit-testing via mc_get_pixel_aabb_ng, commit e7974be4)
 
-### Blocked tests (4) — remaining architectural limitations
+### Blocked tests (3) — remaining architectural limitations
 
 | Test | Match | Issue | Blocker |
 |------|-------|-------|---------|
 | `focus_keyboard_press` | 15/60 | Second Enter/Space/A batch produces extra output; events pump differently than Ruffle | **Event pumping model difference** |
-| `focus_mouse` | 17/45 | Text field click focus not firing (hit-test doesn't find text fields at mouse coordinates) | **Text field hit-testing** |
 | `focus_mouse_rollout` | 0/4 | Needs text field click focus + onRollOut dispatch on focus change | **Text field hit-testing + rollout** |
 | `focus_mouse_focusable` | 0/8 | Needs dynamic createEmptyMovieClip/createTextField + "Focus changed" listener | **Dynamic object creation** |
 

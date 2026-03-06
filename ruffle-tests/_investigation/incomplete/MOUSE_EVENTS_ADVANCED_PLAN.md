@@ -346,22 +346,22 @@ text.onChanged                  // 'b' typed into text field triggers onChanged
 | Phase 4: Frame rect offset | **DONE** | frame_size_translated_positive | 21/21 PASS |
 | Phase 4: Frame rect offset | **DONE** | frame_size_translated_negative | 21/21 PASS |
 | Phase 6: TF onChanged | **DONE** | button_keypress_vs_textinput | 4/4 PASS |
-| Phase 2: Roll dispatch + focus events | **BLOCKED** | focus_mouse_rollout | 3/4 |
-| Phase 2+3: Key sim + Tab rolls | **BLOCKED** | focus_keyboard_press | ~5/60 |
-| Phase 3: Tab roll events | **BLOCKED** | tab_ordering_events_mouse | ~19/65 |
-| Phase 5: Highlight bounds | **BLOCKED** | tab_ordering_automatic_order_same_position | 9/12 |
+| Phase 2: Roll dispatch + focus events | **TODO** | focus_mouse_rollout | 3/4 |
+| Phase 2+3: Key sim + Tab rolls | **TODO** | focus_keyboard_press | ~5/60 |
+| Phase 3: Tab roll events | **TODO** | tab_ordering_events_mouse | ~19/65 |
+| Phase 5: Highlight bounds | **TODO** | tab_ordering_automatic_order_same_position | 9/12 |
 
 ### Completed Changes
 - **Phase 1** (commit e7974be4): Text field bounds in `mc_get_pixel_aabb_ng`, text field exclusion from MC press/release/roll events, focus event ordering fix.
 - **Phase 4** (commit 12d7c2c2): Recompiler emits `FRAME_X_MIN_TWIPS`/`FRAME_Y_MIN_TWIPS`, runtime adds offset to mouse coordinates. Also added `#include "constants.h"` to `swf_core.c`.
 - **Phase 6** (commit c6722fa5): `EV_TEXT_INPUT` handler with button keyPress suppression gate, `actionTextFieldInput()` function with restrict filter/maxChars/onChanged callback.
 
-### Remaining Blockers
-**Phase 2** requires: Dynamic MC rollover/rollout tracking (`g_hovered_mc`), `onRollOver`/`onRollOut` dispatch during mouse move, `onSetFocus`/`onKillFocus` MC handlers (distinct from Selection broadcast), deferred roll event queue completion. This is a medium-large effort (~100-150 lines of new dispatch logic).
+### Remaining Work
+**Phase 2** requires: Dynamic MC rollover/rollout tracking (`g_hovered_mc`), `onRollOver`/`onRollOut` dispatch during mouse move, `onSetFocus`/`onKillFocus` MC handlers (distinct from Selection broadcast), deferred roll event queue completion. This is a medium-large effort (~100-150 lines of new dispatch logic). No external dependencies.
 
-**Phase 3** requires Phase 2 and additionally: Enter/Space key simulation on focused MC (onPress/onRelease), correct event ordering during Tab (rollout → rollover → killfocus → setfocus), integration with button state machine. Large effort.
+**Phase 3** requires Phase 2 and additionally: Enter/Space key simulation on focused MC (onPress/onRelease), correct event ordering during Tab (rollout → rollover → killfocus → setfocus), integration with button state machine. Large effort but no external dependencies.
 
-**Phase 5** requires: Recursive visual bounds computation through sprite display lists (current sort uses registration point, needs to use "highlight bounds" top-left). Medium effort but requires understanding Ruffle's exact sort algorithm for nested clips.
+**Phase 5** requires: Recursive visual bounds computation through sprite display lists (current sort uses registration point, needs to use "highlight bounds" top-left). Medium effort but requires understanding Ruffle's exact sort algorithm for nested clips. No external dependencies.
 
 ---
 

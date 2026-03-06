@@ -589,23 +589,56 @@ static u16 ng_decode_utf8_char(const char* text, size_t text_len, size_t* pos)
 	return cp;
 }
 
+// Round a twips value to the nearest pixel (20-twip boundary).
+static int ng_round_to_pixel(int twips) {
+	// round(twips / 20.0) * 20
+	double px = (double)twips / 20.0;
+	int rounded_px = (px >= 0) ? (int)(px + 0.5) : -(int)(-px + 0.5);
+	return rounded_px * 20;
+}
+
+// Round letter spacing twips to pixel using banker's rounding (ties to even).
+static int ng_round_ls_to_pixel(int ls_twips) {
+	if (ls_twips == 0) return 0;
+	double px = (double)ls_twips / 20.0;
+	double frac = px - (int)px;
+	int rounded_px;
+	if (frac == 0.5 || frac == -0.5) {
+		int trunc = (int)px;
+		rounded_px = (trunc % 2 == 0) ? trunc : trunc + (px > 0 ? 1 : -1);
+	} else {
+		rounded_px = (px >= 0) ? (int)(px + 0.5) : -(int)(-px + 0.5);
+	}
+	return rounded_px * 20;
+}
+
 // Measure width of a UTF-8 substring in twips using font glyph advances.
+// Uses device font model: per-glyph advance rounded to pixel, letter spacing
+// rounded and added per glyph (negative LS clamped to not go below unspaced).
 static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
     const char* text, size_t start, size_t end, int letter_spacing_twips)
 {
 	int w = 0;
-	int char_count = 0;
+	int ls_rounded = ng_round_ls_to_pixel(letter_spacing_twips);
 	size_t i = start;
 	while (i < end) {
 		u16 cp = ng_decode_utf8_char(text, end, &i);
 		s16 adv = ng_font_glyph_advance(font_idx, cp);
-		if (adv >= 0)
-			w += (int)((float)adv * (float)font_height / (float)em);
-		char_count++;
+		int glyph_twips = 0;
+		if (adv >= 0) {
+			int raw = (int)((float)adv * (float)font_height / (float)em);
+			int unspaced = ng_round_to_pixel(raw);
+			if (ls_rounded != 0) {
+				int spaced = unspaced + ls_rounded;
+				glyph_twips = (spaced > 0) ? spaced : unspaced;
+			} else {
+				glyph_twips = unspaced;
+			}
+		} else if (ls_rounded > 0) {
+			glyph_twips = ls_rounded;
+		}
+		w += glyph_twips;
 	}
-	// Letter spacing is added after each character (including the last)
-	if (letter_spacing_twips != 0 && char_count > 0)
-		w += letter_spacing_twips * char_count;
 	return w;
 }
 
@@ -739,11 +772,18 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 			int char_w = 0;
 			int last_fitting_pos = seg_start;
 			int last_fitting_w = 0;
+			int _ls_r = ng_round_ls_to_pixel(letter_spacing_twips);
 			while (char_pos < seg_end) {
 				size_t next_pos = char_pos;
 				u16 cp = ng_decode_utf8_char(text, seg_end, &next_pos);
 				s16 adv = ng_font_glyph_advance(font_idx, cp);
-				int gw = (adv >= 0) ? (int)((float)adv * (float)font_height / (float)em) : 0;
+				int gw = 0;
+				if (adv >= 0) {
+					int raw = (int)((float)adv * (float)font_height / (float)em);
+					int unsp = ng_round_to_pixel(raw);
+					if (_ls_r != 0) { int sp = unsp + _ls_r; gw = (sp > 0) ? sp : unsp; }
+					else gw = unsp;
+				} else if (_ls_r > 0) { gw = _ls_r; }
 				if (char_w + gw > cur_avail && last_fitting_pos > seg_start)
 					break;
 				char_w += gw;
@@ -803,6 +843,8 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
 
+	int ls_rounded = ng_round_ls_to_pixel(letter_spacing_twips);
+
 	if (!word_wrap || field_width_twips <= 0) {
 		// No wrap: measure each hard line, return max width
 		// SWF8+: non-left alignment trims trailing spaces from textWidth
@@ -810,53 +852,42 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 		int max_width_twips = 0;
 		int cur_width_twips = 0;
 		int cur_trimmed_twips = 0; // width excluding trailing spaces
-		int char_count = 0;
-		int trimmed_char_count = 0;
-		int in_trailing_spaces = 0;
 		for (size_t i = 0; i < text_len; ) {
 			unsigned char c = (unsigned char)text[i];
 			if (c == '\r' || c == '\n') {
-				int w = cur_width_twips;
-				if (letter_spacing_twips != 0 && char_count > 0)
-					w += letter_spacing_twips * char_count;
-				if (trim_trailing) {
-					w = cur_trimmed_twips;
-					if (letter_spacing_twips != 0 && trimmed_char_count > 0)
-						w += letter_spacing_twips * trimmed_char_count;
-				}
-				if (w > max_width_twips) max_width_twips = w;
+				if (trim_trailing && cur_trimmed_twips < cur_width_twips)
+					cur_width_twips = cur_trimmed_twips;
+				if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
 				cur_width_twips = 0;
 				cur_trimmed_twips = 0;
-				char_count = 0;
-				trimmed_char_count = 0;
-				in_trailing_spaces = 0;
 				if (c == '\r' && i + 1 < text_len && text[i + 1] == '\n') i += 2; else i++;
 				continue;
 			}
 			u16 code_point = ng_decode_utf8_char(text, text_len, &i);
 			s16 adv = ng_font_glyph_advance(fi, code_point);
-			if (adv >= 0)
-				cur_width_twips += (int)((float)adv * (float)font_height / (float)em);
-			char_count++;
-			if (trim_trailing) {
-				if (code_point == ' ') {
-					in_trailing_spaces = 1;
+			// Device font model: round per-glyph advance to pixel, add rounded LS
+			int glyph_twips = 0;
+			if (adv >= 0) {
+				int raw = (int)((float)adv * (float)font_height / (float)em);
+				int unspaced = ng_round_to_pixel(raw);
+				if (ls_rounded != 0) {
+					int spaced = unspaced + ls_rounded;
+					glyph_twips = (spaced > 0) ? spaced : unspaced;
 				} else {
-					in_trailing_spaces = 0;
-					cur_trimmed_twips = cur_width_twips;
-					trimmed_char_count = char_count;
+					glyph_twips = unspaced;
 				}
+			} else if (ls_rounded > 0) {
+				glyph_twips = ls_rounded; // no glyph but positive letter spacing
+			}
+			cur_width_twips += glyph_twips;
+			if (trim_trailing) {
+				if (code_point != ' ')
+					cur_trimmed_twips = cur_width_twips;
 			}
 		}
-		int w = cur_width_twips;
-		if (letter_spacing_twips != 0 && char_count > 0)
-			w += letter_spacing_twips * char_count;
-		if (trim_trailing) {
-			w = cur_trimmed_twips;
-			if (letter_spacing_twips != 0 && trimmed_char_count > 0)
-				w += letter_spacing_twips * trimmed_char_count;
-		}
-		if (w > max_width_twips) max_width_twips = w;
+		if (trim_trailing && cur_trimmed_twips < cur_width_twips)
+			cur_width_twips = cur_trimmed_twips;
+		if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
 		return max_width_twips;
 	}
 
