@@ -11234,6 +11234,22 @@ static MovieClip* getMovieClipByRelativeName(const char* target) {
 
 // Forward declarations for resolveSlashPathToMC
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
+static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc);
+
+// Re-resolve a dead base_clip's path to find a live replacement MC.
+// Returns the live MC if found, otherwise the original (dead) mc.
+static MovieClip* reResolveDeadBaseClip(SWFAppContext* app_context, MovieClip* mc) {
+	if (mc == NULL || mc->depth >= 0 || mc->original_target[0] == '\0')
+		return mc;
+	const char* tgt = mc->original_target;
+	if (tgt[0] == '/' && tgt[1] != '\0') {
+		extern MovieClip root_movieclip;
+		MovieClip* resolved = resolveSlashPathToMC(app_context, tgt + 1, (u32)strlen(tgt + 1), &root_movieclip);
+		if (resolved != NULL && resolved->depth != INT_MIN)
+			return resolved;
+	}
+	return mc;
+}
 
 // Resolve a slash-separated MC path (e.g., "/clip1/clip2", "../clip1/clip2", "clip2")
 // relative to a starting MC. Returns the target MC or NULL if not found.
@@ -14096,7 +14112,14 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 	if (value->type == ACTION_STACK_VALUE_STRING) {
 		text_u16 = varGetU16Ptr(value);
 		text_len = value->str_size;
-	} else if (value->type != ACTION_STACK_VALUE_UNDEFINED) {
+	} else if (value->type == ACTION_STACK_VALUE_F32 ||
+	           value->type == ACTION_STACK_VALUE_F64 ||
+	           value->type == ACTION_STACK_VALUE_BOOLEAN ||
+	           value->type == ACTION_STACK_VALUE_NULL ||
+	           value->type == ACTION_STACK_VALUE_MOVIECLIP) {
+		// Only convert simple types without side effects.
+		// Object/Array/Function conversion would invoke toString() which has observable
+		// side effects (e.g., custom toString functions that call trace()).
 		char _sv_buf[512];
 		int n = varToStringBuf(app_context, value, _sv_buf, sizeof(_sv_buf));
 		if (n > 0) {
@@ -14105,7 +14128,7 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 			text_len = _sv_u16_len;
 		}
 	} else {
-		return;  // undefined doesn't sync
+		return;  // undefined/object/array/function — don't sync
 	}
 
 	for (int i = 0; i < child_mc_count; i++) {
@@ -34395,7 +34418,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 			if (g_swf_version >= 6 && func->base_clip != NULL)
 			{
-				actionSetCurrentContext(func->base_clip);
+				MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
+				actionSetCurrentContext(_bc);
 				g_current_sprite_obj = NULL;
 			}
 
@@ -37541,7 +37565,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Switch base_clip context for SWF6+ closures
 				MovieClip* saved_ctx_om2 = g_current_context;
 				if (g_swf_version >= 6 && func->base_clip != NULL) {
-					MovieClip* bc = (MovieClip*)func->base_clip;
+					MovieClip* bc_raw = (MovieClip*)func->base_clip;
+					MovieClip* bc = reResolveDeadBaseClip(app_context, bc_raw);
 					if (bc->depth != INT_MIN)
 						g_current_context = bc;
 				}
@@ -37651,7 +37676,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Switch base_clip context for SWF6+ closures
 				MovieClip* saved_ctx_om1 = g_current_context;
 				if (g_swf_version >= 6 && func->base_clip != NULL) {
-					MovieClip* bc = (MovieClip*)func->base_clip;
+					MovieClip* bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
 					if (bc->depth != INT_MIN)
 						g_current_context = bc;
 				}
@@ -41335,9 +41360,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						DisplayObject* saved_cm_sprite = g_current_sprite_obj;
 						if (g_swf_version >= 6 && func->base_clip != NULL)
 						{
-							MovieClip* _bc = (MovieClip*)func->base_clip;
+							MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
 							if (_bc->depth != INT_MIN)
-								actionSetCurrentContext(func->base_clip);
+								actionSetCurrentContext(_bc);
 							else
 								actionSetCurrentContext(mc);
 							g_current_sprite_obj = NULL;
