@@ -42,17 +42,17 @@ Our two-group model (`g_global_legacy` for SWF≤6, `g_global_modern` for SWF7+)
 
 ## Blocker 3: MTASC Class / Recompiler Infrastructure
 
-**Impact**: 5+ tests across 3 plans
+**Impact**: 1-2 tests across 2 plans (PARTIALLY RESOLVED)
 
 MTASC-compiled tests use class syntax with a `main()` static entry point pattern (`_root.main()` or `Test.main()`). Our recompiler handles most bytecode correctly but has gaps with MTASC-specific patterns:
 
 | Gap | Detail | Tests Blocked |
 |-----|--------|---------------|
-| Class constructor dispatch | `new MyClass()` via DoInitAction returns undefined instead of proper object | interface_implements_op (0/47) |
+| ~~Class constructor dispatch~~ | ~~RESOLVED~~ — interface_implements_op was NOT an MTASC/recompiler issue. Fixed 3 bugs in actionImplementsOp runtime: repeat-call lockout, non-object prototype skip, MOVIECLIP interface support. Plus: Function.call() FUNCTION thisArg, addProperty getter on FUNCTION.prototype. Now 47/47 PASS. | ~~interface_implements_op~~ |
 | `_root.main()` entry point | MTASC convention for class entry; needs class→root binding | mcl_loadclip_replace_root |
 | ~~Nested function recompilation~~ | ~~RESOLVED~~ (commit 55fb0205). object_resolve now passes 39/39. | ~~object_resolve~~ |
 
-**Plans blocked**: OOP_SUPER_EXTENDS_PLAN (interface_implements_op), ROOT_REPLACEMENT_PLAN (mcl_loadclip_replace_root)
+**Plans blocked**: ROOT_REPLACEMENT_PLAN (mcl_loadclip_replace_root)
 
 ---
 
@@ -214,9 +214,8 @@ LOADMOVIE_REMAINING ──────► REGISTERCLASS (child SWFs)
                             HIT_TESTING (invalid_get_bounds)
                             BUTTON (root_button_mode)
 
-MTASC class infra ─────────► OOP_SUPER_EXTENDS (interface_implements_op)
-                             ROOT_REPLACEMENT (mcl_loadclip_replace_root)
-                             PROTOTYPE_OBJECT (object_resolve)
+MTASC class infra ─────────► ROOT_REPLACEMENT (mcl_loadclip_replace_root)
+                             (interface_implements_op: RESOLVED, object_resolve: RESOLVED)
 
 Font metrics accuracy ─────► TEXTFIELD (scroll, newlines, bullet)
                              UNCOVERED_SMALL_TESTS (device_font_spacing)
@@ -261,7 +260,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 |---------|-------|---------------|-------------|
 | LoadMovie / multi-SWF | 25+ | 2000+ | Moderate (incremental) |
 | Per-movie `_global` | 4-6 | 400+ | Moderate (architectural) |
-| MTASC class infra | 3 | 100+ | Low (nested func RESOLVED) |
+| MTASC class infra | 1 | 50 | Low (interface_implements_op + object_resolve RESOLVED) |
 | Font metrics | 4 | 35 | Moderate (device_font_spacing RESOLVED) |
 | SWF6 HTML model | 1 | 1480 | Low (complex refactor) |
 | condenseWhite | 2 | 65 | Moderate |

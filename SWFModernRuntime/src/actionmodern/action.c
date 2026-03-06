@@ -25371,14 +25371,14 @@ void actionImplementsOp(SWFAppContext* app_context)
 	else if (constructor_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* ctor_obj = (ASObject*) constructor_var.data.numeric_value;
+		// Raw property lookup — addProperty getters are NOT invoked during ImplementsOp
 		ActionVar* proto_var = getProperty(ctor_obj, "prototype", 9);
 		if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
 			constructor_proto = (ASObject*) proto_var->data.numeric_value;
 	}
 	else
 	{
-		fprintf(stderr, "ERROR: actionImplementsOp - constructor is not a function or object\n");
-		return;
+		// Non-function/non-object constructor — silently ignore (just pop interfaces from stack)
 	}
 
 	// Step 2: Pop count of interfaces from stack
@@ -25397,33 +25397,36 @@ void actionImplementsOp(SWFAppContext* app_context)
 	}
 	else
 	{
-		fprintf(stderr, "ERROR: actionImplementsOp - interface count is not a number\n");
-		return;
+		// Non-numeric count — treat as 0
 	}
 
-	// Step 3: Allocate array for interface constructors
+	// If interface_count is 0 (no interfaces specified), this is a noop.
+	// If interface_count > 0 but interfaces are already set, the call is ignored
+	// (we still need to pop all interface values from the stack).
+	int already_set = (constructor_proto != NULL && constructor_proto->interfaces != NULL);
+
+	// Step 3: Pop interface values and extract prototypes
 	ASObject** interfaces = NULL;
+	u32 valid_count = 0;
 	if (interface_count > 0)
 	{
 		interfaces = (ASObject**) malloc(sizeof(ASObject*) * interface_count);
-		if (interfaces == NULL)
-		{
-			fprintf(stderr, "ERROR: actionImplementsOp - failed to allocate interfaces array\n");
-			return;
-		}
 
-		// Pop each interface constructor from stack and extract its prototype.
-		// Interfaces are pushed in order, so we pop them in reverse.
-		// We store prototype objects (not constructors) so instanceof can match by proto.
+		// Temporary array for reverse ordering
+		ASObject** tmp = (ASObject**) malloc(sizeof(ASObject*) * interface_count);
+		u32 tmp_count = 0;
+
 		for (u32 i = 0; i < interface_count; i++)
 		{
 			ActionVar iface_var;
 			popVar(app_context, &iface_var);
 
+			if (already_set) continue; // Just consuming stack values
+
 			ASObject* iface_proto = NULL;
 			if (iface_var.type == ACTION_STACK_VALUE_FUNCTION)
 			{
-				ASFunction* iface_func = (ASFunction*) iface_var.data.numeric_value;
+				ASFunction* iface_func = (ASFunction*)(uintptr_t) iface_var.data.numeric_value;
 				if (iface_func != NULL)
 				{
 					if (iface_func->prototype_obj == NULL)
@@ -25437,34 +25440,54 @@ void actionImplementsOp(SWFAppContext* app_context)
 			}
 			else if (iface_var.type == ACTION_STACK_VALUE_OBJECT)
 			{
-				ASObject* iface_obj = (ASObject*) iface_var.data.numeric_value;
+				ASObject* iface_obj = (ASObject*)(uintptr_t) iface_var.data.numeric_value;
+				// Raw property lookup — addProperty getters are NOT invoked during ImplementsOp
 				ActionVar* proto_var = getProperty(iface_obj, "prototype", 9);
 				if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
-					iface_proto = (ASObject*) proto_var->data.numeric_value;
+					iface_proto = (ASObject*)(uintptr_t) proto_var->data.numeric_value;
 			}
-
-			if (iface_proto == NULL)
+			else if (iface_var.type == ACTION_STACK_VALUE_MOVIECLIP)
 			{
-				fprintf(stderr, "ERROR: actionImplementsOp - interface %u has no prototype\n", i);
-				for (u32 j = 0; j < i; j++)
-					releaseObject(app_context, interfaces[j]);
-				free(interfaces);
-				return;
+				// MovieClip interface: read "prototype" from dynamic_props
+				MovieClip* mc = (MovieClip*)(uintptr_t) iface_var.data.numeric_value;
+				if (mc != NULL && mc->dynamic_props != NULL)
+				{
+					ActionVar* proto_var = getProperty((ASObject*)mc->dynamic_props, "prototype", 9);
+					if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+						iface_proto = (ASObject*)(uintptr_t) proto_var->data.numeric_value;
+				}
 			}
+			// Non-object/non-function interfaces, or interfaces with non-object prototypes,
+			// are silently skipped (not an error)
 
-			// Store in reverse order (last popped goes first)
-			interfaces[interface_count - 1 - i] = iface_proto;
+			if (iface_proto != NULL)
+			{
+				tmp[tmp_count++] = iface_proto;
+			}
 		}
+
+		// Reverse into interfaces array (first popped = last in list)
+		for (u32 i = 0; i < tmp_count; i++)
+			interfaces[i] = tmp[tmp_count - 1 - i];
+		valid_count = tmp_count;
+		free(tmp);
 	}
 
 	// Step 4: Store interface prototype list on the constructor's prototype.
-	// When instanceof walks obj.__proto__ chain, it finds this prototype and checks interfaces[].
-	setInterfaceList(app_context, constructor_proto, interfaces, interface_count);
-
-#ifdef DEBUG
-	printf("[DEBUG] actionImplementsOp: constructor_proto=%p, interface_count=%u\n",
-		(void*)constructor_proto, interface_count);
-#endif
+	// Only if interface_count > 0 (zero interfaces = noop, doesn't lock).
+	if (interface_count > 0 && !already_set && constructor_proto != NULL)
+	{
+		// Use a sentinel for empty lists: malloc(1) so interfaces != NULL,
+		// signaling "interfaces set" even when valid_count == 0.
+		if (valid_count == 0 && interfaces == NULL)
+			interfaces = (ASObject**) malloc(1);
+		setInterfaceList(app_context, constructor_proto, interfaces, valid_count);
+	}
+	else
+	{
+		// Noop (interface_count==0), already set, or no constructor proto
+		if (interfaces != NULL) free(interfaces);
+	}
 
 	// Note: No values pushed back on stack (ImplementsOp has no return value)
 }
@@ -28944,34 +28967,49 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Check if prototype was set to a non-object value (stored in own_props)
-				int _non_obj_proto = 0;
-				if (func->prototype_obj == NULL && func->own_props != NULL)
+				// Check for addProperty getter on own_props for "prototype"
+				int _handled = 0;
+				if (func->own_props != NULL)
 				{
-					ActionVar* stored = getProperty(func->own_props, "prototype", 9);
-					if (stored != NULL && stored->type != ACTION_STACK_VALUE_UNDEFINED)
+					ASProperty* ps = findPropertyRaw(func->own_props, "prototype", 9);
+					if (ps != NULL && ps->getter != NULL)
 					{
-						pushVar(app_context, stored);
-						_non_obj_proto = 1;
+						ActionVar result = invokePropertyGetter(app_context, (ASFunction*)ps->getter, (void*)func->own_props);
+						pushVar(app_context, &result);
+						_handled = 1;
 					}
 				}
-				if (!_non_obj_proto)
+				if (!_handled)
 				{
-					// Lazily create prototype object on first access
-					if (func->prototype_obj == NULL)
+					// Check if prototype was set to a non-object value (stored in own_props)
+					int _non_obj_proto = 0;
+					if (func->prototype_obj == NULL && func->own_props != NULL)
 					{
-						func->prototype_obj = allocObject(app_context, 4);
-						retainObject(func->prototype_obj);
-						// Set Object.prototype as __proto__ for prototype chain
-						setObjectProto(app_context, func->prototype_obj);
-						// Set constructor property pointing back to the function
-						ActionVar ctor_var;
-						ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-						ctor_var.str_size = 0;
-						ctor_var.data.numeric_value = (u64) func;
-						setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
+						ActionVar* stored = getProperty(func->own_props, "prototype", 9);
+						if (stored != NULL && stored->type != ACTION_STACK_VALUE_UNDEFINED)
+						{
+							pushVar(app_context, stored);
+							_non_obj_proto = 1;
+						}
 					}
-					PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+					if (!_non_obj_proto)
+					{
+						// Lazily create prototype object on first access
+						if (func->prototype_obj == NULL)
+						{
+							func->prototype_obj = allocObject(app_context, 4);
+							retainObject(func->prototype_obj);
+							// Set Object.prototype as __proto__ for prototype chain
+							setObjectProto(app_context, func->prototype_obj);
+							// Set constructor property pointing back to the function
+							ActionVar ctor_var;
+							ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+							ctor_var.str_size = 0;
+							ctor_var.data.numeric_value = (u64) func;
+							setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
+						}
+						PUSH(ACTION_STACK_VALUE_OBJECT, (u64) func->prototype_obj);
+					}
 				}
 			}
 		}
@@ -38399,6 +38437,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
 					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+					} else if (args[0].type == ACTION_STACK_VALUE_FUNCTION) {
+						// Function as thisArg — pass own_props (or create them)
+						ASFunction* this_func = (ASFunction*)(uintptr_t) args[0].data.numeric_value;
+						if (this_func != NULL) {
+							if (this_func->own_props == NULL) {
+								this_func->own_props = allocObject(app_context, 4);
+								retainObject(this_func->own_props);
+							}
+							this_obj = (void*) this_func->own_props;
+						}
 					} else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
 					           args[0].type == ACTION_STACK_VALUE_NULL) {
 						// Flash: undefined/null thisArg → global object
