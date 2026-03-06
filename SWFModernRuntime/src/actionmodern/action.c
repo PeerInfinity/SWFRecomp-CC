@@ -18605,9 +18605,10 @@ typedef struct {
     MovieEntry* entry;   // Movie entry (NULL if URL not found or non-SWF)
     int file_size;       // File size for onLoadProgress
     int is_swf_url;      // 1 if URL ends in .swf (affects error vs init behavior)
+    char url[128];       // Requested URL (for _url update on failed loads)
 } PendingMCLLoad;
 static PendingMCLLoad g_pending_mcl_loads[MAX_PENDING_MCL_LOADS];
-static int g_pending_mcl_load_count = 0;
+int g_pending_mcl_load_count = 0;
 
 // Helper: create an ActionVar string from an ASCII C string
 static ActionVar makeStringVar(SWFAppContext* app_context, const char* str)
@@ -18789,6 +18790,9 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
             g_pending_mcl_loads[g_pending_mcl_load_count].is_swf_url =
                 (url_len >= 4 && strcasecmp(url_utf8 + url_len - 4, ".swf") == 0) ? 1 : 0;
         }
+        snprintf(g_pending_mcl_loads[g_pending_mcl_load_count].url,
+                 sizeof(g_pending_mcl_loads[g_pending_mcl_load_count].url),
+                 "%s", url_utf8);
         g_pending_mcl_load_count++;
     }
 
@@ -18943,16 +18947,25 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
 
     // Pre-phase: Set child SWF URLs and versions on target MCs (before events fire, so mc._url is correct)
     for (int i = 0; i < count; i++) {
-        if (loads[i].entry != NULL && loads[i].target != NULL) {
-            // Note: dynamic_props clearing already happened in actionLoadClip before FlashVars were set
-            snprintf(loads[i].target->url, sizeof(loads[i].target->url), "file:///%s", loads[i].entry->filename);
-            loads[i].target->swf_version = (u16)loads[i].entry->swf_version;
+        if (loads[i].target != NULL) {
+            if (loads[i].entry != NULL) {
+                // Note: dynamic_props clearing already happened in actionLoadClip before FlashVars were set
+                snprintf(loads[i].target->url, sizeof(loads[i].target->url), "file:///%s", loads[i].entry->filename);
+                loads[i].target->swf_version = (u16)loads[i].entry->swf_version;
+            } else if (loads[i].is_swf_url) {
+                // Failed .swf load: still update the URL on the target MC
+                snprintf(loads[i].target->url, sizeof(loads[i].target->url), "file:///%s", loads[i].url);
+            }
         }
     }
 
     // Phase 1: Fire onLoadStart, onLoadProgress, onLoadComplete for each load (FIFO)
+    // For failed .swf loads (entry==NULL && is_swf_url), skip all Phase 1 events —
+    // Flash only fires onLoadError for these (handled in Phase 3).
     for (int i = 0; i < count; i++) {
         if (g_execution_halted) break;
+        if (loads[i].entry == NULL && loads[i].is_swf_url) continue;
+
         ActionVar mc_var = {0};
         mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
         mc_var.data.numeric_value = (u64)loads[i].target;

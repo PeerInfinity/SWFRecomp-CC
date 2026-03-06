@@ -464,6 +464,10 @@ void swfStart(SWFAppContext* app_context)
 	g_frame_funcs = app_context->frame_funcs;
 	g_frame_count = app_context->frame_count;
 
+	// MCL pending load dispatch (used after processTimers and in exit conditions)
+	extern void actionFirePendingLoadInits(SWFAppContext* app_context);
+	extern int g_pending_mcl_load_count;
+
 	initTime(app_context);
 	initMap();
 
@@ -768,6 +772,14 @@ void swfStart(SWFAppContext* app_context)
 			processTimers(app_context, frame_duration_ms);
 		}
 
+		// Dispatch any MCL loads queued by timer callbacks or chained from
+		// onLoadInit handlers.  Loop because each dispatch may queue more loads.
+		{
+			int mcl_guard = 0;
+			while (g_pending_mcl_load_count > 0 && mcl_guard++ < 32)
+				actionFirePendingLoadInits(app_context);
+		}
+
 		// After-tick hook (for test harness / external interface injection)
 		{
 			typedef void (*AfterTickHandler)(SWFAppContext*, int);
@@ -786,6 +798,7 @@ void swfStart(SWFAppContext* app_context)
 			if (hasActiveTimers()) continue;
 			if (g_events && g_event_pos < g_event_count) continue;
 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
+			if (g_pending_mcl_load_count > 0) continue;
 			break;
 		}
 		else if (manual_next_frame)

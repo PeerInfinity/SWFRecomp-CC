@@ -447,12 +447,13 @@ def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], da
 
     passing_tests = {t["test"] for t in data["tests"] if t["status"] == "pass"}
 
-    # Collect all tests referenced by any document
+    all_test_names = {t["test"] for t in data["tests"]}
+
+    # Collect all tests referenced by any document (only those present in results)
     documented_tests = set()
     for _name, _path, test_names in doc_list:
-        documented_tests.update(test_names)
+        documented_tests.update(t for t in test_names if t in all_test_names)
 
-    all_test_names = {t["test"] for t in data["tests"]}
     undocumented = all_test_names - documented_tests
     undoc_total = len(undocumented)
     undoc_passing = sum(1 for t in undocumented if t in passing_tests)
@@ -464,8 +465,9 @@ def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], da
     md.append("| # | Document | Tests | Passing | Failing |")
     md.append("|---|----------|-------|---------|---------|")
     for i, (name, path, test_names) in enumerate(doc_list, 1):
-        total = len(test_names)
-        passing = sum(1 for t in test_names if t in passing_tests)
+        present = [t for t in test_names if t in all_test_names]
+        total = len(present)
+        passing = sum(1 for t in present if t in passing_tests)
         failing = total - passing
         md.append(f"| {i} | [{name}]({path}) | {total} | {passing} | {failing} |")
     md.append(f"| | *(tests not in any document)* | {undoc_total} | {undoc_passing} | {undoc_failing} |")
