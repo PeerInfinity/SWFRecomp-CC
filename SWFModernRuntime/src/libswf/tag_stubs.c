@@ -613,13 +613,12 @@ static int ng_round_ls_to_pixel(int ls_twips) {
 }
 
 // Measure width of a UTF-8 substring in twips using font glyph advances.
-// Uses device font model: per-glyph advance rounded to pixel, letter spacing
-// rounded and added per glyph (negative LS clamped to not go below unspaced).
+// When letter spacing is non-zero, per-glyph advance is rounded to pixel
+// boundaries and letter spacing is rounded/clamped per glyph.
 static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
     const char* text, size_t start, size_t end, int letter_spacing_twips)
 {
 	int w = 0;
-	int ls_rounded = ng_round_ls_to_pixel(letter_spacing_twips);
 	size_t i = start;
 	while (i < end) {
 		u16 cp = ng_decode_utf8_char(text, end, &i);
@@ -627,15 +626,11 @@ static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
 		int glyph_twips = 0;
 		if (adv >= 0) {
 			int raw = (int)((float)adv * (float)font_height / (float)em);
-			int unspaced = ng_round_to_pixel(raw);
-			if (ls_rounded != 0) {
-				int spaced = unspaced + ls_rounded;
-				glyph_twips = (spaced > 0) ? spaced : unspaced;
-			} else {
-				glyph_twips = unspaced;
-			}
-		} else if (ls_rounded > 0) {
-			glyph_twips = ls_rounded;
+			glyph_twips = raw + letter_spacing_twips;
+			if (glyph_twips <= 0 && letter_spacing_twips < 0)
+				glyph_twips = raw; // negative LS clamped per-glyph
+		} else if (letter_spacing_twips > 0) {
+			glyph_twips = letter_spacing_twips;
 		}
 		w += glyph_twips;
 	}
@@ -772,7 +767,6 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 			int char_w = 0;
 			int last_fitting_pos = seg_start;
 			int last_fitting_w = 0;
-			int _ls_r = ng_round_ls_to_pixel(letter_spacing_twips);
 			while (char_pos < seg_end) {
 				size_t next_pos = char_pos;
 				u16 cp = ng_decode_utf8_char(text, seg_end, &next_pos);
@@ -780,10 +774,11 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 				int gw = 0;
 				if (adv >= 0) {
 					int raw = (int)((float)adv * (float)font_height / (float)em);
-					int unsp = ng_round_to_pixel(raw);
-					if (_ls_r != 0) { int sp = unsp + _ls_r; gw = (sp > 0) ? sp : unsp; }
-					else gw = unsp;
-				} else if (_ls_r > 0) { gw = _ls_r; }
+					gw = raw + letter_spacing_twips;
+					if (gw <= 0 && letter_spacing_twips < 0) gw = raw;
+				} else if (letter_spacing_twips > 0) {
+					gw = letter_spacing_twips;
+				}
 				if (char_w + gw > cur_avail && last_fitting_pos > seg_start)
 					break;
 				char_w += gw;
@@ -843,8 +838,6 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
 
-	int ls_rounded = ng_round_ls_to_pixel(letter_spacing_twips);
-
 	if (!word_wrap || field_width_twips <= 0) {
 		// No wrap: measure each hard line, return max width
 		// SWF8+: non-left alignment trims trailing spaces from textWidth
@@ -865,19 +858,14 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 			}
 			u16 code_point = ng_decode_utf8_char(text, text_len, &i);
 			s16 adv = ng_font_glyph_advance(fi, code_point);
-			// Device font model: round per-glyph advance to pixel, add rounded LS
 			int glyph_twips = 0;
 			if (adv >= 0) {
 				int raw = (int)((float)adv * (float)font_height / (float)em);
-				int unspaced = ng_round_to_pixel(raw);
-				if (ls_rounded != 0) {
-					int spaced = unspaced + ls_rounded;
-					glyph_twips = (spaced > 0) ? spaced : unspaced;
-				} else {
-					glyph_twips = unspaced;
-				}
-			} else if (ls_rounded > 0) {
-				glyph_twips = ls_rounded; // no glyph but positive letter spacing
+				glyph_twips = raw + letter_spacing_twips;
+				if (glyph_twips <= 0 && letter_spacing_twips < 0)
+					glyph_twips = raw; // negative LS clamped per-glyph
+			} else if (letter_spacing_twips > 0) {
+				glyph_twips = letter_spacing_twips;
 			}
 			cur_width_twips += glyph_twips;
 			if (trim_trailing) {
