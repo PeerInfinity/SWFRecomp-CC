@@ -2236,6 +2236,107 @@ static void init_isNaN_isFinite(void)
 	g_isNaN_isFinite_init = 1;
 }
 
+// --- ExternalInterface static methods (_escapeXML, _unescapeXML, _jsQuoteString, _toXML, etc.) ---
+
+static ActionVar actionEI_escapeXML(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_NULL;
+	if (arg_count < 1) return result;
+	// Coerce to string
+	char buf[2048];
+	int len = varToStringBuf(app_context, &args[0], buf, sizeof(buf) - 1);
+	buf[len] = '\0';
+	// Empty string → null
+	if (len == 0) return result;
+	// Escape: & → &amp;, < → &lt;, > → &gt;, " → &quot;, ' → &apos;
+	// & must be escaped FIRST (before other replacements produce &)
+	char out[4096];
+	int olen = 0;
+	for (int i = 0; i < len && olen < (int)sizeof(out) - 10; i++) {
+		char c = buf[i];
+		if (c == '&') { memcpy(out + olen, "&amp;", 5); olen += 5; }
+		else if (c == '<') { memcpy(out + olen, "&lt;", 4); olen += 4; }
+		else if (c == '>') { memcpy(out + olen, "&gt;", 4); olen += 4; }
+		else if (c == '"') { memcpy(out + olen, "&quot;", 6); olen += 6; }
+		else if (c == '\'') { memcpy(out + olen, "&apos;", 6); olen += 6; }
+		else { out[olen++] = c; }
+	}
+	out[olen] = '\0';
+	result.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	u16* u16str = utf8_to_u16(app_context, out, olen, &u16len);
+	result.str_size = u16len;
+	VAL(u64, &result.data.numeric_value) = (u64)u16str;
+	return result;
+}
+
+static ActionVar actionEI_unescapeXML(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_NULL;
+	if (arg_count < 1) return result;
+	char buf[2048];
+	int len = varToStringBuf(app_context, &args[0], buf, sizeof(buf) - 1);
+	buf[len] = '\0';
+	if (len == 0) return result;
+	// Unescape: &lt; → <, &gt; → >, &quot; → ", &apos; → ', &amp; → &
+	// &amp; must be unescaped LAST to avoid double-unescaping
+	char out[4096];
+	int olen = 0;
+	for (int i = 0; i < len && olen < (int)sizeof(out) - 2; i++) {
+		if (buf[i] == '&' && i + 3 < len) {
+			if (strncmp(buf + i, "&lt;", 4) == 0) { out[olen++] = '<'; i += 3; }
+			else if (strncmp(buf + i, "&gt;", 4) == 0) { out[olen++] = '>'; i += 3; }
+			else if (i + 5 < len && strncmp(buf + i, "&amp;", 5) == 0) { out[olen++] = '&'; i += 4; }
+			else if (i + 5 < len && strncmp(buf + i, "&quot;", 6) == 0) { out[olen++] = '"'; i += 5; }
+			else if (i + 5 < len && strncmp(buf + i, "&apos;", 6) == 0) { out[olen++] = '\''; i += 5; }
+			else { out[olen++] = buf[i]; }
+		} else {
+			out[olen++] = buf[i];
+		}
+	}
+	out[olen] = '\0';
+	result.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	u16* u16str = utf8_to_u16(app_context, out, olen, &u16len);
+	result.str_size = u16len;
+	VAL(u64, &result.data.numeric_value) = (u64)u16str;
+	return result;
+}
+
+static ActionVar actionEI_jsQuoteString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_NULL;
+	if (arg_count < 1) return result;
+	char buf[2048];
+	int len = varToStringBuf(app_context, &args[0], buf, sizeof(buf) - 1);
+	buf[len] = '\0';
+	if (len == 0) return result;
+	// Only escape " → \" (backslashes are NOT escaped)
+	char out[4096];
+	int olen = 0;
+	for (int i = 0; i < len && olen < (int)sizeof(out) - 4; i++) {
+		if (buf[i] == '"') { out[olen++] = '\\'; out[olen++] = '"'; }
+		else { out[olen++] = buf[i]; }
+	}
+	out[olen] = '\0';
+	result.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	u16* u16str = utf8_to_u16(app_context, out, olen, &u16len);
+	result.str_size = u16len;
+	VAL(u64, &result.data.numeric_value) = (u64)u16str;
+	return result;
+}
+
+static ASFunction g_ei_escapeXML_func;
+static ASFunction g_ei_unescapeXML_func;
+static ASFunction g_ei_jsQuoteString_func;
+
 // --- ASnative class 100: Global functions (escape, unescape, parseInt, parseFloat, trace) ---
 
 static ActionVar asnative_100_escape(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -21161,6 +21262,34 @@ check_special_vars:
 				// flash.external
 				MAKE_PKG(external_obj, flash_object, "external", 8, 4);
 				MAKE_STUB_CTOR(fc_ExternalInterface, "ExternalInterface");
+				// Add static methods on ExternalInterface
+				fc_ExternalInterface.own_props = allocObject(app_context, 8);
+				retainObject(fc_ExternalInterface.own_props);
+				{
+					memset(&g_ei_escapeXML_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_escapeXML_func.name, "_escapeXML", 255);
+					g_ei_escapeXML_func.function_type = 2;
+					g_ei_escapeXML_func.advanced_func = (Function2Ptr)actionEI_escapeXML;
+					ActionVar _ev = {0}; _ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_escapeXML_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_escapeXML", 10, &_ev);
+
+					memset(&g_ei_unescapeXML_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_unescapeXML_func.name, "_unescapeXML", 255);
+					g_ei_unescapeXML_func.function_type = 2;
+					g_ei_unescapeXML_func.advanced_func = (Function2Ptr)actionEI_unescapeXML;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_unescapeXML_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_unescapeXML", 12, &_ev);
+
+					memset(&g_ei_jsQuoteString_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_jsQuoteString_func.name, "_jsQuoteString", 255);
+					g_ei_jsQuoteString_func.function_type = 2;
+					g_ei_jsQuoteString_func.advanced_func = (Function2Ptr)actionEI_jsQuoteString;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_jsQuoteString_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "_jsQuoteString", 14, &_ev);
+				}
 				SET_CTOR_PROP(external_obj, "ExternalInterface", 17, fc_ExternalInterface);
 
 				// flash.filters (10 filter classes)
@@ -34195,19 +34324,19 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 		case ACTION_STACK_VALUE_OBJECT:
 		{
 			if (v->data.numeric_value != 0) {
-				ASObject* obj = (ASObject*) v->data.numeric_value;
-				if (isXMLNodeInstance(obj)) {
-					int ts_found = 0;
-					ActionVar ts = objectCallToString(app_context, v, &ts_found);
-					if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
-						const uint16_t* u16 = varGetU16Ptr(&ts);
-						if (u16) {
-							int len = u16_to_utf8(u16, ts.str_size, buf, buf_size);
-							return len;
-						}
+				int ts_found = 0;
+				ActionVar ts = objectCallToString(app_context, v, &ts_found);
+				if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* u16 = varGetU16Ptr(&ts);
+					if (u16) {
+						int len = u16_to_utf8(u16, ts.str_size, buf, buf_size);
+						return len;
 					}
 				}
 			}
+			extern int g_swf_version;
+			if (g_swf_version >= 5)
+				return snprintf(buf, buf_size, "[object Object]");
 			return snprintf(buf, buf_size, "[type Object]");
 		}
 		case ACTION_STACK_VALUE_FUNCTION:

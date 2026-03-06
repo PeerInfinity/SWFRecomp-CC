@@ -149,10 +149,9 @@ file_reference_upload_success
 
 # --- ExternalInterface (browser JavaScript bridge) ---
 # external_interface needs ExternalInterface.call()/addCallback() which need a browser JS context.
-# external_interface_jsquotestring and external_interface_toas_basic only need static helper methods
-# and should be un-ignored once EXTERNAL_INTERFACE_PLAN Phases 1/3 are implemented.
+# external_interface_toas_basic only needs static helper methods
+# and should be un-ignored once EXTERNAL_INTERFACE_PLAN Phase 3 is implemented.
 external_interface
-external_interface_jsquotestring
 external_interface_toas_basic
 
 # --- Bitmap data operations ---
