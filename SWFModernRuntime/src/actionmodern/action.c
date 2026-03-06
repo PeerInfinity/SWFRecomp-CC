@@ -4723,6 +4723,18 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 		if (func->register_count > 0)
 			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 
+		// Restore captured scopes (closure context)
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH)
+			{
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
 		ASObject* local_scope = allocObject(app_context, 8);
 		if (scope_depth < MAX_SCOPE_DEPTH)
 		{
@@ -4731,15 +4743,47 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 			scope_chain[scope_depth++] = local_scope;
 		}
 
+		// Switch base_clip context for SWF6+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
 		result = func->advanced_func(app_context, NULL, 0, registers, this_obj);
 
-		if (scope_depth > 0) scope_depth--;
+		g_current_context = saved_context;
+		// Pop local scope + captured scopes
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+		{
+			if (scope_depth > 0) scope_depth--;
+		}
 		releaseObject(app_context, local_scope);
 		if (registers != NULL) FREE(registers);
 	}
 	else
 	{
+		// Restore captured scopes for type-1 functions too
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH)
+			{
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
 		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth > 0) scope_depth--;
+		}
 	}
 
 	g_special_depth--;
@@ -38397,7 +38441,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		// Function object - handle toString, valueOf, call, apply
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
 
-		// Check own_props first for method overrides (e.g., ExternalInterface.call)
+		// Check own_props first: methods stored directly on a function's own_props
+		// take priority over Function.prototype builtins (call/apply/toString/valueOf).
+		// This is needed for e.g. ExternalInterface.call vs Function.prototype.call.
 		if (func != NULL && func->own_props != NULL)
 		{
 			ActionVar* own_method = getProperty(func->own_props, method_name, method_name_len);
@@ -38406,13 +38452,72 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ASFunction* own_func = (ASFunction*)(uintptr_t) own_method->data.numeric_value;
 				if (own_func != NULL && own_func->function_type == 2 && own_func->advanced_func != NULL)
 				{
-					ActionVar* regs = NULL;
+					// Delegate to the general type-2 dispatch which does full scope setup
+					ActionVar* registers = NULL;
 					if (own_func->register_count > 0)
-						regs = (ActionVar*) HCALLOC(own_func->register_count, sizeof(ActionVar));
+						registers = (ActionVar*) HCALLOC(own_func->register_count, sizeof(ActionVar));
+
+					ASObject* local_scope_op = allocObject(app_context, 8);
+					retainObject(local_scope_op);
+
+					u32 captured_count_op = own_func->captured_scope_count;
+					for (u32 ci = 0; ci < captured_count_op; ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = own_func->captured_scope_is_with[ci];
+							scope_mc[scope_depth] = own_func->captured_scope_mc[ci];
+							scope_chain[scope_depth++] = own_func->captured_scope[ci];
+						}
+					}
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = local_scope_op;
+					}
+
+					ASFunction* prev_exec_op = g_current_executing_func;
+					u32 saved_this_depth_op = g_this_depth;
+					{
+						u16 f2flags = own_func->flags;
+						if (!(f2flags & 0x0001) && !(f2flags & 0x0002)) {
+							ActionVar this_var_op = {0};
+							this_var_op.type = ACTION_STACK_VALUE_OBJECT;
+							this_var_op.data.numeric_value = (u64)func->own_props;
+							setProperty(app_context, local_scope_op, "this", 4, &this_var_op);
+							if (g_this_depth < MAX_THIS_DEPTH) {
+								g_this_stack[g_this_depth] = this_var_op;
+								g_this_depth++;
+							}
+						}
+						if (!(f2flags & 0x0004) && !(f2flags & 0x0008)) {
+							ASArray* args_arr_op = allocArray(app_context, num_args);
+							for (u32 i = 0; i < num_args; i++)
+								setArrayElement(app_context, args_arr_op, i, &args[i]);
+							setupArgumentsProps(app_context, args_arr_op, own_func, prev_exec_op);
+							ActionVar args_var_op = {0};
+							args_var_op.type = ACTION_STACK_VALUE_ARRAY;
+							args_var_op.data.numeric_value = (u64)args_arr_op;
+							setProperty(app_context, local_scope_op, "arguments", 9, &args_var_op);
+						}
+					}
+
+					MovieClip* prev_ctx_op = g_current_context;
+					if (g_swf_version >= 6 && own_func->base_clip != NULL)
+						g_current_context = own_func->base_clip;
+
+					g_prev_executing_func = prev_exec_op;
+					g_current_executing_func = own_func;
 					g_call_depth++;
-					ActionVar result = own_func->advanced_func(app_context, args, num_args, regs, func->own_props);
+					ActionVar result = own_func->advanced_func(app_context, args, num_args, registers, (void*) func->own_props);
 					g_call_depth--;
-					if (regs != NULL) FREE(regs);
+					g_current_executing_func = prev_exec_op;
+					g_current_context = prev_ctx_op;
+					g_this_depth = saved_this_depth_op;
+
+					for (u32 ci = 0; ci < captured_count_op + 1; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
+					releaseObject(app_context, local_scope_op);
+					if (registers != NULL) FREE(registers);
 					if (args != NULL) FREE(args);
 					pushVar(app_context, &result);
 					return;
