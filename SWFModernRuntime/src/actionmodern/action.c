@@ -13268,9 +13268,12 @@ static int tf_tag_is(const char* tag, u32 tag_len, const char* name) {
 
 // tf_parse_html: parse HTML string into format runs
 // Internal text uses: '\n' for content newlines (bare \n in HTML),
-//   '\x01' for tag paragraph breaks (</p>, </li>)
-//   '\x02' for <br> paragraph breaks (preserves B/I/U in empty paragraphs)
-#define IS_PARA_BREAK(c) ((c) == '\x01' || (c) == '\x02' || (c) == '\n')
+//   SENTINEL_TAG_BREAK for tag paragraph breaks (</p>, </li>)
+//   SENTINEL_BR_BREAK for <br> paragraph breaks (preserves B/I/U in empty paragraphs)
+// Use 0xFE/0xFF (invalid UTF-8 bytes) to avoid collision with content characters.
+#define SENTINEL_TAG_BREAK '\xFE'
+#define SENTINEL_BR_BREAK  '\xFF'
+#define IS_PARA_BREAK(c) ((c) == SENTINEL_TAG_BREAK || (c) == SENTINEL_BR_BREAK || (c) == '\n')
 // condense_white: 1 = condenseWhite mode, 0 = normal
 // swf_version: affects whitespace handling
 // Returns 1 on success.
@@ -13326,10 +13329,10 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 	} while(0)
 
 	// Add a paragraph break marker (tag-based: </p>, </li>, <br>)
-	// Uses \x01 to distinguish from content \n
+	// Uses SENTINEL_TAG_BREAK to distinguish from content \n
 	#define ADD_TAG_BREAK(ptype) do { \
 		FLUSH_RUN(); \
-		ADD_CH('\x01'); \
+		ADD_CH(SENTINEL_TAG_BREAK); \
 		if (table->run_count < TF_MAX_RUNS) { \
 			TFRun* r = &table->runs[table->run_count]; \
 			*r = fmt_stack[fmt_sp]; \
@@ -13341,10 +13344,10 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 		run_text_start = table->text_len; \
 	} while(0)
 
-	// Add a <br> break (\x02 marker — like tag break but preserves B/I/U in empty para)
+	// Add a <br> break (SENTINEL_BR_BREAK — like tag break but preserves B/I/U in empty para)
 	#define ADD_BR_BREAK(ptype) do { \
 		FLUSH_RUN(); \
-		ADD_CH('\x02'); \
+		ADD_CH(SENTINEL_BR_BREAK); \
 		if (table->run_count < TF_MAX_RUNS) { \
 			TFRun* r = &table->runs[table->run_count]; \
 			*r = fmt_stack[fmt_sp]; \
@@ -13373,7 +13376,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 
 	int after_tag = 1; // Start as "after tag" (beginning of input acts like after a tag)
 	int cw8_para_start = (condense_white && swf_version >= 8) ? 1 : 0; // SWF8 condenseWhite: strip leading ws per paragraph
-	int last_break_was_p = 0; // Track if the last \x01 break was from </p> (for double-close detection)
+	int last_break_was_p = 0; // Track if the last tag break was from </p> (for double-close detection)
 	int consumed_p = 0; // Track </p> breaks consumed inside LI context (suppresses matching outer </p>)
 	int nested_p_ignored = 0; // Track nested <p> tags ignored inside in_paragraph (so corresponding </p> are suppressed)
 	int saved_p_align = -1; // Alignment from <p> auto-closed by <li> (restored on post-LI </p>)
@@ -13783,7 +13786,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 		int all_ws = 1;
 		for (u32 ti = 0; ti < table->text_len; ti++) {
 			char c = table->text[ti];
-			if (c == '\x01' || c == '\x02') continue; // skip structural markers
+			if (c == SENTINEL_TAG_BREAK || c == SENTINEL_BR_BREAK) continue; // skip structural markers
 			if (c != ' ' && c != '\n' && c != '\r' && c != '\t') {
 				all_ws = 0;
 				break;
@@ -13793,7 +13796,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 			// Check if there are any tag breaks — if so, keep them (for multiline)
 			int has_tag_breaks = 0;
 			for (u32 ti = 0; ti < table->text_len; ti++) {
-				if (table->text[ti] == '\x01' || table->text[ti] == '\x02') { has_tag_breaks = 1; break; }
+				if (table->text[ti] == SENTINEL_TAG_BREAK || table->text[ti] == SENTINEL_BR_BREAK) { has_tag_breaks = 1; break; }
 			}
 			if (!has_tag_breaks) {
 				// Pure whitespace with no structure — clear completely
@@ -13809,7 +13812,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				u32 new_len = 0;
 				u32 new_run_count = 0;
 				for (u32 ti = 0; ti < table->text_len; ti++) {
-					if (table->text[ti] == '\x01' || table->text[ti] == '\x02') {
+					if (table->text[ti] == SENTINEL_TAG_BREAK || table->text[ti] == SENTINEL_BR_BREAK) {
 						// Preserve zero-length marker runs at this position first
 						for (u32 ri = 0; ri < orig_run_count; ri++) {
 							if (table->runs[ri].start == ti && table->runs[ri].length == 0) {
@@ -13903,7 +13906,7 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 	u32 pstart = 0;
 	for (u32 ti = 0; ti <= table->text_len; ti++) {
 		if (ti == table->text_len || IS_PARA_BREAK(table->text[ti])) {
-			int is_tag_break = (ti < table->text_len && (table->text[ti] == '\x01' || table->text[ti] == '\x02'));
+			int is_tag_break = (ti < table->text_len && (table->text[ti] == SENTINEL_TAG_BREAK || table->text[ti] == SENTINEL_BR_BREAK));
 			int is_content_nl = (ti < table->text_len && table->text[ti] == '\n');
 
 			if (!is_multiline && is_tag_break) {
@@ -14122,7 +14125,7 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			// 1. Content breaks (\n) and <br> breaks (\x02) — from pfmt
 			// 2. Tag breaks (\x01) in LI paragraphs where BIU comes from enclosing tags
 			// 3. Zero-length BIU markers from <b>/<i>/<u> tags wrapping only breaks
-			int emit_biu = (pe < table->text_len && (table->text[pe] == '\n' || table->text[pe] == '\x02'));
+			int emit_biu = (pe < table->text_len && (table->text[pe] == '\n' || table->text[pe] == SENTINEL_BR_BREAK));
 			// For LI paragraphs with tag breaks: check if the break run has BIU formatting
 			// (from enclosing <b>/<i>/<u> tags wrapping the <li>)
 			if (!emit_biu && pfmt.para_type == 1 && (pfmt.bold || pfmt.italic || pfmt.underline)) {
@@ -14149,6 +14152,10 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			}
 			if (emit_href) TF_EMIT(buf, bp, bsz, "</A>");
 		}
+		// In single-line condenseWhite SWF8, tag break sentinels become spaces
+		int cw8_space = (!is_multiline && table->condense_white && table->swf_version >= 8);
+		u32 last_emit_end = ps; // Track end of last emitted content for gap detection
+
 		// Hierarchical FONT nesting with run merging
 		// Flash nests inner FONTs: each specifies only what changes from parent context.
 		// Track a font context stack for proper nesting.
@@ -14263,6 +14270,15 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			// Emit text for all runs in this group
 			for (u32 gi = ri; gi < group_end; gi++) {
 				u32 rstart = prstarts[gi], rlen = prlens[gi];
+				// In single-line condenseWhite SWF8: gap containing sentinel → emit space (deduplicated)
+				if (cw8_space && rstart > last_emit_end) {
+					for (u32 gap = last_emit_end; gap < rstart; gap++) {
+						if (IS_PARA_BREAK(table->text[gap])) {
+							if (bp == 0 || buf[bp - 1] != ' ') TF_EMIT_CHAR(buf, bp, bsz, ' ');
+							break;
+						}
+					}
+				}
 				for (u32 ci = 0; ci < rlen; ci++) {
 					char tc = table->text[rstart + ci];
 					if (tc == '&') TF_EMIT(buf, bp, bsz, "&amp;");
@@ -14270,6 +14286,7 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 					else if (tc == '>') TF_EMIT(buf, bp, bsz, "&gt;");
 					else TF_EMIT_CHAR(buf, bp, bsz, tc);
 				}
+				last_emit_end = rstart + rlen;
 			}
 
 			if (r->underline) TF_EMIT(buf, bp, bsz, "</U>");
@@ -14397,6 +14414,16 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 		#undef CTX
 		#undef FONT_CTX_MAX
 
+		// In single-line condenseWhite SWF8: trailing sentinel → trailing space (deduplicated)
+		if (cw8_space && prcnt > 0 && last_emit_end < pe) {
+			for (u32 gap = last_emit_end; gap < pe; gap++) {
+				if (IS_PARA_BREAK(table->text[gap])) {
+					if (bp == 0 || buf[bp - 1] != ' ') TF_EMIT_CHAR(buf, bp, bsz, ' ');
+					break;
+				}
+			}
+		}
+
 		TF_EMIT(buf, bp, bsz, "</FONT>");
 		if (para_type_out == 1) TF_EMIT(buf, bp, bsz, "</LI>");
 		else TF_EMIT(buf, bp, bsz, "</P>");
@@ -14414,17 +14441,19 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 
 // Get plain text from format runs.
 // In text output: \n → \r (paragraph separator in Flash text).
-// \x01 (tag breaks) → \r in multiline, nothing in single-line.
+// Tag breaks → \r in multiline, space in single-line condenseWhite SWF8, nothing otherwise.
 static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size, int is_multiline) {
+	int cw8_space = (!is_multiline && table->condense_white && table->swf_version >= 8);
 	u32 oi = 0;
 	for (u32 i = 0; i < table->text_len && oi < out_buf_size - 1; i++) {
 		char c = table->text[i];
 		if (c == '\n') {
 			// Content newline: always produces \r
 			out_buf[oi++] = '\r';
-		} else if (c == '\x01' || c == '\x02') {
-			// Tag paragraph break: \r only in multiline
+		} else if (c == SENTINEL_TAG_BREAK || c == SENTINEL_BR_BREAK) {
+			// Tag paragraph break: \r in multiline, space in single-line condenseWhite SWF8
 			if (is_multiline) out_buf[oi++] = '\r';
+			else if (cw8_space && oi > 0 && out_buf[oi - 1] != ' ') out_buf[oi++] = ' ';
 		} else {
 			out_buf[oi++] = c;
 		}
@@ -39953,7 +39982,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					u32 map_begin = run_table->text_len, map_end = run_table->text_len;
 					for (u32 ti = 0; ti < run_table->text_len; ti++) {
 						char c = run_table->text[ti];
-						if (c == '\x01' || c == '\x02') continue; // skip structural markers
+						if (c == SENTINEL_TAG_BREAK || c == SENTINEL_BR_BREAK) continue; // skip structural markers
 						if (plain_idx == tf_begin) map_begin = ti;
 						plain_idx++;
 						if (plain_idx == tf_end) { map_end = ti + 1; break; }
@@ -40017,7 +40046,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Check overlap with [map_begin, map_end)
 						if (re <= map_begin || rs >= map_end) continue;
 						// Skip break markers
-						if (r->length == 1 && (run_table->text[rs] == '\x01' || run_table->text[rs] == '\x02')) {
+						if (r->length == 1 && (run_table->text[rs] == SENTINEL_TAG_BREAK || run_table->text[rs] == SENTINEL_BR_BREAK)) {
 							// Apply paragraph-level properties (align, leading, margins) to break markers too
 							if (p_align != NULL && p_align->type == ACTION_STACK_VALUE_STRING && p_align->str_size > 0) {
 								char ab[16]; size_t abl = u16_to_utf8(varGetU16Ptr(p_align), p_align->str_size, ab, sizeof(ab));
@@ -40274,7 +40303,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						if (query_pos >= r->start && query_pos < r->start + r->length) {
 							// Skip break marker characters
 							if (r->length == 1 && r->start < run_table->text_len &&
-							    (run_table->text[r->start] == '\x01' || run_table->text[r->start] == '\x02'))
+							    (run_table->text[r->start] == SENTINEL_TAG_BREAK || run_table->text[r->start] == SENTINEL_BR_BREAK))
 								continue;
 							found_run = r;
 							break;
@@ -40315,7 +40344,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								TFRun* r = &run_table->runs[ri];
 								if (r->length == 0) continue;
 								if (r->length == 1 && r->start < run_table->text_len &&
-								    (run_table->text[r->start] == '\x01' || run_table->text[r->start] == '\x02'))
+								    (run_table->text[r->start] == SENTINEL_TAG_BREAK || run_table->text[r->start] == SENTINEL_BR_BREAK))
 									continue;
 								if (r->bold != ref_bold) biu_uniform_bold = 0;
 								if (r->italic != ref_italic) biu_uniform_italic = 0;
@@ -42448,7 +42477,7 @@ static int mc_get_track_as_menu_ng(MovieClip* mc)
 // Invoke a named AS2 event handler (onPress, onRelease, onDragOver, ...) stored
 // in mc->dynamic_props, with `this` bound to mc.
 static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
-                                    const char* name, u32 name_len)
+                                    const char* name, u32 name_len, ActionVar* handler_args, int handler_arg_count)
 {
 	if (mc == NULL || mc->dynamic_props == NULL || g_execution_halted) return;
 	ActionVar* handler_var = getProperty((ASObject*)mc->dynamic_props, name, name_len);
@@ -42510,7 +42539,7 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 		// Use g_event_this_mc so generated preload_this code picks up MC type correctly
 		MovieClip* saved_event_this_handler = g_event_this_mc;
 		g_event_this_mc = mc;
-		ActionVar result = func->advanced_func(app_context, NULL, 0, registers, NULL);
+		ActionVar result = func->advanced_func(app_context, handler_args, handler_arg_count, registers, NULL);
 		g_event_this_mc = saved_event_this_handler;
 		(void)result;
 		g_current_executing_func = prev_func;
@@ -42536,6 +42565,8 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 			}
 		}
 
+		// Type 1 functions (recompiler-generated) don't support handler_args
+		// (event handlers are always type 2 DefineFunction2)
 		g_call_depth++;
 		ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 		(void)result;
@@ -42570,7 +42601,7 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 
 		mc->mc_as_pressed = 1;
 		mc->mc_mouse_inside = 1;
-		mc_call_as2_handler_ng(app_context, mc, "onPress", 7);
+		mc_call_as2_handler_ng(app_context, mc, "onPress", 7, NULL, 0);
 	}
 }
 
@@ -42597,9 +42628,9 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 		mc->mc_as_pressed = 0;
 
 		if (inside)
-			mc_call_as2_handler_ng(app_context, mc, "onRelease", 9);
+			mc_call_as2_handler_ng(app_context, mc, "onRelease", 9, NULL, 0);
 		else
-			mc_call_as2_handler_ng(app_context, mc, "onReleaseOutside", 16);
+			mc_call_as2_handler_ng(app_context, mc, "onReleaseOutside", 16, NULL, 0);
 	}
 }
 
@@ -42629,17 +42660,17 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 			if (btn_down) {
 				// onDragOver fires if trackAsMenu=true OR button was pressed inside this MC
 				if (mc_get_track_as_menu_ng(mc) || mc->mc_as_pressed)
-					mc_call_as2_handler_ng(app_context, mc, "onDragOver", 10);
+					mc_call_as2_handler_ng(app_context, mc, "onDragOver", 10, NULL, 0);
 			} else {
-				mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10);
+				mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10, NULL, 0);
 			}
 		} else if (was_inside && !now_inside) {
 			// Mouse exited this MC's hit area
 			if (btn_down) {
 				if (mc_get_track_as_menu_ng(mc) || mc->mc_as_pressed)
-					mc_call_as2_handler_ng(app_context, mc, "onDragOut", 9);
+					mc_call_as2_handler_ng(app_context, mc, "onDragOut", 9, NULL, 0);
 			} else {
-				mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9);
+				mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
 			}
 		}
 	}
@@ -42653,7 +42684,7 @@ void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
-		mc_call_as2_handler_ng(app_context, mc, "onMouseMove", 11);
+		mc_call_as2_handler_ng(app_context, mc, "onMouseMove", 11, NULL, 0);
 	}
 }
 
@@ -42666,7 +42697,7 @@ void actionDispatchMCMouseDown(SWFAppContext* app_context)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
-		mc_call_as2_handler_ng(app_context, mc, "onMouseDown", 11);
+		mc_call_as2_handler_ng(app_context, mc, "onMouseDown", 11, NULL, 0);
 	}
 }
 
@@ -42677,7 +42708,7 @@ void actionDispatchMCMouseUp(SWFAppContext* app_context)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
-		mc_call_as2_handler_ng(app_context, mc, "onMouseUp", 9);
+		mc_call_as2_handler_ng(app_context, mc, "onMouseUp", 9, NULL, 0);
 	}
 }
 
@@ -42902,23 +42933,37 @@ void actionFlushDeferredRollEvents(SWFAppContext* app_context)
 			ng_simulateButtonTransition(app_context, mc, 0x0001);
 		} else if (kind == 1) {
 			// AS2 onRollOut
-			mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9);
+			mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
 		} else {
 			// AS2 onRollOver
-			mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10);
+			mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10, NULL, 0);
 		}
 	}
 }
 
 // Fire focus change events and update g_focused_mc.
-// Fires: old_mc.onKillFocus(), new_mc.onSetFocus(), Selection.broadcastMessage("onSetFocus").
+// Fires: old_mc.onKillFocus(newFocus), new_mc.onSetFocus(oldFocus), Selection.broadcastMessage("onSetFocus").
 static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc)
 {
 	if (old_mc == new_mc) return;
-	// 1. onKillFocus on old MC (no-op if handler not defined)
-	mc_call_as2_handler_ng(app_context, old_mc, "onKillFocus", 11);
-	// 2. onSetFocus on new MC (no-op if handler not defined)
-	mc_call_as2_handler_ng(app_context, new_mc, "onSetFocus", 10);
+	// 1. onKillFocus(newFocus) on old MC
+	ActionVar kill_arg = {0};
+	if (new_mc != NULL) {
+		kill_arg.type = ACTION_STACK_VALUE_MOVIECLIP;
+		kill_arg.data.numeric_value = (u64)(uintptr_t)new_mc;
+	} else {
+		kill_arg.type = ACTION_STACK_VALUE_NULL;
+	}
+	mc_call_as2_handler_ng(app_context, old_mc, "onKillFocus", 11, &kill_arg, 1);
+	// 2. onSetFocus(oldFocus) on new MC
+	ActionVar set_arg = {0};
+	if (old_mc != NULL) {
+		set_arg.type = ACTION_STACK_VALUE_MOVIECLIP;
+		set_arg.data.numeric_value = (u64)(uintptr_t)old_mc;
+	} else {
+		set_arg.type = ACTION_STACK_VALUE_NULL;
+	}
+	mc_call_as2_handler_ng(app_context, new_mc, "onSetFocus", 10, &set_arg, 1);
 	// 3. Update focused MC before broadcasting
 	g_focused_mc = new_mc;
 	// Reset selection indices on focus change
@@ -43407,13 +43452,13 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 		// Button DoAction rollOut fires BEFORE AS2 onRollOut
 		if (g_focused_mc->is_button_mc)
 			ng_simulateButtonTransition(app_context, g_focused_mc, 0x0002);
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9, NULL, 0);
 	}
 	if (!new_is_textfield && new_mc != NULL) {
 		// Button DoAction rollOver fires BEFORE AS2 onRollOver
 		if (new_mc->is_button_mc)
 			ng_simulateButtonTransition(app_context, new_mc, 0x0001);
-		mc_call_as2_handler_ng(app_context, new_mc, "onRollOver", 10);
+		mc_call_as2_handler_ng(app_context, new_mc, "onRollOver", 10, NULL, 0);
 	}
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 	// Tab focus selects all text (same as programmatic setFocus, unlike mouse clicks)
@@ -43434,7 +43479,7 @@ void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code)
 	if (g_focused_mc == NULL) return;
 	// Text fields don't dispatch onKeyDown to the focused MC
 	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
-	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyDown", 9);
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyDown", 9, NULL, 0);
 
 	// Enter/Space on focused MC with onPress → simulated press+release
 	if (key_code == 13 || key_code == 32) {
@@ -43478,13 +43523,13 @@ void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code)
 		// SWF buttons: interleave DoAction and AS2 handlers
 		// press DoAction → onPress → release DoAction → onRelease
 		ng_simulateButtonTransition(app_context, g_focused_mc, 0x0004); // press DoAction
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7, NULL, 0);
 		ng_simulateButtonTransition(app_context, g_focused_mc, 0x0008); // release DoAction
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9, NULL, 0);
 	} else {
 		// MCs with button handlers: just fire AS2 handlers
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7);
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7, NULL, 0);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9, NULL, 0);
 	}
 }
 
@@ -43495,7 +43540,7 @@ void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code)
 	if (g_focused_mc == NULL) return;
 	// Text fields don't dispatch onKeyUp to the focused MC
 	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
-	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyUp", 7);
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyUp", 7, NULL, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -43598,7 +43643,7 @@ void actionWindowFocusLost(SWFAppContext* app_context)
 {
 	if (g_focused_mc != NULL) {
 		// Fire onRollOut before onKillFocus
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9, NULL, 0);
 		selection_do_focus_change(app_context, g_focused_mc, NULL);
 	}
 }
@@ -43795,7 +43840,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 		g_selection_begin = 0;
 		g_selection_end = 0;
 		g_selection_caret = 0;
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9);
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 		return;
 	}
 
@@ -43851,7 +43896,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 	g_selection_caret = del_start;
 
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
-	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9);
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
 // ==================== TextField.restrict pattern filter ====================
@@ -44263,7 +44308,7 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	g_tf_select_all = 0;
 
 	// Fire onChanged callback
-	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9);
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
 // ==================================================================
@@ -44593,7 +44638,7 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 			if (mc != NULL) g_event_this_mc = mc;
 
 			g_call_depth++;
-			((void(*)(SWFAppContext*))method_func->simple_func)(app_context);
+			((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
 			g_call_depth--;
 
 			g_event_this_mc = old_event_this;
@@ -44650,7 +44695,7 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 				g_current_context = func->base_clip;
 
 			g_call_depth++;
-			((void(*)(SWFAppContext*))func->simple_func)(app_context);
+			((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 			g_call_depth--;
 
 			g_current_context = old_context;

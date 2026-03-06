@@ -4,7 +4,7 @@ Last updated: 2026-03-06
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **~477/619 (~77%)** filtered (pending CI confirmation). 22 plans in `blocked/`, 2 in `incomplete/`.
+Current pass rate: **~484/619 (~78%)** filtered (pending CI confirmation). 22 plans in `blocked/`, 2 in `incomplete/`.
 
 ---
 
@@ -94,22 +94,15 @@ This requires a version-specific HTML parser path — a major refactor of the ex
 
 ---
 
-## Blocker 6: condenseWhite Issues
+## ~~Blocker 6: condenseWhite Issues~~ RESOLVED
 
-**Impact**: 2 tests, ~17 lines
+Both tests now **PASS**:
+- edittext_html_condensewhite_swf7: **311/311 PASS**
+- edittext_html_condensewhite_swf8: **311/311 PASS**
 
-Two distinct issues:
-
-1. **Sentinel collision** (both tests): The HTML parser uses `\x01`/`\x02` in-band sentinels for paragraph breaks. Literal control characters in input text (e.g., `\x01`, `\x02`, `\x03`) are misinterpreted as paragraph markers, creating spurious `<P>` splits. This causes 3 lines in SWF7 and 3 lines in SWF8.
-
-2. **SWF8 trailing space after tags** (SWF8 only): When `condenseWhite=true` in SWF8, whitespace-only text nodes after closing tags (e.g., `</b> \n`) should collapse to a single trailing space. Currently they're stripped entirely. Also, inter-block spacing (space between `</p>` and `<p>`) and inline tag boundary spacing (`</b> <b>`) have whitespace collapse differences. ~21 lines.
-
-| Test | Match | Lines Off | Issue |
-|------|-------|-----------|-------|
-| edittext_html_condensewhite_swf7 | 308/311 | 3 | Sentinel collision only |
-| edittext_html_condensewhite_swf8 | ~297/311 | ~14 | Sentinel collision + trailing space after block close + inter-block spacing |
-
-**Plans blocked**: HTML_TEXT_REMAINING_WORK, TEXTFIELD_PLAN
+**Fixes applied:**
+1. **Sentinel collision**: Replaced `\x01`/`\x02` in-band sentinels with `\xFE`/`\xFF` (invalid UTF-8 bytes that never appear in content)
+2. **SWF8 trailing space**: In single-line condenseWhite SWF8, tag break sentinels produce a space (deduplicated with existing trailing spaces). In multiline mode they produce `\r` as before.
 
 ---
 
@@ -239,7 +232,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 1. **Per-movie `_global` isolation** — Move from two-group to per-movie globals
 2. **SWF6 HTML paragraph model** — Version-specific HTML parser path
 3. **call() early termination** — Script execution abort mechanism
-4. **condenseWhite sentinel collision** — Replace `\x01`/`\x02` in-band markers with out-of-band tracking
+4. ~~**condenseWhite sentinel collision**~~ — **RESOLVED** (replaced `\x01`/`\x02` with `\xFE`/`\xFF`)
 
 ### Not Feasible
 1. **Heap-allocated activation scopes** — Would require rewriting the entire variable storage model
@@ -255,7 +248,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 | ~~MTASC class infra~~ | ~~1~~ | ~~50~~ | **MOSTLY RESOLVED** (1 test left, blocked by LoadMovie) |
 | Font metrics | 3 | ~21 | Moderate |
 | SWF6 HTML model | 1 | 1480 | Low (complex refactor) |
-| condenseWhite | 2 | ~17 | Moderate (trailing space, inter-block) / Architectural (sentinels) |
+| ~~condenseWhite~~ | ~~2~~ | ~~17~~ | **RESOLVED** |
 | ~~StyleSheet CSS~~ | ~~1~~ | ~~121~~ | **RESOLVED** |
 | MC removal lifecycle | 1 | ~21 | Low (deep semantics) |
 | Closure capture | 1 | 100 | Not feasible |
