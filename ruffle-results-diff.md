@@ -1,44 +1,34 @@
 # Ruffle Test Results Diff
 
-**Previous:** `7d19cf5299a5` (2026-03-06T18:24:27.933442+00:00)
-**Current:** `ea1732c5c720` (2026-03-06T22:26:29.093400+00:00)
+**Previous:** `ea1732c5c720` (2026-03-06T22:26:29.093400+00:00)
+**Current:** `e2ad847e57dd` (2026-03-06T23:19:39.955202+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 480 | 488 | +8 |
+| Passing | 488 | 490 | +2 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 77.5% | 78.8% | +1.3% |
-| Mismatched lines | 20054 | 20012 | -42 |
-|   Decreased | | | -50 |
-|   Increased | | | +8 |
+| Pass rate | 78.8% | 79.2% | +0.4% |
+| Mismatched lines | 20012 | 19805 | -207 |
+|   Decreased | | | -207 |
 
-## Newly Passing (8)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `duplicate_movie_clip_drawing` | output_mismatch | 1/2 | 2/2 |
-| `edittext_focus_selection` | output_mismatch | 1/2 | 2/2 |
-| `edittext_html_condensewhite_swf7` | output_mismatch | 308/311 | 311/311 |
-| `edittext_html_condensewhite_swf8` | output_mismatch | 288/311 | 311/311 |
-| `edittext_input_newlines` | output_mismatch | 4/9 | 9/9 |
-| `edittext_place_caret` | output_mismatch | 1/2 | 2/2 |
-| `edittext_tab_focus` | output_mismatch | 10/13 | 13/13 |
-| `movieclip_default_state` | output_mismatch | 68/69 | 69/69 |
+| `loadmovie_var_persistence` | output_mismatch | 5/8 | 8/8 |
+| `mcl_events_swf_version` | output_mismatch | 37/232 | 232/232 |
 
-## Status Changed (3)
+## Status Changed (2)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `edittext_ime_focus_lost` | segfault | output_mismatch | - | 0/7 |
-| `string_paths_timer` | segfault | output_mismatch | - | 0/0 |
-| `timer_run_actions` | segfault | output_mismatch | 1/18 | 3/18 |
+| `movieclip_invalid_get_bounds_1` | output_mismatch | runtime_error | 4/75 | 5/75 |
+| `movieclip_invalid_get_bounds_2` | output_mismatch | runtime_error | 5/75 | 7/75 |
 
-## Line Count Changed (3)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `selection_handlers` | output_mismatch | 15/27 | 21/27 | -6 |
-| `mcl_events_swf_version` | output_mismatch | 33/232 | 37/232 | -4 |
-| `movieclip_library_state_values` | output_mismatch | 77/78 | 76/78 | +1 |
+| `register_class` | output_mismatch | 38/66 | 44/66 | -6 |
