@@ -20,10 +20,10 @@ Advanced mouse event infrastructure needed to unblock focus, tab ordering, hit t
 | `button_keypress_vs_textinput` | 3/4 | **4/4** | PASS (Phase 6) |
 | `frame_size_translated_positive` | 20/21 | **21/21** | PASS (Phase 4) |
 | `frame_size_translated_negative` | 20/21 | **21/21** | PASS (Phase 4) |
-| `focus_mouse_rollout` | 1/4 | 3/4 | Blocked (Phase 2) |
-| `focus_keyboard_press` | 5/60 | ~5/60 | Blocked (Phase 2+3) |
+| `focus_mouse_rollout` | 1/4 | **4/4** | PASS (Phase 2c) |
+| `focus_keyboard_press` | 5/60 | ~15/60 | Blocked (Phase 2+3) |
 | `tab_ordering_events_mouse` | 19/65 | ~19/65 | Blocked (Phase 2+3) |
-| `tab_ordering_automatic_order_same_position` | 9/12 | 9/12 | Blocked (Phase 5) |
+| `tab_ordering_automatic_order_same_position` | 9/12 | **12/12** | PASS (Phase 5) |
 
 ---
 
@@ -346,10 +346,10 @@ text.onChanged                  // 'b' typed into text field triggers onChanged
 | Phase 4: Frame rect offset | **DONE** | frame_size_translated_positive | 21/21 PASS |
 | Phase 4: Frame rect offset | **DONE** | frame_size_translated_negative | 21/21 PASS |
 | Phase 6: TF onChanged | **DONE** | button_keypress_vs_textinput | 4/4 PASS |
-| Phase 2: Roll dispatch + focus events | **TODO** | focus_mouse_rollout | 3/4 |
-| Phase 2+3: Key sim + Tab rolls | **TODO** | focus_keyboard_press | ~5/60 |
-| Phase 3: Tab roll events | **TODO** | tab_ordering_events_mouse | ~19/65 |
-| Phase 5: Highlight bounds | **TODO** | tab_ordering_automatic_order_same_position | 9/12 |
+| Phase 2c: Roll on focus change | **DONE** | focus_mouse_rollout | 4/4 PASS |
+| Phase 2+3: Key sim + Tab rolls | **BLOCKED** | focus_keyboard_press | ~15/60 |
+| Phase 3: Tab roll events | **BLOCKED** | tab_ordering_events_mouse | ~19/65 |
+| Phase 5: Highlight bounds | **DONE** | tab_ordering_automatic_order_same_position | 12/12 PASS |
 
 ### Completed Changes
 - **Phase 1** (commit e7974be4): Text field bounds in `mc_get_pixel_aabb_ng`, text field exclusion from MC press/release/roll events, focus event ordering fix.
@@ -357,11 +357,13 @@ text.onChanged                  // 'b' typed into text field triggers onChanged
 - **Phase 6** (commit c6722fa5): `EV_TEXT_INPUT` handler with button keyPress suppression gate, `actionTextFieldInput()` function with restrict filter/maxChars/onChanged callback.
 
 ### Remaining Work
-**Phase 2** requires: Dynamic MC rollover/rollout tracking (`g_hovered_mc`), `onRollOver`/`onRollOut` dispatch during mouse move, `onSetFocus`/`onKillFocus` MC handlers (distinct from Selection broadcast), deferred roll event queue completion. This is a medium-large effort (~100-150 lines of new dispatch logic). No external dependencies.
+**Phase 2 (partial)** requires: Dynamic MC rollover/rollout tracking (`g_hovered_mc`), `onRollOver`/`onRollOut` dispatch during mouse move, `onSetFocus`/`onKillFocus` MC handlers (distinct from Selection broadcast). Phase 2c (roll on focus change) is DONE. Remaining 2a/2b are medium-large effort (~100-150 lines).
 
 **Phase 3** requires Phase 2 and additionally: Enter/Space key simulation on focused MC (onPress/onRelease), correct event ordering during Tab (rollout → rollover → killfocus → setfocus), integration with button state machine. Large effort but no external dependencies.
 
-**Phase 5** requires: Recursive visual bounds computation through sprite display lists (current sort uses registration point, needs to use "highlight bounds" top-left). Medium effort but requires understanding Ruffle's exact sort algorithm for nested clips. No external dependencies.
+### Completed Changes
+- **Phase 2c** (this session): `queue_hover_rollout_on_focus_change()` in action.c — queues deferred rollOut events when focus changes and there's a hovered MC. Called from `actionMouseClickFocus()` when `g_focused_mc` changes.
+- **Phase 5** (this session): Replaced `compute_min_visual_pos()` with `compute_highlight_bounds()` — recursive AABB computation using `ng_getCharBounds()` for shape bounds in world coordinates. Fixed min_x/min_y tracking to be independent (AABB union, not single-point min). Added scale propagation through `tab_collect_recursive`. Added twip rounding (`roundf(x*20)/20`) to eliminate float precision issues in dedup.
 
 ---
 

@@ -41973,29 +41973,44 @@ static int mc_get_tab_children(MovieClip* mc)
 // (visual bounding box), using the formula 6*min_y + min_x.
 // For sprites (containers), the highlight bounds come from their visual children
 // recursively, not from the registration point.
-static void compute_min_visual_pos(
+// Compute the highlight bounds (AABB) of all visual content in a display list.
+// Uses character bounds from ng_getCharBounds, transformed by each entry's
+// placement matrix (scale + translation).  The minimum corner of the union AABB
+// is stored in *min_x/*min_y (pixels) — this is the Ruffle tab sort key.
+static void compute_highlight_bounds(
 	DisplayObject* dl, size_t dl_max,
 	float parent_gx, float parent_gy,
+	float parent_sx, float parent_sy,
 	float* min_x, float* min_y)
 {
 	extern float transform_data[][16];
 	for (size_t d = 1; d <= dl_max; d++) {
 		if (dl[d].char_id == 0) continue;
 		size_t cid = dl[d].char_id;
-		float lx = transform_data[dl[d].transform_id][12] / 20.0f;
-		float ly = transform_data[dl[d].transform_id][13] / 20.0f;
-		float gx = parent_gx + lx;
-		float gy = parent_gy + ly;
+		u32 tid = dl[d].transform_id;
+		float sx = transform_data[tid][0] * parent_sx;
+		float sy = transform_data[tid][5] * parent_sy;
+		float lx = transform_data[tid][12] / 20.0f;
+		float ly = transform_data[tid][13] / 20.0f;
+		float gx = parent_gx + lx * parent_sx;
+		float gy = parent_gy + ly * parent_sy;
 		if (dictionary[cid].type == CHAR_TYPE_SPRITE) {
-			// Recurse into sprite children to find visual bounds
 			if (dl[d].sprite_display_list != NULL && dl[d].sprite_max_depth > 0)
-				compute_min_visual_pos(dl[d].sprite_display_list,
-				    dl[d].sprite_max_depth, gx, gy, min_x, min_y);
+				compute_highlight_bounds(dl[d].sprite_display_list,
+				    dl[d].sprite_max_depth, gx, gy, sx, sy, min_x, min_y);
 		} else {
-			// Text field, button, or shape — use its global position
-			if (gy < *min_y || (gy == *min_y && gx < *min_x)) {
-				*min_y = gy;
-				*min_x = gx;
+			// Use character bounds (AABB in twips) to compute world-space min corner
+			s32 bxmin, bxmax, bymin, bymax;
+			if (ng_getCharBounds(cid, &bxmin, &bxmax, &bymin, &bymax)) {
+				float wx = gx + (float)bxmin / 20.0f * sx;
+				float wy = gy + (float)bymin / 20.0f * sy;
+				// Track min_x and min_y independently (AABB union)
+				if (wx < *min_x) *min_x = wx;
+				if (wy < *min_y) *min_y = wy;
+			} else {
+				// Fallback: use registration point
+				if (gx < *min_x) *min_x = gx;
+				if (gy < *min_y) *min_y = gy;
 			}
 		}
 	}
@@ -42006,7 +42021,7 @@ static void compute_min_visual_pos(
 // creates MCs as needed, and collects tabbable ones.
 // For each child, computes its sort position (for automatic mode):
 //   - Text fields/buttons: global registration point
-//   - Tabbable sprites: minimum visual position from compute_min_visual_pos
+//   - Tabbable sprites: highlight bounds min corner from compute_highlight_bounds
 // Stores the sort position in mc->x/mc->y for the final sort step.
 // tabChildren=true (default) means recurse into a sprite's children.
 static void tab_collect_recursive(
@@ -42014,6 +42029,7 @@ static void tab_collect_recursive(
 	DisplayObject* dl, size_t dl_max,
 	MovieClip* parent_mc,
 	float parent_global_x, float parent_global_y,
+	float parent_scale_x, float parent_scale_y,
 	MovieClip** out, int* count, int max)
 {
 	extern float transform_data[][16];
@@ -42032,12 +42048,16 @@ static void tab_collect_recursive(
 		const char* name = dl[d].instance_name;
 		if (!name || !name[0]) continue;
 
-		// Compute GLOBAL position = parent global + local transform
+		// Compute GLOBAL position and scale
 		u32 tid = dl[d].transform_id;
+		float local_sx = transform_data[tid][0];
+		float local_sy = transform_data[tid][5];
 		float local_x = transform_data[tid][12] / 20.0f;
 		float local_y = transform_data[tid][13] / 20.0f;
-		float global_x = parent_global_x + local_x;
-		float global_y = parent_global_y + local_y;
+		float global_x = parent_global_x + local_x * parent_scale_x;
+		float global_y = parent_global_y + local_y * parent_scale_y;
+		float global_sx = parent_scale_x * local_sx;
+		float global_sy = parent_scale_y * local_sy;
 
 		// Find or create the child MC
 		MovieClip* mc = findOrCreateMovieClip(app_context, name, parent_mc);
@@ -42045,24 +42065,24 @@ static void tab_collect_recursive(
 
 		// Compute the SORT POSITION for this item:
 		// - Text fields/buttons: their global registration point (top-left of bounds)
-		// - Sprites: minimum visual position from their children (not registration point),
+		// - Sprites: highlight bounds min corner from their children,
 		//   because the focus highlight bounds come from visual content, not the sprite origin.
 		//   This matches Ruffle's automatic tab ordering: sort by highlight bounds top-left.
 		float sort_x = global_x;
 		float sort_y = global_y;
 		if (is_sprite && !is_button) {
-			// Use visual bounding box min, not registration point
 			float vis_min_x = 1e30f, vis_min_y = 1e30f;
 			if (dl[d].sprite_display_list != NULL && dl[d].sprite_max_depth > 0) {
-				compute_min_visual_pos(dl[d].sprite_display_list,
+				compute_highlight_bounds(dl[d].sprite_display_list,
 				    dl[d].sprite_max_depth,
-				    global_x, global_y,
+				    global_x, global_y, global_sx, global_sy,
 				    &vis_min_x, &vis_min_y);
 			}
 			if (vis_min_y < 1e29f) { sort_x = vis_min_x; sort_y = vis_min_y; }
 		}
-		mc->x = sort_x;
-		mc->y = sort_y;
+		// Round to nearest twip (1/20 pixel) to match Ruffle's integer-twip sort keys
+		mc->x = roundf(sort_x * 20.0f) / 20.0f;
+		mc->y = roundf(sort_y * 20.0f) / 20.0f;
 
 		// For nested text fields: set ng_textfield_idx if not already set
 		if (mc->ng_textfield_idx < 0) {
@@ -42085,7 +42105,8 @@ static void tab_collect_recursive(
 			if (mc_get_tab_children(mc)) {
 				tab_collect_recursive(app_context,
 				    dl[d].sprite_display_list, dl[d].sprite_max_depth,
-				    mc, global_x, global_y, out, count, max);
+				    mc, global_x, global_y, global_sx, global_sy,
+				    out, count, max);
 			}
 		}
 	}
@@ -42118,7 +42139,7 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 	MovieClip* natural_order[MAX_CHILD_MOVIECLIPS];
 	int natural_count = 0;
 	tab_collect_recursive(app_context, display_list, max_depth,
-	    &root_movieclip, 0.0f, 0.0f,
+	    &root_movieclip, 0.0f, 0.0f, 1.0f, 1.0f,
 	    natural_order, &natural_count, MAX_CHILD_MOVIECLIPS);
 
 	if (natural_count == 0) return;
@@ -42336,8 +42357,27 @@ static int mc_is_focusable_by_click(MovieClip* mc)
 	return 0;
 }
 
+// Queue deferred rollOut on any MC that is currently hovered (mc_mouse_inside == 1).
+// Called when focus changes during mouse-down: Ruffle clears the hover state and fires
+// rollOut on the previously-hovered MC.  Text fields are excluded.
+static void queue_hover_rollout_on_focus_change(void)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || !mc->mc_mouse_inside) continue;
+		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
+		if (mc->dynamic_props == NULL) continue;
+		// Queue button DoAction rollOut first if it's a button MC
+		if (mc->is_button_mc && g_deferred_roll_count + 1 < MAX_DEFERRED_ROLLOVERS)
+			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){mc, 2};
+		if (g_deferred_roll_count < MAX_DEFERRED_ROLLOVERS)
+			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){mc, 1};
+		mc->mc_mouse_inside = 0;
+	}
+}
+
 // On mouse click, determine which MC was clicked and set focus if appropriate.
-// Called from swf_core.c after onPress dispatch on EV_MOUSE_DOWN_LEFT.
+// Called from swf_core.c before press dispatch on EV_MOUSE_DOWN_LEFT.
 void actionMouseClickFocus(SWFAppContext* app_context)
 {
 	float mx = app_context->mouse.stage_x / 20.0f;
@@ -42358,6 +42398,7 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 		break;
 	}
 
+	MovieClip* old_focused = g_focused_mc;
 	if (hit_mc != NULL && mc_is_focusable_by_click(hit_mc)) {
 		if (hit_mc != g_focused_mc)
 			selection_do_focus_change(app_context, g_focused_mc, hit_mc);
@@ -42369,6 +42410,10 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 		if (g_focused_mc != NULL && mc_is_focusable_by_click(g_focused_mc))
 			selection_do_focus_change(app_context, g_focused_mc, NULL);
 	}
+	// When focus changed during mouse-down, fire deferred rollOut on any
+	// previously-hovered MC.  Matches Ruffle's roll_over() in focus_tracker.
+	if (g_focused_mc != old_focused)
+		queue_hover_rollout_on_focus_change();
 }
 
 // ---------------------------------------------------------------------------
