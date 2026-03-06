@@ -31,6 +31,7 @@ static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVa
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version);
+static inline int32_t varToInt32(ActionVar* v);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args);
@@ -2234,6 +2235,89 @@ static void init_isNaN_isFinite(void)
 	g_isFinite_func.advanced_func = (Function2Ptr)builtin_isFinite;
 
 	g_isNaN_isFinite_init = 1;
+}
+
+// --- ASSetPropFlags (Function2Ptr callable via both CallFunction and CallMethod) ---
+static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVar* args, u32 num_args, ActionVar* registers, void* this_obj)
+{
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (num_args < 3 || args[0].type != ACTION_STACK_VALUE_OBJECT) return result;
+	ASObject* obj = (ASObject*)(u64)args[0].data.numeric_value;
+	if (obj == NULL) return result;
+	// Coerce set_flags (args[2]) via valueOf if it's an object
+	if (args[2].type == ACTION_STACK_VALUE_OBJECT || args[2].type == ACTION_STACK_VALUE_ARRAY) {
+		int found = 0;
+		ActionVar coerced = objectCallValueOf(app_context, &args[2], &found);
+		if (found) args[2] = coerced;
+	}
+	// Coerce clear_flags (args[3]) via valueOf if it's an object
+	if (num_args >= 4 && (args[3].type == ACTION_STACK_VALUE_OBJECT || args[3].type == ACTION_STACK_VALUE_ARRAY)) {
+		int found = 0;
+		ActionVar coerced = objectCallValueOf(app_context, &args[3], &found);
+		if (found) args[3] = coerced;
+	}
+	// Coerce prop_name (args[1]) via toString if it's an object (not null/undefined)
+	if (args[1].type == ACTION_STACK_VALUE_OBJECT || args[1].type == ACTION_STACK_VALUE_FUNCTION) {
+		int found = 0;
+		ActionVar coerced = objectCallToString(app_context, &args[1], &found);
+		if (found) args[1] = coerced;
+	}
+	s32 set_flags = varToInt32(&args[2]);
+	s32 clear_flags = (num_args >= 4) ? varToInt32(&args[3]) : 0;
+
+	u8 ecma_clear = 0, ecma_set = 0;
+	if (set_flags & 1) ecma_clear |= PROPERTY_FLAG_ENUMERABLE;
+	if (set_flags & 2) ecma_clear |= PROPERTY_FLAG_CONFIGURABLE;
+	if (set_flags & 4) ecma_clear |= PROPERTY_FLAG_WRITABLE;
+	if (clear_flags & 1) ecma_set |= PROPERTY_FLAG_ENUMERABLE;
+	if (clear_flags & 2) ecma_set |= PROPERTY_FLAG_CONFIGURABLE;
+	if (clear_flags & 4) ecma_set |= PROPERTY_FLAG_WRITABLE;
+
+	int apply_all = (args[1].type == ACTION_STACK_VALUE_NULL);
+	if (apply_all) {
+		for (u32 i = 0; i < obj->num_used; i++) {
+			obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
+			obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+		}
+	} else {
+		char _spf_name_buf[512];
+		const char* prop_str = NULL;
+		if (args[1].type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* _spf_name_u16 = varGetU16Ptr(&args[1]);
+			u16_to_utf8(_spf_name_u16, args[1].str_size, _spf_name_buf, sizeof(_spf_name_buf));
+			prop_str = _spf_name_buf;
+		} else if (args[1].type == ACTION_STACK_VALUE_UNDEFINED) {
+			strncpy(_spf_name_buf, "undefined", sizeof(_spf_name_buf));
+			prop_str = _spf_name_buf;
+		} else if (args[1].type == ACTION_STACK_VALUE_F32 || args[1].type == ACTION_STACK_VALUE_F64 || args[1].type == ACTION_STACK_VALUE_BOOLEAN) {
+			int len = varToStringBuf(app_context, &args[1], _spf_name_buf, sizeof(_spf_name_buf));
+			if (len > 0) prop_str = _spf_name_buf;
+		}
+		if (prop_str != NULL) {
+			char* token = _spf_name_buf;
+			while (*token) {
+				while (*token == ' ' || *token == '\t') token++;
+				if (*token == '\0') break;
+				char* end = token;
+				while (*end && *end != ',') end++;
+				u32 tlen = (u32)(end - token);
+				while (tlen > 0 && (token[tlen-1] == ' ' || token[tlen-1] == '\t')) tlen--;
+				if (tlen > 0) {
+					for (u32 i = 0; i < obj->num_used; i++) {
+						if (obj->properties[i].name_length == tlen && strncmp(obj->properties[i].name, token, tlen) == 0) {
+							obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
+							obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+							break;
+						}
+					}
+				}
+				if (*end == ',') end++;
+				token = end;
+			}
+		}
+	}
+	return result;
 }
 
 // --- ExternalInterface static methods (_escapeXML, _unescapeXML, _jsQuoteString, _toXML, etc.) ---
@@ -19976,7 +20060,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		setProperty(app_context, global_object, "Error", 5, &ev);
 	}
 
-	// ---- ASSetPropFlags (global function) ----
+	// ---- ASSetPropFlags (global function — callable via both CallFunction and CallMethod) ----
 	{
 		static ASFunction g_aspf_func;
 		static int g_aspf_init = 0;
@@ -19984,7 +20068,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		{
 			memset(&g_aspf_func, 0, sizeof(ASFunction));
 			strncpy(g_aspf_func.name, "ASSetPropFlags", 255);
-			g_aspf_func.function_type = 1;
+			g_aspf_func.function_type = 2;
+			g_aspf_func.advanced_func = actionASSetPropFlags_func2;
 			g_aspf_init = 1;
 		}
 		ActionVar aspf_var = {0};
@@ -23695,7 +23780,8 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 		// Dead MCs have no valid prototype
 		MovieClip* cls_mc = (MovieClip*) cls_coerced.data.numeric_value;
 		if (cls_mc != NULL && cls_mc->depth != INT_MIN && cls_mc->dynamic_props != NULL) {
-			ActionVar* cpv = getProperty((ASObject*)cls_mc->dynamic_props, "prototype", 9);
+			ASProperty* cpp = findPropertyRaw((ASObject*)cls_mc->dynamic_props, "prototype", 9);
+			ActionVar* cpv = (cpp != NULL) ? &cpp->value : NULL;
 			if (cpv != NULL && cpv->type == ACTION_STACK_VALUE_OBJECT)
 				proto_target = (ASObject*) cpv->data.numeric_value;
 		}
@@ -23704,7 +23790,10 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 	{
 		ASObject* co = (ASObject*) cls_coerced.data.numeric_value;
 		if (co != NULL) {
-			ActionVar* cpv = getProperty(co, "prototype", 9);
+			// Use findPropertyRaw to bypass ASSetPropFlags version hiding
+			// (instanceof ignores SWF version flags on .prototype lookup)
+			ASProperty* cpp = findPropertyRaw(co, "prototype", 9);
+			ActionVar* cpv = (cpp != NULL) ? &cpp->value : NULL;
 			if (cpv != NULL) {
 				if (cpv->type == ACTION_STACK_VALUE_OBJECT)
 					proto_target = (ASObject*) cpv->data.numeric_value;
@@ -28168,16 +28257,10 @@ void actionGetMember(SWFAppContext* app_context)
 			return;
 		}
 
-		// For other properties, search starting from prop_base.__proto__
-		ASObject* search_start = NULL;
+		// For other properties, search starting from prop_base itself
+		// (super.prop resolves own properties on the proto chain node, not just __proto__)
 		if (prop_base != NULL) {
-			ActionVar* pp = getProperty(prop_base, "__proto__", 9);
-			if (pp != NULL && pp->type == ACTION_STACK_VALUE_OBJECT)
-				search_start = (ASObject*) pp->data.numeric_value;
-		}
-
-		if (search_start != NULL) {
-			ActionVar* prop = getPropertyWithPrototype(search_start, prop_name, prop_name_len);
+			ActionVar* prop = getPropertyWithPrototype(prop_base, prop_name, prop_name_len);
 			if (prop != NULL)
 				pushVar(app_context, prop);
 			else
@@ -33565,129 +33648,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	}
 
 	// ASSetPropFlags(obj, props, setFlags, clearFlags)
-	// Modifies property attribute flags (ECMA flags for enumerable/writable/configurable)
-	// Flash flag bits: DontEnum=1, DontDelete=2, ReadOnly=4
-	// Args: args[0]=obj, args[1]=props (string or null), args[2]=setFlags, args[3]=clearFlags
+	// Delegates to actionASSetPropFlags_func2 (shared with CallMethod path)
 	else if (func_name_len == 14 && strncmp(func_name, "ASSetPropFlags", 14) == 0)
 	{
-		if (num_args >= 3 && args[0].type == ACTION_STACK_VALUE_OBJECT)
-		{
-			ASObject* obj = (ASObject*)(u64)args[0].data.numeric_value;
-			// Coerce set_flags (args[2]) via valueOf if it's an object
-			if (num_args >= 3 && (args[2].type == ACTION_STACK_VALUE_OBJECT ||
-			                      args[2].type == ACTION_STACK_VALUE_ARRAY)) {
-				int found = 0;
-				ActionVar coerced = objectCallValueOf(app_context, &args[2], &found);
-				if (found) args[2] = coerced;
-			}
-			// Coerce clear_flags (args[3]) via valueOf if it's an object
-			if (num_args >= 4 && (args[3].type == ACTION_STACK_VALUE_OBJECT ||
-			                      args[3].type == ACTION_STACK_VALUE_ARRAY)) {
-				int found = 0;
-				ActionVar coerced = objectCallValueOf(app_context, &args[3], &found);
-				if (found) args[3] = coerced;
-			}
-			// Coerce prop_name (args[1]) via toString if it's an object (not null/undefined)
-			if (args[1].type == ACTION_STACK_VALUE_OBJECT || args[1].type == ACTION_STACK_VALUE_FUNCTION) {
-				int found = 0;
-				ActionVar coerced = objectCallToString(app_context, &args[1], &found);
-				if (found) args[1] = coerced;
-			}
-			s32 set_flags = (num_args >= 3) ? varToInt32(&args[2]) : 0;
-			s32 clear_flags = (num_args >= 4) ? varToInt32(&args[3]) : 0;
-
-			if (obj != NULL)
-			{
-				// Convert Flash flags to ECMA flag operations
-				// set_flags = Flash flags to SET (restrict) → clear corresponding ECMA bits
-				// clear_flags = Flash flags to CLEAR (unrestrict) → set corresponding ECMA bits
-				u8 ecma_clear = 0;  // ECMA bits to clear
-				u8 ecma_set = 0;    // ECMA bits to set
-				if (set_flags & 1) ecma_clear |= PROPERTY_FLAG_ENUMERABLE;
-				if (set_flags & 2) ecma_clear |= PROPERTY_FLAG_CONFIGURABLE;
-				if (set_flags & 4) ecma_clear |= PROPERTY_FLAG_WRITABLE;
-				if (clear_flags & 1) ecma_set |= PROPERTY_FLAG_ENUMERABLE;
-				if (clear_flags & 2) ecma_set |= PROPERTY_FLAG_CONFIGURABLE;
-				if (clear_flags & 4) ecma_set |= PROPERTY_FLAG_WRITABLE;
-
-				// Check if props is null → apply to ALL properties
-				int apply_all = (args[1].type == ACTION_STACK_VALUE_NULL);
-
-				if (apply_all)
-				{
-					for (u32 i = 0; i < obj->num_used; i++)
-					{
-						obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
-						obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
-					}
-				}
-				else
-				{
-					// Coerce props argument to string
-					char _spf_name_buf[512];
-					const char* prop_str = NULL;
-					if (args[1].type == ACTION_STACK_VALUE_STRING)
-					{
-						const uint16_t* _spf_name_u16 = varGetU16Ptr(&args[1]);
-						u16_to_utf8(_spf_name_u16, args[1].str_size, _spf_name_buf, sizeof(_spf_name_buf));
-						prop_str = _spf_name_buf;
-					}
-					else if (args[1].type == ACTION_STACK_VALUE_UNDEFINED)
-					{
-						// undefined coerces to "undefined" — applies to property named "undefined"
-						strncpy(_spf_name_buf, "undefined", sizeof(_spf_name_buf));
-						prop_str = _spf_name_buf;
-					}
-					else if (args[1].type == ACTION_STACK_VALUE_OBJECT || args[1].type == ACTION_STACK_VALUE_FUNCTION)
-					{
-						// Object — call toString to get property names string
-						int len = varToStringBuf(app_context, &args[1], _spf_name_buf, sizeof(_spf_name_buf));
-						if (len > 0) prop_str = _spf_name_buf;
-					}
-					else if (args[1].type == ACTION_STACK_VALUE_F32 || args[1].type == ACTION_STACK_VALUE_F64 || args[1].type == ACTION_STACK_VALUE_BOOLEAN)
-					{
-						int len = varToStringBuf(app_context, &args[1], _spf_name_buf, sizeof(_spf_name_buf));
-						if (len > 0) prop_str = _spf_name_buf;
-					}
-
-					if (prop_str != NULL)
-					{
-						// Support comma-separated property names
-						char* token = _spf_name_buf;
-						while (*token)
-						{
-							// Skip leading whitespace
-							while (*token == ' ' || *token == '\t') token++;
-							if (*token == '\0') break;
-
-							// Find end of token (comma or end)
-							char* end = token;
-							while (*end && *end != ',') end++;
-							u32 tlen = (u32)(end - token);
-							// Trim trailing whitespace
-							while (tlen > 0 && (token[tlen-1] == ' ' || token[tlen-1] == '\t')) tlen--;
-
-							if (tlen > 0)
-							{
-								for (u32 i = 0; i < obj->num_used; i++)
-								{
-									if (obj->properties[i].name_length == tlen &&
-									    strncmp(obj->properties[i].name, token, tlen) == 0)
-									{
-										obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
-										obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
-										break;
-									}
-								}
-							}
-
-							if (*end == ',') end++;
-							token = end;
-						}
-					}
-				}
-			}
-		}
+		actionASSetPropFlags_func2(app_context, args, num_args, NULL, NULL);
 		if (args != NULL) FREE(args);
 		pushUndefined(app_context);
 		builtin_handled = 1;
@@ -38263,7 +38227,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						if (tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal())) {
 							this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
 						} else {
-							this_obj = (void*) global_object;
+							// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
+							g_override_this = args[0];
+							g_override_this_set = 1;
 						}
 					}
 				}

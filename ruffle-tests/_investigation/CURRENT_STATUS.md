@@ -6,7 +6,8 @@ Last updated: 2026-03-05
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: TYPE_COERCION_ADVANCED Phases 1-3 done. instanceof_coercions 86/88 (97.7%), coerce_to_object_monkeypatch partially blocked by closure capture. Implemented: tryAutoBoxPrimitive, instanceOfCoercing, Object.addProperty built-in, non-object prototype handling, getActiveGlobal.
+- **Recent gains (this session)**: EXTERNAL_INTERFACE_PLAN Phases 1-3 COMPLETE → 6/7 tests passing (645 lines). Fixed funky_function_calls regression (Function.apply primitive thisArg). swf*_global_funcs SWF-version number parsing fixes.
+- **Recent gains (previous session)**: TYPE_COERCION_ADVANCED Phases 1-3 done. instanceof_coercions 86/88 (97.7%), coerce_to_object_monkeypatch partially blocked by closure capture. Implemented: tryAutoBoxPrimitive, instanceOfCoercing, Object.addProperty built-in, non-object prototype handling, getActiveGlobal.
 - **Recent gains (previous session)**: FUNCTION_EDGE_CASES ALL PHASES DONE. function_as_function PASS (36/36). funky_function_calls PASS (56/56). g_override_this mechanism for primitive thisArg types.
 - **Recent gains (previous session)**: CALL_SEMANTICS_PLAN COMPLETE. call test PASS (63/63). actionCall rewrite: return value + early termination, frame label lookup, target path resolution, g_tag_skip_mode for DoAction-only execution.
 - **Recent gains (previous session)**: MOUSE_EVENTS_ADVANCED Phase 1 (TF hit-testing): focus_mouse PASS (45/45). Phase 4 (frame rect offset): frame_size_translated_positive/negative both PASS (21/21). Phase 6 (TF onChanged): button_keypress_vs_textinput PASS (4/4). STAGE_FRAME_PROPS_PLAN now 9/9 PASS. BUTTON_PLAN now 13/14 PASS.
@@ -27,7 +28,7 @@ Last updated: 2026-03-05
 
 | Test | Status | Match | Notes |
 |------|--------|-------|-------|
-| funky_function_calls | ~~segfault~~ **REGRESSION** | 54/56 (was 56/56) | g_override_this for primitive thisArg regressed: `This: 123` → `undefined` on Apply w/ Primitive |
+| funky_function_calls | ~~segfault~~ **PASS** ✅ | 56/56 | Fixed: Function.apply primitive thisArg fallback to g_override_this (was falling back to global) |
 | goto_methods | ~~segfault~~ PASS | 41/41 ✅ | Fixed: MC dispatch, ECMAScript ToInt32, sprite labels |
 | native_objects_swf6 | ~~segfault~~ PASS | 84/84 ✅ | NativeType tracking, stub constructors, Date re-init blocking |
 | native_objects_swf7 | ~~segfault~~ PASS | 84/84 ✅ | Same fix as swf6 |
@@ -185,13 +186,13 @@ Last updated: 2026-03-05
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4 blocked on loadMovie + per-function version tracking |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie, mouse events |
-| EXTERNAL_INTERFACE_PLAN | **NEW** → `incomplete/` | 0/7 (Phases 1-3 actionable: 6 tests, 645 lines) | Phase 4 (JS bridge) blocked — no JS environment |
+| EXTERNAL_INTERFACE_PLAN | **Phases 1-3 COMPLETE** → `incomplete/` | 6/7 pass (645 lines): escapexml ✅, unescapexml ✅, jsquotestring ✅, toxml_basic ✅, toxml_array ✅, toas_basic ✅ | Phase 4 (JS bridge) blocked — no JS environment |
 | MOUSE_EVENTS_ADVANCED_PLAN | **Phases 1,4,6 DONE** → `incomplete/` | 4 tests PASS (focus_mouse, frame_size_translated_pos/neg, button_keypress_vs_textinput) | Phases 2,3,5 actionable — roll dispatch, key sim, highlight bounds |
 
 ## Recommended Work Order (updated 2026-03-05)
 
 ### Actionable — Quick wins
-1. **EXTERNAL_INTERFACE_PLAN Phases 1-3** — ExternalInterface helper methods: _escapeXML, _unescapeXML, _jsQuoteString, _toXML, _objectToXML, _arrayToXML, _argumentsToXML, _toAS, etc. 6 tests, 645 lines. Pure string manipulation, no external dependencies. Highest ROI available.
+1. ~~**EXTERNAL_INTERFACE_PLAN Phases 1-3**~~ — **DONE** ✅. 6 tests, 645 lines gained.
 2. **TEXTFIELD_PLAN remaining** — scroll, condenseWhite edge cases, SWF6 HTML. 49/57 pass.
 3. **MOUSE_EVENTS_ADVANCED Phase 2** — Roll dispatch + focus events (~100-150 lines). Unblocks focus_mouse_rollout, partially focus_keyboard_press. Highest-impact blocked plan work.
 4. **UNCOVERED_SMALL_TESTS Group A remaining** — define_local_with_paths edge cases (~51/55). sandbox_type_remote and device_font_spacing are blocked.
