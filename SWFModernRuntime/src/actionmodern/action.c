@@ -28872,6 +28872,12 @@ void actionGetMember(SWFAppContext* app_context)
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 				return;
 			}
+			if (strcasecmp(prop_name, "_global") == 0) {
+				ensureGlobalInit(app_context);
+				ASObject* ag = getActiveGlobal();
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)ag);
+				return;
+			}
 		}
 
 		// Dynamically compute textWidth/textHeight/maxscroll/bottomScroll for TextField MovieClips
