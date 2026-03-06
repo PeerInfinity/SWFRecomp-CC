@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-06T17:05:14.034013+00:00",
-    "old_git_sha": "36e2e955d8f5d6604c2877ff21b8afeb300c48a3",
-    "new_timestamp": "2026-03-06T17:44:15.712416+00:00",
-    "new_git_sha": "378a0f9dd0927bfd79407828012499f2030426d4",
+    "old_timestamp": "2026-03-06T17:44:15.712416+00:00",
+    "old_git_sha": "378a0f9dd0927bfd79407828012499f2030426d4",
+    "new_timestamp": "2026-03-06T18:24:27.933442+00:00",
+    "new_git_sha": "7d19cf5299a588f63276a70df1afe5e33bad2153",
     "partial": false,
     "same_commit": false
   },
@@ -14,10 +14,10 @@
     "new_pass": 480,
     "new_total": 619,
     "new_pass_rate": 77.5,
-    "old_mismatched_lines": 20291,
-    "new_mismatched_lines": 20196,
-    "increased_mismatches": 5,
-    "decreased_mismatches": 100,
+    "old_mismatched_lines": 20196,
+    "new_mismatched_lines": 20054,
+    "increased_mismatches": 53,
+    "decreased_mismatches": 195,
     "newly_passing": 1,
     "newly_failing": 1,
     "status_changed": 3,
@@ -27,79 +27,79 @@
   },
   "changes": [
     {
-      "test": "interface_implements_op",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 46,
-        "expected_lines": 47,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 47,
-        "expected_lines": 47,
-        "matching_lines": 47
-      }
-    },
-    {
-      "test": "mcl_events_swf_version",
+      "test": "coerce_to_object_monkeypatch",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 37,
-        "expected_lines": 232,
-        "matching_lines": 37
+        "actual_lines": 135,
+        "expected_lines": 129,
+        "matching_lines": 64
       },
       "new_lines": {
-        "actual_lines": 37,
-        "expected_lines": 232,
-        "matching_lines": 33
+        "actual_lines": 135,
+        "expected_lines": 129,
+        "matching_lines": 77
       }
     },
     {
-      "test": "movieclip_default_state",
+      "test": "interface_implements_op",
       "change_type": "changed",
       "old_status": "pass",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 69,
-        "expected_lines": 69,
-        "matching_lines": 69
+        "actual_lines": 47,
+        "expected_lines": 47,
+        "matching_lines": 47
       },
       "new_lines": {
-        "actual_lines": 69,
-        "expected_lines": 69,
-        "matching_lines": 68
+        "actual_lines": 47,
+        "expected_lines": 47,
+        "matching_lines": 46
+      }
+    },
+    {
+      "test": "loadmovienum_cross_version_prototype",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 9,
+        "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 13,
+        "expected_lines": 9,
+        "matching_lines": 6
       }
     },
     {
       "test": "movieclip_hittest_shapeflag",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 338,
         "expected_lines": 338,
         "matching_lines": 286
-      },
-      "new_lines": null
+      }
     },
     {
-      "test": "movieclip_library_state_values",
+      "test": "native_subclasses",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 78,
-        "expected_lines": 78,
-        "matching_lines": 76
+        "actual_lines": 221,
+        "expected_lines": 191,
+        "matching_lines": 9
       },
       "new_lines": {
-        "actual_lines": 78,
-        "expected_lines": 78,
-        "matching_lines": 77
+        "actual_lines": 191,
+        "expected_lines": 191,
+        "matching_lines": 191
       }
     }
   ]
