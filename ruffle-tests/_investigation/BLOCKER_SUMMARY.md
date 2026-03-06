@@ -50,9 +50,9 @@ MTASC-compiled tests use class syntax with a `main()` static entry point pattern
 |-----|--------|---------------|
 | Class constructor dispatch | `new MyClass()` via DoInitAction returns undefined instead of proper object | interface_implements_op (0/47) |
 | `_root.main()` entry point | MTASC convention for class entry; needs class→root binding | mcl_loadclip_replace_root |
-| Nested function recompilation | DefineFunction2 inside another function generates unreachable C at file scope | object_resolve (14/38) |
+| ~~Nested function recompilation~~ | ~~RESOLVED~~ (commit 55fb0205). object_resolve now passes 39/39. | ~~object_resolve~~ |
 
-**Plans blocked**: OOP_SUPER_EXTENDS_PLAN (interface_implements_op), ROOT_REPLACEMENT_PLAN (mcl_loadclip_replace_root), PROTOTYPE_OBJECT_PLAN (object_resolve)
+**Plans blocked**: OOP_SUPER_EXTENDS_PLAN (interface_implements_op), ROOT_REPLACEMENT_PLAN (mcl_loadclip_replace_root)
 
 ---
 
@@ -73,9 +73,9 @@ TextField textWidth/textHeight computations are close but off by a few pixels. T
 | edittext_newlines | 23/30 | 7 | textWidth/textHeight accuracy |
 | edittext_bullet | 18/30 | 12 | Bullet indent width |
 | edittext_tab_stops | 45/60 | 15 | Tab stop computation (ignored) |
-| device_font_spacing | 46/91 | 45 | Letter spacing + word wrap |
+| ~~device_font_spacing~~ | ~~46/91~~ **91/91 PASS** | ~~45~~ 0 | ~~Letter spacing + word wrap~~ RESOLVED |
 
-**Plans blocked**: TEXTFIELD_PLAN (4 tests), UNCOVERED_SMALL_TESTS (device_font_spacing)
+**Plans blocked**: TEXTFIELD_PLAN (4 tests)
 
 ---
 
@@ -189,13 +189,15 @@ Matching requires: (1) adding all missing globals as stubs, (2) rewriting the en
 
 ---
 
-## Blocker 12: swf5_global_funcs Stack Corruption
+## Blocker 12: swf*_global_funcs SWF-Version Number Parsing
 
-**Impact**: 1 test, ~70 lines
+**Impact**: 3 tests, ~165 lines remaining
 
-`swf5_global_funcs` (232 lines, ~160 failing) produces garbage values like `-42839.25` for what should be simple function results. This suggests stack corruption or wrong data reads in the recompiled test code — possibly a recompiler bug specific to this SWF's bytecode patterns.
+~~Stack corruption~~ **PARTIALLY RESOLVED**: The garbage values were caused by `varToDouble()` reinterpreting non-numeric types (STRING pointers) as float bits. Fixed by switching to `varToDoubleSimple()`. Also fixed `isNaN`/`isFinite` not being first-class function objects (returned UNDEFINED from GetVariable).
 
-**Plans blocked**: GLOBALS_PLAN (swf5_global_funcs)
+**Remaining**: SWF-version-specific string-to-number conversion differences (67 lines in SWF5, 55 in SWF6, 43 in SWF7). `strtod` parses hex `0x10` → 16, but SWF5 should return NaN. SWF6 has octal parsing (`"010"` → 8). Fixing requires a custom SWF-version-aware `strtod` replacement.
+
+**Plans blocked**: GLOBALS_PLAN (swf5/6/7_global_funcs)
 
 ---
 
@@ -259,8 +261,8 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 |---------|-------|---------------|-------------|
 | LoadMovie / multi-SWF | 25+ | 2000+ | Moderate (incremental) |
 | Per-movie `_global` | 4-6 | 400+ | Moderate (architectural) |
-| MTASC class infra | 5 | 100+ | Low (recompiler work) |
-| Font metrics | 5 | 80 | Moderate (incremental) |
+| MTASC class infra | 3 | 100+ | Low (nested func RESOLVED) |
+| Font metrics | 4 | 35 | Moderate (device_font_spacing RESOLVED) |
 | SWF6 HTML model | 1 | 1480 | Low (complex refactor) |
 | condenseWhite | 2 | 65 | Moderate |
 | StyleSheet CSS | 1 | 121 | Moderate |
@@ -268,4 +270,4 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 | Closure capture | 1 | 100 | Not feasible |
 | Global enumeration | 3 | 11000+ | High (tedious) |
 | Dynamic creation edges | 2 | 240+ | Moderate |
-| swf5_global_funcs | 1 | 70 | Unknown (needs debug) |
+| swf*_global_funcs | 3 | 165 | Moderate (main bugs fixed, SWF-version parsing remains) |

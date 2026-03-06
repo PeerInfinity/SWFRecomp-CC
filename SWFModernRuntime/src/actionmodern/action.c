@@ -30,6 +30,7 @@ static double varToDoubleSimple(ActionVar* v);
 static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVar* b, int flags);
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found);
+static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args);
@@ -2194,49 +2195,14 @@ static ASFunction g_isNaN_func;
 static ASFunction g_isFinite_func;
 static int g_isNaN_isFinite_init = 0;
 
-// Helper: convert ActionVar to double with strict string parsing (entire string must be numeric).
-// Used by isNaN/isFinite where "123abc" should be NaN (unlike Number("123abc") which returns 123).
-static double varToDoubleStrict(SWFAppContext* app_context, ActionVar* v)
-{
-	if (v == NULL) return NAN;
-	switch (v->type) {
-		case ACTION_STACK_VALUE_F32: return (double) VAL(float, &v->data.numeric_value);
-		case ACTION_STACK_VALUE_F64: return VAL(double, &v->data.numeric_value);
-		case ACTION_STACK_VALUE_BOOLEAN: return v->data.numeric_value ? 1.0 : 0.0;
-		case ACTION_STACK_VALUE_NULL: return NAN;
-		case ACTION_STACK_VALUE_STRING: {
-			const uint16_t* u16 = varGetU16Ptr(v);
-			if (u16 == NULL || v->str_size == 0) return NAN;
-			char tmp[512];
-			int len = u16_to_utf8(u16, v->str_size, tmp, sizeof(tmp) - 1);
-			tmp[len] = '\0';
-			if (len == 0) return NAN;
-			char* endp = NULL;
-			double d = strtod(tmp, &endp);
-			// Strict: entire string must be consumed
-			if (endp != tmp + len) return NAN;
-			return d;
-		}
-		case ACTION_STACK_VALUE_OBJECT: {
-			int _vof_f = 0;
-			ActionVar vo = objectCallValueOf(app_context, v, &_vof_f);
-			if (vo.type == ACTION_STACK_VALUE_F32)
-				return (double)VAL(float, &vo.data.numeric_value);
-			if (vo.type == ACTION_STACK_VALUE_F64)
-				return VAL(double, &vo.data.numeric_value);
-			return NAN;
-		}
-		default: return NAN; // undefined → NaN
-	}
-}
-
 static ActionVar builtin_isNaN(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
+	extern int g_swf_version;
 	ActionVar result = {0};
 	result.type = ACTION_STACK_VALUE_BOOLEAN;
 	if (arg_count == 0) { result.data.numeric_value = 1; return result; }
-	double val = varToDoubleStrict(app_context, &args[0]);
+	double val = varToDoubleSWF(app_context, &args[0], g_swf_version);
 	result.data.numeric_value = (val != val) ? 1ULL : 0ULL;
 	return result;
 }
@@ -2244,10 +2210,11 @@ static ActionVar builtin_isNaN(SWFAppContext* app_context, ActionVar* args, u32 
 static ActionVar builtin_isFinite(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
+	extern int g_swf_version;
 	ActionVar result = {0};
 	result.type = ACTION_STACK_VALUE_BOOLEAN;
 	if (arg_count == 0) { result.data.numeric_value = 0; return result; }
-	double val = varToDoubleStrict(app_context, &args[0]);
+	double val = varToDoubleSWF(app_context, &args[0], g_swf_version);
 	int is_finite = (val == val && val != INFINITY && val != -INFINITY);
 	result.data.numeric_value = is_finite ? 1ULL : 0ULL;
 	return result;
@@ -14373,13 +14340,20 @@ static double stringVarToDouble(ActionVar* v)
 		// Block strtod special values Flash doesn't recognize
 		if ((*s == 'i' || *s == 'I') && strncasecmp(s, "inf", 3) == 0) return NAN;
 		if ((*s == 'n' || *s == 'N') && strncasecmp(s, "nan", 3) == 0) return NAN;
+		// SWF < 6: reject hex strings (strtod parses 0x... as hex in C99+)
+		if (g_swf_version < 6 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) return NAN;
 		result = strtod(s, &end);
 		if (end == s) return NAN;
 		result = neg ? -result : result;
 	}
-	// Trailing non-whitespace → NaN
-	while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
-	if (*end != '\0') return NAN;
+	// SWF5+: any trailing content (including whitespace) → NaN
+	// SWF4: skip trailing whitespace, non-whitespace → NaN
+	if (g_swf_version >= 5) {
+		if (*end != '\0') return NAN;
+	} else {
+		while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
+		if (*end != '\0') return NAN;
+	}
 	return result;
 }
 
@@ -32612,116 +32586,19 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// isNaN(value) - Check if value is NaN (returns boolean)
 	else if (func_name_len == 5 && strncmp(func_name, "isNaN", 5) == 0)
 	{
-		if (num_args > 0)
-		{
-			double val = 0.0 / 0.0; // default NaN
-			if (args[0].type == ACTION_STACK_VALUE_F32)
-				val = (double)VAL(float, &args[0].data.numeric_value);
-			else if (args[0].type == ACTION_STACK_VALUE_F64)
-				val = VAL(double, &args[0].data.numeric_value);
-			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
-				val = args[0].data.numeric_value ? 1.0 : 0.0;
-			else if (args[0].type == ACTION_STACK_VALUE_NULL)
-				val = 0.0 / 0.0;
-			else if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				char _isnan_buf[512];
-				const uint16_t* _isnan_u16 = varGetU16Ptr(&args[0]);
-				int _isnan_len = u16_to_utf8(_isnan_u16, args[0].str_size, _isnan_buf, sizeof(_isnan_buf) - 1);
-				_isnan_buf[_isnan_len] = '\0';
-				// Flash strict parsing: entire string must be a valid number
-				if (_isnan_len == 0) { val = 0.0 / 0.0; }
-				else {
-					char* endp = NULL;
-					val = strtod(_isnan_buf, &endp);
-					// If not all chars consumed, it's NaN
-					if (endp != _isnan_buf + _isnan_len) val = 0.0 / 0.0;
-				}
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_OBJECT)
-			{
-				// Call valueOf on the object
-				int _vof_f = 0;
-				ActionVar vo = objectCallValueOf(app_context, &args[0], &_vof_f);
-				if (vo.type == ACTION_STACK_VALUE_F32)
-					val = (double)VAL(float, &vo.data.numeric_value);
-				else if (vo.type == ACTION_STACK_VALUE_F64)
-					val = VAL(double, &vo.data.numeric_value);
-				else
-					val = 0.0 / 0.0;
-			}
-			else
-				val = 0.0 / 0.0; // undefined → NaN
-
-			int is_nan = (val != val);
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, is_nan ? 1ULL : 0ULL);
-			builtin_handled = 1;
-		}
-		else
-		{
-			// No arguments - isNaN(undefined) = true
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
-			builtin_handled = 1;
-		}
+		double val = (num_args > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+		if (args != NULL) FREE(args);
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, (val != val) ? 1ULL : 0ULL);
+		builtin_handled = 1;
 	}
 	// isFinite(value) - Check if value is finite (returns boolean)
 	else if (func_name_len == 8 && strncmp(func_name, "isFinite", 8) == 0)
 	{
-		if (num_args > 0)
-		{
-			double val = 0.0 / 0.0; // default NaN
-			if (args[0].type == ACTION_STACK_VALUE_F32)
-				val = (double)VAL(float, &args[0].data.numeric_value);
-			else if (args[0].type == ACTION_STACK_VALUE_F64)
-				val = VAL(double, &args[0].data.numeric_value);
-			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
-				val = args[0].data.numeric_value ? 1.0 : 0.0;
-			else if (args[0].type == ACTION_STACK_VALUE_NULL)
-				val = 0.0 / 0.0;
-			else if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				char _isf_buf[512];
-				const uint16_t* _isf_u16 = varGetU16Ptr(&args[0]);
-				int _isf_len = u16_to_utf8(_isf_u16, args[0].str_size, _isf_buf, sizeof(_isf_buf) - 1);
-				_isf_buf[_isf_len] = '\0';
-				// Flash strict parsing: entire string must be a valid number
-				if (_isf_len == 0) { val = 0.0 / 0.0; }
-				else {
-					char* endp = NULL;
-					val = strtod(_isf_buf, &endp);
-					// If not all chars consumed, it's NaN
-					if (endp != _isf_buf + _isf_len) val = 0.0 / 0.0;
-				}
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_OBJECT)
-			{
-				// Call valueOf on the object
-				int _vof_f = 0;
-				ActionVar vo = objectCallValueOf(app_context, &args[0], &_vof_f);
-				if (vo.type == ACTION_STACK_VALUE_F32)
-					val = (double)VAL(float, &vo.data.numeric_value);
-				else if (vo.type == ACTION_STACK_VALUE_F64)
-					val = VAL(double, &vo.data.numeric_value);
-				else
-					val = 0.0 / 0.0;
-			}
-			else
-				val = 0.0 / 0.0; // undefined → NaN
-
-			int is_finite = (val == val && val != INFINITY && val != -INFINITY);
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, is_finite ? 1ULL : 0ULL);
-			builtin_handled = 1;
-		}
-		else
-		{
-			// No arguments - isFinite(undefined) = false
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
-			builtin_handled = 1;
-		}
+		double val = (num_args > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+		if (args != NULL) FREE(args);
+		int is_finite = (val == val && val != INFINITY && val != -INFINITY);
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, is_finite ? 1ULL : 0ULL);
+		builtin_handled = 1;
 	}
 
 	// escape(string) — URL-encode a string
@@ -32976,7 +32853,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		double result = 0.0;
 		if (num_args >= 1)
 		{
-			result = varToDoubleSimple(&args[0]);
+			result = varToDoubleSWF(app_context, &args[0], g_swf_version);
 		}
 		// else Number() → 0
 		if (args != NULL) FREE(args);
@@ -34116,7 +33993,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						// Number() → primitive number: 0 if no args, else toNumber(arg)
 						double _nc_result = 0.0;
 						if (num_args >= 1 && args != NULL)
-							_nc_result = varToDoubleSimple(&args[0]);
+							_nc_result = varToDoubleSWF(app_context, &args[0], g_swf_version);
 						if (args != NULL) FREE(args);
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_nc_result));
 					}
@@ -34362,6 +34239,142 @@ static double varToDoubleSimple(ActionVar* v)
 			return d;
 		}
 		case ACTION_STACK_VALUE_NULL: return 0.0;
+		default: return NAN;
+	}
+}
+
+// SWF-version-aware string to number conversion (matches Ruffle's string_to_f64).
+// SWF5: strict decimal only (no hex, no octal). strtod with strict full-string check.
+// SWF6+: hex (0x prefix parsed as wrapping i32), octal (leading 0 all 0-7 digits as wrapping i32),
+//         then decimal via strtod with strict check.
+static double swfStringToF64(const char* str, int len, int swf_version)
+{
+	if (len == 0) {
+		// Empty string: SWF5 = NaN (strict mode), SWF<5 = 0
+		return (swf_version >= 5) ? NAN : 0.0;
+	}
+
+	// Decimal: custom parser matching Ruffle's parse_float_impl.
+	// Hex/octal is handled by the caller (varToDoubleSWF) on the untrimmed string.
+	// Only accepts: optional sign, digits, optional dot+digits, optional e/E exponent.
+	// Does NOT accept: "Infinity", "inf", "NaN", hex "0x..." (which strtod does).
+	{
+		const char* p = str;
+		const char* pend = str + len;
+		// Skip sign
+		if (p < pend && (*p == '+' || *p == '-')) p++;
+		// Must have at least one digit or dot-digit
+		const char* digit_start = p;
+		while (p < pend && *p >= '0' && *p <= '9') p++;
+		int digits_before = (int)(p - digit_start);
+		int digits_after = 0;
+		if (p < pend && *p == '.') {
+			p++;
+			const char* frac_start = p;
+			while (p < pend && *p >= '0' && *p <= '9') p++;
+			digits_after = (int)(p - frac_start);
+		}
+		if (digits_before == 0 && digits_after == 0) {
+			return (swf_version >= 5) ? NAN : 0.0;
+		}
+		// Optional exponent
+		if (p < pend && (*p == 'e' || *p == 'E')) {
+			p++;
+			if (p < pend && (*p == '+' || *p == '-')) p++;
+			while (p < pend && *p >= '0' && *p <= '9') p++;
+		}
+		if (swf_version >= 5 && p != pend) return NAN; // strict: trailing chars
+		// Use strtod for actual parsing (we've already validated the format)
+		char* endptr;
+		double d = strtod(str, &endptr);
+		if (endptr == str) return (swf_version >= 5) ? NAN : 0.0;
+		return d;
+	}
+}
+
+// Convert ActionVar to double using SWF-version-aware rules.
+// Used by Number(), isNaN(), isFinite().
+static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version)
+{
+	if (v == NULL) return NAN;
+	switch (v->type) {
+		case ACTION_STACK_VALUE_F32: return (double) VAL(float, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_F64: return VAL(double, &v->data.numeric_value);
+		case ACTION_STACK_VALUE_BOOLEAN: return v->data.numeric_value ? 1.0 : 0.0;
+		case ACTION_STACK_VALUE_STRING: {
+			const uint16_t* u16 = varGetU16Ptr(v);
+			if (u16 == NULL || v->str_size == 0) {
+				return (swf_version >= 5) ? NAN : 0.0;
+			}
+			char tmp[256];
+			int len = u16_to_utf8(u16, v->str_size, tmp, sizeof(tmp) - 1);
+			tmp[len] = '\0';
+			// SWF6+: detect hex/octal on UNTRIMMED string (Ruffle's guess_radix)
+			// Leading whitespace prevents hex/octal detection
+			if (swf_version >= 6) {
+				const char* s = tmp; int slen = len; int sign = 0;
+				if (slen > 0 && (*s == '+' || *s == '-')) {
+					sign = (*s == '-') ? -1 : 1; s++; slen--;
+				}
+				if (slen >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+					if (sign != 0) return NAN;
+					const char* hex = s + 2; int hlen = slen - 2;
+					if (hlen == 0) return NAN;
+					int32_t result = 0;
+					for (int i = 0; i < hlen; i++) {
+						char c = hex[i]; int digit;
+						if (c >= '0' && c <= '9') digit = c - '0';
+						else if (c >= 'a' && c <= 'f') digit = 10 + c - 'a';
+						else if (c >= 'A' && c <= 'F') digit = 10 + c - 'A';
+						else return NAN;
+						result = (int32_t)((uint32_t)result * 16 + (uint32_t)digit);
+					}
+					return (double)result;
+				}
+				if (slen >= 1 && s[0] == '0') {
+					int is_octal = 1;
+					for (int i = 0; i < slen; i++) {
+						if (s[i] < '0' || s[i] > '7') { is_octal = 0; break; }
+					}
+					if (is_octal && slen > 0) {
+						int32_t result = 0;
+						for (int i = 0; i < slen; i++)
+							result = (int32_t)((uint32_t)result * 8 + (uint32_t)(s[i] - '0'));
+						if (sign == -1) result = -result;
+						return (double)result;
+					}
+				}
+			}
+			// Trim only LEADING whitespace for decimal parsing
+			const char* start = tmp;
+			const char* end_ptr = tmp + len;
+			while (start < end_ptr) {
+				char c = *start;
+				if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') { start++; continue; }
+				break;
+			}
+			int trimmed_len = (int)(end_ptr - start);
+			if (trimmed_len == 0) return (swf_version >= 5) ? NAN : 0.0;
+			char trimmed[256];
+			memcpy(trimmed, start, trimmed_len);
+			trimmed[trimmed_len] = '\0';
+			return swfStringToF64(trimmed, trimmed_len, swf_version);
+		}
+		case ACTION_STACK_VALUE_NULL:
+			return (swf_version < 7) ? 0.0 : NAN;
+		case ACTION_STACK_VALUE_UNDEFINED:
+			return (swf_version < 7) ? 0.0 : NAN;
+		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_ARRAY: {
+			if (swf_version < 5) return 0.0;
+			int _vof_f = 0;
+			ActionVar vo = objectCallValueOf(app_context, v, &_vof_f);
+			if (vo.type == ACTION_STACK_VALUE_F32)
+				return (double)VAL(float, &vo.data.numeric_value);
+			if (vo.type == ACTION_STACK_VALUE_F64)
+				return VAL(double, &vo.data.numeric_value);
+			return NAN;
+		}
 		default: return NAN;
 	}
 }
