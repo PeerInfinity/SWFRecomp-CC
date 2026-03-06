@@ -1,10 +1,10 @@
 # Blocker Summary
 
-Last updated: 2026-03-05
+Last updated: 2026-03-06
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **392/619 (63.3%)** filtered. 22 plans in `blocked/`, 2 in `incomplete/`.
+Current pass rate: **~477/619 (~77%)** filtered (pending CI confirmation). 22 plans in `blocked/`, 2 in `incomplete/`.
 
 ---
 
@@ -40,17 +40,17 @@ Our two-group model (`g_global_legacy` for SWF≤6, `g_global_modern` for SWF7+)
 
 ---
 
-## Blocker 3: MTASC Class / Recompiler Infrastructure
+## ~~Blocker 3: MTASC Class / Recompiler Infrastructure~~ MOSTLY RESOLVED
 
-**Impact**: 1-2 tests across 2 plans (PARTIALLY RESOLVED)
+**Impact**: 1 test remaining (mcl_loadclip_replace_root)
 
-MTASC-compiled tests use class syntax with a `main()` static entry point pattern (`_root.main()` or `Test.main()`). Our recompiler handles most bytecode correctly but has gaps with MTASC-specific patterns:
+All MTASC-specific issues have been resolved except `mcl_loadclip_replace_root` which needs the `_root.main()` class entry point pattern. This is now a sub-issue of Blocker 1 (LoadMovie).
 
-| Gap | Detail | Tests Blocked |
-|-----|--------|---------------|
-| ~~Class constructor dispatch~~ | ~~RESOLVED~~ — interface_implements_op was NOT an MTASC/recompiler issue. Fixed 3 bugs in actionImplementsOp runtime: repeat-call lockout, non-object prototype skip, MOVIECLIP interface support. Plus: Function.call() FUNCTION thisArg, addProperty getter on FUNCTION.prototype. Now 47/47 PASS. | ~~interface_implements_op~~ |
-| `_root.main()` entry point | MTASC convention for class entry; needs class→root binding | mcl_loadclip_replace_root |
-| ~~Nested function recompilation~~ | ~~RESOLVED~~ (commit 55fb0205). object_resolve now passes 39/39. | ~~object_resolve~~ |
+| Gap | Detail | Status |
+|-----|--------|--------|
+| ~~Class constructor dispatch~~ | interface_implements_op 47/47 PASS | **RESOLVED** |
+| `_root.main()` entry point | MTASC convention for class entry | Blocked by LoadMovie |
+| ~~Nested function recompilation~~ | object_resolve 39/39 PASS | **RESOLVED** |
 
 **Plans blocked**: ROOT_REPLACEMENT_PLAN (mcl_loadclip_replace_root)
 
@@ -58,24 +58,23 @@ MTASC-compiled tests use class syntax with a `main()` static entry point pattern
 
 ## Blocker 4: Font Metrics / Text Layout Accuracy
 
-**Impact**: 5 tests, ~80 lines
+**Impact**: 3 tests, ~21 lines
 
 TextField textWidth/textHeight computations are close but off by a few pixels. The root causes are interconnected:
 
 - **Word wrap algorithm**: Doesn't perfectly match Flash's line-breaking decisions for mixed-font text
 - **Line height calculation**: Mixed-font lines compute height differently (max ascent + max descent vs per-glyph)
 - **Bullet/tab indent**: Bullet point indent width and tab stop positions slightly wrong
-- **Letter spacing with word wrap**: `letterSpacing` affects character advance but our wrap calculation doesn't account for it
 
 | Test | Match | Lines Off | Issue |
 |------|-------|-----------|-------|
 | edittext_scroll | 52/54 | 2 | maxscroll/bottomScroll with mixed fonts |
 | edittext_newlines | 23/30 | 7 | textWidth/textHeight accuracy |
 | edittext_bullet | 18/30 | 12 | Bullet indent width |
-| edittext_tab_stops | 45/60 | 15 | Tab stop computation (ignored) |
-| ~~device_font_spacing~~ | ~~46/91~~ **91/91 PASS** | ~~45~~ 0 | ~~Letter spacing + word wrap~~ RESOLVED |
+| ~~edittext_tab_stops~~ | 45/60 | 15 | Tab stop computation (ignored — in ignored_tests.txt) |
+| ~~device_font_spacing~~ | **91/91 PASS** | 0 | **RESOLVED** |
 
-**Plans blocked**: TEXTFIELD_PLAN (4 tests)
+**Plans blocked**: TEXTFIELD_PLAN (3 tests)
 
 ---
 
@@ -95,49 +94,47 @@ This requires a version-specific HTML parser path — a major refactor of the ex
 
 ---
 
-## Blocker 6: condenseWhite Paragraph Break Architecture
+## Blocker 6: condenseWhite Issues
 
-**Impact**: 2 tests, ~65 lines
+**Impact**: 2 tests, ~17 lines
 
-The HTML parser uses in-band sentinel characters (`\x01`/`\x02`) to mark paragraph breaks for later processing. This collides with literal control characters in input text. SWF8 condenseWhite also needs paragraph-level leading whitespace stripping (different from SWF7's text-node-level approach).
+Two distinct issues:
+
+1. **Sentinel collision** (both tests): The HTML parser uses `\x01`/`\x02` in-band sentinels for paragraph breaks. Literal control characters in input text (e.g., `\x01`, `\x02`, `\x03`) are misinterpreted as paragraph markers, creating spurious `<P>` splits. This causes 3 lines in SWF7 and 3 lines in SWF8.
+
+2. **SWF8 trailing space after tags** (SWF8 only): When `condenseWhite=true` in SWF8, whitespace-only text nodes after closing tags (e.g., `</b> \n`) should collapse to a single trailing space. Currently they're stripped entirely. Also, inter-block spacing (space between `</p>` and `<p>`) and inline tag boundary spacing (`</b> <b>`) have whitespace collapse differences. ~21 lines.
 
 | Test | Match | Lines Off | Issue |
 |------|-------|-----------|-------|
-| edittext_html_condensewhite_swf7 | 308/311 | 3 | Multiline raw text whitespace |
-| edittext_html_condensewhite_swf8 | 249/311 | 62 | Paragraph-level whitespace stripping |
+| edittext_html_condensewhite_swf7 | 308/311 | 3 | Sentinel collision only |
+| edittext_html_condensewhite_swf8 | ~297/311 | ~14 | Sentinel collision + trailing space after block close + inter-block spacing |
 
 **Plans blocked**: HTML_TEXT_REMAINING_WORK, TEXTFIELD_PLAN
 
 ---
 
-## Blocker 7: StyleSheet CSS Parser
+## ~~Blocker 7: StyleSheet CSS Parser~~ RESOLVED
 
-**Impact**: 1 test, ~121 lines
+~~**Impact**: 1 test, ~121 lines~~
 
-`TextField.styleSheet` needs a CSS parser that converts CSS rules to TextFormat objects. Requires: CSS tokenization, property-to-TextFormat mapping, and style application during HTML rendering.
-
-| Test | Match | Lines Off |
-|------|-------|-----------|
-| edittext_stylesheet | 204/325 | 121 |
-
-**Plans blocked**: TEXTFIELD_PLAN
+`edittext_stylesheet` now **325/325 PASS**. StyleSheet CSS parsing is fully implemented.
 
 ---
 
 ## Blocker 8: MC Removal Lifecycle / call() Semantics
 
-**Impact**: 3 tests across 2 plans
+**Impact**: 2 tests across 2 plans (function_base_clip_readded RESOLVED)
 
 When MovieClips are removed (`depth = INT_MIN`), operations on them or their closures have incomplete fallback behavior:
 
 | Gap | Detail | Tests Blocked |
 |-----|--------|---------------|
 | call() early termination | `call()` on a removed base_clip's frame should terminate the calling script. We don't implement script termination. | removed_target_clip_scope (16/37) |
-| Dead base_clip re-resolution | When a closure's base_clip is removed and a new MC takes the same path, the closure should resolve to the new MC | function_base_clip_readded (10/11) |
+| ~~Dead base_clip re-resolution~~ | ~~RESOLVED~~ — `reResolveDeadBaseClip()` re-resolves via `original_target`. function_base_clip_readded **12/12 PASS**. | ~~function_base_clip_readded~~ |
 | SetTarget on removed base_clip | SetTarget("") should reset to removed base_clip's parent scope, not the target path | removed_target_clip_scope |
-| Ruffle-specific trace | "Target not found: dummy" is Ruffle debug output, not Flash behavior | removed_base_clip_tell_target (0/2) |
+| ~~Ruffle-specific trace~~ | "Target not found: dummy" is Ruffle debug output, not Flash behavior. In ignored_tests.txt. | ~~removed_base_clip_tell_target~~ |
 
-**Plans blocked**: MC_REMOVAL_LIFECYCLE_PLAN (3 tests), CALL_SEMANTICS_PLAN (removed_target_clip_scope), TELLTARGET_PLAN (3 tests referencing removal behavior)
+**Plans blocked**: MC_REMOVAL_LIFECYCLE_PLAN (removed_target_clip_scope), CALL_SEMANTICS_PLAN (removed_target_clip_scope)
 
 ---
 
@@ -189,15 +186,14 @@ Matching requires: (1) adding all missing globals as stubs, (2) rewriting the en
 
 ---
 
-## Blocker 12: swf*_global_funcs SWF-Version Number Parsing
+## ~~Blocker 12: swf*_global_funcs SWF-Version Number Parsing~~ RESOLVED
 
-**Impact**: 3 tests, ~165 lines remaining
+All three tests now **PASS**:
+- swf5_global_funcs: PASS
+- swf6_global_funcs: PASS
+- swf7_global_funcs: PASS
 
-~~Stack corruption~~ **PARTIALLY RESOLVED**: The garbage values were caused by `varToDouble()` reinterpreting non-numeric types (STRING pointers) as float bits. Fixed by switching to `varToDoubleSimple()`. Also fixed `isNaN`/`isFinite` not being first-class function objects (returned UNDEFINED from GetVariable).
-
-**Remaining**: SWF-version-specific string-to-number conversion differences (67 lines in SWF5, 55 in SWF6, 43 in SWF7). `strtod` parses hex `0x10` → 16, but SWF5 should return NaN. SWF6 has octal parsing (`"010"` → 8). Fixing requires a custom SWF-version-aware `strtod` replacement.
-
-**Plans blocked**: GLOBALS_PLAN (swf5/6/7_global_funcs)
+SWF-version-specific number parsing (hex/octal) has been fully implemented.
 
 ---
 
@@ -218,14 +214,12 @@ MTASC class infra ─────────► ROOT_REPLACEMENT (mcl_loadclip_
                              (interface_implements_op: RESOLVED, object_resolve: RESOLVED)
 
 Font metrics accuracy ─────► TEXTFIELD (scroll, newlines, bullet)
-                             UNCOVERED_SMALL_TESTS (device_font_spacing)
 
 SWF6 HTML model ───────────► TEXTFIELD (edittext_html_swf6)
                              HTML_TEXT_REMAINING_WORK
 
 MC removal lifecycle ──────► CALL_SEMANTICS (removed_target_clip_scope)
-                             TELLTARGET (3 tests)
-                             MC_REMOVAL_LIFECYCLE (function_base_clip_readded)
+                             (function_base_clip_readded: RESOLVED)
 
 Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT FEASIBLE)
 ```
@@ -238,16 +232,14 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 1. **Font metrics accuracy** — Incremental improvements to word wrap and line height
 2. **Failed load state values** — Return `-1` for specific MC properties on failed load
 3. **Sequential MCL dispatch** — Timer-based load event spacing
-4. **condenseWhite fixes** — Side-channel paragraph markers instead of in-band sentinels
+4. **condenseWhite SWF8 whitespace** — Preserve trailing space after tags, fix inter-tag spacing
 5. **Global stubs** — Add 20 missing globals (tedious but straightforward)
-6. **swf5_global_funcs** — Debug recompiler stack corruption for this specific test
 
 ### Architectural (requires significant design work)
 1. **Per-movie `_global` isolation** — Move from two-group to per-movie globals
 2. **SWF6 HTML paragraph model** — Version-specific HTML parser path
 3. **call() early termination** — Script execution abort mechanism
-4. **Dead base_clip re-resolution** — Path-based MC lookup on dead closures
-5. **StyleSheet CSS parser** — Full CSS tokenizer + property mapping
+4. **condenseWhite sentinel collision** — Replace `\x01`/`\x02` in-band markers with out-of-band tracking
 
 ### Not Feasible
 1. **Heap-allocated activation scopes** — Would require rewriting the entire variable storage model
@@ -260,13 +252,13 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 |---------|-------|---------------|-------------|
 | LoadMovie / multi-SWF | 25+ | 2000+ | Moderate (incremental) |
 | Per-movie `_global` | 4-6 | 400+ | Moderate (architectural) |
-| MTASC class infra | 1 | 50 | Low (interface_implements_op + object_resolve RESOLVED) |
-| Font metrics | 4 | 35 | Moderate (device_font_spacing RESOLVED) |
+| ~~MTASC class infra~~ | ~~1~~ | ~~50~~ | **MOSTLY RESOLVED** (1 test left, blocked by LoadMovie) |
+| Font metrics | 3 | ~21 | Moderate |
 | SWF6 HTML model | 1 | 1480 | Low (complex refactor) |
-| condenseWhite | 2 | 65 | Moderate |
-| StyleSheet CSS | 1 | 121 | Moderate |
-| MC removal lifecycle | 3 | 120 | Low (deep semantics) |
+| condenseWhite | 2 | ~17 | Moderate (trailing space, inter-block) / Architectural (sentinels) |
+| ~~StyleSheet CSS~~ | ~~1~~ | ~~121~~ | **RESOLVED** |
+| MC removal lifecycle | 1 | ~21 | Low (deep semantics) |
 | Closure capture | 1 | 100 | Not feasible |
 | Global enumeration | 3 | 11000+ | High (tedious) |
 | Dynamic creation edges | 2 | 240+ | Moderate |
-| swf*_global_funcs | 3 | 165 | Moderate (main bugs fixed, SWF-version parsing remains) |
+| ~~swf*_global_funcs~~ | ~~3~~ | ~~165~~ | **RESOLVED** |

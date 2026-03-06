@@ -2984,6 +2984,11 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		clone_mc->totalframes   = src_mc->totalframes;
 		clone_mc->framesloaded  = src_mc->framesloaded;
 		clone_mc->as_set_flags  = src_mc->as_set_flags;
+		clone_mc->draw_has_bounds = src_mc->draw_has_bounds;
+		clone_mc->draw_xmin = src_mc->draw_xmin;
+		clone_mc->draw_xmax = src_mc->draw_xmax;
+		clone_mc->draw_ymin = src_mc->draw_ymin;
+		clone_mc->draw_ymax = src_mc->draw_ymax;
 	}
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
@@ -3080,6 +3085,11 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->totalframes   = src_mc->totalframes;
 	clone_mc->framesloaded  = src_mc->framesloaded;
 	clone_mc->as_set_flags  = src_mc->as_set_flags;
+	clone_mc->draw_has_bounds = src_mc->draw_has_bounds;
+	clone_mc->draw_xmin = src_mc->draw_xmin;
+	clone_mc->draw_xmax = src_mc->draw_xmax;
+	clone_mc->draw_ymin = src_mc->draw_ymin;
+	clone_mc->draw_ymax = src_mc->draw_ymax;
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
 

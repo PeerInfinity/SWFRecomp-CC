@@ -407,5 +407,9 @@ void actionTextControlPaste(SWFAppContext* app_context);
 void actionTextControlCopy(SWFAppContext* app_context);
 void actionTextControlCut(SWFAppContext* app_context);
 void actionTextControlSelectAll(SWFAppContext* app_context);
+void actionTextControlMoveRight(SWFAppContext* app_context);
+void actionTextControlMoveLeft(SWFAppContext* app_context);
+void actionTextControlEnter(SWFAppContext* app_context);
+void actionTextControlBackspace(SWFAppContext* app_context);
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint);
 #endif

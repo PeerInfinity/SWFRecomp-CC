@@ -396,6 +396,14 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             actionTextControlCut(app_context);
         else if (strcmp(ev->ctrl, "SelectAll") == 0)
             actionTextControlSelectAll(app_context);
+        else if (strcmp(ev->ctrl, "MoveRight") == 0)
+            actionTextControlMoveRight(app_context);
+        else if (strcmp(ev->ctrl, "MoveLeft") == 0)
+            actionTextControlMoveLeft(app_context);
+        else if (strcmp(ev->ctrl, "Enter") == 0)
+            actionTextControlEnter(app_context);
+        else if (strcmp(ev->ctrl, "Backspace") == 0)
+            actionTextControlBackspace(app_context);
         break;
     case EV_SET_CLIPBOARD_TEXT:
         actionSetClipboardText(ev->text);

@@ -12239,8 +12239,11 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				// derive their text from the variable, not from the tag default).
 				const char* init_text = ng_getTextFieldInitialText(depth);
 				char* init_text_ml = NULL;
-				if ((tf_flags & 0x0002) && ng_getTextFieldVariableName(tf_idx)[0] == '\0') {
+				if ((tf_flags & 0x0002) && ng_getTextFieldVariableName(tf_idx)[0] == '\0'
+			    && (init_text[0] != '\0' || (tf_flags & 0x0040))) {
 					// Multiline with no variable binding: append trailing newline
+					// (empty non-HTML fields get no trailing newline; HTML fields always get one
+					//  because the paragraph structure <p></p> produces a trailing newline)
 					size_t _ml_len = strlen(init_text);
 					init_text_ml = (char*) malloc(_ml_len + 2);
 					memcpy(init_text_ml, init_text, _ml_len);
@@ -13396,10 +13399,21 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				tn_end++;
 			}
 			if (tn_all_ws) {
-				// Mark all tags on the stack as having had whitespace stripped
-				for (int tsi = 0; tsi < tag_sp; tsi++)
-					tag_had_ws_stripped[tsi] = 1;
-				i = tn_end; // Skip entire whitespace-only text node
+				if (condense_white && swf_version >= 8) {
+					// SWF8 condenseWhite: whitespace-only text nodes between tags
+					// collapse to a single space (like HTML white-space:normal),
+					// unless at paragraph start or last emitted char was already a space.
+					if (!cw8_para_start && table->text_len > 0 &&
+					    table->text[table->text_len - 1] != ' ' &&
+					    !IS_PARA_BREAK(table->text[table->text_len - 1])) {
+						ADD_CH(' ');
+					}
+				} else {
+					// SWF<=7 or no condenseWhite: skip entirely
+					for (int tsi = 0; tsi < tag_sp; tsi++)
+						tag_had_ws_stripped[tsi] = 1;
+				}
+				i = tn_end; // Skip whitespace-only text node
 				continue;
 			}
 			after_tag = 0;
@@ -13746,6 +13760,10 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				}
 				// SWF8 condenseWhite: skip leading whitespace at paragraph start
 				if (cw8_para_start) { i++; continue; }
+				// SWF8 condenseWhite: suppress duplicate space across tag boundaries
+				if (swf_version >= 8 && table->text_len > 0 && table->text[table->text_len - 1] == ' ') {
+					i++; continue;
+				}
 			}
 
 			ADD_CH(c);
@@ -42907,11 +42925,10 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 	g_selection_begin = -1;
 	g_selection_caret = -1;
 	g_selection_end = -1;
-	// When a text field gains focus, select all text (matches Flash behavior)
-	if (new_mc != NULL && new_mc->ng_textfield_idx >= 0)
-		g_tf_select_all = 1;
-	else
-		g_tf_select_all = 0;
+	// Clear select-all state on any focus change.
+	// Callers (Selection.setFocus) set g_tf_select_all = 1 explicitly when needed.
+	// Mouse click focus does NOT select all — it places the caret.
+	g_tf_select_all = 0;
 	// 4. Selection.broadcastMessage("onSetFocus", old_path, new_path)
 	if (!g_selection_obj) return;
 	static const uint16_t s_onSetFocus_u16[] = {
@@ -42984,6 +43001,9 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	}
 	queue_deferred_roll(g_focused_mc, new_mc);
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
+	// Programmatic setFocus selects all text (mouse click does not)
+	if (MC_IS_TEXTFIELD(new_mc))
+		g_tf_select_all = 1;
 	ret.data.numeric_value = 1;
 	return ret;
 }
@@ -43366,7 +43386,16 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 		next_pos = (cur_pos + 1) % tab_count;
 	}
 	MovieClip* new_mc = tab_order[next_pos];
-	if (new_mc == g_focused_mc) return;
+	if (new_mc == g_focused_mc) {
+		// Re-focusing same text field via Tab: re-select all text
+		if (MC_IS_TEXTFIELD(new_mc)) {
+			g_tf_select_all = 1;
+			g_selection_begin = -1;
+			g_selection_caret = -1;
+			g_selection_end = -1;
+		}
+		return;
+	}
 	// Tab focus triggers rollOut on old MC and rollOver on new MC.
 	// Order: button DoAction rollOut → AS2 onRollOut → button DoAction rollOver → AS2 onRollOver
 	// Text fields (EditText) do NOT participate in rollOver/rollOut during Tab focus changes.
@@ -43387,6 +43416,9 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 		mc_call_as2_handler_ng(app_context, new_mc, "onRollOver", 10);
 	}
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
+	// Tab focus selects all text (same as programmatic setFocus, unlike mouse clicks)
+	if (MC_IS_TEXTFIELD(new_mc))
+		g_tf_select_all = 1;
 }
 
 // Accessor for g_focused_mc — used by tag.c for button keyPress focus gating.
@@ -43656,6 +43688,170 @@ void actionTextControlCut(SWFAppContext* app_context)
 
 	ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
 	g_tf_select_all = 0;
+}
+
+// Helper: get text length (in UTF-16 codepoints) for the focused text field.
+static int tf_get_text_length(MovieClip* mc)
+{
+	if (mc == NULL) return 0;
+	ASObject* props = (ASObject*) mc->dynamic_props;
+	if (props == NULL) return 0;
+	ActionVar* text_prop = getProperty(props, "text", 4);
+	if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING)
+		return (int)text_prop->str_size;
+	return 0;
+}
+
+void actionTextControlMoveRight(SWFAppContext* app_context)
+{
+	(void)app_context;
+	if (g_focused_mc == NULL) return;
+	int text_len = tf_get_text_length(g_focused_mc);
+	if (g_tf_select_all) {
+		// Collapse selection to end of text
+		g_selection_begin = text_len;
+		g_selection_end = text_len;
+		g_selection_caret = text_len;
+		g_tf_select_all = 0;
+	} else if (g_selection_begin >= 0 && g_selection_end >= 0 && g_selection_begin != g_selection_end) {
+		// Collapse range selection to right edge
+		int right = g_selection_end > g_selection_begin ? g_selection_end : g_selection_begin;
+		g_selection_begin = right;
+		g_selection_end = right;
+		g_selection_caret = right;
+	} else {
+		// Move caret right by one
+		int pos = g_selection_caret >= 0 ? g_selection_caret : 0;
+		if (pos < text_len) pos++;
+		g_selection_begin = pos;
+		g_selection_end = pos;
+		g_selection_caret = pos;
+	}
+}
+
+void actionTextControlMoveLeft(SWFAppContext* app_context)
+{
+	(void)app_context;
+	if (g_focused_mc == NULL) return;
+	int text_len = tf_get_text_length(g_focused_mc);
+	if (g_tf_select_all) {
+		// Collapse selection to beginning of text
+		g_selection_begin = 0;
+		g_selection_end = 0;
+		g_selection_caret = 0;
+		g_tf_select_all = 0;
+	} else if (g_selection_begin >= 0 && g_selection_end >= 0 && g_selection_begin != g_selection_end) {
+		// Collapse range selection to left edge
+		int left = g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end;
+		g_selection_begin = left;
+		g_selection_end = left;
+		g_selection_caret = left;
+	} else {
+		// Move caret left by one
+		int pos = g_selection_caret >= 0 ? g_selection_caret : text_len;
+		if (pos > 0) pos--;
+		g_selection_begin = pos;
+		g_selection_end = pos;
+		g_selection_caret = pos;
+	}
+}
+
+void actionTextControlEnter(SWFAppContext* app_context)
+{
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	// Check if multiline
+	ActionVar* ml_prop = getProperty(props, "multiline", 9);
+	if (ml_prop == NULL || ml_prop->type != ACTION_STACK_VALUE_BOOLEAN || ml_prop->data.numeric_value == 0)
+		return;  // Non-multiline: Enter does nothing
+
+	// Insert \r (carriage return) at caret position, like a regular character input
+	// but using \r specifically (Flash multiline uses \r for line breaks)
+	actionTextFieldInput(app_context, '\r');
+}
+
+void actionTextControlBackspace(SWFAppContext* app_context)
+{
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	if (g_tf_select_all) {
+		// Delete all text
+		static const uint16_t empty_u16[] = {0};
+		ActionVar empty_text = {0};
+		empty_text.type = ACTION_STACK_VALUE_STRING;
+		empty_text.data.numeric_value = (u64)(uintptr_t)empty_u16;
+		empty_text.str_size = 0;
+		setProperty(app_context, props, "text", 4, &empty_text);
+		ActionVar len_val = {0};
+		len_val.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &len_val.data.numeric_value) = 0.0;
+		setProperty(app_context, props, "length", 6, &len_val);
+		ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
+		g_tf_select_all = 0;
+		g_selection_begin = 0;
+		g_selection_end = 0;
+		g_selection_caret = 0;
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9);
+		return;
+	}
+
+	// Get current text
+	ActionVar* text_prop = getProperty(props, "text", 4);
+	if (text_prop == NULL || text_prop->type != ACTION_STACK_VALUE_STRING) return;
+	const uint16_t* old_u16 = varGetU16Ptr(text_prop);
+	u32 old_len = text_prop->str_size;
+	if (old_len == 0) return;
+
+	// Determine delete position
+	int sel_begin = g_selection_begin >= 0 ? g_selection_begin : 0;
+	int sel_end = g_selection_end >= 0 ? g_selection_end : 0;
+	if (sel_begin > (int)old_len) sel_begin = (int)old_len;
+	if (sel_end > (int)old_len) sel_end = (int)old_len;
+
+	int del_start, del_end;
+	if (sel_begin != sel_end) {
+		// Range selection: delete the selection
+		del_start = sel_begin < sel_end ? sel_begin : sel_end;
+		del_end = sel_begin > sel_end ? sel_begin : sel_end;
+	} else {
+		// No selection: delete character before caret
+		if (sel_begin <= 0) return;
+		del_start = sel_begin - 1;
+		del_end = sel_begin;
+	}
+
+	// Build new text
+	u32 prefix_len = (u32)del_start;
+	u32 suffix_len = old_len - (u32)del_end;
+	u32 result_len = prefix_len + suffix_len;
+	uint16_t* result_u16 = (uint16_t*) heap_alloc(app_context, (result_len + 1) * sizeof(uint16_t));
+	if (prefix_len > 0 && old_u16 != NULL)
+		memcpy(result_u16, old_u16, prefix_len * sizeof(uint16_t));
+	if (suffix_len > 0 && old_u16 != NULL)
+		memcpy(result_u16 + prefix_len, old_u16 + del_end, suffix_len * sizeof(uint16_t));
+	result_u16[result_len] = 0;
+
+	ActionVar new_text = {0};
+	new_text.type = ACTION_STACK_VALUE_STRING;
+	new_text.data.numeric_value = (u64)(uintptr_t)result_u16;
+	new_text.str_size = result_len;
+	setProperty(app_context, props, "text", 4, &new_text);
+
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)result_len;
+	setProperty(app_context, props, "length", 6, &len_val);
+
+	g_selection_begin = del_start;
+	g_selection_end = del_start;
+	g_selection_caret = del_start;
+
+	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9);
 }
 
 // ==================== TextField.restrict pattern filter ====================
