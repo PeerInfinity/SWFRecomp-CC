@@ -363,6 +363,24 @@ int actionHasEnterFrameHandlers(void);
 void processTimers(SWFAppContext* app_context, double frame_duration_ms);
 int hasActiveTimers(void);
 
+// ExternalInterface bridge
+// External call handler: called when AS code invokes ExternalInterface.call(name, ...args)
+typedef ActionVar (*ExternalCallHandler)(SWFAppContext*, const char* name, ActionVar* args, int arg_count);
+extern ExternalCallHandler g_external_call_handler;
+
+// After-tick handler: called at the end of each frame tick (for test harness injection)
+typedef void (*AfterTickHandler)(SWFAppContext*, int tick_number);
+extern AfterTickHandler g_after_tick_handler;
+
+// Call a registered EI callback by name (for test harness / host environment)
+ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char* name, ActionVar* args, int arg_count);
+
+// Convert an ActionVar STRING to a UTF-8 C string in buf. Returns bytes written.
+int ei_actionvar_to_utf8(ActionVar* var, char* buf, int buf_size);
+
+// Set __proto__ on an object to Object.prototype (for test harness use)
+void ei_set_object_proto(SWFAppContext* app_context, void* obj);
+
 #ifdef NO_GRAPHICS
 // AS2 MC event dispatch — called from swf_core.c on mouse events.
 // Iterates child_mc_cache, checks hit area, and calls onPress/onDragOver etc.

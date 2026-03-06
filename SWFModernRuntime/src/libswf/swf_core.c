@@ -760,6 +760,14 @@ void swfStart(SWFAppContext* app_context)
 			processTimers(app_context, frame_duration_ms);
 		}
 
+		// After-tick hook (for test harness / external interface injection)
+		{
+			typedef void (*AfterTickHandler)(SWFAppContext*, int);
+			extern AfterTickHandler g_after_tick_handler;
+			if (g_after_tick_handler)
+				g_after_tick_handler(app_context, (int)tick_count);
+		}
+
 		// Advance to next frame
 		// IMPORTANT: Process manual_next_frame BEFORE checking is_playing
 		// This ensures that gotoFrame/gotoAndStop commands execute the target frame

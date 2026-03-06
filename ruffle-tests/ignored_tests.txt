@@ -147,8 +147,7 @@ file_reference_upload_httperror_status_code
 file_reference_upload_success
 
 # --- ExternalInterface (browser JavaScript bridge) ---
-# external_interface needs ExternalInterface.call()/addCallback() which need a browser JS context.
-external_interface
+# external_interface now passes via test_harness.c mock approach
 
 # --- Bitmap data operations ---
 # These tests require pixel-level bitmap manipulation not available in trace mode.

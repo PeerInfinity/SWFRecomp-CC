@@ -1,17 +1,19 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-05
+Last updated: 2026-03-06
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
-- **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: EXTERNAL_INTERFACE_PLAN Phases 1-3 COMPLETE → 6/7 tests passing (645 lines). Fixed funky_function_calls regression (Function.apply primitive thisArg). instanceof_coercions now 88/88 PASS (ASSetPropFlags Function2Ptr, SUPER GetMember, instanceof version-flag bypass). sound 628/628 PASS. edittext_restrict removed from ignored (now passing). swf*_global_funcs SWF-version number parsing fixes.
+- **Pass rate (CI, last run)**: 471/619 (76.1%) — pending CI run expected ~477-480/619 (~77.4%)
+- **Main failure types**: output_mismatch (~130), segfault (~8), compile_fail (1), runtime_error (2), timeout (1)
+- **Recent gains (this session)**: Fixed device_font_spacing regression (47/91→91/91) via conditional pixel rounding based on embedFonts property. Fixed root_global_parent (2/6→6/6) by adding `_global` as MOVIECLIP builtin in GetMember. Identified 6 CI regressions (add2, string_coercion, duplicate_movie_clip, mcl_getprogress, mcl_loadclip, path_string) that pass locally — likely resolved by ng_syncVarToTextFields fix from prior session.
+- **Recent gains (previous session)**: EXTERNAL_INTERFACE_PLAN Phases 1-3 COMPLETE → 6/7 tests passing (645 lines). Fixed funky_function_calls regression (Function.apply primitive thisArg). instanceof_coercions now 88/88 PASS (ASSetPropFlags Function2Ptr, SUPER GetMember, instanceof version-flag bypass). sound 628/628 PASS. edittext_restrict removed from ignored (now passing). swf*_global_funcs SWF-version number parsing fixes.
 - **Recent gains (previous session)**: TYPE_COERCION_ADVANCED Phases 1-3 done. instanceof_coercions 86/88 (97.7%), coerce_to_object_monkeypatch partially blocked by closure capture. Implemented: tryAutoBoxPrimitive, instanceOfCoercing, Object.addProperty built-in, non-object prototype handling, getActiveGlobal.
 - **Recent gains (previous session)**: FUNCTION_EDGE_CASES ALL PHASES DONE. function_as_function PASS (36/36). funky_function_calls PASS (56/56). g_override_this mechanism for primitive thisArg types.
 - **Recent gains (previous session)**: CALL_SEMANTICS_PLAN COMPLETE. call test PASS (63/63). actionCall rewrite: return value + early termination, frame label lookup, target path resolution, g_tag_skip_mode for DoAction-only execution.
 - **Recent gains (previous session)**: MOUSE_EVENTS_ADVANCED Phase 1 (TF hit-testing): focus_mouse PASS (45/45). Phase 4 (frame rect offset): frame_size_translated_positive/negative both PASS (21/21). Phase 6 (TF onChanged): button_keypress_vs_textinput PASS (4/4). STAGE_FRAME_PROPS_PLAN now 9/9 PASS. BUTTON_PLAN now 13/14 PASS.
-- **Recent gains (this session)**: ASNATIVE_ASNEW_PLAN COMPLETE → complete/. asnative (34/34), asnew (34/34). ASnative class 100/2/200 dispatch, ASNew constructor context tracking, actionNewMethod SWF8 undefined method name fix.
+- **Recent gains (this session)**: EXTERNAL_INTERFACE_PLAN Phase 4 COMPLETE → external_interface 84/84 PASS. Implemented test_harness.c mock approach (mock ExternalCall handler, after-tick hook, ExternalValue Debug formatting). Runtime: EI addCallback/call/available, Function.call own_props override, ei_set_object_proto. Removed from ignored_tests.txt.
+- **Recent gains (previous session)**: ASNATIVE_ASNEW_PLAN COMPLETE → complete/. asnative (34/34), asnew (34/34). ASnative class 100/2/200 dispatch, ASNew constructor context tracking, actionNewMethod SWF8 undefined method name fix.
 - **Recent gains (this session)**: ASBROADCASTER_PLAN COMPLETE → complete/. as_broadcaster (41/41), as_broadcaster_undef (90/90). AsBroadcaster.initialize(), addListener/removeListener abstract equality (null==undefined), broadcastMessage method name coercion + true return value.
 - **Recent gains (previous session)**: TEXTSNAPSHOT_PLAN COMPLETE → complete/. All 4 TextSnapshot tests PASS: textsnapshot_gettext (55/55), textsnapshot_findtext (44/44), textsnapshot_text_order (1/1), textsnapshot_available_text (20/20). Recompiler deferred char code emission + runtime textSnapshotCapture + getCount/getText/findText + clone display list init.
 - **Recent gains (previous session)**: SOUND_CLASS_PLAN Phase 0 DONE → blocked/. register_class_with_sound now PASS (11/11). sound 622/628. Fixed: checkInstanceOf for registerClass MCs, Sound getPan/setPan/getTransform/setTransform, resolveSoundThis for MC dispatch, clamp_to_i32/ecmaToInt32 coercions, own-property-only check in setTransform.
@@ -111,6 +113,8 @@ Last updated: 2026-03-05
 | `tab_ordering_events` | 150/150 ✅ | Button DoAction rollOver/rollOut during Tab, deferred roll queue, text field exclusions |
 | `tab_ordering_movieclip_enabled_default` | 462/462 ✅ | MC tabIndex + mouse handler implicit tabbability |
 | `root_onload` | PASS ✅ | Root MC onLoad dispatch (was compile_fail, now fixed) |
+| `root_global_parent` | 6/6 ✅ | mc._global member access in GetMember |
+| `device_font_spacing` | 91/91 ✅ | Conditional pixel rounding based on embedFonts property |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -234,6 +238,13 @@ Last updated: 2026-03-05
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
 - ~~**OOP_SUPER_EXTENDS_PLAN**~~ — **RESOLVED** (moved to blocked/). 7/8 pass. `super_edge_cases` 39/39 ✅. `interface_implements_op` blocked by REGISTERCLASS_PLAN (MTASC class constructors).
 - ~~**STAGE_FRAME_PROPS_PLAN**~~ — **RESOLVED** (9/9 PASS). Ready to move to complete/.
+
+### Session notes (2026-03-05)
+- **device_font_spacing regression FIXED (47/91→91/91)**: Commit 0f010c5b removed pixel rounding to fix 8 edittext tests but broke device_font_spacing. Fixed by making pixel rounding conditional on `embedFonts` property — device fonts (embedFonts=false) get pixel rounding via `ng_round_to_pixel`/`ng_round_ls_to_pixel`, embedded fonts use raw sub-pixel advances. `ng_device_font_mode` flag in tag_stubs.c, `setDeviceFontModeForMC()` helper in action.c called at 6 measurement sites.
+- **root_global_parent FIXED (2/6→6/6)**: Added `_global` as MOVIECLIP builtin property in `actionGetMember`. Uses `getActiveGlobal()` to return the same `_global` object as `GetVariable("_global")`.
+- **CI regression analysis**: 6 tests (add2, string_coercion, duplicate_movie_clip, mcl_getprogress, mcl_loadclip, path_string) regressed in CI but pass locally. Traced to ng_syncVarToTextFields fix from commit 4e59a0cb. Need CI re-run to confirm.
+- **root_onload compile_fail in CI**: Passes locally. Stale CI build artifact.
+- **Near-passing tests investigated**: target_clip_removed (scope chain inheritance), define_local_with_paths (slash-path edge cases), edittext_scroll (mixed-font line height), edittext_html_condensewhite_swf7 (condenseWhite formatting) — all require non-trivial fixes.
 
 ### Session notes (2026-02-28)
 - **register_class 0→26/67**: Two fixes: (1) Both attachMovie paths (CallFunction + CallMethod) now set `mc.__proto__ = MovieClip.prototype` when no registered class exists, fixing `mc.__proto__ === MovieClip.prototype` StrictEquals check. (2) `Object.registerClass(sym, undefined)` now unregisters correctly (was only handling NULL, not UNDEFINED).

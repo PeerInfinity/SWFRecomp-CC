@@ -2873,6 +2873,280 @@ static ASFunction g_ei_arrayToAS_func;
 static ASFunction g_ei_argumentsToAS_func;
 static ASFunction g_ei_objectToAS_func;
 
+// --- ExternalInterface Phase 4: Bridge methods (available, addCallback, call) ---
+
+// EI Callback registry — stores AS callbacks registered via addCallback
+typedef struct {
+	char name[128];
+	ActionVar this_obj;    // The thisObj passed to addCallback
+	ASFunction* func;      // The registered AS function
+	int in_use;
+} EICallback;
+
+#define MAX_EI_CALLBACKS 32
+static EICallback g_ei_callbacks[MAX_EI_CALLBACKS];
+static int g_ei_callback_count = 0;
+
+// Pluggable external call handler (set by test harness or host environment)
+ExternalCallHandler g_external_call_handler = NULL;
+
+// After-tick handler (set by test harness for post-frame callbacks)
+AfterTickHandler g_after_tick_handler = NULL;
+
+// ExternalInterface.available — returns true if external interface is available
+static ActionVar actionEI_available(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_BOOLEAN;
+	result.data.numeric_value = (g_external_call_handler != NULL) ? 1 : 0;
+	return result;
+}
+
+// ExternalInterface.addCallback(name, thisObj, fn) — register AS callback
+static ActionVar actionEI_addCallback(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+
+	if (arg_count < 3 || g_external_call_handler == NULL)
+	{
+		result.type = ACTION_STACK_VALUE_BOOLEAN;
+		result.data.numeric_value = 0;
+		return result;
+	}
+
+	// Coerce name to string
+	char name_buf[128];
+	int name_len = varToStringBuf(app_context, &args[0], name_buf, sizeof(name_buf) - 1);
+	name_buf[name_len] = '\0';
+
+	// args[1] = thisObj, args[2] = function
+	if (args[2].type != ACTION_STACK_VALUE_FUNCTION)
+	{
+		result.type = ACTION_STACK_VALUE_BOOLEAN;
+		result.data.numeric_value = 0;
+		return result;
+	}
+
+	// Store callback (overwrite existing with same name)
+	int slot = -1;
+	for (int i = 0; i < g_ei_callback_count; i++)
+	{
+		if (g_ei_callbacks[i].in_use && strcmp(g_ei_callbacks[i].name, name_buf) == 0)
+		{
+			slot = i;
+			break;
+		}
+	}
+	if (slot < 0)
+	{
+		// Find empty slot or append
+		for (int i = 0; i < g_ei_callback_count; i++)
+		{
+			if (!g_ei_callbacks[i].in_use) { slot = i; break; }
+		}
+		if (slot < 0 && g_ei_callback_count < MAX_EI_CALLBACKS)
+			slot = g_ei_callback_count++;
+	}
+	if (slot >= 0)
+	{
+		strncpy(g_ei_callbacks[slot].name, name_buf, 127);
+		g_ei_callbacks[slot].name[127] = '\0';
+		g_ei_callbacks[slot].this_obj = args[1];
+		g_ei_callbacks[slot].func = (ASFunction*)(uintptr_t)args[2].data.numeric_value;
+		g_ei_callbacks[slot].in_use = 1;
+	}
+
+	result.type = ACTION_STACK_VALUE_BOOLEAN;
+	result.data.numeric_value = 1;
+	return result;
+}
+
+// ExternalInterface.call(funcName, ...args) — call external function
+static ActionVar actionEI_call(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+
+	if (g_external_call_handler == NULL || arg_count < 1)
+	{
+		result.type = ACTION_STACK_VALUE_NULL;
+		return result;
+	}
+
+	// Coerce funcName to string
+	char name_buf[256];
+	int name_len = varToStringBuf(app_context, &args[0], name_buf, sizeof(name_buf) - 1);
+	name_buf[name_len] = '\0';
+
+	// Pass remaining args to external handler
+	ActionVar* call_args = (arg_count > 1) ? &args[1] : NULL;
+	int call_arg_count = (arg_count > 1) ? (int)(arg_count - 1) : 0;
+
+	return g_external_call_handler(app_context, name_buf, call_args, call_arg_count);
+}
+
+static ASFunction g_ei_available_func;
+static ASFunction g_ei_addCallback_func;
+static ASFunction g_ei_call_func;
+
+// Public: Call a registered EI callback by name (for test harness / host)
+// Invokes the AS function registered via addCallback with the given args.
+// Returns the function's return value, or undefined if callback not found.
+ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char* name, ActionVar* args, int arg_count)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	// Find callback
+	EICallback* cb = NULL;
+	for (int i = 0; i < g_ei_callback_count; i++)
+	{
+		if (g_ei_callbacks[i].in_use && strcmp(g_ei_callbacks[i].name, name) == 0)
+		{
+			cb = &g_ei_callbacks[i];
+			break;
+		}
+	}
+	if (cb == NULL || cb->func == NULL) return undef;
+
+	g_call_depth++;
+	if (g_call_depth > g_max_call_depth)
+	{
+		g_execution_halted = 1;
+		g_call_depth--;
+		return undef;
+	}
+
+	ASFunction* func = cb->func;
+	void* this_obj = NULL;
+
+	// Determine this_obj from the stored thisObj ActionVar
+	if (cb->this_obj.type == ACTION_STACK_VALUE_OBJECT)
+		this_obj = (void*)(uintptr_t)cb->this_obj.data.numeric_value;
+	else if (cb->this_obj.type == ACTION_STACK_VALUE_MOVIECLIP)
+		this_obj = (void*)(uintptr_t)cb->this_obj.data.numeric_value;
+
+	ActionVar result;
+
+	if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		// Push local scope
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		// Restore captured WITH scopes
+		u32 captured_count = func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
+		}
+
+		// Switch base_clip context if SWF6+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		result = func->advanced_func(app_context, args, (u32)arg_count, registers, this_obj);
+
+		g_current_context = saved_context;
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		// Type 1: push args onto stack in reverse, set "this"
+		for (int i = arg_count - 1; i >= 0; i--)
+			pushVar(app_context, &args[i]);
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		// Set "this"
+		ActionVar this_var = {0};
+		if (this_obj != NULL)
+		{
+			this_var.type = ACTION_STACK_VALUE_OBJECT;
+			this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+		}
+		else
+		{
+			this_var.type = ACTION_STACK_VALUE_UNDEFINED;
+		}
+		setVariableByName("this", &this_var);
+
+		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+		g_current_context = saved_context;
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+	else
+	{
+		result = undef;
+	}
+
+	g_call_depth--;
+	return result;
+}
+
+// Public: Convert an ActionVar STRING to a UTF-8 C string.
+// Returns the number of bytes written (not including null terminator).
+int ei_actionvar_to_utf8(ActionVar* var, char* buf, int buf_size)
+{
+	if (var == NULL || var->type != ACTION_STACK_VALUE_STRING)
+	{
+		buf[0] = '\0';
+		return 0;
+	}
+	const uint16_t* u16 = (const uint16_t*)(uintptr_t)var->data.numeric_value;
+	u32 u16_len = var->str_size;
+	if (u16 == NULL || u16_len == 0) { buf[0] = '\0'; return 0; }
+	int len = u16_to_utf8(u16, u16_len, buf, buf_size - 1);
+	buf[len] = '\0';
+	return len;
+}
+
+// Public: Set __proto__ on an object to Object.prototype (for test harness use)
+void ei_set_object_proto(SWFAppContext* app_context, void* obj)
+{
+	setObjectProto(app_context, (ASObject*)obj);
+}
+
 // --- ASnative class 100: Global functions (escape, unescape, parseInt, parseFloat, trace) ---
 
 static ActionVar asnative_100_escape(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -21916,6 +22190,32 @@ check_special_vars:
 					_ev.type = ACTION_STACK_VALUE_FUNCTION;
 					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_objectToAS_func;
 					setProperty(app_context, fc_ExternalInterface.own_props, "_objectToAS", 11, &_ev);
+
+					// Phase 4: Bridge methods (available, addCallback, call)
+					memset(&g_ei_addCallback_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_addCallback_func.name, "addCallback", 255);
+					g_ei_addCallback_func.function_type = 2;
+					g_ei_addCallback_func.advanced_func = (Function2Ptr)actionEI_addCallback;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_addCallback_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "addCallback", 11, &_ev);
+
+					memset(&g_ei_call_func, 0, sizeof(ASFunction));
+					strncpy(g_ei_call_func.name, "call", 255);
+					g_ei_call_func.function_type = 2;
+					g_ei_call_func.advanced_func = (Function2Ptr)actionEI_call;
+					_ev.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_call_func;
+					setProperty(app_context, fc_ExternalInterface.own_props, "call", 4, &_ev);
+
+					// available — set as boolean based on whether external call handler is present
+					// (handler is set by test_harness_init before swfStart, so this check works)
+					{
+						ActionVar av_bool = {0};
+						av_bool.type = ACTION_STACK_VALUE_BOOLEAN;
+						av_bool.data.numeric_value = (g_external_call_handler != NULL) ? 1 : 0;
+						setProperty(app_context, fc_ExternalInterface.own_props, "available", 9, &av_bool);
+					}
 				}
 				SET_CTOR_PROP(external_obj, "ExternalInterface", 17, fc_ExternalInterface);
 
@@ -38058,6 +38358,29 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	{
 		// Function object - handle toString, valueOf, call, apply
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+
+		// Check own_props first for method overrides (e.g., ExternalInterface.call)
+		if (func != NULL && func->own_props != NULL)
+		{
+			ActionVar* own_method = getProperty(func->own_props, method_name, method_name_len);
+			if (own_method != NULL && own_method->type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				ASFunction* own_func = (ASFunction*)(uintptr_t) own_method->data.numeric_value;
+				if (own_func != NULL && own_func->function_type == 2 && own_func->advanced_func != NULL)
+				{
+					ActionVar* regs = NULL;
+					if (own_func->register_count > 0)
+						regs = (ActionVar*) HCALLOC(own_func->register_count, sizeof(ActionVar));
+					g_call_depth++;
+					ActionVar result = own_func->advanced_func(app_context, args, num_args, regs, func->own_props);
+					g_call_depth--;
+					if (regs != NULL) FREE(regs);
+					if (args != NULL) FREE(args);
+					pushVar(app_context, &result);
+					return;
+				}
+			}
+		}
 
 		if (method_name_len == 4 && strncmp(method_name, "call", 4) == 0)
 		{

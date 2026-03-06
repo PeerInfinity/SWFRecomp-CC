@@ -765,6 +765,12 @@ def compile_native(test_dir, num_frames, build_dir):
     if has_data_files:
         generate_data_registry(data_files, build_dir)
 
+    # Handle test harness (per-test custom C code, e.g. ExternalInterface mock)
+    test_harness = test_dir / "test_harness.c"
+    has_test_harness = test_harness.exists()
+    if has_test_harness:
+        shutil.copy2(test_harness, build_dir)
+
     # Compile
     inc = SWFMODERN / "include"
     extra_defines = []
@@ -779,6 +785,8 @@ def compile_native(test_dir, num_frames, build_dir):
         extra_defines.append("-DHAS_CHILD_MOVIES")
     if has_data_files:
         extra_defines.append("-DHAS_DATA_FILES")
+    if has_test_harness:
+        extra_defines.append("-DHAS_TEST_HARNESS")
     # Pass SWF file size for getBytesLoaded/getBytesTotal
     # Use the uncompressed size from the SWF header (bytes 4-7), not the file system size,
     # because Flash reports the uncompressed size for compressed (CWS/ZWS) SWFs.

@@ -1,9 +1,12 @@
 # ExternalInterface Helper Methods Plan
 <!-- TESTS: external_interface_escapexml, external_interface_unescapexml, external_interface_toxml_basic, external_interface_toxml_array, external_interface_jsquotestring, external_interface_toas_basic, external_interface -->
 
-Last updated: 2026-03-05
+Last updated: 2026-03-06
 
-## Status: COMPLETE (Phases 1-3) — 6/7 tests passing (645 lines). Phase 4 BLOCKED.
+## Status: COMPLETE — All 7/7 tests passing (729 lines).
+
+### Verified 2026-03-06
+All 7 tests confirmed passing locally. Phase 4 (`external_interface`) unblocked via test_harness.c mock approach — 84/84 PASS.
 
 ### Test Inventory
 
@@ -15,7 +18,7 @@ Last updated: 2026-03-05
 | external_interface_toxml_basic | 179 | **179/179 PASS** | Phase 2 | Done |
 | external_interface_toxml_array | 25 | **25/25 PASS** | Phase 2 | Done |
 | external_interface_toas_basic | 354 | **354/354 PASS** | Phase 3 | Done |
-| external_interface | 84 | 11/84 (ignored) | Phase 4 | BLOCKED |
+| external_interface | 84 | **84/84 PASS** | Phase 4 | Done |
 
 ### Overview
 
@@ -179,21 +182,17 @@ Requires XML node inspection — accessing `nodeName`, `childNodes`, `attributes
 
 ---
 
-## Phase 4: Bridge Methods (1 test, 84 lines) — BLOCKED
+## Phase 4: Bridge Methods (1 test, 84 lines) — COMPLETE
 
 ### external_interface test
 
-Tests `ExternalInterface.available`, `addCallback`, and `call` — the actual JS↔SWF communication bridge. These require:
-- `available` property: returns `true` if running in a browser with JS access
-- `addCallback(name, thisObj, fn)`: registers AS function callable from JS
-- `call(funcName, ...args)`: calls a JS function from AS
+Tests `ExternalInterface.available`, `addCallback`, and `call` — the actual JS↔SWF communication bridge. Implemented via:
 
-**Blocker**: These require actual JavaScript interop infrastructure. In our native headless runtime, there's no JS environment. Would need to either:
-1. Stub `available = false` (but test expects `true`)
-2. Implement a mock JS bridge for testing
-3. Accept as a permanent diff
-
-**Decision**: Keep in ignored_tests.txt. Focus on Phases 1-3 which are fully implementable.
+1. **Runtime EI support** (`action.c`): `addCallback` registers AS callbacks, `call` dispatches to `g_external_call_handler`, `available` returns `true` when handler is set
+2. **Test harness mechanism** (`verify_output.py`): Per-test `test_harness.c` files are auto-detected and compiled with `-DHAS_TEST_HARNESS`; `main.c` calls `test_harness_init()` before `swfStart()`
+3. **Mock provider** (`test_harness.c`): Implements `ping`/`trace`/`reentry` mock methods + after-tick hook that calls `parrot` and `callWith` callbacks after frame 1
+4. **ExternalValue Debug formatting**: Matches Rust's `#[derive(Debug)]` output format for `ExternalValue` enum (sorted BTreeMap keys, etc.)
+5. **Function.call own_props override**: CallMethod checks func->own_props for method overrides before built-in `Function.call()` dispatch
 
 ---
 
@@ -204,8 +203,8 @@ Tests `ExternalInterface.available`, `addCallback`, and `call` — the actual JS
 | Phase 1 | 3 | 87 | Easy (~80 LOC) | None |
 | Phase 2 | 2 | 204 | Medium (~150 LOC) | Phase 1 |
 | Phase 3 | 1 | 354 | Medium (~120 LOC) | XML class |
-| Phase 4 | 1 | 84 | BLOCKED | JS bridge |
-| **Total actionable** | **6** | **645** | **~350 LOC** | |
+| Phase 4 | 1 | 84 | Done (~350 LOC) | Test harness |
+| **Total** | **7** | **729** | **~700 LOC** | |
 
 Phases 1-3 combined would gain 645 lines across 6 tests with no external dependencies beyond the existing XML class. This makes it one of the highest-ROI plans available.
 

@@ -85,6 +85,12 @@ int main(int argc, char* argv[]) {
         input_events_load(argv[1]);
     }
 #endif
+#ifdef HAS_TEST_HARNESS
+    {
+        extern void test_harness_init(SWFAppContext*);
+        test_harness_init(&app_context);
+    }
+#endif
     swfStart(&app_context);
 #else
     printf("WASM SWF Runtime Loaded!\n");
