@@ -24,7 +24,6 @@ edittext_password
 edittext_password_copy
 edittext_paste_empty
 edittext_place_caret
-edittext_restrict
 edittext_restrict_paste
 edittext_tab_focus
 edittext_tab_stops

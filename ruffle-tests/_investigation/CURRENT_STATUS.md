@@ -6,7 +6,7 @@ Last updated: 2026-03-05
 
 - **Pass rate (CI, last run)**: 392/619 (63.3%) — pending CI run will confirm new passes
 - **Main failure types**: output_mismatch (213), segfault (14), compile_fail (1), runtime_error (2), timeout (1)
-- **Recent gains (this session)**: EXTERNAL_INTERFACE_PLAN Phases 1-3 COMPLETE → 6/7 tests passing (645 lines). Fixed funky_function_calls regression (Function.apply primitive thisArg). swf*_global_funcs SWF-version number parsing fixes.
+- **Recent gains (this session)**: EXTERNAL_INTERFACE_PLAN Phases 1-3 COMPLETE → 6/7 tests passing (645 lines). Fixed funky_function_calls regression (Function.apply primitive thisArg). instanceof_coercions now 88/88 PASS (ASSetPropFlags Function2Ptr, SUPER GetMember, instanceof version-flag bypass). sound 628/628 PASS. edittext_restrict removed from ignored (now passing). swf*_global_funcs SWF-version number parsing fixes.
 - **Recent gains (previous session)**: TYPE_COERCION_ADVANCED Phases 1-3 done. instanceof_coercions 86/88 (97.7%), coerce_to_object_monkeypatch partially blocked by closure capture. Implemented: tryAutoBoxPrimitive, instanceOfCoercing, Object.addProperty built-in, non-object prototype handling, getActiveGlobal.
 - **Recent gains (previous session)**: FUNCTION_EDGE_CASES ALL PHASES DONE. function_as_function PASS (36/36). funky_function_calls PASS (56/56). g_override_this mechanism for primitive thisArg types.
 - **Recent gains (previous session)**: CALL_SEMANTICS_PLAN COMPLETE. call test PASS (63/63). actionCall rewrite: return value + early termination, frame label lookup, target path resolution, g_tag_skip_mode for DoAction-only execution.
@@ -115,7 +115,7 @@ Last updated: 2026-03-05
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
-| `instanceof_coercions` | 86/88 (97.7%) | 2 edge cases: super.prototype in getter, ASSetPropFlags 0x2000 mask |
+| `instanceof_coercions` | **88/88 PASS** ✅ | Fixed: ASSetPropFlags Function2Ptr (CallMethod path) + findPropertyRaw for instanceof version-flag bypass + SUPER GetMember prop_base search |
 | `date` | 6284/6335 (99.2%) | Unfixable edge cases (locale-dependent) |
 | `movieclip_getbounds` | 190/192 (99.0%) | Morph shape bounds interpolation rounding — 2 lines added to ACCEPTED_DIFFS |
 | `frame_size_translated_positive` | **21/21 PASS** ✅ | Fixed: FRAME_X_MIN_TWIPS offset (MOUSE_EVENTS_ADVANCED Phase 4) |
