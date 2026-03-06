@@ -800,8 +800,8 @@ def compile_native(test_dir, num_frames, build_dir):
         else:
             swf_file_size = test_swf.stat().st_size
         extra_defines.append(f"-DSWF_FILE_SIZE={swf_file_size}")
-    # Pass movie URL matching Ruffle's VFS format (file:///test_name/test.swf)
-    extra_defines.append(f'-DSWF_URL="file:///{test_dir.name}/test.swf"')
+    # Pass movie URL matching Ruffle's VFS format (file:///test.swf)
+    extra_defines.append('-DSWF_URL="file:///test.swf"')
     try:
         result = subprocess.run(
             [
