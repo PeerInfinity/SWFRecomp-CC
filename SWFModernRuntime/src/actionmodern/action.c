@@ -11764,6 +11764,7 @@ static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t*
 #ifdef NO_GRAPHICS
 static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc);
 static int getLetterSpacingTwips(MovieClip* mc);
+static void setDeviceFontModeForMC(MovieClip* mc);
 static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 	char* utf8_buf, u16* out_font_id, u16* out_font_height, s16* out_leading,
 	int* out_word_wrap, int* out_field_width_twips,
@@ -27273,6 +27274,7 @@ void actionSetMember(SWFAppContext* app_context)
 				int _hs_ww, _hs_fwt, _hs_lm, _hs_rm, _hs_ind;
 				size_t _hs_len = extractTextFieldParams(app_context, mc, _hs_utf8,
 					&_hs_fid, &_hs_fh, &_hs_ld, &_hs_ww, &_hs_fwt, &_hs_lm, &_hs_rm, &_hs_ind);
+				setDeviceFontModeForMC(mc);
 				int _hs_tw = ng_computeTextWidth(_hs_fid, _hs_fh, _hs_utf8, _hs_len,
 					0, 0, g_swf_version, 0, 0, 0, 0, getLetterSpacingTwips(mc)) / 20;
 				int _hs_vw = (int)mc->width - 4;
@@ -27931,11 +27933,13 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 			else if (align_prop->str_size == 5 && au[0] == 'r') align = 2;  // "right"
 		}
 		int ls_twips = getLetterSpacingTwips(mc);
+		setDeviceFontModeForMC(mc);
 		*out_result = (double)(ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
 		    left_margin_twips, right_margin_twips, indent_twips, align, ls_twips) / 20);
 	} else {
 		int ls_twips = getLetterSpacingTwips(mc);
+		setDeviceFontModeForMC(mc);
 		*out_result = (double)(ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
 		    left_margin_twips, right_margin_twips, indent_twips, ls_twips) / 20);
@@ -27954,6 +27958,20 @@ static int getLetterSpacingTwips(MovieClip* mc)
 			return (int)(ls * 20.0); // pixels to twips
 	}
 	return 0;
+}
+
+// Set device font mode based on text field's embedFonts property.
+// Device fonts (embedFonts=false) round per-glyph advances to pixel boundaries.
+static void setDeviceFontModeForMC(MovieClip* mc)
+{
+	extern void ng_setDeviceFontMode(int mode);
+	int embed = 0;
+	if (mc && mc->dynamic_props) {
+		ActionVar* ef = getProperty((ASObject*)mc->dynamic_props, "embedFonts", 10);
+		if (ef && ef->type == ACTION_STACK_VALUE_BOOLEAN && ef->data.numeric_value)
+			embed = 1;
+	}
+	ng_setDeviceFontMode(!embed);
 }
 
 // Extract font/text/wrap parameters from a textfield MC into provided vars.
@@ -28111,6 +28129,7 @@ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc)
 		}
 	}
 	int _as_ls = getLetterSpacingTwips(mc);
+	setDeviceFontModeForMC(mc);
 	int tw_twips = ng_computeTextWidth(_as_fid, _as_fh, _as_utf8, _as_len,
 		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, _as_align, _as_ls);
 	int th_twips = ng_computeTextHeight(_as_fid, _as_fh, _as_ld, _as_utf8, _as_len,
@@ -28174,6 +28193,7 @@ static __attribute__((noinline)) int computeScrollProperty(
 		&left_margin_twips, &right_margin_twips, &indent_twips);
 
 	int ls_twips = getLetterSpacingTwips(mc);
+	setDeviceFontModeForMC(mc);
 
 	if (is_maxhscroll) {
 		// maxhscroll = max(0, textWidth - visible_width_px)
@@ -28228,6 +28248,7 @@ static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc)
 		&word_wrap, &field_width_twips,
 		&left_margin_twips, &right_margin_twips, &indent_twips);
 
+	setDeviceFontModeForMC(mc);
 	int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
 		word_wrap, field_width_twips, g_swf_version,
 		left_margin_twips, right_margin_twips, indent_twips, getLetterSpacingTwips(mc));

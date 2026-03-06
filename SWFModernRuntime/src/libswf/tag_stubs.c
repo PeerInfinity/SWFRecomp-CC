@@ -589,6 +589,11 @@ static u16 ng_decode_utf8_char(const char* text, size_t text_len, size_t* pos)
 	return cp;
 }
 
+// Device font mode: when true, per-glyph advances are rounded to pixel boundaries.
+// Set by callers in action.c based on the text field's embedFonts property.
+static int ng_device_font_mode = 0;
+void ng_setDeviceFontMode(int mode) { ng_device_font_mode = mode; }
+
 // Round a twips value to the nearest pixel (20-twip boundary).
 static int ng_round_to_pixel(int twips) {
 	// round(twips / 20.0) * 20
@@ -619,6 +624,7 @@ static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
     const char* text, size_t start, size_t end, int letter_spacing_twips)
 {
 	int w = 0;
+	int ls_rounded = ng_device_font_mode ? ng_round_ls_to_pixel(letter_spacing_twips) : 0;
 	size_t i = start;
 	while (i < end) {
 		u16 cp = ng_decode_utf8_char(text, end, &i);
@@ -626,11 +632,21 @@ static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
 		int glyph_twips = 0;
 		if (adv >= 0) {
 			int raw = (int)((float)adv * (float)font_height / (float)em);
-			glyph_twips = raw + letter_spacing_twips;
-			if (glyph_twips <= 0 && letter_spacing_twips < 0)
-				glyph_twips = raw; // negative LS clamped per-glyph
-		} else if (letter_spacing_twips > 0) {
-			glyph_twips = letter_spacing_twips;
+			if (ng_device_font_mode) {
+				int unspaced = ng_round_to_pixel(raw);
+				if (ls_rounded != 0) {
+					int spaced = unspaced + ls_rounded;
+					glyph_twips = (spaced > 0) ? spaced : unspaced;
+				} else {
+					glyph_twips = unspaced;
+				}
+			} else {
+				glyph_twips = raw + letter_spacing_twips;
+				if (glyph_twips <= 0 && letter_spacing_twips < 0)
+					glyph_twips = raw;
+			}
+		} else if (ng_device_font_mode ? (ls_rounded > 0) : (letter_spacing_twips > 0)) {
+			glyph_twips = ng_device_font_mode ? ls_rounded : letter_spacing_twips;
 		}
 		w += glyph_twips;
 	}
@@ -767,6 +783,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 			int char_w = 0;
 			int last_fitting_pos = seg_start;
 			int last_fitting_w = 0;
+			int _wr_ls = ng_device_font_mode ? ng_round_ls_to_pixel(letter_spacing_twips) : 0;
 			while (char_pos < seg_end) {
 				size_t next_pos = char_pos;
 				u16 cp = ng_decode_utf8_char(text, seg_end, &next_pos);
@@ -774,10 +791,16 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 				int gw = 0;
 				if (adv >= 0) {
 					int raw = (int)((float)adv * (float)font_height / (float)em);
-					gw = raw + letter_spacing_twips;
-					if (gw <= 0 && letter_spacing_twips < 0) gw = raw;
-				} else if (letter_spacing_twips > 0) {
-					gw = letter_spacing_twips;
+					if (ng_device_font_mode) {
+						int unsp = ng_round_to_pixel(raw);
+						if (_wr_ls != 0) { int sp = unsp + _wr_ls; gw = (sp > 0) ? sp : unsp; }
+						else gw = unsp;
+					} else {
+						gw = raw + letter_spacing_twips;
+						if (gw <= 0 && letter_spacing_twips < 0) gw = raw;
+					}
+				} else if (ng_device_font_mode ? (_wr_ls > 0) : (letter_spacing_twips > 0)) {
+					gw = ng_device_font_mode ? _wr_ls : letter_spacing_twips;
 				}
 				if (char_w + gw > cur_avail && last_fitting_pos > seg_start)
 					break;
@@ -845,6 +868,7 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 		int max_width_twips = 0;
 		int cur_width_twips = 0;
 		int cur_trimmed_twips = 0; // width excluding trailing spaces
+		int _tw_ls_r = ng_device_font_mode ? ng_round_ls_to_pixel(letter_spacing_twips) : 0;
 		for (size_t i = 0; i < text_len; ) {
 			unsigned char c = (unsigned char)text[i];
 			if (c == '\r' || c == '\n') {
@@ -861,11 +885,21 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 			int glyph_twips = 0;
 			if (adv >= 0) {
 				int raw = (int)((float)adv * (float)font_height / (float)em);
-				glyph_twips = raw + letter_spacing_twips;
-				if (glyph_twips <= 0 && letter_spacing_twips < 0)
-					glyph_twips = raw; // negative LS clamped per-glyph
-			} else if (letter_spacing_twips > 0) {
-				glyph_twips = letter_spacing_twips;
+				if (ng_device_font_mode) {
+					int unspaced = ng_round_to_pixel(raw);
+					if (_tw_ls_r != 0) {
+						int spaced = unspaced + _tw_ls_r;
+						glyph_twips = (spaced > 0) ? spaced : unspaced;
+					} else {
+						glyph_twips = unspaced;
+					}
+				} else {
+					glyph_twips = raw + letter_spacing_twips;
+					if (glyph_twips <= 0 && letter_spacing_twips < 0)
+						glyph_twips = raw;
+				}
+			} else if (ng_device_font_mode ? (_tw_ls_r > 0) : (letter_spacing_twips > 0)) {
+				glyph_twips = ng_device_font_mode ? _tw_ls_r : letter_spacing_twips;
 			}
 			cur_width_twips += glyph_twips;
 			if (trim_trailing) {
