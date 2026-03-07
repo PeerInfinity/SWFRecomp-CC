@@ -203,8 +203,9 @@ void setVariableByName(const char* var_name, ActionVar* value)
 	// If inside a function scope, define on local scope (not global)
 	// This prevents DefineFunction parameter binding from leaking to root scope
 	extern bool setVariableOnLocalScope(const char* var_name, ActionVar* value);
-	if (setVariableOnLocalScope(var_name, value))
+	if (setVariableOnLocalScope(var_name, value)) {
 		return;
+	}
 
 	size_t key_size = strlen(var_name);
 	ActionVar* var = getVariable((char*)var_name, key_size);

@@ -42068,12 +42068,43 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else
 		{
 			// Check if user-defined method exists on dynamic_props
+			ASFunction* _mc_user_func = NULL;
 			if (mc != NULL && mc->dynamic_props != NULL) {
 				ActionVar* method_var = getPropertyWithPrototype((ASObject*)mc->dynamic_props, method_name, method_name_len);
 				if (method_var != NULL && method_var->type == ACTION_STACK_VALUE_FUNCTION) {
-					// Call user-defined function with this = mc
-					ASFunction* func = (ASFunction*) method_var->data.numeric_value;
-					if (func != NULL) {
+					_mc_user_func = (ASFunction*) method_var->data.numeric_value;
+				}
+			}
+			// Fallback: check variable scope (DefineFunction stores in function_registry
+			// and var_map, not on dynamic_props). This handles mc.method() where method
+			// was defined via DefineFunction on the MC's timeline.
+			if (_mc_user_func == NULL && mc != NULL) {
+				extern MovieClip root_movieclip;
+				if (mc == &root_movieclip) {
+					// Root MC: check var_map first (timeline variables)
+					extern hashmap* var_map;
+					if (var_map != NULL) {
+						ActionVar* _rv = NULL;
+						const char* _rv_key = method_name;
+						char _rv_folded[512];
+						u32 _rv_klen = method_name_len;
+						if (g_swf_version <= 6 && method_name_len < sizeof(_rv_folded)) {
+							for (u32 fi = 0; fi < method_name_len; fi++)
+								_rv_folded[fi] = (method_name[fi] >= 'A' && method_name[fi] <= 'Z') ? (method_name[fi] + 32) : method_name[fi];
+							_rv_folded[method_name_len] = '\0';
+							_rv_key = _rv_folded;
+						}
+						hashmap_get(var_map, _rv_key, _rv_klen, (uintptr_t*)&_rv);
+						if (_rv != NULL && _rv->type == ACTION_STACK_VALUE_FUNCTION)
+							_mc_user_func = (ASFunction*) _rv->data.numeric_value;
+					}
+				}
+				// Also check function registry (covers child MCs and root)
+				if (_mc_user_func == NULL)
+					_mc_user_func = lookupFunctionByName(method_name, method_name_len);
+			}
+			if (_mc_user_func != NULL) {
+					ASFunction* func = _mc_user_func;
 						// Create local scope and set this = mc
 						ASObject* mc_method_scope = allocObject(app_context, 4);
 						ActionVar this_var = {0};
@@ -42127,8 +42158,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							// Type 1: push args onto stack
 							for (u32 i = 0; i < num_args; i++)
 								pushVar(app_context, &args[i]);
-							for (u32 i = num_args; i < func->param_count; i++)
+							for (u32 i = num_args; i < func->param_count; i++) {
 								PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+							}
 							if (args != NULL) FREE(args);
 							result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 						} else if (func->advanced_func != NULL) {
@@ -42161,8 +42193,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 						pushVar(app_context, &result);
 						return;
-					}
-				}
 			}
 			// Unknown method on MovieClip — push undefined.
 			if (args != NULL) FREE(args);
