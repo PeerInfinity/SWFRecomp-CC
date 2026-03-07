@@ -750,6 +750,11 @@ void swfStart(SWFAppContext* app_context)
 		if (!actionHasVirtualHover())
 			ng_update_button_states(app_context);
 
+		// Goto catch-up + deferred script processing.
+		// An outer loop retries because deferred scripts (from ng_executeGotoCatchUp)
+		// may trigger new gotos (via ng_executeGotoTagsOnly) that need catch-up.
+		for (;;)
+		{
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
 		// a goto, process intermediate frame tags inline to match Flash's behavior.
 		// Flash processes PlaceObject/RemoveObject for intermediate frames within
@@ -867,6 +872,12 @@ void swfStart(SWFAppContext* app_context)
 				ng_run_deferred_sprite_init_on_or_after(app_context, target);
 			}
 		}
+
+		// If deferred scripts triggered a new goto (via ng_executeGotoTagsOnly),
+		// retry the catch-up loop to process it within this tick.
+		if (goto_from_action && manual_next_frame) continue;
+		break;
+		} // end outer for(;;) retry loop
 
 		// Process timers after frame actions + deferred scripts
 		{
