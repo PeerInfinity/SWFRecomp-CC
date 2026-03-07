@@ -1,28 +1,39 @@
 # Ruffle Test Results Diff
 
-**Previous:** `3496c5eab728` (2026-03-07T01:00:10.615031+00:00)
-**Current:** `4d467b25b6d6` (2026-03-07T02:01:55.866369+00:00)
+**Previous:** `4d467b25b6d6` (2026-03-07T02:01:55.866369+00:00)
+**Current:** `1e2c9890659a` (2026-03-07T02:59:15.043296+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 491 | 492 | +1 |
+| Passing | 492 | 487 | -5 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 79.3% | 79.5% | +0.2% |
-| Mismatched lines | 19770 | 19742 | -28 |
-|   Decreased | | | -28 |
+| Pass rate | 79.5% | 78.7% | -0.8% |
+| Mismatched lines | 19742 | 19873 | +131 |
+|   Decreased | | | -37 |
+|   Increased | | | +168 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `custom_clip_methods` | output_mismatch | 0/4 | 4/4 |
+| `default_names` | output_mismatch | 15/52 | 52/52 |
 
-## Line Count Changed (3)
+## Newly Failing (6)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `clone_sprite_types` | output_mismatch | 24/24 | 15/24 |
+| `named_shapes` | output_mismatch | 14/14 | 10/14 |
+| `native_objects_swf7` | output_mismatch | 84/84 | 83/84 |
+| `native_objects_swf8` | output_mismatch | 84/84 | 83/84 |
+| `place_and_lookup` | output_mismatch | 30/30 | 6/30 |
+| `string_paths_hidden` | output_mismatch | 54/54 | 36/54 |
+
+## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `swf5_to_6_cross_call` | output_mismatch | 11/29 | 23/29 | -12 |
-| `swf6_to_5_cross_call` | output_mismatch | 7/29 | 16/29 | -9 |
-| `register_class_swf6` | output_mismatch | 1/37 | 4/37 | -3 |
+| `native_objects_swf6` | output_mismatch | 83/84 | 82/84 | +1 |
+| `register_and_init_order` | output_mismatch | 146/231 | 36/231 | +110 |
