@@ -21625,40 +21625,47 @@ void actionGetVariable(SWFAppContext* app_context)
 		MovieClip* ctx_mc = getCurrentContext();
 		if (ctx_mc != NULL && ctx_mc->dynamic_props != NULL)
 		{
-			// Use findPropertyStructWithPrototype to handle addProperty getters
-			ASProperty* ctx_prop_struct = findPropertyStructWithPrototype(
-				(ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
-			if (ctx_prop_struct != NULL)
+			// Check own properties — use findPropertyRaw to handle addProperty getters
+			ASProperty* own_prop = findPropertyRaw((ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
+			if (own_prop != NULL)
 			{
-				if (ctx_prop_struct->getter != NULL)
+				if (own_prop->getter != NULL)
 				{
 					ActionVar result = invokePropertyGetter(app_context,
-						(ASFunction*)ctx_prop_struct->getter,
+						(ASFunction*)own_prop->getter,
 						(void*)ctx_mc->dynamic_props);
 					pushVar(app_context, &result);
 					return;
 				}
-				pushVar(app_context, &ctx_prop_struct->value);
+				pushVar(app_context, &own_prop->value);
+				return;
+			}
+			// Check prototype chain for addProperty getters only (not plain values,
+			// which would shadow child MCs and special vars)
+			ASProperty* ctx_prop_struct = findPropertyStructWithPrototype(
+				(ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
+			if (ctx_prop_struct != NULL && ctx_prop_struct->getter != NULL)
+			{
+				ActionVar result = invokePropertyGetter(app_context,
+					(ASFunction*)ctx_prop_struct->getter,
+					(void*)ctx_mc->dynamic_props);
+				pushVar(app_context, &result);
 				return;
 			}
 		}
-		// Check MovieClip.prototype for addProperty getters (e.g., prop3 on prototype)
+		// Check MovieClip.prototype for addProperty getters only (not plain values,
+		// which would shadow child MCs, special vars like _global/_parent/_root)
 		if (ctx_mc != NULL && g_movieclip_constructor_init &&
 		    g_movieclip_constructor.prototype_obj != NULL)
 		{
 			ASProperty* proto_prop = findPropertyStructWithPrototype(
 				g_movieclip_constructor.prototype_obj, var_name, var_name_len);
-			if (proto_prop != NULL)
+			if (proto_prop != NULL && proto_prop->getter != NULL)
 			{
-				if (proto_prop->getter != NULL)
-				{
-					ActionVar result = invokePropertyGetter(app_context,
-						(ASFunction*)proto_prop->getter,
-						(void*)g_movieclip_constructor.prototype_obj);
-					pushVar(app_context, &result);
-					return;
-				}
-				pushVar(app_context, &proto_prop->value);
+				ActionVar result = invokePropertyGetter(app_context,
+					(ASFunction*)proto_prop->getter,
+					(void*)g_movieclip_constructor.prototype_obj);
+				pushVar(app_context, &result);
 				return;
 			}
 		}
@@ -23203,27 +23210,28 @@ void actionDefineLocal(SWFAppContext* app_context)
 
 		if (scope_is_with[i])
 		{
-			// With scope: check for own property OR addProperty on prototype chain
-			ASProperty* prop_struct = findPropertyStructWithPrototype(scope_chain[i], var_name, var_name_len);
-			if (prop_struct != NULL)
+			// With scope: only set here if the object directly owns the property
+			ActionVar* existing = getProperty(scope_chain[i], var_name, var_name_len);
+			if (existing != NULL)
 			{
-				if (prop_struct->setter != NULL)
-				{
-					// Virtual property (addProperty) — invoke setter
-					ActionVar value_var;
-					peekVar(app_context, &value_var);
-					POP_2();
-					invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, (void*)scope_chain[i], &value_var);
-					return;
-				}
-				// Regular property — set directly
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
 				POP_2();
 				return;
 			}
-			// Property not on with object or its prototype — continue to next scope
+			// Check prototype chain for addProperty setters only (not plain prototype
+			// properties, which should NOT cause DefineLocal to store on the with-object)
+			ASProperty* prop_struct = findPropertyStructWithPrototype(scope_chain[i], var_name, var_name_len);
+			if (prop_struct != NULL && prop_struct->setter != NULL)
+			{
+				ActionVar value_var;
+				peekVar(app_context, &value_var);
+				POP_2();
+				invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, (void*)scope_chain[i], &value_var);
+				return;
+			}
+			// Property not directly on with object — continue to next scope
 		}
 		else
 		{
