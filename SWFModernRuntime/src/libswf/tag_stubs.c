@@ -1620,13 +1620,7 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 // Sprite control helpers (use g_current_sprite_obj set by exec_sprite_frame)
 // ---------------------------------------------------------------------------
 
-int ng_isInsideSprite(void) {
-	// Check the DL nesting counter (set by ng_enterSpriteDLContext in
-	// process_sprite_init_at_depth), NOT g_current_sprite_obj which gets
-	// cleared by actionCallFunction's SWF6+ base_clip context switch.
-	extern int ng_inSpriteDLContext(void);
-	return ng_inSpriteDLContext();
-}
+int ng_isInsideSprite(void) { return g_current_sprite_obj != NULL; }
 
 void ng_stopCurrentSprite(void)
 {

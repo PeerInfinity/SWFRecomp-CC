@@ -496,7 +496,7 @@ namespace SWFRecomp
 			}
 			else
 			{
-				context.tag_main << "\t" << "if (!manual_next_frame && is_playing)" << endl
+				context.tag_main << "\t" << "if (!manual_next_frame && is_playing && !g_tag_skip_mode)" << endl
 								 << "\t" << "{" << endl
 								 << "\t\t" << "next_frame = 0;" << endl
 								 << "\t\t" << "manual_next_frame = 1;" << endl
@@ -733,7 +733,7 @@ namespace SWFRecomp
 
 				else
 				{
-					context.tag_main << "\t" << "if (!manual_next_frame && is_playing)" << endl
+					context.tag_main << "\t" << "if (!manual_next_frame && is_playing && !g_tag_skip_mode)" << endl
 									 << "\t" << "{" << endl
 									 << "\t\t" << "next_frame = 0;" << endl
 									 << "\t\t" << "manual_next_frame = 1;" << endl

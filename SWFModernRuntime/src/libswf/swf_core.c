@@ -76,7 +76,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 {
 	if (!goto_from_action || !manual_next_frame) return;
 
-	// If called from inside a sprite DL context, swap to root DL
+	// If called from inside a sprite init context, swap to root DL
 	// so that root frame functions (PlaceObject2, RemoveObject2, etc.)
 	// operate on the correct display list.
 	DisplayObject* saved_sprite_dl = NULL;
@@ -163,6 +163,73 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	}
 	g_deferred_goto_script = 1;
 	g_deferred_goto_target = target;
+}
+
+// Execute goto tags-only: processes intermediate frame tags (PlaceObject,
+// RemoveObject, etc.) immediately so that avm1_removed gets set synchronously,
+// but does NOT queue deferred scripts or modify current_frame.
+// The actual script execution and frame advancement is left to the main loop
+// via goto_from_action / manual_next_frame / g_deferred_root_goto.
+// Used when a root goto happens from a non-sprite-init context (regular frame
+// script calling _root.nextFrame(), etc.) and we need synchronous removal but
+// must avoid double-executing the target frame's script.
+void ng_executeGotoTagsOnly(SWFAppContext* app_context)
+{
+	if (!goto_from_action || !manual_next_frame) return;
+
+	// Advance placement generation
+	extern size_t g_place_gen;
+	g_place_gen++;
+
+	frame_func* funcs = g_frame_funcs;
+	size_t original_frame = current_frame;
+	size_t target = next_frame;
+
+	ng_display_clear_after(app_context, target);
+
+	int saved_tag_skip = g_tag_skip_mode;
+	extern int g_defer_sprite_init;
+	int saved_defer_sprite = g_defer_sprite_init;
+	g_tag_skip_mode = 0;
+	g_defer_sprite_init = 1;
+	catch_up_mode = 1;
+	if (target <= original_frame)
+	{
+#ifdef NO_GRAPHICS
+		{
+			extern void actionRewindCleanup(SWFAppContext* app_context);
+			actionRewindCleanup(app_context);
+		}
+#endif
+		catch_up_backward = 1;
+		catch_up_target = target;
+		for (size_t f = 0; f <= target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+		catch_up_backward = 0;
+	}
+	else
+	{
+		for (size_t f = original_frame + 1; f <= target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+	}
+	catch_up_mode = 0;
+	g_tag_skip_mode = saved_tag_skip;
+	g_defer_sprite_init = saved_defer_sprite;
+
+	// Restore current_frame — the main loop manages frame advancement.
+	// Leave goto_from_action and manual_next_frame set so the main loop's
+	// catch-up path processes the target frame (scripts + sprite init).
+	current_frame = original_frame;
+
+	// Set deferred root goto so the main loop skips re-running the current
+	// frame function and goes straight to goto catch-up.
+	g_deferred_root_goto = 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -605,7 +672,6 @@ void swfStart(SWFAppContext* app_context)
 				// skip running funcs[current_frame] — go straight to goto catch-up.
 				if (g_deferred_root_goto)
 				{
-					// Don't re-run the current frame; the goto catch-up below will handle it
 				}
 				else if (funcs[current_frame])
 				{
@@ -751,11 +817,6 @@ void swfStart(SWFAppContext* app_context)
 			}
 			current_frame = target;
 
-			// Apply deferred play (from gotoAndPlay targeting root from inside a sprite)
-			if (g_deferred_goto_play) {
-				is_playing = 1;
-				g_deferred_goto_play = 0;
-			}
 			g_deferred_root_goto = 0;
 
 			// After catch-up, the goto's advance is consumed; fall through
@@ -805,14 +866,6 @@ void swfStart(SWFAppContext* app_context)
 				// Phase 3: Init sprites placed on the target frame (after target DoAction)
 				ng_run_deferred_sprite_init_on_or_after(app_context, target);
 			}
-		}
-
-		// Apply deferred play from gotoAndPlay targeting root from inside a sprite.
-		// This must happen AFTER the deferred goto queue is fully processed, so that
-		// the calling frame's DoAction (e.g. stop()) doesn't override the play.
-		if (g_deferred_goto_play) {
-			is_playing = 1;
-			g_deferred_goto_play = 0;
 		}
 
 		// Process timers after frame actions + deferred scripts
