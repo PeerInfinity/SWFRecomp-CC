@@ -4,7 +4,7 @@ Last updated: 2026-03-06
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **~484/619 (~78%)** filtered (pending CI confirmation). 22 plans in `blocked/`, 2 in `incomplete/`.
+Current pass rate: **417/477 (87.4%)** filtered, **471/619 (76.1%)** total (CI run on e2ad847e). 29 plans in `blocked/`, 42 in `complete/`.
 
 ---
 
@@ -42,13 +42,13 @@ Our two-group model (`g_global_legacy` for SWF≤6, `g_global_modern` for SWF7+)
 
 ## ~~Blocker 3: MTASC Class / Recompiler Infrastructure~~ MOSTLY RESOLVED
 
-**Impact**: 1 test remaining (mcl_loadclip_replace_root)
+**Impact**: 1 test remaining (mcl_loadclip_replace_root), plus 1 regression
 
 All MTASC-specific issues have been resolved except `mcl_loadclip_replace_root` which needs the `_root.main()` class entry point pattern. This is now a sub-issue of Blocker 1 (LoadMovie).
 
 | Gap | Detail | Status |
 |-----|--------|--------|
-| ~~Class constructor dispatch~~ | interface_implements_op 47/47 PASS | **RESOLVED** |
+| ~~Class constructor dispatch~~ | interface_implements_op 46/47 (was 47/47, regressed — lazy ImplementsOp via valueOf callback) | **REGRESSION** — line 43 `obj instanceof LazyInterfaceA: false` |
 | `_root.main()` entry point | MTASC convention for class entry | Blocked by LoadMovie |
 | ~~Nested function recompilation~~ | object_resolve 39/39 PASS | **RESOLVED** |
 
@@ -222,17 +222,19 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 ## Actionable vs Architectural
 
 ### Actionable (could be tackled with moderate effort)
-1. **Font metrics accuracy** — Incremental improvements to word wrap and line height
-2. **Failed load state values** — Return `-1` for specific MC properties on failed load
-3. **Sequential MCL dispatch** — Timer-based load event spacing
-4. **condenseWhite SWF8 whitespace** — Preserve trailing space after tags, fix inter-tag spacing
-5. **Global stubs** — Add 20 missing globals (tedious but straightforward)
+1. **_lockroot _root resolution** — `_root` getter ignores `lockroot` flag. ~10 lines of code. See LOCKROOT_PLAN.
+2. **Primitive coercion addProperty** — `convertFloat`/`convertString` don't invoke addProperty getters for valueOf/toString. See PRIMITIVE_COERCION_ADDPROPERTY_PLAN.
+3. **Default instance naming** — Auto-naming counter off by 1-2 for timeline children. See DEFAULT_NAMES_PLAN.
+4. **Script halting on clip removal** — `removeMovieClip()` should halt the current script. See SCRIPT_HALTING_PLAN.
+5. **Font metrics accuracy** — Incremental improvements to word wrap and line height
+6. **Failed load state values** — Return `-1` for specific MC properties on failed load
+7. **Global stubs** — Add 20 missing globals (tedious but straightforward)
+8. **interface_implements_op regression** — Lazy ImplementsOp via valueOf callback broke in b1b89de3
 
 ### Architectural (requires significant design work)
 1. **Per-movie `_global` isolation** — Move from two-group to per-movie globals
 2. **SWF6 HTML paragraph model** — Version-specific HTML parser path
 3. **call() early termination** — Script execution abort mechanism
-4. ~~**condenseWhite sentinel collision**~~ — **RESOLVED** (replaced `\x01`/`\x02` with `\xFE`/`\xFF`)
 
 ### Not Feasible
 1. **Heap-allocated activation scopes** — Would require rewriting the entire variable storage model

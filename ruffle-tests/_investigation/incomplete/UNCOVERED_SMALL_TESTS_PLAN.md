@@ -21,7 +21,7 @@ This document catalogs 16 failing tests that don't fit into any existing plan's 
 | gettextextent | 56 | **PASS** ✅ | TextFormat.getTextExtent() implemented | DONE |
 | define_local_with_paths | 55 | ~51/55 (93%) | Slash-path `var /:abc` DefineLocal mostly working; 3 edge cases remain | ~51 lines gained |
 | sandbox_type_remote | 3 | 1/3 | Lines 2-3 need loadMovie infra (multi-SWF) | BLOCKED |
-| device_font_spacing | 91 | ~46/91 (51%) | Text metrics accuracy with device fonts + letter spacing | TEXTFIELD blocker |
+| device_font_spacing | 91 | **91/91 PASS** ✅ | Fixed: conditional pixel rounding based on embedFonts | DONE |
 
 #### define_local_with_paths (55 lines)
 
@@ -62,11 +62,9 @@ Root MC `getBytesLoaded()` and `getBytesTotal()` return `undefined` instead of t
 
 **Related to**: TEXTFIELD_PLAN (shares font metrics infrastructure)
 
-#### device_font_spacing (91 lines)
+#### device_font_spacing (91 lines) — RESOLVED
 
-Tests text formatting with device fonts and letter spacing. Currently ~51% match — remaining failures are font metrics accuracy issues (letter spacing computation, word wrap with spacing).
-
-**Related to**: TEXTFIELD_PLAN Phase 6 (text layout formatting). Blocked by the same font metrics accuracy issues.
+~~Tests text formatting with device fonts and letter spacing.~~ **91/91 PASS.** Fixed by making pixel rounding conditional on `embedFonts` property (commit 0f010c5b).
 
 ---
 
@@ -75,7 +73,7 @@ Tests text formatting with device fonts and letter spacing. Currently ~51% match
 | Test | Lines | Current | Blocker |
 |------|-------|---------|---------|
 | resolve_different_root | 2 | 0/2 (segfault) | __resolve on loaded child MC; segfault from var_map access in loaded context |
-| root_global_parent | 6 | 2/6 | _root._parent chain with loaded movies |
+| root_global_parent | 6 | **6/6 PASS** ✅ | Fixed: _global as MOVIECLIP builtin in GetMember |
 | issue_2084 | 16 | 0/16 | onLoad + attachMovie positioning in child clips |
 | issue_2030 | 4 | 0/4 | MC _width/_height from shape content (needs graphics bounds) |
 
@@ -121,12 +119,40 @@ Tests `getURL()` with POST parameters and traces the request. Needs network requ
 
 ---
 
+### Group D: Small Fixes (potentially quick wins)
+
+| Test | Lines | Current | Issue | Effort |
+|------|-------|---------|-------|--------|
+| movieclip_setmask | 14 | 12/14 (86%) | Lines 4, 11: setMask returns false instead of true for certain arg types | Small |
+| selection_handlers | 27 | 21/27 (78%) | Button rollOver/rollOut not firing second time during focus changes | Medium |
+| define_local | 27 | 27/27 locally | PASS locally, 2/27 in CI — likely stale CI build | Verify |
+| edittext_default_format_empty | 100 | 100/100 locally | PASS locally, 97/100 in CI — likely stale CI build | Verify |
+
+#### movieclip_setmask (14 lines)
+
+`setMask()` returns `true` when given a valid mask MC or null (to clear mask), `false` for invalid args. Lines 4 and 11 return `false` instead of `true`. Need to check which specific argument type/path is failing — likely a string-to-MC path resolution edge case (e.g., `setMask("_root.mc")` where the MC exists but path resolution fails).
+
+**Fix**: Debug lines 4 and 11 of the test to see what arguments produce the wrong return value. Likely a path resolution or type coercion issue in the setMask handler.
+
+#### selection_handlers (27 lines)
+
+Focus-change rollOver/rollOut dispatch is incomplete. Lines 1-21 pass (Selection.setFocus, onSetFocus, onKillFocus, first pair of button rollOver/rollOut). Lines 22-27 fail: button's second rollOver/rollOut pair is missing, and clip rollOver/rollOut appears in wrong position.
+
+**Root cause**: The deferred roll event queue may not be dispatching events for buttons on the second cycle, or the roll state machine isn't tracking button hover state correctly across focus changes.
+
+**Related to**: MOUSE_EVENTS_ADVANCED_PLAN (roll dispatch). Fixing this requires understanding the roll dispatch ordering during programmatic focus changes.
+
+---
+
 ### Priority Summary
 
 | Priority | Test | Status | Lines Gained |
 |----------|------|--------|-------------|
-| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent | PASS | 64 |
+| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent, device_font_spacing | PASS | 155 |
 | **Mostly done** | define_local_with_paths | 51/55 (3 edge cases blocked) | 51 |
+| **Quick win** | movieclip_setmask | 12/14 (2 lines off) | 2 |
+| **CI verify** | define_local, edittext_default_format_empty | PASS locally | 0 (need CI run) |
+| **Medium** | selection_handlers | 21/27 (roll dispatch) | 6 |
 | **Blocked (loadMovie)** | sandbox_type_remote, resolve_different_root, root_global_parent, issue_2030, issue_2084 | blocked by loadMovie | 0 |
 | **Investigate** | string_paths_timer (segfault) | ? | ? |
-| **Low priority** | localconnection, geturl, string_paths_keyevents, device_font_spacing, displacementmapfilter_mappoint_throw_error | complex/blocked | 0 |
+| **Low priority** | localconnection, geturl, string_paths_keyevents, displacementmapfilter_mappoint_throw_error | complex/blocked | 0 |
