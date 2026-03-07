@@ -21619,24 +21619,49 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	// Check current MovieClip's dynamic_props for properties set via SetMember
 	// (e.g., _root.obj_1 = {...} makes obj_1 accessible via GetVariable)
-	// Also checks root_movieclip.dynamic_props as fallback for root-level scripts
+	// Also handles addProperty getters on the MC and MovieClip.prototype.
 	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
 	{
 		MovieClip* ctx_mc = getCurrentContext();
 		if (ctx_mc != NULL && ctx_mc->dynamic_props != NULL)
 		{
-			ActionVar* ctx_prop = getProperty((ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
-			if (ctx_prop != NULL)
+			// Use findPropertyStructWithPrototype to handle addProperty getters
+			ASProperty* ctx_prop_struct = findPropertyStructWithPrototype(
+				(ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
+			if (ctx_prop_struct != NULL)
 			{
-				PUSH_VAR(ctx_prop);
+				if (ctx_prop_struct->getter != NULL)
+				{
+					ActionVar result = invokePropertyGetter(app_context,
+						(ASFunction*)ctx_prop_struct->getter,
+						(void*)ctx_mc->dynamic_props);
+					pushVar(app_context, &result);
+					return;
+				}
+				pushVar(app_context, &ctx_prop_struct->value);
 				return;
 			}
 		}
-		// Note: Do NOT check root_movieclip.dynamic_props here for non-root contexts.
-		// In Flash, GetVariable in a SetTarget/child context resolves against the
-		// target clip's scope, NOT the root timeline. Checking root dp would leak
-		// root-level properties (like child MCs created by createEmptyMovieClip)
-		// into child scope, causing case-insensitive collisions (SWF6).
+		// Check MovieClip.prototype for addProperty getters (e.g., prop3 on prototype)
+		if (ctx_mc != NULL && g_movieclip_constructor_init &&
+		    g_movieclip_constructor.prototype_obj != NULL)
+		{
+			ASProperty* proto_prop = findPropertyStructWithPrototype(
+				g_movieclip_constructor.prototype_obj, var_name, var_name_len);
+			if (proto_prop != NULL)
+			{
+				if (proto_prop->getter != NULL)
+				{
+					ActionVar result = invokePropertyGetter(app_context,
+						(ASFunction*)proto_prop->getter,
+						(void*)g_movieclip_constructor.prototype_obj);
+					pushVar(app_context, &result);
+					return;
+				}
+				pushVar(app_context, &proto_prop->value);
+				return;
+			}
+		}
 	}
 
 check_special_vars:
@@ -23167,7 +23192,8 @@ void actionDefineLocal(SWFAppContext* app_context)
 	}
 
 	// DefineLocal: walk scope chain from innermost to outermost.
-	// For 'with' scopes: if the object DIRECTLY owns the property, set it there.
+	// For 'with' scopes: if the object owns the property (including addProperty on prototype),
+	//   set it there (invoking addProperty setters).
 	// For function scopes: always set there (create if needed).
 	// If no scope found, fall back to global.
 
@@ -23177,17 +23203,27 @@ void actionDefineLocal(SWFAppContext* app_context)
 
 		if (scope_is_with[i])
 		{
-			// With scope: only set here if the object directly owns the property
-			ActionVar* existing = getProperty(scope_chain[i], var_name, var_name_len);
-			if (existing != NULL)
+			// With scope: check for own property OR addProperty on prototype chain
+			ASProperty* prop_struct = findPropertyStructWithPrototype(scope_chain[i], var_name, var_name_len);
+			if (prop_struct != NULL)
 			{
+				if (prop_struct->setter != NULL)
+				{
+					// Virtual property (addProperty) — invoke setter
+					ActionVar value_var;
+					peekVar(app_context, &value_var);
+					POP_2();
+					invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, (void*)scope_chain[i], &value_var);
+					return;
+				}
+				// Regular property — set directly
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
 				POP_2();
 				return;
 			}
-			// Property not directly on with object — continue to next scope
+			// Property not on with object or its prototype — continue to next scope
 		}
 		else
 		{
@@ -23215,7 +23251,42 @@ void actionDefineLocal(SWFAppContext* app_context)
 		return;
 	}
 
-	// Root MC: fall back to global variable table
+	// Root MC: check for addProperty setters on root MC before falling back to var_array.
+	// In Flash, timeline-level DefineLocal stores on `this` (the clip), so addProperty
+	// setters should be triggered. If a setter is found, invoke it and skip var_array.
+	{
+		MovieClip* ctx_mc = getCurrentContext();
+		if (ctx_mc != NULL) {
+			// Check own dynamic_props for addProperty setter
+			if (ctx_mc->dynamic_props != NULL) {
+				ASProperty* prop_struct = findPropertyStructWithPrototype(
+					(ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
+				if (prop_struct != NULL && prop_struct->setter != NULL) {
+					ActionVar value_var;
+					peekVar(app_context, &value_var);
+					POP_2();
+					invokePropertySetter(app_context, (ASFunction*)prop_struct->setter,
+						(void*)ctx_mc->dynamic_props, &value_var);
+					return;
+				}
+			}
+			// Check MovieClip.prototype for addProperty setter (e.g., prop3 on prototype)
+			if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+				ASProperty* proto_prop = findPropertyStructWithPrototype(
+					g_movieclip_constructor.prototype_obj, var_name, var_name_len);
+				if (proto_prop != NULL && proto_prop->setter != NULL) {
+					ActionVar value_var;
+					peekVar(app_context, &value_var);
+					POP_2();
+					invokePropertySetter(app_context, (ASFunction*)proto_prop->setter,
+						(void*)g_movieclip_constructor.prototype_obj, &value_var);
+					return;
+				}
+			}
+		}
+	}
+
+	// Fall back to global variable table
 	ActionVar* var;
 	if (string_id != 0)
 	{
@@ -23376,7 +23447,8 @@ void actionDeclareLocal(SWFAppContext* app_context)
 	}
 
 	// DeclareLocal: same logic as DefineLocal but with undefined value.
-	// For with scopes: set if object directly owns property.
+	// For with scopes: if property exists (own or prototype), no-op (keep value).
+	//   If not found anywhere, create as undefined on the with object.
 	// For function scopes: always set.
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
@@ -23384,17 +23456,30 @@ void actionDeclareLocal(SWFAppContext* app_context)
 
 		if (scope_is_with[i])
 		{
+			// Check own property first
 			ActionVar* existing = getProperty(scope_chain[i], var_name, var_name_len);
 			if (existing != NULL)
 			{
-				ActionVar undefined_var;
-				undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
-				undefined_var.str_size = 0;
-				undefined_var.data.numeric_value = 0;
-				setProperty(app_context, scope_chain[i], var_name, var_name_len, &undefined_var);
+				// Already exists as own property — no-op
 				POP();
 				return;
 			}
+			// Check prototype chain
+			ASProperty* proto_prop = findPropertyStructWithPrototype(scope_chain[i], var_name, var_name_len);
+			if (proto_prop != NULL)
+			{
+				// Exists on prototype — no-op (preserve value)
+				POP();
+				return;
+			}
+			// Not found anywhere — create as undefined on the with object
+			ActionVar undefined_var;
+			undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
+			undefined_var.str_size = 0;
+			undefined_var.data.numeric_value = 0;
+			setProperty(app_context, scope_chain[i], var_name, var_name_len, &undefined_var);
+			POP();
+			return;
 		}
 		else
 		{
@@ -23408,7 +23493,56 @@ void actionDeclareLocal(SWFAppContext* app_context)
 		}
 	}
 
-	// Not in a function — Flash silently ignores DeclareLocal outside functions
+	// Not in a function — at timeline level, DeclareLocal checks if property
+	// already exists on `this` (the clip) or its prototype chain. If it does,
+	// no-op. If not, create it as an own property so hasOwnProperty returns true.
+	{
+		MovieClip* ctx_mc = getCurrentContext();
+		if (ctx_mc != NULL) {
+			// Check var_array/var_map for existing variable
+			ActionVar* existing_var = NULL;
+			if (string_id != 0)
+				existing_var = getVariableById(string_id);
+			if (existing_var == NULL || (existing_var->type == ACTION_STACK_VALUE_STRING &&
+			    existing_var->str_size == 0 && existing_var->data.string_data.heap_ptr == NULL))
+				existing_var = getVariable(var_name, var_name_len);
+			if (existing_var != NULL && !(existing_var->type == ACTION_STACK_VALUE_STRING &&
+			    existing_var->str_size == 0 && existing_var->data.string_data.heap_ptr == NULL)) {
+				POP();
+				return;  // Already exists in var_array — no-op
+			}
+
+			// Check dynamic_props (own + prototype chain)
+			if (ctx_mc->dynamic_props != NULL) {
+				ASProperty* prop = findPropertyStructWithPrototype(
+					(ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
+				if (prop != NULL) {
+					POP();
+					return;  // Already exists on MC — no-op
+				}
+			}
+
+			// Check MovieClip.prototype
+			if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+				ASProperty* proto_prop = findPropertyStructWithPrototype(
+					g_movieclip_constructor.prototype_obj, var_name, var_name_len);
+				if (proto_prop != NULL) {
+					POP();
+					return;  // Already exists on MovieClip.prototype — no-op
+				}
+			}
+
+			// Not found — create as own property on MC's dynamic_props
+			if (ctx_mc->dynamic_props == NULL)
+				ctx_mc->dynamic_props = (void*)allocObject(app_context, 8);
+			ActionVar undefined_var = {0};
+			undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
+			setProperty(app_context, (ASObject*)ctx_mc->dynamic_props,
+				var_name, var_name_len, &undefined_var);
+			POP();
+			return;
+		}
+	}
 
 	// Pop the name
 	POP();
@@ -41574,6 +41708,50 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 #endif
 			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "setMask", 7) == 0)
+		{
+			// setMask(mask) — set a display object as this clip's mask
+			// No args → undefined. null/undefined arg → remove mask, return true.
+			// Valid MC arg → set mask, return true. Invalid arg → return false.
+			if (num_args == 0) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			ActionVar mask_arg = args[0];
+			if (args != NULL) FREE(args);
+			if (mask_arg.type == ACTION_STACK_VALUE_NULL || mask_arg.type == ACTION_STACK_VALUE_UNDEFINED) {
+				// Remove mask — return true
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, 1);
+				return;
+			}
+			// Try to resolve the mask target as a display object
+			MovieClip* mask_mc = NULL;
+			if (mask_arg.type == ACTION_STACK_VALUE_MOVIECLIP) {
+				mask_mc = (MovieClip*) mask_arg.data.numeric_value;
+			} else {
+				// Convert arg to string and try to resolve as MC path
+				char _sm_path[256];
+				_sm_path[0] = '\0';
+				if (mask_arg.type == ACTION_STACK_VALUE_STRING) {
+					u16_to_utf8((const uint16_t*)varGetU16Ptr(&mask_arg),
+						mask_arg.str_size, _sm_path, sizeof(_sm_path));
+				} else if (mask_arg.type == ACTION_STACK_VALUE_F64 || mask_arg.type == ACTION_STACK_VALUE_F32) {
+					// Number — convert to string for path lookup
+					double dv = varToDoubleSimple(&mask_arg);
+					snprintf(_sm_path, sizeof(_sm_path), "%g", dv);
+				}
+				if (_sm_path[0]) {
+					// Convert colon-path (_level0:name) to dot-path
+					for (char* p = _sm_path; *p; p++) if (*p == ':') *p = '.';
+					mask_mc = getMovieClipByTarget(_sm_path);
+					if (mask_mc == NULL)
+						mask_mc = getMovieClipByRelativeName(_sm_path);
+				}
+			}
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, (mask_mc != NULL) ? 1 : 0);
 			return;
 		}
 		else if (method_name_len == 15 && strncmp(method_name, "removeMovieClip", 15) == 0)
