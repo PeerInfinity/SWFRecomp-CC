@@ -34547,7 +34547,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 #ifdef NO_GRAPHICS
 		if (num_args >= 2) {
 			extern MovieClip root_movieclip;
-			MovieClip* mc = &root_movieclip;
+			MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
 			char _cemc_name_buf[512];
 			const char* inst_name = "";
 			if (args[0].type == ACTION_STACK_VALUE_STRING) {
@@ -40740,27 +40740,189 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 15 && strncmp(method_name, "getTextSnapshot", 15) == 0)
 		{
-			// Return a TextSnapshot object capturing text from this MC's display list
+			// Flash semantics: getTextSnapshot() invokes _global.TextSnapshot as
+			// a constructor with the MovieClip as the first argument.  If the user
+			// has overridden _global.TextSnapshot, their constructor is called.
 			if (args != NULL) FREE(args);
-			ASObject* ts = allocObject(app_context, 8);
-			retainObject(ts);
-			ts->native_type = NATIVE_TEXTSNAPSHOT;
-			textSnapshotCapture(app_context, ts, mc);
-			// Set __proto__ to TextSnapshot.prototype
+			ensureGlobalInit(app_context);
+
+			// Look up _global.TextSnapshot
 			PUSH_STR("TextSnapshot", 12);
 			actionGetVariable(app_context);
-			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
-				ASFunction* ts_ctor = (ASFunction*)STACK_TOP_VALUE;
-				if (ts_ctor->prototype_obj) {
+
+			ASFunction* ts_ctor = NULL;
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+				ts_ctor = (ASFunction*)STACK_TOP_VALUE;
+			POP();
+
+			int has_body = ts_ctor != NULL &&
+				((ts_ctor->function_type == 1 && ts_ctor->simple_func != NULL) ||
+				 (ts_ctor->function_type == 2 && ts_ctor->advanced_func != NULL));
+
+			if (has_body)
+			{
+				// User-defined (or callable) constructor: new TextSnapshot(mc)
+				ASObject* new_obj = allocObject(app_context, 8);
+				retainObject(new_obj);
+
+				// Set __proto__ to constructor's prototype
+				if (ts_ctor->prototype_obj == NULL) {
+					ts_ctor->prototype_obj = allocObject(app_context, 4);
+					retainObject(ts_ctor->prototype_obj);
+					setObjectProto(app_context, ts_ctor->prototype_obj);
+					ActionVar cv = {0};
+					cv.type = ACTION_STACK_VALUE_FUNCTION;
+					cv.data.numeric_value = (u64)ts_ctor;
+					setProperty(app_context, ts_ctor->prototype_obj, "constructor", 11, &cv);
+				}
+				{
+					ActionVar pv = {0};
+					pv.type = ACTION_STACK_VALUE_OBJECT;
+					pv.data.numeric_value = (u64)ts_ctor->prototype_obj;
+					setProperty(app_context, new_obj, "__proto__", 9, &pv);
+				}
+				{
+					ActionVar ci = {0};
+					ci.type = ACTION_STACK_VALUE_FUNCTION;
+					ci.data.numeric_value = (u64)ts_ctor;
+					setPropertyWithFlags(app_context, new_obj, "__constructor__", 15, &ci, PROPERTY_FLAGS_DONTENUM);
+				}
+
+				// Prepare MC argument
+				ActionVar mc_arg = {0};
+				mc_arg.type = ACTION_STACK_VALUE_MOVIECLIP;
+				mc_arg.data.numeric_value = (u64)mc;
+
+				pushSuperContext((void*)new_obj, 1);
+
+				if (ts_ctor->function_type == 1)
+				{
+					// Type 1 (DefineFunction): push arg, set up scope, call
+					pushVar(app_context, &mc_arg);
+
+					ASObject* local_scope = allocObject(app_context, 8);
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = local_scope;
+					}
+					u32 cap_count = ts_ctor->captured_scope_count;
+					for (u32 ci2 = 0; ci2 < cap_count && scope_depth < MAX_SCOPE_DEPTH; ci2++) {
+						scope_is_with[scope_depth] = 1;
+						scope_mc[scope_depth] = (MovieClip*)ts_ctor->captured_scope_mc[ci2];
+						scope_chain[scope_depth++] = (ASObject*)ts_ctor->captured_scope[ci2];
+					}
+
+					MovieClip* saved_base = NULL;
+					if (g_swf_version >= 6 && ts_ctor->base_clip != NULL) {
+						saved_base = g_current_context;
+						actionSetCurrentContext(ts_ctor->base_clip);
+					}
+
+					u32 saved_td = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH) {
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)new_obj;
+						g_this_depth++;
+					}
+					ActionVar tv = {0};
+					tv.type = ACTION_STACK_VALUE_OBJECT;
+					tv.data.numeric_value = (u64)new_obj;
+					setVariableByName("this", &tv);
+
+					g_call_depth++;
+					pushCtorContext(1);
+					ActionVar ret = ((ActionVar(*)(SWFAppContext*))ts_ctor->simple_func)(app_context);
+					popCtorContext();
+					g_call_depth--;
+
+					g_this_depth = saved_td;
+					if (saved_base != NULL) actionSetCurrentContext(saved_base);
+					for (u32 ci2 = 0; ci2 < cap_count && scope_depth > 0; ci2++) scope_depth--;
+					if (scope_depth > 0) scope_depth--;
+					releaseObject(app_context, local_scope);
+
+					if (ret.type == ACTION_STACK_VALUE_OBJECT && ret.data.numeric_value != 0) {
+						releaseObject(app_context, new_obj);
+						new_obj = (ASObject*)ret.data.numeric_value;
+						retainObject(new_obj);
+					}
+				}
+				else if (ts_ctor->function_type == 2)
+				{
+					// Type 2 (DefineFunction2): call with args array + registers
+					ActionVar registers[256] = {0};
+					ASObject* ctor_scope = allocObject(app_context, 4);
+					u32 saved_td = g_this_depth;
+					{
+						u16 f2f = ts_ctor->flags;
+						int pt = (f2f & 0x0001);
+						int st = (f2f & 0x0002);
+						if (!pt && !st) {
+							if (g_this_depth < MAX_THIS_DEPTH) {
+								g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+								g_this_stack[g_this_depth].data.numeric_value = (u64)new_obj;
+								g_this_depth++;
+							}
+							ActionVar tv = {0};
+							tv.type = ACTION_STACK_VALUE_OBJECT;
+							tv.data.numeric_value = (u64)new_obj;
+							setProperty(app_context, ctor_scope, "this", 4, &tv);
+						}
+					}
+					u8 cap = ts_ctor->captured_scope_count;
+					for (u8 ci2 = 0; ci2 < cap; ci2++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = ts_ctor->captured_scope_is_with[ci2];
+							scope_mc[scope_depth] = ts_ctor->captured_scope_mc[ci2];
+							scope_chain[scope_depth++] = ts_ctor->captured_scope[ci2];
+						}
+					}
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = ctor_scope;
+					}
+
+					g_call_depth++;
+					pushCtorContext(1);
+					ActionVar ret = ts_ctor->advanced_func(app_context, &mc_arg, 1, registers, new_obj);
+					popCtorContext();
+					g_call_depth--;
+
+					for (u8 ci2 = 0; ci2 < cap + 1; ci2++) {
+						if (scope_depth > 0) scope_depth--;
+					}
+					releaseObject(app_context, ctor_scope);
+					g_this_depth = saved_td;
+
+					if (ret.type == ACTION_STACK_VALUE_OBJECT && ret.data.numeric_value != 0) {
+						releaseObject(app_context, new_obj);
+						new_obj = (ASObject*)ret.data.numeric_value;
+						retainObject(new_obj);
+					}
+				}
+
+				popSuperContext();
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)new_obj);
+				return;
+			}
+			else
+			{
+				// Built-in TextSnapshot (stub ctor or missing): create directly
+				ASObject* ts = allocObject(app_context, 8);
+				retainObject(ts);
+				ts->native_type = NATIVE_TEXTSNAPSHOT;
+				textSnapshotCapture(app_context, ts, mc);
+				if (ts_ctor != NULL && ts_ctor->prototype_obj != NULL) {
 					ActionVar pv = {0};
 					pv.type = ACTION_STACK_VALUE_OBJECT;
 					pv.data.numeric_value = (u64)ts_ctor->prototype_obj;
 					setProperty(app_context, ts, "__proto__", 9, &pv);
 				}
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)ts);
+				return;
 			}
-			POP();
-			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)ts);
-			return;
 		}
 		else if (method_name_len == 10 && strncmp(method_name, "swapDepths", 10) == 0)
 		{
