@@ -7486,6 +7486,42 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 	ActionVar* valueOf_prop = (obj_var->type == ACTION_STACK_VALUE_ARRAY)
 	    ? getProperty(obj, "valueOf", 7)
 	    : getPropertyWithPrototype(obj, "valueOf", 7);
+	// Check for addProperty getter on valueOf first (virtual property)
+	if (obj_var->type != ACTION_STACK_VALUE_ARRAY)
+	{
+		ASProperty* vof_struct = findPropertyStructWithPrototype(obj, "valueOf", 7);
+		if (vof_struct != NULL && vof_struct->getter != NULL)
+		{
+			ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)vof_struct->getter, (void*)obj);
+			ASFunction* vof_func = NULL;
+			if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
+				vof_func = lookupFunctionFromVar(&getter_result);
+			if (vof_func != NULL)
+			{
+				*found = 1;
+				ActionVar result;
+				if (vof_func->function_type == 2 && vof_func->advanced_func != NULL)
+				{
+					ActionVar* regs = NULL;
+					if (vof_func->register_count > 0)
+						regs = (ActionVar*) HCALLOC(vof_func->register_count, sizeof(ActionVar));
+					result = vof_func->advanced_func(app_context, NULL, 0, regs, obj);
+					if (regs != NULL) FREE(regs);
+				}
+				else if (vof_func->function_type == 1 && vof_func->simple_func != NULL)
+				{
+					result = ((ActionVar(*)(SWFAppContext*))vof_func->simple_func)(app_context);
+				}
+				else
+				{
+					result.type = ACTION_STACK_VALUE_UNDEFINED;
+					result.data.numeric_value = 0;
+				}
+				return result;
+			}
+		}
+	}
+
 	if (valueOf_prop != NULL)
 	{
 		if (valueOf_prop->type == ACTION_STACK_VALUE_FUNCTION)
@@ -7658,6 +7694,53 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 			return result;
 		}
 	}
+
+	// Check for addProperty getter on toString (virtual property)
+	if (obj_var->type != ACTION_STACK_VALUE_ARRAY)
+	{
+		ASProperty* ts_struct = findPropertyStructWithPrototype(obj, "toString", 8);
+		if (ts_struct != NULL && ts_struct->getter != NULL)
+		{
+			ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ts_struct->getter, (void*)obj);
+			ASFunction* ts_func = NULL;
+			if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
+				ts_func = lookupFunctionFromVar(&getter_result);
+			if (ts_func != NULL)
+			{
+				if (found) *found = 1;
+				ActionVar result;
+				u32 saved_scope_depth = scope_depth;
+				u8 captured = ts_func->captured_scope_count;
+				for (u8 ci = 0; ci < captured; ci++) {
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = ts_func->captured_scope_is_with[ci];
+						scope_mc[scope_depth] = ts_func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = ts_func->captured_scope[ci];
+					}
+				}
+				if (ts_func->function_type == 2 && ts_func->advanced_func != NULL)
+				{
+					ActionVar* regs = NULL;
+					if (ts_func->register_count > 0)
+						regs = (ActionVar*) HCALLOC(ts_func->register_count, sizeof(ActionVar));
+					result = ts_func->advanced_func(app_context, NULL, 0, regs, obj);
+					if (regs != NULL) FREE(regs);
+				}
+				else if (ts_func->function_type == 1 && ts_func->simple_func != NULL)
+				{
+					result = ((ActionVar(*)(SWFAppContext*))ts_func->simple_func)(app_context);
+				}
+				else
+				{
+					result.type = ACTION_STACK_VALUE_UNDEFINED;
+					result.data.numeric_value = 0;
+				}
+				scope_depth = saved_scope_depth;
+				return result;
+			}
+		}
+	}
+
 	ActionVar undef = {0};
 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	return undef;
@@ -15633,6 +15716,57 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 						POP();
 						pushVar(app_context, valueOf_prop);
 						return valueOf_prop->type;
+					}
+				}
+
+				// Check for addProperty getter on valueOf (virtual property)
+				ASProperty* vof_struct = findPropertyStructWithPrototype(obj, "valueOf", 7);
+				if (vof_struct != NULL && vof_struct->getter != NULL)
+				{
+					ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)vof_struct->getter, (void*)obj);
+					ASFunction* vof_func = NULL;
+					if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
+						vof_func = lookupFunctionFromVar(&getter_result);
+					if (vof_func != NULL)
+					{
+						ActionVar result;
+						u32 saved_scope_depth = scope_depth;
+						u8 captured = vof_func->captured_scope_count;
+						for (u8 ci = 0; ci < captured; ci++) {
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = vof_func->captured_scope_is_with[ci];
+								scope_mc[scope_depth] = vof_func->captured_scope_mc[ci];
+								scope_chain[scope_depth++] = vof_func->captured_scope[ci];
+							}
+						}
+						if (vof_func->function_type == 2 && vof_func->advanced_func != NULL)
+						{
+							ActionVar* regs = NULL;
+							if (vof_func->register_count > 0)
+								regs = (ActionVar*) HCALLOC(vof_func->register_count, sizeof(ActionVar));
+							result = vof_func->advanced_func(app_context, NULL, 0, regs, obj);
+							if (regs != NULL) FREE(regs);
+						}
+						else if (vof_func->function_type == 1 && vof_func->simple_func != NULL)
+						{
+							result = ((ActionVar(*)(SWFAppContext*))vof_func->simple_func)(app_context);
+						}
+						else
+						{
+							result.type = ACTION_STACK_VALUE_UNDEFINED;
+							result.data.numeric_value = 0;
+						}
+						scope_depth = saved_scope_depth;
+						if (result.type != ACTION_STACK_VALUE_OBJECT &&
+						    result.type != ACTION_STACK_VALUE_ARRAY &&
+						    result.type != ACTION_STACK_VALUE_FUNCTION)
+						{
+							POP();
+							pushVar(app_context, &result);
+							if (result.type == ACTION_STACK_VALUE_F64 || result.type == ACTION_STACK_VALUE_F32)
+								return result.type;
+							return convertFloat(app_context);
+						}
 					}
 				}
 			}
