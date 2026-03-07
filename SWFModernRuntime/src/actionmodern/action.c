@@ -43351,11 +43351,9 @@ void actionFlushDeferredRollEvents(SWFAppContext* app_context)
 		if (kind == 2) {
 			// Button DoAction rollOut
 			ng_simulateButtonTransition(app_context, mc, 0x0002);
-			ng_setButtonDisplayState(mc, 0);
 		} else if (kind == 3) {
 			// Button DoAction rollOver
 			ng_simulateButtonTransition(app_context, mc, 0x0001);
-			ng_setButtonDisplayState(mc, 1);
 		} else if (kind == 1) {
 			// AS2 onRollOut
 			mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
