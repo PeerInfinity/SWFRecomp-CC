@@ -280,6 +280,9 @@ void actionResetRegisters(void);
 // Super context for OOP constructor/method chains
 void actionGetCurrentSuperInfo(u64* out_this, u32* out_depth);
 
+// Returns nearest lockroot ancestor MC (for preload_root in DefineFunction2)
+MovieClip* actionGetLockRoot(void);
+
 // Resolve a __proto__ ActionVar to an ASObject* (returned as void*).
 // Handles OBJECT (direct cast) and SUPER (unwrap via proto chain walk).
 void* resolveProtoVar(ActionVar* proto_var);

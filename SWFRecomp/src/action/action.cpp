@@ -1483,9 +1483,8 @@ namespace SWFRecomp
 				if (preload_root)
 				{
 					func_def << "\t// Preload '_root' into register " << next_reg << endl;
-					func_def << "\textern MovieClip root_movieclip;" << endl;
 					func_def << "\tregs[" << next_reg << "].type = ACTION_STACK_VALUE_MOVIECLIP;" << endl;
-					func_def << "\tregs[" << next_reg << "].data.numeric_value = (u64)&root_movieclip;" << endl;
+					func_def << "\tregs[" << next_reg << "].data.numeric_value = (u64)actionGetLockRoot();" << endl;
 					next_reg++;
 				}
 

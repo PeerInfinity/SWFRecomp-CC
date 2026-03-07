@@ -21726,13 +21726,19 @@ check_special_vars:
 			return;
 		}
 
-		// _root refers to the root MovieClip
+		// _root refers to nearest lockroot ancestor or the global root
 		if (g_swf_version <= 6
 		    ? (var_name_len == 5 && strncasecmp(var_name, "_root", 5) == 0)
 		    : (var_name_len == 5 && strncmp(var_name, "_root", 5) == 0))
 		{
 			extern MovieClip root_movieclip;
-			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* root = ctx;
+			while (root->parent != NULL) {
+				if (root->lockroot) break;
+				root = root->parent;
+			}
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)root);
 			return;
 		}
 
@@ -25484,6 +25490,19 @@ void actionGetCurrentSuperInfo(u64* out_this, u32* out_depth) {
 		*out_this = 0;
 		*out_depth = 0;
 	}
+}
+
+// Returns the nearest lockroot ancestor of g_current_context, or root_movieclip.
+// Used by preload_root in DefineFunction2 to respect _lockroot.
+MovieClip* actionGetLockRoot(void) {
+	extern MovieClip root_movieclip;
+	extern MovieClip* g_current_context;
+	MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
+	while (mc->parent != NULL) {
+		if (mc->lockroot) return mc;
+		mc = mc->parent;
+	}
+	return mc;  // global root
 }
 
 // ==================================================================
@@ -29474,7 +29493,13 @@ void actionGetMember(SWFAppContext* app_context)
 				return;
 			}
 			if (strcasecmp(prop_name, "_root") == 0) {
-				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+				// Walk up parent chain to find nearest lockroot ancestor
+				MovieClip* root = mc;
+				while (root->parent != NULL) {
+					if (root->lockroot) break;
+					root = root->parent;
+				}
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)root);
 				return;
 			}
 			if (strcasecmp(prop_name, "_global") == 0) {
