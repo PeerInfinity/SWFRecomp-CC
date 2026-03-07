@@ -1,20 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9f30d7a4f6ee` (2026-03-07T04:36:55.602874+00:00)
-**Current:** `57802f5b8cb2` (2026-03-07T05:35:44.058982+00:00)
+**Previous:** `57802f5b8cb2` (2026-03-07T05:35:44.058982+00:00)
+**Current:** `21cc76da688b` (2026-03-07T06:32:23.141395+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 495 | 496 | +1 |
+| Passing | 496 | 496 | 0 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 80.0% | 80.1% | +0.1% |
-| Mismatched lines | 19696 | 19651 | -45 |
-|   Decreased | | | -45 |
+| Pass rate | 80.1% | 80.1% | 0% |
+| Mismatched lines | 19651 | 19627 | -24 |
+|   Decreased | | | -39 |
+|   Increased | | | +15 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `focus_keyboard_press` | output_mismatch | 15/60 | 60/60 |
+| `tab_ordering_events_mouse` | output_mismatch | 26/65 | 65/65 |
+
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `focus_mouse` | output_mismatch | 45/45 | 30/45 |
