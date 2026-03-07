@@ -834,6 +834,10 @@ namespace SWFRecomp
 			{
 				out_script << "\t" << "// NewObject" << endl
 						   << "\t" << "actionNewObject(app_context);" << endl;
+				if (context.in_function_body)
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+				else
+					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
 				break;
 			}
@@ -842,6 +846,10 @@ namespace SWFRecomp
 			{
 				out_script << "\t" << "// NewMethod" << endl
 						   << "\t" << "actionNewMethod(app_context);" << endl;
+				if (context.in_function_body)
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+				else
+					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
 				break;
 			}
@@ -1570,8 +1578,10 @@ namespace SWFRecomp
 				// Set flag to indicate we're inside a DefineFunction2 (for local register handling)
 				bool prev_inside_function2 = context.inside_function2;
 				int prev_function2_register_count = context.function2_register_count;
+				bool prev_in_function_body = context.in_function_body;
 				context.inside_function2 = true;
 				context.function2_register_count = (int)register_count;
+				context.in_function_body = true;
 
 				char* temp_ptr = temp_buffer;
 				parseActions(context, temp_ptr, func_def);
@@ -1580,6 +1590,7 @@ namespace SWFRecomp
 				// Restore previous state
 				context.inside_function2 = prev_inside_function2;
 				context.function2_register_count = prev_function2_register_count;
+				context.in_function_body = prev_in_function_body;
 
 				// Advance the actual buffer past the function body
 				action_buffer = func_body_end;
@@ -1949,6 +1960,11 @@ namespace SWFRecomp
 						// Top-level frame script (void function)
 						out_script << "\t" << "if (actionCall(app_context)) return;" << endl;
 					}
+					// Also halt if base clip was removed during the call
+					if (context.in_function_body)
+						out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+					else
+						out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
 					break;
 				}
@@ -2073,9 +2089,12 @@ namespace SWFRecomp
 				memcpy(temp_buffer, func_body_start, code_size);
 				temp_buffer[code_size] = 0x00;
 
+				bool prev_in_function_body = context.in_function_body;
+				context.in_function_body = true;
 				char* temp_ptr = temp_buffer;
 				parseActions(context, temp_ptr, func_def);
 				free(temp_buffer);
+				context.in_function_body = prev_in_function_body;
 
 				action_buffer = func_body_end;
 
@@ -2101,6 +2120,10 @@ namespace SWFRecomp
 			{
 				out_script << "\t" << "// CallFunction" << endl
 						   << "\t" << "actionCallFunction(app_context, str_buffer);" << endl;
+				if (context.in_function_body)
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+				else
+					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
 				break;
 			}
@@ -2109,6 +2132,10 @@ namespace SWFRecomp
 			{
 				out_script << "\t" << "// CallMethod" << endl
 						   << "\t" << "actionCallMethod(app_context, str_buffer);" << endl;
+				if (context.in_function_body)
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+				else
+					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
 				break;
 			}

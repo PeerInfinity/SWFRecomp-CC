@@ -47,6 +47,7 @@ struct MovieClip {
 	u8 depth_swapped;      // 1 if depth was changed by swapDepths (prevents display list overwrite in actionGetMember)
 	u8 unloaded;           // 1 if unloadMovie was called on this MC (frame/bytes properties return 0)
 	u8 pending_removal;    // 1 if MC was removed from display list but persists for one more frame (depth transformed)
+	u8 avm1_removed;       // 1 if MC was removed from display list (halts script execution)
 	u32 byte_size;         // getBytesLoaded/getBytesTotal value (0 = dynamic/attached clip)
 	u16 swf_version;       // SWF version of the movie loaded into this MC (for getSWFVersion)
 #ifdef NO_GRAPHICS
@@ -79,6 +80,10 @@ extern MovieClip* g_event_this_mc;
 // Used for primitive thisArg in call/apply and undefined this in empty-method-name calls.
 extern ActionVar g_override_this;
 extern int g_override_this_set;
+
+// Check if the current execution context's base clip has been removed.
+// Used by generated code to halt script execution after function calls.
+int actionBaseClipRemoved(void);
 
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);

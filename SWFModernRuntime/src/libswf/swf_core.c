@@ -76,6 +76,13 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 {
 	if (!goto_from_action || !manual_next_frame) return;
 
+	// If called from inside a sprite DL context, swap to root DL
+	// so that root frame functions (PlaceObject2, RemoveObject2, etc.)
+	// operate on the correct display list.
+	DisplayObject* saved_sprite_dl = NULL;
+	size_t saved_sprite_max = 0, saved_sprite_cap = 0;
+	int swapped = ng_swapToRootDL(&saved_sprite_dl, &saved_sprite_max, &saved_sprite_cap);
+
 	// Advance placement generation so goto target frame's placements
 	// are distinguishable from the calling frame's placements.
 	extern size_t g_place_gen;
@@ -135,6 +142,10 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	// after ng_run_deferred_sprite_init completes.
 	(void)saved_defer_sprite;
 	current_frame = target;
+
+	// Restore sprite DL if we swapped
+	if (swapped)
+		ng_restoreFromRootDL(saved_sprite_dl, saved_sprite_max, saved_sprite_cap);
 
 	// Leave goto_from_action and manual_next_frame set so the main loop
 	// will run the target frame's script after the calling script finishes.
@@ -794,6 +805,14 @@ void swfStart(SWFAppContext* app_context)
 				// Phase 3: Init sprites placed on the target frame (after target DoAction)
 				ng_run_deferred_sprite_init_on_or_after(app_context, target);
 			}
+		}
+
+		// Apply deferred play from gotoAndPlay targeting root from inside a sprite.
+		// This must happen AFTER the deferred goto queue is fully processed, so that
+		// the calling frame's DoAction (e.g. stop()) doesn't override the play.
+		if (g_deferred_goto_play) {
+			is_playing = 1;
+			g_deferred_goto_play = 0;
 		}
 
 		// Process timers after frame actions + deferred scripts

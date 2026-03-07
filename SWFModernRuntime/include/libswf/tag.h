@@ -144,6 +144,13 @@ extern DisplayObject* g_current_sprite_obj;
 int ng_isInsideSprite(void);
 void ng_stopCurrentSprite(void);
 void ng_playCurrentSprite(void);
+
+// Root display list tracking for inline goto from sprite context
+void ng_enterSpriteDLContext(void);
+void ng_leaveSpriteDLContext(void);
+int ng_inSpriteDLContext(void);
+int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap);
+void ng_restoreFromRootDL(DisplayObject* saved_dl, size_t saved_max, size_t saved_cap);
 void ng_gotoFrameCurrentSprite(u16 frame);
 size_t ng_getSpriteFrameCount(void);
 size_t ng_findDisplayEntryByName(const char* name);

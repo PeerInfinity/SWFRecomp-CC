@@ -31,6 +31,53 @@ size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 // Set by advance_sprite_frames before each sprite frame function call.
 DisplayObject* g_current_sprite_obj = NULL;
 
+// Root display list tracking for inline goto from sprite context.
+// When inside a sprite DL context (g_sprite_dl_nesting > 0), these track
+// the root display list state so ng_executeGotoCatchUp can swap to it.
+static DisplayObject* g_root_dl_tracked = NULL;
+static size_t g_root_dl_max_tracked = 0;
+static size_t g_root_dl_cap_tracked = 0;
+static int g_sprite_dl_nesting = 0;
+
+void ng_enterSpriteDLContext(void) {
+	if (g_sprite_dl_nesting == 0) {
+		g_root_dl_tracked = display_list;
+		g_root_dl_max_tracked = max_depth;
+		g_root_dl_cap_tracked = display_list_capacity;
+	}
+	g_sprite_dl_nesting++;
+}
+
+void ng_leaveSpriteDLContext(void) {
+	g_sprite_dl_nesting--;
+}
+
+int ng_inSpriteDLContext(void) {
+	return g_sprite_dl_nesting > 0;
+}
+
+int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap) {
+	if (g_sprite_dl_nesting <= 0) return 0;
+	*saved_dl = display_list;
+	*saved_max = max_depth;
+	*saved_cap = display_list_capacity;
+	display_list = g_root_dl_tracked;
+	max_depth = g_root_dl_max_tracked;
+	display_list_capacity = g_root_dl_cap_tracked;
+	return 1;
+}
+
+void ng_restoreFromRootDL(DisplayObject* saved_dl, size_t saved_max, size_t saved_cap) {
+	// Save back root DL (may have changed due to placements/removals)
+	g_root_dl_tracked = display_list;
+	g_root_dl_max_tracked = max_depth;
+	g_root_dl_cap_tracked = display_list_capacity;
+	// Restore sprite DL
+	display_list = saved_dl;
+	max_depth = saved_max;
+	display_list_capacity = saved_cap;
+}
+
 // When 1, tagPlaceObject2 and tagSetInstanceName are no-ops.
 // Used by tagShowFrame to re-run sprite frame_0 for scripts only (Phase 2),
 // without disturbing the display list already set up in Phase 1 (eager init).
@@ -181,6 +228,7 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			obj->sprite_needs_init = 0;
 
 			// Context swap to sprite's display list
+			ng_enterSpriteDLContext();
 			DisplayObject* saved_dl    = display_list;
 			size_t         saved_max   = max_depth;
 			size_t         saved_cap   = display_list_capacity;
@@ -216,7 +264,7 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 				// exec_sprite_frame would create a duplicate MC with root as parent.
 				int saved_settarget = g_settarget_explicit_root;
 				g_settarget_explicit_root = 0;
-				if (was_eager)
+			if (was_eager)
 				{
 					// Phase 2: run scripts only; placement tags are no-ops via g_script_only_mode.
 					g_script_only_mode = 1;
@@ -246,9 +294,18 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			obj->sprite_max_depth     = max_depth;
 			obj->sprite_dl_capacity   = display_list_capacity;
 
-			display_list          = saved_dl;
-			max_depth             = saved_max;
-			display_list_capacity = saved_cap;
+			ng_leaveSpriteDLContext();
+			if (g_sprite_dl_nesting == 0) {
+				// Returning to root: use tracked globals (may have been updated by inline catch-up)
+				display_list          = g_root_dl_tracked;
+				max_depth             = g_root_dl_max_tracked;
+				display_list_capacity = g_root_dl_cap_tracked;
+			} else {
+				// Still nested in parent sprite: restore from stack
+				display_list          = saved_dl;
+				max_depth             = saved_max;
+				display_list_capacity = saved_cap;
+			}
 
 			// Invoke registered class constructor if this sprite has an exported symbol with a registered class
 			// Skip if already invoked during eager init in tagPlaceObject2 (constructor_invoked flag)

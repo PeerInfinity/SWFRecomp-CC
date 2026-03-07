@@ -266,6 +266,7 @@ static void clone_depth_evict(int swf_depth)
 				for (int ci = 0; ci < child_mc_count; ci++) {
 					if (child_mc_cache[ci] != NULL &&
 					    strcmp(child_mc_cache[ci]->name, old_name) == 0) {
+						child_mc_cache[ci]->avm1_removed = 1;
 						child_mc_cache[ci]->depth = INT_MIN;
 						child_mc_cache[ci] = NULL;
 						break;
@@ -1187,14 +1188,24 @@ static size_t g_pending_attach_init_count = 0;
 
 void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 {
-	for (size_t i = 0; i < g_pending_attach_init_count; i++) {
+	// Use a while loop with local copy: init scripts may call attachMovie at
+	// the same depth, which replaces the current entry. By copying locally and
+	// clearing the global queue first, new entries are picked up on the next pass.
+	while (g_pending_attach_init_count > 0) {
+		PendingAttachInit local_inits[MAX_PENDING_ATTACH_INITS];
+		size_t local_count = g_pending_attach_init_count;
+		for (size_t j = 0; j < local_count; j++)
+			local_inits[j] = g_pending_attach_inits[j];
+		g_pending_attach_init_count = 0;
+
+		for (size_t i = 0; i < local_count; i++) {
 		// Set context and base clip to the attached clip for correct variable resolution
 		MovieClip* saved_ctx = g_current_context;
 		extern void actionSetBaseClip(MovieClip* mc);
 		extern MovieClip* actionGetBaseClip(void);
 		MovieClip* saved_base = actionGetBaseClip();
 		MovieClip* mc = actionFindOrCreateMovieClip(
-			app_context, g_pending_attach_inits[i].instance_name, &root_movieclip);
+			app_context, local_inits[i].instance_name, &root_movieclip);
 		if (mc) { actionSetCurrentContext(mc); actionSetBaseClip(mc); }
 
 		// Save display list state and switch to the MC's sprite display list
@@ -1221,7 +1232,7 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		g_current_sprite_obj = NULL;
 
 		// Run the frame function (scripts will run this time since catch_up_mode = 0)
-		g_pending_attach_inits[i].func(app_context);
+		local_inits[i].func(app_context);
 
 		// Recursively initialize any child sprites placed by the frame function.
 		// Without this, children of attachMovie'd sprites (e.g. sprite_2's child
@@ -1256,8 +1267,8 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		// NOTE: Registered class constructor is now fired synchronously during
 		// attachMovie (in action.c), not deferred here. This ensures the constructor
 		// runs before attachMovie returns to the caller script.
+		}
 	}
-	g_pending_attach_init_count = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -1609,7 +1620,13 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 // Sprite control helpers (use g_current_sprite_obj set by exec_sprite_frame)
 // ---------------------------------------------------------------------------
 
-int ng_isInsideSprite(void) { return g_current_sprite_obj != NULL; }
+int ng_isInsideSprite(void) {
+	// Check the DL nesting counter (set by ng_enterSpriteDLContext in
+	// process_sprite_init_at_depth), NOT g_current_sprite_obj which gets
+	// cleared by actionCallFunction's SWF6+ base_clip context switch.
+	extern int ng_inSpriteDLContext(void);
+	return ng_inSpriteDLContext();
+}
 
 void ng_stopCurrentSprite(void)
 {

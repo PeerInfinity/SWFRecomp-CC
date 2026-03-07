@@ -12751,8 +12751,9 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
-		    child_mc_cache[i]->depth == as_depth &&
+		    (child_mc_cache[i]->depth == as_depth || child_mc_cache[i]->depth == swf_depth) &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
+			child_mc_cache[i]->avm1_removed = 1;
 			child_mc_cache[i]->dynamic_props = NULL;
 			child_mc_cache[i]->ng_textfield_idx = -1;
 			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead
@@ -12773,9 +12774,10 @@ void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, in
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
-		    child_mc_cache[i]->depth == as_depth &&
+		    (child_mc_cache[i]->depth == as_depth || child_mc_cache[i]->depth == swf_depth) &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
 			MovieClip* mc = child_mc_cache[i];
+			mc->avm1_removed = 1;
 			// Transform depth: -(internal_depth) - 1, then subtract AVM_DEPTH_BIAS for AS-facing
 			mc->depth = -(int)swf_depth - 1 - 16384;
 			mc->pending_removal = 1;
@@ -15077,6 +15079,13 @@ MovieClip* actionGetBaseClip(void) {
 void actionSetCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
 }
+// Flag set by actionCallMethod/actionNewMethod when target object is undefined/null.
+// In Flash/Ruffle, CallMethod/NewMethod on undefined/null skip the halt check.
+static int g_call_skipped_halt = 0;
+int actionBaseClipRemoved(void) {
+	if (g_call_skipped_halt) { g_call_skipped_halt = 0; return 0; }
+	return g_current_context != NULL && g_current_context->avm1_removed;
+}
 static void setCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
 }
@@ -17341,11 +17350,35 @@ void actionStringAdd(SWFAppContext* app_context, char* a_str, char* b_str)
 
 void actionNextFrame(SWFAppContext* app_context)
 {
-	(void)app_context;  // Not used but required for consistent API
-	// Advance to the next frame
 	extern size_t current_frame;
 	extern size_t next_frame;
 	extern int manual_next_frame;
+
+#ifdef NO_GRAPHICS
+	extern int g_settarget_explicit_root;
+	if (ng_isInsideSprite() && g_settarget_explicit_root) {
+		// SetTarget("_root") + NextFrame: inline catch-up so RemoveObject2
+		// fires synchronously and avm1_removed gets set.
+		extern int goto_from_action;
+		extern size_t g_frame_count;
+		size_t target = current_frame + 1;
+		if (target < g_frame_count) {
+			goto_from_action = 1;
+			next_frame = target;
+			manual_next_frame = 1;
+			root_movieclip.currentframe = target + 1;
+			extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+			ng_executeGotoCatchUp(app_context);
+			// Clear g_defer_sprite_init so subsequent frames' sprite inits
+			// run normally (the inline catch-up doesn't use the deferred queue).
+			{
+				extern int g_defer_sprite_init;
+				g_defer_sprite_init = 0;
+			}
+		}
+		return;
+	}
+#endif
 
 	next_frame = current_frame + 1;
 	manual_next_frame = 1;
@@ -17766,21 +17799,25 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	if (ng_isInsideSprite()) {
 		if (g_settarget_explicit_root) {
 			// SetTarget("_root") was called — target is root.
-			// Defer root frame navigation; don't execute inline while inside sprite script.
-			// Use goto_from_action + manual_next_frame for the goto catch-up processing,
-			// but also set g_deferred_root_goto so the root frame loop doesn't re-run
-			// the current frame before processing the goto.
+			// Execute inline catch-up so RemoveObject2 fires synchronously
+			// and avm1_removed gets set (needed for script halting).
 			extern size_t next_frame;
 			extern int manual_next_frame;
 			extern size_t g_frame_count;
 			extern int goto_from_action;
-			extern int g_deferred_root_goto;
 			if (frame < g_frame_count) {
 				goto_from_action = 1;
 				next_frame = frame;
 				manual_next_frame = 1;
-				g_deferred_root_goto = 1;
 				root_movieclip.currentframe = frame + 1;
+				extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+				ng_executeGotoCatchUp(app_context);
+				// Clear g_defer_sprite_init so subsequent frames' sprite inits
+				// run normally (the inline catch-up doesn't use the deferred queue).
+				{
+					extern int g_defer_sprite_init;
+					g_defer_sprite_init = 0;
+				}
 			}
 			return;
 		}
@@ -21236,7 +21273,6 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	// Pop variable name
 	POP();
-
 	// Handle slash-path resolution (paths starting with '/' or containing '/')
 	{
 		int has_slash = (memchr(var_name, '/', var_name_len) != NULL);
@@ -21758,7 +21794,10 @@ void actionGetVariable(SWFAppContext* app_context)
 	// Check current MovieClip's dynamic_props for properties set via SetMember
 	// (e.g., _root.obj_1 = {...} makes obj_1 accessible via GetVariable)
 	// Also handles addProperty getters on the MC and MovieClip.prototype.
-	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
+	// Treat UNDEFINED the same as "not found" — an undefined variable (e.g., set by
+	// removeMovieClip) should NOT shadow display list children with the same name.
+	#define VAR_NOT_FOUND(v) (!(v) || ((v)->type == ACTION_STACK_VALUE_STRING && (v)->str_size == 0 && (v)->data.string_data.heap_ptr == NULL) || (v)->type == ACTION_STACK_VALUE_UNDEFINED)
+	if (VAR_NOT_FOUND(var))
 	{
 		MovieClip* ctx_mc = getCurrentContext();
 		if (ctx_mc != NULL && ctx_mc->dynamic_props != NULL)
@@ -21775,8 +21814,12 @@ void actionGetVariable(SWFAppContext* app_context)
 					pushVar(app_context, &result);
 					return;
 				}
-				pushVar(app_context, &own_prop->value);
-				return;
+				// UNDEFINED props (e.g. from removeMovieClip) should NOT shadow
+				// display list children with the same name — fall through instead.
+				if (own_prop->value.type != ACTION_STACK_VALUE_UNDEFINED) {
+					pushVar(app_context, &own_prop->value);
+					return;
+				}
 			}
 			// Check prototype chain for addProperty getters only (not plain values,
 			// which would shadow child MCs and special vars)
@@ -21810,7 +21853,7 @@ void actionGetVariable(SWFAppContext* app_context)
 	}
 
 check_special_vars:
-	if (!var || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 && var->data.string_data.heap_ptr == NULL))
+	if (VAR_NOT_FOUND(var))
 	{
 		// Check special variables (SWF5+ only — SWF4 has no built-in constants)
 		// Note: inside functions in SWF4, use SWF5+ behavior (DefineFunction is SWF5 opcode)
@@ -22766,6 +22809,7 @@ check_special_vars:
 
 	// Push variable value to stack
 	PUSH_VAR(var);
+	#undef VAR_NOT_FOUND
 }
 
 void actionSetVariable(SWFAppContext* app_context)
@@ -31475,6 +31519,14 @@ void actionNewMethod(SWFAppContext* app_context)
 		popVar(app_context, &args[i]);
 	}
 
+	// Ruffle: NewMethod on undefined/null object → push undefined, skip halt check.
+	if (obj_var.type == ACTION_STACK_VALUE_UNDEFINED || obj_var.type == ACTION_STACK_VALUE_NULL)
+	{
+		pushUndefined(app_context);
+		g_call_skipped_halt = 1;
+		return;
+	}
+
 	// 5. Get the method property from the object
 	const char* ctor_name = NULL;
 
@@ -32392,6 +32444,7 @@ void actionRemoveSprite(SWFAppContext* app_context)
 				setVariableByName(_rs_mc->name, &_rs_undef);
 			}
 			// Mark as removed — keep dynamic_props intact until pending unload fires
+			_rs_mc->avm1_removed = 1;
 			_rs_mc->depth = INT_MIN;
 			for (int _rs_j = 0; _rs_j < child_mc_count; _rs_j++) {
 				if (child_mc_cache[_rs_j] == _rs_mc) {
@@ -32431,10 +32484,8 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 
 	// Empty string or NULL means return to base clip (the clip whose script is running)
 	if (!target_name || strlen(target_name) == 0) {
-		// If base clip is removed, fall back to root
-		if (base->depth == INT_MIN) {
-			base = &root_movieclip;
-		}
+		// Keep dead base clip as context (don't fall back to root).
+		// actionBaseClipRemoved() needs to see the dead MC to halt the script.
 		setCurrentContext(base);
 #ifdef NO_GRAPHICS
 		g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
@@ -37746,6 +37797,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
+	// Ruffle: CallMethod on undefined/null object → push undefined, skip halt check.
+	if (obj_var.type == ACTION_STACK_VALUE_UNDEFINED || obj_var.type == ACTION_STACK_VALUE_NULL)
+	{
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+		g_call_skipped_halt = 1;
+		return;
+	}
+
 	// Pattern B (SWF7+ DefineFunction2): CallMethod(arguments_array, undefined) = super()
 	// The arguments array stands in as a proxy for super — AVM1 recognizes this pattern.
 	if (method_is_empty && obj_var.type == ACTION_STACK_VALUE_ARRAY && hasSuperContext())
@@ -39328,7 +39388,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								ActionVar _au = {0}; _au.type = ACTION_STACK_VALUE_UNDEFINED;
 								setVariableByName(_apply_mc->name, &_au);
 							}
-							_apply_mc->depth = INT_MIN;
+							_apply_mc->avm1_removed = 1;
+						_apply_mc->depth = INT_MIN;
 							for (int _ai = 0; _ai < child_mc_count; _ai++) {
 								if (child_mc_cache[_ai] == _apply_mc) { child_mc_cache[_ai] = NULL; break; }
 							}
@@ -39611,10 +39672,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (frame_num > 0) {
 #ifdef NO_GRAPHICS
 					u16 frame0 = (u16)(frame_num - 1);
-					if (!force_root && !ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
-						actionGotoFrame(app_context, frame0);
-						if (is_play) is_playing = 1;
-					} else if (force_root) {
+					if (force_root || mc == &root_movieclip) {
+						// Root goto: inline catch-up so RemoveObject2 tags fire
+						// and avm1_removed gets set for script halting.
+						extern size_t next_frame;
+						extern int manual_next_frame;
+						extern int goto_from_action;
+						extern size_t g_frame_count;
+						if (frame0 < g_frame_count) {
+							goto_from_action = 1;
+							next_frame = frame0;
+							manual_next_frame = 1;
+							root_movieclip.currentframe = frame0 + 1;
+							extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+							ng_executeGotoCatchUp(app_context);
+							// Defer play: the calling frame's DoAction (e.g. stop())
+							// hasn't run yet, so is_playing=1 would get overridden.
+							if (is_play) {
+								extern int g_deferred_goto_play;
+								g_deferred_goto_play = 1;
+							}
+						}
+					} else if (!ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
 						actionGotoFrame(app_context, frame0);
 						if (is_play) is_playing = 1;
 					}
@@ -39635,10 +39714,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				int cf = mc->currentframe;  // 1-indexed
 				if (cf > 1) {
 					u16 frame0 = (u16)(cf - 2);  // prev frame, 0-indexed
-					if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
-						if (current_frame > 0) {
-							actionGotoFrame(app_context, (u16)(current_frame - 1));
+					if (mc == &root_movieclip) {
+						extern size_t next_frame;
+						extern int manual_next_frame;
+						extern int goto_from_action;
+						extern size_t g_frame_count;
+						if (frame0 < g_frame_count) {
+							goto_from_action = 1;
+							next_frame = frame0;
+							manual_next_frame = 1;
+							root_movieclip.currentframe = frame0 + 1;
+							extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+							ng_executeGotoCatchUp(app_context);
 						}
+					} else if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
+						actionGotoFrame(app_context, (u16)(cf - 2));
 					}
 				}
 				// If already at frame 1, do nothing (stay at frame 1)
@@ -39654,9 +39744,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (mc) {
 				int cf = mc->currentframe;  // 1-indexed
 				u16 frame0 = (u16)cf;  // next frame, 0-indexed (cf is 1-indexed, so cf = next 0-indexed)
-				if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
-					// Root fallback — ng_gotoFrameByMC already clamps
-					actionGotoFrame(app_context, (u16)(current_frame + 1));
+				if (mc == &root_movieclip) {
+					// Root nextFrame: inline catch-up so RemoveObject2 fires
+					// and avm1_removed gets set for script halting.
+					extern size_t next_frame;
+					extern int manual_next_frame;
+					extern int goto_from_action;
+					extern size_t g_frame_count;
+					if (frame0 < g_frame_count) {
+						goto_from_action = 1;
+						next_frame = frame0;
+						manual_next_frame = 1;
+						root_movieclip.currentframe = frame0 + 1;
+						extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+						ng_executeGotoCatchUp(app_context);
+					}
+				} else if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
+					actionNextFrame(app_context);
 				}
 			}
 #endif
@@ -42121,6 +42225,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setVariableByName(mc->name, &_rmc_undef);
 				}
 				// Mark as removed — keep dynamic_props intact until pending unload fires
+				mc->avm1_removed = 1;
 				mc->depth = INT_MIN;
 				// Remove from child_mc_cache
 				for (int _rmc_i = 0; _rmc_i < child_mc_count; _rmc_i++) {
