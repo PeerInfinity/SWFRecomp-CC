@@ -347,8 +347,8 @@ text.onChanged                  // 'b' typed into text field triggers onChanged
 | Phase 4: Frame rect offset | **DONE** | frame_size_translated_negative | 21/21 PASS |
 | Phase 6: TF onChanged | **DONE** | button_keypress_vs_textinput | 4/4 PASS |
 | Phase 2c: Roll on focus change | **DONE** | focus_mouse_rollout | 4/4 PASS |
-| Phase 2+3: Key sim + Tab rolls | **BLOCKED** | focus_keyboard_press | ~15/60 |
-| Phase 3: Tab roll events | **BLOCKED** | tab_ordering_events_mouse | ~19/65 |
+| Phase 2+3: Key sim + Tab rolls | **DONE** | focus_keyboard_press | 61/61 PASS |
+| Phase 3: Tab roll events | **DONE** | tab_ordering_events_mouse | 65/65 PASS |
 | Phase 5: Highlight bounds | **DONE** | tab_ordering_automatic_order_same_position | 12/12 PASS |
 
 ### Completed Changes
@@ -357,13 +357,12 @@ text.onChanged                  // 'b' typed into text field triggers onChanged
 - **Phase 6** (commit c6722fa5): `EV_TEXT_INPUT` handler with button keyPress suppression gate, `actionTextFieldInput()` function with restrict filter/maxChars/onChanged callback.
 
 ### Remaining Work
-**Phase 2 (partial)** requires: Dynamic MC rollover/rollout tracking (`g_hovered_mc`), `onRollOver`/`onRollOut` dispatch during mouse move, `onSetFocus`/`onKillFocus` MC handlers (distinct from Selection broadcast). Phase 2c (roll on focus change) is DONE. Remaining 2a/2b are medium-large effort (~100-150 lines).
-
-**Phase 3** requires Phase 2 and additionally: Enter/Space key simulation on focused MC (onPress/onRelease), correct event ordering during Tab (rollout → rollover → killfocus → setfocus), integration with button state machine. Large effort but no external dependencies.
+All phases are DONE. The plan is complete.
 
 ### Completed Changes
-- **Phase 2c** (this session): `queue_hover_rollout_on_focus_change()` in action.c — queues deferred rollOut events when focus changes and there's a hovered MC. Called from `actionMouseClickFocus()` when `g_focused_mc` changes.
-- **Phase 5** (this session): Replaced `compute_min_visual_pos()` with `compute_highlight_bounds()` — recursive AABB computation using `ng_getCharBounds()` for shape bounds in world coordinates. Fixed min_x/min_y tracking to be independent (AABB union, not single-point min). Added scale propagation through `tab_collect_recursive`. Added twip rounding (`roundf(x*20)/20`) to eliminate float precision issues in dedup.
+- **Phase 2c** (earlier session): `queue_hover_rollout_on_focus_change()` in action.c — queues deferred rollOut events when focus changes and there's a hovered MC. Called from `actionMouseClickFocus()` when `g_focused_mc` changes.
+- **Phase 5** (earlier session): Replaced `compute_min_visual_pos()` with `compute_highlight_bounds()` — recursive AABB computation using `ng_getCharBounds()` for shape bounds in world coordinates.
+- **Phase 2+3** (this session): Three-state highlight system (INACTIVE/ACTIVE_HIDDEN/ACTIVE_VISIBLE), Enter/Space key simulation on focused MC, virtual hover tracking (`g_tab_hovered_mc`/`g_mouse_hovered_mc`) for unified Tab+mouse hover management. `actionFlushDeferredRollEvents` sets hover state (`mc_mouse_inside`, `g_tab_hovered_mc`, `button_state`) matching `actionAdvanceTabFocus` behavior. `actionEndVirtualHoverOnMouse` handles Tab-to-mouse hover transition with bounding box check. Same-position MouseMove skipping (`mouse_actually_moved` check) prevents spurious hover re-evaluation.
 
 ---
 

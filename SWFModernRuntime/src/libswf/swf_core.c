@@ -254,9 +254,12 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
 {
     MouseState* ms = &app_context->mouse;
     switch (ev->type) {
-    case EV_MOUSE_MOVE:
-        ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
-        ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
+    case EV_MOUSE_MOVE: {
+        float new_sx = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
+        float new_sy = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
+        int mouse_actually_moved = (new_sx != ms->stage_x || new_sy != ms->stage_y);
+        ms->stage_x = new_sx;
+        ms->stage_y = new_sy;
         ms->moved = 1;
         root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
         root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
@@ -269,15 +272,28 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_MOVE);
         // Broadcast Mouse.onMouseMove to Mouse listeners
         actionDispatchMouseMove(app_context);
-        // Run per-event button state machine
-        ng_update_button_states(app_context);
-        // Dispatch AS2 roll/drag over/out events to dynamic MCs
-        actionDispatchMCMouseMove(app_context);
+        // Ruffle skips hover re-evaluation when mouse didn't move and
+        // there's a hovered object (skip_mouse_hover = true). Mirror this
+        // by only running button state + roll dispatch when mouse moved,
+        // OR when there is no Tab virtual hover to protect.
+        if (mouse_actually_moved || !actionHasVirtualHover()) {
+            // End Tab virtual hover FIRST — fires rollOut (DoAction+AS2) on
+            // the old Tab-hovered MC before ng_update_button_states fires
+            // rollOver on the new mouse-hovered MC. This gives correct
+            // per-object interleaving: old rollOut completes before new rollOver.
+            if (mouse_actually_moved)
+                actionEndVirtualHoverOnMouse(app_context);
+            // Run per-event button state machine
+            ng_update_button_states(app_context);
+            // Dispatch AS2 roll/drag over/out events to dynamic MCs
+            actionDispatchMCMouseMove(app_context);
+        }
         // Global AS2 mc.onMouseMove dispatch to all sprite MCs
         actionDispatchMCMouseMoveGlobal(app_context);
         // SWF<9: mouse move resets focus highlight (no more key simulation until Tab)
         actionResetHighlightState();
         break;
+    }
     case EV_MOUSE_DOWN_LEFT:
         ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
         ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
@@ -302,6 +318,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMCPress(app_context);
         // Left mouse down always resets focus highlight
         actionResetHighlightState();
+        // Clear Tab virtual hover
+        actionClearVirtualHover();
         break;
     case EV_MOUSE_UP_LEFT:
         ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
@@ -323,6 +341,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMCRelease(app_context);
         // SWF<9: mouse up resets focus highlight
         actionResetHighlightState();
+        // Clear Tab virtual hover
+        actionClearVirtualHover();
         break;
     case EV_MOUSE_DOWN_MIDDLE:
         ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
@@ -647,7 +667,11 @@ void swfStart(SWFAppContext* app_context)
 		// Per-tick button state re-evaluation (NO_GRAPHICS mode).
 		// Catches _visible/_enabled changes from enterFrame/action scripts
 		// that don't have an associated mouse event.
-		ng_update_button_states(app_context);
+		// Skip when Tab virtual hover is active: Ruffle's update_mouse_state
+		// uses skip_mouse_hover=true when hovered is Some and mouse didn't move,
+		// so button states are NOT re-evaluated during frame ticks with virtual hover.
+		if (!actionHasVirtualHover())
+			ng_update_button_states(app_context);
 
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
 		// a goto, process intermediate frame tags inline to match Flash's behavior.

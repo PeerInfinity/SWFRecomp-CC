@@ -404,6 +404,13 @@ void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code);
 // Enter/Space press simulation requires is_visible (==2).
 void actionResetHighlightState(void);
 void actionUpdateHighlightState(void);
+// Virtual hover tracking: Tab focus sets g_tab_hovered_mc; mouse events clear it.
+// Per-frame ng_update_button_states should be skipped while virtual hover is active.
+int actionHasVirtualHover(void);
+void actionClearVirtualHover(void);
+// End virtual hover: fire rollOut (DoAction + AS2) on Tab-hovered MC, then clear.
+// Must be called BEFORE ng_update_button_states/actionDispatchMCMouseMove.
+void actionEndVirtualHoverOnMouse(SWFAppContext* app_context);
 // Mouse click focus acquisition — on mouse down, check if clicked MC is focusable.
 void actionMouseClickFocus(SWFAppContext* app_context);
 // Window focus lost — clear keyboard focus, firing onRollOut + onKillFocus.

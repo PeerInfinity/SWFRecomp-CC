@@ -19648,8 +19648,12 @@ static const char* normalizeStageScaleMode(const char* input, u32 input_len)
 
 // Currently focused MovieClip (NULL = no focus)
 static MovieClip* g_focused_mc = NULL;
-// "Hovered" MC for rollOver/rollOut dispatch (analogous to Ruffle's mouse_data.hovered)
+// "Hovered" MC for rollOver/rollOut dispatch (analogous to Ruffle's mouse_data.hovered).
+// g_tab_hovered_mc: set by Tab focus, cleared by mouse events.
+// g_mouse_hovered_mc: set by mouse rollOver, cleared by mouse rollOut.
+// actionAdvanceTabFocus fires rollOut on whichever is currently hovered.
 static MovieClip* g_tab_hovered_mc = NULL;
+static MovieClip* g_mouse_hovered_mc = NULL;
 
 // Deferred rollOver/rollOut queue — when Selection.setFocus() changes focus,
 // rollOver/rollOut events are queued and fire asynchronously (after script completes).
@@ -43079,6 +43083,7 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 					mc_call_as2_handler_ng(app_context, mc, "onDragOver", 10, NULL, 0);
 			} else {
 				mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10, NULL, 0);
+				g_mouse_hovered_mc = mc;
 			}
 		} else if (was_inside && !now_inside) {
 			// Mouse exited this MC's hit area
@@ -43087,6 +43092,8 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 					mc_call_as2_handler_ng(app_context, mc, "onDragOut", 9, NULL, 0);
 			} else {
 				mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
+				if (g_mouse_hovered_mc == mc)
+					g_mouse_hovered_mc = NULL;
 			}
 		}
 	}
@@ -43344,15 +43351,22 @@ void actionFlushDeferredRollEvents(SWFAppContext* app_context)
 		if (kind == 2) {
 			// Button DoAction rollOut
 			ng_simulateButtonTransition(app_context, mc, 0x0002);
+			ng_setButtonDisplayState(mc, 0);
 		} else if (kind == 3) {
 			// Button DoAction rollOver
 			ng_simulateButtonTransition(app_context, mc, 0x0001);
+			ng_setButtonDisplayState(mc, 1);
 		} else if (kind == 1) {
 			// AS2 onRollOut
 			mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
+			mc->mc_mouse_inside = 0;
+			if (g_tab_hovered_mc == mc) g_tab_hovered_mc = NULL;
 		} else {
 			// AS2 onRollOver
 			mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10, NULL, 0);
+			mc->mc_mouse_inside = 1;
+			g_tab_hovered_mc = mc;
+			g_mouse_hovered_mc = NULL;
 		}
 	}
 }
@@ -43859,25 +43873,35 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 		}
 		return;
 	}
-	// Tab focus triggers rollOut on old MC and rollOver on new MC.
+	// Tab focus triggers rollOut on old HOVERED MC and rollOver on new MC.
+	// The "old hovered" is whichever of g_tab_hovered_mc or g_mouse_hovered_mc
+	// is currently set (like Ruffle's mouse_data.hovered which tracks both).
+	// This prevents double-firing rollOut if a mouse event already rolled out the MC.
 	// Order: button DoAction rollOut → AS2 onRollOut → button DoAction rollOver → AS2 onRollOver
 	// Text fields (EditText) do NOT participate in rollOver/rollOut during Tab focus changes.
-	int old_is_textfield = (g_focused_mc != NULL &&
-	    (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2));
+	MovieClip* old_hover = g_tab_hovered_mc ? g_tab_hovered_mc : g_mouse_hovered_mc;
+	int old_hover_is_textfield = (old_hover != NULL &&
+	    (old_hover->ng_textfield_idx >= 0 || old_hover->ng_textfield_idx == -2));
 	int new_is_textfield = (new_mc != NULL &&
 	    (new_mc->ng_textfield_idx >= 0 || new_mc->ng_textfield_idx == -2));
-	if (!old_is_textfield && g_focused_mc != NULL) {
-		// Button DoAction rollOut fires BEFORE AS2 onRollOut
-		if (g_focused_mc->is_button_mc)
-			ng_simulateButtonTransition(app_context, g_focused_mc, 0x0002);
-		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRollOut", 9, NULL, 0);
+	if (!old_hover_is_textfield && old_hover != NULL) {
+		if (old_hover->is_button_mc) {
+			ng_simulateButtonTransition(app_context, old_hover, 0x0002);
+			ng_setButtonDisplayState(old_hover, 0);
+		}
+		mc_call_as2_handler_ng(app_context, old_hover, "onRollOut", 9, NULL, 0);
+		old_hover->mc_mouse_inside = 0;
 	}
 	if (!new_is_textfield && new_mc != NULL) {
-		// Button DoAction rollOver fires BEFORE AS2 onRollOver
-		if (new_mc->is_button_mc)
+		if (new_mc->is_button_mc) {
 			ng_simulateButtonTransition(app_context, new_mc, 0x0001);
+			ng_setButtonDisplayState(new_mc, 1);
+		}
 		mc_call_as2_handler_ng(app_context, new_mc, "onRollOver", 10, NULL, 0);
+		new_mc->mc_mouse_inside = 1;
 	}
+	g_tab_hovered_mc = new_is_textfield ? NULL : new_mc;
+	g_mouse_hovered_mc = NULL; // Tab takes over hover tracking
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 	// Tab always activates the highlight
 	actionUpdateHighlightState();
@@ -43913,6 +43937,58 @@ void actionUpdateHighlightState(void)
 	// focusrect == 0.0f means explicitly false → ACTIVE_HIDDEN
 	// focusrect == -1.0f (default null) or > 0 → ACTIVE_VISIBLE
 	g_highlight_state = (fr == 0.0f) ? 1 : 2;
+}
+
+// ---------------------------------------------------------------------------
+// Virtual hover tracking (Tab focus → mouse handoff)
+// ---------------------------------------------------------------------------
+// Mirrors Ruffle's mouse_data.hovered: Tab focus sets g_tab_hovered_mc, which
+// persists across frame ticks. When a mouse event fires, the virtual hover
+// is cleared and normal mouse hit-testing takes over. This allows the mouse
+// event's rollOut to fire on the Tab-hovered button if the mouse isn't over it.
+
+int actionHasVirtualHover(void)
+{
+	return g_tab_hovered_mc != NULL;
+}
+
+void actionClearVirtualHover(void)
+{
+	g_tab_hovered_mc = NULL;
+}
+
+// End virtual hover from a mouse event: fire rollOut (DoAction + AS2) on the
+// Tab-hovered MC, reset its button_state and mc_mouse_inside, then clear
+// g_tab_hovered_mc. This fires BEFORE ng_update_button_states and
+// actionDispatchMCMouseMove so that per-object event interleaving is correct:
+// rollOut(old) completes before rollOver(new) starts.
+void actionEndVirtualHoverOnMouse(SWFAppContext* app_context)
+{
+	MovieClip* mc = g_tab_hovered_mc;
+	if (mc == NULL) return;
+	// If the mouse is still over the Tab-hovered MC, no rollOut fires —
+	// the virtual hover silently transitions to a real mouse hover.
+	// Matches Ruffle: old hovered == new hovered → no events.
+	float x1, y1, x2, y2;
+	if (mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) {
+		float mx = app_context->mouse.stage_x / 20.0f;
+		float my = app_context->mouse.stage_y / 20.0f;
+		if (mx >= x1 && mx <= x2 && my >= y1 && my <= y2) {
+			// Mouse is over the MC — transition to real hover, no events
+			g_tab_hovered_mc = NULL;
+			g_mouse_hovered_mc = mc;
+			return;
+		}
+	}
+	g_tab_hovered_mc = NULL;
+	// Fire DoAction rollOut (overUpToIdle = 0x0002)
+	if (mc->is_button_mc) {
+		ng_simulateButtonTransition(app_context, mc, 0x0002);
+		ng_setButtonDisplayState(mc, 0);
+	}
+	// Fire AS2 onRollOut
+	mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
+	mc->mc_mouse_inside = 0;
 }
 
 // ---------------------------------------------------------------------------

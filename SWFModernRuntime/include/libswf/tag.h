@@ -11,6 +11,8 @@ int dispatch_button_key_actions(SWFAppContext* app_context, int key_code);
 // Fire button DoAction conditions for a specific transition on a MC.
 // transition_mask: 0x0004 = press, 0x0008 = release
 void ng_simulateButtonTransition(SWFAppContext* app_context, void* mc, int transition_mask);
+// Set button_state on the display object for a button MC (for Tab virtual hover).
+void ng_setButtonDisplayState(void* mc, u8 state);
 // Simulate a button press+release on a specific MC (for keyboard focus activation).
 void ng_simulateButtonPressRelease(SWFAppContext* app_context, void* mc);
 // Run button hit-test + state machine + action dispatch for current mouse state.

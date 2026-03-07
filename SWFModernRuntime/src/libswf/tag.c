@@ -2933,6 +2933,23 @@ void ng_simulateButtonTransition(SWFAppContext* app_context, void* mc_ptr, int t
 	}
 }
 
+// Set the button_state on the display object for a button MC.
+// Used by Tab focus to set virtual hover state (1=Over) so that
+// ng_update_button_states can detect the transition when mouse moves.
+void ng_setButtonDisplayState(void* mc_ptr, u8 state)
+{
+	MovieClip* mc = (MovieClip*)mc_ptr;
+	if (mc == NULL || !mc->is_button_mc) return;
+	if (!mc->name || mc->name[0] == '\0') return;
+	size_t depth = ng_findDisplayEntryByName(mc->name);
+	if (depth == SIZE_MAX || depth > max_depth) return;
+	DisplayObject* obj = &display_list[depth];
+	if (obj->char_id == 0) return;
+	Character* ch = &dictionary[obj->char_id];
+	if (ch->type != CHAR_TYPE_BUTTON) return;
+	obj->button_state = state;
+}
+
 // Simulate a button press+release (both transitions). Used as fallback when
 // the caller doesn't need to interleave handlers between press and release.
 void ng_simulateButtonPressRelease(SWFAppContext* app_context, void* mc_ptr)
