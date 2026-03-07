@@ -315,6 +315,13 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 #define CALL_FRAME(app, obj, f) (f)(app)
 #endif
 
+// Public wrapper for process_sprite_needs_init (called from tag_stubs.c for
+// attachMovie'd sprite child initialization).
+void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc)
+{
+	process_sprite_needs_init(app_context, parent_mc);
+}
+
 // ---------------------------------------------------------------------------
 // Helper 1: Advance sprite timelines recursively
 // ---------------------------------------------------------------------------

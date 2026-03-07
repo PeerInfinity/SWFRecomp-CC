@@ -3067,6 +3067,19 @@ namespace SWFRecomp
 					buffered_removes.erase((u16)depth);
 				}
 
+				// Emit instance name BEFORE placement so g_pending_instance_name prevents
+				// auto-naming and counter increment. For clip-action cases, the name is
+				// already emitted before placement below (guarded by clip_action_count > 0).
+				if (!instance_name_str.empty() && clip_action_count == 0)
+				{
+					std::string escaped_name = "";
+					for (char c : instance_name_str) {
+						if (c == '"' || c == '\\') escaped_name += '\\';
+						escaped_name += c;
+					}
+					context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
+				}
+
 				// Emit the place call
 				if (blend_mode_val > 1)
 				{
@@ -3146,18 +3159,7 @@ namespace SWFRecomp
 					depth_clip_actions.erase((u16)depth);
 				}
 
-				// Emit instance name if present (for non-clip-action case,
-				// or redundantly for clip-action case where it was already emitted above)
-				if (!instance_name_str.empty() && clip_action_count == 0)
-				{
-					// Escape quotes in the name for C string
-					std::string escaped_name = "";
-					for (char c : instance_name_str) {
-						if (c == '"' || c == '\\') escaped_name += '\\';
-						escaped_name += c;
-					}
-					context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
-				}
+				// Instance name already emitted before the placement call above.
 
 				// Emit filter if parsed
 				if (parsed_filter_type != 0)
@@ -4093,6 +4095,18 @@ namespace SWFRecomp
 								}
 							}
 
+							// Emit instance name BEFORE placement so g_pending_instance_name
+							// prevents auto-naming. Clip-action cases also emit before placement.
+							if (!sp_instance_name.empty() && clip_action_count == 0)
+							{
+								std::string escaped = "";
+								for (char c : sp_instance_name) {
+									if (c == '"' || c == '\\') escaped += '\\';
+									escaped += c;
+								}
+								sprite_definitions << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped << "\");" << endl;
+							}
+
 							// Emit the place call
 							if (sp_blend_mode_val > 1)
 							{
@@ -4175,16 +4189,7 @@ namespace SWFRecomp
 												   << to_string(clip_depth_val) << ");" << endl;
 							}
 
-							// Emit instance name if present (skip if already emitted for clip-action case)
-							if (!sp_instance_name.empty() && clip_action_count == 0)
-							{
-								std::string escaped = "";
-								for (char c : sp_instance_name) {
-									if (c == '"' || c == '\\') escaped += '\\';
-									escaped += c;
-								}
-								sprite_definitions << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped << "\");" << endl;
-							}
+							// Instance name already emitted before the placement call above.
 
 							// Emit filter if parsed
 							if (sp_filter_type != 0)

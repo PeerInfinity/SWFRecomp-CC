@@ -1223,6 +1223,14 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		// Run the frame function (scripts will run this time since catch_up_mode = 0)
 		g_pending_attach_inits[i].func(app_context);
 
+		// Recursively initialize any child sprites placed by the frame function.
+		// Without this, children of attachMovie'd sprites (e.g. sprite_2's child
+		// sprite_1 instances) never run their frame 0 scripts.
+		{
+			extern void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc);
+			process_sprite_needs_init_public(app_context, mc);
+		}
+
 		// Persist updated display list state back to the MC's display obj
 		if (mc != NULL && mc->display_obj != NULL) {
 			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
@@ -1525,9 +1533,12 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 			actionInitTextFieldVariable(app_context, var_name, init_text);
 	}
 
-	// Allocate sprite display list and mark for frame-0 execution at tagShowFrame.
-	// tagShowFrame's sprite_needs_init block runs frame 0 WITH scripts in the same
-	// tick as placement, matching Flash's "first frame construction" behavior.
+	// Allocate sprite display list and mark for initialization.
+	// The actual eager init (frame 0 with catch_up_mode=1) happens in tagPlaceObject2
+	// in tag.c, which handles clip event ordering (INITIALIZE before, CONSTRUCT after).
+	// Auto-instance names are assigned depth-first because tag.c's eager init runs
+	// the child sprite's frame function immediately, triggering recursive ng_on_place_object2
+	// calls that increment the counter before the parent continues placing siblings.
 	if (is_sprite)
 	{
 		Character* ch = &dictionary[char_id];
