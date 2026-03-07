@@ -43382,6 +43382,8 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 	mc_call_as2_handler_ng(app_context, new_mc, "onSetFocus", 10, &set_arg, 1);
 	// 3. Update focused MC before broadcasting
 	g_focused_mc = new_mc;
+	// Update highlight state — focus change activates highlight
+	actionUpdateHighlightState();
 	// Reset selection indices on focus change
 	g_selection_begin = -1;
 	g_selection_caret = -1;
@@ -43877,6 +43879,8 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 		mc_call_as2_handler_ng(app_context, new_mc, "onRollOver", 10, NULL, 0);
 	}
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
+	// Tab always activates the highlight
+	actionUpdateHighlightState();
 	// Tab focus selects all text (same as programmatic setFocus, unlike mouse clicks)
 	if (MC_IS_TEXTFIELD(new_mc))
 		g_tf_select_all = 1;
@@ -43886,74 +43890,77 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 void* actionGetFocusedMC(void) { return (void*)g_focused_mc; }
 
 // ---------------------------------------------------------------------------
+// Focus highlight state
+// ---------------------------------------------------------------------------
+// Three-state highlight: gates MC dynamic key handler dispatch and Enter/Space
+// press simulation. Matches Ruffle's Highlight enum:
+//   INACTIVE(0): no key handlers, no simulation
+//   ACTIVE_HIDDEN(1): key handlers fire, no simulation (_focusrect=false)
+//   ACTIVE_VISIBLE(2): key handlers fire, simulation fires
+// Transitions: Tab→Active, MouseMove/Down/Up(SWF<9)→Inactive
+static int g_highlight_state = 0; // 0=INACTIVE
+
+void actionResetHighlightState(void)
+{
+	g_highlight_state = 0;
+}
+
+void actionUpdateHighlightState(void)
+{
+	if (g_focused_mc == NULL) return;
+	extern MovieClip root_movieclip;
+	float fr = root_movieclip.focusrect;
+	// focusrect == 0.0f means explicitly false → ACTIVE_HIDDEN
+	// focusrect == -1.0f (default null) or > 0 → ACTIVE_VISIBLE
+	g_highlight_state = (fr == 0.0f) ? 1 : 2;
+}
+
+// ---------------------------------------------------------------------------
 // Key dispatch to focused MC
 // ---------------------------------------------------------------------------
 
 // Dispatch onKeyDown to the focused MC. Called BEFORE Key.broadcastMessage.
+// Only fires when highlight is active (>=1). See should_fire_event_handlers in Ruffle.
 void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code)
 {
+	(void)key_code;
 	if (g_focused_mc == NULL) return;
+	if (g_highlight_state < 1) return; // highlight must be active
 	// Text fields don't dispatch onKeyDown to the focused MC
 	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyDown", 9, NULL, 0);
-
-	// Enter/Space on focused MC with onPress → simulated press+release
-	if (key_code == 13 || key_code == 32) {
-		// For buttons: fire DoAction button conditions (press/release) too
-		// DoAction conditions are fired via dispatch_button_key_actions in swf_core.c,
-		// which runs after this function. So we only fire the AS2 onPress/onRelease here.
-		// Actually, looking at the expected output for focus_keyboard_press:
-		// _level0.button.onKeyDown: 13
-		// press                           ← DoAction fires (from button key condition)
-		// _level0.button.onPress: 13      ← AS2 onPress
-		// release                         ← DoAction fires
-		// _level0.button.onRelease: 13    ← AS2 onRelease
-		// The DoAction (press/release) fires between onKeyDown and onPress.
-		// dispatch_button_key_actions handles the DoAction part.
-		// We handle onPress/onRelease here, but they need to fire AFTER the DoAction.
-		// Solution: we'll fire onPress/onRelease from swf_core.c AFTER dispatch_button_key_actions.
-		// So skip onPress/onRelease here — they'll be called separately.
-	}
 }
 
 // Fire press + release on focused MC for Enter/Space key (simulated press).
 // Called from swf_core.c AFTER dispatch_button_key_actions so DoAction fires first.
-// Only fires when the focus highlight is active (_focusrect != false).
-// For SWF buttons: fires DoAction press/release conditions, then AS2 onPress/onRelease.
-// For MCs with button handlers: fires AS2 onPress/onRelease only.
+// Only fires when highlight is ACTIVE_VISIBLE (==2).
 void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code)
 {
 	if (g_focused_mc == NULL) return;
 	if (key_code != 13 && key_code != 32) return;
 	// Text fields don't receive simulated press/release from Enter/Space
 	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
-	// Check _focusrect — when false, Enter/Space do NOT simulate press/release.
-	// _focusrect is a stage-level property stored on root_movieclip.
-	extern MovieClip root_movieclip;
-	float fr = root_movieclip.focusrect;
-	// Default: focusrect = -1.0f (null) → highlight is active (true)
-	// focusrect = 0.0f → false → no press/release
-	// focusrect > 0 → true → press/release
-	if (fr == 0.0f) return;
+	// Highlight must be ACTIVE_VISIBLE for press simulation
+	if (g_highlight_state != 2) return;
 	if (g_focused_mc->is_button_mc) {
 		// SWF buttons: interleave DoAction and AS2 handlers
-		// press DoAction → onPress → release DoAction → onRelease
 		ng_simulateButtonTransition(app_context, g_focused_mc, 0x0004); // press DoAction
 		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7, NULL, 0);
 		ng_simulateButtonTransition(app_context, g_focused_mc, 0x0008); // release DoAction
 		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9, NULL, 0);
 	} else {
-		// MCs with button handlers: just fire AS2 handlers
 		mc_call_as2_handler_ng(app_context, g_focused_mc, "onPress", 7, NULL, 0);
 		mc_call_as2_handler_ng(app_context, g_focused_mc, "onRelease", 9, NULL, 0);
 	}
 }
 
 // Dispatch onKeyUp to the focused MC.
+// Only fires when highlight is active (>=1).
 void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code)
 {
 	(void)key_code;
 	if (g_focused_mc == NULL) return;
+	if (g_highlight_state < 1) return; // highlight must be active
 	// Text fields don't dispatch onKeyUp to the focused MC
 	if (g_focused_mc->ng_textfield_idx >= 0 || g_focused_mc->ng_textfield_idx == -2) return;
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onKeyUp", 7, NULL, 0);

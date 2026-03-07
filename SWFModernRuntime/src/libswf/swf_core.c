@@ -275,6 +275,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMCMouseMove(app_context);
         // Global AS2 mc.onMouseMove dispatch to all sprite MCs
         actionDispatchMCMouseMoveGlobal(app_context);
+        // SWF<9: mouse move resets focus highlight (no more key simulation until Tab)
+        actionResetHighlightState();
         break;
     case EV_MOUSE_DOWN_LEFT:
         ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
@@ -298,6 +300,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_press(app_context);
         // Dispatch AS2 onPress to dynamic MCs
         actionDispatchMCPress(app_context);
+        // Left mouse down always resets focus highlight
+        actionResetHighlightState();
         break;
     case EV_MOUSE_UP_LEFT:
         ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;
@@ -317,6 +321,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_release(app_context);
         // Dispatch AS2 onRelease/onReleaseOutside to dynamic MCs
         actionDispatchMCRelease(app_context);
+        // SWF<9: mouse up resets focus highlight
+        actionResetHighlightState();
         break;
     case EV_MOUSE_DOWN_MIDDLE:
         ms->stage_x = ev->x * 20.0f + FRAME_X_MIN_TWIPS;

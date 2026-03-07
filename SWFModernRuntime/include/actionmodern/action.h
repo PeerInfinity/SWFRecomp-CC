@@ -399,6 +399,11 @@ void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context);
 void actionDispatchKeyDownToFocused(SWFAppContext* app_context, int key_code);
 void actionDispatchKeyPressToFocused(SWFAppContext* app_context, int key_code);
 void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code);
+// Focus highlight state: 0=INACTIVE, 1=ACTIVE_HIDDEN, 2=ACTIVE_VISIBLE.
+// MC key handlers (onKeyDown/Up) require is_active (>=1).
+// Enter/Space press simulation requires is_visible (==2).
+void actionResetHighlightState(void);
+void actionUpdateHighlightState(void);
 // Mouse click focus acquisition — on mouse down, check if clicked MC is focusable.
 void actionMouseClickFocus(SWFAppContext* app_context);
 // Window focus lost — clear keyboard focus, firing onRollOut + onKillFocus.
