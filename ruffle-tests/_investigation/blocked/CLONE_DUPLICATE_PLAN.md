@@ -7,17 +7,17 @@ Last updated: 2026-02-27
 
 Clone/Duplicate MovieClip covers 5 failing Ruffle tests. The core feature is `ActionCloneSprite` (opcode 0x24), which duplicates an existing display list object, giving the copy a new name and depth. The AS2 method wrapper is `MovieClip.duplicateMovieClip(name, depth, initObj)`.
 
-**Current state (as of 2026-03-04)**:
+**Current state (as of 2026-03-07)**:
 - `duplicate_movie_clip` (21/21) ✅ — DONE
 - `clone_sprite_types` (25/25) ✅ — DONE
-- `clone_sprite_edittext` (MISMATCH ~15-20/95) — BLOCKED: TextField clone init + position reading
-- `clone_sprite_edittext_dynamic` (MISMATCH ~15-20/87) — BLOCKED: same
+- `clone_sprite_edittext` (26/94) — BLOCKED: TextField clone init + position reading (improved from ~0)
+- `clone_sprite_edittext_dynamic` (52/86) — BLOCKED: same (improved from ~0)
 - `duplicate_movie_clip_drawing` (2 lines off) — DEFERRED: needs Drawing API _width/_height from drawn content
 - `clip_events` ✅ — PASS (fixed by prior commits)
-- `clip_event_propagation_order` (0/17) — BLOCKED: needs mouse events (MOUSE_EVENTS_PLAN) + recursive clip event dispatch
+- `clip_event_propagation_order` (0/17) — BLOCKED: needs recursive clip event dispatch (parent→child propagation order)
 - `on_construct` (25/25) ✅ — DONE (RegisterClass prototype setup + on(construct) event dispatch)
 
-**4/8 PASS.** Phase 1 is fully complete. Phase 2 is blocked on TextField clone infrastructure. `on_construct` now PASS (25/25) — RegisterClass prototype setup + on(construct) event dispatch implemented. `clip_event_propagation_order` still blocked on mouse events.
+**4/8 PASS.** Phase 1 is fully complete. Phase 2 is blocked on TextField clone infrastructure (clone_sprite_edittext/dynamic have improved significantly but still failing). `clip_event_propagation_order` blocked on clip event parent→child propagation ordering.
 
 **Key implementation notes discovered during Phase 1**:
 - `duplicateMovieClip` registers clones via `setVariableByName` so `GetVariable("clip")` works

@@ -1,10 +1,10 @@
 # Blocker Summary
 
-Last updated: 2026-03-06
+Last updated: 2026-03-07
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **417/477 (87.4%)** filtered, **471/619 (76.1%)** total (CI run on e2ad847e). 29 plans in `blocked/`, 42 in `complete/`.
+Current pass rate: **425/477 (89.1%)** filtered, **500/619 (80.8%)** total (CI run on 6e400bd3). 19 plans in `blocked/`, 52 in `complete/`, 0 in `incomplete/`.
 
 ---
 
@@ -122,12 +122,16 @@ When MovieClips are removed (`depth = INT_MIN`), operations on them or their clo
 
 | Gap | Detail | Tests Blocked |
 |-----|--------|---------------|
-| call() early termination | `call()` on a removed base_clip's frame should terminate the calling script. We don't implement script termination. | removed_target_clip_scope (16/37) |
+| ~~Script halting on clip removal~~ | removeMovieClip halts currently executing script. SCRIPT_HALTING_PLAN COMPLETE. | ~~removed_clip_halts_script~~ **15/15 PASS**, ~~target_clip_removed~~ **5/5 PASS** |
+| call() early termination | `call()` on a removed base_clip's frame should terminate the calling script. We don't implement script termination. | removed_target_clip_scope (7/35) |
 | ~~Dead base_clip re-resolution~~ | ~~RESOLVED~~ — `reResolveDeadBaseClip()` re-resolves via `original_target`. function_base_clip_readded **12/12 PASS**. | ~~function_base_clip_readded~~ |
 | SetTarget on removed base_clip | SetTarget("") should reset to removed base_clip's parent scope, not the target path | removed_target_clip_scope |
 | ~~Ruffle-specific trace~~ | "Target not found: dummy" is Ruffle debug output, not Flash behavior. In ignored_tests.txt. | ~~removed_base_clip_tell_target~~ |
+| Script halting regression | remove_movie_clip regressed 29/29 → 25/29 from script halting changes | remove_movie_clip |
 
 **Plans blocked**: MC_REMOVAL_LIFECYCLE_PLAN (removed_target_clip_scope), CALL_SEMANTICS_PLAN (removed_target_clip_scope)
+
+**Regressions from script halting**: remove_movie_clip (29→25/29), register_and_init_order (146→36/231), removed_target_clip_scope (11→7/35). These need investigation.
 
 ---
 
@@ -222,14 +226,15 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 ## Actionable vs Architectural
 
 ### Actionable (could be tackled with moderate effort)
-1. **_lockroot _root resolution** — `_root` getter ignores `lockroot` flag. ~10 lines of code. See LOCKROOT_PLAN.
-2. **Primitive coercion addProperty** — `convertFloat`/`convertString` don't invoke addProperty getters for valueOf/toString. See PRIMITIVE_COERCION_ADDPROPERTY_PLAN.
-3. **Default instance naming** — Auto-naming counter off by 1-2 for timeline children. See DEFAULT_NAMES_PLAN.
-4. **Script halting on clip removal** — `removeMovieClip()` should halt the current script. See SCRIPT_HALTING_PLAN.
-5. **Font metrics accuracy** — Incremental improvements to word wrap and line height
-6. **Failed load state values** — Return `-1` for specific MC properties on failed load
-7. **Global stubs** — Add 20 missing globals (tedious but straightforward)
-8. **interface_implements_op regression** — Lazy ImplementsOp via valueOf callback broke in b1b89de3
+1. ~~**_lockroot _root resolution**~~ — **RESOLVED**. movieclip_lockroot **29/29 PASS**. See LOCKROOT_PLAN (complete/).
+2. ~~**Primitive coercion addProperty**~~ — **RESOLVED**. coerce_to_primitive_resolve **17/17 PASS**. See PRIMITIVE_COERCION_ADDPROPERTY_PLAN (complete/).
+3. ~~**Default instance naming**~~ — **RESOLVED**. default_names **52/52 PASS**. See DEFAULT_NAMES_PLAN (complete/).
+4. ~~**Script halting on clip removal**~~ — **RESOLVED** (with regressions). removed_clip_halts_script **15/15 PASS**, target_clip_removed **5/5 PASS**. But remove_movie_clip regressed 29→25/29. See SCRIPT_HALTING_PLAN (complete/).
+5. **Script halting regressions** — remove_movie_clip (25/29), register_and_init_order (36/231), removed_target_clip_scope (7/35) regressed from script halting changes. Need investigation.
+6. **Font metrics accuracy** — Incremental improvements to word wrap and line height
+7. **Failed load state values** — Return `-1` for specific MC properties on failed load
+8. **Global stubs** — Add 20 missing globals (tedious but straightforward)
+9. **interface_implements_op regression** — Lazy ImplementsOp via valueOf callback broke in b1b89de3
 
 ### Architectural (requires significant design work)
 1. **Per-movie `_global` isolation** — Move from two-group to per-movie globals

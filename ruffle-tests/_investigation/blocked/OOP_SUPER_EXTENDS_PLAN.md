@@ -1,11 +1,11 @@
 # OOP / Super / Extends / Interfaces Implementation Plan
 <!-- TESTS: as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, as2_super_via_manual_prototype, extends_chain, extends_native_type, super_edge_cases, interface_implements_op -->
 
-Last updated: 2026-02-28
+Last updated: 2026-03-07
 
-## Status: 7/8 PASS — remaining test blocked
+## Status: 7/8 PASS — interface_implements_op regressed (46/47, was 47/47)
 
-### Test Results (2026-02-28)
+### Test Results (2026-03-07)
 
 | Test | Status | Notes |
 |------|--------|-------|
@@ -16,7 +16,7 @@ Last updated: 2026-02-28
 | as2_super_via_manual_prototype | **PASS** ✅ | Manual proto chains with super working |
 | extends_chain | **PASS** ✅ | super(), super.method(), constructor chaining working |
 | super_edge_cases | **PASS** ✅ | makeSuperWith SUPER-as-__proto__ fixed via resolveProtoVar() |
-| interface_implements_op | **BLOCKED** | All instanceof checks receive obj_type=UNDEFINED — blocked by MTASC class infrastructure (REGISTERCLASS_PLAN) |
+| interface_implements_op | **46/47 REGRESSED** | Was 47/47 PASS, regressed in commit b1b89de3 (lazy ImplementsOp via valueOf callback). Line 43: `obj instanceof LazyInterfaceA: false` (expected `true`) |
 
 ### What's Implemented
 - **actionExtends**: Correctly sets up prototype chains ✅
@@ -35,15 +35,11 @@ Last updated: 2026-02-28
   - `__constructor__` lookup with addProperty getter invocation ✅
   - Constructor return value capture ✅
 
-### Remaining: interface_implements_op (BLOCKED)
+### Remaining: interface_implements_op (46/47 — ACTIONABLE REGRESSION)
 
-**Root cause**: This is a MTASC-compiled test. `Test.main()` creates objects via `new MyClass()`, but all resulting objects have type UNDEFINED instead of OBJECT. The MTASC class constructors don't produce proper objects because the DoInitAction class infrastructure is incomplete.
+**Previous state**: Was 47/47 PASS. MTASC class infrastructure issues were fully resolved.
 
-**Specific blockers** (all from REGISTERCLASS_PLAN):
-- MTASC class constructor dispatch (`new MyClass()` returns undefined)
-- NoisyString extends native String type
-- Lazy interface registration via toString callbacks
-- MovieClipLoader dependency (cross-SWF loading)
+**Regression**: Commit b1b89de3 (DefineLocal/DeclareLocal addProperty support) broke line 43: `obj instanceof LazyInterfaceA: false` (expected `true`). The lazy ImplementsOp via valueOf callback no longer works correctly. This is an **actionable regression** — the fix is to investigate the addProperty changes in b1b89de3 and ensure they don't interfere with ImplementsOp's valueOf-triggered interface registration.
 
 ## Overview (original)
 

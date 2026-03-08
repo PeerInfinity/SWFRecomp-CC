@@ -1,9 +1,9 @@
 # ActionCall (0x9E) Semantics Plan
 <!-- TESTS: call, removed_target_clip_scope -->
 
-Last updated: 2026-03-04
+Last updated: 2026-03-07
 
-## Status: BLOCKED — call PASSES (63/63), removed_target_clip_scope blocked on SetTarget scope semantics
+## Status: COMPLETE — call 63/63 PASS. removed_target_clip_scope failures belong to MC_REMOVAL_LIFECYCLE_PLAN (SetTarget scope semantics)
 
 ### Overview
 

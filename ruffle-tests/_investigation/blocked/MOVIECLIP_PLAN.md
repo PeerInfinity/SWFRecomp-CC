@@ -47,7 +47,7 @@ Last updated: 2026-02-28
 | empty_movieclip_can_attach_movies | **PASS** ✅ | |
 | duplicate_movie_clip | **PASS** ✅ | |
 | clone_sprite_types | **PASS** ✅ | |
-| remove_movie_clip | **PASS** ✅ | |
+| remove_movie_clip | **REGRESSED** 25/29 | Was PASS (29/29), regressed from SCRIPT_HALTING_PLAN |
 | rewind_depth | **PASS** ✅ | |
 | clip_events | **PASS** ✅ | |
 | on_construct | **PASS** ✅ | |
