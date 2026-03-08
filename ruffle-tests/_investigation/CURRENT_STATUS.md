@@ -1,14 +1,14 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 500/619 (80.8%) total, 425/477 (89.1%) filtered (CI run on 6e400bd3)
-- **Main failure types**: output_mismatch (47), runtime_error (4), compile_fail (1)
-- **Recent gains (this session)**: Implemented 6 new plans from investigation, gained 8 filtered tests (+29 total from regression recovery). Key newly passing: movieclip_lockroot (29/29), coerce_to_primitive_resolve (17/17), default_names (52/52), removed_clip_halts_script (15/15), target_clip_removed (5/5), movieclip_gettextsnapshot (112/112), custom_clip_methods (4/4), movieclip_setmask (14/14), define_local_with_paths (53/54), focus_keyboard_press (60/60), tab_ordering_events_mouse (65/65), tab_ordering_automatic_order_same_position (12/12). MOUSE_EVENTS_ADVANCED Phases 2+3+5 COMPLETE. Also recovered 9 regressions (execution_order1/2/4, getproperty_swf4, set_interval, stage_object_children, tell_target_invalid/_swf6, textfield_properties, goto_frame_number).
-- **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. remove_movie_clip, removed_clip_halts_script, target_clip_removed all recovered to PASS. removed_target_clip_scope improved 7→34/35.
-- **Previous session highlights**: EXTERNAL_INTERFACE_PLAN complete (6/7 pass), interface_implements_op 47/47 (now regressed to 46/47), device_font_spacing 91/91, root_global_parent 6/6, ASBROADCASTER complete, ASNATIVE_ASNEW complete.
+- **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
+- **Main failure types**: output_mismatch, runtime_error, compile_fail
+- **Recent gains (this session)**: Fixed actionGetBaseClip save/restore poisoning bug — recovered all 8 regressions from cb18c430 and gained string_paths_variable_scopes (5/5). Massive bonus: global_swf5_6_7_8_9 jumped 553→1031/1145 (+478 lines) from improved `this` resolution. Also: interface_implements_op 45→46/47, loadmovienum_cross_version_prototype 4→6/9.
+- **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).
+- **Previous session highlights**: Script halting on clip removal, settarget save/restore in sprite init, display list clearing in actionRemoveSprite, SetTarget dead base handling. Newly passing: button_keypress (3/3), call (63/63), do_init_action_child (12/12), global_swf6_7_8 (15/15), loadmovie_flashvars (4/4), moviecliploader_flashvars (4/4), on_construct (25/25), string_paths_variable_scopes (5/5).
 
 ## Crashes and Errors (8 tests)
 

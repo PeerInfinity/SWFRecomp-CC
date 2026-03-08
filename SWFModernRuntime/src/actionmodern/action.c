@@ -12884,7 +12884,15 @@ void actionProcessDeferredUnloads(void)
 {
 	for (int i = 0; i < g_deferred_unload_mc_count; i++) {
 		if (g_deferred_unload_mcs[i] != NULL) {
-			g_deferred_unload_mcs[i]->unloaded = 1;
+			MovieClip* umc = g_deferred_unload_mcs[i];
+			umc->unloaded = 1;
+			// Clear failed-load state and restore root properties
+			if (umc->load_failed) {
+				umc->load_failed = 0;
+				strncpy(umc->url, root_movieclip.url, sizeof(umc->url) - 1);
+				umc->url[sizeof(umc->url) - 1] = '\0';
+				umc->swf_version = (u16)g_swf_version;
+			}
 		}
 	}
 	g_deferred_unload_mc_count = 0;
@@ -18482,10 +18490,34 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 			MovieClip* _saved_ctx = g_current_context;
 			actionSetCurrentContext(mc);
+			// Swap display_list to the container MC's sprite display list so that
+			// the loaded SWF's frame functions place objects inside the container MC
+			// (not on the root display list).
+			extern DisplayObject* display_list;
+			extern size_t max_depth;
+			extern size_t display_list_capacity;
+			DisplayObject* _saved_dl = display_list;
+			size_t _saved_max = max_depth;
+			size_t _saved_cap = display_list_capacity;
+			DisplayObject* dobj_lm = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
+			if (dobj_lm != NULL && dobj_lm->sprite_display_list != NULL) {
+				display_list = dobj_lm->sprite_display_list;
+				max_depth = dobj_lm->sprite_max_depth;
+				display_list_capacity = dobj_lm->sprite_dl_capacity;
+			}
 			entry->init_func(app_context);
 			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 				entry->frame_funcs[0](app_context);
 			}
+			// Save back any display list changes (realloc may have grown it)
+			if (dobj_lm != NULL) {
+				dobj_lm->sprite_display_list = display_list;
+				dobj_lm->sprite_max_depth = max_depth;
+				dobj_lm->sprite_dl_capacity = display_list_capacity;
+			}
+			display_list = _saved_dl;
+			max_depth = _saved_max;
+			display_list_capacity = _saved_cap;
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
@@ -18908,10 +18940,32 @@ static MovieClip* resolveMCLTarget(SWFAppContext* app_context, ActionVar* target
     }
 
     if (target_arg->type == ACTION_STACK_VALUE_STRING) {
-        // Look up by instance name in child_mc_cache
         char name_utf8[256];
         const uint16_t* u16 = (const uint16_t*)(uintptr_t)target_arg->data.numeric_value;
         u16_to_utf8(u16, target_arg->str_size, name_utf8, sizeof(name_utf8));
+
+        // Check for _levelN pattern
+        if (strncmp(name_utf8, "_level", 6) == 0 && name_utf8[6] >= '0' && name_utf8[6] <= '9') {
+            if (out_is_level) *out_is_level = 1;
+            int level = atoi(name_utf8 + 6);
+            if (level == 0) {
+                extern MovieClip root_movieclip;
+                return &root_movieclip;
+            }
+            return getOrCreateLevel(app_context, level);
+        }
+
+        // Try path-based resolution (e.g. "_root.some_mc")
+        pushVar(app_context, target_arg);
+        actionGetVariable(app_context);
+        if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP) {
+            MovieClip* mc = (MovieClip*)(uintptr_t)STACK_TOP_VALUE;
+            POP();
+            return mc;
+        }
+        POP();
+
+        // Look up by instance name in child_mc_cache
         extern MovieClip* child_mc_cache[];
         extern int child_mc_count;
         for (int i = 0; i < child_mc_count; i++) {
@@ -19532,15 +19586,43 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		// g_event_this_mc to preload 'this' as MOVIECLIP.
 		if (func->function_type == 2 && func->advanced_func != NULL)
 		{
+			// Restore captured scopes (closure context)
+			u8 ef_captured = func->captured_scope_count;
+			for (u8 ci = 0; ci < ef_captured; ci++) {
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+					scope_mc[scope_depth] = func->captured_scope_mc[ci];
+					scope_chain[scope_depth++] = func->captured_scope[ci];
+				}
+			}
+			// Switch base_clip context if SWF6+
+			MovieClip* ef_saved_base = g_current_context;
+			if (g_swf_version >= 6 && func->base_clip != NULL)
+				g_current_context = (MovieClip*)func->base_clip;
 			ActionVar* regs = NULL;
 			if (func->register_count > 0)
 				regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 			func->advanced_func(app_context, NULL, 0, regs, NULL);
 			if (regs != NULL) FREE(regs);
+			g_current_context = ef_saved_base;
+			for (u8 ci = 0; ci < ef_captured; ci++) {
+				if (scope_depth > 0) scope_depth--;
+			}
 		}
 		else if (func->function_type == 1 && func->simple_func != NULL)
 		{
+			u8 ef_captured_t1 = func->captured_scope_count;
+			for (u8 ci = 0; ci < ef_captured_t1; ci++) {
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+					scope_mc[scope_depth] = func->captured_scope_mc[ci];
+					scope_chain[scope_depth++] = func->captured_scope[ci];
+				}
+			}
 			((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+			for (u8 ci = 0; ci < ef_captured_t1; ci++) {
+				if (scope_depth > 0) scope_depth--;
+			}
 		}
 		g_event_this_mc = NULL;
 
@@ -19563,13 +19645,39 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 					actionSetCurrentContext(&root_movieclip);
 					g_event_this_mc = &root_movieclip;
 					if (func->function_type == 2 && func->advanced_func != NULL) {
+						u8 ref_captured = func->captured_scope_count;
+						for (u8 ci = 0; ci < ref_captured; ci++) {
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+								scope_mc[scope_depth] = func->captured_scope_mc[ci];
+								scope_chain[scope_depth++] = func->captured_scope[ci];
+							}
+						}
+						MovieClip* ref_saved_base = g_current_context;
+						if (g_swf_version >= 6 && func->base_clip != NULL)
+							g_current_context = (MovieClip*)func->base_clip;
 						ActionVar* regs = NULL;
 						if (func->register_count > 0)
 							regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 						func->advanced_func(app_context, NULL, 0, regs, NULL);
 						if (regs != NULL) FREE(regs);
+						g_current_context = ref_saved_base;
+						for (u8 ci = 0; ci < ref_captured; ci++) {
+							if (scope_depth > 0) scope_depth--;
+						}
 					} else if (func->function_type == 1 && func->simple_func != NULL) {
+						u8 ref_captured_t1 = func->captured_scope_count;
+						for (u8 ci = 0; ci < ref_captured_t1; ci++) {
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+								scope_mc[scope_depth] = func->captured_scope_mc[ci];
+								scope_chain[scope_depth++] = func->captured_scope[ci];
+							}
+						}
 						((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+						for (u8 ci = 0; ci < ref_captured_t1; ci++) {
+							if (scope_depth > 0) scope_depth--;
+						}
 					}
 					g_event_this_mc = NULL;
 					actionSetCurrentContext(saved_ctx);
@@ -20612,6 +20720,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// ---- Existing built-in constructors (Object, Array, String, Number, Boolean, Function) ----
 	// Function constructor is SWF6+ only
 	static ASFunction g_ctors[6];
+	static ASFunction g_registerClass_func_global;
 	memset(g_ctors, 0, sizeof(g_ctors));
 	const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
 	int ctor_name_lens[] = {6, 5, 6, 6, 7, 8};
@@ -20625,6 +20734,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		cv.data.numeric_value = (u64)&g_ctors[ci];
 		setProperty(app_context, global_object, ctor_names[ci], ctor_name_lens[ci], &cv);
 	}
+	// Set up Object constructor's own_props with registerClass and prototype
+	g_ctors[0].prototype_obj = getObjectPrototype(app_context);
+	g_ctors[0].own_props = allocObject(app_context, 4);
+	retainObject(g_ctors[0].own_props);
+	setObjectProto(app_context, g_ctors[0].own_props);
+	registerGeomMethod(&g_registerClass_func_global, "registerClass",
+		(Function2Ptr)actionObjectRegisterClass, app_context,
+		g_ctors[0].own_props);
 
 	// ---- MovieClip ----
 	initMovieClipPrototype(app_context);
@@ -35275,8 +35392,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// prevFrame
 				} else if (_is_mc_nav == 5) {
 					// nextFrame
-				} else if (_is_mc_nav == 6 || _is_mc_nav == 7) {
-					// getBytesLoaded / getBytesTotal
+				} else if (_is_mc_nav == 6) {
+					// getBytesLoaded — returns 0 on failed/unloaded loads (Flash doesn't report -1 for loaded bytes)
+					if (args != NULL) FREE(args);
+					double v = _mc_target->unloaded ? 0.0 : (_mc_target->load_failed ? 0.0 : (double)_mc_target->byte_size);
+					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+					builtin_handled = 1;
+				} else if (_is_mc_nav == 7) {
+					// getBytesTotal — returns -1 on failed loads
 					if (args != NULL) FREE(args);
 					double v = _mc_target->unloaded ? 0.0 : (_mc_target->load_failed ? -1.0 : (double)_mc_target->byte_size);
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
@@ -41181,7 +41304,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 14 && strncmp(method_name, "getBytesLoaded", 14) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = mc->unloaded ? 0.0 : (mc->load_failed ? -1.0 : (double)mc->byte_size);
+			double v = mc->unloaded ? 0.0 : (mc->load_failed ? 0.0 : (double)mc->byte_size);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}

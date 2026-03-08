@@ -1288,7 +1288,10 @@ void tagShowFrame(SWFAppContext* app_context)
 
 		int saved_catch_up = catch_up_mode;
 		catch_up_mode = 0;
-		process_sprite_needs_init(app_context, &root_movieclip);
+		// Use g_current_context as parent when available (e.g., during loadMovie
+		// the loaded SWF's tagShowFrame should parent sprites to the container MC).
+		MovieClip* _si_parent = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+		process_sprite_needs_init(app_context, _si_parent);
 		catch_up_mode = saved_catch_up;
 
 		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
