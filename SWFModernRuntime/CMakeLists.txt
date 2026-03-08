@@ -14,6 +14,9 @@ option(NO_GRAPHICS "Build without graphics support (console-only)" OFF)
 # Option to use WebGPU rendering backend instead of SDL3 GPU (flashbang)
 option(USE_WEBGPU "Use WebGPU rendering backend (native + WASM)" OFF)
 
+# Option for headless graphics mode (NO_GRAPHICS display management + WebGPU offscreen rendering)
+option(HEADLESS_GRAPHICS "Build headless graphics mode for image testing" OFF)
+
 # Core sources (always included)
 set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/action.c
@@ -29,7 +32,23 @@ set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/memory/heap.c
 )
 
-if(NO_GRAPHICS)
+if(HEADLESS_GRAPHICS)
+    # Headless graphics mode: NO_GRAPHICS frame loop + WebGPU offscreen rendering
+    message(STATUS "Building in HEADLESS_GRAPHICS mode (offscreen rendering + trace)")
+    add_definitions(-DNO_GRAPHICS -DHEADLESS_GRAPHICS -DUSE_WEBGPU)
+
+    # Note: swf_headless.c is NOT included here — it requires per-test
+    # generated headers (constants.h, draws.h) and is compiled per-test
+    # by build_test.sh, just like swf_core.c in NO_GRAPHICS mode.
+    set(SWF_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/libswf/tag.c
+        ${PROJECT_SOURCE_DIR}/src/libswf/tag_stubs.c
+        ${PROJECT_SOURCE_DIR}/src/rendering/render_webgpu.c
+    )
+
+    set(SOURCES ${CORE_SOURCES} ${SWF_SOURCES})
+
+elseif(NO_GRAPHICS)
     # Console-only mode
     message(STATUS "Building in NO_GRAPHICS mode (console-only)")
     add_definitions(-DNO_GRAPHICS)
@@ -91,7 +110,33 @@ set(RENAME_ZCONF OFF)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/zlib)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/lzma)
 
-if(NO_GRAPHICS)
+if(HEADLESS_GRAPHICS)
+    # Headless graphics: WebGPU rendering but no SDL windowing
+    find_package(Threads REQUIRED)
+    find_package(Dawn QUIET)
+    if(Dawn_FOUND)
+        message(STATUS "HEADLESS_GRAPHICS: using Dawn via find_package")
+        target_link_libraries(${PROJECT_NAME} PUBLIC
+            zlibstatic
+            lzma
+            dawn::webgpu_dawn
+        )
+    elseif(WEBGPU_LIB)
+        message(STATUS "HEADLESS_GRAPHICS: using WEBGPU_LIB=${WEBGPU_LIB}")
+        find_package(Threads REQUIRED)
+        target_link_libraries(${PROJECT_NAME} PUBLIC
+            zlibstatic
+            lzma
+            ${WEBGPU_LIB}
+            Threads::Threads
+            dl
+        )
+    else()
+        message(FATAL_ERROR "HEADLESS_GRAPHICS requires Dawn. "
+            "Set -DCMAKE_PREFIX_PATH=/path/to/dawn-install or "
+            "-DWEBGPU_LIB=/path/to/libwebgpu_dawn.a")
+    endif()
+elseif(NO_GRAPHICS)
     # Console-only: no graphics libraries needed
     target_link_libraries(${PROJECT_NAME} PUBLIC
         zlibstatic
@@ -148,7 +193,17 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     lzma/liblzma/api
 )
 
-if(USE_WEBGPU)
+if(HEADLESS_GRAPHICS)
+    # Headless graphics: include rendering headers + stb
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include/rendering
+        ${PROJECT_SOURCE_DIR}/../SWFRecomp/lib/stb
+    )
+    # WebGPU headers (user must provide via WEBGPU_INCLUDE_DIR)
+    if(WEBGPU_INCLUDE_DIR)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${WEBGPU_INCLUDE_DIR})
+    endif()
+elseif(USE_WEBGPU)
     # WebGPU backend: include renderer.h and render_webgpu.h
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${PROJECT_SOURCE_DIR}/include/rendering

@@ -1,4 +1,4 @@
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 
 #include <tag.h>
 #include <swf.h>
@@ -1314,7 +1314,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	new_mc->height = 0.0f;
 	// Don't reset frame counters here — they stay at createMovieClip defaults (1,1,1).
 	// attachMovie clips that run frame 0 get their counters set at the end of ng_attachMovie.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	new_mc->as_set_flags = 0;
 #endif
 
@@ -3265,6 +3265,9 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // No-op stubs for functions not needed in NO_GRAPHICS mode
 // ---------------------------------------------------------------------------
 
+#ifndef HEADLESS_GRAPHICS
+// In HEADLESS_GRAPHICS mode, tag.c provides real implementations that call
+// the renderer. These stubs are only needed in pure NO_GRAPHICS mode.
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
 {
 	(void)offset; (void)size; (void)width; (void)height;
@@ -3273,6 +3276,7 @@ void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
 void finalizeBitmaps(void)
 {
 }
+#endif
 
 void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
 	u8 format, u8 rate, u8 sample_size, u8 stereo,
@@ -3321,4 +3325,4 @@ void tagScriptLimits(u16 max_recursion, u16 timeout)
 	g_max_call_depth = max_recursion;
 }
 
-#endif // NO_GRAPHICS
+#endif // NO_GRAPHICS || HEADLESS_GRAPHICS

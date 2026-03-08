@@ -133,14 +133,26 @@ typedef struct WebGPURenderContext
 	WGPUPipelineLayout composite_pipeline_layout;
 
 	// --- SDL window (native only) ---
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__) && !defined(HEADLESS_GRAPHICS)
 	struct SDL_Window* window;
+#endif
+
+#ifdef HEADLESS_GRAPHICS
+	// --- Headless rendering resources ---
+	WGPUTexture offscreen_texture;   // offscreen RGBA8 render target (resolve target)
+	WGPUTextureView offscreen_view;  // persistent view of offscreen_texture
+	WGPUBuffer readback_buffer;      // staging buffer for GPU→CPU readback
+	size_t readback_row_stride;      // bytes per row in readback buffer (256-aligned)
+	int capture_requested;           // 1 if next close_pass should copy to readback buffer
 #endif
 
 	// Window background color
 	u8 red;
 	u8 green;
 	u8 blue;
+
+	// Renderer initialization status (0 = not ready, 1 = fully initialized)
+	int renderer_ok;
 } WebGPURenderContext;
 
 // --- Public API (matches flashbang.h signatures) ---
@@ -175,3 +187,9 @@ void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float bl
 void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
+
+#ifdef HEADLESS_GRAPHICS
+// Headless rendering: framebuffer capture and PNG output
+void render_webgpu_request_capture(WebGPURenderContext* context);
+int render_webgpu_save_png(WebGPURenderContext* context, const char* path);
+#endif

@@ -18,9 +18,17 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
+
+# Optional PIL import for image comparisons
+try:
+    from PIL import Image
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 RUFFLE_KEY_TO_FLASH = {
     # Control keys
@@ -100,6 +108,197 @@ def get_viewport_dimensions(test_dir):
     return None
 
 
+def parse_image_comparisons(test_dir):
+    """Parse [image_comparisons.NAME] sections from test.toml.
+
+    Each comparison has:
+      - tolerance (default 0): per-channel difference threshold
+      - max_outliers (default 0): max channels allowed to exceed tolerance
+      - trigger (default "last_frame"): when to capture ("last_frame", "fs_command", or int)
+      - known_failure (default false): whether the comparison is expected to fail
+      - checks: list of {tolerance, max_outliers} dicts (advanced mode)
+
+    If both simple (tolerance/max_outliers) and advanced (checks) are specified,
+    the simple values are used as a single check.
+
+    Returns a dict of comparison_name -> {checks: [...], trigger: ..., known_failure: bool}
+    or empty dict if no image comparisons are configured.
+    """
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return {}
+
+    with open(toml_path, "rb") as f:
+        data = tomllib.load(f)
+
+    ic_section = data.get("image_comparisons")
+    if not ic_section or not isinstance(ic_section, dict):
+        return {}
+
+    result = {}
+    for name, config in ic_section.items():
+        if not isinstance(config, dict):
+            continue
+
+        known_failure = config.get("known_failure", False)
+
+        # Parse trigger: default "last_frame", can be int or string
+        trigger_raw = config.get("trigger", "last_frame")
+        if isinstance(trigger_raw, int):
+            trigger = ("specific_iteration", trigger_raw)
+        elif isinstance(trigger_raw, str):
+            if trigger_raw == "last_frame":
+                trigger = ("last_frame",)
+            elif trigger_raw == "fs_command":
+                trigger = ("fs_command",)
+            else:
+                # Try parsing as int
+                try:
+                    trigger = ("specific_iteration", int(trigger_raw))
+                except ValueError:
+                    trigger = ("last_frame",)
+        else:
+            trigger = ("last_frame",)
+
+        # Parse checks: either simple (tolerance/max_outliers at top level)
+        # or advanced (list of check dicts under "checks" key)
+        checks_raw = config.get("checks", [])
+        has_simple = "tolerance" in config or "max_outliers" in config
+
+        if has_simple and checks_raw:
+            # Ruffle treats this as an error; we use simple values only
+            checks = [{
+                "tolerance": config.get("tolerance", 0),
+                "max_outliers": config.get("max_outliers", 0),
+            }]
+        elif checks_raw:
+            checks = []
+            for c in checks_raw:
+                if isinstance(c, dict):
+                    checks.append({
+                        "tolerance": c.get("tolerance", 0),
+                        "max_outliers": c.get("max_outliers", 0),
+                    })
+            if not checks:
+                checks = [{"tolerance": 0, "max_outliers": 0}]
+        else:
+            checks = [{
+                "tolerance": config.get("tolerance", 0),
+                "max_outliers": config.get("max_outliers", 0),
+            }]
+
+        result[name] = {
+            "checks": checks,
+            "trigger": trigger,
+            "known_failure": known_failure,
+        }
+
+    return result
+
+
+def compare_images(actual_path, expected_path, checks):
+    """Compare two PNG images using Ruffle's per-pixel per-channel algorithm.
+
+    Args:
+        actual_path: Path to the actual (rendered) PNG image.
+        expected_path: Path to the expected PNG image.
+        checks: List of dicts with 'tolerance' (int, 0-255) and 'max_outliers' (int).
+                Test passes if ANY check passes.
+
+    Returns:
+        (passed: bool, message: str, max_diff: int)
+
+    Algorithm (matching Ruffle):
+    1. Both images are converted to RGBA.
+    2. Dimensions must match exactly.
+    3. Per-pixel, per-channel absolute difference is computed (4 channels: R, G, B, A).
+    4. For each check: count how many individual channels exceed the tolerance.
+       If the count <= max_outliers, the check passes.
+    5. The test passes if any check passes.
+    6. max_diff is the maximum single-channel difference across all pixels.
+    """
+    if not HAS_PIL:
+        return False, "Pillow not installed, skipping image comparison", 0
+
+    actual_path = Path(actual_path)
+    expected_path = Path(expected_path)
+
+    if not actual_path.exists():
+        return False, f"Actual image not found: {actual_path}", 0
+    if not expected_path.exists():
+        return False, f"Expected image not found: {expected_path}", 0
+
+    try:
+        actual_img = Image.open(actual_path).convert("RGBA")
+        expected_img = Image.open(expected_path).convert("RGBA")
+    except Exception as e:
+        return False, f"Failed to open image: {e}", 0
+
+    # Check dimensions
+    if actual_img.size != expected_img.size:
+        return (False,
+                f"Image size mismatch: actual {actual_img.size[0]}x{actual_img.size[1]}, "
+                f"expected {expected_img.size[0]}x{expected_img.size[1]}",
+                0)
+
+    # Compute per-pixel per-channel absolute difference
+    actual_data = actual_img.tobytes()
+    expected_data = expected_img.tobytes()
+
+    # difference_data: one byte per channel (RGBA), abs diff
+    num_pixels = actual_img.size[0] * actual_img.size[1]
+    difference_data = bytearray(num_pixels * 4)
+    max_diff = 0
+    for i in range(num_pixels * 4):
+        d = abs(actual_data[i] - expected_data[i])
+        difference_data[i] = d
+        if d > max_diff:
+            max_diff = d
+
+    # Try each check -- test passes if ANY check passes (Ruffle semantics)
+    best_outliers = None
+    best_max_outliers = None
+    for check in checks:
+        tolerance = check["tolerance"]
+        max_outliers = check["max_outliers"]
+
+        # Count outlier channels (each channel independently, matching Ruffle)
+        outliers = 0
+        for px in range(num_pixels):
+            base = px * 4
+            outliers += (difference_data[base] > tolerance)
+            outliers += (difference_data[base + 1] > tolerance)
+            outliers += (difference_data[base + 2] > tolerance)
+            outliers += (difference_data[base + 3] > tolerance)
+
+        if outliers <= max_outliers:
+            return (True,
+                    f"Image check passed: {outliers} outliers (limit {max_outliers}), "
+                    f"max difference {max_diff}",
+                    max_diff)
+
+        # Track the closest failing check for the error message
+        if best_outliers is None or outliers < best_outliers:
+            best_outliers = outliers
+            best_max_outliers = max_outliers
+
+    # All checks failed -- generate difference image
+    diff_image_path = actual_path.parent / (actual_path.stem + ".difference.png")
+    try:
+        diff_img = Image.frombytes("RGBA", actual_img.size, bytes(difference_data))
+        # Scale up for visibility: multiply difference values by 4
+        from PIL import ImageEnhance
+        diff_img = diff_img.point(lambda x: min(x * 4, 255))
+        diff_img.save(str(diff_image_path))
+    except Exception:
+        pass  # Don't fail the test just because we couldn't save the diff image
+
+    return (False,
+            f"Image comparison failed: {best_outliers} outliers exceed limit of "
+            f"{best_max_outliers}, max difference {max_diff}",
+            max_diff)
+
+
 def preprocess_input_json(src, dst, scale_factor=1.0):
     """Convert input.json to simple line-based event format. Returns wait_count."""
     with open(src) as f:
@@ -155,6 +354,10 @@ RECOMP_CONFIG = SCRIPT_DIR / "_shared" / "config.toml"
 SWFMODERN = PROJECT_ROOT / "SWFModernRuntime"
 MAIN_C = PROJECT_ROOT / "SWFRecomp" / "wasm_wrappers" / "main.c"
 DIFF_SCRIPT = PROJECT_ROOT / "scripts" / "diff_ruffle_results.py"
+DAWN_INSTALL = PROJECT_ROOT.parent / "dawn-install"
+STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
+# Ruffle upstream test assets (expected PNGs live here)
+RUFFLE_UPSTREAM = Path.home() / "CC" / "ruffle" / "tests" / "tests" / "swfs" / "avm1"
 
 # JSON result files
 RESULTS_FINAL = SCRIPT_DIR / "results.json"
@@ -708,24 +911,29 @@ def get_mock_date_time(test_dir):
     return None
 
 
-def compile_native(test_dir, num_frames, build_dir):
+def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_comparisons=False):
     """Compile generated C code with runtime into native binary."""
     mem_dir = build_dir / "memory"
     mem_dir.mkdir(exist_ok=True)
 
     # Copy runtime sources
-    for src in [
+    core_sources = [
         "src/actionmodern/action.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
-        "src/libswf/swf_core.c",
         "src/libswf/tag.c",
         "src/libswf/tag_stubs.c",
         "src/libswf/hit_test.c",
         "src/memory/heap.c",
-    ]:
+    ]
+    if headless:
+        core_sources.append("src/libswf/swf_headless.c")
+        core_sources.append("src/rendering/render_webgpu.c")
+    else:
+        core_sources.append("src/libswf/swf_core.c")
+    for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 
     shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
@@ -802,12 +1010,32 @@ def compile_native(test_dir, num_frames, build_dir):
         extra_defines.append(f"-DSWF_FILE_SIZE={swf_file_size}")
     # Pass movie URL matching Ruffle's VFS format (file:///test.swf)
     extra_defines.append('-DSWF_URL="file:///test.swf"')
+    # Build compiler flags based on mode
+    mode_defines = []
+    mode_includes = []
+    mode_libs = []
+    if headless:
+        mode_defines = ["-DNO_GRAPHICS", "-DHEADLESS_GRAPHICS", "-DUSE_WEBGPU", "-DNDEBUG"]
+        if has_image_comparisons:
+            mode_defines.append("-DHEADLESS_RENDER_ENABLED")
+        mode_includes = [
+            f"-I{inc}/rendering",
+            f"-I{STB_DIR}",
+            f"-I{DAWN_INSTALL}/include",
+        ]
+        mode_libs = [
+            str(DAWN_INSTALL / "lib" / "libwebgpu_dawn.a"),
+            "-lstdc++", "-lpthread", "-ldl",
+        ]
+    else:
+        mode_defines = ["-DNO_GRAPHICS"]
+
     try:
         result = subprocess.run(
             [
                 "gcc",
                 *[str(f) for f in sorted(build_dir.glob("*.c"))],
-                "-DNO_GRAPHICS",
+                *mode_defines,
                 f"-DMAX_FRAMES={num_frames}",
                 "-D_POSIX_C_SOURCE=200809L",
                 *extra_defines,
@@ -817,32 +1045,38 @@ def compile_native(test_dir, num_frames, build_dir):
                 f"-I{inc}/libswf",
                 f"-I{inc}/memory",
                 f"-I{SWFMODERN}/lib/c-hashmap",
+                *mode_includes,
                 "-w",
                 "-std=c17",
                 "-O2",
                 "-o",
                 str(build_dir / "test_run"),
                 "-lm",
+                *mode_libs,
             ],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=120,
         )
         return result.returncode == 0, result.stderr
     except subprocess.TimeoutExpired:
-        return False, "compilation timed out after 60 seconds"
+        return False, "compilation timed out"
 
 
-def run_binary(build_dir, event_file=None):
+def run_binary(build_dir, event_file=None, extra_env=None):
     """Run the compiled binary and capture output."""
     cmd = [str(build_dir / "test_run")]
     if event_file is not None:
         cmd.append(str(event_file))
+    env = os.environ.copy()
+    if extra_env:
+        env.update(extra_env)
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
-            timeout=10,
+            timeout=30,
+            env=env,
         )
         return result.stdout.decode("utf-8", errors="replace"), result.returncode
     except subprocess.TimeoutExpired:
@@ -1048,6 +1282,9 @@ examples:
     parser.add_argument(
         "--json", metavar="PATH",
         help="Write JSON results report to PATH")
+    parser.add_argument(
+        "--headless", action="store_true",
+        help="Build with HEADLESS_GRAPHICS mode (offscreen WebGPU rendering + trace)")
     return parser.parse_args()
 
 
@@ -1058,6 +1295,13 @@ def main():
         print(f"Error: SWFRecomp not found at {RECOMP_BIN}")
         print(f"Build it first:  cd {PROJECT_ROOT}/SWFRecomp/build && cmake .. && make -j")
         sys.exit(1)
+
+    if args.headless:
+        dawn_lib = DAWN_INSTALL / "lib" / "libwebgpu_dawn.a"
+        if not dawn_lib.exists():
+            print(f"Error: Dawn library not found at {dawn_lib}")
+            print(f"Build Dawn first and install to {DAWN_INSTALL}")
+            sys.exit(1)
 
     # Determine test list
     if args.test:
@@ -1138,6 +1382,8 @@ def main():
 
         test_start = time.monotonic()
         entry = {"test": name}
+        image_comparisons = {}
+        image_results = {}
 
         # Step 1: Recompile SWF
         if not recompile_swf(test_dir, force=args.recompile):
@@ -1165,7 +1411,12 @@ def main():
                 event_file = event_file_path
             num_frames = get_num_frames(test_dir, wait_count, has_input=input_json.exists())
             entry["num_frames"] = num_frames
-            ok, err = compile_native(test_dir, num_frames, build_dir)
+            # Parse image comparisons early so we can enable rendering at compile time
+            image_comparisons = parse_image_comparisons(test_dir) if args.headless else {}
+            has_image_cmps = bool(image_comparisons) and HAS_PIL
+            ok, err = compile_native(test_dir, num_frames, build_dir,
+                                     headless=args.headless,
+                                     has_image_comparisons=has_image_cmps)
             if not ok:
                 stats["compile_fail"] += 1
                 fail_list.append(name)
@@ -1187,7 +1438,25 @@ def main():
                 continue
 
             # Step 3: Run binary
-            raw_output, rc = run_binary(build_dir, event_file=event_file)
+            # Set up capture triggers for image comparison tests
+            run_env = {}
+            if has_image_cmps and args.headless:
+                triggers = []
+                for cmp_name, cmp_config in image_comparisons.items():
+                    trig = cmp_config["trigger"]
+                    if trig[0] == "last_frame":
+                        triggers.append(f"{cmp_name}:last_frame")
+                    elif trig[0] == "specific_iteration":
+                        triggers.append(f"{cmp_name}:iteration:{trig[1]}")
+                    elif trig[0] == "fs_command":
+                        triggers.append(f"{cmp_name}:fs_command")
+                run_env["CAPTURE_TRIGGERS"] = ",".join(triggers)
+                run_env["CAPTURE_OUTPUT_DIR"] = str(build_dir)
+                # Force lavapipe software Vulkan for WSL2 compatibility
+                run_env["VK_ICD_FILENAMES"] = "/usr/share/vulkan/icd.d/lvp_icd.json"
+                run_env["VK_DRIVER_FILES"] = "/usr/share/vulkan/icd.d/lvp_icd.json"
+            raw_output, rc = run_binary(build_dir, event_file=event_file,
+                                        extra_env=run_env if run_env else None)
             if raw_output is None:
                 stats["timeout"] += 1
                 fail_list.append(name)
@@ -1235,13 +1504,66 @@ def main():
                 save_incremental()
                 continue
 
-        # Step 4: Filter and compare
+            # Step 3b: Image comparisons (only in headless mode with rendering)
+            # image_comparisons was already parsed before compile when headless
+            if not args.headless:
+                image_comparisons = {}
+            elif not image_comparisons:
+                image_comparisons = parse_image_comparisons(test_dir)
+            image_results = {}
+            if image_comparisons and HAS_PIL:
+                for cmp_name, cmp_config in image_comparisons.items():
+                    # Look for expected PNG: local test dir first, then Ruffle upstream
+                    expected_png = test_dir / f"{cmp_name}.expected.png"
+                    if not expected_png.exists() and RUFFLE_UPSTREAM.exists():
+                        upstream_png = RUFFLE_UPSTREAM / name / f"{cmp_name}.expected.png"
+                        if upstream_png.exists():
+                            expected_png = upstream_png
+                    # Actual PNG: look in build_dir (produced by test binary)
+                    actual_png = build_dir / f"{cmp_name}.png"
+                    if not actual_png.exists():
+                        # Also check test_dir in case the binary writes there
+                        actual_png = test_dir / f"{cmp_name}.actual.png"
+                    if not expected_png.exists():
+                        image_results[cmp_name] = {
+                            "status": "skip",
+                            "message": f"No expected image: {cmp_name}.expected.png",
+                        }
+                        continue
+                    if not actual_png.exists():
+                        image_results[cmp_name] = {
+                            "status": "fail",
+                            "message": f"No actual image produced for {cmp_name}",
+                        }
+                        continue
+                    passed, message, max_diff = compare_images(
+                        actual_png, expected_png, cmp_config["checks"])
+                    image_results[cmp_name] = {
+                        "status": "pass" if passed else "fail",
+                        "message": message,
+                        "max_diff": max_diff,
+                        "trigger": cmp_config["trigger"],
+                        "known_failure": cmp_config.get("known_failure", False),
+                    }
+
+        # Step 4: Filter and compare trace output
         actual = filter_output(raw_output)
         expected = (test_dir / "output.txt").read_text().replace("\r\n", "\n").rstrip("\n")
 
         match, diff_summary, line_stats = compare_output(actual, expected, epsilon)
         entry["lines"] = line_stats
         entry["duration"] = round(time.monotonic() - test_start, 2)
+
+        # Include image comparison results in entry if any were run
+        if image_comparisons:
+            entry["image_comparisons"] = image_results
+            # Log image comparison results in verbose mode
+            if args.verbose and image_results:
+                for cmp_name, cmp_result in image_results.items():
+                    status = cmp_result["status"].upper()
+                    msg = cmp_result.get("message", "")
+                    print(f"    [image:{cmp_name}] {status} - {msg}")
+
         if match:
             stats["pass"] += 1
             pass_list.append(name)

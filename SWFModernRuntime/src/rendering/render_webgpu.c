@@ -13,7 +13,11 @@
 #include <swf.h>
 #include <heap.h>
 
-#ifndef __EMSCRIPTEN__
+#ifdef HEADLESS_GRAPHICS
+// Headless mode: no SDL, no Emscripten — offscreen rendering only
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+#elif !defined(__EMSCRIPTEN__)
 #include <SDL3/SDL.h>
 #include "sdl3webgpu.h"
 #else
@@ -299,6 +303,11 @@ static void request_adapter_sync(WebGPURenderContext* ctx,
 	{
 		emscripten_sleep(10);
 	}
+#elif defined(HEADLESS_GRAPHICS)
+	// Headless: use ProcessEvents polling (WaitAny requires timed wait features)
+	(void)future;
+	while (ctx->adapter == NULL)
+		wgpuInstanceProcessEvents(ctx->instance);
 #else
 	// Native: poll until the callback fires
 	WGPUFutureWaitInfo wait_info = {0};
@@ -341,6 +350,10 @@ static void request_device_sync(WebGPURenderContext* ctx,
 	{
 		emscripten_sleep(10);
 	}
+#elif defined(HEADLESS_GRAPHICS)
+	(void)future;
+	while (ctx->device == NULL)
+		wgpuInstanceProcessEvents(ctx->instance);
 #else
 	WGPUFutureWaitInfo wait_info = {0};
 	wait_info.future = future;
@@ -459,7 +472,10 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	assert(ctx->instance != NULL);
 
 	// --- Create surface ---
-#ifdef __EMSCRIPTEN__
+#ifdef HEADLESS_GRAPHICS
+	// Headless mode: no surface, no window
+	ctx->surface = NULL;
+#elif defined(__EMSCRIPTEN__)
 	WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvas_src = {0};
 	canvas_src.chain.sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
 	canvas_src.selector = WGPU_LABEL("#canvas");
@@ -480,12 +496,18 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 
 	ctx->surface = SDL_GetWGPUSurface(ctx->instance, ctx->window);
 #endif
+#ifndef HEADLESS_GRAPHICS
 	assert(ctx->surface != NULL);
+#endif
 
 	// --- Request adapter ---
 	{
 		WGPURequestAdapterOptions opts = {0};
+#ifdef HEADLESS_GRAPHICS
+		opts.compatibleSurface = NULL;  // No surface in headless mode
+#else
 		opts.compatibleSurface = ctx->surface;
+#endif
 		opts.powerPreference = WGPUPowerPreference_HighPerformance;
 
 		request_adapter_sync(ctx, &opts);
@@ -503,9 +525,38 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		assert(ctx->device != NULL);
 	}
 
-	// --- Configure surface ---
+	// --- Configure surface (or create offscreen texture for headless) ---
 	ctx->surface_format = WGPUTextureFormat_BGRA8Unorm;
 
+#ifdef HEADLESS_GRAPHICS
+	// Create offscreen render target texture (used as MSAA resolve target)
+	{
+		WGPUTextureDescriptor offscreen_desc = {0};
+		offscreen_desc.label = WGPU_LABEL("offscreen_target");
+		offscreen_desc.dimension = WGPUTextureDimension_2D;
+		offscreen_desc.size = (WGPUExtent3D){ctx->width, ctx->height, 1};
+		offscreen_desc.format = ctx->surface_format;
+		offscreen_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
+		offscreen_desc.mipLevelCount = 1;
+		offscreen_desc.sampleCount = 1;
+		ctx->offscreen_texture = wgpuDeviceCreateTexture(ctx->device, &offscreen_desc);
+		assert(ctx->offscreen_texture != NULL);
+		ctx->offscreen_view = wgpuTextureCreateView(ctx->offscreen_texture, NULL);
+
+		// Create staging buffer for readback
+		size_t row_bytes = (size_t)ctx->width * 4;
+		// WebGPU requires bytesPerRow aligned to 256
+		size_t aligned_row = (row_bytes + 255) & ~(size_t)255;
+		ctx->readback_row_stride = aligned_row;
+		WGPUBufferDescriptor buf_desc = {0};
+		buf_desc.label = WGPU_LABEL("readback_buffer");
+		buf_desc.size = aligned_row * ctx->height;
+		buf_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
+		buf_desc.mappedAtCreation = false;
+		ctx->readback_buffer = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
+		assert(ctx->readback_buffer != NULL);
+	}
+#else
 	WGPUSurfaceConfiguration surf_config = {0};
 	surf_config.device = ctx->device;
 	surf_config.format = ctx->surface_format;
@@ -515,6 +566,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	surf_config.height = ctx->height;
 	surf_config.presentMode = WGPUPresentMode_Fifo;
 	wgpuSurfaceConfigure(ctx->surface, &surf_config);
+#endif
 
 	// --- Create all GPU resources ---
 	create_dummy_texture(ctx);
@@ -533,13 +585,19 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		// the bind group remains valid.
 	}
 
-	// --- Register mouse input callbacks (WASM only) ---
-#ifdef __EMSCRIPTEN__
+	// --- Register mouse input callbacks (WASM only, not headless) ---
+#if defined(__EMSCRIPTEN__) && !defined(HEADLESS_GRAPHICS)
 	g_mouse_app_context = app_context;
 	emscripten_set_mousemove_callback("#canvas", NULL, 0, on_mouse_move);
 	emscripten_set_mousedown_callback("#canvas", NULL, 0, on_mouse_down);
 	emscripten_set_mouseup_callback("#canvas", NULL, 0, on_mouse_up);
 #endif
+
+	// Mark renderer as ready only if critical objects were created
+	if (ctx->device && ctx->render_pipeline && ctx->queue)
+		ctx->renderer_ok = 1;
+	else
+		fprintf(stderr, "Warning: WebGPU renderer not fully initialized, rendering disabled\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -1185,7 +1243,11 @@ static void run_compute_pass(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 int render_webgpu_poll(SWFAppContext* app_context)
 {
-#ifdef __EMSCRIPTEN__
+#ifdef HEADLESS_GRAPHICS
+	// Headless mode: no events to poll
+	(void)app_context;
+	return 0;
+#elif defined(__EMSCRIPTEN__)
 	// In WASM, mouse events are handled by callbacks registered in init.
 	return 0;
 #else
@@ -1235,6 +1297,11 @@ void render_webgpu_set_background(WebGPURenderContext* ctx, u8 r, u8 g, u8 b)
 // ---------------------------------------------------------------------------
 void render_webgpu_open_pass(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
+#ifdef HEADLESS_GRAPHICS
+	// Headless: use the persistent offscreen texture as resolve target
+	ctx->surface_view = ctx->offscreen_view;
+#else
 	// Get the current surface texture
 	WGPUSurfaceTexture surf_tex;
 	wgpuSurfaceGetCurrentTexture(ctx->surface, &surf_tex);
@@ -1246,6 +1313,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	}
 
 	ctx->surface_view = wgpuTextureCreateView(surf_tex.texture, NULL);
+#endif
 
 	// Create command encoder
 	WGPUCommandEncoderDescriptor enc_desc = {0};
@@ -1320,6 +1388,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
                               size_t num_verts, u32 transform_id, u32 cxform_id)
 {
+	if (!ctx->renderer_ok) return;
 	// Set vertex buffer with byte offset
 	uint64_t byte_offset = offset * 4 * sizeof(u32);
 	uint64_t byte_size = num_verts * 4 * sizeof(u32);
@@ -1339,6 +1408,7 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 // ---------------------------------------------------------------------------
 void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	// Switch to stencil-write pipeline: draws to stencil buffer only (no color)
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
 	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
@@ -1346,6 +1416,7 @@ void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)
 
 void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	// Switch to stencil-test pipeline: only draws where stencil == 1 (inside mask)
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
 	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
@@ -1353,12 +1424,14 @@ void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
 
 void render_webgpu_end_clip(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	// Switch back to normal pipeline (no stencil testing)
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
 }
 
 void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
 {
+	if (!ctx->renderer_ok) return;
 	WGPURenderPipeline pipeline;
 	switch (blend_mode)
 	{
@@ -1376,13 +1449,37 @@ void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
 // ---------------------------------------------------------------------------
 void render_webgpu_close_pass(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	wgpuRenderPassEncoderEnd(ctx->render_pass);
+
+#ifdef HEADLESS_GRAPHICS
+	// Headless: copy offscreen texture to staging buffer for readback
+	if (ctx->capture_requested)
+	{
+		WGPUTexelCopyTextureInfo src = {0};
+		src.texture = ctx->offscreen_texture;
+		src.mipLevel = 0;
+		src.origin = (WGPUOrigin3D){0, 0, 0};
+		src.aspect = WGPUTextureAspect_All;
+
+		WGPUTexelCopyBufferInfo dst = {0};
+		dst.buffer = ctx->readback_buffer;
+		dst.layout.offset = 0;
+		dst.layout.bytesPerRow = (uint32_t)ctx->readback_row_stride;
+		dst.layout.rowsPerImage = ctx->height;
+
+		WGPUExtent3D copy_size = {(uint32_t)ctx->width, (uint32_t)ctx->height, 1};
+		wgpuCommandEncoderCopyTextureToBuffer(ctx->encoder, &src, &dst, &copy_size);
+	}
+#endif
 
 	WGPUCommandBufferDescriptor cmd_desc = {0};
 	WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(ctx->encoder, &cmd_desc);
 	wgpuQueueSubmit(ctx->queue, 1, &cmd);
 
-#ifndef __EMSCRIPTEN__
+#ifdef HEADLESS_GRAPHICS
+	// Headless: no surface to present
+#elif !defined(__EMSCRIPTEN__)
 	wgpuSurfacePresent(ctx->surface);
 #endif
 
@@ -1390,11 +1487,15 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	wgpuCommandBufferRelease(cmd);
 	wgpuRenderPassEncoderRelease(ctx->render_pass);
 	wgpuCommandEncoderRelease(ctx->encoder);
+#ifndef HEADLESS_GRAPHICS
 	wgpuTextureViewRelease(ctx->surface_view);
+#endif
 
 	ctx->render_pass = NULL;
 	ctx->encoder = NULL;
+#ifndef HEADLESS_GRAPHICS
 	ctx->surface_view = NULL;
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -1463,6 +1564,7 @@ void render_webgpu_finalize_bitmaps(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 void render_webgpu_upload_extra_transform_id(WebGPURenderContext* ctx, u32 transform_id)
 {
+	if (!ctx->renderer_ok) return;
 	// Upload to GPU buffer (matching flashbang behavior).
 	// Not yet bound to shaders — deferred until both backends' shaders are updated.
 	u32 id_data[4] = {transform_id, 0, 0, 0};
@@ -1471,6 +1573,7 @@ void render_webgpu_upload_extra_transform_id(WebGPURenderContext* ctx, u32 trans
 
 void render_webgpu_upload_extra_transform(WebGPURenderContext* ctx, float* transform)
 {
+	if (!ctx->renderer_ok) return;
 	// Upload mat4 to GPU buffer (matching flashbang behavior).
 	// Not yet bound to shaders — deferred until both backends' shaders are updated.
 	wgpuQueueWriteBuffer(ctx->queue, ctx->extra_transform_buf, 0, transform, 16 * sizeof(float));
@@ -1478,6 +1581,7 @@ void render_webgpu_upload_extra_transform(WebGPURenderContext* ctx, float* trans
 
 void render_webgpu_upload_cxform_id(WebGPURenderContext* ctx, u32 cxform_id)
 {
+	if (!ctx->renderer_ok) return;
 	// Upload to GPU buffer (matching flashbang behavior).
 	// Not yet bound to shaders — deferred until both backends' shaders are updated.
 	u32 id_data[4] = {cxform_id, 0, 0, 0};
@@ -1486,6 +1590,7 @@ void render_webgpu_upload_cxform_id(WebGPURenderContext* ctx, u32 cxform_id)
 
 void render_webgpu_upload_cxform(WebGPURenderContext* ctx, float* cxform)
 {
+	if (!ctx->renderer_ok) return;
 	// Upload 20 floats (5x4 color transform) to GPU buffer (matching flashbang behavior).
 	// Not yet bound to shaders — deferred until both backends' shaders are updated.
 	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_uniform_buf, 0, cxform, 20 * sizeof(float));
@@ -1521,6 +1626,7 @@ void render_webgpu_compose_text_transforms(WebGPURenderContext* ctx,
                                             u32 glyph_start,
                                             size_t count)
 {
+	if (!ctx->renderer_ok) return;
 	const float* transforms = (const float*)transform_data;
 	const float* place_xform = &transforms[place_transform_id * 16];
 
@@ -1549,6 +1655,7 @@ void render_webgpu_compose_sprite_transform(WebGPURenderContext* ctx,
                                             u32 parent_transform_id,
                                             u32 child_transform_id)
 {
+	if (!ctx->renderer_ok) return;
 	const float* transforms = (const float*)transform_data;
 	const float* parent_xform = &transforms[parent_transform_id * 16];
 	const float* child_xform  = &transforms[child_transform_id * 16];
@@ -1568,6 +1675,7 @@ void render_webgpu_compose_sprite_transform(WebGPURenderContext* ctx,
 void render_webgpu_write_transform(WebGPURenderContext* ctx,
                                    u32 transform_id, const float composed[16])
 {
+	if (!ctx->renderer_ok) return;
 	uint64_t offset = (uint64_t)transform_id * 16 * sizeof(float);
 	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
 	                     composed, 16 * sizeof(float));
@@ -1580,12 +1688,14 @@ void render_webgpu_write_transform(WebGPURenderContext* ctx,
 void render_webgpu_update_vertices(WebGPURenderContext* ctx,
 	size_t byte_offset, const void* data, size_t byte_size)
 {
+	if (!ctx->renderer_ok) return;
 	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer, byte_offset, data, byte_size);
 }
 
 void render_webgpu_update_colors(WebGPURenderContext* ctx,
 	size_t byte_offset, const void* data, size_t byte_size)
 {
+	if (!ctx->renderer_ok) return;
 	wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer, byte_offset, data, byte_size);
 }
 
@@ -1681,6 +1791,7 @@ static const char* composite_wgsl =
 
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	if (ctx->filter_resources_created) return;
 	ctx->filter_resources_created = 1;
 
@@ -1880,6 +1991,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 
 void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	if (ctx->render_pass)
 	{
 		wgpuRenderPassEncoderEnd(ctx->render_pass);
@@ -1890,6 +2002,7 @@ void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
 
 void render_webgpu_resume_pass(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	// Resume the main render pass with loadOp=Load to preserve existing content + stencil
 	WGPURenderPassColorAttachment color_att = {0};
 	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
@@ -1922,6 +2035,7 @@ void render_webgpu_resume_pass(WebGPURenderContext* ctx)
 
 void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	render_webgpu_ensure_filter_resources(ctx);
 
 	// Use a SEPARATE MSAA texture (filter_msaa_view) so we don't clobber
@@ -1961,6 +2075,7 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 
 void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
 {
+	if (!ctx->renderer_ok) return;
 	if (ctx->render_pass)
 	{
 		wgpuRenderPassEncoderEnd(ctx->render_pass);
@@ -1973,6 +2088,7 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 	float blur_x, float blur_y, u8 quality,
 	float strength, float r, float g, float b, float a, int colorize)
 {
+	if (!ctx->renderer_ok) return;
 	float texel_w = 1.0f / (float)ctx->width;
 	float texel_h = 1.0f / (float)ctx->height;
 
@@ -2065,6 +2181,7 @@ void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
 	float offset_x, float offset_y,
 	float tint_r, float tint_g, float tint_b, float tint_a)
 {
+	if (!ctx->renderer_ok) return;
 	// offset_x/y are in NDC space; tint rgba = 0 means passthrough
 	float has_tint = (tint_r != 0 || tint_g != 0 || tint_b != 0 || tint_a != 0) ? 1.0f : 0.0f;
 	float params[8] = {offset_x, offset_y, has_tint, 0, tint_r, tint_g, tint_b, tint_a};
@@ -2195,10 +2312,104 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	FREE(ctx->bitmap_sizes);
 
 	// Destroy SDL window (native only)
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__) && !defined(HEADLESS_GRAPHICS)
 	if (ctx->window)
 		SDL_DestroyWindow(ctx->window);
 #endif
 
+#ifdef HEADLESS_GRAPHICS
+	// Release headless resources
+	if (ctx->offscreen_view) wgpuTextureViewRelease(ctx->offscreen_view);
+	if (ctx->offscreen_texture) wgpuTextureRelease(ctx->offscreen_texture);
+	if (ctx->readback_buffer) wgpuBufferRelease(ctx->readback_buffer);
+#endif
+
 	free(ctx);
 }
+
+// ---------------------------------------------------------------------------
+// Headless framebuffer capture and PNG output
+// ---------------------------------------------------------------------------
+#ifdef HEADLESS_GRAPHICS
+
+// Synchronous callback state for buffer mapping
+static volatile int g_map_done = 0;
+static volatile WGPUMapAsyncStatus g_map_status;
+
+static void on_map_callback(WGPUMapAsyncStatus status,
+                            WGPUStringView message,
+                            void* userdata1, void* userdata2)
+{
+	(void)message;
+	(void)userdata1;
+	(void)userdata2;
+	g_map_status = status;
+	g_map_done = 1;
+}
+
+void render_webgpu_request_capture(WebGPURenderContext* ctx)
+{
+	ctx->capture_requested = 1;
+}
+
+int render_webgpu_save_png(WebGPURenderContext* ctx, const char* path)
+{
+	if (!ctx->readback_buffer) return 0;
+
+	// Map the staging buffer synchronously
+	g_map_done = 0;
+	WGPUBufferMapCallbackInfo map_info = {0};
+	map_info.mode = WGPUCallbackMode_AllowProcessEvents;
+	map_info.callback = on_map_callback;
+	wgpuBufferMapAsync(ctx->readback_buffer, WGPUMapMode_Read, 0,
+	                   ctx->readback_row_stride * ctx->height, map_info);
+
+	// Poll until mapped (synchronous spin — fine for headless test runner)
+	while (!g_map_done) {
+		wgpuInstanceProcessEvents(ctx->instance);
+	}
+
+	if (g_map_status != WGPUMapAsyncStatus_Success) {
+		fprintf(stderr, "render_webgpu_save_png: buffer map failed (status %d)\n",
+		        (int)g_map_status);
+		return 0;
+	}
+
+	const void* mapped = wgpuBufferGetConstMappedRange(ctx->readback_buffer, 0,
+	                                                   ctx->readback_row_stride * ctx->height);
+	if (!mapped) {
+		wgpuBufferUnmap(ctx->readback_buffer);
+		return 0;
+	}
+
+	// Convert BGRA8 (GPU format) to RGBA8 (PNG format), stripping row padding
+	int w = ctx->width;
+	int h = ctx->height;
+	unsigned char* rgba = malloc(w * h * 4);
+	if (!rgba) {
+		wgpuBufferUnmap(ctx->readback_buffer);
+		return 0;
+	}
+
+	for (int y = 0; y < h; y++) {
+		const unsigned char* src_row = (const unsigned char*)mapped + y * ctx->readback_row_stride;
+		unsigned char* dst_row = rgba + y * w * 4;
+		for (int x = 0; x < w; x++) {
+			dst_row[x * 4 + 0] = src_row[x * 4 + 2]; // R <- B
+			dst_row[x * 4 + 1] = src_row[x * 4 + 1]; // G <- G
+			dst_row[x * 4 + 2] = src_row[x * 4 + 0]; // B <- R
+			dst_row[x * 4 + 3] = src_row[x * 4 + 3]; // A <- A
+		}
+	}
+
+	wgpuBufferUnmap(ctx->readback_buffer);
+
+	// Write PNG
+	int ok = stbi_write_png(path, w, h, 4, rgba, w * 4);
+	free(rgba);
+
+	ctx->capture_requested = 0;
+	return ok;
+}
+
+#endif // HEADLESS_GRAPHICS

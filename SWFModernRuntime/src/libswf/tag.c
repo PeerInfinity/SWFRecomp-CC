@@ -9,11 +9,13 @@
 #include <heap.h>
 #include <hit_test.h>
 
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 #include <renderer.h>
 extern RenderContext* context;
-#else
-// NO_GRAPHICS: extern data arrays from generated code
+#endif
+
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+// NO_GRAPHICS / HEADLESS: extern data arrays from generated code
 extern float transform_data[][16];
 extern float cxform_data[];
 extern int catch_up_mode;
@@ -454,7 +456,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					// Recurse nested sprites (set parent context for correct child MC creation)
 					{
 						extern MovieClip root_movieclip;
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
 #else
@@ -500,7 +502,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					// Recurse nested sprites (set parent context for correct child MC creation)
 					{
 						extern MovieClip root_movieclip;
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
 #else
@@ -602,7 +604,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		if (!g_advance_defer_nested)
 		{
 			MovieClip* sprite_mc = NULL;
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 			extern MovieClip root_movieclip;
 			MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 			if (obj->instance_name != NULL)
@@ -662,7 +664,7 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 
 		// Set context to this sprite's MC for correct child resolution
 		MovieClip* sprite_mc = NULL;
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 		{
 			extern MovieClip root_movieclip;
 			MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
@@ -695,7 +697,7 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 	}
 }
 
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 // ---------------------------------------------------------------------------
 // Helper 2: Recursive transform composition for sprite/button children
 // ---------------------------------------------------------------------------
@@ -945,7 +947,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 {
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	renderer_set_background(context, red, green, blue);
 #else
 	(void)red; (void)green; (void)blue;
@@ -1328,11 +1330,11 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Button hit testing + state machine + action dispatch ---
 	// In NO_GRAPHICS mode, button states are updated per-tick from swf_core.c frame loop
 	// (after event delivery), and per-mouse-event from input_events_deliver().
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	ng_update_button_states(app_context);
 #endif
 
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	// Compose transforms recursively BEFORE the render pass.
 	// For sprites/buttons: compose_children handles all nesting levels,
 	// passing the composed parent transform down so nested text/sprite/button
@@ -2765,7 +2767,7 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 #endif
 		clear_display_entry(app_context, depth);
 	}
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
 	(void)app_context;
 #endif
 }
@@ -2829,7 +2831,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 #endif
 		clear_display_entry(app_context, depth);
 	}
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
 	(void)app_context;
 #endif
 }
@@ -3215,9 +3217,9 @@ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
 #endif
 }
 
-// tagRegisterExport: in NO_GRAPHICS mode, implemented in tag_stubs.c.
-// In graphics mode, provide a no-op stub.
-#ifndef NO_GRAPHICS
+// tagRegisterExport: in NO_GRAPHICS/HEADLESS mode, implemented in tag_stubs.c.
+// In pure graphics mode (no tag_stubs.c), provide a no-op stub.
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id)
 {
 	(void)app_context; (void)name; (void)char_id;
@@ -3338,7 +3340,7 @@ void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 }
 #endif // NO_GRAPHICS
 
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
 {
 	renderer_upload_bitmap(context, offset, size, width, height);

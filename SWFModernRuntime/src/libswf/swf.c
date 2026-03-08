@@ -1,4 +1,4 @@
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
 
 #include <stdlib.h>
 #include <swf.h>
@@ -157,4 +157,4 @@ void swfStart(SWFAppContext* app_context)
 	free(display_list);
 }
 
-#endif // NO_GRAPHICS
+#endif // !NO_GRAPHICS && !HEADLESS_GRAPHICS

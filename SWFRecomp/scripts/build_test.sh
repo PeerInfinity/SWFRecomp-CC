@@ -1,8 +1,9 @@
 #!/bin/bash
-# Usage: ./scripts/build_test.sh <test_name> [native|wasm] [--clean] [--graphics]
+# Usage: ./scripts/build_test.sh <test_name> [native|wasm] [--clean] [--graphics] [--headless]
 # Example: ./scripts/build_test.sh trace_swf_4 wasm
 # Example: ./scripts/build_test.sh trace_swf_4 native --clean
 # Example: ./scripts/build_test.sh graphics/three_boxes wasm --graphics
+# Example: ./scripts/build_test.sh trace_swf_4 native --headless
 
 set -e
 
@@ -11,6 +12,7 @@ TEST_NAME=$1
 TARGET=${2:-wasm}              # Default: wasm
 CLEAN_FLAG=false
 GRAPHICS_FLAG=false
+HEADLESS_FLAG=false
 
 # Check for flags in any position
 for arg in "$@"; do
@@ -19,6 +21,9 @@ for arg in "$@"; do
     fi
     if [ "$arg" = "--graphics" ]; then
         GRAPHICS_FLAG=true
+    fi
+    if [ "$arg" = "--headless" ]; then
+        HEADLESS_FLAG=true
     fi
 done
 
@@ -29,6 +34,9 @@ if [ "$TARGET" = "--clean" ]; then
 elif [ "$TARGET" = "--graphics" ]; then
     TARGET="wasm"
     GRAPHICS_FLAG=true
+elif [ "$TARGET" = "--headless" ]; then
+    TARGET="native"
+    HEADLESS_FLAG=true
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -160,7 +168,14 @@ cp "${SWFMODERN_SRC}/actionmodern/object.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
 
-if [ "$GRAPHICS_FLAG" = true ]; then
+if [ "$HEADLESS_FLAG" = true ]; then
+    echo "Using HEADLESS_GRAPHICS mode (offscreen WebGPU + trace) for ${TARGET} build..."
+    cp "${SWFMODERN_SRC}/libswf/swf_headless.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
+elif [ "$GRAPHICS_FLAG" = true ]; then
     echo "Using GRAPHICS mode (WebGPU) for ${TARGET} build..."
     cp "${SWFMODERN_SRC}/libswf/swf.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
@@ -264,7 +279,19 @@ else
     cd "${BUILD_DIR}"
 
     NATIVE_GRAPHICS_FLAGS=""
-    if [ "$GRAPHICS_FLAG" = true ]; then
+    NATIVE_EXTRA_INCLUDES=""
+    NATIVE_EXTRA_LIBS=""
+    if [ "$HEADLESS_FLAG" = true ]; then
+        DAWN_INSTALL="${SWFRECOMP_ROOT}/../../dawn-install"
+        if [ ! -f "${DAWN_INSTALL}/lib/libwebgpu_dawn.a" ]; then
+            echo "Error: Dawn not found at ${DAWN_INSTALL}"
+            echo "Build Dawn first: see SWFModernRuntime/CMakeLists.txt comments"
+            exit 1
+        fi
+        NATIVE_GRAPHICS_FLAGS="-DNO_GRAPHICS -DHEADLESS_GRAPHICS -DUSE_WEBGPU"
+        NATIVE_EXTRA_INCLUDES="-I${SWFMODERN_INC}/rendering -I${SWFRECOMP_ROOT}/lib/stb -I${DAWN_INSTALL}/include"
+        NATIVE_EXTRA_LIBS="${DAWN_INSTALL}/lib/libwebgpu_dawn.a -lstdc++ -lpthread -ldl"
+    elif [ "$GRAPHICS_FLAG" = true ]; then
         NATIVE_GRAPHICS_FLAGS="-DUSE_WEBGPU -I${SWFMODERN_INC}/rendering -I${SWFMODERN_INC}/audio"
     else
         NATIVE_GRAPHICS_FLAGS="-DNO_GRAPHICS"
@@ -280,11 +307,12 @@ else
         -I"${SWFMODERN_INC}/libswf" \
         -I"${SWFMODERN_INC}/memory" \
         -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
+        $NATIVE_EXTRA_INCLUDES \
         -Wall \
         -Wno-unused-variable \
         -std=c17 \
         -o "${OUTPUT_NAME}" \
-        -lm
+        -lm $NATIVE_EXTRA_LIBS
 
     echo ""
     echo "✅ Native build complete!"

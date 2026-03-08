@@ -26507,6 +26507,12 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				extern int quit_swf;
 				quit_swf = 1;
 			}
+#ifdef HEADLESS_GRAPHICS
+			else if (strcasecmp(cmd, "capture") == 0) {
+				extern void headless_on_fscommand_capture(void);
+				headless_on_fscommand_capture();
+			}
+#endif
 			return;
 		}
 	}

@@ -45,6 +45,11 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) render_webgpu_composite_filtered(ctx, ox, oy, tr, tg, tb, ta)
 #define renderer_ensure_filter_resources(ctx)          render_webgpu_ensure_filter_resources(ctx)
 
+#ifdef HEADLESS_GRAPHICS
+#define renderer_request_capture(ctx)                  render_webgpu_request_capture(ctx)
+#define renderer_save_png(ctx, path)                   render_webgpu_save_png(ctx, path)
+#endif
+
 #else
 
 #include <flashbang.h>
