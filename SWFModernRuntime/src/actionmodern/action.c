@@ -11587,13 +11587,22 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 			const char* dot = strchr(rest, '.');
 			int seg_len = dot ? (int)(dot - rest) : (int)strlen(rest);
 			MovieClip* found = NULL;
-			for (int i = 0; i < child_mc_count; i++) {
-				if (child_mc_cache[i] == NULL) continue;
-				if (child_mc_cache[i]->parent == mc &&
-				    (int)strlen(child_mc_cache[i]->name) == seg_len &&
-				    strncmp(child_mc_cache[i]->name, rest, seg_len) == 0) {
-					found = child_mc_cache[i];
-					break;
+			// Handle special segments: _root, _level0, _parent
+			if (seg_len == 5 && strncmp(rest, "_root", 5) == 0) {
+				found = &root_movieclip;
+			} else if (seg_len == 7 && strncmp(rest, "_level0", 7) == 0) {
+				found = &root_movieclip;
+			} else if (seg_len == 7 && strncmp(rest, "_parent", 7) == 0) {
+				found = (mc->parent != NULL) ? mc->parent : &root_movieclip;
+			} else {
+				for (int i = 0; i < child_mc_count; i++) {
+					if (child_mc_cache[i] == NULL) continue;
+					if (child_mc_cache[i]->parent == mc &&
+					    (int)strlen(child_mc_cache[i]->name) == seg_len &&
+					    strncmp(child_mc_cache[i]->name, rest, seg_len) == 0) {
+						found = child_mc_cache[i];
+						break;
+					}
 				}
 			}
 			if (found == NULL) return NULL;
@@ -21314,6 +21323,39 @@ void actionGetVariable(SWFAppContext* app_context)
 					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 					return;
 				}
+				// For colon-separated slash paths (variable access like /ruffle/:def),
+				// try resolving the target as a non-MC Object via GetVariable
+				if (*last_sep == ':' && target_len > 0 && prop_len > 0) {
+					char _gv_dp[512];
+					u32 _gv_dp_len = 0;
+					u32 _gv_src_len = target_len;
+					while (_gv_src_len > 0 && var_name[_gv_src_len - 1] == '/')
+						_gv_src_len--;
+					if (_gv_src_len > 0 && var_name[0] == '/') {
+						memcpy(_gv_dp, "_root", 5);
+						_gv_dp_len = 5;
+						if (_gv_src_len > 1) {
+							_gv_dp[_gv_dp_len++] = '.';
+							for (u32 _i = 1; _i < _gv_src_len; _i++)
+								_gv_dp[_gv_dp_len++] = (var_name[_i] == '/') ? '.' : var_name[_i];
+						}
+					} else {
+						for (u32 _i = 0; _i < _gv_src_len; _i++)
+							_gv_dp[_gv_dp_len++] = (var_name[_i] == '/') ? '.' : var_name[_i];
+					}
+					_gv_dp[_gv_dp_len] = '\0';
+					PUSH_STR(_gv_dp, _gv_dp_len);
+					actionGetVariable(app_context);
+					u8 _gv_rt = STACK_TOP_TYPE;
+					// Only use object fallback for non-MC objects (plain ASObject)
+					// MC targets should have been found by resolveFlashPathToMC above
+					if (_gv_rt == ACTION_STACK_VALUE_OBJECT) {
+						PUSH_STR(prop_name, prop_len);
+						actionGetMember(app_context);
+						return;
+					}
+					POP();
+				}
 				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 				return;
 			}
@@ -23307,14 +23349,44 @@ void actionDefineLocal(SWFAppContext* app_context)
 					PUSH_STR(prop_name, prop_len);
 					pushVar(app_context, &value_var);
 					actionSetMember(app_context);
+					// Also store the literal slash-path key on the MC, so that
+					// this['/:pqr'] (GetMember with literal key) can find it.
+					if (target_mc->dynamic_props == NULL) {
+						target_mc->dynamic_props = (void*)allocObject(app_context, 8);
+					}
+					setProperty(app_context, (ASObject*)target_mc->dynamic_props,
+						var_name, var_name_len, &value_var);
 					POP_2();
 					return;
 				}
 				// MC resolution failed — try resolving slash path via GetVariable
-				// Convert slash path like "/ruffle" to GetVariable path "ruffle"
-				// (leading "/" resolves from root, segments separated by "/")
+				// Convert slash path like "/ruffle/" to dot path "_root.ruffle"
 				if (path_len > 0) {
-					PUSH_STR(var_name, path_len);
+					char _dl_dot_path[512];
+					u32 _dl_dp_len = 0;
+					const char* _dl_src = var_name;
+					u32 _dl_src_len = path_len;
+					// Strip trailing slash
+					while (_dl_src_len > 0 && _dl_src[_dl_src_len - 1] == '/')
+						_dl_src_len--;
+					if (_dl_src_len > 0 && _dl_src[0] == '/') {
+						// Absolute slash path: "/" = _root, "/clip" = _root.clip
+						memcpy(_dl_dot_path, "_root", 5);
+						_dl_dp_len = 5;
+						if (_dl_src_len > 1) {
+							_dl_dot_path[_dl_dp_len++] = '.';
+							for (u32 _dl_i = 1; _dl_i < _dl_src_len; _dl_i++) {
+								_dl_dot_path[_dl_dp_len++] = (_dl_src[_dl_i] == '/') ? '.' : _dl_src[_dl_i];
+							}
+						}
+					} else {
+						// Relative slash path
+						for (u32 _dl_i = 0; _dl_i < _dl_src_len; _dl_i++) {
+							_dl_dot_path[_dl_dp_len++] = (_dl_src[_dl_i] == '/') ? '.' : _dl_src[_dl_i];
+						}
+					}
+					_dl_dot_path[_dl_dp_len] = '\0';
+					PUSH_STR(_dl_dot_path, _dl_dp_len);
 					actionGetVariable(app_context);
 					u8 resolved_type = STACK_TOP_TYPE;
 					if (resolved_type == ACTION_STACK_VALUE_OBJECT ||
@@ -23505,13 +23577,13 @@ void actionDefineLocal(SWFAppContext* app_context)
 		extern hashmap* var_map;
 		ActionVar* old_hash;
 		// For SWF <= 6, fold keys to lowercase (matching getVariable behavior)
-		char _dl_folded[512];
+		char _dl_folded2[512];
 		char* hm_lookup_key = var_name;
-		if (g_swf_version <= 6 && var_name_len < sizeof(_dl_folded)) {
+		if (g_swf_version <= 6 && var_name_len < sizeof(_dl_folded2)) {
 			for (u32 fi = 0; fi < var_name_len; fi++)
-				_dl_folded[fi] = (var_name[fi] >= 'A' && var_name[fi] <= 'Z') ? (var_name[fi] + 32) : var_name[fi];
-			_dl_folded[var_name_len] = '\0';
-			hm_lookup_key = _dl_folded;
+				_dl_folded2[fi] = (var_name[fi] >= 'A' && var_name[fi] <= 'Z') ? (var_name[fi] + 32) : var_name[fi];
+			_dl_folded2[var_name_len] = '\0';
+			hm_lookup_key = _dl_folded2;
 		}
 		if (hashmap_get(var_map, hm_lookup_key, var_name_len, (uintptr_t*)&old_hash)) {
 			if (old_hash != var) {
@@ -23529,6 +23601,24 @@ void actionDefineLocal(SWFAppContext* app_context)
 				memcpy(hm_key, hm_lookup_key, var_name_len);
 				hm_key[var_name_len] = '\0';
 				hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
+			}
+		}
+	}
+
+	// At top-level, also sync to MC's dynamic_props if property already exists there.
+	// This keeps slash-path reads (e.g., /:abc → _root.abc via dynamic_props) in sync
+	// with var_array storage used by plain DefineLocal.
+	if (g_call_depth == 0) {
+		extern MovieClip root_movieclip;
+		MovieClip* _dl_mc = g_current_context ? g_current_context : &root_movieclip;
+		if (_dl_mc->dynamic_props != NULL) {
+			ActionVar* _dl_existing = getProperty((ASObject*)_dl_mc->dynamic_props,
+				var_name, var_name_len);
+			if (_dl_existing != NULL) {
+				ActionVar _dl_val;
+				peekVar(app_context, &_dl_val);
+				setProperty(app_context, (ASObject*)_dl_mc->dynamic_props,
+					var_name, var_name_len, &_dl_val);
 			}
 		}
 	}
@@ -42170,16 +42260,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (mask_arg.type == ACTION_STACK_VALUE_MOVIECLIP) {
 				mask_mc = (MovieClip*) mask_arg.data.numeric_value;
 			} else {
-				// Convert arg to string and try to resolve as MC path
+				// Convert non-string args to string for path lookup
+				// Note: OBJECT args are NOT resolved via valueOf — they just fail (return false)
+				if (mask_arg.type == ACTION_STACK_VALUE_OBJECT ||
+				    mask_arg.type == ACTION_STACK_VALUE_FUNCTION ||
+				    mask_arg.type == ACTION_STACK_VALUE_ARRAY) {
+					// Objects/functions/arrays can't be resolved as mask targets
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+					return;
+				}
+				if (mask_arg.type != ACTION_STACK_VALUE_STRING) {
+					char _sm_str[17];
+					pushVar(app_context, &mask_arg);
+					convertString(app_context, _sm_str);
+					popVar(app_context, &mask_arg);
+				}
 				char _sm_path[256];
 				_sm_path[0] = '\0';
-				if (mask_arg.type == ACTION_STACK_VALUE_STRING) {
+				if (mask_arg.type == ACTION_STACK_VALUE_STRING && mask_arg.str_size > 0) {
 					u16_to_utf8((const uint16_t*)varGetU16Ptr(&mask_arg),
 						mask_arg.str_size, _sm_path, sizeof(_sm_path));
-				} else if (mask_arg.type == ACTION_STACK_VALUE_F64 || mask_arg.type == ACTION_STACK_VALUE_F32) {
-					// Number — convert to string for path lookup
-					double dv = varToDoubleSimple(&mask_arg);
-					snprintf(_sm_path, sizeof(_sm_path), "%g", dv);
 				}
 				if (_sm_path[0]) {
 					// Convert colon-path (_level0:name) to dot-path
@@ -42187,6 +42287,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					mask_mc = getMovieClipByTarget(_sm_path);
 					if (mask_mc == NULL)
 						mask_mc = getMovieClipByRelativeName(_sm_path);
+					// Also try looking up as dynamic property on root/context MC
+					if (mask_mc == NULL) {
+						MovieClip* _sm_base = g_current_context ? g_current_context : &root_movieclip;
+						if (_sm_base->dynamic_props != NULL) {
+							ActionVar* _sm_prop = getProperty((ASObject*)_sm_base->dynamic_props,
+								_sm_path, strlen(_sm_path));
+							if (_sm_prop != NULL && _sm_prop->type == ACTION_STACK_VALUE_MOVIECLIP)
+								mask_mc = (MovieClip*) _sm_prop->data.numeric_value;
+						}
+						if (mask_mc == NULL && _sm_base != &root_movieclip && root_movieclip.dynamic_props != NULL) {
+							ActionVar* _sm_prop = getProperty((ASObject*)root_movieclip.dynamic_props,
+								_sm_path, strlen(_sm_path));
+							if (_sm_prop != NULL && _sm_prop->type == ACTION_STACK_VALUE_MOVIECLIP)
+								mask_mc = (MovieClip*) _sm_prop->data.numeric_value;
+						}
+					}
 				}
 			}
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, (mask_mc != NULL) ? 1 : 0);
