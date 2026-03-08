@@ -167,8 +167,7 @@
         /* Canvas */
         .canvas-wrap {
             text-align: center;
-            padding: 10px;
-            background: #000;
+            background: #fff;
         }
         .canvas-wrap canvas {
             display: block;
@@ -324,6 +323,18 @@
 
                 document.getElementById('meta-desc').textContent = meta.description || '';
 
+                // Store SWF dimensions and pre-size canvas immediately
+                if (isGraphics && meta.width && meta.height) {
+                    window._swfWidth = meta.width;
+                    window._swfHeight = meta.height;
+                    var canvas = document.getElementById('canvas');
+                    canvas.width = meta.width;
+                    canvas.height = meta.height;
+                    canvas.style.width = '100%';
+                    canvas.style.height = 'auto';
+                    canvas.style.aspectRatio = meta.width + ' / ' + meta.height;
+                }
+
                 let details = '';
                 if (meta.swf_version) {
                     details += '<span><span class="label">SWF Version:</span> <span class="value">' + meta.swf_version + '</span></span>';
@@ -428,6 +439,13 @@
                 document.getElementById('btn-run').disabled = true;
                 updateStatus('running', 'SWF rendering in progress...');
 
+                // Ensure canvas pixel buffer matches SWF dimensions
+                if (window._swfWidth && window._swfHeight) {
+                    var canvas = document.getElementById('canvas');
+                    canvas.width = window._swfWidth;
+                    canvas.height = window._swfHeight;
+                }
+
                 try {
                     Module.ccall('runSWF', null, [], [], {async: true}).then(function() {
                         addOutput('', 'separator');
@@ -503,7 +521,14 @@
                 var ruffle = window.RufflePlayer.newest();
                 var player = ruffle.createPlayer();
                 player.style.width = '100%';
-                player.style.height = '400px';
+                if (window._swfWidth && window._swfHeight) {
+                    // Match canvas sizing: compute height from container width + SWF aspect ratio
+                    var ruffleWidth = container.clientWidth;
+                    var ruffleHeight = Math.round(ruffleWidth * window._swfHeight / window._swfWidth);
+                    player.style.height = ruffleHeight + 'px';
+                } else {
+                    player.style.height = '400px';
+                }
                 container.appendChild(player);
                 player.load(testDir + 'test.swf');
             };

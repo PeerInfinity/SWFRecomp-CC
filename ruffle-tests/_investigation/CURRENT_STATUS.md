@@ -5,10 +5,10 @@ Last updated: 2026-03-08
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
+- **Image test baseline**: 2/31 image tests passing (`display_object_properties`, `focusrect_focuslost`). See `ruffle-image-results.md`.
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
-- **Recent gains (this session)**: Fixed actionGetBaseClip save/restore poisoning bug — recovered all 8 regressions from cb18c430 and gained string_paths_variable_scopes (5/5). Massive bonus: global_swf5_6_7_8_9 jumped 553→1031/1145 (+478 lines) from improved `this` resolution. Also: interface_implements_op 45→46/47, loadmovienum_cross_version_prototype 4→6/9.
+- **Recent gains (this session)**: Plan 01 (Runtime Transforms) COMPLETE — `display_object_properties` and `color` trace tests pass. Image test runner created (`run_image_tests.py`). Two ASan-detected bugs fixed: global buffer overflow in `create_buffer` (render_webgpu.c) and use-after-free in button override restore (tag.c).
 - **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).
-- **Previous session highlights**: Script halting on clip removal, settarget save/restore in sprite init, display list clearing in actionRemoveSprite, SetTarget dead base handling. Newly passing: button_keypress (3/3), call (63/63), do_init_action_child (12/12), global_swf6_7_8 (15/15), loadmovie_flashvars (4/4), moviecliploader_flashvars (4/4), on_construct (25/25), string_paths_variable_scopes (5/5).
 
 ## Crashes and Errors (8 tests)
 
@@ -121,6 +121,7 @@ Last updated: 2026-03-08
 
 | Plan | Status | Tests Passing | Key Remaining |
 |------|--------|--------------|---------------|
+| IMAGE_PLAN_01 | **COMPLETE** | display_object_properties ✅, color ✅ (trace); 2/31 image tests pass | Image rendering improvements via Plans 02-05 |
 | DATE_PLAN | **FULLY COMPLETE** | 8+ tests; `date` at ~99.2% | — |
 | TRY_CATCH_PLAN | **FULLY COMPLETE** | `try_catch_finally` 118/118 ✅ | — |
 | MATH_PLAN | **FULLY COMPLETE** | 4/4 pass | — |
@@ -191,6 +192,16 @@ All actionable plans have been completed. Remaining failing tests are blocked by
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
 - **FOCUS_SYSTEM_PLAN** — 6/7 pass. TAB_ORDERING_PLAN now fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-08)
+- **Plan 01 (Runtime Transforms) COMPLETE**: Both target tests pass:
+  - `display_object_properties`: Runtime `_x/_y/_xscale/_yscale/_rotation` → GPU transform buffer via `apply_as_transform()` + `renderer_write_transform()`
+  - `color`: Runtime `Color.setRGB()`/`setTransform()` → GPU cxform buffer via `build_cxform_from_obj()` + dynamic cxform slot allocation + `renderer_write_cxform()`. Cxform propagation to sprite/button children for both runtime (`cx_overridden`) and timeline (`has_cxform`) cxforms.
+- **Image test runner created**: `ruffle-tests/run_image_tests.py` discovers all 31 tests with `[image_comparisons]` in test.toml, runs via headless WebGPU, outputs `image_results.json` + `ruffle-image-results.md`. Baseline: 2/31 image tests pass.
+- **Two ASan bugs fixed** (flaky segfault in `color` test, ~35% repro rate):
+  1. `render_webgpu.c` `create_buffer()`: Minimum 64-byte buffer padding was applied before data upload, reading past small arrays (e.g. `color_data[1][4]` = 16 bytes uploaded as 64 bytes). Fixed by using original `data_size` for `wgpuQueueWriteBuffer`.
+  2. `tag.c` button blocks in `compose_children()` and `tagShowFrame()`: `compose_children` stored `DisplayObject*` pointers from temporary button display lists into `g_xform_overrides`/`g_cxform_overrides`. After `free(display_list)`, `xform_overrides_restore()` dereferenced dangling pointers. Fixed by saving/restoring override counts around button blocks and restoring before free.
+- **Key files changed**: `tag.c` (runtime update loops, cxform allocator, button override fix), `render_webgpu.c` (cxform buffer over-allocation, `create_buffer` fix, `write_cxform`), `render_webgpu.h` (`cxform_slot_count`, `write_cxform` declaration), `renderer.h` (`renderer_write_cxform` macro)
 
 ### Session notes (2026-03-07)
 - **Pass rate: 500/619 (80.8%) total, 425/477 (89.1%) filtered** (CI run on 6e400bd3)

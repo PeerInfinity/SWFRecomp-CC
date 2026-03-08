@@ -126,6 +126,22 @@ size_t ng_getCharIdByMC(MovieClip* mc);
 // Get the DefineSprite tag data size for a sprite character.
 size_t ng_getSpriteByteSize(size_t char_id);
 
+// Functions needed by action.c / tag.c in all build modes (NO_GRAPHICS, HEADLESS, GRAPHICS).
+// Implementations live in tag_stubs.c (NO_GRAPHICS/HEADLESS) or swf.c stubs (GRAPHICS).
+u16 ng_findFontIdByName(const char* name);
+void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
+    double width_px, double* out_ascent, double* out_descent,
+    double* out_width, double* out_height, double* out_tf_height, double* out_tf_width);
+size_t ng_lookupExport(const char* name);
+int32_t ng_getSoundDuration(u16 char_id);
+void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
+void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
+size_t ng_findDisplayEntryByName(const char* name);
+
+// Currently-executing sprite DisplayObject (set by advance_sprite_frames in NO_GRAPHICS,
+// or defined as dummy in swf.c for GRAPHICS mode). Used by action.c in all modes.
+extern DisplayObject* g_current_sprite_obj;
+
 // NO_GRAPHICS helpers for sprite timeline control from action.c
 #ifdef NO_GRAPHICS
 // Advance sprite timelines (replaces old ng_advanceSprites; called by swf_core.c)
@@ -138,8 +154,6 @@ void advance_nested_sprite_frames(SWFAppContext* app_context);
 int hasPlayingSprites(void);
 // Returns 1 if any initialized sprite has CLIP_EVENT_ENTER_FRAME clip actions
 int hasClipEnterFrameHandlers(void);
-// Currently-executing sprite DisplayObject (set by advance_sprite_frames)
-extern DisplayObject* g_current_sprite_obj;
 
 int ng_isInsideSprite(void);
 void ng_stopCurrentSprite(void);
@@ -263,15 +277,9 @@ int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size
     int left_margin_twips, int right_margin_twips, int indent_twips,
     int letter_spacing_twips);
 int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, float field_height_pixels);
-u16 ng_findFontIdByName(const char* name);
-void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
-    double width_px, double* out_ascent, double* out_descent,
-    double* out_width, double* out_height, double* out_tf_height, double* out_tf_width);
+// ng_findFontIdByName, ng_getTextExtent, ng_lookupExport, ng_getSoundDuration
+// are declared above (outside #ifdef NO_GRAPHICS) since action.c needs them in all modes.
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
-// Look up exported symbol by linkage name. Returns char_id or (size_t)-1 if not found.
-size_t ng_lookupExport(const char* name);
-// Look up sound duration in ms by char_id. Returns -1 if not found.
-int32_t ng_getSoundDuration(u16 char_id);
 // Attach a library symbol by char_id. Returns created MC, or NULL if not sprite.
 MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent);
 // Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)

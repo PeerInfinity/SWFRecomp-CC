@@ -4,6 +4,7 @@
 #include <swf.h>
 #include <tag.h>
 #include <action.h>
+#include <object.h>
 #include <variables.h>
 #include <renderer.h>
 #include <utils.h>
@@ -30,10 +31,18 @@ size_t g_frame_count = 0;
 int is_dragging = 0;
 char* dragged_target = NULL;
 
+// Frame execution state — needed by tag.c sprite advancement
+int catch_up_mode = 0;
+int g_tag_skip_mode = 0;
+
 Character* dictionary = NULL;
 
 DisplayObject* display_list = NULL;
 size_t max_depth = 0;
+
+// Dummy sprite object pointer — in graphics mode sprites are managed by the renderer.
+// action.c saves/restores this during function calls, so it needs to exist.
+DisplayObject* g_current_sprite_obj = NULL;
 
 RenderContext* context;
 
@@ -50,12 +59,23 @@ void tagMain(SWFAppContext* app_context)
 		current_frame = next_frame;
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
-		frame_funcs[next_frame](app_context);
-		if (!manual_next_frame)
+		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL)
+		{
+			frame_funcs[current_frame](app_context);
+		}
+		if (manual_next_frame)
+		{
+			// Goto/play command set next_frame directly
+			manual_next_frame = 0;
+		}
+		else if (is_playing)
 		{
 			next_frame += 1;
+			// Wrap around when reaching the end (Flash movies loop by default)
+			if (next_frame >= g_frame_count)
+				next_frame = 0;
 		}
-		manual_next_frame = 0;
+		// else: stopped — stay on current frame
 		bad_poll |= renderer_poll(app_context);
 #ifdef __EMSCRIPTEN__
 		double elapsed = emscripten_get_now() - frame_start;
@@ -156,5 +176,68 @@ void swfStart(SWFAppContext* app_context)
 	free(dictionary);
 	free(display_list);
 }
+
+// ---------------------------------------------------------------------------
+// Stubs for functions declared in tag.h that action.c/tag.c call in all modes.
+// Full implementations live in tag_stubs.c (NO_GRAPHICS/HEADLESS builds).
+// ---------------------------------------------------------------------------
+
+// tag.c stubs: called from tagPlaceObject2/tagRemoveObject shared code
+void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id) {
+	(void)app_context; (void)depth; (void)char_id;
+}
+
+void ng_on_remove_object(SWFAppContext* app_context, size_t depth) {
+	(void)app_context; (void)depth;
+}
+
+size_t ng_findDisplayEntryByName(const char* name) {
+	size_t result = SIZE_MAX;
+	for (size_t d = 0; d <= max_depth; d++) {
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].instance_name == NULL) continue;
+		if (swf_name_match(display_list[d].instance_name, name)) {
+			if (result == SIZE_MAX || d < result)
+				result = d;
+		}
+	}
+	return result;
+}
+
+size_t ng_lookupExport(const char* name) {
+	(void)name;
+	return (size_t)-1; // Not found
+}
+
+int32_t ng_getSoundDuration(u16 char_id) {
+	(void)char_id;
+	return -1; // Not found
+}
+
+u16 ng_findFontIdByName(const char* name) {
+	(void)name;
+	return 0; // Default font
+}
+
+void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
+    double width_px, double* out_ascent, double* out_descent,
+    double* out_width, double* out_height, double* out_tf_height, double* out_tf_width) {
+	(void)font_id; (void)font_size_px; (void)text; (void)text_len; (void)width_px;
+	// Return rough estimates based on font size
+	if (out_ascent) *out_ascent = font_size_px * 0.8;
+	if (out_descent) *out_descent = font_size_px * 0.2;
+	if (out_width) *out_width = font_size_px * 0.6 * (double)text_len;
+	if (out_height) *out_height = font_size_px;
+	if (out_tf_height) *out_tf_height = font_size_px + 4.0;
+	if (out_tf_width) *out_tf_width = font_size_px * 0.6 * (double)text_len;
+}
+
+// Default findMovieEntry stub when no child movies are linked
+#ifndef HAS_CHILD_MOVIES
+MovieEntry* findMovieEntry(const char* filename) {
+	(void)filename;
+	return NULL;
+}
+#endif
 
 #endif // !NO_GRAPHICS && !HEADLESS_GRAPHICS

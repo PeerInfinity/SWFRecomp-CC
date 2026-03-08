@@ -14,19 +14,28 @@
 extern RenderContext* context;
 #endif
 
+// action.h is needed in all modes (g_current_context, actionFindOrCreateMovieClip, etc.)
+#include <action.h>
+
+// Frame execution state — defined in swf_core.c (NO_GRAPHICS), swf_headless.c (HEADLESS), swf.c (GRAPHICS)
+extern int catch_up_mode;
+extern int g_tag_skip_mode;
+
 #if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 // NO_GRAPHICS / HEADLESS: extern data arrays from generated code
 extern float transform_data[][16];
 extern float cxform_data[];
-extern int catch_up_mode;
-extern int g_tag_skip_mode;
-#include <action.h>
 #endif
 
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
 size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 
 // Note: tagInit() is provided by the generated tagMain.c file
+
+// Monotonically increasing counter to detect within-same-frame placement conflicts.
+// Incremented at the end of each tagShowFrame call and before goto catch-up.
+// Used by tagPlaceObject2 in all build modes.
+size_t g_place_gen = 0;
 
 #ifdef NO_GRAPHICS
 // Tracks the currently-executing sprite's DisplayObject.
@@ -71,10 +80,6 @@ void ng_restoreFromRootDL(DisplayObject* saved_dl, size_t saved_max, size_t save
 // Used by tagShowFrame to re-run sprite frame_0 for scripts only (Phase 2),
 // without disturbing the display list already set up in Phase 1 (eager init).
 static int g_script_only_mode = 0;
-
-// Monotonically increasing counter to detect within-same-frame placement conflicts.
-// Incremented at the end of each tagShowFrame call and before goto catch-up.
-size_t g_place_gen = 0;
 
 // When 1, tagShowFrame defers process_sprite_needs_init.
 // Set by ng_executeGotoCatchUp so sprite init scripts run AFTER the deferred
@@ -375,10 +380,12 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 
 // Public wrapper for process_sprite_needs_init (called from tag_stubs.c for
 // attachMovie'd sprite child initialization).
+#ifdef NO_GRAPHICS
 void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc)
 {
 	process_sprite_needs_init(app_context, parent_mc);
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Helper 1: Advance sprite timelines recursively
@@ -2523,8 +2530,15 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		free(display_list[depth].instance_name);
 	}
-	display_list[depth].instance_name = NULL;
-	display_list[depth].instance_name_owned = 0;
+	// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
+	if (g_pending_instance_name != NULL) {
+		display_list[depth].instance_name = (char*)g_pending_instance_name;
+		display_list[depth].instance_name_owned = 0;
+		g_pending_instance_name = NULL;
+	} else {
+		display_list[depth].instance_name = NULL;
+		display_list[depth].instance_name_owned = 0;
+	}
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
@@ -2739,8 +2753,15 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].sprite_is_playing = 1;
 	display_list[depth].sprite_manual_next_frame = 0;
 	display_list[depth].sprite_next_frame = 0;
-	display_list[depth].instance_name = NULL;
-	display_list[depth].instance_name_owned = 0;
+	// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
+	if (g_pending_instance_name != NULL) {
+		display_list[depth].instance_name = (char*)g_pending_instance_name;
+		display_list[depth].instance_name_owned = 0;
+		g_pending_instance_name = NULL;
+	} else {
+		display_list[depth].instance_name = NULL;
+		display_list[depth].instance_name_owned = 0;
+	}
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
@@ -3344,15 +3365,15 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 #ifdef NO_GRAPHICS
 	// In script_only_mode (Phase 2), display list is already set up from Phase 1 — skip.
 	if (g_script_only_mode) return;
+#endif
 
 	// If the display entry doesn't exist yet (tagSetInstanceName called before tagPlaceObject2),
-	// store as pending so ng_on_place_object2 uses it instead of auto-assigning "instanceN".
+	// store as pending so the next PlaceObject at this depth uses it.
 	if (depth > max_depth || display_list[depth].char_id == 0)
 	{
 		g_pending_instance_name = name;
 		return;
 	}
-#endif
 	if (depth <= max_depth)
 	{
 		char* old_name = display_list[depth].instance_name;

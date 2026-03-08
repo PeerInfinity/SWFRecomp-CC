@@ -211,6 +211,7 @@ namespace SWFRecomp
 		std::unordered_map<u16, float> font_em_square;  // font_id → EM square size
 		std::unordered_map<u16, std::vector<u16>> font_code_tables;  // font_id → code table (index=glyph, value=char code)
 		std::unordered_map<u16, std::vector<s16>> font_advance_tables;  // font_id → per-glyph advance widths
+		std::unordered_map<u16, size_t> font_glyph_bases;  // font_id → base index in global glyph_data
 		std::unordered_map<u16, std::string> font_names;  // font_id → font name string
 		std::unordered_map<u16, bool> font_bold_flags;    // font_id → bold flag
 		std::unordered_map<u16, bool> font_italic_flags;  // font_id → italic flag

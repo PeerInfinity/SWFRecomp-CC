@@ -51,7 +51,6 @@ struct MovieClip {
 	u8 avm1_removed;       // 1 if MC was removed from display list (halts script execution)
 	u32 byte_size;         // getBytesLoaded/getBytesTotal value (0 = dynamic/attached clip)
 	u16 swf_version;       // SWF version of the movie loaded into this MC (for getSWFVersion)
-#ifdef NO_GRAPHICS
 	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
@@ -63,7 +62,6 @@ struct MovieClip {
 	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
 	u8 mc_enterframe_eligible; // 0 on creation tick, set to 1 on next tick so onEnterFrame doesn't fire on creation frame
-#endif
 };
 
 // Global root MovieClip

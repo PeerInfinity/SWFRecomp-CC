@@ -572,16 +572,19 @@ namespace SWFRecomp
 		
 		context.out_draws << endl << endl;
 		
-		// Build text_data from deferred glyph entries (font_code_tables now fully populated)
+		// Build text_data from deferred glyph entries
+		// text_data stores global glyph indices (into glyph_data), NOT character codes.
+		// The renderer does: glyph_data[2 * text_data[j]] to get shape offset/size.
 		for (auto& entry : text_glyph_entries) {
 			u16 fid = entry.first;
 			u32 glyph_index = entry.second;
-			u32 char_code = glyph_index;  // fallback to glyph index
-			auto fct_it = font_code_tables.find(fid);
-			if (fct_it != font_code_tables.end() && glyph_index < fct_it->second.size()) {
-				char_code = (u32) fct_it->second[glyph_index];
+			// Convert per-font glyph index to global glyph index
+			auto base_it = font_glyph_bases.find(fid);
+			u32 global_index = glyph_index;
+			if (base_it != font_glyph_bases.end()) {
+				global_index = (u32)base_it->second + glyph_index;
 			}
-			text_data << "\t" << to_string(char_code) << "," << endl;
+			text_data << "\t" << to_string(global_index) << "," << endl;
 		}
 
 		context.out_draws << "u32 shape_data[" << to_string(current_tri ? 3*current_tri : 1) << "][4] =" << endl
@@ -1575,6 +1578,9 @@ namespace SWFRecomp
 					for (u16 i = 0; i < num_entries - 1; ++i)
 						entry_offsets.push_back((u16) tag.fields[i].value);
 				}
+
+				// Record this font's base index in global glyph_data
+				font_glyph_bases[font_id] = current_glyph;
 
 				for (u16 i = 0; i < num_entries; ++i)
 				{

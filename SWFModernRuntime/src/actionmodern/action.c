@@ -5095,7 +5095,12 @@ static ActionVar ctToString(SWFAppContext* app_context, ActionVar* args, u32 arg
 // Forward declarations for functions used by transform helpers/getters before their definitions
 static double propToDouble(ASObject* obj, const char* name, u32 name_len);
 static ASObject* createRectObj(SWFAppContext* app_context, ActionVar* x, ActionVar* y, ActionVar* w, ActionVar* h);
-static float normalizeRotation(float r);
+static float normalizeRotation(float r) {
+	r = fmodf(r, 360.0f);
+	if (r > 180.0f) r -= 360.0f;
+	else if (r < -180.0f) r += 360.0f;
+	return r;
+}
 static void setAddProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen, ASFunction* getter, ASFunction* setter);
 static void initGeomPrototypes(SWFAppContext* app_context);
 static void initColorTransformPrototype(SWFAppContext* app_context);
@@ -14823,14 +14828,6 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 			setProperty(app_context, other_props, "length", 6, &len_val);
 		}
 	}
-}
-
-// Flash normalizes _rotation to the range (-180, 180].
-static float normalizeRotation(float r) {
-	r = fmodf(r, 360.0f);
-	if (r > 180.0f) r -= 360.0f;
-	else if (r < -180.0f) r += 360.0f;
-	return r;
 }
 
 // Re-sync x/y/xscale/yscale/rotation from transform_data if the display entry's transform_id
@@ -28029,7 +28026,8 @@ void actionSetMember(SWFAppContext* app_context)
 					if (ml_prop != NULL && ml_prop->type == ACTION_STACK_VALUE_BOOLEAN && ml_prop->data.numeric_value)
 						is_multiline = 1;
 
-					// Parse HTML into format runs
+					// Parse HTML into format runs (NO_GRAPHICS only — tf_* system not available in graphics mode)
+#ifdef NO_GRAPHICS
 					TFRunTable* table = tf_get_table(mc);
 					table->from_html_text = 1; // Content set via .htmlText
 					TFRun defaults;
@@ -28086,6 +28084,20 @@ void actionSetMember(SWFAppContext* app_context)
 					// Extract plain text (with \r as paragraph separator for storage)
 					char plain_buf[16384];
 					tf_get_plain_text(table, plain_buf, sizeof(plain_buf), is_multiline);
+#else
+					// In graphics mode, simple tag-stripping fallback
+					char plain_buf[16384];
+					u32 pi = 0;
+					for (u32 si = 0; _ht_buf[si] && pi < sizeof(plain_buf) - 1; si++) {
+						if (_ht_buf[si] == '<') {
+							while (_ht_buf[si] && _ht_buf[si] != '>') si++;
+							if (!_ht_buf[si]) break;
+						} else {
+							plain_buf[pi++] = _ht_buf[si];
+						}
+					}
+					plain_buf[pi] = '\0';
+#endif
 					u32 plain_len = (u32)strlen(plain_buf);
 
 					// Convert plain text to UTF-16 and store as "text"

@@ -1,19 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-03-08T20:07:22.010392+00:00",
-    "git_sha": "6d4f715f934747c6f8241a4da24562dfad7ba4ac",
-    "duration_seconds": 593.36
+    "timestamp": "2026-03-08T20:58:45.026044+00:00",
+    "git_sha": "2e40877110be548a037371f2a5ae1993e74cb9c0",
+    "duration_seconds": 583.0
   },
   "total": 31,
   "image_pass": 2,
-  "image_fail": 26,
-  "image_no_render": 3,
+  "image_fail": 28,
+  "image_no_render": 1,
   "image_skip": 0,
-  "trace_pass": 25,
+  "trace_pass": 27,
   "tests": [
     {
       "test": "bitmap_data_colortransform",
-      "duration": 18.0,
+      "duration": 16.82,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -25,7 +25,7 @@
     },
     {
       "test": "bitmap_data_copypixels",
-      "duration": 18.64,
+      "duration": 18.41,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -37,7 +37,7 @@
     },
     {
       "test": "bitmap_data_fillrect",
-      "duration": 17.59,
+      "duration": 17.04,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -49,7 +49,7 @@
     },
     {
       "test": "bitmap_data_perlinnoise",
-      "duration": 20.37,
+      "duration": 18.99,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -61,7 +61,7 @@
     },
     {
       "test": "bitmap_data_pixeldissolve_image",
-      "duration": 18.67,
+      "duration": 17.26,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -73,7 +73,7 @@
     },
     {
       "test": "bitmapdata_applyfilter_colormatrix",
-      "duration": 17.37,
+      "duration": 18.5,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -85,14 +85,19 @@
     },
     {
       "test": "color",
-      "duration": 18.56,
-      "trace_status": "segfault",
-      "image_comparisons": {},
-      "image_status": "no_render"
+      "duration": 18.08,
+      "trace_status": "pass",
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 70000 outliers exceed limit of 0, max difference 91"
+        }
+      },
+      "image_status": "fail"
     },
     {
       "test": "display_object_properties",
-      "duration": 16.92,
+      "duration": 17.22,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -104,7 +109,7 @@
     },
     {
       "test": "edittext_stylesheet",
-      "duration": 18.52,
+      "duration": 19.52,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -116,7 +121,7 @@
     },
     {
       "test": "edittext_tag_indent",
-      "duration": 17.13,
+      "duration": 17.7,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -128,7 +133,7 @@
     },
     {
       "test": "focusrect_focuslost",
-      "duration": 17.56,
+      "duration": 16.83,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -140,7 +145,7 @@
     },
     {
       "test": "focusrect_mouse_swf8",
-      "duration": 18.76,
+      "duration": 18.53,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01.tab": {
@@ -180,7 +185,7 @@
     },
     {
       "test": "focusrect_mouse_swf9",
-      "duration": 19.24,
+      "duration": 17.71,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01.tab": {
@@ -220,7 +225,7 @@
     },
     {
       "test": "focusrect_swf5",
-      "duration": 19.08,
+      "duration": 17.82,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01a": {
@@ -276,7 +281,7 @@
     },
     {
       "test": "focusrect_swf6",
-      "duration": 18.56,
+      "duration": 17.91,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01a": {
@@ -332,7 +337,7 @@
     },
     {
       "test": "frame_size_translated_negative",
-      "duration": 17.11,
+      "duration": 17.08,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -344,7 +349,7 @@
     },
     {
       "test": "frame_size_translated_positive",
-      "duration": 17.7,
+      "duration": 16.89,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -356,7 +361,7 @@
     },
     {
       "test": "mask_reapply",
-      "duration": 17.97,
+      "duration": 19.19,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -368,7 +373,7 @@
     },
     {
       "test": "mask_with_drawing",
-      "duration": 19.62,
+      "duration": 18.02,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -380,7 +385,7 @@
     },
     {
       "test": "mcl_target_gif87a",
-      "duration": 20.39,
+      "duration": 18.35,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -392,7 +397,7 @@
     },
     {
       "test": "mcl_target_gif89a",
-      "duration": 23.12,
+      "duration": 18.72,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -404,7 +409,7 @@
     },
     {
       "test": "mcl_target_jpg",
-      "duration": 21.76,
+      "duration": 20.09,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -416,7 +421,7 @@
     },
     {
       "test": "mcl_target_png",
-      "duration": 18.65,
+      "duration": 18.53,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -428,14 +433,19 @@
     },
     {
       "test": "mouse_events_visible_enabled",
-      "duration": 17.97,
-      "trace_status": "segfault",
-      "image_comparisons": {},
-      "image_status": "no_render"
+      "duration": 18.63,
+      "trace_status": "pass",
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 287006 outliers exceed limit of 0, max difference 204"
+        }
+      },
+      "image_status": "fail"
     },
     {
       "test": "movieclip_begin_gradient_fill",
-      "duration": 18.38,
+      "duration": 21.24,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -447,7 +457,7 @@
     },
     {
       "test": "movieclip_create_text_field",
-      "duration": 18.02,
+      "duration": 18.56,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -459,7 +469,7 @@
     },
     {
       "test": "movieclip_line_gradient_style",
-      "duration": 18.39,
+      "duration": 18.78,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -471,7 +481,7 @@
     },
     {
       "test": "movieclip_methods_with_loaded_image",
-      "duration": 17.81,
+      "duration": 20.04,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -483,7 +493,7 @@
     },
     {
       "test": "movieclip_setmask",
-      "duration": 19.0,
+      "duration": 18.69,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -495,7 +505,7 @@
     },
     {
       "test": "netstream_play_flv",
-      "duration": 18.62,
+      "duration": 17.98,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -507,7 +517,7 @@
     },
     {
       "test": "netstream_play_flv_screen",
-      "duration": 33.9,
+      "duration": 33.87,
       "trace_status": "segfault",
       "image_comparisons": {},
       "image_status": "no_render"
