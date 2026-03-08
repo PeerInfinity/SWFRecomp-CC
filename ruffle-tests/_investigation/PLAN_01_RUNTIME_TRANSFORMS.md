@@ -3,6 +3,7 @@
 **Priority**: Highest — pure bug fix, no new features
 **Tests unlocked**: `display_object_properties` (tolerance=90), `color` (tolerance=1)
 **Estimated complexity**: Medium
+**Status**: COMPLETE — both tests passing
 
 ---
 

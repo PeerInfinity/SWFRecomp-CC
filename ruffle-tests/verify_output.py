@@ -1434,6 +1434,7 @@ def main():
                 test_results.append(entry)
                 if args.verbose:
                     print("COMPILE_FAIL")
+                    print(f"  Error: {detail}")
                 save_incremental()
                 continue
 

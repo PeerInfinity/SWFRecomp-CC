@@ -12,7 +12,7 @@ Plans 02 and 04 both need a `renderer_draw_rect()` function for drawing dynamic 
 
 | Plan | Feature | Tests Unlocked | Complexity | Status |
 |------|---------|---------------|------------|--------|
-| [01](PLAN_01_RUNTIME_TRANSFORMS.md) | Runtime transform & cxform GPU updates | 2 | Medium | Not started |
+| [01](PLAN_01_RUNTIME_TRANSFORMS.md) | Runtime transform & cxform GPU updates | 2 | Medium | **COMPLETE** |
 | [02](PLAN_02_TEXTFIELD_RENDERING.md) | TextField background/border/text rendering | 5 | Large | Not started |
 | [03](PLAN_03_DRAWING_API.md) | Drawing API (beginFill/lineTo/etc.) | 4 | Large | Not started |
 | [04](PLAN_04_FOCUS_RECT.md) | Focus rect yellow outline | 6 (41 images) | Small-Medium | Not started |

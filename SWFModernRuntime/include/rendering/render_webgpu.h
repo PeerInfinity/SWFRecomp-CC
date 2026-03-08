@@ -54,6 +54,7 @@ typedef struct WebGPURenderContext
 	WGPUBuffer inv_mat_buffer;        // storage: inverted gradient matrices (output)
 	WGPUBuffer bitmap_sizes_buffer;   // storage: bitmap_sizes[]
 	WGPUBuffer cxform_buffer;         // storage: cxform data
+	u32 cxform_slot_count;            // total slots in cxform_buffer (original + dynamic)
 
 	// Uniform buffers (written per-frame or per-draw)
 	WGPUBuffer stage_to_ndc_buf;      // uniform: mat4
@@ -177,6 +178,7 @@ void render_webgpu_close_pass(WebGPURenderContext* context);
 void render_webgpu_compose_text_transforms(WebGPURenderContext* context, const char* transform_data, u32 place_transform_id, u32 glyph_start, size_t count);
 void render_webgpu_compose_sprite_transform(WebGPURenderContext* context, const char* transform_data, u32 parent_transform_id, u32 child_transform_id);
 void render_webgpu_write_transform(WebGPURenderContext* context, u32 transform_id, const float composed[16]);
+void render_webgpu_write_cxform(WebGPURenderContext* context, u32 cxform_slot, const float cxform[20]);
 void render_webgpu_update_vertices(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
 void render_webgpu_update_colors(WebGPURenderContext* context, size_t byte_offset, const void* data, size_t byte_size);
 void render_webgpu_set_blend_mode(WebGPURenderContext* context, u8 blend_mode);

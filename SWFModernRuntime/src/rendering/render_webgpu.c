@@ -645,9 +645,22 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
 		NULL, 2 * sizeof(u32) * ctx->bitmap_count, "bitmap_sizes_buffer");
 
-	ctx->cxform_buffer = create_buffer(ctx->device, ctx->queue,
-		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-		ctx->cxform_data, ctx->cxform_data_size, "cxform_buffer");
+	// Over-allocate cxform buffer for dynamic runtime cxform slots
+	// (Color.setRGB/setTransform modify cx_* at runtime)
+	{
+		u32 orig_cxform_slots = ctx->cxform_data_size > 0
+			? (u32)(ctx->cxform_data_size / (20 * sizeof(float))) : 1;
+		u32 extra_cxform_slots = 256;
+		u32 total_cxform_slots = orig_cxform_slots + extra_cxform_slots;
+		size_t total_cxform_size = (size_t)total_cxform_slots * 20 * sizeof(float);
+		ctx->cxform_buffer = create_buffer(ctx->device, ctx->queue,
+			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+			NULL, total_cxform_size, "cxform_buffer");
+		if (ctx->cxform_data && ctx->cxform_data_size > 0)
+			wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_buffer, 0,
+				ctx->cxform_data, ctx->cxform_data_size);
+		ctx->cxform_slot_count = total_cxform_slots;
+	}
 
 	// Uniform buffers (small, updated per-frame/per-draw)
 	ctx->stage_to_ndc_buf = create_buffer(ctx->device, ctx->queue,
@@ -1693,6 +1706,19 @@ void render_webgpu_write_transform(WebGPURenderContext* ctx,
 	uint64_t offset = (uint64_t)transform_id * 16 * sizeof(float);
 	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
 	                     composed, 16 * sizeof(float));
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_write_cxform: write a 20-float cxform entry to the GPU
+// cxform_buffer at the given slot.  Used for runtime Color.setRGB/setTransform.
+// ---------------------------------------------------------------------------
+void render_webgpu_write_cxform(WebGPURenderContext* ctx,
+                                u32 cxform_slot, const float cxform[20])
+{
+	if (!ctx->renderer_ok) return;
+	uint64_t offset = (uint64_t)cxform_slot * 20 * sizeof(float);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_buffer, offset,
+	                     cxform, 20 * sizeof(float));
 }
 
 // ---------------------------------------------------------------------------

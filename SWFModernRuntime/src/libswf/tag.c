@@ -735,6 +735,86 @@ static void xform_overrides_restore(void)
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic cxform slot allocator for runtime Color.setRGB/setTransform changes.
+// Same pattern as the transform slot allocator above.
+// ---------------------------------------------------------------------------
+static u32 g_next_dynamic_cxform_slot;   // next available slot in cxform_buffer
+static u32 g_cxform_slot_capacity;       // total slots available
+
+// Save/restore stack for cxform_id overrides during render
+#define MAX_CXFORM_OVERRIDES 256
+typedef struct { DisplayObject* obj; u32 original_id; } CxformOverride;
+static CxformOverride g_cxform_overrides[MAX_CXFORM_OVERRIDES];
+static int g_cxform_override_count;
+
+static void cxform_overrides_reset(void)
+{
+	g_cxform_override_count = 0;
+}
+
+static void cxform_overrides_push(DisplayObject* obj, u32 original_id)
+{
+	if (g_cxform_override_count < MAX_CXFORM_OVERRIDES)
+	{
+		g_cxform_overrides[g_cxform_override_count].obj = obj;
+		g_cxform_overrides[g_cxform_override_count].original_id = original_id;
+		g_cxform_override_count++;
+	}
+}
+
+static void cxform_overrides_restore(void)
+{
+	for (int i = g_cxform_override_count - 1; i >= 0; --i)
+		g_cxform_overrides[i].obj->cxform_id = g_cxform_overrides[i].original_id;
+	g_cxform_override_count = 0;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: Build a 4x4 transform matrix from MovieClip's AS-set properties.
+// Overlays AS-modified fields (as_set_flags bits) onto the existing base
+// transform from transform_data.
+// ---------------------------------------------------------------------------
+#ifdef NO_GRAPHICS
+static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
+{
+	// Overlay scale/rotation (bits 4|8|16 = xscale|yscale|rotation)
+	if (flags & (4|8|16))
+	{
+		float sx = mc->xscale / 100.0f;
+		float sy = mc->yscale / 100.0f;
+		float rad = mc->rotation * 3.14159265358979323846f / 180.0f;
+		float c = cosf(rad), s = sinf(rad);
+		slot[0]  = sx * c;    // a
+		slot[1]  = sx * s;    // b
+		slot[4]  = -(sy * s); // c
+		slot[5]  = sy * c;    // d
+	}
+	// Overlay translation (bit 0 = _x, bit 1 = _y)
+	if (flags & 1) slot[12] = rintf(mc->x * 20.0f);  // pixels to twips
+	if (flags & 2) slot[13] = rintf(mc->y * 20.0f);
+}
+#endif
+
+// ---------------------------------------------------------------------------
+// Helper: Build a 20-float cxform entry from DisplayObject cx_* fields.
+// GPU format: 4x4 diagonal matrix (mult) + 4 add values.
+// ---------------------------------------------------------------------------
+static void build_cxform_from_obj(float out[20], const DisplayObject* obj)
+{
+	memset(out, 0, 20 * sizeof(float));
+	// Diagonal multipliers (percentage to 0-1)
+	out[0]  = (float)(obj->cx_ra / 100.0);
+	out[5]  = (float)(obj->cx_ga / 100.0);
+	out[10] = (float)(obj->cx_ba / 100.0);
+	out[15] = (float)(obj->cx_aa / 100.0);
+	// Additive offsets (0-255 to 0-1)
+	out[16] = (float)(obj->cx_rb / 255.0);
+	out[17] = (float)(obj->cx_gb / 255.0);
+	out[18] = (float)(obj->cx_bb / 255.0);
+	out[19] = (float)(obj->cx_ab / 255.0);
+}
+
+// ---------------------------------------------------------------------------
 // Helper 2: Recursive transform composition for sprite/button children
 // ---------------------------------------------------------------------------
 // Composes each child's local transform with the parent's already-composed
@@ -743,7 +823,8 @@ static void xform_overrides_restore(void)
 // Original transform_ids are saved via xform_overrides for restoration after
 // rendering.
 static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
-	size_t dl_max_depth, const float parent_composed[16])
+	size_t dl_max_depth, const float parent_composed[16],
+	int parent_cx_override, u32 parent_cxform_id)
 {
 	const float* transforms = (const float*)app_context->transform_data;
 
@@ -769,6 +850,16 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		} else {
 			// Fallback: overwrite in-place (may cause visual artifacts)
 			renderer_write_transform(context, obj->transform_id, composed);
+		}
+
+		// Propagate parent's cxform to children.
+		// When a parent sprite/button has a cxform (from timeline or runtime),
+		// children should inherit it.  For now, replace the child's cxform_id
+		// with the parent's (no composition — works when child has identity cxform).
+		// TODO: proper cxform composition (parent * child) for non-identity children.
+		if (parent_cx_override && obj->cxform_id != parent_cxform_id) {
+			cxform_overrides_push(obj, obj->cxform_id);
+			obj->cxform_id = parent_cxform_id;
 		}
 
 		switch (ch->type)
@@ -832,7 +923,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				if (obj->sprite_display_list != NULL)
 					compose_children(app_context,
 						obj->sprite_display_list, obj->sprite_max_depth,
-						composed);
+						composed, parent_cx_override, parent_cxform_id);
 				break;
 			}
 
@@ -850,7 +941,8 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				if (ch->button_state_funcs[state] != NULL)
 					ch->button_state_funcs[state](app_context);
 
-				compose_children(app_context, display_list, max_depth, composed);
+				compose_children(app_context, display_list, max_depth, composed,
+					parent_cx_override, parent_cxform_id);
 
 				free(display_list);
 				display_list = saved_display_list;
@@ -1379,14 +1471,74 @@ void tagShowFrame(SWFAppContext* app_context)
 #endif
 
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
-	// Initialize dynamic transform slot allocator.
-	// Original transform slots are [0, orig_count). Dynamic slots start after.
+	// Initialize dynamic transform and cxform slot allocators.
+	// Original slots are [0, orig_count). Dynamic slots start after.
 	{
-		u32 orig_count = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
-		g_next_dynamic_xform_slot = orig_count;
+		u32 orig_xform_count = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
+		g_next_dynamic_xform_slot = orig_xform_count;
 		g_xform_slot_capacity = context->xform_slot_count;
 		xform_overrides_reset();
+
+		u32 orig_cxform_count = app_context->cxform_data_size > 0
+			? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 1;
+		g_next_dynamic_cxform_slot = orig_cxform_count;
+		g_cxform_slot_capacity = context->cxform_slot_count;
+		cxform_overrides_reset();
 	}
+
+#ifdef NO_GRAPHICS
+	{
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+
+		// --- Runtime transform updates ---
+		// When ActionScript modifies _x/_y/_xscale/_yscale/_rotation, the changes
+		// are stored on the MovieClip but not written to the GPU.  Apply them now
+		// so that compose_children and the render pass use the updated values.
+		for (size_t i = 1; i <= max_depth; ++i)
+		{
+			DisplayObject* obj = &display_list[i];
+			if (obj->char_id == 0 || obj->instance_name == NULL) continue;
+
+			MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
+			if (mc == NULL || mc->as_set_flags == 0) continue;
+
+			// Update CPU-side transform_data so compose_children picks it up
+			float* slot = transform_data[obj->transform_id];
+			apply_as_transform(slot, mc, mc->as_set_flags);
+
+			// Also update the GPU buffer for this slot
+			renderer_write_transform(context, obj->transform_id, slot);
+		}
+
+		// --- Runtime cxform updates ---
+		// When Color.setRGB()/setTransform() modifies display object color,
+		// cx_overridden is set.  Build a new cxform and write to a dynamic GPU slot.
+		// The compose_children loop below propagates the overridden cxform_id
+		// to sprite/button children.
+		// Memory barrier: GCC -O2 can misoptimize struct field reads across
+		// function calls that modify related memory.
+		__asm__ volatile("" ::: "memory");
+		for (size_t i = 1; i <= max_depth; ++i)
+		{
+			DisplayObject* obj = &display_list[i];
+			if (obj->char_id == 0) continue;
+			if (!obj->cx_overridden) continue;
+
+			// Build cxform from the runtime cx_* values and allocate a dynamic slot
+			float cx[20];
+			build_cxform_from_obj(cx, obj);
+
+			u32 new_slot = g_next_dynamic_cxform_slot;
+			if (new_slot < g_cxform_slot_capacity) {
+				g_next_dynamic_cxform_slot++;
+				cxform_overrides_push(obj, obj->cxform_id);
+				obj->cxform_id = new_slot;
+				renderer_write_cxform(context, new_slot, cx);
+			}
+		}
+		__asm__ volatile("" ::: "memory");
+	}
+#endif
 
 	// Compose transforms recursively BEFORE the render pass.
 	// For sprites/buttons: compose_children handles all nesting levels,
@@ -1406,7 +1558,8 @@ void tagShowFrame(SWFAppContext* app_context)
 				const float* sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
-					sprite_xform);
+					sprite_xform,
+					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
@@ -1424,7 +1577,8 @@ void tagShowFrame(SWFAppContext* app_context)
 				ch->button_state_funcs[state](app_context);
 
 			const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
-			compose_children(app_context, display_list, max_depth, btn_xform);
+			compose_children(app_context, display_list, max_depth, btn_xform,
+				obj->cx_overridden || obj->has_cxform, obj->cxform_id);
 
 			free(display_list);
 			display_list = saved_display_list;
@@ -1605,8 +1759,9 @@ void tagShowFrame(SWFAppContext* app_context)
 
 	renderer_close_pass(context);
 
-	// Restore original transform_ids that were overridden during composition
+	// Restore original transform_ids and cxform_ids that were overridden
 	xform_overrides_restore();
+	cxform_overrides_restore();
 #endif // NO_GRAPHICS
 
 	// Dispatch _root.onLoad once after first frame
