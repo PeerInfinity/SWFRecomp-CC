@@ -257,7 +257,11 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 				// because we already set g_current_context and g_current_sprite_obj above.
 				// exec_sprite_frame would create a duplicate MC with root as parent.
 				int saved_settarget = g_settarget_explicit_root;
+				int saved_invalid2 = g_settarget_invalid;
+				int saved_none2 = g_settarget_none;
 				g_settarget_explicit_root = 0;
+				g_settarget_invalid = 0;
+				g_settarget_none = 0;
 				if (was_eager)
 				{
 					// Phase 2: run scripts only; placement tags are no-ops via g_script_only_mode.
@@ -270,6 +274,8 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 					ch->sprite_frame_funcs[0](app_context);
 				}
 				g_settarget_explicit_root = saved_settarget;
+				g_settarget_invalid = saved_invalid2;
+				g_settarget_none = saved_none2;
 			}
 
 			actionSetCurrentContext(saved_ctx);

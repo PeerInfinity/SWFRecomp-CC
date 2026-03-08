@@ -12890,6 +12890,51 @@ void actionProcessDeferredUnloads(void)
 	g_deferred_unload_mc_count = 0;
 }
 
+// --- Deferred failed loadMovie state ---
+// When loadMovie is called but the URL is not found, the MC's properties should not change
+// until the next frame (async load simulation). We queue MCs here and apply on next frame.
+typedef struct {
+	MovieClip* mc;
+	char url[512];
+} DeferredFailedLoad;
+#define MAX_DEFERRED_FAILED_LOADS 16
+static DeferredFailedLoad g_deferred_failed_loads[MAX_DEFERRED_FAILED_LOADS];
+static int g_deferred_failed_load_count = 0;
+
+// Construct a child URL relative to root_movieclip's base directory.
+// E.g., root url "file:///test_name/test.swf" + child "target.swf" -> "file:///test_name/target.swf"
+static void constructChildURL(char* dest, size_t dest_size, const char* child_filename)
+{
+	const char* root_url = root_movieclip.url;
+	const char* last_slash = strrchr(root_url, '/');
+	if (last_slash != NULL) {
+		size_t base_len = (size_t)(last_slash - root_url + 1); // include the trailing /
+		if (base_len >= dest_size) base_len = dest_size - 1;
+		memcpy(dest, root_url, base_len);
+		strncpy(dest + base_len, child_filename, dest_size - base_len - 1);
+		dest[dest_size - 1] = '\0';
+	} else {
+		snprintf(dest, dest_size, "file:///%s", child_filename);
+	}
+}
+
+void actionProcessDeferredFailedLoads(void)
+{
+	for (int i = 0; i < g_deferred_failed_load_count; i++) {
+		DeferredFailedLoad* dfl = &g_deferred_failed_loads[i];
+		if (dfl->mc != NULL) {
+			dfl->mc->load_failed = 1;
+			dfl->mc->totalframes = 0;
+			dfl->mc->currentframe = 0;
+			dfl->mc->byte_size = 0;
+			dfl->mc->swf_version = 0;
+			strncpy(dfl->mc->url, dfl->url, sizeof(dfl->mc->url) - 1);
+			dfl->mc->url[sizeof(dfl->mc->url) - 1] = '\0';
+		}
+	}
+	g_deferred_failed_load_count = 0;
+}
+
 // --- Deferred onUnload queue ---
 // When removeMovieClip/actionRemoveSprite removes a dynamic clip, the AS-set onUnload
 // handler is queued here and fired at ShowFrame time (between frames), matching Flash.
@@ -15093,11 +15138,12 @@ void actionSetCurrentContext(MovieClip* mc) {
 static int g_call_skipped_halt = 0;
 int actionBaseClipRemoved(void) {
 	if (g_call_skipped_halt) { g_call_skipped_halt = 0; return 0; }
-	// Check both the current context AND the base clip.
-	// SetTarget can change g_current_context to root even when the
-	// function's actual base clip has been removed. The halt should
-	// trigger if EITHER the current context or the base clip is removed.
-	if (g_current_context != NULL && g_current_context->avm1_removed) return 1;
+	// Check the current function's base_clip (the MC where the function was defined).
+	// This is the Ruffle "continue_if_base_clip_exists" check.
+	if (g_current_executing_func != NULL && g_current_executing_func->base_clip != NULL) {
+		if (((MovieClip*)g_current_executing_func->base_clip)->avm1_removed) return 1;
+	}
+	// Fall back to sprite frame base_clip (set by process_sprite_init_at_depth)
 	if (g_base_clip != NULL && g_base_clip->avm1_removed) return 1;
 	return 0;
 }
@@ -18424,8 +18470,9 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		MovieEntry* entry = findMovieEntry(url_mut);
 		if (entry != NULL && mc != NULL) {
 			// Set child SWF URL and version on target MC
-			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
+			mc->load_failed = 0;
 			// Switch to child's SWF version during init (with versioned global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
@@ -18442,6 +18489,13 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
+		} else if (mc != NULL) {
+			// Failed load: defer state change to next frame (async load simulation)
+			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+				dfl->mc = mc;
+				constructChildURL(dfl->url, sizeof(dfl->url), url_mut);
+			}
 		}
 		return;
 	}
@@ -18489,8 +18543,9 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		MovieEntry* entry = findMovieEntry(url_mut2);
 		if (entry != NULL && mc != NULL) {
 			// Set child SWF URL and version on target MC
-			snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
+			mc->load_failed = 0;
 			// Switch to child's SWF version during init (with versioned global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
@@ -18507,6 +18562,13 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
+		} else if (mc != NULL) {
+			// Failed load: defer state change to next frame (async load simulation)
+			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+				dfl->mc = mc;
+				constructChildURL(dfl->url, sizeof(dfl->url), url_mut2);
+			}
 		}
 		return;
 	}
@@ -19126,11 +19188,11 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
         if (loads[i].target != NULL) {
             if (loads[i].entry != NULL) {
                 // Note: dynamic_props clearing already happened in actionLoadClip before FlashVars were set
-                snprintf(loads[i].target->url, sizeof(loads[i].target->url), "file:///%s", loads[i].entry->filename);
+                constructChildURL(loads[i].target->url, sizeof(loads[i].target->url), loads[i].entry->filename);
                 loads[i].target->swf_version = (u16)loads[i].entry->swf_version;
             } else if (loads[i].is_swf_url) {
                 // Failed .swf load: still update the URL on the target MC
-                snprintf(loads[i].target->url, sizeof(loads[i].target->url), "file:///%s", loads[i].url);
+                constructChildURL(loads[i].target->url, sizeof(loads[i].target->url), loads[i].url);
             }
         }
     }
@@ -21922,9 +21984,10 @@ check_special_vars:
 					pushVar(app_context, &g_this_stack[g_this_depth - 1]);
 					return;
 				}
-				// Fallback to current MC context
+				// Fallback to base clip (the MC whose timeline script is running).
+				// SetTarget/SetTarget2 change g_current_context but must NOT affect "this".
 				extern MovieClip root_movieclip;
-				MovieClip* ctx = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+				MovieClip* ctx = (g_base_clip != NULL) ? g_base_clip : &root_movieclip;
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
 				return;
 			}
@@ -22710,8 +22773,8 @@ check_special_vars:
 			if (strcasecmp(var_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
 			if (strcasecmp(var_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
 			if (strcasecmp(var_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_totalframes") == 0) { float v = (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_totalframes") == 0) { float v = mc->load_failed ? 0.0f : (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_framesloaded") == 0) { float v = mc->load_failed ? -1.0f : (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
 			if (strcasecmp(var_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
@@ -24020,7 +24083,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			is_string = 1;
 			break;
 		case 12: // _framesloaded
-			value = mc ? (float)mc->framesloaded : 1.0f;
+			value = mc ? (mc->load_failed ? -1.0f : (float)mc->framesloaded) : 1.0f;
 			break;
 		case 13: // _name
 			str_value = mc ? mc->name : "";
@@ -26406,7 +26469,10 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				releaseObject(app_context, (ASObject*)_gu2_mc->dynamic_props);
 				_gu2_mc->dynamic_props = NULL;
 			}
-			if (_gu2_mc != NULL) _gu2_mc->unloaded = 0;
+			if (_gu2_mc != NULL) {
+				_gu2_mc->unloaded = 0;
+				_gu2_mc->load_failed = 0;
+			}
 			// Set FlashVars AFTER clearing (so they survive into the child SWF)
 			if (_gu2_query != NULL && *_gu2_query != '\0') {
 				parseURLEncodedVars(app_context, _gu2_query, _gu2_mc);
@@ -26436,7 +26502,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			}
 			// Set child SWF URL and version on target MC
 			if (_gu2_mc != NULL) {
-				snprintf(_gu2_mc->url, sizeof(_gu2_mc->url), "file:///%s", entry->filename);
+				constructChildURL(_gu2_mc->url, sizeof(_gu2_mc->url), entry->filename);
 				_gu2_mc->swf_version = (u16)entry->swf_version;
 			}
 			// Run child in target MC context with child's SWF version (with versioned global)
@@ -26455,6 +26521,13 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
+		} else if (_gu2_mc != NULL) {
+			// Failed load: defer state change to next frame (async load simulation)
+			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+				dfl->mc = _gu2_mc;
+				constructChildURL(dfl->url, sizeof(dfl->url), url_utf8);
+			}
 		}
 		return;
 	}
@@ -29713,8 +29786,8 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
 			if (strcasecmp(prop_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
 			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? 0.0f : (float)mc->totalframes); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? -1.0f : (float)mc->framesloaded); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
 			if (strcasecmp(prop_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
@@ -32531,6 +32604,23 @@ void actionRemoveSprite(SWFAppContext* app_context)
 					break;
 				}
 			}
+			// Clear display list entry so GetVariable doesn't re-find it
+			{
+				extern size_t ng_findDisplayEntryByName(const char* name);
+				size_t _rs_dl = ng_findDisplayEntryByName(_rs_mc->name);
+				if (_rs_dl != SIZE_MAX) {
+					extern DisplayObject* display_list;
+					memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
+				}
+			}
+			// If the removed MC was the current context (via SetTarget),
+			// fall back to the base clip so scope resolution continues correctly.
+			if (g_current_context == _rs_mc) {
+				MovieClip* _fallback = g_base_clip ? g_base_clip : &root_movieclip;
+				if (_fallback->avm1_removed || _fallback->depth == INT_MIN)
+					_fallback = &root_movieclip;
+				g_current_context = _fallback;
+			}
 		}
 	}
 	#endif
@@ -32563,14 +32653,23 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 
 	// Empty string or NULL means return to base clip (the clip whose script is running)
 	if (!target_name || strlen(target_name) == 0) {
-		// Keep dead base clip as context (don't fall back to root).
-		// actionBaseClipRemoved() needs to see the dead MC to halt the script.
-		setCurrentContext(base);
+		if (base->avm1_removed || base->depth == INT_MIN) {
+			// Base clip is removed/dead: Ruffle treats target_clip() as None.
+			// GotoFrame/Play/Stop become no-ops; scope falls back to root for variables.
+			setCurrentContext(&root_movieclip);
 #ifdef NO_GRAPHICS
-		g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
-		g_settarget_invalid = 0;
-		g_settarget_none = 0;
+			g_settarget_explicit_root = 0;
+			g_settarget_invalid = 1;
+			g_settarget_none = 1;
 #endif
+		} else {
+			setCurrentContext(base);
+#ifdef NO_GRAPHICS
+			g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
+			g_settarget_invalid = 0;
+			g_settarget_none = 0;
+#endif
+		}
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
 #endif
@@ -32700,8 +32799,8 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 	if (strcasecmp(name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_ew, 8); return 1; }
 	if (strcasecmp(name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_eh, 8); return 1; }
 	if (strcasecmp(name, "_currentframe") == 0) { float v = (float)mc->currentframe; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_totalframes") == 0) { float v = (float)mc->totalframes; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_framesloaded") == 0) { float v = (float)mc->framesloaded; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_totalframes") == 0) { float v = mc->load_failed ? 0.0f : (float)mc->totalframes; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_framesloaded") == 0) { float v = mc->load_failed ? -1.0f : (float)mc->framesloaded; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_name") == 0) { result->type = ACTION_STACK_VALUE_STRING; /* caller must handle string push */ return 2; }
 	if (strcasecmp(name, "_target") == 0) { result->type = ACTION_STACK_VALUE_STRING; return 3; }
 	return 0;
@@ -35175,7 +35274,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				} else if (_is_mc_nav == 6 || _is_mc_nav == 7) {
 					// getBytesLoaded / getBytesTotal
 					if (args != NULL) FREE(args);
-					double v = _mc_target->unloaded ? 0.0 : (double)_mc_target->byte_size;
+					double v = _mc_target->unloaded ? 0.0 : (_mc_target->load_failed ? -1.0 : (double)_mc_target->byte_size);
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 					builtin_handled = 1;
 				}
@@ -39471,6 +39570,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							for (int _ai = 0; _ai < child_mc_count; _ai++) {
 								if (child_mc_cache[_ai] == _apply_mc) { child_mc_cache[_ai] = NULL; break; }
 							}
+							// Clear display list entry so GetVariable doesn't re-find it
+							{
+								extern size_t ng_findDisplayEntryByName(const char* name);
+								size_t _dl = ng_findDisplayEntryByName(_apply_mc->name);
+								if (_dl != SIZE_MAX) {
+									extern DisplayObject* display_list;
+									memset(&display_list[_dl], 0, sizeof(DisplayObject));
+								}
+							}
+							// If the removed MC was the current context (via SetTarget),
+							// fall back to the base clip so scope resolution continues correctly.
+							if (g_current_context == _apply_mc) {
+								MovieClip* _fb = g_base_clip ? g_base_clip : &root_movieclip;
+								if (_fb->avm1_removed || _fb->depth == INT_MIN)
+									_fb = &root_movieclip;
+								g_current_context = _fb;
+							}
 						}
 					}
 #endif
@@ -41055,21 +41171,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 13 && strncmp(method_name, "getSWFVersion", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = mc->swf_version ? (double)mc->swf_version : (double)g_swf_version;
+			double v = mc->load_failed ? -1.0 : (mc->swf_version ? (double)mc->swf_version : (double)g_swf_version);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
 		else if (method_name_len == 14 && strncmp(method_name, "getBytesLoaded", 14) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = mc->unloaded ? 0.0 : (double)mc->byte_size;
+			double v = mc->unloaded ? 0.0 : (mc->load_failed ? -1.0 : (double)mc->byte_size);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
 		else if (method_name_len == 13 && strncmp(method_name, "getBytesTotal", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = mc->unloaded ? 0.0 : (double)mc->byte_size;
+			double v = mc->unloaded ? 0.0 : (mc->load_failed ? -1.0 : (double)mc->byte_size);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
@@ -42386,8 +42502,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					MovieEntry* entry = findMovieEntry(_lm_url);
 					if (entry != NULL && mc != NULL) {
 						// Set child SWF URL and version on target MC
-						snprintf(mc->url, sizeof(mc->url), "file:///%s", entry->filename);
+						constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 						mc->swf_version = (u16)entry->swf_version;
+						mc->load_failed = 0;
 						// Run the child movie's init and frame 0 with child's SWF version (with versioned global)
 						int _saved_ver = g_swf_version;
 						ASObject* _saved_global = global_object;
@@ -42404,6 +42521,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						actionSetCurrentContext(_saved_ctx);
 						g_swf_version = _saved_ver;
 						global_object = _saved_global;
+					} else if (mc != NULL) {
+						// Failed load: defer state change to next frame
+						if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+							DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+							dfl->mc = mc;
+							constructChildURL(dfl->url, sizeof(dfl->url), _lm_url);
+						}
 					}
 				}
 			}

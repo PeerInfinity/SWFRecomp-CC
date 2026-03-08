@@ -46,6 +46,7 @@ struct MovieClip {
 	int depth;             // ActionScript display depth (-16384 for _root, SWF_depth-16384 for timeline clips, AS-space for dynamic clips)
 	u8 depth_swapped;      // 1 if depth was changed by swapDepths (prevents display list overwrite in actionGetMember)
 	u8 unloaded;           // 1 if unloadMovie was called on this MC (frame/bytes properties return 0)
+	u8 load_failed;        // 1 if loadMovie was called but the URL was not found (_framesloaded/-1, getBytesTotal/-1, getSWFVersion/-1)
 	u8 pending_removal;    // 1 if MC was removed from display list but persists for one more frame (depth transformed)
 	u8 avm1_removed;       // 1 if MC was removed from display list (halts script execution)
 	u32 byte_size;         // getBytesLoaded/getBytesTotal value (0 = dynamic/attached clip)

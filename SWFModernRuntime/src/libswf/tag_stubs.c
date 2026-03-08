@@ -1214,6 +1214,10 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		size_t saved_cap = display_list_capacity;
 		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
 		int saved_settarget = g_settarget_explicit_root;
+		extern int g_settarget_invalid;
+		extern int g_settarget_none;
+		int saved_invalid = g_settarget_invalid;
+		int saved_none = g_settarget_none;
 
 		// Use the MC's own sprite display list (created during ng_attachMovie)
 		if (mc != NULL && mc->display_obj != NULL) {
@@ -1229,6 +1233,8 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 			display_list_capacity = tmp_cap;
 		}
 		g_settarget_explicit_root = 0;
+		g_settarget_invalid = 0;
+		g_settarget_none = 0;
 		g_current_sprite_obj = NULL;
 
 		// Run the frame function (scripts will run this time since catch_up_mode = 0)
@@ -1260,6 +1266,8 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		actionSetBaseClip(saved_base);
 		g_current_sprite_obj = saved_sprite_obj;
 		g_settarget_explicit_root = saved_settarget;
+		g_settarget_invalid = saved_invalid;
+		g_settarget_none = saved_none;
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
@@ -1328,6 +1336,10 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		MovieClip*     saved_ctx   = NULL;
 		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
 		int            saved_settarget = g_settarget_explicit_root;
+		extern int g_settarget_invalid;
+		extern int g_settarget_none;
+		int            saved_invalid2 = g_settarget_invalid;
+		int            saved_none2 = g_settarget_none;
 		int            saved_catch_up = catch_up_mode;
 
 		// Create a display object for the attached clip to hold its children
@@ -1353,6 +1365,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		max_depth = dobj->sprite_max_depth;
 		display_list_capacity = dobj->sprite_dl_capacity;
 		g_settarget_explicit_root = 0;
+		g_settarget_invalid = 0;
+		g_settarget_none = 0;
 
 		// Set the MC context so _name, _x etc resolve correctly
 		saved_ctx = g_current_context;
@@ -1368,6 +1382,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		actionSetCurrentContext(saved_ctx);
 		g_current_sprite_obj = saved_sprite_obj;
 		g_settarget_explicit_root = saved_settarget;
+		g_settarget_invalid = saved_invalid2;
+		g_settarget_none = saved_none2;
 
 		// Persist the updated display list state on the MC's display obj
 		dobj->sprite_display_list = display_list;

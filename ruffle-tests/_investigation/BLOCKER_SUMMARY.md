@@ -116,22 +116,22 @@ Both tests now **PASS**:
 
 ## Blocker 8: MC Removal Lifecycle / call() Semantics
 
-**Impact**: 2 tests across 2 plans (function_base_clip_readded RESOLVED)
+**Impact**: 1 test remaining across 2 plans (function_base_clip_readded, remove_movie_clip, removed_clip_halts_script, target_clip_removed all RESOLVED)
 
 When MovieClips are removed (`depth = INT_MIN`), operations on them or their closures have incomplete fallback behavior:
 
 | Gap | Detail | Tests Blocked |
 |-----|--------|---------------|
 | ~~Script halting on clip removal~~ | removeMovieClip halts currently executing script. SCRIPT_HALTING_PLAN COMPLETE. | ~~removed_clip_halts_script~~ **15/15 PASS**, ~~target_clip_removed~~ **5/5 PASS** |
-| call() early termination | `call()` on a removed base_clip's frame should terminate the calling script. We don't implement script termination. | removed_target_clip_scope (7/35) |
+| call() early termination | `call()` on a removed base_clip's frame should terminate the calling script. We don't implement script termination. | removed_target_clip_scope (34/35) |
 | ~~Dead base_clip re-resolution~~ | ~~RESOLVED~~ — `reResolveDeadBaseClip()` re-resolves via `original_target`. function_base_clip_readded **12/12 PASS**. | ~~function_base_clip_readded~~ |
-| SetTarget on removed base_clip | SetTarget("") should reset to removed base_clip's parent scope, not the target path | removed_target_clip_scope |
+| ~~SetTarget on removed base_clip~~ | ~~RESOLVED~~ — SetTarget("") with dead base_clip sets `g_settarget_none=1` (GotoFrame/Play/Stop become no-ops). Settarget flags saved/restored around sprite init contexts. | ~~removed_target_clip_scope~~ (was 7→34/35) |
 | ~~Ruffle-specific trace~~ | "Target not found: dummy" is Ruffle debug output, not Flash behavior. In ignored_tests.txt. | ~~removed_base_clip_tell_target~~ |
-| Script halting regression | remove_movie_clip regressed 29/29 → 25/29 from script halting changes | remove_movie_clip |
+| ~~Script halting regressions~~ | ~~RECOVERED~~ — remove_movie_clip **29/29 PASS** (display list clearing + context reset). removed_clip_halts_script/target_clip_removed recovered via `g_current_executing_func->base_clip` check. | ~~remove_movie_clip~~ **29/29 PASS** |
 
-**Plans blocked**: MC_REMOVAL_LIFECYCLE_PLAN (removed_target_clip_scope), CALL_SEMANTICS_PLAN (removed_target_clip_scope)
+**Plans blocked**: MC_REMOVAL_LIFECYCLE_PLAN (removed_target_clip_scope 34/35), CALL_SEMANTICS_PLAN (removed_target_clip_scope 34/35)
 
-**Regressions from script halting**: remove_movie_clip (29→25/29), register_and_init_order (146→36/231), removed_target_clip_scope (11→7/35). These need investigation.
+**Remaining**: removed_target_clip_scope line 21 (`scope = /base2/target2` expected, get `scope = /base2`) — child MC resolution in non-root sprite context. register_and_init_order (146→36/231) regression from script halting is a separate constructor ordering issue (Blocker 11).
 
 ---
 
@@ -229,8 +229,8 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 1. ~~**_lockroot _root resolution**~~ — **RESOLVED**. movieclip_lockroot **29/29 PASS**. See LOCKROOT_PLAN (complete/).
 2. ~~**Primitive coercion addProperty**~~ — **RESOLVED**. coerce_to_primitive_resolve **17/17 PASS**. See PRIMITIVE_COERCION_ADDPROPERTY_PLAN (complete/).
 3. ~~**Default instance naming**~~ — **RESOLVED**. default_names **52/52 PASS**. See DEFAULT_NAMES_PLAN (complete/).
-4. ~~**Script halting on clip removal**~~ — **RESOLVED** (with regressions). removed_clip_halts_script **15/15 PASS**, target_clip_removed **5/5 PASS**. But remove_movie_clip regressed 29→25/29. See SCRIPT_HALTING_PLAN (complete/).
-5. **Script halting regressions** — remove_movie_clip (25/29), register_and_init_order (36/231), removed_target_clip_scope (7/35) regressed from script halting changes. Need investigation.
+4. ~~**Script halting on clip removal**~~ — **RESOLVED**. removed_clip_halts_script **15/15 PASS**, target_clip_removed **5/5 PASS**, remove_movie_clip **29/29 PASS**, removed_target_clip_scope **34/35**. All script halting regressions recovered except register_and_init_order (36/231, constructor ordering issue).
+5. **register_and_init_order regression** — 146→36/231 from script halting changes. Deep constructor ordering issue, partially overlaps with Blocker 11.
 6. **Font metrics accuracy** — Incremental improvements to word wrap and line height
 7. **Failed load state values** — Return `-1` for specific MC properties on failed load
 8. **Global stubs** — Add 20 missing globals (tedious but straightforward)
@@ -257,7 +257,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 | SWF6 HTML model | 1 | 1480 | Low (complex refactor) |
 | ~~condenseWhite~~ | ~~2~~ | ~~17~~ | **RESOLVED** |
 | ~~StyleSheet CSS~~ | ~~1~~ | ~~121~~ | **RESOLVED** |
-| MC removal lifecycle | 1 | ~21 | Low (deep semantics) |
+| MC removal lifecycle | 1 | ~1 | Low (1 line remaining: child MC resolution in non-root context) |
 | Closure capture | 1 | 100 | Not feasible |
 | Global enumeration | 3 | 11000+ | High (tedious) |
 | Dynamic creation edges | 2 | 240+ | Moderate |

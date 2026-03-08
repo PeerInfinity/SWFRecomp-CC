@@ -879,6 +879,12 @@ void swfStart(SWFAppContext* app_context)
 		break;
 		} // end outer for(;;) retry loop
 
+		// Process deferred failed loadMovie state (apply between frame scripts and timers)
+		{
+			extern void actionProcessDeferredFailedLoads(void);
+			actionProcessDeferredFailedLoads();
+		}
+
 		// Process timers after frame actions + deferred scripts
 		{
 			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;

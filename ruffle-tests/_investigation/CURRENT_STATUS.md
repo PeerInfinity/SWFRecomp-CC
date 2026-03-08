@@ -7,7 +7,7 @@ Last updated: 2026-03-07
 - **Pass rate (CI, last run)**: 500/619 (80.8%) total, 425/477 (89.1%) filtered (CI run on 6e400bd3)
 - **Main failure types**: output_mismatch (47), runtime_error (4), compile_fail (1)
 - **Recent gains (this session)**: Implemented 6 new plans from investigation, gained 8 filtered tests (+29 total from regression recovery). Key newly passing: movieclip_lockroot (29/29), coerce_to_primitive_resolve (17/17), default_names (52/52), removed_clip_halts_script (15/15), target_clip_removed (5/5), movieclip_gettextsnapshot (112/112), custom_clip_methods (4/4), movieclip_setmask (14/14), define_local_with_paths (53/54), focus_keyboard_press (60/60), tab_ordering_events_mouse (65/65), tab_ordering_automatic_order_same_position (12/12). MOUSE_EVENTS_ADVANCED Phases 2+3+5 COMPLETE. Also recovered 9 regressions (execution_order1/2/4, getproperty_swf4, set_interval, stage_object_children, tell_target_invalid/_swf6, textfield_properties, goto_frame_number).
-- **Known regressions**: remove_movie_clip (29→25/29), register_and_init_order (146→36/231), removed_target_clip_scope (11→7/35) — all from script halting changes. Need investigation.
+- **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. remove_movie_clip, removed_clip_halts_script, target_clip_removed all recovered to PASS. removed_target_clip_scope improved 7→34/35.
 - **Previous session highlights**: EXTERNAL_INTERFACE_PLAN complete (6/7 pass), interface_implements_op 47/47 (now regressed to 46/47), device_font_spacing 91/91, root_global_parent 6/6, ASBROADCASTER complete, ASNATIVE_ASNEW complete.
 
 ## Crashes and Errors (8 tests)
@@ -111,9 +111,8 @@ Last updated: 2026-03-07
 ### Regressions to investigate
 | Test | Before | After | Cause |
 |------|--------|-------|-------|
-| `register_and_init_order` | 146/231 | 36/231 | Script halting changes |
-| `remove_movie_clip` | 29/29 PASS | 25/29 | Script halting changes |
-| `removed_target_clip_scope` | 11/35 | 7/35 | Script halting changes |
+| `register_and_init_order` | 146/231 | 36/231 | Constructor ordering — script halting changes |
+| `removed_target_clip_scope` | 11/35 | **34/35** | ~~7/35~~ Recovered via "this" fix + context reset. 1 remaining: child MC resolution via GetVariable in non-root sprite |
 
 ### FrameLabelEntry compile_fail (FIXED)
 202 tests had stale `FrameLabelEntry` typedef in generated tagMain.c conflicting with tag.h. Fixed by removing the stale typedefs from all generated files. The recompiler was already updated to not emit the typedef, but pre-existing generated files needed cleanup. Many tests that were compile_fail now compile and run (some pass, some have output_mismatch).
@@ -147,7 +146,7 @@ Last updated: 2026-03-07
 | REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 13/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅, register_class_with_sound ✅) | register_class 26/67 (loadMovie), register_and_init_order ~76/233 (sprite init ordering) |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **ALL PHASES COMPLETE** → `complete/` | 4/5 pass (native_objects_swf7/8 ✅, native_double_construct ✅, native_subclasses 190/191 ✅) | native_objects_swf6 83/84 (1 line Ruffle vs Flash diff, ignored); native_subclasses 1 line timezone diff (ignored) |
-| TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 16/37), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
+| TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 34/35), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
 | TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
 | FOCUS_SYSTEM_PLAN | **6/7 PASS** → `blocked/` | focus_root_movie ✅, focusrect_focuslost ✅, movieclip_focusenabled ✅, focus_mouse ✅, focus_keyboard_press ✅ (60/60), focus_mouse_rollout ✅ (4/4) | Remaining 1: focus_mouse_focusable blocked by dynamic object creation |
 | TAB_ORDERING_PLAN | **16/16 PASS** → `complete/` | All 16 tests PASS including edittext_tab_focus ✅ (13/13), tab_ordering_events_mouse ✅ (65/65), tab_ordering_automatic_order_same_position ✅ (12/12) | — |
@@ -167,14 +166,14 @@ Last updated: 2026-03-07
 | LOCKROOT_PLAN | **COMPLETE** → `complete/` | movieclip_lockroot 29/29 ✅ | — |
 | PRIMITIVE_COERCION_ADDPROPERTY_PLAN | **COMPLETE** → `complete/` | coerce_to_primitive_resolve 17/17 ✅ | — |
 | DEFAULT_NAMES_PLAN | **COMPLETE** → `complete/` | default_names 52/52 ✅ | — |
-| SCRIPT_HALTING_PLAN | **COMPLETE** → `complete/` | removed_clip_halts_script 15/15 ✅, target_clip_removed 5/5 ✅ | Regressions: remove_movie_clip (29→25), register_and_init_order (146→36), removed_target_clip_scope (11→7) |
+| SCRIPT_HALTING_PLAN | **COMPLETE** → `complete/` | removed_clip_halts_script 15/15 ✅, target_clip_removed 5/5 ✅, remove_movie_clip 29/29 ✅ | Regressions recovered: remove_movie_clip ✅, removed_target_clip_scope (7→34/35). Remaining: register_and_init_order (36/231) |
 | CUSTOM_CLIP_METHODS_PLAN | **COMPLETE** → `complete/` | custom_clip_methods 4/4 ✅ | — |
 | GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN | **COMPLETE** → `complete/` | movieclip_gettextsnapshot 112/112 ✅ | — |
 
 ## Recommended Work Order (updated 2026-03-07)
 
 ### Actionable — Quick wins
-1. **Script halting regressions** — remove_movie_clip (25/29), register_and_init_order (36/231), removed_target_clip_scope (7/35) regressed from SCRIPT_HALTING_PLAN. Need investigation and selective fix.
+1. **Script halting regressions** — ~~remove_movie_clip (25/29)~~ ✅ FIXED, register_and_init_order (36/231) still broken (constructor ordering), ~~removed_target_clip_scope (7/35)~~ improved to 34/35.
 2. **interface_implements_op regression** — 47→46/47, regressed in commit b1b89de3 (lazy ImplementsOp via valueOf callback). Line 43 `obj instanceof LazyInterfaceA: false`.
 3. **define_local_with_paths** — 53/54, 1 remaining slash-path edge case.
 4. **Font metrics accuracy** — edittext_scroll (52/54), edittext_newlines (23/30), edittext_bullet (18/30). Incremental improvements possible.
@@ -201,7 +200,19 @@ All actionable plans have been completed. Remaining failing tests are blocked by
 - **define_local_with_paths improved**: 51/54 → 53/54 (DefineLocal/DeclareLocal addProperty support, commit b1b89de3)
 - **BLOCKER_SUMMARY.md fully updated**: Blockers 3, 6, 7, 12 marked RESOLVED; Blocker 8 updated with script halting regressions; actionable items list refreshed
 - **All actionable quick wins exhausted**: No more plans needed for non-blocked tests. Remaining failures are architectural blockers or regressions.
-- **Known regressions to investigate**: remove_movie_clip (29→25/29), register_and_init_order (146→36/231), removed_target_clip_scope (11→7/35) — all from script halting; interface_implements_op (47→46/47) from lazy ImplementsOp in b1b89de3
+- **Known regressions to investigate**: register_and_init_order (146→36/231) — constructor ordering; interface_implements_op (47→46/47) from lazy ImplementsOp in b1b89de3
+
+### Session notes (2026-03-07 continued)
+- **Script halting regressions FIXED**: 3 of 3 regressions recovered, 1 improved:
+  - `remove_movie_clip` 25→29/29 ✅: Display list entry clearing after RemoveSprite (both direct and apply paths) + context reset when removed MC == g_current_context
+  - `removed_clip_halts_script` 15/15 ✅ (was regressed): actionBaseClipRemoved() now checks g_current_executing_func->base_clip for function closures
+  - `target_clip_removed` 5/5 ✅ (was regressed): SetTarget("") with removed base clip sets g_settarget_none=1 + settarget flag save/restore in sprite init (tag.c + tag_stubs.c)
+  - `removed_target_clip_scope` 7→34/35: GetVariable("this") returns g_base_clip (not g_current_context) when g_this_depth==0, fixing removeMovieClip(this) inside SetTarget2; context reset on RemoveSprite; SetTarget("") dead-base handling. Remaining 1 line: child MC "target2" not found via GetVariable in non-root sprite context
+- **Key architectural fixes**:
+  - `actionBaseClipRemoved()`: Added g_current_executing_func->base_clip check (Ruffle's continue_if_base_clip_exists). Functions defined on a sprite correctly halt when the sprite is removed via _root.nextFrame() or similar
+  - `GetVariable("this")` at g_this_depth==0: Now returns g_base_clip (timeline script's MC), not g_current_context (which may be changed by SetTarget2). Matches Ruffle behavior
+  - Settarget flag save/restore: g_settarget_invalid and g_settarget_none now saved/restored in process_sprite_init_at_depth (tag.c) and ng_fire_pending_attach_inits + ng_attachMovie (tag_stubs.c)
+- **No regressions**: Verified 25+ tests still pass after changes
 
 ### Session notes (2026-03-05)
 - **device_font_spacing regression FIXED (47/91→91/91)**: Commit 0f010c5b removed pixel rounding to fix 8 edittext tests but broke device_font_spacing. Fixed by making pixel rounding conditional on `embedFonts` property — device fonts (embedFonts=false) get pixel rounding via `ng_round_to_pixel`/`ng_round_ls_to_pixel`, embedded fonts use raw sub-pixel advances. `ng_device_font_mode` flag in tag_stubs.c, `setDeviceFontModeForMC()` helper in action.c called at 6 measurement sites.
