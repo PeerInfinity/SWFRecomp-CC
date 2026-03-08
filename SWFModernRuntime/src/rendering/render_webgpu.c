@@ -224,6 +224,7 @@ static WGPUBuffer create_buffer(WGPUDevice device, WGPUQueue queue,
 	// Ensure minimum buffer size of 64 bytes. WebGPU requires non-zero buffers,
 	// and shader bindings like array<mat4x4f> require at least 64 bytes even
 	// when no data is present.
+	size_t data_size = size;  // actual data to upload
 	if (size < 64) size = 64;
 
 	WGPUBufferDescriptor desc = {0};
@@ -235,9 +236,9 @@ static WGPUBuffer create_buffer(WGPUDevice device, WGPUQueue queue,
 	desc.mappedAtCreation = false;
 
 	WGPUBuffer buffer = wgpuDeviceCreateBuffer(device, &desc);
-	if (data && size > 0)
+	if (data && data_size > 0)
 	{
-		wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+		wgpuQueueWriteBuffer(queue, buffer, 0, data, data_size);
 	}
 	return buffer;
 }

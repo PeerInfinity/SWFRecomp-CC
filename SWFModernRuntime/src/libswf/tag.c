@@ -941,8 +941,21 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				if (ch->button_state_funcs[state] != NULL)
 					ch->button_state_funcs[state](app_context);
 
+				// Save override counts so we can restore button-local overrides
+				// before freeing the temporary display list (they hold pointers into it).
+				int saved_xform_count = g_xform_override_count;
+				int saved_cxform_count = g_cxform_override_count;
+
 				compose_children(app_context, display_list, max_depth, composed,
 					parent_cx_override, parent_cxform_id);
+
+				// Restore overrides that compose_children added for the temp display list
+				for (int k = g_xform_override_count - 1; k >= saved_xform_count; --k)
+					g_xform_overrides[k].obj->transform_id = g_xform_overrides[k].original_id;
+				g_xform_override_count = saved_xform_count;
+				for (int k = g_cxform_override_count - 1; k >= saved_cxform_count; --k)
+					g_cxform_overrides[k].obj->cxform_id = g_cxform_overrides[k].original_id;
+				g_cxform_override_count = saved_cxform_count;
 
 				free(display_list);
 				display_list = saved_display_list;
@@ -1577,8 +1590,22 @@ void tagShowFrame(SWFAppContext* app_context)
 				ch->button_state_funcs[state](app_context);
 
 			const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+
+			// Save override counts so we can restore button-local overrides
+			// before freeing the temporary display list (they hold pointers into it).
+			int saved_xform_count = g_xform_override_count;
+			int saved_cxform_count = g_cxform_override_count;
+
 			compose_children(app_context, display_list, max_depth, btn_xform,
 				obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+
+			// Restore overrides that compose_children added for the temp display list
+			for (int k = g_xform_override_count - 1; k >= saved_xform_count; --k)
+				g_xform_overrides[k].obj->transform_id = g_xform_overrides[k].original_id;
+			g_xform_override_count = saved_xform_count;
+			for (int k = g_cxform_override_count - 1; k >= saved_cxform_count; --k)
+				g_cxform_overrides[k].obj->cxform_id = g_cxform_overrides[k].original_id;
+			g_cxform_override_count = saved_cxform_count;
 
 			free(display_list);
 			display_list = saved_display_list;
