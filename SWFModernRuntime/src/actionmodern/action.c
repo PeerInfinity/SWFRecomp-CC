@@ -15126,7 +15126,7 @@ void actionSetBaseClip(MovieClip* mc) {
 }
 
 MovieClip* actionGetBaseClip(void) {
-	return g_base_clip ? g_base_clip : &root_movieclip;
+	return g_base_clip;
 }
 
 // Set the current execution context
@@ -21984,10 +21984,12 @@ check_special_vars:
 					pushVar(app_context, &g_this_stack[g_this_depth - 1]);
 					return;
 				}
-				// Fallback to base clip (the MC whose timeline script is running).
-				// SetTarget/SetTarget2 change g_current_context but must NOT affect "this".
+				// Fallback: prefer g_base_clip (frame script's clip, unaffected by
+				// SetTarget) when set; otherwise use g_current_context.
 				extern MovieClip root_movieclip;
-				MovieClip* ctx = (g_base_clip != NULL) ? g_base_clip : &root_movieclip;
+				MovieClip* ctx = g_base_clip;
+				if (ctx == NULL) ctx = g_current_context;
+				if (ctx == NULL) ctx = &root_movieclip;
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
 				return;
 			}
@@ -32613,10 +32615,12 @@ void actionRemoveSprite(SWFAppContext* app_context)
 					memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
 				}
 			}
-			// If the removed MC was the current context (via SetTarget),
-			// fall back to the base clip so scope resolution continues correctly.
-			if (g_current_context == _rs_mc) {
-				MovieClip* _fallback = g_base_clip ? g_base_clip : &root_movieclip;
+			// Reset context when removing the current context MC, but ONLY inside
+			// a sprite frame script (g_base_clip != NULL). When g_base_clip is NULL
+			// (e.g., onEnterFrame handler), keep the removed MC as context so
+			// GetVariable("this") returns the removed MC (empty string in Flash).
+			if (g_current_context == _rs_mc && g_base_clip != NULL) {
+				MovieClip* _fallback = (g_base_clip != _rs_mc) ? g_base_clip : &root_movieclip;
 				if (_fallback->avm1_removed || _fallback->depth == INT_MIN)
 					_fallback = &root_movieclip;
 				g_current_context = _fallback;
@@ -39579,10 +39583,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									memset(&display_list[_dl], 0, sizeof(DisplayObject));
 								}
 							}
-							// If the removed MC was the current context (via SetTarget),
-							// fall back to the base clip so scope resolution continues correctly.
-							if (g_current_context == _apply_mc) {
-								MovieClip* _fb = g_base_clip ? g_base_clip : &root_movieclip;
+							// Reset context when removing the current context MC inside sprite frame scripts.
+							if (g_current_context == _apply_mc && g_base_clip != NULL) {
+								MovieClip* _fb = (g_base_clip != _apply_mc) ? g_base_clip : &root_movieclip;
 								if (_fb->avm1_removed || _fb->depth == INT_MIN)
 									_fb = &root_movieclip;
 								g_current_context = _fb;
