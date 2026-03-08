@@ -699,16 +699,49 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 // ---------------------------------------------------------------------------
+// Dynamic transform slot allocator for composed transforms.
+// When multiple sprite instances share the same child transform_id, we must
+// allocate unique GPU buffer slots so they don't overwrite each other.
+// ---------------------------------------------------------------------------
+static u32 g_next_dynamic_xform_slot;   // next available slot in xform_buffer
+static u32 g_xform_slot_capacity;       // total slots available
+
+// Save/restore stack for transform_id overrides during compose+render
+#define MAX_XFORM_OVERRIDES 4096
+typedef struct { DisplayObject* obj; u32 original_id; } XformOverride;
+static XformOverride g_xform_overrides[MAX_XFORM_OVERRIDES];
+static int g_xform_override_count;
+
+static void xform_overrides_reset(void)
+{
+	g_xform_override_count = 0;
+}
+
+static void xform_overrides_push(DisplayObject* obj, u32 original_id)
+{
+	if (g_xform_override_count < MAX_XFORM_OVERRIDES)
+	{
+		g_xform_overrides[g_xform_override_count].obj = obj;
+		g_xform_overrides[g_xform_override_count].original_id = original_id;
+		g_xform_override_count++;
+	}
+}
+
+static void xform_overrides_restore(void)
+{
+	for (int i = g_xform_override_count - 1; i >= 0; --i)
+		g_xform_overrides[i].obj->transform_id = g_xform_overrides[i].original_id;
+	g_xform_override_count = 0;
+}
+
+// ---------------------------------------------------------------------------
 // Helper 2: Recursive transform composition for sprite/button children
 // ---------------------------------------------------------------------------
 // Composes each child's local transform with the parent's already-composed
-// global transform, writes the result to GPU, and recurses for nested
-// structures (text glyphs, nested sprites, buttons).
-//
-// Unlike the old compose_child_transforms, this function receives the parent's
-// COMPOSED transform (not a transform_id), so it works correctly at any
-// nesting depth.  The CPU-side transform_data is never modified — all composed
-// results go directly to the GPU xform buffer via renderer_write_transform.
+// global transform, writes the result to a dynamically allocated GPU buffer
+// slot, and updates the child's transform_id to point to the new slot.
+// Original transform_ids are saved via xform_overrides for restoration after
+// rendering.
 static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 	size_t dl_max_depth, const float parent_composed[16])
 {
@@ -725,7 +758,18 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		const float* local_xform = &transforms[obj->transform_id * 16];
 		float composed[16];
 		hit_test_mat4_multiply(composed, parent_composed, local_xform);
-		renderer_write_transform(context, obj->transform_id, composed);
+
+		// Allocate a dynamic transform slot to avoid overwriting shared slots
+		u32 new_slot = g_next_dynamic_xform_slot;
+		if (new_slot < g_xform_slot_capacity) {
+			g_next_dynamic_xform_slot++;
+			xform_overrides_push(obj, obj->transform_id);
+			obj->transform_id = new_slot;
+			renderer_write_transform(context, new_slot, composed);
+		} else {
+			// Fallback: overwrite in-place (may cause visual artifacts)
+			renderer_write_transform(context, obj->transform_id, composed);
+		}
 
 		switch (ch->type)
 		{
@@ -1335,6 +1379,15 @@ void tagShowFrame(SWFAppContext* app_context)
 #endif
 
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+	// Initialize dynamic transform slot allocator.
+	// Original transform slots are [0, orig_count). Dynamic slots start after.
+	{
+		u32 orig_count = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
+		g_next_dynamic_xform_slot = orig_count;
+		g_xform_slot_capacity = context->xform_slot_count;
+		xform_overrides_reset();
+	}
+
 	// Compose transforms recursively BEFORE the render pass.
 	// For sprites/buttons: compose_children handles all nesting levels,
 	// passing the composed parent transform down so nested text/sprite/button
@@ -1551,6 +1604,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	}
 
 	renderer_close_pass(context);
+
+	// Restore original transform_ids that were overridden during composition
+	xform_overrides_restore();
 #endif // NO_GRAPHICS
 
 	// Dispatch _root.onLoad once after first frame

@@ -1545,6 +1545,14 @@ def main():
                         "trigger": cmp_config["trigger"],
                         "known_failure": cmp_config.get("known_failure", False),
                     }
+                    # Save actual and difference images to test dir for inspection
+                    if args.verbose:
+                        saved_actual = test_dir / f"{cmp_name}.actual.png"
+                        shutil.copy2(str(actual_png), str(saved_actual))
+                        diff_in_build = actual_png.parent / (actual_png.stem + ".difference.png")
+                        if diff_in_build.exists():
+                            saved_diff = test_dir / f"{cmp_name}.difference.png"
+                            shutil.copy2(str(diff_in_build), str(saved_diff))
 
         # Step 4: Filter and compare trace output
         actual = filter_output(raw_output)

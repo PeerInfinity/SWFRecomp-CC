@@ -611,9 +611,23 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->shape_data, ctx->shape_data_size, "vertex_buffer");
 
 	// Storage buffers
-	ctx->xform_buffer = create_buffer(ctx->device, ctx->queue,
-		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-		ctx->transform_data, ctx->transform_data_size, "xform_buffer");
+	// Over-allocate xform buffer to leave room for dynamic composed transform
+	// slots.  compose_children() in tag.c needs unique slots when multiple
+	// sprite instances share the same child transform_id.
+	{
+		u32 orig_slots = (u32)(ctx->transform_data_size / (16 * sizeof(float)));
+		u32 extra_slots = 512;
+		u32 total_slots = orig_slots + extra_slots;
+		size_t total_size = (size_t)total_slots * 16 * sizeof(float);
+		ctx->xform_buffer = create_buffer(ctx->device, ctx->queue,
+			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+			NULL, total_size, "xform_buffer");
+		// Upload original data into the first orig_slots
+		if (ctx->transform_data && ctx->transform_data_size > 0)
+			wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, 0,
+				ctx->transform_data, ctx->transform_data_size);
+		ctx->xform_slot_count = total_slots;
+	}
 
 	ctx->color_buffer = create_buffer(ctx->device, ctx->queue,
 		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,

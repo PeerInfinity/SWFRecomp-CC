@@ -286,8 +286,8 @@ namespace SWFRecomp
 						  << "\t" << "0.0f," << endl
 						  << "\t" << "1.0f," << endl
 						  << "\t" << "0.0f," << endl
-						  << "\t" << "-1.0f," << endl
-						  << "\t" << "1.0f," << endl
+						  << "\t" << "-1.0f - (float)FRAME_X_MIN_TWIPS/(FRAME_WIDTH_TWIPS/2.0f)," << endl
+						  << "\t" << "1.0f + (float)FRAME_Y_MIN_TWIPS/(FRAME_HEIGHT_TWIPS/2.0f)," << endl
 						  << "\t" << "0.0f," << endl
 						  << "\t" << "1.0f," << endl
 						  << "};" << endl;

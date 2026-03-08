@@ -48,6 +48,7 @@ typedef struct WebGPURenderContext
 	// --- GPU buffers ---
 	WGPUBuffer vertex_buffer;
 	WGPUBuffer xform_buffer;          // storage: transforms[]
+	u32 xform_slot_count;             // total slots in xform_buffer (original + dynamic)
 	WGPUBuffer color_buffer;          // storage: colors[]
 	WGPUBuffer uninv_mat_buffer;      // storage: gradient matrices (input)
 	WGPUBuffer inv_mat_buffer;        // storage: inverted gradient matrices (output)
