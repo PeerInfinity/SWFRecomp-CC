@@ -1,7 +1,7 @@
 # Uncovered Small/Miscellaneous Tests Catalog
 <!-- TESTS: define_local_with_paths, device_font_spacing, gettextextent, get_bytes_total, geturl, issue_2030, issue_2084, issue_3169, resolve_different_root, root_global_parent, root_onload, sandbox_type_remote, string_paths_keyevents, string_paths_timer, displacementmapfilter_mappoint_throw_error, localconnection -->
 
-Last updated: 2026-03-05
+Last updated: 2026-03-07
 
 ## Status: BLOCKED — catalog of individual uncovered tests, grouped by blocker
 
@@ -19,20 +19,24 @@ This document catalogs 16 failing tests that don't fit into any existing plan's 
 | issue_3169 | 2 | **PASS** ✅ | Was 0/2, now passes in CI | DONE |
 | get_bytes_total | 4 | **PASS** ✅ | getBytesLoaded/getBytesTotal implemented | DONE |
 | gettextextent | 56 | **PASS** ✅ | TextFormat.getTextExtent() implemented | DONE |
-| define_local_with_paths | 55 | ~51/55 (93%) | Slash-path `var /:abc` DefineLocal mostly working; 3 edge cases remain | ~51 lines gained |
+| define_local_with_paths | 55 | **53/54 (98%)** | Slash-path DefineLocal working; 1 edge case remains (`this['/:pqr']` scoping) | ~53 lines gained |
 | sandbox_type_remote | 3 | 1/3 | Lines 2-3 need loadMovie infra (multi-SWF) | BLOCKED |
 | device_font_spacing | 91 | **91/91 PASS** ✅ | Fixed: conditional pixel rounding based on embedFonts | DONE |
 
-#### define_local_with_paths (55 lines)
+#### define_local_with_paths (55 lines) — 53/54 PASS
 
 DefineLocal (ActionDefineLocal, `var x`) with slash-path syntax:
 - `var /:abc = 'ABC'` → sets variable `abc` on `_root` (slash `/` = root, colon `:` = variable separator)
 - `var /ruffle/:def = 'DEF'` → sets variable `def` on `_root.ruffle` MC
 - Uses Flash's SWF4 slash-path variable convention
 
-**Root cause**: `actionDeclareLocal` doesn't handle slash-path variable names. When the variable name contains `/` or `:`, it should resolve the path and set the variable on the target MC.
+**Fixed** (commit c4b7c440):
+- DefineLocal slash-path: converts `/ruffle/` → `_root.ruffle` dot-path for GetVariable resolution
+- Stores literal slash-path key on MC's dynamic_props for GetMember access
+- Syncs var_array changes to dynamic_props at top-level
+- GetVariable colon-path: object fallback for non-MC targets (e.g., `/ruffle/:def` where `ruffle` is an Object)
 
-**Fix**: In `actionDeclareLocal`, check if variable name contains `:` (slash-path separator). If so, parse the path portion before `:` as a MC path, resolve it, and set the variable on that MC's dynamic_props.
+**Remaining (line 54)**: `this['/:pqr']` inside a function — requires DefineLocal inside a function with slash-path key to store on root MC in a way that `GetMember(this, '/:pqr')` can find. Complex scoping interaction between function scope and slash-path MC property storage. BLOCKED.
 
 #### issue_3169 (2 lines)
 
@@ -123,16 +127,18 @@ Tests `getURL()` with POST parameters and traces the request. Needs network requ
 
 | Test | Lines | Current | Issue | Effort |
 |------|-------|---------|-------|--------|
-| movieclip_setmask | 14 | 12/14 (86%) | Lines 4, 11: setMask returns false instead of true for certain arg types | Small |
+| movieclip_setmask | 14 | **14/14 PASS** ✅ | Fixed: path resolution, dynamic_props lookup, type handling | DONE |
 | selection_handlers | 27 | 21/27 (78%) | Button rollOver/rollOut not firing second time during focus changes | Medium |
 | define_local | 27 | 27/27 locally | PASS locally, 2/27 in CI — likely stale CI build | Verify |
 | edittext_default_format_empty | 100 | 100/100 locally | PASS locally, 97/100 in CI — likely stale CI build | Verify |
 
-#### movieclip_setmask (14 lines)
+#### movieclip_setmask (14 lines) — RESOLVED
 
-`setMask()` returns `true` when given a valid mask MC or null (to clear mask), `false` for invalid args. Lines 4 and 11 return `false` instead of `true`. Need to check which specific argument type/path is failing — likely a string-to-MC path resolution edge case (e.g., `setMask("_root.mc")` where the MC exists but path resolution fails).
-
-**Fix**: Debug lines 4 and 11 of the test to see what arguments produce the wrong return value. Likely a path resolution or type coercion issue in the setMask handler.
+~~setMask returns false for certain arg types.~~ **14/14 PASS.** Fixed (commit c4b7c440):
+- OBJECT/FUNCTION/ARRAY args return false immediately (no valueOf coercion)
+- Non-string types converted via `convertString` for path lookup
+- Added `_root`/`_level0`/`_parent` special segment handling in `getMovieClipByTarget`
+- Added dynamic_props lookup fallback for variable-based MC references (e.g., number `1234` stored as variable pointing to MC)
 
 #### selection_handlers (27 lines)
 
@@ -148,9 +154,8 @@ Focus-change rollOver/rollOut dispatch is incomplete. Lines 1-21 pass (Selection
 
 | Priority | Test | Status | Lines Gained |
 |----------|------|--------|-------------|
-| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent, device_font_spacing | PASS | 155 |
-| **Mostly done** | define_local_with_paths | 51/55 (3 edge cases blocked) | 51 |
-| **Quick win** | movieclip_setmask | 12/14 (2 lines off) | 2 |
+| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent, device_font_spacing, movieclip_setmask | PASS | 169 |
+| **Nearly done** | define_local_with_paths | 53/54 (1 edge case blocked: `this['/:pqr']` scoping) | 53 |
 | **CI verify** | define_local, edittext_default_format_empty | PASS locally | 0 (need CI run) |
 | **Medium** | selection_handlers | 21/27 (roll dispatch) | 6 |
 | **Blocked (loadMovie)** | sandbox_type_remote, resolve_different_root, root_global_parent, issue_2030, issue_2084 | blocked by loadMovie | 0 |
