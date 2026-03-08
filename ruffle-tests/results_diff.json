@@ -1,42 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-08T06:44:15.806455+00:00",
-    "old_git_sha": "5f091c15c0f39ac564935a827167b47f96ec881c",
-    "new_timestamp": "2026-03-08T18:32:03.291601+00:00",
-    "new_git_sha": "43b752afba79565314419765e1ecac2a39585eba",
+    "old_timestamp": "2026-03-08T18:32:03.291601+00:00",
+    "old_git_sha": "43b752afba79565314419765e1ecac2a39585eba",
+    "new_timestamp": "2026-03-08T19:10:37.721932+00:00",
+    "new_git_sha": "6d4f715f934747c6f8241a4da24562dfad7ba4ac",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 503,
-    "old_total": 619,
-    "old_pass_rate": 81.3,
+    "old_total": 620,
+    "old_pass_rate": 81.1,
     "new_pass": 503,
     "new_total": 620,
     "new_pass_rate": 81.1,
-    "old_mismatched_lines": 19451,
+    "old_mismatched_lines": 19453,
     "new_mismatched_lines": 19453,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 619,
-    "added": 1,
+    "unchanged": 620,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "text_format_get_text_extent_undefined_width",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 10,
-        "matching_lines": 8
-      }
-    }
-  ]
+  "changes": []
 }
