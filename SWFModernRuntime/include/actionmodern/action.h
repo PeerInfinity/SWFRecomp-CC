@@ -390,6 +390,20 @@ int ei_actionvar_to_utf8(ActionVar* var, char* buf, int buf_size);
 // Set __proto__ on an object to Object.prototype (for test harness use)
 void ei_set_object_proto(SWFAppContext* app_context, void* obj);
 
+// Text field rendering info (used by tag.c in graphics mode)
+typedef struct TextFieldRenderInfo {
+	int has_background;
+	u32 background_color;  // 24-bit RGB
+	int has_border;
+	u32 border_color;      // 24-bit RGB
+	float x, y, w, h;     // position and size in pixels
+} TextFieldRenderInfo;
+
+// Get text field count and info for rendering. Returns count of text fields.
+// For each text field, calls callback with the render info and user data.
+typedef void (*TextFieldRenderCallback)(const TextFieldRenderInfo* info, void* user_data);
+int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data);
+
 #ifdef NO_GRAPHICS
 // AS2 MC event dispatch — called from swf_core.c on mouse events.
 // Iterates child_mc_cache, checks hit area, and calls onPress/onDragOver etc.

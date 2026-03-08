@@ -1413,6 +1413,39 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 // call() only runs DoAction scripts, not timeline management tags.
 int g_in_action_call = 0;
 
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+// Callback for actionIterateTextFields: render text field background/border rectangles.
+static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data)
+{
+	(void)user_data;
+
+	// Convert pixel coordinates to twips.
+	// Flash text field background includes the right/bottom edge pixel (+1 pixel).
+	float x = info->x * 20.0f;
+	float y = info->y * 20.0f;
+	float w = (info->w + 1.0f) * 20.0f;
+	float h = (info->h + 1.0f) * 20.0f;
+
+	if (info->has_background) {
+		float r = ((info->background_color >> 16) & 0xFF) / 255.0f;
+		float g = ((info->background_color >> 8) & 0xFF) / 255.0f;
+		float b = (info->background_color & 0xFF) / 255.0f;
+		renderer_draw_rect(context, x, y, w, h, r, g, b, 1.0f, 0, 0);
+	}
+
+	if (info->has_border) {
+		float r = ((info->border_color >> 16) & 0xFF) / 255.0f;
+		float g = ((info->border_color >> 8) & 0xFF) / 255.0f;
+		float b = (info->border_color & 0xFF) / 255.0f;
+		float t = 20.0f;  // 1 pixel border thickness in twips
+		renderer_draw_rect(context, x, y, w, t, r, g, b, 1.0f, 0, 0);         // top
+		renderer_draw_rect(context, x, y + h - t, w, t, r, g, b, 1.0f, 0, 0); // bottom
+		renderer_draw_rect(context, x, y + t, t, h - 2*t, r, g, b, 1.0f, 0, 0); // left
+		renderer_draw_rect(context, x + w - t, y + t, t, h - 2*t, r, g, b, 1.0f, 0, 0); // right
+	}
+}
+#endif
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
@@ -1783,6 +1816,11 @@ void tagShowFrame(SWFAppContext* app_context)
 	{
 		renderer_end_clip(context);
 	}
+
+	// --- Render text field backgrounds and borders ---
+	// Dynamic text fields (createTextField) are tracked in child_mc_cache but not
+	// on the tag display list. Render their background/border rectangles here.
+	actionIterateTextFields(textfield_render_cb, NULL);
 
 	renderer_close_pass(context);
 

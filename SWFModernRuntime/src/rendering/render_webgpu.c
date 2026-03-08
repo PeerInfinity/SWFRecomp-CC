@@ -606,10 +606,20 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 static void create_buffers_and_upload(WebGPURenderContext* ctx)
 {
-	// Vertex buffer (shape geometry)
-	ctx->vertex_buffer = create_buffer(ctx->device, ctx->queue,
-		WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
-		ctx->shape_data, ctx->shape_data_size, "vertex_buffer");
+	// Vertex buffer (shape geometry) — over-allocate for dynamic rect rendering
+	#define MAX_DYNAMIC_RECTS 64
+	{
+		u32 orig_verts = (u32)(ctx->shape_data_size / (4 * sizeof(u32)));
+		size_t extra_bytes = (size_t)MAX_DYNAMIC_RECTS * 6 * 4 * sizeof(u32);
+		size_t total_size = ctx->shape_data_size + extra_bytes;
+		ctx->vertex_buffer = create_buffer(ctx->device, ctx->queue,
+			WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
+			NULL, total_size, "vertex_buffer");
+		if (ctx->shape_data && ctx->shape_data_size > 0)
+			wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer, 0,
+				ctx->shape_data, ctx->shape_data_size);
+		ctx->dynamic_vertex_base = orig_verts;
+	}
 
 	// Storage buffers
 	// Over-allocate xform buffer to leave room for dynamic composed transform
@@ -630,9 +640,20 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->xform_slot_count = total_slots;
 	}
 
-	ctx->color_buffer = create_buffer(ctx->device, ctx->queue,
-		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-		ctx->color_data, ctx->color_data_size, "color_buffer");
+	// Color buffer — over-allocate for dynamic rect colors
+	{
+		u32 orig_colors = ctx->color_data_size > 0
+			? (u32)(ctx->color_data_size / (4 * sizeof(float))) : 1;
+		size_t extra_bytes = (size_t)MAX_DYNAMIC_RECTS * 4 * sizeof(float);
+		size_t total_size = ctx->color_data_size + extra_bytes;
+		ctx->color_buffer = create_buffer(ctx->device, ctx->queue,
+			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+			NULL, total_size, "color_buffer");
+		if (ctx->color_data && ctx->color_data_size > 0)
+			wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer, 0,
+				ctx->color_data, ctx->color_data_size);
+		ctx->dynamic_color_base = orig_colors;
+	}
 
 	ctx->uninv_mat_buffer = create_buffer(ctx->device, ctx->queue,
 		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
@@ -1326,6 +1347,7 @@ void render_webgpu_set_background(WebGPURenderContext* ctx, u8 r, u8 g, u8 b)
 void render_webgpu_open_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
+	ctx->dynamic_rect_count = 0;
 #ifdef HEADLESS_GRAPHICS
 	// Headless: use the persistent offscreen texture as resolve target
 	ctx->surface_view = ctx->offscreen_view;
@@ -1429,6 +1451,54 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 	// effect until the next queue submit.
 	u32 packed_id = transform_id | (cxform_id << 16);
 	wgpuRenderPassEncoderDraw(ctx->render_pass, (u32)num_verts, 1, 0, packed_id);
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_draw_rect — dynamic filled rectangle (for text field bg/border)
+// ---------------------------------------------------------------------------
+void render_webgpu_draw_rect(WebGPURenderContext* ctx,
+	float x, float y, float w, float h,      // position/size in twips
+	float r, float g, float b, float a,      // fill color (0-1)
+	u32 transform_id, u32 cxform_id)
+{
+	if (!ctx->renderer_ok) return;
+	if (ctx->dynamic_rect_count >= MAX_DYNAMIC_RECTS) return;
+
+	u32 idx = ctx->dynamic_rect_count++;
+	u32 color_idx = ctx->dynamic_color_base + idx;
+	u32 vert_base = ctx->dynamic_vertex_base + idx * 6;
+
+	// Write color to the dynamic color slot
+	float color[4] = { r, g, b, a };
+	wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
+		(uint64_t)color_idx * 4 * sizeof(float), color, sizeof(color));
+
+	// Generate 6 vertices (2 triangles) for the quad
+	// Vertex format: { float x, float y, u32 style_x, u32 style_y }
+	// style_x = 0x00 (solid color), style_y = color_idx
+	union { float f; u32 u; } x0, y0, x1, y1;
+	x0.f = x;       y0.f = y;
+	x1.f = x + w;   y1.f = y + h;
+
+	u32 sx = 0x00;   // solid color fill
+	u32 sy = color_idx;
+
+	u32 verts[6][4] = {
+		{ x0.u, y0.u, sx, sy },  // top-left
+		{ x1.u, y0.u, sx, sy },  // top-right
+		{ x0.u, y1.u, sx, sy },  // bottom-left
+		{ x1.u, y0.u, sx, sy },  // top-right
+		{ x1.u, y1.u, sx, sy },  // bottom-right
+		{ x0.u, y1.u, sx, sy },  // bottom-left
+	};
+
+	// Write vertices to the dynamic area
+	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+		byte_offset, verts, sizeof(verts));
+
+	// Issue draw call
+	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
 }
 
 // ---------------------------------------------------------------------------

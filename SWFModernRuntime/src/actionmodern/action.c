@@ -14865,6 +14865,64 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 // Dynamic textfields (createTextField) have ng_textfield_idx == -2.
 #define MC_IS_TEXTFIELD(mc) ((mc)->ng_textfield_idx >= 0 || (mc)->ng_textfield_idx == -2)
 
+// Iterate all text field MovieClips in child_mc_cache and report their render info.
+// Used by tag.c to render text field backgrounds/borders in graphics mode.
+int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
+{
+	int count = 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!MC_IS_TEXTFIELD(mc)) continue;
+		if (mc->dynamic_props == NULL) continue;
+		if (!mc->visible) continue;
+
+		ASObject* props = (ASObject*)mc->dynamic_props;
+
+		// Check background property
+		int has_bg = 0;
+		u32 bg_color = 0xFFFFFF;
+		{
+			ActionVar* v = getProperty(props, "background", 10);
+			if (v && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value)
+				has_bg = 1;
+		}
+		if (has_bg) {
+			ActionVar* v = getProperty(props, "backgroundColor", 15);
+			if (v) bg_color = (u32)varToDoubleSimple(v);
+		}
+
+		// Check border property
+		int has_border = 0;
+		u32 bd_color = 0x000000;
+		{
+			ActionVar* v = getProperty(props, "border", 6);
+			if (v && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value)
+				has_border = 1;
+		}
+		if (has_border) {
+			ActionVar* v = getProperty(props, "borderColor", 11);
+			if (v) bd_color = (u32)varToDoubleSimple(v);
+		}
+
+		if (!has_bg && !has_border) continue;
+
+		TextFieldRenderInfo info;
+		info.has_background = has_bg;
+		info.background_color = bg_color;
+		info.has_border = has_border;
+		info.border_color = bd_color;
+		info.x = mc->x;
+		info.y = mc->y;
+		info.w = mc->width;
+		info.h = mc->height;
+
+		cb(&info, user_data);
+		count++;
+	}
+	return count;
+}
+
 // Get the original (unscaled, unrotated) content bounds for an MC, in pixels.
 // Returns 1 if bounds found, 0 if not.
 static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat_h)

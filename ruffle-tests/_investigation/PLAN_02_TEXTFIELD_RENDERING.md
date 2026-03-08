@@ -5,6 +5,8 @@
 **Estimated complexity**: Large (text layout is inherently complex)
 **Depends on**: Plan 01 (runtime transforms) for correct text field positioning
 
+**Status: Phase 1 COMPLETE** — `frame_size_translated_negative` and `frame_size_translated_positive` both passing (0 outliers)
+
 ---
 
 ## Problem
@@ -26,7 +28,7 @@ HTML rendering, multi-line layout, word wrap, scroll, etc. Needed for full compl
 
 ---
 
-## Phase 1: Background + Border Rendering
+## Phase 1: Background + Border Rendering — COMPLETE
 
 ### What's Needed
 
