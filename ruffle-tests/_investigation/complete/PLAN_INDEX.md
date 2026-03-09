@@ -8,9 +8,12 @@
 
 Plans 02 and 04 both need a `renderer_draw_rect()` function for drawing dynamic filled rectangles. This should be implemented first as shared infrastructure.
 
-## Current Results: 27/32 image tests pass
+## Current Results
 
-Remaining 5 failures: `bitmap_data_copypixels` (trace mismatch — pixel read returns undefined), `movieclip_methods_with_loaded_image` (trace mismatch — loaded image properties), `netstream_play_flv` / `netstream_play_flv_screen` / `netstream_seek_flv` (FLV playback not supported).
+- **Strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff): **7/31 pass**
+- **Tolerance pass** (within test.toml limits): **9/31 pass** (includes the 7 strict)
+
+Most tests have significant image outliers due to missing rendering features (BitmapData pixels, image loading, text glyphs, gradient anti-aliasing) but pass verify_output.py because test.toml specifies generous tolerances.
 
 ## Plan Summary
 

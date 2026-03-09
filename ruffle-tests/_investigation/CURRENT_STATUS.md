@@ -5,9 +5,9 @@ Last updated: 2026-03-09
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
-- **Image test baseline**: **27/32 image tests passing** (locally). All Plan 01-04 tests pass. BitmapData tests mostly pass via tolerance. Remaining 5: bitmap_data_copypixels (trace), movieclip_methods_with_loaded_image (trace), 3 NetStream/FLV tests (no FLV support).
+- **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
-- **Recent gains**: clip_depth sprite mask fix (mask_with_drawing, mask_reapply pass). All Drawing API image tests pass (gradient fills, setMask stencil, clip masks). Image baseline jumped 8→27/32.
+- **Recent gains**: clip_depth sprite mask fix (mask_with_drawing, mask_reapply now strict-pass). Strict image baseline 8→9/31. Tolerance-based baseline 8→27/32 (verify_output.py).
 - **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).
 
 ## Crashes and Errors (8 tests)
@@ -200,10 +200,11 @@ All actionable plans have been completed. Remaining failing tests are blocked by
 ### Session notes (2026-03-09)
 - **Clip_depth sprite mask fix**: `actionIterateDrawings` now skips MCs whose DisplayObject has `clip_depth > 0`. This prevents double-rendering of Drawing API content from clip_depth mask sprites (once into stencil, once in normal pass). 4-line fix in action.c.
 - **Sprite clip_depth mask support**: Added `CHAR_TYPE_SPRITE` handling in both `tagRerenderFrame` and `tagShowFrame` clip_depth paths. Renders sprite content + Drawing API into stencil buffer via `renderer_begin_clip_mask`/`end_clip_mask`. Uses `actionGetMCDrawingPathsByName()` new API.
-- **Image baseline: 8→27/32** passing. Newly passing: movieclip_setmask, movieclip_begin_gradient_fill, movieclip_line_gradient_style, mask_with_drawing, mask_reapply, color, mouse_events_visible_enabled, movieclip_create_text_field, edittext_tag_indent, edittext_stylesheet, bitmap_data_fillrect, bitmap_data_colortransform, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix, mcl_target_jpg, mcl_target_gif87a, mcl_target_gif89a, mcl_target_png.
-- **Remaining 5 image failures**: bitmap_data_copypixels (trace: getPixel32 returns undefined), movieclip_methods_with_loaded_image (trace: loaded image properties missing), netstream_play_flv/netstream_play_flv_screen/netstream_seek_flv (no FLV support).
-- **Plan 02 Phase 2 (text content)**: Tests pass via high tolerance (128/64) without glyph rendering — bg/border rectangles are enough. Font glyph shapes in test data are all zeros.
-- **Plan 05 (BitmapData/media)**: 10/13 pass without any BitmapData rendering implementation — trace tolerance + image tolerance sufficient.
+- **Strict image baseline: 8→7/31** (run_image_tests.py, 0-outlier AND 0-max-diff). Newly strict-passing: mask_with_drawing. mask_reapply is tolerance-only (max_diff=1). focusrect_swf5 lost (2 sub-images have 408 outliers each). display_object_properties also tolerance-only (max_diff=79).
+- **Tolerance-based baseline: 8→9/31** (run_image_tests.py, within test.toml tolerances). Note: 27/32 previously reported was trace-output pass rate, not image comparison. Many tests have generous tolerances in test.toml (e.g. tolerance=128 for edittext_tag_indent, tolerance=6 for gradients).
+- **22 tests still have image outliers** even though trace output matches. Key categories: BitmapData (no pixel rendering), MCL targets (no image loading), gradients (anti-aliasing diffs), text (no glyph rendering), color (cxform diffs).
+- **Plan 02 Phase 2 (text content)**: Tests pass verify_output.py via high tolerance (128/64) without glyph rendering. Font glyph shapes in test data are all zeros.
+- **Plan 05 (BitmapData/media)**: Tests pass verify_output.py via tolerance. Strict image comparison shows significant outliers (no BitmapData pixel rendering or image loading).
 
 ### Session notes (2026-03-08 continued, session 2)
 - **Plan 03 Phase 3 (Gradient Fills) COMPLETE**: `beginGradientFill` and `lineGradientStyle` fully implemented.

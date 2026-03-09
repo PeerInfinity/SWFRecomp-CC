@@ -12,8 +12,10 @@ Usage:
 """
 
 import argparse
+import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -125,9 +127,18 @@ def run_single_test(test_name):
                 pass
             idx = pos + 1
 
+    # Parse outlier counts from messages for strict vs tolerance classification
+    import re
+    for cmp_name, r in image_results.items():
+        msg = r.get("message", "")
+        m = re.search(r'(\d+) outliers', msg)
+        r["outliers"] = int(m.group(1)) if m else None
+        m2 = re.search(r'max difference (\d+)', msg)
+        r["max_diff"] = int(m2.group(1)) if m2 else None
+
     entry["image_comparisons"] = image_results
 
-    # Determine overall image status
+    # Determine overall image status (tolerance-based, as reported by verify_output.py)
     if not image_results:
         entry["image_status"] = "no_render"
     elif all(r["status"] == "pass" for r in image_results.values()):
@@ -136,6 +147,17 @@ def run_single_test(test_name):
         entry["image_status"] = "skip"
     else:
         entry["image_status"] = "fail"
+
+    # Determine strict image status (0 outliers, 0 max_diff)
+    if not image_results:
+        entry["image_status_strict"] = "no_render"
+    elif all(r.get("outliers") == 0 and r.get("max_diff", 0) == 0
+             for r in image_results.values() if r["status"] != "skip"):
+        entry["image_status_strict"] = "pass"
+    elif all(r["status"] == "skip" for r in image_results.values()):
+        entry["image_status_strict"] = "skip"
+    else:
+        entry["image_status_strict"] = "fail"
 
     return entry, stdout
 
@@ -159,6 +181,8 @@ def build_report(test_results, run_start):
     image_fail = sum(1 for t in test_results if t["image_status"] == "fail")
     image_no_render = sum(1 for t in test_results if t["image_status"] == "no_render")
     image_skip = sum(1 for t in test_results if t["image_status"] == "skip")
+    strict_pass = sum(1 for t in test_results if t.get("image_status_strict") == "pass")
+    strict_fail = sum(1 for t in test_results if t.get("image_status_strict") == "fail")
     trace_pass = sum(1 for t in test_results if t["trace_status"] == "pass")
 
     return {
@@ -172,6 +196,8 @@ def build_report(test_results, run_start):
         "image_fail": image_fail,
         "image_no_render": image_no_render,
         "image_skip": image_skip,
+        "strict_pass": strict_pass,
+        "strict_fail": strict_fail,
         "trace_pass": trace_pass,
         "tests": test_results,
     }
@@ -278,14 +304,19 @@ def generate_markdown(results_path, output_path):
     image_pass = data["image_pass"]
     image_fail = data["image_fail"]
     image_no_render = data["image_no_render"]
+    strict_pass = data.get("strict_pass", 0)
     trace_pass = data["trace_pass"]
+
+    tolerance_only_count = image_pass - strict_pass
 
     md.append("## Summary")
     md.append("")
     md.append("| Metric | Value |")
     md.append("|--------|-------|")
     md.append(f"| Total image tests | {total} |")
-    md.append(f"| Image passing | **{image_pass}** ({100*image_pass/total:.0f}%) |" if total else "| Image passing | 0 |")
+    md.append(f"| Strict image pass (exact pixel match) | **{strict_pass}** ({100*strict_pass/total:.0f}%) |" if total else "| Strict image pass | 0 |")
+    md.append(f"| Tolerance-only pass (non-zero diff within test.toml limits) | **{tolerance_only_count}** |" if total else "| Tolerance-only pass | 0 |")
+    md.append(f"| **Total image pass** | **{image_pass}** ({100*image_pass/total:.0f}%) |" if total else "| Total image pass | 0 |")
     md.append(f"| Image failing | {image_fail} |")
     md.append(f"| No render (build/runtime fail) | {image_no_render} |")
     md.append(f"| Trace output passing | {trace_pass} ({100*trace_pass/total:.0f}%) |" if total else "| Trace passing | 0 |")
@@ -293,23 +324,51 @@ def generate_markdown(results_path, output_path):
 
     tests = data["tests"]
 
-    # Passing image tests
-    passing = [t for t in tests if t["image_status"] == "pass"]
-    passing.sort(key=lambda t: t["test"])
-    md.append("## Passing Image Tests")
+    # Strict passing image tests (0 outliers, exact match)
+    strict_passing = [t for t in tests if t.get("image_status_strict") == "pass"]
+    strict_passing.sort(key=lambda t: t["test"])
+    md.append("## Strict Passing Image Tests (exact pixel match)")
     md.append("")
-    if passing:
-        md.append(f"**{len(passing)} tests** with matching rendered output")
+    if strict_passing:
+        md.append(f"**{len(strict_passing)} tests** with 0 outliers across all image comparisons")
         md.append("")
         md.append("| # | Test | Trace | Duration |")
         md.append("|---|------|-------|----------|")
-        for i, t in enumerate(passing, 1):
+        for i, t in enumerate(strict_passing, 1):
             trace = "PASS" if t["trace_status"] == "pass" else t["trace_status"].upper()
             dur = f"{t['duration']:.1f}s"
             md.append(f"| {i} | `{t['test']}` | {trace} | {dur} |")
         md.append("")
     else:
-        md.append("No image tests passing yet.")
+        md.append("No tests with exact pixel match.")
+        md.append("")
+
+    # Tolerance-only passing (pass with tolerance but not strict)
+    tolerance_only = [t for t in tests
+                      if t["image_status"] == "pass"
+                      and t.get("image_status_strict") != "pass"]
+    tolerance_only.sort(key=lambda t: t["test"])
+    if tolerance_only:
+        md.append("## Tolerance-Only Passing (non-zero outliers within test.toml limits)")
+        md.append("")
+        md.append(f"**{len(tolerance_only)} tests** pass within configured tolerance but have image differences")
+        md.append("")
+        md.append("| # | Test | Trace | Outliers | Max Diff | Duration |")
+        md.append("|---|------|-------|---------|----------|----------|")
+        for i, t in enumerate(tolerance_only, 1):
+            trace = "PASS" if t["trace_status"] == "pass" else t["trace_status"].upper()
+            dur = f"{t['duration']:.1f}s"
+            # Summarize outliers across comparisons
+            total_outliers = 0
+            worst_diff = 0
+            for r in t.get("image_comparisons", {}).values():
+                o = r.get("outliers")
+                if o is not None:
+                    total_outliers += o
+                d = r.get("max_diff", 0)
+                if d and d > worst_diff:
+                    worst_diff = d
+            md.append(f"| {i} | `{t['test']}` | {trace} | {total_outliers:,} | {worst_diff} | {dur} |")
         md.append("")
 
     # Failing image tests — sorted by outlier count (ascending = closest to passing)
@@ -318,7 +377,7 @@ def generate_markdown(results_path, output_path):
         """Sort by total outliers across all comparisons (lowest first)."""
         total_outliers = 0
         for r in t.get("image_comparisons", {}).values():
-            o = _parse_outliers(r.get("message", ""))
+            o = r.get("outliers")
             if o is not None:
                 total_outliers += o
         return total_outliers
@@ -430,9 +489,14 @@ def main():
         test_results.append(entry)
 
         # Print concise result
-        img = entry["image_status"].upper()
+        strict = entry.get("image_status_strict", "?").upper()
+        tolerant = entry["image_status"].upper()
         trace = entry["trace_status"].upper()
-        parts = [f"image:{img}", f"trace:{trace}"]
+        if strict == tolerant:
+            img_label = f"image:{strict}"
+        else:
+            img_label = f"image:strict={strict},tolerance={tolerant}"
+        parts = [img_label, f"trace:{trace}"]
         # Include image detail if available
         for cname, cresult in entry.get("image_comparisons", {}).items():
             if cresult["status"] != "pass":
@@ -449,16 +513,42 @@ def main():
 
     # Print summary
     print(f"\n{'='*60}")
-    print(f"Total:        {report['total']}")
-    print(f"Image pass:   {report['image_pass']}")
-    print(f"Image fail:   {report['image_fail']}")
-    print(f"No render:    {report['image_no_render']}")
-    print(f"Trace pass:   {report['trace_pass']}")
+    print(f"Total:              {report['total']}")
+    print(f"Strict image pass:  {report['strict_pass']}  (0 outliers, exact pixel match)")
+    print(f"Tolerance pass:     {report['image_pass']}  (within test.toml tolerances)")
+    print(f"Image fail:         {report['image_fail']}")
+    print(f"No render:          {report['image_no_render']}")
+    print(f"Trace pass:         {report['trace_pass']}")
     print(f"{'='*60}")
 
     # Generate markdown
     if not args.no_report:
         generate_markdown(json_path, md_path)
+
+    # Collect image output PNGs into _image-test-output/
+    collect_image_output(tests)
+
+
+def collect_image_output(tests):
+    """Copy all PNG files from each test directory into _image-test-output/{test}/."""
+    output_root = SCRIPT_DIR / "_image-test-output"
+    if output_root.exists():
+        shutil.rmtree(output_root)
+    output_root.mkdir()
+
+    copied = 0
+    for name in tests:
+        test_dir = SCRIPT_DIR / name
+        pngs = sorted(test_dir.glob("*.png"))
+        if not pngs:
+            continue
+        dest = output_root / name
+        dest.mkdir()
+        for png in pngs:
+            shutil.copy2(png, dest / png.name)
+            copied += 1
+
+    print(f"Image output collected in {output_root} ({copied} files)")
 
 
 if __name__ == "__main__":

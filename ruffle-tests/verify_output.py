@@ -875,9 +875,12 @@ def generate_data_registry(data_files, build_dir):
 
 
 def recompile_swf(test_dir, force=False):
-    """Run SWFRecomp on test.swf if not already done (or if forced)."""
+    """Run SWFRecomp on test.swf if not already done (or if forced).
+
+    Returns (success, stderr).
+    """
     if not force and (test_dir / "RecompiledScripts").exists():
-        return True
+        return True, ""
 
     # Remove old output if forcing
     if force:
@@ -895,9 +898,9 @@ def recompile_swf(test_dir, force=False):
             text=True,
             timeout=30,
         )
-        return result.returncode == 0
+        return result.returncode == 0, result.stderr
     except subprocess.TimeoutExpired:
-        return False
+        return False, "recompiler timed out"
 
 
 def get_mock_date_time(test_dir):
@@ -1064,7 +1067,10 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
 
 
 def run_binary(build_dir, event_file=None, extra_env=None):
-    """Run the compiled binary and capture output."""
+    """Run the compiled binary and capture output.
+
+    Returns (stdout, returncode, stderr).
+    """
     cmd = [str(build_dir / "test_run")]
     if event_file is not None:
         cmd.append(str(event_file))
@@ -1078,9 +1084,11 @@ def run_binary(build_dir, event_file=None, extra_env=None):
             timeout=30,
             env=env,
         )
-        return result.stdout.decode("utf-8", errors="replace"), result.returncode
+        return (result.stdout.decode("utf-8", errors="replace"),
+                result.returncode,
+                result.stderr.decode("utf-8", errors="replace"))
     except subprocess.TimeoutExpired:
-        return None, -1
+        return None, -1, ""
 
 
 def compare_output(actual, expected, epsilon=0.0):
@@ -1386,7 +1394,8 @@ def main():
         image_results = {}
 
         # Step 1: Recompile SWF
-        if not recompile_swf(test_dir, force=args.recompile):
+        recomp_ok, recomp_stderr = recompile_swf(test_dir, force=args.recompile)
+        if not recomp_ok:
             stats["recomp_fail"] += 1
             fail_list.append(name)
             fail_details[name] = "SWFRecomp failed"
@@ -1395,6 +1404,9 @@ def main():
             test_results.append(entry)
             if args.verbose:
                 print("RECOMP_FAIL")
+                if recomp_stderr.strip():
+                    for line in recomp_stderr.strip().splitlines()[:10]:
+                        print(f"  stderr: {line}")
             save_incremental()
             continue
 
@@ -1456,8 +1468,8 @@ def main():
                 # Force lavapipe software Vulkan for WSL2 compatibility
                 run_env["VK_ICD_FILENAMES"] = "/usr/share/vulkan/icd.d/lvp_icd.json"
                 run_env["VK_DRIVER_FILES"] = "/usr/share/vulkan/icd.d/lvp_icd.json"
-            raw_output, rc = run_binary(build_dir, event_file=event_file,
-                                        extra_env=run_env if run_env else None)
+            raw_output, rc, run_stderr = run_binary(build_dir, event_file=event_file,
+                                                    extra_env=run_env if run_env else None)
             if raw_output is None:
                 stats["timeout"] += 1
                 fail_list.append(name)
@@ -1502,6 +1514,9 @@ def main():
                         ls = entry["lines"]
                         line_info = f" [{ls.get('matched',0)}/{ls.get('expected',0)} lines]"
                     print(f"{crash_status.upper()}{line_info}")
+                    if run_stderr.strip():
+                        for line in run_stderr.strip().splitlines()[:20]:
+                            print(f"  stderr: {line}")
                 save_incremental()
                 continue
 
