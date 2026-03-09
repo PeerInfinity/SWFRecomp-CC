@@ -17,7 +17,7 @@ void ng_setButtonDisplayState(void* mc, u8 state);
 void ng_simulateButtonPressRelease(SWFAppContext* app_context, void* mc);
 // Run button hit-test + state machine + action dispatch for current mouse state.
 // In NO_GRAPHICS mode called per mouse event; in graphics mode called from tagShowFrame.
-void ng_update_button_states(SWFAppContext* app_context);
+int ng_update_button_states(SWFAppContext* app_context);
 #ifdef NO_GRAPHICS
 // Dispatch CLIP_EVENT_PRESS for all sprites whose hit area contains the mouse.
 // Called from swf_core.c on EV_MOUSE_DOWN_LEFT.

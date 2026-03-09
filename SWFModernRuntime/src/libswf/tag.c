@@ -9,6 +9,10 @@
 #include <heap.h>
 #include <hit_test.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 #include <renderer.h>
 extern RenderContext* context;
@@ -409,6 +413,29 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
+
+		// Recurse into button display lists to advance their sprite children
+		if (ch->type == CHAR_TYPE_BUTTON)
+		{
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+			{
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
+				display_list = obj->sprite_display_list;
+				max_depth = obj->sprite_max_depth;
+				display_list_capacity = obj->sprite_dl_capacity;
+				advance_sprite_frames(app_context);
+				obj->sprite_display_list = display_list;
+				obj->sprite_max_depth = max_depth;
+				obj->sprite_dl_capacity = display_list_capacity;
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
+			continue;
+		}
+
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 
 		// Allocate persistent display list on first encounter
@@ -1013,27 +1040,9 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 				render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 			break;
 		case CHAR_TYPE_BUTTON:
-		{
-			DisplayObject* saved_display_list = display_list;
-			size_t saved_max_depth = max_depth;
-			size_t saved_capacity = display_list_capacity;
-
-			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-			max_depth = 0;
-
-			u8 state = obj->button_state;
-			if (ch->button_state_funcs[state] != NULL)
-				ch->button_state_funcs[state](app_context);
-
-			render_display_list(app_context, display_list, max_depth);
-
-			free(display_list);
-			display_list = saved_display_list;
-			max_depth = saved_max_depth;
-			display_list_capacity = saved_capacity;
+			if (obj->sprite_display_list != NULL)
+				render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 			break;
-		}
 	}
 }
 
@@ -1247,6 +1256,52 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		obj->sticky_char_id = obj->char_id;
 		obj->sticky_button_state = new_state;
 
+		// On state change, re-populate the button's persistent display list
+		// with the new state's children (shapes, sprites, etc.)
+		if (old_state != new_state)
+		{
+			// Allocate display list if needed
+			if (obj->sprite_display_list == NULL)
+			{
+				obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
+				obj->sprite_max_depth = 0;
+			}
+
+			// Clear existing children
+			for (size_t j = 1; j <= obj->sprite_max_depth; j++)
+			{
+				if (obj->sprite_display_list[j].sprite_display_list != NULL)
+				{
+					FREE(obj->sprite_display_list[j].sprite_display_list);
+					obj->sprite_display_list[j].sprite_display_list = NULL;
+				}
+				obj->sprite_display_list[j].char_id = 0;
+			}
+			obj->sprite_max_depth = 0;
+
+			// Run new state function to populate the display list
+			u8 effective_state = (new_state == 3) ? 0 : new_state; // outDown shows "up"
+			if (effective_state < 3 && ch->button_state_funcs[effective_state] != NULL)
+			{
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
+				display_list = obj->sprite_display_list;
+				max_depth = obj->sprite_max_depth;
+				display_list_capacity = obj->sprite_dl_capacity;
+
+				ch->button_state_funcs[effective_state](app_context);
+
+				obj->sprite_display_list = display_list;
+				obj->sprite_max_depth = max_depth;
+				obj->sprite_dl_capacity = display_list_capacity;
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
+		}
+
 		// Dispatch actions on state transitions
 		if (old_state != new_state && ch->button_action_count > 0)
 		{
@@ -1308,9 +1363,9 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 	}
 }
 
-void ng_update_button_states(SWFAppContext* app_context)
+int ng_update_button_states(SWFAppContext* app_context)
 {
-	if (app_context->shape_data == NULL) return;
+	if (app_context->shape_data == NULL) return 0;
 
 	// Identity transform for root-level buttons
 	static const float identity[16] = {
@@ -1322,6 +1377,7 @@ void ng_update_button_states(SWFAppContext* app_context)
 		display_list, max_depth,
 		identity, &root_movieclip,
 		&found_hover);
+	return found_hover;
 }
 
 // Recursively upgrade sprite_initialized from 1 (this tick) to 2 (ready for per-tick dispatch).
@@ -1732,7 +1788,14 @@ void tagShowFrame(SWFAppContext* app_context)
 	// In NO_GRAPHICS mode, button states are updated per-tick from swf_core.c frame loop
 	// (after event delivery), and per-mouse-event from input_events_deliver().
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
-	ng_update_button_states(app_context);
+	{
+		int any_hover = ng_update_button_states(app_context);
+#ifdef __EMSCRIPTEN__
+		EM_ASM({
+			document.getElementById('canvas').style.cursor = $0 ? 'pointer' : 'default';
+		}, any_hover);
+#endif
+	}
 #endif
 
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
@@ -1835,40 +1898,43 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
 		{
-			DisplayObject* saved_display_list = display_list;
-			size_t saved_max_depth = max_depth;
-			size_t saved_capacity = display_list_capacity;
+			// Initialize button display list on first encounter (graphics mode)
+			if (obj->sprite_display_list == NULL && ch->button_state_funcs != NULL)
+			{
+				obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
+				obj->sprite_max_depth = 0;
 
-			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-			max_depth = 0;
+				u8 state = obj->button_state;
+				u8 effective = (state == 3) ? 0 : state;
+				if (effective < 3 && ch->button_state_funcs[effective] != NULL)
+				{
+					DisplayObject* saved_dl = display_list;
+					size_t saved_max = max_depth;
+					size_t saved_cap = display_list_capacity;
+					display_list = obj->sprite_display_list;
+					max_depth = obj->sprite_max_depth;
+					display_list_capacity = obj->sprite_dl_capacity;
 
-			u8 state = obj->button_state;
-			if (ch->button_state_funcs[state] != NULL)
-				ch->button_state_funcs[state](app_context);
+					ch->button_state_funcs[effective](app_context);
 
-			const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+					obj->sprite_display_list = display_list;
+					obj->sprite_max_depth = max_depth;
+					obj->sprite_dl_capacity = display_list_capacity;
+					display_list = saved_dl;
+					max_depth = saved_max;
+					display_list_capacity = saved_cap;
+				}
+			}
 
-			// Save override counts so we can restore button-local overrides
-			// before freeing the temporary display list (they hold pointers into it).
-			int saved_xform_count = g_xform_override_count;
-			int saved_cxform_count = g_cxform_override_count;
-
-			compose_children(app_context, display_list, max_depth, btn_xform,
-				obj->cx_overridden || obj->has_cxform, obj->cxform_id);
-
-			// Restore overrides that compose_children added for the temp display list
-			for (int k = g_xform_override_count - 1; k >= saved_xform_count; --k)
-				g_xform_overrides[k].obj->transform_id = g_xform_overrides[k].original_id;
-			g_xform_override_count = saved_xform_count;
-			for (int k = g_cxform_override_count - 1; k >= saved_cxform_count; --k)
-				g_cxform_overrides[k].obj->cxform_id = g_cxform_overrides[k].original_id;
-			g_cxform_override_count = saved_cxform_count;
-
-			free(display_list);
-			display_list = saved_display_list;
-			max_depth = saved_max_depth;
-			display_list_capacity = saved_capacity;
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+			{
+				const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				compose_children(app_context,
+					obj->sprite_display_list, obj->sprite_max_depth,
+					btn_xform,
+					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+			}
 		}
 		else if (ch->type == CHAR_TYPE_TEXT)
 		{

@@ -1,19 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-03-09T00:12:23.479198+00:00",
-    "git_sha": "66ca53385bc1762a509d8287aa544d57fbc2aa42",
-    "duration_seconds": 678.59
+    "timestamp": "2026-03-09T01:53:29.111702+00:00",
+    "git_sha": "d24c9463a80a6a28db8588fbd750c808db261fd7",
+    "duration_seconds": 594.1
   },
   "total": 31,
   "image_pass": 5,
   "image_fail": 25,
   "image_no_render": 1,
   "image_skip": 0,
-  "trace_pass": 26,
+  "trace_pass": 27,
   "tests": [
     {
       "test": "bitmap_data_colortransform",
-      "duration": 17.79,
+      "duration": 20.59,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -25,7 +25,7 @@
     },
     {
       "test": "bitmap_data_copypixels",
-      "duration": 18.81,
+      "duration": 22.24,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -37,7 +37,7 @@
     },
     {
       "test": "bitmap_data_fillrect",
-      "duration": 20.11,
+      "duration": 19.84,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -49,7 +49,7 @@
     },
     {
       "test": "bitmap_data_perlinnoise",
-      "duration": 24.41,
+      "duration": 20.91,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -61,7 +61,7 @@
     },
     {
       "test": "bitmap_data_pixeldissolve_image",
-      "duration": 21.09,
+      "duration": 22.28,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -73,7 +73,7 @@
     },
     {
       "test": "bitmapdata_applyfilter_colormatrix",
-      "duration": 19.47,
+      "duration": 17.06,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -85,7 +85,7 @@
     },
     {
       "test": "color",
-      "duration": 19.26,
+      "duration": 16.55,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -97,7 +97,7 @@
     },
     {
       "test": "display_object_properties",
-      "duration": 22.21,
+      "duration": 17.58,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -109,7 +109,7 @@
     },
     {
       "test": "edittext_stylesheet",
-      "duration": 23.19,
+      "duration": 20.57,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -121,7 +121,7 @@
     },
     {
       "test": "edittext_tag_indent",
-      "duration": 21.22,
+      "duration": 17.09,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -133,7 +133,7 @@
     },
     {
       "test": "focusrect_focuslost",
-      "duration": 22.04,
+      "duration": 16.8,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -145,7 +145,7 @@
     },
     {
       "test": "focusrect_mouse_swf8",
-      "duration": 21.15,
+      "duration": 17.28,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01.tab": {
@@ -185,7 +185,7 @@
     },
     {
       "test": "focusrect_mouse_swf9",
-      "duration": 21.06,
+      "duration": 16.85,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01.tab": {
@@ -225,7 +225,7 @@
     },
     {
       "test": "focusrect_swf5",
-      "duration": 21.41,
+      "duration": 17.12,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01a": {
@@ -245,24 +245,24 @@
           "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.03a": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
+          "status": "fail",
+          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
         },
         "output.03b": {
           "status": "fail",
           "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
         },
         "output.04a": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
+          "status": "fail",
+          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
         },
         "output.04b": {
           "status": "fail",
           "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
         },
         "output.05a": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
+          "status": "fail",
+          "message": "Image comparison failed: 744 outliers exceed limit of 0, max difference 204"
         },
         "output.05b": {
           "status": "pass",
@@ -281,7 +281,7 @@
     },
     {
       "test": "focusrect_swf6",
-      "duration": 21.12,
+      "duration": 18.36,
       "trace_status": "pass",
       "image_comparisons": {
         "output.01a": {
@@ -337,7 +337,7 @@
     },
     {
       "test": "frame_size_translated_negative",
-      "duration": 22.99,
+      "duration": 16.76,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -349,7 +349,7 @@
     },
     {
       "test": "frame_size_translated_positive",
-      "duration": 20.87,
+      "duration": 17.32,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -361,7 +361,7 @@
     },
     {
       "test": "mask_reapply",
-      "duration": 20.8,
+      "duration": 19.3,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -373,7 +373,7 @@
     },
     {
       "test": "mask_with_drawing",
-      "duration": 21.47,
+      "duration": 17.37,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -385,7 +385,7 @@
     },
     {
       "test": "mcl_target_gif87a",
-      "duration": 21.45,
+      "duration": 17.54,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -397,7 +397,7 @@
     },
     {
       "test": "mcl_target_gif89a",
-      "duration": 20.91,
+      "duration": 17.25,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -409,7 +409,7 @@
     },
     {
       "test": "mcl_target_jpg",
-      "duration": 21.81,
+      "duration": 19.28,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -421,7 +421,7 @@
     },
     {
       "test": "mcl_target_png",
-      "duration": 21.25,
+      "duration": 17.49,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -433,7 +433,7 @@
     },
     {
       "test": "mouse_events_visible_enabled",
-      "duration": 21.25,
+      "duration": 17.98,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -445,7 +445,7 @@
     },
     {
       "test": "movieclip_begin_gradient_fill",
-      "duration": 23.02,
+      "duration": 18.31,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -457,8 +457,8 @@
     },
     {
       "test": "movieclip_create_text_field",
-      "duration": 22.19,
-      "trace_status": "output_mismatch",
+      "duration": 19.18,
+      "trace_status": "pass",
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -469,7 +469,7 @@
     },
     {
       "test": "movieclip_line_gradient_style",
-      "duration": 21.86,
+      "duration": 19.92,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -481,7 +481,7 @@
     },
     {
       "test": "movieclip_methods_with_loaded_image",
-      "duration": 20.77,
+      "duration": 18.16,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -493,7 +493,7 @@
     },
     {
       "test": "movieclip_setmask",
-      "duration": 21.32,
+      "duration": 18.52,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -505,7 +505,7 @@
     },
     {
       "test": "netstream_play_flv",
-      "duration": 22.07,
+      "duration": 18.21,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -517,7 +517,7 @@
     },
     {
       "test": "netstream_play_flv_screen",
-      "duration": 40.24,
+      "duration": 40.38,
       "trace_status": "segfault",
       "image_comparisons": {},
       "image_status": "no_render"

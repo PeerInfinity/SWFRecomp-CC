@@ -232,6 +232,12 @@ void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t
 	if (out_tf_width) *out_tf_width = font_size_px * 0.6 * (double)text_len;
 }
 
+// Focus rect stub — full implementation lives in action.c under #ifdef NO_GRAPHICS
+int actionGetFocusRectInfo(FocusRectInfo* out) {
+	(void)out;
+	return 0; // Never draw focus rect in graphics mode (for now)
+}
+
 // Default findMovieEntry stub when no child movies are linked
 #ifndef HAS_CHILD_MOVIES
 MovieEntry* findMovieEntry(const char* filename) {
