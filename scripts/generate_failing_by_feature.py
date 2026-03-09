@@ -241,11 +241,16 @@ def generate_category_section(
     filtered: bool,
     test_to_docs: dict[str, list[tuple[str, str]]],
 ) -> str | None:
-    """Generate one ## Feature: section. Returns None if category is empty after filtering."""
+    """Generate one ## Feature: section. Returns None if category has no failing tests."""
     tests = cat["tests"]
     if filtered:
         tests = [t for t in tests if t not in ignored]
     if not tests:
+        return None
+
+    # Only include failing tests
+    failing_tests = [t for t in tests if lookup.get(t, {}).get("status") != "pass"]
+    if not failing_tests:
         return None
 
     passing, failing, total = count_by_status(tests, lookup)
@@ -253,7 +258,7 @@ def generate_category_section(
     md = []
     md.append(f"## {priority}. {cat['name']} ({failing} failing / {total} total)")
     md.append("")
-    md.append(f"Tests: {format_test_list(tests, lookup)}")
+    md.append(f"Failing tests: {format_test_list(failing_tests, lookup)}")
     md.append("")
 
     if cat.get("description"):
@@ -262,7 +267,8 @@ def generate_category_section(
 
     sub_cats = cat.get("sub_categories", [])
     if sub_cats:
-        md.append("Sub-categories:")
+        has_subcats = False
+        subcat_lines = []
         for sc in sub_cats:
             sc_tests = sc.get("tests", [])
             if filtered:
@@ -277,18 +283,24 @@ def generate_category_section(
                             explicit_tests.add(t)
                 sc_tests = [t for t in tests if t not in explicit_tests]
 
-            if not sc_tests and filtered:
+            # Only include failing tests in sub-category counts
+            sc_failing = [t for t in sc_tests if lookup.get(t, {}).get("status") != "pass"]
+            if not sc_failing:
                 continue
 
-            sc_count = len(sc_tests)
+            has_subcats = True
+            sc_count = len(sc_failing)
             note = f" -- {sc['note']}" if sc.get("note") else ""
-            md.append(f"- **{sc['name']}**: {sc_count} tests{note}")
+            subcat_lines.append(f"- **{sc['name']}**: {sc_count} failing{note}")
 
-        md.append("")
+        if has_subcats:
+            md.append("Sub-categories:")
+            md.extend(subcat_lines)
+            md.append("")
 
-    # Collect related investigation docs for tests in this category
+    # Collect related investigation docs for failing tests in this category
     seen_docs: dict[str, str] = {}  # rel_path -> display_name (dedup)
-    for t in tests:
+    for t in failing_tests:
         for doc_name, doc_path in test_to_docs.get(t, []):
             if doc_path not in seen_docs:
                 seen_docs[doc_path] = doc_name
@@ -407,23 +419,20 @@ def generate_uncategorized(
     if not uncategorized:
         return ""
 
-    # Split by status
-    passing = [t for t in uncategorized if lookup[t]["status"] == "pass"]
+    # Only show failing tests
     failing = [t for t in uncategorized if lookup[t]["status"] != "pass"]
 
+    if not failing:
+        return ""
+
     md = []
-    md.append(f"## Uncategorized Tests ({len(uncategorized)} tests)")
+    md.append(f"## Uncategorized Tests ({len(failing)} failing)")
     md.append("")
-    md.append("Tests not assigned to any feature category above.")
+    md.append("Failing tests not assigned to any feature category above.")
     md.append("")
 
-    if failing:
-        md.append(f"**Failing ({len(failing)})**: {format_test_list(failing, lookup)}")
-        md.append("")
-
-    if passing:
-        md.append(f"**Passing ({len(passing)})**: {', '.join(sorted(passing))}")
-        md.append("")
+    md.append(f"{format_test_list(failing, lookup)}")
+    md.append("")
 
     md.append("---")
     md.append("")

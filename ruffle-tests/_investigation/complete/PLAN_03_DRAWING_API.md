@@ -4,7 +4,7 @@
 **Tests unlocked**: `movieclip_begin_gradient_fill` (tolerance=6), `movieclip_line_gradient_style` (tolerance=6), `mask_with_drawing` (tolerance=6), `movieclip_setmask` (tolerance=0)
 **Estimated complexity**: Large
 **Depends on**: Plan 01 (runtime transforms)
-**Status**: Phases 1, 2, 3, 4 COMPLETE. `setMask` stencil rendering IMPLEMENTED. `movieclip_setmask` image ~97% correct (10K outliers from MSAA edge differences, tolerance=0). Phase 3 (gradient fills) implemented — rendering works, image near-match (anti-aliasing diffs remain).
+**Status**: **ALL PHASES COMPLETE**. All 4 tests pass: `movieclip_setmask`, `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style`, `mask_with_drawing`. Also `mask_reapply` passes (clip_depth sprite mask support added — `actionIterateDrawings` skips MCs whose DisplayObject has `clip_depth > 0`).
 
 ---
 

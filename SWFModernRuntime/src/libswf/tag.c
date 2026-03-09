@@ -1706,6 +1706,20 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
 				renderer_end_clip_mask(context);
 				active_clip_depth = obj->clip_depth;
+			} else if (ch->type == CHAR_TYPE_SPRITE) {
+				// Sprite clip mask: render sprite content + Drawing API into stencil
+				renderer_begin_clip_mask(context);
+				if (obj->sprite_display_list != NULL)
+					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+				// Also render Drawing API shapes drawn into this sprite's MC
+				if (obj->instance_name != NULL) {
+					DrawingRenderInfo dinfos[64];
+					int dn = actionGetMCDrawingPathsByName(obj->instance_name, dinfos, 64);
+					for (int di = 0; di < dn; di++)
+						render_drawing_path(&dinfos[di]);
+				}
+				renderer_end_clip_mask(context);
+				active_clip_depth = obj->clip_depth;
 			}
 			continue;
 		}
@@ -2079,6 +2093,22 @@ void tagShowFrame(SWFAppContext* app_context)
 			{
 				renderer_begin_clip_mask(context);
 				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
+				renderer_end_clip_mask(context);
+				active_clip_depth = obj->clip_depth;
+			}
+			else if (ch->type == CHAR_TYPE_SPRITE)
+			{
+				// Sprite clip mask: render sprite content + Drawing API into stencil
+				renderer_begin_clip_mask(context);
+				if (obj->sprite_display_list != NULL)
+					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+				// Also render Drawing API shapes drawn into this sprite's MC
+				if (obj->instance_name != NULL) {
+					DrawingRenderInfo dinfos[64];
+					int dn = actionGetMCDrawingPathsByName(obj->instance_name, dinfos, 64);
+					for (int di = 0; di < dn; di++)
+						render_drawing_path(&dinfos[di]);
+				}
 				renderer_end_clip_mask(context);
 				active_clip_depth = obj->clip_depth;
 			}

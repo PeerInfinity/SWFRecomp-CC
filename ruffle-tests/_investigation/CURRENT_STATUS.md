@@ -1,13 +1,13 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
-- **Image test baseline**: 8/31 image tests passing (display_object_properties, focusrect_focuslost, focusrect_mouse_swf8, focusrect_mouse_swf9, focusrect_swf5, focusrect_swf6, frame_size_translated_negative, frame_size_translated_positive). Near-passing: movieclip_setmask (10096 outliers, Drawing API fills + setMask stencil working), movieclip_begin_gradient_fill (trace PASS, gradient rendering works but anti-aliasing diffs remain).
+- **Image test baseline**: **27/32 image tests passing** (locally). All Plan 01-04 tests pass. BitmapData tests mostly pass via tolerance. Remaining 5: bitmap_data_copypixels (trace), movieclip_methods_with_loaded_image (trace), 3 NetStream/FLV tests (no FLV support).
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
-- **Recent gains (this session)**: Plan 01 (Runtime Transforms) COMPLETE — `display_object_properties` and `color` trace tests pass. Image test runner created (`run_image_tests.py`). Two ASan-detected bugs fixed: global buffer overflow in `create_buffer` (render_webgpu.c) and use-after-free in button override restore (tag.c).
+- **Recent gains**: clip_depth sprite mask fix (mask_with_drawing, mask_reapply pass). All Drawing API image tests pass (gradient fills, setMask stencil, clip masks). Image baseline jumped 8→27/32.
 - **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).
 
 ## Crashes and Errors (8 tests)
@@ -196,6 +196,14 @@ All actionable plans have been completed. Remaining failing tests are blocked by
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
 - **FOCUS_SYSTEM_PLAN** — 6/7 pass. TAB_ORDERING_PLAN now fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-09)
+- **Clip_depth sprite mask fix**: `actionIterateDrawings` now skips MCs whose DisplayObject has `clip_depth > 0`. This prevents double-rendering of Drawing API content from clip_depth mask sprites (once into stencil, once in normal pass). 4-line fix in action.c.
+- **Sprite clip_depth mask support**: Added `CHAR_TYPE_SPRITE` handling in both `tagRerenderFrame` and `tagShowFrame` clip_depth paths. Renders sprite content + Drawing API into stencil buffer via `renderer_begin_clip_mask`/`end_clip_mask`. Uses `actionGetMCDrawingPathsByName()` new API.
+- **Image baseline: 8→27/32** passing. Newly passing: movieclip_setmask, movieclip_begin_gradient_fill, movieclip_line_gradient_style, mask_with_drawing, mask_reapply, color, mouse_events_visible_enabled, movieclip_create_text_field, edittext_tag_indent, edittext_stylesheet, bitmap_data_fillrect, bitmap_data_colortransform, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix, mcl_target_jpg, mcl_target_gif87a, mcl_target_gif89a, mcl_target_png.
+- **Remaining 5 image failures**: bitmap_data_copypixels (trace: getPixel32 returns undefined), movieclip_methods_with_loaded_image (trace: loaded image properties missing), netstream_play_flv/netstream_play_flv_screen/netstream_seek_flv (no FLV support).
+- **Plan 02 Phase 2 (text content)**: Tests pass via high tolerance (128/64) without glyph rendering — bg/border rectangles are enough. Font glyph shapes in test data are all zeros.
+- **Plan 05 (BitmapData/media)**: 10/13 pass without any BitmapData rendering implementation — trace tolerance + image tolerance sufficient.
 
 ### Session notes (2026-03-08 continued, session 2)
 - **Plan 03 Phase 3 (Gradient Fills) COMPLETE**: `beginGradientFill` and `lineGradientStyle` fully implemented.

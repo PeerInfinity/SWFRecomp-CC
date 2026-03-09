@@ -499,6 +499,10 @@ typedef struct {
 typedef void (*DrawingMaskedCallback)(const DrawingMCInfo* masked, const DrawingMCInfo* mask, void* user_data);
 int actionIterateMaskedDrawings(DrawingMaskedCallback cb, void* user_data);
 
+// Get Drawing API paths for a specific MovieClip (by instance name).
+// Returns the number of paths filled into out[]. Used by tag.c for sprite clip masks.
+int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo* out, int max_out);
+
 // Text field rendering info (used by tag.c in graphics mode)
 typedef struct TextFieldRenderInfo {
 	int has_background;

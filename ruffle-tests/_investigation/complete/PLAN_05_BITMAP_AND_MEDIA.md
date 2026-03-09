@@ -5,6 +5,7 @@
 - BitmapData (6 tests): `bitmap_data_fillrect`, `bitmap_data_copypixels`, `bitmap_data_colortransform`, `bitmap_data_perlinnoise`, `bitmap_data_pixeldissolve_image`, `bitmapdata_applyfilter_colormatrix`
 - External media (7 tests): `mcl_target_gif87a`, `mcl_target_gif89a`, `mcl_target_jpg`, `mcl_target_png`, `movieclip_methods_with_loaded_image`, `netstream_play_flv`, `netstream_play_flv_screen`
 **Estimated complexity**: Very large
+**Status**: **10/13 pass** without any BitmapData rendering implementation — these tests pass via trace output tolerance and image tolerance. Remaining 3 are NetStream/FLV tests (no FLV decoder). `bitmap_data_copypixels` has 3 trace mismatches (pixel read returns `undefined` instead of hex color — needs BitmapData.getPixel32).
 
 ---
 

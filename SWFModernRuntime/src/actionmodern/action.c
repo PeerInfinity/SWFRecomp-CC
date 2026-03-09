@@ -15268,6 +15268,11 @@ int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
 		if (!mc->visible) continue;
 		if (mc->is_mask) continue;       // masks rendered via actionIterateMaskedDrawings
 		if (mc->mask_mc != NULL) continue; // masked MCs also via masked iterator
+		// Skip clip_depth mask sprites (their drawings are rendered into stencil buffer by tag.c)
+		if (mc->display_obj != NULL) {
+			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+			if (dobj->clip_depth > 0) continue;
+		}
 		DrawingState* ds = (DrawingState*)mc->drawing_state;
 		if (ds == NULL) continue;
 
@@ -15302,6 +15307,15 @@ int actionIterateMaskedDrawings(DrawingMaskedCallback cb, void* user_data)
 		count++;
 	}
 	return count;
+}
+
+int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo* out, int max_out)
+{
+	if (instance_name == NULL || max_out <= 0) return 0;
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+	MovieClip* mc = actionFindMovieClipByName(instance_name);
+	if (mc == NULL) return 0;
+	return fillDrawingInfos(mc, out, max_out);
 }
 
 // Get the original (unscaled, unrotated) content bounds for an MC, in pixels.

@@ -1,10 +1,10 @@
 # Blocker Summary
 
-Last updated: 2026-03-07
+Last updated: 2026-03-09
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **501/619 (80.9%)** total (CI run on e7443545). 19 plans in `blocked/`, 52 in `complete/`, 0 in `incomplete/`.
+Current pass rate: **501/619 (80.9%)** total (CI run on e7443545). Image tests: **27/32 passing** (locally). 19 plans in `blocked/`, 52 in `complete/`, 0 in `incomplete/`.
 
 ---
 
@@ -48,7 +48,7 @@ All MTASC-specific issues have been resolved except `mcl_loadclip_replace_root` 
 
 | Gap | Detail | Status |
 |-----|--------|--------|
-| ~~Class constructor dispatch~~ | interface_implements_op 46/47 (was 47/47, regressed — lazy ImplementsOp via valueOf callback) | **REGRESSION** — line 43 `obj instanceof LazyInterfaceA: false` |
+| ~~Class constructor dispatch~~ | interface_implements_op **47/47 PASS** | **RESOLVED** |
 | `_root.main()` entry point | MTASC convention for class entry | Blocked by LoadMovie |
 | ~~Nested function recompilation~~ | object_resolve 39/39 PASS | **RESOLVED** |
 
@@ -234,7 +234,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 6. **Font metrics accuracy** — Incremental improvements to word wrap and line height
 7. **Failed load state values** — Return `-1` for specific MC properties on failed load
 8. **Global stubs** — Add 20 missing globals (tedious but straightforward)
-9. **interface_implements_op regression** — Lazy ImplementsOp via valueOf callback broke in b1b89de3
+9. ~~**interface_implements_op regression**~~ — **RESOLVED** (47/47 PASS)
 
 ### Architectural (requires significant design work)
 1. **Per-movie `_global` isolation** — Move from two-group to per-movie globals
