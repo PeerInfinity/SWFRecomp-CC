@@ -656,13 +656,28 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->dynamic_color_base = orig_colors;
 	}
 
-	ctx->uninv_mat_buffer = create_buffer(ctx->device, ctx->queue,
-		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-		ctx->uninv_mat_data, ctx->uninv_mat_data_size, "uninv_mat_buffer");
+	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient matrices
+	#define MAX_DYNAMIC_GRADIENTS 64
+	{
+		u32 static_mats = ctx->uninv_mat_data_size > 0
+			? (u32)(ctx->uninv_mat_data_size / (16 * sizeof(float))) : 0;
+		size_t total_mat_size = (size_t)(static_mats + MAX_DYNAMIC_GRADIENTS) * 16 * sizeof(float);
+		if (total_mat_size == 0) total_mat_size = 16 * sizeof(float); // minimum 1 slot
 
-	ctx->inv_mat_buffer = create_buffer(ctx->device, ctx->queue,
-		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-		NULL, ctx->uninv_mat_data_size, "inv_mat_buffer");
+		ctx->uninv_mat_buffer = create_buffer(ctx->device, ctx->queue,
+			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+			NULL, total_mat_size, "uninv_mat_buffer");
+		if (ctx->uninv_mat_data && ctx->uninv_mat_data_size > 0)
+			wgpuQueueWriteBuffer(ctx->queue, ctx->uninv_mat_buffer, 0,
+				ctx->uninv_mat_data, ctx->uninv_mat_data_size);
+
+		ctx->inv_mat_buffer = create_buffer(ctx->device, ctx->queue,
+			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+			NULL, total_mat_size, "inv_mat_buffer");
+
+		ctx->static_mat_count = static_mats;
+		ctx->dynamic_gradient_capacity = MAX_DYNAMIC_GRADIENTS;
+	}
 
 	ctx->bitmap_sizes_buffer = create_buffer(ctx->device, ctx->queue,
 		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
@@ -718,14 +733,16 @@ static void create_textures(WebGPURenderContext* ctx)
 {
 	size_t sizeof_gradient = 256 * 4; // 256 RGBA8 entries per gradient = 1024 bytes
 	size_t num_gradients = ctx->gradient_data_size / sizeof_gradient;
+	u32 total_gradient_layers = (u32)num_gradients + MAX_DYNAMIC_GRADIENTS;
+	if (total_gradient_layers == 0) total_gradient_layers = 1; // minimum 1 layer
+	ctx->static_gradient_count = (u32)num_gradients;
 
-	// --- Gradient texture array ---
-	if (num_gradients > 0)
+	// --- Gradient texture array (always created, over-allocated for dynamic gradients) ---
 	{
 		WGPUTextureDescriptor tex_desc = {0};
 		tex_desc.label = WGPU_LABEL("gradient_tex");
 		tex_desc.dimension = WGPUTextureDimension_2D;
-		tex_desc.size = (WGPUExtent3D){256, 1, (u32)num_gradients};
+		tex_desc.size = (WGPUExtent3D){256, 1, total_gradient_layers};
 		tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
 		tex_desc.mipLevelCount = 1;
 		tex_desc.sampleCount = 1;
@@ -734,22 +751,22 @@ static void create_textures(WebGPURenderContext* ctx)
 
 		WGPUTextureViewDescriptor view_desc = {0};
 		view_desc.dimension = WGPUTextureViewDimension_2DArray;
-		view_desc.arrayLayerCount = (u32)num_gradients;
+		view_desc.arrayLayerCount = total_gradient_layers;
 		view_desc.mipLevelCount = 1;
 		ctx->gradient_tex_view = wgpuTextureCreateView(ctx->gradient_tex, &view_desc);
 
-		// Upload gradient data: each gradient = 256 RGBA8 pixels = 1024 bytes
-		WGPUTexelCopyTextureInfo dest = {0};
-		dest.texture = ctx->gradient_tex;
-		WGPUTexelCopyBufferLayout layout = {0};
-		layout.bytesPerRow = 256 * 4; // 256 pixels * 4 bytes (RGBA8)
-		layout.rowsPerImage = 1;
-		WGPUExtent3D extent = {256, 1, (u32)num_gradients};
-
-		// The gradient data size per layer needs to match RGBA8 = 1024 bytes per layer
-		// Total upload = num_gradients * 1024 bytes
-		wgpuQueueWriteTexture(ctx->queue, &dest, ctx->gradient_data,
-		                      num_gradients * 256 * 4, &layout, &extent);
+		// Upload static gradient data
+		if (num_gradients > 0)
+		{
+			WGPUTexelCopyTextureInfo dest = {0};
+			dest.texture = ctx->gradient_tex;
+			WGPUTexelCopyBufferLayout layout = {0};
+			layout.bytesPerRow = 256 * 4;
+			layout.rowsPerImage = 1;
+			WGPUExtent3D extent = {256, 1, (u32)num_gradients};
+			wgpuQueueWriteTexture(ctx->queue, &dest, ctx->gradient_data,
+			                      num_gradients * 256 * 4, &layout, &extent);
+		}
 
 		WGPUSamplerDescriptor samp_desc = {0};
 		samp_desc.label = WGPU_LABEL("gradient_sampler");
@@ -1350,6 +1367,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	if (!ctx->renderer_ok) return;
 	ctx->dynamic_rect_count = 0;
 	ctx->dynamic_vertex_used = 0;
+	ctx->dynamic_gradient_used = 0;
 #ifdef HEADLESS_GRAPHICS
 	// Headless: use the persistent offscreen texture as resolve target
 	ctx->surface_view = ctx->offscreen_view;
@@ -1551,6 +1569,105 @@ void render_webgpu_draw_tris(WebGPURenderContext* ctx,
 	free(verts);
 
 	// Issue draw call
+	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
+}
+
+// ---------------------------------------------------------------------------
+// CPU-side 4x4 matrix inverse (for dynamic gradient matrices)
+// ---------------------------------------------------------------------------
+static int invert_4x4_matrix(const float m[16], float inv[16])
+{
+	// For our 2D affine matrices, only the 2x2 + translation part matters.
+	// Full 4x4 inverse for generality:
+	float a = m[0], b = m[1], c = m[4], d = m[5];
+	float tx = m[12], ty = m[13];
+	float det = a * d - b * c;
+	if (det == 0.0f) return 0;  // singular
+	float inv_det = 1.0f / det;
+	// Zero-initialize
+	for (int i = 0; i < 16; i++) inv[i] = 0.0f;
+	inv[0]  =  d * inv_det;
+	inv[1]  = -b * inv_det;
+	inv[4]  = -c * inv_det;
+	inv[5]  =  a * inv_det;
+	inv[10] = 1.0f;
+	inv[15] = 1.0f;
+	inv[12] = -(inv[0] * tx + inv[4] * ty);
+	inv[13] = -(inv[1] * tx + inv[5] * ty);
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_draw_gradient_tris — gradient-filled triangles (Drawing API)
+// ---------------------------------------------------------------------------
+void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
+	const float* xy_pairs, u32 vertex_count,
+	u8 gradient_type, u8 spread_mode, float focal_ratio,
+	const u8* gradient_ramp, const float* gradient_matrix,
+	u32 transform_id, u32 cxform_id)
+{
+	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
+	if (ctx->dynamic_gradient_used >= ctx->dynamic_gradient_capacity) return;
+	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
+		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
+	if (vertex_count == 0) return;
+
+	// Allocate a gradient layer (after all static gradients)
+	u32 grad_id = ctx->static_gradient_count + ctx->dynamic_gradient_used;
+	ctx->dynamic_gradient_used++;
+
+	// Upload gradient ramp to this texture layer
+	{
+		WGPUTexelCopyTextureInfo dest = {0};
+		dest.texture = ctx->gradient_tex;
+		dest.origin = (WGPUOrigin3D){0, 0, grad_id};
+		WGPUTexelCopyBufferLayout layout = {0};
+		layout.bytesPerRow = 256 * 4;
+		layout.rowsPerImage = 1;
+		WGPUExtent3D extent = {256, 1, 1};
+		wgpuQueueWriteTexture(ctx->queue, &dest, gradient_ramp,
+		                      256 * 4, &layout, &extent);
+	}
+
+	// Compute inverse of the gradient matrix on CPU and upload to inv_mat_buffer
+	{
+		float inv_mat[16];
+		if (!invert_4x4_matrix(gradient_matrix, inv_mat)) {
+			// Singular matrix — use identity as fallback
+			for (int i = 0; i < 16; i++) inv_mat[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+		}
+		uint64_t mat_offset = (uint64_t)grad_id * 16 * sizeof(float);
+		wgpuQueueWriteBuffer(ctx->queue, ctx->inv_mat_buffer, mat_offset,
+			inv_mat, 16 * sizeof(float));
+	}
+
+	// Allocate dynamic vertices (shared counter with draw_rect/draw_tris)
+	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	ctx->dynamic_vertex_used += vertex_count;
+
+	// Style encoding: gradient_type | (spread_mode << 8)
+	u32 sx = (u32)gradient_type | ((u32)spread_mode << 8);
+
+	// Style Y: gradient_id in lower 16, focal_encoded in upper 16
+	u16 focal_encoded = (u16)(focal_ratio * 16384.0f + 32768.0f);
+	u32 sy = (u32)grad_id | ((u32)focal_encoded << 16);
+
+	u32* verts = (u32*)malloc(vertex_count * 4 * sizeof(u32));
+	for (u32 i = 0; i < vertex_count; i++) {
+		union { float f; u32 u; } xv, yv;
+		xv.f = xy_pairs[i * 2];
+		yv.f = xy_pairs[i * 2 + 1];
+		verts[i * 4 + 0] = xv.u;
+		verts[i * 4 + 1] = yv.u;
+		verts[i * 4 + 2] = sx;
+		verts[i * 4 + 3] = sy;
+	}
+
+	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+		byte_offset, verts, vertex_count * 4 * sizeof(u32));
+	free(verts);
+
 	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
 }
 

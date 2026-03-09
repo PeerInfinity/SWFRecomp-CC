@@ -14961,6 +14961,127 @@ static void drawingUpdateBounds(MovieClip* mc, float x, float y)
 	}
 }
 
+// sRGB <-> linear conversion for linearRGB gradient interpolation
+static float drawingSrgbToLinear(float c)
+{
+	if (c <= 0.04045f) return c / 12.92f;
+	return powf((c + 0.055f) / 1.055f, 2.4f);
+}
+static float drawingLinearToSrgb(float c)
+{
+	if (c <= 0.0031308f) return c * 12.92f;
+	return 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
+}
+static u8 drawingLinearRgbLerp(u8 start, u8 end, float t)
+{
+	float s = drawingSrgbToLinear(start / 255.0f);
+	float e = drawingSrgbToLinear(end / 255.0f);
+	float result = s + t * (e - s);
+	return (u8)(drawingLinearToSrgb(result) * 255.0f + 0.5f);
+}
+static u8 drawingRgbLerp(u8 a, u8 b, float t)
+{
+	return (u8)(a + t * (b - a) + 0.5f);
+}
+
+// Generate a 256-entry RGBA8 gradient ramp from color stops.
+// ratios: 0-255, colors: 0xRRGGBB, alphas: 0-100 (percent)
+static void drawingGenerateGradientRamp(
+	u32* colors, float* alphas, u8* ratios, int stop_count,
+	int use_linear_rgb, u8* out_ramp)
+{
+	if (stop_count <= 0) {
+		memset(out_ramp, 0, 256 * 4);
+		return;
+	}
+	// Fill entire ramp with first color before first ratio
+	u8 r0 = (colors[0] >> 16) & 0xFF;
+	u8 g0 = (colors[0] >> 8) & 0xFF;
+	u8 b0 = colors[0] & 0xFF;
+	u8 a0 = (u8)(alphas[0] / 100.0f * 255.0f + 0.5f);
+	for (int i = 0; i < 256; i++) {
+		out_ramp[i*4+0] = r0;
+		out_ramp[i*4+1] = g0;
+		out_ramp[i*4+2] = b0;
+		out_ramp[i*4+3] = a0;
+	}
+	if (stop_count == 1) return;
+
+	for (int s = 1; s < stop_count; s++) {
+		u8 ratio_start = ratios[s-1];
+		u8 ratio_end = ratios[s];
+		u8 sr = (colors[s-1] >> 16) & 0xFF, sg = (colors[s-1] >> 8) & 0xFF, sb = colors[s-1] & 0xFF;
+		u8 sa = (u8)(alphas[s-1] / 100.0f * 255.0f + 0.5f);
+		u8 er = (colors[s] >> 16) & 0xFF, eg = (colors[s] >> 8) & 0xFF, eb = colors[s] & 0xFF;
+		u8 ea = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
+
+		float range = (float)(ratio_end - ratio_start);
+		if (range <= 0) range = 1;
+
+		for (u8 i = ratio_start; i <= ratio_end; i++) {
+			float t = (float)(i - ratio_start) / range;
+			if (use_linear_rgb) {
+				out_ramp[i*4+0] = drawingLinearRgbLerp(sr, er, t);
+				out_ramp[i*4+1] = drawingLinearRgbLerp(sg, eg, t);
+				out_ramp[i*4+2] = drawingLinearRgbLerp(sb, eb, t);
+			} else {
+				out_ramp[i*4+0] = drawingRgbLerp(sr, er, t);
+				out_ramp[i*4+1] = drawingRgbLerp(sg, eg, t);
+				out_ramp[i*4+2] = drawingRgbLerp(sb, eb, t);
+			}
+			out_ramp[i*4+3] = drawingRgbLerp(sa, ea, t);
+			if (i == 255) break;  // prevent u8 overflow
+		}
+		// Fill remaining after last stop
+		if (s == stop_count - 1 && ratio_end < 255) {
+			for (int i = ratio_end + 1; i < 256; i++) {
+				out_ramp[i*4+0] = er;
+				out_ramp[i*4+1] = eg;
+				out_ramp[i*4+2] = eb;
+				out_ramp[i*4+3] = ea;
+			}
+		}
+	}
+}
+
+// Build a 4x4 column-major gradient matrix from "box" parameters.
+// Maps gradient space [-16384, 16384] → stage space (twips).
+static void drawingBuildGradientBoxMatrix(float x, float y, float w, float h, float r, float* out)
+{
+	// Same as Ruffle: create_gradient_box
+	float scale_x = w / 1638.4f;  // w / (16384/10)
+	float scale_y = h / 1638.4f;
+	float tx = (x + w / 2.0f) * 20.0f;  // center, in twips
+	float ty = (y + h / 2.0f) * 20.0f;
+	float cos_r = cosf(r), sin_r = sinf(r);
+
+	// Column-major 4x4 (same layout as recompileMatrix)
+	memset(out, 0, 16 * sizeof(float));
+	out[0]  = cos_r * scale_x;    // a
+	out[1]  = sin_r * scale_y;    // b
+	out[4]  = -sin_r * scale_x;   // c
+	out[5]  = cos_r * scale_y;    // d
+	out[10] = 1.0f;
+	out[12] = tx;
+	out[13] = ty;
+	out[15] = 1.0f;
+}
+
+// Build a 4x4 column-major gradient matrix from {a, b, c, d, tx, ty} properties.
+static void drawingBuildGradientAbcdMatrix(float a, float b, float c, float d,
+	float tx_pixels, float ty_pixels, float* out)
+{
+	memset(out, 0, 16 * sizeof(float));
+	out[0]  = a;
+	out[1]  = b;
+	out[4]  = c;
+	out[5]  = d;
+	out[10] = 1.0f;
+	out[12] = tx_pixels * 20.0f;  // pixels → twips
+	out[13] = ty_pixels * 20.0f;
+	out[15] = 1.0f;
+}
+
 // Finalize the active path: tessellate to triangles and add to paths array.
 static void drawingFinalizePath(DrawingState* ds)
 {
@@ -15016,6 +15137,27 @@ static void drawingFinalizePath(DrawingState* ds)
 	path->line_width = ds->line_w;
 	path->line_r = ds->line_r; path->line_g = ds->line_g;
 	path->line_b = ds->line_b; path->line_a = ds->line_a;
+	// Copy gradient fill state
+	if (ds->has_gradient) {
+		path->has_gradient = 1;
+		path->gradient_type = ds->gradient_type;
+		path->spread_mode = ds->gradient_spread;
+		path->interpolation = ds->gradient_interp;
+		path->focal_ratio = ds->gradient_focal;
+		memcpy(path->gradient_ramp, ds->gradient_ramp, 256 * 4);
+		memcpy(path->gradient_matrix, ds->gradient_matrix, 16 * sizeof(float));
+		path->has_fill = 1;  // gradient is a fill
+	}
+	// Copy line gradient state
+	if (ds->has_line_gradient) {
+		path->has_line_gradient = 1;
+		path->line_gradient_type = ds->line_gradient_type;
+		path->line_spread_mode = ds->line_gradient_spread;
+		path->line_interpolation = ds->line_gradient_interp;
+		path->line_focal_ratio = ds->line_gradient_focal;
+		memcpy(path->line_gradient_ramp, ds->line_gradient_ramp, 256 * 4);
+		memcpy(path->line_gradient_matrix, ds->line_gradient_matrix, 16 * sizeof(float));
+	}
 
 	// Fan tessellation for fill (convert pixels to twips)
 	if (path->has_fill && poly_count >= 3) {
@@ -15073,7 +15215,9 @@ static void drawingClear(MovieClip* mc)
 	ds->cmd_count = ds->cmd_capacity = 0;
 	ds->pen_set = 0;
 	ds->has_fill = 0;
+	ds->has_gradient = 0;
 	ds->has_line = 0;
+	ds->has_line_gradient = 0;
 	mc->draw_has_bounds = 0;
 }
 
@@ -15093,10 +15237,22 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->fill_count = path->has_fill ? path->fill_vert_count : 0;
 		info->fill_r = path->fill_r; info->fill_g = path->fill_g;
 		info->fill_b = path->fill_b; info->fill_a = path->fill_a;
+		info->has_gradient = path->has_gradient;
+		info->gradient_type = path->gradient_type;
+		info->spread_mode = path->spread_mode;
+		info->focal_ratio = path->focal_ratio;
+		info->gradient_ramp = path->has_gradient ? path->gradient_ramp : NULL;
+		info->gradient_matrix = path->has_gradient ? path->gradient_matrix : NULL;
 		info->line_verts = path->line_verts;
 		info->line_count = path->has_line ? path->line_vert_count : 0;
 		info->line_r = path->line_r; info->line_g = path->line_g;
 		info->line_b = path->line_b; info->line_a = path->line_a;
+		info->has_line_gradient = path->has_line_gradient;
+		info->line_gradient_type = path->line_gradient_type;
+		info->line_spread_mode = path->line_spread_mode;
+		info->line_focal_ratio = path->line_focal_ratio;
+		info->line_gradient_ramp = path->has_line_gradient ? path->line_gradient_ramp : NULL;
+		info->line_gradient_matrix = path->has_line_gradient ? path->line_gradient_matrix : NULL;
 		info->transform_id = mc->last_transform_id;
 		info->cxform_id = 0;
 	}
@@ -23577,7 +23733,16 @@ void actionSetVariable(SWFAppContext* app_context)
 			handled = 1;
 		}
 		else if (strcasecmp(var_name, "_highquality") == 0) { mc->highquality = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_focusrect") == 0) { mc->focusrect = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_focusrect") == 0) {
+			// Boolean coercion: varToDouble doesn't handle BOOLEAN type (raw u32 bits)
+			if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+				mc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
+			else if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+				mc->focusrect = -1.0f; // sentinel for "inherit"
+			else
+				mc->focusrect = fval;
+			handled = 1;
+		}
 		else if (strcasecmp(var_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; handled = 1; }
 		if (handled)
 		{
@@ -27931,12 +28096,13 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				if (strcasecmp(prop_name, "_highquality") == 0) { mc->highquality = fval; return; }
 				if (strcasecmp(prop_name, "_focusrect") == 0) {
-					// null/undefined → sentinel -1.0f (null); otherwise store numeric
-					if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+					// Boolean coercion: varToDouble doesn't handle BOOLEAN type (raw u32 bits)
+					if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+						mc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
+					else if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
 						mc->focusrect = -1.0f;
-					} else {
+					else
 						mc->focusrect = fval;
-					}
 					return;
 				}
 				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
@@ -42694,6 +42860,181 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ds->fill_b = (rgb & 0xFF) / 255.0f;
 				ds->fill_a = alpha;
 				ds->has_fill = 1;
+				ds->has_gradient = 0;  // solid fill clears gradient
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 17 && strncmp(method_name, "beginGradientFill", 17) == 0)
+		{
+			// beginGradientFill(fillType, colors, alphas, ratios, matrix [, spreadMode [, interpolationMode [, focalPointRatio]]])
+			if (mc != NULL && num_args >= 5) {
+				// First arg undefined → clear fill (checked before arg count validation)
+				if (args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
+					DrawingState* ds = getOrCreateDrawingState(mc);
+					if (ds->cmd_count > 0) drawingFinalizePath(ds);
+					ds->has_fill = 0;
+					ds->has_gradient = 0;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// Too many args: silently fail (per Ruffle)
+				if (num_args > 8 || (num_args > 5 && g_swf_version < 8)) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// Parse gradient type
+				char gt_buf[32];
+				int gt_len = varToStringBuf(app_context, &args[0], gt_buf, sizeof(gt_buf));
+				u8 grad_type;
+				if (gt_len == 6 && strncmp(gt_buf, "linear", 6) == 0) grad_type = 0x10;
+				else if (gt_len == 6 && strncmp(gt_buf, "radial", 6) == 0) grad_type = 0x12;
+				else {
+					// Invalid gradient type
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// colors, alphas, ratios must be arrays/objects
+				if (args[1].type != ACTION_STACK_VALUE_OBJECT &&
+				    args[1].type != ACTION_STACK_VALUE_ARRAY) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// Helper: get array/object length and element access
+				// Arrays (type 12) use ASArray; Objects (type 11) use getProperty
+				#define GRAD_ARG_LEN(argvar) ( \
+					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+						(int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length : \
+					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+						({ ActionVar* _lv = getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, "length", 6); _lv ? (int)varToDouble(_lv) : 0; }) : 0)
+				#define GRAD_ARG_ELEM(argvar, idx) ( \
+					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+						((idx) < (int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length ? \
+							&((ASArray*)(uintptr_t)(argvar).data.numeric_value)->elements[(idx)] : NULL) : \
+					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+						({ char _is[8]; int _il = snprintf(_is, sizeof(_is), "%d", (idx)); getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, _is, _il); }) : NULL)
+
+				if ((args[2].type != ACTION_STACK_VALUE_OBJECT && args[2].type != ACTION_STACK_VALUE_ARRAY) ||
+				    (args[3].type != ACTION_STACK_VALUE_OBJECT && args[3].type != ACTION_STACK_VALUE_ARRAY)) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				int colors_len = GRAD_ARG_LEN(args[1]);
+				int alphas_len = GRAD_ARG_LEN(args[2]);
+				int ratios_len = GRAD_ARG_LEN(args[3]);
+				if (colors_len != alphas_len || colors_len != ratios_len || colors_len == 0) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				if (colors_len > 16) colors_len = 16;  // cap at 16 stops
+				// Read color/alpha/ratio values
+				u32 grad_colors[16];
+				float grad_alphas[16];
+				u8 grad_ratios[16];
+				int valid = 1;
+				for (int i = 0; i < colors_len; i++) {
+					ActionVar* cv = GRAD_ARG_ELEM(args[1], i);
+					ActionVar* av = GRAD_ARG_ELEM(args[2], i);
+					ActionVar* rv = GRAD_ARG_ELEM(args[3], i);
+					grad_colors[i] = cv ? (u32)varToDouble(cv) : 0;
+					float a_val = av ? varToDouble(av) : 100.0;
+					if (a_val < 0) a_val = 0; if (a_val > 100) a_val = 100;
+					grad_alphas[i] = (float)a_val;
+					double r_val = rv ? varToDouble(rv) : 0.0;
+					if (r_val <= -1.0 || r_val >= 256.0) { valid = 0; break; }
+					grad_ratios[i] = (u8)r_val;
+				}
+				#undef GRAD_ARG_LEN
+				#undef GRAD_ARG_ELEM
+				if (!valid) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// Parse matrix (arg 4)
+				ASObject* matrix_obj = NULL;
+				if (args[4].type == ACTION_STACK_VALUE_OBJECT)
+					matrix_obj = (ASObject*)(uintptr_t)args[4].data.numeric_value;
+				if (!matrix_obj) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// Parse spread mode (arg 5)
+				u8 spread = 0;  // pad
+				if (num_args >= 6) {
+					char sp_buf[32];
+					int sp_len = varToStringBuf(app_context, &args[5], sp_buf, sizeof(sp_buf));
+					if (sp_len == 7 && strncmp(sp_buf, "reflect", 7) == 0) spread = 1;
+					else if (sp_len == 6 && strncmp(sp_buf, "repeat", 6) == 0) spread = 2;
+				}
+				// Parse interpolation mode (arg 6)
+				u8 interp = 0;  // RGB
+				if (num_args >= 7) {
+					char ip_buf[32];
+					int ip_len = varToStringBuf(app_context, &args[6], ip_buf, sizeof(ip_buf));
+					if (ip_len == 9 && strncmp(ip_buf, "linearRGB", 9) == 0) interp = 1;
+				}
+				// Parse focal point ratio (arg 7)
+				float focal = 0.0f;
+				if (num_args >= 8) {
+					focal = (float)varToDouble(&args[7]);
+					if (focal != 0.0f) grad_type = 0x13;  // focal radial
+				}
+				// Build gradient matrix
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				if (ds->cmd_count > 0) drawingFinalizePath(ds);
+				// Check if matrixType == "box"
+				ActionVar* mt_v = getProperty(matrix_obj, "matrixType", 10);
+				int is_box = 0;
+				if (mt_v) {
+					char mt_buf[32];
+					int mt_len = varToStringBuf(app_context, mt_v, mt_buf, sizeof(mt_buf));
+					is_box = (mt_len == 3 && strncmp(mt_buf, "box", 3) == 0);
+				}
+				if (is_box) {
+					ActionVar* mx_v = getProperty(matrix_obj, "x", 1);
+					ActionVar* my_v = getProperty(matrix_obj, "y", 1);
+					ActionVar* mw_v = getProperty(matrix_obj, "w", 1);
+					ActionVar* mh_v = getProperty(matrix_obj, "h", 1);
+					ActionVar* mr_v = getProperty(matrix_obj, "r", 1);
+					float mx = mx_v ? (float)varToDouble(mx_v) : 0;
+					float my = my_v ? (float)varToDouble(my_v) : 0;
+					float mw = mw_v ? (float)varToDouble(mw_v) : 0;
+					float mh = mh_v ? (float)varToDouble(mh_v) : 0;
+					float mr = mr_v ? (float)varToDouble(mr_v) : 0;
+					drawingBuildGradientBoxMatrix(mx, my, mw, mh, mr, ds->gradient_matrix);
+				} else {
+					ActionVar* ma_v = getProperty(matrix_obj, "a", 1);
+					ActionVar* mb_v = getProperty(matrix_obj, "b", 1);
+					ActionVar* mc_v = getProperty(matrix_obj, "c", 1);
+					ActionVar* md_v = getProperty(matrix_obj, "d", 1);
+					ActionVar* mtx_v = getProperty(matrix_obj, "tx", 2);
+					ActionVar* mty_v = getProperty(matrix_obj, "ty", 2);
+					float ma = ma_v ? (float)varToDouble(ma_v) : 1;
+					float mb = mb_v ? (float)varToDouble(mb_v) : 0;
+					float mat_c = mc_v ? (float)varToDouble(mc_v) : 0;
+					float md = md_v ? (float)varToDouble(md_v) : 1;
+					float mtx = mtx_v ? (float)varToDouble(mtx_v) : 0;
+					float mty = mty_v ? (float)varToDouble(mty_v) : 0;
+					drawingBuildGradientAbcdMatrix(ma, mb, mat_c, md, mtx, mty, ds->gradient_matrix);
+				}
+				// Generate ramp and store state
+				drawingGenerateGradientRamp(grad_colors, grad_alphas, grad_ratios, colors_len,
+					interp == 1, ds->gradient_ramp);
+				ds->has_gradient = 1;
+				ds->gradient_type = grad_type;
+				ds->gradient_spread = spread;
+				ds->gradient_interp = interp;
+				ds->gradient_focal = focal;
+				ds->has_fill = 1;  // gradient counts as a fill
 			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -42706,6 +43047,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				DrawingState* ds = (DrawingState*)mc->drawing_state;
 				drawingFinalizePath(ds);
 				ds->has_fill = 0;
+				ds->has_gradient = 0;
 			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -42735,6 +43077,126 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ds->line_a = alpha;
 					ds->has_line = 1;
 				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 17 && strncmp(method_name, "lineGradientStyle", 17) == 0)
+		{
+			// lineGradientStyle(fillType, colors, alphas, ratios, matrix [, spreadMode [, interpolationMode [, focalPointRatio]]])
+			// Same arg format as beginGradientFill, but applies to strokes
+			if (mc != NULL && num_args >= 5) {
+				if (num_args > 8 || (num_args > 5 && g_swf_version < 8)) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				char lgt_buf[32];
+				int lgt_len = varToStringBuf(app_context, &args[0], lgt_buf, sizeof(lgt_buf));
+				u8 grad_type;
+				if (lgt_len == 6 && strncmp(lgt_buf, "linear", 6) == 0) grad_type = 0x10;
+				else if (lgt_len == 6 && strncmp(lgt_buf, "radial", 6) == 0) grad_type = 0x12;
+				else { if (args != NULL) FREE(args); pushUndefined(app_context); return; }
+				if (args[1].type != ACTION_STACK_VALUE_OBJECT && args[1].type != ACTION_STACK_VALUE_ARRAY) {
+					if (args != NULL) FREE(args); pushUndefined(app_context); return;
+				}
+				if ((args[2].type != ACTION_STACK_VALUE_OBJECT && args[2].type != ACTION_STACK_VALUE_ARRAY) ||
+				    (args[3].type != ACTION_STACK_VALUE_OBJECT && args[3].type != ACTION_STACK_VALUE_ARRAY)) {
+					if (args != NULL) FREE(args); pushUndefined(app_context); return;
+				}
+				#define LGS_ARG_LEN(argvar) ( \
+					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+						(int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length : \
+					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+						({ ActionVar* _lv = getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, "length", 6); _lv ? (int)varToDouble(_lv) : 0; }) : 0)
+				#define LGS_ARG_ELEM(argvar, idx) ( \
+					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+						((idx) < (int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length ? \
+							&((ASArray*)(uintptr_t)(argvar).data.numeric_value)->elements[(idx)] : NULL) : \
+					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+						({ char _is[8]; int _il = snprintf(_is, sizeof(_is), "%d", (idx)); getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, _is, _il); }) : NULL)
+				int cl = LGS_ARG_LEN(args[1]);
+				int al = LGS_ARG_LEN(args[2]);
+				int rl = LGS_ARG_LEN(args[3]);
+				if (cl != al || cl != rl || cl == 0) {
+					if (args != NULL) FREE(args); pushUndefined(app_context); return;
+				}
+				if (cl > 16) cl = 16;
+				u32 gc[16]; float ga[16]; u8 gr[16];
+				int valid = 1;
+				for (int i = 0; i < cl; i++) {
+					ActionVar* cv = LGS_ARG_ELEM(args[1], i);
+					ActionVar* av = LGS_ARG_ELEM(args[2], i);
+					ActionVar* rv = LGS_ARG_ELEM(args[3], i);
+					gc[i] = cv ? (u32)varToDouble(cv) : 0;
+					float a_v = av ? varToDouble(av) : 100.0;
+					if (a_v < 0) a_v = 0; if (a_v > 100) a_v = 100;
+					ga[i] = (float)a_v;
+					double r_v = rv ? varToDouble(rv) : 0.0;
+					if (r_v <= -1.0 || r_v >= 256.0) { valid = 0; break; }
+					gr[i] = (u8)r_v;
+				}
+				#undef LGS_ARG_LEN
+				#undef LGS_ARG_ELEM
+				if (!valid) { if (args != NULL) FREE(args); pushUndefined(app_context); return; }
+				ASObject* matrix_obj = (args[4].type == ACTION_STACK_VALUE_OBJECT) ?
+					(ASObject*)(uintptr_t)args[4].data.numeric_value : NULL;
+				if (!matrix_obj) { if (args != NULL) FREE(args); pushUndefined(app_context); return; }
+				u8 spread = 0, interp = 0;
+				if (num_args >= 6) {
+					char sp_buf[32];
+					int sp_len = varToStringBuf(app_context, &args[5], sp_buf, sizeof(sp_buf));
+					if (sp_len == 7 && strncmp(sp_buf, "reflect", 7) == 0) spread = 1;
+					else if (sp_len == 6 && strncmp(sp_buf, "repeat", 6) == 0) spread = 2;
+				}
+				if (num_args >= 7) {
+					char ip_buf[32];
+					int ip_len = varToStringBuf(app_context, &args[6], ip_buf, sizeof(ip_buf));
+					if (ip_len == 9 && strncmp(ip_buf, "linearRGB", 9) == 0) interp = 1;
+				}
+				float focal = 0.0f;
+				if (num_args >= 8) {
+					focal = (float)varToDouble(&args[7]);
+					if (focal != 0.0f) grad_type = 0x13;
+				}
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				ActionVar* lmt_v = getProperty(matrix_obj, "matrixType", 10);
+				int l_is_box = 0;
+				if (lmt_v) {
+					char lmt_buf[32];
+					int lmt_len = varToStringBuf(app_context, lmt_v, lmt_buf, sizeof(lmt_buf));
+					l_is_box = (lmt_len == 3 && strncmp(lmt_buf, "box", 3) == 0);
+				}
+				if (l_is_box) {
+					ActionVar* mx_v = getProperty(matrix_obj, "x", 1);
+					ActionVar* my_v = getProperty(matrix_obj, "y", 1);
+					ActionVar* mw_v = getProperty(matrix_obj, "w", 1);
+					ActionVar* mh_v = getProperty(matrix_obj, "h", 1);
+					ActionVar* mr_v = getProperty(matrix_obj, "r", 1);
+					drawingBuildGradientBoxMatrix(
+						mx_v ? (float)varToDouble(mx_v) : 0, my_v ? (float)varToDouble(my_v) : 0,
+						mw_v ? (float)varToDouble(mw_v) : 0, mh_v ? (float)varToDouble(mh_v) : 0,
+						mr_v ? (float)varToDouble(mr_v) : 0, ds->line_gradient_matrix);
+				} else {
+					ActionVar* ma = getProperty(matrix_obj, "a", 1);
+					ActionVar* mb = getProperty(matrix_obj, "b", 1);
+					ActionVar* mat_c = getProperty(matrix_obj, "c", 1);
+					ActionVar* md = getProperty(matrix_obj, "d", 1);
+					ActionVar* mtx = getProperty(matrix_obj, "tx", 2);
+					ActionVar* mty = getProperty(matrix_obj, "ty", 2);
+					drawingBuildGradientAbcdMatrix(
+						ma ? (float)varToDouble(ma) : 1, mb ? (float)varToDouble(mb) : 0,
+						mat_c ? (float)varToDouble(mat_c) : 0, md ? (float)varToDouble(md) : 1,
+						mtx ? (float)varToDouble(mtx) : 0, mty ? (float)varToDouble(mty) : 0,
+						ds->line_gradient_matrix);
+				}
+				drawingGenerateGradientRamp(gc, ga, gr, cl, interp == 1, ds->line_gradient_ramp);
+				ds->has_line_gradient = 1;
+				ds->line_gradient_type = grad_type;
+				ds->line_gradient_spread = spread;
+				ds->line_gradient_interp = interp;
+				ds->line_gradient_focal = focal;
 			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -44886,6 +45348,9 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 			g_selection_caret = -1;
 			g_selection_end = -1;
 		}
+		// Still update highlight state — mouse events may have reset it to INACTIVE,
+		// and Tab should always re-activate the highlight even when re-focusing same MC.
+		actionUpdateHighlightState();
 		return;
 	}
 	// Tab focus triggers rollOut on old HOVERED MC and rollOver on new MC.
@@ -44944,6 +45409,23 @@ void actionResetHighlightState(void)
 	g_highlight_state = 0;
 }
 
+// Version-aware highlight reset matching Ruffle's should_reset_highlight.
+// event_type: 0=mouse_move, 1=left_down, 2=left_up, 3=right_down, 4=right_up
+void actionResetHighlightForEvent(int event_type)
+{
+	// Left mouse down always resets (all SWF versions)
+	if (event_type == 1) {
+		g_highlight_state = 0;
+		return;
+	}
+	// For SWF < 9: mouse move, left/right down/up all reset
+	if (g_swf_version < 9) {
+		// event_type 0=move, 2=left_up, 3=right_down, 4=right_up
+		g_highlight_state = 0;
+	}
+	// For SWF >= 9: only left down resets (handled above), everything else is no-op
+}
+
 void actionUpdateHighlightState(void)
 {
 	if (g_focused_mc == NULL) return;
@@ -44984,6 +45466,11 @@ int actionGetFocusRectInfo(FocusRectInfo* out)
 		fr = root_movieclip.focusrect;
 	}
 	// Default (null/-1) = true; 0 = false; > 0 = true
+	{
+		extern MovieClip root_movieclip;
+		printf("[FR_CHECK] fr=%g root_fr=%g focused_fr=%g hl=%d\n",
+			fr, root_movieclip.focusrect, g_focused_mc->focusrect, g_highlight_state);
+	}
 	if (fr == 0.0f) return 0;
 
 	// Get local content bounds (in pixels) for the focused MC

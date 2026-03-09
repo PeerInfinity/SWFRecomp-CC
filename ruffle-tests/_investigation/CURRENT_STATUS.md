@@ -5,7 +5,7 @@ Last updated: 2026-03-08
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
-- **Image test baseline**: 5/31 image tests passing (display_object_properties, focusrect_focuslost, focusrect_swf6, frame_size_translated_negative, frame_size_translated_positive). See `ruffle-image-results.md`. Near-passing: focusrect_swf5 (10/12, 408 outlier diff), focusrect_mouse_swf8 (6/8, 408), movieclip_setmask (10096 outliers, Drawing API fills + setMask stencil working).
+- **Image test baseline**: 8/31 image tests passing (display_object_properties, focusrect_focuslost, focusrect_mouse_swf8, focusrect_mouse_swf9, focusrect_swf5, focusrect_swf6, frame_size_translated_negative, frame_size_translated_positive). Near-passing: movieclip_setmask (10096 outliers, Drawing API fills + setMask stencil working), movieclip_begin_gradient_fill (trace PASS, gradient rendering works but anti-aliasing diffs remain).
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
 - **Recent gains (this session)**: Plan 01 (Runtime Transforms) COMPLETE — `display_object_properties` and `color` trace tests pass. Image test runner created (`run_image_tests.py`). Two ASan-detected bugs fixed: global buffer overflow in `create_buffer` (render_webgpu.c) and use-after-free in button override restore (tag.c).
 - **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).
@@ -196,6 +196,16 @@ All actionable plans have been completed. Remaining failing tests are blocked by
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
 - **FOCUS_SYSTEM_PLAN** — 6/7 pass. TAB_ORDERING_PLAN now fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-08 continued, session 2)
+- **Plan 03 Phase 3 (Gradient Fills) COMPLETE**: `beginGradientFill` and `lineGradientStyle` fully implemented.
+  - Key bug: `getProperty()` only works on `ASObject*`, not `ASArray*`. The colors/alphas/ratios args are `ASArray*` (type 12), must use `arr->length` and `arr->elements[]` directly.
+  - `drawingGenerateGradientRamp()`: 256-entry RGBA8 ramp with sRGB↔linear for linearRGB mode
+  - `render_webgpu_draw_gradient_tris()`: Dynamic gradient texture layer upload + CPU matrix inverse + style encoding
+  - `beginGradientFill(undefined, ...)` clears fill regardless of arg count (before too-many-args check)
+  - `movieclip_begin_gradient_fill`: trace PASS, image rendering works (all gradients visible), anti-aliasing diffs remain
+- **focusrect_swf5, focusrect_mouse_swf8, focusrect_mouse_swf9**: Now passing (boolean coercion fix from previous session)
+- **Image baseline: 5→8/31** passing
 
 ### Session notes (2026-03-08 continued)
 - **Plan 03 (Drawing API) Phases 1,2,4 COMPLETE**: Solid fills, curve flattening, line stroke expansion all implemented. `drawingFinalizePath` tessellates fan triangles + stroke quads. `renderer_draw_tris` uploads arbitrary triangle data to GPU. `drawing_render_cb` in tag.c dispatches fills/strokes per path.

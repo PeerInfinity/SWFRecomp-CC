@@ -4,7 +4,7 @@
 **Tests unlocked**: `movieclip_begin_gradient_fill` (tolerance=6), `movieclip_line_gradient_style` (tolerance=6), `mask_with_drawing` (tolerance=6), `movieclip_setmask` (tolerance=0)
 **Estimated complexity**: Large
 **Depends on**: Plan 01 (runtime transforms)
-**Status**: Phases 1, 2, 4 COMPLETE. `setMask` stencil rendering IMPLEMENTED. `movieclip_setmask` image ~97% correct (10K outliers from MSAA edge differences, tolerance=0). Phase 3 (gradient fills) remaining.
+**Status**: Phases 1, 2, 3, 4 COMPLETE. `setMask` stencil rendering IMPLEMENTED. `movieclip_setmask` image ~97% correct (10K outliers from MSAA edge differences, tolerance=0). Phase 3 (gradient fills) implemented — rendering works, image near-match (anti-aliasing diffs remain).
 
 ---
 
@@ -102,15 +102,23 @@ Handle `beginFill()` + `moveTo()`/`lineTo()` + `endFill()` — solid color fille
 
 Handle `curveTo()` — quadratic Bezier curves. Flatten to 8 line segments per curve in `drawingFinalizePath`.
 
-### Phase 3: Gradient Fills
+### Phase 3: Gradient Fills — **COMPLETE**
 
-Handle `beginGradientFill()` — linear and radial gradients. Requires gradient texture generation and the existing gradient shader path.
+Handle `beginGradientFill()` and `lineGradientStyle()` — linear and radial gradients.
 
-**Tests helped**: `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style`
+**Implementation**:
+- `drawingGenerateGradientRamp()`: 256-entry RGBA8 lookup from color stops, with sRGB↔linear for linearRGB mode
+- `drawingBuildGradientBoxMatrix()` / `drawingBuildGradientAbcdMatrix()`: Matrix builders for box and ABCD matrix formats
+- `render_webgpu_draw_gradient_tris()`: Uploads gradient ramp to texture array layer, computes inverse matrix on CPU, builds vertices with style encoding (gradient_type | spread_mode<<8, grad_id | focal_encoded<<16)
+- Over-allocated gradient texture + inv_mat_buffer with 64 dynamic slots at init time
+- Key bug fixed: `getProperty()` only works on `ASObject*`, not `ASArray*`. Array args (colors, alphas, ratios) must use `ASArray->length` and `ASArray->elements[]` directly.
+- `beginGradientFill(undefined, ...)` clears fill regardless of arg count (checked before too-many-args validation)
+
+**Tests helped**: `movieclip_begin_gradient_fill` (trace PASS, image near-match), `movieclip_line_gradient_style`
 
 ### Phase 4: Line Styles — **COMPLETE**
 
-Handle `lineStyle()` — stroke rendering. Strokes expanded to filled quads (2 triangles per segment) with normal-based offset in `drawingFinalizePath`. `lineGradientStyle()` not yet implemented (needs Phase 3).
+Handle `lineStyle()` and `lineGradientStyle()` — stroke rendering. Strokes expanded to filled quads (2 triangles per segment) with normal-based offset in `drawingFinalizePath`. `lineGradientStyle()` uses same gradient infrastructure as Phase 3.
 
 ---
 

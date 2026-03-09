@@ -1508,38 +1508,47 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	}
 }
 
+// Helper: render a single drawing path (fill + stroke), handling gradients
+static void render_drawing_path(const DrawingRenderInfo* info)
+{
+	if (info->fill_count > 0) {
+		if (info->has_gradient && info->gradient_ramp && info->gradient_matrix) {
+			renderer_draw_gradient_tris(context, info->fill_verts, info->fill_count,
+				info->gradient_type, info->spread_mode, info->focal_ratio,
+				info->gradient_ramp, info->gradient_matrix,
+				info->transform_id, info->cxform_id);
+		} else {
+			renderer_draw_tris(context, info->fill_verts, info->fill_count,
+				info->fill_r, info->fill_g, info->fill_b, info->fill_a,
+				info->transform_id, info->cxform_id);
+		}
+	}
+	if (info->line_count > 0) {
+		if (info->has_line_gradient && info->line_gradient_ramp && info->line_gradient_matrix) {
+			renderer_draw_gradient_tris(context, info->line_verts, info->line_count,
+				info->line_gradient_type, info->line_spread_mode, info->line_focal_ratio,
+				info->line_gradient_ramp, info->line_gradient_matrix,
+				info->transform_id, info->cxform_id);
+		} else {
+			renderer_draw_tris(context, info->line_verts, info->line_count,
+				info->line_r, info->line_g, info->line_b, info->line_a,
+				info->transform_id, info->cxform_id);
+		}
+	}
+}
+
 // Callback for actionIterateDrawings: render Drawing API fills and strokes (unmasked).
 static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data)
 {
 	(void)user_data;
-
-	if (info->fill_count > 0) {
-		renderer_draw_tris(context, info->fill_verts, info->fill_count,
-			info->fill_r, info->fill_g, info->fill_b, info->fill_a,
-			info->transform_id, info->cxform_id);
-	}
-	if (info->line_count > 0) {
-		renderer_draw_tris(context, info->line_verts, info->line_count,
-			info->line_r, info->line_g, info->line_b, info->line_a,
-			info->transform_id, info->cxform_id);
-	}
+	render_drawing_path(info);
 }
 
 // Helper: render all paths in a DrawingMCInfo
 static void render_drawing_mc_paths(const DrawingMCInfo* mc_info)
 {
 	for (int i = 0; i < mc_info->path_count; i++) {
-		const DrawingRenderInfo* info = &mc_info->paths[i];
-		if (info->fill_count > 0) {
-			renderer_draw_tris(context, info->fill_verts, info->fill_count,
-				info->fill_r, info->fill_g, info->fill_b, info->fill_a,
-				info->transform_id, info->cxform_id);
-		}
-		if (info->line_count > 0) {
-			renderer_draw_tris(context, info->line_verts, info->line_count,
-				info->line_r, info->line_g, info->line_b, info->line_a,
-				info->transform_id, info->cxform_id);
-		}
+		render_drawing_path(&mc_info->paths[i]);
 	}
 }
 

@@ -14,8 +14,8 @@ Plans 02 and 04 both need a `renderer_draw_rect()` function for drawing dynamic 
 |------|---------|---------------|------------|--------|
 | [01](PLAN_01_RUNTIME_TRANSFORMS.md) | Runtime transform & cxform GPU updates | 2 | Medium | **COMPLETE** |
 | [02](PLAN_02_TEXTFIELD_RENDERING.md) | TextField background/border/text rendering | 5 | Large | **Phase 1 COMPLETE** |
-| [03](PLAN_03_DRAWING_API.md) | Drawing API (beginFill/lineTo/etc.) | 4 | Large | **Phases 1,2,4 COMPLETE** (gradient fills remaining) |
-| [04](PLAN_04_FOCUS_RECT.md) | Focus rect yellow outline | 6 (41 images) | Small-Medium | **COMPLETE** |
+| [03](PLAN_03_DRAWING_API.md) | Drawing API (beginFill/lineTo/etc.) | 4 | Large | **All phases COMPLETE** (gradient fills implemented, image near-match) |
+| [04](PLAN_04_FOCUS_RECT.md) | Focus rect yellow outline | 6 (41 images) | Small-Medium | **COMPLETE** (all 6 tests pass) |
 | [05](PLAN_05_BITMAP_AND_MEDIA.md) | BitmapData rendering + external media | 13 | Very large | Not started |
 
 ## Recommended Implementation Order

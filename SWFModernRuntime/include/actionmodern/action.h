@@ -404,6 +404,22 @@ typedef struct {
 	float line_width;   // pixels (0 = no stroke)
 	float line_r, line_g, line_b, line_a;
 	int has_line;
+	// Gradient fill data (mutually exclusive with solid fill)
+	int has_gradient;
+	u8 gradient_type;      // 0x10=linear, 0x12=radial, 0x13=focal_radial
+	u8 spread_mode;        // 0=pad, 1=reflect, 2=repeat
+	u8 interpolation;      // 0=RGB, 1=linearRGB
+	float focal_ratio;     // -1.0 to 1.0 for focal radial
+	u8 gradient_ramp[256 * 4];    // pre-generated 256 RGBA8 entries
+	float gradient_matrix[16];    // 4x4 column-major matrix (gradient space → stage twips)
+	// Gradient line style data
+	int has_line_gradient;
+	u8 line_gradient_type;
+	u8 line_spread_mode;
+	u8 line_interpolation;
+	float line_focal_ratio;
+	u8 line_gradient_ramp[256 * 4];
+	float line_gradient_matrix[16];
 	// Tessellated output (filled after endFill)
 	float* fill_verts;     // x,y pairs in twips (triangle vertices)
 	u32 fill_vert_count;   // number of vertices (multiple of 3)
@@ -418,13 +434,29 @@ typedef struct {
 	// Current pen position
 	float pen_x, pen_y;
 	int pen_set;
-	// Current fill style (set by beginFill)
+	// Current fill style (set by beginFill or beginGradientFill)
 	float fill_r, fill_g, fill_b, fill_a;
 	int has_fill;
+	// Gradient fill state (set by beginGradientFill)
+	int has_gradient;
+	u8 gradient_type;
+	u8 gradient_spread;
+	u8 gradient_interp;
+	float gradient_focal;
+	u8 gradient_ramp[256 * 4];
+	float gradient_matrix[16];
 	// Current line style (set by lineStyle)
 	float line_w;
 	float line_r, line_g, line_b, line_a;
 	int has_line;
+	// Line gradient state (set by lineGradientStyle)
+	int has_line_gradient;
+	u8 line_gradient_type;
+	u8 line_gradient_spread;
+	u8 line_gradient_interp;
+	float line_gradient_focal;
+	u8 line_gradient_ramp[256 * 4];
+	float line_gradient_matrix[16];
 	// Active path commands (between beginFill and endFill)
 	DrawCmd* cmds;
 	u32 cmd_count;
@@ -436,9 +468,21 @@ typedef struct {
 	const float* fill_verts;  // twips, triangle vertices (x,y pairs)
 	u32 fill_count;           // vertex count
 	float fill_r, fill_g, fill_b, fill_a;
+	int has_gradient;
+	u8 gradient_type;         // 0x10, 0x12, 0x13
+	u8 spread_mode;
+	float focal_ratio;
+	const u8* gradient_ramp;  // 256*4 RGBA8 entries
+	const float* gradient_matrix; // 4x4 column-major
 	const float* line_verts;
 	u32 line_count;
 	float line_r, line_g, line_b, line_a;
+	int has_line_gradient;
+	u8 line_gradient_type;
+	u8 line_spread_mode;
+	float line_focal_ratio;
+	const u8* line_gradient_ramp;
+	const float* line_gradient_matrix;
 	u32 transform_id;         // MC's transform slot
 	u32 cxform_id;            // MC's cxform slot
 } DrawingRenderInfo;
@@ -496,6 +540,11 @@ void actionDispatchKeyUpToFocused(SWFAppContext* app_context, int key_code);
 // MC key handlers (onKeyDown/Up) require is_active (>=1).
 // Enter/Space press simulation requires is_visible (==2).
 void actionResetHighlightState(void);
+// Version-aware highlight reset matching Ruffle's should_reset_highlight:
+// event_type: 0=mouse_move, 1=left_down, 2=left_up, 3=right_down, 4=right_up
+// Left down always resets. Others only reset for SWF < 9.
+// Middle mouse never resets (not listed).
+void actionResetHighlightForEvent(int event_type);
 void actionUpdateHighlightState(void);
 // Virtual hover tracking: Tab focus sets g_tab_hovered_mc; mouse events clear it.
 // Per-frame ng_update_button_states should be skipped while virtual hover is active.

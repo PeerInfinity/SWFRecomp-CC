@@ -1,19 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-03-09T04:08:36.363572+00:00",
-    "git_sha": "976737f27ac1b8bf4ba547617503663ff5c93c6a",
-    "duration_seconds": 827.58
+    "timestamp": "2026-03-09T05:37:11.155462+00:00",
+    "git_sha": "5abba1955f74d57fd9c5daaa36e6530c884b6795",
+    "duration_seconds": 630.04
   },
   "total": 31,
-  "image_pass": 5,
-  "image_fail": 25,
+  "image_pass": 7,
+  "image_fail": 23,
   "image_no_render": 1,
   "image_skip": 0,
-  "trace_pass": 26,
+  "trace_pass": 22,
   "tests": [
     {
       "test": "bitmap_data_colortransform",
-      "duration": 27.21,
+      "duration": 20.44,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -25,7 +25,7 @@
     },
     {
       "test": "bitmap_data_copypixels",
-      "duration": 29.18,
+      "duration": 21.47,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -37,7 +37,7 @@
     },
     {
       "test": "bitmap_data_fillrect",
-      "duration": 28.2,
+      "duration": 19.46,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -49,7 +49,7 @@
     },
     {
       "test": "bitmap_data_perlinnoise",
-      "duration": 32.12,
+      "duration": 21.49,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -61,7 +61,7 @@
     },
     {
       "test": "bitmap_data_pixeldissolve_image",
-      "duration": 29.08,
+      "duration": 19.75,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -73,7 +73,7 @@
     },
     {
       "test": "bitmapdata_applyfilter_colormatrix",
-      "duration": 28.87,
+      "duration": 18.81,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -85,7 +85,7 @@
     },
     {
       "test": "color",
-      "duration": 29.25,
+      "duration": 19.72,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -97,7 +97,7 @@
     },
     {
       "test": "display_object_properties",
-      "duration": 26.76,
+      "duration": 19.19,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -109,7 +109,7 @@
     },
     {
       "test": "edittext_stylesheet",
-      "duration": 28.46,
+      "duration": 20.11,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -121,7 +121,7 @@
     },
     {
       "test": "edittext_tag_indent",
-      "duration": 28.08,
+      "duration": 20.29,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -133,7 +133,7 @@
     },
     {
       "test": "focusrect_focuslost",
-      "duration": 26.98,
+      "duration": 19.34,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -145,8 +145,8 @@
     },
     {
       "test": "focusrect_mouse_swf8",
-      "duration": 25.11,
-      "trace_status": "pass",
+      "duration": 18.88,
+      "trace_status": "output_mismatch",
       "image_comparisons": {
         "output.01.tab": {
           "status": "pass",
@@ -173,60 +173,60 @@
           "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.07.middle_down": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.08.middle_up": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         }
       },
-      "image_status": "fail"
+      "image_status": "pass"
     },
     {
       "test": "focusrect_mouse_swf9",
-      "duration": 27.16,
-      "trace_status": "pass",
+      "duration": 19.14,
+      "trace_status": "output_mismatch",
       "image_comparisons": {
         "output.01.tab": {
           "status": "pass",
           "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.02.move": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.03.left_down": {
           "status": "pass",
           "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.04.left_up": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.05.right_down": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.06.right_up": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.07.middle_down": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         },
         "output.08.middle_up": {
-          "status": "fail",
-          "message": "Image comparison failed: 408 outliers exceed limit of 0, max difference 204"
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0"
         }
       },
-      "image_status": "fail"
+      "image_status": "pass"
     },
     {
       "test": "focusrect_swf5",
-      "duration": 29.33,
-      "trace_status": "pass",
+      "duration": 19.32,
+      "trace_status": "output_mismatch",
       "image_comparisons": {
         "output.01a": {
           "status": "pass",
@@ -281,8 +281,8 @@
     },
     {
       "test": "focusrect_swf6",
-      "duration": 30.05,
-      "trace_status": "pass",
+      "duration": 19.35,
+      "trace_status": "output_mismatch",
       "image_comparisons": {
         "output.01a": {
           "status": "pass",
@@ -337,7 +337,7 @@
     },
     {
       "test": "frame_size_translated_negative",
-      "duration": 29.37,
+      "duration": 19.37,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -349,7 +349,7 @@
     },
     {
       "test": "frame_size_translated_positive",
-      "duration": 28.38,
+      "duration": 19.41,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -361,7 +361,7 @@
     },
     {
       "test": "mask_reapply",
-      "duration": 20.61,
+      "duration": 18.89,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -373,7 +373,7 @@
     },
     {
       "test": "mask_with_drawing",
-      "duration": 24.99,
+      "duration": 19.0,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -385,7 +385,7 @@
     },
     {
       "test": "mcl_target_gif87a",
-      "duration": 23.2,
+      "duration": 19.91,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -397,7 +397,7 @@
     },
     {
       "test": "mcl_target_gif89a",
-      "duration": 21.12,
+      "duration": 19.58,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -409,7 +409,7 @@
     },
     {
       "test": "mcl_target_jpg",
-      "duration": 21.36,
+      "duration": 19.41,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -421,7 +421,7 @@
     },
     {
       "test": "mcl_target_png",
-      "duration": 21.54,
+      "duration": 19.39,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -433,7 +433,7 @@
     },
     {
       "test": "mouse_events_visible_enabled",
-      "duration": 26.11,
+      "duration": 19.79,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -445,7 +445,7 @@
     },
     {
       "test": "movieclip_begin_gradient_fill",
-      "duration": 25.46,
+      "duration": 20.35,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -457,7 +457,7 @@
     },
     {
       "test": "movieclip_create_text_field",
-      "duration": 22.45,
+      "duration": 19.58,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -469,7 +469,7 @@
     },
     {
       "test": "movieclip_line_gradient_style",
-      "duration": 28.3,
+      "duration": 19.82,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -481,7 +481,7 @@
     },
     {
       "test": "movieclip_methods_with_loaded_image",
-      "duration": 22.45,
+      "duration": 19.36,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -493,7 +493,7 @@
     },
     {
       "test": "movieclip_setmask",
-      "duration": 21.01,
+      "duration": 19.93,
       "trace_status": "pass",
       "image_comparisons": {
         "output": {
@@ -505,7 +505,7 @@
     },
     {
       "test": "netstream_play_flv",
-      "duration": 21.72,
+      "duration": 20.53,
       "trace_status": "output_mismatch",
       "image_comparisons": {
         "output": {
@@ -517,7 +517,7 @@
     },
     {
       "test": "netstream_play_flv_screen",
-      "duration": 43.65,
+      "duration": 38.97,
       "trace_status": "segfault",
       "image_comparisons": {},
       "image_status": "no_render"
