@@ -1507,6 +1507,58 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 		renderer_draw_rect(context, x + w - t, y + t, t, h - 2*t, r, g, b, 1.0f, 0, 0); // right
 	}
 }
+
+// Callback for actionIterateDrawings: render Drawing API fills and strokes (unmasked).
+static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data)
+{
+	(void)user_data;
+
+	if (info->fill_count > 0) {
+		renderer_draw_tris(context, info->fill_verts, info->fill_count,
+			info->fill_r, info->fill_g, info->fill_b, info->fill_a,
+			info->transform_id, info->cxform_id);
+	}
+	if (info->line_count > 0) {
+		renderer_draw_tris(context, info->line_verts, info->line_count,
+			info->line_r, info->line_g, info->line_b, info->line_a,
+			info->transform_id, info->cxform_id);
+	}
+}
+
+// Helper: render all paths in a DrawingMCInfo
+static void render_drawing_mc_paths(const DrawingMCInfo* mc_info)
+{
+	for (int i = 0; i < mc_info->path_count; i++) {
+		const DrawingRenderInfo* info = &mc_info->paths[i];
+		if (info->fill_count > 0) {
+			renderer_draw_tris(context, info->fill_verts, info->fill_count,
+				info->fill_r, info->fill_g, info->fill_b, info->fill_a,
+				info->transform_id, info->cxform_id);
+		}
+		if (info->line_count > 0) {
+			renderer_draw_tris(context, info->line_verts, info->line_count,
+				info->line_r, info->line_g, info->line_b, info->line_a,
+				info->transform_id, info->cxform_id);
+		}
+	}
+}
+
+// Callback for actionIterateMaskedDrawings: stencil-masked rendering.
+static void masked_drawing_render_cb(const DrawingMCInfo* masked, const DrawingMCInfo* mask, void* user_data)
+{
+	(void)user_data;
+
+	// 1. Write mask shape into stencil buffer
+	renderer_begin_clip_mask(context);
+	render_drawing_mc_paths(mask);
+	renderer_end_clip_mask(context);
+
+	// 2. Render masked MC content with stencil test
+	render_drawing_mc_paths(masked);
+
+	// 3. End stencil clip
+	renderer_end_clip(context);
+}
 #endif
 
 // Re-render current display list state (for headless per-tick image capture).
@@ -1703,6 +1755,10 @@ void tagRerenderFrame(SWFAppContext* app_context)
 
 	// Text field backgrounds/borders
 	actionIterateTextFields(textfield_render_cb, NULL);
+
+	// Drawing API fills and strokes
+	actionIterateDrawings(drawing_render_cb, NULL);
+	actionIterateMaskedDrawings(masked_drawing_render_cb, NULL);
 
 	// Focus rect (pre-computed before compose_children)
 	// Drawn as 3-pixel thick border INSIDE the object's world AABB.
@@ -2112,6 +2168,10 @@ void tagShowFrame(SWFAppContext* app_context)
 	// Dynamic text fields (createTextField) are tracked in child_mc_cache but not
 	// on the tag display list. Render their background/border rectangles here.
 	actionIterateTextFields(textfield_render_cb, NULL);
+
+	// --- Render Drawing API fills and strokes ---
+	actionIterateDrawings(drawing_render_cb, NULL);
+	actionIterateMaskedDrawings(masked_drawing_render_cb, NULL);
 
 	// --- Render focus rect (pre-computed before compose_children) ---
 	// Drawn as 3-pixel thick border INSIDE the object's world AABB.

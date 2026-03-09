@@ -12093,17 +12093,18 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->depth_swapped = 0;
 	// Inherit SWF version from parent; overridden by loadMovie
 	mc->swf_version = parent ? parent->swf_version : (u16)g_swf_version;
-#ifdef NO_GRAPHICS
 	mc->last_transform_id = 0;
 	mc->as_set_flags = 0;
 	mc->ng_textfield_idx = -1;
 	mc->draw_xmin = mc->draw_xmax = mc->draw_ymin = mc->draw_ymax = 0.0f;
 	mc->draw_has_bounds = 0;
+	mc->drawing_state = NULL;
+	mc->mask_mc = NULL;
+	mc->is_mask = 0;
 	mc->mc_mouse_inside = 0;
 	mc->mc_as_pressed = 0;
 	mc->mc_enterframe_eligible = 0;
 	mc->display_obj = NULL;
-#endif
 
 	// Set instance name
 	strncpy(mc->name, instance_name, sizeof(mc->name) - 1);
@@ -14916,6 +14917,232 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 		info.h = mc->height;
 
 		cb(&info, user_data);
+		count++;
+	}
+	return count;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing API — Path recording, tessellation, and iterator
+// ---------------------------------------------------------------------------
+
+static DrawingState* getOrCreateDrawingState(MovieClip* mc)
+{
+	if (mc->drawing_state == NULL) {
+		DrawingState* ds = (DrawingState*)calloc(1, sizeof(DrawingState));
+		mc->drawing_state = ds;
+	}
+	return (DrawingState*)mc->drawing_state;
+}
+
+static void drawingAddCmd(DrawingState* ds, u8 type, float x, float y, float cx, float cy)
+{
+	if (ds->cmd_count >= ds->cmd_capacity) {
+		ds->cmd_capacity = ds->cmd_capacity ? ds->cmd_capacity * 2 : 64;
+		ds->cmds = (DrawCmd*)realloc(ds->cmds, ds->cmd_capacity * sizeof(DrawCmd));
+	}
+	DrawCmd* c = &ds->cmds[ds->cmd_count++];
+	c->type = type;
+	c->x = x; c->y = y;
+	c->cx = cx; c->cy = cy;
+}
+
+static void drawingUpdateBounds(MovieClip* mc, float x, float y)
+{
+	if (!mc->draw_has_bounds) {
+		mc->draw_xmin = mc->draw_xmax = x;
+		mc->draw_ymin = mc->draw_ymax = y;
+		mc->draw_has_bounds = 1;
+	} else {
+		if (x < mc->draw_xmin) mc->draw_xmin = x;
+		if (x > mc->draw_xmax) mc->draw_xmax = x;
+		if (y < mc->draw_ymin) mc->draw_ymin = y;
+		if (y > mc->draw_ymax) mc->draw_ymax = y;
+	}
+}
+
+// Finalize the active path: tessellate to triangles and add to paths array.
+static void drawingFinalizePath(DrawingState* ds)
+{
+	if (ds->cmd_count == 0) return;
+
+	// Extract polygon vertices from commands
+	float* poly = NULL;
+	u32 poly_count = 0, poly_cap = 0;
+
+	for (u32 i = 0; i < ds->cmd_count; i++) {
+		DrawCmd* c = &ds->cmds[i];
+		if (c->type == 2) {
+			// CURVE_TO: flatten quadratic Bezier to line segments
+			float sx = (i > 0) ? ds->cmds[i-1].x : ds->pen_x;
+			float sy = (i > 0) ? ds->cmds[i-1].y : ds->pen_y;
+			// Subdivide into 8 segments (good enough for most curves)
+			for (int seg = 1; seg <= 8; seg++) {
+				float t = (float)seg / 8.0f;
+				float u = 1.0f - t;
+				float px = u*u*sx + 2*u*t*c->cx + t*t*c->x;
+				float py = u*u*sy + 2*u*t*c->cy + t*t*c->y;
+				if (poly_count >= poly_cap) {
+					poly_cap = poly_cap ? poly_cap * 2 : 64;
+					poly = (float*)realloc(poly, poly_cap * 2 * sizeof(float));
+				}
+				poly[poly_count*2] = px;
+				poly[poly_count*2+1] = py;
+				poly_count++;
+			}
+		} else {
+			// MOVE_TO or LINE_TO: just add the point
+			if (poly_count >= poly_cap) {
+				poly_cap = poly_cap ? poly_cap * 2 : 64;
+				poly = (float*)realloc(poly, poly_cap * 2 * sizeof(float));
+			}
+			poly[poly_count*2] = c->x;
+			poly[poly_count*2+1] = c->y;
+			poly_count++;
+		}
+	}
+
+	// Ensure path capacity
+	if (ds->path_count >= ds->path_capacity) {
+		ds->path_capacity = ds->path_capacity ? ds->path_capacity * 2 : 16;
+		ds->paths = (DrawPath*)realloc(ds->paths, ds->path_capacity * sizeof(DrawPath));
+	}
+	DrawPath* path = &ds->paths[ds->path_count++];
+	memset(path, 0, sizeof(DrawPath));
+	path->has_fill = ds->has_fill;
+	path->fill_r = ds->fill_r; path->fill_g = ds->fill_g;
+	path->fill_b = ds->fill_b; path->fill_a = ds->fill_a;
+	path->has_line = ds->has_line;
+	path->line_width = ds->line_w;
+	path->line_r = ds->line_r; path->line_g = ds->line_g;
+	path->line_b = ds->line_b; path->line_a = ds->line_a;
+
+	// Fan tessellation for fill (convert pixels to twips)
+	if (path->has_fill && poly_count >= 3) {
+		u32 tri_count = poly_count - 2;
+		path->fill_vert_count = tri_count * 3;
+		path->fill_verts = (float*)malloc(path->fill_vert_count * 2 * sizeof(float));
+		for (u32 i = 0; i < tri_count; i++) {
+			float* out = &path->fill_verts[i * 6];
+			out[0] = poly[0] * 20.0f;       out[1] = poly[1] * 20.0f;
+			out[2] = poly[(i+1)*2] * 20.0f;  out[3] = poly[(i+1)*2+1] * 20.0f;
+			out[4] = poly[(i+2)*2] * 20.0f;  out[5] = poly[(i+2)*2+1] * 20.0f;
+		}
+	}
+
+	// Line stroke expansion: for each consecutive pair, expand to quad
+	if (path->has_line && poly_count >= 2) {
+		u32 seg_count = poly_count - 1;
+		// Check if first == last (closed path) — don't draw closing segment twice
+		// Actually, each line_to IS a segment, so iterate pairwise
+		path->line_vert_count = seg_count * 6;  // 2 triangles per segment
+		path->line_verts = (float*)malloc(path->line_vert_count * 2 * sizeof(float));
+		float half_w = path->line_width * 0.5f * 20.0f;  // half width in twips
+		for (u32 i = 0; i < seg_count; i++) {
+			float x0 = poly[i*2] * 20.0f, y0 = poly[i*2+1] * 20.0f;
+			float x1 = poly[(i+1)*2] * 20.0f, y1 = poly[(i+1)*2+1] * 20.0f;
+			float dx = x1 - x0, dy = y1 - y0;
+			float len = sqrtf(dx*dx + dy*dy);
+			if (len < 0.001f) len = 0.001f;
+			float nx = -dy / len * half_w, ny = dx / len * half_w;
+			float* out = &path->line_verts[i * 12];
+			// Quad as 2 triangles
+			out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny;
+			out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny;
+		}
+	}
+
+	free(poly);
+
+	// Clear active commands
+	ds->cmd_count = 0;
+}
+
+// Clear all drawing data for an MC.
+static void drawingClear(MovieClip* mc)
+{
+	DrawingState* ds = (DrawingState*)mc->drawing_state;
+	if (ds == NULL) return;
+	for (u32 i = 0; i < ds->path_count; i++) {
+		free(ds->paths[i].fill_verts);
+		free(ds->paths[i].line_verts);
+	}
+	free(ds->paths); ds->paths = NULL;
+	ds->path_count = ds->path_capacity = 0;
+	free(ds->cmds); ds->cmds = NULL;
+	ds->cmd_count = ds->cmd_capacity = 0;
+	ds->pen_set = 0;
+	ds->has_fill = 0;
+	ds->has_line = 0;
+	mc->draw_has_bounds = 0;
+}
+
+// Iterator for rendering: calls cb for each filled/stroked path across all MCs.
+// Helper to fill DrawingRenderInfo array for an MC's drawing paths
+static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
+{
+	DrawingState* ds = (DrawingState*)mc->drawing_state;
+	if (ds == NULL) return 0;
+	int count = 0;
+	for (u32 p = 0; p < ds->path_count && count < max_out; p++) {
+		DrawPath* path = &ds->paths[p];
+		if ((path->fill_vert_count == 0 || !path->has_fill) &&
+		    (path->line_vert_count == 0 || !path->has_line)) continue;
+		DrawingRenderInfo* info = &out[count++];
+		info->fill_verts = path->fill_verts;
+		info->fill_count = path->has_fill ? path->fill_vert_count : 0;
+		info->fill_r = path->fill_r; info->fill_g = path->fill_g;
+		info->fill_b = path->fill_b; info->fill_a = path->fill_a;
+		info->line_verts = path->line_verts;
+		info->line_count = path->has_line ? path->line_vert_count : 0;
+		info->line_r = path->line_r; info->line_g = path->line_g;
+		info->line_b = path->line_b; info->line_a = path->line_a;
+		info->transform_id = mc->last_transform_id;
+		info->cxform_id = 0;
+	}
+	return count;
+}
+
+int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
+{
+	int count = 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!mc->visible) continue;
+		if (mc->is_mask) continue;       // masks rendered via actionIterateMaskedDrawings
+		if (mc->mask_mc != NULL) continue; // masked MCs also via masked iterator
+		DrawingState* ds = (DrawingState*)mc->drawing_state;
+		if (ds == NULL) continue;
+
+		DrawingRenderInfo infos[64];
+		int n = fillDrawingInfos(mc, infos, 64);
+		for (int j = 0; j < n; j++) {
+			cb(&infos[j], user_data);
+			count++;
+		}
+	}
+	return count;
+}
+
+int actionIterateMaskedDrawings(DrawingMaskedCallback cb, void* user_data)
+{
+	int count = 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!mc->visible) continue;
+		if (mc->mask_mc == NULL) continue;
+		MovieClip* mask = (MovieClip*)mc->mask_mc;
+
+		DrawingRenderInfo masked_infos[64], mask_infos[64];
+		int masked_n = fillDrawingInfos(mc, masked_infos, 64);
+		int mask_n = fillDrawingInfos(mask, mask_infos, 64);
+		if (masked_n == 0 && mask_n == 0) continue;
+
+		DrawingMCInfo masked_info = { masked_n, masked_infos };
+		DrawingMCInfo mask_info = { mask_n, mask_infos };
+		cb(&masked_info, &mask_info, user_data);
 		count++;
 	}
 	return count;
@@ -40597,8 +40824,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 20 && strncmp(method_name, "createEmptyMovieClip", 20) == 0)
 		{
 			// createEmptyMovieClip(instanceName, depth)
-			// Creates a new empty child MovieClip
-#ifdef NO_GRAPHICS
+			// Creates a new empty child MovieClip (works in both NO_GRAPHICS and graphics mode)
 			if (num_args >= 2) {
 				char _mcemc_name_buf[512];
 				const char* inst_name = "";
@@ -40665,10 +40891,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if (method_name_len == 18 && strncmp(method_name, "duplicateMovieClip", 18) == 0)
@@ -42407,58 +42629,121 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 6 && strncmp(method_name, "moveTo", 6) == 0)
 		{
-			// moveTo(x, y) — update drawing bounds for hit-testing
-#ifdef NO_GRAPHICS
+			// moveTo(x, y) — set pen position, record command
 			if (num_args >= 2 && mc != NULL) {
 				float x = (float)varToDouble(&args[0]);
 				float y = (float)varToDouble(&args[1]);
-				if (!mc->draw_has_bounds) {
-					mc->draw_xmin = mc->draw_xmax = x;
-					mc->draw_ymin = mc->draw_ymax = y;
-					mc->draw_has_bounds = 1;
-				} else {
-					if (x < mc->draw_xmin) mc->draw_xmin = x;
-					if (x > mc->draw_xmax) mc->draw_xmax = x;
-					if (y < mc->draw_ymin) mc->draw_ymin = y;
-					if (y > mc->draw_ymax) mc->draw_ymax = y;
-				}
+				drawingUpdateBounds(mc, x, y);
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				drawingAddCmd(ds, 0, x, y, 0, 0); // MOVE_TO
+				ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
 			}
-#endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 6 && strncmp(method_name, "lineTo", 6) == 0)
 		{
-			// lineTo(x, y) — update drawing bounds for hit-testing
-#ifdef NO_GRAPHICS
+			// lineTo(x, y) — draw line segment, record command
 			if (num_args >= 2 && mc != NULL) {
 				float x = (float)varToDouble(&args[0]);
 				float y = (float)varToDouble(&args[1]);
-				if (!mc->draw_has_bounds) {
-					mc->draw_xmin = mc->draw_xmax = x;
-					mc->draw_ymin = mc->draw_ymax = y;
-					mc->draw_has_bounds = 1;
-				} else {
-					if (x < mc->draw_xmin) mc->draw_xmin = x;
-					if (x > mc->draw_xmax) mc->draw_xmax = x;
-					if (y < mc->draw_ymin) mc->draw_ymin = y;
-					if (y > mc->draw_ymax) mc->draw_ymax = y;
-				}
+				drawingUpdateBounds(mc, x, y);
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				drawingAddCmd(ds, 1, x, y, 0, 0); // LINE_TO
+				ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
 			}
-#endif
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 7 && strncmp(method_name, "curveTo", 7) == 0)
+		{
+			// curveTo(cx, cy, ax, ay) — quadratic Bezier curve
+			if (num_args >= 4 && mc != NULL) {
+				float cx = (float)varToDouble(&args[0]);
+				float cy = (float)varToDouble(&args[1]);
+				float ax = (float)varToDouble(&args[2]);
+				float ay = (float)varToDouble(&args[3]);
+				drawingUpdateBounds(mc, cx, cy);
+				drawingUpdateBounds(mc, ax, ay);
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				drawingAddCmd(ds, 2, ax, ay, cx, cy); // CURVE_TO
+				ds->pen_x = ax; ds->pen_y = ay; ds->pen_set = 1;
+			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 9 && strncmp(method_name, "beginFill", 9) == 0)
 		{
+			// beginFill(rgb [, alpha]) — start solid fill
+			if (mc != NULL) {
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				// Finalize any pending path before starting a new fill
+				if (ds->cmd_count > 0) drawingFinalizePath(ds);
+				u32 rgb = 0;
+				float alpha = 1.0f;
+				if (num_args >= 1) rgb = (u32)varToDouble(&args[0]);
+				if (num_args >= 2) {
+					alpha = (float)varToDouble(&args[1]) / 100.0f;
+					if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
+				}
+				ds->fill_r = ((rgb >> 16) & 0xFF) / 255.0f;
+				ds->fill_g = ((rgb >> 8) & 0xFF) / 255.0f;
+				ds->fill_b = (rgb & 0xFF) / 255.0f;
+				ds->fill_a = alpha;
+				ds->has_fill = 1;
+			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 7 && strncmp(method_name, "endFill", 7) == 0)
 		{
+			// endFill() — finalize current path
+			if (mc != NULL && mc->drawing_state != NULL) {
+				DrawingState* ds = (DrawingState*)mc->drawing_state;
+				drawingFinalizePath(ds);
+				ds->has_fill = 0;
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 9 && strncmp(method_name, "lineStyle", 9) == 0)
+		{
+			// lineStyle([thickness [, rgb [, alpha]]]) — set line style
+			if (mc != NULL) {
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				if (num_args == 0) {
+					// No args: clear line style
+					ds->has_line = 0; ds->line_w = 0;
+				} else {
+					float thickness = (float)varToDouble(&args[0]);
+					u32 rgb = 0;
+					float alpha = 1.0f;
+					if (num_args >= 2) rgb = (u32)varToDouble(&args[1]);
+					if (num_args >= 3) {
+						alpha = (float)varToDouble(&args[2]) / 100.0f;
+						if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
+					}
+					ds->line_w = thickness;
+					ds->line_r = ((rgb >> 16) & 0xFF) / 255.0f;
+					ds->line_g = ((rgb >> 8) & 0xFF) / 255.0f;
+					ds->line_b = (rgb & 0xFF) / 255.0f;
+					ds->line_a = alpha;
+					ds->has_line = 1;
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 5 && strncmp(method_name, "clear", 5) == 0 && mc != NULL)
+		{
+			// clear() — clear all drawing data
+			drawingClear(mc);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
@@ -42611,7 +42896,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar mask_arg = args[0];
 			if (args != NULL) FREE(args);
 			if (mask_arg.type == ACTION_STACK_VALUE_NULL || mask_arg.type == ACTION_STACK_VALUE_UNDEFINED) {
-				// Remove mask — return true
+				// Remove mask
+				if (mc != NULL && mc->mask_mc != NULL) {
+					((MovieClip*)mc->mask_mc)->is_mask = 0;
+					mc->mask_mc = NULL;
+				}
 				PUSH(ACTION_STACK_VALUE_BOOLEAN, 1);
 				return;
 			}
@@ -42664,6 +42953,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 				}
+			}
+			if (mask_mc != NULL && mc != NULL) {
+				// Clear any previous mask
+				if (mc->mask_mc != NULL)
+					((MovieClip*)mc->mask_mc)->is_mask = 0;
+				mc->mask_mc = mask_mc;
+				mask_mc->is_mask = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, (mask_mc != NULL) ? 1 : 0);
 			return;

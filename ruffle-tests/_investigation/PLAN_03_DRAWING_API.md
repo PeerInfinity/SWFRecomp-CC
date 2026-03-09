@@ -4,6 +4,7 @@
 **Tests unlocked**: `movieclip_begin_gradient_fill` (tolerance=6), `movieclip_line_gradient_style` (tolerance=6), `mask_with_drawing` (tolerance=6), `movieclip_setmask` (tolerance=0)
 **Estimated complexity**: Large
 **Depends on**: Plan 01 (runtime transforms)
+**Status**: Phases 1, 2, 4 COMPLETE. `setMask` stencil rendering IMPLEMENTED. `movieclip_setmask` image ~97% correct (10K outliers from MSAA edge differences, tolerance=0). Phase 3 (gradient fills) remaining.
 
 ---
 
@@ -88,20 +89,18 @@ Use the same dynamic slot approach as Plan 01:
 
 ## Implementation Phases
 
-### Phase 1: Solid Fill Polygons (Simplest)
+### Phase 1: Solid Fill Polygons — **COMPLETE**
 
 Handle `beginFill()` + `moveTo()`/`lineTo()` + `endFill()` — solid color filled polygons with straight edges only.
 
-1. Store path commands in MovieClip's DrawingState
-2. On `endFill()`, tessellate the polygon into triangles
-3. Before render pass, upload tessellated vertices to GPU
-4. Draw using `renderer_draw_shape()` with dynamic vertex/color slots
+1. ✅ Store path commands in MovieClip's DrawingState (`DrawCmd`, `DrawPath`, `DrawingState` structs in action.h)
+2. ✅ On `endFill()`, tessellate the polygon into triangles (fan tessellation in `drawingFinalizePath`)
+3. ✅ Before render pass, upload tessellated vertices to GPU (`renderer_draw_tris` in tag.c `drawing_render_cb`)
+4. ✅ Draw using `renderer_draw_tris()` with dynamic vertex/color slots
 
-**Tests helped**: `movieclip_setmask` (uses simple filled rectangles via drawing API)
+### Phase 2: Curve Segments — **COMPLETE**
 
-### Phase 2: Curve Segments
-
-Handle `curveTo()` — quadratic Bezier curves. Flatten to line segments using adaptive subdivision.
+Handle `curveTo()` — quadratic Bezier curves. Flatten to 8 line segments per curve in `drawingFinalizePath`.
 
 ### Phase 3: Gradient Fills
 
@@ -109,9 +108,9 @@ Handle `beginGradientFill()` — linear and radial gradients. Requires gradient 
 
 **Tests helped**: `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style`
 
-### Phase 4: Line Styles
+### Phase 4: Line Styles — **COMPLETE**
 
-Handle `lineStyle()` and `lineGradientStyle()` — stroke rendering. Convert strokes to filled geometry (stroke expansion).
+Handle `lineStyle()` — stroke rendering. Strokes expanded to filled quads (2 triangles per segment) with normal-based offset in `drawingFinalizePath`. `lineGradientStyle()` not yet implemented (needs Phase 3).
 
 ---
 

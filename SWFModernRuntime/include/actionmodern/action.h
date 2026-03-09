@@ -58,6 +58,9 @@ struct MovieClip {
 	// Drawing API bounds tracking (updated by moveTo/lineTo calls)
 	float draw_xmin, draw_xmax, draw_ymin, draw_ymax;
 	int draw_has_bounds;   // 1 if any moveTo/lineTo was called
+	void* drawing_state;   // DrawingState* (lazily allocated, used by Drawing API)
+	void* mask_mc;         // MovieClip* that masks this MC (set by setMask), NULL if none
+	u8 is_mask;            // 1 if this MC is used as a mask for another MC (skip normal rendering)
 	// AS2 event dispatch state
 	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
@@ -387,6 +390,70 @@ int ei_actionvar_to_utf8(ActionVar* var, char* buf, int buf_size);
 
 // Set __proto__ on an object to Object.prototype (for test harness use)
 void ei_set_object_proto(SWFAppContext* app_context, void* obj);
+
+// Drawing API data structures (used by beginFill/moveTo/lineTo/curveTo/endFill)
+typedef struct {
+	u8 type;           // 0=MOVE_TO, 1=LINE_TO, 2=CURVE_TO
+	float x, y;        // endpoint (pixels)
+	float cx, cy;      // control point (CURVE_TO only)
+} DrawCmd;
+
+typedef struct {
+	float fill_r, fill_g, fill_b, fill_a;
+	int has_fill;
+	float line_width;   // pixels (0 = no stroke)
+	float line_r, line_g, line_b, line_a;
+	int has_line;
+	// Tessellated output (filled after endFill)
+	float* fill_verts;     // x,y pairs in twips (triangle vertices)
+	u32 fill_vert_count;   // number of vertices (multiple of 3)
+	float* line_verts;     // x,y pairs in twips (line quad triangles)
+	u32 line_vert_count;
+} DrawPath;
+
+typedef struct {
+	DrawPath* paths;
+	u32 path_count;
+	u32 path_capacity;
+	// Current pen position
+	float pen_x, pen_y;
+	int pen_set;
+	// Current fill style (set by beginFill)
+	float fill_r, fill_g, fill_b, fill_a;
+	int has_fill;
+	// Current line style (set by lineStyle)
+	float line_w;
+	float line_r, line_g, line_b, line_a;
+	int has_line;
+	// Active path commands (between beginFill and endFill)
+	DrawCmd* cmds;
+	u32 cmd_count;
+	u32 cmd_capacity;
+} DrawingState;
+
+// Drawing render info (used by tag.c in graphics mode)
+typedef struct {
+	const float* fill_verts;  // twips, triangle vertices (x,y pairs)
+	u32 fill_count;           // vertex count
+	float fill_r, fill_g, fill_b, fill_a;
+	const float* line_verts;
+	u32 line_count;
+	float line_r, line_g, line_b, line_a;
+	u32 transform_id;         // MC's transform slot
+	u32 cxform_id;            // MC's cxform slot
+} DrawingRenderInfo;
+
+typedef void (*DrawingRenderCallback)(const DrawingRenderInfo* info, void* user_data);
+int actionIterateDrawings(DrawingRenderCallback cb, void* user_data);
+
+// Masked MC iteration: callback receives (masked_mc_paths, mask_mc_paths) pairs
+typedef struct {
+	int path_count;
+	const DrawingRenderInfo* paths;   // array of path_count entries
+} DrawingMCInfo;
+
+typedef void (*DrawingMaskedCallback)(const DrawingMCInfo* masked, const DrawingMCInfo* mask, void* user_data);
+int actionIterateMaskedDrawings(DrawingMaskedCallback cb, void* user_data);
 
 // Text field rendering info (used by tag.c in graphics mode)
 typedef struct TextFieldRenderInfo {

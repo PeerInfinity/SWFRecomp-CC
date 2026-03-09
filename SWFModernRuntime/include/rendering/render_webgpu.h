@@ -153,10 +153,11 @@ typedef struct WebGPURenderContext
 	u8 green;
 	u8 blue;
 
-	// Dynamic rectangle rendering (text field backgrounds/borders)
+	// Dynamic rendering (text field backgrounds/borders, Drawing API)
 	u32 dynamic_vertex_base;    // vertex offset (in vertices) where dynamic area starts
 	u32 dynamic_color_base;     // color index where dynamic colors start
-	u32 dynamic_rect_count;     // number of dynamic rects used this frame
+	u32 dynamic_rect_count;     // number of dynamic color slots used this frame
+	u32 dynamic_vertex_used;    // total dynamic vertices used this frame
 
 	// Renderer initialization status (0 = not ready, 1 = fully initialized)
 	int renderer_ok;
@@ -177,6 +178,7 @@ void render_webgpu_upload_cxform_id(WebGPURenderContext* context, u32 cxform_id)
 void render_webgpu_upload_cxform(WebGPURenderContext* context, float* cxform);
 void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_t num_verts, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
+void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
 void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip(WebGPURenderContext* context);

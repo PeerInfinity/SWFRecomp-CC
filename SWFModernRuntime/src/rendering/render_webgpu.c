@@ -606,11 +606,12 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 static void create_buffers_and_upload(WebGPURenderContext* ctx)
 {
-	// Vertex buffer (shape geometry) — over-allocate for dynamic rect rendering
-	#define MAX_DYNAMIC_RECTS 64
+	// Vertex buffer (shape geometry) — over-allocate for dynamic rendering
+	#define MAX_DYNAMIC_RECTS 256     // max color slots for dynamic rendering
+	#define MAX_DYNAMIC_VERTICES 8192 // max vertices for dynamic rendering
 	{
 		u32 orig_verts = (u32)(ctx->shape_data_size / (4 * sizeof(u32)));
-		size_t extra_bytes = (size_t)MAX_DYNAMIC_RECTS * 6 * 4 * sizeof(u32);
+		size_t extra_bytes = (size_t)MAX_DYNAMIC_VERTICES * 4 * sizeof(u32);
 		size_t total_size = ctx->shape_data_size + extra_bytes;
 		ctx->vertex_buffer = create_buffer(ctx->device, ctx->queue,
 			WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
@@ -1348,6 +1349,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
 	ctx->dynamic_rect_count = 0;
+	ctx->dynamic_vertex_used = 0;
 #ifdef HEADLESS_GRAPHICS
 	// Headless: use the persistent offscreen texture as resolve target
 	ctx->surface_view = ctx->offscreen_view;
@@ -1463,10 +1465,12 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 {
 	if (!ctx->renderer_ok) return;
 	if (ctx->dynamic_rect_count >= MAX_DYNAMIC_RECTS) return;
+	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
 
 	u32 idx = ctx->dynamic_rect_count++;
 	u32 color_idx = ctx->dynamic_color_base + idx;
-	u32 vert_base = ctx->dynamic_vertex_base + idx * 6;
+	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	ctx->dynamic_vertex_used += 6;
 
 	// Write color to the dynamic color slot
 	float color[4] = { r, g, b, a };
@@ -1499,6 +1503,55 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 
 	// Issue draw call
 	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_draw_tris — arbitrary solid-color triangles (for Drawing API)
+// ---------------------------------------------------------------------------
+void render_webgpu_draw_tris(WebGPURenderContext* ctx,
+	const float* xy_pairs, u32 vertex_count,   // pre-tessellated triangle verts in twips
+	float r, float g, float b, float a,        // fill color (0-1)
+	u32 transform_id, u32 cxform_id)
+{
+	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
+	if (ctx->dynamic_rect_count >= MAX_DYNAMIC_RECTS) return;
+	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
+		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
+	if (vertex_count == 0) return;
+
+	u32 idx = ctx->dynamic_rect_count++;
+	u32 color_idx = ctx->dynamic_color_base + idx;
+
+	// Write color to the dynamic color slot
+	float color[4] = { r, g, b, a };
+	wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
+		(uint64_t)color_idx * 4 * sizeof(float), color, sizeof(color));
+
+	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	ctx->dynamic_vertex_used += vertex_count;
+
+	// Build vertex data: { float x, float y, u32 style_x, u32 style_y } per vertex
+	u32 sx = 0x00;   // solid color fill
+	u32 sy = color_idx;
+	u32* verts = (u32*)malloc(vertex_count * 4 * sizeof(u32));
+	for (u32 i = 0; i < vertex_count; i++) {
+		union { float f; u32 u; } xv, yv;
+		xv.f = xy_pairs[i * 2];
+		yv.f = xy_pairs[i * 2 + 1];
+		verts[i * 4 + 0] = xv.u;
+		verts[i * 4 + 1] = yv.u;
+		verts[i * 4 + 2] = sx;
+		verts[i * 4 + 3] = sy;
+	}
+
+	// Write vertices to the dynamic area
+	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+		byte_offset, verts, vertex_count * 4 * sizeof(u32));
+	free(verts);
+
+	// Issue draw call
+	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
 }
 
 // ---------------------------------------------------------------------------

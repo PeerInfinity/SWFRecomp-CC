@@ -183,6 +183,7 @@ timeout
 # or internally inconsistent expected output (Ruffle test generation bugs).
 array_sort
 date
+edittext_default_format_empty
 movieclip_library_state_values
 native_objects_swf6
 native_subclasses

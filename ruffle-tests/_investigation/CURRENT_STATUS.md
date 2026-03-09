@@ -5,7 +5,7 @@ Last updated: 2026-03-08
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
-- **Image test baseline**: 7/31 image tests passing. See `ruffle-image-results.md`. Newly passing: focusrect_swf5 (12/12), focusrect_swf6 (12/12), focusrect_mouse_swf8 (8/8), focusrect_mouse_swf9 (8/8), focusrect_focuslost (1/1).
+- **Image test baseline**: 5/31 image tests passing (display_object_properties, focusrect_focuslost, focusrect_swf6, frame_size_translated_negative, frame_size_translated_positive). See `ruffle-image-results.md`. Near-passing: focusrect_swf5 (10/12, 408 outlier diff), focusrect_mouse_swf8 (6/8, 408), movieclip_setmask (10096 outliers, Drawing API fills + setMask stencil working).
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
 - **Recent gains (this session)**: Plan 01 (Runtime Transforms) COMPLETE — `display_object_properties` and `color` trace tests pass. Image test runner created (`run_image_tests.py`). Two ASan-detected bugs fixed: global buffer overflow in `create_buffer` (render_webgpu.c) and use-after-free in button override restore (tag.c).
 - **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).
@@ -106,7 +106,7 @@ Last updated: 2026-03-08
 | ~~`define_local_with_paths`~~ | ~~53/54~~ **54/54 ✅** | Fixed: type 1 function slash-path resolution in DefineLocal |
 | ~~`movieclip_getbounds`~~ | ~~189/191~~ **191/191 ✅** | Fixed: round transformed AABB to integer twips (Ruffle Twips model) |
 | ~~`text_format_get_text_extent_undefined_width`~~ | ~~8/10~~ **10/10 ✅** | Fixed: valueOf coercion on getTextExtent width argument |
-| `edittext_default_format_empty` | 97/100 (97%) | 3 lines: `display` field should be `block` not `null` in new TextFormat / getTextFormat(0,0) on empty text |
+| `edittext_default_format_empty` | ~95/100 (95%) | 5 missing `display = block;` lines — SWF code doesn't access `display` property; Ruffle's expected output injects it (see RUFFLE_VS_FLASH_DIFFERENCES.md). Permanent diff. |
 | `edittext_scroll` | 52/54 (96%) | Mixed-font maxscroll/bottomScroll (font metrics) |
 | `global_swf5_6_7_8_9` | 1031/1145 (90%) | Blocked on per-movie `_global` isolation |
 
@@ -196,6 +196,14 @@ All actionable plans have been completed. Remaining failing tests are blocked by
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
 - **FOCUS_SYSTEM_PLAN** — 6/7 pass. TAB_ORDERING_PLAN now fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-08 continued)
+- **Plan 03 (Drawing API) Phases 1,2,4 COMPLETE**: Solid fills, curve flattening, line stroke expansion all implemented. `drawingFinalizePath` tessellates fan triangles + stroke quads. `renderer_draw_tris` uploads arbitrary triangle data to GPU. `drawing_render_cb` in tag.c dispatches fills/strokes per path.
+- **setMask stencil rendering IMPLEMENTED**: `MovieClip.mask_mc`/`is_mask` fields track masking relationships. `actionIterateMaskedDrawings` iterates masked MCs. `masked_drawing_render_cb` uses `renderer_begin_clip_mask`/`end_clip_mask`/`end_clip` for stencil-based masking.
+- **movieclip_setmask image**: 164K→10K outliers. All colored fills render correctly. Remaining 10K are MSAA edge differences (tolerance=0 requires exact pixel match).
+- **Key files**: action.h (DrawingState/DrawPath/DrawCmd structs, DrawingRenderInfo+mask fields), action.c (path recording, fan tessellation, stroke expansion, setMask storage, iterate functions), tag.c (drawing_render_cb, masked_drawing_render_cb), render_webgpu.c (draw_tris, dynamic_vertex_used tracking), render_webgpu.h (draw_tris decl), renderer.h (draw_tris macro)
+- **createEmptyMovieClip**: Removed #ifdef NO_GRAPHICS guard so MC creation works in graphics mode
+- **MC field init**: Moved last_transform_id, as_set_flags, etc. out of #ifdef NO_GRAPHICS in createMovieClipChild (fields exist in both modes)
 
 ### Session notes (2026-03-08)
 - **Plan 01 (Runtime Transforms) COMPLETE**: Both target tests pass:
