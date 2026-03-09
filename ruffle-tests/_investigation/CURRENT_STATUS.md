@@ -103,7 +103,9 @@ Last updated: 2026-03-08
 ### Near-passing (>=90%)
 | Test | Match | Issue |
 |------|-------|-------|
-| `define_local_with_paths` | **53/54 (98%)** | 1 remaining slash-path edge case |
+| ~~`define_local_with_paths`~~ | ~~53/54~~ **54/54 ✅** | Fixed: type 1 function slash-path resolution in DefineLocal |
+| ~~`movieclip_getbounds`~~ | ~~189/191~~ **191/191 ✅** | Fixed: round transformed AABB to integer twips (Ruffle Twips model) |
+| ~~`text_format_get_text_extent_undefined_width`~~ | ~~8/10~~ **10/10 ✅** | Fixed: valueOf coercion on getTextExtent width argument |
 | `edittext_default_format_empty` | 97/100 (97%) | 3 lines: `display` field should be `block` not `null` in new TextFormat / getTextFormat(0,0) on empty text |
 | `edittext_scroll` | 52/54 (96%) | Mixed-font maxscroll/bottomScroll (font metrics) |
 | `global_swf5_6_7_8_9` | 1031/1145 (90%) | Blocked on per-movie `_global` isolation |
@@ -143,7 +145,7 @@ Last updated: 2026-03-08
 | STAGE_FRAME_PROPS_PLAN | **ALL PHASES COMPLETE** → `complete/` | **9/9 pass** ✅ (all 7 stage tests + frame_size_translated_positive ✅ + frame_size_translated_negative ✅) | — |
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
-| OOP_SUPER_EXTENDS_PLAN | **7/8 PASS** → `blocked/` | 7/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅) | `interface_implements_op` blocked by MTASC class infra (REGISTERCLASS_PLAN) |
+| OOP_SUPER_EXTENDS_PLAN | **8/8 PASS** → `complete/` | 8/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅, interface_implements_op 47/47 ✅) | — |
 | REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 13/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅, register_class_with_sound ✅) | register_class 26/67 (loadMovie), register_and_init_order ~76/233 (sprite init ordering) |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **ALL PHASES COMPLETE** → `complete/` | 4/5 pass (native_objects_swf7/8 ✅, native_double_construct ✅, native_subclasses 190/191 ✅) | native_objects_swf6 83/84 (1 line Ruffle vs Flash diff, ignored); native_subclasses 1 line timezone diff (ignored) |
@@ -175,9 +177,11 @@ Last updated: 2026-03-08
 
 ### Actionable — Quick wins
 1. **Script halting regressions** — ~~remove_movie_clip (25/29)~~ ✅ FIXED, register_and_init_order (36/231) still broken (constructor ordering), ~~removed_target_clip_scope (7/35)~~ improved to 34/35.
-2. **interface_implements_op regression** — 47→46/47, regressed in commit b1b89de3 (lazy ImplementsOp via valueOf callback). Line 43 `obj instanceof LazyInterfaceA: false`.
-3. **define_local_with_paths** — 53/54, 1 remaining slash-path edge case.
-4. **Font metrics accuracy** — edittext_scroll (52/54), edittext_newlines (23/30), edittext_bullet (18/30). Incremental improvements possible.
+2. ~~**interface_implements_op regression**~~ — ✅ FIXED 47/47: scope chain search in actionNewObject + own_props fallback in instanceOfCoercing.
+3. ~~**define_local_with_paths**~~ — ✅ FIXED 54/54: type 1 function slash-path resolution.
+4. ~~**movieclip_getbounds**~~ — ✅ FIXED 191/191: integer twips rounding for cross-target getBounds.
+5. ~~**text_format_get_text_extent_undefined_width**~~ — ✅ FIXED 10/10: valueOf coercion on getTextExtent width arg.
+6. **Font metrics accuracy** — edittext_scroll (52/54), edittext_newlines (23/30), edittext_bullet (18/30). Incremental improvements possible.
 
 ### All quick wins exhausted
 All actionable plans have been completed. Remaining failing tests are blocked by architectural issues (per-movie `_global`, SWF6 HTML model, heap-allocated closures) or require features not feasible in the current architecture. Focus should be on regression fixes and incremental accuracy improvements.

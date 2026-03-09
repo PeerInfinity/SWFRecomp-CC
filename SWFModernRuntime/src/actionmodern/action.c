@@ -10047,10 +10047,11 @@ static ActionVar textFormatGetTextExtent(SWFAppContext* app_context, ActionVar* 
 	}
 
 	// Get optional width argument (second arg)
+	// Uses tsArgToDouble_ctx for valueOf coercion on objects
 	double width_px = -1.0;
 	if (arg_count >= 2 && args[1].type != ACTION_STACK_VALUE_UNDEFINED &&
 	    args[1].type != ACTION_STACK_VALUE_NULL) {
-		double w = varToDoubleSimple(&args[1]);
+		double w = tsArgToDouble_ctx(app_context, &args[1]);
 		if (w > 0 && !isnan(w) && !isinf(w)) width_px = w;
 	}
 
@@ -23565,8 +23566,12 @@ void actionDefineLocal(SWFAppContext* app_context)
 	char* var_name = _dl_buf;
 
 	// Handle slash-path variable names (e.g., "/:abc" → set abc on root, "/clip/:def" → set def on clip)
-	// Only at timeline level — inside functions, DefineLocal stores with the literal name
-	if (g_call_depth == 0) {
+	// Resolve at timeline level OR inside type 1 functions (DefineFunction).
+	// Type 2 functions (DefineFunction2) have proper local scopes, so store with literal name.
+	// In Ruffle, type 1 functions resolve via Callable this-binding; we approximate by storing on MC.
+	int _dl_resolve_paths = (g_call_depth == 0) ||
+		(g_current_executing_func != NULL && g_current_executing_func->function_type == 1);
+	if (_dl_resolve_paths) {
 		const char* colon = NULL;
 		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
 			if (var_name[ci] == ':') { colon = var_name + ci; break; }
@@ -23648,8 +23653,8 @@ void actionDefineLocal(SWFAppContext* app_context)
 	}
 
 	// Handle dot-path variable names (e.g., "_root.o" → set "o" on _root MC)
-	// Only at timeline level — inside functions, DefineLocal stores with the literal name
-	if (g_call_depth == 0) {
+	// Same condition as slash-path above: timeline or type 1 function.
+	if (_dl_resolve_paths) {
 		const char* last_dot = NULL;
 		for (int di = (int)var_name_len - 1; di >= 0; di--) {
 			if (var_name[di] == '.') { last_dot = var_name + di; break; }
@@ -24847,7 +24852,31 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 	if (cls_coerced.type == ACTION_STACK_VALUE_FUNCTION)
 	{
 		ASFunction* cf = (ASFunction*) cls_coerced.data.numeric_value;
-		if (cf != NULL) proto_target = cf->prototype_obj;
+		if (cf != NULL) {
+			if (cf->prototype_obj != NULL) {
+				proto_target = cf->prototype_obj;
+			} else if (cf->own_props != NULL) {
+				// prototype was set to a non-object value (e.g., "trigger") —
+				// stored in own_props, prototype_obj is NULL. Coerce the primitive
+				// to an object (may trigger side effects like ImplementsOp).
+				ASProperty* cpp = findPropertyRaw(cf->own_props, "prototype", 9);
+				ActionVar* cpv = (cpp != NULL) ? &cpp->value : NULL;
+				if (cpv != NULL) {
+					if (cpv->type == ACTION_STACK_VALUE_OBJECT)
+						proto_target = (ASObject*) cpv->data.numeric_value;
+					else if (cpv->type == ACTION_STACK_VALUE_STRING ||
+					         cpv->type == ACTION_STACK_VALUE_BOOLEAN ||
+					         cpv->type == ACTION_STACK_VALUE_F32 ||
+					         cpv->type == ACTION_STACK_VALUE_F64)
+					{
+						ActionVar proto_coerced = *cpv;
+						tryAutoBoxPrimitive(app_context, &proto_coerced, getActiveGlobal());
+						if (proto_coerced.type == ACTION_STACK_VALUE_OBJECT)
+							proto_target = (ASObject*) proto_coerced.data.numeric_value;
+					}
+				}
+			}
+		}
 	}
 	else if (cls_coerced.type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
@@ -24888,6 +24917,7 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 	}
 
 	if (proto_target == NULL) return 0;
+
 
 	// Dead MovieClips are never instances (checked AFTER cls coercion for side effects)
 	if (obj_var->type == ACTION_STACK_VALUE_MOVIECLIP) {
@@ -31309,6 +31339,19 @@ void actionNewObject(SWFAppContext* app_context)
 				ActionVar* gvar = getProperty(global_object, ctor_name, ctor_name_len);
 				if (gvar != NULL && gvar->type == ACTION_STACK_VALUE_FUNCTION)
 					ctor_func = (ASFunction*) gvar->data.numeric_value;
+			}
+		}
+		if (ctor_func == NULL)
+		{
+			// Check scope chain (local variables stored via DefineLocal inside functions)
+			for (int si = scope_depth - 1; si >= 0 && ctor_func == NULL; si--)
+			{
+				if (scope_chain[si] != NULL)
+				{
+					ASProperty* sp = findPropertyRaw(scope_chain[si], ctor_name, ctor_name_len);
+					if (sp != NULL && sp->value.type == ACTION_STACK_VALUE_FUNCTION)
+						ctor_func = (ASFunction*) sp->value.data.numeric_value;
+				}
 			}
 		}
 		if (ctor_func == NULL)
@@ -42043,13 +42086,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 
-				// Convert twips to pixels. Do NOT round transformed AABB corners
-				// to integer twips — only individual shape bounds are in integer twips;
-				// after matrix transformation the corners can be fractional.
-				bxmin_d = bxmin_d / 20.0;
-				bymin_d = bymin_d / 20.0;
-				bxmax_d = bxmax_d / 20.0;
-				bymax_d = bymax_d / 20.0;
+				// Convert twips to pixels. Round to nearest integer twip first —
+				// Ruffle's Twips are i32 and matrix transforms round via f64::round().
+				bxmin_d = round(bxmin_d) / 20.0;
+				bymin_d = round(bymin_d) / 20.0;
+				bxmax_d = round(bxmax_d) / 20.0;
+				bymax_d = round(bymax_d) / 20.0;
 
 				// Property order: xMin, xMax, yMin, yMax (matches Flash)
 				// Enumerate2 LIFO yields: yMax, yMin, xMax, xMin
