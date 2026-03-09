@@ -1,7 +1,7 @@
 # SWFRecomp-CC Upstream/Downstream Merge Plan
 
 **Date:** December 4, 2025
-**Last Updated:** December 20, 2025
+**Last Updated:** March 9, 2026
 
 **Author:** Claude (via PeerInfinity/SWFRecomp-CC)
 
@@ -10,6 +10,104 @@
 - Upstream: [SWFRecomp/SWFRecomp](https://github.com/SWFRecomp/SWFRecomp)
 - Upstream: [SWFRecomp/SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime)
 - This repo: [PeerInfinity/SWFRecomp-CC](https://github.com/PeerInfinity/SWFRecomp-CC)
+
+---
+
+## UPDATE: March 9, 2026
+
+### Upstream Objects & Functions PRs (In Progress)
+
+LittleCube and PeerInfinity have opened PRs implementing **objects and functions** in the upstream repositories. These are currently **Open** (not yet merged to master):
+
+#### SWFRecomp PR #4: `feature/objects-and-functions`
+- **Status:** Open
+- **Branch:** `PeerInfinity/SWFRecomp:feature/objects-and-functions` → `master`
+- **5 commits:**
+  - `98977fd` - Add minimal object and function opcode support
+  - `37192d3` - Mark unsupported opcodes in minimal build
+  - `4e93e6c` - Add back arithmetic, comparison, string, and variable opcodes
+  - `8da99f2` - major prune/rework (LittleCube)
+  - `8742c6a` - implement bulk of objects and functions (LittleCube)
+
+**Key changes:**
+- ~25 new opcodes: DefineFunction/DefineFunction2, CallFunction/CallMethod, GetMember/SetMember, NewObject/NewMethod, InstanceOf, Extends, etc.
+- String deduplication via `string_to_id` map — every string gets a unique ID
+- Per-function output streams (`func_id_to_stream`) for isolated recompilation of nested scopes
+- Parameter naming uses `arg1`–`arg6` with string IDs tracked per function
+- `initial_strings.hpp`: pre-defines `"_global"`, `"Object"`, `"Math"`, `"this"`, `"length"`, etc.
+- `Constant` struct for constant pool indexing
+
+#### SWFModernRuntime PR #3: `feature/objects-and-functions`
+- **Status:** Open
+- **Branch:** `PeerInfinity/SWFModernRuntime:feature/objects-and-functions` → `master`
+- **14 commits** (iterative refinements), key ones:
+  - `bfdbf3c` - Add object/function opcode support and heap refactoring
+  - `f409c12` - major prune/rework (LittleCube)
+  - `96f3ac8` - implement the bulk of objects and functions (LittleCube)
+
+**Key changes:**
+- Stack expansion: variables = 24 bytes, functions = 40 bytes. `PUSH_FUNC` macro
+- **Red-black tree** (`lib/rbtree`) for property storage on objects
+- `Function2Ptr` typedef: `(SWFAppContext*, ActionVar*, u32, ActionVar*, void*)` — matches our signature
+- Scope chain: `getPropertyInThisScope()`, `actionDefineLocal`/`actionDefineLocal2`
+- Runtime API modules: `Math.c`/`Object.c` with native C functions registered via `RuntimeFunc` table
+- **String interning**: enum-based string IDs replace raw string comparisons
+- `_global` object as root scope — similar concept to ours
+- Constructor support: `actionNewObject`, `actionNewMethod`, `new_Object()` built-in
+- `initial_strings_decls.h` / `initial_strings_defs.h` for pre-defined string IDs
+
+**Still to come:** Refcount cycle detection and object freeing (per LittleCube, March 9, 2026).
+
+#### Architectural Comparison: Upstream vs Our Fork
+
+| Aspect | Upstream (Objects/Functions PR) | Our Fork |
+|--------|--------------------------------|----------|
+| Property storage | Red-black tree (`lib/rbtree`) | Linear `properties` array on ASObject |
+| String handling | Enum-based string IDs (compile-time interning) | Raw strings with strcmp |
+| Function struct | Stack-embedded (40 bytes via PUSH_FUNC) | Separate `ASFunction` struct with prototype_obj, captured_scope, base_clip |
+| Scope chain | `getPropertyInThisScope()` | WITH scope stack + function scope + global |
+| Object/Function relation | Unified ("functions are objects") | Separate structs (ASObject vs ASFunction) — **different structs, never cast** |
+| Memory management | Red-black tree + refcount (in progress) | Reference counting on ASObject/ASArray, manual lifecycle |
+| Prototype chains | Not yet visible in PR | Full __proto__ chain traversal, __constructor__, super depth tracking |
+| Closure semantics | Not yet visible in PR | Full base_clip capture, SWF5 vs SWF6+ differentiation |
+| Test coverage | Basic (included in PR) | 616 Ruffle tests + 115 hand-written tests |
+
+#### Impact on Upstream Contribution Strategy (Phases 5-8)
+
+The upstream objects/functions PR significantly changes our upstream contribution plans:
+
+1. **Object system (Phase 5):** Upstream is building their own object system with fundamentally different architecture (rbtree vs linear array, string IDs vs raw strings). **Direct merge of our `object.h`/`object.c` is no longer viable.** Instead, we should:
+   - Wait for upstream's objects/functions PR to merge
+   - Identify gaps in their implementation vs ours (prototype chains, closures, super, etc.)
+   - Contribute incremental additions using their architecture
+
+2. **Action implementations (Phase 7):** Our opcode implementations assume our object system's API. They would need to be **rewritten against upstream's API** (rbtree properties, string IDs, etc.) rather than cherry-picked.
+
+3. **Tests (Phase 8):** Test SWFs are architecture-independent and can still be contributed directly.
+
+4. **New recommended approach:** Instead of porting our code upstream, we should:
+   - Help review/test the objects-and-functions PRs
+   - Contribute AVM1 semantics knowledge (prototype chains, scope rules, closure behavior, super keyword, etc.)
+   - Port specific behavioral fixes and edge case handling as incremental PRs against their new architecture
+
+### New Master Commits Since December 20, 2025
+
+#### SWFRecomp/SWFRecomp
+
+| Date | SHA | Description | Priority |
+|------|-----|-------------|----------|
+| Jan 11, 2026 | `297c920` | fix false hole issue | MEDIUM |
+| Jan 12, 2026 | `2400abd` | update README | LOW |
+| Feb 6, 2026 | `7f53538` | update README | LOW |
+| Feb 6, 2026 | `293fe5f` | update README | LOW |
+
+#### SWFRecomp/SWFModernRuntime
+
+| Date | SHA | Description | Priority |
+|------|-----|-------------|----------|
+| Feb 6, 2026 | `9b6f2c0` | comment update | LOW |
+
+No critical architectural changes since December 20, 2025 on master. The `297c920` ("fix false hole issue") may be worth investigating for the recompiler.
 
 ---
 
@@ -57,7 +155,7 @@ Since this document was created on December 4, 2025, **significant architectural
 2. **Phase 1:** Memory/Linux fixes (already in Dec 2-3 commits, now part of Phase 0)
 3. **Phase 2:** Font/Text system (already documented)
 4. **Phase 3:** Heap reconciliation (may need revision based on new architecture)
-5. **Phases 4-8:** Upstream contributions (after downstream sync complete)
+5. **Phases 4-8:** Upstream contributions — **strategy revised, see March 2026 update above**
 
 ---
 
@@ -263,6 +361,10 @@ All commits after these points need to be evaluated for downstream merge.
 
 | Date | SHA | Author | Description | Priority |
 |------|-----|--------|-------------|----------|
+| **Feb 6, 2026** | `293fe5f` | LittleCube | update README | LOW |
+| Feb 6, 2026 | `7f53538` | LittleCube | update README | LOW |
+| Jan 12, 2026 | `2400abd` | LittleCube | update README | LOW |
+| **Jan 11, 2026** | `297c920` | LittleCube | **fix false hole issue** | **MEDIUM** |
 | **Dec 20** | `06506c3` | LittleCube | **refactor stack and sp into app_context** | **CRITICAL** |
 | Dec 12 | `44324d8` | LittleCube | update README | LOW |
 | Dec 12 | `620c30f` | LittleCube | fix passing app_context to tagInit | HIGH |
@@ -274,11 +376,16 @@ All commits after these points need to be evaluated for downstream merge.
 | Nov 8 | `17f07ee` | LittleCube | **implement glyph and text recompilation** | **HIGH** |
 | Oct 10 | `bc761f4` | LittleCube | remove unnecessary check | FORK POINT |
 
+**Open PR:** PR #4 (`feature/objects-and-functions`) — 5 commits implementing object/function opcodes in the recompiler. See March 2026 update above for details.
+
 **App Context Architecture (CRITICAL - Dec 2025):**
 The Dec 12-20 commits complete the `app_context` refactoring, moving `stack` and `sp` into the `SWFAppContext` structure. This is a major architectural change that must be merged before any upstream contributions.
 
 **Font/Text System (HIGH PRIORITY):**
 The Nov 8-10 commits add significant font and text rendering capabilities that are missing from this fork.
+
+**False Hole Fix (Jan 2026):**
+`297c920` fixes a "false hole issue" in the recompiler — worth investigating for potential relevance to our recompilation pipeline.
 
 ---
 
@@ -286,6 +393,7 @@ The Nov 8-10 commits add significant font and text rendering capabilities that a
 
 | Date | SHA | Author | Description | Priority |
 |------|-----|--------|-------------|----------|
+| **Feb 6, 2026** | `9b6f2c0` | LittleCube | comment update | LOW |
 | **Dec 20** | `39ec6ad` | LittleCube | **refactor stack and sp into app_context** | **CRITICAL** |
 | Dec 12 | `b682cd2` | LittleCube | pass app_context to tagInit | HIGH |
 | Dec 5 | `669e40c` | LittleCube | if guard bitmap_transfer | LOW |
@@ -306,6 +414,8 @@ The Nov 8-10 commits add significant font and text rendering capabilities that a
 | Nov 9 | `7558e43` | LittleCube | add flashbang_upload_extra_transform functions | **HIGH** |
 | Nov 8 | `00166cc` | LittleCube | **implement glyph and text recompilation** | **HIGH** |
 | Oct 7 | `267553d` | LittleCube | select bitmap at style index | FORK POINT |
+
+**Open PR:** PR #3 (`feature/objects-and-functions`) — 14 commits implementing runtime object/function support. See March 2026 update above for details.
 
 **App Context Architecture (CRITICAL - Dec 2025):**
 - Dec 5: `669e40c` - bitmap_transfer guard
@@ -546,45 +656,40 @@ These commits are now part of the upstream state that Phase 0 will sync to.
 
 ---
 
-### Phase 5: Upstream - Object System
-1. Create PR for `object.h` + `object.c`
-2. Update upstream `CMakeLists.txt`
-3. Include basic object tests
+### Phase 5: Upstream - Object System (REVISED March 2026)
 
-### Phase 6: Upstream - Action Header
-1. Create PR for `action.h` additions
-2. Coordinate with maintainers on MovieClip struct placement
+> **NOTE:** Upstream is now building their own object/function system via PR #4 (SWFRecomp) and PR #3 (SWFModernRuntime). Direct porting of our `object.h`/`object.c` is **no longer viable** due to fundamental architectural differences (rbtree vs linear array, string IDs vs raw strings, unified vs separate function structs).
 
-### Phase 7: Upstream - Action Implementation
-1. **PR 7a:** Object/Array opcode implementations
-   - `actionNewObject`, `actionInitObject`, `actionInitArray`
-   - `actionGetMember`, `actionSetMember`
-   - Tests: `new_object_*`, `init_object_*`, `get_member_*`, `set_member_*`
+**New approach:**
+1. Wait for upstream's `feature/objects-and-functions` PRs to merge to master
+2. Review their implementation for correctness and completeness
+3. Identify gaps vs our implementation (prototype chains, closures, super, etc.)
+4. Contribute incremental additions using their architecture and conventions
 
-2. **PR 7b:** Function opcode implementations
-   - `actionDefineFunction`, `actionDefineFunction2`
-   - `actionCallFunction`, `actionCallMethod`, `actionReturn`
-   - Tests: `call_function_*`, `define_function*`, `call_method_*`
+### Phase 6: Upstream - AVM1 Semantics Knowledge (REVISED March 2026)
 
-3. **PR 7c:** Control flow opcodes
-   - `actionGotoFrame`, `actionGotoFrame2`, `actionGoToLabel`
-   - `actionWaitForFrame`, `actionWaitForFrame2`
-   - `actionTry*`, `actionThrow`, `actionCatch*`
-   - Tests: `goto_*`, `wait_for_frame*`, `try_*`, `throw_*`
+Rather than porting code, contribute **behavioral knowledge** as incremental PRs against upstream's new architecture:
+1. Prototype chain traversal and `__proto__` semantics
+2. Closure scope capture (WITH scope, base_clip for SWF6+)
+3. Super keyword depth-based dispatch
+4. Constructor return value handling
+5. `__resolve` hook
+6. SetTarget/target_clip semantics
+7. MovieClip timeline control and execution ordering
 
-4. **PR 7d:** Type and comparison opcodes
-   - `actionEquals2`, `actionLess2`, `actionGreater`, `actionStrictEquals`
-   - `actionTypeof`, `actionCastOp`, `actionInstanceOf`, `actionExtends`
-   - Tests: `equals2_*`, `less2_*`, `typeof_*`, `instanceof_*`, `extends_*`
+### Phase 7: Upstream - Tests (REVISED March 2026)
 
-5. **PR 7e:** Remaining opcodes
-   - Bitwise operations
-   - String operations
-   - Enumeration
-   - Miscellaneous
+Test SWFs are architecture-independent and can be contributed directly:
+1. **PR 7a:** Basic opcode tests (arithmetic, comparison, bitwise, string)
+2. **PR 7b:** Object/function/scope tests
+3. **PR 7c:** Control flow tests (goto, frame navigation, exceptions)
+4. **PR 7d:** Advanced semantics tests (super, closures, prototype chains)
+5. Consider contributing our Ruffle test infrastructure
 
-### Phase 8: Upstream - Remaining Tests (ongoing)
-1. Merge remaining test cases as features stabilize
+### Phase 8: Upstream - Remaining Contributions (ongoing)
+1. Bug fixes and edge case handling as incremental PRs
+2. Help validate upstream's implementation against Flash behavior
+3. Share investigation docs (ACCEPTED_DIFFS, RUFFLE_VS_FLASH_DIFFERENCES)
 
 ---
 

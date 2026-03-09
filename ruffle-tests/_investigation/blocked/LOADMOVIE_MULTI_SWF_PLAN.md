@@ -1,10 +1,12 @@
 # LoadMovie / Multi-SWF Infrastructure — Implementation Plan
 
-Last updated: 2026-03-07
+Last updated: 2026-03-09
 
 **Goal**: Close the remaining gaps in multi-SWF support. This is the single largest blocker in the project (11 plans, 25+ tests, 2000+ lines).
 
-**Current state**: Phases 0–5 and 7 are implemented. 24/49 loadMovie-related tests pass. The pre-compiled child movie registry, symbol prefix-renaming, MCL event dispatch, unloadMovie, loadVariables, and two-group version globals all work.
+**Current state**: Phases 0–5, 7, 8, 10, 13, and 14 are implemented. 27/49 loadMovie-related tests pass. The pre-compiled child movie registry, symbol prefix-renaming, MCL event dispatch, unloadMovie, loadVariables, two-group version globals, failed load state, sequential MCL dispatch, _root scope in loaded SWFs, and MCL root replacement all work.
+
+**Status: BLOCKED** — All remaining phases (6, 9, 11, 12) are blocked on per-movie `_global` isolation (Phase 6) or mouse event infrastructure (Phase 12).
 
 ---
 
@@ -99,16 +101,16 @@ static ASObject* g_array_proto_legacy/modern = NULL;
 
 ## 2. Gap Analysis
 
-| # | Gap | Tests Affected | Lines at Stake | Difficulty |
-|---|-----|----------------|----------------|------------|
-| 6 | Per-movie `_global` isolation | global_swf5_6_7_8_9, loadmovienum_cross_version_prototype, mcl_events_swf_version | ~120+ | HIGH |
-| 8 | Failed load state (`-1` values) | movieclip_state_values | ~100+ | LOW |
-| 9 | Child URL / version properties | movieclip_library_state_values (2 lines), mcl_events_swf_version | ~5 | LOW |
-| 10 | Sequential MCL dispatch (one-per-frame) | mcl_events_swf_version | ~50 | MEDIUM |
-| 11 | Child RegisterClass in child scope | register_class (22 lines), register_class_swf6 (33 lines) | ~55 | MEDIUM |
-| 12 | Root button mode / mouse events | root_button_mode (10 lines) | ~10 | MEDIUM (needs mouse infra) |
-| 13 | `_root` scope in loaded SWFs | resolve_different_root (2 lines), sandbox_type_remote (2 lines) | ~4 | LOW |
-| 14 | MCL loadClip replace root (MTASC) | mcl_loadclip_replace_root (1 line) | ~1 | MEDIUM |
+| # | Gap | Tests Affected | Lines at Stake | Difficulty | Status |
+|---|-----|----------------|----------------|------------|--------|
+| 6 | Per-movie `_global` isolation | global_swf5_6_7_8_9 (88 lines), loadmovienum_cross_version_prototype (3 lines) | ~91 | HIGH | **BLOCKED** |
+| 8 | Failed load state (`-1` values) | movieclip_state_values | ~100+ | LOW | **DONE** (load_failed flag, DeferredFailedLoad queue, getter checks) |
+| 9 | Child URL / version properties | movieclip_library_state_values (1 _url line) | ~1 | LOW | **BLOCKED** (URL format inconsistent across tests — changing risks regressions; _xmouse needs mouse sim) |
+| 10 | Sequential MCL dispatch (one-per-frame) | mcl_events_swf_version | ~50 | MEDIUM | **DONE** — mcl_events_swf_version 232/232 PASS |
+| 11 | Child RegisterClass in child scope | register_class (19 lines), register_class_swf6 (34 lines) | ~53 | MEDIUM | **BLOCKED** (depends on Phase 6 for per-movie prototype isolation) |
+| 12 | Root button mode / mouse events | root_button_mode (10 lines) | ~10 | MEDIUM (needs mouse infra) | **BLOCKED** (mouse event sim) |
+| 13 | `_root` scope in loaded SWFs | resolve_different_root (2 lines) | ~2 | LOW | **DONE** — resolve_different_root PASS |
+| 14 | MCL loadClip replace root (MTASC) | mcl_loadclip_replace_root (1 line) | ~1 | MEDIUM | **DONE** — mcl_loadclip_replace_root PASS |
 
 ---
 
@@ -590,66 +592,59 @@ The onLoadStart event should fire when the MCL loadClip begins loading the child
 ## 11. Dependency Graph
 
 ```
-Phase 6 (Per-Movie _global)
+Phase 6 (Per-Movie _global) ─── BLOCKED (high complexity, core architectural change)
     │
-    ├──► Phase 11 (Child RegisterClass) — needs child's global context
+    ├──► Phase 11 (Child RegisterClass) — needs child's global context ── BLOCKED
     │
-    ├──► global_swf5_6_7_8_9 test (114 lines)
+    ├──► global_swf5_6_7_8_9 test (88 lines remaining)
     │
-    ├──► loadmovienum_cross_version_prototype test (3 lines)
-    │
-    └──► Phase 10 (Sequential MCL) — mcl_events_swf_version needs per-movie global
+    └──► loadmovienum_cross_version_prototype test (3 lines)
 
-Phase 8 (Failed Load State) ──► movieclip_state_values ─── INDEPENDENT
+Phase 8 (Failed Load State) ──► movieclip_state_values ─── DONE ✅
 
-Phase 9 (Child URL/Version) ──► movieclip_library_state_values ─── INDEPENDENT
+Phase 9 (Child URL/Version) ──► movieclip_library_state_values ─── BLOCKED (URL format risk)
 
-Phase 10 (Sequential MCL) ──► mcl_events_swf_version ─── depends on Phase 6
+Phase 10 (Sequential MCL) ──► mcl_events_swf_version ─── DONE ✅
 
 Phase 12 (Mouse Events) ──► root_button_mode ─── BLOCKED (separate infra)
 
-Phase 13 (_root Scope) ──► resolve_different_root, sandbox_type_remote ─── INDEPENDENT
+Phase 13 (_root Scope) ──► resolve_different_root ─── DONE ✅
 
-Phase 14 (MCL Root Replace) ──► mcl_loadclip_replace_root ─── mostly INDEPENDENT
+Phase 14 (MCL Root Replace) ──► mcl_loadclip_replace_root ─── DONE ✅
 ```
 
-### Recommended Execution Order
+### Completion Status (2026-03-09)
 
-1. **Phase 8** (Failed Load State) — independent, low difficulty, immediate test gains
-2. **Phase 9** (Child URL/Version) — independent, low difficulty, 2 quick lines
-3. **Phase 13** (_root Scope) — independent, low difficulty, 4 lines
-4. **Phase 14** (MCL Root Replace) — mostly independent, debugging needed
-5. **Phase 6** (Per-Movie _global) — architectural, enables Phases 10 and 11
-6. **Phase 10** (Sequential MCL) — depends on Phase 6
-7. **Phase 11** (Child RegisterClass) — depends on Phase 6
-8. **Phase 12** (Mouse Events) — defer (blocked on separate infrastructure)
+**Completed phases**: 8, 10, 13, 14 (all passing tests verified locally)
+**Remaining blocked phases**: 6 (core blocker), 9 (URL risk), 11 (depends on 6), 12 (mouse infra)
+
+Phase 6 (per-movie `_global` isolation) is the single remaining actionable blocker. It requires:
+- Extracting `ensureSecondaryGlobalInit()` into a per-movie factory function
+- Adding `movie_global_idx` to ASFunction for per-function global resolution
+- Updating 9+ sites that resolve globals/prototypes
+- HIGH regression risk (affects all 425+ filtered-passing tests)
 
 ---
 
 ## 12. Test Impact Matrix
 
-| Test | Current | Phase 6 | Phase 8 | Phase 9 | Phase 10 | Phase 11 | Phase 13 | Phase 14 | Projected |
-|------|---------|---------|---------|---------|----------|----------|----------|----------|-----------|
-| global_swf5_6_7_8_9 | 1031/1145 | +114 | | | | | | | 1145/1145 |
-| loadmovienum_cross_version_prototype | 6/9 | +3 | | | | | | | 9/9 |
-| movieclip_state_values | 3/114 | | +80? | | | | | | ~83/114 |
-| movieclip_library_state_values | 76/78 | | | +2 | | | | | 78/78 |
-| mcl_events_swf_version | 232/232 | ? | | | +? | | | | 232/232 |
-| register_class | 44/66 | | | | | +22 | | | 66/66 |
-| register_class_swf6 | 4/37 | | | | | +33 | | | 37/37 |
-| resolve_different_root | 0/2 | | | | | | +2 | | 2/2 |
-| sandbox_type_remote | 1/3 | | | | | | +2 | | 3/3 |
-| mcl_loadclip_replace_root | 0/1 | | | | | | | +1 | 1/1 |
-| root_button_mode | 0/10 | | | | | | | | 0/10 (deferred) |
+| Test | Plan Estimate | Actual (2026-03-09) | Phase Needed | Status |
+|------|---------------|---------------------|--------------|--------|
+| mcl_events_swf_version | 232/232 | 232/232 PASS | Phase 10 | DONE |
+| mcl_loadclip_replace_root | 0/1 | 1/1 PASS | Phase 14 | DONE |
+| resolve_different_root | 0/2 | 2/2 PASS | Phase 13 | DONE |
+| global_swf5_6_7_8_9 | 1031/1145 | 1057/1145 | Phase 6 | BLOCKED |
+| loadmovienum_cross_version_prototype | 6/9 | 6/9 | Phase 6 | BLOCKED |
+| movieclip_state_values | 3/114 | 41/114 | Phase 8 DONE; test 3 blocked on image loading | PARTIAL |
+| movieclip_library_state_values | 76/78 | 76/78 | Phase 9 | BLOCKED |
+| register_class | 44/66 | 48/67 | Phase 11 (depends on Phase 6) | BLOCKED |
+| register_class_swf6 | 4/37 | 4/38 | Phase 11 (depends on Phase 6) | BLOCKED |
+| sandbox_type_remote | 1/3 | 1/3 | Needs network loading | BLOCKED |
+| root_button_mode | 0/10 | 0/10 | Phase 12 (mouse infra) | BLOCKED |
 
-**Projected total gain**: ~260 lines across ~10 tests (excluding root_button_mode).
+**Remaining actionable lines**: ~200 lines across blocked tests, all gated on Phase 6 (per-movie `_global`) or external infrastructure (mouse events, image loading, network).
 
-**Filtered pass rate impact**: Several of these tests are in ignored_tests.txt (loadmovie-related). The filtered impact comes from:
-- register_class: +22 lines (in filtered results)
-- register_class_swf6: +33 lines (in filtered results)
-- global_swf5_6_7_8_9: +114 lines (in filtered results)
-- resolve_different_root: +2 lines (in filtered results)
-- sandbox_type_remote: +2 lines (in filtered results)
+**Key blocker**: Phase 6 (per-movie `_global` isolation) blocks ~91 lines directly (global_swf5_6_7_8_9 + loadmovienum_cross_version_prototype) and ~53 lines indirectly via Phase 11 (register_class + register_class_swf6). HIGH regression risk — affects all 425+ filtered-passing tests.
 
 ---
 

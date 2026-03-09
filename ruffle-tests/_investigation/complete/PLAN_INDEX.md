@@ -37,7 +37,6 @@ All sprints completed:
 
 ## Cross-References
 - [IMAGE_COMPARISON_TESTS.md](../IMAGE_COMPARISON_TESTS.md) — Full investigation report with per-test analysis
-- [headless_rendering.md](/home/robert/.claude/projects/-home-robert-CC-SWFRecomp-CC/memory/headless_rendering.md) — Session memory for headless pipeline
 
 ## Already Fixed (This Session)
 - Stage origin offset in `stage_to_ndc` matrix (SWFRecomp/src/swf.cpp)
