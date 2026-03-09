@@ -653,6 +653,15 @@ static void save_capture(CaptureEntry* e)
 
 // Index of the next fs_command capture to fire (-1 = none pending)
 static int g_fscommand_pending = -1;
+
+// Check if any captures remain unsaved for this tick (used by tagRerenderFrame).
+int headless_has_pending_captures(void)
+{
+	for (int i = 0; i < g_capture_count; i++) {
+		if (!g_captures[i].saved) return 1;
+	}
+	return 0;
+}
 #endif
 
 // Called from actionFSCommand when fscommand("capture", ...) fires.
@@ -1098,6 +1107,26 @@ void swfStart(SWFAppContext* app_context)
 			if (g_after_tick_handler)
 				g_after_tick_handler(app_context, (int)tick_count);
 		}
+
+		// --- Re-render after events so captures reflect event-driven state changes ---
+		// Events (Tab key, mouse) can change focus state, button states, etc.
+		// Re-render so the next capture reflects the post-event display state.
+#ifdef HEADLESS_RENDER_ENABLED
+		if (context->renderer_ok) {
+			int need_render = 0;
+			for (int ci = 0; ci < g_capture_count; ci++) {
+				CaptureEntry* e = &g_captures[ci];
+				if (!e->saved && e->type == CAPTURE_ITERATION && e->iteration == (int)tick_count) {
+					need_render = 1;
+					break;
+				}
+			}
+			if (need_render) {
+				extern void tagRerenderFrame(SWFAppContext* app_context);
+				tagRerenderFrame(app_context);
+			}
+		}
+#endif
 
 		// --- Save captures after this tick's tagShowFrame has rendered ---
 #ifdef HEADLESS_RENDER_ENABLED

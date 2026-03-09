@@ -35,6 +35,9 @@ int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 #endif
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
+#ifdef HEADLESS_GRAPHICS
+void tagRerenderFrame(SWFAppContext* app_context);
+#endif
 void tagFlushPendingEnterFrame(SWFAppContext* app_context);
 
 // Tag functions needed by both graphics and trace (NO_GRAPHICS) builds.

@@ -5,7 +5,7 @@ Last updated: 2026-03-08
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
-- **Image test baseline**: 2/31 image tests passing (`display_object_properties`, `focusrect_focuslost`). See `ruffle-image-results.md`.
+- **Image test baseline**: 7/31 image tests passing. See `ruffle-image-results.md`. Newly passing: focusrect_swf5 (12/12), focusrect_swf6 (12/12), focusrect_mouse_swf8 (8/8), focusrect_mouse_swf9 (8/8), focusrect_focuslost (1/1).
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
 - **Recent gains (this session)**: Plan 01 (Runtime Transforms) COMPLETE — `display_object_properties` and `color` trace tests pass. Image test runner created (`run_image_tests.py`). Two ASan-detected bugs fixed: global buffer overflow in `create_buffer` (render_webgpu.c) and use-after-free in button override restore (tag.c).
 - **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).

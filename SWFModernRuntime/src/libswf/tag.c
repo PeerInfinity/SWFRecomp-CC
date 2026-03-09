@@ -1453,6 +1453,218 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 }
 #endif
 
+// Re-render current display list state (for headless per-tick image capture).
+// Only does the rendering pass — no frame script processing, no sprite init, etc.
+#ifdef HEADLESS_GRAPHICS
+void tagRerenderFrame(SWFAppContext* app_context)
+{
+	if (context == NULL || !context->renderer_ok) return;
+
+	// Compute focus rect BEFORE compose_children modifies transform_ids.
+	// ng_getDisplayEntryBounds reads from CPU-side transform_data which only
+	// has original (non-composed) slots; composed dynamic slots exist only in GPU.
+	FocusRectInfo fri;
+	int draw_focus_rect = actionGetFocusRectInfo(&fri);
+
+	// --- Re-compose transforms (same as tagShowFrame) ---
+	{
+		u32 orig_xform_count = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
+		g_next_dynamic_xform_slot = orig_xform_count;
+		g_xform_slot_capacity = context->xform_slot_count;
+		xform_overrides_reset();
+
+		u32 orig_cxform_count = app_context->cxform_data_size > 0
+			? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 1;
+		g_next_dynamic_cxform_slot = orig_cxform_count;
+		g_cxform_slot_capacity = context->cxform_slot_count;
+		cxform_overrides_reset();
+	}
+
+	// Runtime transform updates (AS _x/_y/_xscale/_rotation changes)
+	{
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		for (size_t i = 1; i <= max_depth; ++i)
+		{
+			DisplayObject* obj = &display_list[i];
+			if (obj->char_id == 0 || obj->instance_name == NULL) continue;
+			MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
+			if (mc == NULL || mc->as_set_flags == 0) continue;
+			float* slot = transform_data[obj->transform_id];
+			apply_as_transform(slot, mc, mc->as_set_flags);
+			renderer_write_transform(context, obj->transform_id, slot);
+		}
+		__asm__ volatile("" ::: "memory");
+		for (size_t i = 1; i <= max_depth; ++i)
+		{
+			DisplayObject* obj = &display_list[i];
+			if (obj->char_id == 0 || !obj->cx_overridden) continue;
+			float cx[20];
+			build_cxform_from_obj(cx, obj);
+			u32 new_slot = g_next_dynamic_cxform_slot;
+			if (new_slot < g_cxform_slot_capacity) {
+				g_next_dynamic_cxform_slot++;
+				cxform_overrides_push(obj, obj->cxform_id);
+				obj->cxform_id = new_slot;
+				renderer_write_cxform(context, new_slot, cx);
+			}
+		}
+		__asm__ volatile("" ::: "memory");
+	}
+
+	// Compose children transforms (sprites, buttons, text)
+	for (size_t i = 1; i <= max_depth; ++i)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type == CHAR_TYPE_SPRITE)
+		{
+			if (obj->sprite_display_list != NULL)
+			{
+				const float* sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				compose_children(app_context,
+					obj->sprite_display_list, obj->sprite_max_depth,
+					sprite_xform,
+					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+			}
+		}
+		else if (ch->type == CHAR_TYPE_BUTTON)
+		{
+			DisplayObject* saved_display_list = display_list;
+			size_t saved_max_depth = max_depth;
+			size_t saved_capacity = display_list_capacity;
+			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
+			max_depth = 0;
+			u8 state = obj->button_state;
+			if (ch->button_state_funcs[state] != NULL)
+				ch->button_state_funcs[state](app_context);
+			const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+			int saved_xform_count = g_xform_override_count;
+			int saved_cxform_count = g_cxform_override_count;
+			compose_children(app_context, display_list, max_depth, btn_xform,
+				obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+			for (int k = g_xform_override_count - 1; k >= saved_xform_count; --k)
+				g_xform_overrides[k].obj->transform_id = g_xform_overrides[k].original_id;
+			g_xform_override_count = saved_xform_count;
+			for (int k = g_cxform_override_count - 1; k >= saved_cxform_count; --k)
+				g_cxform_overrides[k].obj->cxform_id = g_cxform_overrides[k].original_id;
+			g_cxform_override_count = saved_cxform_count;
+			free(display_list);
+			display_list = saved_display_list;
+			max_depth = saved_max_depth;
+			display_list_capacity = saved_capacity;
+		}
+		else if (ch->type == CHAR_TYPE_TEXT)
+		{
+			renderer_compose_text_transforms(context,
+				app_context->transform_data,
+				obj->transform_id, ch->transform_start, ch->text_size);
+		}
+	}
+
+	// --- Render pass ---
+	renderer_open_pass(context);
+
+#ifdef HEADLESS_RENDER_ENABLED
+	extern int headless_has_pending_captures(void);
+	if (headless_has_pending_captures())
+		renderer_request_capture(context);
+#endif
+
+	// Render display list
+	u32 active_clip_depth = 0;
+	for (size_t i = 1; i <= max_depth; ++i)
+	{
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
+		if (active_clip_depth > 0 && i > active_clip_depth) {
+			renderer_end_clip(context);
+			active_clip_depth = 0;
+		}
+		if (obj->clip_depth > 0) {
+			Character* ch = &dictionary[obj->char_id];
+			if (ch->type == CHAR_TYPE_SHAPE) {
+				renderer_begin_clip_mask(context);
+				renderer_draw_shape(context, ch->shape_offset, ch->size, obj->transform_id, obj->cxform_id);
+				renderer_end_clip_mask(context);
+				active_clip_depth = obj->clip_depth;
+			}
+			continue;
+		}
+		if (obj->blend_mode > 1)
+			renderer_set_blend_mode(context, obj->blend_mode);
+		if (obj->filter_type != 0) {
+			renderer_suspend_pass(context);
+			renderer_begin_offscreen_pass(context);
+			render_single_object(app_context, obj);
+			renderer_end_offscreen_pass(context);
+			int is_shadow = (obj->filter_type == 2);
+			int is_glow = (obj->filter_type == 3);
+			int is_bevel = (obj->filter_type == 4);
+			int colorize = is_shadow || is_glow;
+			renderer_run_blur(context,
+				obj->filter_blur_x, obj->filter_blur_y,
+				obj->filter_quality, obj->filter_strength,
+				obj->filter_color_r, obj->filter_color_g,
+				obj->filter_color_b, obj->filter_color_a, colorize);
+			renderer_resume_pass(context);
+			if (is_shadow) {
+				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
+				float dist_px = obj->filter_distance;
+				float ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
+				float oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				renderer_composite_filtered(context, ox, -oy, 0, 0, 0, 0);
+				render_single_object(app_context, obj);
+			} else if (is_glow) {
+				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+				render_single_object(app_context, obj);
+			} else if (is_bevel) {
+				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
+				float dist_px = obj->filter_distance;
+				float sox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
+				float soy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				renderer_composite_filtered(context, sox, -soy,
+					obj->filter_color_r, obj->filter_color_g,
+					obj->filter_color_b, obj->filter_color_a);
+				renderer_composite_filtered(context, -sox, soy,
+					obj->filter_highlight_r, obj->filter_highlight_g,
+					obj->filter_highlight_b, obj->filter_highlight_a);
+				render_single_object(app_context, obj);
+			} else {
+				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+			}
+			if (obj->blend_mode > 1)
+				renderer_set_blend_mode(context, obj->blend_mode);
+		} else {
+			render_single_object(app_context, obj);
+		}
+		if (obj->blend_mode > 1)
+			renderer_set_blend_mode(context, 0);
+	}
+	if (active_clip_depth > 0)
+		renderer_end_clip(context);
+
+	// Text field backgrounds/borders
+	actionIterateTextFields(textfield_render_cb, NULL);
+
+	// Focus rect (pre-computed before compose_children)
+	// Drawn as 3-pixel thick border INSIDE the object's world AABB.
+	if (draw_focus_rect) {
+		float t = 3.0f * 20.0f;  // 3 pixels in twips
+		float fx = fri.x, fy = fri.y, fw = fri.w, fh = fri.h;
+		renderer_draw_rect(context, fx, fy, fw, t, 1, 1, 0, 1, 0, 0);                  // top
+		renderer_draw_rect(context, fx, fy + fh - t, fw, t, 1, 1, 0, 1, 0, 0);          // bottom
+		renderer_draw_rect(context, fx, fy + t, t, fh - 2*t, 1, 1, 0, 1, 0, 0);         // left
+		renderer_draw_rect(context, fx + fw - t, fy + t, t, fh - 2*t, 1, 1, 0, 1, 0, 0);// right
+	}
+
+	renderer_close_pass(context);
+	xform_overrides_restore();
+	cxform_overrides_restore();
+}
+#endif
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 #ifdef NO_GRAPHICS
@@ -1524,6 +1736,12 @@ void tagShowFrame(SWFAppContext* app_context)
 #endif
 
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+	// Compute focus rect BEFORE compose_children modifies transform_ids.
+	// ng_getDisplayEntryBounds reads from CPU-side transform_data which only
+	// has original (non-composed) slots; composed dynamic slots exist only in GPU.
+	FocusRectInfo g_frame_fri;
+	int g_frame_draw_focus_rect = actionGetFocusRectInfo(&g_frame_fri);
+
 	// Initialize dynamic transform and cxform slot allocators.
 	// Original slots are [0, orig_count). Dynamic slots start after.
 	{
@@ -1828,6 +2046,17 @@ void tagShowFrame(SWFAppContext* app_context)
 	// Dynamic text fields (createTextField) are tracked in child_mc_cache but not
 	// on the tag display list. Render their background/border rectangles here.
 	actionIterateTextFields(textfield_render_cb, NULL);
+
+	// --- Render focus rect (pre-computed before compose_children) ---
+	// Drawn as 3-pixel thick border INSIDE the object's world AABB.
+	if (g_frame_draw_focus_rect) {
+		float t = 3.0f * 20.0f;  // 3 pixels in twips
+		float fx = g_frame_fri.x, fy = g_frame_fri.y, fw = g_frame_fri.w, fh = g_frame_fri.h;
+		renderer_draw_rect(context, fx, fy, fw, t, 1, 1, 0, 1, 0, 0);                  // top
+		renderer_draw_rect(context, fx, fy + fh - t, fw, t, 1, 1, 0, 1, 0, 0);          // bottom
+		renderer_draw_rect(context, fx, fy + t, t, fh - 2*t, 1, 1, 0, 1, 0, 0);         // left
+		renderer_draw_rect(context, fx + fw - t, fy + t, t, fh - 2*t, 1, 1, 0, 1, 0, 0);// right
+	}
 
 	renderer_close_pass(context);
 

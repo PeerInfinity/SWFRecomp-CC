@@ -44609,11 +44609,76 @@ void actionResetHighlightState(void)
 void actionUpdateHighlightState(void)
 {
 	if (g_focused_mc == NULL) return;
-	extern MovieClip root_movieclip;
-	float fr = root_movieclip.focusrect;
+	// Walk from focused MC up parent chain: first non-null _focusrect wins.
+	// If all null (sentinel -1.0f), default is true (ACTIVE_VISIBLE).
+	float fr = -1.0f;
+	MovieClip* mc = g_focused_mc;
+	while (mc != NULL) {
+		if (mc->focusrect != -1.0f) { fr = mc->focusrect; break; }
+		mc = mc->parent;
+	}
+	if (fr == -1.0f) {
+		extern MovieClip root_movieclip;
+		fr = root_movieclip.focusrect;
+	}
 	// focusrect == 0.0f means explicitly false → ACTIVE_HIDDEN
 	// focusrect == -1.0f (default null) or > 0 → ACTIVE_VISIBLE
 	g_highlight_state = (fr == 0.0f) ? 1 : 2;
+}
+
+// Get focus rect bounds (world-space AABB in twips) if a focus rect should be drawn.
+// Returns 1 if the focus rect should be drawn, 0 otherwise.
+int actionGetFocusRectInfo(FocusRectInfo* out)
+{
+	if (g_focused_mc == NULL) return 0;
+	if (g_highlight_state < 1) return 0;
+
+	// Check per-object _focusrect with parent chain inheritance.
+	// Walk from focused MC up to root; first non-null value wins.
+	float fr = -1.0f;
+	MovieClip* mc = g_focused_mc;
+	while (mc != NULL) {
+		if (mc->focusrect != -1.0f) { fr = mc->focusrect; break; }
+		mc = mc->parent;
+	}
+	if (fr == -1.0f) {
+		extern MovieClip root_movieclip;
+		fr = root_movieclip.focusrect;
+	}
+	// Default (null/-1) = true; 0 = false; > 0 = true
+	if (fr == 0.0f) return 0;
+
+	// Get local content bounds (in pixels) for the focused MC
+	size_t entry_idx = getDisplayEntryIdxForMC(g_focused_mc);
+	float lxmin, lxmax, lymin, lymax;
+	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax))
+		return 0;
+
+	// Get concatenated world transform (in pixels)
+	double ca, cb, cc, cd, ctx, cty;
+	getConcatMatrixForMC(g_focused_mc, &ca, &cb, &cc, &cd, &ctx, &cty);
+
+	// Transform 4 corners to world space (pixels)
+	double lx0 = (double)lxmin, lx1 = (double)lxmax;
+	double ly0 = (double)lymin, ly1 = (double)lymax;
+	double cx0 = ca*lx0 + cc*ly0 + ctx, cy0 = cb*lx0 + cd*ly0 + cty;
+	double cx1 = ca*lx1 + cc*ly0 + ctx, cy1 = cb*lx1 + cd*ly0 + cty;
+	double cx2 = ca*lx0 + cc*ly1 + ctx, cy2 = cb*lx0 + cd*ly1 + cty;
+	double cx3 = ca*lx1 + cc*ly1 + ctx, cy3 = cb*lx1 + cd*ly1 + cty;
+	double pxmin = cx0, pxmax = cx0, pymin = cy0, pymax = cy0;
+	if (cx1 < pxmin) pxmin = cx1; if (cx1 > pxmax) pxmax = cx1;
+	if (cx2 < pxmin) pxmin = cx2; if (cx2 > pxmax) pxmax = cx2;
+	if (cx3 < pxmin) pxmin = cx3; if (cx3 > pxmax) pxmax = cx3;
+	if (cy1 < pymin) pymin = cy1; if (cy1 > pymax) pymax = cy1;
+	if (cy2 < pymin) pymin = cy2; if (cy2 > pymax) pymax = cy2;
+	if (cy3 < pymin) pymin = cy3; if (cy3 > pymax) pymax = cy3;
+
+	// Convert to twips
+	out->x = (float)(pxmin * 20.0);
+	out->y = (float)(pymin * 20.0);
+	out->w = (float)((pxmax - pxmin) * 20.0);
+	out->h = (float)((pymax - pymin) * 20.0);
+	return 1;
 }
 
 // ---------------------------------------------------------------------------

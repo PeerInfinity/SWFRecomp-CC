@@ -402,6 +402,14 @@ typedef struct TextFieldRenderInfo {
 typedef void (*TextFieldRenderCallback)(const TextFieldRenderInfo* info, void* user_data);
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data);
 
+// Focus rect rendering info (used by tag.c in graphics mode)
+typedef struct FocusRectInfo {
+	float x, y, w, h;  // world-space bounds in twips
+} FocusRectInfo;
+
+// Get focus rect bounds if one should be drawn. Returns 1 if should draw, 0 if not.
+int actionGetFocusRectInfo(FocusRectInfo* out);
+
 #ifdef NO_GRAPHICS
 // AS2 MC event dispatch — called from swf_core.c on mouse events.
 // Iterates child_mc_cache, checks hit area, and calls onPress/onDragOver etc.

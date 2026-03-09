@@ -1,9 +1,7 @@
-# Plan 04: Focus Rect Rendering
+# Plan 04: Focus Rect Rendering — COMPLETE
 
-**Priority**: Medium — unlocks 6 tests (41 image comparisons total)
-**Tests unlocked**: `focusrect_focuslost` (1 image), `focusrect_mouse_swf8` (8 images), `focusrect_mouse_swf9` (8 images), `focusrect_swf5` (12 images), `focusrect_swf6` (12 images)
-**Estimated complexity**: Small-Medium
-**Depends on**: Plan 01 (runtime transforms), Plan 02 (text field rendering) for some sub-tests
+**Status**: DONE — all 5 tests passing (41/41 image comparisons)
+**Tests unlocked**: `focusrect_focuslost` (1/1), `focusrect_mouse_swf8` (8/8), `focusrect_mouse_swf9` (8/8), `focusrect_swf5` (12/12), `focusrect_swf6` (12/12)
 
 ---
 
