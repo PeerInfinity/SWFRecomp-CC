@@ -601,6 +601,10 @@ typedef struct ASFunction {
 	// When called, g_swf_version is switched to this value so version-dependent
 	// behavior matches the SWF where the function was originally defined.
 	u16 swf_version;
+
+	// Per-movie global index: reserved for future per-movie _global isolation.
+	// Currently unused (always 0). Built-in functions are zero-initialized.
+	u16 movie_global_idx;
 } ASFunction;
 
 // Function registry
@@ -7470,9 +7474,10 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 	ASObject* obj;
 	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		ASFunction* fn = (ASFunction*) obj_var->data.numeric_value;
-		obj = fn->own_props;
-		if (obj == NULL) return *obj_var;  // No own_props, no valueOf
+		// Functions are primitives for valueOf purposes — return the function itself.
+		// Don't look up inherited valueOf on own_props (Object.prototype.valueOf
+		// would return own_props as OBJECT, breaking "[type Function]" display).
+		return *obj_var;
 	}
 	else if (obj_var->type == ACTION_STACK_VALUE_ARRAY)
 	{
@@ -7593,18 +7598,29 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		return undef;
 	}
 
-	// For functions, use own_props for property lookup
+	// For functions, don't look up inherited toString on own_props.
+	// convertString produces the correct "[type Function]" string.
 	ASObject* obj;
 	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
 	{
 		ASFunction* fn = (ASFunction*) obj_var->data.numeric_value;
-		obj = fn->own_props;
-		if (obj == NULL)
+		if (fn == NULL || fn->own_props == NULL)
 		{
 			ActionVar undef = {0};
 			undef.type = ACTION_STACK_VALUE_UNDEFINED;
 			return undef;
 		}
+		// Check for a directly-set toString (not inherited)
+		obj = fn->own_props;
+		ActionVar* ts = getProperty(obj, "toString", 8);
+		if (ts == NULL || ts->type != ACTION_STACK_VALUE_FUNCTION)
+		{
+			// No direct toString — let convertString handle it ("[type Function]")
+			ActionVar undef = {0};
+			undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			return undef;
+		}
+		// Fall through to invoke the directly-set toString
 	}
 	else if (obj_var->type == ACTION_STACK_VALUE_ARRAY)
 	{
@@ -8058,7 +8074,7 @@ static int g_secondary_global_init = 0;
 
 static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
 
-// Get the version-appropriate _global object (same as actionGetVariable("_global"))
+// Get the version-appropriate _global object
 static inline ASObject* getActiveGlobal(void) {
 	ASObject* ag = global_object;
 	if (g_swf_version <= 6 && g_global_legacy != NULL) ag = g_global_legacy;
@@ -8072,10 +8088,11 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 // Phase 3: Per-function version context switching helpers.
 // Built-in functions have swf_version=0 (zero-initialized statics) → no switch.
 // User-defined functions have swf_version set at definition time → switch to their version.
-static inline void switchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** saved_global)
+static inline void switchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** saved_global, int* saved_movie_idx)
 {
 	*saved_ver = g_swf_version;
 	*saved_global = global_object;
+	*saved_movie_idx = 0; // reserved for future use
 	if (func->swf_version != 0) {
 		g_swf_version = func->swf_version;
 		int vg = versionGroup(g_swf_version);
@@ -8083,10 +8100,11 @@ static inline void switchToFunctionVersion(ASFunction* func, int* saved_ver, ASO
 		else if (vg == 1 && g_global_modern) global_object = g_global_modern;
 	}
 }
-static inline void restoreFunctionVersion(int saved_ver, ASObject* saved_global)
+static inline void restoreFunctionVersion(int saved_ver, ASObject* saved_global, int saved_movie_idx)
 {
 	g_swf_version = saved_ver;
 	global_object = saved_global;
+	(void)saved_movie_idx; // reserved for future use
 }
 
 // MovieClip constructor function (for MovieClip.prototype access)
@@ -18934,7 +18952,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
 			mc->load_failed = 0;
-			// Switch to child's SWF version during init (with versioned global)
+			// Switch to child's SWF version during init (with per-movie global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
 			g_swf_version = entry->swf_version;
@@ -19031,7 +19049,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
 			mc->load_failed = 0;
-			// Switch to child's SWF version during init (with versioned global)
+			// Switch to child's SWF version during init (with per-movie global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
 			g_swf_version = entry->swf_version;
@@ -19664,7 +19682,7 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 	MovieEntry* entry = findMovieEntry(url);
 	if (entry == NULL) return;
 
-	// Save/restore SWF version around imported SWF init (with versioned global)
+	// Save/restore SWF version around imported SWF init (with per-movie global)
 	int _saved_ver = g_swf_version;
 	ASObject* _saved_global = global_object;
 	g_swf_version = entry->swf_version;
@@ -19760,7 +19778,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 root_movieclip.framesloaded = loads[i].entry->frame_count;
                 root_movieclip.currentframe = 1;
             }
-            // Run child in target MC context with child's SWF version (with versioned global)
+            // Run child in target MC context with child's SWF version (with per-movie global)
             MovieClip* _saved_ctx = g_current_context;
             int _saved_ver = g_swf_version;
             ASObject* _saved_global = global_object;
@@ -21840,6 +21858,14 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		if (an) setProperty(app_context, sec_global, "ASnative", 8, an);
 	}
 
+	// Copy isNaN/isFinite from primary global
+	{
+		ActionVar* isnan = getProperty(global_object, "isNaN", 5);
+		if (isnan) setProperty(app_context, sec_global, "isNaN", 5, isnan);
+		ActionVar* isfin = getProperty(global_object, "isFinite", 8);
+		if (isfin) setProperty(app_context, sec_global, "isFinite", 8, isfin);
+	}
+
 	// Set valueOf on secondary _global to undefined (matches primary)
 	{
 		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED;
@@ -22684,14 +22710,14 @@ check_special_vars:
 		}
 		else if (var_name_len == 7 && strncmp(var_name, "_global", 7) == 0)
 		{
+			// SWF5 and below: _global is not a recognized variable
+			if (g_swf_version < 6) {
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				return;
+			}
 			ensureGlobalInit(app_context);
 			// Return the version-appropriate _global object
-			ASObject* active_global = global_object;
-			int vg = versionGroup(g_swf_version);
-			if (vg == 0 && g_global_legacy != NULL)
-				active_global = g_global_legacy;
-			else if (vg == 1 && g_global_modern != NULL)
-				active_global = g_global_modern;
+			ASObject* active_global = getActiveGlobal();
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)active_global);
 			return;
 		}
@@ -22749,7 +22775,6 @@ check_special_vars:
 				strncpy(g_object_constructor.name, "Object", 255);
 				g_object_constructor.function_type = 1;
 				g_object_constructor.param_count = 0;
-				g_object_constructor.simple_func = (SimpleFunctionPtr) builtin_object_toString; // placeholder
 				// Point prototype_obj at the REAL g_object_prototype so that
 				// Object.prototype identity checks (isPrototypeOf etc.) work correctly
 				g_object_constructor.prototype_obj = getObjectPrototype(app_context);
@@ -22757,7 +22782,6 @@ check_special_vars:
 				// Add registerClass as a static method on Object (own_props)
 				g_object_constructor.own_props = allocObject(app_context, 4);
 				retainObject(g_object_constructor.own_props);
-				// Set __proto__ to Object.prototype so Object.addProperty etc. resolve
 				setObjectProto(app_context, g_object_constructor.own_props);
 				registerGeomMethod(&g_registerClass_func, "registerClass",
 					(Function2Ptr)actionObjectRegisterClass, app_context,
@@ -27121,7 +27145,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				constructChildURL(_gu2_mc->url, sizeof(_gu2_mc->url), entry->filename);
 				_gu2_mc->swf_version = (u16)entry->swf_version;
 			}
-			// Run child in target MC context with child's SWF version (with versioned global)
+			// Run child in target MC context with child's SWF version (with per-movie global)
 			MovieClip* _saved_ctx = g_current_context;
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
@@ -30470,6 +30494,10 @@ void actionGetMember(SWFAppContext* app_context)
 				return;
 			}
 			if (strcasecmp(prop_name, "_global") == 0) {
+				if (g_swf_version < 6) {
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
+				}
 				ensureGlobalInit(app_context);
 				ASObject* ag = getActiveGlobal();
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)ag);
@@ -33943,6 +33971,8 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 
 	// Capture SWF version at definition time (Phase 3: per-function version tracking)
 	as_func->swf_version = (u16)g_swf_version;
+	// Per-movie global index: reserved for future per-movie _global isolation
+	as_func->movie_global_idx = 0;
 
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
@@ -34041,6 +34071,8 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 
 	// Capture SWF version at definition time (Phase 3: per-function version tracking)
 	as_func->swf_version = (u16)g_swf_version;
+	// Per-movie global index: reserved for future per-movie _global isolation
+	as_func->movie_global_idx = 0;
 
 	// Capture scope chain entries at definition time.
 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
@@ -34651,8 +34683,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				pushSuperContext(this_obj, depth + 1);
 
 				// Phase 3: switch to parent constructor's SWF version
-				int _sc_saved_ver = 0; ASObject* _sc_saved_global = NULL;
-				switchToFunctionVersion(parent_ctor, &_sc_saved_ver, &_sc_saved_global);
+				int _sc_saved_ver = 0; ASObject* _sc_saved_global = NULL; int _sc_saved_midx = 0;
+				switchToFunctionVersion(parent_ctor, &_sc_saved_ver, &_sc_saved_global, &_sc_saved_midx);
 
 				if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL)
 				{
@@ -34678,7 +34710,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					invokeNativeSuperConstructor(app_context, parent_ctor, this_obj, args, num_args, &_nsc_result);
 				}
 
-				restoreFunctionVersion(_sc_saved_ver, _sc_saved_global);
+				restoreFunctionVersion(_sc_saved_ver, _sc_saved_global, _sc_saved_midx);
 				popSuperContext();
 			}
 		}
@@ -36053,8 +36085,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			MovieClip* saved_cf_context = g_current_context;
 			DisplayObject* saved_cf_sprite = g_current_sprite_obj;
 			// Phase 3: switch to function's SWF version for correct version-dependent behavior
-			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL;
-			switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global);
+			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL; int _cf_saved_midx = 0;
+			switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global, &_cf_saved_midx);
 			// Save scope chain: SWF6+ functions start with a fresh scope chain
 			// (only captured scopes + local scope), not inheriting the caller's scopes.
 			// We save the entire scope chain state because the function will overwrite
@@ -36381,7 +36413,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			actionSetCurrentContext(saved_cf_context);
 			g_current_sprite_obj = saved_cf_sprite;
 			// Phase 3: restore caller's SWF version
-			restoreFunctionVersion(_cf_saved_ver, _cf_saved_global);
+			restoreFunctionVersion(_cf_saved_ver, _cf_saved_global, _cf_saved_midx);
 		}
 		else
 		{
@@ -39224,8 +39256,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushSuperContext((void*)obj, method_search_depth);
 
 				// Phase 3: switch to function's SWF version
-				int _om2_saved_ver = 0; ASObject* _om2_saved_global = NULL;
-				switchToFunctionVersion(func, &_om2_saved_ver, &_om2_saved_global);
+				int _om2_saved_ver = 0; ASObject* _om2_saved_global = NULL; int _om2_saved_midx = 0;
+				switchToFunctionVersion(func, &_om2_saved_ver, &_om2_saved_global, &_om2_saved_midx);
 
 				// Switch base_clip context for SWF6+ closures
 				MovieClip* saved_ctx_om2 = g_current_context;
@@ -39322,7 +39354,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				releaseObject(app_context, local_scope);
 				g_this_depth = saved_this_depth_am2;
 				popSuperContext();
-				restoreFunctionVersion(_om2_saved_ver, _om2_saved_global);
+				restoreFunctionVersion(_om2_saved_ver, _om2_saved_global, _om2_saved_midx);
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
 
@@ -39335,8 +39367,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushSuperContext((void*)obj, method_search_depth);
 
 				// Phase 3: switch to function's SWF version
-				int _om1_saved_ver = 0; ASObject* _om1_saved_global = NULL;
-				switchToFunctionVersion(func, &_om1_saved_ver, &_om1_saved_global);
+				int _om1_saved_ver = 0; ASObject* _om1_saved_global = NULL; int _om1_saved_midx = 0;
+				switchToFunctionVersion(func, &_om1_saved_ver, &_om1_saved_global, &_om1_saved_midx);
 
 				// Switch base_clip context for SWF6+ closures
 				MovieClip* saved_ctx_om1 = g_current_context;
@@ -39395,7 +39427,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				releaseObject(app_context, local_scope_am1);
 				g_this_depth = saved_this_depth_am1;
 				popSuperContext();
-				restoreFunctionVersion(_om1_saved_ver, _om1_saved_global);
+				restoreFunctionVersion(_om1_saved_ver, _om1_saved_global, _om1_saved_midx);
 
 				pushVar(app_context, &result);
 			}
@@ -43521,7 +43553,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 						mc->swf_version = (u16)entry->swf_version;
 						mc->load_failed = 0;
-						// Run the child movie's init and frame 0 with child's SWF version (with versioned global)
+						// Run the child movie's init and frame 0 with child's SWF version
 						int _saved_ver = g_swf_version;
 						ASObject* _saved_global = global_object;
 						g_swf_version = entry->swf_version;

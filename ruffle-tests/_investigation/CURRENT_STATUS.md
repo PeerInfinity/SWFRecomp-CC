@@ -108,7 +108,7 @@ Last updated: 2026-03-09
 | ~~`text_format_get_text_extent_undefined_width`~~ | ~~8/10~~ **10/10 ✅** | Fixed: valueOf coercion on getTextExtent width argument |
 | `edittext_default_format_empty` | ~95/100 (95%) | 5 missing `display = block;` lines — SWF code doesn't access `display` property; Ruffle's expected output injects it (see RUFFLE_VS_FLASH_DIFFERENCES.md). Permanent diff. |
 | `edittext_scroll` | 52/54 (96%) | Mixed-font maxscroll/bottomScroll (font metrics) |
-| `global_swf5_6_7_8_9` | 1031/1145 (90%) | Blocked on per-movie `_global` isolation |
+| `global_swf5_6_7_8_9` | 1073/1145 (93.7%) | 72 remaining diffs: per-movie Function.prototype identity (architectural). Fixed: SWF5 _global restriction + function valueOf/toString display |
 
 ### Regressions to investigate
 | Test | Before | After | Cause |

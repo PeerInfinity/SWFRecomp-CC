@@ -26,17 +26,19 @@ Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at 
 
 ---
 
-## Blocker 2: Per-Movie `_global` Isolation
+## Blocker 2: Per-Movie `_global` Isolation — PARTIALLY RESOLVED
 
-**Impact**: 4-6 tests directly, precondition for Blocker 1 Phase 6
+**Impact**: 1 test, 72 lines (down from 114)
 
-This is the critical sub-blocker within loadMovie. In Ruffle/Flash, each SWF7+ loaded movie gets its own `_global` object with distinct constructor instances (`Object`, `Array`, `MovieClip`, etc.). Cross-version `instanceof` checks fail when constructor identity doesn't match.
+**Resolved**: The two-group `_global` model (`g_global_legacy` for SWF≤6, `g_global_modern` for SWF7+) is CORRECT. Investigation confirmed `global_swf6_7_8` expects `g7 === g8: true` — SWF7+ share `_global`. Per-movie `_global` was attempted and REVERTED (caused regressions).
 
-Our two-group model (`g_global_legacy` for SWF≤6, `g_global_modern` for SWF7+) is too coarse. A SWF5 child sharing the legacy `_global` with a SWF6 parent gets constructors it shouldn't have.
+**Fixed items**:
+- SWF5 `_global` restriction: `GetVariable("_global")` returns undefined for SWF≤5
+- Object constructor display: `objectCallValueOf`/`objectCallToString` no longer invoke inherited Object.prototype methods on function own_props, so functions correctly display as `[type Function]`
 
-**Required change**: Per-`MovieEntry` `_global` allocation. Each loaded movie gets a fresh `_global` populated with version-appropriate constructors. `_global` references in generated code resolve through the current movie's context, not a static global.
+**Remaining gap**: Per-movie `Function.prototype` identity (72 diff lines). Each loaded movie should have its own `Function.prototype` so that `func1.__proto__ !== func2.__proto__` across different movies. Our implementation shares `Object.prototype` for all functions' `own_props.__proto__`.
 
-**Plans blocked**: CROSS_VERSION_ISOLATION_PLAN (Phase 5), LOADMOVIE_PLAN (Phase 6), ROOT_REPLACEMENT_PLAN (cross-version tests)
+**Plans blocked**: PER_MOVIE_GLOBAL_ISOLATION_PLAN (blocked/ — Function.prototype only)
 
 ---
 
