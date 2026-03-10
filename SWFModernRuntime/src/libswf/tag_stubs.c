@@ -191,6 +191,7 @@ void ng_try_reclaim_auto_instance_name(const char* auto_name)
 static struct {
 	char name[128];
 	size_t char_id;
+	u8 swf_version; // SWF version of the movie that defined this export
 } ng_exported_symbols[MAX_EXPORTED_SYMBOLS];
 static size_t ng_exported_symbol_count = 0;
 
@@ -202,6 +203,17 @@ size_t ng_lookupExport(const char* name)
 	for (size_t i = 0; i < ng_exported_symbol_count; i++)
 		if (strcasecmp(ng_exported_symbols[i].name, name) == 0)
 			result = ng_exported_symbols[i].char_id;
+	return result;
+}
+
+// Returns the SWF version of the movie that exported the given symbol name.
+// Used by registerClass lookup to determine which registry (case-sensitive vs insensitive).
+int ng_lookupExportVersion(const char* name)
+{
+	int result = 0;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (strcasecmp(ng_exported_symbols[i].name, name) == 0)
+			result = ng_exported_symbols[i].swf_version;
 	return result;
 }
 
@@ -1157,10 +1169,12 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id)
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id)
 {
 	(void)app_context;
+	extern int g_swf_version;
 	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
 		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, name, 127);
 		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
 		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
+		ng_exported_symbols[ng_exported_symbol_count].swf_version = (u8)g_swf_version;
 		ng_exported_symbol_count++;
 	}
 }

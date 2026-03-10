@@ -32368,7 +32368,9 @@ void actionNewObject(SWFAppContext* app_context)
 void actionSetupRegisteredClassPrototype(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
 {
 	if (export_name == NULL || mc == NULL) return;
-	int mc_ver = (mc->swf_version) ? mc->swf_version : g_swf_version;
+	// Use the export's defining SWF version for registerClass registry lookup
+	int exp_ver = ng_lookupExportVersion(export_name);
+	int mc_ver = exp_ver ? exp_ver : ((mc->swf_version) ? mc->swf_version : g_swf_version);
 	void* raw_ctor = lookupRegisteredClassVersion(export_name, mc_ver);
 	if (raw_ctor == NULL) return;
 
@@ -32411,7 +32413,9 @@ void actionSetupRegisteredClassPrototype(SWFAppContext* app_context, const char*
 void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
 {
 	if (export_name == NULL || mc == NULL) return;
-	int mc_ver = (mc->swf_version) ? mc->swf_version : g_swf_version;
+	// Use the export's defining SWF version for registerClass registry lookup
+	int exp_ver = ng_lookupExportVersion(export_name);
+	int mc_ver = exp_ver ? exp_ver : ((mc->swf_version) ? mc->swf_version : g_swf_version);
 	void* raw_ctor = lookupRegisteredClassVersion(export_name, mc_ver);
 	if (raw_ctor == NULL) return;
 
@@ -36057,7 +36061,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
 							}
 						} else {
-							int _am_ver = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+							// Use the export's defining SWF version for registerClass registry lookup
+							// (Ruffle: self.movie().version() — the SWF that defines the symbol)
+							int _am_exp_ver = ng_lookupExportVersion(_am_buf1);
+							int _am_ver = _am_exp_ver ? _am_exp_ver : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 							void* reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver);
 							if (reg_ctor != NULL) {
 								ASFunction* ctor_func = (ASFunction*)reg_ctor;
@@ -36115,7 +36122,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// (Flash fires it before returning to caller script)
 					// Button symbols skip constructor (Flash doesn't fire registerClass for buttons)
 					if (!attached->is_button_mc) {
-						int _am_ver2 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+						int _am_exp_ver2 = ng_lookupExportVersion(_am_buf1);
+						int _am_ver2 = _am_exp_ver2 ? _am_exp_ver2 : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 						void* _am_reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver2);
 						if (_am_reg_ctor != NULL) {
 							actionInvokeRegisteredClassConstructor(app_context, _am_buf1, attached);
@@ -41328,7 +41336,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
 								}
 							} else {
-								int _am_ver3 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+								// Use the export's defining SWF version for registerClass registry lookup
+								int _am_exp_ver3 = ng_lookupExportVersion(linkage_id);
+								int _am_ver3 = _am_exp_ver3 ? _am_exp_ver3 : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 								void* reg_ctor = lookupRegisteredClassVersion(linkage_id, _am_ver3);
 								if (reg_ctor != NULL) {
 									ASFunction* ctor_func = (ASFunction*)reg_ctor;
@@ -41397,7 +41407,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Fire registered class constructor synchronously
 						// Button symbols skip constructor (Flash doesn't fire registerClass for buttons)
 						if (!attached->is_button_mc) {
-							int _am_ver4 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+							int _am_exp_ver4 = ng_lookupExportVersion(linkage_id);
+							int _am_ver4 = _am_exp_ver4 ? _am_exp_ver4 : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 							void* _am_reg_ctor2 = lookupRegisteredClassVersion(linkage_id, _am_ver4);
 							if (_am_reg_ctor2 != NULL) {
 								actionInvokeRegisteredClassConstructor(app_context, linkage_id, attached);
