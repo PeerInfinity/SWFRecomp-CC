@@ -1288,13 +1288,15 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	extern size_t display_list_capacity;
 
 	if (char_id >= INITIAL_DICTIONARY_CAPACITY) return NULL;
-	if (dictionary[char_id].type != CHAR_TYPE_SPRITE) return NULL;
+	int _am_is_button = (dictionary[char_id].type == CHAR_TYPE_BUTTON);
+	if (dictionary[char_id].type != CHAR_TYPE_SPRITE && !_am_is_button) return NULL;
 	// Flash valid depth range: -16384 to 2130690044
 	if (as_depth > 2130690044 || as_depth < -16384) return NULL;
 
 	// Create MC for the attached clip (reset position/scale to defaults for re-attach)
 	MovieClip* new_mc = actionFindOrCreateMovieClip(app_context, new_name, parent);
 	if (new_mc == NULL) return NULL;
+	new_mc->is_button_mc = _am_is_button ? 1 : 0;
 
 	// Remove any existing clone at this SWF depth BEFORE setting depth/props.
 	// clone_depth_evict may set depth=INT_MIN on the old MC at this depth,

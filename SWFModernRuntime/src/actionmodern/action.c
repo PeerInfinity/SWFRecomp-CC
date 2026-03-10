@@ -36039,38 +36039,50 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (char_id != (size_t)-1) {
 				MovieClip* attached = ng_attachMovie(app_context, char_id, _am_buf2, depth_val, mc);
 				if (attached != NULL) {
-					// Set __proto__ from registered class (if any) BEFORE initObject
-					// Constructor invocation happens in ng_fire_pending_attach_inits (deferred)
+					// Set __proto__ BEFORE initObject
 					{
-						int _am_ver = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
-						void* reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver);
 						if (attached->dynamic_props == NULL) {
 							attached->dynamic_props = (void*) allocObject(app_context, 8);
 							retainObject((ASObject*) attached->dynamic_props);
 						}
-						if (reg_ctor != NULL) {
-							ASFunction* ctor_func = (ASFunction*)reg_ctor;
-							if (ctor_func->prototype_obj == NULL) {
-								ctor_func->prototype_obj = allocObject(app_context, 4);
-								retainObject(ctor_func->prototype_obj);
-								setObjectProto(app_context, ctor_func->prototype_obj);
-								ActionVar ctor_var = {0};
-								ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-								ctor_var.data.numeric_value = (u64) ctor_func;
-								setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
-							}
-							ActionVar proto_var = {0};
-							proto_var.type = ACTION_STACK_VALUE_OBJECT;
-							proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
-							setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
-						} else {
-							// No registered class — set default __proto__ to version-appropriate MovieClip.prototype
-							ASObject* mc_proto = getMovieClipPrototype(_am_ver);
-							if (mc_proto != NULL) {
+						if (attached->is_button_mc) {
+							// Button symbols: __proto__ = Button.prototype (ignore registered class)
+							ASFunction* btn_ctor = &g_stub_ctors[1]; // Button is index 1
+							if (btn_ctor->prototype_obj == NULL)
+								initButtonPrototype(app_context, btn_ctor);
+							if (btn_ctor->prototype_obj != NULL) {
 								ActionVar proto_var = {0};
 								proto_var.type = ACTION_STACK_VALUE_OBJECT;
-								proto_var.data.numeric_value = (u64) mc_proto;
+								proto_var.data.numeric_value = (u64) btn_ctor->prototype_obj;
 								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+							}
+						} else {
+							int _am_ver = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+							void* reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver);
+							if (reg_ctor != NULL) {
+								ASFunction* ctor_func = (ASFunction*)reg_ctor;
+								if (ctor_func->prototype_obj == NULL) {
+									ctor_func->prototype_obj = allocObject(app_context, 4);
+									retainObject(ctor_func->prototype_obj);
+									setObjectProto(app_context, ctor_func->prototype_obj);
+									ActionVar ctor_var = {0};
+									ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+									ctor_var.data.numeric_value = (u64) ctor_func;
+									setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+								}
+								ActionVar proto_var = {0};
+								proto_var.type = ACTION_STACK_VALUE_OBJECT;
+								proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
+								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+							} else {
+								// No registered class — set default __proto__ to version-appropriate MovieClip.prototype
+								ASObject* mc_proto = getMovieClipPrototype(_am_ver);
+								if (mc_proto != NULL) {
+									ActionVar proto_var = {0};
+									proto_var.type = ACTION_STACK_VALUE_OBJECT;
+									proto_var.data.numeric_value = (u64) mc_proto;
+									setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+								}
 							}
 						}
 					}
@@ -36101,7 +36113,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					setVariableByName(_am_buf2, &mc_var);
 					// Fire registered class constructor synchronously during attachMovie
 					// (Flash fires it before returning to caller script)
-					{
+					// Button symbols skip constructor (Flash doesn't fire registerClass for buttons)
+					if (!attached->is_button_mc) {
 						int _am_ver2 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
 						void* _am_reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver2);
 						if (_am_reg_ctor != NULL) {
@@ -41297,37 +41310,50 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Library MCs report DefineSprite data size for getBytesLoaded/Total
 						attached->byte_size = 4;  // Minimum DefineSprite: SpriteID(2) + FrameCount(2)
 
-						// Set __proto__ from registered class (if any) BEFORE initObject
+						// Set __proto__ BEFORE initObject
 						{
 							if (attached->dynamic_props == NULL) {
 								attached->dynamic_props = (void*) allocObject(app_context, 8);
 								retainObject((ASObject*) attached->dynamic_props);
 							}
-							int _am_ver3 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
-							void* reg_ctor = lookupRegisteredClassVersion(linkage_id, _am_ver3);
-							if (reg_ctor != NULL) {
-								ASFunction* ctor_func = (ASFunction*)reg_ctor;
-								if (ctor_func->prototype_obj == NULL) {
-									ctor_func->prototype_obj = allocObject(app_context, 4);
-									retainObject(ctor_func->prototype_obj);
-									setObjectProto(app_context, ctor_func->prototype_obj);
-									ActionVar ctor_var = {0};
-									ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-									ctor_var.data.numeric_value = (u64) ctor_func;
-									setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
-								}
-								ActionVar proto_var = {0};
-								proto_var.type = ACTION_STACK_VALUE_OBJECT;
-								proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
-								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
-							} else {
-								// No registered class — set default __proto__ to version-appropriate MovieClip.prototype
-								ASObject* mc_proto = getMovieClipPrototype(_am_ver3);
-								if (mc_proto != NULL) {
+							if (attached->is_button_mc) {
+								// Button symbols: __proto__ = Button.prototype (ignore registered class)
+								ASFunction* btn_ctor = &g_stub_ctors[1]; // Button is index 1
+								if (btn_ctor->prototype_obj == NULL)
+									initButtonPrototype(app_context, btn_ctor);
+								if (btn_ctor->prototype_obj != NULL) {
 									ActionVar proto_var = {0};
 									proto_var.type = ACTION_STACK_VALUE_OBJECT;
-									proto_var.data.numeric_value = (u64) mc_proto;
+									proto_var.data.numeric_value = (u64) btn_ctor->prototype_obj;
 									setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+								}
+							} else {
+								int _am_ver3 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+								void* reg_ctor = lookupRegisteredClassVersion(linkage_id, _am_ver3);
+								if (reg_ctor != NULL) {
+									ASFunction* ctor_func = (ASFunction*)reg_ctor;
+									if (ctor_func->prototype_obj == NULL) {
+										ctor_func->prototype_obj = allocObject(app_context, 4);
+										retainObject(ctor_func->prototype_obj);
+										setObjectProto(app_context, ctor_func->prototype_obj);
+										ActionVar ctor_var = {0};
+										ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+										ctor_var.data.numeric_value = (u64) ctor_func;
+										setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+									}
+									ActionVar proto_var = {0};
+									proto_var.type = ACTION_STACK_VALUE_OBJECT;
+									proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
+									setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+								} else {
+									// No registered class — set default __proto__ to version-appropriate MovieClip.prototype
+									ASObject* mc_proto = getMovieClipPrototype(_am_ver3);
+									if (mc_proto != NULL) {
+										ActionVar proto_var = {0};
+										proto_var.type = ACTION_STACK_VALUE_OBJECT;
+										proto_var.data.numeric_value = (u64) mc_proto;
+										setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
+									}
 								}
 							}
 						}
@@ -41369,7 +41395,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 
 						// Fire registered class constructor synchronously
-						{
+						// Button symbols skip constructor (Flash doesn't fire registerClass for buttons)
+						if (!attached->is_button_mc) {
 							int _am_ver4 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
 							void* _am_reg_ctor2 = lookupRegisteredClassVersion(linkage_id, _am_ver4);
 							if (_am_reg_ctor2 != NULL) {
