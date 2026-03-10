@@ -4,7 +4,7 @@ Last updated: 2026-03-10
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **507/618 (82.0%)** total (CI run on d9e5dbcf). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits).
+Current pass rate: **509/618 (82.4%)** total (CI run on a5bc34f5). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits).
 
 ---
 
@@ -18,7 +18,7 @@ Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at 
 |-----|----------------|---------------|--------|
 | ~~Per-movie `_global`~~ | ~~SWF7+ need separate `_global`~~ | ~~global_swf5_6_7_8_9, loadmovienum_cross_version_prototype~~ | **CANCELLED** (Ruffle shares `_global`) |
 | ~~Failed load state~~ | ~~`_framesloaded`/`getBytesTotal` return `-1`~~ | ~~movieclip_state_values~~ | **DONE** |
-| Child RegisterClass | Classes registered in child SWF's DoInitAction | register_class (64/66), register_class_swf6 | **ACTIONABLE** |
+| ~~Child RegisterClass~~ | ~~Classes registered in child SWF's DoInitAction~~ | ~~register_class, register_class_swf6~~ | **DONE** (export-versioned lookup) |
 | MCL cross-version root replace | Closure clearing, _name reset | mcl_replace_root_swf7_to_swf5/swf6 | **ACTIONABLE** |
 | Mouse events | root_button_mode needs mouse dispatch | root_button_mode | **BLOCKED** |
 

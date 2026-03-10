@@ -4,10 +4,10 @@ Last updated: 2026-03-10
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 507/618 (82.0%) total (CI run on d9e5dbcf)
+- **Pass rate (CI, last run)**: 509/618 (82.4%) total (CI run on a5bc34f5)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
-- **Main failure types**: output_mismatch, runtime_error, compile_fail
-- **Recent gains**: clip_depth sprite mask fix (mask_with_drawing, mask_reapply now strict-pass). Strict image baseline 8→9/31. Tolerance-based baseline 8→27/32 (verify_output.py).
+- **Main failure types**: output_mismatch (46), segfault (2, ignored), timeout (1, ignored)
+- **Recent gains**: register_class 66/66 ✅, register_class_swf6 38/38 ✅ (export-versioned registerClass lookup). HCALLOC fix unlocked movieclip_invalid_get_bounds_6/7 (0/10 → 8/10). 4 textsnapshot tests pass locally (not yet in CI).
 - **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes.
 
 ## Crashes and Errors (8 tests)
@@ -19,8 +19,8 @@ Last updated: 2026-03-10
 | native_objects_swf6 | ~~segfault~~ PASS | 84/84 ✅ | NativeType tracking, stub constructors, Date re-init blocking |
 | native_objects_swf7 | ~~segfault~~ PASS | 84/84 ✅ | Same fix as swf6 |
 | native_objects_swf8 | ~~segfault~~ PASS | 84/84 ✅ | + flash.* filter dispatch, TextRenderer/Transform |
-| movieclip_invalid_get_bounds_6 | runtime_error | 0/0 | FrameLabelEntry typedef fixed; now hits runtime error |
-| movieclip_invalid_get_bounds_7 | runtime_error | 0/0 | Same as _6 |
+| movieclip_invalid_get_bounds_6 | ~~runtime_error~~ output_mismatch | 8/10 | Fixed: HCALLOC fix (mismatched calloc/FREE). Remaining: child bounds precision + parent getBounds after child load |
+| movieclip_invalid_get_bounds_7 | ~~runtime_error~~ output_mismatch | 8/10 | Same fix as _6 |
 | timeout | timeout | 0/0 | Infinite loop — needs script execution timeout mechanism |
 
 ## Top Near-Passing Tests (best ROI to fix)
@@ -99,6 +99,8 @@ Last updated: 2026-03-10
 | `root_onload` | PASS ✅ | Root MC onLoad dispatch (was compile_fail, now fixed) |
 | `root_global_parent` | 6/6 ✅ | mc._global member access in GetMember |
 | `device_font_spacing` | 91/91 ✅ | Conditional pixel rounding based on embedFonts property |
+| `register_class` | 66/66 ✅ | Export-versioned registerClass lookup for cross-version attachMovie |
+| `register_class_swf6` | 38/38 ✅ | Same fix — SWF6 parent + SWF17 child cross-version registry isolation |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -106,8 +108,8 @@ Last updated: 2026-03-10
 | ~~`define_local_with_paths`~~ | ~~53/54~~ **54/54 ✅** | Fixed: type 1 function slash-path resolution in DefineLocal |
 | ~~`movieclip_getbounds`~~ | ~~189/191~~ **191/191 ✅** | Fixed: round transformed AABB to integer twips (Ruffle Twips model) |
 | ~~`text_format_get_text_extent_undefined_width`~~ | ~~8/10~~ **10/10 ✅** | Fixed: valueOf coercion on getTextExtent width argument |
-| `edittext_default_format_empty` | ~95/100 (95%) | 5 missing `display = block;` lines — SWF code doesn't access `display` property; Ruffle's expected output injects it (see RUFFLE_VS_FLASH_DIFFERENCES.md). Permanent diff. |
-| `edittext_scroll` | 52/54 (96%) | Mixed-font maxscroll/bottomScroll (font metrics) |
+| `edittext_default_format_empty` | ~95/100 (95%) | 5 missing `display = block;` lines — permanent diff (see RUFFLE_VS_FLASH_DIFFERENCES.md) |
+| `edittext_scroll` | 52/54 (96%) | Mixed-font maxscroll/bottomScroll (font metrics — needs per-line height for mixed fonts) |
 | ~~`global_swf5_6_7_8_9`~~ | ~~1073/1145~~ **1145/1145 ✅** | Fixed: per-version-group Function.prototype + SWF5 _global restriction + function valueOf/toString display |
 
 ### Regressions to investigate
@@ -146,7 +148,7 @@ Last updated: 2026-03-10
 | INPUT_EVENTS_PLAN | **Phases 1-3 DONE** | 22+ input tests pass | Phase 4 (rollover/rollout) |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **8/8 PASS** → `complete/` | 8/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅, interface_implements_op 47/47 ✅) | — |
-| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | 13/15 pass (register_underflow ✅, register_globals_across_frames ✅, attach_movie ✅, attach_movie_stop ✅, empty_movieclip_can_attach_movies ✅, export_assets ✅, register_class_return_value ✅, on_construct ✅, clip_constructors ✅, movieclip_init_object ✅, do_init_action_child ✅, register_class_with_sound ✅) | register_class 26/67 (loadMovie), register_and_init_order ~76/233 (sprite init ordering) |
+| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | **15/15 pass** (+ register_class 66/66 ✅, register_class_swf6 38/38 ✅ via export-versioned lookup) | register_and_init_order 36/231 (sprite init ordering regression) |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **ALL PHASES COMPLETE** → `complete/` | 4/5 pass (native_objects_swf7/8 ✅, native_double_construct ✅, native_subclasses 190/191 ✅) | native_objects_swf6 83/84 (1 line Ruffle vs Flash diff, ignored); native_subclasses 1 line timezone diff (ignored) |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: button dispatch (string_paths_eval), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 34/35), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
@@ -154,7 +156,7 @@ Last updated: 2026-03-10
 | FOCUS_SYSTEM_PLAN | **6/7 PASS** → `blocked/` | focus_root_movie ✅, focusrect_focuslost ✅, movieclip_focusenabled ✅, focus_mouse ✅, focus_keyboard_press ✅ (60/60), focus_mouse_rollout ✅ (4/4) | Remaining 1: focus_mouse_focusable blocked by dynamic object creation |
 | TAB_ORDERING_PLAN | **16/16 PASS** → `complete/` | All 16 tests PASS including edittext_tab_focus ✅ (13/13), tab_ordering_events_mouse ✅ (65/65), tab_ordering_automatic_order_same_position ✅ (12/12) | — |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
-| LOADMOVIE_PLAN | **31/35 core tests PASS** → `blocked/` | Phase 6 CANCELLED (Ruffle shares `_global`). loadmovie_var_persistence ✅, loadmovienum_cross_version_prototype ✅ newly passing | Remaining: child RegisterClass (ACTIONABLE), MCL cross-version root replace, mouse events |
+| LOADMOVIE_PLAN | **31/35 core tests PASS** → `blocked/` | Phase 6 CANCELLED. Child RegisterClass ✅ DONE. | Remaining: MCL cross-version root replace, mouse events |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | ASNATIVE_ASNEW_PLAN | **COMPLETE** → `complete/` | asnative 34/34 ✅, asnew 34/34 ✅ | — |
@@ -173,19 +175,21 @@ Last updated: 2026-03-10
 | CUSTOM_CLIP_METHODS_PLAN | **COMPLETE** → `complete/` | custom_clip_methods 4/4 ✅ | — |
 | GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN | **COMPLETE** → `complete/` | movieclip_gettextsnapshot 112/112 ✅ | — |
 
-## Recommended Work Order (updated 2026-03-07)
+## Recommended Work Order (updated 2026-03-10)
 
 ### Actionable — Quick wins
-1. **Script halting regressions** — ~~remove_movie_clip (25/29)~~ ✅ FIXED, register_and_init_order (36/231) still broken (constructor ordering), ~~removed_target_clip_scope (7/35)~~ improved to 34/35.
-2. ~~**interface_implements_op regression**~~ — ✅ FIXED 47/47: scope chain search in actionNewObject + own_props fallback in instanceOfCoercing.
-3. ~~**define_local_with_paths**~~ — ✅ FIXED 54/54: type 1 function slash-path resolution.
-4. ~~**movieclip_getbounds**~~ — ✅ FIXED 191/191: integer twips rounding for cross-target getBounds.
-5. ~~**text_format_get_text_extent_undefined_width**~~ — ✅ FIXED 10/10: valueOf coercion on getTextExtent width arg.
-6. **Font metrics accuracy** — edittext_scroll (52/54), edittext_newlines (23/30), edittext_bullet (18/30). Incremental improvements possible.
+1. ~~**Child RegisterClass**~~ — ✅ FIXED: register_class 66/66, register_class_swf6 38/38. Export-versioned registerClass lookup.
+2. **Font metrics accuracy** — edittext_scroll (52/54), edittext_newlines (23/30), edittext_bullet (18/30). Needs per-line height for mixed-font text.
+3. **removed_target_clip_scope** (34/35) — child MC resolution via GetVariable in non-root sprite context.
+4. **register_and_init_order** (36/231) — constructor ordering regression from script halting changes.
+5. **MCL cross-version root replace** (Phase 15) — mcl_replace_root_swf7_to_swf5/swf6 (14/57, 17/57). Far from passing.
 
-### Newly actionable (2026-03-10)
-1. **Child RegisterClass** (Phase 11) — register_class (64/66), register_class_swf6 (~30/38). Was blocked on Phase 6, now unblocked. Child class constructor typeof/prototype issue.
-2. **MCL cross-version root replace** (Phase 15) — mcl_replace_root_swf7_to_swf5/swf6. Closure variable clearing, _name reset.
+### Quick wins exhausted
+All simple fixes have been applied. Remaining failing tests require:
+- Font metrics improvements (mixed-font line height)
+- Mouse event dispatch (rollover/rollout, shape-flag hitTest)
+- LoadMovie infrastructure improvements (parent getBounds after child load)
+- Deep architectural changes (constructor ordering, call() termination, closure capture)
 
 ### Remaining blocked work (from blocked/ plans)
 - **TEXTFIELD_PLAN remaining** — scroll, newlines, bullet (font metrics), SWF6 HTML. 57/62 pass.
@@ -197,6 +201,13 @@ Last updated: 2026-03-10
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** (reduced blocker): Phase 6 cancelled. Remaining loadMovie issues block: BUTTON_PLAN (root_button_mode, mouse events), some getBounds tests.
 - **FOCUS_SYSTEM_PLAN** — 7/7 pass (focus_remove ✅ newly fixed). TAB_ORDERING_PLAN fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-10 continued)
+- **Pass rate: 507→509/618 (82.4%)**: +2 from register_class (66/66 PASS) and register_class_swf6 (38/38 PASS)
+- **register_class + register_class_swf6 FIXED**: Export-versioned registerClass lookup. `ng_lookupExportVersion()` returns the SWF version of the movie that DEFINED the exported symbol. All 6 registerClass lookup sites in action.c updated to use export version for registry selection (case-sensitive vs case-insensitive). Matches Ruffle's `self.movie().version()` behavior in `get_registered_avm1_constructor()`.
+- **HCALLOC fix**: `actionNewMethod` DefineFunction2 constructor path used `calloc()` but freed with `FREE()` (heap_free). Fixed to `HCALLOC()`. Resolved runtime_error crash in movieclip_invalid_get_bounds_6/7 (0/10 → 8/10 each).
+- **4 textsnapshot tests pass locally** (not yet in CI): textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_text_order. CI still shows output_mismatch — needs investigation.
+- **Near-passing test investigation**: Exhaustive sweep of all 46 remaining output_mismatch tests. No more quick wins found. Remaining failures require font metrics (edittext_scroll 52/54), mouse events, loadMovie infrastructure, or architectural changes.
 
 ### Session notes (2026-03-10)
 - **Pass rate: 505→507/618 (82.0%)**: +2 from focus_remove (33/33 PASS), root_onload (compile_fail→PASS)
