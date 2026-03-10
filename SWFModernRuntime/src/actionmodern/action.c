@@ -8070,9 +8070,17 @@ static ASObject* g_object_proto_legacy = NULL;
 static ASObject* g_object_proto_modern = NULL;
 static ASObject* g_array_proto_legacy = NULL;
 static ASObject* g_array_proto_modern = NULL;
+// Per-version-group Function.prototype for function __proto__ identity
+static ASObject* g_function_proto_legacy = NULL;  // SWF 1-6
+static ASObject* g_function_proto_modern = NULL;  // SWF 7+
 static int g_secondary_global_init = 0;
 
 static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
+
+// Get the version-appropriate Function.prototype (for function __proto__ identity)
+static inline ASObject* getFunctionProto(int version) {
+	return (version <= 6) ? g_function_proto_legacy : g_function_proto_modern;
+}
 
 // Get the version-appropriate _global object
 static inline ASObject* getActiveGlobal(void) {
@@ -21209,7 +21217,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	g_ctors[0].prototype_obj = getObjectPrototype(app_context);
 	g_ctors[0].own_props = allocObject(app_context, 4);
 	retainObject(g_ctors[0].own_props);
-	setObjectProto(app_context, g_ctors[0].own_props);
+	// __proto__ set to Function.prototype at end of ensureGlobalInit
 	registerGeomMethod(&g_registerClass_func_global, "registerClass",
 		(Function2Ptr)actionObjectRegisterClass, app_context,
 		g_ctors[0].own_props);
@@ -21595,6 +21603,32 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		g_object_proto_modern = g_object_prototype;
 		g_array_proto_modern = g_array_prototype;
 	}
+
+	// Create Function.prototype for the primary version group.
+	// Each version group has a distinct Function.prototype so that
+	// cross-group func.__proto__ === comparisons return false.
+	{
+		ASObject* fn_proto = allocObject(app_context, 4);
+		retainObject(fn_proto);
+		// Function.prototype.__proto__ = Object.prototype
+		ActionVar op_val; op_val.type = ACTION_STACK_VALUE_OBJECT; op_val.str_size = 0;
+		op_val.data.numeric_value = (u64) g_object_prototype;
+		setProperty(app_context, fn_proto, "__proto__", 9, &op_val);
+		if (g_primary_version_group == 0)
+			g_function_proto_legacy = fn_proto;
+		else
+			g_function_proto_modern = fn_proto;
+
+		// Set __proto__ on all constructors that have own_props to Function.prototype
+		// (replaces previous setObjectProto which pointed to Object.prototype)
+		for (int ci = 0; ci < 18; ci++) {
+			if (g_ctors[ci].own_props != NULL) {
+				ActionVar fp; fp.type = ACTION_STACK_VALUE_OBJECT; fp.str_size = 0;
+				fp.data.numeric_value = (u64) fn_proto;
+				setProperty(app_context, g_ctors[ci].own_props, "__proto__", 9, &fp);
+			}
+		}
+	}
 }
 
 // Copy all properties from src to dst, preserving flags
@@ -21618,8 +21652,18 @@ static ASFunction* createConstructorCopy(SWFAppContext* app_context, ASFunction*
 	// Clear prototype_obj — it will be lazily created as a new instance
 	// (with __proto__ pointing to the secondary Object.prototype)
 	copy->prototype_obj = NULL;
-	// Clear own_props — fresh instance
-	copy->own_props = NULL;
+	// Allocate own_props with __proto__ pointing to secondary Function.prototype
+	int sec_vg = 1 - g_primary_version_group;
+	ASObject* fn_proto = (sec_vg == 0) ? g_function_proto_legacy : g_function_proto_modern;
+	if (fn_proto) {
+		copy->own_props = allocObject(app_context, 4);
+		retainObject(copy->own_props);
+		ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+		fp.data.numeric_value = (u64) fn_proto;
+		setProperty(app_context, copy->own_props, "__proto__", 9, &fp);
+	} else {
+		copy->own_props = NULL;
+	}
 	return copy;
 }
 
@@ -21689,6 +21733,19 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		g_array_proto_modern = sec_arr_proto;
 	}
 
+	// Create Function.prototype for the secondary version group
+	{
+		ASObject* fn_proto = allocObject(app_context, 4);
+		retainObject(fn_proto);
+		ActionVar op_val; op_val.type = ACTION_STACK_VALUE_OBJECT; op_val.str_size = 0;
+		op_val.data.numeric_value = (u64) sec_obj_proto;
+		setProperty(app_context, fn_proto, "__proto__", 9, &op_val);
+		if (vg == 0)
+			g_function_proto_legacy = fn_proto;
+		else
+			g_function_proto_modern = fn_proto;
+	}
+
 	// Create secondary _global object
 	ASObject* sec_global = allocObject(app_context, 64);
 	retainObject(sec_global);
@@ -21710,6 +21767,15 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	// Register Object.registerClass on secondary Object — copy from primary global's Object
 	sec_obj_ctor->own_props = allocObject(app_context, 4);
 	retainObject(sec_obj_ctor->own_props);
+	// Set __proto__ to this group's Function.prototype
+	{
+		ASObject* fn_proto = (vg == 0) ? g_function_proto_legacy : g_function_proto_modern;
+		if (fn_proto) {
+			ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+			fp.data.numeric_value = (u64) fn_proto;
+			setProperty(app_context, sec_obj_ctor->own_props, "__proto__", 9, &fp);
+		}
+	}
 	{
 		// Find registerClass from the primary global's Object constructor
 		ActionVar* pri_obj_var = getProperty(global_object, "Object", 6);
@@ -21740,11 +21806,21 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	int ctor_name_lens[] = {6, 6, 7, 8};
 	int num_extra = (target_version >= 6) ? 4 : 3; // Function is SWF6+ only
 	ASFunction* sec_extra_ctors[4];
+	int sec_vg = 1 - g_primary_version_group;
+	ASObject* sec_fn_proto = (sec_vg == 0) ? g_function_proto_legacy : g_function_proto_modern;
 	for (int i = 0; i < num_extra; i++) {
 		sec_extra_ctors[i] = (ASFunction*) malloc(sizeof(ASFunction));
 		memset(sec_extra_ctors[i], 0, sizeof(ASFunction));
 		strncpy(sec_extra_ctors[i]->name, ctor_names[i], 255);
 		sec_extra_ctors[i]->function_type = 1;
+		// Set own_props with __proto__ to secondary Function.prototype
+		if (sec_fn_proto) {
+			sec_extra_ctors[i]->own_props = allocObject(app_context, 4);
+			retainObject(sec_extra_ctors[i]->own_props);
+			ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+			fp.data.numeric_value = (u64) sec_fn_proto;
+			setProperty(app_context, sec_extra_ctors[i]->own_props, "__proto__", 9, &fp);
+		}
 	}
 
 	// MovieClip constructor — separate instance
@@ -21775,6 +21851,13 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	memset(sec_error_ctor, 0, sizeof(ASFunction));
 	strncpy(sec_error_ctor->name, "Error", 255);
 	sec_error_ctor->function_type = 1;
+	if (sec_fn_proto) {
+		sec_error_ctor->own_props = allocObject(app_context, 4);
+		retainObject(sec_error_ctor->own_props);
+		ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+		fp.data.numeric_value = (u64) sec_fn_proto;
+		setProperty(app_context, sec_error_ctor->own_props, "__proto__", 9, &fp);
+	}
 
 	// Stub constructors — fresh instances
 	ASFunction* sec_stub_ctors[18];
@@ -22782,7 +22865,15 @@ check_special_vars:
 				// Add registerClass as a static method on Object (own_props)
 				g_object_constructor.own_props = allocObject(app_context, 4);
 				retainObject(g_object_constructor.own_props);
-				setObjectProto(app_context, g_object_constructor.own_props);
+				// Set __proto__ to Function.prototype (not Object.prototype)
+				{
+					ASObject* _fn_p = getFunctionProto(g_swf_version);
+					if (_fn_p) {
+						ActionVar _fpv = {0}; _fpv.type = ACTION_STACK_VALUE_OBJECT;
+						_fpv.data.numeric_value = (u64)_fn_p;
+						setProperty(app_context, g_object_constructor.own_props, "__proto__", 9, &_fpv);
+					}
+				}
 				registerGeomMethod(&g_registerClass_func, "registerClass",
 					(Function2Ptr)actionObjectRegisterClass, app_context,
 					g_object_constructor.own_props);
@@ -30283,7 +30374,22 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 			if (!found)
-				pushUndefined(app_context);
+			{
+				// Virtual __proto__: return version-group Function.prototype
+				// User functions have swf_version > 0; built-ins have 0 (use current context)
+				if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0)
+				{
+					int fv = (func->swf_version > 0) ? func->swf_version : g_swf_version;
+					ASObject* fn_proto = getFunctionProto(fv);
+					if (fn_proto) {
+						PUSH(ACTION_STACK_VALUE_OBJECT, (u64) fn_proto);
+					} else {
+						pushUndefined(app_context);
+					}
+				}
+				else
+					pushUndefined(app_context);
+			}
 		}
 		else
 		{
