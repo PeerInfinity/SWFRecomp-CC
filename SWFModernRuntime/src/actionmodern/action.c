@@ -36275,12 +36275,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		ActionVar callable_this = {0};
 		int has_callable_this = 0;
 
-		// During child SWF init, check MC's dynamic_props FIRST.
-		// Child SWF functions are scoped to the MC and should shadow global definitions.
+		// In non-root context, check MC's dynamic_props FIRST.
+		// Functions defined during child SWF init or DoInitAction are stored on
+		// the MC's dynamic_props and should shadow global definitions when
+		// executing in that MC's scope.
 		{
 			extern MovieClip root_movieclip;
-			if (g_child_swf_init > 0 &&
-			    g_current_context != NULL && g_current_context != &root_movieclip &&
+			if (g_current_context != NULL && g_current_context != &root_movieclip &&
 			    g_current_context->dynamic_props != NULL)
 			{
 				ASObject* _dp = (ASObject*)g_current_context->dynamic_props;
