@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a3a41118d694` (2026-03-10T04:58:01.138660+00:00)
-**Current:** `e1901ae56ad4` (2026-03-10T05:27:12.013967+00:00)
+**Previous:** `e1901ae56ad4` (2026-03-10T05:27:12.013967+00:00)
+**Current:** `dce6e972ec40` (2026-03-10T06:05:19.843296+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 504 | 504 | 0 |
+| Passing | 504 | 505 | +1 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 81.6% | 81.6% | 0% |
-| Mismatched lines | 19212 | 19264 | +52 |
-|   Increased | | | +52 |
+| Pass rate | 81.6% | 81.7% | +0.1% |
+| Mismatched lines | 19264 | 19263 | -1 |
+|   Decreased | | | -1 |
 
-## Status Changed (1)
+## Newly Passing (1)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `movieclip_hittest_shapeflag` | compile_fail | output_mismatch | - | 286/338 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `movieclip_in_removed_button` | output_mismatch | 3/4 | 4/4 |
