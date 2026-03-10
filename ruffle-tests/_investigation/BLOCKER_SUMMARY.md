@@ -4,7 +4,7 @@ Last updated: 2026-03-09
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **501/619 (80.9%)** total (CI run on e7443545). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits). 19 plans in `blocked/`, 52 in `complete/`, 0 in `incomplete/`.
+Current pass rate: **502/619 (81.1%)** total (CI run on 21dadefb). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits). 18 plans in `blocked/`, 53 in `complete/`, 0 in `incomplete/`.
 
 ---
 
@@ -16,29 +16,26 @@ Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at 
 
 | Gap | What's Missing | Tests Blocked |
 |-----|----------------|---------------|
-| Per-movie `_global` | SWF7+ each need separate `_global` with own constructors. We use a two-group model (SWF≤6, SWF7+). See Blocker 2. | global_swf5_6_7_8_9, mcl_events_swf_version, loadmovienum_cross_version_prototype |
+| Per-movie `_global` | SWF7+ each need separate `_global` with own constructors. We use a two-group model (SWF≤6, SWF7+). ~~See Blocker 2.~~ Blocker 2 RESOLVED (global_swf5_6_7_8_9 PASS). | ~~global_swf5_6_7_8_9~~, mcl_events_swf_version, loadmovienum_cross_version_prototype |
 | Failed load state | `_framesloaded`/`getBytesTotal`/`getSWFVersion` should return `-1` on failed loads | movieclip_state_values |
 | Child URL/version | Loaded MC's `_url` and `getSWFVersion()` should reflect child SWF, not parent | movieclip_library_state_values (76/78), multiple MCL tests |
 | Sequential MCL dispatch | Multiple `loadClip` calls should fire events one-per-frame, not all-at-once | mcl_events_swf_version |
 | Child RegisterClass | Classes registered in child SWF's DoInitAction need child scope context | register_class (26/67), register_class_swf6 |
 
-**Plans blocked**: LOADMOVIE_PLAN (Phase 6), LOADMOVIE_REMAINING_PLAN (5 tests), CROSS_VERSION_ISOLATION_PLAN, ROOT_REPLACEMENT_PLAN (3 tests), SWF_VERSION_SEMANTICS_PLAN (2 tests), REGISTERCLASS_PLAN (2 tests), BUTTON_PLAN (root_button_mode), HIT_TESTING_PLAN (invalid_get_bounds 1-8), GLOBALS_PLAN (global_swf5_6_7_8_9), UNCOVERED_SMALL_TESTS (sandbox_type_remote, resolve_different_root)
+**Plans blocked**: LOADMOVIE_PLAN (Phase 6), LOADMOVIE_REMAINING_PLAN (5 tests), CROSS_VERSION_ISOLATION_PLAN, ROOT_REPLACEMENT_PLAN (3 tests), SWF_VERSION_SEMANTICS_PLAN (2 tests), REGISTERCLASS_PLAN (2 tests), BUTTON_PLAN (root_button_mode), HIT_TESTING_PLAN (invalid_get_bounds 1-8), ~~GLOBALS_PLAN (global_swf5_6_7_8_9)~~, UNCOVERED_SMALL_TESTS (sandbox_type_remote, resolve_different_root)
 
 ---
 
-## Blocker 2: Per-Movie `_global` Isolation — PARTIALLY RESOLVED
+## ~~Blocker 2: Per-Movie `_global` Isolation~~ RESOLVED
 
-**Impact**: 1 test, 72 lines (down from 114)
+`global_swf5_6_7_8_9` now **1145/1145 PASS**. All issues resolved:
 
-**Resolved**: The two-group `_global` model (`g_global_legacy` for SWF≤6, `g_global_modern` for SWF7+) is CORRECT. Investigation confirmed `global_swf6_7_8` expects `g7 === g8: true` — SWF7+ share `_global`. Per-movie `_global` was attempted and REVERTED (caused regressions).
+- **SWF5 `_global` restriction**: `GetVariable("_global")` returns undefined for SWF≤5
+- **Object constructor display**: `objectCallValueOf`/`objectCallToString` fixed for function types
+- **Two-group `_global` model**: Confirmed correct (SWF≤6 legacy, SWF7+ modern share `_global`)
+- **Per-version-group Function.prototype**: `g_function_proto_legacy`/`g_function_proto_modern` give each version group its own `Function.prototype`. All constructors (primary and secondary) get `own_props.__proto__` set to the appropriate Function.prototype. Virtual `__proto__` fallback in `actionGetMember` for functions without own_props.
 
-**Fixed items**:
-- SWF5 `_global` restriction: `GetVariable("_global")` returns undefined for SWF≤5
-- Object constructor display: `objectCallValueOf`/`objectCallToString` no longer invoke inherited Object.prototype methods on function own_props, so functions correctly display as `[type Function]`
-
-**Remaining gap**: Per-movie `Function.prototype` identity (72 diff lines). Each loaded movie should have its own `Function.prototype` so that `func1.__proto__ !== func2.__proto__` across different movies. Our implementation shares `Object.prototype` for all functions' `own_props.__proto__`.
-
-**Plans blocked**: PER_MOVIE_GLOBAL_ISOLATION_PLAN (blocked/ — Function.prototype only)
+Key learning: Function.prototype is per-version-group (not per-movie). Confirmed by Ruffle source (`core/src/avm1/runtime.rs` — two `GlobalEnv` instances).
 
 ---
 
@@ -199,12 +196,12 @@ SWF-version-specific number parsing (hex/octal) has been fully implemented.
 ## Dependency Graph
 
 ```
-Per-movie _global ◄──── LoadMovie Phase 6
+~~Per-movie _global~~ ◄── LoadMovie Phase 6 (RESOLVED — Blocker 2)
        │
        ▼
 Cross-version isolation ──► ROOT_REPLACEMENT
        │                    SWF_VERSION_SEMANTICS
-       ▼                    GLOBALS (global_swf5_6_7_8_9)
+       ▼                    ~~GLOBALS (global_swf5_6_7_8_9)~~ RESOLVED
 LOADMOVIE_REMAINING ──────► REGISTERCLASS (child SWFs)
                             HIT_TESTING (invalid_get_bounds)
                             BUTTON (root_button_mode)
@@ -239,7 +236,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 9. ~~**interface_implements_op regression**~~ — **RESOLVED** (47/47 PASS)
 
 ### Architectural (requires significant design work)
-1. **Per-movie `_global` isolation** — Move from two-group to per-movie globals
+1. ~~**Per-movie `_global` isolation**~~ — **RESOLVED**. Per-version-group Function.prototype. global_swf5_6_7_8_9 **1145/1145 PASS**.
 2. **SWF6 HTML paragraph model** — Version-specific HTML parser path
 3. **call() early termination** — Script execution abort mechanism
 
@@ -253,7 +250,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 | Blocker | Tests | Lines Blocked | Feasibility |
 |---------|-------|---------------|-------------|
 | LoadMovie / multi-SWF | 25+ | 2000+ | Moderate (incremental) |
-| Per-movie `_global` | 4-6 | 400+ | Moderate (architectural) |
+| ~~Per-movie `_global`~~ | ~~4-6~~ | ~~400+~~ | **RESOLVED** |
 | ~~MTASC class infra~~ | ~~1~~ | ~~50~~ | **MOSTLY RESOLVED** (1 test left, blocked by LoadMovie) |
 | Font metrics | 3 | ~21 | Moderate |
 | SWF6 HTML model | 1 | 1480 | Low (complex refactor) |

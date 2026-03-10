@@ -4,7 +4,7 @@ Last updated: 2026-03-09
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 501/619 (80.9%) total (CI run on e7443545)
+- **Pass rate (CI, last run)**: 502/619 (81.1%) total (CI run on 21dadefb)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
 - **Recent gains**: clip_depth sprite mask fix (mask_with_drawing, mask_reapply now strict-pass). Strict image baseline 8→9/31. Tolerance-based baseline 8→27/32 (verify_output.py).
@@ -108,7 +108,7 @@ Last updated: 2026-03-09
 | ~~`text_format_get_text_extent_undefined_width`~~ | ~~8/10~~ **10/10 ✅** | Fixed: valueOf coercion on getTextExtent width argument |
 | `edittext_default_format_empty` | ~95/100 (95%) | 5 missing `display = block;` lines — SWF code doesn't access `display` property; Ruffle's expected output injects it (see RUFFLE_VS_FLASH_DIFFERENCES.md). Permanent diff. |
 | `edittext_scroll` | 52/54 (96%) | Mixed-font maxscroll/bottomScroll (font metrics) |
-| `global_swf5_6_7_8_9` | 1073/1145 (93.7%) | 72 remaining diffs: per-movie Function.prototype identity (architectural). Fixed: SWF5 _global restriction + function valueOf/toString display |
+| ~~`global_swf5_6_7_8_9`~~ | ~~1073/1145~~ **1145/1145 ✅** | Fixed: per-version-group Function.prototype + SWF5 _global restriction + function valueOf/toString display |
 
 ### Regressions to investigate
 | Test | Before | After | Cause |
@@ -154,7 +154,7 @@ Last updated: 2026-03-09
 | FOCUS_SYSTEM_PLAN | **6/7 PASS** → `blocked/` | focus_root_movie ✅, focusrect_focuslost ✅, movieclip_focusenabled ✅, focus_mouse ✅, focus_keyboard_press ✅ (60/60), focus_mouse_rollout ✅ (4/4) | Remaining 1: focus_mouse_focusable blocked by dynamic object creation |
 | TAB_ORDERING_PLAN | **16/16 PASS** → `complete/` | All 16 tests PASS including edittext_tab_focus ✅ (13/13), tab_ordering_events_mouse ✅ (65/65), tab_ordering_automatic_order_same_position ✅ (12/12) | — |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
-| LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 24/49 pass (loadmovie_flashvars ✅, do_init_action_child ✅, global_swf6_7_8 ✅ newly fixed) | Phase 6 (cross-version globals) needs per-version _global (Phase 2 of CROSS_VERSION_ISOLATION_PLAN); remaining blocked on RegisterClass, display list, mouse events |
+| LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 25/49 pass (loadmovie_flashvars ✅, do_init_action_child ✅, global_swf6_7_8 ✅, global_swf5_6_7_8_9 ✅ newly fixed) | Phase 6 (cross-version globals) partially resolved (Function.prototype done); remaining blocked on RegisterClass, display list, mouse events |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | ASNATIVE_ASNEW_PLAN | **COMPLETE** → `complete/` | asnative 34/34 ✅, asnew 34/34 ✅ | — |
@@ -196,6 +196,11 @@ All actionable plans have been completed. Remaining failing tests are blocked by
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
 - **FOCUS_SYSTEM_PLAN** — 6/7 pass. TAB_ORDERING_PLAN now fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-09 continued)
+- **global_swf5_6_7_8_9 1145/1145 PASS** (was 1073/1145): Per-version-group Function.prototype resolves all 72 `__proto__` identity diffs. Two new globals `g_function_proto_legacy`/`g_function_proto_modern` with `getFunctionProto(version)` helper. Primary group created at end of `ensureGlobalInit`, secondary in `ensureSecondaryGlobalInit`. All constructors (primary via loop, secondary via `createConstructorCopy` + extra ctors) get `own_props.__proto__` set. Virtual `__proto__` fallback in `actionGetMember` FUNCTION path.
+- **PER_MOVIE_GLOBAL_ISOLATION_PLAN moved to complete/**: Blocker 2 fully resolved. Key insight: Function.prototype is per-version-group (2 objects), not per-movie (confirmed via Ruffle source). child9.swf is SWF5, not SWF9.
+- **Pass rate: 501→502/619 (81.1%)**: +1 from global_swf5_6_7_8_9, no regressions.
 
 ### Session notes (2026-03-09)
 - **Clip_depth sprite mask fix**: `actionIterateDrawings` now skips MCs whose DisplayObject has `clip_depth > 0`. This prevents double-rendering of Drawing API content from clip_depth mask sprites (once into stencil, once in normal pass). 4-line fix in action.c.
