@@ -480,6 +480,11 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str);
 // ==================================================================
 // Note: uses void* for constructor pointers because ASFunction is defined
 // later in this file. Cast to ASFunction* when accessing.
+//
+// Ruffle uses TWO constructor registries: case-sensitive (SWF7+) and
+// case-insensitive (SWF<=6). Registration uses the calling code's SWF
+// version; lookup uses the new MC's movie SWF version. The two registries
+// are completely separate.
 #define MAX_REGISTERED_CLASSES 128
 
 typedef struct {
@@ -487,43 +492,112 @@ typedef struct {
 	void* constructor; // ASFunction* or NULL (unregistered)
 } RegisteredClassEntry;
 
-static RegisteredClassEntry g_registered_classes[MAX_REGISTERED_CLASSES];
-static size_t g_registered_class_count = 0;
+// Case-sensitive registry (SWF7+)
+static RegisteredClassEntry g_registered_classes_cs[MAX_REGISTERED_CLASSES];
+static size_t g_registered_class_count_cs = 0;
+
+// Case-insensitive registry (SWF<=6) — keys stored as lowercase
+static RegisteredClassEntry g_registered_classes_ci[MAX_REGISTERED_CLASSES];
+static size_t g_registered_class_count_ci = 0;
+
+static void _toLowerBuf(char* dst, const char* src, size_t max_len)
+{
+	size_t i;
+	for (i = 0; i < max_len - 1 && src[i]; i++)
+		dst[i] = (src[i] >= 'A' && src[i] <= 'Z') ? (src[i] + 32) : src[i];
+	dst[i] = '\0';
+}
+
+// Forward declarations for version-aware registry functions
+void* lookupRegisteredClassVersion(const char* symbol_name, int swf_version);
+static void registerClassForSymbolVersion(const char* symbol_name, void* constructor, int swf_version);
 
 // Look up a registered class constructor by symbol name.
+// swf_version determines which registry (case-sensitive vs insensitive).
 // Returns NULL if not found or if unregistered (constructor == NULL).
 void* lookupRegisteredClass(const char* symbol_name)
 {
-	// Last match wins (in case of re-registration)
-	void* result = NULL;
-	for (size_t i = 0; i < g_registered_class_count; i++)
+	// Default: use g_swf_version for backward compat with old call sites
+	return lookupRegisteredClassVersion(symbol_name, g_swf_version);
+}
+
+void* lookupRegisteredClassVersion(const char* symbol_name, int swf_version)
+{
+	if (swf_version >= 7)
 	{
-		if (strcmp(g_registered_classes[i].symbol_name, symbol_name) == 0)
-			result = g_registered_classes[i].constructor;
+		// Case-sensitive lookup
+		void* result = NULL;
+		for (size_t i = 0; i < g_registered_class_count_cs; i++)
+		{
+			if (strcmp(g_registered_classes_cs[i].symbol_name, symbol_name) == 0)
+				result = g_registered_classes_cs[i].constructor;
+		}
+		return result;
 	}
-	return result;
+	else
+	{
+		// Case-insensitive lookup — lowercase the query
+		char lower[128];
+		_toLowerBuf(lower, symbol_name, sizeof(lower));
+		void* result = NULL;
+		for (size_t i = 0; i < g_registered_class_count_ci; i++)
+		{
+			if (strcmp(g_registered_classes_ci[i].symbol_name, lower) == 0)
+				result = g_registered_classes_ci[i].constructor;
+		}
+		return result;
+	}
 }
 
 // Register or unregister a class for a symbol name.
-// constructor=NULL means unregister.
+// swf_version determines which registry. constructor=NULL means unregister.
 static void registerClassForSymbol(const char* symbol_name, void* constructor)
 {
-	// Check if already registered — update in place
-	for (size_t i = 0; i < g_registered_class_count; i++)
+	// Use g_swf_version (current execution context)
+	registerClassForSymbolVersion(symbol_name, constructor, g_swf_version);
+}
+
+static void registerClassForSymbolVersion(const char* symbol_name, void* constructor, int swf_version)
+{
+	if (swf_version >= 7)
 	{
-		if (strcmp(g_registered_classes[i].symbol_name, symbol_name) == 0)
+		// Case-sensitive registry
+		for (size_t i = 0; i < g_registered_class_count_cs; i++)
 		{
-			g_registered_classes[i].constructor = constructor;
-			return;
+			if (strcmp(g_registered_classes_cs[i].symbol_name, symbol_name) == 0)
+			{
+				g_registered_classes_cs[i].constructor = constructor;
+				return;
+			}
+		}
+		if (g_registered_class_count_cs < MAX_REGISTERED_CLASSES)
+		{
+			strncpy(g_registered_classes_cs[g_registered_class_count_cs].symbol_name, symbol_name, 127);
+			g_registered_classes_cs[g_registered_class_count_cs].symbol_name[127] = '\0';
+			g_registered_classes_cs[g_registered_class_count_cs].constructor = constructor;
+			g_registered_class_count_cs++;
 		}
 	}
-	// New entry
-	if (g_registered_class_count < MAX_REGISTERED_CLASSES)
+	else
 	{
-		strncpy(g_registered_classes[g_registered_class_count].symbol_name, symbol_name, 127);
-		g_registered_classes[g_registered_class_count].symbol_name[127] = '\0';
-		g_registered_classes[g_registered_class_count].constructor = constructor;
-		g_registered_class_count++;
+		// Case-insensitive registry — store key as lowercase
+		char lower[128];
+		_toLowerBuf(lower, symbol_name, sizeof(lower));
+		for (size_t i = 0; i < g_registered_class_count_ci; i++)
+		{
+			if (strcmp(g_registered_classes_ci[i].symbol_name, lower) == 0)
+			{
+				g_registered_classes_ci[i].constructor = constructor;
+				return;
+			}
+		}
+		if (g_registered_class_count_ci < MAX_REGISTERED_CLASSES)
+		{
+			strncpy(g_registered_classes_ci[g_registered_class_count_ci].symbol_name, lower, 127);
+			g_registered_classes_ci[g_registered_class_count_ci].symbol_name[127] = '\0';
+			g_registered_classes_ci[g_registered_class_count_ci].constructor = constructor;
+			g_registered_class_count_ci++;
+		}
 	}
 }
 
@@ -536,6 +610,7 @@ int g_use_network = 0;       // UseNetwork flag from FileAttributes tag
 u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
 u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
 static u32 g_call_depth = 0;
+static int g_child_swf_init = 0;  // >0 during child SWF init (MCL/loadMovie); scopes funcs to MC
 
 // ==================================================================
 // Effective SWF Version (accounts for function context)
@@ -18987,7 +19062,9 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			// Switch to child's SWF version during init (with per-movie global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
+			int _saved_child_init = g_child_swf_init;
 			g_swf_version = entry->swf_version;
+			g_child_swf_init = 1;
 			ensureSecondaryGlobalInit(app_context, entry->swf_version);
 			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -19024,6 +19101,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
+			g_child_swf_init = _saved_child_init;
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -19084,7 +19162,9 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			// Switch to child's SWF version during init (with per-movie global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
+			int _saved_child_init2 = g_child_swf_init;
 			g_swf_version = entry->swf_version;
+			g_child_swf_init = 1;
 			ensureSecondaryGlobalInit(app_context, entry->swf_version);
 			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -19097,6 +19177,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
+			g_child_swf_init = _saved_child_init2;
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -19814,7 +19895,9 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             MovieClip* _saved_ctx = g_current_context;
             int _saved_ver = g_swf_version;
             ASObject* _saved_global = global_object;
+            int _saved_child_init = g_child_swf_init;
             g_swf_version = loads[i].entry->swf_version;
+            g_child_swf_init = 1;
             ensureSecondaryGlobalInit(app_context, loads[i].entry->swf_version);
             if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
             else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -19827,6 +19910,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             actionSetCurrentContext(_saved_ctx);
             g_swf_version = _saved_ver;
             global_object = _saved_global;
+            g_child_swf_init = _saved_child_init;
         }
     }
 
@@ -27274,7 +27358,9 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			MovieClip* _saved_ctx = g_current_context;
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
+			int _saved_child_init3 = g_child_swf_init;
 			g_swf_version = entry->swf_version;
+			g_child_swf_init = 1;
 			ensureSecondaryGlobalInit(app_context, entry->swf_version);
 			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -27286,6 +27372,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			actionSetCurrentContext(_saved_ctx);
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
+			g_child_swf_init = _saved_child_init3;
 		} else if (_gu2_mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -32264,7 +32351,8 @@ void actionNewObject(SWFAppContext* app_context)
 void actionSetupRegisteredClassPrototype(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
 {
 	if (export_name == NULL || mc == NULL) return;
-	void* raw_ctor = lookupRegisteredClass(export_name);
+	int mc_ver = (mc->swf_version) ? mc->swf_version : g_swf_version;
+	void* raw_ctor = lookupRegisteredClassVersion(export_name, mc_ver);
 	if (raw_ctor == NULL) return;
 
 	ASFunction* ctor_func = (ASFunction*)raw_ctor;
@@ -32306,7 +32394,8 @@ void actionSetupRegisteredClassPrototype(SWFAppContext* app_context, const char*
 void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc)
 {
 	if (export_name == NULL || mc == NULL) return;
-	void* raw_ctor = lookupRegisteredClass(export_name);
+	int mc_ver = (mc->swf_version) ? mc->swf_version : g_swf_version;
+	void* raw_ctor = lookupRegisteredClassVersion(export_name, mc_ver);
 	if (raw_ctor == NULL) return;
 
 	ASFunction* ctor_func = (ASFunction*)raw_ctor;
@@ -34161,13 +34250,23 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 		}
 	}
 
-	// Register function
-	if (function_count < MAX_FUNCTIONS) {
-		function_registry[function_count++] = as_func;
-	} else {
-		fprintf(stderr, "ERROR: Function registry full\n");
-		free(as_func);
-		return;
+	// During child SWF init (MCL/loadMovie), scope functions to the MC's
+	// dynamic_props only — do NOT pollute the global function_registry or
+	// variable table.  This prevents child SWF definitions from shadowing
+	// the parent's identically-named functions.
+	// Note: DoInitAction for same-SWF sprites should NOT be scoped (g_child_swf_init=0).
+	extern MovieClip root_movieclip;
+	int _df1_is_child = (g_child_swf_init > 0 && g_current_context != NULL && g_current_context != &root_movieclip);
+
+	// Register function in global registry (unless in child SWF init)
+	if (!_df1_is_child) {
+		if (function_count < MAX_FUNCTIONS) {
+			function_registry[function_count++] = as_func;
+		} else {
+			fprintf(stderr, "ERROR: Function registry full\n");
+			free(as_func);
+			return;
+		}
 	}
 
 	// If named, store in variable
@@ -34192,19 +34291,19 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 			}
 		}
 
-		setVariableByName(name, &func_var);
-		if (resolved_name != name && strlen(resolved_name) > 0) {
-			setVariableByName(resolved_name, &func_var);
-		}
-		// Also store on MC's dynamic_props when in non-root context
-		// (matches DefineLocal behavior — non-root scope stores on the MC)
-		extern MovieClip root_movieclip;
-		if (g_current_context != NULL && g_current_context != &root_movieclip) {
+		if (_df1_is_child) {
+			// Child SWF context: store on MC's dynamic_props only
 			MovieClip* ctx = g_current_context;
 			if (ctx->dynamic_props == NULL) {
 				ctx->dynamic_props = (void*)allocObject(app_context, 8);
 			}
-			setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
+			setProperty(app_context, (ASObject*)ctx->dynamic_props, resolved_name, strlen(resolved_name), &func_var);
+		} else {
+			// Root context: store in global variable table
+			setVariableByName(name, &func_var);
+			if (resolved_name != name && strlen(resolved_name) > 0) {
+				setVariableByName(resolved_name, &func_var);
+			}
 		}
 	} else {
 		// Anonymous function: push to stack
@@ -34261,13 +34360,23 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 		}
 	}
 
-	// Register function
-	if (function_count < MAX_FUNCTIONS) {
-		function_registry[function_count++] = as_func;
-	} else {
-		fprintf(stderr, "ERROR: Function registry full\n");
-		free(as_func);
-		return;
+	// During child SWF init (MCL/loadMovie), scope functions to the MC's
+	// dynamic_props only — do NOT pollute the global function_registry or
+	// variable table.  This prevents child SWF definitions from shadowing
+	// the parent's identically-named functions.
+	// Note: DoInitAction for same-SWF sprites should NOT be scoped (g_child_swf_init=0).
+	extern MovieClip root_movieclip;
+	int _df2_is_child = (g_child_swf_init > 0 && g_current_context != NULL && g_current_context != &root_movieclip);
+
+	// Register function in global registry (unless in child SWF init)
+	if (!_df2_is_child) {
+		if (function_count < MAX_FUNCTIONS) {
+			function_registry[function_count++] = as_func;
+		} else {
+			fprintf(stderr, "ERROR: Function registry full\n");
+			free(as_func);
+			return;
+		}
 	}
 
 	// If named, store in variable
@@ -34292,19 +34401,19 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 			}
 		}
 
-		setVariableByName(name, &func_var);
-		if (resolved_name != name && strlen(resolved_name) > 0) {
-			setVariableByName(resolved_name, &func_var);
-		}
-		// Also store on MC's dynamic_props when in non-root context
-		// (matches DefineLocal behavior — non-root scope stores on the MC)
-		extern MovieClip root_movieclip;
-		if (g_current_context != NULL && g_current_context != &root_movieclip) {
+		if (_df2_is_child) {
+			// Child SWF context: store on MC's dynamic_props only
 			MovieClip* ctx = g_current_context;
 			if (ctx->dynamic_props == NULL) {
 				ctx->dynamic_props = (void*)allocObject(app_context, 8);
 			}
-			setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
+			setProperty(app_context, (ASObject*)ctx->dynamic_props, resolved_name, strlen(resolved_name), &func_var);
+		} else {
+			// Root context: store in global variable table
+			setVariableByName(name, &func_var);
+			if (resolved_name != name && strlen(resolved_name) > 0) {
+				setVariableByName(resolved_name, &func_var);
+			}
 		}
 	} else {
 		// Anonymous function: push to stack
@@ -35861,7 +35970,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 #ifdef NO_GRAPHICS
 		if (num_args >= 3) {
 			extern MovieClip root_movieclip;
-			MovieClip* mc = &root_movieclip;
+			MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
 			char _am_buf1[256], _am_buf2[256];
 			if (args[0].type == ACTION_STACK_VALUE_STRING) {
 				const uint16_t* _u16 = varGetU16Ptr(&args[0]);
@@ -35883,7 +35992,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Set __proto__ from registered class (if any) BEFORE initObject
 					// Constructor invocation happens in ng_fire_pending_attach_inits (deferred)
 					{
-						void* reg_ctor = lookupRegisteredClass(_am_buf1);
+						int _am_ver = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+						void* reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver);
 						if (attached->dynamic_props == NULL) {
 							attached->dynamic_props = (void*) allocObject(app_context, 8);
 							retainObject((ASObject*) attached->dynamic_props);
@@ -35904,13 +36014,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
 							setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
 						} else {
-							// No registered class — set default __proto__ to MovieClip.prototype
-							extern ASFunction g_movieclip_constructor;
-							extern int g_movieclip_constructor_init;
-							if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+							// No registered class — set default __proto__ to version-appropriate MovieClip.prototype
+							ASObject* mc_proto = getMovieClipPrototype(_am_ver);
+							if (mc_proto != NULL) {
 								ActionVar proto_var = {0};
 								proto_var.type = ACTION_STACK_VALUE_OBJECT;
-								proto_var.data.numeric_value = (u64) g_movieclip_constructor.prototype_obj;
+								proto_var.data.numeric_value = (u64) mc_proto;
 								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
 							}
 						}
@@ -35943,7 +36052,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Fire registered class constructor synchronously during attachMovie
 					// (Flash fires it before returning to caller script)
 					{
-						void* _am_reg_ctor = lookupRegisteredClass(_am_buf1);
+						int _am_ver2 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+						void* _am_reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver2);
 						if (_am_reg_ctor != NULL) {
 							actionInvokeRegisteredClassConstructor(app_context, _am_buf1, attached);
 						}
@@ -36142,10 +36252,29 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// If not a built-in function, look up user-defined functions
 	if (!builtin_handled)
 	{
-		ASFunction* func = lookupFunctionByName(func_name, func_name_len);
+		ASFunction* func = NULL;
 		// Track whether function was found on a WITH scope object (for this binding)
 		ActionVar callable_this = {0};
 		int has_callable_this = 0;
+
+		// During child SWF init, check MC's dynamic_props FIRST.
+		// Child SWF functions are scoped to the MC and should shadow global definitions.
+		{
+			extern MovieClip root_movieclip;
+			if (g_child_swf_init > 0 &&
+			    g_current_context != NULL && g_current_context != &root_movieclip &&
+			    g_current_context->dynamic_props != NULL)
+			{
+				ASObject* _dp = (ASObject*)g_current_context->dynamic_props;
+				ActionVar* _dp_val = getProperty(_dp, func_name, func_name_len);
+				if (_dp_val != NULL && _dp_val->type == ACTION_STACK_VALUE_FUNCTION)
+					func = (ASFunction*)_dp_val->data.numeric_value;
+			}
+		}
+
+		// Global function registry lookup
+		if (func == NULL)
+			func = lookupFunctionByName(func_name, func_name_len);
 
 		// Try slash-path resolution: /:foo -> foo (Flash 4 root variable syntax)
 		if (func == NULL && func_name_len > 2 && func_name[0] == '/' && func_name[1] == ':')
@@ -41110,7 +41239,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								attached->dynamic_props = (void*) allocObject(app_context, 8);
 								retainObject((ASObject*) attached->dynamic_props);
 							}
-							void* reg_ctor = lookupRegisteredClass(linkage_id);
+							int _am_ver3 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+							void* reg_ctor = lookupRegisteredClassVersion(linkage_id, _am_ver3);
 							if (reg_ctor != NULL) {
 								ASFunction* ctor_func = (ASFunction*)reg_ctor;
 								if (ctor_func->prototype_obj == NULL) {
@@ -41127,13 +41257,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								proto_var.data.numeric_value = (u64) ctor_func->prototype_obj;
 								setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
 							} else {
-								// No registered class — set default __proto__ to MovieClip.prototype
-								extern ASFunction g_movieclip_constructor;
-								extern int g_movieclip_constructor_init;
-								if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
+								// No registered class — set default __proto__ to version-appropriate MovieClip.prototype
+								ASObject* mc_proto = getMovieClipPrototype(_am_ver3);
+								if (mc_proto != NULL) {
 									ActionVar proto_var = {0};
 									proto_var.type = ACTION_STACK_VALUE_OBJECT;
-									proto_var.data.numeric_value = (u64) g_movieclip_constructor.prototype_obj;
+									proto_var.data.numeric_value = (u64) mc_proto;
 									setProperty(app_context, (ASObject*)attached->dynamic_props, "__proto__", 9, &proto_var);
 								}
 							}
@@ -41177,7 +41306,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 						// Fire registered class constructor synchronously
 						{
-							void* _am_reg_ctor2 = lookupRegisteredClass(linkage_id);
+							int _am_ver4 = (mc && mc->swf_version) ? mc->swf_version : g_swf_version;
+							void* _am_reg_ctor2 = lookupRegisteredClassVersion(linkage_id, _am_ver4);
 							if (_am_reg_ctor2 != NULL) {
 								actionInvokeRegisteredClassConstructor(app_context, linkage_id, attached);
 							}
@@ -43723,7 +43853,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Run the child movie's init and frame 0 with child's SWF version
 						int _saved_ver = g_swf_version;
 						ASObject* _saved_global = global_object;
+						int _saved_child_init4 = g_child_swf_init;
 						g_swf_version = entry->swf_version;
+						g_child_swf_init = 1;
 						ensureSecondaryGlobalInit(app_context, entry->swf_version);
 						if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 						else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -43736,6 +43868,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						actionSetCurrentContext(_saved_ctx);
 						g_swf_version = _saved_ver;
 						global_object = _saved_global;
+						g_child_swf_init = _saved_child_init4;
 					} else if (mc != NULL) {
 						// Failed load: defer state change to next frame
 						if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
