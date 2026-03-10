@@ -8073,6 +8073,9 @@ static ASObject* g_array_proto_modern = NULL;
 // Per-version-group Function.prototype for function __proto__ identity
 static ASObject* g_function_proto_legacy = NULL;  // SWF 1-6
 static ASObject* g_function_proto_modern = NULL;  // SWF 7+
+// Per-version-group MovieClip constructor and prototype
+static ASFunction* g_mc_ctor_legacy = NULL;  // SWF 1-6
+static ASFunction* g_mc_ctor_modern = NULL;  // SWF 7+
 static int g_secondary_global_init = 0;
 
 static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
@@ -8080,6 +8083,21 @@ static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
 // Get the version-appropriate Function.prototype (for function __proto__ identity)
 static inline ASObject* getFunctionProto(int version) {
 	return (version <= 6) ? g_function_proto_legacy : g_function_proto_modern;
+}
+
+// Forward declaration (defined at ~line 8134)
+extern ASFunction g_movieclip_constructor;
+
+// Get the version-appropriate MovieClip constructor
+static inline ASFunction* getMovieClipCtor(int version) {
+	ASFunction* ctor = (version <= 6) ? g_mc_ctor_legacy : g_mc_ctor_modern;
+	return ctor ? ctor : &g_movieclip_constructor;
+}
+
+// Get the version-appropriate MovieClip.prototype
+static inline ASObject* getMovieClipPrototype(int version) {
+	ASFunction* ctor = getMovieClipCtor(version);
+	return ctor->prototype_obj;
 }
 
 // Get the version-appropriate _global object
@@ -8202,6 +8220,12 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 	}
 
 	g_movieclip_constructor_init = 1;
+
+	// Register as the primary version group's MC constructor
+	if (g_primary_version_group == 0)
+		g_mc_ctor_legacy = &g_movieclip_constructor;
+	else if (g_primary_version_group == 1)
+		g_mc_ctor_modern = &g_movieclip_constructor;
 }
 
 // TextField constructor function and prototype
@@ -21824,6 +21848,8 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	}
 
 	// MovieClip constructor — separate instance
+	// Ensure primary MovieClip.prototype is initialized first
+	initMovieClipPrototype(app_context);
 	ASFunction* sec_mc_ctor = createConstructorCopy(app_context, &g_movieclip_constructor, sec_obj_proto);
 	// Create prototype for secondary MC constructor with same methods
 	if (g_movieclip_constructor.prototype_obj != NULL) {
@@ -21836,6 +21862,11 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		mcv.data.numeric_value = (u64)sec_mc_ctor;
 		setPropertyWithFlags(app_context, sec_mc_ctor->prototype_obj, "constructor", 11, &mcv, PROPERTY_FLAGS_DONTENUM);
 	}
+	// Store as the secondary version group's MC constructor
+	if (vg == 0)
+		g_mc_ctor_legacy = sec_mc_ctor;
+	else
+		g_mc_ctor_modern = sec_mc_ctor;
 
 	// TextField, TextFormat — separate instances
 	ASFunction* sec_tf_ctor = createConstructorCopy(app_context, &g_textfield_constructor, sec_obj_proto);
@@ -22420,15 +22451,17 @@ void actionGetVariable(SWFAppContext* app_context)
 				return;
 			}
 			// Check MovieClip.prototype for methods (gotoAndStop, etc.)
-			if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL) {
-				ActionVar* mc_proto_prop = getPropertyWithPrototype(
-					g_movieclip_constructor.prototype_obj, var_name, var_name_len);
-				if (mc_proto_prop != NULL) {
-					g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
-					g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
-					g_last_callable_this_set = 1;
-					pushVar(app_context, mc_proto_prop);
-					return;
+			{
+				ASObject* mc_proto = getMovieClipPrototype(scope_mc[i]->swf_version ? scope_mc[i]->swf_version : g_swf_version);
+				if (mc_proto != NULL) {
+					ActionVar* mc_proto_prop = getPropertyWithPrototype(mc_proto, var_name, var_name_len);
+					if (mc_proto_prop != NULL) {
+						g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
+						g_last_callable_this_set = 1;
+						pushVar(app_context, mc_proto_prop);
+						return;
+					}
 				}
 			}
 		}
@@ -22885,9 +22918,10 @@ check_special_vars:
 		}
 		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0)
 		{
-			// Return the built-in MovieClip constructor as a function
+			// Return the version-appropriate MovieClip constructor
 			initMovieClipPrototype(app_context);
-			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_movieclip_constructor);
+			ASFunction* mc_ctor = getMovieClipCtor(g_swf_version);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)mc_ctor);
 			return;
 		}
 		else if (var_name_len == 9 && strncmp(var_name, "TextField", 9) == 0)
@@ -30976,16 +31010,43 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 		}
 
-		// Fall back to MovieClip.prototype chain
-		extern ASFunction g_movieclip_constructor;
-		extern int g_movieclip_constructor_init;
-		if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL)
+		// Explicit __proto__ handling: return the version-appropriate MovieClip.prototype
+		// (unless dynamic_props has __proto__ already set, e.g. via registerClass)
+		if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0)
 		{
-			ActionVar* prop = getPropertyWithPrototype(g_movieclip_constructor.prototype_obj, prop_name, prop_name_len);
-			if (prop != NULL)
+			// Check if dynamic_props has explicit __proto__ (registerClass sets this)
+			if (mc != NULL && mc->dynamic_props != NULL)
 			{
-				pushVar(app_context, prop);
-				return;
+				ActionVar* dp_proto = getProperty((ASObject*)mc->dynamic_props, "__proto__", 9);
+				if (dp_proto != NULL)
+				{
+					pushVar(app_context, dp_proto);
+					return;
+				}
+			}
+			// No explicit __proto__: return version-appropriate MovieClip.prototype
+			int mc_ver = (mc != NULL && mc->swf_version) ? mc->swf_version : g_swf_version;
+			ASObject* mc_proto = getMovieClipPrototype(mc_ver);
+			if (mc_proto != NULL) {
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)mc_proto);
+			} else {
+				pushUndefined(app_context);
+			}
+			return;
+		}
+
+		// Fall back to MovieClip.prototype chain
+		{
+			int mc_ver = (mc != NULL && mc->swf_version) ? mc->swf_version : g_swf_version;
+			ASObject* mc_proto = getMovieClipPrototype(mc_ver);
+			if (mc_proto != NULL)
+			{
+				ActionVar* prop = getPropertyWithPrototype(mc_proto, prop_name, prop_name_len);
+				if (prop != NULL)
+				{
+					pushVar(app_context, prop);
+					return;
+				}
 			}
 		}
 
@@ -43955,6 +44016,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_current_executing_func = func;
 						g_call_depth++;
 
+						// Switch to function's SWF version (closure version context)
+						int _mcm_saved_ver = 0; ASObject* _mcm_saved_global = NULL; int _mcm_saved_midx = 0;
+						switchToFunctionVersion(func, &_mcm_saved_ver, &_mcm_saved_global, &_mcm_saved_midx);
+
 						// SWF6+ closure: switch to function's base_clip
 						// SWF5: no closures — execute in receiver's context (mc)
 						// If base_clip is removed (depth==INT_MIN), fall back to receiver MC
@@ -44003,7 +44068,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_call_depth--;
 						g_current_executing_func = prev_exec_mc;
 
-						// Restore caller's context
+						// Restore caller's context and SWF version
+						restoreFunctionVersion(_mcm_saved_ver, _mcm_saved_global, _mcm_saved_midx);
 						actionSetCurrentContext(saved_cm_context);
 						g_current_sprite_obj = saved_cm_sprite;
 
