@@ -34299,10 +34299,19 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 			}
 			setProperty(app_context, (ASObject*)ctx->dynamic_props, resolved_name, strlen(resolved_name), &func_var);
 		} else {
-			// Root context: store in global variable table
+			// Store in global variable table
 			setVariableByName(name, &func_var);
 			if (resolved_name != name && strlen(resolved_name) > 0) {
 				setVariableByName(resolved_name, &func_var);
+			}
+			// Also store on MC's dynamic_props when in non-root context
+			// (e.g., DoInitAction for sprites — matches DefineLocal behavior)
+			if (g_current_context != NULL && g_current_context != &root_movieclip) {
+				MovieClip* ctx = g_current_context;
+				if (ctx->dynamic_props == NULL) {
+					ctx->dynamic_props = (void*)allocObject(app_context, 8);
+				}
+				setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
 			}
 		}
 	} else {
@@ -34409,10 +34418,19 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 			}
 			setProperty(app_context, (ASObject*)ctx->dynamic_props, resolved_name, strlen(resolved_name), &func_var);
 		} else {
-			// Root context: store in global variable table
+			// Store in global variable table
 			setVariableByName(name, &func_var);
 			if (resolved_name != name && strlen(resolved_name) > 0) {
 				setVariableByName(resolved_name, &func_var);
+			}
+			// Also store on MC's dynamic_props when in non-root context
+			// (e.g., DoInitAction for sprites — matches DefineLocal behavior)
+			if (g_current_context != NULL && g_current_context != &root_movieclip) {
+				MovieClip* ctx = g_current_context;
+				if (ctx->dynamic_props == NULL) {
+					ctx->dynamic_props = (void*)allocObject(app_context, 8);
+				}
+				setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
 			}
 		}
 	} else {
