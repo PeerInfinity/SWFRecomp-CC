@@ -1,26 +1,23 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b80f529ec258` (2026-03-10T19:30:48.992478+00:00)
-**Current:** `6856edc7e86f` (2026-03-10T20:42:48.671230+00:00)
+**Previous:** `6856edc7e86f` (2026-03-10T20:42:48.671230+00:00)
+**Current:** `a5bc34f5f337` (2026-03-10T21:26:50.290749+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 508 | 509 | +1 |
+| Passing | 509 | 509 | 0 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 82.2% | 82.4% | +0.2% |
-| Mismatched lines | 19234 | 19156 | -78 |
-|   Decreased | | | -78 |
+| Pass rate | 82.4% | 82.4% | 0% |
+| Mismatched lines | 19156 | 19194 | +38 |
+|   Decreased | | | -14 |
+|   Increased | | | +52 |
 
-## Newly Passing (1)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `register_class_swf6` | output_mismatch | 11/37 | 37/37 |
-
-## Status Changed (1)
+## Status Changed (3)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `movieclip_hittest_shapeflag` | output_mismatch | compile_fail | 286/338 | - |
+| `movieclip_hittest_shapeflag` | compile_fail | output_mismatch | - | 286/338 |
+| `movieclip_invalid_get_bounds_6` | runtime_error | output_mismatch | 1/10 | 8/10 |
+| `movieclip_invalid_get_bounds_7` | runtime_error | output_mismatch | 1/10 | 8/10 |
