@@ -11667,6 +11667,10 @@ MovieClip root_movieclip = {
 extern MovieClip* child_mc_cache[];
 extern int child_mc_count;
 
+// Forward declarations for focus tracking (defined in Selection section)
+static MovieClip* g_focused_mc;
+static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc);
+
 // Forward declaration for _level management (defined after child_mc_cache)
 #ifndef MAX_LEVELS
 #define MAX_LEVELS 16
@@ -12894,6 +12898,19 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 		    child_mc_cache[i]->depth != INT_MIN &&
 		    (child_mc_cache[i]->depth == as_depth || child_mc_cache[i]->depth == swf_depth) &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
+			// Clear focus if the invalidated MC (or one of its children) is focused
+			if (g_focused_mc != NULL) {
+				int _ifc = (g_focused_mc == child_mc_cache[i]);
+				if (!_ifc) {
+					MovieClip* _ifp = g_focused_mc->parent;
+					while (_ifp != NULL) {
+						if (_ifp == child_mc_cache[i]) { _ifc = 1; break; }
+						_ifp = _ifp->parent;
+					}
+				}
+				if (_ifc)
+					selection_do_focus_change(app_context, g_focused_mc, NULL);
+			}
 			child_mc_cache[i]->avm1_removed = 1;
 			child_mc_cache[i]->dynamic_props = NULL;
 			child_mc_cache[i]->ng_textfield_idx = -1;
@@ -33500,6 +33517,21 @@ void actionRemoveSprite(SWFAppContext* app_context)
 		#define AVM_MAX_REMOVE_DEPTH 2130690032
 		#endif
 		if (_rs_mc != NULL && _rs_mc->depth >= 0 && _rs_mc->depth < AVM_MAX_REMOVE_DEPTH) {
+			// Clear focus if the removed MC (or one of its children) is focused
+			if (g_focused_mc != NULL) {
+				// Check if focused MC IS the removed MC
+				int _rs_clear_focus = (g_focused_mc == _rs_mc);
+				// Also check if focused MC is a child of the removed MC
+				if (!_rs_clear_focus) {
+					MovieClip* _rs_p = g_focused_mc->parent;
+					while (_rs_p != NULL) {
+						if (_rs_p == _rs_mc) { _rs_clear_focus = 1; break; }
+						_rs_p = _rs_p->parent;
+					}
+				}
+				if (_rs_clear_focus)
+					selection_do_focus_change(app_context, g_focused_mc, NULL);
+			}
 			// Queue AS-set onUnload handler for deferred firing at ShowFrame
 			if (_rs_mc->dynamic_props != NULL) {
 				ActionVar* _rs_handler = getProperty((ASObject*)_rs_mc->dynamic_props, "onUnload", 8);
@@ -40549,6 +40581,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						#define AVM_MAX_REMOVE_DEPTH 2130690032
 						#endif
 						if (_apply_mc->depth >= 0 && _apply_mc->depth < AVM_MAX_REMOVE_DEPTH) {
+							// Clear focus if the removed MC (or one of its children) is focused
+							if (g_focused_mc != NULL) {
+								int _afc = (g_focused_mc == _apply_mc);
+								if (!_afc) {
+									MovieClip* _afp = g_focused_mc->parent;
+									while (_afp != NULL) {
+										if (_afp == _apply_mc) { _afc = 1; break; }
+										_afp = _afp->parent;
+									}
+								}
+								if (_afc)
+									selection_do_focus_change(app_context, g_focused_mc, NULL);
+							}
 							if (_apply_mc->dynamic_props != NULL) {
 								ActionVar* _ah = getProperty((ASObject*)_apply_mc->dynamic_props, "onUnload", 8);
 								if (_ah != NULL && _ah->type == ACTION_STACK_VALUE_FUNCTION) {
@@ -43796,6 +43841,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Timeline-placed clips (negative depth) and reserved-range clips are immune.
 			#define AVM_MAX_REMOVE_DEPTH 2130690032
 			if (mc != NULL && mc->depth >= 0 && mc->depth < AVM_MAX_REMOVE_DEPTH) {
+				// Clear focus if the removed MC (or one of its children) is focused
+				if (g_focused_mc != NULL) {
+					int _rmc_clear_focus = (g_focused_mc == mc);
+					if (!_rmc_clear_focus) {
+						MovieClip* _rmc_p = g_focused_mc->parent;
+						while (_rmc_p != NULL) {
+							if (_rmc_p == mc) { _rmc_clear_focus = 1; break; }
+							_rmc_p = _rmc_p->parent;
+						}
+					}
+					if (_rmc_clear_focus)
+						selection_do_focus_change(app_context, g_focused_mc, NULL);
+				}
 				// Queue onUnload handler for deferred firing at ShowFrame (matches Flash behavior)
 				if (mc->dynamic_props != NULL) {
 					ActionVar* _rmc_handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);

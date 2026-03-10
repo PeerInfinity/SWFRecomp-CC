@@ -820,8 +820,9 @@ def generate_movie_registry(prefixes, build_dir):
 def find_data_files(test_dir):
     """Find data files (non-.swf, non-.fla, non-config) in a test directory.
     These are files like testvars.txt that loadVariables loads at runtime."""
-    skip_names = {"test.swf", "test.fla", "test.toml", "test.as", "output.txt"}
-    skip_suffixes = {".swf", ".fla", ".toml"}
+    skip_names = {"test.swf", "test.fla", "test.toml", "test.as", "output.txt",
+                   "output.ruffle.txt", "input.json", "test_harness.c"}
+    skip_suffixes = {".swf", ".fla", ".toml", ".json", ".c", ".h", ".py"}
     data_files = []
     for f in sorted(test_dir.iterdir()):
         if f.is_dir():
