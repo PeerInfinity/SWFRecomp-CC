@@ -33156,7 +33156,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			// DefineFunction2 with full register support
 			ActionVar* registers = NULL;
 			if (user_ctor_func->register_count > 0) {
-				registers = (ActionVar*) calloc(user_ctor_func->register_count, sizeof(ActionVar));
+				registers = (ActionVar*) HCALLOC(user_ctor_func->register_count, sizeof(ActionVar));
 			}
 
 			// Create local scope for function
