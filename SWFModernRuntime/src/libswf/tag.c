@@ -3393,6 +3393,7 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 // Recursively fire CLIP_EVENT_UNLOAD for children of a display object.
 // Fires children-first (depth order within each sprite's display list),
 // recursing into nested sprites before firing the child's own unload.
+// Also invalidates child MCs so they don't fire onEnterFrame after parent removal.
 static void fire_recursive_child_unloads(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
@@ -3413,19 +3414,27 @@ static void fire_recursive_child_unloads(SWFAppContext* app_context,
 		}
 
 		// Fire this child's CLIP_EVENT_UNLOAD
-		if (obj->clip_action_count == 0) continue;
-		MovieClip* saved_ctx = g_current_context;
+		if (obj->clip_action_count > 0)
+		{
+			MovieClip* saved_ctx = g_current_context;
+			if (obj->instance_name != NULL)
+			{
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (mc) actionSetCurrentContext(mc);
+			}
+			for (size_t a = 0; a < obj->clip_action_count; a++)
+			{
+				if (obj->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+					obj->clip_actions[a].action(app_context);
+			}
+			actionSetCurrentContext(saved_ctx);
+		}
+
+		// Invalidate child MC so it won't fire onEnterFrame after parent removal.
+		// The parent's sprite_display_list will be freed by clear_display_entry,
+		// making child MC's display_obj a dangling pointer.
 		if (obj->instance_name != NULL)
-		{
-			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-			if (mc) actionSetCurrentContext(mc);
-		}
-		for (size_t a = 0; a < obj->clip_action_count; a++)
-		{
-			if (obj->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-				obj->clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
+			actionInvalidateCachedMovieClip(app_context, obj->instance_name, (int)i);
 	}
 }
 
