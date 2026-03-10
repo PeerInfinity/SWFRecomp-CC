@@ -28,6 +28,9 @@ The original plan proposed per-movie `_global` objects (one per loaded SWF). Imp
 - `Function.prototype` is per-version-group (not per-movie — confirmed by Ruffle source code at `core/src/avm1/runtime.rs` using two `GlobalEnv` instances)
 - child9.swf in the test is actually SWF version 5 (not 9), so grouping is: {child5(v5), child6(v6), child9(v5)} = legacy, {child7(v7), child8(v8)} = modern
 
+### Comprehensive Ruffle source confirmation (2026-03-10):
+Full investigation of `~/CC/ruffle/core/src/avm1/runtime.rs` confirmed: Ruffle has NO per-movie `_global` isolation for AVM1. The `Avm1` struct has exactly two `GlobalEnv` instances (case-sensitive/case-insensitive), shared across ALL loaded SWFs. All constructors, prototypes, and singletons (Math, Key, Mouse, Stage) are shared. Cross-movie `instanceof` returns TRUE (shared prototype chain). The LOADMOVIE_MULTI_SWF_PLAN Phase 6 was cancelled as a result — it was the documented "biggest blocker" but was never needed.
+
 ---
 
 ## Correction Record

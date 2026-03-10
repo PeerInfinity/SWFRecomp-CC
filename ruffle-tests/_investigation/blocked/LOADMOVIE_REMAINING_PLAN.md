@@ -1,13 +1,15 @@
 # LoadMovie Remaining Tests Plan
 <!-- TESTS: loadmovie_var_persistence, loadmovienum_cross_version_prototype, mcl_events_swf_version, movieclip_state_values, movieclip_library_state_values -->
 
-Last updated: 2026-02-27
+Last updated: 2026-03-10
 
-## Status: BLOCKED — 0/5 tests passing (1 near-pass at 77/78)
+## Status: MOSTLY DONE — 3/5 tests passing
 
-4 tests are blocked by fundamental loadMovie infrastructure limitations.
-1 test (`movieclip_library_state_values`) is near-passing at 77/78 lines — remaining
-diff is `_xmouse` (mouse position not simulated in test harness).
+3 tests now pass: `loadmovie_var_persistence` ✅, `loadmovienum_cross_version_prototype` ✅, `mcl_events_swf_version` ✅.
+`movieclip_library_state_values` near-passing at 76/78 (ignored — _xmouse + _url format diffs).
+`movieclip_state_values` at 41/114 (blocked on image loading).
+
+**Phase 6 (per-movie `_global`) was CANCELLED** — Ruffle shares `_global` across all movies (2026-03-10 investigation).
 
 ### Fixes completed (2026-02-27)
 

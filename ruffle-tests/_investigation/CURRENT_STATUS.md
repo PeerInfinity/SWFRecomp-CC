@@ -1,14 +1,14 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 502/619 (81.1%) total (CI run on 21dadefb)
+- **Pass rate (CI, last run)**: 507/618 (82.0%) total (CI run on d9e5dbcf)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch, runtime_error, compile_fail
 - **Recent gains**: clip_depth sprite mask fix (mask_with_drawing, mask_reapply now strict-pass). Strict image baseline 8→9/31. Tolerance-based baseline 8→27/32 (verify_output.py).
-- **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes. movieclip_invalid_get_bounds_3/4 each lost 1 line (3→2/13).
+- **Known regressions**: register_and_init_order (146→36/231) — constructor ordering issue from script halting changes.
 
 ## Crashes and Errors (8 tests)
 
@@ -154,7 +154,7 @@ Last updated: 2026-03-09
 | FOCUS_SYSTEM_PLAN | **6/7 PASS** → `blocked/` | focus_root_movie ✅, focusrect_focuslost ✅, movieclip_focusenabled ✅, focus_mouse ✅, focus_keyboard_press ✅ (60/60), focus_mouse_rollout ✅ (4/4) | Remaining 1: focus_mouse_focusable blocked by dynamic object creation |
 | TAB_ORDERING_PLAN | **16/16 PASS** → `complete/` | All 16 tests PASS including edittext_tab_focus ✅ (13/13), tab_ordering_events_mouse ✅ (65/65), tab_ordering_automatic_order_same_position ✅ (12/12) | — |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
-| LOADMOVIE_PLAN | **Phases 0-5,7 DONE** → `blocked/` | 25/49 pass (loadmovie_flashvars ✅, do_init_action_child ✅, global_swf6_7_8 ✅, global_swf5_6_7_8_9 ✅ newly fixed) | Phase 6 (cross-version globals) partially resolved (Function.prototype done); remaining blocked on RegisterClass, display list, mouse events |
+| LOADMOVIE_PLAN | **31/35 core tests PASS** → `blocked/` | Phase 6 CANCELLED (Ruffle shares `_global`). loadmovie_var_persistence ✅, loadmovienum_cross_version_prototype ✅ newly passing | Remaining: child RegisterClass (ACTIONABLE), MCL cross-version root replace, mouse events |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | ASNATIVE_ASNEW_PLAN | **COMPLETE** → `complete/` | asnative 34/34 ✅, asnew 34/34 ✅ | — |
@@ -183,19 +183,29 @@ Last updated: 2026-03-09
 5. ~~**text_format_get_text_extent_undefined_width**~~ — ✅ FIXED 10/10: valueOf coercion on getTextExtent width arg.
 6. **Font metrics accuracy** — edittext_scroll (52/54), edittext_newlines (23/30), edittext_bullet (18/30). Incremental improvements possible.
 
-### All quick wins exhausted
-All actionable plans have been completed. Remaining failing tests are blocked by architectural issues (per-movie `_global`, SWF6 HTML model, heap-allocated closures) or require features not feasible in the current architecture. Focus should be on regression fixes and incremental accuracy improvements.
+### Newly actionable (2026-03-10)
+1. **Child RegisterClass** (Phase 11) — register_class (64/66), register_class_swf6 (~30/38). Was blocked on Phase 6, now unblocked. Child class constructor typeof/prototype issue.
+2. **MCL cross-version root replace** (Phase 15) — mcl_replace_root_swf7_to_swf5/swf6. Closure variable clearing, _name reset.
 
 ### Remaining blocked work (from blocked/ plans)
 - **TEXTFIELD_PLAN remaining** — scroll, newlines, bullet (font metrics), SWF6 HTML. 57/62 pass.
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
-- **LOADMOVIE_PLAN Phase 6** — Per-movie `_global` isolation. Largest cross-cutting blocker.
+- ~~**LOADMOVIE_PLAN Phase 6**~~ — **CANCELLED**: Ruffle shares `_global` across movies. Was never needed.
 - **MC_REMOVAL_LIFECYCLE_PLAN** — call() early termination, SetTarget on removed base_clip.
 - **TYPE_COERCION_ADVANCED_PLAN** — coerce_to_object_monkeypatch blocked by closure variable capture (not feasible).
 
 ### Dependency Blockers (plans blocking other plans)
-- **LOADMOVIE_PLAN** blocks: GLOBALS_PLAN, HIT_TESTING_PLAN, BUTTON_PLAN (root_button_mode), SWF_VERSION_SEMANTICS_PLAN, ROOT_REPLACEMENT_PLAN, CROSS_VERSION_ISOLATION_PLAN, LOADMOVIE_REMAINING_PLAN, UNCOVERED_SMALL_TESTS (sandbox_type_remote)
-- **FOCUS_SYSTEM_PLAN** — 6/7 pass. TAB_ORDERING_PLAN now fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+- **LOADMOVIE_PLAN** (reduced blocker): Phase 6 cancelled. Remaining loadMovie issues block: BUTTON_PLAN (root_button_mode, mouse events), some getBounds tests.
+- **FOCUS_SYSTEM_PLAN** — 7/7 pass (focus_remove ✅ newly fixed). TAB_ORDERING_PLAN fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-10)
+- **Pass rate: 505→507/618 (82.0%)**: +2 from focus_remove (33/33 PASS), root_onload (compile_fail→PASS)
+- **focus_remove FIXED**: Focus clearing in all 4 MC removal paths (actionRemoveSprite, mc.removeMovieClip() builtin, removeMovieClip.apply(), actionInvalidateCachedMovieClip). Forward declarations for g_focused_mc and selection_do_focus_change moved before first use.
+- **root_onload FIXED**: verify_output.py find_data_files() was too permissive — output.ruffle.txt, .json/.c/.h/.py files were being embedded as data files in data_registry.c, causing compile errors.
+- **CRITICAL FINDING: Phase 6 (per-movie `_global` isolation) CANCELLED**: Investigation of Ruffle source (`~/CC/ruffle/core/src/avm1/runtime.rs`) confirmed Ruffle has NO per-movie `_global`. It has exactly 2 global environments (case-sensitive for SWF7+, case-insensitive for SWF≤6), shared across ALL loaded movies. This matches our existing two-group model. Phase 6 was the documented "biggest blocker" — turns out it was never needed.
+- **LoadMovie test count updated**: 31/35 core loadMovie tests pass locally (was documented as 24/49). Tests newly confirmed passing: loadmovie_var_persistence, loadmovienum_cross_version_prototype, global_swf5_6_7_8_9, global_swf6_7_8, resolve_different_root, mcl_loadclip_replace_root.
+- **Phase 11 (child RegisterClass) UNBLOCKED**: Was blocked on Phase 6, now actionable. register_class (64/66) — only 2 lines off (typeof mc = undefined, prototype check).
+- **LOADMOVIE_MULTI_SWF_PLAN.md fully updated**: Phase 6 cancelled, dependency graph simplified, test matrix refreshed, risk assessment rewritten.
 
 ### Session notes (2026-03-09 continued)
 - **global_swf5_6_7_8_9 1145/1145 PASS** (was 1073/1145): Per-version-group Function.prototype resolves all 72 `__proto__` identity diffs. Two new globals `g_function_proto_legacy`/`g_function_proto_modern` with `getFunctionProto(version)` helper. Primary group created at end of `ensureGlobalInit`, secondary in `ensureSecondaryGlobalInit`. All constructors (primary via loop, secondary via `createConstructorCopy` + extra ctors) get `own_props.__proto__` set. Virtual `__proto__` fallback in `actionGetMember` FUNCTION path.

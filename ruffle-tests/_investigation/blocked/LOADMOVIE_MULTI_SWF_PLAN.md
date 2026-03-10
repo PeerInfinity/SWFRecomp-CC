@@ -1,12 +1,23 @@
 # LoadMovie / Multi-SWF Infrastructure — Implementation Plan
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
-**Goal**: Close the remaining gaps in multi-SWF support. This is the single largest blocker in the project (11 plans, 25+ tests, 2000+ lines).
+**Goal**: Close the remaining gaps in multi-SWF support.
 
-**Current state**: Phases 0–5, 7, 8, 10, 13, and 14 are implemented. 27/49 loadMovie-related tests pass. The pre-compiled child movie registry, symbol prefix-renaming, MCL event dispatch, unloadMovie, loadVariables, two-group version globals, failed load state, sequential MCL dispatch, _root scope in loaded SWFs, and MCL root replacement all work.
+**Current state**: Phases 0–5, 7, 8, 10, 13, and 14 are implemented. **Phase 6 (per-movie `_global` isolation) was CANCELLED** — Ruffle investigation confirmed it shares `_global` across all movies (see below). **31/35 loadMovie-related tests pass locally** (up from documented 27/49).
 
-**Status: BLOCKED** — All remaining phases (6, 9, 11, 12) are blocked on per-movie `_global` isolation (Phase 6) or mouse event infrastructure (Phase 12).
+**Status: PARTIALLY BLOCKED** — Remaining failures are: child RegisterClass (Phase 11, now unblocked), MCL root replace cross-version (closure/name clearing), mouse events (Phase 12). Phase 6 is no longer a blocker.
+
+### Critical Finding: Ruffle Has NO Per-Movie `_global` Isolation (2026-03-10)
+
+Investigation of Ruffle source (`~/CC/ruffle/core/src/avm1/runtime.rs`) confirmed:
+- Ruffle's `Avm1` struct has exactly **two** global environments: `env_case_sensitive` (SWF7+) and `env_case_insensitive` (SWF≤6)
+- **All loaded SWFs share these same globals** — no per-movie isolation
+- All constructors (Object, Array, Function, etc.), prototypes, and singletons (Math, Key, Mouse, Stage) are shared
+- Cross-movie `instanceof` returns TRUE (shared prototype chain)
+- This matches our existing two-group model (`g_global_legacy` / `g_global_modern`)
+
+The Phase 6 plan was based on the incorrect assumption that Ruffle isolates `_global` per-movie (Flash Player does, but Ruffle does not). The tests that were supposedly blocked by Phase 6 (`global_swf5_6_7_8_9`, `loadmovienum_cross_version_prototype`) already pass without it.
 
 ---
 
@@ -103,33 +114,43 @@ static ASObject* g_array_proto_legacy/modern = NULL;
 
 | # | Gap | Tests Affected | Lines at Stake | Difficulty | Status |
 |---|-----|----------------|----------------|------------|--------|
-| 6 | Per-movie `_global` isolation | global_swf5_6_7_8_9 (88 lines), loadmovienum_cross_version_prototype (3 lines) | ~91 | HIGH | **BLOCKED** |
+| 6 | ~~Per-movie `_global` isolation~~ | ~~global_swf5_6_7_8_9, loadmovienum_cross_version_prototype~~ | ~~91~~ | ~~HIGH~~ | **CANCELLED** — Ruffle shares `_global` across all movies. Tests already pass. |
 | 8 | Failed load state (`-1` values) | movieclip_state_values | ~100+ | LOW | **DONE** (load_failed flag, DeferredFailedLoad queue, getter checks) |
 | 9 | Child URL / version properties | movieclip_library_state_values (1 _url line) | ~1 | LOW | **BLOCKED** (URL format inconsistent across tests — changing risks regressions; _xmouse needs mouse sim) |
 | 10 | Sequential MCL dispatch (one-per-frame) | mcl_events_swf_version | ~50 | MEDIUM | **DONE** — mcl_events_swf_version 232/232 PASS |
-| 11 | Child RegisterClass in child scope | register_class (19 lines), register_class_swf6 (34 lines) | ~53 | MEDIUM | **BLOCKED** (depends on Phase 6 for per-movie prototype isolation) |
+| 11 | Child RegisterClass in child scope | register_class (2 lines), register_class_swf6 (~8 lines) | ~10 | MEDIUM | **UNBLOCKED** — no longer depends on Phase 6. Actual issue: child class constructor timing/typeof |
 | 12 | Root button mode / mouse events | root_button_mode (10 lines) | ~10 | MEDIUM (needs mouse infra) | **BLOCKED** (mouse event sim) |
 | 13 | `_root` scope in loaded SWFs | resolve_different_root (2 lines) | ~2 | LOW | **DONE** — resolve_different_root PASS |
 | 14 | MCL loadClip replace root (MTASC) | mcl_loadclip_replace_root (1 line) | ~1 | MEDIUM | **DONE** — mcl_loadclip_replace_root PASS |
+| 15 | MCL root replace cross-version | mcl_replace_root_swf7_to_swf5/swf6 (~10 lines each) | ~20 | MEDIUM | **NEW** — closure var clearing, _name reset, onLoadProgress event count |
 
 ---
 
-## 3. Phase 6: Per-Movie `_global` Isolation
+## 3. Phase 6: Per-Movie `_global` Isolation — CANCELLED
 
-**Impact**: ~120 lines across 3 tests. Highest architectural complexity.
+**Status: CANCELLED** — Investigation of Ruffle source (2026-03-10) confirmed this is unnecessary.
 
-### Problem
+### Finding
 
-In Ruffle/Flash, each SWF7+ loaded movie gets its own `_global` object with **distinct constructor instances** (`Object`, `Array`, `MovieClip`, etc.). Cross-movie `instanceof` checks fail when constructors are shared because `instanceof` compares constructor identity.
+Ruffle's AVM1 runtime (`core/src/avm1/runtime.rs`) has exactly TWO global environments:
+```rust
+pub struct Avm1<'gc> {
+    env_case_sensitive: GlobalEnv<'gc>,   // SWF7+ (case-sensitive)
+    env_case_insensitive: GlobalEnv<'gc>, // SWF≤6 (case-insensitive)
+}
+```
 
-Our current model uses **two groups**:
-- `g_global_legacy` (SWF 1–6) — all legacy SWFs share one `_global`
-- `g_global_modern` (SWF 7+) — all modern SWFs share one `_global`
+All loaded SWFs share these same globals. There is NO per-movie `_global` isolation in Ruffle AVM1. This is a known difference from Flash Player, but since our test expected output comes from Ruffle, our existing two-group model (`g_global_legacy` / `g_global_modern`) is correct.
 
-This fails when:
-1. A SWF8 parent loads a SWF7 child — both share `g_global_modern`, so `parent._global === child._global` (wrong: should be different objects)
-2. A SWF6 parent loads a SWF5 child — both share `g_global_legacy`
-3. `{} instanceof child._global.Object` returns true (wrong: should be false, different constructor identity)
+### What's shared across all movies (confirmed):
+- `_global` object (one per case-sensitivity group)
+- All constructors: Object, Array, Function, String, Number, Boolean, MovieClip, etc.
+- All prototypes: Object.prototype, Array.prototype, etc.
+- All singletons: Math, Key, Mouse, Stage, Selection, Accessibility
+- Cross-movie `instanceof` returns TRUE (shared prototype chain)
+
+### Previous incorrect assumption
+The original plan assumed Ruffle isolates `_global` per-loaded-movie, requiring a `MovieGlobalEntry` per-movie tracking system. This was wrong — the tests that were supposedly blocked (`global_swf5_6_7_8_9`, `loadmovienum_cross_version_prototype`) already pass with our two-group model.
 
 ### What the Tests Expect
 
@@ -592,13 +613,7 @@ The onLoadStart event should fire when the MCL loadClip begins loading the child
 ## 11. Dependency Graph
 
 ```
-Phase 6 (Per-Movie _global) ─── BLOCKED (high complexity, core architectural change)
-    │
-    ├──► Phase 11 (Child RegisterClass) — needs child's global context ── BLOCKED
-    │
-    ├──► global_swf5_6_7_8_9 test (88 lines remaining)
-    │
-    └──► loadmovienum_cross_version_prototype test (3 lines)
+Phase 6 (Per-Movie _global) ─── CANCELLED ❌ (Ruffle shares _global, not per-movie)
 
 Phase 8 (Failed Load State) ──► movieclip_state_values ─── DONE ✅
 
@@ -606,64 +621,68 @@ Phase 9 (Child URL/Version) ──► movieclip_library_state_values ─── B
 
 Phase 10 (Sequential MCL) ──► mcl_events_swf_version ─── DONE ✅
 
+Phase 11 (Child RegisterClass) ──► register_class, register_class_swf6 ─── UNBLOCKED (investigate)
+
 Phase 12 (Mouse Events) ──► root_button_mode ─── BLOCKED (separate infra)
 
 Phase 13 (_root Scope) ──► resolve_different_root ─── DONE ✅
 
 Phase 14 (MCL Root Replace) ──► mcl_loadclip_replace_root ─── DONE ✅
+
+Phase 15 (MCL Root Replace Cross-Version) ──► mcl_replace_root_swf7_to_swf5/6 ─── NEW
 ```
 
-### Completion Status (2026-03-09)
+### Completion Status (2026-03-10)
 
-**Completed phases**: 8, 10, 13, 14 (all passing tests verified locally)
-**Remaining blocked phases**: 6 (core blocker), 9 (URL risk), 11 (depends on 6), 12 (mouse infra)
-
-Phase 6 (per-movie `_global` isolation) is the single remaining actionable blocker. It requires:
-- Extracting `ensureSecondaryGlobalInit()` into a per-movie factory function
-- Adding `movie_global_idx` to ASFunction for per-function global resolution
-- Updating 9+ sites that resolve globals/prototypes
-- HIGH regression risk (affects all 425+ filtered-passing tests)
+**Completed phases**: 6 (cancelled/unnecessary), 8, 10, 13, 14
+**Actionable phases**: 11 (child RegisterClass — unblocked), 15 (MCL cross-version root replace)
+**Blocked phases**: 9 (URL format risk), 12 (mouse infra)
 
 ---
 
 ## 12. Test Impact Matrix
 
-| Test | Plan Estimate | Actual (2026-03-09) | Phase Needed | Status |
-|------|---------------|---------------------|--------------|--------|
+| Test | Previous | Actual (2026-03-10) | Phase Needed | Status |
+|------|----------|---------------------|--------------|--------|
 | mcl_events_swf_version | 232/232 | 232/232 PASS | Phase 10 | DONE |
 | mcl_loadclip_replace_root | 0/1 | 1/1 PASS | Phase 14 | DONE |
 | resolve_different_root | 0/2 | 2/2 PASS | Phase 13 | DONE |
-| global_swf5_6_7_8_9 | 1031/1145 | 1057/1145 | Phase 6 | BLOCKED |
-| loadmovienum_cross_version_prototype | 6/9 | 6/9 | Phase 6 | BLOCKED |
-| movieclip_state_values | 3/114 | 41/114 | Phase 8 DONE; test 3 blocked on image loading | PARTIAL |
-| movieclip_library_state_values | 76/78 | 76/78 | Phase 9 | BLOCKED |
-| register_class | 44/66 | 48/67 | Phase 11 (depends on Phase 6) | BLOCKED |
-| register_class_swf6 | 4/37 | 4/38 | Phase 11 (depends on Phase 6) | BLOCKED |
+| global_swf5_6_7_8_9 | 1057/1145 | **1145/1145 PASS** | ~~Phase 6~~ | **DONE** (Phase 6 unnecessary) |
+| loadmovienum_cross_version_prototype | 6/9 | **9/9 PASS** | ~~Phase 6~~ | **DONE** (Phase 6 unnecessary) |
+| loadmovie_var_persistence | — | **PASS** | — | **DONE** (was undocumented) |
+| movieclip_state_values | 41/114 | 41/114 | Phase 8 DONE; remaining blocked on image loading | PARTIAL |
+| movieclip_library_state_values | 76/78 | 76/78 | Phase 9 | BLOCKED (ignored) |
+| register_class | 48/67 | 64/66 | Phase 11 (UNBLOCKED) | **ACTIONABLE** |
+| register_class_swf6 | 4/38 | ~30/38 | Phase 11 (UNBLOCKED) | **ACTIONABLE** |
+| loadmovie_registerclass | — | 24/30 | Phase 11 | **ACTIONABLE** |
+| mcl_replace_root_swf7_to_swf5 | — | ~37/57 | Phase 15 | **ACTIONABLE** |
+| mcl_replace_root_swf7_to_swf6 | — | ~37/57 | Phase 15 | **ACTIONABLE** |
 | sandbox_type_remote | 1/3 | 1/3 | Needs network loading | BLOCKED |
 | root_button_mode | 0/10 | 0/10 | Phase 12 (mouse infra) | BLOCKED |
 
-**Remaining actionable lines**: ~200 lines across blocked tests, all gated on Phase 6 (per-movie `_global`) or external infrastructure (mouse events, image loading, network).
+**Remaining actionable**: Phase 11 (child RegisterClass) is now unblocked — ~10 lines across register_class + register_class_swf6. Phase 15 (MCL cross-version root replace) has ~20 lines of closure/name clearing fixes.
 
-**Key blocker**: Phase 6 (per-movie `_global` isolation) blocks ~91 lines directly (global_swf5_6_7_8_9 + loadmovienum_cross_version_prototype) and ~53 lines indirectly via Phase 11 (register_class + register_class_swf6). HIGH regression risk — affects all 425+ filtered-passing tests.
+**Key insight**: Phase 6 was cancelled. The "biggest blocker" turned out to be unnecessary — Ruffle shares `_global` across movies, matching our existing model.
 
 ---
 
 ## 13. Risk Assessment
 
-### High Risk: Phase 6 (Per-Movie _global)
+### CANCELLED: Phase 6 (Per-Movie _global)
 
-- **Regression risk**: Changing global resolution affects every operation that touches `_global`, constructors, or prototypes. The 24 already-passing loadMovie tests and all 425 filtered-passing tests could regress.
-- **Mitigation**: Implement behind a flag initially. Run full test suite in CI after. Ensure `getActiveGlobal()` fallback works when no per-movie context is set.
-- **Complexity**: Moderate — the `ensureSecondaryGlobalInit()` function already creates a fresh global. The main work is making it per-movie instead of per-version-group, and threading the movie context through function calls.
+Phase 6 was cancelled after Ruffle source investigation (2026-03-10) confirmed Ruffle shares `_global` across all movies. No code changes needed. Zero risk.
 
-### Medium Risk: Phase 10 (Sequential MCL)
+### Low Risk: Phase 11 (Child RegisterClass)
 
-- **Regression risk**: Changing MCL dispatch to one-per-frame could break tests that rely on all loads completing in one frame.
-- **Mitigation**: Check all MCL test expectations. The 3 currently-passing MCL tests (mcl_as_broadcaster, mcl_getprogress, mcl_loadclip) use single loads, so sequential dispatch shouldn't affect them.
+- Only affects child SWF class constructor invocation timing
+- Unlikely to regress existing tests since it's additive behavior for child SWFs
+- register_class test has only 2 failing lines — small, targeted fix
 
-### Low Risk: Phases 8, 9, 13, 14
+### Medium Risk: Phase 15 (MCL Cross-Version Root Replace)
 
-- These are additive changes (new behavior for previously-unhandled cases). Risk of regression is minimal since they don't change existing code paths significantly.
+- Closure variable clearing, `_name` reset, and onLoadProgress event count
+- May require changes to MCL deferred dispatch that could affect other MCL tests
+- Mitigation: test all 20+ passing MCL/loadMovie tests after changes
 
 ---
 

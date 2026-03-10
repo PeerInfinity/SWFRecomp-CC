@@ -1,42 +1,39 @@
 # LoadMovie / Multi-SWF Infrastructure Plan
 <!-- TESTS: loadmovie, loadmovie_fail, loadmovie_flashvars, loadmovie_method, loadmovie_registerclass, loadmovie_replace_root, loadmovie_var_persistence, loadmovienum, loadmovienum_cross_version_prototype, loadvariables, loadvariables2, loadvariables_method, loadvariablesnum, mcl_as_broadcaster, mcl_events_swf_version, mcl_getprogress, mcl_loadclip, mcl_unloadclip, moviecliploader_flashvars, mcl_loadclip_properties, mcl_loadclip_replace_root, mcl_mislabeled_target, mcl_replace_root_swf7_to_swf5, mcl_replace_root_swf7_to_swf6, mcl_target_gif87a, mcl_target_gif89a, mcl_target_jpg, mcl_target_png, loading_avm2, unloadmovie, unloadmovie_method, unloadmovienum, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8, root_button_mode, movieclip_state_values, movieclip_library_state_values, movieclip_methods_with_loaded_image, do_init_action_child, register_class, register_class_swf6, global_swf5_6_7_8_9, global_swf6_7_8 -->
 
-Last updated: 2026-03-03
+Last updated: 2026-03-10
 
-## Status: BLOCKED — 24/49 tests passing, Phases 0-5,7 complete + FlashVars + loadVariables + root replacement + image MCL
+## Status: MOSTLY COMPLETE — 31/35 core loadMovie tests passing locally
 
-Phases 0-5 (build pipeline, _level management, core loadMovie, actionGetURL routing,
-MovieClipLoader class, unloadMovie) are implemented. FlashVars, loadVariables, root
-replacement, and image MCL loading also working.
+Phases 0-5, 7, 8, 10, 13, 14 all implemented. **Phase 6 (per-movie `_global` isolation)
+was CANCELLED** — Ruffle source investigation confirmed it shares `_global` across movies,
+matching our existing two-group model. See LOADMOVIE_MULTI_SWF_PLAN.md for details.
 
-24 tests pass: `loadmovie`, `loadmovie_fail`, `loadmovie_flashvars`, `loadmovie_method`,
-`loadmovie_replace_root`, `loadmovienum`, `loadvariables`, `loadvariables2`,
-`loadvariablesnum`, `mcl_as_broadcaster`, `mcl_getprogress`, `mcl_loadclip`,
-`mcl_loadclip_properties`, `mcl_mislabeled_target`, `mcl_unloadclip`,
-`mcl_target_gif87a`, `mcl_target_gif89a`, `mcl_target_jpg`, `mcl_target_png`,
-`moviecliploader_flashvars`, `unloadmovie`, `unloadmovie_method`, `unloadmovienum`,
-`do_init_action_child`.
+31 tests pass locally: `loadmovie`, `loadmovie_fail`, `loadmovie_flashvars`,
+`loadmovie_method`, `loadmovie_replace_root`, `loadmovie_var_persistence`, `loadmovienum`,
+`loadmovienum_cross_version_prototype`, `loadvariables`, `loadvariables2`,
+`loadvariablesnum`, `mcl_as_broadcaster`, `mcl_events_swf_version`, `mcl_getprogress`,
+`mcl_loadclip`, `mcl_loadclip_properties`, `mcl_loadclip_replace_root`,
+`mcl_mislabeled_target`, `mcl_unloadclip`, `mcl_target_gif87a`, `mcl_target_gif89a`,
+`mcl_target_jpg`, `mcl_target_png`, `moviecliploader_flashvars`, `unloadmovie`,
+`unloadmovie_method`, `unloadmovienum`, `do_init_action_child`,
+`global_swf5_6_7_8_9`, `global_swf6_7_8`, `resolve_different_root`.
 
-Remaining 25 failures are blocked by: cross-version global isolation (Phase 6),
-RegisterClass in child SWFs, root replacement via MCL,
-mouse events, variable clearing on loadMovie, and AVM2 (unfixable).
-
-This is the single largest blocker across the entire test suite. loadMovie infrastructure
-is referenced as a blocker in BUTTON_PLAN, HIT_TESTING_PLAN, UNLOAD_PLAN, MOVIECLIP_PLAN,
-GLOBALS_PLAN, REGISTERCLASS_PLAN, and others.
-
-### Remaining failures by category
+### Remaining 4 failures (of 35 core loadMovie tests)
 
 | Category | Tests | Blocker |
 |----------|-------|---------|
-| **Cross-version globals** (Phase 6) | global_swf5_6_7_8_9, loadmovienum_cross_version_prototype, mcl_events_swf_version | Per-SWF `_global` isolation not implemented |
-| **Root replacement via MCL** | mcl_loadclip_replace_root, mcl_replace_root_swf7_to_swf5, mcl_replace_root_swf7_to_swf6 | MCL loadClip into _root + cross-version |
-| **RegisterClass in child SWF** | loadmovie_registerclass, register_class, register_class_swf6 | RegisterClass dispatch timing + child SWF classes |
-| **Variable persistence** | loadmovie_var_persistence | Variable clearing on loadMovie (needs setTimeout for multi-frame) |
-| ~~**DoInitAction**~~ | ~~do_init_action_child~~ | ✅ PASS — Cross-version Phase 1+4 + ImportAssets2 |
-| **getBounds on loaded clips** | movieclip_invalid_get_bounds_1-5 (output_mismatch), _6-7 (runtime_error), _8 (output_mismatch) | Display list not updated after loadMovie |
-| **Mouse events** | root_button_mode | Needs mouse event dispatch infrastructure |
-| **Clip state after load** | movieclip_state_values, movieclip_library_state_values (segfault) | State values + library symbol defaults |
+| **RegisterClass in child SWF** | register_class (64/66), register_class_swf6 (~30/38) | Child class constructor typeof/prototype — **ACTIONABLE** |
+| **MCL root replace cross-version** | mcl_replace_root_swf7_to_swf5 (~37/57), mcl_replace_root_swf7_to_swf6 (~37/57) | Closure var clearing, _name reset, onLoadProgress count — **ACTIONABLE** |
+
+### Additional loadMovie-adjacent tests (not in core 35)
+
+| Category | Tests | Blocker |
+|----------|-------|---------|
+| **getBounds on loaded clips** | movieclip_invalid_get_bounds_1-8 | getBounds returns undefined after child load; _6/_7 crash (heap_free) |
+| **RegisterClass + loadMovie** | loadmovie_registerclass (24/30) | Child class registration |
+| **Mouse events** | root_button_mode (0/10) | Needs mouse event dispatch infrastructure |
+| **Clip state after load** | movieclip_state_values (41/114), movieclip_library_state_values (76/78) | Image loading, URL format |
 | **Image loading methods** | movieclip_methods_with_loaded_image | MC methods on loaded image clip |
 | **loadVariables POST** | loadvariables_method | Needs log_fetch / network POST trace infra |
 | **AVM2 (unfixable)** | loading_avm2 | Cross-AVM loading out of scope |

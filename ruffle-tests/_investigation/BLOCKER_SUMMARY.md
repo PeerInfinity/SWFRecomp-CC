@@ -1,41 +1,38 @@
 # Blocker Summary
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **502/619 (81.1%)** total (CI run on 21dadefb). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits). 18 plans in `blocked/`, 53 in `complete/`, 0 in `incomplete/`.
+Current pass rate: **507/618 (82.0%)** total (CI run on d9e5dbcf). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits).
 
 ---
 
-## Blocker 1: LoadMovie / Multi-SWF Infrastructure
+## Blocker 1: LoadMovie / Multi-SWF Infrastructure — MOSTLY RESOLVED
 
-**Impact**: 11 plans, 25+ tests, largest single blocker
+**Impact**: Reduced — 31/35 core loadMovie tests pass. Only 4 remaining failures.
 
-Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at runtime, which we handle by pre-compiling child SWFs and linking them via a `MovieEntry` registry with symbol prefix-renaming. Phases 0-5 and 7 are implemented (24/49 tests pass). The remaining gaps:
+Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at runtime, which we handle by pre-compiling child SWFs and linking them via a `MovieEntry` registry with symbol prefix-renaming. Phases 0-5, 7, 8, 10, 13, 14 all implemented. **Phase 6 (per-movie `_global`) CANCELLED** — Ruffle shares `_global` across movies (confirmed 2026-03-10).
 
-| Gap | What's Missing | Tests Blocked |
-|-----|----------------|---------------|
-| Per-movie `_global` | SWF7+ each need separate `_global` with own constructors. We use a two-group model (SWF≤6, SWF7+). ~~See Blocker 2.~~ Blocker 2 RESOLVED (global_swf5_6_7_8_9 PASS). | ~~global_swf5_6_7_8_9~~, mcl_events_swf_version, loadmovienum_cross_version_prototype |
-| Failed load state | `_framesloaded`/`getBytesTotal`/`getSWFVersion` should return `-1` on failed loads | movieclip_state_values |
-| Child URL/version | Loaded MC's `_url` and `getSWFVersion()` should reflect child SWF, not parent | movieclip_library_state_values (76/78), multiple MCL tests |
-| Sequential MCL dispatch | Multiple `loadClip` calls should fire events one-per-frame, not all-at-once | mcl_events_swf_version |
-| Child RegisterClass | Classes registered in child SWF's DoInitAction need child scope context | register_class (26/67), register_class_swf6 |
+| Gap | What's Missing | Tests Blocked | Status |
+|-----|----------------|---------------|--------|
+| ~~Per-movie `_global`~~ | ~~SWF7+ need separate `_global`~~ | ~~global_swf5_6_7_8_9, loadmovienum_cross_version_prototype~~ | **CANCELLED** (Ruffle shares `_global`) |
+| ~~Failed load state~~ | ~~`_framesloaded`/`getBytesTotal` return `-1`~~ | ~~movieclip_state_values~~ | **DONE** |
+| Child RegisterClass | Classes registered in child SWF's DoInitAction | register_class (64/66), register_class_swf6 | **ACTIONABLE** |
+| MCL cross-version root replace | Closure clearing, _name reset | mcl_replace_root_swf7_to_swf5/swf6 | **ACTIONABLE** |
+| Mouse events | root_button_mode needs mouse dispatch | root_button_mode | **BLOCKED** |
 
-**Plans blocked**: LOADMOVIE_PLAN (Phase 6), LOADMOVIE_REMAINING_PLAN (5 tests), CROSS_VERSION_ISOLATION_PLAN, ROOT_REPLACEMENT_PLAN (3 tests), SWF_VERSION_SEMANTICS_PLAN (2 tests), REGISTERCLASS_PLAN (2 tests), BUTTON_PLAN (root_button_mode), HIT_TESTING_PLAN (invalid_get_bounds 1-8), ~~GLOBALS_PLAN (global_swf5_6_7_8_9)~~, UNCOVERED_SMALL_TESTS (sandbox_type_remote, resolve_different_root)
+**Plans blocked (reduced)**: BUTTON_PLAN (root_button_mode, mouse events), HIT_TESTING_PLAN (invalid_get_bounds 1-8, display list after load)
 
 ---
 
-## ~~Blocker 2: Per-Movie `_global` Isolation~~ RESOLVED
+## ~~Blocker 2: Per-Movie `_global` Isolation~~ RESOLVED (NEVER NEEDED)
 
-`global_swf5_6_7_8_9` now **1145/1145 PASS**. All issues resolved:
+`global_swf5_6_7_8_9` now **1145/1145 PASS**. `loadmovienum_cross_version_prototype` **9/9 PASS**.
 
-- **SWF5 `_global` restriction**: `GetVariable("_global")` returns undefined for SWF≤5
-- **Object constructor display**: `objectCallValueOf`/`objectCallToString` fixed for function types
-- **Two-group `_global` model**: Confirmed correct (SWF≤6 legacy, SWF7+ modern share `_global`)
-- **Per-version-group Function.prototype**: `g_function_proto_legacy`/`g_function_proto_modern` give each version group its own `Function.prototype`. All constructors (primary and secondary) get `own_props.__proto__` set to the appropriate Function.prototype. Virtual `__proto__` fallback in `actionGetMember` for functions without own_props.
+**Critical finding (2026-03-10)**: Investigation of Ruffle source code (`~/CC/ruffle/core/src/avm1/runtime.rs`) confirmed that Ruffle does NOT implement per-movie `_global` isolation. The `Avm1` struct has exactly TWO global environments (`env_case_sensitive` for SWF7+, `env_case_insensitive` for SWF≤6), shared across ALL loaded movies. All constructors, prototypes, and singletons are shared. This matches our existing two-group model — per-movie isolation was never needed.
 
-Key learning: Function.prototype is per-version-group (not per-movie). Confirmed by Ruffle source (`core/src/avm1/runtime.rs` — two `GlobalEnv` instances).
+This was previously documented as the "single largest blocker" and "highest architectural complexity" change. The entire LOADMOVIE_MULTI_SWF_PLAN Phase 6 was cancelled.
 
 ---
 
