@@ -1,7 +1,7 @@
 # SWF Version-Specific Semantics Plan
 <!-- TESTS: swf6_case_insensitive, swf6_string_as_bool, swf4_actions_coercion_order, swf5_to_6_cross_call, swf6_to_5_cross_call -->
 
-Last updated: 2026-02-24
+Last updated: 2026-03-11
 
 ## Status: IN PROGRESS — 3/5 tests passing (Phases 1+2+3 complete)
 
@@ -12,8 +12,8 @@ Last updated: 2026-02-24
 | swf6_case_insensitive | 6 | 43/43 | 43 | **PASS** (Phase 1 complete) |
 | swf6_string_as_bool | 6 | 15/15 | 15 | **PASS** (Phase 2 complete) |
 | swf4_actions_coercion_order | 8 | 158/158 | 158 | **PASS** (Phase 3 complete) |
-| swf5_to_6_cross_call | 5 | ~10/29 | 29 | Phase 4 — blocked on per-function SWF version tracking |
-| swf6_to_5_cross_call | 6 | ~10/29 | 29 | Phase 4 — blocked on per-function SWF version tracking |
+| swf5_to_6_cross_call | 5 | ~9/30 | 30 | Phase 4 — partially unblocked (onEnterFrame version switching done, direct calls still need it) |
+| swf6_to_5_cross_call | 6 | ~19/30 | 30 | Phase 4 — improved from ~10 via onEnterFrame per-function version switching |
 
 ### Already passing
 - `divide_swf4` — PASS
@@ -86,14 +86,14 @@ Both tests have `child.swf` files that are loaded via loadMovie. The multi-SWF l
 
 Current test results (2026-03-10): swf5_to_6_cross_call ~10/29, swf6_to_5_cross_call ~10/29. The `this` binding and `_target` resolution are wrong — functions from the child execute with the parent's version semantics.
 
-### Blocker
+### Blocker (Partially Resolved)
 
 This requires:
 1. ~~**loadMovie child SWF support**~~ — **DONE** (multi-SWF infrastructure fully working)
-2. **Per-function SWF version tracking** — each ASFunction needs to remember which SWF version it was defined in
-3. **Version switching on call** — when calling a function from a different version, temporarily switch `g_swf_version`
+2. **Per-function SWF version tracking** — **PARTIALLY DONE**. `ASFunction.swf_version` field exists, set at definition time. `switchToFunctionVersion()`/`restoreFunctionVersion()` helpers save/restore `g_swf_version`, `g_active_global`, and `g_active_movie_idx` around calls.
+3. **Version switching on call** — **DONE for onEnterFrame dispatch** (b5df5477). Still needed for `actionCallFunction`/`actionCallMethod` direct call paths.
 
-Per-function version tracking is not implemented. The `ASFunction` struct needs a `swf_version` field set at definition time, and `actionCallFunction`/`actionCallMethod` need to save/restore `g_swf_version` around the call.
+The `swf6_to_5_cross_call` test improved from ~10 to ~19/30 after onEnterFrame version switching was added. The remaining failures need version switching in the direct function/method call paths.
 
 ### Estimated Impact
 - swf5_to_6_cross_call: requires loadMovie + version tracking

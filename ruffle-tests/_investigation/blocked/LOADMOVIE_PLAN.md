@@ -30,7 +30,7 @@ matching our existing two-group model. See LOADMOVIE_MULTI_SWF_PLAN.md for detai
 
 | Category | Tests | Blocker |
 |----------|-------|---------|
-| **getBounds on loaded clips** | movieclip_invalid_get_bounds_1-8 | getBounds returns undefined after child load; _6/_7 crash (heap_free) |
+| ~~**getBounds on loaded clips**~~ | movieclip_invalid_get_bounds_1-5, 8 ✅ PASS; _6, _7 (9/10 each) | **MOSTLY RESOLVED** — broadcastMessage MC `this` type fix + `g_use_new_invalid_bounds` flag + onEnterFrame version switching. Remaining 1 line in _6/_7: actual shape bounds needed in NO_GRAPHICS |
 | **RegisterClass + loadMovie** | loadmovie_registerclass (27/31) | Cross-movie export table isolation |
 | **Self-loading SWF** | root_button_mode ✅ (10/10) | Fixed: self_load MovieEntry + quit_swf restore + root onMouse* dispatch + child MC bounds propagation |
 | **Clip state after load** | movieclip_state_values (41/114), movieclip_library_state_values (76/78) | Image loading, URL format |
@@ -111,14 +111,14 @@ them into the same binary, using a dispatch mechanism to "load" them at runtime.
 | unloadmovie | ✅ PASS | UNLOAD | loadMovie + unloadMovie |
 | unloadmovie_method | ✅ PASS | UNLOAD | loadMovie + unloadMovie() |
 | unloadmovienum | ✅ PASS | UNLOAD | loadMovie + unloadMovieNum |
-| movieclip_invalid_get_bounds_1 | ❌ output_mismatch | HIT_TESTING | getBounds on loaded clip |
-| movieclip_invalid_get_bounds_2 | ❌ output_mismatch | HIT_TESTING | getBounds on loaded clip |
-| movieclip_invalid_get_bounds_3 | ❌ output_mismatch | HIT_TESTING | getBounds on loaded clip |
-| movieclip_invalid_get_bounds_4 | ❌ output_mismatch | HIT_TESTING | getBounds on loaded clip |
-| movieclip_invalid_get_bounds_5 | ❌ output_mismatch | HIT_TESTING | getBounds on loaded clip |
-| movieclip_invalid_get_bounds_6 | ❌ runtime_error | HIT_TESTING | getBounds on loaded clip |
-| movieclip_invalid_get_bounds_7 | ❌ runtime_error | HIT_TESTING | getBounds on loaded clip |
-| movieclip_invalid_get_bounds_8 | ❌ output_mismatch | HIT_TESTING | getBounds on loaded clip |
+| movieclip_invalid_get_bounds_1 | ✅ PASS (75/75) | HIT_TESTING | getBounds sentinel flag + MC this type |
+| movieclip_invalid_get_bounds_2 | ✅ PASS (75/75) | HIT_TESTING | Root SWF version check |
+| movieclip_invalid_get_bounds_3 | ✅ PASS (13/13) | HIT_TESTING | onEnterFrame version switching |
+| movieclip_invalid_get_bounds_4 | ✅ PASS (13/13) | HIT_TESTING | Same |
+| movieclip_invalid_get_bounds_5 | ✅ PASS (11/11) | HIT_TESTING | Same |
+| movieclip_invalid_get_bounds_6 | ❌ output_mismatch (9/10) | HIT_TESTING | 1 line: actual shape bounds in NO_GRAPHICS |
+| movieclip_invalid_get_bounds_7 | ❌ output_mismatch (9/10) | HIT_TESTING | 1 line: actual shape bounds in NO_GRAPHICS |
+| movieclip_invalid_get_bounds_8 | ✅ PASS (11/11) | HIT_TESTING | getBounds sentinel flag |
 | root_button_mode | ❌ output_mismatch | BUTTON | Mouse events implemented; still needs loadMovie |
 | movieclip_state_values | ❌ output_mismatch | MOVIECLIP | Clip state after load |
 | movieclip_library_state_values | ❌ output_mismatch (77/78) | MOVIECLIP | Library state after load (segfault fixed) |
@@ -155,7 +155,7 @@ them into the same binary, using a dispatch mechanism to "load" them at runtime.
 - **Cross-SWF global scope isolation**: SWF7+ need separate `_global` per loaded SWF. Blocks 4+ tests.
 - **Proper clip clearing on loadMovie**: Current loadMovie just runs init+frame0 without clearing target clip state. Blocks loadmovie_var_persistence.
 - ~~**DoInitAction for child SWFs**~~: ✅ DONE — do_init_action_child now 12/12 PASS.
-- **getBounds on loaded clips**: Returns wrong values (loaded clip doesn't update display list properly). Blocks 8 tests.
+- ~~**getBounds on loaded clips**~~: ✅ MOSTLY RESOLVED — 6/8 PASS (sentinel flag + MC this type + onEnterFrame version switching). Tests 6/7 each 9/10 (1 line needs real shape bounds in NO_GRAPHICS).
 - **MCL root replacement**: MCL loadClip into _root with cross-version transitions. Blocks 3 tests.
 
 ---

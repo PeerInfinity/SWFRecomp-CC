@@ -1,7 +1,7 @@
 # Hit Testing Implementation Plan
 <!-- TESTS: hittest_lockroot, hittest_morph, hittest_morph_input, hittest_winding_rule, text_blocks_clicks, movieclip_hittest, movieclip_hittest_shapeflag, local_to_global, movieclip_getbounds, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8 -->
 
-Last updated: 2026-02-25
+Last updated: 2026-03-11
 
 ## Status: BLOCKED (remaining tests need loadMovie or morph interpolation; mouse events now implemented)
 
@@ -18,7 +18,14 @@ Last updated: 2026-02-25
 | movieclip_getbounds | 191 | 186/191 (5 diff) | Rounding precision (-99.9 vs -100) |
 | hittest_morph | 70 | **PASS** (70/70) ✅ | Now passing in CI |
 | movieclip_hittest_shapeflag | 338 | 266/338 (72 diff) | Was compile_fail, now output_mismatch — edge cases in triangulation approach |
-| movieclip_invalid_get_bounds_1-8 | varies | BLOCKED | Needs loadMovie infrastructure |
+| movieclip_invalid_get_bounds_1 | 75 | **PASS** (75/75) ✅ | Fixed: broadcastMessage MC `this` type + `g_use_new_invalid_bounds` flag |
+| movieclip_invalid_get_bounds_2 | 75 | **PASS** (75/75) ✅ | Fixed: root SWF version >= 8 check for sentinel flag |
+| movieclip_invalid_get_bounds_3 | 13 | **PASS** (13/13) ✅ | Fixed: onEnterFrame per-function version switching |
+| movieclip_invalid_get_bounds_4 | 13 | **PASS** (13/13) ✅ | Same fixes as above |
+| movieclip_invalid_get_bounds_5 | 11 | **PASS** (11/11) ✅ | Same fixes as above |
+| movieclip_invalid_get_bounds_6 | 10 | 9/10 (1 diff) | Remaining: line 2 expects actual bounds (550.45) from child shape data — needs real bounds in NO_GRAPHICS |
+| movieclip_invalid_get_bounds_7 | 10 | 9/10 (1 diff) | Same issue as _6 |
+| movieclip_invalid_get_bounds_8 | 11 | **PASS** (11/11) ✅ | Fixed with same sentinel flag changes |
 | hittest_morph_input | 1 | Needs re-evaluation | Mouse event dispatch now implemented |
 | text_blocks_clicks | 4 | Needs re-evaluation | Mouse event dispatch now implemented |
 
@@ -73,8 +80,11 @@ Remaining failures come from:
 
 Fundamental fix would require vector-path-based hit testing (line segment intersection counting) instead of triangle-based approach.
 
-### movieclip_invalid_get_bounds_1-8 — BLOCKED on loadMovie
-These tests use `loadMovie`/`loadClip` to load external SWFs, which requires multi-SWF infrastructure not yet implemented.
+### movieclip_invalid_get_bounds_6, _7 (1 diff line each) — Shape Bounds in NO_GRAPHICS
+Line 2 expects `550.45` (actual shape bounds from loaded child) but we return the sentinel value (6710886.4 / 6710886.35). In NO_GRAPHICS mode, we don't have the child SWF's shape data available after load, so getBounds falls back to the invalid sentinel. Tests 1-5, 8 all PASS after implementing:
+1. `g_use_new_invalid_bounds` one-way flag (matches Ruffle's `use_new_invalid_bounds_value`)
+2. broadcastMessage MC listener `this` type fix (MOVIECLIP type via `g_override_this`)
+3. onEnterFrame per-function SWF version switching (`switchToFunctionVersion`/`restoreFunctionVersion`)
 
 ### hittest_morph_input, text_blocks_clicks — Mouse Events Now Implemented
 Both require mouse event dispatch infrastructure (onMouseMove, onMouseDown, onPress) which is now fully implemented via input event injection. These tests need re-evaluation — they were previously in `ignored_tests.txt` and have been un-ignored.

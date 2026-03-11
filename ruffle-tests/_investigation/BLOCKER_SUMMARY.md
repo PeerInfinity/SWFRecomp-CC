@@ -1,6 +1,6 @@
 # Blocker Summary
 
-Last updated: 2026-03-10
+Last updated: 2026-03-11
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
@@ -21,9 +21,10 @@ Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at 
 | ~~Child RegisterClass~~ | ~~Classes registered in child SWF's DoInitAction~~ | ~~register_class, register_class_swf6~~ | **DONE** (export-versioned lookup) |
 | ~~MCL cross-version root replace~~ | ~~Closure clearing, _name reset~~ | mcl_replace_root_swf7_to_swf5/swf6 (56/57 each) | **DONE** (1 line accepted diff per test) |
 | ~~Mouse events~~ | ~~Mouse dispatch now implemented~~ | ~~root_button_mode~~ | **RESOLVED** — root_button_mode **10/10 PASS** |
+| ~~getBounds on loaded clips~~ | ~~getBounds returns undefined after child load~~ | ~~movieclip_invalid_get_bounds_1-8~~ | **MOSTLY RESOLVED** — 6/8 PASS (b5df5477: broadcastMessage MC `this` type, `g_use_new_invalid_bounds` flag, onEnterFrame version switching). Tests 6, 7 each 9/10 (remaining line needs actual shape bounds in NO_GRAPHICS) |
 | Cross-movie export isolation | Per-movie char_id and export table scoping | loadmovie_registerclass (27/31) | **ACTIONABLE** (see CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md) |
 
-**Plans blocked (reduced)**: HIT_TESTING_PLAN (invalid_get_bounds 1-8, display list after load). Multi-SWF tests now visible in filtered results (removed from ignored_tests.txt).
+**Plans blocked (reduced)**: HIT_TESTING_PLAN (invalid_get_bounds_6/7 each 9/10 — need shape bounds data in NO_GRAPHICS mode). Multi-SWF tests now visible in filtered results (removed from ignored_tests.txt).
 
 ---
 
@@ -201,7 +202,7 @@ Cross-version isolation ──► ROOT_REPLACEMENT
        │                    SWF_VERSION_SEMANTICS
        ▼                    ~~GLOBALS (global_swf5_6_7_8_9)~~ RESOLVED
 LOADMOVIE_REMAINING ──────► REGISTERCLASS (child SWFs)
-                            HIT_TESTING (invalid_get_bounds)
+                            ~~HIT_TESTING (invalid_get_bounds)~~ MOSTLY RESOLVED (6/8 PASS)
                             BUTTON (root_button_mode)
 
 MTASC class infra ─────────► ROOT_REPLACEMENT (mcl_loadclip_replace_root)
@@ -226,8 +227,9 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 1. ~~**_lockroot _root resolution**~~ — **RESOLVED**. movieclip_lockroot **29/29 PASS**. See LOCKROOT_PLAN (complete/).
 2. ~~**Primitive coercion addProperty**~~ — **RESOLVED**. coerce_to_primitive_resolve **17/17 PASS**. See PRIMITIVE_COERCION_ADDPROPERTY_PLAN (complete/).
 3. ~~**Default instance naming**~~ — **RESOLVED**. default_names **52/52 PASS**. See DEFAULT_NAMES_PLAN (complete/).
-4. ~~**Script halting on clip removal**~~ — **RESOLVED**. removed_clip_halts_script **15/15 PASS**, target_clip_removed **5/5 PASS**, remove_movie_clip **29/29 PASS**, removed_target_clip_scope **34/35**. All script halting regressions recovered except register_and_init_order (36/231, constructor ordering issue).
-5. **register_and_init_order regression** — 146→36/231 from script halting changes. Deep constructor ordering issue, partially overlaps with Blocker 11.
+4. ~~**Script halting on clip removal**~~ — **RESOLVED**. removed_clip_halts_script **15/15 PASS**, target_clip_removed **5/5 PASS**, remove_movie_clip **29/29 PASS**, removed_target_clip_scope **35/35 PASS**. All script halting regressions recovered except register_and_init_order (~16/233, constructor ordering issue).
+5. **register_and_init_order regression** — 146→~16/233 from script halting changes. Deep constructor ordering issue, partially overlaps with Blocker 11.
+6. ~~**getBounds on loaded clips**~~ — **MOSTLY RESOLVED**. 6/8 tests PASS (movieclip_invalid_get_bounds_1-5, 8). Tests 6, 7 each 9/10 (remaining 1 line needs real shape bounds in NO_GRAPHICS mode).
 6. ~~**Font metrics accuracy**~~ — **MOSTLY RESOLVED**. edittext_scroll **54/54 PASS**, edittext_newlines **30/30 PASS**, edittext_bullet 26/30 (4 lines: bounding box model mismatch)
 7. **Failed load state values** — Return `-1` for specific MC properties on failed load
 8. **Global stubs** — Add 20 missing globals (tedious but straightforward)
